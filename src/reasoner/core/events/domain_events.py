@@ -93,6 +93,20 @@ class DomainEvent:
     version: int
     metadata: dict[str, Any] = field(default_factory=dict)
     
+    @property
+    def is_critical(self) -> bool:
+        """Determines if the event is critical for business logic or state consistency."""
+        return self.event_type in (
+            PipelineEventType.PIPELINE_COMPLETED,
+            PipelineEventType.PIPELINE_FAILED,
+            SaaSEventType.PAYMENT_SUCCEEDED,
+            SaaSEventType.PAYMENT_FAILED,
+            SaaSEventType.SUBSCRIPTION_CREATED,
+            SaaSEventType.SUBSCRIPTION_UPDATED,
+            SaaSEventType.SUBSCRIPTION_CANCELLED,
+            PipelineEventType.ERROR_OCCURRED, # Error events are critical for debugging
+        )
+
     def to_dict(self) -> dict[str, Any]:
         """Serialize event to dictionary for storage."""
         from dataclasses import asdict

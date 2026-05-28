@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Callable, Awaitable
 from collections import defaultdict
 import os # New import for environment variable checking
+import time # New import
 
 from reasoner.core.events.domain_events import DomainEvent, EventType, _AllEventType, PipelineEventType
 from reasoner.infrastructure.observability.langfuse_subscriber import get_langfuse_subscriber # New import
@@ -145,9 +146,19 @@ class EventBus:
         if self._running and self._task_queue is not None:
             for handler in handlers:
                 try:
-                    self._task_queue.put_nowait((event, handler))
+                    if event.is_critical:
+                        await self._task_queue.put((event, handler)) # Apply backpressure for critical events
+                    else:
+                        self._task_queue.put_nowait((event, handler)) # Drop non-critical if queue is full
                 except asyncio.QueueFull:
-                    logger.error("Event bus queue full; dropping event %s", event.event_id)
+                    logger.error(
+                        "Event bus queue full; %s event %s dropped.",
+                        "Critical" if event.is_critical else "Non-critical",
+                        event.event_id,
+                    )
+                    # For critical events that are dropped due to full queue, also log to dead-letter
+                    if event.is_critical:
+                        asyncio.create_task(self._log_to_dead_letter(event, "Queue full"))
             return
 
         # Execute all handlers concurrently with bounded concurrency
@@ -187,6 +198,7 @@ class EventBus:
                     )
 
         # Notify error handlers
+        # Notify error handlers
         for error_handler in self._error_handlers:
             try:
                 await error_handler(event, last_exc)
@@ -194,21 +206,26 @@ class EventBus:
                 logger.error("Error handler failed: %s", inner_exc)
 
         # Dead-letter log
+        await self._log_to_dead_letter(event, str(last_exc))
+
+        async def _log_to_dead_letter(self, event: DomainEvent, error_message: str, handler_name: str = "") -> None:
+        """Log event to dead-letter file."""
         try:
             entry = {
                 "event_type": event.event_type.value,
                 "aggregate_id": event.aggregate_id,
                 "event_id": event.event_id,
-                "error": str(last_exc),
-                "handler": getattr(handler, "__name__", repr(handler)),
+                "error": error_message,
+                "handler": handler_name,
+                "timestamp": time.time(),
+                "is_critical": event.is_critical,
             }
-            with open(_DEAD_LETTER_PATH, "a", encoding="utf-8") as f:
-                f.write(json.dumps(entry, default=str) + "
-")
+            # Use asyncio.to_thread for blocking file I/O
+            await asyncio.to_thread(lambda: _DEAD_LETTER_PATH.open("a", encoding="utf-8").write(json.dumps(entry, default=str) + "\n"))
         except Exception as dl_exc:
             logger.error("Failed to write dead-letter entry: %s", dl_exc)
-    
-    def clear(self) -> None:
+
+        def clear(self) -> None:
         """Clear all subscriptions."""
         self._handlers.clear()
         self._global_handlers.clear()
