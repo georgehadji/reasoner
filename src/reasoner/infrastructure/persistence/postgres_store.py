@@ -58,7 +58,6 @@ class PostgreSQLEventStore:
         
         self._pool = None
         self._read_pool = None
-        self._lock = asyncio.Lock()
         self._encryption = get_encryption_service()
     
     async def initialize(self) -> None:
