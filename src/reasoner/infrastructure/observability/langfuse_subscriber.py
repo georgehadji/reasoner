@@ -185,3 +185,13 @@ async def get_langfuse_subscriber() -> LangfuseSubscriber:
         if _langfuse_subscriber is None:
             _langfuse_subscriber = LangfuseSubscriber()
     return _langfuse_subscriber
+
+
+def reset_langfuse() -> None:
+    global _langfuse_client, _is_langfuse_enabled, _langfuse_subscriber
+    if _langfuse_client:
+        _langfuse_client.flush()
+        _langfuse_client = None
+    _is_langfuse_enabled = False
+    _langfuse_subscriber = None
+    logger.debug("Langfuse global state reset.")

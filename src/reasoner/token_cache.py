@@ -378,3 +378,11 @@ def get_token_cache(
             cache_dir=Path(cache_dir) if cache_dir else None,
         )
     return _cache
+
+
+async def reset_token_cache() -> None:
+    """Resets the global token cache for testing purposes."""
+    global _cache
+    if _cache:
+        await _cache.clear()
+    _cache = None
