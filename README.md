@@ -125,7 +125,11 @@ SEARXNG_URL="http://localhost:8888"
 # Admin API key for cache clearing and key management
 ADMIN_API_KEY="your-admin-key"
 
-# Rate limiting
+# Rate limiting (REQUIRED 'redis' mode in production)
+# In production environments, RATE_LIMITER_MODE must be set to 'redis'.
+# The application will fail to start if 'memory' mode is detected in production
+# to prevent unsafe unthrottled access across multiple workers.
+RATE_LIMITER_MODE="memory" # or "redis"
 RATE_LIMIT_PER_MINUTE=60
 RATE_LIMIT_PER_HOUR=1000
 ```
@@ -214,40 +218,40 @@ Every method has a **Budget** (~$0.02/run) and **Premium** (~$0.15–$0.30/run) 
 
 | Preset | Tier | Primary | Phase 2 Diversity |
 |--------|------|---------|-------------------|
-| `multi-perspective-budget` | Budget | `deepseek-v3.1-nex-n1` | DeepSeek + Qwen + GLM |
-| `multi-perspective-premium` | Premium | `deepseek-v4-pro` | DeepSeek + Claude + Kimi + Mistral |
-| `debate-budget` | Budget | `deepseek-v3.1-nex-n1` | DeepSeek + Qwen + GLM |
-| `debate-premium` | Premium | `deepseek-v4-pro` | DeepSeek + Claude + Kimi |
-| `scientific-budget` | Budget | `deepseek-v3.1-nex-n1` | DeepSeek + Qwen + GLM |
-| `scientific-premium` | Premium | `deepseek-v4-pro` | DeepSeek + Claude + Kimi |
-| `research-budget` | Budget | `deepseek-v3.1-nex-n1` | DeepSeek + Qwen + GLM |
-| `research-premium` | Premium | `deepseek-v4-pro` | DeepSeek + Claude + Kimi |
-| `jury-budget` | Budget | `deepseek-v3.1-nex-n1` | DeepSeek + Qwen + GLM |
-| `jury-premium` | Premium | `deepseek-v4-pro` | DeepSeek + Claude + Kimi + Gemini |
-| `cove-budget` | Budget | `deepseek-v3.1-nex-n1` | DeepSeek draft → Qwen verify → GLM answer → Gemma revise |
-| `cove-premium` | Premium | `deepseek-v4-pro` | DeepSeek + Claude + Kimi |
-| `sot-budget` | Budget | `deepseek-v3.1-nex-n1` | DeepSeek skeleton → Qwen parallel solve → GLM assemble |
-| `sot-premium` | Premium | `deepseek-v4-pro` | DeepSeek + Claude + Kimi |
-| `tot-budget` | Budget | `deepseek-v3.1-nex-n1` | DeepSeek decompose → Qwen generate → GLM evaluate → Gemma backtrack |
-| `tot-premium` | Premium | `deepseek-v4-pro` | DeepSeek + Claude + Kimi |
-| `pot-budget` | Budget | `deepseek-v3.1-nex-n1` | DeepSeek code generation + Qwen execution + GLM interpretation |
-| `pot-premium` | Premium | `deepseek-v4-pro` | DeepSeek + Claude + Kimi |
-| `self-discover-budget` | Budget | `deepseek-v3.1-nex-n1` | DeepSeek selection → Qwen adaptation → GLM implementation |
-| `self-discover-premium` | Premium | `deepseek-v4-pro` | DeepSeek + Claude + Kimi |
-| `pre-mortem-budget` | Budget | `deepseek-v3.1-nex-n1` | DeepSeek + Qwen + GLM |
-| `pre-mortem-premium` | Premium | `deepseek-v4-pro` | DeepSeek + Claude + Kimi |
-| `bayesian-budget` | Budget | `deepseek-v3.1-nex-n1` | DeepSeek + Qwen + GLM |
-| `bayesian-premium` | Premium | `deepseek-v4-pro` | DeepSeek + Claude + Kimi |
-| `dialectical-budget` | Budget | `deepseek-v3.1-nex-n1` | DeepSeek + Qwen + GLM |
-| `dialectical-premium` | Premium | `deepseek-v4-pro` | DeepSeek + Claude + Kimi |
-| `analogical-budget` | Budget | `deepseek-v3.1-nex-n1` | DeepSeek + Qwen + GLM |
-| `analogical-premium` | Premium | `deepseek-v4-pro` | DeepSeek + Claude + Kimi |
-| `delphi-budget` | Budget | `deepseek-v3.1-nex-n1` | DeepSeek + Qwen + GLM + Gemma |
-| `delphi-premium` | Premium | `deepseek-v4-pro` | DeepSeek + Claude + Kimi + Gemini |
-| `writing-budget` | Budget | `deepseek-v3.1-nex-n1` | DeepSeek + Mistral + Kimi + GLM |
-| `writing-premium` | Premium | `deepseek-v4-pro` | DeepSeek + Claude + GLM + Grok |
-| `cross-language-budget` | Budget | `deepseek-v3.1-nex-n1` | DeepSeek + Mistral + Gemma |
-| `cross-language-premium` | Premium | `deepseek-v4-pro` | DeepSeek + Qwen + Claude + Gemini |
+| `multi-perspective-budget` | Budget | `gemini-flash-lite` | Google + Mistral + Zhipu |
+| `multi-perspective-premium` | Premium | `gemini-pro` | Moonshot + DeepSeek + Anthropic + Mistral |
+| `debate-budget` | Budget | `gemini-flash-lite` | DeepSeek + Qwen + GLM |
+| `debate-premium` | Premium | `gemini-pro` | Gemini + Moonshot + Perplexity |
+| `scientific-budget` | Budget | `gemini-flash-lite` | DeepSeek + Qwen + GLM |
+| `scientific-premium` | Premium | `gemini-pro` | Gemini + Claude + Moonshot |
+| `research-budget` | Budget | `gemini-flash-lite` | DeepSeek + Qwen + Gemma |
+| `research-premium` | Premium | `gemini-pro` | Gemini + Claude + Moonshot + DeepSeek |
+| `jury-budget` | Budget | `gemini-flash-lite` | DeepSeek + Qwen + GLM + Gemma + Mistral |
+| `jury-premium` | Premium | `gemini-pro` | Claude + Moonshot + DeepSeek + Alibaba |
+| `cove-budget` | Budget | `gemini-flash-lite` | DeepSeek draft → Qwen verify → GLM answer → Gemma revise |
+| `cove-premium` | Premium | `gemini-pro` | Gemini + Claude + Moonshot |
+| `sot-budget` | Budget | `gemini-flash-lite` | DeepSeek skeleton → Qwen parallel solve → GLM assemble |
+| `sot-premium` | Premium | `gemini-pro` | Gemini + Claude + Moonshot |
+| `tot-budget` | Budget | `gemini-flash-lite` | DeepSeek decompose → Qwen generate → GLM evaluate → Gemma backtrack |
+| `tot-premium` | Premium | `gemini-pro` | Gemini + Claude + Moonshot |
+| `pot-budget` | Budget | `gemini-flash-lite` | DeepSeek code generation + Qwen execution + GLM interpretation |
+| `pot-premium` | Premium | `gemini-pro` | Gemini + Claude + Moonshot |
+| `self-discover-budget` | Budget | `gemini-flash-lite` | DeepSeek selection → Qwen adaptation → GLM implementation |
+| `self-discover-premium` | Premium | `gemini-pro` | Gemini + Claude + Moonshot |
+| `pre-mortem-budget` | Budget | `gemini-flash-lite` | DeepSeek + Qwen + GLM |
+| `pre-mortem-premium` | Premium | `gemini-pro` | Gemini + Claude + Moonshot |
+| `bayesian-budget` | Budget | `gemini-flash-lite` | DeepSeek + Qwen + GLM |
+| `bayesian-premium` | Premium | `gemini-pro` | Gemini + Claude + Moonshot |
+| `dialectical-budget` | Budget | `gemini-flash-lite` | DeepSeek + Qwen + GLM |
+| `dialectical-premium` | Premium | `gemini-pro` | Gemini + Claude + Moonshot |
+| `analogical-budget` | Budget | `gemini-flash-lite` | DeepSeek + Qwen + GLM |
+| `analogical-premium` | Premium | `gemini-pro` | Gemini + Claude + Moonshot |
+| `delphi-budget` | Budget | `gemini-flash-lite` | DeepSeek + Qwen + GLM + Gemma |
+| `delphi-premium` | Premium | `gemini-pro` | Gemini + Claude + Moonshot + DeepSeek |
+| `writing-budget` | Budget | `gemini-flash-lite` | DeepSeek + Mistral + Moonshot + GLM |
+| `writing-premium` | Premium | `gemini-pro` | Gemini + Claude + GLM + xAI |
+| `cross-language-budget` | Budget | `gemini-flash-lite` | DeepSeek + Mistral + Gemma |
+| `cross-language-premium` | Premium | `gemini-pro` | DeepSeek + Qwen + Claude + Gemini |
 
 ---
 
@@ -275,6 +279,24 @@ Reasoner v2.1 implements a comprehensive **Zero-Trust** security architecture to
 - **Internal PKI:** An automated certificate generation system provisions unique internal certificates for all services (`backend`, `frontend`, `database`, `redis`) on every startup.
 - **At-Rest Protection:** Sensitive data, including API key metadata, user information, and full pipeline execution states, is encrypted at the application layer using **AES-256-GCM** before storage.
 - **Zero-Trust Networking:** All internal components (PostgreSQL, Redis, FastAPI, Next.js) strictly require TLS, making the internal network opaque even to local attackers.
+
+### Legacy Data Encryption Migration
+
+To migrate existing encrypted data to the latest envelope encryption format with blind indexing (introduced in Reasoner v2.2), use the standalone migration script. This is an **idempotent** operation and can be run safely multiple times.
+
+```bash
+python scripts/migrate_encryption_v2.py \
+  --connection-string "postgresql://user:pass@host:port/dbname" \
+  --encryption-key "your_base64_fernet_key" \
+  --blind-index-key "your_hmac_sha256_key" \
+  --batch-size 1000 \
+  --delay-seconds 0.05
+```
+
+**Important Notes:**
+-   **Production:** Run this script during off-peak hours with appropriate batch sizes and delays to minimize database load.
+-   **Keys:** Ensure `ENCRYPTION_KEY` and `BLIND_INDEX_KEY` match those used by your running Reasoner application.
+-   **Backward Compatibility:** The Reasoner application is designed to gracefully handle both old and new encryption formats during reads, allowing for a zero-downtime migration.
 
 For more technical details, see [ENCRYPTION.md](./ENCRYPTION.md).
 
