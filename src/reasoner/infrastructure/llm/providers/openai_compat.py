@@ -141,13 +141,14 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         # GLM/ZhipuAI
         'glm-5', 'glm-4-plus', 'glm-4-air', 'glm-4',
         # MiniMax
-        'minimax-01', 'minimax-text', 'minimax-m2.5', 'minimax-m2.5-free', 'minimax-m2.7',
+        'minimax-01', 'minimax-text', 'minimax-m2.5', 'minimax-m2.5-free', 'minimax-m2.7', 'minimax-m1',
         # Mistral
-        'mistral-large-latest', 'mistral-medium', 'mistral-small', 'codestral',
+        'mistral-large-latest', 'mistral-medium', 'mistral-small', 'codestral', 'codestral-2508',
+        'devstral', 'devstral-medium', 'devstral-small',
         # Google Gemini
         'gemini-2.0-pro-exp', 'gemini-2.0-flash-exp', MODEL_GEMINI_PRO, MODEL_GEMINI_FLASH,
         # xAI Grok
-        'grok-4', 'grok-3', 'grok-3-mini', 'grok-beta',
+        'grok-4', 'grok-4.3', 'grok-3', 'grok-3-mini', 'grok-beta',
         # Perplexity (search-grounded, temperature has limited effect)
         'sonar-pro', 'sonar', 'sonar-deep-research',
         # Xiaomi
@@ -156,6 +157,14 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         'ling-2.6',
         # NVIDIA
         'nemotron',
+        # DeepSeek
+        'deepseek-v3', 'deepseek-v3.1', 'deepseek-r1', 'deepseek-r1t2', 'deepseek-v4', 'deepseek-v4-flash',
+        # Qwen
+        'qwen3', 'qwen3-coder', 'qwen3-coder-next', 'qwen3-coder-flash',
+        # Tencent
+        'hy3',
+        # OpenRouter
+        'owl-alpha', 'pareto-code',
     })
 
     async def complete(

@@ -20,7 +20,8 @@ from reasoner.core.constants import (
 )
 from reasoner.quality import PhaseMonitor, reset_phase_state
 from reasoner.hypergate import HyperGateAgent
-from reasoner.llm import ProviderRouter, _REGISTRY
+from reasoner.infrastructure.llm.router import ProviderRouter
+from reasoner.infrastructure.llm.registry import _REGISTRY
 from reasoner.models import PipelineState, TaskType
 from reasoner.pipeline import ReasonerPipeline
 from reasoner.application.services.preset_service import PresetService
@@ -133,8 +134,8 @@ async def _persist_event(event) -> None:
     try:
         store = get_event_store()
         await store.save_events([event])
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("EventStore persistence failed for event %s: %s", event.event_type.value, str(e), exc_info=True)
 
 
 # Creative-writing model tiers with 2 fallbacks each.
@@ -378,7 +379,15 @@ async def run_stream(
     req: RunRequest,
     initial_state: PipelineState | None = None,
     user_id: str | None = None,
+    preset_service: PresetService | None = None,
+    pipeline_service: PipelineService | None = None,
 ) -> AsyncGenerator[str, None]:
+    if preset_service is None:
+        preset_service = _ensure_fresh_preset_service()
+    if pipeline_service is None:
+        from reasoner.application.services.pipeline_service import PipelineService
+        pipeline_service = PipelineService()
+
     run_id = req.client_run_id or str(uuid.uuid4())
     event_version = 1
     state: PipelineState | None = None
@@ -397,6 +406,17 @@ async def run_stream(
                     "memory_count": len(recalled_chunks),
                     "memory_ids": [c.get("source", "") for c in recalled_chunks if c.get("source")],
                 })
+                # Emit domain event for neuro memory usage
+                recall_evt = make_event(
+                    EventType.MEMORY_RECALLED,
+                    aggregate_id=run_id,
+                    version=event_version,
+                    query=req.problem,
+                    chunks_found=len(recalled_chunks),
+                    latency_ms=0.0
+                )
+                await _persist_event(recall_evt)
+                event_version += 1
 
         raw_preset = req.preset or "auto-budget"
         preset_svc = _ensure_fresh_preset_service()
@@ -447,23 +467,21 @@ async def run_stream(
                 )
                 auto_selected_method = decision.method
 
-        pipeline = ReasonerPipeline(
+        pipeline = pipeline_service.create_pipeline(
             router=router,
+            preset_name=effective_preset_name,
             top_k=req.top_k,
             parallel_perspectives=(not req.sequential) if "multi-perspective" not in effective_preset_name else True,
-            verbose=False,
-            preset_name=effective_preset_name,
             source_type=req.source_type,
             domain=req.domain,
             enhance_prompt=req.enhance_prompt,
-            expert=req.expert,
-            web_search=req.web_search,
-            smart_search=req.smart_search,
-            attachments=getattr(req, "attachments", []) or [],
+            complexity=getattr(req, "complexity", None),
+            batch_critique_jury=getattr(req, "batch_critique_jury", False),
+            initial_state=initial_state,
         )
         state = initial_state or PipelineState(problem=req.problem, preset_name=effective_preset_name)
         if recalled_chunks:
-            state.memory_context = recalled_chunks
+            state.neuro_context = recalled_chunks
 
         # --- BRAINSTORMING CONFIG: inject VS runtime parameters from preset metadata
         # before any phase runs so _phase_brainstorm_generate can read them.
@@ -475,7 +493,7 @@ async def run_stream(
 
         # --- ARTICLE DETECTION: must happen BEFORE the start event so the frontend
         # receives auto_selected_method="writing" and renders the correct phase list.
-        from reasoner.application.mixins.article_pipeline import is_article_request
+        from reasoner.phases._shared import is_article_request
         if is_article_request(state.problem):
             state.task_type = TaskType.TECHNICAL
             state.decomposition = ["article workflow"]
@@ -521,51 +539,52 @@ async def run_stream(
                 "tokens": state.phase_tokens.get("Phase 1.25: Context Vetting", {"input": 0, "output": 0}),
             }
 
+        from reasoner.application.flows.search_phases import run_context_vetting_phase
+        from reasoner.application.flows.services import PipelineWorkflowServices
+        _services = PipelineWorkflowServices(pipeline)
+
         async def _run_context_vetting(state: PipelineState):
-            await pipeline._phase_context_vetting(state, source_type=req.source_type)
+            await run_context_vetting_phase(state, _services, source_type=req.source_type)
 
-        from reasoner.application.flows import build_default_flow_registry
-
-        phases: list[tuple[float, str, Any, Any]] = [
-            (0, "Classification", pipeline._phase_0_classify, _ser_0),
-        ]
-        is_brainstorming = (state.method == "brainstorming")
-        if not (state.method == "writing" or state.decomposition or is_brainstorming):
-            phases.append((1, "Decomposition", pipeline._phase_1_decompose, _ser_1))
-            phases.append((1.25, "Context Vetting", _run_context_vetting, _ser_context_vetting))
-        elif not is_brainstorming:
-            # Writing method or existing decomposition: skip generic decomposition/vetting
-            async def _noop(s: PipelineState) -> None:  # noqa: E306
-                pass
-            _noop._is_silent_noop = True  # type: ignore[attr-defined]
-            phases.append((1, "Decomposition", _noop, _ser_1))
-            phases.append((1.25, "Context Vetting", _noop, _ser_context_vetting))
-        # Deep Read: only for non-writing methods. Writing pipelines do their own
-        # source retrieval and vetting in method-specific phases (e.g., Retrieve Sources).
-        # Running generic Deep Read here would find no sources because Context Vetting
-        # is skipped for writing methods (see _noop above).
-        if state.method != "writing":
-            phases.append((1.5, "Deep Read", pipeline._phase_deep_read, _ser_1_5))
-
-        flow = build_default_flow_registry(pipeline)
-        # Prefer state.method (set by article detection or HyperGate before this point)
-        # over preset-name inference, which can't see runtime routing overrides.
+        from reasoner.application.flows.factory import WorkflowFactory
+        flow_factory = WorkflowFactory()
         method = state.method or pipeline._get_method_from_preset()
-        for step in flow.get_sequence(method):
-            phases.append((step.num, step.name, step.fn, step.serializer))
+        strategy = flow_factory.get_strategy(method)
+        
+        step_metadata: dict[str, dict[str, Any]] = {}
+        if strategy:
+            for step in strategy.get_phases(state):
+                
+                # Wrap the step function so that it accepts only (state)
+                # and calls the strategy function with (state, _services)
+                def make_wrapper(fn):
+                    async def wrapper(state: PipelineState):
+                        await fn(state, _services)
+                    return wrapper
+                    
+                phases.append((step.num, step.name, make_wrapper(step.fn), step.serializer))
+                step_metadata[step.name] = {"critical": step.critical}
+        else:
+            logger.error(f"No strategy found for method: {method}")
 
         last_phase_num = max(p[0] for p in phases) if phases else 5
         synthesis_phase_num = last_phase_num + 1
         if state.method != "writing":
             phases += [(synthesis_phase_num, "Synthesis", pipeline._phase_synthesis, _ser_synthesis)]
 
-        CRITICAL_PHASES = {name for _, name, _, _ in phases}
         _LEGACY_CRITICAL = {
             "Decomposition", "Perspectives", "Opening Statements",
             "Hypotheses", "Maieutic Questions", "Generation Pool",
-            "Deep Research",
+            "Deep Research", "Retrieve Sources", "Adversarial Verify",
         }
-        CRITICAL_PHASES = CRITICAL_PHASES & _LEGACY_CRITICAL
+        
+        # Determine if a phase is critical:
+        # 1. Is it explicitly marked critical in the Flow Registry?
+        # 2. Is it in the legacy critical set?
+        CRITICAL_PHASES = {
+            name for _, name, _, _ in phases 
+            if step_metadata.get(name, {}).get("critical") or name in _LEGACY_CRITICAL
+        }
 
         _PHASE_ROLE_HINTS: dict[str, list[str]] = {
             "Classification": ["classification"],
@@ -586,6 +605,16 @@ async def run_stream(
             "Critique & Pruning": ["scoring"],
             "Stress Testing": ["stress_testing"],
             "Synthesis": ["synthesis"],
+            # Article-specific roles
+            "Decompose Topic": ["article_decompose"],
+            "Retrieve Sources": ["primary"],
+            "Extract Claims (CoVE)": ["article_claim_extract"],
+            "Adversarial Verify": ["article_verifier"],
+            "Synthesize (SoT)": ["article_synthesize"],
+            "Pre-Mortem": ["article_pre_mortem"],
+            "Journal Review": ["article_critic"],
+            "Final Assembly": ["article_assemble"],
+            "Humanize": ["article_humanize"],
         }
 
         def _get_phase_start_models(phase_name: str) -> list[str]:
@@ -1002,8 +1031,7 @@ async def run_stream(
     except Exception as exc:
         logger.error("Pipeline error for run %s: %s", run_id, exc, exc_info=True)
         err_msg = f"Pipeline processing error: {type(exc).__name__}: {str(exc)[:120]}"
-        await _broadcast_ws(run_id, {"type": "done", "errors": [err_msg]})
-        yield _event({"type": "done", "errors": [err_msg]})
+        
         # Persist pipeline failure
         fail_evt = make_event(
             EventType.PIPELINE_FAILED,
@@ -1014,6 +1042,9 @@ async def run_stream(
             phases_completed=len(state.phase_durations) if state else 0,
         )
         await _persist_event(fail_evt)
+
+        await _broadcast_ws(run_id, {"type": "done", "errors": [err_msg]})
+        yield _event({"type": "done", "errors": [err_msg]})
     finally:
         await _run_store.remove(run_id)
 
@@ -1081,7 +1112,19 @@ async def run_followup_stream(
         pass
 
 
-async def run_stream_cached(req: RunRequest, user_id: str | None = None) -> AsyncGenerator[str, None]:
+async def run_stream_cached(
+    req: RunRequest, 
+    user_id: str | None = None,
+    preset_service: PresetService | None = None,
+    pipeline_service: PipelineService | None = None,
+) -> AsyncGenerator[str, None]:
+    if preset_service is None:
+        from reasoner.application.services.preset_service import PresetService
+        preset_service = PresetService()
+    if pipeline_service is None:
+        from reasoner.application.services.pipeline_service import PipelineService
+        pipeline_service = PipelineService()
+
     key = _cache_key(req)
     if not req.no_cache:
         cached = await _load_cache(key)

@@ -22,7 +22,7 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from reasoner.core.constants import HYPERGATE_METHOD_THRESHOLD
-from reasoner.llm import ProviderRouter
+from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.models import PipelineState
 from reasoner.parsing import extract_json
 from reasoner.subagents.models import PhaseSubAgentOutput

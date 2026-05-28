@@ -12,7 +12,7 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-from reasoner.models import CritiqueScore, PerspectiveType
+from reasoner.models import CritiqueScore, PerspectiveRegistry
 from reasoner.utils.json_safe import safe_json_loads, JSONDepthExceededError
 
 
@@ -482,7 +482,8 @@ def _repair_truncated_json(text: str) -> str | None:
     # Drop incomplete key-value pairs (handles both after-comma and first-in-object cases)
     tail = re.sub(r'([,{])\s*"[^"]*"\s*:\s*$', r'\1', tail)
 
-    suffix = "".join(reversed(stack))
+    closing = "".join(reversed(stack))
+    suffix = suffix + closing
     return tail + suffix
 
 
@@ -590,7 +591,7 @@ def _parse_critique_scores(raw_scores: list[dict]) -> list[CritiqueScore]:
     for s in raw_scores:
         try:
             out.append(CritiqueScore(
-                perspective=PerspectiveType(s["perspective"]),
+                perspective=PerspectiveRegistry.coerce(s["perspective"]),
                 logical_consistency=float(s.get("logical_consistency") or 0),
                 evidence_support=float(s.get("evidence_support") or 0),
                 failure_resilience=float(s.get("failure_resilience") or 0),

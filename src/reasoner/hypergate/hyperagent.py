@@ -33,7 +33,7 @@ from reasoner.hypergate.sub_agents import (
     TieBreakerSubAgent,
     WebSearchDetectorSubAgent,
 )
-from reasoner.llm import ProviderRouter
+from reasoner.infrastructure.llm.router import ProviderRouter
 
 # Fast-path patterns for pure creative-writing requests that should bypass the pipeline
 # and go straight to direct answer (no search, no multi-phase reasoning).

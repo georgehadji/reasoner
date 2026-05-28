@@ -6,7 +6,8 @@ import os
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal, Optional
 
-from reasoner.llm import ProviderRouter, _REGISTRY
+# Removed ProviderRouter and _REGISTRY imports to restore domain purity.
+# Validation logic will be moved to an application service.
 from reasoner.domain.saas import SubscriptionTier
 
 if TYPE_CHECKING:
@@ -230,49 +231,20 @@ class PipelinePreset:
     cascading_routing: dict[str, list[str]] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        """Validate routing keys and model IDs at construction time."""
+        """Validate routing keys at construction time."""
         unknown_roles = set(self.routing.keys()) - _KNOWN_ROUTING_ROLES
         if unknown_roles:
             raise ValueError(
                 f"Preset '{self.name}' has unknown routing keys: {sorted(unknown_roles)}. "
                 f"Valid roles: {sorted(_KNOWN_ROUTING_ROLES)}"
             )
-        unknown_models = {
-            role: mid for role, mid in self.routing.items() if mid not in _REGISTRY
-        }
-        if unknown_models:
-            raise ValueError(
-                f"Preset '{self.name}' references unknown model IDs: {unknown_models}. "
-                f"Run 'python main.py --list-models' to see valid IDs."
-            )
-        if self.primary_id not in _REGISTRY:
-            raise ValueError(
-                f"Preset '{self.name}' primary model '{self.primary_id}' is not in the registry. "
-                f"Run 'python main.py --list-models' to see valid IDs."
-            )
+
         unknown_fb_roles = set(self.fallback_routing.keys()) - _KNOWN_ROUTING_ROLES
         if unknown_fb_roles:
             raise ValueError(
                 f"Preset '{self.name}' has unknown fallback routing keys: {sorted(unknown_fb_roles)}. "
                 f"Valid roles: {sorted(_KNOWN_ROUTING_ROLES)}"
             )
-        unknown_fb_models = {
-            role: mid for role, mid in self.fallback_routing.items() if mid not in _REGISTRY
-        }
-        if unknown_fb_models:
-            raise ValueError(
-                f"Preset '{self.name}' references unknown fallback model IDs: {unknown_fb_models}. "
-                f"Run 'python main.py --list-models' to see valid IDs."
-            )
-
-    def build_router(self) -> ProviderRouter:
-        return ProviderRouter.from_model_ids(
-            primary_id=self.primary_id,
-            routing=self.routing,
-            fallback_routing=self.fallback_routing,
-            cascading_routing=self.cascading_routing,
-            verbose=True # Always verbose when built from a preset
-        )
 
     def check_keys(self) -> dict[str, bool]:
         """Return {env_var: is_set} for all required API keys."""

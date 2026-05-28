@@ -96,6 +96,7 @@ class TokenAwareCache:
         self._current_tokens = 0
         self._stats = CacheStats()
         self._lock = asyncio.Lock()
+        self._problem_index: dict[str, list[str]] = {}
         self._loaded = False
 
         # Defer disk loading — call _ensure_loaded() before first use
@@ -165,8 +166,8 @@ class TokenAwareCache:
             if key in self._entries:
                 entry = self._entries[key]
 
-                # Check TTL
-                if time.monotonic() - entry.created_at > entry.ttl_seconds:
+                # Check TTL — use wall-clock time so TTL survives disk reload
+                if time.time() - entry.created_at > entry.ttl_seconds:
                     await self._evict(key)
                     self._stats.misses += 1
                     return None
@@ -174,34 +175,33 @@ class TokenAwareCache:
                 # Exact prompt match
                 if entry.prompt_hash == prompt_hash:
                     entry.access_count += 1
-                    entry.last_accessed = time.monotonic()
+                    entry.last_accessed = time.time()
                     self._stats.hits += 1
                     self._stats.total_tokens_saved += entry.tokens_used
                     return entry.response
 
-            # Check semantic similarity (same phase + similar problem)
+            # Check semantic similarity via problem_hash index (O(k) vs O(n))
             problem_hash = self._compute_problem_hash(problem)
-            for entry in self._entries.values():
-                if entry.phase != phase or entry.model_id != model_id:
+            for ck in self._problem_index.get(problem_hash, []):
+                entry = self._entries.get(ck)
+                if entry is None or entry.phase != phase or entry.model_id != model_id:
                     continue
 
-                # Same problem group = high chance of cache hit
-                if entry.problem_hash == problem_hash:
-                    # Try exact match on prompt hash first (fast path)
-                    if entry.prompt_hash == prompt_hash:
-                        entry.access_count += 1
-                        entry.last_accessed = time.monotonic()
-                        self._stats.hits += 1
-                        self._stats.total_tokens_saved += entry.tokens_used
-                        return entry.response
+                # Exact prompt match within same problem group (fast path)
+                if entry.prompt_hash == prompt_hash:
+                    entry.access_count += 1
+                    entry.last_accessed = time.time()
+                    self._stats.hits += 1
+                    self._stats.total_tokens_saved += entry.tokens_used
+                    return entry.response
 
-                    # Jaccard semantic similarity on raw prompts
-                    if entry.raw_prompt and self._jaccard_similarity(prompt, entry.raw_prompt) >= semantic_threshold:
-                        entry.access_count += 1
-                        entry.last_accessed = time.monotonic()
-                        self._stats.hits += 1
-                        self._stats.total_tokens_saved += entry.tokens_used
-                        return entry.response
+                # Jaccard semantic similarity on raw prompts
+                if entry.raw_prompt and self._jaccard_similarity(prompt, entry.raw_prompt) >= semantic_threshold:
+                    entry.access_count += 1
+                    entry.last_accessed = time.time()
+                    self._stats.hits += 1
+                    self._stats.total_tokens_saved += entry.tokens_used
+                    return entry.response
 
             self._stats.misses += 1
             return None
@@ -234,8 +234,8 @@ class TokenAwareCache:
                 prompt_hash=self._compute_prompt_hash(prompt),
                 response=response,
                 tokens_used=tokens_used,
-                created_at=time.monotonic(),
-                last_accessed=time.monotonic(),
+                created_at=time.time(),
+                last_accessed=time.time(),
                 ttl_seconds=ttl_seconds or self.ttl_seconds,
                 raw_prompt=prompt,
             )
@@ -247,6 +247,7 @@ class TokenAwareCache:
                 self._stats.total_size_bytes -= len(old_entry.response.encode())
             
             self._entries[key] = entry
+            self._problem_index.setdefault(entry.problem_hash, []).append(key)
             self._current_tokens += tokens_used
             self._stats.total_size_bytes += len(response.encode())
             
@@ -258,6 +259,12 @@ class TokenAwareCache:
         """Evict specific entry."""
         if key in self._entries:
             entry = self._entries[key]
+            idx = self._problem_index.get(entry.problem_hash)
+            if idx:
+                try:
+                    idx.remove(key)
+                except ValueError:
+                    pass
             self._current_tokens -= entry.tokens_used
             self._stats.total_size_bytes -= len(entry.response.encode())
             self._stats.evictions += 1
@@ -279,13 +286,17 @@ class TokenAwareCache:
         """Clear all cache entries."""
         async with self._lock:
             self._entries.clear()
+            self._problem_index.clear()
             self._current_tokens = 0
             self._stats.total_size_bytes = 0
             
             # Clear disk cache
             if self.cache_dir:
                 for f in self.cache_dir.glob("*.json"):
-                    f.unlink()
+                    try:
+                        f.unlink(missing_ok=True)
+                    except PermissionError:
+                        pass
     
     def get_stats(self) -> dict[str, Any]:
         """Get cache statistics."""
@@ -312,12 +323,13 @@ class TokenAwareCache:
                 data = json.loads(await asyncio.to_thread(f.read_text))
                 entry = CacheEntry(**data)
 
-                # Skip expired entries
-                if time.monotonic() - entry.created_at > entry.ttl_seconds:
+                # Skip expired entries — use wall-clock time for cross-process TTL
+                if time.time() - entry.created_at > entry.ttl_seconds:
                     f.unlink()
                     continue
 
                 self._entries[entry.key] = entry
+                self._problem_index.setdefault(entry.problem_hash, []).append(entry.key)
                 self._current_tokens += entry.tokens_used
             except (json.JSONDecodeError, KeyError, TypeError):
                 # Corrupted file, remove it

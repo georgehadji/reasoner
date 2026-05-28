@@ -87,7 +87,7 @@ def get_pricing(model_id: str) -> ModelPricing:
     
     # Try to extract from registry model ID
     # (e.g., "claude-opus" -> look up "anthropic/claude-opus-4.6")
-    from reasoner.llm import _REGISTRY
+    from reasoner.infrastructure.llm.registry import _REGISTRY
     if model_id in _REGISTRY:
         or_model = _REGISTRY[model_id]["model"]
         if or_model in PRICING_DB:

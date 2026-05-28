@@ -203,3 +203,24 @@ QUALITY STANDARD:
 - Have a point of view — don't just neutrally list pros and cons when the evidence supports a conclusion
 - Use specific details over vague claims; real numbers and named sources over "many experts"
 """
+
+
+_WRITING_INDICATORS = [
+    r"\b(write|draft|compose|author|create)\b.*\b(article|essay|blog|report|paper|explainer)\b",
+    r"\barticle\b.*\b(about|on)\b",
+]
+
+_REFERENTIAL_SIGNALS = ["continue", "expand", "revise that", "elaborate", "add more"]
+
+def is_article_request(problem: str) -> bool:
+    """Detect if the user is asking for a structured written piece."""
+    lower = problem.lower()
+    return any(re.search(p, lower) for p in _WRITING_INDICATORS)
+
+def is_referential_followup(problem: str, history: list) -> bool:
+    """Detect if a follow-up message refers to prior context."""
+    if not history:
+        return False
+    lower = problem.lower()
+    return any(sig in lower for sig in _REFERENTIAL_SIGNALS)
+

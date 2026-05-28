@@ -70,8 +70,9 @@ def fusion_prompt(state: PipelineState, language: str) -> str:
     web_context = f"\nWeb: {state.web_discovery_results[:TRUNCATION.KEY_INSIGHTS]}" if state.web_discovery_results else ""
     followup = _followup_context(state)
 
+    problem = state.enhanced_problem or state.problem
     return (
-        f'{lang_instruction}\n\nProblem: {_wrap_user_input(state.problem)}{web_context}{followup}\n\n'
+        f'{lang_instruction}\n\nProblem: {_wrap_user_input(problem)}{web_context}{followup}\n\n'
         f'First, choose exactly ONE task type from: analytical, strategic, creative, technical, predictive, hybrid.\n'
         f'\n'
         f'DISAMBIGUATION (apply strictly):\n'

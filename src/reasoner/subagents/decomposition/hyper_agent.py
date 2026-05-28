@@ -14,7 +14,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from reasoner.llm import ProviderRouter
+from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.models import Decomposition, PipelineState, SubProblem, Assumption, ClaimLabel
 from reasoner.subagents.models import PhaseSubAgentOutput
 from reasoner.subagents.decomposition.structural_decomposer import StructuralDecomposerSubAgent

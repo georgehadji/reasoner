@@ -18,7 +18,7 @@ from reasoner.domain.preset_registry import (
     _PRESET_CONFIGS,
     PRESETS,
 )
-from reasoner.llm import ProviderRouter
+from reasoner.infrastructure.llm.router import ProviderRouter
 
 
 def get_preset(name: str) -> PipelinePreset:

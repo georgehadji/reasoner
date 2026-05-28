@@ -9,59 +9,19 @@ import json
 from collections import deque
 from dataclasses import dataclass, field, asdict, fields as dc_fields
 from enum import Enum
+from functools import lru_cache
 from typing import Any, TYPE_CHECKING
 from datetime import datetime, timezone
 from pathlib import Path
 
+from reasoner.domain.models import TaskType, ClaimLabel, PerspectiveType, PerspectiveRegistry
+
 if TYPE_CHECKING:
     from reasoner.core.protocol import PhaseResult
 
-
-class TaskType(str, Enum):
-    ANALYTICAL = "analytical"
-    STRATEGIC = "strategic"
-    CREATIVE = "creative"
-    TECHNICAL = "technical"
-    PREDICTIVE = "predictive"
-    HYBRID = "hybrid"
-
     @classmethod
-    def coerce(cls, value: str | "TaskType") -> "TaskType":
-        if isinstance(value, cls):
-            return value
-        raw = str(value).lower().strip()
-        try:
-            return cls(raw)
-        except ValueError:
-            return cls.HYBRID
-
-
-
-class ClaimLabel(str, Enum):
-    VERIFIED = "VERIFIED"
-    HYPOTHESIS = "HYPOTHESIS"
-    UNKNOWN = "UNKNOWN"
-
-
-class ModelProvider(str, Enum):
-    ANTHROPIC  = "anthropic"
-    OPENAI     = "openai"
-    GOOGLE     = "google"
-    XAI        = "xai"
-    PERPLEXITY = "perplexity"
-    MISTRAL    = "mistral"
-    DEEPSEEK   = "deepseek"
-    QWEN       = "qwen"
-    KIMI       = "kimi"
-    GLM        = "glm"
-    MINIMAX    = "minimax"
-
-
-class PerspectiveType(str, Enum):
-    CONSTRUCTIVE = "constructive"
-    DESTRUCTIVE = "destructive"
-    SYSTEMIC = "systemic"
-    MINIMALIST = "minimalist"
+    def list_all(cls) -> list[str]:
+        return list(cls._known.keys())
 
 
 class ScenarioType(str, Enum):
@@ -118,15 +78,19 @@ class Decomposition:
 
 @dataclass
 class SolutionCandidate:
-    perspective: PerspectiveType
+    perspective: PerspectiveType | str
     content: str
     key_insights: list[str]
     model_used: str
 
+    def __post_init__(self) -> None:
+        if isinstance(self.perspective, str):
+            self.perspective = PerspectiveRegistry.coerce(self.perspective)
+
 
 @dataclass
 class CritiqueScore:
-    perspective: PerspectiveType
+    perspective: PerspectiveType | str
     logical_consistency: float       # 0-10
     evidence_support: float          # 0-10
     failure_resilience: float        # 0-10
@@ -136,6 +100,10 @@ class CritiqueScore:
     # Penalises overconfident-but-wrong claims; sourced from the critique prompt.
     # Default 0.0 so deserialized CritiqueScores without this field still load cleanly.
     confidence_vs_accuracy_penalty: float = 0.0
+
+    def __post_init__(self) -> None:
+        if isinstance(self.perspective, str):
+            self.perspective = PerspectiveRegistry.coerce(self.perspective)
 
     @property
     def total(self) -> float:
@@ -241,6 +209,23 @@ class FinalSolution:
 
 
 @dataclass
+class MethodState:
+    """Generic container for method-specific phase data.
+
+    Replace 19 named PipelineState fields (jury_guidelines, debate_rounds,
+    scientific_state, ...) with a single dict indexed by method name.
+    """
+    data: dict[str, Any] = field(default_factory=dict)
+
+    def get(self, method: str) -> dict[str, Any]:
+        v = self.data.get(method)
+        return v if isinstance(v, dict) else {}
+
+    def set(self, method: str, state: dict[str, Any]) -> None:
+        self.data[method] = state
+
+
+@dataclass
 class CostTrackingState:
     """Grouped cost and token tracking for the pipeline.
 
@@ -265,135 +250,667 @@ class ConversationState:
 
 
 @dataclass
-class PipelineState:
-    """Complete pipeline state — passed between phases."""
-    problem: str
+class PipelineCore:
+    """Fields that every phase reads during execution."""
+    problem: str = ""
     enhanced_problem: str = ""  # Auto-rewritten prompt for clarity and context
-    started_at: "datetime" = field(default_factory=lambda: datetime.now(timezone.utc))
     task_type: TaskType | None = None
     task_type_rationale: str = ""
     language: str = "English"  # Detected language from the problem
-    complexity: str | None = None # Estimated problem complexity (simple, medium, complex)
+    complexity: str | None = None  # Estimated problem complexity (simple, medium, complex)
     decomposition: Decomposition | None = None
     candidates: list[SolutionCandidate] = field(default_factory=list)
     scores: list[CritiqueScore] = field(default_factory=list)
     top_candidates: list[SolutionCandidate] = field(default_factory=list)
     stress_results: list[StressTestResult] = field(default_factory=list)
     final_solution: FinalSolution | None = None
-    phase_logs: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
-    # Tracks which model was used for each phase role
-    phase_models: dict[str, str] = field(default_factory=dict)
-    # Tracks tokens used per phase: {phase_name: {"input": int, "output": int}}
-    phase_tokens: dict[str, dict[str, int]] = field(default_factory=dict)
-    # Tracks duration (seconds) per phase: {phase_name: float}
-    phase_durations: dict[str, float] = field(default_factory=dict)
-    # Immutable per-phase results (foundation for future resume/replay support)
-    phase_results: list["PhaseResult"] = field(default_factory=list)
-    # Which preset was used — drives method-specific rendering
-    preset_name: str | None = None
-    # Active reasoning method (overrides preset inference; set by article detection or HyperGate)
-    method: str | None = None
-    # Quality monitor: per-phase feedback injected into next retry prompt
-    quality_hints: dict[str, str] = field(default_factory=dict)
-    # Quality monitor: ordered history of {phase, attempt, score, passed} per evaluation
-    quality_history: list[dict] = field(default_factory=list)
-    # Context quality assessment for synthesis circuit breaker
-    context_quality: str = "unknown"  # "good" | "partial" | "contaminated" | "missing"
+    attachments: list[dict[str, Any]] = field(default_factory=list)
     # ORCHESTRATED method fields (populated only when preset is orchestrated)
     generation_candidates: list["GenerationCandidate"] = field(default_factory=list)
     critic_scores: list["CriticScore"] = field(default_factory=list)
     verification_results: list["VerificationResult"] = field(default_factory=list)
     meta_evaluation: "MetaEvaluation | None" = None
 
-    @property
-    def synthesis(self) -> dict[str, Any] | None:
-        """Compatibility layer for old handler code expecting a dict."""
-        if self.final_solution:
-            return {
-                "core_solution": self.final_solution.core_solution,
-                "critical_insights": self.final_solution.critical_insights,
-            }
-        return None
 
-    # ─────────────────────────────────────────────────────────────────────
-    # NEW: Advanced Method States (v2.1)
-    # ─────────────────────────────────────────────────────────────────────
-    # Jury Method: Constitution/Principles defined in Phase 1 for objective scoring
-    jury_guidelines: list[str] = field(default_factory=list)
-    # Debate Method: Structured rounds (opening, rebuttal, cross-exam)
-    debate_rounds: list[dict[str, Any]] = field(default_factory=list)
-    # Scientific Method: Hypotheses, experiments, and falsification tests
-    scientific_state: dict[str, Any] = field(default_factory=dict)
-    # Socratic Method: Definitions, questions (elenchus), and aporia state
-    socratic_state: dict[str, Any] = field(default_factory=dict)
-    # Jury Method: Reliability-weighted generator ranking (Track A3)
-    jury_weighted_ranking: list[str] = field(default_factory=list)
-    # Pre-Mortem Analysis Method: Prospective hindsight failure analysis (B1)
-    pre_mortem_state: dict[str, Any] = field(default_factory=dict)
-    # Bayesian Reasoning Method: Prior-likelihood-posterior-sensitivity (B2)
-    bayesian_state: dict[str, Any] = field(default_factory=dict)
-    # Dialectical Reasoning Method: Hegelian Aufhebung (B3)
-    dialectical_state: dict[str, Any] = field(default_factory=dict)
-    # Analogical Reasoning Method: Structure-mapping & cross-domain transfer (B4)
-    analogical_state: dict[str, Any] = field(default_factory=dict)
-    # Delphi Method: Expert consensus with convergence tracking (B5)
-    delphi_state: dict[str, Any] = field(default_factory=dict)
-    # Chain-of-Verification (CoVe): Draft → verify → revise
-    cove_state: dict[str, Any] = field(default_factory=dict)
-    # Skeleton-of-Thought (SoT): Skeleton → parallel solve → assemble
-    sot_state: dict[str, Any] = field(default_factory=dict)
-    # Tree-of-Thoughts (ToT): Decompose → generate candidates → evaluate → backtrack
-    tot_state: dict[str, Any] = field(default_factory=dict)
-    # Program-of-Thoughts (PoT): Generate code → execute → return results
-    pot_state: dict[str, Any] = field(default_factory=dict)
-    # Self-Discover: Dynamic reasoning module composition
-    self_discover_state: dict[str, Any] = field(default_factory=dict)
-    # Writing Method: Structured article writing with research-backed outline, draft, fact-check
-    writing_state: dict[str, Any] = field(default_factory=dict)
-    # Coding Method: Production-grade code generation with spec, generate, review, tests, assembly
-    coding_state: dict[str, Any] = field(default_factory=dict)
-    # Brainstorming Method: Verbalized Sampling idea generation → clustering → deep development
-    brainstorming_state: dict[str, Any] = field(default_factory=dict)
-    # Cross-Language Method: Translation metadata (source lang, original problem, translated synthesis)
-    cross_language_state: dict[str, Any] = field(default_factory=dict)
-    # PhaseSubAgent outputs (for transparency / resume / debugging)
+@dataclass
+class PipelineMeta:
+    """Fields that are write-only during execution, read-only after."""
+    started_at: "datetime" = field(default_factory=lambda: datetime.now(timezone.utc))
+    phase_logs: list[str] = field(default_factory=list)
+    phase_tokens: dict[str, dict[str, int]] = field(default_factory=dict)
+    phase_durations: dict[str, float] = field(default_factory=dict)
+    phase_models: dict[str, str] = field(default_factory=dict)
+    phase_results: list["PhaseResult"] = field(default_factory=list)
+    quality_hints: dict[str, str] = field(default_factory=dict)
+    quality_history: list[dict] = field(default_factory=list)
+    preset_name: str | None = None
+    method: str | None = None
+    context_quality: str = "unknown"  # "good" | "partial" | "contaminated" | "missing"
+
+
+@dataclass
+class PipelineRemainder:
+    """Fields that don't fit cleanly into core or meta."""
+    neuro_context: list[dict[str, Any]] = field(default_factory=list)
+    reflexion_memory: list[str] = field(default_factory=list)
+    web_discovery_results: list[dict[str, Any]] = field(default_factory=list)
+    vetted_context: list[dict[str, Any]] = field(default_factory=list)
     synthesis_subagent_outputs: list[dict[str, Any]] = field(default_factory=list)
-    # Neuro memory: recalled context chunks from long-term memory
-    memory_context: list[dict[str, Any]] = field(default_factory=list)
     critique_subagent_outputs: list[dict[str, Any]] = field(default_factory=list)
     decomposition_subagent_outputs: list[dict[str, Any]] = field(default_factory=list)
     enhancement_subagent_outputs: list[dict[str, Any]] = field(default_factory=list)
     search_subagent_outputs: list[dict[str, Any]] = field(default_factory=list)
-    # Real-time agent activity events (subagent start/complete) — drained by SSE stream
     pending_events: list[dict[str, Any]] = field(default_factory=list)
-    # Reflexion memory: accumulated self-correction insights across turns
-    reflexion_memory: list[str] = field(default_factory=list)
-    # Web Discovery: Results from SearXNG search
-    web_discovery_results: list[dict[str, Any]] = field(default_factory=list)
-    # Vetted Context: Flags from context vetting phase
-    vetted_context: list[dict[str, Any]] = field(default_factory=list)
-    # Internal: cached _followup_context result to avoid rebuilding per-phase
     _followup_cache: str | None = field(default=None, repr=False)
-    
-    # ─────────────────────────────────────────────────────────────────────
-    # Cost Tracking (grouped in CostTrackingState sub-object)
-    # ─────────────────────────────────────────────────────────────────────
-    cost_state: CostTrackingState = field(default_factory=CostTrackingState)
 
-    # ─────────────────────────────────────────────────────────────────────
-    # Conversation Context (grouped in ConversationState sub-object)
-    # ─────────────────────────────────────────────────────────────────────
+
+@dataclass
+class PipelineState:
+    """Complete pipeline state — passed between phases."""
+    core: PipelineCore = field(default_factory=PipelineCore)
+    method_state: MethodState = field(default_factory=MethodState)
+    meta: PipelineMeta = field(default_factory=PipelineMeta)
+    remainder: PipelineRemainder = field(default_factory=PipelineRemainder)
+    cost_state: CostTrackingState = field(default_factory=CostTrackingState)
     conversation_state: ConversationState = field(default_factory=ConversationState)
 
+    def __init__(self, **kwargs: Any) -> None:
+        """Backward-compatible init: accepts both old flat kwargs and new nested kwargs."""
+        _CORE_FIELDS = {
+            'problem', 'enhanced_problem', 'task_type', 'task_type_rationale',
+            'language', 'complexity', 'decomposition', 'candidates', 'scores',
+            'top_candidates', 'stress_results', 'final_solution', 'errors',
+            'attachments', 'generation_candidates', 'critic_scores',
+            'verification_results', 'meta_evaluation',
+        }
+        _META_FIELDS = {
+            'started_at', 'phase_logs', 'phase_tokens', 'phase_durations',
+            'phase_models', 'phase_results', 'quality_hints', 'quality_history',
+            'preset_name', 'method', 'context_quality',
+        }
+        _REMAINDER_FIELDS = {
+            'neuro_context', 'reflexion_memory', 'web_discovery_results',
+            'vetted_context', 'synthesis_subagent_outputs',
+            'critique_subagent_outputs', 'decomposition_subagent_outputs',
+            'enhancement_subagent_outputs', 'search_subagent_outputs',
+            'pending_events', '_followup_cache',
+        }
+
+        core_kwargs: dict[str, Any] = {}
+        meta_kwargs: dict[str, Any] = {}
+        remainder_kwargs: dict[str, Any] = {}
+        direct_kwargs: dict[str, Any] = {}
+
+        for key, value in kwargs.items():
+            if key in _CORE_FIELDS:
+                core_kwargs[key] = value
+            elif key in _META_FIELDS:
+                meta_kwargs[key] = value
+            elif key in _REMAINDER_FIELDS:
+                remainder_kwargs[key] = value
+            else:
+                direct_kwargs[key] = value
+
+        # Build sub-objects: explicit containers take precedence
+        core = direct_kwargs.pop('core', None)
+        if core is None:
+            core = PipelineCore(**core_kwargs) if core_kwargs else PipelineCore()
+        elif core_kwargs:
+            # Merge flat kwargs into existing container
+            for k, v in core_kwargs.items():
+                setattr(core, k, v)
+
+        meta = direct_kwargs.pop('meta', None)
+        if meta is None:
+            meta = PipelineMeta(**meta_kwargs) if meta_kwargs else PipelineMeta()
+        elif meta_kwargs:
+            for k, v in meta_kwargs.items():
+                setattr(meta, k, v)
+
+        remainder = direct_kwargs.pop('remainder', None)
+        if remainder is None:
+            remainder = PipelineRemainder(**remainder_kwargs) if remainder_kwargs else PipelineRemainder()
+        elif remainder_kwargs:
+            for k, v in remainder_kwargs.items():
+                setattr(remainder, k, v)
+
+        method_state = direct_kwargs.pop('method_state', MethodState())
+        cost_state = direct_kwargs.pop('cost_state', CostTrackingState())
+        conversation_state = direct_kwargs.pop('conversation_state', ConversationState())
+
+        # Assign fields directly to avoid dataclass __init__ recursion
+        object.__setattr__(self, 'core', core)
+        object.__setattr__(self, 'method_state', method_state)
+        object.__setattr__(self, 'meta', meta)
+        object.__setattr__(self, 'remainder', remainder)
+        object.__setattr__(self, 'cost_state', cost_state)
+        object.__setattr__(self, 'conversation_state', conversation_state)
+
+        # Run post-init migration logic
+        self.__post_init__()
+
     # ─────────────────────────────────────────────────────────────────────
-    # Uploaded File Attachments
+    # Backward-compatible property aliases for core fields
     # ─────────────────────────────────────────────────────────────────────
-    attachments: list[dict[str, Any]] = field(default_factory=list)  # [{file_id, filename, mime_type, extracted_text}]
+    @property
+    def problem(self) -> str:
+        return self.core.problem
+
+    @problem.setter
+    def problem(self, value: str) -> None:
+        self.core.problem = value
+
+    @property
+    def enhanced_problem(self) -> str:
+        return self.core.enhanced_problem
+
+    @enhanced_problem.setter
+    def enhanced_problem(self, value: str) -> None:
+        self.core.enhanced_problem = value
+
+    @property
+    def task_type(self) -> TaskType | None:
+        return self.core.task_type
+
+    @task_type.setter
+    def task_type(self, value: TaskType | None) -> None:
+        self.core.task_type = value
+
+    @property
+    def task_type_rationale(self) -> str:
+        return self.core.task_type_rationale
+
+    @task_type_rationale.setter
+    def task_type_rationale(self, value: str) -> None:
+        self.core.task_type_rationale = value
+
+    @property
+    def language(self) -> str:
+        return self.core.language
+
+    @language.setter
+    def language(self, value: str) -> None:
+        self.core.language = value
+
+    @property
+    def complexity(self) -> str | None:
+        return self.core.complexity
+
+    @complexity.setter
+    def complexity(self, value: str | None) -> None:
+        self.core.complexity = value
+
+    @property
+    def decomposition(self) -> Decomposition | None:
+        return self.core.decomposition
+
+    @decomposition.setter
+    def decomposition(self, value: Decomposition | None) -> None:
+        self.core.decomposition = value
+
+    @property
+    def candidates(self) -> list[SolutionCandidate]:
+        return self.core.candidates
+
+    @candidates.setter
+    def candidates(self, value: list[SolutionCandidate]) -> None:
+        self.core.candidates = value
+
+    @property
+    def scores(self) -> list[CritiqueScore]:
+        return self.core.scores
+
+    @scores.setter
+    def scores(self, value: list[CritiqueScore]) -> None:
+        self.core.scores = value
+
+    @property
+    def top_candidates(self) -> list[SolutionCandidate]:
+        return self.core.top_candidates
+
+    @top_candidates.setter
+    def top_candidates(self, value: list[SolutionCandidate]) -> None:
+        self.core.top_candidates = value
+
+    @property
+    def stress_results(self) -> list[StressTestResult]:
+        return self.core.stress_results
+
+    @stress_results.setter
+    def stress_results(self, value: list[StressTestResult]) -> None:
+        self.core.stress_results = value
+
+    @property
+    def final_solution(self) -> FinalSolution | None:
+        return self.core.final_solution
+
+    @final_solution.setter
+    def final_solution(self, value: FinalSolution | None) -> None:
+        self.core.final_solution = value
+
+    @property
+    def errors(self) -> list[str]:
+        return self.core.errors
+
+    @errors.setter
+    def errors(self, value: list[str]) -> None:
+        self.core.errors = value
+
+    @property
+    def attachments(self) -> list[dict[str, Any]]:
+        return self.core.attachments
+
+    @attachments.setter
+    def attachments(self, value: list[dict[str, Any]]) -> None:
+        self.core.attachments = value
+
+    @property
+    def generation_candidates(self) -> list["GenerationCandidate"]:
+        return self.core.generation_candidates
+
+    @generation_candidates.setter
+    def generation_candidates(self, value: list["GenerationCandidate"]) -> None:
+        self.core.generation_candidates = value
+
+    @property
+    def critic_scores(self) -> list["CriticScore"]:
+        return self.core.critic_scores
+
+    @critic_scores.setter
+    def critic_scores(self, value: list["CriticScore"]) -> None:
+        self.core.critic_scores = value
+
+    @property
+    def verification_results(self) -> list["VerificationResult"]:
+        return self.core.verification_results
+
+    @verification_results.setter
+    def verification_results(self, value: list["VerificationResult"]) -> None:
+        self.core.verification_results = value
+
+    @property
+    def meta_evaluation(self) -> "MetaEvaluation | None":
+        return self.core.meta_evaluation
+
+    @meta_evaluation.setter
+    def meta_evaluation(self, value: "MetaEvaluation | None") -> None:
+        self.core.meta_evaluation = value
+
+    # ─────────────────────────────────────────────────────────────────────
+    # Backward-compatible property aliases for meta fields
+    # ─────────────────────────────────────────────────────────────────────
+    @property
+    def started_at(self) -> "datetime":
+        return self.meta.started_at
+
+    @started_at.setter
+    def started_at(self, value: "datetime") -> None:
+        self.meta.started_at = value
+
+    @property
+    def phase_logs(self) -> list[str]:
+        return self.meta.phase_logs
+
+    @phase_logs.setter
+    def phase_logs(self, value: list[str]) -> None:
+        self.meta.phase_logs = value
+
+    @property
+    def phase_tokens(self) -> dict[str, dict[str, int]]:
+        return self.meta.phase_tokens
+
+    @phase_tokens.setter
+    def phase_tokens(self, value: dict[str, dict[str, int]]) -> None:
+        self.meta.phase_tokens = value
+
+    @property
+    def phase_durations(self) -> dict[str, float]:
+        return self.meta.phase_durations
+
+    @phase_durations.setter
+    def phase_durations(self, value: dict[str, float]) -> None:
+        self.meta.phase_durations = value
+
+    @property
+    def phase_models(self) -> dict[str, str]:
+        return self.meta.phase_models
+
+    @phase_models.setter
+    def phase_models(self, value: dict[str, str]) -> None:
+        self.meta.phase_models = value
+
+    @property
+    def phase_results(self) -> list["PhaseResult"]:
+        return self.meta.phase_results
+
+    @phase_results.setter
+    def phase_results(self, value: list["PhaseResult"]) -> None:
+        self.meta.phase_results = value
+
+    @property
+    def quality_hints(self) -> dict[str, str]:
+        return self.meta.quality_hints
+
+    @quality_hints.setter
+    def quality_hints(self, value: dict[str, str]) -> None:
+        self.meta.quality_hints = value
+
+    @property
+    def quality_history(self) -> list[dict]:
+        return self.meta.quality_history
+
+    @quality_history.setter
+    def quality_history(self, value: list[dict]) -> None:
+        self.meta.quality_history = value
+
+    @property
+    def preset_name(self) -> str | None:
+        return self.meta.preset_name
+
+    @preset_name.setter
+    def preset_name(self, value: str | None) -> None:
+        self.meta.preset_name = value
+
+    @property
+    def method(self) -> str | None:
+        return self.meta.method
+
+    @method.setter
+    def method(self, value: str | None) -> None:
+        self.meta.method = value
+
+    @property
+    def context_quality(self) -> str:
+        return self.meta.context_quality
+
+    @context_quality.setter
+    def context_quality(self, value: str) -> None:
+        self.meta.context_quality = value
+
+    # ─────────────────────────────────────────────────────────────────────
+    # Backward-compatible property aliases for remainder fields
+    # ─────────────────────────────────────────────────────────────────────
+    @property
+    def neuro_context(self) -> list[dict[str, Any]]:
+        return self.remainder.neuro_context
+
+    @neuro_context.setter
+    def neuro_context(self, value: list[dict[str, Any]]) -> None:
+        self.remainder.neuro_context = value
+
+    @property
+    def reflexion_memory(self) -> list[str]:
+        return self.remainder.reflexion_memory
+
+    @reflexion_memory.setter
+    def reflexion_memory(self, value: list[str]) -> None:
+        self.remainder.reflexion_memory = value
+
+    @property
+    def web_discovery_results(self) -> list[dict[str, Any]]:
+        return self.remainder.web_discovery_results
+
+    @web_discovery_results.setter
+    def web_discovery_results(self, value: list[dict[str, Any]]) -> None:
+        self.remainder.web_discovery_results = value
+
+    @property
+    def vetted_context(self) -> list[dict[str, Any]]:
+        return self.remainder.vetted_context
+
+    @vetted_context.setter
+    def vetted_context(self, value: list[dict[str, Any]]) -> None:
+        self.remainder.vetted_context = value
+
+    @property
+    def synthesis_subagent_outputs(self) -> list[dict[str, Any]]:
+        return self.remainder.synthesis_subagent_outputs
+
+    @synthesis_subagent_outputs.setter
+    def synthesis_subagent_outputs(self, value: list[dict[str, Any]]) -> None:
+        self.remainder.synthesis_subagent_outputs = value
+
+    @property
+    def critique_subagent_outputs(self) -> list[dict[str, Any]]:
+        return self.remainder.critique_subagent_outputs
+
+    @critique_subagent_outputs.setter
+    def critique_subagent_outputs(self, value: list[dict[str, Any]]) -> None:
+        self.remainder.critique_subagent_outputs = value
+
+    @property
+    def decomposition_subagent_outputs(self) -> list[dict[str, Any]]:
+        return self.remainder.decomposition_subagent_outputs
+
+    @decomposition_subagent_outputs.setter
+    def decomposition_subagent_outputs(self, value: list[dict[str, Any]]) -> None:
+        self.remainder.decomposition_subagent_outputs = value
+
+    @property
+    def enhancement_subagent_outputs(self) -> list[dict[str, Any]]:
+        return self.remainder.enhancement_subagent_outputs
+
+    @enhancement_subagent_outputs.setter
+    def enhancement_subagent_outputs(self, value: list[dict[str, Any]]) -> None:
+        self.remainder.enhancement_subagent_outputs = value
+
+    @property
+    def search_subagent_outputs(self) -> list[dict[str, Any]]:
+        return self.remainder.search_subagent_outputs
+
+    @search_subagent_outputs.setter
+    def search_subagent_outputs(self, value: list[dict[str, Any]]) -> None:
+        self.remainder.search_subagent_outputs = value
+
+    @property
+    def pending_events(self) -> list[dict[str, Any]]:
+        return self.remainder.pending_events
+
+    @pending_events.setter
+    def pending_events(self, value: list[dict[str, Any]]) -> None:
+        self.remainder.pending_events = value
+
+    @property
+    def _followup_cache(self) -> str | None:
+        return self.remainder._followup_cache
+
+    @_followup_cache.setter
+    def _followup_cache(self, value: str | None) -> None:
+        self.remainder._followup_cache = value
+
+    @property
+    def synthesis(self) -> dict[str, Any] | None:
+        """Compatibility layer for old handler code expecting a dict."""
+        if self.core.final_solution:
+            return {
+                "core_solution": self.core.final_solution.core_solution,
+                "critical_insights": self.core.final_solution.critical_insights,
+            }
+        return None
+
+    # ─────────────────────────────────────────────────────────────────────
+    # Method State (replaces 19 named fields with a single dict container)
+    # ─────────────────────────────────────────────────────────────────────
+
+    # ─────────────────────────────────────────────────────────────────────
+    # Backward-compatible property aliases for method state fields
+    # ─────────────────────────────────────────────────────────────────────
+    @property
+    def jury_guidelines(self) -> list[str]:
+        return self.method_state.data.setdefault("jury", {}).setdefault("guidelines", [])
+
+    @jury_guidelines.setter
+    def jury_guidelines(self, value: list[str]) -> None:
+        self.method_state.data.setdefault("jury", {})["guidelines"] = value
+
+    @property
+    def debate_rounds(self) -> list[dict[str, Any]]:
+        return self.method_state.data.setdefault("debate", {}).setdefault("rounds", [])
+
+    @debate_rounds.setter
+    def debate_rounds(self, value: list[dict[str, Any]]) -> None:
+        self.method_state.data.setdefault("debate", {})["rounds"] = value
+
+    @property
+    def scientific_state(self) -> dict[str, Any]:
+        return self.method_state.data.setdefault("scientific", {})
+
+    @scientific_state.setter
+    def scientific_state(self, value: dict[str, Any]) -> None:
+        self.method_state.data["scientific"] = value
+
+    @property
+    def socratic_state(self) -> dict[str, Any]:
+        return self.method_state.data.setdefault("socratic", {})
+
+    @socratic_state.setter
+    def socratic_state(self, value: dict[str, Any]) -> None:
+        self.method_state.data["socratic"] = value
+
+    @property
+    def jury_weighted_ranking(self) -> list[str]:
+        return self.method_state.data.setdefault("jury", {}).setdefault("weighted_ranking", [])
+
+    @jury_weighted_ranking.setter
+    def jury_weighted_ranking(self, value: list[str]) -> None:
+        self.method_state.data.setdefault("jury", {})["weighted_ranking"] = value
+
+    @property
+    def pre_mortem_state(self) -> dict[str, Any]:
+        return self.method_state.data.setdefault("pre_mortem", {})
+
+    @pre_mortem_state.setter
+    def pre_mortem_state(self, value: dict[str, Any]) -> None:
+        self.method_state.data["pre_mortem"] = value
+
+    @property
+    def bayesian_state(self) -> dict[str, Any]:
+        return self.method_state.data.setdefault("bayesian", {})
+
+    @bayesian_state.setter
+    def bayesian_state(self, value: dict[str, Any]) -> None:
+        self.method_state.data["bayesian"] = value
+
+    @property
+    def dialectical_state(self) -> dict[str, Any]:
+        return self.method_state.data.setdefault("dialectical", {})
+
+    @dialectical_state.setter
+    def dialectical_state(self, value: dict[str, Any]) -> None:
+        self.method_state.data["dialectical"] = value
+
+    @property
+    def analogical_state(self) -> dict[str, Any]:
+        return self.method_state.data.setdefault("analogical", {})
+
+    @analogical_state.setter
+    def analogical_state(self, value: dict[str, Any]) -> None:
+        self.method_state.data["analogical"] = value
+
+    @property
+    def delphi_state(self) -> dict[str, Any]:
+        return self.method_state.data.setdefault("delphi", {})
+
+    @delphi_state.setter
+    def delphi_state(self, value: dict[str, Any]) -> None:
+        self.method_state.data["delphi"] = value
+
+    @property
+    def cove_state(self) -> dict[str, Any]:
+        return self.method_state.data.setdefault("cove", {})
+
+    @cove_state.setter
+    def cove_state(self, value: dict[str, Any]) -> None:
+        self.method_state.data["cove"] = value
+
+    @property
+    def sot_state(self) -> dict[str, Any]:
+        return self.method_state.data.setdefault("sot", {})
+
+    @sot_state.setter
+    def sot_state(self, value: dict[str, Any]) -> None:
+        self.method_state.data["sot"] = value
+
+    @property
+    def tot_state(self) -> dict[str, Any]:
+        return self.method_state.data.setdefault("tot", {})
+
+    @tot_state.setter
+    def tot_state(self, value: dict[str, Any]) -> None:
+        self.method_state.data["tot"] = value
+
+    @property
+    def pot_state(self) -> dict[str, Any]:
+        return self.method_state.data.setdefault("pot", {})
+
+    @pot_state.setter
+    def pot_state(self, value: dict[str, Any]) -> None:
+        self.method_state.data["pot"] = value
+
+    @property
+    def self_discover_state(self) -> dict[str, Any]:
+        return self.method_state.data.setdefault("self_discover", {})
+
+    @self_discover_state.setter
+    def self_discover_state(self, value: dict[str, Any]) -> None:
+        self.method_state.data["self_discover"] = value
+
+    @property
+    def writing_state(self) -> dict[str, Any]:
+        return self.method_state.data.setdefault("writing", {})
+
+    @writing_state.setter
+    def writing_state(self, value: dict[str, Any]) -> None:
+        self.method_state.data["writing"] = value
+
+    @property
+    def coding_state(self) -> dict[str, Any]:
+        return self.method_state.data.setdefault("coding", {})
+
+    @coding_state.setter
+    def coding_state(self, value: dict[str, Any]) -> None:
+        self.method_state.data["coding"] = value
+
+    @property
+    def brainstorming_state(self) -> dict[str, Any]:
+        return self.method_state.data.setdefault("brainstorming", {})
+
+    @brainstorming_state.setter
+    def brainstorming_state(self, value: dict[str, Any]) -> None:
+        self.method_state.data["brainstorming"] = value
+
+    @property
+    def cross_language_state(self) -> dict[str, Any]:
+        return self.method_state.data.setdefault("cross_language", {})
+
+    @cross_language_state.setter
+    def cross_language_state(self, value: dict[str, Any]) -> None:
+        self.method_state.data["cross_language"] = value
 
     def __post_init__(self) -> None:
         """Backward-compat migration for --resume with old-format state files.
         Also sets up property-backed alias attributes for the grouped fields."""
+        if not isinstance(self.core, PipelineCore):
+            if isinstance(self.core, dict):
+                self.core = PipelineCore(**self.core)
+            else:
+                self.core = PipelineCore()
+        if not isinstance(self.meta, PipelineMeta):
+            if isinstance(self.meta, dict):
+                self.meta = PipelineMeta(**self.meta)
+            else:
+                self.meta = PipelineMeta()
+        if not isinstance(self.remainder, PipelineRemainder):
+            if isinstance(self.remainder, dict):
+                self.remainder = PipelineRemainder(**self.remainder)
+            else:
+                self.remainder = PipelineRemainder()
+        if not isinstance(self.method_state, MethodState):
+            if isinstance(self.method_state, dict):
+                self.method_state = MethodState(**self.method_state)
+            else:
+                self.method_state = MethodState()
         if not isinstance(self.cost_state, CostTrackingState):
             if isinstance(self.cost_state, dict):
                 self.cost_state = CostTrackingState(**self.cost_state)
@@ -557,28 +1074,31 @@ class PipelineState:
 
         # Balanced compression (default) - progressive truncation
         method_states = {
-            "jury_guidelines": self.jury_guidelines,
-            "debate_rounds": self.debate_rounds,
-            "scientific_state": self.scientific_state,
-            "socratic_state": self.socratic_state,
-            "jury_weighted_ranking": self.jury_weighted_ranking,
-            "pre_mortem_state": self.pre_mortem_state,
-            "bayesian_state": self.bayesian_state,
-            "dialectical_state": self.dialectical_state,
-            "analogical_state": self.analogical_state,
-            "delphi_state": self.delphi_state,
-            "cove_state": self.cove_state,
-            "sot_state": self.sot_state,
-            "tot_state": self.tot_state,
-            "pot_state": self.pot_state,
-            "self_discover_state": self.self_discover_state,
-            # Compress web results to "Title: Snippet" strings to reduce token waste in synthesis
-            "web_discovery_results": [
-                f"{r.get('title', 'Unknown')}: {r.get('snippet', '')[:TRUNCATION.SNIPPET]}"
-                for r in (self.web_discovery_results or [])
-            ] or None,
+            f"{k}_state" if k not in ("debate", "jury") else (
+                "debate_rounds" if k == "debate" else "jury_guidelines"
+            ): v
+            for k, v in self.method_state.data.items()
+            if v and k not in ("debate", "jury")
         }
-        context.update({k: v for k, v in method_states.items() if v})
+        # Add nested jury/debate fields if present
+        if "jury" in self.method_state.data:
+            jury = self.method_state.data["jury"]
+            if jury.get("guidelines"):
+                method_states["jury_guidelines"] = jury["guidelines"]
+            if jury.get("weighted_ranking"):
+                method_states["jury_weighted_ranking"] = jury["weighted_ranking"]
+        if "debate" in self.method_state.data:
+            debate = self.method_state.data["debate"]
+            if debate.get("rounds"):
+                method_states["debate_rounds"] = debate["rounds"]
+        # Compress web results to "Title: Snippet" strings to reduce token waste in synthesis
+        web_results = [
+            f"{r.get('title', 'Unknown')}: {r.get('snippet', '')[:TRUNCATION.SNIPPET]}"
+            for r in (self.web_discovery_results or [])
+        ] or None
+        if web_results:
+            method_states["web_discovery_results"] = web_results
+        context.update(method_states)
         context.update({
             "sub_problems": [
                 {
@@ -797,26 +1317,114 @@ class PipelineState:
     @classmethod
     def _from_dict(cls, data: dict[str, Any]) -> "PipelineState":
         """Deserialize dictionary to PipelineState with proper type reconstruction."""
+        # ── Phase A: Migrate old flat-format to new nested structure FIRST ──
+        # This ensures all downstream reconstruction works on the new layout.
+
+        # Migrate old-format flat method state fields into method_state
+        _METHOD_KEYS = [
+            'jury_guidelines', 'debate_rounds', 'scientific_state',
+            'socratic_state', 'jury_weighted_ranking', 'pre_mortem_state',
+            'bayesian_state', 'dialectical_state', 'analogical_state',
+            'delphi_state', 'cove_state', 'sot_state', 'tot_state', 'pot_state',
+            'self_discover_state', 'writing_state', 'coding_state',
+            'brainstorming_state', 'cross_language_state',
+        ]
+        if 'method_state' not in data:
+            raw: dict[str, Any] = {}
+            for key in _METHOD_KEYS:
+                val = data.pop(key, None)
+                if val is not None and val != [] and val != {}:
+                    if key == 'debate_rounds':
+                        raw.setdefault('debate', {})['rounds'] = val
+                    elif key == 'jury_guidelines':
+                        raw.setdefault('jury', {})['guidelines'] = val
+                    elif key == 'jury_weighted_ranking':
+                        raw.setdefault('jury', {})['weighted_ranking'] = val
+                    else:
+                        method_name = key.replace('_state', '')
+                        raw[method_name] = val
+            if raw:
+                data['method_state'] = {'data': raw}
+
+        # Migrate old-format flat cost fields into cost_state
+        if 'cost_state' not in data:
+            cost_fields = {}
+            for key in ('total_cost_usd', 'phase_costs', 'detailed_token_usage',
+                        'phase_costs_by_key', '_phase_models_by_key'):
+                if key in data:
+                    cost_fields[key] = data.pop(key)
+            if cost_fields:
+                data['cost_state'] = cost_fields
+
+        # Migrate old-format flat conversation fields into conversation_state
+        if 'conversation_state' not in data:
+            conv_fields = {}
+            for key in ('conversation_history', 'conversation_id', 'turn_number',
+                        'previous_synthesis', 'agent_model'):
+                if key in data:
+                    conv_fields[key] = data.pop(key)
+            if conv_fields:
+                data['conversation_state'] = conv_fields
+
+        # Migrate old-format flat fields into core/meta/remainder sub-objects
+        if 'core' not in data:
+            core_fields = {}
+            for key in ('problem', 'enhanced_problem', 'task_type', 'task_type_rationale',
+                        'language', 'complexity', 'decomposition', 'candidates', 'scores',
+                        'top_candidates', 'stress_results', 'final_solution', 'errors',
+                        'attachments', 'generation_candidates', 'critic_scores',
+                        'verification_results', 'meta_evaluation'):
+                if key in data:
+                    core_fields[key] = data.pop(key)
+            if core_fields:
+                data['core'] = core_fields
+
+        if 'meta' not in data:
+            meta_fields = {}
+            for key in ('started_at', 'phase_logs', 'phase_tokens', 'phase_durations',
+                        'phase_models', 'phase_results', 'quality_hints', 'quality_history',
+                        'preset_name', 'method', 'context_quality'):
+                if key in data:
+                    meta_fields[key] = data.pop(key)
+            if meta_fields:
+                data['meta'] = meta_fields
+
+        if 'remainder' not in data:
+            remainder_fields = {}
+            for key in ('neuro_context', 'reflexion_memory', 'web_discovery_results',
+                        'vetted_context', 'synthesis_subagent_outputs',
+                        'critique_subagent_outputs', 'decomposition_subagent_outputs',
+                        'enhancement_subagent_outputs', 'search_subagent_outputs',
+                        'pending_events', '_followup_cache'):
+                if key in data:
+                    remainder_fields[key] = data.pop(key)
+            if remainder_fields:
+                data['remainder'] = remainder_fields
+
+        # ── Phase B: Reconstruct nested types in the new layout ──
+        core = data.get('core', {})
+        meta = data.get('meta', {})
+
         # Convert string enums back to Enum types
-        if data.get('task_type'):
+        if core.get('task_type'):
             try:
-                data['task_type'] = TaskType(data['task_type'])
+                core['task_type'] = TaskType(core['task_type'])
             except ValueError:
-                data['task_type'] = None
-        if data.get('started_at'):
-            dt = datetime.fromisoformat(data['started_at'])
+                core['task_type'] = None
+        if meta.get('started_at'):
+            dt = datetime.fromisoformat(meta['started_at'])
             if dt.tzinfo is None:
                 dt = dt.replace(tzinfo=timezone.utc)
-            data['started_at'] = dt
-        
-        # Reconstruct decomposition.
+            meta['started_at'] = dt
+
+        # Reconstruct decomposition inside core
         # The LLM returns extra keys (causal_chain, critical_sources, …) that are
         # not in the Decomposition dataclass.  Strip unknown keys before unpacking
         # so that a saved state with any LLM-generated decomposition can be resumed.
         # CRITICAL: Use defensive .get() for ALL nested dataclasses to handle
         # truncated or corrupted state files gracefully.
-        if data.get('decomposition'):
-            dec = data['decomposition']
+        if core.get('decomposition'):
+            dec = core['decomposition']
             # SubProblem reconstruction with error handling and type coercion
             _sub_problems = []
             for sp in dec.get('sub_problems', []):
@@ -865,30 +1473,30 @@ class PipelineState:
             
             # Strip unknown keys before constructing Decomposition
             _known = {f.name for f in dc_fields(Decomposition)}
-            data['decomposition'] = Decomposition(**{k: v for k, v in dec.items() if k in _known})
-        
+            core['decomposition'] = Decomposition(**{k: v for k, v in dec.items() if k in _known})
+
         # Reconstruct candidates with PerspectiveType
-        if data.get('candidates'):
+        if core.get('candidates'):
             _candidates = []
-            for c in data['candidates']:
+            for c in core['candidates']:
                 try:
                     _candidates.append(SolutionCandidate(
-                        perspective=PerspectiveType(c['perspective']),
+                        perspective=PerspectiveRegistry.coerce(c['perspective']),
                         content=c['content'],
                         key_insights=c['key_insights'],
                         model_used=c['model_used']
                     ))
                 except (ValueError, KeyError):
                     pass # skip malformed candidate
-            data['candidates'] = _candidates
-        
+            core['candidates'] = _candidates
+
         # Reconstruct scores with PerspectiveType
-        if data.get('scores'):
+        if core.get('scores'):
             _scores = []
-            for s in data['scores']:
+            for s in core['scores']:
                 try:
                     _scores.append(CritiqueScore(
-                        perspective=PerspectiveType(s['perspective']),
+                        perspective=PerspectiveRegistry.coerce(s['perspective']),
                         logical_consistency=s['logical_consistency'],
                         evidence_support=s['evidence_support'],
                         failure_resilience=s['failure_resilience'],
@@ -898,31 +1506,31 @@ class PipelineState:
                     ))
                 except (ValueError, KeyError):
                     pass # skip malformed score
-            data['scores'] = _scores
-        
+            core['scores'] = _scores
+
         # Reconstruct top_candidates
-        if data.get('top_candidates'):
+        if core.get('top_candidates'):
             _top_candidates = []
-            for c in data['top_candidates']:
+            for c in core['top_candidates']:
                 try:
                     _top_candidates.append(SolutionCandidate(
-                        perspective=PerspectiveType(c['perspective']),
+                        perspective=PerspectiveRegistry.coerce(c['perspective']),
                         content=c['content'],
                         key_insights=c['key_insights'],
                         model_used=c['model_used']
                     ))
                 except (ValueError, KeyError):
                     pass # skip malformed candidate
-            data['top_candidates'] = _top_candidates
-        
+            core['top_candidates'] = _top_candidates
+
         # Reconstruct stress_results with ScenarioType.
         # BUG-021: _from_dict used direct subscripts sr['scenario'] etc. — a
         # truncated or older state file missing any field crashed with KeyError.
         # Use .get() + coerce (matching the live-pipeline fix from BUG-015) and
         # skip malformed entries with a warning instead of crashing the load.
-        if data.get('stress_results'):
+        if core.get('stress_results'):
             _stress_results: list[StressTestResult] = []
-            for sr in data['stress_results']:
+            for sr in core['stress_results']:
                 try:
                     _stress_results.append(StressTestResult(
                         scenario=ScenarioType.coerce(sr.get('scenario', 'optimal')),
@@ -932,11 +1540,11 @@ class PipelineState:
                     ))
                 except (ValueError, TypeError):
                     pass  # skip malformed stress result entry
-            data['stress_results'] = _stress_results
-        
+            core['stress_results'] = _stress_results
+
         # Reconstruct final_solution with ClaimLabel and MetaCognitiveAudit
-        if data.get('final_solution'):
-            fs = data['final_solution']
+        if core.get('final_solution'):
+            fs = core['final_solution']
             # If it's already a FinalSolution object (unlikely here but for safety)
             if hasattr(fs, '__dataclass_fields__'):
                 data['final_solution'] = fs
@@ -965,7 +1573,7 @@ class PipelineState:
                     except ValueError:
                         clean_labels[k] = ClaimLabel.UNKNOWN
 
-                data['final_solution'] = FinalSolution(
+                core['final_solution'] = FinalSolution(
                     core_solution=fs_dict.get('core_solution', ''),
                     critical_insights=fs_dict.get('critical_insights', []),
                     action_blueprint=fs_dict.get('action_blueprint', []),
@@ -976,20 +1584,20 @@ class PipelineState:
                     generator_attribution=fs_dict.get('generator_attribution', {}),
                     critic_weighting=fs_dict.get('critic_weighting', {})
                 )
-        
+
         # Reconstruct generation_candidates
-        if data.get('generation_candidates'):
-            data['generation_candidates'] = [
-                GenerationCandidate(**gc) for gc in data['generation_candidates']
+        if core.get('generation_candidates'):
+            core['generation_candidates'] = [
+                GenerationCandidate(**gc) for gc in core['generation_candidates']
             ]
         
         # Reconstruct critic_scores.
         # CriticDimensionScore(**v) and CriticScore(**cs) have required fields with
         # no defaults — a truncated or partially-written state file causes TypeError.
         # Build each object explicitly with .get() fallbacks and skip bad entries.
-        if data.get('critic_scores'):
+        if core.get('critic_scores'):
             new_scores = []
-            for cs in data['critic_scores']:
+            for cs in core['critic_scores']:
                 try:
                     safe_dim: dict[str, CriticDimensionScore] = {}
                     for k, v in cs.get('candidate_scores', {}).items():
@@ -1012,66 +1620,22 @@ class PipelineState:
                     ))
                 except (TypeError, ValueError, KeyError):
                     pass  # skip malformed critic score entry
-            data['critic_scores'] = new_scores
-        
+            core['critic_scores'] = new_scores
+
         # Reconstruct verification_results with ClaimLabel
-        if data.get('verification_results'):
-            data['verification_results'] = [
+        if core.get('verification_results'):
+            core['verification_results'] = [
                 VerificationResult(
                     claim=vr['claim'],
                     source_generator=vr['source_generator'],
                     verdict=ClaimLabel(vr['verdict']),
                     evidence=vr['evidence'],
                     confidence=vr['confidence']
-                ) for vr in data['verification_results']
+                ) for vr in core['verification_results']
             ]
-        
+
         # Reconstruct meta_evaluation
-        if data.get('meta_evaluation'):
-            data['meta_evaluation'] = MetaEvaluation(**data['meta_evaluation'])
-
-        # New method state dicts — safe defaults for older state files
-        data.setdefault('method', None)
-        data.setdefault('quality_hints', {})
-        data.setdefault('quality_history', [])
-        data.setdefault('jury_weighted_ranking', [])
-        data.setdefault('pre_mortem_state', {})
-        data.setdefault('bayesian_state', {})
-        data.setdefault('dialectical_state', {})
-        data.setdefault('analogical_state', {})
-        data.setdefault('delphi_state', {})
-        data.setdefault('cove_state', {})
-        data.setdefault('sot_state', {})
-        data.setdefault('tot_state', {})
-        data.setdefault('pot_state', {})
-        data.setdefault('self_discover_state', {})
-        data.setdefault('coding_state', {})
-        data.setdefault('brainstorming_state', {})
-        data.setdefault('reflexion_memory', [])
-        data.setdefault('synthesis_subagent_outputs', [])
-        data.setdefault('critique_subagent_outputs', [])
-        data.setdefault('decomposition_subagent_outputs', [])
-        data.setdefault('enhancement_subagent_outputs', [])
-        data.setdefault('search_subagent_outputs', [])
-
-        # Migrate old-format flat cost fields into cost_state
-        if 'cost_state' not in data:
-            cost_fields = {}
-            for key in ('total_cost_usd', 'phase_costs', 'detailed_token_usage',
-                        'phase_costs_by_key', '_phase_models_by_key'):
-                if key in data:
-                    cost_fields[key] = data.pop(key)
-            if cost_fields:
-                data['cost_state'] = cost_fields
-
-        # Migrate old-format flat conversation fields into conversation_state
-        if 'conversation_state' not in data:
-            conv_fields = {}
-            for key in ('conversation_history', 'conversation_id', 'turn_number',
-                        'previous_synthesis', 'agent_model'):
-                if key in data:
-                    conv_fields[key] = data.pop(key)
-            if conv_fields:
-                data['conversation_state'] = conv_fields
+        if core.get('meta_evaluation'):
+            core['meta_evaluation'] = MetaEvaluation(**core['meta_evaluation'])
 
         return cls(**data)

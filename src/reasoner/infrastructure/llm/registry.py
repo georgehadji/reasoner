@@ -30,6 +30,11 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # OpenAI
     "gpt-5":            {"model": "openai/gpt-5.4"},
     "gpt-5-mini":       {"model": "openai/gpt-5.4-mini"},
+    "gpt-5.3-codex":    {"model": "openai/gpt-5.3-codex"},
+    "gpt-5.2-codex":    {"model": "openai/gpt-5.2-codex"},
+    "gpt-5.1-codex":    {"model": "openai/gpt-5.1-codex"},
+    "gpt-5.1-codex-max": {"model": "openai/gpt-5.1-codex-max"},
+    "gpt-5.1-codex-mini": {"model": "openai/gpt-5.1-codex-mini"},
     "gpt-4o":           {"model": "openai/gpt-4o"},
     MODEL_GPT4O_MINI:   {"model": "openai/gpt-4o-mini"},
     "o3":               {"model": "openai/o3"},
@@ -44,6 +49,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "grok-4.20":        {"model": "x-ai/grok-4.20"},
     "grok-4.1-fast":    {"model": "x-ai/grok-4.1-fast"},
     "grok-4":           {"model": "x-ai/grok-4"},
+    "grok-4.3":         {"model": "x-ai/grok-4.3"},
     "grok-3":           {"model": "x-ai/grok-3"},
     "grok-3-mini":      {"model": "x-ai/grok-3-mini"},
     # Perplexity
@@ -56,6 +62,10 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "mistral-medium":   {"model": "mistralai/mistral-medium-3.1"},
     "mistral-small":    {"model": "mistralai/mistral-small-3.2-24b-instruct"},
     "codestral":        {"model": "mistralai/codestral-2501"},
+    "codestral-2508":   {"model": "mistralai/codestral-2508"},
+    "devstral":         {"model": "mistralai/devstral-2512"},
+    "devstral-medium":  {"model": "mistralai/devstral-medium"},
+    "devstral-small":   {"model": "mistralai/devstral-small"},
     "ministral-8b":     {"model": "mistralai/mistral-small-3.2-24b-instruct"},
     "ministral-3b":     {"model": "mistralai/mistral-small-3.2-24b-instruct"},
     # DeepSeek
@@ -63,6 +73,9 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "deepseek-v3.1-nex-n1": {"model": "nex-agi/deepseek-v3.1-nex-n1"},
     "deepseek-r1":      {"model": "deepseek/deepseek-r1-0528"},
     "deepseek-r1t2-chimera": {"model": "tngtech/deepseek-r1t2-chimera"},
+    "deepseek-v4-flash": {"model": "deepseek/deepseek-v4-flash"},
+    "deepseek-v4-flash-free": {"model": "deepseek/deepseek-v4-flash:free"},
+    "deepseek-v4-pro":  {"model": "deepseek/deepseek-v4-pro"},
     # Qwen
     "qwen3-max":           {"model": "qwen/qwen3.6-plus"},
     "qwen3.6-plus":        {"model": "qwen/qwen3.6-plus"},
@@ -70,6 +83,8 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "qwen3.5-plus":        {"model": "qwen/qwen3.5-plus-20260420"},
     "qwen3-turbo":         {"model": "qwen/qwen-turbo"},
     "qwen3-coder":         {"model": "qwen/qwen3-coder-plus"},
+    "qwen3-coder-next":    {"model": "qwen/qwen3-coder-next"},
+    "qwen3-coder-flash":   {"model": "qwen/qwen3-coder-flash"},
     "qwen3.5-flash":       {"model": "qwen/qwen3.5-flash-02-23"},
     "qwen3.5-9b":          {"model": "qwen/qwen3.5-9b"},
     "qwen3.5-27b":         {"model": "qwen/qwen3.5-27b"},
@@ -97,6 +112,9 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "glm-4.7-flash":    {"model": "z-ai/glm-4.7-flash"},
     # Elephant
     "elephant-alpha":   {"model": "openrouter/elephant-alpha"},
+    # OpenRouter
+    "owl-alpha":        {"model": "openrouter/owl-alpha"},
+    "pareto-code":      {"model": "openrouter/pareto-code"},
     # Arcee AI
     "arcee-trinity-large-thinking": {"model": "arcee-ai/trinity-large-thinking"},
     "arcee-virtuoso-large":         {"model": "arcee-ai/virtuoso-large"},
@@ -111,6 +129,9 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "minimax-m2.5":     {"model": "minimax/minimax-m2.5"},
     "minimax-m2.5-free": {"model": "minimax/minimax-m2.5:free"},
     "minimax-m2.7":     {"model": "minimax/minimax-m2.7"},
+    "minimax-m1":       {"model": "minimax/minimax-m1"},
+    # Tencent
+    "hy3-preview":      {"model": "tencent/hy3-preview"},
     # Baidu
     "qianfan-ocr-fast": {"model": "baidu/qianfan-ocr-fast:free"},
     # inclusionAI (Ant Group)
@@ -128,6 +149,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "gemini-3.1-flash-image-preview": {"model": "google/gemini-3.1-flash-image-preview", "extra_body": {"include_images": True}},
     "gpt-5-image":                   {"model": "openai/gpt-5-image", "extra_body": {"include_images": True}},
     "gpt-5-image-mini":              {"model": "openai/gpt-5-image-mini", "extra_body": {"include_images": True}},
+    "gpt-5.4-image-2":               {"model": "openai/gpt-5.4-image-2", "extra_body": {"include_images": True}},
     # Flux 2 (Black Forest Labs)
     "flux.2-pro":                    {"model": "black-forest-labs/flux.2-pro", "extra_body": {"include_images": True}},
     "flux.2-flex":                   {"model": "black-forest-labs/flux.2-flex", "extra_body": {"include_images": True}},
@@ -141,6 +163,15 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "riverflow-v2-max-preview":      {"model": "sourceful/riverflow-v2-max-preview", "extra_body": {"include_images": True}},
     "riverflow-v2-standard-preview": {"model": "sourceful/riverflow-v2-standard-preview", "extra_body": {"include_images": True}},
     "riverflow-v2-fast-preview":     {"model": "sourceful/riverflow-v2-fast-preview", "extra_body": {"include_images": True}},
+    # Recraft (vector illustration, icons, design)
+    "recraft-v4":                    {"model": "recraft/recraft-v4", "extra_body": {"include_images": True}},
+    "recraft-v4-pro":                {"model": "recraft/recraft-v4-pro", "extra_body": {"include_images": True}},
+    "recraft-v4.1":                  {"model": "recraft/recraft-v4.1", "extra_body": {"include_images": True}},
+    "recraft-v4.1-pro":              {"model": "recraft/recraft-v4.1-pro", "extra_body": {"include_images": True}},
+    "recraft-v4.1-utility":          {"model": "recraft/recraft-v4.1-utility", "extra_body": {"include_images": True}},
+    "recraft-v4.1-utility-pro":      {"model": "recraft/recraft-v4.1-utility-pro", "extra_body": {"include_images": True}},
+    "recraft-v4.1-vector":           {"model": "recraft/recraft-v4.1-vector", "extra_body": {"include_images": True}},
+    "recraft-v4.1-pro-vector":       {"model": "recraft/recraft-v4.1-pro-vector", "extra_body": {"include_images": True}},
     # Ollama (local)
     "ollama-llama3":    {"cls": "compat", "model": "llama3",    "base": f"{DEFAULT_OLLAMA_URL}/v1", "env": "OLLAMA_API_KEY", "is_local": True},
     "ollama-llama3.1":  {"cls": "compat", "model": "llama3.1",  "base": f"{DEFAULT_OLLAMA_URL}/v1", "env": "OLLAMA_API_KEY", "is_local": True},

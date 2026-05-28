@@ -37,7 +37,7 @@ _build_provider = None
 def _get_build_provider():
     global _build_provider
     if _build_provider is None:
-        from reasoner.llm import build_provider
+        from reasoner.infrastructure.llm.registry import build_provider
         _build_provider = build_provider
     return _build_provider
 
@@ -281,67 +281,13 @@ def _should_include_result(result: dict[str, Any]) -> bool:
 #  Discovery Client
 # ─────────────────────────────────────────────
 
-class DiscoveryClient:
-    """Client for interacting with the internal Web Discovery Engine."""
+from reasoner.infrastructure.search.port import SearchServicePort
+from reasoner.infrastructure.search.searxng_adapter import SearXNGAdapter
 
+# DiscoveryClient now wraps SearXNGAdapter to conform to SearchServicePort
+class DiscoveryClient(SearchServicePort):
     def __init__(self, base_url: str = DEFAULT_SEARXNG_URL):
-        self.base_url = base_url.rstrip("/")
-        self.client = httpx.AsyncClient(timeout=TIMEOUTS.SEARCH_CLIENT)
-
-    async def _fetch_page(
-        self,
-        query: str,
-        pageno: int,
-        num_results: int,
-        categories: Optional[list[str]],
-        source_type: Optional[SourceType],
-    ) -> tuple[list[dict[str, Any]], int]:
-        """
-        Fetch one page of SearXNG results and apply the quality filter.
-
-        Returns (refined_results, total_raw_fetched).
-        """
-        params: dict[str, Any] = {"q": query, "format": "json", "pageno": pageno}
-
-        if source_type and source_type != "general":
-            engines = SOURCE_TYPE_ENGINES.get(source_type, [])
-            if engines:
-                params["engines"] = ",".join(engines)
-
-        if categories:
-            params["categories"] = ",".join(categories)
-
-        response = await self.client.get(f"{self.base_url}/search", params=params)
-        response.raise_for_status()
-        data = response.json()
-
-        raw = data.get("results", [])
-        refined: list[dict[str, Any]] = []
-        seen_norm: set[str] = set()
-
-        for r in raw:
-            content = r.get("content", "")[:TRUNCATION.SNIPPET]
-            freshness = _parse_freshness(r)
-            result = {
-                "title": r.get("title"),
-                "url": r.get("url"),
-                "content": content,
-                "snippet": content,
-                "source": r.get("engine"),
-                "full_content": r.get("content", ""),
-                "published_date": r.get("publishedDate", ""),
-                "freshness_score": freshness,
-            }
-            norm = _normalize_url(result.get("url", ""))
-            if norm in seen_norm:
-                continue
-            seen_norm.add(norm)
-            if _should_include_result(result):
-                refined.append(result)
-            else:
-                logger.debug("Filtered out search result: %s", result.get("url"))
-
-        return refined, len(raw)
+        self.adapter = SearXNGAdapter(base_url=base_url)
 
     async def search(
         self,
@@ -351,72 +297,12 @@ class DiscoveryClient:
         source_type: Optional[SourceType] = None,
         domain: Optional[str] = None,
     ) -> list[dict[str, Any]]:
-        """
-        Execute a discovery query and return filtered, freshness-annotated results.
+        return await self.adapter.search(
+            query, num_results, categories, source_type, domain
+        )
 
-        When page 1 yields fewer than 3 passing results, automatically retries
-        with page 2 and merges unique new results.
-        """
-        # FAST-FAIL: circuit breaker prevents 30s hangs when SearXNG is down
-        if not await _SEARXNG_CB.can_execute():
-            logger.warning(
-                "SearXNG circuit breaker OPEN — skipping search for %r",
-                query[:60],
-            )
-            return []
-
-        if domain:
-            query = f"site:{domain} {query}"
-
-        try:
-            refined, total_raw = await self._fetch_page(
-                query, pageno=1, num_results=num_results,
-                categories=categories, source_type=source_type,
-            )
-
-            # Pagination retry: when page-1 yield is poor, pull page 2
-            _LOW_YIELD_THRESHOLD = min(3, max(1, num_results // 4))
-            if len(refined) < _LOW_YIELD_THRESHOLD:
-                logger.info(
-                    "Page 1 low yield (%d results) for query=%r — fetching page 2",
-                    len(refined), query[:80],
-                )
-                try:
-                    page2, raw2 = await self._fetch_page(
-                        query, pageno=2, num_results=num_results,
-                        categories=categories, source_type=source_type,
-                    )
-                    existing_norms = {_normalize_url(r.get("url", "")) for r in refined}
-                    new_from_p2 = [
-                        r for r in page2
-                        if _normalize_url(r.get("url", "")) not in existing_norms
-                    ]
-                    refined.extend(new_from_p2)
-                    total_raw += raw2
-                    logger.info("Page 2 added %d more results", len(new_from_p2))
-                except Exception as p2_exc:
-                    logger.debug("Page 2 fetch failed: %s", p2_exc)
-
-            # Telemetry
-            passed = len(refined)
-            if total_raw > 0:
-                logger.info(
-                    "Search quality: %d/%d results passed filtering (%.0f%%) for query=%r",
-                    passed, total_raw, (passed / total_raw) * 100, query[:80],
-                )
-
-            # Record success (HTTP OK, even if all results were filtered out)
-            await _SEARXNG_CB.record_success()
-            return refined[:num_results]
-
-        except Exception as exc:
-            # Record failure so circuit breaker can detect outage pattern
-            await _SEARXNG_CB.record_failure()
-            logger.error("Web discovery failed: %s", exc)
-            return []
-
-    async def close(self):
-        await self.client.aclose()
+    async def close(self) -> None:
+        await self.adapter.close()
 
 
 # ─────────────────────────────────────────────
@@ -735,22 +621,24 @@ async def get_search_client(
 ) -> tuple[SearchClient, Optional[SourceType]]:
     """Factory: returns SearXNG when healthy, Perplexity when SearXNG is down or
     when OpenRouter key is available and SearXNG fails."""
-    searxng_open = await _SEARXNG_CB.can_execute()
+    searxng_healthy = await _SEARXNG_CB.can_execute()
 
     # Strategy 1: SearXNG is healthy — try it first for raw source diversity
-    if searxng_open:
+    if searxng_healthy:
         try:
             client, resolved_type = await get_discovery_client(source_type=source_type)
             # Quick health check: perform a lightweight search
             health_results = await client.search("test", num_results=1)
-            if health_results is not None:
+            # Must return at least one result to be considered truly healthy
+            if health_results:
                 return client, resolved_type
+            logger.warning("SearXNG health check returned 0 results — considering fallback")
         except Exception as exc:
             logger.warning("SearXNG health check failed (%s) — considering fallback", exc)
 
     # Strategy 2: SearXNG is down or unhealthy — use Perplexity if available
     if settings.OPENROUTER_API_KEY:
-        logger.info("SearXNG circuit OPEN/unhealthy — using Perplexity fallback")
+        logger.info("SearXNG circuit OPEN/unhealthy/empty — using Perplexity fallback")
         try:
             return PerplexitySearchClient(), source_type
         except ValueError:

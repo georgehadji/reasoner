@@ -54,8 +54,15 @@ class FineTunedProvider(OpenAICompatibleProvider):
         max_retries: int = DEFAULT_MAX_RETRIES,
         extra_body: dict[str, Any] | None = None,
     ) -> None:
-        # Resolve API key: explicit > env > None (OpenAI client will error clearly)
-        resolved_key = api_key or os.getenv("OPENAI_API_KEY") or os.getenv("FINE_TUNED_API_KEY")
+        from reasoner.core.settings import settings
+        # Resolve API key: explicit > settings > env > None (OpenAI client will error clearly)
+        resolved_key = (
+            api_key 
+            or settings.OPENAI_API_KEY 
+            or settings.FINE_TUNED_API_KEY 
+            or os.getenv("OPENAI_API_KEY") 
+            or os.getenv("FINE_TUNED_API_KEY")
+        )
         super().__init__(
             model=model,
             api_key=resolved_key,

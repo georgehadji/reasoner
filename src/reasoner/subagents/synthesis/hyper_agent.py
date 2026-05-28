@@ -17,7 +17,7 @@ import asyncio
 import logging
 from typing import Any
 
-from reasoner.llm import ProviderRouter
+from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.models import FinalSolution, PipelineState
 from reasoner.subagents.models import PhaseSubAgentOutput
 from reasoner.subagents.synthesis.consensus_mapper import ConsensusMapperSubAgent

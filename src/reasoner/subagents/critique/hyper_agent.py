@@ -16,7 +16,7 @@ import asyncio
 import logging
 from typing import Any
 
-from reasoner.llm import ProviderRouter
+from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.models import CritiqueScore, PipelineState, PerspectiveType
 from reasoner.subagents.models import PhaseSubAgentOutput
 from reasoner.subagents.critique.logic_critique import LogicCritiqueSubAgent

@@ -1,97 +1,106 @@
 # Codebase Introspection Report
 
-**Generated:** 2026-03-25T00:54:21.554084
+**Generated:** 2026-05-04T09:32:22.854277+00:00
 
 ## Summary
 
-- **Total Modules:** 81
-- **Total Functions:** 843
-- **Total Classes:** 274
-- **Average Coverage:** 2.6%
+- **Total Modules:** 272
+- **Total Functions:** 1518
+- **Total Classes:** 424
+- **Average Coverage:** 0.0%
 
 ## Complexity Distribution
 
-- **LOW:** 784
-- **MEDIUM:** 59
+- **LOW:** 1361
+- **MEDIUM:** 157
 - **HIGH:** 0
 - **CRITICAL:** 0
 
 ## Severity Summary
 
-- **P1:** 19
-- **P2:** 8
-- **P3:** 782
+- **P1:** 16
+- **P2:** 37
+- **P3:** 1379
 
 ## Error Handling Gaps
 
-**Total Gaps:** 19
+**Total Gaps:** 16
 
 ### Top 20 Gaps
 
 | Function | File | Gap Type | Recommendation |
 |----------|------|----------|----------------|
-| save | models.py | no_handling | Add try/except block around I/O operations |
-| load | models.py | no_handling | Add try/except block around I/O operations |
-| export_to_json | renderer.py | no_handling | Add try/except block around I/O operations |
-| save_events | infrastructure\persistence\event_store.py | no_handling | Add try/except block around I/O operations |
-| get_events | infrastructure\persistence\event_store.py | no_handling | Add try/except block around I/O operations |
-| list_pipelines | infrastructure\persistence\event_store.py | no_handling | Add try/except block around I/O operations |
-| get_aggregate_state | infrastructure\persistence\event_store.py | no_handling | Add try/except block around I/O operations |
-| save_snapshot | infrastructure\persistence\event_store.py | no_handling | Add try/except block around I/O operations |
-| get_snapshot | infrastructure\persistence\event_store.py | no_handling | Add try/except block around I/O operations |
-| count_events | infrastructure\persistence\event_store.py | no_handling | Add try/except block around I/O operations |
-| delete_aggregate | infrastructure\persistence\event_store.py | no_handling | Add try/except block around I/O operations |
-| get_stats | infrastructure\persistence\event_store.py | no_handling | Add try/except block around I/O operations |
-| save_events | infrastructure\persistence\postgres_store.py | no_handling | Add try/except block around I/O operations |
-| save_snapshot | infrastructure\persistence\postgres_store.py | no_handling | Add try/except block around I/O operations |
-| save_read_model | infrastructure\persistence\postgres_store.py | no_handling | Add try/except block around I/O operations |
-| delete_aggregate | infrastructure\persistence\postgres_store.py | no_handling | Add try/except block around I/O operations |
-| execute_widget | infrastructure\widgets\registry.py | no_handling | Add try/except block around I/O operations |
-| load_config | neuro\config.py | no_handling | Add try/except block around I/O operations |
-| ingest | neuro\sessions.py | no_handling | Add try/except block around I/O operations |
+| run | reasoner_persuasion_defense.py | no_handling | Add try/except block around I/O operations |
+| reset_all_quotas_monthly | api\cron.py | no_handling | Add try/except block around I/O operations |
+| error_logs | api\__init__.py | no_handling | Add try/except block around I/O operations |
+| add | core\memory.py | no_handling | Add try/except block around I/O operations |
+| get_quota | infrastructure\persistence\quota_repo_postgres.py | no_handling | Add try/except block around I/O operations |
+| check_and_increment | infrastructure\persistence\quota_repo_postgres.py | no_handling | Add try/except block around I/O operations |
+| reset_monthly | infrastructure\persistence\quota_repo_postgres.py | no_handling | Add try/except block around I/O operations |
+| log_query | infrastructure\persistence\quota_repo_postgres.py | no_handling | Add try/except block around I/O operations |
+| upsert_subscription | infrastructure\persistence\subscription_repo.py | no_handling | Add try/except block around I/O operations |
+| sync_quota_for_subscription | infrastructure\persistence\subscription_repo.py | no_handling | Add try/except block around I/O operations |
+| set_subscription_status | infrastructure\persistence\subscription_repo.py | no_handling | Add try/except block around I/O operations |
+| set_subscription_status_by_paypal | infrastructure\persistence\subscription_repo.py | no_handling | Add try/except block around I/O operations |
+| execute | subagents\critique\hyper_agent.py | no_handling | Add try/except block around I/O operations |
+| execute | subagents\decomposition\hyper_agent.py | no_handling | Add try/except block around I/O operations |
+| execute | subagents\enhancement\hyper_agent.py | no_handling | Add try/except block around I/O operations |
+| execute | subagents\search\hyper_agent.py | no_handling | Add try/except block around I/O operations |
 
 ## Type Annotation Gaps
 
-**Total Gaps:** 8
+**Total Gaps:** 37
 
 ### Top 20 Gaps
 
 | Function | File | Missing Annotations |
 |----------|------|---------------------|
-| dispatch | api.py | self, request, call_next |
-| run_pipeline | api.py | request, req, authenticated, rate_limit_checked |
-| dispatch | api.py | self, request, call_next |
-| dispatch | api.py | self, request, call_next |
 | check_component | server_check.py | name, func |
-| start | neuro\cli.py | host, port |
-| archive_hot_sessions | neuro\sessions.py | self, summarize_fn |
-| pytest_configure | tests\conftest.py | config |
+| dispatch | api\middleware.py | self, request, call_next |
+| dispatch | api\middleware.py | self, request, call_next |
+| dispatch | api\middleware.py | self, request, call_next |
+| dispatch | api\middleware.py | self, request, call_next |
+| run_pipeline | api\__init__.py | request, req, user, authenticated, rate_limit_checked, quota, csrf_checked |
+| run_followup_pipeline | api\__init__.py | request, req, user, rate_limit_checked, csrf_checked |
+| search_web | api\__init__.py | req, user, rate_limit_checked |
+| clear_cache | api\__init__.py | csrf_checked |
+| stop_pipeline | api\__init__.py | run_id, user, csrf_checked |
+| estimate_cost | api\__init__.py | req, csrf_checked |
+| submit_feedback | api\__init__.py | req, csrf_checked |
+| run_with_context | api\routes\context.py | req, user, rate_limit_checked, csrf_checked, quota |
+| delete_history_entry | api\routes\history.py | entry_id, user, csrf_checked |
+| clear_history | api\routes\history.py | user, csrf_checked |
+| generate_image_endpoint | api\routes\images.py | request, body, user, rate_limit_checked, csrf_checked, quota |
+| get_api_keys_status | api\routes\keys.py | user, authenticated |
+| validate_api_keys | api\routes\keys.py | request, authenticated, csrf_checked |
+| calculate | api\routes\legacy_widgets.py | req, csrf_checked |
+| resume_pipeline | api\routes\pipelines.py | pipeline_id, user, csrf_checked |
 
 ## Dead Code
 
-**Total Items:** 782
+**Total Items:** 1379
 
 ### Top 20 Items
 
 | Type | Name | File | Reason |
 |------|------|------|--------|
-| function | add_rule | alerts.py | Public function not called anywhere in codebase |
-| function | check_and_alert | alerts.py | Public function not called anywhere in codebase |
-| function | get_alert_history | alerts.py | Public function not called anywhere in codebase |
-| function | get_active_alerts | alerts.py | Public function not called anywhere in codebase |
-| function | get_memory_usage_percent | alerts.py | Public function not called anywhere in codebase |
-| function | get_circuit_breaker_open_count | alerts.py | Public function not called anywhere in codebase |
-| function | get_health_check_success | alerts.py | Public function not called anywhere in codebase |
-| function | get_alert_manager | alerts.py | Public function not called anywhere in codebase |
-| function | dispatch | api.py | Public function not called anywhere in codebase |
-| function | validate_problem | api.py | Public function not called anywhere in codebase |
-| function | validate_preset | api.py | Public function not called anywhere in codebase |
-| function | validate_source_type | api.py | Public function not called anywhere in codebase |
-| function | validate_domain | api.py | Public function not called anywhere in codebase |
-| function | run_stream | api.py | Public function not called anywhere in codebase |
-| function | check_rate_limit | api.py | Public function not called anywhere in codebase |
-| function | require_auth | api.py | Public function not called anywhere in codebase |
-| function | optional_auth | api.py | Public function not called anywhere in codebase |
-| function | run_pipeline | api.py | Public function not called anywhere in codebase |
-| function | clear_cache | api.py | Public function not called anywhere in codebase |
-| function | stop_pipeline | api.py | Public function not called anywhere in codebase |
+| function | authorize | auth.py | Public function not called anywhere in codebase |
+| function | check_scopes | auth.py | Public function not called anywhere in codebase |
+| function | revoke_key | auth.py | Public function not called anywhere in codebase |
+| function | list_keys | auth.py | Public function not called anywhere in codebase |
+| function | get_rate_limit_tier | auth.py | Public function not called anywhere in codebase |
+| function | state | circuit_breaker.py | Public function not called anywhere in codebase |
+| function | stats | circuit_breaker.py | Public function not called anywhere in codebase |
+| function | reset_all_circuits | circuit_breaker.py | Public function not called anywhere in codebase |
+| function | decide | gate_agent.py | Public function not called anywhere in codebase |
+| function | filter | logging_utils.py | Public function not called anywhere in codebase |
+| function | set_correlation_id | logging_utils.py | Public function not called anywhere in codebase |
+| function | critical | logging_utils.py | Public function not called anywhere in codebase |
+| function | timed_async | logging_utils.py | Public function not called anywhere in codebase |
+| function | configure_logging | logging_utils.py | Public function not called anywhere in codebase |
+| function | total | models.py | Public function not called anywhere in codebase |
+| function | total | models.py | Public function not called anywhere in codebase |
+| function | synthesis | models.py | Public function not called anywhere in codebase |
+| function | total_cost_usd | models.py | Public function not called anywhere in codebase |
+| function | phase_costs | models.py | Public function not called anywhere in codebase |
+| function | detailed_token_usage | models.py | Public function not called anywhere in codebase |

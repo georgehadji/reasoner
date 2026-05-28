@@ -78,7 +78,7 @@ def main():
     
     # Check 6: LLM Providers
     def check_llm():
-        from reasoner.llm import _REGISTRY as registry
+        from reasoner.infrastructure.llm.registry import _REGISTRY as registry
         return len(registry) > 10
     checks.append(check_component("LLM Providers", check_llm))
     

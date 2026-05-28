@@ -76,7 +76,7 @@ class RunPipelineCommandHandler:
         
         # Execute pipeline phases
         from reasoner.pipeline import ReasonerPipeline
-        from reasoner.llm import ProviderRouter
+        from reasoner.infrastructure.llm.router import ProviderRouter
         
         router = ProviderRouter(primary=self.llm_router)
         pipeline = ReasonerPipeline(
@@ -442,7 +442,7 @@ def get_handler_registry(llm_router: Any = None, event_store: Any = None) -> Han
     global _handler_registry
     if _handler_registry is None:
         if llm_router is None:
-            from reasoner.llm import ProviderRouter
+            from reasoner.infrastructure.llm.router import ProviderRouter
             llm_router = ProviderRouter()
         _handler_registry = HandlerRegistry(llm_router, event_store)
     return _handler_registry

@@ -67,10 +67,62 @@ def cove_answer_prompt(state: PipelineState) -> str:
         f'"reasoning": "<why>"'
         f'}}]}}'
     )
+def cove_answer_prompt_single(question: dict) -> str:
+    """Factored variant (CoVE paper Sec 3.3). One question per call, no baseline draft."""
+    return (
+        f'Question: {question.get("question", "")}\n\n'
+        f'Answer this question accurately using your own knowledge. '
+        f'Do NOT refer to any previous draft or response.\n\n'
+        f'Output JSON: {{'
+        f'"answer": "<your answer>", '
+        f'"confidence": 0.8, '
+        f'"reasoning": "<why>"'
+        f'}}'
+    )
+
+# Factor+Revise Cross-Check (CoVE paper, Sec 3.4)
+COVE_CROSSCHECK_SYSTEM = (
+    "You are an inconsistency detector. Compare verification answers against "
+    "original claims and report mismatches. " + JSON_ONLY_FOOTER
+)
+
+def cove_crosscheck_prompt(state: PipelineState) -> str:
+    """Generate a cross-check prompt to detect inconsistencies between
+    independent verification answers and the original draft claims."""
+    draft = state.cove_state.get("draft_answer", "")
+    answers = state.cove_state.get("verification_answers", [])
+    return (
+        f'{get_language_instruction(state)}\n\n'
+        f'Original Draft:\n{_wrap_external_content(draft)}\n\n'
+        f'Verification Results:\n{json.dumps(answers, indent=2)}\n\n'
+        f'For EACH verification result, determine if the answer contradicts '
+        f'the original draft claim. Report any inconsistencies found.\n\n'
+        f'Output JSON: {{"inconsistencies": [{{'
+        f'"claim": "<original claim>", '
+        f'"verification_answer": "<what was found>", '
+        f'"is_contradiction": true, '
+        f'"resolution": "<suggested fix>"'
+        f'}}]}}'
+    )
+
+# Few-Shot Demonstrations (CoVE paper, Sec 3.4)
+COVE_FEW_SHOT = (
+    "Example 1:\n"
+    "Draft: The Mexican-American War was from 1846 to 1848.\n"
+    "Verification Q: When did the Mexican-American war start?\n"
+    "Verified Answer: 1846. Therefore the draft is consistent.\n"
+    "Result: Consistent. No change needed.\n\n"
+    "Example 2:\n"
+    "Draft: Hillary Clinton was born in NY, New York.\n"
+    "Verification Q: Where was Hillary Clinton born?\n"
+    "Verified Answer: Chicago, Illinois. Therefore the draft is WRONG.\n"
+    "Result: INCONSISTENCY detected. Draft must be corrected.\n"
+)
+
 
 COVE_REVISE_SYSTEM = (
     "You are a careful editor. Given a draft answer and independent verification results, "
-    "revise the answer to correct errors, add caveats, and improve accuracy. " + JSON_ONLY_FOOTER
+    "revise the entire answer to correct errors. When cross-check inconsistencies are present, you MUST correct them. Add caveats where evidence is uncertain. " + JSON_ONLY_FOOTER
 )
 
 def cove_revise_prompt(state: PipelineState) -> str:

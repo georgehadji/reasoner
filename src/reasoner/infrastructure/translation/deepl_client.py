@@ -29,7 +29,8 @@ class DeepLClient:
     """Lightweight async client for the DeepL REST API."""
 
     def __init__(self, api_key: str | None = None) -> None:
-        self.api_key = api_key or os.getenv("DEEPL_API_KEY")
+        from reasoner.core.settings import settings
+        self.api_key = api_key or settings.DEEPL_API_KEY or os.getenv("DEEPL_API_KEY")
         self.base_url = _get_base_url(self.api_key)
         self._client: httpx.AsyncClient | None = None
 

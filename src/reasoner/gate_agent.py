@@ -25,7 +25,7 @@ from reasoner.core.constants import (
     GATE_TEMPERATURE,
     GATE_TIMEOUT_SECONDS,
 )
-from reasoner.llm import ProviderRouter
+from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.utils.json_safe import safe_json_loads, JSONDepthExceededError
 
 logger = logging.getLogger(__name__)

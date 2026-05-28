@@ -203,8 +203,14 @@ MODEL_GEMINI_PRO_IMAGE: str = "gemini-pro-image"
 MODEL_GEMINI_31_FLASH_IMAGE_PREVIEW: str = "gemini-3.1-flash-image-preview"
 MODEL_GPT5_IMAGE: str = "gpt-5-image"
 MODEL_GPT5_IMAGE_MINI: str = "gpt-5-image-mini"
+MODEL_GPT54_IMAGE_2: str = "gpt-5.4-image-2"
 MODEL_FLUX_2_PRO: str = "flux.2-pro"
 MODEL_FLUX_2_FLEX: str = "flux.2-flex"
+# Recraft (vector illustration, icons, design)
+MODEL_RECRAFT_V4: str = "recraft-v4"
+MODEL_RECRAFT_V4_PRO: str = "recraft-v4-pro"
+MODEL_RECRAFT_V41: str = "recraft-v4.1"
+MODEL_RECRAFT_V41_PRO: str = "recraft-v4.1-pro"
 
 # Qwen (temperature-supporting, non-OpenAI)
 MODEL_QWEN35_FLASH: str = "qwen3.5-flash"
@@ -224,8 +230,7 @@ MODEL_MIMO_V2_PRO: str = "mimo-v2-pro"
 MODEL_MIMO_V2_FLASH: str = "mimo-v2-flash"
 
 # DeepSeek (reasoning-effort modes)
-# NOTE: deepseek-v4-pro and deepseek-v4-flash do not exist on OpenRouter.
-# Use gemini-pro / gemini-flash-lite as low-latency replacements.
+# Verified low-latency models: gemini-pro / gemini-flash-lite
 MODEL_GEMINI_FLASH_LITE: str = "gemini-flash-lite"
 MODEL_GLM_47_FLASH: str = "glm-4.7-flash"
 MODEL_MISTRAL_SMALL: str = "mistral-small"
@@ -412,15 +417,15 @@ IMAGE_GEN_COMPLETION_TIMEOUT_SECONDS: float = 90.0
 IMAGE_GEN_ENHANCEMENT_MODEL: str = MODEL_GEMINI_FLASH
 IMAGE_GEN_PRESETS: dict[str, list[str]] = {
     "budget": ["riverflow-v2-fast-preview", "gemini-flash-image"],
-    "premium": ["gemini-pro-image", "gpt-5-image"],
+    "premium": ["gpt-5.4-image-2", "recraft-v4.1-pro"],
     IMAGE_GEN_BUDGET_PRESET: ["riverflow-v2-fast-preview", "gemini-flash-image"],
-    IMAGE_GEN_PREMIUM_PRESET: ["gemini-pro-image", "gpt-5-image"],
+    IMAGE_GEN_PREMIUM_PRESET: ["gpt-5.4-image-2", "recraft-v4.1-pro"],
 }
 IMAGE_GEN_FALLBACKS: dict[str, list[str]] = {
-    "budget": ["seedream-4.5", "flux.2-pro"],
-    "premium": ["gemini-3.1-flash-image-preview", "gemini-flash-image"],
-    IMAGE_GEN_BUDGET_PRESET: ["seedream-4.5", "flux.2-pro"],
-    IMAGE_GEN_PREMIUM_PRESET: ["gemini-3.1-flash-image-preview", "gemini-flash-image"],
+    "budget": ["seedream-4.5", "flux.2-pro", "recraft-v4.1-utility"],
+    "premium": ["gpt-5-image", "gemini-3.1-flash-image-preview", "recraft-v4-pro"],
+    IMAGE_GEN_BUDGET_PRESET: ["seedream-4.5", "flux.2-pro", "recraft-v4.1-utility"],
+    IMAGE_GEN_PREMIUM_PRESET: ["gpt-5-image", "gemini-3.1-flash-image-preview", "recraft-v4-pro"],
 }
 IMAGE_GEN_ENHANCEMENT_SYSTEM_PROMPT: str = (
     "You are an expert image-generation prompt engineer for DALL-E 3, Midjourney, and Flux. "

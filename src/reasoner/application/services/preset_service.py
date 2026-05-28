@@ -6,7 +6,8 @@ import logging
 import os
 from typing import Any
 
-from reasoner.llm import ProviderRouter, _REGISTRY
+from reasoner.infrastructure.llm.router import ProviderRouter
+from reasoner.infrastructure.llm.registry import _REGISTRY
 from reasoner.presets import build_auto_preset, build_custom_router, get_preset
 
 logger = logging.getLogger(__name__)
@@ -47,21 +48,32 @@ class PresetService:
     ) -> tuple[str, ProviderRouter]:
         """
         Build a ProviderRouter from a preset or custom routing.
-
-        Args:
-            preset_name: The preset identifier (e.g. 'multi-perspective-budget').
-            custom_routing: Optional explicit routing dict (bypasses preset).
-            agent_model: Optional override for synthesis/classification/decomposition.
-
-        Returns:
-            (effective_preset_name, router)
+        Validates model IDs against the registry at this layer.
         """
         if custom_routing:
+            # Validate custom routing
+            for model_id in custom_routing.values():
+                if model_id not in _REGISTRY:
+                    raise ValueError(f"Unknown model ID: {model_id}")
+            
             filtered = self.filter_routing(custom_routing, "claude-sonnet")
             router = build_custom_router(filtered)
             return preset_name, router
 
         preset = get_preset(preset_name)
+        
+        # Validate preset configuration
+        if preset.primary_id not in _REGISTRY:
+             raise ValueError(f"Preset primary model '{preset.primary_id}' not in registry.")
+        
+        for role, mid in preset.routing.items():
+            if mid not in _REGISTRY:
+                raise ValueError(f"Preset '{preset_name}' role '{role}' uses unknown model '{mid}'")
+        
+        for role, mid in preset.fallback_routing.items():
+            if mid not in _REGISTRY:
+                raise ValueError(f"Preset '{preset_name}' role '{role}' fallback uses unknown model '{mid}'")
+                
         filtered_routing = self.filter_routing(preset.routing, preset.primary_id)
 
         if agent_model:

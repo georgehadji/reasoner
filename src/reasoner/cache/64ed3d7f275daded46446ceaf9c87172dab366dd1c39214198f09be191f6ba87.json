@@ -1,1 +1,0 @@
-[{"type": "start", "preset": "writing-budget", "auto_selected_method": "writing"}, {"type": "done", "errors": ["Pipeline processing error: ImportError: cannot import name 'ReasonerPipeline' from 'reasoner.pipeline' (E:\\Documents\\Vibe-Coding\\Reasoner\\src\\reasoner\\pipeline."]}]

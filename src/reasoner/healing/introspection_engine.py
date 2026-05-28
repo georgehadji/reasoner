@@ -771,25 +771,25 @@ def main():
         with open(__file__, encoding='utf-8') as f:
             source = f.read()
         ast.parse(source)  # Syntax check
-        print("✓ Syntax valid")
+        print("[OK] Syntax valid")
         
         # Check all functions are discoverable
         tree = ast.parse(source)
         functions = [n.name for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)]
         assert len(functions) > 0, "No functions found"
-        print(f"✓ {len(functions)} functions discoverable")
+        print(f"[OK] {len(functions)} functions discoverable")
         
         # Verify report was generated
         assert json_path.exists(), "JSON report not generated"
-        print("✓ JSON report generated")
+        print("[OK] JSON report generated")
         
         assert md_path.exists(), "Markdown report not generated"
-        print("✓ Markdown report generated")
+        print("[OK] Markdown report generated")
         
-        print("\n✅ ALL SELF-VERIFICATION CHECKS PASSED")
+        print("\n[PASS] ALL SELF-VERIFICATION CHECKS PASSED")
         
     except Exception as e:
-        print(f"\n❌ SELF-VERIFICATION FAILED: {e}")
+        print(f"\n[FAIL] SELF-VERIFICATION FAILED: {e}")
         sys.exit(1)
 
 

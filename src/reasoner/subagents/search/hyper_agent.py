@@ -14,7 +14,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from reasoner.llm import ProviderRouter
+from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.models import PipelineState
 from reasoner.subagents.models import PhaseSubAgentOutput
 from reasoner.subagents.search.query_generator import QueryGeneratorSubAgent

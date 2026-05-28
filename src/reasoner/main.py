@@ -56,7 +56,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from reasoner.pipeline import ReasonerPipeline
 from reasoner.renderer import export_to_json, render_pipeline_result
-from reasoner.llm import ProviderRouter, list_models
+from reasoner.infrastructure.llm.router import ProviderRouter
+from reasoner.infrastructure.llm.registry import list_models
 from reasoner.core.settings import settings  # triggers dotenv load
 from reasoner.core.constants import DEFAULT_CLI_PRESET
 from reasoner.presets import (
@@ -82,38 +83,23 @@ logger = logging.getLogger(__name__)
 # ROUTER BUILDER
 # ─────────────────────────────────────────────────────────────────────
 
+from reasoner.application.services.preset_service import PresetService
+
 def build_router(args: argparse.Namespace) -> ProviderRouter:
     """
     Resolve router from CLI args.
     Priority: --routing > --preset > default (multi-perspective-budget)
     """
+    service = PresetService()
     if args.routing:
-        try:
-            routing_dict: dict[str, str] = json.loads(args.routing)
-        except json.JSONDecodeError as exc:
-            print(f"[ERROR] --routing is not valid JSON: {exc}")
-            sys.exit(1)
-        if "primary" not in routing_dict:
-            print("[ERROR] --routing JSON must include a 'primary' key.")
-            sys.exit(1)
-        router = build_custom_router(routing_dict)
-        print(f"\n[Custom routing] primary={routing_dict['primary']}")
-        for role, mid in routing_dict.items():
-            if role != "primary":
-                print(f"  {role:18s} -> {mid}")
+        _, router = service.build_router("custom", custom_routing=json.loads(args.routing))
+        print(f"\n[Custom routing] primary={json.loads(args.routing)['primary']}")
         return router
 
     raw_preset = args.preset or DEFAULT_CLI_PRESET
-    # "auto", "auto-budget", "auto-premium" are resolved after the gate decision.
-    # For router construction we use the tier's default preset.
-    if raw_preset.startswith("auto"):
-        tier = raw_preset.split("-", 1)[1] if "-" in raw_preset else "budget"
-        preset_name = f"multi-perspective-{tier}"
-    else:
-        preset_name = raw_preset
-
+    preset_name, is_auto, tier = service.resolve(raw_preset)
+    
     preset = get_preset(preset_name)
-
     missing = preset.missing_keys()
     if missing:
         print(f"\n[WARNING] Preset '{preset_name}' requires API keys that are not set:")
@@ -121,12 +107,14 @@ def build_router(args: argparse.Namespace) -> ProviderRouter:
             print(f"  • {key}")
         print("  Affected phases will fail. Set keys or choose a different preset.\n")
 
-    router = preset.build_router()
-    if raw_preset.startswith("auto"):
+    _, router = service.build_router(preset_name)
+    
+    if is_auto:
         print(f"\n[Auto-routing] tier={tier} — method will be selected by HyperGate")
     else:
         print(f"\n[Preset: {preset.name}]")
         print(f"  {preset.description}")
+    
     routing_info = router.describe()
     for role, model in routing_info.items():
         print(f"  {role:22s} -> {model}")
@@ -283,11 +271,12 @@ async def main(args: argparse.Namespace) -> None:
 
             # ── Auto-method: rebuild router with gate-selected preset ──
             if is_auto and decision.method:
-                from reasoner.presets import build_auto_preset, get_preset
+                from reasoner.presets import build_auto_preset
                 effective_preset_name = build_auto_preset(decision.method, auto_tier)
                 print(f"  [Gate] Auto-selected method: {decision.method} → preset: {effective_preset_name}\n")
                 method_preset = get_preset(effective_preset_name)
-                router = method_preset.build_router()
+                service = PresetService()
+                _, router = service.build_router(effective_preset_name)
             else:
                 print(f"  [Gate] Pipeline selected ({decision.method or 'multi_perspective'}).\n")
 
@@ -325,7 +314,7 @@ async def main(args: argparse.Namespace) -> None:
         from reasoner.scraper import close_scraper_client
         await close_scraper_client()
         
-        from reasoner.llm import OpenAICompatibleProvider
+        from reasoner.infrastructure.llm.providers.openai_compat import OpenAICompatibleProvider
         await OpenAICompatibleProvider.close_shared_pool()
 
 
@@ -424,6 +413,11 @@ def parse_args() -> argparse.Namespace:
         type=str, default="",
         metavar="DOMAIN",
         help="Limit search to specific domain (e.g., github.com, stackoverflow.com)",
+    )
+    pipeline_group.add_argument(
+        "--enhance-prompt",
+        action="store_true",
+        help="Use LLM to rewrite and clarify the user's problem before execution",
     )
 
     # ── Output

@@ -766,7 +766,8 @@ def _ser_writing_premortem(state: PipelineState) -> dict:
     writing = _get_v(state, 'writing_state', {})
     pm = writing.get("pre_mortem", {}) if writing else {}
     # Prefer the revised article if corrections were applied, else show original
-    article_original = writing.get("article", "") if writing else ""
+    # We check for 'article_original' first (set by C2 fix), falling back to 'article'
+    article_original = (writing.get("article_original") or writing.get("article", "")) if writing else ""
     article_revised = writing.get("article_revised", "") if writing else ""
     return {
         "writing_state": {

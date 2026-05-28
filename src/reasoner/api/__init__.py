@@ -90,12 +90,19 @@ async def lifespan(app: FastAPI):
     uvicorn_workers = int(os.environ.get("UVICORN_WORKERS", "1"))
     if uvicorn_workers > 1:
         if settings.RATE_LIMITER_MODE == "memory":
-            logger.warning(
-                "Rate limiter is in 'memory' mode but UVICORN_WORKERS=%d. "
+            message = (
+                f"Rate limiter is in 'memory' mode but UVICORN_WORKERS={uvicorn_workers}. "
                 "Each worker maintains its own token bucket, allowing rate-limit bypass. "
-                "Set RATE_LIMITER_MODE to a shared backend (e.g., 'redis') for production.",
-                uvicorn_workers,
+                "Set RATE_LIMITER_MODE to a shared backend (e.g., 'redis')."
             )
+            if settings.ENVIRONMENT == "production":
+                logger.critical(message)
+                raise RuntimeError(
+                    f"Unsafe rate limiter configuration: RATE_LIMITER_MODE=memory with "
+                    f"UVICORN_WORKERS={uvicorn_workers} in production. "
+                    f"Set RATE_LIMITER_MODE=redis."
+                )
+            logger.warning(message)
         if settings.CIRCUIT_BREAKER_MODE == "memory":
             logger.warning(
                 "Circuit breaker is in 'memory' mode but UVICORN_WORKERS=%d. "
@@ -128,7 +135,7 @@ async def lifespan(app: FastAPI):
     if _event_store and hasattr(_event_store, 'close'):
         _event_store.close()
 
-    from reasoner.llm import OpenAICompatibleProvider
+    from reasoner.infrastructure.llm.providers.openai_compat import OpenAICompatibleProvider
     await OpenAICompatibleProvider.close_shared_pool()
 
     from reasoner.scraper import close_scraper_client
@@ -201,7 +208,7 @@ print("[DEBUG] api/__init__.py: Initializing auth manager...")
 auth_manager = get_auth_manager()
 print("[DEBUG] api/__init__.py: Auth manager initialized")
 
-from reasoner.llm import _REGISTRY
+from reasoner.infrastructure.llm.registry import _REGISTRY
 
 # Neuro Integration
 print("[DEBUG] api/__init__.py: Initializing neuro router...")
@@ -237,7 +244,7 @@ def get_architecture_components():
     if _handler_registry is None:
         # Create a simple router for new architecture components
         # Uses Claude as primary by default, falls back to legacy router for actual LLM calls
-        from reasoner.llm import build_provider, _REGISTRY
+        from reasoner.infrastructure.llm.registry import build_provider, _REGISTRY
         
         # Try to get a primary provider (use first available OpenRouter model)
         primary_provider = None
@@ -360,7 +367,18 @@ print("[DEBUG] api/__init__.py: After streaming imports")
 
 print("[DEBUG] api/__init__.py: Before auth_deps and dependencies imports")
 from reasoner.api.auth_deps import optional_auth, require_csrf
-from reasoner.api.dependencies import check_rate_limit, get_current_user, get_optional_user, check_quota_if_authenticated
+from reasoner.api.dependencies import (
+    check_rate_limit, 
+    get_current_user, 
+    get_optional_user, 
+    check_quota_if_authenticated,
+    get_preset_service,
+    get_pipeline_service,
+    get_search_service
+)
+from reasoner.application.services.preset_service import PresetService
+from reasoner.application.services.pipeline_service import PipelineService
+from reasoner.application.services.search_service import SearchService
 from reasoner.domain.saas import User, QuotaResult
 print("[DEBUG] api/__init__.py: After auth_deps and dependencies imports")
 
@@ -376,12 +394,17 @@ async def get_csrf_token():
     return {"token": generate_signed_csrf_token()}
 
 
-async def _run_stream_with_metrics(req: RunRequest, user: User | None):
-    """Wrap run_stream_cached with Prometheus metrics (Critical Enhancement 7.1)."""
+async def _run_stream_with_metrics(
+    req: RunRequest, 
+    user: User | None,
+    preset_service: PresetService,
+    pipeline_service: PipelineService,
+):
+    """Wrap run_stream_cached with Prometheus metrics."""
     from reasoner.api.metrics import REASONER_QUERIES_TOTAL, QueryTimer
     from reasoner.logging_utils import set_log_context
 
-    tier = "anonymous" if user is None else "free"  # TODO(#502): actual tier
+    tier = "anonymous" if user is None else "free"
     preset = req.preset or "auto-budget"
     set_log_context(user_id=str(user.id) if user else None, tier=tier, preset=preset)
 
@@ -390,7 +413,12 @@ async def _run_stream_with_metrics(req: RunRequest, user: User | None):
 
     has_error = False
     try:
-        async for chunk in run_stream_cached(req, user_id=str(user.id) if user else None):
+        async for chunk in run_stream_cached(
+            req, 
+            user_id=str(user.id) if user else None,
+            preset_service=preset_service,
+            pipeline_service=pipeline_service,
+        ):
             yield chunk
     except Exception:
         has_error = True
@@ -422,6 +450,8 @@ async def run_pipeline(
     rate_limit_checked = Depends(check_rate_limit),
     quota: QuotaResult | None = Depends(check_quota_if_authenticated),
     csrf_checked = Depends(require_csrf),
+    preset_service: PresetService = Depends(get_preset_service),
+    pipeline_service: PipelineService = Depends(get_pipeline_service),
 ):
     """
     Run pipeline with optional authentication and rate limiting.
@@ -440,7 +470,7 @@ async def run_pipeline(
             )
     # TODO(#502): use actual user tier from subscription DB
     return StreamingResponse(
-        _run_stream_with_metrics(req, user),
+        _run_stream_with_metrics(req, user, preset_service, pipeline_service),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -479,7 +509,8 @@ async def run_followup_pipeline(
 async def search_web(
     req: SearchRequest,
     user: User | None = Depends(get_optional_user),
-    rate_limit_checked = Depends(check_rate_limit)
+    rate_limit_checked = Depends(check_rate_limit),
+    search_service: SearchService = Depends(get_search_service),
 ):
     _require_auth_if_legacy_disabled(user)
     """
@@ -489,7 +520,6 @@ async def search_web(
     deduplicated, and grouped.
     """
     try:
-        from reasoner.application.services.search_service import SearchService
         from reasoner.core.search import smart_search
 
         if req.smart:
@@ -499,7 +529,6 @@ async def search_web(
                 num_results=req.num_results,
             )
         else:
-            search_service = SearchService()
             results = await search_service.search(
                 req.query,
                 source_type=req.source_type,

@@ -298,17 +298,10 @@ async def check_rate_limit(
 # ── Quota Service Singleton ──
 _quota_service: QuotaService | None = None
 
-
 def _get_quota_service() -> QuotaService:
-    """Factory for QuotaService with cached Postgres repository.
-
-    Caches the service instance to avoid creating new connection pools
-    on every request (Critical Enhancement 3.1).
-    """
+    """Factory for QuotaService with cached Postgres repository."""
     global _quota_service
     if _quota_service is None:
-        # Deferred imports: asyncpg (via PostgresQuotaRepository) hangs on
-        # import at startup due to platform.uname() DNS resolution in compat.py.
         from reasoner.infrastructure.persistence.quota_repo_postgres import PostgresQuotaRepository
         from reasoner.infrastructure.persistence.cached_quota_repo import CachedQuotaRepository
         dsn = settings.DATABASE_URL.replace("+asyncpg", "")
@@ -316,6 +309,23 @@ def _get_quota_service() -> QuotaService:
         cached_repo = CachedQuotaRepository(pg_repo)
         _quota_service = QuotaService(cached_repo)
     return _quota_service
+
+# ── Pipeline & Preset Services ──
+
+def get_preset_service() -> PresetService:
+    """Dependency provider for PresetService."""
+    from reasoner.application.services.preset_service import PresetService
+    return PresetService()
+
+def get_pipeline_service() -> PipelineService:
+    """Dependency provider for PipelineService."""
+    from reasoner.application.services.pipeline_service import PipelineService
+    return PipelineService()
+
+def get_search_service() -> SearchService:
+    """Dependency provider for SearchService."""
+    from reasoner.application.services.search_service import SearchService
+    return SearchService()
 
 
 def _reset_quota_service() -> None:

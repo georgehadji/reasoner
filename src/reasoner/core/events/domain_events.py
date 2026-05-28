@@ -13,40 +13,39 @@ from datetime import datetime
 from enum import Enum
 
 
-class EventType(str, Enum):
-    """Types of domain events."""
-    # Pipeline Events
+class PipelineEventType(str, Enum):
+    """Pipeline lifecycle and method events."""
     PIPELINE_STARTED = "pipeline_started"
     PHASE_STARTED = "phase_started"
     PHASE_COMPLETED = "phase_completed"
     PHASE_FAILED = "phase_failed"
     PIPELINE_COMPLETED = "pipeline_completed"
     PIPELINE_FAILED = "pipeline_failed"
-    
-    # Context Events
-    CONTEXT_FETCHED = "context_fetched"
-    CONTEXT_VETTED = "context_vetted"
-    SOURCE_ADDED = "source_added"
-    
-    # Method-Specific Events
     PERSPECTIVE_GENERATED = "perspective_generated"
     CANDIDATE_SCORED = "candidate_scored"
     STRESS_TEST_COMPLETED = "stress_test_completed"
-    
-    # Widget Events
+    RETRY_ATTEMPTED = "retry_attempted"
+    CONTEXT_FETCHED = "context_fetched"
+    CONTEXT_VETTED = "context_vetted"
+    SOURCE_ADDED = "source_added"
+    ERROR_OCCURRED = "error_occurred"
+
+
+class WidgetEventType(str, Enum):
+    """Widget lifecycle events."""
     WIDGET_DETECTED = "widget_detected"
     WIDGET_EXECUTED = "widget_executed"
     WIDGET_FAILED = "widget_failed"
-    
-    # Memory Events
+
+
+class MemoryEventType(str, Enum):
+    """Neuro memory events."""
     MEMORY_STORED = "memory_stored"
     MEMORY_RECALLED = "memory_recalled"
-    
-    # Error Events
-    ERROR_OCCURRED = "error_occurred"
-    RETRY_ATTEMPTED = "retry_attempted"
 
-    # SaaS Events
+
+class SaaSEventType(str, Enum):
+    """SaaS / billing events."""
     USER_REGISTERED = "user_registered"
     USER_LOGGED_IN = "user_logged_in"
     SUBSCRIPTION_CREATED = "subscription_created"
@@ -57,6 +56,21 @@ class EventType(str, Enum):
     QUERY_LOGGED = "query_logged"
     PAYMENT_FAILED = "payment_failed"
     PAYMENT_SUCCEEDED = "payment_succeeded"
+
+
+# Union type for backward compatibility
+_AllEventType = PipelineEventType | WidgetEventType | MemoryEventType | SaaSEventType
+
+# Old import path still resolves
+EventType = PipelineEventType  # type: ignore[misc]
+
+# For consumers that need to handle all types:
+ALL_EVENT_TYPES: dict[str, _AllEventType] = {
+    e.value: e for e in (
+        list(PipelineEventType) + list(WidgetEventType) +
+        list(MemoryEventType) + list(SaaSEventType)
+    )
+}
 
 
 @dataclass(frozen=True)
@@ -72,7 +86,7 @@ class DomainEvent:
     - version: Event version for optimistic concurrency
     """
     event_id: str
-    event_type: EventType
+    event_type: _AllEventType
     timestamp: float
     aggregate_id: str
     version: int
@@ -282,7 +296,7 @@ import time
 
 
 def make_event(
-    event_type: EventType,
+    event_type: _AllEventType,
     aggregate_id: str,
     version: int,
     **kwargs: Any
@@ -306,35 +320,52 @@ def make_event(
     )
 
 
-# Map event types to classes
-EVENT_CLASSES: dict[EventType, type[DomainEvent]] = {
-    EventType.PIPELINE_STARTED: PipelineStarted,
-    EventType.PHASE_STARTED: PhaseStarted,
-    EventType.PHASE_COMPLETED: PhaseCompleted,
-    EventType.PHASE_FAILED: PhaseFailed,
-    EventType.PIPELINE_COMPLETED: PipelineCompleted,
-    EventType.PIPELINE_FAILED: PipelineFailed,
-    EventType.CONTEXT_FETCHED: ContextFetched,
-    EventType.CONTEXT_VETTED: ContextVetted,
-    EventType.SOURCE_ADDED: SourceAdded,
-    EventType.PERSPECTIVE_GENERATED: PerspectiveGenerated,
-    EventType.CANDIDATE_SCORED: CandidateScored,
-    EventType.STRESS_TEST_COMPLETED: StressTestCompleted,
-    EventType.WIDGET_DETECTED: WidgetDetected,
-    EventType.WIDGET_EXECUTED: WidgetExecuted,
-    EventType.WIDGET_FAILED: WidgetFailed,
-    EventType.MEMORY_STORED: MemoryStored,
-    EventType.MEMORY_RECALLED: MemoryRecalled,
-    EventType.ERROR_OCCURRED: ErrorOccurred,
-    EventType.RETRY_ATTEMPTED: RetryAttempted,
-    EventType.USER_REGISTERED: DomainEvent,
-    EventType.USER_LOGGED_IN: DomainEvent,
-    EventType.SUBSCRIPTION_CREATED: DomainEvent,
-    EventType.SUBSCRIPTION_UPDATED: DomainEvent,
-    EventType.SUBSCRIPTION_CANCELLED: DomainEvent,
-    EventType.QUOTA_EXCEEDED: DomainEvent,
-    EventType.QUOTA_RESET: DomainEvent,
-    EventType.QUERY_LOGGED: DomainEvent,
-    EventType.PAYMENT_FAILED: DomainEvent,
-    EventType.PAYMENT_SUCCEEDED: DomainEvent,
+# Split registries for type-safe subscriptions
+PIPELINE_EVENT_CLASSES: dict[PipelineEventType, type[DomainEvent]] = {
+    PipelineEventType.PIPELINE_STARTED: PipelineStarted,
+    PipelineEventType.PHASE_STARTED: PhaseStarted,
+    PipelineEventType.PHASE_COMPLETED: PhaseCompleted,
+    PipelineEventType.PHASE_FAILED: PhaseFailed,
+    PipelineEventType.PIPELINE_COMPLETED: PipelineCompleted,
+    PipelineEventType.PIPELINE_FAILED: PipelineFailed,
+    PipelineEventType.CONTEXT_FETCHED: ContextFetched,
+    PipelineEventType.CONTEXT_VETTED: ContextVetted,
+    PipelineEventType.SOURCE_ADDED: SourceAdded,
+    PipelineEventType.PERSPECTIVE_GENERATED: PerspectiveGenerated,
+    PipelineEventType.CANDIDATE_SCORED: CandidateScored,
+    PipelineEventType.STRESS_TEST_COMPLETED: StressTestCompleted,
+    PipelineEventType.ERROR_OCCURRED: ErrorOccurred,
+    PipelineEventType.RETRY_ATTEMPTED: RetryAttempted,
+}
+
+WIDGET_EVENT_CLASSES: dict[WidgetEventType, type[DomainEvent]] = {
+    WidgetEventType.WIDGET_DETECTED: WidgetDetected,
+    WidgetEventType.WIDGET_EXECUTED: WidgetExecuted,
+    WidgetEventType.WIDGET_FAILED: WidgetFailed,
+}
+
+MEMORY_EVENT_CLASSES: dict[MemoryEventType, type[DomainEvent]] = {
+    MemoryEventType.MEMORY_STORED: MemoryStored,
+    MemoryEventType.MEMORY_RECALLED: MemoryRecalled,
+}
+
+SAAS_EVENT_CLASSES: dict[SaaSEventType, type[DomainEvent]] = {
+    SaaSEventType.USER_REGISTERED: DomainEvent,
+    SaaSEventType.USER_LOGGED_IN: DomainEvent,
+    SaaSEventType.SUBSCRIPTION_CREATED: DomainEvent,
+    SaaSEventType.SUBSCRIPTION_UPDATED: DomainEvent,
+    SaaSEventType.SUBSCRIPTION_CANCELLED: DomainEvent,
+    SaaSEventType.QUOTA_EXCEEDED: DomainEvent,
+    SaaSEventType.QUOTA_RESET: DomainEvent,
+    SaaSEventType.QUERY_LOGGED: DomainEvent,
+    SaaSEventType.PAYMENT_FAILED: DomainEvent,
+    SaaSEventType.PAYMENT_SUCCEEDED: DomainEvent,
+}
+
+# Shorthand backward compat
+EVENT_CLASSES: dict[_AllEventType, type[DomainEvent]] = {
+    **PIPELINE_EVENT_CLASSES,
+    **WIDGET_EVENT_CLASSES,
+    **MEMORY_EVENT_CLASSES,
+    **SAAS_EVENT_CLASSES,
 }

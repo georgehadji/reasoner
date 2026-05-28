@@ -419,7 +419,7 @@ def _get_modalities(model_id: str) -> list[str] | None:
 def _should_prefer_images_api(model_id: str) -> bool:
     """Use the dedicated images API first for image-native models."""
     lowered = model_id.lower()
-    return any(token in lowered for token in ("image", "flux", "seedream", "riverflow"))
+    return any(token in lowered for token in ("image", "flux", "seedream", "riverflow", "recraft"))
 
 
 async def _enhance_image_prompt(user_prompt: str, api_key: str | None = None) -> str:

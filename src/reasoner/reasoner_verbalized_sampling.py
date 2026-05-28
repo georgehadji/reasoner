@@ -49,7 +49,7 @@ def build_vs_prompt(query: str, mode: VSMode, k: int | None = None) -> tuple[str
     if mode == VSMode.TAIL:
         system += " Include unconventional or tail-distribution candidates."
     elif mode == VSMode.COT:
-        system += " Show step-by-by-step reasoning for each candidate."
+        system += " Show step-by-step reasoning for each candidate."
     user = (
         f"Query: {query}\n"
         f'Respond as JSON: {{"candidates": [{{"text": "...", "probability": 0.1}}]}}'

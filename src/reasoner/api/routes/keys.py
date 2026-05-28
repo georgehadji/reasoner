@@ -13,7 +13,7 @@ from reasoner.api.dependencies import get_current_user
 from reasoner.domain.saas import User
 from reasoner.auth import Scope
 from reasoner.core.constants import TIMEOUTS, VALIDATION_TEST_MAX_TOKENS
-from reasoner.llm import _REGISTRY, build_provider
+from reasoner.infrastructure.llm.registry import _REGISTRY, build_provider
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

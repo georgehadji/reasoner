@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any, Callable, Awaitable
 from collections import defaultdict
 
-from reasoner.core.events.domain_events import DomainEvent, EventType
+from reasoner.core.events.domain_events import DomainEvent, EventType, _AllEventType
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ class EventBus:
     """
     
     def __init__(self, max_queue_size: int = 1000):
-        self._handlers: dict[EventType, list[EventHandler]] = defaultdict(list)
+        self._handlers: dict[_AllEventType, list[EventHandler]] = defaultdict(list)
         self._global_handlers: list[EventHandler] = []
         self._error_handlers: list[Callable[[DomainEvent, Exception], Awaitable[None]]] = []
         self._running = False
@@ -52,7 +52,7 @@ class EventBus:
     
     def subscribe(
         self,
-        event_type: EventType,
+        event_type: _AllEventType,
         handler: EventHandler,
     ) -> None:
         """
@@ -211,7 +211,7 @@ class EventBus:
         self._global_handlers.clear()
         self._error_handlers.clear()
     
-    def get_subscriber_count(self, event_type: EventType) -> int:
+    def get_subscriber_count(self, event_type: _AllEventType) -> int:
         """Get number of subscribers for an event type."""
         return len(self._handlers.get(event_type, []))
     
@@ -249,7 +249,7 @@ def reset_event_bus() -> None:
 # EVENT HANDLER DECORATORS
 # ─────────────────────────────────────────────────────────────────────
 
-def handle_event(event_type: EventType) -> Callable[[EventHandler], EventHandler]:
+def handle_event(event_type: _AllEventType) -> Callable[[EventHandler], EventHandler]:
     """
     Decorator to register an event handler.
     

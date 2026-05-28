@@ -24,7 +24,7 @@ from reasoner.core.constants import (
     HYPERGATE_TIMEOUT_SECONDS,
 )
 from reasoner.hypergate.models import SubAgentInput, SubAgentOutput
-from reasoner.llm import ProviderRouter
+from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.utils.json_safe import safe_json_loads, JSONDepthExceededError
 
 logger = logging.getLogger(__name__)

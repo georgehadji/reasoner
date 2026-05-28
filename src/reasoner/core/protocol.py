@@ -15,7 +15,7 @@ from typing import Any, Protocol, runtime_checkable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from reasoner.models import PipelineState
-    from reasoner.llm import ProviderRouter
+    from reasoner.infrastructure.llm.router import ProviderRouter
 
 
 from reasoner.core.constants import DEFAULT_MAX_TOKENS
