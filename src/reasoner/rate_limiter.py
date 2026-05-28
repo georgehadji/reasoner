@@ -77,7 +77,11 @@ class RateLimiter:
         self._redis_script: Any = None
         self._redis_available: bool = False
 
+        is_production = os.environ.get("ENVIRONMENT") == "production"
+
         if _REDIS_RATE_LIMITER_ENABLED:
+            if is_production:
+                print("[INFO] RateLimiter: Attempting to initialize Redis rate limiter in production.")
             try:
                 self._redis_client = get_redis()
                 script_dir = os.path.join(os.path.dirname(__file__), "infrastructure", "redis", "scripts")
@@ -88,11 +92,20 @@ class RateLimiter:
                 self._redis_available = True
                 print("[DEBUG] RateLimiter: Redis rate limiter enabled and script loaded.")
             except Exception as e:
-                print(f"[ERROR] RateLimiter: Failed to connect to Redis or load script: {e}")
-                self._redis_available = False
-                print("[DEBUG] RateLimiter: Falling back to in-memory rate limiter.")
+                error_msg = f"Failed to connect to Redis or load script for rate limiter: {e}"
+                if is_production:
+                    logger.critical(f"CRITICAL: {error_msg} Failing application startup.")
+                    raise RuntimeError(f"Critical rate limiter error: {error_msg}") from e
+                else:
+                    print(f"[ERROR] RateLimiter: {error_msg}")
+                    self._redis_available = False
+                    print("[DEBUG] RateLimiter: Falling back to in-memory rate limiter.")
         else:
-            print("[DEBUG] RateLimiter: In-memory rate limiter enabled (RATE_LIMITER_MODE=memory).")
+            if is_production:
+                logger.critical("CRITICAL: RATE_LIMITER_MODE is 'memory' in production. This is unsafe. Failing application startup.")
+                raise RuntimeError("Unsafe rate limiter configuration: RATE_LIMITER_MODE=memory in production.")
+            else:
+                print("[DEBUG] RateLimiter: In-memory rate limiter enabled (RATE_LIMITER_MODE=memory).")
 
         # In-memory fallback (always initialized, even if Redis is primary)
         self._buckets: Dict[str, ClientBucket] = defaultdict(ClientBucket)
