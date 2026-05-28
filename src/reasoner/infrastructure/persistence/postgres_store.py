@@ -11,12 +11,14 @@ Supports:
 
 from __future__ import annotations
 
-import json
 import asyncio
 import logging
 from pathlib import Path
 from typing import Any, Optional
 from dataclasses import asdict
+
+from tenacity import retry, stop_after_attempt, wait_exponential # New import
+from aiocircuitbreaker import CircuitBreaker # New import
 
 try:
     import asyncpg
@@ -50,6 +52,7 @@ class PostgreSQLEventStore:
         pool_size: int = 10,
         use_read_replica: bool = False,
         read_replica_url: str | None = None,
+        circuit_breaker_enabled: bool = True,
     ):
         self.connection_string = connection_string
         self.pool_size = pool_size
@@ -59,7 +62,10 @@ class PostgreSQLEventStore:
         self._pool = None
         self._read_pool = None
         self._encryption = get_encryption_service()
-    
+        
+        # Initialize circuit breaker
+        self._circuit_breaker = CircuitBreaker(fail_max=5, reset_timeout=30) if circuit_breaker_enabled else None
+
     async def initialize(self) -> None:
         """Initialize connection pools."""
         import asyncpg
@@ -197,6 +203,7 @@ class PostgreSQLEventStore:
                     EXECUTE FUNCTION update_updated_at_column();
             """)
     
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=8), reraise=True)
     async def save_events(self, events: list[DomainEvent]) -> None:
         """
         Save events atomically.
@@ -209,6 +216,17 @@ class PostgreSQLEventStore:
         import logging
         logger = logging.getLogger(__name__)
         
+        # If circuit breaker is enabled, wrap the operation with it
+        if self._circuit_breaker:
+            async with self._circuit_breaker:
+                await self._save_events_internal(events)
+        else:
+            await self._save_events_internal(events)
+
+    async def _save_events_internal(self, events: list[DomainEvent]) -> None:
+        """
+        Internal method for saving events, allowing external decorators to wrap it.
+        """
         try:
             async with self._pool.acquire() as conn:
                 async with conn.transaction():
@@ -520,6 +538,7 @@ class PostgreSQLEventStore:
                 for row in rows
             ]
     
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=8), reraise=True)
     async def save_snapshot(
         self,
         aggregate_id: str,
@@ -543,6 +562,23 @@ class PostgreSQLEventStore:
         import logging
         logger = logging.getLogger(__name__)
         
+        # If circuit breaker is enabled, wrap the operation with it
+        if self._circuit_breaker:
+            async with self._circuit_breaker:
+                await self._save_snapshot_internal(aggregate_id, version, state, snapshot_type)
+        else:
+            await self._save_snapshot_internal(aggregate_id, version, state, snapshot_type)
+
+    async def _save_snapshot_internal(
+        self,
+        aggregate_id: str,
+        version: int,
+        state: dict[str, Any],
+        snapshot_type: str = "full",
+    ) -> None:
+        """
+        Internal method for saving snapshots, allowing external decorators to wrap it.
+        """
         try:
             # Encrypt snapshot state (Phase 3: E2EE)
             state_json = json.dumps(state)
