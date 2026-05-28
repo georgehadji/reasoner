@@ -16,6 +16,7 @@ from langfuse.model import CreateTrace, CreateSpan, CreateGeneration, UpdateGene
 
 from reasoner.core.events.domain_events import LLMGenerationCompleted, PipelineEventType
 from reasoner.application.event_bus.bus import EventBus
+from reasoner.api.metrics import OBSERVABILITY_EVENTS_DROPPED_TOTAL # New import
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +53,8 @@ class LangfuseSubscriber:
     def __init__(self):
         _setup_langfuse() # Initialize Langfuse when subscriber is created
         if not _is_langfuse_enabled:
-            logger.warning("LangfuseSubscriber initialized but Langfuse is disabled.")
+            logger.warning("LangfuseSubscriber initialized but Langfuse is disabled. Observability events will be dropped.")
+            OBSERVABILITY_EVENTS_DROPPED_TOTAL.inc() # Increment counter if disabled
         
         self._active_traces: Dict[str, Any] = {}
         self._active_spans: Dict[str, Any] = {}

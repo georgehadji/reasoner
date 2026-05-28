@@ -37,6 +37,12 @@ from reasoner.api.sentry import init_sentry
 init_sentry()
 print("[DEBUG] api/__init__.py: Sentry initialized")
 
+    # --- Action 1.2: Observability Strictness & Metrics --- START
+    if os.environ.get("ENVIRONMENT") == "production":
+        if not os.environ.get("LANGFUSE_PUBLIC_KEY") or not os.environ.get("LANGFUSE_SECRET_KEY"):
+            logger.critical("CRITICAL: Langfuse keys (LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY) are missing in production environment. LLM observability will be severely limited.")
+    # --- Action 1.2: Observability Strictness & Metrics --- END
+
 # Register global exception handlers (Critical Enhancement 7.7)
 from reasoner.api.error_handler import register_exception_handlers
 

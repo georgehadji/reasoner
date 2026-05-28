@@ -122,6 +122,11 @@ TOKEN_SAVINGS_USD = Counter(
     "Estimated cost savings from cache",
 )
 
+OBSERVABILITY_EVENTS_DROPPED_TOTAL = Counter(
+    "reasoner_observability_events_dropped_total",
+    "Total observability events dropped due to client being disabled or unreachable",
+)
+
 # Phase latency histograms
 PHASE_DURATION = Histogram(
     "reasoner_phase_duration_seconds",
