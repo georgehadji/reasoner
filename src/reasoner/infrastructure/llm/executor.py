@@ -14,7 +14,8 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, AsyncIterator
+import time # Ensure time is imported once
+from typing import Any, AsyncIterator, ClassVar # Add ClassVar for _LANG_TO_EXT
 
 from reasoner.core.constants import (
     DEFAULT_MAX_TOKENS,
@@ -24,10 +25,16 @@ from reasoner.core.constants import (
 from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.models import PipelineState
 
+# New imports for event emission
+from reasoner.core.events.domain_events import LLMGenerationCompleted, PipelineEventType, make_event
+from reasoner.application.event_bus.bus import get_event_bus
+
 logger = logging.getLogger(__name__)
 
 # Regex for fenced code blocks inside prompts
-_CODE_FENCE_RE = re.compile(r"```(\w+)?\n(.*?)\n```", re.DOTALL)
+_CODE_FENCE_RE = re.compile(r"```(\w+)?
+(.*?)
+```", re.DOTALL)
 
 
 class LLMExecutor:
@@ -144,6 +151,28 @@ class LLMExecutor:
                     TOKEN_SAVINGS_USD.inc(estimated_output * 0.000001)
                 except Exception:
                     pass  # Metrics are best-effort
+                
+                # Emit LLMGenerationCompleted event for cache hit
+                bus = get_event_bus()
+                event = make_event(
+                    PipelineEventType.LLM_GENERATION_COMPLETED,
+                    aggregate_id=state.conversation_id or "unknown",
+                    version=1,
+                    model_name=model_id_for_cache,
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    raw_response=cached_response,
+                    prompt_tokens=estimated_input,
+                    completion_tokens=estimated_output,
+                    total_tokens=estimated_input + estimated_output,
+                    cost=0.0, # Cache hit has no cost
+                    duration_seconds=0.0, # Instantaneous for cache
+                    pipeline_id=state.conversation_id or "unknown",
+                    phase_name=phase_key or role,
+                    metadata={"cached": True}
+                )
+                await bus.publish(event)
+
                 return cached_response, {**token_meta, "cost_usd": 0.0, "model": model_id_for_cache, "cached": True}
             else:
                 # Emit cache miss metric
@@ -164,6 +193,8 @@ class LLMExecutor:
             logger.debug(f"[EXECUTOR] defaulted max_tokens={kwargs['max_tokens']} for role={role}")
 
         cascading_models = self.cascading_routing.get(role)
+        
+        llm_call_start_time = time.monotonic() # Capture start time for LLM call
 
         if cascading_models:
             last_error: Exception | None = None
@@ -176,9 +207,12 @@ class LLMExecutor:
                     raw, metadata = await temp_router.call(
                         role="primary",
                         system_prompt=system_prompt,
-                        user_prompt=user_prompt,
+user_prompt=user_prompt,
                         **kwargs,
                     )
+                    llm_call_end_time = time.monotonic() # Capture end time for LLM call
+                    duration_seconds = llm_call_end_time - llm_call_start_time
+
                     from reasoner.infrastructure.llm.ports import DegradedLLMResponse
                     if isinstance(raw, DegradedLLMResponse):
                         raise RuntimeError(f"Degraded response from {model_id}: {raw.error}")
@@ -214,6 +248,28 @@ class LLMExecutor:
                             tokens_used=metadata.get("input_tokens", 0) + metadata.get("output_tokens", 0),
                         )
                     self._accumulate_tokens(state, role, metadata.get("input_tokens", 0), metadata.get("output_tokens", 0), model_id)
+
+                    # Emit LLMGenerationCompleted event for successful cascading call
+                    bus = get_event_bus()
+                    event = make_event(
+                        PipelineEventType.LLM_GENERATION_COMPLETED,
+                        aggregate_id=state.conversation_id or "unknown",
+                        version=1,
+                        model_name=model_id,
+                        system_prompt=system_prompt,
+                        user_prompt=user_prompt,
+                        raw_response=raw,
+                        prompt_tokens=metadata.get("input_tokens", 0),
+                        completion_tokens=metadata.get("output_tokens", 0),
+                        total_tokens=metadata.get("input_tokens", 0) + metadata.get("output_tokens", 0),
+                        cost=metadata.get("cost_usd", 0.0),
+                        duration_seconds=duration_seconds,
+                        pipeline_id=state.conversation_id or "unknown",
+                        phase_name=phase_key or role,
+                        metadata={"cached": False, "cascading": True}
+                    )
+                    await bus.publish(event)
+
                     return raw, metadata
 
                 except Exception as exc:
@@ -222,6 +278,27 @@ class LLMExecutor:
             
             if last_error:
                 logger.error(f"All cascading models failed for role={role}: {last_error}")
+                # Emit LLMGenerationCompleted event for failed cascading
+                bus = get_event_bus()
+                event = make_event(
+                    PipelineEventType.LLM_GENERATION_COMPLETED,
+                    aggregate_id=state.conversation_id or "unknown",
+                    version=1,
+                    model_name="unknown", # Model failed, so unknown
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    raw_response="",
+                    prompt_tokens=0,
+                    completion_tokens=0,
+                    total_tokens=0,
+                    cost=0.0,
+                    duration_seconds=time.monotonic() - llm_call_start_time,
+                    pipeline_id=state.conversation_id or "unknown",
+                    phase_name=phase_key or role,
+                    metadata={"cached": False, "cascading": True, "failed": True, "error": str(last_error)}
+                )
+                await bus.publish(event)
+
                 return DegradedLLMResponse(
                     text="",
                     error=f"All cascading models failed for role={role}: {last_error}",
@@ -229,6 +306,27 @@ class LLMExecutor:
                 ), {}
             else:
                 logger.error(f"Unknown error in cascading for role={role}")
+                # Emit LLMGenerationCompleted event for unknown cascading error
+                bus = get_event_bus()
+                event = make_event(
+                    PipelineEventType.LLM_GENERATION_COMPLETED,
+                    aggregate_id=state.conversation_id or "unknown",
+                    version=1,
+                    model_name="unknown", 
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    raw_response="",
+                    prompt_tokens=0,
+                    completion_tokens=0,
+                    total_tokens=0,
+                    cost=0.0,
+                    duration_seconds=time.monotonic() - llm_call_start_time,
+                    pipeline_id=state.conversation_id or "unknown",
+                    phase_name=phase_key or role,
+                    metadata={"cached": False, "cascading": True, "failed": True, "error": f"Unknown error in cascading for role={role}"}
+                )
+                await bus.publish(event)
+
                 return DegradedLLMResponse(
                     text="",
                     error=f"Unknown error in cascading for role={role}",
@@ -243,14 +341,58 @@ class LLMExecutor:
                 user_prompt=user_prompt,
                 **kwargs,
             )
+            llm_call_end_time = time.monotonic() # Capture end time for LLM call
+            duration_seconds = llm_call_end_time - llm_call_start_time
 
             from reasoner.infrastructure.llm.ports import DegradedLLMResponse
             if isinstance(raw, DegradedLLMResponse):
                 logger.error(f"LLM degraded for role={role}: {raw.error}")
+                # Emit LLMGenerationCompleted event for degraded response
+                bus = get_event_bus()
+                event = make_event(
+                    PipelineEventType.LLM_GENERATION_COMPLETED,
+                    aggregate_id=state.conversation_id or "unknown",
+                    version=1,
+                    model_name=metadata.get("model", "unknown"), 
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    raw_response=raw.error, # Store error message
+                    prompt_tokens=metadata.get("input_tokens", 0),
+                    completion_tokens=metadata.get("output_tokens", 0),
+                    total_tokens=metadata.get("input_tokens", 0) + metadata.get("output_tokens", 0),
+                    cost=metadata.get("cost_usd", 0.0),
+                    duration_seconds=duration_seconds,
+                    pipeline_id=state.conversation_id or "unknown",
+                    phase_name=phase_key or role,
+                    metadata={"cached": False, "degraded": True, "error": raw.error}
+                )
+                await bus.publish(event)
+
                 raise RuntimeError(raw.error)
 
             if not raw or not raw.strip():
                 logger.warning(f"LLM returned empty response for role={role}; possible content filter or API error")
+                # Emit LLMGenerationCompleted event for empty response
+                bus = get_event_bus()
+                event = make_event(
+                    PipelineEventType.LLM_GENERATION_COMPLETED,
+                    aggregate_id=state.conversation_id or "unknown",
+                    version=1,
+                    model_name=metadata.get("model", "unknown"), 
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    raw_response=raw,
+                    prompt_tokens=metadata.get("input_tokens", 0),
+                    completion_tokens=metadata.get("output_tokens", 0),
+                    total_tokens=metadata.get("input_tokens", 0) + metadata.get("output_tokens", 0),
+                    cost=metadata.get("cost_usd", 0.0),
+                    duration_seconds=duration_seconds,
+                    pipeline_id=state.conversation_id or "unknown",
+                    phase_name=phase_key or role,
+                    metadata={"cached": False, "empty_response": True}
+                )
+                await bus.publish(event)
+
 
             cost_usd = metadata.get("cost_usd", 0.0)
             input_tokens = metadata.get("input_tokens", 0)
@@ -278,6 +420,27 @@ class LLMExecutor:
                     response=raw,
                     tokens_used=input_tokens + output_tokens,
                 )
+            
+            # Emit LLMGenerationCompleted event for successful standard call
+            bus = get_event_bus()
+            event = make_event(
+                PipelineEventType.LLM_GENERATION_COMPLETED,
+                aggregate_id=state.conversation_id or "unknown",
+                version=1,
+                model_name=model,
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                raw_response=raw,
+                prompt_tokens=input_tokens,
+                completion_tokens=output_tokens,
+                total_tokens=input_tokens + output_tokens,
+                cost=cost_usd,
+                duration_seconds=duration_seconds,
+                pipeline_id=state.conversation_id or "unknown",
+                phase_name=phase_key or role,
+                metadata={"cached": False, "cascading": False}
+            )
+            await bus.publish(event)
 
             return raw, metadata
 
@@ -436,6 +599,8 @@ class LLMExecutor:
             ext = cls._LANG_TO_EXT.get(lang.lower(), lang)
             # Use minimal compression (remove comments/blank lines)
             compressed = smart_compress(code, ext=ext, level="minimal")
-            return f"```{lang}\n{compressed}\n```"
+            return f"```{lang}
+{compressed}
+```"
 
         return _CODE_FENCE_RE.sub(_replace_block, prompt)

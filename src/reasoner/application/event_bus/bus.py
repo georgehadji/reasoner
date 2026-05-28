@@ -16,8 +16,10 @@ import logging
 from pathlib import Path
 from typing import Any, Callable, Awaitable
 from collections import defaultdict
+import os # New import for environment variable checking
 
-from reasoner.core.events.domain_events import DomainEvent, EventType, _AllEventType
+from reasoner.core.events.domain_events import DomainEvent, EventType, _AllEventType, PipelineEventType
+from reasoner.infrastructure.observability.langfuse_subscriber import get_langfuse_subscriber # New import
 
 logger = logging.getLogger(__name__)
 
@@ -201,7 +203,8 @@ class EventBus:
                 "handler": getattr(handler, "__name__", repr(handler)),
             }
             with open(_DEAD_LETTER_PATH, "a", encoding="utf-8") as f:
-                f.write(json.dumps(entry, default=str) + "\n")
+                f.write(json.dumps(entry, default=str) + "
+")
         except Exception as dl_exc:
             logger.error("Failed to write dead-letter entry: %s", dl_exc)
     
@@ -317,7 +320,7 @@ async def track_pipeline_metrics(event: DomainEvent) -> None:
         )
 
 
-def init_default_subscribers(bus: EventBus | None = None) -> None:
+async def init_default_subscribers(bus: EventBus | None = None) -> None:
     """
     Register default subscribers.
 
@@ -328,3 +331,16 @@ def init_default_subscribers(bus: EventBus | None = None) -> None:
         bus = get_event_bus()
     bus.subscribe_all(log_all_events)
     bus.subscribe_all(track_pipeline_metrics)
+
+    # Initialize and register Langfuse subscriber if enabled
+    # Check if Langfuse keys are set in environment variables
+    if os.environ.get("LANGFUSE_PUBLIC_KEY") and os.environ.get("LANGFUSE_SECRET_KEY"):
+        langfuse_subscriber = await get_langfuse_subscriber()
+        # The _is_langfuse_enabled check is now inside the get_langfuse_subscriber factory
+        # We only proceed if an active subscriber is returned.
+        if langfuse_subscriber._is_langfuse_enabled:
+            bus.subscribe(PipelineEventType.LLM_GENERATION_COMPLETED, langfuse_subscriber.handle_llm_generation_completed)
+            bus.subscribe(PipelineEventType.PIPELINE_STARTED, langfuse_subscriber.handle_pipeline_started)
+            bus.subscribe(PipelineEventType.PIPELINE_COMPLETED, langfuse_subscriber.handle_pipeline_completed)
+            bus.subscribe(PipelineEventType.PIPELINE_FAILED, langfuse_subscriber.handle_pipeline_failed)
+            logger.info("Langfuse subscriber registered with EventBus.")

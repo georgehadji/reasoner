@@ -29,6 +29,7 @@ class PipelineEventType(str, Enum):
     CONTEXT_VETTED = "context_vetted"
     SOURCE_ADDED = "source_added"
     ERROR_OCCURRED = "error_occurred"
+    LLM_GENERATION_COMPLETED = "llm_generation_completed"
 
 
 class WidgetEventType(str, Enum):
@@ -159,6 +160,22 @@ class PipelineFailed(DomainEvent):
     error: str = ""
     phase_at_failure: str = ""
     phases_completed: int = 0
+
+
+@dataclass(frozen=True)
+class LLMGenerationCompleted(DomainEvent):
+    """LLM generation completed for a specific phase/role."""
+    model_name: str = ""
+    system_prompt: str = ""
+    user_prompt: str = ""
+    raw_response: str = ""
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
+    cost: float = 0.0
+    duration_seconds: float = 0.0
+    pipeline_id: str = ""  # Redundant but useful for tracing
+    phase_name: str = ""  # Redundant but useful for tracing
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -336,6 +353,7 @@ PIPELINE_EVENT_CLASSES: dict[PipelineEventType, type[DomainEvent]] = {
     PipelineEventType.STRESS_TEST_COMPLETED: StressTestCompleted,
     PipelineEventType.ERROR_OCCURRED: ErrorOccurred,
     PipelineEventType.RETRY_ATTEMPTED: RetryAttempted,
+    PipelineEventType.LLM_GENERATION_COMPLETED: LLMGenerationCompleted,
 }
 
 WIDGET_EVENT_CLASSES: dict[WidgetEventType, type[DomainEvent]] = {
