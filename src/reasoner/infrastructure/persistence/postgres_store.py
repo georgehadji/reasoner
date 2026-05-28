@@ -359,7 +359,8 @@ class PostgreSQLEventStore:
     
     def _deserialize_event(self, row: Any) -> DomainEvent | None:
         """Deserialize database row to event. Decrypts payload if necessary (Phase 3)."""
-        from reasoner.core.events.domain_events import make_event
+        from reasoner.core.events.domain_events import make_event, ErrorOccurred, PipelineEventType # Added ErrorOccurred and PipelineEventType
+        from reasoner.application.event_bus.bus import get_event_bus # Added get_event_bus
 
         try:
             payload = json.loads(row["payload"])
@@ -381,15 +382,54 @@ class PostgreSQLEventStore:
             object.__setattr__(event, 'timestamp', row["timestamp"])
 
             return event
-        except Exception as exc:
+        except json.JSONDecodeError as exc:
             logger.error(
-                "Data integrity failure: event %s (aggregate %s v%s): %s",
+                "Data integrity failure (JSONDecodeError): event %s (aggregate %s v%s): %s",
                 row.get("event_id"),
                 row.get("aggregate_id"),
                 row.get("version"),
                 exc,
             )
-            raise RuntimeError(f"Corrupted event data: {exc}") from exc
+            # Emit ErrorOccurred event for DLQ logging
+            bus = get_event_bus()
+            error_event = make_event(
+                PipelineEventType.ERROR_OCCURRED, # Using a generic ErrorOccurred event type
+                aggregate_id=row.get("aggregate_id", "unknown"),
+                version=row.get("version", 0),
+                message=f"JSONDecodeError in event deserialization: {exc}",
+                details={
+                    "event_id": str(row.get("event_id", "unknown")),
+                    "event_type": row.get("event_type", "unknown"),
+                    "payload_sample": str(row.get("payload", ""))[:200] # Log a sample of corrupted payload
+                }
+            )
+            # We don't await here to avoid blocking and potentially causing a loop if bus itself is failing.
+            # The EventBus is designed to handle this asynchronously.
+            asyncio.create_task(bus.publish(error_event))
+            return None # Return None for corrupted events
+        except Exception as exc:
+            logger.error(
+                "Data integrity failure (Generic Exception): event %s (aggregate %s v%s): %s",
+                row.get("event_id"),
+                row.get("aggregate_id"),
+                row.get("version"),
+                exc,
+            )
+            # Emit ErrorOccurred event for DLQ logging
+            bus = get_event_bus()
+            error_event = make_event(
+                PipelineEventType.ERROR_OCCURRED,
+                aggregate_id=row.get("aggregate_id", "unknown"),
+                version=row.get("version", 0),
+                message=f"Generic error in event deserialization: {exc}",
+                details={
+                    "event_id": str(row.get("event_id", "unknown")),
+                    "event_type": row.get("event_type", "unknown"),
+                    "payload_sample": str(row.get("payload", ""))[:200] # Log a sample of corrupted payload
+                }
+            )
+            asyncio.create_task(bus.publish(error_event))
+            return None # Return None for corrupted events
     
     async def list_pipelines(
         self,
@@ -540,12 +580,32 @@ class PostgreSQLEventStore:
             """, aggregate_id)
             
             if row:
-                state = json.loads(row["state"])
-                # Check for encryption (Phase 3: E2EE)
-                if isinstance(state, dict) and "_e" in state:
-                    decrypted_json = self._encryption.decrypt(state["_e"])
-                    state = json.loads(decrypted_json)
-                return row["version"], state
+                try:
+                    state = json.loads(row["state"])
+                    # Check for encryption (Phase 3: E2EE)
+                    if isinstance(state, dict) and "_e" in state:
+                        decrypted_json = self._encryption.decrypt(state["_e"])
+                        state = json.loads(decrypted_json)
+                    return row["version"], state
+                except json.JSONDecodeError as exc:
+                    logger.error(
+                        "Corrupted snapshot data for aggregate %s: JSONDecodeError: %s",
+                        aggregate_id, exc,
+                    )
+                    from reasoner.core.events.domain_events import make_event, ErrorOccurred, PipelineEventType
+                    from reasoner.application.event_bus.bus import get_event_bus
+                    bus = get_event_bus()
+                    error_event = make_event(
+                        PipelineEventType.ERROR_OCCURRED,
+                        aggregate_id=aggregate_id,
+                        version=row.get("version", 0),
+                        message=f"JSONDecodeError in snapshot deserialization: {exc}",
+                        details={
+                            "snapshot_data_sample": str(row.get("state", ""))[:200]
+                        }
+                    )
+                    asyncio.create_task(bus.publish(error_event))
+                    return None
             return None
     
     # ─────────────────────────────────────────────────────────────────────
@@ -613,11 +673,47 @@ class PostgreSQLEventStore:
                         decrypted_json = self._encryption.decrypt(data["_e"])
                         data = json.loads(decrypted_json)
                     return data
-                except (json.JSONDecodeError, ValueError) as exc:
+                except json.JSONDecodeError as exc:
                     logger.error(
-                        "Corrupted read model data for %s/%s: %s",
+                        "Corrupted read model data for %s/%s: JSONDecodeError: %s",
                         model_name, model_key, exc,
                     )
+                    from reasoner.core.events.domain_events import make_event, ErrorOccurred, PipelineEventType
+                    from reasoner.application.event_bus.bus import get_event_bus
+                    bus = get_event_bus()
+                    error_event = make_event(
+                        PipelineEventType.ERROR_OCCURRED,
+                        aggregate_id=model_key, # model_key serves as aggregate_id for read models
+                        version=row.get("version", 0),
+                        message=f"JSONDecodeError in read model deserialization: {exc}",
+                        details={
+                            "model_name": model_name,
+                            "model_key": model_key,
+                            "read_model_data_sample": str(row.get("data", ""))[:200]
+                        }
+                    )
+                    asyncio.create_task(bus.publish(error_event))
+                    return None
+                except ValueError as exc: # Original ValueError catch remains
+                    logger.error(
+                        "Corrupted read model data for %s/%s: ValueError: %s",
+                        model_name, model_key, exc,
+                    )
+                    from reasoner.core.events.domain_events import make_event, ErrorOccurred, PipelineEventType
+                    from reasoner.application.event_bus.bus import get_event_bus
+                    bus = get_event_bus()
+                    error_event = make_event(
+                        PipelineEventType.ERROR_OCCURRED,
+                        aggregate_id=model_key, 
+                        version=row.get("version", 0),
+                        message=f"ValueError in read model deserialization: {exc}",
+                        details={
+                            "model_name": model_name,
+                            "model_key": model_key,
+                            "read_model_data_sample": str(row.get("data", ""))[:200]
+                        }
+                    )
+                    asyncio.create_task(bus.publish(error_event))
                     return None
             return None
     
