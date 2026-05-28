@@ -129,15 +129,15 @@ class PostgreSQLEventStore:
                 CREATE INDEX IF NOT EXISTS idx_events_aggregate 
                     ON events(aggregate_id, version);
                 CREATE INDEX IF NOT EXISTS idx_events_type 
-                    ON events USING GIN (payload);
+                    ON events USING GIN (payload jsonb_path_ops);
                 CREATE INDEX IF NOT EXISTS idx_events_timestamp 
                     ON events(timestamp DESC);
                 CREATE INDEX IF NOT EXISTS idx_events_created 
                     ON events(created_at DESC);
                 
-                -- Full-text search index
+                -- Full-text search index on blind_index
                 CREATE INDEX IF NOT EXISTS idx_events_search 
-                    ON events USING GIN (to_tsvector('english', payload::text));
+                    ON events USING GIN ((payload->'_blind_index')) WHERE payload->'_blind_index' IS NOT NULL;
                 
                 -- Aggregates table
                 CREATE TABLE IF NOT EXISTS aggregates (
@@ -221,7 +221,22 @@ class PostgreSQLEventStore:
                         }
                         payload_json = json.dumps(raw_payload)
                         encrypted_payload = self._encryption.encrypt(payload_json)
-                        final_payload = {"_e": encrypted_payload}
+                        
+                        # Generate blind indexes from the textual content of the raw_payload
+                        blind_indexes: List[str] = []
+                        if isinstance(raw_payload, dict):
+                            # Focus on common textual fields for blind indexing
+                            text_to_index = []
+                            for key in ['problem', 'content', 'rationale', 'summary', 'message']:
+                                if key in raw_payload and isinstance(raw_payload[key], str):
+                                    text_to_index.append(raw_payload[key])
+                            if text_to_index:
+                                blind_indexes = self._encryption.generate_blind_index(" ".join(text_to_index))
+
+                        final_payload = {
+                            "_e": encrypted_payload,
+                            "_blind_index": blind_indexes # Store blind indexes
+                        }
 
                         # Determine aggregate type
                         aggregate_type = self._get_aggregate_type(event.event_type)
@@ -435,14 +450,23 @@ class PostgreSQLEventStore:
         pool = self._read_pool if self.use_read_replica else self._pool
         
         async with pool.acquire() as conn:
+            # Generate blind indexes for the search query
+            search_hashes = self._encryption.generate_blind_index(query)
+            if not search_hashes:
+                return [] # No search terms to index
+            
+            # PostgreSQL array contains operator (jsonb @> array)
+            # We need to construct a JSONB array for the @> operator
+            search_hashes_jsonb = json.dumps(search_hashes)
+
             rows = await conn.fetch("""
                 SELECT e.*, a.problem, a.status
                 FROM events e
                 JOIN aggregates a ON e.aggregate_id = a.aggregate_id
-                WHERE to_tsvector('english', e.payload::text) @@ plainto_tsquery('english', $1)
+                WHERE e.payload->'_blind_index' @> $1::jsonb
                 ORDER BY e.timestamp DESC
                 LIMIT $2
-            """, query, limit)
+            """, search_hashes_jsonb, limit)
             
             return [
                 {
