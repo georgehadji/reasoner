@@ -18,8 +18,15 @@ import os
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 import asyncio
+import math # Added math for ceil in Lua script error fallback
+
+import redis.asyncio as aioredis
+from reasoner.infrastructure.redis.client import get_redis
+from reasoner.core.constants import MAX_RATE_LIMIT_BUCKETS # Imported MAX_RATE_LIMIT_BUCKETS
+
+_REDIS_RATE_LIMITER_ENABLED = os.environ.get("RATE_LIMITER_MODE", "memory").lower() == "redis"
 print("[DEBUG] reasoner/rate_limiter.py: Before metrics import")
 
 # Temporarily disable metrics import
@@ -61,167 +68,122 @@ class RateLimiter:
     - Async-safe
     """
     
-    from reasoner.core.constants import MAX_RATE_LIMIT_BUCKETS
+    # MAX_RATE_LIMIT_BUCKETS is now imported at the top
     _MAX_BUCKETS: int = MAX_RATE_LIMIT_BUCKETS
 
     def __init__(self, config: Optional[RateLimitConfig] = None):
         self.config = config or RateLimitConfig()
-        self._buckets: Dict[str, ClientBucket] = defaultdict(ClientBucket)
-        self._sharded = os.environ.get("ENABLE_SHARDED_LOCKS", "false").lower() == "true"
-        if self._sharded:
-            self._shard_count = 64
-            self._locks = [asyncio.Lock() for _ in range(self._shard_count)]
-        else:
-            self._lock = asyncio.Lock()
+        self._redis_client: Optional[aioredis.Redis] = None
+        self._redis_script: Any = None
+        self._redis_available: bool = False
 
-    def _lock_for(self, key: str) -> asyncio.Lock:
-        if self._sharded:
-            return self._locks[hash(key) % self._shard_count]
-        return self._lock
-    
-    def _get_bucket(self, client_id: str) -> ClientBucket:
-        """Get or create bucket for client."""
-        if client_id not in self._buckets:
-            if len(self._buckets) >= self._MAX_BUCKETS:
-                oldest = next(iter(self._buckets))
-                del self._buckets[oldest]
-            bucket = ClientBucket()
-            bucket.tokens = self.config.burst_size  # Start with full burst
-            self._buckets[client_id] = bucket
-        return self._buckets[client_id]
-    
-    def _refill_tokens(self, bucket: ClientBucket, multiplier: float = 1.0) -> None:
-        """Refill tokens based on elapsed time."""
-        now = time.monotonic()
-        elapsed = now - bucket.last_update
-        
-        # Refill rate: 1 token per (60 / requests_per_minute) seconds, scaled by tier
-        refill_rate = (self.config.requests_per_minute * multiplier) / 60.0
-        max_tokens = self.config.burst_size * multiplier
-        bucket.tokens = min(
-            max_tokens,
-            bucket.tokens + (elapsed * refill_rate)
-        )
-        bucket.last_update = now
-    
-    def _reset_windows_if_needed(self, bucket: ClientBucket) -> None:
-        """Reset sliding windows if expired."""
-        now = time.monotonic()
-        
-        # Reset minute window (snap to exact boundary, O(1))
-        elapsed_minutes = int((now - bucket.minute_window_start) // 60)
-        if elapsed_minutes > 0:
-            bucket.requests_minute = 0
-            bucket.minute_window_start += elapsed_minutes * 60
-        
-        # Reset hour window (snap to exact boundary, O(1))
-        elapsed_hours = int((now - bucket.hour_window_start) // 3600)
-        if elapsed_hours > 0:
-            bucket.requests_hour = 0
-            bucket.hour_window_start += elapsed_hours * 3600
-    
-    async def is_allowed(self, client_id: str) -> tuple[bool, dict]:
-        """
-        Check if request is allowed for client.
-        
-        Returns:
-            (allowed: bool, info: dict with retry-after and limits)
-        """
-        async with self._lock_for(client_id):
-            bucket = self._get_bucket(client_id)
-            self._refill_tokens(bucket, 1.0)
-            self._reset_windows_if_needed(bucket)
-            
-            info = {
-                "limit_minute": self.config.requests_per_minute,
-                "limit_hour": self.config.requests_per_hour,
-                "remaining_minute": self.config.requests_per_minute - bucket.requests_minute,
-                "remaining_hour": self.config.requests_per_hour - bucket.requests_hour,
-                "retry_after": None,
-            }
-            
-            # Check per-minute limit
-            if bucket.requests_minute >= self.config.requests_per_minute:
-                info["retry_after"] = 60 - (time.monotonic() - bucket.minute_window_start)
-                info["reason"] = "per_minute_limit"
-                return False, info
-            
-            # Check per-hour limit
-            if bucket.requests_hour >= self.config.requests_per_hour:
-                info["retry_after"] = 3600 - (time.monotonic() - bucket.hour_window_start)
-                info["reason"] = "per_hour_limit"
-                return False, info
-            
-            # Check token bucket
-            if bucket.tokens < 1:
-                # Calculate time until next token
-                tokens_needed = 1 - bucket.tokens
-                refill_rate = self.config.requests_per_minute / 60.0
-                info["retry_after"] = tokens_needed / refill_rate
-                info["reason"] = "burst_limit"
-                return False, info
-            
-            # Consume token
-            bucket.tokens -= 1
-            bucket.requests_minute += 1
-            bucket.requests_hour += 1
-            
-            # Update remaining
-            info["remaining_minute"] = self.config.requests_per_minute - bucket.requests_minute
-            info["remaining_hour"] = self.config.requests_per_hour - bucket.requests_hour
-            
-            return True, info
-    
-    async def record_request(self, client_id: str) -> None:
-        """Record a successful request (alternative to is_allowed)."""
-        async with self._lock_for(client_id):
-            bucket = self._get_bucket(client_id)
-            bucket.requests_minute += 1
-            bucket.requests_hour += 1
-    
-    async def get_client_stats(self, client_id: str) -> dict:
-        """Get rate limit stats for client."""
-        async with self._lock_for(client_id):
-            bucket = self._get_bucket(client_id)
-            return {
-                "tokens": bucket.tokens,
-                "requests_minute": bucket.requests_minute,
-                "requests_hour": bucket.requests_hour,
-                "limit_minute": self.config.requests_per_minute,
-                "limit_hour": self.config.requests_per_hour,
-            }
-    
-    async def reset_client(self, client_id: str) -> None:
-        """Reset rate limits for client."""
-        # BUG-FIX: Acquire lock before mutating shared bucket dictionary to prevent
-        # race conditions with concurrent is_allowed() calls that may be iterating
-        # over or reading from the same bucket.
-        async with self._lock_for(client_id):
-            self._buckets.pop(client_id, None)
-    
-    async def is_allowed_for_user(
+        if _REDIS_RATE_LIMITER_ENABLED:
+            try:
+                self._redis_client = get_redis()
+                script_dir = os.path.join(os.path.dirname(__file__), "infrastructure", "redis", "scripts")
+                script_path = os.path.join(script_dir, "rate_limit.lua")
+                with open(script_path, "r", encoding="utf-8") as f:
+                    lua_script_content = f.read()
+                self._redis_script = self._redis_client.register_script(lua_script_content)
+                self._redis_available = True
+                print("[DEBUG] RateLimiter: Redis rate limiter enabled and script loaded.")
+            except Exception as e:
+                print(f"[ERROR] RateLimiter: Failed to connect to Redis or load script: {e}")
+                self._redis_available = False
+                print("[DEBUG] RateLimiter: Falling back to in-memory rate limiter.")
+        else:
+            print("[DEBUG] RateLimiter: In-memory rate limiter enabled (RATE_LIMITER_MODE=memory).")
+
+        # In-memory fallback (always initialized, even if Redis is primary)
+        self._buckets: Dict[str, ClientBucket] = defaultdict(ClientBucket)
+        self._fallback_lock = asyncio.Lock()
+
+    async def _execute_redis_script(
         self,
         client_id: str,
-        tier: str = "default",
-    ) -> tuple[bool, dict]:
-        """
-        Check rate limit for an authenticated user with tier-scaled limits.
-        Runs the full check inside a single lock acquisition to avoid mutating
-        shared config state that concurrent callers would race on.
-        """
-        tier_multipliers = {
-            "default": 1.0,
-            "free": 1.0,
-            "pro": 2.0,
-            "enterprise": 5.0,
-        }
-        multiplier = tier_multipliers.get(tier, 1.0)
+        refill_rate: float,
+        burst_capacity: float,
+        requests_per_minute: int,
+        requests_per_hour: int,
+        requested_tokens: int = 1,
+    ) -> tuple[bool, Dict[str, Any]]:
+        if not self._redis_available or self._redis_client is None or self._redis_script is None:
+            raise ConnectionError("Redis rate limiter not available.")
 
-        async with self._lock_for(client_id):
-            bucket = self._get_bucket(client_id)
-            self._refill_tokens(bucket, multiplier)
-            self._reset_windows_if_needed(bucket)
+        current_time_ms = int(time.time() * 1000)
+        token_bucket_key = f"rate_limit:{client_id}:tokens"
+        minute_window_key = f"rate_limit:{client_id}:minute"
+        hour_window_key = f"rate_limit:{client_id}:hour"
 
+        try:
+            # KEYS: token_bucket_key, minute_window_key, hour_window_key
+            # ARGV: current_time_ms, refill_rate, burst_capacity, requests_per_minute, requests_per_hour, requested_tokens
+            result = await self._redis_script(
+                keys=[token_bucket_key, minute_window_key, hour_window_key],
+                args=[
+                    current_time_ms,
+                    refill_rate,
+                    burst_capacity,
+                    requests_per_minute,
+                    requests_per_hour,
+                    requested_tokens,
+                ],
+            )
+            # Result: [allowed (1/0), tokens_remaining, retry_after_ms, reason_code]
+            allowed = bool(result[0])
+            tokens_remaining = result[1]
+            retry_after_ms = result[2]
+            reason = result[3]
+
+            info = {
+                "limit_minute": requests_per_minute,
+                "limit_hour": requests_per_hour,
+                "remaining_minute": requests_per_minute, # Placeholder, cannot calculate accurately from Lua script output directly for remaining *minute* requests without additional ZCARD calls
+                "remaining_hour": requests_per_hour, # Same as above
+                "tokens_remaining": tokens_remaining,
+                "retry_after": max(0, retry_after_ms / 1000.0) if retry_after_ms > 0 else None,
+                "reason": reason,
+            }
+            return allowed, info
+        except aioredis.RedisError as e:
+            print(f"[ERROR] Redis script execution failed: {e}")
+            self._redis_available = False # Mark as unavailable for this session
+            raise ConnectionError("Redis script execution failed.") from e
+        except Exception as e:
+            print(f"[ERROR] Unexpected error during Redis rate limiting: {e}")
+            self._redis_available = False
+            raise ConnectionError("Unexpected Redis error.") from e
+
+    async def _in_memory_is_allowed_for_user(
+        self,
+        client_id: str,
+        multiplier: float = 1.0,
+        requested_tokens: int = 1,
+    ) -> tuple[bool, Dict[str, Any]]:
+        # This is the original in-memory logic, simplified for the fallback.
+        # It needs to be self-contained and not rely on self._lock (which is removed).
+        async with self._fallback_lock:
+            bucket = self._buckets[client_id]
+            now = time.monotonic()
+
+            # Refill tokens (in-memory logic)
+            elapsed = now - bucket.last_update
+            refill_rate = (self.config.requests_per_minute * multiplier) / 60.0
+            max_tokens = self.config.burst_size * multiplier
+            bucket.tokens = min(max_tokens, bucket.tokens + (elapsed * refill_rate))
+            bucket.last_update = now
+
+            # Reset windows if expired (in-memory logic)
+            elapsed_minutes = int((now - bucket.minute_window_start) // 60)
+            if elapsed_minutes > 0:
+                bucket.requests_minute = 0
+                bucket.minute_window_start += elapsed_minutes * 60
+
+            elapsed_hours = int((now - bucket.hour_window_start) // 3600)
+            if elapsed_hours > 0:
+                bucket.requests_hour = 0
+                bucket.hour_window_start += elapsed_hours * 3600
+            
             rpm = int(self.config.requests_per_minute * multiplier)
             rph = int(self.config.requests_per_hour * multiplier)
 
@@ -235,51 +197,198 @@ class RateLimiter:
 
             if bucket.requests_minute >= rpm:
                 info["retry_after"] = 60 - (time.monotonic() - bucket.minute_window_start)
-                info["reason"] = "per_minute_limit"
+                info["reason"] = "per_minute_limit_fallback"
                 if _METRICS_AVAILABLE:
-                    REASONER_RATE_LIMIT_REJECTED.labels(tier=tier).inc()
+                    REASONER_RATE_LIMIT_REJECTED.labels(tier="fallback").inc()
                 return False, info
 
             if bucket.requests_hour >= rph:
                 info["retry_after"] = 3600 - (time.monotonic() - bucket.hour_window_start)
-                info["reason"] = "per_hour_limit"
+                info["reason"] = "per_hour_limit_fallback"
                 if _METRICS_AVAILABLE:
-                    REASONER_RATE_LIMIT_REJECTED.labels(tier=tier).inc()
+                    REASONER_RATE_LIMIT_REJECTED.labels(tier="fallback").inc()
                 return False, info
 
-            if bucket.tokens < 1:
-                tokens_needed = 1 - bucket.tokens
+            if bucket.tokens < requested_tokens:
+                tokens_needed = requested_tokens - bucket.tokens
                 refill_rate = (self.config.requests_per_minute * multiplier) / 60.0
                 info["retry_after"] = tokens_needed / refill_rate
-                info["reason"] = "burst_limit"
+                info["reason"] = "burst_limit_fallback"
                 if _METRICS_AVAILABLE:
-                    REASONER_RATE_LIMIT_REJECTED.labels(tier=tier).inc()
+                    REASONER_RATE_LIMIT_REJECTED.labels(tier="fallback").inc()
                 return False, info
 
-            bucket.tokens -= 1
+            bucket.tokens -= requested_tokens
             bucket.requests_minute += 1
             bucket.requests_hour += 1
 
             info["remaining_minute"] = rpm - bucket.requests_minute
             info["remaining_hour"] = rph - bucket.requests_hour
             return True, info
+    
+    async def is_allowed(self, client_id: str) -> tuple[bool, Dict[str, Any]]:
+        try:
+            return await self._execute_redis_script(
+                client_id=client_id,
+                refill_rate=self.config.requests_per_minute / 60000.0, # tokens per ms
+                burst_capacity=self.config.burst_size,
+                requests_per_minute=self.config.requests_per_minute,
+                requests_per_hour=self.config.requests_per_hour,
+                requested_tokens=1,
+            )
+        except ConnectionError:
+            print("[WARNING] Redis unavailable, falling back to in-memory rate limiter for is_allowed.")
+            return await self._in_memory_is_allowed_for_user(client_id, 1.0, 1)
 
+    async def is_allowed_for_user(
+        self,
+        client_id: str,
+        tier: str = "default",
+    ) -> tuple[bool, Dict[str, Any]]:
+        tier_multipliers = {
+            "default": 1.0,
+            "free": 1.0,
+            "pro": 2.0,
+            "enterprise": 5.0,
+        }
+        multiplier = tier_multipliers.get(tier, 1.0)
+        
+        # Calculate tier-specific limits
+        rpm_limit = int(self.config.requests_per_minute * multiplier)
+        rph_limit = int(self.config.requests_per_hour * multiplier)
+        burst_cap = int(self.config.burst_size * multiplier)
+        refill_rate_ms = (self.config.requests_per_minute * multiplier) / 60000.0 # tokens per ms
+
+        try:
+            return await self._execute_redis_script(
+                client_id=client_id,
+                refill_rate=refill_rate_ms,
+                burst_capacity=burst_cap,
+                requests_per_minute=rpm_limit,
+                requests_per_hour=rph_limit,
+                requested_tokens=1,
+            )
+        except ConnectionError:
+            print(f"[WARNING] Redis unavailable, falling back to in-memory rate limiter for user {client_id} (tier: {tier}).")
+            return await self._in_memory_is_allowed_for_user(client_id, multiplier, 1)
+
+    async def record_request(self, client_id: str) -> None:
+        # With Redis, the token is consumed by is_allowed, so this method is mostly redundant.
+        # However, for consistency with the in-memory fallback, we can keep a no-op or
+        # adjust it if specific logging/metrics are needed outside of the main check.
+        pass
+
+    async def get_client_stats(self, client_id: str) -> dict:
+        if not self._redis_available or self._redis_client is None:
+            # Fallback for stats if Redis is not available
+            async with self._fallback_lock:
+                bucket = self._buckets[client_id]
+                self._in_memory_refill_tokens(bucket, 1.0) # Ensure current state
+                self._in_memory_reset_windows_if_needed(bucket)
+                return {
+                    "tokens": bucket.tokens,
+                    "requests_minute": bucket.requests_minute,
+                    "requests_hour": bucket.requests_hour,
+                    "limit_minute": self.config.requests_per_minute,
+                    "limit_hour": self.config.requests_per_hour,
+                }
+        
+        token_bucket_key = f"rate_limit:{client_id}:tokens"
+        minute_window_key = f"rate_limit:{client_id}:minute"
+        hour_window_key = f"rate_limit:{client_id}:hour"
+        current_time_ms = int(time.time() * 1000)
+
+        try:
+            # Re-run refill logic to get current token count without consuming
+            bucket_info = await self._redis_client.hmget(token_bucket_key, 'tokens', 'last_refill_time_ms')
+            tokens = float(bucket_info[0]) if bucket_info[0] else self.config.burst_size
+            last_refill_time_ms = float(bucket_info[1]) if bucket_info[1] else current_time_ms
+            
+            elapsed_time_ms = current_time_ms - last_refill_time_ms
+            refill_rate = (self.config.requests_per_minute) / 60000.0
+            refilled_tokens = math.floor(elapsed_time_ms * refill_rate)
+            
+            current_tokens = min(self.config.burst_size, tokens + refilled_tokens)
+
+            # Get counts for windows (no request added)
+            await self._redis_client.zremrangebyscore(minute_window_key, 0, current_time_ms - 60000)
+            count_minute = await self._redis_client.zcard(minute_window_key)
+
+            await self._redis_client.zremrangebyscore(hour_window_key, 0, current_time_ms - 3600000)
+            count_hour = await self._redis_client.zcard(hour_window_key)
+
+            return {
+                "tokens": current_tokens,
+                "requests_minute": count_minute,
+                "requests_hour": count_hour,
+                "limit_minute": self.config.requests_per_minute,
+                "limit_hour": self.config.requests_per_hour,
+            }
+        except Exception as e:
+            print(f"[ERROR] Failed to get Redis client stats: {e}")
+            return {
+                "tokens": 0, "requests_minute": 0, "requests_hour": 0,
+                "limit_minute": self.config.requests_per_minute, "limit_hour": self.config.requests_per_hour,
+                "error": str(e)
+            }
+
+    async def reset_client(self, client_id: str) -> None:
+        if not self._redis_available or self._redis_client is None:
+            async with self._fallback_lock:
+                self._buckets.pop(client_id, None)
+            return
+
+        token_bucket_key = f"rate_limit:{client_id}:tokens"
+        minute_window_key = f"rate_limit:{client_id}:minute"
+        hour_window_key = f"rate_limit:{client_id}:hour"
+        try:
+            await self._redis_client.delete(token_bucket_key, minute_window_key, hour_window_key)
+        except Exception as e:
+            print(f"[ERROR] Failed to reset client {client_id} in Redis: {e}")
+    
     async def reset_all(self) -> None:
-        """Reset all rate limits."""
-        # BUG-FIX: Acquire all locks before clearing buckets to prevent races with
-        # concurrent is_allowed() calls. In sharded mode we must hold all shard locks.
-        if self._sharded:
-            for lock in self._locks:
-                await lock.acquire()
-            try:
+        if not self._redis_available or self._redis_client is None:
+            async with self._fallback_lock:
                 self._buckets.clear()
-            finally:
-                for lock in self._locks:
-                    lock.release()
-        else:
-            async with self._lock:
-                self._buckets.clear()
+            return
+        
+        # Danger zone: This will delete ALL keys matching the pattern. Use with caution.
+        try:
+            async for key in self._redis_client.scan_iter("rate_limit:*"):
+                await self._redis_client.delete(key)
+        except Exception as e:
+            print(f"[ERROR] Failed to reset all rate limits in Redis: {e}") # Fixed double f-string
 
+    # In-memory helpers for fallback mode
+    def _in_memory_get_bucket(self, client_id: str) -> ClientBucket:
+        if client_id not in self._buckets:
+            if len(self._buckets) >= self._MAX_BUCKETS:
+                oldest = next(iter(self._buckets))
+                del self._buckets[oldest]
+            bucket = ClientBucket()
+            bucket.tokens = self.config.burst_size # Start with full burst
+            self._buckets[client_id] = bucket
+        return self._buckets[client_id]
+    
+    def _in_memory_refill_tokens(self, bucket: ClientBucket, multiplier: float = 1.0) -> None:
+        now = time.monotonic()
+        elapsed = now - bucket.last_update
+        refill_rate = (self.config.requests_per_minute * multiplier) / 60.0
+        max_tokens = self.config.burst_size * multiplier
+        bucket.tokens = min(max_tokens, bucket.tokens + (elapsed * refill_rate))
+        bucket.last_update = now
+    
+    def _in_memory_reset_windows_if_needed(self, bucket: ClientBucket) -> None:
+        now = time.monotonic()
+        elapsed_minutes = int((now - bucket.minute_window_start) // 60)
+        if elapsed_minutes > 0:
+            bucket.requests_minute = 0
+            bucket.minute_window_start += elapsed_minutes * 60
+        
+        elapsed_hours = int((now - bucket.hour_window_start) // 3600)
+        if elapsed_hours > 0:
+            bucket.requests_hour = 0
+            bucket.hour_window_start += elapsed_hours * 3600
 
 # Global rate limiter instance
 # NOTE: This is a per-process singleton. For horizontal scaling
@@ -292,7 +401,7 @@ _rate_limiter: Optional[RateLimiter] = None
 def get_rate_limiter(config: Optional[RateLimitConfig] = None) -> RateLimiter:
     """Get or create global rate limiter."""
     global _rate_limiter
-    if _rate_limiter is None:
+    if _rate_limiter is None: # Removed conditional for _REDIS_RATE_LIMITER_ENABLED as RateLimiter handles it internally
         print("[DEBUG] reasoner/rate_limiter.py: Instantiating RateLimiter")
         _rate_limiter = RateLimiter(config)
     return _rate_limiter
