@@ -7,7 +7,7 @@ from typing import Any
 
 from reasoner.pipeline import ReasonerPipeline
 from reasoner.infrastructure.llm.router import ProviderRouter
-from reasoner.models import PipelineState
+from reasoner.domain.pipeline_state import PipelineState
 
 logger = logging.getLogger(__name__)
 

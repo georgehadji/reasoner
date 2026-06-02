@@ -54,22 +54,19 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from reasoner.pipeline import ReasonerPipeline
+from reasoner.application.orchestrator import PipelineOrchestrator
 from reasoner.renderer import export_to_json, render_pipeline_result
-from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.infrastructure.llm.registry import list_models
 from reasoner.core.settings import settings  # triggers dotenv load
 from reasoner.core.constants import DEFAULT_CLI_PRESET
 from reasoner.presets import (
     PRESETS,
-    build_custom_router,
     get_preset,
     is_valid_preset_name,
     print_presets_summary,
     resolve_preset_name,
 )
-from reasoner.gate_agent import GateAgent  # kept for backward compat
-from reasoner.hypergate import HyperGateAgent
+# GateAgent / HyperGateAgent — handled by PipelineOrchestrator
 
 logging.basicConfig(
     level=logging.INFO,
@@ -77,48 +74,6 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 logger = logging.getLogger(__name__)
-
-
-# ─────────────────────────────────────────────────────────────────────
-# ROUTER BUILDER
-# ─────────────────────────────────────────────────────────────────────
-
-from reasoner.application.services.preset_service import PresetService
-
-def build_router(args: argparse.Namespace) -> ProviderRouter:
-    """
-    Resolve router from CLI args.
-    Priority: --routing > --preset > default (multi-perspective-budget)
-    """
-    service = PresetService()
-    if args.routing:
-        _, router = service.build_router("custom", custom_routing=json.loads(args.routing))
-        print(f"\n[Custom routing] primary={json.loads(args.routing)['primary']}")
-        return router
-
-    raw_preset = args.preset or DEFAULT_CLI_PRESET
-    preset_name, is_auto, tier = service.resolve(raw_preset)
-    
-    preset = get_preset(preset_name)
-    missing = preset.missing_keys()
-    if missing:
-        print(f"\n[WARNING] Preset '{preset_name}' requires API keys that are not set:")
-        for key in missing:
-            print(f"  • {key}")
-        print("  Affected phases will fail. Set keys or choose a different preset.\n")
-
-    _, router = service.build_router(preset_name)
-    
-    if is_auto:
-        print(f"\n[Auto-routing] tier={tier} — method will be selected by HyperGate")
-    else:
-        print(f"\n[Preset: {preset.name}]")
-        print(f"  {preset.description}")
-    
-    routing_info = router.describe()
-    for role, model in routing_info.items():
-        print(f"  {role:22s} -> {model}")
-    return router
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -163,7 +118,7 @@ async def main(args: argparse.Namespace) -> None:
 
     # Handle resume from saved state
     if args.resume:
-        from reasoner.models import PipelineState
+        from reasoner.domain.pipeline_state import PipelineState
         state_path = Path(args.resume)
         if not state_path.exists():
             print(f"[ERROR] State file not found: {args.resume}")
@@ -197,7 +152,6 @@ async def main(args: argparse.Namespace) -> None:
         print("        Run 'python main.py --help' for usage.")
         sys.exit(1)
 
-    router = build_router(args)
 
     try:
         # Determine initial_state for the pipeline
@@ -222,67 +176,60 @@ async def main(args: argparse.Namespace) -> None:
         from reasoner.sanitization import sanitize_for_prompt
         problem, _ = sanitize_for_prompt(problem)
 
-        # ── Gate Agent: decide direct answer vs full pipeline ──
-        raw_preset = args.preset or DEFAULT_CLI_PRESET
-        is_auto = raw_preset.startswith("auto")
-        auto_tier = raw_preset.split("-", 1)[1] if is_auto and "-" in raw_preset else "budget"
-        effective_preset_name = f"multi-perspective-{auto_tier}" if is_auto else raw_preset
+        # ?? Orchestrator Preflight: preset resolution, HyperGate, neuro recall ??
+        preset_service = PresetService()
+        orchestrator = PipelineOrchestrator(preset_service, None, None)
+        preflight = await orchestrator.preflight(args, initial_state)
 
-        if not args.force_pipeline:
-            gate = HyperGateAgent(router)
-            decision = await gate.decide(problem)
-            if decision.action == "direct":
-                print("  [Gate] Direct answer selected.\n")
-                response, _ = await router.call(
-                    role="primary",
-                    system_prompt="You are an analytical assistant. Provide a clear, concise answer.",
-                    user_prompt=problem,
-                    max_tokens=2048,
-                    temperature=0.7,
-                )
-                from reasoner.infrastructure.llm.ports import DegradedLLMResponse
-                if isinstance(response, DegradedLLMResponse):
-                    print(f"[Error] {response.error}")
-                    return
-                print(response)
+        if preflight.action == "direct":
+            print("  [Gate] Direct answer selected.\n")
+            response, _ = await preflight.router.call(
+                role="primary",
+                system_prompt="You are an analytical assistant. Provide a clear, concise answer.",
+                user_prompt=problem,
+                max_tokens=2048,
+                temperature=0.7,
+            )
+            from reasoner.infrastructure.llm.ports import DegradedLLMResponse
+            if isinstance(response, DegradedLLMResponse):
+                print(f"[Error] {response.error}")
                 return
-            if decision.action == "web_search":
-                print("  [Gate] Web search selected.\n")
-                from reasoner.core.search import get_discovery_client
-                try:
-                    client, _ = await get_discovery_client(source_type="general")
-                    results = await client.search(problem, num_results=10, source_type="general")
-                except Exception as exc:
-                    logger.warning("Web search failed: %s", exc)
-                    results = []
-                if not results:
-                    print("No relevant web search results were found for your query.")
-                    return
-                print("### Web Search Results\n")
-                for i, r in enumerate(results, 1):
-                    title = r.get("title") or "Untitled"
-                    url = r.get("url") or ""
-                    snippet = r.get("snippet") or r.get("content") or ""
-                    print(f"{i}. [{title}]({url})")
-                    if snippet:
-                        print(f"   > {snippet}")
-                    print()
+            print(response)
+            return
+
+        if preflight.action == "web_search":
+            print("  [Gate] Web search selected.\n")
+            from reasoner.infrastructure.search.discovery import get_discovery_client
+            try:
+                client, _ = await get_discovery_client(source_type="general")
+                results = await client.search(problem, num_results=10, source_type="general")
+            except Exception as exc:
+                logger.warning("Web search failed: %s", exc)
+                results = []
+            if not results:
+                print("No relevant web search results were found for your query.")
                 return
+            print("### Web Search Results\n")
+            for i, r in enumerate(results, 1):
+                title = r.get("title") or "Untitled"
+                url = r.get("url") or ""
+                snippet = r.get("snippet") or r.get("content") or ""
+                print(f"{i}. [{title}]({url})")
+                if snippet:
+                    print(f"   > {snippet}")
+                print()
+            return
 
-            # ── Auto-method: rebuild router with gate-selected preset ──
-            if is_auto and decision.method:
-                from reasoner.presets import build_auto_preset
-                effective_preset_name = build_auto_preset(decision.method, auto_tier)
-                print(f"  [Gate] Auto-selected method: {decision.method} → preset: {effective_preset_name}\n")
-                method_preset = get_preset(effective_preset_name)
-                service = PresetService()
-                _, router = service.build_router(effective_preset_name)
-            else:
-                print(f"  [Gate] Pipeline selected ({decision.method or 'multi_perspective'}).\n")
+        router = preflight.router
+        effective_preset_name = preflight.effective_preset_name
+        auto_selected_method = preflight.auto_selected_method
 
-        # Retrieve the final preset after potential auto-routing
+        if auto_selected_method:
+            print(f"  [Gate] Auto-selected method: {auto_selected_method} -> preset: {effective_preset_name}\n")
+
         final_preset = get_preset(effective_preset_name)
 
+        from reasoner.pipeline import ReasonerPipeline
         pipeline = ReasonerPipeline(
             router=router,
             initial_state=initial_state,
@@ -293,10 +240,8 @@ async def main(args: argparse.Namespace) -> None:
             source_type=args.source_type,
             domain=args.domain or None,
             enhance_prompt=args.enhance_prompt,
-            complexity=decision.complexity if not args.force_pipeline else None, # Pass complexity from HyperGate if not forcing pipeline
             batch_critique_jury=final_preset.batch_critique_jury if final_preset else False,
         )
-
         state = await pipeline.run(problem)
 
         render_pipeline_result(state)

@@ -11,22 +11,37 @@ import logging
 import asyncio
 from typing import Any, Dict, Optional
 
-from langfuse import Langfuse
-from langfuse.model import CreateTrace, CreateSpan, CreateGeneration, UpdateGeneration
+# Lazy imports to handle missing/version-mismatched langfuse gracefully
+try:
+    from langfuse import Langfuse as _Langfuse
+    from langfuse.model import (
+        CreateTrace as _CreateTrace,
+        CreateSpan as _CreateSpan,
+        CreateGeneration as _CreateGeneration,
+        UpdateGeneration as _UpdateGeneration,
+    )
+    _LANGFUSE_AVAILABLE = True
+except ImportError:
+    _Langfuse = None
+    _CreateTrace = _CreateSpan = _CreateGeneration = _UpdateGeneration = None
+    _LANGFUSE_AVAILABLE = False
 
 from reasoner.core.events.domain_events import LLMGenerationCompleted, PipelineEventType
-from reasoner.application.event_bus.bus import EventBus
-from reasoner.api.metrics import OBSERVABILITY_EVENTS_DROPPED_TOTAL # New import
+from reasoner.metrics import OBSERVABILITY_EVENTS_DROPPED_TOTAL # New import
 
 logger = logging.getLogger(__name__)
 
 # Global Langfuse client instance
-_langfuse_client: Optional[Langfuse] = None
+_langfuse_client = None
 _langfuse_lock = asyncio.Lock()
 _is_langfuse_enabled = False
 
 def _setup_langfuse() -> None:
     global _langfuse_client, _is_langfuse_enabled
+    if not _LANGFUSE_AVAILABLE:
+        logger.info("Langfuse library not available — observability disabled.")
+        _is_langfuse_enabled = False
+        return
     if _langfuse_client is None:
         public_key = os.environ.get("LANGFUSE_PUBLIC_KEY")
         secret_key = os.environ.get("LANGFUSE_SECRET_KEY")
@@ -34,7 +49,7 @@ def _setup_langfuse() -> None:
 
         if public_key and secret_key:
             try:
-                _langfuse_client = Langfuse(public_key=public_key, secret_key=secret_key, host=host)
+                _langfuse_client = _Langfuse(public_key=public_key, secret_key=secret_key, host=host)
                 _is_langfuse_enabled = True
                 logger.info("Langfuse client initialized successfully.")
             except Exception as e:
@@ -68,21 +83,21 @@ class LangfuseSubscriber:
         # Create or retrieve trace
         if trace_id not in self._active_traces:
             self._active_traces[trace_id] = _langfuse_client.trace(
-                CreateTrace(id=trace_id, name=f"Pipeline: {trace_id}", metadata={"problem": ""}) # Problem field is updated later if needed
+                _CreateTrace(id=trace_id, name=f"Pipeline: {trace_id}", metadata={"problem": ""})
             )
             logger.debug(f"Langfuse: Created trace {trace_id}")
 
         # Create or retrieve span for the phase
         if span_id not in self._active_spans:
             self._active_spans[span_id] = self._active_traces[trace_id].span(
-                CreateSpan(id=span_id, name=f"Phase: {event.phase_name}", input={"system_prompt": event.system_prompt, "user_prompt": event.user_prompt})
+                _CreateSpan(id=span_id, name=f"Phase: {event.phase_name}", input={"system_prompt": event.system_prompt, "user_prompt": event.user_prompt})
             )
             logger.debug(f"Langfuse: Created span {span_id}")
 
         # Create generation
         try:
             generation = self._active_spans[span_id].generation(
-                CreateGeneration(
+                _CreateGeneration(
                     name=f"LLM Call: {event.model_name}",
                     model=event.model_name,
                     input={
@@ -106,15 +121,12 @@ class LangfuseSubscriber:
                         "cascading": event.metadata.get("cascading", False),
                         "error": event.metadata.get("error"),
                     },
-                    start_time=event.timestamp, # Use event timestamp for start time
+                    start_time=event.timestamp,
                     end_time=event.timestamp + event.duration_seconds if event.duration_seconds is not None else event.timestamp,
                 )
             )
             logger.debug(f"Langfuse: Created generation {generation.id}")
-            # For Langfuse, we need to explicitly update the generation when it's completed.
-            # The `create_generation` call implicitly starts a new generation.
-            # We can use update_generation to set the output and end_time.
-            generation.update(UpdateGeneration(
+            generation.update(_UpdateGeneration(
                 output={
                     "raw_response": event.raw_response,
                 },
@@ -131,12 +143,11 @@ class LangfuseSubscriber:
             logger.error(f"Langfuse: Failed to send generation event for pipeline {trace_id}, phase {event.phase_name}: {e}")
 
     async def handle_pipeline_started(self, event: Any) -> None:
-        # Initial trace creation, ensuring the trace exists for subsequent spans/generations
         if not _is_langfuse_enabled or _langfuse_client is None: return
         trace_id = event.aggregate_id
         if trace_id not in self._active_traces:
             self._active_traces[trace_id] = _langfuse_client.trace(
-                CreateTrace(id=trace_id, name=f"Pipeline: {trace_id}", metadata={"problem": event.problem, "preset": event.preset, "method": event.method})
+                _CreateTrace(id=trace_id, name=f"Pipeline: {trace_id}", metadata={"problem": event.problem, "preset": event.preset, "method": event.method})
             )
             logger.debug(f"Langfuse: Initialized trace {trace_id} from PipelineStarted event.")
 
@@ -144,8 +155,6 @@ class LangfuseSubscriber:
         if not _is_langfuse_enabled or _langfuse_client is None: return
         trace_id = event.aggregate_id
         if trace_id in self._active_traces:
-            # Optionally update trace with final status or metadata
-            # For now, just ensure it's flushed
             self._active_traces[trace_id].update(
                 name=f"Pipeline: {trace_id} (Completed)",
                 output=event.solution,
@@ -155,15 +164,14 @@ class LangfuseSubscriber:
                     "phases_completed": event.phases_completed,
                 }
             )
-            _langfuse_client.flush() # Ensure all events are sent
-            del self._active_traces[trace_id] # Clean up
+            _langfuse_client.flush()
+            del self._active_traces[trace_id]
             logger.debug(f"Langfuse: Flushed and cleaned up trace {trace_id}")
 
     async def handle_pipeline_failed(self, event: Any) -> None:
         if not _is_langfuse_enabled or _langfuse_client is None: return
         trace_id = event.aggregate_id
         if trace_id in self._active_traces:
-            # Mark trace as failed
             self._active_traces[trace_id].update(
                 name=f"Pipeline: {trace_id} (Failed)",
                 status="ERROR",
@@ -173,8 +181,8 @@ class LangfuseSubscriber:
                     "phases_completed": event.phases_completed,
                 }
             )
-            _langfuse_client.flush() # Ensure all events are sent
-            del self._active_traces[trace_id] # Clean up
+            _langfuse_client.flush()
+            del self._active_traces[trace_id]
             logger.debug(f"Langfuse: Flushed and cleaned up failed trace {trace_id}")
 
 

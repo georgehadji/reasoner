@@ -6,7 +6,11 @@ import logging
 from dataclasses import asdict
 
 from reasoner.core.constants import TRUNCATION
-from reasoner.models import PipelineState, SolutionCandidate, GenerationCandidate
+from reasoner.domain.pipeline_state import PipelineState
+from reasoner.domain.core_types import (
+    SolutionCandidate,
+    GenerationCandidate,
+)
 from reasoner.parsing import ParseError, extract_json
 from reasoner.application.flows.base import WorkflowServices
 import reasoner.phases as phases

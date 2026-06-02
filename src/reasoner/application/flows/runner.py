@@ -7,7 +7,7 @@ import logging
 import time
 from typing import Any, Callable
 
-from reasoner.models import PipelineState
+from reasoner.domain.pipeline_state import PipelineState
 from reasoner.application.flows.base import WorkflowStrategy, WorkflowServices, PhaseStep
 from reasoner.quality import PhaseMonitor, reset_phase_state
 from reasoner.core.constants import get_phase_retry_budget, get_phase_timeout
@@ -42,7 +42,6 @@ class WorkflowRunner:
         config: Any = None
     ) -> PipelineState:
         """Run the strategy to completion."""
-        # Strategies currently implement their own loop in 'execute'.
         return await strategy.execute(state, self.services)
 
     async def run_phase(

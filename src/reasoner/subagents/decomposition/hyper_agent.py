@@ -15,7 +15,13 @@ import asyncio
 import logging
 
 from reasoner.infrastructure.llm.router import ProviderRouter
-from reasoner.models import Decomposition, PipelineState, SubProblem, Assumption, ClaimLabel
+from reasoner.domain.core_types import (
+    Decomposition,
+    SubProblem,
+    Assumption,
+)
+from reasoner.domain.pipeline_state import PipelineState
+from reasoner.models import ClaimLabel
 from reasoner.subagents.models import PhaseSubAgentOutput
 from reasoner.subagents.decomposition.structural_decomposer import StructuralDecomposerSubAgent
 from reasoner.subagents.decomposition.stakeholder_mapper import StakeholderMapperSubAgent

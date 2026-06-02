@@ -18,7 +18,8 @@ import logging
 from typing import Any
 
 from reasoner.infrastructure.llm.router import ProviderRouter
-from reasoner.models import FinalSolution, PipelineState
+from reasoner.domain.core_types import FinalSolution
+from reasoner.domain.pipeline_state import PipelineState
 from reasoner.subagents.models import PhaseSubAgentOutput
 from reasoner.subagents.synthesis.consensus_mapper import ConsensusMapperSubAgent
 from reasoner.subagents.synthesis.contradiction_resolver import ContradictionResolverSubAgent
@@ -98,7 +99,8 @@ class SynthesisHyperAgent:
 
         # ── Build FinalSolution ───────────────────────────────────────
         result = writer_out.result
-        from reasoner.models import ClaimLabel, MetaCognitiveAudit
+        from reasoner.domain.core_types import MetaCognitiveAudit
+from reasoner.models import ClaimLabel
 
         meta_audit_raw = result.get("meta_audit", {})
         meta_audit = MetaCognitiveAudit(

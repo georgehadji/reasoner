@@ -1,6 +1,6 @@
 from __future__ import annotations
 import json
-from reasoner.models import PipelineState
+from reasoner.domain.pipeline_state import PipelineState
 from reasoner.phases._shared import get_language_instruction, _wrap_user_input
 
 JURY_GENERATOR_SYSTEM = "You are an analytical assistant. Produce your best possible solution. Output ONLY valid JSON."

@@ -5,7 +5,7 @@ from reasoner.application.services.renderers._shared import (
     _render_stress, _render_action_blueprint, _render_errors,
     render_routing_table, render_perspective_content,
 )
-from reasoner.models import PipelineState
+from reasoner.domain.pipeline_state import PipelineState
 
 from rich.panel import Panel
 from rich.table import Table

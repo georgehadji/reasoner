@@ -1,0 +1,2062 @@
+"""
+PipelineState and sub-containers extracted from models.py.
+
+Contains: MethodState, CostTrackingState, ConversationState,
+          PipelineCore, PipelineMeta, PipelineRemainder, PipelineState
+"""
+
+from __future__ import annotations
+
+import json
+from collections import deque
+from dataclasses import dataclass, field, asdict, fields as dc_fields
+from enum import Enum
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, TYPE_CHECKING
+
+from reasoner.domain.core_types import (
+    SolutionCandidate, CritiqueScore, StressTestResult,
+    MetaCognitiveAudit, GenerationCandidate, CriticScore,
+    VerificationResult, MetaEvaluation, Decomposition, FinalSolution,
+)
+from reasoner.domain.models import TaskType, ClaimLabel, PerspectiveType, PerspectiveRegistry
+
+if TYPE_CHECKING:
+    from reasoner.core.protocol import PhaseResult
+
+@dataclass
+class MethodState:
+    """Generic container for method-specific phase data.
+
+    Replace 19 named PipelineState fields (jury_guidelines, debate_rounds,
+    scientific_state, ...) with a single dict indexed by method name.
+    """
+    data: dict[str, Any] = field(default_factory=dict)
+
+    def get(self, method: str) -> dict[str, Any]:
+        v = self.data.get(method)
+        return v if isinstance(v, dict) else {}
+
+    def set(self, method: str, state: dict[str, Any]) -> None:
+        self.data[method] = state
+
+
+@dataclass
+class CostTrackingState:
+    """Grouped cost and token tracking for the pipeline.
+
+    Aggregates fields that were previously flat in PipelineState
+    into a single sub-object for cleaner serialization.
+    """
+    total_cost_usd: float = 0.0
+    phase_costs: dict[str, float] = field(default_factory=dict)
+    detailed_token_usage: dict[str, dict[str, int]] = field(default_factory=dict)
+    phase_costs_by_key: dict[str, float] = field(default_factory=dict)
+    _phase_models_by_key: dict[str, list[str]] = field(default_factory=dict)
+
+
+@dataclass
+class ConversationState:
+    """Grouped multi-turn follow-up context."""
+    conversation_history: list[dict[str, str]] = field(default_factory=list)
+    conversation_id: str = ""
+    turn_number: int = 1
+    previous_synthesis: str = ""
+    agent_model: str | None = None
+
+
+@dataclass
+class PipelineCore:
+    """Fields that every phase reads during execution."""
+    problem: str = ""
+    enhanced_problem: str = ""  # Auto-rewritten prompt for clarity and context
+    task_type: TaskType | None = None
+    task_type_rationale: str = ""
+    language: str = "English"  # Detected language from the problem
+    complexity: str | None = None  # Estimated problem complexity (simple, medium, complex)
+    decomposition: Decomposition | None = None
+    candidates: list[SolutionCandidate] = field(default_factory=list)
+    scores: list[CritiqueScore] = field(default_factory=list)
+    top_candidates: list[SolutionCandidate] = field(default_factory=list)
+    stress_results: list[StressTestResult] = field(default_factory=list)
+    final_solution: FinalSolution | None = None
+    errors: list[str] = field(default_factory=list)
+    attachments: list[dict[str, Any]] = field(default_factory=list)
+    # ORCHESTRATED method fields (populated only when preset is orchestrated)
+    generation_candidates: list["GenerationCandidate"] = field(default_factory=list)
+    critic_scores: list["CriticScore"] = field(default_factory=list)
+    verification_results: list["VerificationResult"] = field(default_factory=list)
+    meta_evaluation: "MetaEvaluation | None" = None
+
+
+@dataclass
+class PipelineMeta:
+    """Fields that are write-only during execution, read-only after."""
+    started_at: "datetime" = field(default_factory=lambda: datetime.now(timezone.utc))
+    phase_logs: list[str] = field(default_factory=list)
+    phase_tokens: dict[str, dict[str, int]] = field(default_factory=dict)
+    phase_durations: dict[str, float] = field(default_factory=dict)
+    phase_models: dict[str, str] = field(default_factory=dict)
+    phase_results: list["PhaseResult"] = field(default_factory=list)
+    quality_hints: dict[str, str] = field(default_factory=dict)
+    quality_history: list[dict] = field(default_factory=list)
+    preset_name: str | None = None
+    method: str | None = None
+    context_quality: str = "unknown"  # "good" | "partial" | "contaminated" | "missing"
+
+
+@dataclass
+class PipelineRemainder:
+    """Fields that don't fit cleanly into core or meta."""
+    neuro_context: list[dict[str, Any]] = field(default_factory=list)
+    reflexion_memory: list[str] = field(default_factory=list)
+    web_discovery_results: list[dict[str, Any]] = field(default_factory=list)
+    vetted_context: list[dict[str, Any]] = field(default_factory=list)
+    synthesis_subagent_outputs: list[dict[str, Any]] = field(default_factory=list)
+    critique_subagent_outputs: list[dict[str, Any]] = field(default_factory=list)
+    decomposition_subagent_outputs: list[dict[str, Any]] = field(default_factory=list)
+    enhancement_subagent_outputs: list[dict[str, Any]] = field(default_factory=list)
+    search_subagent_outputs: list[dict[str, Any]] = field(default_factory=list)
+    pending_events: list[dict[str, Any]] = field(default_factory=list)
+    _followup_cache: str | None = field(default=None, repr=False)
+
+
+@dataclass
+class PipelineState:
+    """Complete pipeline state — passed between phases."""
+    core: PipelineCore = field(default_factory=PipelineCore)
+    method_state: MethodState = field(default_factory=MethodState)
+    meta: PipelineMeta = field(default_factory=PipelineMeta)
+    remainder: PipelineRemainder = field(default_factory=PipelineRemainder)
+    cost_state: CostTrackingState = field(default_factory=CostTrackingState)
+    conversation_state: ConversationState = field(default_factory=ConversationState)
+
+    def __init__(self, **kwargs: Any) -> None:
+        """Backward-compatible init: accepts both old flat kwargs and new nested kwargs."""
+        _CORE_FIELDS = {
+            'problem', 'enhanced_problem', 'task_type', 'task_type_rationale',
+            'language', 'complexity', 'decomposition', 'candidates', 'scores',
+            'top_candidates', 'stress_results', 'final_solution', 'errors',
+            'attachments', 'generation_candidates', 'critic_scores',
+            'verification_results', 'meta_evaluation',
+        }
+        _META_FIELDS = {
+            'started_at', 'phase_logs', 'phase_tokens', 'phase_durations',
+            'phase_models', 'phase_results', 'quality_hints', 'quality_history',
+            'preset_name', 'method', 'context_quality',
+        }
+        _REMAINDER_FIELDS = {
+            'neuro_context', 'reflexion_memory', 'web_discovery_results',
+            'vetted_context', 'synthesis_subagent_outputs',
+            'critique_subagent_outputs', 'decomposition_subagent_outputs',
+            'enhancement_subagent_outputs', 'search_subagent_outputs',
+            'pending_events', '_followup_cache',
+        }
+
+        core_kwargs: dict[str, Any] = {}
+        meta_kwargs: dict[str, Any] = {}
+        remainder_kwargs: dict[str, Any] = {}
+        direct_kwargs: dict[str, Any] = {}
+
+        for key, value in kwargs.items():
+            if key in _CORE_FIELDS:
+                core_kwargs[key] = value
+            elif key in _META_FIELDS:
+                meta_kwargs[key] = value
+            elif key in _REMAINDER_FIELDS:
+                remainder_kwargs[key] = value
+            else:
+                direct_kwargs[key] = value
+
+        # Build sub-objects: explicit containers take precedence
+        core = direct_kwargs.pop('core', None)
+        if core is None:
+            core = PipelineCore(**core_kwargs) if core_kwargs else PipelineCore()
+        elif core_kwargs:
+            # Merge flat kwargs into existing container
+            for k, v in core_kwargs.items():
+                setattr(core, k, v)
+
+        meta = direct_kwargs.pop('meta', None)
+        if meta is None:
+            meta = PipelineMeta(**meta_kwargs) if meta_kwargs else PipelineMeta()
+        elif meta_kwargs:
+            for k, v in meta_kwargs.items():
+                setattr(meta, k, v)
+
+        remainder = direct_kwargs.pop('remainder', None)
+        if remainder is None:
+            remainder = PipelineRemainder(**remainder_kwargs) if remainder_kwargs else PipelineRemainder()
+        elif remainder_kwargs:
+            for k, v in remainder_kwargs.items():
+                setattr(remainder, k, v)
+
+        method_state = direct_kwargs.pop('method_state', MethodState())
+        cost_state = direct_kwargs.pop('cost_state', CostTrackingState())
+        conversation_state = direct_kwargs.pop('conversation_state', ConversationState())
+
+        # Assign fields directly to avoid dataclass __init__ recursion
+        object.__setattr__(self, 'core', core)
+        object.__setattr__(self, 'method_state', method_state)
+        object.__setattr__(self, 'meta', meta)
+        object.__setattr__(self, 'remainder', remainder)
+        object.__setattr__(self, 'cost_state', cost_state)
+        object.__setattr__(self, 'conversation_state', conversation_state)
+
+        # v3.1: Set any remaining direct kwargs (dataclass fields added after original impl)
+        for k, v in direct_kwargs.items():
+            object.__setattr__(self, k, v)
+
+        # Run post-init migration logic
+        self.__post_init__()
+
+    # ─────────────────────────────────────────────────────────────────────
+    # Backward-compatible property aliases for core fields
+    # ─────────────────────────────────────────────────────────────────────
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def problem(self) -> str:
+        return self.core.problem
+
+    @problem.setter
+    def problem(self, value: str) -> None:
+        self.core.problem = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def enhanced_problem(self) -> str:
+        return self.core.enhanced_problem
+
+    @enhanced_problem.setter
+    def enhanced_problem(self, value: str) -> None:
+        self.core.enhanced_problem = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def task_type(self) -> TaskType | None:
+        return self.core.task_type
+
+    @task_type.setter
+    def task_type(self, value: TaskType | None) -> None:
+        self.core.task_type = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def task_type_rationale(self) -> str:
+        return self.core.task_type_rationale
+
+    @task_type_rationale.setter
+    def task_type_rationale(self, value: str) -> None:
+        self.core.task_type_rationale = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def language(self) -> str:
+        return self.core.language
+
+    @language.setter
+    def language(self, value: str) -> None:
+        self.core.language = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def complexity(self) -> str | None:
+        return self.core.complexity
+
+    @complexity.setter
+    def complexity(self, value: str | None) -> None:
+        self.core.complexity = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def decomposition(self) -> Decomposition | None:
+        return self.core.decomposition
+
+    @decomposition.setter
+    def decomposition(self, value: Decomposition | None) -> None:
+        self.core.decomposition = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def candidates(self) -> list[SolutionCandidate]:
+        return self.core.candidates
+
+    @candidates.setter
+    def candidates(self, value: list[SolutionCandidate]) -> None:
+        self.core.candidates = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def scores(self) -> list[CritiqueScore]:
+        return self.core.scores
+
+    @scores.setter
+    def scores(self, value: list[CritiqueScore]) -> None:
+        self.core.scores = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def top_candidates(self) -> list[SolutionCandidate]:
+        return self.core.top_candidates
+
+    @top_candidates.setter
+    def top_candidates(self, value: list[SolutionCandidate]) -> None:
+        self.core.top_candidates = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def stress_results(self) -> list[StressTestResult]:
+        return self.core.stress_results
+
+    @stress_results.setter
+    def stress_results(self, value: list[StressTestResult]) -> None:
+        self.core.stress_results = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def final_solution(self) -> FinalSolution | None:
+        return self.core.final_solution
+
+    @final_solution.setter
+    def final_solution(self, value: FinalSolution | None) -> None:
+        self.core.final_solution = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def errors(self) -> list[str]:
+        return self.core.errors
+
+    @errors.setter
+    def errors(self, value: list[str]) -> None:
+        self.core.errors = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def attachments(self) -> list[dict[str, Any]]:
+        return self.core.attachments
+
+    @attachments.setter
+    def attachments(self, value: list[dict[str, Any]]) -> None:
+        self.core.attachments = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def generation_candidates(self) -> list["GenerationCandidate"]:
+        return self.core.generation_candidates
+
+    @generation_candidates.setter
+    def generation_candidates(self, value: list["GenerationCandidate"]) -> None:
+        self.core.generation_candidates = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def critic_scores(self) -> list["CriticScore"]:
+        return self.core.critic_scores
+
+    @critic_scores.setter
+    def critic_scores(self, value: list["CriticScore"]) -> None:
+        self.core.critic_scores = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def verification_results(self) -> list["VerificationResult"]:
+        return self.core.verification_results
+
+    @verification_results.setter
+    def verification_results(self, value: list["VerificationResult"]) -> None:
+        self.core.verification_results = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def meta_evaluation(self) -> "MetaEvaluation | None":
+        return self.core.meta_evaluation
+
+    @meta_evaluation.setter
+    def meta_evaluation(self, value: "MetaEvaluation | None") -> None:
+        self.core.meta_evaluation = value
+
+    # ─────────────────────────────────────────────────────────────────────
+    # Backward-compatible property aliases for meta fields
+    # ─────────────────────────────────────────────────────────────────────
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def started_at(self) -> "datetime":
+        return self.meta.started_at
+
+    @started_at.setter
+    def started_at(self, value: "datetime") -> None:
+        self.meta.started_at = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def phase_logs(self) -> list[str]:
+        return self.meta.phase_logs
+
+    @phase_logs.setter
+    def phase_logs(self, value: list[str]) -> None:
+        self.meta.phase_logs = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def phase_tokens(self) -> dict[str, dict[str, int]]:
+        return self.meta.phase_tokens
+
+    @phase_tokens.setter
+    def phase_tokens(self, value: dict[str, dict[str, int]]) -> None:
+        self.meta.phase_tokens = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def phase_durations(self) -> dict[str, float]:
+        return self.meta.phase_durations
+
+    @phase_durations.setter
+    def phase_durations(self, value: dict[str, float]) -> None:
+        self.meta.phase_durations = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def phase_models(self) -> dict[str, str]:
+        return self.meta.phase_models
+
+    @phase_models.setter
+    def phase_models(self, value: dict[str, str]) -> None:
+        self.meta.phase_models = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def phase_results(self) -> list["PhaseResult"]:
+        return self.meta.phase_results
+
+    @phase_results.setter
+    def phase_results(self, value: list["PhaseResult"]) -> None:
+        self.meta.phase_results = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def quality_hints(self) -> dict[str, str]:
+        return self.meta.quality_hints
+
+    @quality_hints.setter
+    def quality_hints(self, value: dict[str, str]) -> None:
+        self.meta.quality_hints = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def quality_history(self) -> list[dict]:
+        return self.meta.quality_history
+
+    @quality_history.setter
+    def quality_history(self, value: list[dict]) -> None:
+        self.meta.quality_history = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def preset_name(self) -> str | None:
+        return self.meta.preset_name
+
+    @preset_name.setter
+    def preset_name(self, value: str | None) -> None:
+        self.meta.preset_name = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def method(self) -> str | None:
+        return self.meta.method
+
+    @method.setter
+    def method(self, value: str | None) -> None:
+        self.meta.method = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def context_quality(self) -> str:
+        return self.meta.context_quality
+
+    @context_quality.setter
+    def context_quality(self, value: str) -> None:
+        self.meta.context_quality = value
+
+    # ─────────────────────────────────────────────────────────────────────
+    # Backward-compatible property aliases for remainder fields
+    # ─────────────────────────────────────────────────────────────────────
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def neuro_context(self) -> list[dict[str, Any]]:
+        return self.remainder.neuro_context
+
+    @neuro_context.setter
+    def neuro_context(self, value: list[dict[str, Any]]) -> None:
+        self.remainder.neuro_context = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def reflexion_memory(self) -> list[str]:
+        return self.remainder.reflexion_memory
+
+    @reflexion_memory.setter
+    def reflexion_memory(self, value: list[str]) -> None:
+        self.remainder.reflexion_memory = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def web_discovery_results(self) -> list[dict[str, Any]]:
+        return self.remainder.web_discovery_results
+
+    @web_discovery_results.setter
+    def web_discovery_results(self, value: list[dict[str, Any]]) -> None:
+        self.remainder.web_discovery_results = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def vetted_context(self) -> list[dict[str, Any]]:
+        return self.remainder.vetted_context
+
+    @vetted_context.setter
+    def vetted_context(self, value: list[dict[str, Any]]) -> None:
+        self.remainder.vetted_context = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def synthesis_subagent_outputs(self) -> list[dict[str, Any]]:
+        return self.remainder.synthesis_subagent_outputs
+
+    @synthesis_subagent_outputs.setter
+    def synthesis_subagent_outputs(self, value: list[dict[str, Any]]) -> None:
+        self.remainder.synthesis_subagent_outputs = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def critique_subagent_outputs(self) -> list[dict[str, Any]]:
+        return self.remainder.critique_subagent_outputs
+
+    @critique_subagent_outputs.setter
+    def critique_subagent_outputs(self, value: list[dict[str, Any]]) -> None:
+        self.remainder.critique_subagent_outputs = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def decomposition_subagent_outputs(self) -> list[dict[str, Any]]:
+        return self.remainder.decomposition_subagent_outputs
+
+    @decomposition_subagent_outputs.setter
+    def decomposition_subagent_outputs(self, value: list[dict[str, Any]]) -> None:
+        self.remainder.decomposition_subagent_outputs = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def enhancement_subagent_outputs(self) -> list[dict[str, Any]]:
+        return self.remainder.enhancement_subagent_outputs
+
+    @enhancement_subagent_outputs.setter
+    def enhancement_subagent_outputs(self, value: list[dict[str, Any]]) -> None:
+        self.remainder.enhancement_subagent_outputs = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def search_subagent_outputs(self) -> list[dict[str, Any]]:
+        return self.remainder.search_subagent_outputs
+
+    @search_subagent_outputs.setter
+    def search_subagent_outputs(self, value: list[dict[str, Any]]) -> None:
+        self.remainder.search_subagent_outputs = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def pending_events(self) -> list[dict[str, Any]]:
+        return self.remainder.pending_events
+
+    @pending_events.setter
+    def pending_events(self, value: list[dict[str, Any]]) -> None:
+        self.remainder.pending_events = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def _followup_cache(self) -> str | None:
+        return self.remainder._followup_cache
+
+    @_followup_cache.setter
+    def _followup_cache(self, value: str | None) -> None:
+        self.remainder._followup_cache = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def synthesis(self) -> dict[str, Any] | None:
+        """Compatibility layer for old handler code expecting a dict."""
+        if self.core.final_solution:
+            return {
+                "core_solution": self.core.final_solution.core_solution,
+                "critical_insights": self.core.final_solution.critical_insights,
+            }
+        return None
+
+    # ─────────────────────────────────────────────────────────────────────
+    # Method State (replaces 19 named fields with a single dict container)
+    # ─────────────────────────────────────────────────────────────────────
+
+    # ─────────────────────────────────────────────────────────────────────
+    # Backward-compatible property aliases for method state fields
+    # ─────────────────────────────────────────────────────────────────────
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def jury_guidelines(self) -> list[str]:
+        return self.method_state.data.setdefault("jury", {}).setdefault("guidelines", [])
+
+    @jury_guidelines.setter
+    def jury_guidelines(self, value: list[str]) -> None:
+        self.method_state.data.setdefault("jury", {})["guidelines"] = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def debate_rounds(self) -> list[dict[str, Any]]:
+        return self.method_state.data.setdefault("debate", {}).setdefault("rounds", [])
+
+    @debate_rounds.setter
+    def debate_rounds(self, value: list[dict[str, Any]]) -> None:
+        self.method_state.data.setdefault("debate", {})["rounds"] = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def scientific_state(self) -> dict[str, Any]:
+        return self.method_state.data.setdefault("scientific", {})
+
+    @scientific_state.setter
+    def scientific_state(self, value: dict[str, Any]) -> None:
+        self.method_state.data["scientific"] = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def socratic_state(self) -> dict[str, Any]:
+        return self.method_state.data.setdefault("socratic", {})
+
+    @socratic_state.setter
+    def socratic_state(self, value: dict[str, Any]) -> None:
+        self.method_state.data["socratic"] = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def jury_weighted_ranking(self) -> list[str]:
+        return self.method_state.data.setdefault("jury", {}).setdefault("weighted_ranking", [])
+
+    @jury_weighted_ranking.setter
+    def jury_weighted_ranking(self, value: list[str]) -> None:
+        self.method_state.data.setdefault("jury", {})["weighted_ranking"] = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def pre_mortem_state(self) -> dict[str, Any]:
+        return self.method_state.data.setdefault("pre_mortem", {})
+
+    @pre_mortem_state.setter
+    def pre_mortem_state(self, value: dict[str, Any]) -> None:
+        self.method_state.data["pre_mortem"] = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def bayesian_state(self) -> dict[str, Any]:
+        return self.method_state.data.setdefault("bayesian", {})
+
+    @bayesian_state.setter
+    def bayesian_state(self, value: dict[str, Any]) -> None:
+        self.method_state.data["bayesian"] = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def dialectical_state(self) -> dict[str, Any]:
+        return self.method_state.data.setdefault("dialectical", {})
+
+    @dialectical_state.setter
+    def dialectical_state(self, value: dict[str, Any]) -> None:
+        self.method_state.data["dialectical"] = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def analogical_state(self) -> dict[str, Any]:
+        return self.method_state.data.setdefault("analogical", {})
+
+    @analogical_state.setter
+    def analogical_state(self, value: dict[str, Any]) -> None:
+        self.method_state.data["analogical"] = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def delphi_state(self) -> dict[str, Any]:
+        return self.method_state.data.setdefault("delphi", {})
+
+    @delphi_state.setter
+    def delphi_state(self, value: dict[str, Any]) -> None:
+        self.method_state.data["delphi"] = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def cove_state(self) -> dict[str, Any]:
+        return self.method_state.data.setdefault("cove", {})
+
+    @cove_state.setter
+    def cove_state(self, value: dict[str, Any]) -> None:
+        self.method_state.data["cove"] = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def sot_state(self) -> dict[str, Any]:
+        return self.method_state.data.setdefault("sot", {})
+
+    @sot_state.setter
+    def sot_state(self, value: dict[str, Any]) -> None:
+        self.method_state.data["sot"] = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def tot_state(self) -> dict[str, Any]:
+        return self.method_state.data.setdefault("tot", {})
+
+    @tot_state.setter
+    def tot_state(self, value: dict[str, Any]) -> None:
+        self.method_state.data["tot"] = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def pot_state(self) -> dict[str, Any]:
+        return self.method_state.data.setdefault("pot", {})
+
+    @pot_state.setter
+    def pot_state(self, value: dict[str, Any]) -> None:
+        self.method_state.data["pot"] = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def self_discover_state(self) -> dict[str, Any]:
+        return self.method_state.data.setdefault("self_discover", {})
+
+    @self_discover_state.setter
+    def self_discover_state(self, value: dict[str, Any]) -> None:
+        self.method_state.data["self_discover"] = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def writing_state(self) -> dict[str, Any]:
+        return self.method_state.data.setdefault("writing", {})
+
+    @writing_state.setter
+    def writing_state(self, value: dict[str, Any]) -> None:
+        self.method_state.data["writing"] = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def coding_state(self) -> dict[str, Any]:
+        return self.method_state.data.setdefault("coding", {})
+
+    @coding_state.setter
+    def coding_state(self, value: dict[str, Any]) -> None:
+        self.method_state.data["coding"] = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def brainstorming_state(self) -> dict[str, Any]:
+        return self.method_state.data.setdefault("brainstorming", {})
+
+    @brainstorming_state.setter
+    def brainstorming_state(self, value: dict[str, Any]) -> None:
+        self.method_state.data["brainstorming"] = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def cross_language_state(self) -> dict[str, Any]:
+        return self.method_state.data.setdefault("cross_language", {})
+
+    @cross_language_state.setter
+    def cross_language_state(self, value: dict[str, Any]) -> None:
+        self.method_state.data["cross_language"] = value
+
+    def __post_init__(self) -> None:
+        """Backward-compat migration for --resume with old-format state files.
+        Also sets up property-backed alias attributes for the grouped fields."""
+        if not isinstance(self.core, PipelineCore):
+            if isinstance(self.core, dict):
+                self.core = PipelineCore(**self.core)
+            else:
+                self.core = PipelineCore()
+        if not isinstance(self.meta, PipelineMeta):
+            if isinstance(self.meta, dict):
+                self.meta = PipelineMeta(**self.meta)
+            else:
+                self.meta = PipelineMeta()
+        if not isinstance(self.remainder, PipelineRemainder):
+            if isinstance(self.remainder, dict):
+                self.remainder = PipelineRemainder(**self.remainder)
+            else:
+                self.remainder = PipelineRemainder()
+        if not isinstance(self.method_state, MethodState):
+            if isinstance(self.method_state, dict):
+                self.method_state = MethodState(**self.method_state)
+            else:
+                self.method_state = MethodState()
+        if not isinstance(self.cost_state, CostTrackingState):
+            if isinstance(self.cost_state, dict):
+                self.cost_state = CostTrackingState(**self.cost_state)
+            else:
+                self.cost_state = CostTrackingState()
+        if not isinstance(self.conversation_state, ConversationState):
+            if isinstance(self.conversation_state, dict):
+                self.conversation_state = ConversationState(**self.conversation_state)
+            else:
+                self.conversation_state = ConversationState()
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def total_cost_usd(self) -> float:
+        return self.cost_state.total_cost_usd
+
+    @total_cost_usd.setter
+    def total_cost_usd(self, value: float) -> None:
+        self.cost_state.total_cost_usd = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def phase_costs(self) -> dict[str, float]:
+        return self.cost_state.phase_costs
+
+    @phase_costs.setter
+    def phase_costs(self, value: dict[str, float]) -> None:
+        self.cost_state.phase_costs = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def detailed_token_usage(self) -> dict[str, dict[str, int]]:
+        return self.cost_state.detailed_token_usage
+
+    @detailed_token_usage.setter
+    def detailed_token_usage(self, value: dict[str, dict[str, int]]) -> None:
+        self.cost_state.detailed_token_usage = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def conversation_history(self) -> list[dict[str, str]]:
+        return self.conversation_state.conversation_history
+
+    @conversation_history.setter
+    def conversation_history(self, value: list[dict[str, str]]) -> None:
+        self.conversation_state.conversation_history = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def conversation_id(self) -> str:
+        return self.conversation_state.conversation_id
+
+    @conversation_id.setter
+    def conversation_id(self, value: str) -> None:
+        self.conversation_state.conversation_id = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def turn_number(self) -> int:
+        return self.conversation_state.turn_number
+
+    @turn_number.setter
+    def turn_number(self, value: int) -> None:
+        self.conversation_state.turn_number = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def previous_synthesis(self) -> str:
+        return self.conversation_state.previous_synthesis
+
+    @previous_synthesis.setter
+    def previous_synthesis(self, value: str) -> None:
+        self.conversation_state.previous_synthesis = value
+
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        import dataclasses
+        for f in dataclasses.fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not dataclasses.MISSING:
+                    object.__setattr__(self, f.name, f.default)
+    @property
+    def agent_model(self) -> str | None:
+        return self.conversation_state.agent_model
+
+    @agent_model.setter
+    def agent_model(self, value: str | None) -> None:
+        self.conversation_state.agent_model = value
+
+    # Event sourcing support — set via wire_event_bus()
+    _event_bus: "EventBus | None" = None
+    _aggregate_id: str = ""
+
+
+    # Adversarial debate (iterative critique method)
+    adversarial_rounds: list = field(default_factory=list)
+    adversarial_converged: bool = False
+    adversarial_convergence_round: int = 0
+    adversarial_convergence_reason: str = ""
+
+    _MAX_PENDING_EVENTS: int = 1000
+
+    def wire_event_bus(self, bus: "EventBus", aggregate_id: str = "") -> None:
+        """Wire an EventBus for domain event publishing during pipeline execution.
+
+        Args:
+            bus: EventBus instance for publishing domain events
+            aggregate_id: Unique identifier for this pipeline run (run_id)
+        """
+        object.__setattr__(self, '_event_bus', bus)
+        object.__setattr__(self, '_aggregate_id', aggregate_id)
+
+    def _emit(self, event_type: str, **event_kwargs: Any) -> None:
+        """Emit a domain event through the wired EventBus (fire-and-forget).
+
+        Accepts string event_type (e.g. "PIPELINE_STARTED") or enum member.
+        No-op if no EventBus is wired. Events are published asynchronously
+        — this method does not await the publish and never raises.
+        """
+        bus = getattr(self, '_event_bus', None) if hasattr(self, '_event_bus') else None
+        if bus is None:
+            return
+        try:
+            import asyncio
+            from reasoner.core.events.domain_events import (
+                make_event, PipelineEventType
+            )
+
+            # Coerce string to proper PipelineEventType enum member.
+            # BUGFIX v3.1: don't silently absorb ValueError.
+            if isinstance(event_type, str):
+                event_type = PipelineEventType(event_type.upper())
+
+            aggregate_id = getattr(self, '_aggregate_id', '') or ''
+            event = make_event(event_type, aggregate_id=aggregate_id, version=1, **event_kwargs)
+            # Fire-and-forget: create a task for the bus.publish
+            asyncio.create_task(bus.publish(event))
+        except Exception:
+            pass  # Never let event publishing crash the pipeline
+
+    def append_pending_event(self, event: dict[str, Any]) -> None:
+        """Append event with bounded backpressure."""
+        if len(self.pending_events) >= self._MAX_PENDING_EVENTS:
+            # Drop oldest 10% to make room
+            drop_count = self._MAX_PENDING_EVENTS // 10
+            self.pending_events = self.pending_events[drop_count:]
+        self.pending_events.append(event)
+
+    def add_error(self, message: str) -> None:
+        """Atomic append to error list."""
+        if message and message not in self.errors:
+            self.errors.append(str(message))
+
+    def add_log(self, phase: str, message: str) -> None:
+        """Atomic log entry."""
+        entry = f"[{phase}] {message}"
+        self.phase_logs.append(entry)
+
+    def set_duration(self, phase: str, seconds: float) -> None:
+        """Safe update of phase durations."""
+        self.phase_durations[phase] = seconds
+
+    def log(self, phase: str, message: str) -> None:
+        self.add_log(phase, message)
+
+    def to_context_dict(self, phase: str = "default", compression: str = "balanced", use_neuro: bool = False) -> dict[str, Any]:
+        """
+        Serialize state for passing to next LLM call.
+        
+        Args:
+            phase: Current phase name (determines what data to include)
+            compression: Compression level - "aggressive" | "balanced" | "none"
+            use_neuro: If True, use neuro-compression for text content (40-50% additional savings)
+        
+        Returns:
+            Context dictionary optimized for token efficiency
+        """
+        from reasoner.core.constants import TRUNCATION
+        
+        # Base context - always included
+        context = {
+            "problem": self.problem,
+            "task_type": (self.task_type.value if hasattr(self.task_type, 'value') else self.task_type) if self.task_type else None,
+            "language": self.language,
+            "reflexion_memory": self.reflexion_memory,
+        }
+        
+        # Include attachments as a distinct field so synthesis phases see them explicitly
+        if self.attachments:
+            context["attachments"] = [
+                {
+                    "filename": a.get("filename", "unknown"),
+                    "extracted_text": (a.get("extracted_text", "") or "")[:TRUNCATION.LARGE_CONTENT],
+                }
+                for a in self.attachments
+            ]
+        # Aggressive compression: minimal context
+        if compression == "aggressive":
+            context["problem"] = self.problem[:TRUNCATION.PROBLEM]  # Truncate problem
+            # Only include phase-relevant data
+            if phase in ["perspective", "constructive", "destructive", "systemic", "minimalist"]:
+                context["decomposition_summary"] = self._get_decomposition_summary()
+            elif phase in ["scoring", "critique"]:
+                context["candidates_summary"] = self._get_candidates_summary(max_candidates=3, max_chars=200)
+            elif phase in ["stress_testing"]:
+                context["top_candidates_summary"] = self._get_candidates_summary(max_candidates=2, max_chars=150)
+            return context
+        
+        def _get_attr(obj: Any, key: str, default: Any = None) -> Any:
+            if obj is None:
+                return default
+            if hasattr(obj, key):
+                return getattr(obj, key, default)
+            if isinstance(obj, dict):
+                return obj.get(key, default)
+            return default
+
+        def _get_value(obj: Any) -> Any:
+            return obj.value if hasattr(obj, "value") else obj
+
+        # Determine content limit based on phase to balance token cost vs quality.
+        # Synthesis legitimately needs full candidate content to merge them correctly.
+        content_limit = TRUNCATION.LARGE_CONTENT if phase in ("synthesis", "stress_testing", "verification") else TRUNCATION.CONTENT
+
+        # Balanced compression (default) - progressive truncation
+        method_states = {
+            f"{k}_state" if k not in ("debate", "jury") else (
+                "debate_rounds" if k == "debate" else "jury_guidelines"
+            ): v
+            for k, v in self.method_state.data.items()
+            if v and k not in ("debate", "jury")
+        }
+        # Add nested jury/debate fields if present
+        if "jury" in self.method_state.data:
+            jury = self.method_state.data["jury"]
+            if jury.get("guidelines"):
+                method_states["jury_guidelines"] = jury["guidelines"]
+            if jury.get("weighted_ranking"):
+                method_states["jury_weighted_ranking"] = jury["weighted_ranking"]
+        if "debate" in self.method_state.data:
+            debate = self.method_state.data["debate"]
+            if debate.get("rounds"):
+                method_states["debate_rounds"] = debate["rounds"]
+        # Compress web results to "Title: Snippet" strings to reduce token waste in synthesis
+        web_results = [
+            f"{r.get('title', 'Unknown')}: {r.get('snippet', '')[:TRUNCATION.SNIPPET]}"
+            for r in (self.web_discovery_results or [])
+        ] or None
+        if web_results:
+            method_states["web_discovery_results"] = web_results
+        context.update(method_states)
+        context.update({
+            "sub_problems": [
+                {
+                    "id": _get_attr(sp, "id"),
+                    "description": (_get_attr(sp, "description", "")[:TRUNCATION.API_STORAGE] if use_neuro else _get_attr(sp, "description", "")),
+                    "inputs": _get_attr(sp, "inputs", []),
+                    "outputs": _get_attr(sp, "outputs", []),
+                    "constraints": _get_attr(sp, "constraints", []),
+                }
+                for sp in (_get_attr(self.decomposition, "sub_problems", []) if self.decomposition else [])
+            ],
+            "assumptions": [
+                {"text": (_get_attr(a, "text", "")[:TRUNCATION.ASSUMPTION] if use_neuro else _get_attr(a, "text", "")), "label": _get_value(_get_attr(a, "label", ClaimLabel.UNKNOWN))}
+                for a in (_get_attr(self.decomposition, "assumptions", []) if self.decomposition else [])
+            ],
+            "candidates": [
+                {
+                    "perspective": _get_value(_get_attr(c, "perspective")),
+                    "content": _get_attr(c, "content", "")[:content_limit],
+                    "key_insights": (_get_attr(c, "key_insights", [])[:TRUNCATION.KEY_INSIGHTS] if use_neuro else _get_attr(c, "key_insights", [])),
+                }
+                for c in (
+                    self.candidates if phase == "synthesis" and self.candidates
+                    else self.top_candidates or self.candidates
+                )
+            ],
+            "scores": [
+                {
+                    "perspective": _get_value(_get_attr(s, "perspective")),
+                    "total": round(_get_attr(s, "total", 0), 2),
+                    "bias_flags": _get_attr(s, "bias_flags", []),
+                }
+                for s in self.scores
+            ],
+            "stress_results": [
+                {
+                    "scenario": _get_value(_get_attr(sr, "scenario")),
+                    "survival_rate": _get_attr(sr, "survival_rate", 0),
+                    "failure_mode": (_get_attr(sr, "failure_mode", "")[:TRUNCATION.SESSION_EXCERPT] if use_neuro else _get_attr(sr, "failure_mode", "")),
+                    "recovery_path": (_get_attr(sr, "recovery_path", "")[:TRUNCATION.SESSION_EXCERPT] if use_neuro else _get_attr(sr, "recovery_path", "")),
+                }
+                for sr in self.stress_results
+            ],
+        })
+        
+        # ORCHESTRATED method context (empty for other methods)
+        context.update({
+            "generation_candidates": [
+                {
+                    "generator_id": gc.generator_id,
+                    "model_used": gc.model_used,
+                    "solution": gc.solution[:TRUNCATION.SOLUTION],
+                    "confidence": gc.confidence,
+                    "key_claims": gc.key_claims[:TRUNCATION.KEY_INSIGHTS] if use_neuro else gc.key_claims,
+                    "approach_summary": gc.approach_summary[:TRUNCATION.API_STORAGE] if use_neuro else gc.approach_summary,
+                }
+                for gc in self.generation_candidates
+            ],
+            "critic_scores": [
+                {
+                    "critic_id": cs.critic_id,
+                    "critic_model": cs.critic_model,
+                    "candidate_scores": {
+                        gen_id: {
+                            "factuality": ds.factuality,
+                            "reasoning": ds.reasoning,
+                            "completeness": ds.completeness,
+                            "helpfulness": ds.helpfulness,
+                            "total": round(ds.total, 2),
+                        }
+                        for gen_id, ds in cs.candidate_scores.items()
+                    },
+                    "ranking": cs.ranking,
+                    "dissenting_note": cs.dissenting_note[:TRUNCATION.SESSION_EXCERPT] if use_neuro else cs.dissenting_note,
+                }
+                for cs in self.critic_scores
+            ],
+            "verification_results": [
+                {
+                    "claim": vr.claim[:TRUNCATION.API_STORAGE] if use_neuro else vr.claim,
+                    "source_generator": vr.source_generator,
+                    "verdict": vr.verdict.value,
+                    "evidence": vr.evidence[:TRUNCATION.API_STORAGE] if use_neuro else vr.evidence,
+                    "confidence": vr.confidence,
+                }
+                for vr in self.verification_results
+            ],
+        })
+        
+        return context
+    
+    def _get_decomposition_summary(self) -> dict[str, Any]:
+        """Get condensed decomposition summary for token efficiency."""
+        if not self.decomposition:
+            return {}
+        return {
+            "causal_chain_length": len(self.decomposition.sub_problems) if hasattr(self.decomposition, 'sub_problems') else 0,
+            "key_assumptions": [
+                {"text": a.text[:TRUNCATION.SESSION_EXCERPT], "label": a.label.value}
+                for a in (self.decomposition.assumptions[:TRUNCATION.KEY_INSIGHTS] if self.decomposition.assumptions else [])
+            ],
+        }
+    
+    def _get_candidates_summary(self, max_candidates: int = 3, max_chars: int = 200) -> list[dict]:
+        """Get condensed candidates summary for token efficiency."""
+        candidates = self.top_candidates or self.candidates
+        return [
+            {
+                "perspective": c.perspective.value,
+                "one_liner": c.content[:max_chars],
+                "key_insights": c.key_insights[:TRUNCATION.MEMORY],  # Top 2 only
+            }
+            for c in candidates[:max_candidates]
+        ]
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize complete state to dictionary (for persistence)."""
+        def serialize(obj: Any) -> Any:
+            if isinstance(obj, Enum):
+                return obj.value
+            if isinstance(obj, datetime):
+                return obj.isoformat()
+            if isinstance(obj, deque):
+                return list(obj)
+            if isinstance(obj, list):
+                return [serialize(item) for item in obj]
+            if isinstance(obj, dict):
+                return {k: serialize(v) for k, v in obj.items()}
+            if hasattr(obj, '__dataclass_fields__'):
+                return {k: serialize(v) for k, v in asdict(obj).items()}
+            return obj
+        
+        return serialize(asdict(self))
+
+    def save(self, path: str | Path) -> None:
+        """
+        Save state to JSON file.
+        
+        Args:
+            path: File path to save to
+            
+        Raises:
+            PermissionError: If write permission is denied
+            OSError: If disk is full or path is invalid
+            TypeError: If state contains non-serializable data
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        path = Path(path)
+        if ".." in path.parts:
+            raise ValueError("Invalid path: directory traversal not allowed")
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with open(path, 'w', encoding='utf-8') as f:
+                json.dump(self.to_dict(), f, indent=2, ensure_ascii=False)
+            logger.info(f"PipelineState saved to {path}")
+        except PermissionError as e:
+            logger.error(f"Permission denied saving PipelineState to {path}: {e}")
+            raise
+        except OSError as e:
+            logger.error(f"OS error saving PipelineState to {path}: {e}")
+            raise
+        except TypeError as e:
+            logger.error(f"Cannot serialize PipelineState: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error saving PipelineState to {path}: {e}")
+            raise
+
+    @classmethod
+    def load(cls, path: str | Path) -> "PipelineState":
+        """
+        Load state from JSON file.
+        
+        Args:
+            path: File path to load from
+            
+        Returns:
+            Reconstructed PipelineState instance
+            
+        Raises:
+            FileNotFoundError: If the file does not exist
+            PermissionError: If read permission is denied
+            json.JSONDecodeError: If the file contains invalid JSON
+            ValueError: If the file is corrupted or incomplete
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        path = Path(path)
+        if ".." in path.parts:
+            raise ValueError("Invalid path: directory traversal not allowed")
+        try:
+            if not path.exists():
+                raise FileNotFoundError(f"PipelineState file not found: {path}")
+            
+            with open(path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            state = cls._from_dict(data)
+            logger.info(f"PipelineState loaded from {path}")
+            return state
+        except FileNotFoundError:
+            raise
+        except PermissionError as e:
+            logger.error(f"Permission denied loading PipelineState from {path}: {e}")
+            raise
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON in PipelineState file {path}: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error loading PipelineState from {path}: {e}")
+            raise ValueError(f"Failed to load PipelineState: {e}") from e
+
+    @classmethod
+    def _from_dict(cls, data: dict[str, Any]) -> "PipelineState":
+        """Deserialize dictionary to PipelineState with proper type reconstruction."""
+        # ── Phase A: Migrate old flat-format to new nested structure FIRST ──
+        # This ensures all downstream reconstruction works on the new layout.
+
+        # Migrate old-format flat method state fields into method_state
+        _METHOD_KEYS = [
+            'jury_guidelines', 'debate_rounds', 'scientific_state',
+            'socratic_state', 'jury_weighted_ranking', 'pre_mortem_state',
+            'bayesian_state', 'dialectical_state', 'analogical_state',
+            'delphi_state', 'cove_state', 'sot_state', 'tot_state', 'pot_state',
+            'self_discover_state', 'writing_state', 'coding_state',
+            'brainstorming_state', 'cross_language_state',
+        ]
+        if 'method_state' not in data:
+            raw: dict[str, Any] = {}
+            for key in _METHOD_KEYS:
+                val = data.pop(key, None)
+                if val is not None and val != [] and val != {}:
+                    if key == 'debate_rounds':
+                        raw.setdefault('debate', {})['rounds'] = val
+                    elif key == 'jury_guidelines':
+                        raw.setdefault('jury', {})['guidelines'] = val
+                    elif key == 'jury_weighted_ranking':
+                        raw.setdefault('jury', {})['weighted_ranking'] = val
+                    else:
+                        method_name = key.replace('_state', '')
+                        raw[method_name] = val
+            if raw:
+                data['method_state'] = {'data': raw}
+
+        # Migrate old-format flat cost fields into cost_state
+        if 'cost_state' not in data:
+            cost_fields = {}
+            for key in ('total_cost_usd', 'phase_costs', 'detailed_token_usage',
+                        'phase_costs_by_key', '_phase_models_by_key'):
+                if key in data:
+                    cost_fields[key] = data.pop(key)
+            if cost_fields:
+                data['cost_state'] = cost_fields
+
+        # Migrate old-format flat conversation fields into conversation_state
+        if 'conversation_state' not in data:
+            conv_fields = {}
+            for key in ('conversation_history', 'conversation_id', 'turn_number',
+                        'previous_synthesis', 'agent_model'):
+                if key in data:
+                    conv_fields[key] = data.pop(key)
+            if conv_fields:
+                data['conversation_state'] = conv_fields
+
+        # Migrate old-format flat fields into core/meta/remainder sub-objects
+        if 'core' not in data:
+            core_fields = {}
+            for key in ('problem', 'enhanced_problem', 'task_type', 'task_type_rationale',
+                        'language', 'complexity', 'decomposition', 'candidates', 'scores',
+                        'top_candidates', 'stress_results', 'final_solution', 'errors',
+                        'attachments', 'generation_candidates', 'critic_scores',
+                        'verification_results', 'meta_evaluation'):
+                if key in data:
+                    core_fields[key] = data.pop(key)
+            if core_fields:
+                data['core'] = core_fields
+
+        if 'meta' not in data:
+            meta_fields = {}
+            for key in ('started_at', 'phase_logs', 'phase_tokens', 'phase_durations',
+                        'phase_models', 'phase_results', 'quality_hints', 'quality_history',
+                        'preset_name', 'method', 'context_quality'):
+                if key in data:
+                    meta_fields[key] = data.pop(key)
+            if meta_fields:
+                data['meta'] = meta_fields
+
+        if 'remainder' not in data:
+            remainder_fields = {}
+            for key in ('neuro_context', 'reflexion_memory', 'web_discovery_results',
+                        'vetted_context', 'synthesis_subagent_outputs',
+                        'critique_subagent_outputs', 'decomposition_subagent_outputs',
+                        'enhancement_subagent_outputs', 'search_subagent_outputs',
+                        'pending_events', '_followup_cache'):
+                if key in data:
+                    remainder_fields[key] = data.pop(key)
+            if remainder_fields:
+                data['remainder'] = remainder_fields
+
+        # ── Phase B: Reconstruct nested types in the new layout ──
+        core = data.get('core', {})
+        meta = data.get('meta', {})
+
+        # Convert string enums back to Enum types
+        if core.get('task_type'):
+            try:
+                core['task_type'] = TaskType(core['task_type'])
+            except ValueError:
+                core['task_type'] = None
+        if meta.get('started_at'):
+            dt = datetime.fromisoformat(meta['started_at'])
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            meta['started_at'] = dt
+
+        # Reconstruct decomposition inside core
+        # The LLM returns extra keys (causal_chain, critical_sources, …) that are
+        # not in the Decomposition dataclass.  Strip unknown keys before unpacking
+        # so that a saved state with any LLM-generated decomposition can be resumed.
+        # CRITICAL: Use defensive .get() for ALL nested dataclasses to handle
+        # truncated or corrupted state files gracefully.
+        if core.get('decomposition'):
+            dec = core['decomposition']
+            # SubProblem reconstruction with error handling and type coercion
+            _sub_problems = []
+            for sp in dec.get('sub_problems', []):
+                try:
+                    # Coerce list fields to lists in case LLM returned wrong type
+                    _inputs = sp.get('inputs', [])
+                    if not isinstance(_inputs, list):
+                        _inputs = [str(_inputs)] if _inputs else []
+                    _outputs = sp.get('outputs', [])
+                    if not isinstance(_outputs, list):
+                        _outputs = [str(_outputs)] if _outputs else []
+                    _constraints = sp.get('constraints', [])
+                    if not isinstance(_constraints, list):
+                        _constraints = [str(_constraints)] if _constraints else []
+                    
+                    _sub_problems.append(SubProblem(
+                        id=str(sp.get('id', '')),
+                        description=str(sp.get('description', '')),
+                        inputs=_inputs,
+                        outputs=_outputs,
+                        constraints=_constraints,
+                    ))
+                except (TypeError, ValueError, KeyError):
+                    pass  # skip malformed sub_problem entry
+            dec['sub_problems'] = _sub_problems
+            
+            # Use .get() with fallbacks: a missing 'rationale' or 'label' key in a
+            # saved assumption entry must not crash the entire resume.  Direct
+            # subscript access caused KeyError for any partially-written state file.
+            _assumptions = []
+            for a in dec.get('assumptions', []):
+                try:
+                    _assumptions.append(Assumption(
+                        text=str(a.get('text', '')),
+                        label=ClaimLabel(str(a.get('label', ClaimLabel.UNKNOWN.value))),
+                        rationale=str(a.get('rationale', '')),
+                        source_hint=str(a.get('source_hint', '')),
+                    ))
+                except (ValueError, KeyError):
+                    pass  # skip malformed assumption entry
+            dec['assumptions'] = _assumptions
+
+            # Preserve critical_sources if present
+            _cs = dec.get('critical_sources', [])
+            dec['critical_sources'] = [dict(cs) for cs in _cs if isinstance(cs, dict)]
+            
+            # Strip unknown keys before constructing Decomposition
+            _known = {f.name for f in dc_fields(Decomposition)}
+            core['decomposition'] = Decomposition(**{k: v for k, v in dec.items() if k in _known})
+
+        # Reconstruct candidates with PerspectiveType
+        if core.get('candidates'):
+            _candidates = []
+            for c in core['candidates']:
+                try:
+                    _candidates.append(SolutionCandidate(
+                        perspective=PerspectiveRegistry.coerce(c['perspective']),
+                        content=c['content'],
+                        key_insights=c['key_insights'],
+                        model_used=c['model_used']
+                    ))
+                except (ValueError, KeyError):
+                    pass # skip malformed candidate
+            core['candidates'] = _candidates
+
+        # Reconstruct scores with PerspectiveType
+        if core.get('scores'):
+            _scores = []
+            for s in core['scores']:
+                try:
+                    _scores.append(CritiqueScore(
+                        perspective=PerspectiveRegistry.coerce(s['perspective']),
+                        logical_consistency=s['logical_consistency'],
+                        evidence_support=s['evidence_support'],
+                        failure_resilience=s['failure_resilience'],
+                        feasibility=s['feasibility'],
+                        bias_flags=s['bias_flags'],
+                        steel_man=s['steel_man']
+                    ))
+                except (ValueError, KeyError):
+                    pass # skip malformed score
+            core['scores'] = _scores
+
+        # Reconstruct top_candidates
+        if core.get('top_candidates'):
+            _top_candidates = []
+            for c in core['top_candidates']:
+                try:
+                    _top_candidates.append(SolutionCandidate(
+                        perspective=PerspectiveRegistry.coerce(c['perspective']),
+                        content=c['content'],
+                        key_insights=c['key_insights'],
+                        model_used=c['model_used']
+                    ))
+                except (ValueError, KeyError):
+                    pass # skip malformed candidate
+            core['top_candidates'] = _top_candidates
+
+        # Reconstruct stress_results with ScenarioType.
+        # BUG-021: _from_dict used direct subscripts sr['scenario'] etc. — a
+        # truncated or older state file missing any field crashed with KeyError.
+        # Use .get() + coerce (matching the live-pipeline fix from BUG-015) and
+        # skip malformed entries with a warning instead of crashing the load.
+        if core.get('stress_results'):
+            _stress_results: list[StressTestResult] = []
+            for sr in core['stress_results']:
+                try:
+                    _stress_results.append(StressTestResult(
+                        scenario=ScenarioType.coerce(sr.get('scenario', 'optimal')),
+                        survival_rate=float(sr.get('survival_rate') or 0),
+                        failure_mode=sr.get('failure_mode', ''),
+                        recovery_path=sr.get('recovery_path', ''),
+                    ))
+                except (ValueError, TypeError):
+                    pass  # skip malformed stress result entry
+            core['stress_results'] = _stress_results
+
+        # Reconstruct final_solution with ClaimLabel and MetaCognitiveAudit
+        if core.get('final_solution'):
+            fs = core['final_solution']
+            # If it's already a FinalSolution object (unlikely here but for safety)
+            if hasattr(fs, '__dataclass_fields__'):
+                data['final_solution'] = fs
+            else:
+                # Ensure it's a dict
+                fs_dict = fs if isinstance(fs, dict) else {}
+                
+                # Safely reconstruct meta_audit
+                ma = fs_dict.get('meta_audit', {})
+                if not isinstance(ma, dict): ma = {}
+                meta_audit_obj = MetaCognitiveAudit(
+                    most_dangerous_assumption=ma.get('most_dangerous_assumption', ''),
+                    dominant_bias=ma.get('dominant_bias', ''),
+                    remaining_uncertainty=ma.get('remaining_uncertainty', ''),
+                    assumption_failure_impact=ma.get('assumption_failure_impact', ''),
+                    non_obvious_insight=ma.get('non_obvious_insight', '')
+                )
+                
+                # Safely reconstruct claim_labels
+                raw_labels = fs_dict.get('claim_labels', {})
+                if not isinstance(raw_labels, dict): raw_labels = {}
+                clean_labels = {}
+                for k, v in raw_labels.items():
+                    try:
+                        clean_labels[k] = ClaimLabel(v)
+                    except ValueError:
+                        clean_labels[k] = ClaimLabel.UNKNOWN
+
+                core['final_solution'] = FinalSolution(
+                    core_solution=fs_dict.get('core_solution', ''),
+                    critical_insights=fs_dict.get('critical_insights', []),
+                    action_blueprint=fs_dict.get('action_blueprint', []),
+                    open_questions=fs_dict.get('open_questions', []),
+                    claim_labels=clean_labels,
+                    meta_audit=meta_audit_obj,
+                    sources=fs_dict.get('sources', []),
+                    generator_attribution=fs_dict.get('generator_attribution', {}),
+                    critic_weighting=fs_dict.get('critic_weighting', {})
+                )
+
+        # Reconstruct generation_candidates
+        if core.get('generation_candidates'):
+            core['generation_candidates'] = [
+                GenerationCandidate(**gc) for gc in core['generation_candidates']
+            ]
+        
+        # Reconstruct critic_scores.
+        # CriticDimensionScore(**v) and CriticScore(**cs) have required fields with
+        # no defaults — a truncated or partially-written state file causes TypeError.
+        # Build each object explicitly with .get() fallbacks and skip bad entries.
+        if core.get('critic_scores'):
+            new_scores = []
+            for cs in core['critic_scores']:
+                try:
+                    safe_dim: dict[str, CriticDimensionScore] = {}
+                    for k, v in cs.get('candidate_scores', {}).items():
+                        try:
+                            safe_dim[k] = CriticDimensionScore(
+                                factuality=float(v.get('factuality') or 0),
+                                reasoning=float(v.get('reasoning') or 0),
+                                completeness=float(v.get('completeness') or 0),
+                                helpfulness=float(v.get('helpfulness') or 0),
+                                confidence_vs_accuracy_penalty=float(v.get('confidence_vs_accuracy_penalty') or 0),
+                            )
+                        except (TypeError, ValueError):
+                            pass  # skip this dimension entry
+                    new_scores.append(CriticScore(
+                        critic_id=cs.get('critic_id', ''),
+                        critic_model=cs.get('critic_model', ''),
+                        candidate_scores=safe_dim,
+                        ranking=cs.get('ranking') or [],
+                        dissenting_note=cs.get('dissenting_note') or '',
+                    ))
+                except (TypeError, ValueError, KeyError):
+                    pass  # skip malformed critic score entry
+            core['critic_scores'] = new_scores
+
+        # Reconstruct verification_results with ClaimLabel.
+        # BUG-022: _from_dict used direct subscripts vr['claim'] etc. — a
+        # truncated or older state file missing any field crashed with KeyError.
+        # Use .get() fallbacks + try/except so malformed entries are skipped.
+        if core.get('verification_results'):
+            _vresults: list[VerificationResult] = []
+            for vr in core['verification_results']:
+                try:
+                    _vresults.append(VerificationResult(
+                        claim=vr.get('claim', ''),
+                        source_generator=vr.get('source_generator', ''),
+                        verdict=ClaimLabel(vr.get('verdict', ClaimLabel.UNKNOWN.value)),
+                        evidence=vr.get('evidence', ''),
+                        confidence=float(vr.get('confidence') or 0),
+                    ))
+                except (TypeError, ValueError, KeyError):
+                    pass  # skip malformed verification result entry
+            core['verification_results'] = _vresults
+
+        # Reconstruct meta_evaluation
+        if core.get('meta_evaluation'):
+            core['meta_evaluation'] = MetaEvaluation(**core['meta_evaluation'])
+
+        return cls(**data)

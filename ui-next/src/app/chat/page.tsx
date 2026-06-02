@@ -820,7 +820,22 @@ export default function ChatPage() {
           // body wasn't JSON, fall through to generic error
         }
       }
-      const msg = err instanceof Error ? err.message : 'Connection error';
+      let msg = err instanceof Error ? err.message : 'Connection error';
+      // Extract clean server error from PipelineError body
+      if (err instanceof PipelineError) {
+        try {
+          const data = JSON.parse(err.body);
+          // For 422 validation errors, show which fields failed
+          if (err.status === 422 && data.detail?.validation_errors) {
+            const fields = data.detail.validation_errors
+              .map((e: { loc: string[]; msg: string }) => `${e.loc.join('.')}: ${e.msg}`)
+              .join('; ');
+            msg = `Validation failed: ${fields}`;
+          } else {
+            msg = data.error || data.detail || msg;
+          }
+        } catch { /* use raw message */ }
+      }
       // Update assistant message with connection error
       dispatchMessages({ type: 'UPDATE_MESSAGE', payload: { messageId: assistantId, updates: { isStreaming: false } } });
       dispatchMessages({ type: 'ADD_MESSAGES', payload: [{ id: 'err-' + Date.now(), role: 'error', content: msg }] });
@@ -1090,19 +1105,21 @@ export default function ChatPage() {
           {hasMessages ? (
             <>
               <ChatErrorBoundary fallback={<div className="p-4 text-red-500">Display error. Please refresh.</div>}>
-                {activeAssistantMsg && activeAssistantMsg.phases?.length === 0 && activeAssistantMsg.isStreaming && (
-                  <PipelineSkeleton method={autoSelectedMethod} />
-                )}
-                <ChatFeed
-                  messages={messages}
-                  onScrollToBottom={dismissIndicator}
-                  showNewContentIndicator={showNewContentIndicator}
-                  phaseOpenMode={phaseOpenMode}
-                  errorPhases={errorPhases}
-                  onFeedback={handleFeedback}
-                  onContinueGenerating={handleContinueGenerating}
-                  currentPhaseName={activeAssistantMsg?.currentPhaseName}
-                />
+                <>
+                  {activeAssistantMsg && activeAssistantMsg.phases?.length === 0 && activeAssistantMsg.isStreaming && (
+                    <PipelineSkeleton method={autoSelectedMethod} />
+                  )}
+                  <ChatFeed
+                    messages={messages}
+                    onScrollToBottom={dismissIndicator}
+                    showNewContentIndicator={showNewContentIndicator}
+                    phaseOpenMode={phaseOpenMode}
+                    errorPhases={errorPhases}
+                    onFeedback={handleFeedback}
+                    onContinueGenerating={handleContinueGenerating}
+                    currentPhaseName={activeAssistantMsg?.currentPhaseName}
+                  />
+                </>
               </ChatErrorBoundary>
             </>
           ) : (

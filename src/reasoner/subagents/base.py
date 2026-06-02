@@ -23,7 +23,7 @@ from typing import Any
 
 from reasoner.core.constants import HYPERGATE_METHOD_THRESHOLD
 from reasoner.infrastructure.llm.router import ProviderRouter
-from reasoner.models import PipelineState
+from reasoner.domain.pipeline_state import PipelineState
 from reasoner.parsing import extract_json
 from reasoner.subagents.models import PhaseSubAgentOutput
 

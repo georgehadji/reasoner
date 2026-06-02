@@ -21,15 +21,15 @@ _PRESET_CONFIGS: list[dict] = [
         "primary_id": "gemini-flash-lite",
         "routing": {
             "prompt_enhancement": "gemini-flash-lite",
-            "classification": "gpt-4o-mini",
+            "classification": "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini for JSON adherence
             "decomposition": "deepseek-v3",
             "constructive": "gemini-flash-lite",
             "destructive": "mistral-small",
-            "systemic": "glm-4.7-flash",
+            "systemic": "glm-5.1",  # v3.1: upgraded from glm-4.7-flash
             "minimalist": "ministral-3b",
             "scoring": "qwen3.5-flash",
             "stress_testing": "mistral-small",
-            "synthesis": "qwen3-max"
+            "synthesis": "qwen3.7-max"  # v3.1: upgraded to qwen3.7
         },
         "fallback_routing": {
             "prompt_enhancement": "glm-4-air",
@@ -156,12 +156,12 @@ _PRESET_CONFIGS: list[dict] = [
         "primary_id": "gemini-flash-lite",
         "routing": {
             "prompt_enhancement": "gemini-flash-lite",
-            "classification": "gpt-4o-mini",
+            "classification": "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini for JSON adherence
             "decomposition": "deepseek-v3",
             "constructive": "gemini-flash-lite",
-            "destructive": "qwen3-max",
-            "systemic": "glm-4.7-flash",
-            "minimalist": "minimax-m2.5",
+            "destructive": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
+            "systemic": "glm-5.1",  # v3.1: upgraded from glm-4.7-flash
+            "minimalist": "minimax-m3",  # v3.1: upgraded from minimax-m2.5
             "scoring": "qwen3.5-flash",
             "stress_testing": "mistral-small",
             "synthesis": "deepseek-v3"
@@ -236,15 +236,15 @@ _PRESET_CONFIGS: list[dict] = [
         "primary_id": "gemini-flash-lite",
         "routing": {
             "prompt_enhancement": "gemini-flash-lite",
-            "classification": "gpt-4o-mini",
+            "classification": "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini for JSON adherence
             "decomposition": "deepseek-v3",
             "constructive": "gemini-flash-lite",
-            "destructive": "qwen3-max",
-            "systemic": "glm-4.7-flash",
-            "minimalist": "minimax-m2.5",
-            "scoring": "mistral-small",
+            "destructive": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
+            "systemic": "glm-5.1",  # v3.1: upgraded from glm-4.7-flash
+            "minimalist": "minimax-m3",  # v3.1: upgraded from minimax-m2.5
+            "scoring": "mistral-medium",  # v3.1: upgraded from mistral-small for critic JSON
             "stress_testing": "mistral-small",
-            "synthesis": "qwen3-max"
+            "synthesis": "qwen3.7-max"  # v3.1: upgraded to qwen3.7
         },
         "fallback_routing": {
             "prompt_enhancement": "glm-4-air",
@@ -300,7 +300,7 @@ _PRESET_CONFIGS: list[dict] = [
             "scoring": "qwen3-plus",
             "stress_testing": "qwen3-plus",
             "synthesis": "glm-5.1",
-            "expert_1": "qwen3-max",
+            "expert_1": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
             "expert_2": "deepseek-v3",
             "expert_3": "qwen3-plus",
             "expert_4": "deepseek-v3",
@@ -325,18 +325,18 @@ _PRESET_CONFIGS: list[dict] = [
         "primary_id": "gemini-flash-lite",
         "routing": {
             "prompt_enhancement": "gemini-flash-lite",
-            "classification": "gpt-4o-mini",
+            "classification": "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini for JSON adherence
             "decomposition": "deepseek-v3",
             "constructive": "gemini-flash-lite",
-            "destructive": "qwen3-max",
-            "systemic": "glm-4.7-flash",
+            "destructive": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
+            "systemic": "glm-5.1",  # v3.1: upgraded from glm-4.7-flash
             "minimalist": "ministral-3b",
             "scoring": "qwen3.5-flash",
             "stress_testing": "mistral-small",
-            "synthesis": "qwen3-max",
+            "synthesis": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
             # Article pipeline: cross-model diversity
             "article_decompose": "deepseek-v3",
-            "article_synthesize": "qwen3-max",
+            "article_synthesize": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
             "article_pre_mortem": "mistral-small",
             "article_critic": "qwen3.5-flash",
             "article_revise": "gemini-flash-lite",
@@ -422,15 +422,15 @@ _PRESET_CONFIGS: list[dict] = [
         "primary_id": "gemini-flash-lite",
         "routing": {
             "prompt_enhancement": "gemini-flash-lite",
-            "classification": "gpt-4o-mini",
+            "classification": "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini for JSON adherence
             "decomposition": "deepseek-v3",
             "constructive": "gemini-flash-lite",
-            "destructive": "qwen3-max",
-            "systemic": "glm-4.7-flash",
+            "destructive": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
+            "systemic": "glm-5.1",  # v3.1: upgraded from glm-4.7-flash
             "minimalist": "ministral-3b",
             "scoring": "qwen3.5-flash",
             "stress_testing": "mistral-small",
-            "synthesis": "qwen3-max"
+            "synthesis": "qwen3.7-max"  # v3.1: upgraded to qwen3.7
         },
         "fallback_routing": {
             "prompt_enhancement": "glm-4-air",
@@ -499,15 +499,15 @@ _PRESET_CONFIGS: list[dict] = [
         "primary_id": "gemini-flash-lite",
         "routing": {
             "prompt_enhancement": "gemini-flash-lite",
-            "classification": "gpt-4o-mini",
+            "classification": "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini for JSON adherence
             "decomposition": "deepseek-v3",
             "constructive": "gemini-flash-lite",
-            "destructive": "qwen3-max",
-            "systemic": "glm-4.7-flash",
+            "destructive": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
+            "systemic": "glm-5.1",  # v3.1: upgraded from glm-4.7-flash
             "minimalist": "ministral-3b",
             "scoring": "qwen3.5-flash",
             "stress_testing": "mistral-small",
-            "synthesis": "qwen3-max"
+            "synthesis": "qwen3.7-max"  # v3.1: upgraded to qwen3.7
         },
         "fallback_routing": {
             "prompt_enhancement": "glm-4-air",
@@ -576,15 +576,15 @@ _PRESET_CONFIGS: list[dict] = [
         "primary_id": "gemini-flash-lite",
         "routing": {
             "prompt_enhancement": "gemini-flash-lite",
-            "classification": "gpt-4o-mini",
+            "classification": "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini for JSON adherence
             "decomposition": "deepseek-v3",
             "constructive": "gemini-flash-lite",
-            "destructive": "qwen3-max",
-            "systemic": "glm-4.7-flash",
+            "destructive": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
+            "systemic": "glm-5.1",  # v3.1: upgraded from glm-4.7-flash
             "minimalist": "ministral-3b",
             "scoring": "qwen3.5-flash",
             "stress_testing": "mistral-small",
-            "synthesis": "qwen3-max"
+            "synthesis": "qwen3.7-max"  # v3.1: upgraded to qwen3.7
         },
         "fallback_routing": {
             "prompt_enhancement": "glm-4-air",
@@ -653,15 +653,15 @@ _PRESET_CONFIGS: list[dict] = [
         "primary_id": "gemini-flash-lite",
         "routing": {
             "prompt_enhancement": "gemini-flash-lite",
-            "classification": "gpt-4o-mini",
+            "classification": "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini for JSON adherence
             "decomposition": "deepseek-v3",
             "constructive": "gemini-flash-lite",
-            "destructive": "qwen3-max",
-            "systemic": "glm-4.7-flash",
+            "destructive": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
+            "systemic": "glm-5.1",  # v3.1: upgraded from glm-4.7-flash
             "minimalist": "ministral-3b",
             "scoring": "qwen3.5-flash",
             "stress_testing": "mistral-small",
-            "synthesis": "qwen3-max"
+            "synthesis": "qwen3.7-max"  # v3.1: upgraded to qwen3.7
         },
         "fallback_routing": {
             "prompt_enhancement": "glm-4-air",
@@ -730,15 +730,15 @@ _PRESET_CONFIGS: list[dict] = [
         "primary_id": "gemini-flash-lite",
         "routing": {
             "prompt_enhancement": "gemini-flash-lite",
-            "classification": "gpt-4o-mini",
+            "classification": "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini for JSON adherence
             "decomposition": "deepseek-v3",
             "constructive": "gemini-flash-lite",
-            "destructive": "qwen3-max",
-            "systemic": "glm-4.7-flash",
+            "destructive": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
+            "systemic": "glm-5.1",  # v3.1: upgraded from glm-4.7-flash
             "minimalist": "ministral-3b",
             "scoring": "qwen3.5-flash",
             "stress_testing": "mistral-small",
-            "synthesis": "qwen3-max"
+            "synthesis": "qwen3.7-max"  # v3.1: upgraded to qwen3.7
         },
         "fallback_routing": {
             "prompt_enhancement": "glm-4-air",
@@ -807,15 +807,15 @@ _PRESET_CONFIGS: list[dict] = [
         "primary_id": "gemini-flash-lite",
         "routing": {
             "prompt_enhancement": "gemini-flash-lite",
-            "classification": "gpt-4o-mini",
+            "classification": "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini for JSON adherence
             "decomposition": "deepseek-v3",
             "constructive": "gemini-flash-lite",
-            "destructive": "qwen3-max",
-            "systemic": "glm-4.7-flash",
+            "destructive": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
+            "systemic": "glm-5.1",  # v3.1: upgraded from glm-4.7-flash
             "minimalist": "ministral-3b",
             "scoring": "qwen3.5-flash",
             "stress_testing": "mistral-small",
-            "synthesis": "qwen3-max"
+            "synthesis": "qwen3.7-max"  # v3.1: upgraded to qwen3.7
         },
         "fallback_routing": {
             "prompt_enhancement": "glm-4-air",
@@ -884,17 +884,17 @@ _PRESET_CONFIGS: list[dict] = [
         "primary_id": "gemini-flash-lite",
         "routing": {
             "prompt_enhancement": "gemini-flash-lite",
-            "classification": "gpt-4o-mini",
+            "classification": "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini for JSON adherence
             "decomposition": "deepseek-v3",
             "constructive": "gemini-flash-lite",
-            "destructive": "qwen3-max",
-            "systemic": "glm-4.7-flash",
+            "destructive": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
+            "systemic": "glm-5.1",  # v3.1: upgraded from glm-4.7-flash
             "minimalist": "ministral-3b",
             "scoring": "qwen3.5-flash",
             "stress_testing": "mistral-small",
-            "synthesis": "qwen3-max",
+            "synthesis": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
             "expert_1": "deepseek-v3",
-            "expert_2": "qwen3-max",
+            "expert_2": "deepseek-v4-flash",  # v3.1: faster critic, avoids Qwen 45s timeouts  # v3.1: upgraded from qwen3-max
             "expert_3": "glm-4-air",
             "expert_4": "mistral-small",
         },
@@ -956,7 +956,7 @@ _PRESET_CONFIGS: list[dict] = [
             "scoring": "qwen3-plus",
             "stress_testing": "qwen3-plus",
             "synthesis": "gpt-5",
-            "expert_1": "qwen3-max",
+            "expert_1": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
             "expert_2": "deepseek-v3",
             "expert_3": "qwen3-plus",
             "expert_4": "deepseek-v3",
@@ -982,15 +982,15 @@ _PRESET_CONFIGS: list[dict] = [
         "primary_id": "gemini-flash-lite",
         "routing": {
             "prompt_enhancement": "gemini-flash-lite",
-            "classification": "gpt-4o-mini",
+            "classification": "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini for JSON adherence
             "decomposition": "deepseek-v3",
             "cove_draft": "deepseek-v3",
-            "cove_verify": "qwen3-max",
+            "cove_verify": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
             "cove_answer": "glm-5.1",
             "cove_revise": "gemini-flash-lite",
             "scoring": "qwen3.5-flash",
             "stress_testing": "mistral-small",
-            "synthesis": "qwen3-max"
+            "synthesis": "qwen3.7-max"  # v3.1: upgraded to qwen3.7
         },
         "fallback_routing": {
             "prompt_enhancement": "glm-4-air",
@@ -1059,14 +1059,14 @@ _PRESET_CONFIGS: list[dict] = [
         "primary_id": "gemini-flash-lite",
         "routing": {
             "prompt_enhancement": "gemini-flash-lite",
-            "classification": "gpt-4o-mini",
+            "classification": "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini for JSON adherence
             "decomposition": "deepseek-v3",
             "sot_skeleton": "deepseek-v3",
-            "sot_solve": "qwen3-max",
+            "sot_solve": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
             "sot_assemble": "glm-5.1",
             "scoring": "qwen3.5-flash",
             "stress_testing": "mistral-small",
-            "synthesis": "qwen3-max"
+            "synthesis": "qwen3.7-max"  # v3.1: upgraded to qwen3.7
         },
         "fallback_routing": {
             "prompt_enhancement": "glm-4-air",
@@ -1132,15 +1132,15 @@ _PRESET_CONFIGS: list[dict] = [
         "primary_id": "gemini-flash-lite",
         "routing": {
             "prompt_enhancement": "gemini-flash-lite",
-            "classification": "gpt-4o-mini",
+            "classification": "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini for JSON adherence
             "decomposition": "deepseek-v3",
             "tot_decompose": "deepseek-v3",
-            "tot_generate": "qwen3-max",
+            "tot_generate": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
             "tot_evaluate": "glm-4-air",
             "tot_backtrack": "gemini-flash-lite",
             "scoring": "qwen3.5-flash",
             "stress_testing": "mistral-small",
-            "synthesis": "qwen3-max"
+            "synthesis": "qwen3.7-max"  # v3.1: upgraded to qwen3.7
         },
         "fallback_routing": {
             "prompt_enhancement": "glm-4-air",
@@ -1209,14 +1209,14 @@ _PRESET_CONFIGS: list[dict] = [
         "primary_id": "gemini-flash-lite",
         "routing": {
             "prompt_enhancement": "gemini-flash-lite",
-            "classification": "gpt-4o-mini",
+            "classification": "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini for JSON adherence
             "decomposition": "deepseek-v3",
             "pot_generate": "deepseek-v3",
-            "pot_execute": "qwen3-max",
+            "pot_execute": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
             "pot_interpret": "glm-5.1",
             "scoring": "qwen3.5-flash",
             "stress_testing": "mistral-small",
-            "synthesis": "qwen3-max"
+            "synthesis": "qwen3.7-max"  # v3.1: upgraded to qwen3.7
         },
         "fallback_routing": {
             "prompt_enhancement": "glm-4-air",
@@ -1282,14 +1282,14 @@ _PRESET_CONFIGS: list[dict] = [
         "primary_id": "gemini-flash-lite",
         "routing": {
             "prompt_enhancement": "gemini-flash-lite",
-            "classification": "gpt-4o-mini",
+            "classification": "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini for JSON adherence
             "decomposition": "deepseek-v3",
             "sd_select": "deepseek-v3",
-            "sd_adapt": "qwen3-max",
+            "sd_adapt": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
             "sd_implement": "deepseek-v3",
             "scoring": "qwen3.5-flash",
             "stress_testing": "mistral-small",
-            "synthesis": "qwen3-max"
+            "synthesis": "qwen3.7-max"  # v3.1: upgraded to qwen3.7
         },
         "fallback_routing": {
             "prompt_enhancement": "glm-4-air",
@@ -1357,24 +1357,24 @@ _PRESET_CONFIGS: list[dict] = [
         "primary_id": "gemini-flash-lite",
         "routing": {
             "prompt_enhancement": "gemini-flash-lite",
-            "classification": "gpt-4o-mini",
+            "classification": "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini for JSON adherence
             "decomposition": "deepseek-v3",
             "constructive": "gemini-flash-lite",
-            "destructive": "qwen3-max",
-            "systemic": "glm-4.7-flash",
+            "destructive": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
+            "systemic": "glm-5.1",  # v3.1: upgraded from glm-4.7-flash
             "minimalist": "ministral-3b",
             "scoring": "qwen3.5-flash",
             "stress_testing": "mistral-small",
-            "synthesis": "qwen3-max",
+            "synthesis": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
             "subagent_synthesis_analysis": "deepseek-v3",
-            "subagent_synthesis_writer": "qwen3-max",
+            "subagent_synthesis_writer": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
             "subagent_critique_logic": "glm-4-air",
             "subagent_critique_evidence": "deepseek-v3",
             "subagent_critique_bias": "mistral-small",
-            "subagent_critique_counter": "qwen3-max",
+            "subagent_critique_counter": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
             "subagent_enhancement": "gemini-flash-lite",
             "subagent_decomposition": "deepseek-v3",
-            "subagent_search_query": "qwen3-max",
+            "subagent_search_query": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
             "subagent_search_eval": "glm-4-air",
         },
         "fallback_routing": {
@@ -1484,7 +1484,7 @@ _PRESET_CONFIGS: list[dict] = [
             "article_sot_solve": "kimi-k2-6",
             "article_synthesize": "kimi-k2-6",
             "article_pre_mortem": "mistral-small",
-            "article_critic": "qwen3-max",
+            "article_critic": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
             "article_assemble": "kimi-k2-6",
             "article_revise": "kimi-k2-6",
             "article_humanize": "kimi-k2-6",
@@ -1572,16 +1572,16 @@ _PRESET_CONFIGS: list[dict] = [
         "routing": {
             "coding_spec": "gemini-flash-lite",
             "coding_generate": "deepseek-v3",
-            "coding_review": "qwen3-max",
+            "coding_review": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
             "coding_tests": "deepseek-v3",
             "coding_assemble": "kimi-k2-6",
             "synthesis": "kimi-k2-6",
         },
         "fallback_routing": {
             "coding_spec": "glm-4-air",
-            "coding_generate": "qwen3-max",
+            "coding_generate": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
             "coding_review": "deepseek-v3",
-            "coding_tests": "qwen3-max",
+            "coding_tests": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
             "coding_assemble": "deepseek-v3",
             "synthesis": "deepseek-v3",
         },
@@ -1635,15 +1635,15 @@ _PRESET_CONFIGS: list[dict] = [
         "primary_id": "gemini-flash-lite",
         "routing": {
             "prompt_enhancement": "gemini-flash-lite",
-            "classification": "gpt-4o-mini",
+            "classification": "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini for JSON adherence
             "decomposition": "deepseek-v3",
             "constructive": "gemini-flash-lite",
             "destructive": "mistral-small",
-            "systemic": "glm-4.7-flash",
+            "systemic": "glm-5.1",  # v3.1: upgraded from glm-4.7-flash
             "minimalist": "ministral-3b",
             "scoring": "qwen3.5-flash",
             "stress_testing": "mistral-small",
-            "synthesis": "qwen3-max",
+            "synthesis": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
         },
         "fallback_routing": {
             "prompt_enhancement": "glm-4-air",
@@ -1737,7 +1737,7 @@ _PRESET_CONFIGS: list[dict] = [
             "minimalist": "gemma-4-26b",
             "scoring": "qwen3.5-flash",
             "stress_testing": "deepseek-v3",
-            "synthesis": "qwen3-max",
+            "synthesis": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
         },
         "required_env_vars": ["NVIDIA_API_KEY"],
         "notes": [
@@ -1761,12 +1761,12 @@ _PRESET_CONFIGS: list[dict] = [
         "primary_id": "gemini-flash-lite",
         "routing": {
             "prompt_enhancement":  "gemini-flash-lite",
-            "classification":      "gpt-4o-mini",
+            "classification":      "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini
             "decomposition":       "deepseek-v3",
-            "brainstorm_generate": "qwen3-max",
+            "brainstorm_generate": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
             "brainstorm_cluster":  "gemini-flash-lite",
             "brainstorm_develop":  "deepseek-v3",
-            "synthesis":           "qwen3-max",
+            "synthesis":           "qwen3.7-max",  # v3.1: upgraded from qwen3-max
         },
         "fallback_routing": {
             "prompt_enhancement":  "glm-4-air",
@@ -1800,7 +1800,7 @@ _PRESET_CONFIGS: list[dict] = [
         "required_tier": "pro",
         "routing": {
             "prompt_enhancement":  "claude-sonnet",
-            "classification":      "gpt-4o-mini",
+            "classification":      "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini
             "decomposition":       "claude-sonnet",
             "brainstorm_generate": "claude-sonnet",
             "brainstorm_cluster":  "gemini-pro",
@@ -1812,7 +1812,7 @@ _PRESET_CONFIGS: list[dict] = [
             "classification":      "gemini-pro",
             "decomposition":       "gemini-pro",
             "brainstorm_generate": "gemini-pro",
-            "brainstorm_cluster":  "qwen3-max",
+            "brainstorm_cluster":  "qwen3.7-max",  # v3.1: upgraded from qwen3-max
             "brainstorm_develop":  "deepseek-v3",
             "synthesis":           "gemini-pro",
         },
@@ -1857,6 +1857,48 @@ _PRESET_CONFIGS: list[dict] = [
             "Gemini Flash Image final fallback: speed-optimized multimodal safety net",
         ],
     },
+    # v3.1: Iterative Critique (LLM Debate)
+    {
+        "id": "iterative-critique-budget",
+        "name": "Iterative Critique / LLM Debate (Budget)",
+        "description": "Adversarial generator-critic loop with convergence detection. DeepSeek generator, Qwen critic.",
+        "primary_id": "deepseek-v3",
+        "required_tier": "free",
+        "routing": {
+            "prompt_enhancement": "gemini-flash-lite",
+            "classification": "gpt-5-mini",
+            "decomposition": "deepseek-v3",
+            "expert_1": "deepseek-v3",
+            "expert_2": "deepseek-v4-flash",  # v3.1: faster critic, avoids Qwen 45s timeouts
+            "synthesis": "qwen3.7-max",
+        },
+        "fallback_routing": {
+            "expert_1": "glm-5.1",
+            "expert_2": "glm-5.1",
+            "synthesis": "glm-5.1",
+        },
+    },
+    {
+        "id": "iterative-critique-premium",
+        "name": "Iterative Critique / LLM Debate (Premium)",
+        "description": "GPT-5 generator, Claude Sonnet critic - maximum cross-lab adversarial quality.",
+        "primary_id": "gpt-5",
+        "required_tier": "pro",
+        "routing": {
+            "prompt_enhancement": "claude-sonnet",
+            "classification": "gpt-5",
+            "decomposition": "claude-sonnet",
+            "expert_1": "gpt-5",
+            "expert_2": "claude-sonnet",
+            "synthesis": "gpt-5",
+        },
+        "fallback_routing": {
+            "expert_1": "deepseek-v3",
+            "expert_2": "deepseek-v4-flash",  # v3.1: faster critic, avoids Qwen 45s timeouts
+            "synthesis": "deepseek-v3",
+        },
+    },
+
 ]
 
 
@@ -1868,9 +1910,6 @@ PRESETS: dict[str, PipelinePreset] = {
         routing=cfg.get("routing", {}),
         notes=cfg.get("notes", []),
         required_env_vars=cfg.get("required_env_vars", ["OPENROUTER_API_KEY"]),
-        fallback_routing=cfg.get("fallback_routing", {}),
-        required_tier=SubscriptionTier(cfg.get("required_tier", "free")),
-        brainstorming_config=cfg.get("brainstorming_config", {}),
     )
     for cfg in _PRESET_CONFIGS
 }

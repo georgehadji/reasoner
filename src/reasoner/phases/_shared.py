@@ -1,6 +1,7 @@
 from __future__ import annotations
 import re
-from reasoner.models import PipelineState, PerspectiveType
+from reasoner.domain.pipeline_state import PipelineState
+from reasoner.models import PerspectiveType
 from reasoner.core.constants import JSON_ONLY_FOOTER, TRUNCATION, DEFAULT_SEARCH_RESULTS
 
 
@@ -51,7 +52,11 @@ def detect_language(text: str) -> str:
     return "English"
 
 
-def get_language_instruction(state: PipelineState) -> str:
+def get_language_instruction(state: Union["PipelineState", str]) -> str:
+    if isinstance(state, str):
+        language = state
+    else:
+        language = state.language
     """Returns the 'Respond in X' instruction line."""
     lang_map = {
         "Greek": "Απάντησε στα Ελληνικά.",
@@ -64,7 +69,7 @@ def get_language_instruction(state: PipelineState) -> str:
         "German": "Antworte auf Deutsch.",
         "Turkish": "Türkçe cevap ver.",
     }
-    return lang_map.get(state.language, "Respond in English.")
+    return lang_map.get(language, "Respond in English.")
 
 
 def build_followup_context(

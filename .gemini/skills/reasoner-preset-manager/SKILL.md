@@ -30,12 +30,12 @@ To create a new preset, follow these steps:
         "id": "multi-perspective-example",
         "name": "Multi-Perspective (Example)",
         "description": "An example preset showing how to configure models for different phases.",
-        "primary_id": "deepseek-v4-pro",
+        "primary_id": "gemini-pro",
         "routing": {
-            "prompt_enhancement": "deepseek-v4-flash",
-            "classification": "deepseek-v4-flash",
-            "decomposition": "deepseek-v4-pro",
-            "synthesis": "deepseek-v4-pro"
+            "prompt_enhancement": "gemini-flash-lite",
+            "classification": "gemini-flash-lite",
+            "decomposition": "gemini-pro",
+            "synthesis": "gemini-pro"
         },
         "fallback_routing": {
             "prompt_enhancement": "gemma-4-26b",
@@ -44,8 +44,8 @@ To create a new preset, follow these steps:
             "synthesis": "glm-5.1"
         },
         "notes": [
-            "DeepSeek Flash for efficient early-phase processing.",
-            "DeepSeek Pro for high-quality, complex reasoning and synthesis."
+            "Gemini Flash Lite for efficient early-phase processing.",
+            "Gemini Pro for high-quality, complex reasoning and synthesis."
         ],
         "required_env_vars": ["OPENROUTER_API_KEY"],
     },

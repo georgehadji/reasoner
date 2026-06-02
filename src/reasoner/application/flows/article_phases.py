@@ -6,7 +6,7 @@ import json
 import logging
 from typing import Any
 
-from reasoner.models import PipelineState
+from reasoner.domain.pipeline_state import PipelineState
 from reasoner.parsing import extract_json
 import reasoner.phases as phases
 from reasoner.application.flows.base import WorkflowServices
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 async def run_article_retrieve_sources_phase(state: PipelineState, services: WorkflowServices, domain: str | None = None) -> None:
     services.log("WRITING", "Retrieving targeted sources for article...", state)
     try:
-        from reasoner.core.search import get_discovery_client
+        from reasoner.infrastructure.search.discovery import get_discovery_client
         client, _ = await get_discovery_client(source_type="general")
         
         raw_plan, _ = await services.call_llm(

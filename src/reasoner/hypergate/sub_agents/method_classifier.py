@@ -38,6 +38,7 @@ _TAXONOMY: dict[str, tuple[str, str]] = {
     "R": ("pipeline", "writing"),
     "S": ("pipeline", "coding"),
     "T": ("pipeline", "brainstorming"),
+    "U": ("pipeline", "iterative_critique"),  # v3.1: LLM debate
 }
 
 _SYSTEM = """\

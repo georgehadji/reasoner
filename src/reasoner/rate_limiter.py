@@ -14,7 +14,6 @@ ARCHITECTURAL NOTE:
 from __future__ import annotations
 print("[DEBUG] reasoner/rate_limiter.py: Top of file")
 
-import os
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -26,13 +25,14 @@ import redis.asyncio as aioredis
 from reasoner.infrastructure.redis.client import get_redis
 from reasoner.core.constants import MAX_RATE_LIMIT_BUCKETS # Imported MAX_RATE_LIMIT_BUCKETS
 
-_REDIS_RATE_LIMITER_ENABLED = os.environ.get("RATE_LIMITER_MODE", "memory").lower() == "redis"
+from reasoner.core.settings import settings
+_REDIS_RATE_LIMITER_ENABLED = settings.RATE_LIMITER_MODE.lower() == "redis"
 print("[DEBUG] reasoner/rate_limiter.py: Before metrics import")
 
 # Temporarily disable metrics import
 _METRICS_AVAILABLE = False
 # try:
-#     from reasoner.api.metrics import REASONER_RATE_LIMIT_REJECTED
+#     from reasoner.metrics import REASONER_RATE_LIMIT_REJECTED
 #     _METRICS_AVAILABLE = True
 # except Exception:
 #     _METRICS_AVAILABLE = False
@@ -77,7 +77,7 @@ class RateLimiter:
         self._redis_script: Any = None
         self._redis_available: bool = False
 
-        is_production = os.environ.get("ENVIRONMENT") == "production"
+        is_production = settings.ENVIRONMENT == "production"
 
         if _REDIS_RATE_LIMITER_ENABLED:
             if is_production:

@@ -14,7 +14,7 @@ from enum import Enum
 from typing import Any, Protocol, runtime_checkable, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from reasoner.models import PipelineState
+    from reasoner.domain.pipeline_state import PipelineState
     from reasoner.infrastructure.llm.router import ProviderRouter
 
 

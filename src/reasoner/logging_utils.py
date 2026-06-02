@@ -301,6 +301,24 @@ def timed_async(correlation_extra: dict[str, Any] | None = None):
     return decorator
 
 
+def setup_production_logging() -> None:
+    """Auto-configure logging based on environment (Phase 4.2 hardening).
+
+    Production: JSON-structured logs to stdout (consumed by log aggregators).
+    Development: Human-readable format with timestamps.
+    Testing: Suppress log output.
+    """
+    from reasoner.core.settings import settings
+
+    env = getattr(settings, 'ENVIRONMENT', 'development')
+    if env == 'production':
+        configure_logging(level='INFO', json_output=True)
+    elif env == 'testing':
+        configure_logging(level='WARNING', json_output=False)
+    else:
+        configure_logging(level='DEBUG', json_output=False)
+
+
 def configure_logging(level: str = "INFO", json_output: bool = False) -> None:
     """
     Configure logging for the application.

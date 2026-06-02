@@ -1,6 +1,6 @@
 from __future__ import annotations
 import json
-from reasoner.models import PipelineState
+from reasoner.domain.pipeline_state import PipelineState
 from reasoner.core.constants import JSON_ONLY_FOOTER, TRUNCATION, DEFAULT_SEARCH_RESULTS
 from reasoner.phases._shared import (
     detect_language,
@@ -32,12 +32,12 @@ CRITICAL RULES:
 5. If the problem is already clear and specific, return it nearly unchanged."""
 
 def prompt_enhancement_prompt(problem: str, language: str) -> str:
-    lang_instruction = get_language_instruction(PipelineState(problem="", language=language))
+    lang_instruction = get_language_instruction(language)
     return f'{lang_instruction}\n\nOriginal Problem:\n{_wrap_user_input(problem)}\n\nRewrite this problem to be clearer, more specific, and easier for a multi-step AI reasoning pipeline to solve. Preserve the original language and intent.\n\nOutput JSON: {{"enhanced_problem": "<rewritten problem>", "improvements": ["<what was improved>"]}}'
 
 CLASSIFICATION_SYSTEM = "Classify task type. JSON only."
 def classification_prompt(problem: str, language: str, state: PipelineState | None = None) -> str:
-    lang_instruction = get_language_instruction(PipelineState(problem="", language=language))
+    lang_instruction = get_language_instruction(language)
     followup = _followup_context(state) if state else ""
     return (
         f'{lang_instruction}\n\nProblem:\n{_wrap_user_input(problem)}{followup}\n\n'
@@ -64,7 +64,7 @@ Rules: Max 5 steps. Surface assumptions with rationale. VERIFIED assumptions MUS
 FUSION_SYSTEM = """You are an analytical assistant. Your job is to classify the task type, detect the language, and decompose the problem into a causal chain. Output ONLY valid JSON."""
 
 def fusion_prompt(state: PipelineState, language: str) -> str:
-    lang_instruction = get_language_instruction(PipelineState(problem="", language=language))
+    lang_instruction = get_language_instruction(language)
     is_jury = "jury" in (state.preset_name or "")
     jury_instr = " Add jury_guidelines." if is_jury else ""
     web_context = f"\nWeb: {state.web_discovery_results[:TRUNCATION.KEY_INSIGHTS]}" if state.web_discovery_results else ""

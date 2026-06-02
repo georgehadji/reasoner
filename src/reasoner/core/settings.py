@@ -58,6 +58,18 @@ class Settings:
     ADMIN_API_KEY: str | None = os.getenv("ADMIN_API_KEY")
     REASONER_DEEP_READ_LLM: bool = os.getenv("REASONER_DEEP_READ_LLM", "1") != "0"
 
+    # ── Phase Subagent Feature Flags ──
+    USE_SUBAGENT_ENHANCEMENT: bool = os.getenv("USE_SUBAGENT_ENHANCEMENT", "false").lower() == "true"
+    USE_SUBAGENT_DECOMPOSITION: bool = os.getenv("USE_SUBAGENT_DECOMPOSITION", "false").lower() == "true"
+    USE_SUBAGENT_CRITIQUE: bool = os.getenv("USE_SUBAGENT_CRITIQUE", "false").lower() == "true"
+    USE_SUBAGENT_SYNTHESIS: bool = os.getenv("USE_SUBAGENT_SYNTHESIS", "false").lower() == "true"
+    USE_SUBAGENT_SEARCH: bool = os.getenv("USE_SUBAGENT_SEARCH", "false").lower() == "true"
+
+    # ── Environment / Deployment ──
+    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
+    UVICORN_WORKERS: int = int(os.getenv("UVICORN_WORKERS", "1"))
+    ENABLE_LEGACY_API_KEY: bool = os.getenv("ENABLE_LEGACY_API_KEY", "false").lower() in ("1", "true", "yes")
+
     # ── Cohere Rerank (via OpenRouter) ──
     COHERE_RERANK_ENABLED: bool = os.getenv("COHERE_RERANK_ENABLED", "true").lower() in ("1", "true", "yes")
     COHERE_RERANK_MODEL: str = os.getenv("COHERE_RERANK_MODEL", "cohere/rerank-4-fast")
@@ -69,17 +81,23 @@ class Settings:
     DOCUMENT_MAX_CHUNKS_PER_FILE: int = int(os.getenv("DOCUMENT_MAX_CHUNKS_PER_FILE", "500"))
 
     # ── Server bind configuration ──
+    APP_URL: str = os.getenv("APP_URL", "http://localhost:3000")
     SERVER_HOST: str = os.getenv("SERVER_HOST", "127.0.0.1")
     SERVER_PORT: int = int(os.getenv("SERVER_PORT", "8003"))
     UVICORN_HOST: str = os.getenv("UVICORN_HOST", "127.0.0.1")
+    METRICS_ALLOWED_IPS: str = os.getenv("METRICS_ALLOWED_IPS", "127.0.0.1,::1")
 
     # ── CSRF ──
     CSRF_SECRET: str | None = os.getenv("CSRF_SECRET")
     CSRF_ENFORCE_BACKEND: bool = os.getenv("CSRF_ENFORCE_BACKEND", "true").lower() in ("1", "true", "yes")
 
-    # ── Auth Persistence ──
+    # ── Auth / Supabase ──
     AUTH_PERSISTENCE_ENABLED: bool = os.getenv("AUTH_PERSISTENCE_ENABLED", "false").lower() in ("1", "true", "yes")
     AUTH_DB_PATH: str = os.getenv("AUTH_DB_PATH", "src/reasoner/auth_keys.db")
+    SUPABASE_URL: str | None = os.getenv("SUPABASE_URL")
+    SUPABASE_ANON_KEY: str | None = os.getenv("SUPABASE_ANON_KEY")
+    SUPABASE_SERVICE_ROLE_KEY: str | None = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    JWT_SECRET_KEY: str | None = os.getenv("JWT_SECRET_KEY")
 
     # ── Rate Limiter / Circuit Breaker Mode ──
     RATE_LIMITER_MODE: str = os.getenv("RATE_LIMITER_MODE", "redis")
@@ -113,7 +131,15 @@ class Settings:
     )
 
     # ── Sentry ──
+    SENTRY_DSN: str | None = os.getenv("SENTRY_DSN")
     SENTRY_TRACES_SAMPLE_RATE: float = float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1"))
+
+    # ── Langfuse (LLM Observability) ──
+    LANGFUSE_PUBLIC_KEY: str | None = os.getenv("LANGFUSE_PUBLIC_KEY")
+    LANGFUSE_SECRET_KEY: str | None = os.getenv("LANGFUSE_SECRET_KEY")
+
+    # ── Stripe Billing ──
+    STRIPE_SECRET_KEY: str | None = os.getenv("STRIPE_SECRET_KEY")
 
     # ── Scraping ──
     SCRAPE_USER_AGENT: str = os.getenv(

@@ -16,9 +16,9 @@ import logging
 from pathlib import Path
 from typing import Any, Callable, Awaitable
 from collections import defaultdict
-import os # New import for environment variable checking
 import time # New import
 
+from reasoner.core.settings import settings
 from reasoner.core.events.domain_events import DomainEvent, EventType, _AllEventType, PipelineEventType
 from reasoner.infrastructure.observability.langfuse_subscriber import get_langfuse_subscriber # New import
 
@@ -208,7 +208,7 @@ class EventBus:
         # Dead-letter log
         await self._log_to_dead_letter(event, str(last_exc))
 
-        async def _log_to_dead_letter(self, event: DomainEvent, error_message: str, handler_name: str = "") -> None:
+    async def _log_to_dead_letter(self, event: DomainEvent, error_message: str, handler_name: str = "") -> None:
         """Log event to dead-letter file."""
         try:
             entry = {
@@ -225,7 +225,7 @@ class EventBus:
         except Exception as dl_exc:
             logger.error("Failed to write dead-letter entry: %s", dl_exc)
 
-        def clear(self) -> None:
+    def clear(self) -> None:
         """Clear all subscriptions."""
         self._handlers.clear()
         self._global_handlers.clear()
@@ -337,6 +337,20 @@ async def track_pipeline_metrics(event: DomainEvent) -> None:
         )
 
 
+async def persist_all_events(event: DomainEvent) -> None:
+    """Persist all events to the EventStore for audit trail and replay.
+
+    The EventBus already runs handlers in a dedicated worker task with
+    queue-based backpressure, so we call EventStore.save_events directly.
+    """
+    try:
+        from reasoner.infrastructure.persistence.event_store import get_event_store
+        store = get_event_store()
+        await store.save_events([event])
+    except Exception as exc:
+        logger.warning("EventStore persistence failed for %s: %s", event.event_type.value, exc)
+
+
 async def init_default_subscribers(bus: EventBus | None = None) -> None:
     """
     Register default subscribers.
@@ -348,10 +362,11 @@ async def init_default_subscribers(bus: EventBus | None = None) -> None:
         bus = get_event_bus()
     bus.subscribe_all(log_all_events)
     bus.subscribe_all(track_pipeline_metrics)
+    bus.subscribe_all(persist_all_events)
 
     # Initialize and register Langfuse subscriber if enabled
     # Check if Langfuse keys are set in environment variables
-    if os.environ.get("LANGFUSE_PUBLIC_KEY") and os.environ.get("LANGFUSE_SECRET_KEY"):
+    if settings.LANGFUSE_PUBLIC_KEY and settings.LANGFUSE_SECRET_KEY:
         langfuse_subscriber = await get_langfuse_subscriber()
         # The _is_langfuse_enabled check is now inside the get_langfuse_subscriber factory
         # We only proceed if an active subscriber is returned.

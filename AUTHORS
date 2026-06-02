@@ -1,0 +1,24 @@
+# Authors
+
+Reasoner is developed and maintained by the following people.
+
+## Project Owner / Maintainer
+
+- Georgios-Chrysovalantis Chatzivantsidis ([@georgehadji](https://github.com/georgehadji))
+
+## Contributors
+
+Contributors are listed in alphabetical order by name. If you have contributed
+to this project and are not listed here, please open a pull request adding
+yourself to this file.
+
+<!--
+Format:
+- Your Name ([@github-handle](https://github.com/github-handle))
+-->
+
+## Acknowledgements
+
+This project makes use of many open-source libraries and LLM providers.
+See `requirements.txt`, `ui-next/package.json`, and `README.md` for the
+full list of dependencies and model providers that power Reasoner.

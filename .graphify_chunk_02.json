@@ -1,0 +1,289 @@
+{
+  "nodes": [
+    {
+      "id": "humanizer_main",
+      "label": "Humanizer FastAPI Entry Point",
+      "file_type": "code",
+      "source_file": "Humanizer/main.py",
+      "rationale": "FastAPI microservice for text humanization. Defines HumanizeRequest Pydantic model, POST /humanize endpoint that generates UUID task and delegates to Celery, and GET /status/{task_id} endpoint."
+    },
+    {
+      "id": "humanizer_tasks",
+      "label": "Humanizer Celery Tasks",
+      "file_type": "code",
+      "source_file": "Humanizer/tasks.py",
+      "rationale": "Celery task definitions for humanization pipeline. process_humanization_task runs bridge translation + omni-humanizer iterations with GPTZero validation loop. Uses redis://redis:6379/0 as broker/backend."
+    },
+    {
+      "id": "humanizer_utils",
+      "label": "Humanizer Utilities",
+      "file_type": "code",
+      "source_file": "Humanizer/utils.py",
+      "rationale": "Zero-width space injection cloaking (apply_zws_cloak) and PII masking placeholder. ZWS randomly inserted into words >5 chars at 10% probability."
+    },
+    {
+      "id": "humanizer_requirements",
+      "label": "Humanizer Dependencies",
+      "file_type": "code",
+      "source_file": "Humanizer/requirements.txt",
+      "rationale": "Microservice dependencies: fastapi, uvicorn, celery, redis, requests, openai, gunicorn."
+    },
+    {
+      "id": "benchmark_calibration",
+      "label": "VS Calibration Benchmark",
+      "file_type": "code",
+      "source_file": "benchmarks/benchmark_vs_calibration.py",
+      "rationale": "Verbalized entropy vs uncertainty correlation benchmark. Computes Pearson r across 50 simulated candidate distributions. AC: r >= 0.6. Uses VSCandidate and compute_verbalized_entropy from reasoner package."
+    },
+    {
+      "id": "benchmark_diversity",
+      "label": "VS Diversity Benchmark",
+      "file_type": "code",
+      "source_file": "benchmarks/benchmark_vs_diversity.py",
+      "rationale": "Diversity benchmark comparing Verbalized Sampling vs direct generation across radiology/legal/aerospace verticals. Uses Jaccard distance as semantic proxy. AC: >=2/3 verticals meet >=1.3x diversity."
+    },
+    {
+      "id": "benchmark_latency",
+      "label": "VS Latency Benchmark",
+      "file_type": "code",
+      "source_file": "benchmarks/benchmark_vs_latency.py",
+      "rationale": "Latency benchmark measuring VS overhead per deployment profile (LATENCY_SENSITIVE, BALANCED, MAX_ACCURACY). Uses _MockLLM (100ms) and _MockNLI (20ms). AC: overhead <50% for LATENCY_SENSITIVE. Writes results to vs_latency_overhead.md."
+    },
+    {
+      "id": "vs_latency_overhead",
+      "label": "VS Latency Overhead Report",
+      "file_type": "document",
+      "source_file": "benchmarks/vs_latency_overhead.md",
+      "rationale": "Auto-generated markdown table of VS latency overhead across 3 profiles x 5 queries. LATENCY_SENSITIVE overhead ranges 26.3%-35.5%."
+    },
+    {
+      "id": "agent_memory_structures",
+      "label": "Agent Memory Data Structures Guide",
+      "file_type": "document",
+      "source_file": "docs/agent_memory_structures_2.md",
+      "rationale": "Greek-language reference documenting Python data structures for agent memory: EventLog (list), ConversationBuffer (deque), UndoStack (LIFO), AsyncTaskQueue (asyncio.Queue), AgentScheduler (heapq), EntityMemory (defaultdict), TTLMemory, TaggedMemory. Covers short-term through archival hierarchy."
+    },
+    {
+      "id": "architectural_audit_v5",
+      "label": "Architectural Reaper V5 Audit",
+      "file_type": "document",
+      "source_file": "docs/ARCHITECTURAL_AUDIT_V5.md",
+      "rationale": "Adversarial audit of full Python+TS monolith (130+50 files). Verdict: Two-architecture collision with 3 God Objects (pipeline.py 2301L, api/__init__.py 2009L, renderer.py 1686L) and 2 CRITICAL runtime hazards (_cancelled_runs TOCTOU race, EventStore asyncio.Lock cross-worker collision). Recommends Strategy A tactical fixes (52 person-days) then Strategy B component extraction."
+    },
+    {
+      "id": "audit_report",
+      "label": "ARA Pipeline Handover Audit",
+      "file_type": "document",
+      "source_file": "docs/AUDIT_REPORT.md",
+      "rationale": "Complete 11-phase audit (Context, System, Epistemic, Security, Debt, Failure, Code, Observability, Deployment, Recovery, Documentation). All P1 issues resolved. Covers STRIDE threat model, 14 failure modes, dependency inventory, operational runbook."
+    },
+    {
+      "id": "codebase_mindmap",
+      "label": "Codebase Mindmap",
+      "file_type": "document",
+      "source_file": "docs/CODEBASE_MINDMAP.md",
+      "rationale": "High-fidelity architectural reconstruction dated 2026-04-17. Covers system overview, directory map, module dependency graph, layered architecture, request/response lifecycle, 16+ method-specific phase sequences, caching strategy, relationship mapping, design patterns, risks/coupling, and ASCII summary mindmap. HyperGateAgent documented with 5 Phase-1 sub-agents + TieBreaker."
+    },
+    {
+      "id": "color_palette",
+      "label": "Carbon Black Color Palette",
+      "file_type": "document",
+      "source_file": "docs/Color Palette.txt",
+      "rationale": "Design token reference: Carbon Black #181818, Bright Snow #fafafa, Graphite #2a2a2a, Dim Grey #6e6e6e, Dust Grey #cfcfcf."
+    },
+    {
+      "id": "design_system",
+      "label": "ElevenLabs Design System",
+      "file_type": "document",
+      "source_file": "docs/DESIGN.md",
+      "rationale": "Comprehensive design system analysis. Near-white canvas with warm undertones. Typography: Waldenburg weight 300 display, Inter body with positive letter-spacing. Multi-layered shadow stacks at sub-0.1 opacity. Pill buttons (9999px radius). Warm stone CTA signature: rgba(245,242,239,0.8) with rgba(78,50,23,0.04) shadow."
+    },
+    {
+      "id": "e2e_encryption_research",
+      "label": "E2E Encryption Research & Implementation",
+      "file_type": "document",
+      "source_file": "docs/E2E_ENCRYPTION_RESEARCH.md",
+      "rationale": "Production-ready E2EE design for user prompts. Cryptography: X25519 ECDH + HKDF-SHA256 + ChaCha20-Poly1305. Server decrypts transiently in RAM only; plaintext never persisted. Includes Python E2EEncryptionService implementation, TypeScript client lib with libsodium-wrappers, FastAPI endpoints (/api/e2e/pubkey, /api/e2e/run), React hook useEncryptedPipeline, key rotation scripts, and Alembic migration schema."
+    },
+    {
+      "id": "environment_variables",
+      "label": "Environment Variables Reference",
+      "file_type": "document",
+      "source_file": "docs/ENVIRONMENT.md",
+      "rationale": "Reference for all env vars: 11 LLM API keys, SearXNG config, server bindings, DB settings, rate limits, CSRF secrets, 8 VS feature flags (VSFeatureFlags in code; env vars not yet wired), Neuro memory models, and other toggles."
+    },
+    {
+      "id": "methods_documentation",
+      "label": "ARA Methods Documentation",
+      "file_type": "document",
+      "source_file": "docs/METHODS.md",
+      "rationale": "Greek-language documentation of 12 reasoning methods (Multi-Perspective, Iterative, Debate, Research, Jury, Scientific, Socratic, Pre-Mortem, Bayesian, Dialectical, Analogical, Delphi). Each method includes phase sequences, implementation pseudocode, and use-case guidance."
+    },
+    {
+      "id": "method_comparison",
+      "label": "Method Comparison Guide",
+      "file_type": "document",
+      "source_file": "docs/METHOD_COMPARISON.md",
+      "rationale": "Analytical guide comparing 18 reasoning methods with HyperGate codes (B-Q). Covers method descriptions, phase counts, parallel execution points, optimal use cases, disambiguation rules (Debate vs Dialectical, SoT vs ToT, CoVE vs Scientific, Coding vs PoT), and method groups (Adversarial, Panel, Verification, Decomposition, Computation, Risk, Domain-Specific, General)."
+    },
+    {
+      "id": "model_routing_research",
+      "label": "Model Routing Research",
+      "file_type": "document",
+      "source_file": "docs/model_routing_research.md",
+      "rationale": "Capability-based scoring across 7 dimensions for 60+ models. Cost-adjusted routing tables per phase per preset (Budget/Premium) for 7 methods (Multi-Perspective, Iterative, Debate, Scientific, Socratic, Research, Jury). Budget synthesis favored: qwen3-plus (1M ctx, $1.82). Premium synthesis favored: claude-opus ($30, 1M ctx)."
+    },
+    {
+      "id": "neuro_memory",
+      "label": "Neuro Memory Subsystem",
+      "file_type": "document",
+      "source_file": "docs/NEURO_MEMORY.md",
+      "rationale": "Long-term memory coprocessor documentation. 3-tier storage: HOT (JSONL, string matching), WARM (L1 in-memory bundles + L2 FAISS index, embedding-based), COLD (full archive). API endpoints: /recall, /learn, /audit, /sessions. Tenant-isolated per agent_id. Frontend integration via NeuroPanel in sidebar."
+    },
+    {
+      "id": "openrouter_recommendations",
+      "label": "OpenRouter Recommendations",
+      "file_type": "document",
+      "source_file": "docs/openrouter_final_recommendations.md",
+      "rationale": "Executive summary for OpenRouter adoption: 346 models, single API key replaces 7 provider keys, 5 preset tiers ($0.005-$0.30/run), best value DeepSeek V3 ($0.20/$0.77 per 1M), best quality Claude Sonnet 4.6 ($3/$15 per 1M), recommended default 'balanced' preset at ~$0.12/run."
+    }
+  ],
+  "edges": [
+    {
+      "source": "humanizer_main",
+      "target": "humanizer_tasks",
+      "relation": "delegates_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "Humanizer/main.py"
+    },
+    {
+      "source": "humanizer_main",
+      "target": "humanizer_utils",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "Humanizer/main.py"
+    },
+    {
+      "source": "humanizer_tasks",
+      "target": "humanizer_utils",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "Humanizer/tasks.py"
+    },
+    {
+      "source": "humanizer_tasks",
+      "target": "humanizer_requirements",
+      "relation": "depends_on",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "Humanizer/tasks.py"
+    },
+    {
+      "source": "benchmark_latency",
+      "target": "vs_latency_overhead",
+      "relation": "generates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "benchmarks/benchmark_vs_latency.py"
+    },
+    {
+      "source": "benchmark_calibration",
+      "target": "benchmark_diversity",
+      "relation": "related_benchmark",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "benchmarks/"
+    },
+    {
+      "source": "benchmark_diversity",
+      "target": "benchmark_latency",
+      "relation": "related_benchmark",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "benchmarks/"
+    },
+    {
+      "source": "architectural_audit_v5",
+      "target": "codebase_mindmap",
+      "relation": "extends",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/"
+    },
+    {
+      "source": "audit_report",
+      "target": "architectural_audit_v5",
+      "relation": "predecessor_audit",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "docs/"
+    },
+    {
+      "source": "methods_documentation",
+      "target": "method_comparison",
+      "relation": "complements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "docs/"
+    },
+    {
+      "source": "method_comparison",
+      "target": "model_routing_research",
+      "relation": "informs",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "docs/"
+    },
+    {
+      "source": "model_routing_research",
+      "target": "openrouter_recommendations",
+      "relation": "extends",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/"
+    },
+    {
+      "source": "environment_variables",
+      "target": "neuro_memory",
+      "relation": "configures",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "docs/"
+    },
+    {
+      "source": "design_system",
+      "target": "color_palette",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.65,
+      "source_file": "docs/"
+    },
+    {
+      "source": "e2e_encryption_research",
+      "target": "audit_report",
+      "relation": "addresses_security_gap",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "docs/"
+    },
+    {
+      "source": "agent_memory_structures",
+      "target": "neuro_memory",
+      "relation": "informs_implementation",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/"
+    },
+    {
+      "source": "codebase_mindmap",
+      "target": "architectural_audit_v5",
+      "relation": "documents_same_system",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "docs/"
+    }
+  ]
+}

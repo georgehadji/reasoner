@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import Any, List
-from reasoner.models import PipelineState
+from reasoner.domain.pipeline_state import PipelineState
 from reasoner.application.flows.base import WorkflowServices, WorkflowStrategy, PhaseStep
 from reasoner.application.flows.delphi_phases import (
     run_delphi_round1_phase,
@@ -13,7 +13,7 @@ from reasoner.application.flows.delphi_phases import (
     run_delphi_dissent_phase
 )
 from reasoner.application.flows.synthesis_phase import run_synthesis_phase
-from reasoner.api.serializers import _ser_2, _ser_3, _ser_4, _ser_5, _ser_synthesis
+from reasoner.application.services.serializers import _ser_2, _ser_3, _ser_4, _ser_5, _ser_synthesis
 
 class DelphiFlow(WorkflowStrategy):
     """Delphi method reasoning workflow."""

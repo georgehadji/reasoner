@@ -1,6 +1,6 @@
 from __future__ import annotations
 import json
-from reasoner.models import PipelineState
+from reasoner.domain.pipeline_state import PipelineState
 from reasoner.core.constants import (
     ARTICLE_MAX_SOURCES_FOR_CLAIM_EXTRACTION,
     ARTICLE_MIN_SOURCE_COUNT,

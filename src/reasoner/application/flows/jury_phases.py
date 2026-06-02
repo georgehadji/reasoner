@@ -7,10 +7,16 @@ import logging
 from dataclasses import asdict
 from typing import Any
 
-from reasoner.models import (
-    PipelineState, GenerationCandidate, CriticScore, CriticDimensionScore, 
-    VerificationResult, MetaEvaluation, ClaimLabel, SolutionCandidate
+from reasoner.domain.pipeline_state import PipelineState
+from reasoner.domain.core_types import (
+    GenerationCandidate,
+    CriticScore,
+    CriticDimensionScore,
+    VerificationResult,
+    MetaEvaluation,
+    SolutionCandidate,
 )
+from reasoner.models import ClaimLabel
 from reasoner.parsing import extract_json
 from reasoner.core.constants import TRUNCATION
 import reasoner.phases as phases
@@ -193,11 +199,23 @@ async def run_jury_weighted_ranking_phase(state: PipelineState, services: Workfl
     if state.meta_evaluation:
         reliability = state.meta_evaluation.critic_reliability or {}
     
+    def _safe_float(v) -> float:
+        if isinstance(v, (int, float)):
+            return float(v)
+        if isinstance(v, dict):
+            return 0.0
+        try:
+            return float(v or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
     generator_scores: dict[str, float] = {}
     for cs in state.critic_scores:
-        weight = reliability.get(cs.critic_id, 1.0)
+        weight = _safe_float(reliability.get(cs.critic_id, 1.0))
         for gen_id, dims in cs.candidate_scores.items():
-            generator_scores[gen_id] = generator_scores.get(gen_id, 0.0) + (dims.total * weight)
+            score = (_safe_float(dims.factuality) + _safe_float(dims.reasoning)
+                   + _safe_float(dims.completeness) + _safe_float(dims.helpfulness))
+            generator_scores[gen_id] = generator_scores.get(gen_id, 0.0) + (score * weight)
     
     state.jury_weighted_ranking = sorted(
         generator_scores.keys(),

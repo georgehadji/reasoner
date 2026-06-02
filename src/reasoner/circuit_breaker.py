@@ -23,7 +23,7 @@ from typing import Any, Callable, TypeVar
 from reasoner.logging_utils import llm_logger
 
 try:
-    from reasoner.api.metrics import (
+    from reasoner.metrics import (
         REASONER_CIRCUIT_BREAKER_STATE,
         REASONER_CIRCUIT_BREAKER_REJECTED,
     )

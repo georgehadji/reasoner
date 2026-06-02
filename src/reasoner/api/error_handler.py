@@ -131,9 +131,9 @@ def _safe_json_response(
     detail: str,
     correlation_id: str,
     request: Request | None = None,
+    extra: dict[str, Any] | None = None,
 ) -> JSONResponse:
     """Build a safe JSON error response that doesn't leak internals."""
-    # In production, don't expose internal details
     from reasoner.core.settings import settings
     env = getattr(settings, "ENVIRONMENT", "development")
 
@@ -143,10 +143,13 @@ def _safe_json_response(
         "correlation_id": correlation_id,
     }
 
-    # Only include path/method in non-production for debugging
     if env != "production" and request is not None:
         body["path"] = request.url.path
         body["method"] = request.method
+
+    # In development, include extra detail (validation errors, etc.)
+    if env != "production" and extra:
+        body["detail"] = extra
 
     return JSONResponse(status_code=status_code, content=body)
 
@@ -199,6 +202,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         "Request validation failed",
         get_correlation_id(),
         request,
+        extra={"validation_errors": simplified},
     )
 
 

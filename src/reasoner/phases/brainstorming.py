@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 
-from reasoner.models import PipelineState
+from reasoner.domain.pipeline_state import PipelineState
 from reasoner.phases._shared import _wrap_user_input, get_language_instruction
 
 # ─────────────────────────────────────────────────────────────────────────────

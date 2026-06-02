@@ -213,6 +213,11 @@ export function buildMarkdownFromPhase(
       append('\n');
     }
   }
+  // ── State Objects (dispatched via lookup) ──
+  // OPTIMIZATION: Skip all 11 state blocks if none are present (common for Perspectives/Classification phases)
+  const _STATE_KEYS = ['cove_state','pre_mortem_state','bayesian_state','dialectical_state','analogical_state','sot_state','tot_state','pot_state','self_discover_state','delphi_state','writing_state','debate_rounds'];
+  if (_STATE_KEYS.some(k => (d as Record<string, unknown>)[k] !== undefined)) {
+
   // ── CoVE state ──
   if (d.cove_state && typeof d.cove_state === 'object') {
     const cs = d.cove_state as Record<string, unknown>;
@@ -1024,6 +1029,8 @@ export function buildMarkdownFromPhase(
       });
       append('\n');
     }
+  }
+
   }
 
   // ── Critique & Pruning ──

@@ -18,7 +18,7 @@ from reasoner.core.search import (
     _bm25_score,
     _extract_search_keywords,
 )
-from reasoner.models import PipelineState
+from reasoner.domain.pipeline_state import PipelineState
 from reasoner.parsing import ParseError, extract_json, safe_list
 from reasoner.sanitization import sanitize_for_prompt
 import reasoner.phases as phases
@@ -360,7 +360,8 @@ async def run_deep_read_phase(state: PipelineState, services: WorkflowServices, 
         return
 
     services.log("DEEP_READ", f"Deep reading {len(sources_to_scrape)} sources...", state)
-    use_llm_extraction = os.getenv("REASONER_DEEP_READ_LLM", "1") != "0"
+    from reasoner.core.settings import settings
+    use_llm_extraction = settings.REASONER_DEEP_READ_LLM
 
     async def _process_scraped(scraped: dict, matching_result: dict) -> None:
         url = scraped.get("url")

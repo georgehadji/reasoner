@@ -10,7 +10,6 @@ import asyncio
 import functools
 import json
 import logging
-import os
 import re
 import time
 from typing import Any, Callable, TypeVar
@@ -35,9 +34,24 @@ def timed(func: Callable[..., T]) -> Callable[..., T]:
                 self._log("TIMING", f"{func.__name__} completed in {elapsed*1000:.1f}ms", state)
     return async_wrapper  # type: ignore[return-value]
 
-from reasoner.models import (PipelineState, SolutionCandidate, CritiqueScore, StressTestResult,
-                ScenarioType, GenerationCandidate, CriticScore, VerificationResult,
-                MetaEvaluation, ClaimLabel, PerspectiveType, FinalSolution, MetaCognitiveAudit, TaskType)
+from reasoner.domain.pipeline_state import PipelineState
+from reasoner.domain.core_types import (
+    SolutionCandidate,
+    CritiqueScore,
+    StressTestResult,
+    ScenarioType,
+    GenerationCandidate,
+    CriticScore,
+    VerificationResult,
+    MetaEvaluation,
+    FinalSolution,
+    MetaCognitiveAudit,
+)
+from reasoner.models import (
+    ClaimLabel,
+    PerspectiveType,
+    TaskType,
+)
 from reasoner.parsing import ParseError, extract_json, safe_list, safe_float, _parse_critique_scores
 from reasoner.infrastructure.llm.exceptions import LLMError
 from reasoner.infrastructure.llm.router import ProviderRouter
@@ -65,12 +79,14 @@ TOKEN_OPTIMIZATION = {
     "caching": True,
 }
 
+from reasoner.core.settings import settings
+
 USE_PHASE_SUBAGENTS = {
-    "enhancement": os.getenv("USE_SUBAGENT_ENHANCEMENT", "false").lower() == "true",
-    "decomposition": os.getenv("USE_SUBAGENT_DECOMPOSITION", "false").lower() == "true",
-    "critique": os.getenv("USE_SUBAGENT_CRITIQUE", "false").lower() == "true",
-    "synthesis": os.getenv("USE_SUBAGENT_SYNTHESIS", "false").lower() == "true",
-    "search": os.getenv("USE_SUBAGENT_SEARCH", "false").lower() == "true",
+    "enhancement": settings.USE_SUBAGENT_ENHANCEMENT,
+    "decomposition": settings.USE_SUBAGENT_DECOMPOSITION,
+    "critique": settings.USE_SUBAGENT_CRITIQUE,
+    "synthesis": settings.USE_SUBAGENT_SYNTHESIS,
+    "search": settings.USE_SUBAGENT_SEARCH,
 }
 
 token_cache = get_token_cache(

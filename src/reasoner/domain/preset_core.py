@@ -166,7 +166,7 @@ _METHOD_TO_SLUG: dict[str, str] = {
     "scientific": "scientific",
     "socratic": "socratic",
     "multi_perspective": "multi-perspective",
-    "iterative": "multi-perspective",   # no iterative preset — fall back to multi-perspective
+    "iterative_critique": "iterative-critique",  # v3.1: new LLM debate method
     "research": "research",
     "jury": "jury",
     "pre_mortem": "pre-mortem",

@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, Suspense } from 'react';
+import { memo, Suspense, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -11,7 +11,21 @@ const CodeBlock = dynamic(
   { ssr: false },
 );
 
-const MarkdownRendererComponent = ({ children }: { children: string }) => {
+const MarkdownRendererComponent = ({ children }: { children: string | React.ReactNode }) => {
+  // Ensure children is strictly a string for ReactMarkdown
+  const contentString = useMemo(() => {
+    if (typeof children === 'string') return children;
+    if (Array.isArray(children)) return children.join('');
+    if (typeof children === 'object') {
+      try {
+        return JSON.stringify(children, null, 2);
+      } catch {
+        return String(children);
+      }
+    }
+    return String(children || '');
+  }, [children]);
+
   return (
     <div className="markdown-body">
       <ReactMarkdown
@@ -62,7 +76,7 @@ const MarkdownRendererComponent = ({ children }: { children: string }) => {
           },
         }}
       >
-        {children}
+        {contentString}
       </ReactMarkdown>
     </div>
   );

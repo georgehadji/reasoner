@@ -6,10 +6,10 @@ Selects the appropriate auth adapter based on environment settings.
 
 from __future__ import annotations
 
-import os
 import threading
 from typing import Optional
 
+from reasoner.core.settings import settings
 from reasoner.application.ports.auth_port import AuthPort
 
 _auth_adapter: Optional[AuthPort] = None
@@ -27,9 +27,9 @@ def get_auth_adapter() -> AuthPort:
         if _auth_adapter is not None:
             return _auth_adapter
 
-        env = os.environ.get("ENVIRONMENT", "development")
-        supabase_url = os.environ.get("SUPABASE_URL")
-        supabase_service_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+        env = settings.ENVIRONMENT
+        supabase_url = settings.SUPABASE_URL
+        supabase_service_key = settings.SUPABASE_SERVICE_ROLE_KEY
 
         if env == "production" and supabase_url and supabase_service_key:
             from .supabase_adapter import SupabaseAuthAdapter
@@ -51,7 +51,7 @@ def get_auth_adapter() -> AuthPort:
                 _auth_adapter = LocalAuthAdapter()
 
     # Security guard: prevent local HS256 auth in production
-    if os.environ.get("ENVIRONMENT") == "production":
+    if settings.ENVIRONMENT == "production":
         from .local_adapter import LocalAuthAdapter
         if isinstance(_auth_adapter, LocalAuthAdapter):
             raise RuntimeError(

@@ -7,7 +7,16 @@ import logging
 from typing import Any
 
 from reasoner.core.constants import TRUNCATION, get_token_budget, DEFAULT_MAX_TOKENS
-from reasoner.models import PipelineState, SolutionCandidate, PerspectiveRegistry, PerspectiveType, StressTestResult, ScenarioType
+from reasoner.domain.pipeline_state import PipelineState
+from reasoner.domain.core_types import (
+    SolutionCandidate,
+    StressTestResult,
+    ScenarioType,
+)
+from reasoner.models import (
+    PerspectiveRegistry,
+    PerspectiveType,
+)
 from reasoner.parsing import ParseError, extract_json, _parse_critique_scores
 import reasoner.phases as phases
 from reasoner.application.flows.base import WorkflowServices

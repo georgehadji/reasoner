@@ -7,7 +7,9 @@ import logging
 import re
 from typing import Any
 
-from reasoner.models import PipelineState, PerspectiveType, SolutionCandidate
+from reasoner.domain.pipeline_state import PipelineState
+from reasoner.domain.core_types import SolutionCandidate
+from reasoner.models import PerspectiveType
 from reasoner.parsing import extract_json
 import reasoner.phases as phases
 from reasoner.application.flows.base import WorkflowServices

@@ -8,7 +8,7 @@ This module is now a thin compatibility shim over
 
 from __future__ import annotations
 
-from reasoner.models import PipelineState
+from reasoner.domain.pipeline_state import PipelineState
 
 from reasoner.application.services.renderers import (
     RendererService,

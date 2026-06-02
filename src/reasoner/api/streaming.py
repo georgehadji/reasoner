@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass, field
 import hashlib
 import json
 import logging
@@ -19,18 +20,17 @@ from reasoner.core.constants import (
     get_phase_timeout,
 )
 from reasoner.quality import PhaseMonitor, reset_phase_state
-from reasoner.hypergate import HyperGateAgent
 from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.infrastructure.llm.registry import _REGISTRY
-from reasoner.models import PipelineState, TaskType
+from reasoner.domain.pipeline_state import PipelineState
+from reasoner.models import TaskType
 from reasoner.pipeline import ReasonerPipeline
 from reasoner.application.services.preset_service import PresetService
 from reasoner.application.services.search_service import SearchService
+from reasoner.application.orchestrator import PipelineOrchestrator
 from reasoner.exceptions import classify_error, is_retryable
 from reasoner.presets import (
-    build_auto_preset,
     get_method_from_preset,
-    get_preset_tier,
     get_preset_price_tier,
 )
 from reasoner.phases._shared import build_followup_context, _wrap_user_input
@@ -41,8 +41,15 @@ from reasoner.infrastructure.redis.run_state import _run_state_manager as _run_s
 from reasoner.core.events.domain_events import make_event, EventType
 from reasoner.infrastructure.persistence.event_store import get_event_store
 from .schemas import FollowupRequest, RunRequest
+# SSE protocol helpers shared across streaming endpoints.
+from .sse_utils import _event, _broadcast_ws, _persist_event
+from .phase_executor import (
+    get_phase_start_models,
+    get_critical_phases,
+    run_phase_with_keepalive,
+)
+
 from .serializers import (
-    _event,
     _ser_0,
     _ser_1,
     _ser_1_5,
@@ -110,32 +117,6 @@ async def _emit_widget_event(
             "citations": widget_result.get("citations", []),
         },
     })
-
-
-async def _broadcast_ws(run_id: str, payload: dict[str, Any]) -> None:
-    """Broadcast an event to WebSocket subscribers for this run.
-
-    Fire-and-forget: never blocks the SSE stream on WS delivery.
-    """
-    try:
-        from reasoner.infrastructure.websocket import get_websocket_manager
-
-        manager = get_websocket_manager()
-        asyncio.create_task(manager.broadcast_event(payload, run_id))
-    except Exception:
-        logger.warning("WS broadcast failed for run %s", run_id, exc_info=True)
-
-
-async def _persist_event(event) -> None:
-    """Persist a domain event to the event store.
-
-    Fire-and-forget: event-store failure must never break the stream.
-    """
-    try:
-        store = get_event_store()
-        await store.save_events([event])
-    except Exception as e:
-        logger.warning("EventStore persistence failed for event %s: %s", event.event_type.value, str(e), exc_info=True)
 
 
 # Creative-writing model tiers with 2 fallbacks each.
@@ -348,31 +329,7 @@ async def _stream_web_search_results(
         yield chunk
 
 
-async def _recall_neuro_context(problem: str, agent_id: str | None = None) -> list[dict[str, Any]]:
-    """Fetch relevant past context from Neuro memory."""
-    try:
-        from reasoner.api.clients import get_neuro_client
-        from reasoner.core.settings import settings
 
-        client = get_neuro_client()
-        resp = await client.post(
-            f"{settings.internal_api_base_url}/neuro/recall",
-            json={
-                "prompt": problem,
-                "agent_id": agent_id,
-                "max_results": 5,
-                "compression": "none",
-            },
-        )
-        if resp.status_code == 200:
-                data = resp.json()
-                return [
-                    {"content": c["content"], "source": c["source"], "relevance": c["relevance"]}
-                    for c in data.get("chunks", [])
-                ]
-    except Exception as exc:
-        logger.debug("Neuro recall failed, proceeding without memory: %s", exc)
-    return []
 
 
 async def run_stream(
@@ -394,78 +351,29 @@ async def run_stream(
     cancel_event = await _run_store.add(run_id, user_id=user_id)
     _save_pipeline_owner(run_id, user_id)
     try:
-        # ── Neuro Recall ──
-        recalled_chunks: list[dict[str, Any]] = []
-        if not req.no_cache:
-            conversation_id = initial_state.conversation_id if initial_state else None
-            recalled_chunks = await _recall_neuro_context(req.problem, agent_id=conversation_id)
-            if recalled_chunks:
-                logger.info("Neuro recall returned %d chunks", len(recalled_chunks))
-                yield _event({
-                    "type": "recall_used",
-                    "memory_count": len(recalled_chunks),
-                    "memory_ids": [c.get("source", "") for c in recalled_chunks if c.get("source")],
-                })
-                # Emit domain event for neuro memory usage
-                recall_evt = make_event(
-                    EventType.MEMORY_RECALLED,
-                    aggregate_id=run_id,
-                    version=event_version,
-                    query=req.problem,
-                    chunks_found=len(recalled_chunks),
-                    latency_ms=0.0
-                )
-                await _persist_event(recall_evt)
-                event_version += 1
+        # ── Orchestrator Preflight: preset resolution, HyperGate, neuro recall ──
+        orchestrator = PipelineOrchestrator(preset_service, pipeline_service)
+        preflight = await orchestrator.preflight(req, initial_state)
 
-        raw_preset = req.preset or "auto-budget"
-        preset_svc = _ensure_fresh_preset_service()
-        gate_preset_name, is_auto, auto_tier = preset_svc.resolve(raw_preset)
-        auto_selected_method: str | None = None
+        if preflight.action == "direct":
+            async for chunk in _stream_direct_answer(
+                preflight.router, req.problem, run_id, cancel_event,
+                conversation_history=preflight.conversation_history,
+                previous_synthesis=preflight.previous_synthesis,
+                turn_number=preflight.turn_number,
+                preset_name=preflight.effective_preset_name,
+            ):
+                yield chunk
+            return
+        if preflight.action == "web_search":
+            async for chunk in _stream_web_search_results(req.problem, run_id, cancel_event=cancel_event):
+                yield chunk
+            return
 
-        agent_model = initial_state.agent_model if initial_state else None
-        effective_preset_name, router = preset_svc.build_router(
-            gate_preset_name,
-            custom_routing=req.routing,
-            agent_model=agent_model,
-        )
-        # DEBUG: log a few routing entries so we can verify presets are fresh
-        # Defensive: test fakes may use _primary instead of primary (see _stream_direct_answer)
-        _primary_for_log = getattr(router, "primary", None) or getattr(router, "_primary", None)
-        _routing_table = getattr(router, "routing_table", {})
-        logger.info(
-            "Preset '%s' primary=%s sample_routing=%s",
-            effective_preset_name,
-            getattr(_primary_for_log, "model", "unknown") if _primary_for_log else "unknown",
-            {k: _routing_table.get(k).model if _routing_table.get(k) else None for k in list(_routing_table)[:3]},
-        )
-
-        if not req.force_pipeline:
-            gate = HyperGateAgent(router)
-            decision = await gate.decide(req.problem)
-            if decision.action == "direct":
-                async for chunk in _stream_direct_answer(
-                    router, req.problem, run_id, cancel_event,
-                    conversation_history=initial_state.conversation_history if initial_state else None,
-                    previous_synthesis=initial_state.previous_synthesis if initial_state else "",
-                    turn_number=initial_state.turn_number if initial_state else 1,
-                    preset_name=effective_preset_name,
-                ):
-                    yield chunk
-                return
-            if decision.action == "web_search":
-                async for chunk in _stream_web_search_results(req.problem, run_id, cancel_event=cancel_event):
-                    yield chunk
-                return
-
-            if is_auto and decision.method and not req.routing:
-                preset_svc = _ensure_fresh_preset_service()
-                effective_preset_name, router = preset_svc.build_auto_router(
-                    decision.method,
-                    auto_tier,
-                    agent_model=agent_model,
-                )
-                auto_selected_method = decision.method
+        router = preflight.router
+        effective_preset_name = preflight.effective_preset_name
+        auto_selected_method = preflight.auto_selected_method
+        recalled_chunks = preflight.recalled_chunks
 
         pipeline = pipeline_service.create_pipeline(
             router=router,
@@ -482,6 +390,10 @@ async def run_stream(
         state = initial_state or PipelineState(problem=req.problem, preset_name=effective_preset_name)
         if recalled_chunks:
             state.neuro_context = recalled_chunks
+
+        # ── Wire event bus for domain event sourcing ──
+        from reasoner.application.event_bus.bus import get_event_bus
+        state.wire_event_bus(get_event_bus(), aggregate_id=run_id)
 
         # --- BRAINSTORMING CONFIG: inject VS runtime parameters from preset metadata
         # before any phase runs so _phase_brainstorm_generate can read them.
@@ -520,6 +432,11 @@ async def run_stream(
         )
         await _persist_event(start_evt)
         event_version += 1
+
+        # Emit domain event for pipeline start
+        state._emit("PIPELINE_STARTED", problem=req.problem,
+                     preset=effective_preset_name,
+                     method=get_method_from_preset(effective_preset_name) or "multi-perspective")
 
         if req.enhance_prompt and not state.enhanced_problem:
             try:
@@ -572,162 +489,15 @@ async def run_stream(
         if state.method != "writing":
             phases += [(synthesis_phase_num, "Synthesis", pipeline._phase_synthesis, _ser_synthesis)]
 
-        _LEGACY_CRITICAL = {
-            "Decomposition", "Perspectives", "Opening Statements",
-            "Hypotheses", "Maieutic Questions", "Generation Pool",
-            "Deep Research", "Retrieve Sources", "Adversarial Verify",
-        }
-        
-        # Determine if a phase is critical:
-        # 1. Is it explicitly marked critical in the Flow Registry?
-        # 2. Is it in the legacy critical set?
-        CRITICAL_PHASES = {
-            name for _, name, _, _ in phases 
-            if step_metadata.get(name, {}).get("critical") or name in _LEGACY_CRITICAL
-        }
+        # CRITICAL_PHASES computed via get_critical_phases(phases, step_metadata)
 
-        _PHASE_ROLE_HINTS: dict[str, list[str]] = {
-            "Classification": ["classification"],
-            "Decomposition": ["decomposition"],
-            "Deep Read": ["primary"],
-            "Perspectives": ["constructive", "destructive", "systemic", "minimalist"],
-            "Opening Statements": ["constructive", "destructive"],
-            "Rebuttals": ["constructive", "destructive"],
-            "Cross-Examination": ["systemic"],
-            "Hypotheses": ["primary"],
-            "Falsification Tests": ["scoring"],
-            "Maieutic Questions": ["destructive"],
-            "Dialectic Answers": ["constructive"],
-            "Generation Pool": ["generator_1", "generator_2", "generator_3"],
-            "Critic Pool": ["critic_1", "critic_2", "critic_3"],
-            "Verification & Meta": ["verifier", "meta_evaluator"],
-            "Deep Research": ["primary"],
-            "Critique & Pruning": ["scoring"],
-            "Stress Testing": ["stress_testing"],
-            "Synthesis": ["synthesis"],
-            # Article-specific roles
-            "Decompose Topic": ["article_decompose"],
-            "Retrieve Sources": ["primary"],
-            "Extract Claims (CoVE)": ["article_claim_extract"],
-            "Adversarial Verify": ["article_verifier"],
-            "Synthesize (SoT)": ["article_synthesize"],
-            "Pre-Mortem": ["article_pre_mortem"],
-            "Journal Review": ["article_critic"],
-            "Final Assembly": ["article_assemble"],
-            "Humanize": ["article_humanize"],
-        }
+        # _PHASE_ROLE_HINTS moved to api/phase_executor.py
 
-        def _get_phase_start_models(phase_name: str) -> list[str]:
-            roles = _PHASE_ROLE_HINTS.get(phase_name, [])
-            models: list[str] = []
-            for role in roles:
-                try:
-                    provider = router.get(role)
-                    if provider and hasattr(provider, "model") and provider.model and provider.model not in models:
-                        models.append(provider.model)
-                except Exception:
-                    continue
-            return models
+# _get_phase_start_models moved to get_phase_start_models(phase_name, router)
 
-        async def _run_phase_cancellable(
-            coro_fn, state: PipelineState, timeout_seconds: float = 90.0
-        ) -> bool:
-            """Run a phase coroutine; cancel it if cancel_event fires or timeout expires.
+# _run_phase_cancellable removed (unused)
 
-            Returns True if cancelled by user, False if completed.
-            Raises asyncio.TimeoutError if the phase exceeds timeout_seconds.
-            """
-            phase_task = asyncio.ensure_future(coro_fn(state))
-            cancel_task = asyncio.ensure_future(cancel_event.wait())
-            timeout_task = asyncio.ensure_future(asyncio.sleep(timeout_seconds))
-            done, pending = await asyncio.wait(
-                {phase_task, cancel_task, timeout_task},
-                return_when=asyncio.FIRST_COMPLETED,
-            )
-            for t in pending:
-                t.cancel()
-                try:
-                    await t
-                except (asyncio.CancelledError, Exception):
-                    pass
-            if timeout_task in done:
-                # Timeout expired — cancel the phase task
-                if not phase_task.done():
-                    phase_task.cancel()
-                    try:
-                        await phase_task
-                    except (asyncio.CancelledError, Exception):
-                        pass
-                raise asyncio.TimeoutError(
-                    f"Phase timed out after {timeout_seconds}s"
-                )
-            if cancel_task in done:
-                # User cancelled — cancel the phase task if still running
-                if not phase_task.done():
-                    phase_task.cancel()
-                    try:
-                        await phase_task
-                    except (asyncio.CancelledError, Exception):
-                        pass
-                return True
-            # Phase finished — propagate any exception
-            exc = phase_task.exception()
-            if exc:
-                raise exc
-            return False
-
-        async def _run_phase_with_keepalive(
-            coro_fn, state: PipelineState, timeout_seconds: float = 90.0,
-            keepalive_interval: float = 15.0,
-        ):
-            """Async generator: runs a phase and yields SSE keepalive comments every
-            keepalive_interval seconds so the browser/proxy never sees an idle connection."""
-            phase_task = asyncio.ensure_future(coro_fn(state))
-            cancel_watch = asyncio.ensure_future(cancel_event.wait())
-            deadline = time.monotonic() + timeout_seconds
-            try:
-                while True:
-                    remaining = deadline - time.monotonic()
-                    if remaining <= 0:
-                        if not phase_task.done():
-                            phase_task.cancel()
-                            try:
-                                await phase_task
-                            except (asyncio.CancelledError, Exception):
-                                pass
-                        raise asyncio.TimeoutError(
-                            f"Phase timed out after {timeout_seconds}s"
-                        )
-                    wait = min(keepalive_interval, remaining)
-                    done, _ = await asyncio.wait(
-                        {phase_task, cancel_watch},
-                        timeout=wait,
-                        return_when=asyncio.FIRST_COMPLETED,
-                    )
-                    if cancel_watch in done:
-                        if not phase_task.done():
-                            phase_task.cancel()
-                            try:
-                                await phase_task
-                            except (asyncio.CancelledError, Exception):
-                                pass
-                        return
-                    if phase_task in done:
-                        exc = phase_task.exception()
-                        if exc:
-                            raise exc
-                        return
-                    # Phase still running — send a keepalive SSE comment
-                    yield ": keepalive\n\n"
-            finally:
-                for t in (phase_task, cancel_watch):
-                    if not t.done():
-                        t.cancel()
-                        try:
-                            await t
-                        except (asyncio.CancelledError, Exception):
-                            pass
-
+        # _run_phase_with_keepalive moved to run_phase_with_keepalive(coro_fn, state, cancel_event, ...)
         phase_monitor = PhaseMonitor(router, preset_name=req.preset)
         run_start = time.monotonic()
         for num, name, fn, serializer in phases:
@@ -736,18 +506,22 @@ async def run_stream(
                 return
 
             # Silent no-ops (e.g. writing pipeline skips generic decomposition/vetting)
-            if getattr(fn, "_is_silent_noop", False) is True:
+            if getattr(fn, "_is_silent_noop", False):  # v3.1: relaxed from identity check
                 await fn(state)
                 continue
 
             phase_key = f"Phase {num}: {name}"
             state._current_phase_key = phase_key
-            phase_start_models = _get_phase_start_models(name)
+            phase_start_models = get_phase_start_models(name, router)
             start_payload: dict[str, Any] = {"type": "phase_start", "phase": num, "name": name}
             if phase_start_models:
                 start_payload["models"] = phase_start_models
             await _broadcast_ws(run_id, start_payload)
             yield _event(start_payload)
+
+            # Emit domain event for phase start
+            state._emit("PHASE_STARTED", phase_name=name,
+                         phase_number=num)
 
             max_retries = get_phase_retry_budget(name)
             quality_result = None
@@ -758,7 +532,7 @@ async def run_stream(
             for retry_attempt in range(max_retries + 1):
                 try:
                     phase_timeout = get_phase_timeout(name)
-                    async for _ka in _run_phase_with_keepalive(fn, state, timeout_seconds=phase_timeout):
+                    async for _ka in run_phase_with_keepalive(fn, state, cancel_event, timeout_seconds=phase_timeout):
                         yield _ka
                     if cancel_event.is_set():
                         yield _event({"type": "cancelled", "message": "Pipeline stopped by user"})
@@ -792,7 +566,9 @@ async def run_stream(
                     await _persist_event(fail_evt)
                     event_version += 1
                     phase_errored = True
-                    phase_fatal = name in CRITICAL_PHASES
+                    state._emit("PHASE_FAILED", phase_name=name,
+                                 error=err_msg)
+                    phase_fatal = name in get_critical_phases(phases, step_metadata)
                     break
                 except Exception as exc:
                     logger.error("Phase %s (%s) failed: %s", num, name, exc, exc_info=True)
@@ -828,7 +604,9 @@ async def run_stream(
                     await _persist_event(fail_evt)
                     event_version += 1
                     phase_errored = True
-                    phase_fatal = err_type == "auth" or name in CRITICAL_PHASES
+                    state._emit("PHASE_FAILED", phase_name=name,
+                                 error=err_msg)
+                    phase_fatal = err_type == "auth" or name in get_critical_phases(phases, step_metadata)
                     break
 
                 # Phase executed successfully — run quality check
@@ -931,6 +709,12 @@ async def run_stream(
             await _broadcast_ws(run_id, phase_complete_payload)
             yield _event(phase_complete_payload)
 
+            # Emit domain event for phase completion
+            state._emit("PHASE_COMPLETED", phase_name=name,
+                         duration_seconds=duration,
+                         tokens=state.phase_tokens.get(phase_key,
+                             {"input": 0, "output": 0}))
+
             complete_evt = make_event(
                 EventType.PHASE_COMPLETED,
                 aggregate_id=run_id,
@@ -1001,32 +785,11 @@ async def run_stream(
         )
         await _persist_event(done_evt)
 
-        # ── Neuro Persist (main pipeline) ──
-        try:
-            from reasoner.api.clients import get_neuro_client
-            from reasoner.core.settings import settings
+        # Emit domain event for pipeline completion
+        state._emit("PIPELINE_COMPLETED", phases_completed=len(state.phase_durations))
 
-            client = get_neuro_client()
-            await client.post(
-                f"{settings.internal_api_base_url}/neuro/learn",
-                json={
-                    "prompt": req.problem,
-                    "response": (
-                        state.final_solution.core_solution
-                        if state.final_solution
-                        else getattr(state, 'previous_synthesis', '')
-                    ),
-                    "agent_id": getattr(state, 'conversation_id', None),
-                    "metadata": {
-                        "preset": effective_preset_name,
-                        "tokens": {"input": total_input, "output": total_output},
-                        "type": "pipeline",
-                    },
-                },
-                timeout=5.0,
-            )
-        except Exception:
-            pass
+        # ── Postflight: neuro persist ──
+        await orchestrator.postflight(state, req, user_id=user_id, run_id=run_id)
 
     except Exception as exc:
         logger.error("Pipeline error for run %s: %s", run_id, exc, exc_info=True)
@@ -1085,7 +848,7 @@ async def run_followup_stream(
         yield chunk
 
     try:
-        from reasoner.api.clients import get_neuro_client
+        from reasoner.clients import get_neuro_client
         from reasoner.core.settings import settings
 
         client = get_neuro_client()

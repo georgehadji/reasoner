@@ -94,7 +94,7 @@ class AuthManager:
         self._admin_keys: Set[str] = set()
 
         # Load admin key from environment
-        admin_key = os.environ.get("ADMIN_API_KEY")
+        admin_key = settings.ADMIN_API_KEY
         if admin_key:
             self._admin_keys.add(self._hash_key(admin_key))
 

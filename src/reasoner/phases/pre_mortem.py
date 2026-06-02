@@ -1,6 +1,6 @@
 from __future__ import annotations
 import json
-from reasoner.models import PipelineState
+from reasoner.domain.pipeline_state import PipelineState
 from reasoner.phases._shared import get_language_instruction, _wrap_user_input
 
 PRE_MORTEM_FAILURE_SYSTEM = "You are an analytical assistant. Assume failure has already occurred and reconstruct why. Be specific and unflinching. Output ONLY valid JSON."

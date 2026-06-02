@@ -1,0 +1,1 @@
+{"nodes": [{"id": "humanizer_zws_cloak", "label": "Zero-Width Space Cloaking Utility", "file_type": "code", "source_file": "Humanizer/utils.py", "rationale": "Utility providing apply_zws_cloak() which injects \\u200B into words > 5 chars with 10% probability for text cloaking. Also contains unimplemented pii_masking() placeholder."}], "edges": [], "hyperedges": []}

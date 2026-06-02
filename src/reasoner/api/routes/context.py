@@ -14,7 +14,7 @@ from reasoner.api.dependencies import (
 )
 from reasoner.api.schemas import ContextAnalysisRequest
 from reasoner.domain.saas import User
-from reasoner.models import PipelineState
+from reasoner.domain.pipeline_state import PipelineState
 from reasoner.pipeline import ReasonerPipeline
 
 logger = logging.getLogger(__name__)

@@ -12,7 +12,8 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-from reasoner.models import CritiqueScore, PerspectiveRegistry
+from reasoner.domain.core_types import CritiqueScore
+from reasoner.models import PerspectiveRegistry
 from reasoner.utils.json_safe import safe_json_loads, JSONDepthExceededError
 
 

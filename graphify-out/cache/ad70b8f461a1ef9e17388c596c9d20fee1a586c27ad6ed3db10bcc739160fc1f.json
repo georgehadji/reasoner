@@ -1,0 +1,1 @@
+{"nodes": [], "edges": [{"source": "vs_generation_generationcandidate", "target": "vs_conflict_surfacing_surface_cross_candidate_conflicts", "relation": "shares_data_with", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "tests/test_vs_conflict_surfacing.py", "source_location": null, "weight": 1.0}], "hyperedges": []}

@@ -96,7 +96,7 @@ class RunStateManager:
     def _get_fallback(self) -> "RunStateStore":
         """Lazy-create the in-memory fallback store."""
         if self._fallback is None:
-            from reasoner.api.run_state import RunStateStore
+            from reasoner.infrastructure.redis.in_memory import RunStateStore
             self._fallback = RunStateStore()
         return self._fallback
 

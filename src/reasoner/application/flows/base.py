@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from typing import Any, Protocol, runtime_checkable, Callable, List
-from reasoner.models import PipelineState
-from reasoner.infrastructure.llm.router import ProviderRouter
+from reasoner.domain.pipeline_state import PipelineState
+from reasoner.core.ports.llm_port import LLMPort
+from reasoner.core.events.domain_events import LLMGenerationCompleted, PipelineEventType, make_event # Added for LLM event
+from reasoner.application.event_bus.bus import get_event_bus # Added for event bus
 
 class PhaseStep:
     """A single step in a reasoning flow."""
@@ -28,7 +30,7 @@ class PhaseStep:
 class WorkflowServices(Protocol):
     """Port defining core services provided by the orchestrator to workflows."""
     
-    router: ProviderRouter
+    router: LLMPort
     
     def log(self, phase: str, message: str, state: PipelineState) -> None: ...
     

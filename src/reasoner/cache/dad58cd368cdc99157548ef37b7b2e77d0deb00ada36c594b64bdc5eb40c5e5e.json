@@ -1,1 +1,0 @@
-[{"type": "start"}, {"type": "phase_start", "phase": 0, "name": "Direct Response"}, {"type": "phase_complete", "phase": 0, "name": "Direct Response", "data": {"solution": "test", "tokens": {"input": 28, "output": 1}, "duration": 0.75}}, {"type": "done", "errors": [], "total_tokens": {"input": 28, "output": 1, "total": 29}, "duration": 0.75}]

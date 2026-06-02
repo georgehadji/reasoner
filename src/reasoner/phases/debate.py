@@ -1,6 +1,6 @@
 from __future__ import annotations
 import json
-from reasoner.models import PipelineState
+from reasoner.domain.pipeline_state import PipelineState
 from reasoner.phases._shared import get_language_instruction, _wrap_user_input
 
 DEBATE_OPENING_SYSTEM = "You are an expert debater. Your objective is to present a compelling, evidence-based opening argument for your assigned stance. Focus on making strong claims, supported by logic and any provided context. Do NOT describe the debate process or your role; execute your role as a debater. Output ONLY valid JSON."

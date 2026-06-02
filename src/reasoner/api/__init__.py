@@ -37,11 +37,11 @@ from reasoner.api.sentry import init_sentry
 init_sentry()
 print("[DEBUG] api/__init__.py: Sentry initialized")
 
-    # --- Action 1.2: Observability Strictness & Metrics --- START
-    if os.environ.get("ENVIRONMENT") == "production":
-        if not os.environ.get("LANGFUSE_PUBLIC_KEY") or not os.environ.get("LANGFUSE_SECRET_KEY"):
-            logger.critical("CRITICAL: Langfuse keys (LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY) are missing in production environment. LLM observability will be severely limited.")
-    # --- Action 1.2: Observability Strictness & Metrics --- END
+# --- Action 1.2: Observability Strictness & Metrics --- START
+if settings.ENVIRONMENT == "production":
+    if not settings.LANGFUSE_PUBLIC_KEY or not settings.LANGFUSE_SECRET_KEY:
+        logger.critical("CRITICAL: Langfuse keys (LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY) are missing in production environment. LLM observability will be severely limited.")
+# --- Action 1.2: Observability Strictness & Metrics --- END
 
 # Register global exception handlers (Critical Enhancement 7.7)
 from reasoner.api.error_handler import register_exception_handlers
@@ -65,7 +65,7 @@ _health_postgres_pool = None
 
 async def _update_active_users_loop() -> None:
     """Background task to update active users gauge every 60s (Critical Enhancement 7.3)."""
-    from reasoner.api.metrics import REASONER_ACTIVE_USERS
+    from reasoner.metrics import REASONER_ACTIVE_USERS
     while True:
         try:
             await asyncio.sleep(60)
@@ -93,7 +93,7 @@ async def lifespan(app: FastAPI):
     await validate_all()
 
     # Warn if running in multi-worker mode with in-memory rate limiting / circuit breaker
-    uvicorn_workers = int(os.environ.get("UVICORN_WORKERS", "1"))
+    uvicorn_workers = settings.UVICORN_WORKERS
     if uvicorn_workers > 1:
         if settings.RATE_LIMITER_MODE == "memory":
             message = (
@@ -172,10 +172,9 @@ from reasoner.api.middleware import AuditMiddleware
 app.add_middleware(AuditMiddleware)
 
 # Add CORS middleware — production-aware (Critical Enhancement 6.1.2)
-_env = os.environ.get("ENVIRONMENT", "development")
+_env = settings.ENVIRONMENT
 if _env == "production":
-    _app_url = os.environ.get("APP_URL", "")
-    _allowed_origins = [_app_url] if _app_url else []
+    _allowed_origins = [settings.APP_URL] if settings.APP_URL else []
 else:
     _allowed_origins = settings.cors_origins_list
     logger.warning(
@@ -293,7 +292,6 @@ def get_architecture_components():
 
 def _filter_routing(routing: dict[str, str], primary_id: str) -> dict[str, str]:
     """Drop routing entries whose API key is missing; fall back to primary."""
-    import os
     filtered = {}
     for role, model_id in routing.items():
         entry = _REGISTRY.get(model_id, {})
@@ -328,15 +326,9 @@ print("[DEBUG] api/__init__.py: After cache imports")
 
 print("[DEBUG] api/__init__.py: Before schemas imports")
 from reasoner.api.schemas import (
-    CalculationRequest,
-    ContextAnalysisRequest,
-    DiscoverRequest,
     FollowupRequest,
     RunRequest,
     SearchRequest,
-    StockRequest,
-    SuggestionRequestModel,
-    WeatherRequest,
 )
 print("[DEBUG] api/__init__.py: After schemas imports")
 
@@ -407,7 +399,7 @@ async def _run_stream_with_metrics(
     pipeline_service: PipelineService,
 ):
     """Wrap run_stream_cached with Prometheus metrics."""
-    from reasoner.api.metrics import REASONER_QUERIES_TOTAL, QueryTimer
+    from reasoner.metrics import REASONER_QUERIES_TOTAL, QueryTimer
     from reasoner.logging_utils import set_log_context
 
     tier = "anonymous" if user is None else "free"
@@ -440,7 +432,7 @@ async def _run_stream_with_metrics(
 
 def _require_auth_if_legacy_disabled(user: User | None) -> None:
     """Backward-compat gate: require auth when legacy API key mode is disabled."""
-    if user is None and os.environ.get("ENABLE_LEGACY_API_KEY", "false").lower() != "true":
+    if user is None and not settings.ENABLE_LEGACY_API_KEY:
         raise HTTPException(
             status_code=401,
             detail="Authentication required. Set ENABLE_LEGACY_API_KEY=true for v1 backward compatibility.",
@@ -672,6 +664,14 @@ app.include_router(websocket_router)
 from reasoner.api.routes.keys import router as keys_router
 app.include_router(keys_router)
 
+from reasoner.api.routes.feedback import router as feedback_router
+from reasoner.api.routes.estimate import router as estimate_router
+app.include_router(feedback_router)
+app.include_router(estimate_router)
+
+from reasoner.api.routes.errors import router as errors_router
+app.include_router(errors_router)
+
 # Mount SaaS router
 from reasoner.api import saas_router
 app.include_router(saas_router.router)
@@ -687,7 +687,7 @@ from reasoner.api.client_ip import get_client_ip
 
 
 async def _metrics_ip_restricted(request: Request):
-    allowed = os.environ.get("METRICS_ALLOWED_IPS", "127.0.0.1,::1").split(",")
+    allowed = settings.METRICS_ALLOWED_IPS.split(",")
     client_ip = get_client_ip(request)
     if client_ip not in allowed:
         raise HTTPException(status_code=403, detail="Metrics access denied")
@@ -708,10 +708,10 @@ print("[DEBUG] api/__init__.py: After API Endpoints block")
 
 from reasoner.api.middleware import MemoryLimitMiddleware, RequestTimeoutMiddleware
 
-# Add memory and timeout middleware
-MEMORY_LIMIT_MB = int(os.environ.get("MEMORY_LIMIT_MB", "1024"))
-MEMORY_WARNING_MB = int(os.environ.get("MEMORY_WARNING_MB", "768"))
-REQUEST_TIMEOUT_SECONDS = float(os.environ.get("REQUEST_TIMEOUT_SECONDS", "300"))
+# Add memory and timeout middleware (using centralized settings)
+MEMORY_LIMIT_MB = settings.MEMORY_LIMIT_MB
+MEMORY_WARNING_MB = settings.MEMORY_WARNING_MB
+REQUEST_TIMEOUT_SECONDS = settings.REQUEST_TIMEOUT_SECONDS
 
 app.add_middleware(
     MemoryLimitMiddleware,
@@ -739,329 +739,7 @@ async def root():
 
 
 # ─────────────────────────────────────────────────────────────────────
-# COST ESTIMATE ENDPOINT
-# ─────────────────────────────────────────────────────────────────────
 
-@app.post("/api/estimate")
-async def estimate_cost(
-    req: RunRequest,
-    csrf_checked = Depends(require_csrf),
-):
-    """
-    Estimate tokens, cost, and duration for a pipeline run without executing it.
-    """
-    from reasoner.pricing import calculate_model_cost, get_pricing
-    from reasoner.presets import get_preset_price_tier
-    from reasoner.application.services.preset_service import PresetService
-
-    _preset_service = PresetService()
-    raw_preset = req.preset or "auto-budget"
-    gate_preset_name, is_auto, auto_tier = _preset_service.resolve(raw_preset)
-    tier = get_preset_price_tier(gate_preset_name)
-
-    # Rough token estimation based on prompt length + heuristic overhead
-    prompt_tokens = len(req.problem.split()) + 50  # words → tokens approx
-    num_phases = 8  # average phases per run
-    tokens_per_phase_input = 500
-    tokens_per_phase_output = 800
-
-    if tier == "premium":
-        tokens_per_phase_input = 1000
-        tokens_per_phase_output = 1500
-
-    estimated_input = prompt_tokens + (num_phases * tokens_per_phase_input)
-    estimated_output = num_phases * tokens_per_phase_output
-
-    # Get primary model pricing
-    primary_id = _REGISTRY.get(gate_preset_name, {}).get("primary", "openrouter/openai/gpt-4o-mini")
-    pricing = get_pricing(primary_id)
-    estimated_cost = calculate_model_cost(primary_id, estimated_input, estimated_output)
-
-    # Heuristic duration (seconds)
-    base_duration = 8 if tier == "budget" else 20
-    estimated_duration = base_duration + (len(req.problem.split()) / 50)
-
-    return {
-        "estimated_tokens_input": estimated_input,
-        "estimated_tokens_output": estimated_output,
-        "estimated_cost_usd": round(estimated_cost, 4),
-        "estimated_duration_seconds": round(estimated_duration, 1),
-        "preset": gate_preset_name,
-        "tier": tier,
-    }
 
 
 # ─────────────────────────────────────────────────────────────────────
-# FEEDBACK ENDPOINT
-# ─────────────────────────────────────────────────────────────────────
-
-from reasoner.infrastructure.persistence.feedback_store import FeedbackStore, FeedbackEntry
-
-_feedback_store = FeedbackStore()
-
-
-class FeedbackRequest(BaseModel):
-    conversation_id: str
-    message_id: str
-    rating: str  # "up" | "down"
-    reason: str | None = None
-    comment: str | None = None
-    context: dict | None = None
-
-
-@app.post("/api/feedback")
-async def submit_feedback(
-    req: FeedbackRequest,
-    csrf_checked = Depends(require_csrf),
-):
-    """
-    Submit user feedback for a specific message.
-    Persisted to SQLite for durability and queryability.
-    """
-    row_id = await _feedback_store.insert(
-        FeedbackEntry(
-            conversation_id=req.conversation_id,
-            message_id=req.message_id,
-            rating=req.rating,
-            reason=req.reason,
-            comment=req.comment,
-            context=req.context,
-        )
-    )
-    return {"status": "received", "id": row_id}
-
-
-@app.get("/api/admin/feedback-stats", dependencies=[Depends(check_rate_limit)])
-async def feedback_stats(
-    request: Request,
-    days: int = Query(30, ge=1, le=365),
-    admin_key: str | None = Header(default=None, alias="X-Admin-Key"),
-    user: User = Depends(get_current_user),
-):
-    """
-    Admin-only endpoint returning aggregated feedback statistics.
-    Requires BOTH a valid JWT with admin scope AND correct X-Admin-Key.
-    Uses constant-time comparison to mitigate timing attacks.
-    """
-    if not settings.ADMIN_API_KEY:
-        raise HTTPException(status_code=503, detail="Admin endpoint not configured")
-    # Require admin scope on the JWT
-    from reasoner.auth import Scope
-    user_scopes = getattr(user, "scopes", set())
-    if Scope.ADMIN.value not in user_scopes:
-        raise HTTPException(status_code=403, detail="Admin scope required")
-    if not admin_key or not secrets.compare_digest(admin_key, settings.ADMIN_API_KEY):
-        raise HTTPException(status_code=401, detail="Unauthorized")
-    logger.info("Admin feedback-stats accessed by user %s", user.id)
-    stats = await _feedback_store.get_stats(days=days)
-    return {
-        "total_entries": stats.total_entries,
-        "upvotes": stats.upvotes,
-        "downvotes": stats.downvotes,
-        "downvote_reasons": stats.downvote_reasons,
-        "avg_comment_length": stats.avg_comment_length,
-        "entries_with_context": stats.entries_with_context,
-        "period_days": stats.period_days,
-    }
-
-
-# ─────────────────────────────────────────────────────────────────────
-# CLIENT ERROR REPORTING
-# ─────────────────────────────────────────────────────────────────────
-
-from reasoner.infrastructure.persistence.error_store import ErrorStore, ErrorEntry
-
-_error_store = ErrorStore()
-
-
-class ClientErrorReport(BaseModel):
-    message: str
-    source: str = "client"  # client | widget | chat
-    stack: str | None = None
-    url: str | None = None
-    user_agent: str | None = None
-
-
-@app.post("/api/error-report")
-async def report_client_error(
-    req: ClientErrorReport,
-    request: Request,
-):
-    """
-    Accept error reports from the frontend.
-    Does not require auth so anonymous users can report issues.
-    Rate-limited by IP via the global rate limiter middleware.
-    """
-    from reasoner.logging_utils import get_correlation_id
-
-    entry = ErrorEntry(
-        level="error",
-        source=req.source,
-        message=req.message,
-        correlation_id=get_correlation_id(),
-        path=req.url,
-        traceback=req.stack,
-        extra={"user_agent": req.user_agent},
-    )
-    row_id = await _error_store.insert(entry)
-    return {"status": "logged", "id": row_id}
-
-
-@app.get("/api/admin/errors", dependencies=[Depends(check_rate_limit)])
-async def error_logs(
-    request: Request,
-    limit: int = Query(100, ge=1, le=500),
-    offset: int = Query(0, ge=0),
-    level: str | None = Query(None),
-    source: str | None = Query(None),
-    hours: int | None = Query(None),
-    admin_key: str | None = Header(default=None, alias="X-Admin-Key"),
-    user: User = Depends(get_current_user),
-):
-    """
-    Admin-only endpoint returning recent error logs.
-    Requires BOTH a valid JWT with admin scope AND correct X-Admin-Key.
-    """
-    if not settings.ADMIN_API_KEY:
-        raise HTTPException(status_code=503, detail="Admin endpoint not configured")
-    from reasoner.auth import Scope
-    user_scopes = getattr(user, "scopes", set())
-    if Scope.ADMIN.value not in user_scopes:
-        raise HTTPException(status_code=403, detail="Admin scope required")
-    if not admin_key or not secrets.compare_digest(admin_key, settings.ADMIN_API_KEY):
-        raise HTTPException(status_code=401, detail="Unauthorized")
-
-    errors = await _error_store.query(
-        limit=limit,
-        offset=offset,
-        level=level,
-        source=source,
-        hours=hours,
-    )
-    stats = await _error_store.get_stats(days=7)
-
-    logger.info("Admin error-logs accessed by user %s", user.id)
-    return {
-        "errors": errors,
-        "stats": {
-            "total_7d": stats.total,
-            "by_level": stats.by_level,
-            "by_source": stats.by_source,
-            "recent_1h": stats.recent_count_1h,
-            "recent_24h": stats.recent_count_24h,
-            "unique_paths": stats.unique_paths,
-        },
-    }
-
-
-# ─────────────────────────────────────────────────────────────────────
-# HEALTH CHECK ENDPOINT
-# ─────────────────────────────────────────────────────────────────────
-
-@app.get("/api/health")
-async def health_check(request: Request):
-    """
-    Comprehensive health check endpoint.
-
-    Returns system status and subsystem pass/fail.
-    Public response omits internal details (memory bytes, pool sizes, Python version).
-    Full diagnostics available with valid X-Admin-Key header.
-    Uses cached connections for Postgres and Redis (Critical Enhancement 5.6).
-    """
-    import sys
-    from datetime import datetime, timezone
-    import secrets
-
-    admin_key = request.headers.get("X-Admin-Key", "")
-    admin_api_key = settings.ADMIN_API_KEY or ""
-    is_admin = bool(admin_api_key and secrets.compare_digest(admin_key, admin_api_key))
-
-    health: dict[str, Any] = {
-        "status": "healthy",
-        "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-        "version": "2.0",
-        "checks": {},
-    }
-
-    # Internal details only for admin
-    if is_admin:
-        health["python"] = sys.version
-
-    # Memory check
-    try:
-        import psutil
-        process = psutil.Process()
-        memory_mb = process.memory_info().rss / 1024 / 1024
-        status = "ok" if memory_mb < MEMORY_LIMIT_MB else "warning"
-        health["checks"]["memory"] = {
-            "status": status,
-            **({"used_mb": round(memory_mb, 1), "limit_mb": MEMORY_LIMIT_MB} if is_admin else {}),
-        }
-    except ImportError:
-        health["checks"]["memory"] = {"status": "unknown", "reason": "psutil not installed"}
-
-    # Circuit breaker status
-    from reasoner.circuit_breaker import get_all_circuit_breakers
-    circuits = get_all_circuit_breakers()
-    open_circuits = [name for name, cb in circuits.items() if cb["state"] == "open"]
-    health["checks"]["circuit_breakers"] = {
-        "status": "ok" if not open_circuits else "degraded",
-        **({"open_circuits": open_circuits, "total": len(circuits)} if is_admin else {}),
-    }
-
-    # Cache status
-    cache_files = list(CACHE_DIR.glob("*.json"))
-    health["checks"]["cache"] = {
-        "status": "ok",
-        **({"files": len(cache_files)} if is_admin else {}),
-    }
-
-    # Postgres check — use cached pool (Critical Enhancement 5.6)
-    global _health_postgres_pool
-    try:
-        if _health_postgres_pool is None:
-            import asyncpg
-            dsn = settings.DATABASE_URL.replace("+asyncpg", "")
-            _health_postgres_pool = await asyncpg.create_pool(dsn, min_size=1, max_size=2)
-        await _health_postgres_pool.fetchval("SELECT 1")
-        health["checks"]["postgres"] = {"status": "ok"}
-        # Update pool metrics (Critical Enhancement 7.6)
-        from reasoner.api.metrics import REASONER_POSTGRES_POOL_SIZE, REASONER_POSTGRES_POOL_FREE
-        REASONER_POSTGRES_POOL_SIZE.set(_health_postgres_pool.get_size())
-        REASONER_POSTGRES_POOL_FREE.set(_health_postgres_pool.get_size() - _health_postgres_pool.get_idle_size())
-    except Exception as e:
-        health["checks"]["postgres"] = {"status": "error", "reason": str(e)}
-        _health_postgres_pool = None
-
-    # Redis check
-    try:
-        from reasoner.infrastructure.redis.client import get_redis
-        redis = get_redis()
-        await redis.ping()
-        health["checks"]["redis"] = {"status": "ok"}
-        # Update Redis pool metrics (Critical Enhancement 7.6)
-        from reasoner.api.metrics import REASONER_REDIS_POOL_SIZE
-        pool_info = redis.connection_pool.max_connections
-        REASONER_REDIS_POOL_SIZE.set(pool_info or 0)
-    except Exception as e:
-        health["checks"]["redis"] = {"status": "error", "reason": str(e)}
-
-    # Stripe check (optional — don't fail health if Stripe is down)
-    try:
-        stripe_key = os.environ.get("STRIPE_SECRET_KEY", "")
-        if stripe_key:
-            health["checks"]["stripe"] = {"status": "ok"}
-        else:
-            health["checks"]["stripe"] = {"status": "ok", "reason": "not configured"}
-    except Exception as e:
-        health["checks"]["stripe"] = {"status": "warning", "reason": str(e)}
-
-    # Determine overall status
-    if any(c.get("status") == "error" for c in health["checks"].values()):
-        health["status"] = "unhealthy"
-    elif any(c.get("status") in ("warning", "degraded") for c in health["checks"].values()):
-        health["status"] = "degraded"
-
-    return health
-
-

@@ -17,7 +17,9 @@ import logging
 from typing import Any
 
 from reasoner.infrastructure.llm.router import ProviderRouter
-from reasoner.models import CritiqueScore, PipelineState, PerspectiveType
+from reasoner.domain.core_types import CritiqueScore
+from reasoner.domain.pipeline_state import PipelineState
+from reasoner.models import PerspectiveType
 from reasoner.subagents.models import PhaseSubAgentOutput
 from reasoner.subagents.critique.logic_critique import LogicCritiqueSubAgent
 from reasoner.subagents.critique.evidence_critique import EvidenceCritiqueSubAgent

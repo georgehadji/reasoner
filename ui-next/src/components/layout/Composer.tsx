@@ -218,7 +218,7 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
   function TierToggle() {
     const { subscription } = useSubscription();
     const isPremium = tier === 'premium';
-    const isLocked = !subscription?.tier || subscription.tier === 'free';
+    const isLocked = false;
     const costNum = estimate ? parseFloat(estimate.cost) : NaN;
     const costDisplay = Number.isFinite(costNum) ? costNum.toFixed(3) : '0.000';
     const tooltipText = isLocked

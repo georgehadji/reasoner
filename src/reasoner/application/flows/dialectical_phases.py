@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from reasoner.models import PipelineState
+from reasoner.domain.pipeline_state import PipelineState
 from reasoner.parsing import extract_json
 import reasoner.phases as phases
 from reasoner.application.flows.base import WorkflowServices

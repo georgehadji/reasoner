@@ -1,0 +1,1 @@
+{"nodes": [], "edges": [{"source": "calculator_calculatorwidget", "target": "protocol_basewidget", "relation": "implements", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "tests/test_widgets_calculator.py", "source_location": null, "weight": 1.0}], "hyperedges": []}

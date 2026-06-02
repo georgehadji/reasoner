@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import List
-from reasoner.models import PipelineState
+from reasoner.domain.pipeline_state import PipelineState
 from reasoner.application.flows.base import WorkflowServices, WorkflowStrategy, PhaseStep
 from reasoner.application.flows.cognitive_phases import (
     run_cove_draft_phase,
@@ -25,7 +25,7 @@ from reasoner.application.flows.cognitive_phases import (
     run_sd_implement_phase
 )
 from reasoner.application.flows.synthesis_phase import run_synthesis_phase
-from reasoner.api.serializers import _ser_2, _ser_3, _ser_4, _ser_5
+from reasoner.application.services.serializers import _ser_2, _ser_3, _ser_4, _ser_5
 
 class CoVEFlow(WorkflowStrategy):
     """Chain-of-Verification (CoVE) reasoning workflow."""

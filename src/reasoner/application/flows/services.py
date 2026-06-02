@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import Any, TYPE_CHECKING
-from reasoner.models import PipelineState
+from reasoner.domain.pipeline_state import PipelineState
 from reasoner.application.flows.base import WorkflowServices, PhaseStep
 
 if TYPE_CHECKING:

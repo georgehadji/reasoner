@@ -27,6 +27,7 @@ from reasoner.application.flows.cognitive import (
     PoTFlow,
     SelfDiscoverFlow
 )
+from reasoner.application.flows.iterative_critique import IterativeCritiqueFlow
 from reasoner.application.flows.article import ArticleFlow
 
 class WorkflowFactory:
@@ -53,6 +54,7 @@ class WorkflowFactory:
             "tot": ToTFlow,
             "pot": PoTFlow,
             "self_discover": SelfDiscoverFlow,
+            "iterative_critique": IterativeCritiqueFlow,
             "article": ArticleFlow,
         }
         

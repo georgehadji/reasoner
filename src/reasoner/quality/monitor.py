@@ -12,7 +12,7 @@ from reasoner.quality.criteria import PhaseQualityResult, evaluate_rules
 
 if TYPE_CHECKING:
     from reasoner.infrastructure.llm.router import ProviderRouter
-    from reasoner.models import PipelineState
+    from reasoner.domain.pipeline_state import PipelineState
 
 logger = logging.getLogger(__name__)
 

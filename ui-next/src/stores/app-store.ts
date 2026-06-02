@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import { Conversation } from '@/lib/types';
 import { STORAGE_KEYS, LIMITS } from '@/lib/config';
+import { shallow } from 'zustand/shallow';
 
 export interface ComposerAttachment {
   id: string;
@@ -14,6 +15,7 @@ export interface ComposerAttachment {
 }
 
 export type Tier = 'budget' | 'premium';
+export { shallow };
 
 interface AppState {
   running: boolean;

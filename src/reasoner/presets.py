@@ -42,6 +42,49 @@ def resolve_preset_name(name: str) -> str:
     return name
 
 
+
+def get_method_from_preset(preset: str) -> str:
+    """Extract method name from preset string."""
+    if "debate" in preset:
+        return "debate"
+    if "iterative" in preset:
+        return "iterative_critique"
+    if "jury" in preset or "orchestrated" in preset:
+        return "jury"
+    if "research" in preset:
+        return "research"
+    if "scientific" in preset:
+        return "scientific"
+    if "socratic" in preset:
+        return "socratic"
+    if "pre-mortem" in preset or "premortem" in preset:
+        return "pre_mortem"
+    if "bayesian" in preset:
+        return "bayesian"
+    if "dialectical" in preset:
+        return "dialectical"
+    if "analogical" in preset:
+        return "analogical"
+    if "delphi" in preset:
+        return "delphi"
+    if "self-discover" in preset:
+        return "self_discover"
+    if "cove" in preset:
+        return "cove"
+    if "brainstorming" in preset:
+        return "brainstorming"
+    if "writing" in preset:
+        return "writing"
+    if "sot" in preset:
+        return "sot"
+    if "tot" in preset:
+        return "tot"
+    if "pot" in preset:
+        return "pot"
+    if "cross-language" in preset or "cross_language" in preset:
+        return "cross_language"
+    return "multi-perspective"
+
 def build_custom_router(routing_dict: dict[str, str]) -> ProviderRouter:
     """
     Build a ProviderRouter from a custom role->model_id dict.

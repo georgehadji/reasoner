@@ -23,18 +23,22 @@ from reasoner.core.constants import (
     TRUNCATION,
 )
 from reasoner.infrastructure.llm.router import ProviderRouter
-from reasoner.models import PipelineState
+from reasoner.domain.pipeline_state import PipelineState
 
 # New imports for event emission
 from reasoner.core.events.domain_events import LLMGenerationCompleted, PipelineEventType, make_event
-from reasoner.application.event_bus.bus import get_event_bus
+# get_event_bus imported lazily inside methods to avoid circular import with api/__init__.py
 
 logger = logging.getLogger(__name__)
 
+
+def _get_event_bus():
+    """Lazy import to avoid circular dependency with api/__init__.py."""
+    from reasoner.application.event_bus.bus import get_event_bus
+    return get_event_bus()
+
 # Regex for fenced code blocks inside prompts
-_CODE_FENCE_RE = re.compile(r"```(\w+)?
-(.*?)
-```", re.DOTALL)
+_CODE_FENCE_RE = re.compile(r"```(\w+)?\n(.*?)\n```", re.DOTALL)
 
 
 class LLMExecutor:
@@ -146,14 +150,14 @@ class LLMExecutor:
                 }
                 # Emit Prometheus cache metrics
                 try:
-                    from reasoner.api.metrics import CACHE_HITS, TOKEN_SAVINGS_USD
+                    from reasoner.metrics import CACHE_HITS, TOKEN_SAVINGS_USD
                     CACHE_HITS.labels(phase=role, model=model_id_for_cache).inc()
                     TOKEN_SAVINGS_USD.inc(estimated_output * 0.000001)
                 except Exception:
                     pass  # Metrics are best-effort
                 
                 # Emit LLMGenerationCompleted event for cache hit
-                bus = get_event_bus()
+                bus = _get_event_bus()
                 event = make_event(
                     PipelineEventType.LLM_GENERATION_COMPLETED,
                     aggregate_id=state.conversation_id or "unknown",
@@ -177,7 +181,7 @@ class LLMExecutor:
             else:
                 # Emit cache miss metric
                 try:
-                    from reasoner.api.metrics import CACHE_MISSES
+                    from reasoner.metrics import CACHE_MISSES
                     CACHE_MISSES.labels(phase=role, model=model_id_for_cache).inc()
                 except Exception:
                     pass
@@ -207,7 +211,7 @@ class LLMExecutor:
                     raw, metadata = await temp_router.call(
                         role="primary",
                         system_prompt=system_prompt,
-user_prompt=user_prompt,
+                        user_prompt=user_prompt,
                         **kwargs,
                     )
                     llm_call_end_time = time.monotonic() # Capture end time for LLM call
@@ -250,7 +254,7 @@ user_prompt=user_prompt,
                     self._accumulate_tokens(state, role, metadata.get("input_tokens", 0), metadata.get("output_tokens", 0), model_id)
 
                     # Emit LLMGenerationCompleted event for successful cascading call
-                    bus = get_event_bus()
+                    bus = _get_event_bus()
                     event = make_event(
                         PipelineEventType.LLM_GENERATION_COMPLETED,
                         aggregate_id=state.conversation_id or "unknown",
@@ -279,7 +283,7 @@ user_prompt=user_prompt,
             if last_error:
                 logger.error(f"All cascading models failed for role={role}: {last_error}")
                 # Emit LLMGenerationCompleted event for failed cascading
-                bus = get_event_bus()
+                bus = _get_event_bus()
                 event = make_event(
                     PipelineEventType.LLM_GENERATION_COMPLETED,
                     aggregate_id=state.conversation_id or "unknown",
@@ -307,7 +311,7 @@ user_prompt=user_prompt,
             else:
                 logger.error(f"Unknown error in cascading for role={role}")
                 # Emit LLMGenerationCompleted event for unknown cascading error
-                bus = get_event_bus()
+                bus = _get_event_bus()
                 event = make_event(
                     PipelineEventType.LLM_GENERATION_COMPLETED,
                     aggregate_id=state.conversation_id or "unknown",
@@ -348,7 +352,7 @@ user_prompt=user_prompt,
             if isinstance(raw, DegradedLLMResponse):
                 logger.error(f"LLM degraded for role={role}: {raw.error}")
                 # Emit LLMGenerationCompleted event for degraded response
-                bus = get_event_bus()
+                bus = _get_event_bus()
                 event = make_event(
                     PipelineEventType.LLM_GENERATION_COMPLETED,
                     aggregate_id=state.conversation_id or "unknown",
@@ -373,7 +377,7 @@ user_prompt=user_prompt,
             if not raw or not raw.strip():
                 logger.warning(f"LLM returned empty response for role={role}; possible content filter or API error")
                 # Emit LLMGenerationCompleted event for empty response
-                bus = get_event_bus()
+                bus = _get_event_bus()
                 event = make_event(
                     PipelineEventType.LLM_GENERATION_COMPLETED,
                     aggregate_id=state.conversation_id or "unknown",
@@ -422,7 +426,7 @@ user_prompt=user_prompt,
                 )
             
             # Emit LLMGenerationCompleted event for successful standard call
-            bus = get_event_bus()
+            bus = _get_event_bus()
             event = make_event(
                 PipelineEventType.LLM_GENERATION_COMPLETED,
                 aggregate_id=state.conversation_id or "unknown",
@@ -599,8 +603,6 @@ user_prompt=user_prompt,
             ext = cls._LANG_TO_EXT.get(lang.lower(), lang)
             # Use minimal compression (remove comments/blank lines)
             compressed = smart_compress(code, ext=ext, level="minimal")
-            return f"```{lang}
-{compressed}
-```"
+            return f"```{lang}\n{compressed}\n```"
 
         return _CODE_FENCE_RE.sub(_replace_block, prompt)

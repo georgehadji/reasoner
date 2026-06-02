@@ -11,14 +11,13 @@ async def auto_clean_state():
     """Fixture to reset all global state between tests."""
     # Ensure event loop is running for async resets
     if asyncio.get_event_loop().is_running():
-        await reset_event_bus()
+        reset_event_bus()
         reset_langfuse()
         await reset_token_cache()
     else:
         # If loop is not running, create a new one for the reset operations
-        # This should ideally not happen with pytest-asyncio, but as a fallback
         async def _run_resets():
-            await reset_event_bus()
+            reset_event_bus()
             reset_langfuse()
             await reset_token_cache()
         asyncio.run(_run_resets())
@@ -27,12 +26,12 @@ async def auto_clean_state():
 
     # Also reset after the test
     if asyncio.get_event_loop().is_running():
-        await reset_event_bus()
+        reset_event_bus()
         reset_langfuse()
         await reset_token_cache()
     else:
         async def _run_resets_after():
-            await reset_event_bus()
+            reset_event_bus()
             reset_langfuse()
             await reset_token_cache()
         asyncio.run(_run_resets_after())

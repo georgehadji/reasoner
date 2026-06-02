@@ -15,7 +15,7 @@ import asyncio
 import logging
 
 from reasoner.infrastructure.llm.router import ProviderRouter
-from reasoner.models import PipelineState
+from reasoner.domain.pipeline_state import PipelineState
 from reasoner.subagents.models import PhaseSubAgentOutput
 from reasoner.subagents.enhancement.ambiguity_detector import AmbiguityDetectorSubAgent
 from reasoner.subagents.enhancement.context_enricher import ContextEnricherSubAgent

@@ -5,7 +5,11 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from reasoner.models import FinalSolution, MetaCognitiveAudit, PipelineState
+from reasoner.domain.core_types import (
+    FinalSolution,
+    MetaCognitiveAudit,
+)
+from reasoner.domain.pipeline_state import PipelineState
 from reasoner.parsing import extract_json
 from reasoner.phases.brainstorming import (
     VS_CLUSTER_SYSTEM,

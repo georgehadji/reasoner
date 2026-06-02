@@ -39,7 +39,7 @@ class SearchService:
         Results are fetched via the configured search client (Perplexity via
         OpenRouter when OPENROUTER_API_KEY is set, otherwise SearXNG).
         """
-        from reasoner.api.serializers import _event
+        from reasoner.application.services.serializers import _event
         import time
 
         yield _event({"type": "start"})

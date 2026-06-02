@@ -10,10 +10,11 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import os
 import secrets
 import time
 from typing import Optional
+
+from reasoner.core.settings import settings
 
 
 # Token validity window in seconds (24 hours)
@@ -27,7 +28,7 @@ _CSRF_TOKEN_MAX_AGE = 86400
 
 def _get_csrf_secret() -> bytes:
     """Get the CSRF signing secret. CSRF_SECRET must be set independently of ADMIN_API_KEY."""
-    raw = os.environ.get("CSRF_SECRET") or ""
+    raw = settings.CSRF_SECRET or ""
     if not raw:
         raise RuntimeError(
             "CSRF_SECRET must be set for CSRF protection. "

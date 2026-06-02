@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import os
 from fastapi import APIRouter, Depends, HTTPException, Request
+from reasoner.core.settings import settings
 from reasoner.domain.saas import User, SubscriptionTier
 from reasoner.api.dependencies import get_current_user
 from reasoner.infrastructure.billing.stripe_adapter import StripeBillingAdapter
@@ -39,7 +39,7 @@ async def create_checkout(
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Invalid tier: {tier}. Must be one of: free, pro, enterprise.")
 
-    app_url = os.environ.get("APP_URL", "http://localhost:3000")
+    app_url = settings.APP_URL
     success_url = f"{app_url}/dashboard?checkout=success&provider={provider}"
     cancel_url = f"{app_url}/pricing?checkout=cancel&provider={provider}"
 
@@ -69,7 +69,7 @@ async def create_portal(
 ):
     """Create a Stripe Billing Portal session."""
     service = _get_stripe_service()
-    app_url = os.environ.get("APP_URL", "http://localhost:3000")
+    app_url = settings.APP_URL
     url = await service.create_portal(str(user.id), f"{app_url}/dashboard")
     return {"portal_url": url}
 

@@ -7,7 +7,15 @@ import re
 from typing import Any
 
 from reasoner.core.constants import ARTICLE_MIN_SOURCE_COUNT, ARTICLE_MIN_CLAIM_SUPPORT_RATIO, get_token_budget, DEFAULT_MAX_TOKENS, TRUNCATION
-from reasoner.models import PipelineState, FinalSolution, MetaCognitiveAudit, ClaimLabel, TaskType
+from reasoner.domain.pipeline_state import PipelineState
+from reasoner.domain.core_types import (
+    FinalSolution,
+    MetaCognitiveAudit,
+)
+from reasoner.models import (
+    ClaimLabel,
+    TaskType,
+)
 from reasoner.parsing import extract_solution_prose, extract_json, strip_json_fences, ParseError
 from reasoner.sanitization import clean_llm_artifacts
 import reasoner.phases as phases

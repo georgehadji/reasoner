@@ -15,7 +15,7 @@ import asyncio
 import logging
 
 from reasoner.infrastructure.llm.router import ProviderRouter
-from reasoner.models import PipelineState
+from reasoner.domain.pipeline_state import PipelineState
 from reasoner.subagents.models import PhaseSubAgentOutput
 from reasoner.subagents.search.query_generator import QueryGeneratorSubAgent
 from reasoner.subagents.search.source_evaluator import SourceEvaluatorSubAgent

@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 
 try:
-    from reasoner.api.metrics import REASONER_CACHE_HIT_RATE, REASONER_CACHE_ENTRIES
+    from reasoner.metrics import REASONER_CACHE_HIT_RATE, REASONER_CACHE_ENTRIES
     _METRICS_AVAILABLE = True
 except Exception:
     _METRICS_AVAILABLE = False
@@ -25,6 +25,7 @@ _MEMORY_CACHE_MAX_SIZE = 256
 _memory_cache_lock = threading.Lock()
 _cache_hits: int = 0
 _cache_misses: int = 0
+_cache_evictions: int = 0  # Track evictions for metric
 
 
 def get_cache_stats() -> dict[str, int | float]:
@@ -33,24 +34,36 @@ def get_cache_stats() -> dict[str, int | float]:
     return {
         "hits": _cache_hits,
         "misses": _cache_misses,
+        "evictions": _cache_evictions,
         "total": total,
         "hit_rate": (_cache_hits / total) if total > 0 else 0.0,
+        "current_size": len(_MEMORY_CACHE),
+        "max_size": _MEMORY_CACHE_MAX_SIZE,
     }
 
 
 def _prune_memory_cache() -> None:
-    """Simple FIFO eviction for the in-memory cache."""
-    # Back-compat: allow monkey-patching from importing modules (e.g. tests)
-    max_size = _MEMORY_CACHE_MAX_SIZE
-    try:
-        import reasoner.api as _api
-        max_size = getattr(_api, '_MEMORY_CACHE_MAX_SIZE', max_size)
-    except Exception:
-        pass
-    excess = len(_MEMORY_CACHE) - max_size
-    if excess > 0:
-        for _ in range(excess):
-            _MEMORY_CACHE.pop(next(iter(_MEMORY_CACHE)), None)
+    """Simple FIFO eviction for the in-memory cache (thread-safe)."""
+    global _cache_evictions
+    with _memory_cache_lock:
+        # Back-compat: allow monkey-patching from importing modules (e.g. tests)
+        max_size = _MEMORY_CACHE_MAX_SIZE
+        try:
+            import reasoner.api as _api
+            max_size = getattr(_api, '_MEMORY_CACHE_MAX_SIZE', max_size)
+        except Exception:
+            pass
+        excess = len(_MEMORY_CACHE) - max_size
+        if excess > 0:
+            for _ in range(excess):
+                _MEMORY_CACHE.pop(next(iter(_MEMORY_CACHE)), None)
+            _cache_evictions += excess
+            if _METRICS_AVAILABLE:
+                try:
+                    from reasoner.metrics import REASONER_CACHE_EVICTIONS
+                    REASONER_CACHE_EVICTIONS.set(_cache_evictions)
+                except Exception:
+                    pass
 
 
 def clear_memory_cache() -> None:

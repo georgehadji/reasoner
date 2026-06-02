@@ -7,7 +7,7 @@ import logging
 from typing import Any
 
 from reasoner.core.constants import TRUNCATION
-from reasoner.models import PipelineState
+from reasoner.domain.pipeline_state import PipelineState
 from reasoner.parsing import extract_json, _parse_critique_scores
 import reasoner.phases as phases
 from reasoner.application.flows.base import WorkflowServices

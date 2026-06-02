@@ -77,7 +77,8 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "deepseek-v4-flash-free": {"model": "deepseek/deepseek-v4-flash:free"},
     "deepseek-v4-pro":  {"model": "deepseek/deepseek-v4-pro"},
     # Qwen
-    "qwen3-max":           {"model": "qwen/qwen3.6-plus"},
+    "qwen3-max":           {"model": "qwen/qwen3.6-plus"},  # v3.1: kept qwen3.6-plus (qwen3.7 not available on OpenRouter),
+    "qwen3.7-max":         {"model": "qwen/qwen3.7-max"},
     "qwen3.6-plus":        {"model": "qwen/qwen3.6-plus"},
     "qwen3-plus":          {"model": "qwen/qwen3.5-plus-02-15"},
     "qwen3.5-plus":        {"model": "qwen/qwen3.5-plus-20260420"},
@@ -110,6 +111,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "glm-4-long":       {"model": "z-ai/glm-4-32b"},
     "glm-5.1":          {"model": "z-ai/glm-5.1"},
     "glm-4.7-flash":    {"model": "z-ai/glm-4.7-flash"},
+    "glm-5.1":           {"model": "z-ai/glm-5.1"},
     # Elephant
     "elephant-alpha":   {"model": "openrouter/elephant-alpha"},
     # OpenRouter
@@ -129,6 +131,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "minimax-m2.5":     {"model": "minimax/minimax-m2.5"},
     "minimax-m2.5-free": {"model": "minimax/minimax-m2.5:free"},
     "minimax-m2.7":     {"model": "minimax/minimax-m2.7"},
+    "minimax-m3":        {"model": "minimax/minimax-m3"},
     "minimax-m1":       {"model": "minimax/minimax-m1"},
     # Tencent
     "hy3-preview":      {"model": "tencent/hy3-preview"},

@@ -203,8 +203,14 @@ export function validateRunRequest(body: unknown): RunRequest {
   }
   const b = body as Record<string, unknown>;
 
-  if (typeof b.problem !== 'string' || b.problem.length === 0 || b.problem.length > VALIDATION_LIMITS.problemMaxLength) {
-    throw new ValidationError('Invalid problem');
+  if (typeof b.problem !== 'string') {
+    throw new ValidationError('Problem must be a string');
+  }
+  if (b.problem.length === 0) {
+    throw new ValidationError('Problem cannot be empty');
+  }
+  if (b.problem.length > VALIDATION_LIMITS.problemMaxLength) {
+    throw new ValidationError(`Problem exceeds ${VALIDATION_LIMITS.problemMaxLength.toLocaleString()} characters`);
   }
   if (typeof b.preset !== 'string' || !VALID_PRESET_PATTERN.test(b.preset)) {
     throw new ValidationError('Invalid preset');
@@ -242,8 +248,14 @@ export function validateRunFollowupRequest(body: unknown): import('./types').Run
   }
   const b = body as Record<string, unknown>;
 
-  if (typeof b.question !== 'string' || b.question.length === 0 || b.question.length > VALIDATION_LIMITS.questionMaxLength) {
-    throw new ValidationError('Invalid question');
+  if (typeof b.question !== 'string') {
+    throw new ValidationError('Question must be a string');
+  }
+  if (b.question.length === 0) {
+    throw new ValidationError('Question cannot be empty');
+  }
+  if (b.question.length > VALIDATION_LIMITS.questionMaxLength) {
+    throw new ValidationError(`Question exceeds ${VALIDATION_LIMITS.questionMaxLength.toLocaleString()} characters`);
   }
   if (typeof b.preset !== 'string' || !VALID_PRESET_PATTERN.test(b.preset)) {
     throw new ValidationError('Invalid preset');

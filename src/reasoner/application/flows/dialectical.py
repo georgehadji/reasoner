@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import Any, List
-from reasoner.models import PipelineState
+from reasoner.domain.pipeline_state import PipelineState
 from reasoner.application.flows.base import WorkflowServices, WorkflowStrategy, PhaseStep
 from reasoner.application.flows.dialectical_phases import (
     run_scientific_hypothesize_phase,
@@ -29,7 +29,7 @@ from reasoner.application.flows.dialectical_phases import (
 )
 from reasoner.application.flows.perspective_phases import run_stress_test_phase
 from reasoner.application.flows.synthesis_phase import run_synthesis_phase
-from reasoner.api.serializers import _ser_2, _ser_3, _ser_4, _ser_5, _ser_synthesis
+from reasoner.application.services.serializers import _ser_2, _ser_3, _ser_4, _ser_5, _ser_synthesis
 
 class ScientificFlow(WorkflowStrategy):
     """Scientific reasoning workflow."""

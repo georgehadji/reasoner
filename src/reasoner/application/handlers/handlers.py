@@ -24,9 +24,15 @@ from reasoner.application.queries import (
 )
 from reasoner.core.aggregates.pipeline import PipelineAggregate
 from reasoner.core.events.domain_events import make_event, EventType
-from reasoner.application.event_bus import get_event_bus
+# get_event_bus imported lazily in constructors to avoid circular import with api/__init__.py
 
 logger = logging.getLogger(__name__)
+
+
+def _get_event_bus():
+    """Lazy import to avoid circular dependency with api/__init__.py."""
+    from reasoner.application.event_bus import get_event_bus
+    return get_event_bus()
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -43,7 +49,7 @@ class RunPipelineCommandHandler:
     def __init__(self, llm_router: Any, event_store: Any | None = None):
         self.llm_router = llm_router
         self.event_store = event_store
-        self.event_bus = get_event_bus()
+        self.event_bus = _get_event_bus()
     
     async def handle(self, command: RunPipelineCommand) -> PipelineAggregate:
         """Execute pipeline command."""
@@ -138,7 +144,7 @@ class ResumePipelineCommandHandler:
     def __init__(self, event_store: Any, llm_router: Any):
         self.event_store = event_store
         self.llm_router = llm_router
-        self.event_bus = get_event_bus()
+        self.event_bus = _get_event_bus()
     
     async def handle(self, command: ResumePipelineCommand) -> dict[str, Any]:
         """Resume pipeline from event history.
@@ -185,7 +191,7 @@ class StopPipelineCommandHandler:
     
     def __init__(self, event_store: Any | None = None):
         self.event_store = event_store
-        self.event_bus = get_event_bus()
+        self.event_bus = _get_event_bus()
     
     async def handle(self, command: StopPipelineCommand) -> dict[str, Any]:
         """Stop running pipeline."""
@@ -214,7 +220,7 @@ class ExecuteWidgetCommandHandler:
     def __init__(self):
         from reasoner.infrastructure.widgets import get_widget_registry
         self.registry = get_widget_registry()
-        self.event_bus = get_event_bus()
+        self.event_bus = _get_event_bus()
     
     async def handle(self, command: ExecuteWidgetCommand) -> dict[str, Any]:
         """Execute widget."""

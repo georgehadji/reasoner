@@ -6,7 +6,7 @@ import asyncio
 from dataclasses import dataclass, field
 from typing import Callable, Protocol
 
-from reasoner.models import PipelineState
+from reasoner.domain.pipeline_state import PipelineState
 
 
 class PhaseFn(Protocol):

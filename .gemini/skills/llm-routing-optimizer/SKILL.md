@@ -19,8 +19,8 @@ LLM routing is primarily managed by the `ProviderRouter` in `src/reasoner/infras
 
 Consider the following strategies when optimizing LLM routing:
 
--   **Cost-Effectiveness**: Use cheaper, faster models (e.g., `deepseek-v4-flash`, `gemma-4-26b`) for simpler, early pipeline phases like `classification` or `prompt_enhancement`.
--   **Quality & Complexity**: Reserve high-quality, more expensive models (e.g., `deepseek-v4-pro`, `claude-sonnet`, `qwen3.6-plus`) for complex reasoning, generation, and synthesis phases (e.g., `decomposition`, `constructive`, `synthesis`).
+-   **Cost-Effectiveness**: Use cheaper, faster models (e.g., `gemini-flash-lite`, `gemma-4-26b`) for simpler, early pipeline phases like `classification` or `prompt_enhancement`.
+-   **Quality & Complexity**: Reserve high-quality, more expensive models (e.g., `gemini-pro`, `claude-sonnet`, `qwen3.6-plus`) for complex reasoning, generation, and synthesis phases (e.g., `decomposition`, `constructive`, `synthesis`).
 -   **Speed**: Prioritize faster models for phases that require quick turnaround or have high throughput needs.
 -   **Specific Model Strengths**: Leverage models known for particular strengths (e.g., `sonar-pro` for fact-checking/scoring, `kimi-k2-6` for agentic reasoning or code generation).
 -   **Cross-Ecosystem Diversity**: Utilize models from different providers in fallback routes (`fallback_routing`) to ensure robustness and mitigate single-provider failures or biases.

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Callable, Protocol
 
-from reasoner.models import PipelineState
+from reasoner.domain.pipeline_state import PipelineState
 
 from ._shared import MethodType, _method_type
 

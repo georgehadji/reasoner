@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from reasoner.models import PipelineState
+from reasoner.domain.pipeline_state import PipelineState
 from reasoner.subagents.base import PhaseSubAgent
 
 

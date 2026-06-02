@@ -32,7 +32,8 @@ class LocalAuthAdapter(AuthPort):
     """
 
     def __init__(self, secret: str | None = None):
-        raw_secret = secret or os.environ.get("JWT_SECRET_KEY")
+        from reasoner.core.settings import settings
+        raw_secret = secret or settings.JWT_SECRET_KEY
         if not raw_secret or len(raw_secret) < 32:
             raise RuntimeError(
                 "JWT_SECRET_KEY must be set and at least 32 characters long. "

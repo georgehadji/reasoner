@@ -6,7 +6,6 @@ import { isEnabled } from '@/hooks/useFeatureFlags';
 import { ChevronDown, Sparkles, Bot, Cpu, Timer, Boxes, ListChecks, ExternalLink } from 'lucide-react';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { TEXT_SIZES, TIMING } from '@/lib/config';
-import { ProfessionalRenderer } from '@/components/ui/ProfessionalRenderer';
 
 interface SubagentInfo {
   name: string;
@@ -247,7 +246,9 @@ export function SynthesisCard({
               </div>
             </div>
           )}
-          <ProfessionalRenderer content={children as string} layoutHints={layoutHints || undefined} />
+          <div className="text-[var(--text)]">
+            {children}
+          </div>
         </div>
       </div>
     </div>

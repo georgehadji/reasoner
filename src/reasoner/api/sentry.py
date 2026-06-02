@@ -7,7 +7,8 @@ products and can be reduced as traffic grows.
 from __future__ import annotations
 
 import logging
-import os
+
+from reasoner.core.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -25,15 +26,12 @@ def init_sentry() -> None:
         logger.debug("sentry-sdk not installed, skipping Sentry initialization")
         return
 
-    dsn = os.environ.get("SENTRY_DSN")
-    if not dsn:
+    if not settings.SENTRY_DSN:
         return
 
-    from reasoner.core.settings import settings
-
     sentry_sdk.init(
-        dsn=dsn,
-        environment=os.environ.get("ENVIRONMENT", "development"),
+        dsn=settings.SENTRY_DSN,
+        environment=settings.ENVIRONMENT,
         integrations=[
             StarletteIntegration(),
             FastApiIntegration(),

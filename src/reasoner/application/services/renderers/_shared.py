@@ -23,7 +23,11 @@ from rich.table import Table
 from rich.text import Text
 from rich import box
 
-from reasoner.models import ClaimLabel, PerspectiveType, PipelineState
+from reasoner.domain.pipeline_state import PipelineState
+from reasoner.models import (
+    ClaimLabel,
+    PerspectiveType,
+)
 
 console = Console()
 

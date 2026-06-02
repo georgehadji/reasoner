@@ -24,7 +24,7 @@ from starlette.websockets import WebSocketState
 from reasoner.core.constants import DEFAULT_HEARTBEAT_INTERVAL
 
 try:
-    from reasoner.api.metrics import REASONER_WEBSOCKET_CONNECTIONS
+    from reasoner.metrics import REASONER_WEBSOCKET_CONNECTIONS
     _METRICS_AVAILABLE = True
 except Exception:
     _METRICS_AVAILABLE = False
@@ -424,7 +424,7 @@ async def websocket_endpoint(
     # Subscribe to pipeline if provided
     if pipeline_id:
         # Ownership check
-        from reasoner.api.history import _get_pipeline_owner
+        from reasoner.pipeline_owner import _get_pipeline_owner
         owner = _get_pipeline_owner(pipeline_id)
         if owner is not None and owner != user_id:
             await manager.send_to_connection(
@@ -478,7 +478,7 @@ async def handle_websocket_message(
             # Enforce pipeline ownership on dynamic subscribe
             metadata = manager.connection_metadata.get(connection_id, {})
             user_id = metadata.get('user_id')
-            from reasoner.api.history import _get_pipeline_owner
+            from reasoner.pipeline_owner import _get_pipeline_owner
             owner = _get_pipeline_owner(pipeline_id)
             if owner is not None and owner != user_id:
                 await manager.send_to_connection(

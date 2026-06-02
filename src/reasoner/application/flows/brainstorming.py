@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import Any, List
-from reasoner.models import PipelineState
+from reasoner.domain.pipeline_state import PipelineState
 from reasoner.application.flows.base import WorkflowStrategy, WorkflowServices, PhaseStep
 from reasoner.application.flows.brainstorming_phases import (
     run_brainstorm_generate_phase,
@@ -11,7 +11,7 @@ from reasoner.application.flows.brainstorming_phases import (
     run_brainstorm_develop_phase,
     run_brainstorm_synthesis_phase
 )
-from reasoner.api.serializers import _ser_2, _ser_3, _ser_4, _ser_synthesis
+from reasoner.application.services.serializers import _ser_2, _ser_3, _ser_4, _ser_synthesis
 
 class BrainstormingFlow(WorkflowStrategy):
     """

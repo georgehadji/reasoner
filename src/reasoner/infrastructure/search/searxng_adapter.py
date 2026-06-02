@@ -3,7 +3,7 @@ import httpx
 import logging
 from typing import Any, Optional
 
-from reasoner.infrastructure.search.port import SourceType
+from reasoner.core.ports.search_port import SourceType
 from reasoner.core.constants import TIMEOUTS, DEFAULT_SEARXNG_URL
 from reasoner.core.search import _should_include_result, _normalize_url, _parse_freshness, TRUNCATION
 

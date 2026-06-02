@@ -40,7 +40,7 @@ async def handle_stripe_webhook(request: Request) -> dict:
             logger.warning("Stripe webhook: invalid payload")
             return {"status": "ok"}
         except stripe.error.SignatureVerificationError:
-            from reasoner.api.metrics import STRIPE_WEBHOOK_SIG_FAILURES
+            from reasoner.metrics import STRIPE_WEBHOOK_SIG_FAILURES
             STRIPE_WEBHOOK_SIG_FAILURES.inc()
             logger.warning("Stripe webhook: invalid signature")
             return {"status": "ok"}

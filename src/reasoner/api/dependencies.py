@@ -31,6 +31,10 @@ from reasoner.auth import AuthenticationError as LegacyAuthError
 from reasoner.core.settings import settings
 from reasoner.rate_limiter import RateLimitConfig, get_rate_limiter
 from reasoner.presets import get_preset_tier
+from reasoner.application.services.preset_service import PresetService
+from reasoner.application.services.pipeline_service import PipelineService
+from reasoner.application.services.search_service import SearchService
+
 
 # ── Rate Limiter Singleton ──
 _rate_limiter_instance: RateLimiter | None = None
@@ -140,7 +144,7 @@ async def _resolve_auth_token(token: str) -> User:
         return await service.authenticate(token)
 
     # Legacy API key path (only if explicitly enabled)
-    if os.environ.get("ENABLE_LEGACY_API_KEY", "false").lower() == "true":
+    if settings.ENABLE_LEGACY_API_KEY:
         import logging
         logger = logging.getLogger(__name__)
         logger.warning(
@@ -229,7 +233,7 @@ def require_tier(min_tier: SubscriptionTier):
         # to access endpoints protected by require_tier().
         # TODO(#501): Replace with actual tier lookup from subscription DB.
         # For now, fail closed in production to prevent unauthorized access.
-        if os.environ.get("ENVIRONMENT", "development") == "production":
+        if settings.ENVIRONMENT == "production":
             raise HTTPException(
                 status_code=403,
                 detail=f"Tier enforcement not yet implemented. Minimum required: {min_tier.name}",
@@ -305,7 +309,7 @@ def _get_quota_service() -> QuotaService:
         from reasoner.infrastructure.persistence.quota_repo_postgres import PostgresQuotaRepository
         from reasoner.infrastructure.persistence.cached_quota_repo import CachedQuotaRepository
         dsn = settings.DATABASE_URL.replace("+asyncpg", "")
-        pg_repo = PostgresQuotaRepository(dsn, pool_size=int(os.environ.get("DB_POOL_SIZE", "10")))
+        pg_repo = PostgresQuotaRepository(dsn, pool_size=settings.DB_POOL_SIZE)
         cached_repo = CachedQuotaRepository(pg_repo)
         _quota_service = QuotaService(cached_repo)
     return _quota_service
@@ -326,6 +330,19 @@ def get_search_service() -> SearchService:
     """Dependency provider for SearchService."""
     from reasoner.application.services.search_service import SearchService
     return SearchService()
+
+# ── Event Bus & Event Store Dependency Providers ──
+
+def get_event_bus(request: Request):
+    """FastAPI dependency: provides the shared EventBus."""
+    from reasoner.application.event_bus.bus import get_event_bus
+    return get_event_bus()
+
+
+def get_event_store(request: Request):
+    """FastAPI dependency: provides the shared EventStore."""
+    from reasoner.infrastructure.persistence.event_store import get_event_store
+    return get_event_store()
 
 
 def _reset_quota_service() -> None:
@@ -389,7 +406,7 @@ async def check_preset_access(
     # For now, fail closed in production to prevent unauthorized access.
     from fastapi import HTTPException
 
-    if os.environ.get("ENVIRONMENT", "development") == "production":
+    if settings.ENVIRONMENT == "production":
         raise HTTPException(
             status_code=403,
             detail=f"Preset access enforcement not yet implemented. Preset: {preset}",
