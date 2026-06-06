@@ -12,8 +12,8 @@ ARCHITECTURAL NOTE:
 """
 
 from __future__ import annotations
-print("[DEBUG] reasoner/rate_limiter.py: Top of file")
 
+import os
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -27,7 +27,6 @@ from reasoner.core.constants import MAX_RATE_LIMIT_BUCKETS # Imported MAX_RATE_L
 
 from reasoner.core.settings import settings
 _REDIS_RATE_LIMITER_ENABLED = settings.RATE_LIMITER_MODE.lower() == "redis"
-print("[DEBUG] reasoner/rate_limiter.py: Before metrics import")
 
 # Temporarily disable metrics import
 _METRICS_AVAILABLE = False
@@ -80,8 +79,6 @@ class RateLimiter:
         is_production = settings.ENVIRONMENT == "production"
 
         if _REDIS_RATE_LIMITER_ENABLED:
-            if is_production:
-                print("[INFO] RateLimiter: Attempting to initialize Redis rate limiter in production.")
             try:
                 self._redis_client = get_redis()
                 script_dir = os.path.join(os.path.dirname(__file__), "infrastructure", "redis", "scripts")
@@ -90,22 +87,17 @@ class RateLimiter:
                     lua_script_content = f.read()
                 self._redis_script = self._redis_client.register_script(lua_script_content)
                 self._redis_available = True
-                print("[DEBUG] RateLimiter: Redis rate limiter enabled and script loaded.")
             except Exception as e:
                 error_msg = f"Failed to connect to Redis or load script for rate limiter: {e}"
                 if is_production:
                     logger.critical(f"CRITICAL: {error_msg} Failing application startup.")
                     raise RuntimeError(f"Critical rate limiter error: {error_msg}") from e
                 else:
-                    print(f"[ERROR] RateLimiter: {error_msg}")
                     self._redis_available = False
-                    print("[DEBUG] RateLimiter: Falling back to in-memory rate limiter.")
         else:
             if is_production:
                 logger.critical("CRITICAL: RATE_LIMITER_MODE is 'memory' in production. This is unsafe. Failing application startup.")
                 raise RuntimeError("Unsafe rate limiter configuration: RATE_LIMITER_MODE=memory in production.")
-            else:
-                print("[DEBUG] RateLimiter: In-memory rate limiter enabled (RATE_LIMITER_MODE=memory).")
 
         # In-memory fallback (always initialized, even if Redis is primary)
         self._buckets: Dict[str, ClientBucket] = defaultdict(ClientBucket)
@@ -151,7 +143,7 @@ class RateLimiter:
             info = {
                 "limit_minute": requests_per_minute,
                 "limit_hour": requests_per_hour,
-                "remaining_minute": requests_per_minute, # Placeholder, cannot calculate accurately from Lua script output directly for remaining *minute* requests without additional ZCARD calls
+                "remaining_minute": 0 if not allowed else requests_per_minute,  # v3.1: Show 0 when rejected (was always showing full limit)
                 "remaining_hour": requests_per_hour, # Same as above
                 "tokens_remaining": tokens_remaining,
                 "retry_after": max(0, retry_after_ms / 1000.0) if retry_after_ms > 0 else None,
@@ -176,6 +168,10 @@ class RateLimiter:
         # This is the original in-memory logic, simplified for the fallback.
         # It needs to be self-contained and not rely on self._lock (which is removed).
         async with self._fallback_lock:
+            # BUG FIX: Use _in_memory_get_bucket so new clients start with burst_size tokens.
+            # Directly accessing self._buckets[client_id] creates a ClientBucket()
+            # with tokens=0.0, causing the first request from every client to be rejected.
+            self._in_memory_get_bucket(client_id)
             bucket = self._buckets[client_id]
             now = time.monotonic()
 
@@ -225,7 +221,13 @@ class RateLimiter:
             if bucket.tokens < requested_tokens:
                 tokens_needed = requested_tokens - bucket.tokens
                 refill_rate = (self.config.requests_per_minute * multiplier) / 60.0
-                info["retry_after"] = tokens_needed / refill_rate
+                # BUG FIX: Floor retry_after to at least 1 to prevent the confusing
+                # "retry_after: 0" case that occurs when tokens refill in <1s.
+                info["retry_after"] = max(1.0, tokens_needed / refill_rate)
+                # BUG FIX: Show actual remaining tokens (not requests_minute) so the
+                # reported remaining reflects the token bucket state, not the clean window.
+                info["remaining_minute"] = int(bucket.tokens)
+                info["remaining_hour"] = int(bucket.tokens)
                 info["reason"] = "burst_limit_fallback"
                 if _METRICS_AVAILABLE:
                     REASONER_RATE_LIMIT_REJECTED.labels(tier="fallback").inc()
@@ -415,6 +417,5 @@ def get_rate_limiter(config: Optional[RateLimitConfig] = None) -> RateLimiter:
     """Get or create global rate limiter."""
     global _rate_limiter
     if _rate_limiter is None: # Removed conditional for _REDIS_RATE_LIMITER_ENABLED as RateLimiter handles it internally
-        print("[DEBUG] reasoner/rate_limiter.py: Instantiating RateLimiter")
         _rate_limiter = RateLimiter(config)
     return _rate_limiter

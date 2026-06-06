@@ -11,13 +11,13 @@ from typing import Any
 import httpx
 
 from reasoner.core.constants import TRUNCATION, YOUTUBE_OEMBED_URL, YOUTUBE_WATCH_BASE_URL
+from reasoner.infrastructure.search.discovery import get_discovery_client
 from reasoner.core.search import (
-    get_discovery_client,
     _should_include_result,
     _normalize_url,
     _bm25_score,
-    _extract_search_keywords,
 )
+from reasoner.infrastructure.search.discovery import _extract_search_keywords
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.parsing import ParseError, extract_json, safe_list
 from reasoner.sanitization import sanitize_for_prompt

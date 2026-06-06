@@ -155,7 +155,7 @@ class PipelineOrchestrator:
             from reasoner.core.settings import settings as app_settings
 
             resp = await client.post(
-                f"{app_settings.internal_api_base_url}/neuro/recall",
+                f"{app_settings.internal_api_base_url}/api/neuro/recall",
                 json={
                     "prompt": problem,
                     "agent_id": agent_id,
@@ -225,7 +225,7 @@ class PipelineOrchestrator:
 
             if synthesis_text:
                 await client.post(
-                    f"{app_settings.internal_api_base_url}/neuro/learn",
+                    f"{app_settings.internal_api_base_url}/api/neuro/learn",
                     json={
                         "prompt": getattr(req, "problem", ""),
                         "response": synthesis_text,

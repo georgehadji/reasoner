@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass, field
 import hashlib
 import json
 import logging
@@ -13,19 +12,16 @@ from typing import Any, AsyncGenerator
 
 from reasoner.core.constants import (
     SSE_FLUSH_INTERVAL,
-    TIMEOUTS,
     TRUNCATION,
-    VALIDATION_TEST_MAX_TOKENS,
     get_phase_retry_budget,
     get_phase_timeout,
 )
 from reasoner.quality import PhaseMonitor, reset_phase_state
 from reasoner.infrastructure.llm.router import ProviderRouter
-from reasoner.infrastructure.llm.registry import _REGISTRY
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.models import TaskType
-from reasoner.pipeline import ReasonerPipeline
 from reasoner.application.services.preset_service import PresetService
+from reasoner.application.services.pipeline_service import PipelineService
 from reasoner.application.services.search_service import SearchService
 from reasoner.application.orchestrator import PipelineOrchestrator
 from reasoner.exceptions import classify_error, is_retryable
@@ -35,11 +31,10 @@ from reasoner.presets import (
 )
 from reasoner.phases._shared import build_followup_context, _wrap_user_input
 
-from .cache import CACHE_DIR, _cache_key, _load_cache, _save_cache
+from .cache import _cache_key, _load_cache, _save_cache
 from .history import HISTORY_DIR, HistoryEntry, _save_history_entry, _save_pipeline_owner
 from reasoner.infrastructure.redis.run_state import _run_state_manager as _run_store
 from reasoner.core.events.domain_events import make_event, EventType
-from reasoner.infrastructure.persistence.event_store import get_event_store
 from .schemas import FollowupRequest, RunRequest
 # SSE protocol helpers shared across streaming endpoints.
 from .sse_utils import _event, _broadcast_ws, _persist_event
@@ -50,39 +45,11 @@ from .phase_executor import (
 )
 
 from .serializers import (
-    _ser_0,
-    _ser_1,
-    _ser_1_5,
-    _ser_5,
     _ser_synthesis,
 )
 
 logger = logging.getLogger(__name__)
 
-# NOTE: We instantiate lazily inside run_stream so that preset module
-# reloads (e.g. after editing preset_registry.py) are picked up by
-# long-running processes.
-_preset_service: PresetService | None = None
-
-
-def _ensure_fresh_preset_service() -> PresetService:
-    """Force-reload preset modules in case a long-running process has stale code."""
-    global _preset_service
-    import importlib
-    import sys
-    # Nuke all preset-related modules from sys.modules so they are re-imported fresh
-    for mod_name in list(sys.modules.keys()):
-        if mod_name.startswith(("reasoner.domain.preset", "reasoner.presets", "reasoner.application.services.preset_service")):
-            del sys.modules[mod_name]
-    # Re-import after eviction
-    import reasoner.domain.preset_registry as _pr_mod  # type: ignore[no-redef]
-    import reasoner.presets as _ps_mod  # type: ignore[no-redef]
-    import reasoner.application.services.preset_service as _svc_mod  # type: ignore[no-redef]
-    importlib.reload(_pr_mod)
-    importlib.reload(_ps_mod)
-    importlib.reload(_svc_mod)
-    _preset_service = _svc_mod.PresetService()
-    return _preset_service
 
 
 def _get_phase_subagents(state: PipelineState, phase_name: str) -> list[dict[str, Any]]:
@@ -340,7 +307,7 @@ async def run_stream(
     pipeline_service: PipelineService | None = None,
 ) -> AsyncGenerator[str, None]:
     if preset_service is None:
-        preset_service = _ensure_fresh_preset_service()
+        preset_service = PresetService()
     if pipeline_service is None:
         from reasoner.application.services.pipeline_service import PipelineService
         pipeline_service = PipelineService()
@@ -350,6 +317,9 @@ async def run_stream(
     state: PipelineState | None = None
     cancel_event = await _run_store.add(run_id, user_id=user_id)
     _save_pipeline_owner(run_id, user_id)
+    # Yield a "connecting" event immediately so the UI has content to render
+    # while the preflight (HyperGate LLM calls) completes.
+    yield _event({"type": "connecting", "message": "Running system check…"})
     try:
         # ── Orchestrator Preflight: preset resolution, HyperGate, neuro recall ──
         orchestrator = PipelineOrchestrator(preset_service, pipeline_service)
@@ -468,6 +438,7 @@ async def run_stream(
         method = state.method or pipeline._get_method_from_preset()
         strategy = flow_factory.get_strategy(method)
         
+        phases: list[tuple[int, str, Any, Any]] = []
         step_metadata: dict[str, dict[str, Any]] = {}
         if strategy:
             for step in strategy.get_phases(state):
@@ -853,7 +824,7 @@ async def run_followup_stream(
 
         client = get_neuro_client()
         await client.post(
-            f"{settings.internal_api_base_url}/neuro/learn",
+            f"{settings.internal_api_base_url}/api/neuro/learn",
             json={
                 "prompt": req.question,
                 "response": (
@@ -882,7 +853,6 @@ async def run_stream_cached(
     pipeline_service: PipelineService | None = None,
 ) -> AsyncGenerator[str, None]:
     if preset_service is None:
-        from reasoner.application.services.preset_service import PresetService
         preset_service = PresetService()
     if pipeline_service is None:
         from reasoner.application.services.pipeline_service import PipelineService
@@ -908,8 +878,16 @@ async def run_stream_cached(
                 logger.info(f"Ignoring cached result for {key} due to stored errors.")
 
     collected: list[dict] = []
-    async for chunk in run_stream(req, user_id=user_id):
+    async for chunk in run_stream(
+        req, 
+        user_id=user_id, 
+        preset_service=preset_service, 
+        pipeline_service=pipeline_service
+    ):
         yield chunk
+        # Force flush after each event so the browser receives SSE events
+        # in real-time instead of buffering them until the buffer fills.
+        await asyncio.sleep(SSE_FLUSH_INTERVAL)
         if chunk.startswith("data: "):
             try:
                 ev = json.loads(chunk[6:])

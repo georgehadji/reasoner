@@ -21,24 +21,29 @@ logger = logging.getLogger(__name__)
 class PostgresSubscriptionRepository:
     """Atomic subscription storage in PostgreSQL."""
 
+    _pool: asyncpg.Pool | None = None
+    _pool_lock: asyncio.Lock | None = None
+
     def __init__(self, dsn: str, pool_size: int = 10):
         self._dsn = dsn
         self._pool_size = pool_size
-        self._pool: asyncpg.Pool | None = None
-        self._pool_lock = asyncio.Lock()
 
     async def _get_pool(self) -> asyncpg.Pool:
-        # BUG-FIX: Prevent race condition where concurrent coroutines create multiple pools.
-        if self._pool is not None:
-            return self._pool
-        async with self._pool_lock:
-            if self._pool is None:
-                self._pool = await asyncpg.create_pool(
+        # Lazy initialize the class-level lock
+        if PostgresSubscriptionRepository._pool_lock is None:
+            PostgresSubscriptionRepository._pool_lock = asyncio.Lock()
+
+        if PostgresSubscriptionRepository._pool is not None:
+            return PostgresSubscriptionRepository._pool
+            
+        async with PostgresSubscriptionRepository._pool_lock:
+            if PostgresSubscriptionRepository._pool is None:
+                PostgresSubscriptionRepository._pool = await asyncpg.create_pool(
                     self._dsn,
                     min_size=1,
                     max_size=self._pool_size,
                 )
-            return self._pool
+            return PostgresSubscriptionRepository._pool
 
     async def upsert_subscription(self, sub: Subscription) -> None:
         """Idempotently update subscription in Postgres.

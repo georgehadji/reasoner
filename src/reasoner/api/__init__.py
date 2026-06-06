@@ -25,17 +25,14 @@ import logging
 
 # Setup logger
 logger = logging.getLogger(__name__)
-print("[DEBUG] api/__init__.py: Logger setup")
 
 # Wire safe-logging filter so ALL output is redacted
 from reasoner.logging_utils import SafeLoggingFilter
 logging.getLogger().addFilter(SafeLoggingFilter())
-print("[DEBUG] api/__init__.py: Logging filter added")
 
 # Initialize Sentry (Critical Enhancement 7.2)
 from reasoner.api.sentry import init_sentry
 init_sentry()
-print("[DEBUG] api/__init__.py: Sentry initialized")
 
 # --- Action 1.2: Observability Strictness & Metrics --- START
 if settings.ENVIRONMENT == "production":
@@ -47,15 +44,11 @@ if settings.ENVIRONMENT == "production":
 from reasoner.api.error_handler import register_exception_handlers
 
 # Security dependencies
-print("[DEBUG] api/__init__.py: Initializing security...")
 security = HTTPBearer(auto_error=False)
-print("[DEBUG] api/__init__.py: Security initialized")
 
 # Import rate limiter and auth
-print("[DEBUG] api/__init__.py: Importing rate limiter and auth managers...")
 from reasoner.rate_limiter import get_rate_limiter, RateLimitConfig
 from reasoner.auth import get_auth_manager, AuthenticationError
-print("[DEBUG] api/__init__.py: Rate limiter and auth managers imported")
 
 from reasoner.api.middleware import SecurityHeadersMiddleware
 
@@ -83,8 +76,10 @@ async def _update_active_users_loop() -> None:
 async def lifespan(app: FastAPI):
     """Application lifespan: startup and shutdown orchestration."""
     # ── Startup ──
-    from reasoner.application.event_bus.bus import init_default_subscribers
-    init_default_subscribers()
+    from reasoner.application.event_bus.bus import init_default_subscribers, get_event_bus
+    bus = get_event_bus()
+    await bus.start()
+    await init_default_subscribers(bus)
 
     from reasoner.infrastructure.websocket import setup_event_bus_integration
     await setup_event_bus_integration()
@@ -151,6 +146,10 @@ async def lifespan(app: FastAPI):
     from reasoner.infrastructure.redis.client import close_redis
     await close_redis()
 
+    # Close shared neuro HTTP client (B4 fix — resource leak)
+    from reasoner.clients import close_neuro_client
+    await close_neuro_client()
+
     # Close health-check Postgres pool
     if _health_postgres_pool is not None:
         await _health_postgres_pool.close()
@@ -159,10 +158,8 @@ async def lifespan(app: FastAPI):
     logger.info("Reasoner shutdown complete")
 
 
-print("[DEBUG] api/__init__.py: Creating FastAPI app...")
 app = FastAPI(title="Reasoner v2.0", lifespan=lifespan)
 register_exception_handlers(app)
-print("[DEBUG] api/__init__.py: FastAPI app created")
 
 # Add security middleware
 app.add_middleware(SecurityHeadersMiddleware)
@@ -200,44 +197,34 @@ app.add_middleware(
 )
 
 # Initialize rate limiter
-print("[DEBUG] api/__init__.py: Initializing rate limiter...")
 rate_limiter = get_rate_limiter(RateLimitConfig(
     requests_per_minute=settings.RATE_LIMIT_PER_MINUTE,
     requests_per_hour=settings.RATE_LIMIT_PER_HOUR,
     burst_size=settings.RATE_LIMIT_BURST,
 ))
-print("[DEBUG] api/__init__.py: Rate limiter initialized")
 
 # Initialize auth manager
-print("[DEBUG] api/__init__.py: Initializing auth manager...")
 auth_manager = get_auth_manager()
-print("[DEBUG] api/__init__.py: Auth manager initialized")
 
 from reasoner.infrastructure.llm.registry import _REGISTRY
 
 # Neuro Integration
-print("[DEBUG] api/__init__.py: Initializing neuro router...")
 from reasoner.neuro.server import create_neuro_router
 app.include_router(create_neuro_router())
-print("[DEBUG] api/__init__.py: Neuro router initialized")
 
-print("[DEBUG] api/__init__.py: Before new architecture integration block")
 # New Architecture Integration
 from reasoner.infrastructure.persistence import get_event_store
 from reasoner.application.handlers import get_handler_registry
 from reasoner.application.queries import (
     GetPipelineStatusQuery,
 )
-print("[DEBUG] api/__init__.py: After new architecture integration block")
 
 
-print("[DEBUG] api/__init__.py: Before widget integrations block")
 # Widget Integrations (legacy fallback)
 
 # Initialize new architecture components
 _event_store = None
 _handler_registry = None
-print("[DEBUG] api/__init__.py: After widget integrations block")
 
 def get_architecture_components():
     """Lazy initialization of new architecture components."""
@@ -304,15 +291,12 @@ def _filter_routing(routing: dict[str, str], primary_id: str) -> dict[str, str]:
 # Per-run cancellation tracking.
 # Encapsulated in RunStateManager for testability and safe async locking.
 # Redis-backed with in-memory fallback (Critical Enhancement 9.1–9.3, 9.7).
-print("[DEBUG] api/__init__.py: Before run state manager import")
 from reasoner.infrastructure.redis.run_state import _run_state_manager as _run_store
-print("[DEBUG] api/__init__.py: After run state manager import")
 
 # ─────────────────────────────────────────────────────────────────────
 # CACHE
 # ─────────────────────────────────────────────────────────────────────
 
-print("[DEBUG] api/__init__.py: Before cache imports")
 from .cache import (
     CACHE_DIR,
     _MEMORY_CACHE,
@@ -321,23 +305,19 @@ from .cache import (
     _load_cache,
     _save_cache,
 )
-print("[DEBUG] api/__init__.py: After cache imports")
 
 
-print("[DEBUG] api/__init__.py: Before schemas imports")
 from reasoner.api.schemas import (
     FollowupRequest,
     RunRequest,
     SearchRequest,
 )
-print("[DEBUG] api/__init__.py: After schemas imports")
 
 
 # ─────────────────────────────────────────────────────────────────────
 # SERIALIZERS — one per phase
 # ─────────────────────────────────────────────────────────────────────
 
-print("[DEBUG] api/__init__.py: Before serializers imports")
 from .serializers import (
     _event,
     _is_debate,
@@ -352,18 +332,14 @@ from .serializers import (
     _ser_4,
     _ser_5,
 )
-print("[DEBUG] api/__init__.py: After serializers imports")
 
 
-print("[DEBUG] api/__init__.py: Before streaming imports")
 from reasoner.api.streaming import (
     run_followup_stream,
     run_stream,
     run_stream_cached,
 )
-print("[DEBUG] api/__init__.py: After streaming imports")
 
-print("[DEBUG] api/__init__.py: Before auth_deps and dependencies imports")
 from reasoner.api.auth_deps import optional_auth, require_csrf
 from reasoner.api.dependencies import (
     check_rate_limit, 
@@ -378,9 +354,7 @@ from reasoner.application.services.preset_service import PresetService
 from reasoner.application.services.pipeline_service import PipelineService
 from reasoner.application.services.search_service import SearchService
 from reasoner.domain.saas import User, QuotaResult
-print("[DEBUG] api/__init__.py: After auth_deps and dependencies imports")
 
-print("[DEBUG] api/__init__.py: Before API Endpoints block")
 # ─────────────────────────────────────────────────────────────────────
 # API Endpoints
 # ─────────────────────────────────────────────────────────────────────
@@ -399,15 +373,20 @@ async def _run_stream_with_metrics(
     pipeline_service: PipelineService,
 ):
     """Wrap run_stream_cached with Prometheus metrics."""
-    from reasoner.metrics import REASONER_QUERIES_TOTAL, QueryTimer
     from reasoner.logging_utils import set_log_context
 
     tier = "anonymous" if user is None else "free"
     preset = req.preset or "auto-budget"
     set_log_context(user_id=str(user.id) if user else None, tier=tier, preset=preset)
 
-    timer = QueryTimer(preset=preset)
-    timer.start()
+    # Metrics are optional — degrade gracefully if QueryTimer is missing
+    timer = None
+    try:
+        from reasoner.metrics import REASONER_QUERIES_TOTAL, QueryTimer
+        timer = QueryTimer(preset=preset)
+        timer.start()
+    except (ImportError, AttributeError):
+        pass
 
     has_error = False
     try:
@@ -422,12 +401,16 @@ async def _run_stream_with_metrics(
         has_error = True
         raise
     finally:
-        timer.observe()
-        REASONER_QUERIES_TOTAL.labels(
-            tier=tier,
-            preset=preset,
-            status="error" if has_error else "success",
-        ).inc()
+        if timer is not None:
+            timer.observe()
+        try:
+            REASONER_QUERIES_TOTAL.labels(
+                tier=tier,
+                preset=preset,
+                status="error" if has_error else "success",
+            ).inc()
+        except NameError:
+            pass
 
 
 def _require_auth_if_legacy_disabled(user: User | None) -> None:
@@ -672,6 +655,9 @@ app.include_router(estimate_router)
 from reasoner.api.routes.errors import router as errors_router
 app.include_router(errors_router)
 
+from reasoner.api.routes.health import router as health_router
+app.include_router(health_router)
+
 # Mount SaaS router
 from reasoner.api import saas_router
 app.include_router(saas_router.router)
@@ -693,7 +679,6 @@ async def _metrics_ip_restricted(request: Request):
         raise HTTPException(status_code=403, detail="Metrics access denied")
 
 app.add_api_route("/api/metrics", metrics_endpoint, methods=["GET"], dependencies=[Depends(_metrics_ip_restricted)])
-print("[DEBUG] api/__init__.py: After API Endpoints block")
 
 
 # ─────────────────────────────────────────────────────────────────────

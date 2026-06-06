@@ -166,6 +166,10 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "riverflow-v2-max-preview":      {"model": "sourceful/riverflow-v2-max-preview", "extra_body": {"include_images": True}},
     "riverflow-v2-standard-preview": {"model": "sourceful/riverflow-v2-standard-preview", "extra_body": {"include_images": True}},
     "riverflow-v2-fast-preview":     {"model": "sourceful/riverflow-v2-fast-preview", "extra_body": {"include_images": True}},
+    # Grok Imagine (xAI)
+    "grok-imagine":               {"model": "x-ai/grok-imagine-image-quality", "extra_body": {"include_images": True}},
+    # MAI-Image (Microsoft)
+    "mai-image-2.5":               {"model": "microsoft/mai-image-2.5", "extra_body": {"include_images": True}},
     # Recraft (vector illustration, icons, design)
     "recraft-v4":                    {"model": "recraft/recraft-v4", "extra_body": {"include_images": True}},
     "recraft-v4-pro":                {"model": "recraft/recraft-v4-pro", "extra_body": {"include_images": True}},

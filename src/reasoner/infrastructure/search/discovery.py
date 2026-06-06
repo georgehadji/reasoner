@@ -119,9 +119,11 @@ def reset_discovery_client() -> None:
     _default_client = None
     if old is not None:
         try:
+            # Running inside an async context — schedule close as a fire-and-forget task.
             loop = asyncio.get_running_loop()
             loop.create_task(old.close())
         except RuntimeError:
+            # No running event loop (CLI, test, sync context) — safe to use asyncio.run().
             try:
                 asyncio.run(old.close())
             except Exception:

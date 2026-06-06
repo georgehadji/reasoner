@@ -100,6 +100,17 @@ class EventBus:
         self._task_queue = asyncio.Queue(maxsize=self._max_queue_size)
         self._running = True
         self._worker_task = asyncio.create_task(self._queue_worker())
+        self._worker_task.add_done_callback(self._on_worker_exit)
+
+    def _on_worker_exit(self, task: asyncio.Task) -> None:
+        """Handle unexpected worker exit."""
+        self._running = False
+        try:
+            task.result()
+        except asyncio.CancelledError:
+            logger.info("Event bus worker task cancelled.")
+        except Exception as exc:
+            logger.critical("Event bus worker task crashed: %s", exc, exc_info=True)
 
     async def stop(self) -> None:
         """Stop the background queue consumer."""
@@ -118,8 +129,10 @@ class EventBus:
         while self._running:
             try:
                 event, handler = await self._task_queue.get()
-                await self._safe_execute(handler, event)
-                self._task_queue.task_done()
+                try:
+                    await self._safe_execute(handler, event)
+                finally:
+                    self._task_queue.task_done()
             except asyncio.CancelledError:
                 break
             except Exception as exc:
@@ -156,9 +169,8 @@ class EventBus:
                         "Critical" if event.is_critical else "Non-critical",
                         event.event_id,
                     )
-                    # For critical events that are dropped due to full queue, also log to dead-letter
-                    if event.is_critical:
-                        asyncio.create_task(self._log_to_dead_letter(event, "Queue full"))
+                    # For critical and non-critical events that are dropped due to full queue, log to dead-letter
+                    asyncio.create_task(self._log_to_dead_letter(event, "Queue full"))
             return
 
         # Execute all handlers concurrently with bounded concurrency

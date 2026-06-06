@@ -5,7 +5,7 @@ import { REASONER_API_BASE } from './server-config';
 import { TIMING } from './config';
 
 // Turbopack cache-bust hash — changing this forces a recompile of routes that import it.
-export const SECURITY_SERVER_HASH = 'v1-8003';
+export const SECURITY_SERVER_HASH = 'v1-8004';
 
 export const VALIDATION_LIMITS = {
   problemMaxLength: 10000,
@@ -19,7 +19,7 @@ export const VALIDATION_LIMITS = {
 };
 
 export const SECURITY_CONSTANTS = {
-  allowedPorts: new Set(['', '80', '443', '8000', '8003', '8080', '3000']),
+  allowedPorts: new Set(['', '80', '443', '8000', '8003', '8004', '8080', '3000']),
   rateLimitWindowMs: 60_000,
   rateLimitMaxEntries: 10_000,
   rateLimitEvictionBatch: 100,

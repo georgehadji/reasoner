@@ -319,16 +319,16 @@ IMAGE_GEN_REMOTE_TIMEOUT_SECONDS: float = 20.0
 IMAGE_GEN_COMPLETION_TIMEOUT_SECONDS: float = 90.0
 IMAGE_GEN_ENHANCEMENT_MODEL: str = MODEL_GEMINI_FLASH
 IMAGE_GEN_PRESETS: dict[str, list[str]] = {
-    "budget": ["riverflow-v2-fast-preview", "gemini-flash-image"],
+    "budget": ["grok-imagine", "riverflow-v2-fast-preview", "gemini-flash-image"],
     "premium": ["gpt-5.4-image-2", "recraft-v4.1-pro"],
-    IMAGE_GEN_BUDGET_PRESET: ["riverflow-v2-fast-preview", "gemini-flash-image"],
+    IMAGE_GEN_BUDGET_PRESET: ["grok-imagine", "riverflow-v2-fast-preview", "gemini-flash-image"],
     IMAGE_GEN_PREMIUM_PRESET: ["gpt-5.4-image-2", "recraft-v4.1-pro"],
 }
 IMAGE_GEN_FALLBACKS: dict[str, list[str]] = {
     "budget": ["seedream-4.5", "flux.2-pro", "recraft-v4.1-utility"],
-    "premium": ["gpt-5-image", "gemini-3.1-flash-image-preview", "recraft-v4-pro"],
+    "premium": ["gpt-5-image", "gemini-3.1-flash-image-preview", "mai-image-2.5", "recraft-v4-pro"],
     IMAGE_GEN_BUDGET_PRESET: ["seedream-4.5", "flux.2-pro", "recraft-v4.1-utility"],
-    IMAGE_GEN_PREMIUM_PRESET: ["gpt-5-image", "gemini-3.1-flash-image-preview", "recraft-v4-pro"],
+    IMAGE_GEN_PREMIUM_PRESET: ["gpt-5-image", "gemini-3.1-flash-image-preview", "mai-image-2.5", "recraft-v4-pro"],
 }
 IMAGE_GEN_ENHANCEMENT_SYSTEM_PROMPT: str = ""  # moved to constants_prompts.py
 IMAGE_GEN_POLICY_REWRITE_SYSTEM_PROMPT: str = ""  # moved to constants_prompts.py

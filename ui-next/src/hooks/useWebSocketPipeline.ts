@@ -5,8 +5,14 @@ import { PhaseEvent } from '@/lib/types';
 import { WS } from '@/lib/config';
 import { REASONER_WS_URL } from '@/lib/server-config';
 import { getAuthToken } from '@/lib/auth';
+import { fetchWithCsrf } from '@/lib/security-client';
 
-export type ConnectionStatus = 'idle' | 'connecting' | 'connected' | 'disconnected' | 'reconnecting';
+export type ConnectionStatus = 'idle' | 'connecting' | 'connected' | 'disconnected' | 'reconnecting' | 'error';
+
+export interface ConnectionInfo {
+  status: ConnectionStatus;
+  lastError: string | null;
+}
 
 export function useWebSocketPipeline() {
   const wsRef = useRef<WebSocket | null>(null);
@@ -17,6 +23,7 @@ export function useWebSocketPipeline() {
   const doConnectRef = useRef<(pipelineId: string, onEvent: (ev: PhaseEvent) => void) => void>(undefined);
 
   const [status, setStatus] = useState<ConnectionStatus>('idle');
+  const [lastError, setLastError] = useState<string | null>(null);
 
   const clearReconnect = useCallback(() => {
     if (reconnectTimerRef.current) {
@@ -25,10 +32,37 @@ export function useWebSocketPipeline() {
     }
   }, []);
 
+  const lastErrorRef = useRef<string | null>(null);
+
   const doConnect = useCallback(async (pipelineId: string, onEvent: (ev: PhaseEvent) => void) => {
     clearReconnect();
     pipelineIdRef.current = pipelineId;
     onEventRef.current = onEvent;
+
+    // Pre-check: is the backend reachable?
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    try {
+      const healthResp = await fetchWithCsrf('/api/neuro/health', { signal: controller.signal });
+      if (!healthResp.ok) {
+        const msg = `Backend returned ${healthResp.status} — cannot establish WebSocket`;
+        setLastError(msg);
+        lastErrorRef.current = msg;
+        setStatus('error');
+        clearTimeout(timeoutId);
+        return;
+      }
+    } catch {
+      const msg = `Backend unreachable at ${REASONER_WS_URL} — is the server running?`;
+      setLastError(msg);
+      lastErrorRef.current = msg;
+      setStatus('error');
+      clearTimeout(timeoutId);
+      return;
+    }
+    clearTimeout(timeoutId);
+    setLastError(null);
+    lastErrorRef.current = null;
 
     if (wsRef.current) {
       wsRef.current.close();
@@ -62,9 +96,12 @@ export function useWebSocketPipeline() {
       }
     };
 
-    ws.onerror = (err) => {
+    ws.onerror = (_err: Event) => {
+      // Browser WebSocket error events are intentionally opaque (no detail exposed for security).
+      // Diagnose the likely cause by checking backend health.
+      const msg = lastErrorRef.current || 'WebSocket connection failed';
       // eslint-disable-next-line no-console
-      console.error('[WebSocket] error:', err);
+      console.error('[WebSocket] error:', msg);
     };
 
     ws.onclose = () => {
@@ -127,5 +164,5 @@ export function useWebSocketPipeline() {
     };
   }, [clearReconnect]);
 
-  return { connect, disconnect, sendStop, status };
+  return { connect, disconnect, sendStop, status, lastError };
 }

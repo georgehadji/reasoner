@@ -211,7 +211,7 @@ export default function ChatPage() {
 
   const { history, refresh: refreshHistory, remove: removeHistory } = useConversationHistory();
   const { startRun, startFollowup, stopRun } = usePipelineStream();
-  const { connect: wsConnect, disconnect: wsDisconnect, sendStop: wsSendStop, status: wsStatus } = useWebSocketPipeline();
+  const { connect: wsConnect, disconnect: wsDisconnect, sendStop: wsSendStop, status: wsStatus, lastError: wsLastError } = useWebSocketPipeline();
   const serverOnline = useServerStatus();
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
@@ -1025,13 +1025,15 @@ export default function ChatPage() {
             </Tooltip>
             {wsStatus !== 'idle' && (
               <div className="flex items-center gap-1.5">
-                <Tooltip text={`WebSocket: ${wsStatus}`}>
+                <Tooltip text={wsStatus === 'error' && wsLastError ? wsLastError : `WebSocket: ${wsStatus}`}>
                   <div
                     className={`h-2 w-2 rounded-full ${
                       wsStatus === 'connected'
                         ? 'bg-[#22C55E]'
                         : wsStatus === 'reconnecting'
                         ? 'bg-[#A0A0A0] animate-pulse'
+                        : wsStatus === 'error'
+                        ? 'bg-[#EF4444]'
                         : 'bg-gray-400'
                     }`}
                     aria-label={`WebSocket ${wsStatus}`}

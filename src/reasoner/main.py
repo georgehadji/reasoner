@@ -55,6 +55,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from reasoner.application.orchestrator import PipelineOrchestrator
+from reasoner.application.services.preset_service import PresetService
 from reasoner.renderer import export_to_json, render_pipeline_result
 from reasoner.infrastructure.llm.registry import list_models
 from reasoner.core.settings import settings  # triggers dotenv load

@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
-import { REASONER_API_BASE } from '@/lib/server-config';
+import { getApiBaseUrl, validateUpstreamUrl } from '@/lib/security-server';
+import { API } from '@/lib/config';
 
 export async function GET(request: Request) {
   try {
-    const upstream = new URL(`${REASONER_API_BASE}/neuro/health`);
+    const apiBase = validateUpstreamUrl(getApiBaseUrl());
+    const upstream = new URL(`${apiBase}${API.NEURO_HEALTH}`);
 
     const resp = await fetch(upstream.toString(), {
       headers: {

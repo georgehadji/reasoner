@@ -206,6 +206,7 @@ export const EXAMPLE_PROMPTS: string[] = [
 ];
 
 export const API = {
+  HEALTH: '/api/health',
   RUN: '/api/run',
   RUN_FOLLOWUP: '/api/run-followup',
   STOP: '/api/stop',
@@ -247,7 +248,7 @@ export const LIMITS = {
 };
 
 export const WS = {
-  defaultUrl: 'ws://localhost:8003/ws',
+  defaultUrl: 'ws://127.0.0.1:8003/ws',
   maxReconnectAttempts: 5,
   baseReconnectDelayMs: 1000,
 };

@@ -15,7 +15,13 @@ def get_redis() -> aioredis.Redis:
     global _pool
     if _pool is None:
         url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
-        _pool = aioredis.from_url(url, decode_responses=True)
+        # Add timeouts to prevent long hangs when Redis is unreachable (Critical for local dev)
+        _pool = aioredis.from_url(
+            url,
+            decode_responses=True,
+            socket_connect_timeout=2.0,
+            socket_timeout=2.0,
+        )
     return _pool
 
 

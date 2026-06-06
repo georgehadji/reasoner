@@ -14,8 +14,8 @@ export async function GET(req: NextRequest) {
     const headers = sanitizeRequestHeaders(req.headers);
     const upstream = await fetch(`${apiBase}/api/billing/subscription`, { headers });
 
-    // Auth not configured (local dev without Supabase) → return free tier default
-    if (upstream.status === 401 || upstream.status === 403) {
+    // Auth not configured or route not found → return free tier default
+    if (upstream.status === 401 || upstream.status === 403 || upstream.status === 404) {
       return NextResponse.json(DEFAULT_FREE_SUBSCRIPTION);
     }
 

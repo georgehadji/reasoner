@@ -24,26 +24,30 @@ logger = logging.getLogger(__name__)
 class PostgresQuotaRepository(QuotaRepository):
     """Atomic quota storage in PostgreSQL."""
 
+    _pool: asyncpg.Pool | None = None
+    _pool_lock: asyncio.Lock | None = None
+
     def __init__(self, dsn: str, pool_size: int | None = None):
         self._dsn = dsn
         self._pool_size = pool_size if pool_size is not None else int(
             os.environ.get("DB_POOL_SIZE", "10")
         )
-        self._pool: asyncpg.Pool | None = None
-        self._pool_lock = asyncio.Lock()
 
     async def _get_pool(self) -> asyncpg.Pool:
-        # BUG-FIX: Prevent race condition where concurrent coroutines create multiple pools.
-        if self._pool is not None:
-            return self._pool
-        async with self._pool_lock:
-            if self._pool is None:
-                self._pool = await asyncpg.create_pool(
+        if PostgresQuotaRepository._pool_lock is None:
+            PostgresQuotaRepository._pool_lock = asyncio.Lock()
+
+        if PostgresQuotaRepository._pool is not None:
+            return PostgresQuotaRepository._pool
+            
+        async with PostgresQuotaRepository._pool_lock:
+            if PostgresQuotaRepository._pool is None:
+                PostgresQuotaRepository._pool = await asyncpg.create_pool(
                     self._dsn,
                     min_size=1,
                     max_size=self._pool_size,
                 )
-            return self._pool
+            return PostgresQuotaRepository._pool
 
     async def get_quota(self, user_id: str) -> UsageQuota:
         pool = await self._get_pool()

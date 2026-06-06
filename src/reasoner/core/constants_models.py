@@ -19,6 +19,12 @@ MODEL_RECRAFT_V4: str = "recraft-v4"
 MODEL_RECRAFT_V4_PRO: str = "recraft-v4-pro"
 MODEL_RECRAFT_V41: str = "recraft-v4.1"
 MODEL_RECRAFT_V41_PRO: str = "recraft-v4.1-pro"
+MODEL_RECRAFT_V41_UTILITY: str = "recraft-v4.1-utility"
+MODEL_RECRAFT_V41_UTILITY_PRO: str = "recraft-v4.1-utility-pro"
+# Grok (xAI)
+MODEL_GROK_IMAGINE: str = "grok-imagine"
+# Microsoft
+MODEL_MAI_IMAGE_25: str = "mai-image-2.5"
 
 # Qwen (temperature-supporting, non-OpenAI)
 MODEL_QWEN35_FLASH: str = "qwen3.5-flash"

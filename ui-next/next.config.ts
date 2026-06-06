@@ -13,7 +13,7 @@ const HSTS_VALUE = 'max-age=31536000; includeSubDomains; preload';
 
 // Build CSP connect-src from environment: include the WebSocket URL if set
 function buildCsp(): string {
-  const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://127.0.0.1:8001/ws';
+  const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://127.0.0.1:8003/ws';
 
   // Collect all WebSocket origins that should be allowed
   const wsOrigins = new Set<string>();
@@ -21,7 +21,7 @@ function buildCsp(): string {
   // 1. Always include common dev ports — both localhost and 127.0.0.1 since
   //    browsers treat them as different origins. Handles cases where next.config
   //    doesn't reliably read .env.local at startup.
-  const DEV_PORTS = ['8000', '8001'];
+  const DEV_PORTS = ['8000', '8001', '8003'];
   for (const port of DEV_PORTS) {
     wsOrigins.add(`ws://localhost:${port}`);
     wsOrigins.add(`ws://127.0.0.1:${port}`);

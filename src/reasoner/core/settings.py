@@ -106,7 +106,7 @@ class Settings:
     # ── CORS ──
     CORS_ORIGINS: str = os.getenv(
         "CORS_ORIGINS",
-        "http://localhost:3000,http://localhost:8003,http://127.0.0.1:8003"
+        "http://localhost:3000,http://localhost:8003,http://127.0.0.1:8003,http://localhost:8004,http://127.0.0.1:8004"
     )
 
     # ── DeepL Translation ──

@@ -35,7 +35,7 @@ def _safe_num(value):
 def status():
     """Check health and statistics."""
     cfg = load_config()
-    url = f"http://{cfg.server.host}:{cfg.server.port}/neuro/health"
+    url = f"http://{cfg.server.host}:{cfg.server.port}/api/neuro/health"
     
     try:
         resp = httpx.get(url, timeout=5.0)
@@ -62,11 +62,20 @@ def status():
 def start(host, port):
     """Start the memory engine server."""
     import uvicorn
+    from fastapi import FastAPI
+    from reasoner.neuro.server import create_neuro_router
+    
     cfg = load_config()
     h = host or cfg.server.host
     p = port or cfg.server.port
+    
+    def app_factory():
+        app = FastAPI(title="Neuro Memory Engine")
+        app.include_router(create_neuro_router(cfg))
+        return app
+        
     console.print(f"[cyan]Starting Neuro Engine on {h}:{p}...[/cyan]")
-    uvicorn.run("reasoner.neuro.server:create_neuro_router", host=h, port=p, factory=True)
+    uvicorn.run(app_factory, host=h, port=p, factory=True)
 
 if __name__ == "__main__":
     main()
