@@ -7,6 +7,7 @@ from typing import Any
 
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.parsing import extract_json
+from reasoner.core.parsing import ParseError
 import reasoner.phases as phases
 from reasoner.application.flows.base import WorkflowServices
 
@@ -242,7 +243,13 @@ async def run_analogical_abstraction_phase(state: PipelineState, services: Workf
         user_prompt=phases.analogical_abstraction_prompt(state), 
         state=state
     )
-    data = extract_json(raw)
+    try:
+        data = extract_json(raw)
+    except ParseError:
+        import re as _re
+        # Graceful degradation: pull the abstract_structure string directly from raw text
+        m = _re.search(r'"abstract_structure"\s*:\s*"((?:[^"\\]|\\.)*)"', raw, _re.DOTALL)
+        data = {"abstract_structure": m.group(1) if m else raw[:500]}
     state.analogical_state["abstract_structure"] = data.get("abstract_structure", "") or ""
     state.analogical_state["constraints"] = data.get("constraints", [])
     state.analogical_state["objectives"] = data.get("objectives", [])
@@ -258,7 +265,10 @@ async def run_analogical_domain_search_phase(state: PipelineState, services: Wor
         user_prompt=phases.analogical_domain_search_prompt(state), 
         state=state
     )
-    data = extract_json(raw)
+    try:
+        data = extract_json(raw)
+    except ParseError:
+        data = {}
     _raw_domains = data.get("source_domains", [])
     state.analogical_state["source_domains"] = _raw_domains if isinstance(_raw_domains, list) else []
 
@@ -272,7 +282,10 @@ async def run_analogical_mapping_phase(state: PipelineState, services: WorkflowS
         user_prompt=phases.analogical_mapping_prompt(state), 
         state=state
     )
-    data = extract_json(raw)
+    try:
+        data = extract_json(raw)
+    except ParseError:
+        data = {}
     _raw_mappings = data.get("analogy_mappings", [])
     state.analogical_state["analogy_mappings"] = _raw_mappings if isinstance(_raw_mappings, list) else []
     state.analogical_state["unmapped_elements"] = data.get("unmapped_elements", [])
@@ -288,8 +301,10 @@ async def run_analogical_transfer_phase(state: PipelineState, services: Workflow
         user_prompt=phases.analogical_transfer_prompt(state), 
         state=state
     )
-    data = extract_json(raw)
-    
+    try:
+        data = extract_json(raw)
+    except ParseError:
+        data = {}
     if isinstance(data, str):
         data = {"transferred_solution": data}
 

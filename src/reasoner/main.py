@@ -203,7 +203,14 @@ async def main(args: argparse.Namespace) -> None:
             from reasoner.infrastructure.search.discovery import get_discovery_client
             try:
                 client, _ = await get_discovery_client(source_type="general")
-                results = await client.search(problem, num_results=10, source_type="general")
+                if settings.PRISM_RESEARCHER_ENABLED:
+                    from reasoner.application.flows.prism_research import run_prism_standalone
+                    print("  [Prism] Iterative research mode active.\n")
+                    results, _ = await run_prism_standalone(
+                        problem, preflight.router, client, mode="balanced"
+                    )
+                else:
+                    results = await client.search(problem, num_results=10, source_type="general")
             except Exception as exc:
                 logger.warning("Web search failed: %s", exc)
                 results = []

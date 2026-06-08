@@ -48,6 +48,28 @@ _CREATIVE_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"\b(πες\s+μου|φτιάξε\s+μου|γράψε\s+μου)\s+(μια\s+)?(ιστορία|αφήγηση|ανέκδοτο)\b", re.I),
 ]
 
+# Fast-path patterns for clearly real-time queries that require a live web search.
+# Checked before factual and writing patterns so temporal queries are never mislabeled.
+_REALTIME_PATTERNS: list[re.Pattern[str]] = [
+    # Price / market data with explicit temporal marker
+    re.compile(r"\bprice\b.{0,30}\b(now|today|right now|currently|live)\b", re.I),
+    re.compile(r"\b(now|today|right now|currently|live)\b.{0,30}\bprice\b", re.I),
+    re.compile(r"\b(current|live|real.?time)\s+(price|rate|exchange rate|value|cost)\b", re.I),
+    # News and recent events
+    re.compile(r"\b(latest|breaking|today'?s?|current)\s+(news|headline|update|development)\b", re.I),
+    re.compile(r"\bnews\b.{0,20}\b(today|right now|latest|breaking)\b", re.I),
+    re.compile(r"\blatest\b.{0,50}\b(release|launch|update|announcement|version)\b", re.I),
+    # Weather
+    re.compile(r"\b(weather|temperature|forecast)\b.{0,25}\b(today|now|right now|this week|tomorrow)\b", re.I),
+    re.compile(r"\b(today'?s?|current|live)\s+weather\b", re.I),
+    # Sports live scores
+    re.compile(r"\b(live|current)\s+(score|match|game|result|standings?)\b", re.I),
+    re.compile(r"\b(score|result)\b.{0,20}\b(live|now|today)\b", re.I),
+    # Greek
+    re.compile(r"\b(τελευταία|πρόσφατη?|σημερινή)\s+(είδηση|νέα|τιμή|ανακοίνωση)\b", re.I),
+    re.compile(r"\b(τρέχουσα|ζωντανή)\s+(τιμή|αποτέλεσμα)\b", re.I),
+]
+
 # Fast-path patterns for simple factual lookups that can be answered directly
 # by a knowledge model (no web search or multi-phase reasoning needed).
 _FACTUAL_PATTERNS: list[re.Pattern[str]] = [
@@ -151,25 +173,9 @@ class HyperGateAgent:
                 complexity="simple"
             )
 
-        # Fast-path: simple factual lookups (e.g., "What is X?")
-        # If it's a short, simple factual question, bypass the pipeline
-        if any(p.search(problem) for p in _FACTUAL_PATTERNS) and len(problem) < 60:
-            decision = GateDecision(
-                action="direct",
-                method=None,
-                confidence=0.95,
-                reasoning="Detected simple factual lookup, assumed direct answer",
-                complexity="simple"
-            )
-            self._cache[problem_hash] = decision
-            logger.info(
-                "HyperGateAgent fast-path: factual-lookup hash=%s action=direct",
-                problem_hash[:16],
-            )
-            return decision
-
         # Fast-path: research-backed writing (articles/essays/blog posts/reports)
-        if _WRITING_INTENT.search(problem) or any(p.search(problem) for p in _RESEARCH_INDICATORS):
+        # Checked first so "write an article about latest news" routes to writing, not web_search.
+        if _WRITING_INTENT.search(problem):
             decision = GateDecision(
                 action="pipeline",
                 method="writing",
@@ -180,6 +186,38 @@ class HyperGateAgent:
             self._cache[problem_hash] = decision
             logger.info(
                 "HyperGateAgent fast-path: writing-intent hash=%s action=pipeline method=writing",
+                problem_hash[:16],
+            )
+            return decision
+
+        # Fast-path: obvious real-time data queries (prices, live news, weather, scores)
+        if any(p.search(problem) for p in _REALTIME_PATTERNS):
+            decision = GateDecision(
+                action="web_search",
+                method=None,
+                confidence=0.92,
+                reasoning="Detected real-time data query (prices/news/weather/scores)",
+                complexity="simple",
+            )
+            self._cache[problem_hash] = decision
+            logger.info(
+                "HyperGateAgent fast-path: realtime hash=%s action=web_search",
+                problem_hash[:16],
+            )
+            return decision
+
+        # Fast-path: simple factual lookups (e.g., "What is X?")
+        if any(p.search(problem) for p in _FACTUAL_PATTERNS) and len(problem) < 60:
+            decision = GateDecision(
+                action="direct",
+                method=None,
+                confidence=0.95,
+                reasoning="Detected simple factual lookup, assumed direct answer",
+                complexity="simple",
+            )
+            self._cache[problem_hash] = decision
+            logger.info(
+                "HyperGateAgent fast-path: factual-lookup hash=%s action=direct",
                 problem_hash[:16],
             )
             return decision
@@ -266,8 +304,10 @@ class HyperGateAgent:
             and complexity != "simple"
         )
 
-        # Overlap: web search need + research pipeline method — let TieBreaker decide.
-        web_research_overlap = needs_search and category == "G"
+        # Overlap: web search need + research pipeline method — defer to TieBreaker,
+        # but only when WebDetector is not clearly confident. A high web_conf (≥ 0.85)
+        # means the query is plainly real-time and wins over the research method label.
+        web_research_overlap = needs_search and category == "G" and web_conf < 0.85
 
         # Step 1 — direct answer
         if (

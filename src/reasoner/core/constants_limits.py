@@ -58,7 +58,7 @@ GATE_DEFAULT_MODEL: str = "gemini-flash"  # non-OpenAI model that supports tempe
 # ═════════════════════════════════════════════════════════════════════
 
 HYPERGATE_DIRECT_THRESHOLD: float = 0.80   # DirectDetector confidence floor
-HYPERGATE_WEB_THRESHOLD: float = 0.75      # WebDetector confidence floor
+HYPERGATE_WEB_THRESHOLD: float = 0.65      # WebDetector confidence floor
 HYPERGATE_METHOD_THRESHOLD: float = 0.70   # MethodClassifier confidence floor
 HYPERGATE_AMBIGUOUS_FLOOR: float = 0.45    # Below this on all agents → hard fallback
 HYPERGATE_TIMEOUT_SECONDS: float = 6.0     # Per-sub-agent call timeout
@@ -360,3 +360,8 @@ MAX_PROBLEM_DISPLAY_CHARS: int = 120
 
 MAX_EXPRESSION_DEPTH: int = 100
 MAX_EXPRESSION_LENGTH: int = 10000
+
+# ── Event Store Compaction ──────────────────────────────────────────
+EVENT_RETENTION_DAYS: int = 365
+SNAPSHOT_RETENTION_COUNT: int = 3   # reserved — current schema supports only 1 snapshot/aggregate
+COMPACTION_BATCH_SIZE: int = 500

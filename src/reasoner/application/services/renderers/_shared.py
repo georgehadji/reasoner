@@ -29,7 +29,9 @@ from reasoner.models import (
     PerspectiveType,
 )
 
-console = Console()
+import sys as _sys, io as _io
+_stdout_utf8 = _io.TextIOWrapper(_sys.stdout.buffer, encoding="utf-8", errors="replace") if hasattr(_sys.stdout, "buffer") else _sys.stdout
+console = Console(highlight=False, emoji=False, file=_stdout_utf8)
 
 
 # ─────────────────────────────────────────────────────────────────────

@@ -91,7 +91,7 @@ def _render_analogical(state: PipelineState) -> None:
         if adaptations:
             content.append("\nAdaptations Required:\n", style="bold yellow")
             for adap in adaptations:
-                content.append(f"  ⟳ {adap}\n", style="yellow")
+                content.append(f"  ~ {adap}\n", style="yellow")
         caveats = a.get("caveats", [])
         if caveats:
             content.append("\nCaveats:\n", style="bold dim")
@@ -116,7 +116,7 @@ def _render_analogical(state: PipelineState) -> None:
         content = Text()
         content.append("Where the analogy breaks down:\n", style="bold red")
         for b in broken:
-            content.append(f"  ✗ {b}\n", style="red")
+            content.append(f"  x {b}\n", style="red")
         unmapped = a.get("unmapped_elements", [])
         if unmapped:
             content.append("\nUnmapped Source Elements:\n", style="bold dim")
