@@ -74,6 +74,11 @@ class Settings:
     COHERE_RERANK_ENABLED: bool = os.getenv("COHERE_RERANK_ENABLED", "true").lower() in ("1", "true", "yes")
     COHERE_RERANK_MODEL: str = os.getenv("COHERE_RERANK_MODEL", "cohere/rerank-4-fast")
 
+    # ── Prism Integration ──
+    PRISM_RESEARCHER_ENABLED: bool = os.getenv("PRISM_RESEARCHER_ENABLED", "false").lower() in ("1", "true", "yes")
+    PRISM_CLASSIFIER_ENABLED: bool = os.getenv("PRISM_CLASSIFIER_ENABLED", "false").lower() in ("1", "true", "yes")
+    PRISM_FILE_SEARCH_ENABLED: bool = os.getenv("PRISM_FILE_SEARCH_ENABLED", "false").lower() in ("1", "true", "yes")
+
     # ── Document Semantic Retrieval (Phase 4, opt-in) ──
     DOCUMENT_SEMANTIC_RETRIEVAL_ENABLED: bool = os.getenv("DOCUMENT_SEMANTIC_RETRIEVAL_ENABLED", "false").lower() in ("1", "true", "yes")
     DOCUMENT_CHUNK_SIZE: int = int(os.getenv("DOCUMENT_CHUNK_SIZE", "1000"))
@@ -91,6 +96,7 @@ class Settings:
     CSRF_SECRET: str | None = os.getenv("CSRF_SECRET")
     CSRF_ENFORCE_BACKEND: bool = os.getenv("CSRF_ENFORCE_BACKEND", "true").lower() in ("1", "true", "yes")
 
+
     # ── Auth / Supabase ──
     AUTH_PERSISTENCE_ENABLED: bool = os.getenv("AUTH_PERSISTENCE_ENABLED", "false").lower() in ("1", "true", "yes")
     AUTH_DB_PATH: str = os.getenv("AUTH_DB_PATH", "src/reasoner/auth_keys.db")
@@ -101,6 +107,9 @@ class Settings:
 
     # ── Rate Limiter / Circuit Breaker Mode ──
     RATE_LIMITER_MODE: str = os.getenv("RATE_LIMITER_MODE", "redis")
+    # "fail_closed": deny requests when Redis is down (safe default; prevents 4× bypass on multi-worker)
+    # "fail_open": fall back to per-worker in-memory limiting (allows bypass, but keeps service running)
+    RATE_LIMITER_REDIS_FAILURE_MODE: str = os.getenv("RATE_LIMITER_REDIS_FAILURE_MODE", "fail_closed")
     CIRCUIT_BREAKER_MODE: str = os.getenv("CIRCUIT_BREAKER_MODE", "redis")
 
     # ── CORS ──
@@ -152,6 +161,11 @@ class Settings:
 
     # ── Database ──
     DATABASE_URL: str = os.getenv("DATABASE_URL", "")
+
+    # ── Event Store Compaction ──
+    COMPACTION_ENABLED: bool = os.getenv("COMPACTION_ENABLED", "true").lower() in ("1", "true", "yes")
+    COMPACTION_RUN_HOUR_UTC: int = int(os.getenv("COMPACTION_RUN_HOUR_UTC", "3"))
+    EVENT_RETENTION_DAYS: int = int(os.getenv("EVENT_RETENTION_DAYS", "365"))
     DB_POOL_SIZE: int = int(os.getenv("DB_POOL_SIZE", "50"))
 
     @property
@@ -181,3 +195,10 @@ class Settings:
 
 
 settings = Settings()
+
+# Fail fast at startup if CSRF protection is enabled but no secret is configured.
+if settings.CSRF_ENFORCE_BACKEND and not settings.CSRF_SECRET:
+    raise RuntimeError(
+        "CSRF_SECRET environment variable must be set when CSRF_ENFORCE_BACKEND=true. "
+        "Set CSRF_ENFORCE_BACKEND=false to disable CSRF protection (development only)."
+    )

@@ -15,7 +15,6 @@ from reasoner.api.dependencies import (
 from reasoner.api.schemas import ContextAnalysisRequest
 from reasoner.domain.saas import User
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.pipeline import ReasonerPipeline
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -53,19 +52,32 @@ async def run_with_context(
 
     try:
         from reasoner.application.services.preset_service import PresetService
+        from reasoner.application.services.pipeline_service import PipelineService
+        from reasoner.application.orchestrator import PipelineOrchestrator
 
         _preset_service = PresetService()
+        _orchestrator = PipelineOrchestrator(
+            preset_service=_preset_service,
+            pipeline_service=PipelineService(),
+        )
 
-        # Get preset and build router
-        _, router = _preset_service.build_router(req.preset)
+        # Resolve preset and build router via orchestrator
+        effective_preset, _router = _preset_service.build_router(req.preset)
 
-        # Create pipeline
-        pipeline = ReasonerPipeline(
-            router=router,
+        from reasoner.application.orchestrator import PreflightDecision
+        _decision = PreflightDecision(
+            action="pipeline",
+            router=_router,
+            effective_preset_name=effective_preset,
+            problem=req.problem,
+        )
+
+        # Create pipeline via orchestrator (removes direct ReasonerPipeline import)
+        pipeline = _orchestrator.create_pipeline(
+            _decision,
             top_k=req.top_k,
             parallel_perspectives=True,
             verbose=False,
-            preset_name=req.preset,
             domain=req.domain if hasattr(req, "domain") else None,
         )
 

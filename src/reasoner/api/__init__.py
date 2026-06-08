@@ -122,9 +122,40 @@ async def lifespan(app: FastAPI):
     # Background task: update active users gauge (Critical Enhancement 7.3)
     _active_users_task = asyncio.create_task(_update_active_users_loop())
 
+    # Background task: token cache eviction (B-18 fix)
+    from reasoner.infrastructure.token_cache import get_token_cache
+    _token_cache = get_token_cache()
+    _cache_cleanup_task = await _token_cache.start_background_cleanup(interval_seconds=300)
+
+    # Background task: nightly event store compaction (P2-A)
+    from reasoner.application.services.compaction_service import run_nightly_compaction_loop
+    if settings.DATABASE_URL:
+        from reasoner.infrastructure.persistence.postgres_store import PostgreSQLEventStore
+        _compaction_store = PostgreSQLEventStore(settings.DATABASE_URL)
+        await _compaction_store.initialize()
+    else:
+        from reasoner.infrastructure.persistence.event_store import get_event_store
+        _compaction_store = get_event_store()
+    _compaction_task = asyncio.create_task(
+        run_nightly_compaction_loop(_compaction_store),
+        name="event_store_compaction",
+    )
+
     yield
 
-    # Cancel background task on shutdown
+    # Cancel background tasks on shutdown (reverse order)
+    _compaction_task.cancel()
+    try:
+        await _compaction_task
+    except asyncio.CancelledError:
+        pass
+
+    _cache_cleanup_task.cancel()
+    try:
+        await _cache_cleanup_task
+    except asyncio.CancelledError:
+        pass
+
     _active_users_task.cancel()
     try:
         await _active_users_task
@@ -367,7 +398,8 @@ async def get_csrf_token():
 
 
 async def _run_stream_with_metrics(
-    req: RunRequest, 
+    req: RunRequest,
+    request: Request,
     user: User | None,
     preset_service: PresetService,
     pipeline_service: PipelineService,
@@ -391,7 +423,8 @@ async def _run_stream_with_metrics(
     has_error = False
     try:
         async for chunk in run_stream_cached(
-            req, 
+            req,
+            request=request,
             user_id=str(user.id) if user else None,
             preset_service=preset_service,
             pipeline_service=pipeline_service,
@@ -451,7 +484,7 @@ async def run_pipeline(
             )
     # TODO(#502): use actual user tier from subscription DB
     return StreamingResponse(
-        _run_stream_with_metrics(req, user, preset_service, pipeline_service),
+        _run_stream_with_metrics(req, request, user, preset_service, pipeline_service),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -475,7 +508,7 @@ async def run_followup_pipeline(
     """
     _require_auth_if_legacy_disabled(user)
     return StreamingResponse(
-        run_followup_stream(req, user_id=str(user.id) if user else None),
+        run_followup_stream(req, request=request, user_id=str(user.id) if user else None),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -657,6 +690,9 @@ app.include_router(errors_router)
 
 from reasoner.api.routes.health import router as health_router
 app.include_router(health_router)
+
+from reasoner.api.routes.admin import router as admin_router
+app.include_router(admin_router)
 
 # Mount SaaS router
 from reasoner.api import saas_router

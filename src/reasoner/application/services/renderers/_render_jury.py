@@ -26,7 +26,8 @@ def _render_jury(state: PipelineState) -> None:
         gen_table.add_column("Approach", style="white")
 
         for gc in state.generation_candidates:
-            conf_bar = "█" * int(gc.confidence * 10) + "░" * (10 - int(gc.confidence * 10))
+            filled = int(gc.confidence * 10)
+            conf_bar = "#" * filled + "-" * (10 - filled)
             gen_table.add_row(
                 gc.generator_id,
                 gc.model_used or "?",
@@ -76,7 +77,14 @@ def _render_jury(state: PipelineState) -> None:
         meta_text = Text()
         meta_text.append("[bold]Critic Reliability:[/bold]\n", style="cyan")
         for cid, rel in _get_attr(meta, 'critic_reliability', {}).items():
-            meta_text.append(f"  {cid}: {rel:.1f}/10\n", style="white")
+            rel_val = rel if isinstance(rel, (int, float)) else (
+                rel.get("score", rel.get("value", rel.get("reliability", 0)))
+                if isinstance(rel, dict) else 0
+            )
+            try:
+                meta_text.append(f"  {cid}: {float(rel_val):.1f}/10\n", style="white")
+            except (TypeError, ValueError):
+                meta_text.append(f"  {cid}: {rel_val}\n", style="white")
         meta_text.append(f"\n[bold]Agreement Rate:[/bold] {_get_attr(meta, 'agreement_rate', 0):.0%}\n", style="cyan")
         meta_text.append(f"[bold]Most Reliable:[/bold] {_get_attr(meta, 'most_reliable_critic', '')}\n", style="green")
         meta_text.append(f"[bold]Least Reliable:[/bold] {_get_attr(meta, 'least_reliable_critic', '')}\n", style="red")

@@ -206,26 +206,37 @@ class SnapshotManager:
         
         if snapshot_result:
             version, state = snapshot_result
-            
+
             # Load events since snapshot (exclude the version already in snapshot)
             events = await self.event_store.get_events(
                 aggregate_id, from_version=version + 1
             )
-            
+
             if not events:
                 return None
-            
+
+            # Guard against event gaps left by incorrect compaction.
+            # Versions must be a contiguous sequence from snapshot_version+1.
+            actual_versions = [e.version for e in events]
+            expected_versions = list(range(version + 1, version + 1 + len(events)))
+            if actual_versions != expected_versions:
+                from reasoner.core.exceptions import EventStoreCorruptionError
+                raise EventStoreCorruptionError(
+                    f"Event gap detected for aggregate {aggregate_id}: "
+                    f"expected versions {expected_versions}, got {actual_versions}"
+                )
+
             # Rebuild aggregate
             aggregate = PipelineAggregate(aggregate_id=aggregate_id)
-            
+
             # Apply snapshot state
             aggregate._state_data = state
             aggregate.version = version
-            
+
             # Apply events since snapshot
             for event in events:
                 aggregate.apply(event)
-            
+
             return aggregate
         
         # No snapshot - load from full history

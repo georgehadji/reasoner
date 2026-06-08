@@ -222,6 +222,22 @@ def is_article_request(problem: str) -> bool:
     lower = problem.lower()
     return any(re.search(p, lower) for p in _WRITING_INDICATORS)
 
+def build_synthesis_context(state: PipelineState) -> str:
+    """Build Prism citation block for synthesis prompts."""
+    parts = []
+    prism = state.method_state.get("prism")
+    citations = prism.get("citations", []) if prism else []
+    if citations:
+        parts.append("[SOURCED EVIDENCE]")
+        for i, c in enumerate(citations, 1):
+            parts.append(f"[{i}] {c['title']} — {c['url']}\n    {c['snippet']}")
+        parts.append(
+            "\nWhen making a claim supported by the above sources, "
+            "append [N] inline. Include a ## Sources section at the end."
+        )
+    return "\n\n".join(parts)
+
+
 def is_referential_followup(problem: str, history: list) -> bool:
     """Detect if a follow-up message refers to prior context."""
     if not history:

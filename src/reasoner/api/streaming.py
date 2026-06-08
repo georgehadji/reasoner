@@ -305,6 +305,7 @@ async def run_stream(
     user_id: str | None = None,
     preset_service: PresetService | None = None,
     pipeline_service: PipelineService | None = None,
+    request=None,
 ) -> AsyncGenerator[str, None]:
     if preset_service is None:
         preset_service = PresetService()
@@ -317,6 +318,16 @@ async def run_stream(
     state: PipelineState | None = None
     cancel_event = await _run_store.add(run_id, user_id=user_id)
     _save_pipeline_owner(run_id, user_id)
+
+    # Track per-run WS broadcast tasks so they can be cancelled on disconnect (B-13)
+    _run_tasks: set[asyncio.Task] = set()
+
+    def _tracked_broadcast(run_id: str, payload: dict) -> None:
+        coro = _broadcast_ws(run_id, payload, _tasks=_run_tasks)
+        task = asyncio.create_task(coro)
+        _run_tasks.add(task)
+        task.add_done_callback(_run_tasks.discard)
+
     # Yield a "connecting" event immediately so the UI has content to render
     # while the preflight (HyperGate LLM calls) completes.
     yield _event({"type": "connecting", "message": "Running system check…"})
@@ -361,6 +372,16 @@ async def run_stream(
         if recalled_chunks:
             state.neuro_context = recalled_chunks
 
+        # ── Prism file_ids: extract from explicit file_ids or attachments ──
+        file_ids = list(getattr(req, "file_ids", []) or [])
+        if not file_ids and getattr(req, "attachments", None):
+            file_ids = [a.file_id for a in req.attachments if getattr(a, "file_id", None)]
+        if file_ids:
+            state.method_state.set("prism", {
+                **state.method_state.get("prism"),
+                "file_ids": file_ids,
+            })
+
         # ── Wire event bus for domain event sourcing ──
         from reasoner.application.event_bus.bus import get_event_bus
         state.wire_event_bus(get_event_bus(), aggregate_id=run_id)
@@ -387,7 +408,7 @@ async def run_stream(
         start_payload: dict = {"type": "start", "preset": effective_preset_name}
         if auto_selected_method:
             start_payload["auto_selected_method"] = auto_selected_method
-        await _broadcast_ws(run_id, start_payload)
+        _tracked_broadcast(run_id, start_payload)
         yield _event(start_payload)
 
         # Persist pipeline start event
@@ -476,6 +497,18 @@ async def run_stream(
                 yield _event({"type": "cancelled", "message": "Pipeline stopped by user"})
                 return
 
+            # Disconnect check — bail before starting next phase (B-13)
+            if request is not None and await request.is_disconnected():
+                logger.info(
+                    "Client disconnected before phase %s (run %s)", name, run_id
+                )
+                yield _event({
+                    "type": "cancelled",
+                    "run_id": run_id,
+                    "reason": "client_disconnected",
+                })
+                return
+
             # Silent no-ops (e.g. writing pipeline skips generic decomposition/vetting)
             if getattr(fn, "_is_silent_noop", False):  # v3.1: relaxed from identity check
                 await fn(state)
@@ -487,7 +520,7 @@ async def run_stream(
             start_payload: dict[str, Any] = {"type": "phase_start", "phase": num, "name": name}
             if phase_start_models:
                 start_payload["models"] = phase_start_models
-            await _broadcast_ws(run_id, start_payload)
+            _tracked_broadcast(run_id, start_payload)
             yield _event(start_payload)
 
             # Emit domain event for phase start
@@ -523,9 +556,9 @@ async def run_stream(
                         "phase": num,
                         "phase_name": name,
                     }
-                    await _broadcast_ws(run_id, err_payload)
+                    _tracked_broadcast(run_id, err_payload)
                     yield _event(err_payload)
-                    await _broadcast_ws(run_id, {"type": "phase_error", "phase": num, "error": err_msg})
+                    _tracked_broadcast(run_id, {"type": "phase_error", "phase": num, "error": err_msg})
                     yield _event({"type": "phase_error", "phase": num, "error": err_msg})
                     fail_evt = make_event(
                         EventType.PHASE_FAILED,
@@ -561,9 +594,9 @@ async def run_stream(
                         "phase": num,
                         "phase_name": name,
                     }
-                    await _broadcast_ws(run_id, err_payload)
+                    _tracked_broadcast(run_id, err_payload)
                     yield _event(err_payload)
-                    await _broadcast_ws(run_id, {"type": "phase_error", "phase": num, "error": err_msg})
+                    _tracked_broadcast(run_id, {"type": "phase_error", "phase": num, "error": err_msg})
                     yield _event({"type": "phase_error", "phase": num, "error": err_msg})
                     fail_evt = make_event(
                         EventType.PHASE_FAILED,
@@ -592,7 +625,7 @@ async def run_stream(
                     "attempt": retry_attempt + 1,
                 }
                 yield _event(quality_payload)
-                await _broadcast_ws(run_id, quality_payload)
+                _tracked_broadcast(run_id, quality_payload)
 
                 # Record quality score in state history for downstream context
                 state.quality_history.append({
@@ -618,7 +651,7 @@ async def run_stream(
                     "reason": quality_result.reason,
                 }
                 yield _event(retry_payload)
-                await _broadcast_ws(run_id, retry_payload)
+                _tracked_broadcast(run_id, retry_payload)
 
                 reset_phase_state(name, state)
 
@@ -677,7 +710,7 @@ async def run_stream(
                 "name": name,
                 "data": data,
             }
-            await _broadcast_ws(run_id, phase_complete_payload)
+            _tracked_broadcast(run_id, phase_complete_payload)
             yield _event(phase_complete_payload)
 
             # Emit domain event for phase completion
@@ -741,7 +774,7 @@ async def run_stream(
             "total_cost_usd": getattr(state, 'total_cost_usd', 0.0),
             "phase_costs": getattr(state, 'phase_costs', {}),
         }
-        await _broadcast_ws(run_id, done_payload)
+        _tracked_broadcast(run_id, done_payload)
         yield _event(done_payload)
 
         # Persist pipeline completion
@@ -777,14 +810,20 @@ async def run_stream(
         )
         await _persist_event(fail_evt)
 
-        await _broadcast_ws(run_id, {"type": "done", "errors": [err_msg]})
+        _tracked_broadcast(run_id, {"type": "done", "errors": [err_msg]})
         yield _event({"type": "done", "errors": [err_msg]})
     finally:
+        # Cancel all pending broadcast tasks for this run (B-13)
+        for t in list(_run_tasks):
+            if not t.done():
+                t.cancel()
+        if _run_tasks:
+            await asyncio.gather(*_run_tasks, return_exceptions=True)
         await _run_store.remove(run_id)
 
 
 async def run_followup_stream(
-    req: FollowupRequest, user_id: str | None = None
+    req: FollowupRequest, request=None, user_id: str | None = None
 ) -> AsyncGenerator[str, None]:
     """Run the full Reasoner pipeline for a follow-up question with conversation context."""
     from reasoner.presets import FOLLOWUP_AGENT_MODELS
@@ -815,7 +854,7 @@ async def run_followup_stream(
         attachments=getattr(req, "attachments", []) or [],
         client_run_id=req.client_run_id,
     )
-    async for chunk in run_stream(run_req, initial_state=state, user_id=user_id):
+    async for chunk in run_stream(run_req, initial_state=state, user_id=user_id, request=request):
         yield chunk
 
     try:
@@ -847,7 +886,8 @@ async def run_followup_stream(
 
 
 async def run_stream_cached(
-    req: RunRequest, 
+    req: RunRequest,
+    request=None,
     user_id: str | None = None,
     preset_service: PresetService | None = None,
     pipeline_service: PipelineService | None = None,
@@ -878,21 +918,26 @@ async def run_stream_cached(
                 logger.info(f"Ignoring cached result for {key} due to stored errors.")
 
     collected: list[dict] = []
-    async for chunk in run_stream(
-        req, 
-        user_id=user_id, 
-        preset_service=preset_service, 
-        pipeline_service=pipeline_service
-    ):
-        yield chunk
-        # Force flush after each event so the browser receives SSE events
-        # in real-time instead of buffering them until the buffer fills.
-        await asyncio.sleep(SSE_FLUSH_INTERVAL)
-        if chunk.startswith("data: "):
-            try:
-                ev = json.loads(chunk[6:])
-                collected.append(ev)
-                if ev.get("type") == "done" and not req.no_cache:
-                    await _save_cache(key, collected)
-            except Exception:
-                pass
+    gen = run_stream(
+        req,
+        request=request,
+        user_id=user_id,
+        preset_service=preset_service,
+        pipeline_service=pipeline_service,
+    )
+    try:
+        async for chunk in gen:
+            yield chunk
+            # Force flush after each event so the browser receives SSE events
+            # in real-time instead of buffering them until the buffer fills.
+            await asyncio.sleep(SSE_FLUSH_INTERVAL)
+            if chunk.startswith("data: "):
+                try:
+                    ev = json.loads(chunk[6:])
+                    collected.append(ev)
+                    if ev.get("type") == "done" and not req.no_cache:
+                        await _save_cache(key, collected)
+                except Exception:
+                    pass
+    finally:
+        await gen.aclose()

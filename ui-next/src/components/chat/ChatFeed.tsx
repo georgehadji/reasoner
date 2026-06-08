@@ -7,6 +7,7 @@ import { ChatMessage, MemoryBadge } from './ChatMessage';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { StreamingMarkdown } from './StreamingMarkdown';
 import { PhaseRenderer } from '@/components/phases/PhaseRenderer';
+import { ResearchProgress } from '@/components/phases/ResearchProgress';
 import { ErrorMessage } from './ErrorMessage';
 import { WidgetRenderer } from '@/components/widgets/WidgetRenderer';
 import { TokenCount, Attachment } from '@/lib/types';
@@ -47,6 +48,7 @@ export interface ChatFeedMessage {
   errorRetryable?: boolean | null;
   errorRetryAfter?: number | null;
   memoryCount?: number;
+  researchSteps?: { step_type: string; queries: string[]; plan: string; urls: string[] }[];
 }
 
 interface ChatFeedProps {
@@ -64,10 +66,12 @@ function PhaseIndicator({
   name,
   agents,
   models,
+  researchSteps,
 }: {
   name?: string;
   agents?: { name: string; task: string }[];
   models?: string[];
+  researchSteps?: { step_type: string; queries: string[]; plan: string; urls: string[] }[];
 }) {
   return (
     <div className="mb-3 flex flex-col gap-2">
@@ -112,6 +116,11 @@ function PhaseIndicator({
               </span>
             </Tooltip>
           ))}
+        </div>
+      )}
+      {researchSteps && researchSteps.length > 0 && (
+        <div className="pl-6">
+          <ResearchProgress steps={researchSteps} />
         </div>
       )}
     </div>
@@ -446,6 +455,7 @@ function ChatFeedComponent({
                   name={msg.currentPhaseName}
                   agents={msg.activeAgents}
                   models={msg.phaseModels}
+                  researchSteps={msg.researchSteps}
                 />
               )}
               {msg.images && msg.images.length > 0 && (

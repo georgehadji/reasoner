@@ -97,6 +97,8 @@ _KNOWN_ROUTING_ROLES: frozenset[str] = frozenset({
     "brainstorm_generate",
     "brainstorm_cluster",
     "brainstorm_develop",
+    # Prism integration
+    "prism_classify",
 })
 
 

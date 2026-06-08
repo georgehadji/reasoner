@@ -161,6 +161,12 @@ def synthesis_prompt(state: PipelineState) -> str:
             for r in state.web_discovery_results[:DEFAULT_SEARCH_RESULTS]
         ], indent=2)
 
+    # Prism citations (populated by PrismResearcher)
+    from reasoner.phases._shared import build_synthesis_context
+    prism_context = build_synthesis_context(state)
+    if prism_context:
+        sources_info += "\n\n" + prism_context
+
     method_hint = "Synthesize the best possible solution."
     followup = _followup_context(state)
     quality_note = f"\nCONTEXT QUALITY: {state.context_quality}\n" if state.context_quality and state.context_quality != "unknown" else ""

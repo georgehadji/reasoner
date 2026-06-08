@@ -90,16 +90,19 @@ class AuditMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
 
         if request.method in ("POST", "DELETE", "PUT", "PATCH"):
-            user = getattr(request.state, "user", None)
-            path = _sanitize_url_for_audit(request.url.path, request.url.query)
-            logger.info(
-                "audit: method=%s path=%s user=%s status=%d ip=%s",
-                request.method,
-                path,
-                str(user.id) if user else None,
-                response.status_code,
-                _anonymize_ip(request.client.host if request.client else None),
-            )
+            try:
+                user = getattr(request.state, "user", None)
+                path = _sanitize_url_for_audit(request.url.path, request.url.query)
+                logger.info(
+                    "audit: method=%s path=%s user=%s status=%d ip=%s",
+                    request.method,
+                    path,
+                    str(user.id) if user else None,
+                    response.status_code,
+                    _anonymize_ip(request.client.host if request.client else None),
+                )
+            except Exception as exc:
+                logger.error("Audit logging failed: %s", exc)
 
         return response
 
@@ -118,6 +121,7 @@ class MemoryLimitMiddleware(BaseHTTPMiddleware):
         self.memory_limit_mb = memory_limit_mb
         self.warning_mb = warning_mb
         self._warning_logged = False
+        self._lock = asyncio.Lock()
 
     async def dispatch(self, request: Request, call_next):
         try:
@@ -135,16 +139,20 @@ class MemoryLimitMiddleware(BaseHTTPMiddleware):
                     status_code=503,
                 )
 
-            if memory_mb > self.warning_mb and not self._warning_logged:
-                logger.warning(
-                    f"Memory usage high: {memory_mb:.1f}MB (limit: {self.memory_limit_mb}MB)"
-                )
-                self._warning_logged = True
-            elif memory_mb < self.warning_mb * 0.8:
-                self._warning_logged = False
+            async with self._lock:
+                if memory_mb > self.warning_mb and not self._warning_logged:
+                    logger.warning(
+                        f"Memory usage high: {memory_mb:.1f}MB (limit: {self.memory_limit_mb}MB)"
+                    )
+                    self._warning_logged = True
+                elif memory_mb < self.warning_mb * 0.8:
+                    self._warning_logged = False
 
         except ImportError:
-            pass
+            logger.warning(
+                "psutil not installed — MemoryLimitMiddleware is disabled. "
+                "Install psutil to enable RSS-based memory enforcement."
+            )
 
         return await call_next(request)
 

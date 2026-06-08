@@ -322,8 +322,9 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
     const md = buildMarkdownFromPhase(index, phaseNum, name, data, {
       omitSections: ['critical_insights', 'action_blueprint', 'open_questions', 'sources', 'vetted_context'],
     });
+    const citations = data && typeof data === 'object' ? (data as Record<string, unknown>).citations as Array<{ url: string; title: string; snippet: string; source_type: string }> | undefined : undefined;
     return (
-      <SynthesisCard index={index} phase={phaseNum} name={name} tokens={tokens} models={models} subagents={subagents} duration={duration} highlights={synthesisHighlights} sources={synthesisSections?.sources} defaultOpen>
+      <SynthesisCard index={index} phase={phaseNum} name={name} tokens={tokens} models={models} subagents={subagents} duration={duration} highlights={synthesisHighlights} sources={synthesisSections?.sources} citations={citations} defaultOpen>
         {synthesisSections && (
           <div className="mb-4 grid gap-4">
             {synthesisSections.criticalInsights.length > 0 && (

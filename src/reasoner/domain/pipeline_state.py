@@ -8,6 +8,7 @@ Contains: MethodState, CostTrackingState, ConversationState,
 from __future__ import annotations
 
 import json
+import logging
 from collections import deque
 from dataclasses import dataclass, field, asdict, fields as dc_fields
 from enum import Enum
@@ -1398,7 +1399,14 @@ class PipelineState:
             aggregate_id = getattr(self, '_aggregate_id', '') or ''
             event = make_event(event_type, aggregate_id=aggregate_id, version=1, **event_kwargs)
             # Fire-and-forget: create a task for the bus.publish
-            asyncio.create_task(bus.publish(event))
+            task = asyncio.create_task(bus.publish(event))
+            task.add_done_callback(
+                lambda t: logging.getLogger(__name__).error(
+                    "Event publish failed: %s", t.exception()
+                )
+                if not t.cancelled() and t.exception()
+                else None
+            )
         except Exception:
             pass  # Never let event publishing crash the pipeline
 

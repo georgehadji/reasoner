@@ -25,7 +25,7 @@ export interface TokenCount {
 }
 
 export interface PhaseEvent {
-  type: 'start' | 'prompt_enhanced' | 'phase_start' | 'phase_complete' | 'phase_quality' | 'phase_retry' | 'phase_error' | 'error' | 'cancelled' | 'done' | 'agent_start' | 'agent_complete' | 'text_chunk' | 'widget' | 'recall_used';
+  type: 'start' | 'prompt_enhanced' | 'phase_start' | 'phase_complete' | 'phase_quality' | 'phase_retry' | 'phase_error' | 'error' | 'cancelled' | 'done' | 'agent_start' | 'agent_complete' | 'text_chunk' | 'widget' | 'recall_used' | 'research_step_emitted' | 'research_citations_ready';
   /** phase_quality fields */
   score?: number;
   passed?: boolean;
@@ -64,6 +64,13 @@ export interface PhaseEvent {
   /** Memory recall fields */
   memory_count?: number;
   memory_ids?: string[];
+  /** Prism research step fields */
+  step_type?: string;
+  queries?: string[];
+  plan?: string;
+  urls?: string[];
+  citation_count?: number;
+  source_types?: string[];
 }
 
 export interface Attachment {
@@ -73,6 +80,20 @@ export interface Attachment {
   type: string;
   previewUrl?: string;
   extractedText?: string;
+}
+
+export interface ResearchStepEvent {
+  step_type: 'searching' | 'reasoning' | 'reading';
+  queries: string[];
+  plan: string;
+  urls: string[];
+}
+
+export interface Citation {
+  url: string;
+  title: string;
+  snippet: string;
+  source_type: 'web' | 'academic' | 'discussion' | 'file' | 'scraped';
 }
 
 export interface ConversationTurn {
@@ -127,6 +148,7 @@ export interface RunRequest {
   web_search?: boolean;
   smart_search?: boolean;
   attachments?: AttachmentRef[];
+  file_ids?: string[];
   client_run_id?: string;
 }
 
@@ -145,6 +167,7 @@ export interface RunFollowupRequest {
   previous_synthesis: string;
   agent_model?: string | null;
   attachments?: AttachmentRef[];
+  file_ids?: string[];
 }
 
 export interface PresetMeta {

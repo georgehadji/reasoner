@@ -188,12 +188,25 @@ class ProviderRouter:
                     ), {}
 
         async def _execute_stream(provider: BaseLLMProvider, is_fallback: bool = False):
+            from reasoner.circuit_breaker import get_circuit_breaker
+            circuit = get_circuit_breaker(f"llm:{provider.model}")
+            if not await circuit.can_execute():
+                yield DegradedLLMResponse(
+                    text="",
+                    error=f"Circuit open for {provider.model}",
+                    metadata={"model": provider.model},
+                )
+                return
             try:
                 async for chunk in provider.stream_complete_with_retry(
                     system_prompt, user_prompt, max_tokens, temperature
                 ):
                     yield chunk
+                await circuit.record_success()
+            except asyncio.CancelledError:
+                raise
             except asyncio.TimeoutError:
+                await circuit.record_failure()
                 if is_fallback:
                     yield DegradedLLMResponse(
                         text="",
@@ -211,6 +224,7 @@ class ProviderRouter:
                         metadata={"model": assigned.model},
                     )
             except LLMError as exc:
+                await circuit.record_failure()
                 if is_fallback:
                     yield DegradedLLMResponse(
                         text="",

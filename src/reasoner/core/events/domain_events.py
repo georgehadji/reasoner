@@ -30,6 +30,8 @@ class PipelineEventType(str, Enum):
     SOURCE_ADDED = "source_added"
     ERROR_OCCURRED = "error_occurred"
     LLM_GENERATION_COMPLETED = "llm_generation_completed"
+    RESEARCH_STEP_EMITTED = "research_step_emitted"
+    RESEARCH_CITATIONS_READY = "research_citations_ready"
 
 
 class WidgetEventType(str, Enum):
@@ -97,6 +99,10 @@ class DomainEvent:
     def is_critical(self) -> bool:
         """Determines if the event is critical for business logic or state consistency."""
         return self.event_type in (
+            PipelineEventType.PIPELINE_STARTED,
+            PipelineEventType.PHASE_STARTED,
+            PipelineEventType.PHASE_COMPLETED,
+            PipelineEventType.PHASE_FAILED,
             PipelineEventType.PIPELINE_COMPLETED,
             PipelineEventType.PIPELINE_FAILED,
             SaaSEventType.PAYMENT_SUCCEEDED,
@@ -104,7 +110,7 @@ class DomainEvent:
             SaaSEventType.SUBSCRIPTION_CREATED,
             SaaSEventType.SUBSCRIPTION_UPDATED,
             SaaSEventType.SUBSCRIPTION_CANCELLED,
-            PipelineEventType.ERROR_OCCURRED, # Error events are critical for debugging
+            PipelineEventType.ERROR_OCCURRED,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -218,6 +224,21 @@ class SourceAdded(DomainEvent):
     title: str = ""
     source_type: str = ""
     relevance_score: float = 0.0
+
+
+@dataclass(frozen=True)
+class ResearchStepEmitted(DomainEvent):
+    """Single iteration progress event from PrismResearcher loop."""
+    step_type: str = ""       # "searching" | "reasoning" | "reading"
+    queries: tuple[str, ...] = field(default_factory=tuple)
+    plan: str = ""
+    urls: tuple[str, ...] = field(default_factory=tuple)
+
+
+@dataclass(frozen=True)
+class ResearchCitationsReady(DomainEvent):
+    """Emitted once when PrismResearcher completes and citations are stored."""
+    citation_count: int = 0
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -368,6 +389,8 @@ PIPELINE_EVENT_CLASSES: dict[PipelineEventType, type[DomainEvent]] = {
     PipelineEventType.ERROR_OCCURRED: ErrorOccurred,
     PipelineEventType.RETRY_ATTEMPTED: RetryAttempted,
     PipelineEventType.LLM_GENERATION_COMPLETED: LLMGenerationCompleted,
+    PipelineEventType.RESEARCH_STEP_EMITTED: ResearchStepEmitted,
+    PipelineEventType.RESEARCH_CITATIONS_READY: ResearchCitationsReady,
 }
 
 WIDGET_EVENT_CLASSES: dict[WidgetEventType, type[DomainEvent]] = {

@@ -664,6 +664,85 @@ class EventStore:
 
         return await self._run_in_executor(_get_stats_sync)
     
+    async def prune_events_before(
+        self,
+        cutoff: datetime,
+        batch_size: int = 500,
+    ) -> int:
+        """Delete events older than cutoff that are covered by a snapshot.
+
+        Only deletes events where a snapshot at version >= the event's version
+        exists for the same aggregate. Never creates version gaps that would
+        trigger EventStoreCorruptionError on replay.
+
+        Returns:
+            Number of event rows deleted.
+        """
+        cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S")
+
+        def _prune_sync() -> int:
+            conn = self._get_connection()
+            try:
+                cursor = conn.execute(
+                    """
+                    DELETE FROM events
+                    WHERE id IN (
+                        SELECT e.id
+                        FROM events e
+                        INNER JOIN snapshots s ON s.aggregate_id = e.aggregate_id
+                        WHERE e.version <= s.version
+                          AND e.created_at < ?
+                        ORDER BY e.created_at ASC
+                        LIMIT ?
+                    )
+                    """,
+                    (cutoff_str, batch_size),
+                )
+                deleted = cursor.rowcount
+
+                # Clean up terminal aggregates with no remaining events
+                conn.execute(
+                    """
+                    DELETE FROM aggregates
+                    WHERE status IN ('completed', 'failed')
+                      AND updated_at < ?
+                      AND NOT EXISTS (
+                          SELECT 1 FROM events
+                          WHERE events.aggregate_id = aggregates.aggregate_id
+                      )
+                    """,
+                    (cutoff_str,),
+                )
+
+                conn.commit()
+                return deleted
+            except sqlite3.Error as e:
+                conn.rollback()
+                logger.error("prune_events_before failed: %s", e)
+                raise
+
+        return await self._run_in_executor(_prune_sync)
+
+    async def count_eligible_events(self, cutoff: datetime) -> int:
+        """Count events eligible for pruning (dry-run support)."""
+        cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S")
+
+        def _count_sync() -> int:
+            conn = self._get_connection()
+            cursor = conn.execute(
+                """
+                SELECT COUNT(*)
+                FROM events e
+                INNER JOIN snapshots s ON s.aggregate_id = e.aggregate_id
+                WHERE e.version <= s.version
+                  AND e.created_at < ?
+                """,
+                (cutoff_str,),
+            )
+            return cursor.fetchone()[0]
+
+        return await self._run_in_executor(_count_sync)
+
     def close(self) -> None:
         """Close database connection and thread pool."""
         if self._connection:

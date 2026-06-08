@@ -43,16 +43,17 @@ def _sanitize_text(text: str, max_length: int = _MAX_QUERY_LENGTH) -> str:
     return text[:max_length]
 
 
-def _is_circuit_open() -> bool:
+async def _is_circuit_open() -> bool:
     """Lightweight circuit breaker based on recent failures."""
-    global _failure_count, _last_failure_time
-    if _failure_count < _CIRCUIT_THRESHOLD:
-        return False
-    elapsed = asyncio.get_event_loop().time() - _last_failure_time
-    if elapsed >= _CIRCUIT_COOLDOWN_SECONDS:
-        _failure_count = 0
-        return False
-    return True
+    async with _failure_lock:
+        global _failure_count, _last_failure_time
+        if _failure_count < _CIRCUIT_THRESHOLD:
+            return False
+        elapsed = asyncio.get_event_loop().time() - _last_failure_time
+        if elapsed >= _CIRCUIT_COOLDOWN_SECONDS:
+            _failure_count = 0
+            return False
+        return True
 
 
 async def _record_failure() -> None:
@@ -105,7 +106,7 @@ async def rerank_documents(
         documents = documents[:_MAX_DOCUMENTS]
 
     # ── Circuit breaker ──
-    if _is_circuit_open():
+    if await _is_circuit_open():
         logger.info("Rerank circuit open; skipping rerank.")
         return documents
 

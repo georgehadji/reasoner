@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { isEnabled } from '@/hooks/useFeatureFlags';
 import { ChevronDown, Sparkles, Bot, Cpu, Timer, Boxes, ListChecks, ExternalLink } from 'lucide-react';
+import { SourceCard } from './SourceCard';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { TEXT_SIZES, TIMING } from '@/lib/config';
 
@@ -24,6 +25,13 @@ interface SourceItem {
   domain?: string;
 }
 
+interface CitationItem {
+  url: string;
+  title: string;
+  snippet: string;
+  source_type: string;
+}
+
 interface SynthesisCardProps {
   index: number;
   phase: number;
@@ -36,6 +44,7 @@ interface SynthesisCardProps {
   duration?: number;
   highlights?: Array<{ label: string; value: number }> | null;
   sources?: SourceItem[] | null;
+  citations?: CitationItem[] | null;
   layoutHints?: {
     primary_theme_color?: string;
     important_sections?: string[];
@@ -98,6 +107,7 @@ export function SynthesisCard({
   duration,
   highlights,
   sources,
+  citations,
   layoutHints,
 }: SynthesisCardProps) {
   const [open, setOpen] = useState(defaultOpen);
@@ -214,6 +224,7 @@ export function SynthesisCard({
             </div>
           )}
           {isEnabled('sources-panel') && sources && sources.length > 0 && <SourcesPanel sources={sources} />}
+          {citations && citations.length > 0 && <SourceCard citations={citations} />}
           {subagents && subagents.length > 0 && (
             <div className="mb-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
               <p className="mb-2 text-xs font-medium text-[var(--text-muted)]">Subagents</p>

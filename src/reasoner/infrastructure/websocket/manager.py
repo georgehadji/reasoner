@@ -151,7 +151,12 @@ class WebSocketManager:
         # Schedule the async cleanup on the running loop.
         try:
             loop = asyncio.get_running_loop()
-            loop.create_task(_do_disconnect())
+            task = loop.create_task(_do_disconnect())
+            task.add_done_callback(
+                lambda t: logger.error("WS disconnect cleanup failed: %s", t.exception())
+                if not t.cancelled() and t.exception()
+                else None
+            )
         except RuntimeError:
             # No running loop (should not happen in production)
             logger.warning(f"No event loop available to disconnect {connection_id}")

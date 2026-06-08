@@ -48,12 +48,22 @@ def _get_build_provider():
 logger = logging.getLogger(__name__)
 
 # Circuit breaker for SearXNG — prevents 30s hangs when instance is down
-from reasoner.circuit_breaker import get_circuit_breaker
+# Deferred to avoid core → infrastructure import at module load time
+_SEARXNG_CB = None
+_SEARXNG_CB_LOCK = threading.Lock()
 
-_SEARXNG_CB = get_circuit_breaker("searxng")
-_SEARXNG_CB.config.failure_threshold = 3
-_SEARXNG_CB.config.success_threshold = 2
-_SEARXNG_CB.config.timeout_seconds = 30.0
+def _get_searxng_cb():
+    global _SEARXNG_CB
+    if _SEARXNG_CB is None:
+        with _SEARXNG_CB_LOCK:
+            if _SEARXNG_CB is None:
+                from reasoner.infrastructure.circuit_breaker import get_circuit_breaker
+                cb = get_circuit_breaker("searxng")
+                cb.config.failure_threshold = 3
+                cb.config.success_threshold = 2
+                cb.config.timeout_seconds = 30.0
+                _SEARXNG_CB = cb
+    return _SEARXNG_CB
 
 # Source type categories for specialized searches
 SOURCE_TYPE_ENGINES: dict[str, list[str]] = {

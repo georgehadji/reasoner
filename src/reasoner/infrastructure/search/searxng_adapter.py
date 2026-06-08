@@ -78,8 +78,9 @@ class SearXNGAdapter:
         source_type: Optional[SourceType] = None,
         domain: Optional[str] = None,
     ) -> list[dict[str, Any]]:
-        from reasoner.core.search import _SEARXNG_CB
-        if not await _SEARXNG_CB.can_execute():
+        from reasoner.core.search import _get_searxng_cb
+        cb = _get_searxng_cb()
+        if cb is None or not await cb.can_execute():
             logger.warning(
                 "SearXNG circuit breaker OPEN — skipping search for %r",
                 query[:60],
@@ -124,11 +125,13 @@ class SearXNGAdapter:
                     passed, total_raw, (passed / total_raw) * 100, query[:80],
                 )
 
-            await _SEARXNG_CB.record_success()
+            if cb is not None:
+                await cb.record_success()
             return refined[:num_results]
 
         except Exception as exc:
-            await _SEARXNG_CB.record_failure()
+            if cb is not None:
+                await cb.record_failure()
             logger.error("Web discovery failed: %s", exc)
             return []
     

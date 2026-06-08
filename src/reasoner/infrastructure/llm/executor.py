@@ -27,12 +27,13 @@ from reasoner.domain.pipeline_state import PipelineState
 
 # New imports for event emission
 from reasoner.core.events.domain_events import LLMGenerationCompleted, PipelineEventType, make_event
+from reasoner.core.events.ports import EventPublisher
 # get_event_bus imported lazily inside methods to avoid circular import with api/__init__.py
 
 logger = logging.getLogger(__name__)
 
 
-def _get_event_bus():
+def _get_event_bus() -> EventPublisher:
     """Lazy import to avoid circular dependency with api/__init__.py."""
     from reasoner.application.event_bus.bus import get_event_bus
     return get_event_bus()
@@ -59,6 +60,7 @@ class LLMExecutor:
         cascading_routing: dict[str, list[str]] | None = None,
         cascading_quality_check: bool = True,
         prompt_compression: bool = False,
+        event_publisher: EventPublisher | None = None,
     ) -> None:
         self.router = router
         self.phase_configs = phase_configs
@@ -67,6 +69,7 @@ class LLMExecutor:
         self.cascading_routing = cascading_routing or {}
         self.cascading_quality_check = cascading_quality_check
         self.prompt_compression = prompt_compression
+        self._event_publisher = event_publisher
 
     async def execute(
         self,
@@ -157,7 +160,7 @@ class LLMExecutor:
                     pass  # Metrics are best-effort
                 
                 # Emit LLMGenerationCompleted event for cache hit
-                bus = _get_event_bus()
+                bus = self._event_publisher or _get_event_bus()
                 event = make_event(
                     PipelineEventType.LLM_GENERATION_COMPLETED,
                     aggregate_id=state.conversation_id or "unknown",
@@ -254,7 +257,7 @@ class LLMExecutor:
                     self._accumulate_tokens(state, role, metadata.get("input_tokens", 0), metadata.get("output_tokens", 0), model_id)
 
                     # Emit LLMGenerationCompleted event for successful cascading call
-                    bus = _get_event_bus()
+                    bus = self._event_publisher or _get_event_bus()
                     event = make_event(
                         PipelineEventType.LLM_GENERATION_COMPLETED,
                         aggregate_id=state.conversation_id or "unknown",
@@ -283,7 +286,7 @@ class LLMExecutor:
             if last_error:
                 logger.error(f"All cascading models failed for role={role}: {last_error}")
                 # Emit LLMGenerationCompleted event for failed cascading
-                bus = _get_event_bus()
+                bus = self._event_publisher or _get_event_bus()
                 event = make_event(
                     PipelineEventType.LLM_GENERATION_COMPLETED,
                     aggregate_id=state.conversation_id or "unknown",
@@ -311,7 +314,7 @@ class LLMExecutor:
             else:
                 logger.error(f"Unknown error in cascading for role={role}")
                 # Emit LLMGenerationCompleted event for unknown cascading error
-                bus = _get_event_bus()
+                bus = self._event_publisher or _get_event_bus()
                 event = make_event(
                     PipelineEventType.LLM_GENERATION_COMPLETED,
                     aggregate_id=state.conversation_id or "unknown",
@@ -352,7 +355,7 @@ class LLMExecutor:
             if isinstance(raw, DegradedLLMResponse):
                 logger.error(f"LLM degraded for role={role}: {raw.error}")
                 # Emit LLMGenerationCompleted event for degraded response
-                bus = _get_event_bus()
+                bus = self._event_publisher or _get_event_bus()
                 event = make_event(
                     PipelineEventType.LLM_GENERATION_COMPLETED,
                     aggregate_id=state.conversation_id or "unknown",
@@ -377,7 +380,7 @@ class LLMExecutor:
             if not raw or not raw.strip():
                 logger.warning(f"LLM returned empty response for role={role}; possible content filter or API error")
                 # Emit LLMGenerationCompleted event for empty response
-                bus = _get_event_bus()
+                bus = self._event_publisher or _get_event_bus()
                 event = make_event(
                     PipelineEventType.LLM_GENERATION_COMPLETED,
                     aggregate_id=state.conversation_id or "unknown",
@@ -426,7 +429,7 @@ class LLMExecutor:
                 )
             
             # Emit LLMGenerationCompleted event for successful standard call
-            bus = _get_event_bus()
+            bus = self._event_publisher or _get_event_bus()
             event = make_event(
                 PipelineEventType.LLM_GENERATION_COMPLETED,
                 aggregate_id=state.conversation_id or "unknown",

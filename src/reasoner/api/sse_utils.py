@@ -28,15 +28,33 @@ def _event(data: dict) -> str:
     return f"data: {json.dumps(data, default=json_serializer)}\n\n"
 
 
-async def _broadcast_ws(run_id: str, payload: dict[str, Any]) -> None:
+async def _broadcast_ws(
+    run_id: str, payload: dict[str, Any], _tasks: set | None = None
+) -> None:
     """Broadcast a payload to WebSocket subscribers for this run.
 
     Fire-and-forget: never blocks the caller on WS delivery.
+
+    If ``_tasks`` is provided, the inner broadcast task is registered there
+    so callers can cancel it (e.g. on client disconnect).  Otherwise the
+    task is fire-and-forget with no external cancellation handle.
     """
     try:
         from reasoner.infrastructure.websocket import get_websocket_manager
         manager = get_websocket_manager()
-        asyncio.create_task(manager.broadcast_event(payload, run_id))
+        task = asyncio.create_task(manager.broadcast_event(payload, run_id))
+        if _tasks is not None:
+            _tasks.add(task)
+        task.add_done_callback(
+            lambda t: (
+                _tasks.discard(t) if _tasks is not None else None
+            )
+            or (
+                logger.warning("WS broadcast failed for run %s: %s", run_id, t.exception())
+                if not t.cancelled() and t.exception()
+                else None
+            )
+        )
     except Exception:
         logger.warning("WS broadcast failed for run %s", run_id, exc_info=True)
 

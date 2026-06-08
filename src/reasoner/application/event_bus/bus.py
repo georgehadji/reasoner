@@ -52,6 +52,7 @@ class EventBus:
         self._max_queue_size: int = max_queue_size
         self._task_queue: asyncio.Queue[tuple[DomainEvent, EventHandler]] | None = None
         self._semaphore = asyncio.Semaphore(200)  # Max 200 concurrent handler executions
+        self._dropped_event_count: int = 0
     
     def subscribe(
         self,
@@ -164,12 +165,13 @@ class EventBus:
                     else:
                         self._task_queue.put_nowait((event, handler)) # Drop non-critical if queue is full
                 except asyncio.QueueFull:
-                    logger.error(
-                        "Event bus queue full; %s event %s dropped.",
+                    self._dropped_event_count += 1
+                    logger.warning(
+                        "Event bus queue full; %s event %s dropped (total_dropped=%d).",
                         "Critical" if event.is_critical else "Non-critical",
                         event.event_id,
+                        self._dropped_event_count,
                     )
-                    # For critical and non-critical events that are dropped due to full queue, log to dead-letter
                     asyncio.create_task(self._log_to_dead_letter(event, "Queue full"))
             return
 
@@ -233,7 +235,10 @@ class EventBus:
                 "is_critical": event.is_critical,
             }
             # Use asyncio.to_thread for blocking file I/O
-            await asyncio.to_thread(lambda: _DEAD_LETTER_PATH.open("a", encoding="utf-8").write(json.dumps(entry, default=str) + "\n"))
+            def _write_dead_letter():
+                with _DEAD_LETTER_PATH.open("a", encoding="utf-8") as f:
+                    f.write(json.dumps(entry, default=str) + "\n")
+            await asyncio.to_thread(_write_dead_letter)
         except Exception as dl_exc:
             logger.error("Failed to write dead-letter entry: %s", dl_exc)
 
@@ -243,6 +248,11 @@ class EventBus:
         self._global_handlers.clear()
         self._error_handlers.clear()
     
+    @property
+    def dropped_event_count(self) -> int:
+        """Total events dropped since startup due to full queue."""
+        return self._dropped_event_count
+
     def get_subscriber_count(self, event_type: _AllEventType) -> int:
         """Get number of subscribers for an event type."""
         return len(self._handlers.get(event_type, []))

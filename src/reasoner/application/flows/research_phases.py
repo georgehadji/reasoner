@@ -7,6 +7,7 @@ import logging
 from typing import Any
 
 from reasoner.core.constants import TRUNCATION
+from reasoner.core.settings import settings
 from reasoner.infrastructure.search.discovery import get_discovery_client
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.parsing import ParseError, extract_json
@@ -20,6 +21,43 @@ async def run_research_web_search_phase(
     services: WorkflowServices,
     domain: str | None = None
 ) -> None:
+    # Prism classifier (optional enrichment)
+    if settings.PRISM_CLASSIFIER_ENABLED:
+        from reasoner.application.services.prism_classifier import classify_query
+        classification = await classify_query(state.problem, services, state)
+        state.method_state.set("prism", {
+            **state.method_state.get("prism"),
+            "classification": {
+                "skip_search": classification.skip_search,
+                "personal_search": classification.personal_search,
+                "academic_search": classification.academic_search,
+                "discussion_search": classification.discussion_search,
+                "show_weather_widget": classification.show_weather_widget,
+                "show_stock_widget": classification.show_stock_widget,
+                "show_calculation_widget": classification.show_calculation_widget,
+                "standalone_follow_up": classification.standalone_follow_up,
+            },
+        })
+
+    if settings.PRISM_RESEARCHER_ENABLED:
+        from reasoner.application.flows.prism_research import run_prism_research_phase
+        client, _ = await get_discovery_client()
+        file_search = None
+        if settings.PRISM_FILE_SEARCH_ENABLED:
+            from reasoner.infrastructure.prism.file_search import PrismFileSearch
+            file_search = PrismFileSearch()
+        await run_prism_research_phase(
+            state, services, client, mode="quality", file_search=file_search
+        )
+        # Backfill remainder.web_discovery_results from citations for downstream
+        # phases that still consume vetted_context
+        prism = state.method_state.get("prism")
+        state.remainder.web_discovery_results = [
+            {"url": c["url"], "title": c["title"], "snippet": c["snippet"]}
+            for c in prism.get("citations", [])
+        ]
+        return
+
     services.log("RESEARCH", "Starting deep iterative research...", state)
     max_iterations = 3
     current_knowledge = []

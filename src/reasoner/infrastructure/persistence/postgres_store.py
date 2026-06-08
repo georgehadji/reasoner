@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 from dataclasses import asdict
@@ -32,6 +33,22 @@ from reasoner.core.constants import DEFAULT_DB_COMMAND_TIMEOUT
 from reasoner.security.encryption import get_encryption_service
 
 logger = logging.getLogger(__name__)
+
+# Retained references to background publish tasks to prevent premature GC.
+_BG_PUBLISH_TASKS: set[asyncio.Task] = set()
+
+
+def _fire_and_forget(coro, *, label: str = "background task") -> asyncio.Task:
+    """Create a tracked asyncio task; log exceptions via done_callback."""
+    task = asyncio.create_task(coro)
+    _BG_PUBLISH_TASKS.add(task)
+    task.add_done_callback(_BG_PUBLISH_TASKS.discard)
+    task.add_done_callback(
+        lambda t: logger.warning("%s failed: %s", label, t.exception())
+        if not t.cancelled() and t.exception()
+        else None
+    )
+    return task
 
 
 class PostgreSQLEventStore:
@@ -373,12 +390,38 @@ class PostgreSQLEventStore:
                 ORDER BY version ASC
             """, aggregate_id, from_version)
             
-            return [e for e in (self._deserialize_event(row) for row in rows) if e is not None]
-    
-    def _deserialize_event(self, row: Any) -> DomainEvent | None:
+            events = []
+            for row in rows:
+                event = await self._deserialize_event(row)
+                if event is not None:
+                    events.append(event)
+            return events
+
+    async def _publish_error_or_persist(self, error_event: DomainEvent, label: str) -> None:
+        """Publish error event to bus; persist directly to event store if bus is unavailable."""
+        from reasoner.application.event_bus.bus import get_event_bus
+        try:
+            bus = get_event_bus()
+            await asyncio.wait_for(bus.publish(error_event), timeout=5.0)
+        except Exception as exc:
+            logger.error(
+                "%s: bus publish failed (%s) — persisting error event directly to store",
+                label, exc,
+            )
+            try:
+                if self._pool is not None:
+                    await self.save_events([error_event])
+            except Exception as db_exc:
+                logger.error(
+                    "%s: error event lost — bus and direct persist both failed: "
+                    "bus_err=%s db_err=%s aggregate=%s version=%s event_id=%s",
+                    label, exc, db_exc,
+                    error_event.aggregate_id, error_event.version, error_event.event_id,
+                )
+
+    async def _deserialize_event(self, row: Any) -> DomainEvent | None:
         """Deserialize database row to event. Decrypts payload if necessary (Phase 3)."""
-        from reasoner.core.events.domain_events import make_event, ErrorOccurred, PipelineEventType # Added ErrorOccurred and PipelineEventType
-        from reasoner.application.event_bus.bus import get_event_bus # Added get_event_bus
+        from reasoner.core.events.domain_events import make_event, PipelineEventType
 
         try:
             payload = json.loads(row["payload"])
@@ -408,23 +451,19 @@ class PostgreSQLEventStore:
                 row.get("version"),
                 exc,
             )
-            # Emit ErrorOccurred event for DLQ logging
-            bus = get_event_bus()
             error_event = make_event(
-                PipelineEventType.ERROR_OCCURRED, # Using a generic ErrorOccurred event type
+                PipelineEventType.ERROR_OCCURRED,
                 aggregate_id=row.get("aggregate_id", "unknown"),
                 version=row.get("version", 0),
                 message=f"JSONDecodeError in event deserialization: {exc}",
                 details={
                     "event_id": str(row.get("event_id", "unknown")),
                     "event_type": row.get("event_type", "unknown"),
-                    "payload_sample": str(row.get("payload", ""))[:200] # Log a sample of corrupted payload
+                    "payload_sample": str(row.get("payload", ""))[:200],
                 }
             )
-            # We don't await here to avoid blocking and potentially causing a loop if bus itself is failing.
-            # The EventBus is designed to handle this asynchronously.
-            asyncio.create_task(bus.publish(error_event))
-            return None # Return None for corrupted events
+            await self._publish_error_or_persist(error_event, "postgres_store _deserialize_event JSONDecodeError")
+            return None
         except Exception as exc:
             logger.error(
                 "Data integrity failure (Generic Exception): event %s (aggregate %s v%s): %s",
@@ -433,8 +472,6 @@ class PostgreSQLEventStore:
                 row.get("version"),
                 exc,
             )
-            # Emit ErrorOccurred event for DLQ logging
-            bus = get_event_bus()
             error_event = make_event(
                 PipelineEventType.ERROR_OCCURRED,
                 aggregate_id=row.get("aggregate_id", "unknown"),
@@ -443,11 +480,11 @@ class PostgreSQLEventStore:
                 details={
                     "event_id": str(row.get("event_id", "unknown")),
                     "event_type": row.get("event_type", "unknown"),
-                    "payload_sample": str(row.get("payload", ""))[:200] # Log a sample of corrupted payload
+                    "payload_sample": str(row.get("payload", ""))[:200],
                 }
             )
-            asyncio.create_task(bus.publish(error_event))
-            return None # Return None for corrupted events
+            await self._publish_error_or_persist(error_event, "postgres_store _deserialize_event Exception")
+            return None
     
     async def list_pipelines(
         self,
@@ -628,9 +665,7 @@ class PostgreSQLEventStore:
                         "Corrupted snapshot data for aggregate %s: JSONDecodeError: %s",
                         aggregate_id, exc,
                     )
-                    from reasoner.core.events.domain_events import make_event, ErrorOccurred, PipelineEventType
-                    from reasoner.application.event_bus.bus import get_event_bus
-                    bus = get_event_bus()
+                    from reasoner.core.events.domain_events import make_event, PipelineEventType
                     error_event = make_event(
                         PipelineEventType.ERROR_OCCURRED,
                         aggregate_id=aggregate_id,
@@ -640,7 +675,7 @@ class PostgreSQLEventStore:
                             "snapshot_data_sample": str(row.get("state", ""))[:200]
                         }
                     )
-                    asyncio.create_task(bus.publish(error_event))
+                    await self._publish_error_or_persist(error_event, "postgres_store get_snapshot")
                     return None
             return None
     
@@ -714,12 +749,10 @@ class PostgreSQLEventStore:
                         "Corrupted read model data for %s/%s: JSONDecodeError: %s",
                         model_name, model_key, exc,
                     )
-                    from reasoner.core.events.domain_events import make_event, ErrorOccurred, PipelineEventType
-                    from reasoner.application.event_bus.bus import get_event_bus
-                    bus = get_event_bus()
+                    from reasoner.core.events.domain_events import make_event, PipelineEventType
                     error_event = make_event(
                         PipelineEventType.ERROR_OCCURRED,
-                        aggregate_id=model_key, # model_key serves as aggregate_id for read models
+                        aggregate_id=model_key,
                         version=row.get("version", 0),
                         message=f"JSONDecodeError in read model deserialization: {exc}",
                         details={
@@ -728,19 +761,17 @@ class PostgreSQLEventStore:
                             "read_model_data_sample": str(row.get("data", ""))[:200]
                         }
                     )
-                    asyncio.create_task(bus.publish(error_event))
+                    await self._publish_error_or_persist(error_event, "postgres_store get_read_model JSONDecodeError")
                     return None
-                except ValueError as exc: # Original ValueError catch remains
+                except ValueError as exc:
                     logger.error(
                         "Corrupted read model data for %s/%s: ValueError: %s",
                         model_name, model_key, exc,
                     )
-                    from reasoner.core.events.domain_events import make_event, ErrorOccurred, PipelineEventType
-                    from reasoner.application.event_bus.bus import get_event_bus
-                    bus = get_event_bus()
+                    from reasoner.core.events.domain_events import make_event, PipelineEventType
                     error_event = make_event(
                         PipelineEventType.ERROR_OCCURRED,
-                        aggregate_id=model_key, 
+                        aggregate_id=model_key,
                         version=row.get("version", 0),
                         message=f"ValueError in read model deserialization: {exc}",
                         details={
@@ -749,7 +780,7 @@ class PostgreSQLEventStore:
                             "read_model_data_sample": str(row.get("data", ""))[:200]
                         }
                     )
-                    asyncio.create_task(bus.publish(error_event))
+                    await self._publish_error_or_persist(error_event, "postgres_store get_read_model ValueError")
                     return None
             return None
     
@@ -824,6 +855,77 @@ class PostgreSQLEventStore:
             logger.error(f"Unexpected error deleting aggregate {aggregate_id}: {e}")
             raise
     
+    async def prune_events_before(
+        self,
+        cutoff: datetime,
+        batch_size: int = 500,
+    ) -> int:
+        """Delete events older than cutoff that are covered by a snapshot.
+
+        Uses a CTE to work around the PostgreSQL restriction that partitioned
+        tables do not support LIMIT in a top-level DELETE statement.
+
+        Returns:
+            Number of event rows deleted.
+        """
+        if self._pool is None:
+            raise RuntimeError("PostgreSQLEventStore not initialized")
+
+        async with self._pool.acquire() as conn:
+            result = await conn.execute(
+                """
+                WITH to_delete AS (
+                    SELECT e.id
+                    FROM events e
+                    INNER JOIN snapshots s ON s.aggregate_id = e.aggregate_id
+                    WHERE e.version <= s.version
+                      AND e.created_at < $1
+                    ORDER BY e.created_at ASC
+                    LIMIT $2
+                )
+                DELETE FROM events
+                WHERE id IN (SELECT id FROM to_delete)
+                """,
+                cutoff,
+                batch_size,
+            )
+            # asyncpg returns "DELETE N" string
+            deleted = int(result.split()[-1]) if result else 0
+
+            # Clean up terminal aggregates with no remaining events
+            await conn.execute(
+                """
+                DELETE FROM aggregates
+                WHERE status IN ('completed', 'failed')
+                  AND updated_at < $1
+                  AND NOT EXISTS (
+                      SELECT 1 FROM events
+                      WHERE events.aggregate_id = aggregates.aggregate_id
+                  )
+                """,
+                cutoff,
+            )
+
+            return deleted
+
+    async def count_eligible_events(self, cutoff: datetime) -> int:
+        """Count events eligible for pruning (dry-run support)."""
+        if self._pool is None:
+            raise RuntimeError("PostgreSQLEventStore not initialized")
+
+        async with self._pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT COUNT(*) AS cnt
+                FROM events e
+                INNER JOIN snapshots s ON s.aggregate_id = e.aggregate_id
+                WHERE e.version <= s.version
+                  AND e.created_at < $1
+                """,
+                cutoff,
+            )
+            return row["cnt"] if row else 0
+
     async def close(self) -> None:
         """Close connection pools."""
         if self._pool:

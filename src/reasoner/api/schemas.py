@@ -70,6 +70,7 @@ class RunRequest(BaseModel):
     source_type: str = DEFAULT_SOURCE_TYPE
     domain: str | None = None
     attachments: list[AttachmentRef] = []
+    file_ids: list[str] = []
     client_run_id: str | None = None
 
     @field_validator("problem")
@@ -164,6 +165,7 @@ class FollowupRequest(BaseModel):
     previous_synthesis: str
     agent_model: str | None = None
     attachments: list[AttachmentRef] = []
+    file_ids: list[str] = []
     client_run_id: str | None = None
 
     @field_validator("question")

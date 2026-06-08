@@ -807,6 +807,11 @@ def _ser_writing_critic(state: PipelineState) -> dict:
     }
 
 
+def _ser_citations(state: PipelineState) -> list[dict]:
+    prism = state.method_state.get("prism") if state.method_state else {}
+    return prism.get("citations", [])
+
+
 def _ser_5(state: PipelineState) -> dict:
     # ── Writing flow — Humanize (check first: most recent state wins) ──
     writing = _get_v(state, 'writing_state', {})
@@ -935,7 +940,11 @@ def _ser_5(state: PipelineState) -> dict:
             "tokens": state.phase_tokens.get("Phase 5: Final Assembly", {"input": 0, "output": 0}),
         }
 
-    return {}
+    base = {}
+    citations = _ser_citations(state)
+    if citations:
+        base["citations"] = citations
+    return base
 
 
 def _ser_synthesis(state: PipelineState) -> dict:

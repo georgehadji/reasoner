@@ -12,6 +12,7 @@ from typing import Any, Optional, Protocol
 
 from reasoner.core.ports.search_port import SearchServicePort, SourceType
 from reasoner.core.constants import DEFAULT_SEARCH_RESULTS, DEFAULT_SEARXNG_URL, TIMEOUTS, MODEL_QWEN35_9B, MODEL_QWEN35_FLASH, MODEL_GEMINI_FLASH
+from reasoner.core.settings import settings
 from reasoner.infrastructure.search.searxng_adapter import SearXNGAdapter
 
 # DiscoveryClient now wraps SearXNGAdapter to conform to SearchServicePort
@@ -353,7 +354,9 @@ async def get_search_client(
 ) -> tuple[SearchClient, Optional[SourceType]]:
     """Factory: returns SearXNG when healthy, Perplexity when SearXNG is down or
     when OpenRouter key is available and SearXNG fails."""
-    searxng_healthy = await _SEARXNG_CB.can_execute()
+    from reasoner.core.search import _get_searxng_cb
+    cb = _get_searxng_cb()
+    searxng_healthy = cb is not None and await cb.can_execute()
 
     # Strategy 1: SearXNG is healthy — try it first for raw source diversity
     if searxng_healthy:

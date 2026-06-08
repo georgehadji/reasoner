@@ -544,6 +544,24 @@ export default function ChatPage() {
             }
           }
           break;
+        case 'research_step_emitted': {
+          const step = {
+            step_type: String(ev.step_type || 'reasoning'),
+            queries: Array.isArray(ev.queries) ? ev.queries : [],
+            plan: String(ev.plan || ''),
+            urls: Array.isArray(ev.urls) ? ev.urls : [],
+          };
+          dispatchMessages({
+            type: 'UPDATE_MESSAGE',
+            payload: {
+              messageId: assistantId,
+              updates: {
+                researchSteps: [...(messages.find((m) => m.id === assistantId)?.researchSteps || []), step],
+              },
+            },
+          });
+          break;
+        }
         case 'phase_complete':
           if (typeof ev.phase === 'number') {
             const methodPhases = getMethodPhases(runMethod);
@@ -783,6 +801,7 @@ export default function ChatPage() {
           previous_synthesis: lastAssistantMsg.content || '',
           agent_model: null,
           attachments: uploadedAttachments.length > 0 ? uploadedAttachments : undefined,
+          file_ids: uploadedAttachments.length > 0 ? uploadedAttachments.map((a) => a.file_id) : undefined,
           client_run_id: clientRunId,
         };
         await startFollowup(followupReq, onEvent);
@@ -799,6 +818,7 @@ export default function ChatPage() {
           web_search: false,
           smart_search: true,
           attachments: uploadedAttachments.length > 0 ? uploadedAttachments : undefined,
+          file_ids: uploadedAttachments.length > 0 ? uploadedAttachments.map((a) => a.file_id) : undefined,
           client_run_id: clientRunId,
         };
         await startRun(req, onEvent);
