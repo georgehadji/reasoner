@@ -1,9 +1,14 @@
 """
-Update dynamic metadata in ARCHITECTURE_MINDMAP.md after each commit.
+Patch dynamic metadata in architecture/codebase docs after each commit.
+
+Targets:
+  - ARCHITECTURE_MINDMAP.md  (root)
+  - docs/CODEBASE_MINDMAP.md
+  - docs/CODEMAPS/*.md       (<!-- Generated: ... --> headers)
 
 Updates: Last Updated date, Python source file count, model count,
 preset count, reasoning method count — all derived from live code.
-Leaves all architectural prose untouched.
+Leaves all prose untouched.
 """
 
 from __future__ import annotations
@@ -15,8 +20,12 @@ from datetime import date
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-MINDMAP = ROOT / "ARCHITECTURE_MINDMAP.md"
+ARCHITECTURE_MINDMAP = ROOT / "ARCHITECTURE_MINDMAP.md"
+CODEBASE_MINDMAP = ROOT / "docs" / "CODEBASE_MINDMAP.md"
+CODEMAPS_DIR = ROOT / "docs" / "CODEMAPS"
 
+
+# ── Live counts ──────────────────────────────────────────────────────────────
 
 def _count_py_files() -> int:
     src = ROOT / "src" / "reasoner"
@@ -25,8 +34,8 @@ def _count_py_files() -> int:
 
 def _count_models() -> int:
     try:
-        import importlib, sys as _sys
-        _sys.path.insert(0, str(ROOT / "src"))
+        import importlib
+        sys.path.insert(0, str(ROOT / "src"))
         mod = importlib.import_module("reasoner.infrastructure.llm.registry")
         whitelist = getattr(mod, "_MODEL_WHITELIST", None)
         return len(whitelist) if whitelist else 0
@@ -36,8 +45,8 @@ def _count_models() -> int:
 
 def _count_presets() -> int:
     try:
-        import importlib, sys as _sys
-        _sys.path.insert(0, str(ROOT / "src"))
+        import importlib
+        sys.path.insert(0, str(ROOT / "src"))
         mod = importlib.import_module("reasoner.presets")
         presets = getattr(mod, "PRESETS", None)
         return len(presets) if presets else 0
@@ -49,80 +58,130 @@ def _count_methods() -> int:
     phases_dir = ROOT / "src" / "reasoner" / "phases"
     if not phases_dir.exists():
         return 0
-    # Each method has a dedicated prompt module (exclude _shared and _universal)
     return len([
         f for f in phases_dir.glob("*.py")
-        if not f.stem.startswith("_") and f.stem not in ("__init__",)
+        if not f.stem.startswith("_") and f.stem != "__init__"
     ])
 
 
-def _patch(text: str, pattern: str, replacement: str) -> str:
+# ── Patching helpers ──────────────────────────────────────────────────────────
+
+def _patch(text: str, pattern: str, replacement: str, label: str = "") -> str:
     new, n = re.subn(pattern, replacement, text, count=1)
-    if n == 0:
-        print(f"  [mindmap] WARNING: pattern not found — {pattern!r}", file=sys.stderr)
+    if n == 0 and label:
+        print(f"  [mindmap] WARNING: pattern not found in {label} — {pattern!r}", file=sys.stderr)
     return new
 
 
-def main() -> None:
-    if not MINDMAP.exists():
-        print("[mindmap] ARCHITECTURE_MINDMAP.md not found — skipping", file=sys.stderr)
-        sys.exit(0)
+def _stage(path: Path) -> None:
+    subprocess.run(
+        ["git", "add", str(path.relative_to(ROOT))],
+        cwd=ROOT, check=False, capture_output=True,
+    )
 
+
+# ── Per-document updaters ────────────────────────────────────────────────────
+
+def _update_architecture_mindmap(today: str, py: int, models: int, presets: int, methods: int) -> bool:
+    if not ARCHITECTURE_MINDMAP.exists():
+        return False
+    text = orig = ARCHITECTURE_MINDMAP.read_text(encoding="utf-8")
+    f = ARCHITECTURE_MINDMAP.name
+
+    text = _patch(text, r"\*\*Last Updated:\*\* \S+", f"**Last Updated:** {today}", f)
+    # Legacy table row — present in older regenerations, absent in newer ones; skip silently
+    text = re.sub(r"\| \*\*Generated\*\* \| [^\|]+ \|", f"| **Generated** | {today} |", text)
+    if py:
+        text = _patch(text, r"~\d+\+? source files", f"~{py} source files", f)
+    if models:
+        # "131+ LLM models" in prose, and "| **Models Supported** | 100+" in table
+        text = re.sub(r"\b\d+\+? LLM models\b", f"{models}+ LLM models", text)
+        text = re.sub(r"(\| \*\*Models Supported\*\* \| )\d+\+?", rf"\g<1>{models}+", text)
+    if presets:
+        text = re.sub(r"\b\d+\+? declarative presets\b", f"{presets}+ declarative presets", text)
+        text = re.sub(r"(\| \*\*Presets\*\* \| )\d+\+?", rf"\g<1>{presets}+", text)
+    if methods:
+        text = _patch(text, r"\| \*\*Reasoning Methods\*\* \| \d+", f"| **Reasoning Methods** | {methods}", f)
+
+    if text == orig:
+        return False
+    ARCHITECTURE_MINDMAP.write_text(text, encoding="utf-8")
+    _stage(ARCHITECTURE_MINDMAP)
+    return True
+
+
+def _update_codebase_mindmap(today: str, py: int, models: int, presets: int, methods: int) -> bool:
+    if not CODEBASE_MINDMAP.exists():
+        return False
+    text = orig = CODEBASE_MINDMAP.read_text(encoding="utf-8")
+    f = CODEBASE_MINDMAP.name
+
+    # Both "Last updated: DATE" (no >) and "> Last updated: DATE" forms
+    text = re.sub(r"(>?\s*)Last updated: \S+", rf"\g<1>Last updated: {today}", text)
+    # Header stats line: "Python source files: N | Models: N | Presets: N | Methods: N"
+    # These patterns only exist after the doc-updater regenerates the file; silent no-ops on the old format
+    if py:
+        text = re.sub(r"Python source files: \d+", f"Python source files: {py}", text)
+    if models:
+        text = re.sub(r"(?<=\| )Models: \d+", f"Models: {models}", text)
+    if presets:
+        text = re.sub(r"(?<=\| )Presets: \d+", f"Presets: {presets}", text)
+    if methods:
+        text = re.sub(r"(?<=\| )Methods: \d+", f"Methods: {methods}", text)
+
+    if text == orig:
+        return False
+    CODEBASE_MINDMAP.write_text(text, encoding="utf-8")
+    _stage(CODEBASE_MINDMAP)
+    return True
+
+
+def _update_codemaps(today: str, py: int) -> int:
+    if not CODEMAPS_DIR.exists():
+        return 0
+    updated = 0
+    for md in CODEMAPS_DIR.glob("*.md"):
+        text = orig = md.read_text(encoding="utf-8")
+        text = re.sub(
+            r"<!-- Generated: \d{4}-\d{2}-\d{2} \| Files scanned: \d+",
+            f"<!-- Generated: {today} | Files scanned: {py}",
+            text,
+        )
+        if text != orig:
+            md.write_text(text, encoding="utf-8")
+            _stage(md)
+            updated += 1
+    return updated
+
+
+# ── Entry point ──────────────────────────────────────────────────────────────
+
+def main() -> None:
     today = date.today().isoformat()
-    py_files = _count_py_files()
+    py = _count_py_files()
     models = _count_models()
     presets = _count_presets()
     methods = _count_methods()
 
-    text = MINDMAP.read_text(encoding="utf-8")
-    original = text
+    changed: list[str] = []
 
-    text = _patch(text, r"\*\*Last Updated:\*\* \S+", f"**Last Updated:** {today}")
-    text = _patch(text, r"\| \*\*Generated\*\* \| [^\|]+ \|", f"| **Generated** | {today} |")
+    if _update_architecture_mindmap(today, py, models, presets, methods):
+        changed.append("ARCHITECTURE_MINDMAP.md")
 
-    if py_files:
-        text = _patch(
-            text,
-            r"~\d+ source files",
-            f"~{py_files} source files",
-        )
-    if models:
-        text = _patch(
-            text,
-            r"\b\d+\+ LLM models\b",
-            f"{models}+ LLM models",
-        )
-    if presets:
-        text = _patch(
-            text,
-            r"\b\d+ declarative presets\b",
-            f"{presets} declarative presets",
-        )
-    if methods:
-        text = _patch(
-            text,
-            r"\| \*\*Reasoning Methods\*\* \| \d+",
-            f"| **Reasoning Methods** | {methods}",
-        )
+    if _update_codebase_mindmap(today, py, models, presets, methods):
+        changed.append("docs/CODEBASE_MINDMAP.md")
 
-    if text == original:
+    n = _update_codemaps(today, py)
+    if n:
+        changed.append(f"docs/CODEMAPS/ ({n} files)")
+
+    if changed:
+        print(
+            f"[mindmap] Updated {', '.join(changed)} — "
+            f"date={today}, py={py}, models={models}, presets={presets}, methods={methods}"
+        )
+    else:
         print("[mindmap] No metadata changes detected.")
-        sys.exit(0)
-
-    MINDMAP.write_text(text, encoding="utf-8")
-    print(
-        f"[mindmap] Updated metadata: date={today}, py={py_files}, "
-        f"models={models}, presets={presets}, methods={methods}"
-    )
-
-    # Stage the updated file so it's included in the next commit
-    # (runs inside post-commit, so we amend-stage without re-triggering the hook)
-    subprocess.run(
-        ["git", "add", str(MINDMAP.relative_to(ROOT))],
-        cwd=ROOT,
-        check=False,
-        capture_output=True,
-    )
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 # CODEBASE_MINDMAP.md — Reasoner (ARA Pipeline v2.2 + HyperGate)
 
 > High-fidelity architectural reconstruction.  
-> Last updated: 2026-04-17  
+> Last updated: 2026-06-08  
 > HyperGateAgent added: 2026-04-17
 
 ---
