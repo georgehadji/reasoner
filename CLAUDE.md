@@ -6,48 +6,35 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 1. Project Overview
 
-**Reasoner** (Adaptive Reasoning Architecture) is a production-grade AI reasoning orchestrator that decomposes complex problems into structured multi-phase pipelines, leverages 90+ LLM models from diverse training ecosystems in parallel, applies independent critique, stress-tests solutions, and synthesizes actionable recommendations with epistemic labeling (`VERIFIED` / `HYPOTHESIS` / `UNKNOWN`).
+**Reasoner** (Adaptive Reasoning Architecture) is a production-grade AI reasoning orchestrator that decomposes complex problems into structured multi-phase pipelines, leverages 131 LLM models from diverse training ecosystems in parallel, applies independent critique, stress-tests solutions, and synthesizes actionable recommendations with epistemic labeling (`VERIFIED` / `HYPOTHESIS` / `UNKNOWN`).
 
-- **Version:** 2.2 (Python package 2.1.0)
-- **Python:** 3.12+ | **Frontend:** Next.js 16 / React 19 / TypeScript 5
-- **License:** MIT
+- **Version:** 2.2 (Python package 2.1.0) | **Python:** 3.12+ | **Frontend:** Next.js 16 / React 19 / TypeScript 5
 
 > This is not a chatbot. Reasoning is a first-class engineering problem: classify → decompose → vet context → generate (parallel, cross-lab) → critique → stress-test → synthesize → epistemic label → action blueprint.
 
 ### Architecture Style
 
-Hexagonal DDD + CQRS + Event Sourcing + Mixin Composition. The `PipelineState` (~60 fields) is the primary state model. `PipelineAggregate` provides event-sourced state replay.
+Hexagonal DDD + CQRS + Event Sourcing + Mixin Composition. `PipelineState` (~60 fields, `domain/pipeline_state.py`) is the primary state model. `PipelineAggregate` provides event-sourced replay.
 
-**Dependency Rule:** Dependencies point inward — Domain has no outer dependencies, Application depends on Domain/Core but not Infrastructure, Infrastructure implements ports defined in Core.
+**Dependency Rule:** Domain has no outer dependencies → Application depends on Domain/Core only → Infrastructure implements Core ports → API/Interface depends on Application.
 
-**Known violations:** `domain/preset_core.py` imports from `infrastructure.llm.registry`. `api/streaming.py` directly instantiates `ReasonerPipeline` rather than routing through CQRS handlers. `application/flows/__init__.py` imports from `api.serializers`.
+**Known violations:** `domain/preset_core.py` imports from `infrastructure.llm.registry`. `api/streaming.py` directly instantiates the pipeline rather than routing through CQRS handlers. `application/flows/__init__.py` imports from `api.serializers`.
 
 ---
 
 ## 2. Technology Stack
 
-### Backend
 | Layer | Technology |
 |-------|------------|
-| Runtime | Python 3.12+, FastAPI 0.109+, uvicorn, Pydantic v2 |
-| HTTP | httpx |
+| Runtime | Python 3.12+, FastAPI 0.109+, uvicorn, Pydantic v2, httpx |
 | LLM Routing | OpenRouter (primary, 350+ models); 12 direct adapters (Anthropic, OpenAI, Google, Perplexity, DeepSeek, Mistral, xAI, Qwen, Kimi, GLM, MiniMax, Ollama) |
 | Search | SearXNG (Docker), Perplexity Sonar |
 | Database | SQLite (event store), PostgreSQL (asyncpg), aiosqlite |
-| Memory | Custom token cache, Neuro L1/L2/L3 tiered cache with embedding search |
-| Security | Auth, rate limiter, circuit breaker, input sanitization, prompt-injection defense |
+| Memory | Neuro L1/L2/L3 tiered cache with embedding search |
+| Security | Auth, rate limiter, circuit breaker, sanitization, prompt-injection defense, CSRF |
+| Frontend | Next.js 16 (App Router), React 19, TypeScript 5, Tailwind CSS v4, Zustand v5, SWR v2, IndexedDB |
 
-### Frontend (`ui-next/`)
-| Layer | Technology |
-|-------|------------|
-| Framework | Next.js 16 (App Router), React 19 |
-| Language | TypeScript 5 |
-| Styling | Tailwind CSS v4 |
-| State | Zustand v5 (client), SWR v2 (server) |
-| Persistence | IndexedDB via `idb` v8 |
-| Markdown | react-markdown, react-syntax-highlighter, remark-gfm, rehype-highlight |
-
-**Critical:** Tailwind CSS v4 does **NOT** use `tailwind.config.ts`. Configuration is CSS-native via `@import "tailwindcss"` in `globals.css` and the `@tailwindcss/postcss` PostCSS plugin. Do not create `tailwind.config.ts`.
+**Critical:** Tailwind CSS v4 does **NOT** use `tailwind.config.ts`. Config is CSS-native via `@import "tailwindcss"` in `globals.css`. Do not create `tailwind.config.ts`.
 
 ---
 
@@ -55,163 +42,104 @@ Hexagonal DDD + CQRS + Event Sourcing + Mixin Composition. The `PipelineState` (
 
 ```
 src/reasoner/
-├── api/                      # FastAPI HTTP/SSE interface (~30 endpoints)
-│   ├── __init__.py           # App factory, CORS, middleware, route mounting
-│   ├── streaming.py          # Core SSE: run_stream(), run_followup_stream(), run_stream_cached()
-│   ├── serializers.py        # SSE serialization by phase (_ser_0 through _ser_5)
-│   ├── schemas.py            # Pydantic request/response models
-│   ├── middleware.py         # Security headers, memory limits, timeouts
-│   ├── auth_deps.py          # Auth dependencies with scoped permissions
-│   └── routes/               # Modular route handlers (pipelines, uploads, websocket, etc.)
-├── application/              # CQRS commands, queries, event bus, flows, mixins
-│   ├── flows/                # build_default_flow_registry() — binds 17 methods to ReasonerPipeline
-│   ├── handlers/             # RunPipelineCommandHandler, ResumePipelineCommandHandler, etc.
-│   ├── mixins/               # 12 method-specific mixins (debate, jury, research, etc.)
-│   └── services/             # PresetService, SearchService, RendererService
-├── core/                     # Domain core: protocols, constants, settings, events, aggregates
-│   ├── protocol.py           # PhaseConfig, PhaseResult, Phase Protocol
-│   ├── constants.py          # Token budgets, defaults, truncation rules, HyperGate thresholds
-│   ├── search.py             # DiscoveryClient (SearXNG + BM25), PerplexitySearchClient
-│   ├── memory.py             # TaggedMemory (JSONL-based)
-│   ├── events/               # DomainEvent hierarchy + make_event() factory
-│   └── aggregates/           # PipelineAggregate (event-sourced), WidgetAggregate
-├── domain/                   # PresetCore, PresetRegistry — declarative routing configs
-│   ├── preset_core.py        # _KNOWN_ROUTING_ROLES, PipelinePreset, build_auto_preset()
-│   └── preset_registry.py     # 42 preset configs with model routing and fallbacks
-├── infrastructure/           # Adapters: LLM providers, persistence, websocket, widgets
+├── api/                    # FastAPI HTTP/SSE (~30 endpoints)
+│   ├── __init__.py         # App factory, CORS, middleware, route mounting
+│   ├── streaming.py        # Core SSE: run_stream(), run_followup_stream(), run_stream_cached()
+│   ├── serializers.py      # SSE serialization by phase (_ser_0 through _ser_5)
+│   ├── schemas.py          # Pydantic request/response models
+│   ├── middleware.py       # Security headers, memory limits, timeouts
+│   ├── auth_deps.py        # Auth dependencies with scoped permissions
+│   └── routes/             # Modular route handlers
+├── application/            # CQRS commands, queries, event bus, flows, mixins
+│   ├── pipeline.py         # ReasonerPipeline orchestrator (real impl — pipeline.py root is a shim)
+│   ├── orchestrator.py     # PipelineOrchestrator + preflight (HyperGate, preset resolution)
+│   ├── flows/              # Phase functions bound to ReasonerPipeline by flow registry
+│   ├── handlers/           # RunPipelineCommandHandler, ResumePipelineCommandHandler, etc.
+│   ├── mixins/             # Method-specific mixins (debate, jury, research, writing, etc.)
+│   └── services/           # PresetService, SearchService, RendererService
+├── core/                   # Domain core: protocols, constants, settings, events, aggregates
+│   ├── constants.py        # → re-exports constants_limits + constants_models
+│   ├── constants_limits.py # Token budgets, timeouts, HyperGate thresholds, truncation
+│   ├── settings.py         # Settings (pydantic-settings), dotenv load, CSRF/auth config
+│   ├── ports/              # Hexagonal ports: LLMPort, SearchServicePort, FileSearchPort
+│   ├── events/             # DomainEvent hierarchy + make_event() factory
+│   └── aggregates/         # PipelineAggregate (event-sourced), WidgetAggregate
+├── domain/                 # Business entities and declarative routing configs
+│   ├── pipeline_state.py   # PipelineState (~60 fields) — canonical state model
+│   ├── preset_core.py      # PipelinePreset, build_auto_preset(), _KNOWN_ROUTING_ROLES
+│   └── preset_registry.py  # 48 preset configs with model routing and fallbacks
+├── infrastructure/         # Adapters implementing Core ports
 │   ├── llm/
-│   │   ├── ports.py          # Hexagonal ports: LLMProvider Protocol, Message, LLMResponse
-│   │   ├── registry.py       # _MODEL_WHITELIST (90+ models), _REGISTRY, build_provider()
-│   │   ├── router.py         # ProviderRouter: role-based routing, fallback chain
-│   │   ├── providers/        # OpenAICompatibleProvider, OpenRouterProvider
-│   │   └── extraction/       # Vision LLM image description/OCR
-│   ├── persistence/          # EventStore (SQLite), snapshots, postgres_store
-│   └── websocket/            # WebSocket connection manager
-├── pipeline.py               # ReasonerPipeline orchestrator (902 lines + 11 mixins)
-├── models.py                 # PipelineState (~60 fields), CostTrackingState, ConversationState
-├── phases/                   # 19 prompt modules (_shared, _universal, 17 methods)
-├── hypergate/                # HyperGate pre-router: 5 parallel sub-agents + TieBreaker
-│   ├── hyperagent.py         # HyperGateAgent orchestrator
-│   ├── base_sub_agent.py     # Abstract base
-│   └── sub_agents/           # language, complexity, direct, web, method, tie-breaker
-├── subagents/                # Phase sub-agents (enhancement, decomposition, critique, synthesis, search)
-├── neuro/                    # Long-term memory: server.py, L1/L2/L3 cache, compression, sessions
-├── healing/                  # Self-healing: introspection_engine, test_generation_engine, generated_tests/
-└── [utility modules]
-    ├── auth.py               # Token-based auth with scopes
-    ├── rate_limiter.py       # Token-bucket rate limiter
-    ├── circuit_breaker.py   # Circuit breaker pattern
-    ├── sanitization.py       # Input sanitization / prompt-injection defense
-    ├── parsing.py            # JSON extraction, repair, structured parsing
-    ├── renderer.py           # CLI rendering
-    ├── scraper.py            # Web content extraction
-    └── reasoner_persuasion_defense.py  # Adversarial persuasion defense
+│   │   ├── registry.py     # _MODEL_WHITELIST (131 models), _REGISTRY, build_provider()
+│   │   ├── router.py       # ProviderRouter: role-based routing, fallback chain
+│   │   └── providers/      # OpenAICompatibleProvider, OpenRouterProvider, etc.
+│   ├── persistence/        # EventStore (SQLite), snapshots, postgres_store
+│   └── websocket/          # WebSocket connection manager
+├── hypergate/              # HyperGate pre-router: 5 parallel sub-agents + TieBreaker
+│   ├── hyperagent.py       # HyperGateAgent orchestrator + fast-path regexes
+│   ├── base_sub_agent.py   # Abstract base with LRU caching
+│   └── sub_agents/         # language, complexity, direct, web_detector, method, tiebreaker
+├── phases/                 # 31 prompt modules: _shared, _universal + 29 method modules
+├── subagents/              # Phase sub-agents (enhancement, decomposition, critique, synthesis, search)
+├── neuro/                  # Long-term memory: L1/L2/L3 tiered cache, compression, sessions
+├── healing/                # Self-healing: introspection_engine, test_generation_engine
+├── models.py               # Backward-compat shim → domain/pipeline_state.py + domain/models.py
+└── pipeline.py             # Backward-compat shim → application/pipeline.py
 
 ui-next/src/
-├── app/                      # App Router (layout, page, providers, error, api routes)
-├── components/
-│   ├── chat/                 # ChatFeed, ChatMessage, MarkdownRenderer, TypewriterMarkdown
-│   ├── layout/               # Composer, PhaseTimeline, Sidebar, ShortcutModal
-│   ├── phases/              # PhaseCard, PhaseRenderer, ClassificationCard, CritiqueCard, SynthesisCard
-│   ├── ui/                  # Button, Badge, Spinner, ThemeToggle
-│   └── widgets/             # WidgetRenderer, CalculationWidget, StockWidget, WeatherWidget
-├── hooks/                    # usePipelineStream (SSE), useConversationHistory, useKeyboardShortcuts, useServerStatus
-├── lib/                      # api-client, db (IndexedDB), types, utils, security, markdown
-└── stores/                   # app-store.ts (Zustand global state with persistence)
+├── app/                    # App Router (layout, page, providers, error, api routes)
+├── components/             # chat/, layout/, phases/, ui/, widgets/
+├── hooks/                  # usePipelineStream (SSE), useConversationHistory, useKeyboardShortcuts
+├── lib/                    # api-client, db (IndexedDB), types, utils, security, markdown
+└── stores/                 # app-store.ts (Zustand global state with persistence)
 
-tests/                        # pytest suite (~60+ test files)
+tests/                      # pytest suite (~60+ test files)
+scripts/
+└── update_mindmap_meta.py  # Patches live counts into ARCHITECTURE_MINDMAP.md (runs post-commit)
 ```
 
 ---
 
 ## 4. Commands
 
-### Development Environment
+### Development
 
 ```bash
-# Backend
-pip install -r requirements.txt
-
-# Frontend
-cd ui-next && npm install
-
-# Start all (backend + frontend + SearXNG)
-python start_all.py
-
-# Backend only
-uvicorn asgi:app --reload --host 0.0.0.0 --port 8003
-
-# Frontend only
-cd ui-next && npm run dev
-
-# SearXNG search
-docker-compose -f docker-compose.searxng.yml up -d
+python start_all.py                                          # backend + frontend + SearXNG
+uvicorn asgi:app --reload --host 0.0.0.0 --port 8003        # backend only
+cd ui-next && npm run dev                                    # frontend only
+docker-compose -f docker-compose.searxng.yml up -d          # SearXNG
+pip install -r requirements.txt                             # install deps
 ```
 
 ### Testing
 
 ```bash
-# All tests
-python -m pytest tests/ -v
-
-# Skip slow/integration
+python -m pytest tests/ -v                                  # all tests
 python -m pytest tests/ -v -m "not slow and not integration"
-
-# Single file
-pytest tests/unit/test_activity_stream.py -v
-
-# With coverage
 pytest tests/ --cov=src/reasoner --cov-report=html
-
-# Include slow tests
-python -m pytest --run-slow
-
-# SearXNG integration tests (requires live instance)
-python -m pytest -m searxng
-
-# Parallel execution
-pytest -n auto
+pytest -n auto                                              # parallel
+python -m pytest -m searxng                                 # requires live SearXNG
 ```
 
 ### CLI
 
 ```bash
-# List presets and models
 python main.py --list-presets
 python main.py --list-models
-
-# Run a reasoning pipeline
 python main.py --problem "..." --preset debate-premium
-
-# Load from file, export JSON
 python main.py --problem-file problem.txt --output result.json --preset multi-perspective-premium
-
-# Sequential mode (rate-limited environments)
-python main.py --problem "..." --sequential
-
-# Adjust top-k pruning (default: 2)
-python main.py --problem "..." --top-k 3
-
-# Save and resume state
-python main.py --save-state state.json --problem "..."
-python main.py --resume state.json
+python main.py --problem "..." --sequential                 # for rate-limited providers
+python main.py --save-state state.json --problem "..." && python main.py --resume state.json
 ```
 
 ### Frontend
 
 ```bash
-cd ui-next
-
-# Dev / build
-npm run dev
-npm run build
-npm run lint        # ESLint 9 flat config (eslint.config.mjs)
-
-# Type check
-npx tsc --noEmit
-
-# E2E tests
-npx playwright test
+cd ui-next && npm run dev
+cd ui-next && npm run build
+cd ui-next && npx tsc --noEmit
+cd ui-next && npx playwright test
 ```
 
 ---
@@ -220,32 +148,35 @@ npx playwright test
 
 ### HyperGate Pre-Router
 
-Every request passes through `HyperGateAgent` before any reasoning pipeline. Six specialized sub-agents run **in parallel** with fail-safe fallback — any sub-agent error becomes a graceful fallback, never a crash. Real method names are never exposed to LLMs; only opaque letters (B–Q) appear in sub-agent prompts.
+Every request passes through `HyperGateAgent` before any pipeline. Five sub-agents run **in parallel** with fail-safe fallback. Real method names are never exposed to LLMs; only opaque letters (B–Q) appear in sub-agent prompts.
 
 ```
-Problem → [LanguageDetector, ComplexityEstimator, DirectDetector, WebSearchDetector, MethodClassifier] → TieBreaker
-                                                                                                          ↓
-                              DIRECT (instant answer) | WEB_SEARCH | PIPELINE (method auto-selected)
+Problem → [LanguageDetector | ComplexityEstimator | DirectDetector | WebSearchDetector | MethodClassifier]
+                                                          ↓ TieBreaker
+                        DIRECT (instant) | WEB_SEARCH (real-time) | PIPELINE (method auto-selected)
 ```
+
+Fast-path order before sub-agents fire: short prompt → writing intent → realtime patterns → factual patterns.
 
 ### Core Pipeline Flow
 
 ```
-Problem → HyperGate → Phase 0: Classification (task type, language) → Phase 1: Decomposition (≤5 sub-problems, failure modes)
-       → Phase 2: Multi-Perspective Generation (parallel, cross-lab: constructive/destructive/systemic/minimalist)
-       → Phase 3: Critique & Pruning (independent scoring 0-10, retains top-k)
-       → Phase 4: Stress Testing (optimal/constraint-violation/adversarial)
-       → Phase 5: Synthesis (VERIFIED/HYPOTHESIS/UNKNOWN + Action Blueprint)
+HyperGate → Phase 0: Classification (task type, language)
+          → Phase 1: Decomposition (≤5 sub-problems, failure modes)
+          → Phase 2: Multi-Perspective Generation (parallel, cross-lab: constructive/destructive/systemic/minimalist)
+          → Phase 3: Critique & Pruning (independent scoring 0–10, retains top-k)
+          → Phase 4: Stress Testing (optimal / constraint-violation / adversarial)
+          → Phase 5: Synthesis (VERIFIED/HYPOTHESIS/UNKNOWN + Action Blueprint)
 ```
 
-### Reasoning Methods (17)
+### Reasoning Methods (19 top-level + Verbalized Sampling sub-phases)
 
 | Method | Description |
 |--------|-------------|
 | **Orchestrated** | Default 6-phase multi-perspective |
-| **Debate** | Adversarial with opening, rebuttal, judge |
-| **Jury** | Expert panel (generator, critic, verifier) |
-| **Research** | Web-grounded iterative RAG with SearXNG |
+| **Debate** | Adversarial opening, rebuttal, judge |
+| **Jury** | Expert panel: generator, critic, verifier |
+| **Research** | Web-grounded iterative RAG (Prism loop) |
 | **Scientific** | Hypothesis generation + falsification |
 | **Socratic** | Elenchus questioning to expose assumptions |
 | **Pre-Mortem** | Prospective failure analysis |
@@ -253,16 +184,18 @@ Problem → HyperGate → Phase 0: Classification (task type, language) → Phas
 | **Dialectical** | Hegelian thesis-antithesis-synthesis |
 | **Analogical** | Cross-domain structure-mapping |
 | **Delphi** | Structured expert consensus |
-| **CoVE** | Chain-of-Verification (draft → verify → answer → revise) |
-| **SoT** | Skeleton-of-Thought (skeleton → parallel solve → assemble) |
-| **ToT** | Tree-of-Thoughts (search + evaluate + backtrack) |
-| **PoT** | Program-of-Thoughts (executable code as reasoning) |
+| **CoVE** | Chain-of-Verification: draft → verify → revise |
+| **SoT** | Skeleton-of-Thought: skeleton → parallel solve → assemble |
+| **ToT** | Tree-of-Thoughts: search + evaluate + backtrack |
+| **PoT** | Program-of-Thoughts: executable code as reasoning |
 | **Self-Discover** | Dynamic reasoning module composition |
 | **Writing** | Creative writing with hallucination guards |
+| **Brainstorming** | Divergent idea generation |
+| **Coding** | Code-focused structured reasoning |
 
-### Presets (42)
+### Presets (48)
 
-Every method has **Budget** (~$0.02/run) and **Premium** (~$0.15–$0.30/run) tiers, plus 1 Balanced and 1 Experimental. The UI orders methods Budget → Balanced → Premium from most to least cost-effective, defaulting to the first method/preset.
+Every method has **Budget** (~$0.02/run) and **Premium** (~$0.15–$0.30/run) tiers. The UI orders Budget → Balanced → Premium, defaulting to the first (cheapest) method/preset.
 
 ### Model Routing Philosophy
 
@@ -271,264 +204,64 @@ Cross-lab diversity prevents echo chambers:
 - **Scoring:** Scorer must be from a different ecosystem than the dominant generator
 - **Fallbacks:** Fail to cross-lab equivalent, never blindly to preset primary
 
-### State Field Pattern
+### Key Invariants
 
-Method-specific state uses `dict[str, Any]` fields initialized with `field(default_factory=dict)` in `PipelineState`. Accessed via `.get()`, never direct subscript. Enables `--resume` with partial/older state files.
-
-### JSON Extraction
-
-All LLM responses parsed via `parsing.extract_json()`, never direct JSON parsing.
+- Method-specific state uses `dict[str, Any]` fields with `field(default_factory=dict)`. Always access via `.get()`, never direct subscript — enables `--resume` with older state files.
+- All LLM responses parsed via `parsing.extract_json()`, never direct `json.loads`.
+- `sanitize_for_prompt()` must gate all user-supplied text before it enters any prompt.
+- `CSRF_ENFORCE_BACKEND=false` in CI envs (no `CSRF_SECRET` available).
 
 ---
 
 ## 6. Working with Neuro & Compression
 
-- **Recall:** `neuro.server.create_neuro_router()` provides the `/neuro/recall` endpoint. Automatically called in `ReasonerPipeline.run` to fetch relevant context from long-term memory.
-- **Learn:** `/neuro/learn` saves the final synthesis at pipeline end. Tag entries with metadata (preset, task_type).
-- **Compression:** `neuro.compression.smart_compress(text, ext, level)` reduces token usage.
-  - `Aggressive` — structural analysis, keeps only signatures
-  - `Minimal` — general cleanup
-- **L1/L2/L3 tiers:** L1=memory, L2=disk JSON, L3=Neuro LTM with embedding search
-- **Tenant isolation:** Use `agent_id` in Neuro requests → stored in `~/.neuro/agents/<id>`
+- **Recall:** `neuro.server.create_neuro_router()` → `/neuro/recall` — auto-called in pipeline run.
+- **Learn:** `/neuro/learn` saves final synthesis at pipeline end.
+- **Compression:** `neuro.compression.smart_compress(text, ext, level)` — `Aggressive` keeps only signatures; `Minimal` does general cleanup.
+- **L1/L2/L3:** L1=memory, L2=disk JSON, L3=Neuro LTM with embedding search.
+- **Tenant isolation:** Use `agent_id` in Neuro requests → `~/.neuro/agents/<id>`.
 
 ---
 
 ## 7. Cross-Cutting Concerns
 
 ### Security (Defense in Depth)
-- **Input:** `reasoner.sanitization.sanitize_for_prompt()` — XSS stripping, null-byte removal, prompt-injection regex guards, unicode NFKC normalization
+- **Input:** `sanitization.sanitize_for_prompt()` — XSS stripping, null-byte removal, prompt-injection regex, unicode NFKC normalization
 - **Auth:** Token-based with scoped permissions (`auth.py`)
 - **Rate limiting:** Token-bucket per client IP (`rate_limiter.py`)
-- **CSRF:** HMAC-SHA256 signed tokens verified in Next.js API routes **and** FastAPI via `require_csrf`
+- **CSRF:** HMAC-SHA256 signed tokens in Next.js API routes and FastAPI `require_csrf`
 - **Circuit breaker:** Automatic provider fallback (`circuit_breaker.py`)
 - **Headers:** X-Frame-Options, X-Content-Type-Options, Referrer-Policy, HSTS, CSP
 
 ### Self-Healing CI/CD
-`.github/workflows/self-healing-ci.yml` runs 5 loops: healing-profile → loop1-static → loop2-runtime → loop3-evolutionary → searxng-integration → healing-verification. Coverage gates: 60% fail, 80% warn.
+
+`.github/workflows/self-healing-ci.yml` — healing-profile → loop1-static → loop2-runtime → loop3-evolutionary → searxng-integration → healing-verification. Coverage gates: 60% fail, 80% warn.
 
 ---
 
 ## 8. Workflow Orchestration
 
-1. **Plan First** — Enter plan mode for any non-trivial task (3+ steps or architectural decisions). Write specs to `tasks/todo.md`.
-2. **Subagent Strategy** — Use subagents liberally to keep main context clean. Offload research, exploration, and parallel analysis.
-3. **Self-Improvement Loop** — After any correction from the user, update `tasks/lessons.md` with the pattern.
-4. **Verification Before Done** — Never mark a task complete without proving it works (tests, logs, diffs).
-5. **Demand Elegance** — For non-trivial changes, pause and ask "is there a more elegant way?"
-6. **Autonomous Bug Fixing** — When given a bug report, just fix it. Point at logs, errors, failing tests — then resolve them.
+1. **Plan First** — Enter plan mode for any non-trivial task (3+ steps or architectural decisions).
+2. **Subagent Strategy** — Use subagents liberally to keep main context clean. Offload research and parallel analysis.
+3. **Verification Before Done** — Never mark a task complete without proving it works (tests, logs, diffs).
+4. **Autonomous Bug Fixing** — When given a bug report, just fix it. Point at logs, errors, failing tests — then resolve them.
 
 ---
 
 ## 9. Core Principles
 
 - **Simplicity First** — Make every change as simple as possible. Impact minimal code.
-- **Root Causes** — Find root causes. No temporary fixes. Senior developer standards.
-- **Minimal Impact** — Changes should only touch what's necessary. Avoid introducing bugs.
+- **Root Causes** — No temporary fixes. Senior developer standards.
+- **Minimal Impact** — Changes should only touch what's necessary.
 
 ---
 
-*For detailed product snapshot, reasoning methods, and preset tiers, see `AGENTS.md`. For complete architectural analysis (structural, behavioral, domain, infrastructure views), see `ARCHITECTURE_MINDMAP.md`.*
-# CLAUDE.md
+## 10. Living Documentation
 
-Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
+| Doc | How it updates |
+|-----|---------------|
+| `ARCHITECTURE_MINDMAP.md` | `post-commit` hook patches date + counts (models, presets, files) automatically via `scripts/update_mindmap_meta.py` |
+| `graphify-out/` | `post-commit` and `post-checkout` hooks rebuild the knowledge graph automatically |
+| `AGENTS.md` | Manual — update when adding methods, presets, or major architectural changes |
 
-**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
-
-## 1. Think Before Coding
-
-**Don't assume. Don't hide confusion. Surface tradeoffs.**
-
-Before implementing:
-- State your assumptions explicitly. If uncertain, ask.
-- If multiple interpretations exist, present them - don't pick silently.
-- If a simpler approach exists, say so. Push back when warranted.
-- If something is unclear, stop. Name what's confusing. Ask.
-
-## 2. Simplicity First
-
-**Minimum code that solves the problem. Nothing speculative.**
-
-- No features beyond what was asked.
-- No abstractions for single-use code.
-- No "flexibility" or "configurability" that wasn't requested.
-- No error handling for impossible scenarios.
-- If you write 200 lines and it could be 50, rewrite it.
-
-Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
-
-## 3. Surgical Changes
-
-**Touch only what you must. Clean up only your own mess.**
-
-When editing existing code:
-- Don't "improve" adjacent code, comments, or formatting.
-- Don't refactor things that aren't broken.
-- Match existing style, even if you'd do it differently.
-- If you notice unrelated dead code, mention it - don't delete it.
-
-When your changes create orphans:
-- Remove imports/variables/functions that YOUR changes made unused.
-- Don't remove pre-existing dead code unless asked.
-
-The test: Every changed line should trace directly to the user's request.
-
-## 4. Goal-Driven Execution
-
-**Define success criteria. Loop until verified.**
-
-Transform tasks into verifiable goals:
-- "Add validation" → "Write tests for invalid inputs, then make them pass"
-- "Fix the bug" → "Write a test that reproduces it, then make it pass"
-- "Refactor X" → "Ensure tests pass before and after"
-
-For multi-step tasks, state a brief plan:
-```
-1. [Step] → verify: [check]
-2. [Step] → verify: [check]
-3. [Step] → verify: [check]
-```
-
-Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
-
----
-
-**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
-
-<!-- rtk-instructions v2 -->
-# RTK (Rust Token Killer) - Token-Optimized Commands
-
-## Golden Rule
-
-**Always prefix commands with `rtk`**. If RTK has a dedicated filter, it uses it. If not, it passes through unchanged. This means RTK is always safe to use.
-
-**Important**: Even in command chains with `&&`, use `rtk`:
-```bash
-# ❌ Wrong
-git add . && git commit -m "msg" && git push
-
-# ✅ Correct
-rtk git add . && rtk git commit -m "msg" && rtk git push
-```
-
-## RTK Commands by Workflow
-
-### Build & Compile (80-90% savings)
-```bash
-rtk cargo build         # Cargo build output
-rtk cargo check         # Cargo check output
-rtk cargo clippy        # Clippy warnings grouped by file (80%)
-rtk tsc                 # TypeScript errors grouped by file/code (83%)
-rtk lint                # ESLint/Biome violations grouped (84%)
-rtk prettier --check    # Files needing format only (70%)
-rtk next build          # Next.js build with route metrics (87%)
-```
-
-### Test (60-99% savings)
-```bash
-rtk cargo test          # Cargo test failures only (90%)
-rtk go test             # Go test failures only (90%)
-rtk jest                # Jest failures only (99.5%)
-rtk vitest              # Vitest failures only (99.5%)
-rtk playwright test     # Playwright failures only (94%)
-rtk pytest              # Python test failures only (90%)
-rtk rake test           # Ruby test failures only (90%)
-rtk rspec               # RSpec test failures only (60%)
-rtk test <cmd>          # Generic test wrapper - failures only
-```
-
-### Git (59-80% savings)
-```bash
-rtk git status          # Compact status
-rtk git log             # Compact log (works with all git flags)
-rtk git diff            # Compact diff (80%)
-rtk git show            # Compact show (80%)
-rtk git add             # Ultra-compact confirmations (59%)
-rtk git commit          # Ultra-compact confirmations (59%)
-rtk git push            # Ultra-compact confirmations
-rtk git pull            # Ultra-compact confirmations
-rtk git branch          # Compact branch list
-rtk git fetch           # Compact fetch
-rtk git stash           # Compact stash
-rtk git worktree        # Compact worktree
-```
-
-Note: Git passthrough works for ALL subcommands, even those not explicitly listed.
-
-### GitHub (26-87% savings)
-```bash
-rtk gh pr view <num>    # Compact PR view (87%)
-rtk gh pr checks        # Compact PR checks (79%)
-rtk gh run list         # Compact workflow runs (82%)
-rtk gh issue list       # Compact issue list (80%)
-rtk gh api              # Compact API responses (26%)
-```
-
-### JavaScript/TypeScript Tooling (70-90% savings)
-```bash
-rtk pnpm list           # Compact dependency tree (70%)
-rtk pnpm outdated       # Compact outdated packages (80%)
-rtk pnpm install        # Compact install output (90%)
-rtk npm run <script>    # Compact npm script output
-rtk npx <cmd>           # Compact npx command output
-rtk prisma              # Prisma without ASCII art (88%)
-```
-
-### Files & Search (60-75% savings)
-```bash
-rtk ls <path>           # Tree format, compact (65%)
-rtk read <file>         # Code reading with filtering (60%)
-rtk grep <pattern>      # Search grouped by file (75%)
-rtk find <pattern>      # Find grouped by directory (70%)
-```
-
-### Analysis & Debug (70-90% savings)
-```bash
-rtk err <cmd>           # Filter errors only from any command
-rtk log <file>          # Deduplicated logs with counts
-rtk json <file>         # JSON structure without values
-rtk deps                # Dependency overview
-rtk env                 # Environment variables compact
-rtk summary <cmd>       # Smart summary of command output
-rtk diff                # Ultra-compact diffs
-```
-
-### Infrastructure (85% savings)
-```bash
-rtk docker ps           # Compact container list
-rtk docker images       # Compact image list
-rtk docker logs <c>     # Deduplicated logs
-rtk kubectl get         # Compact resource list
-rtk kubectl logs        # Deduplicated pod logs
-```
-
-### Network (65-70% savings)
-```bash
-rtk curl <url>          # Compact HTTP responses (70%)
-rtk wget <url>          # Compact download output (65%)
-```
-
-### Meta Commands
-```bash
-rtk gain                # View token savings statistics
-rtk gain --history      # View command history with savings
-rtk discover            # Analyze Claude Code sessions for missed RTK usage
-rtk proxy <cmd>         # Run command without filtering (for debugging)
-rtk init                # Add RTK instructions to CLAUDE.md
-rtk init --global       # Add RTK to ~/.claude/CLAUDE.md
-```
-
-## Token Savings Overview
-
-| Category | Commands | Typical Savings |
-|----------|----------|-----------------|
-| Tests | vitest, playwright, cargo test | 90-99% |
-| Build | next, tsc, lint, prettier | 70-87% |
-| Git | status, log, diff, add, commit | 59-80% |
-| GitHub | gh pr, gh run, gh issue | 26-87% |
-| Package Managers | pnpm, npm, npx | 70-90% |
-| Files | ls, read, grep, find | 60-75% |
-| Infrastructure | docker, kubectl | 85% |
-| Network | curl, wget | 65-70% |
-
-Overall average: **60-90% token reduction** on common development operations.
-<!-- /rtk-instructions -->
+*For complete architectural analysis see `ARCHITECTURE_MINDMAP.md`. For dependency graph see `graphify-out/GRAPH_REPORT.md`.*
