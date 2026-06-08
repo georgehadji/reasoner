@@ -56,3 +56,6 @@ settings.json
 .worktrees/
 # Local agent profile configs (may contain secrets)
 .openclaude-profile.json
+
+# SQLite database files (may contain session data / false-positive secret patterns)
+*.db
