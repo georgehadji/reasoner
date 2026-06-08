@@ -31,9 +31,11 @@ env:
   PYTHON_VERSION: '3.12'
   PIP_CACHE_DIR: ${{ github.workspace }}/.cache/pip
   # BUG-001: Add source and legacy dirs to Python path so all `python -c`
-  # verification steps (imports of circuit_breaker, health_check, retry_utils)
-  # resolve correctly from the repo root during CI runs.
-  PYTHONPATH: src/reasoner:legacy
+  # verification steps resolve correctly from the repo root during CI runs.
+  # src         → enables `from reasoner.xxx import` (package-qualified imports)
+  # src/reasoner → enables bare `from core.xxx import` (legacy direct imports)
+  # legacy      → backward-compat shims
+  PYTHONPATH: src:src/reasoner:legacy
   # Disable CSRF enforcement in CI — no CSRF_SECRET is available in the CI
   # environment; keeping enforce=true causes a RuntimeError at import time.
   CSRF_ENFORCE_BACKEND: 'false'
