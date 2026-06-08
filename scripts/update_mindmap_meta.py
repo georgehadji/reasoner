@@ -116,18 +116,17 @@ def _update_codebase_mindmap(today: str, py: int, models: int, presets: int, met
     text = orig = CODEBASE_MINDMAP.read_text(encoding="utf-8")
     f = CODEBASE_MINDMAP.name
 
-    # Both "Last updated: DATE" (no >) and "> Last updated: DATE" forms
-    text = re.sub(r"(>?\s*)Last updated: \S+", rf"\g<1>Last updated: {today}", text)
-    # Header stats line: "Python source files: N | Models: N | Presets: N | Methods: N"
-    # These patterns only exist after the doc-updater regenerates the file; silent no-ops on the old format
+    # Both plain and bold "Last updated" forms
+    text = re.sub(r"(\*\*Last updated:\*\*|Last updated:) \S+", rf"\1 {today}", text)
+    # Header stats: both plain "Python source files: N" and bold "**Python source files:** N"
     if py:
-        text = re.sub(r"Python source files: \d+", f"Python source files: {py}", text)
+        text = re.sub(r"(\*\*Python source files:\*\*|Python source files:) \d+", rf"\1 {py}", text)
     if models:
-        text = re.sub(r"(?<=\| )Models: \d+", f"Models: {models}", text)
+        text = re.sub(r"(\*\*Models:\*\*|Models:) \d+", rf"\1 {models}", text)
     if presets:
-        text = re.sub(r"(?<=\| )Presets: \d+", f"Presets: {presets}", text)
+        text = re.sub(r"(\*\*Presets:\*\*|Presets:) \d+", rf"\1 {presets}", text)
     if methods:
-        text = re.sub(r"(?<=\| )Methods: \d+", f"Methods: {methods}", text)
+        text = re.sub(r"(\*\*Methods:\*\*|Methods:) \d+", rf"\1 {methods}", text)
 
     if text == orig:
         return False
