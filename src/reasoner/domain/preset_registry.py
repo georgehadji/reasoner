@@ -1910,6 +1910,16 @@ PRESETS: dict[str, PipelinePreset] = {
         routing=cfg.get("routing", {}),
         notes=cfg.get("notes", []),
         required_env_vars=cfg.get("required_env_vars", ["OPENROUTER_API_KEY"]),
+        fallback_routing=cfg.get("fallback_routing", {}),
+        required_tier=cfg.get("required_tier", SubscriptionTier.FREE),
+        top_k=cfg.get("top_k", 2),
+        parallel_perspectives=cfg.get("parallel_perspectives", True),
+        enhance_prompt=cfg.get("enhance_prompt", False),
+        skip_stress_test=cfg.get("skip_stress_test", False),
+        skip_deep_read=cfg.get("skip_deep_read", False),
+        batch_critique_jury=cfg.get("batch_critique_jury", False),
+        cascading_routing=cfg.get("cascading_routing", {}),
+        brainstorming_config=cfg.get("brainstorming_config", {}),
     )
     for cfg in _PRESET_CONFIGS
 }
