@@ -1,7 +1,7 @@
 # CODEBASE_MINDMAP.md — Reasoner (v3.0 Post-Refactor)
 
 > High-fidelity codebase reconstruction.  
-> **Last updated:** 2026-06-08  
+> **Last updated:** 2026-06-09  
 > **Python source files:** 375 | **Models:** 131 | **Presets:** 48 | **Methods:** 29 | **Phase modules:** 32
 
 ---
