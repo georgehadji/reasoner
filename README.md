@@ -23,7 +23,7 @@ v2.2 — Reasoner
 [![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/tesse/Reasoner?style=flat-square&logo=github)](https://github.com/tesse/Reasoner)
 
-**A production-grade reasoning engine that orchestrates 16+ LLM methodologies — from multi-perspective analysis to scientific hypothesis testing — with automatic method selection, cross-lab diversity, and real-time streaming.**
+**A production-grade reasoning engine that orchestrates 20 LLM methodologies — from multi-perspective analysis to verbalized sampling brainstorming — with automatic method selection, cross-lab diversity, and real-time streaming.**
 
 [🚀 Quick Start](#quick-start) · [🧠 Methods](#reasoning-methods) · [🎛️ Presets](#available-presets) · [💻 Development](#development)
 
@@ -33,7 +33,7 @@ v2.2 — Reasoner
 
 ## 🎯 Project Overview
 
-Reasoner is a **reasoning orchestrator** that decomposes complex problems into structured phases, leverages multiple LLMs in parallel from diverse training ecosystems, applies rigorous independent critique, stress-tests solutions under adversarial conditions, and synthesizes actionable recommendations with epistemic labeling. It features a HyperGate Pre-Router for automatic method selection, supports 16 reasoning methods, ensures cross-lab diversity, and provides real-time streaming of progress and cost.
+Reasoner is a **reasoning orchestrator** that decomposes complex problems into structured phases, leverages multiple LLMs in parallel from diverse training ecosystems, applies rigorous independent critique, stress-tests solutions under adversarial conditions, and synthesizes actionable recommendations with epistemic labeling. It features a HyperGate Pre-Router for automatic method selection, supports 20 reasoning methods with 48 presets, ensures cross-lab diversity, and provides real-time streaming of progress and cost.
 
 ---
 
@@ -189,69 +189,204 @@ asyncio.run(main())
 
 ## 🧠 Reasoning Methods
 
-Reasoner supports **16 specialized reasoning methodologies** beyond the default orchestrated pipeline:
+Reasoner supports **20 specialized reasoning methodologies**:
 
-| Method | Description | Best For |
-|--------|-------------|----------|
-| **Orchestrated** | Default 6-phase pipeline with multi-perspective generation | General complex problems |
-| **Debate** | Two models compete; a third judges the winner | Polarized decisions |
-| **Scientific** | Hypothesis generation, falsification tests, evidence scoring | Research & validation |
-| **Socratic** | Elenchus questioning to expose assumptions | Clarifying ambiguous problems |
-| **Jury** | Multiple generators scored by an independent panel of critics | High-stakes decisions |
-| **Research** | Web-grounded deep research with iterative SearXNG search | Evidence-heavy questions |
-| **Pre-Mortem** | Prospective hindsight failure analysis (Gary Klein methodology) | Risk assessment |
-| **Bayesian** | Prior → likelihood → posterior → sensitivity reasoning | Probabilistic reasoning |
-| **Dialectical** | Hegelian thesis-antithesis-synthesis progression | Philosophical analysis |
-| **Analogical** | Structure-mapping and cross-domain transfer | Creative problem solving |
-| **Delphi** | Expert consensus with convergence tracking | Forecasting |
-| **Chain-of-Verification** | Draft → verify → answer → revise | Fact-checking |
-| **Skeleton-of-Thought** | Skeleton → parallel solve → assemble | Latency reduction |
-| **Tree-of-Thoughts** | Reasoning as tree search with evaluation and backtracking | Planning & optimization |
-| **Program-of-Thoughts** | Executable code as intermediate reasoning | Quantitative problems |
-| **Self-Discover** | Dynamic selection and composition of reasoning modules | Novel problem types |
+| Method | Preset Slug | Description | Best For |
+|--------|-------------|-------------|----------|
+| **Multi-Perspective** | `multi-perspective` | Default 6-phase pipeline with multi-perspective generation across 3–4 labs | General complex problems |
+| **Debate** | `debate` | Two models argue opposing positions; a third judges the winner | Polarized decisions |
+| **Jury / Orchestrated** | `jury` | Multiple generators scored by an independent panel of critics (4–6 experts) | High-stakes decisions |
+| **Research** | `research` | Web-grounded deep research with iterative SearXNG search and article pipeline | Evidence-heavy questions |
+| **Scientific** | `scientific` | Hypothesis generation, falsification tests, evidence scoring | Research & validation |
+| **Socratic** | `socratic` | Elenchus questioning to expose hidden assumptions | Clarifying ambiguous problems |
+| **Pre-Mortem** | `pre-mortem` | Prospective hindsight failure analysis (Gary Klein methodology) | Risk assessment |
+| **Bayesian** | `bayesian` | Prior → likelihood → posterior → sensitivity reasoning | Probabilistic reasoning |
+| **Dialectical** | `dialectical` | Hegelian thesis-antithesis-synthesis progression | Philosophical analysis |
+| **Analogical** | `analogical` | Cross-domain structure-mapping and transfer | Creative problem solving |
+| **Delphi** | `delphi` | Structured multi-round expert consensus with convergence tracking | Forecasting & estimation |
+| **Chain-of-Verification (CoVE)** | `cove` | Draft → verify → answer → revise self-checking loop | Fact-checking |
+| **Skeleton-of-Thought (SoT)** | `sot` | Skeleton → parallel solve → assemble for latency savings | Long structured output |
+| **Tree-of-Thoughts (ToT)** | `tot` | Reasoning as tree search with evaluation and backtracking | Planning & optimization |
+| **Program-of-Thought (PoT)** | `pot` | Executable code as intermediate reasoning step | Quantitative problems |
+| **Self-Discover** | `self-discover` | Dynamic selection and composition of reasoning modules | Novel problem types |
+| **Writing / Article** | `writing` | Research-backed article generation: CoVE + SoT + Pre-Mortem pipeline | Long-form writing |
+| **Brainstorming** | `brainstorming` | Verbalized Sampling (VS-Standard / VS-CoT): multi-round divergent idea generation with semantic clustering | Creative ideation |
+| **Coding** | `coding` | 5-phase production code pipeline: spec → parallel generation → adversarial review → tests → assembly | Production code |
+| **Iterative Critique** | `iterative-critique` | Adversarial generator-critic loop with convergence detection (LLM Debate) | Iterative refinement |
 
 ---
 
 ## 🎛️ Available Presets
 
-Every method has a **Budget** (~$0.02/run) and **Premium** (~$0.15–$0.30/run) variant.
+Reasoner ships with **48 presets** — every method has at least a **Budget** (~$0.01–$0.05/run) and **Premium** (~$0.15–$0.35/run) variant.
 
-| Preset | Tier | Primary | Phase 2 Diversity |
-|--------|------|---------|-------------------|
-| `multi-perspective-budget` | Budget | `gemini-flash-lite` | Google + Mistral + Zhipu |
-| `multi-perspective-premium` | Premium | `gemini-pro` | Moonshot + DeepSeek + Anthropic + Mistral |
-| `debate-budget` | Budget | `gemini-flash-lite` | DeepSeek + Qwen + GLM |
-| `debate-premium` | Premium | `gemini-pro` | Gemini + Moonshot + Perplexity |
-| `scientific-budget` | Budget | `gemini-flash-lite` | DeepSeek + Qwen + GLM |
-| `scientific-premium` | Premium | `gemini-pro` | Gemini + Claude + Moonshot |
-| `research-budget` | Budget | `gemini-flash-lite` | DeepSeek + Qwen + Gemma |
-| `research-premium` | Premium | `gemini-pro` | Gemini + Claude + Moonshot + DeepSeek |
-| `jury-budget` | Budget | `gemini-flash-lite` | DeepSeek + Qwen + GLM + Gemma + Mistral |
-| `jury-premium` | Premium | `gemini-pro` | Claude + Moonshot + DeepSeek + Alibaba |
-| `cove-budget` | Budget | `gemini-flash-lite` | DeepSeek draft → Qwen verify → GLM answer → Gemma revise |
-| `cove-premium` | Premium | `gemini-pro` | Gemini + Claude + Moonshot |
-| `sot-budget` | Budget | `gemini-flash-lite` | DeepSeek skeleton → Qwen parallel solve → GLM assemble |
-| `sot-premium` | Premium | `gemini-pro` | Gemini + Claude + Moonshot |
-| `tot-budget` | Budget | `gemini-flash-lite` | DeepSeek decompose → Qwen generate → GLM evaluate → Gemma backtrack |
-| `tot-premium` | Premium | `gemini-pro` | Gemini + Claude + Moonshot |
-| `pot-budget` | Budget | `gemini-flash-lite` | DeepSeek code generation + Qwen execution + GLM interpretation |
-| `pot-premium` | Premium | `gemini-pro` | Gemini + Claude + Moonshot |
-| `self-discover-budget` | Budget | `gemini-flash-lite` | DeepSeek selection → Qwen adaptation → GLM implementation |
-| `self-discover-premium` | Premium | `gemini-pro` | Gemini + Claude + Moonshot |
-| `pre-mortem-budget` | Budget | `gemini-flash-lite` | DeepSeek + Qwen + GLM |
-| `pre-mortem-premium` | Premium | `gemini-pro` | Gemini + Claude + Moonshot |
-| `bayesian-budget` | Budget | `gemini-flash-lite` | DeepSeek + Qwen + GLM |
-| `bayesian-premium` | Premium | `gemini-pro` | Gemini + Claude + Moonshot |
-| `dialectical-budget` | Budget | `gemini-flash-lite` | DeepSeek + Qwen + GLM |
-| `dialectical-premium` | Premium | `gemini-pro` | Gemini + Claude + Moonshot |
-| `analogical-budget` | Budget | `gemini-flash-lite` | DeepSeek + Qwen + GLM |
-| `analogical-premium` | Premium | `gemini-pro` | Gemini + Claude + Moonshot |
-| `delphi-budget` | Budget | `gemini-flash-lite` | DeepSeek + Qwen + GLM + Gemma |
-| `delphi-premium` | Premium | `gemini-pro` | Gemini + Claude + Moonshot + DeepSeek |
-| `writing-budget` | Budget | `gemini-flash-lite` | DeepSeek + Mistral + Moonshot + GLM |
-| `writing-premium` | Premium | `gemini-pro` | Gemini + Claude + GLM + xAI |
-| `cross-language-budget` | Budget | `gemini-flash-lite` | DeepSeek + Mistral + Gemma |
-| `cross-language-premium` | Premium | `gemini-pro` | DeepSeek + Qwen + Claude + Gemini |
+### Multi-Perspective
+
+| Preset | Tier | Est. Cost | Key Model Diversity |
+|--------|------|-----------|---------------------|
+| `multi-perspective-ultra-budget` | Ultra-Budget | <$0.01 | Ministral-3B + Gemini Flash Lite — minimal 5-phase, top-k=1 |
+| `multi-perspective-budget` | Budget | ~$0.02 | Google (constructive) + Mistral (destructive) + Zhipu GLM (systemic) |
+| `multi-perspective-premium` | Premium | ~$0.20 | Kimi K2.6 + DeepSeek R1T2 + Qwen 3.6 + Gemini Pro |
+
+### Debate
+
+| Preset | Tier | Est. Cost | Key Model Diversity |
+|--------|------|-----------|---------------------|
+| `debate-budget` | Budget | ~$0.015 | DeepSeek (Model A) vs Qwen (Model B), judged by GLM |
+| `debate-premium` | Premium | ~$0.25 | Gemini Pro vs Kimi K2.6, judged by Perplexity Sonar Pro |
+
+### Jury / Orchestrated
+
+| Preset | Tier | Est. Cost | Key Model Diversity |
+|--------|------|-----------|---------------------|
+| `jury-budget` | Budget | ~$0.02 | DeepSeek + Qwen + GLM + MiniMax + Mistral (5 different labs) |
+| `jury-premium` | Premium | ~$0.30 | Claude + Kimi K2.6 + DeepSeek R1T2 + Qwen 3.6, scored by Sonar Pro |
+
+### Research
+
+| Preset | Tier | Est. Cost | Key Model Diversity |
+|--------|------|-----------|---------------------|
+| `research-budget` | Budget | ~$0.02 | DeepSeek + Qwen + Gemini — iterative SearXNG search |
+| `research-premium` | Premium | ~$0.25 | Claude + Kimi K2.6 + DeepSeek + MiMo V2, live fact-check via Sonar Pro |
+
+### Scientific
+
+| Preset | Tier | Est. Cost | Key Model Diversity |
+|--------|------|-----------|---------------------|
+| `scientific-budget` | Budget | ~$0.02 | DeepSeek hypothesis, Qwen testing, GLM evaluation |
+| `scientific-premium` | Premium | ~$0.25 | Claude hypothesis, Kimi K2.6 testing, Sonar Pro evidence |
+
+### Socratic
+
+| Preset | Tier | Est. Cost | Key Model Diversity |
+|--------|------|-----------|---------------------|
+| `socratic-budget` | Budget | ~$0.02 | DeepSeek questions, Qwen answers, GLM evaluation |
+| `socratic-premium` | Premium | ~$0.25 | Claude questions, Kimi K2.6 answers, Sonar Pro evidence |
+
+### Pre-Mortem
+
+| Preset | Tier | Est. Cost | Key Model Diversity |
+|--------|------|-----------|---------------------|
+| `pre-mortem-budget` | Budget | ~$0.02 | DeepSeek failure scenarios, Qwen backtracking, GLM signals |
+| `pre-mortem-premium` | Premium | ~$0.25 | Claude failure scenarios, Kimi K2.6 backtracking, MiMo V2 synthesis |
+
+### Bayesian
+
+| Preset | Tier | Est. Cost | Key Model Diversity |
+|--------|------|-----------|---------------------|
+| `bayesian-budget` | Budget | ~$0.02 | DeepSeek priors, Qwen likelihood, GLM posterior |
+| `bayesian-premium` | Premium | ~$0.25 | Claude priors, Kimi K2.6 likelihood, Sonar Pro evidence |
+
+### Dialectical
+
+| Preset | Tier | Est. Cost | Key Model Diversity |
+|--------|------|-----------|---------------------|
+| `dialectical-budget` | Budget | ~$0.02 | DeepSeek thesis, Qwen antithesis, GLM synthesis |
+| `dialectical-premium` | Premium | ~$0.25 | Claude thesis, Kimi K2.6 antithesis, MiMo V2 synthesis |
+
+### Analogical
+
+| Preset | Tier | Est. Cost | Key Model Diversity |
+|--------|------|-----------|---------------------|
+| `analogical-budget` | Budget | ~$0.02 | DeepSeek abstraction, Qwen domain search, GLM mapping |
+| `analogical-premium` | Premium | ~$0.25 | Claude abstraction, Kimi K2.6 domain search, MiMo V2 synthesis |
+
+### Delphi
+
+| Preset | Tier | Est. Cost | Key Model Diversity |
+|--------|------|-----------|---------------------|
+| `delphi-budget` | Budget | ~$0.03 | DeepSeek + Qwen + GLM + Mistral experts (4 different labs) |
+| `delphi-premium` | Premium | ~$0.30 | Claude + Kimi K2.6 + DeepSeek R1T2 + Qwen 3.6 experts |
+
+### Chain-of-Verification (CoVE)
+
+| Preset | Tier | Est. Cost | Key Model Diversity |
+|--------|------|-----------|---------------------|
+| `cove-budget` | Budget | ~$0.02 | DeepSeek draft → Qwen verify → GLM answer → Gemini revise |
+| `cove-premium` | Premium | ~$0.25 | Claude draft → Kimi K2.6 verify → DeepSeek R1T2 answer → Qwen revise |
+
+### Skeleton-of-Thought (SoT)
+
+| Preset | Tier | Est. Cost | Key Model Diversity |
+|--------|------|-----------|---------------------|
+| `sot-budget` | Budget | ~$0.02 | DeepSeek skeleton → Qwen solve → GLM assemble |
+| `sot-premium` | Premium | ~$0.25 | Claude skeleton → Kimi K2.6 solve → DeepSeek R1T2 assemble |
+
+### Tree-of-Thoughts (ToT)
+
+| Preset | Tier | Est. Cost | Key Model Diversity |
+|--------|------|-----------|---------------------|
+| `tot-budget` | Budget | ~$0.02 | DeepSeek decompose → Qwen generate → GLM evaluate → Gemini backtrack |
+| `tot-premium` | Premium | ~$0.25 | Claude decompose → Kimi K2.6 generate → DeepSeek R1T2 evaluate |
+
+### Program-of-Thought (PoT)
+
+| Preset | Tier | Est. Cost | Key Model Diversity |
+|--------|------|-----------|---------------------|
+| `pot-budget` | Budget | ~$0.02 | DeepSeek generate → Qwen execute → GLM interpret |
+| `pot-premium` | Premium | ~$0.25 | Claude generate → Kimi K2.6 execute → DeepSeek R1T2 interpret |
+
+### Self-Discover
+
+| Preset | Tier | Est. Cost | Key Model Diversity |
+|--------|------|-----------|---------------------|
+| `self-discover-budget` | Budget | ~$0.02 | DeepSeek select → Qwen adapt → DeepSeek implement |
+| `self-discover-premium` | Premium | ~$0.25 | Claude select → Kimi K2.6 adapt → DeepSeek R1T2 implement |
+
+### Writing / Article Generation
+
+| Preset | Tier | Est. Cost | Key Model Diversity |
+|--------|------|-----------|---------------------|
+| `writing-budget` | Budget | ~$0.05 | DeepSeek + Mistral + Kimi K2.6 + GLM — CoVE + SoT + Pre-Mortem |
+| `writing-premium` | Premium | ~$0.20 | Claude (decompose/CoVE/verify) + GLM-5.1 (SoT/assemble) + Gemini Pro (synthesis/critique) |
+
+### Brainstorming (Verbalized Sampling)
+
+| Preset | Tier | Est. Cost | Key Model Diversity |
+|--------|------|-----------|---------------------|
+| `brainstorming-budget` | Budget | ~$0.03 | Qwen3-Max generates (3 rounds × 5 ideas), Gemini clusters, DeepSeek develops top 3 |
+| `brainstorming-premium` | Premium | ~$0.25 | Claude Sonnet VS-CoT (5 rounds × 5 ideas), Gemini Pro clusters, Kimi K2.6 develops top 5 |
+
+### Coding / Code Generation
+
+| Preset | Tier | Est. Cost | Key Model Diversity |
+|--------|------|-----------|---------------------|
+| `coding-budget` | Budget | ~$0.05 | Gemini spec → DeepSeek generate → Qwen review → DeepSeek tests → Kimi K2.6 assemble |
+| `coding-premium` | Premium | ~$0.30 | Claude spec+tests → Kimi K2.6 generate → DeepSeek R1T2 review → GPT-5 assemble |
+
+### Iterative Critique (LLM Debate)
+
+| Preset | Tier | Est. Cost | Key Model Diversity |
+|--------|------|-----------|---------------------|
+| `iterative-critique-budget` | Budget | ~$0.02 | DeepSeek generator vs DeepSeek V4 Flash critic |
+| `iterative-critique-premium` | Premium | ~$0.25 | GPT-5 generator vs Claude Sonnet critic |
+
+### SubAgent (Per-Subagent Routing)
+
+| Preset | Tier | Est. Cost | Key Model Diversity |
+|--------|------|-----------|---------------------|
+| `subagent-budget` | Budget | ~$0.02 | Every subagent (synthesis, critique, search) routed to a dedicated cross-lab model |
+| `subagent-premium` | Premium | ~$0.30 | Gemini Pro + Claude + DeepSeek R1T2 + Sonar Pro per-subagent |
+
+### Cross-Language (DeepL Translation)
+
+| Preset | Tier | Est. Cost | Key Model Diversity |
+|--------|------|-----------|---------------------|
+| `cross-language-budget` | Budget | ~$0.02 | Google + Mistral + Zhipu — requires `DEEPL_API_KEY` |
+| `cross-language-premium` | Premium | ~$0.20 | Gemini Pro + Claude + Qwen 3.6 — requires `DEEPL_API_KEY` |
+
+### Image Generation
+
+| Preset | Tier | Est. Cost | Primary Models |
+|--------|------|-----------|----------------|
+| `image-gen-budget` | Budget | varies | Riverflow v2 Fast Preview + Gemini Flash Image; Seedream 4.5 / Flux 2 Pro fallbacks |
+| `image-gen-premium` | Premium | varies | Gemini 3 Pro Image + GPT-5 Image; Gemini 3.1 Flash Image fallback |
+
+### Experimental
+
+| Preset | Tier | Notes |
+|--------|------|-------|
+| `nvidia-nemotron-test` | Experimental | NVIDIA Nemotron-3-Super-120B via NIM free tier. Use with `--sequential` only (40 RPM cap). |
 
 ---
 
