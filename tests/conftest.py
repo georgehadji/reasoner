@@ -22,6 +22,13 @@ def searxng_container() -> str:
     return url
 
 
+@pytest.fixture(scope="session")
+def searxng_client(searxng_container: str):
+    """Return a DiscoveryClient pointed at the live SearXNG instance."""
+    from reasoner.infrastructure.search.discovery import DiscoveryClient
+    return DiscoveryClient(base_url=searxng_container)
+
+
 @pytest.fixture(autouse=True)
 async def auto_clean_state():
     """Fixture to reset all global state between tests."""
