@@ -8,11 +8,12 @@
 ██╔══██║██╔══██╗██╔══██║        ██╔═══╝ ██║██╔══██╗██╔══╝  ██║     ██║██║╚██╗██║██╔══╝  
 ██║  ██║██║  ██║██║  ██║        ██║     ██║██║  ██║███████╗███████╗██║██║ ╚████║██╔════╗
 ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝        ╚═╝     ╚═╝╚═╝  ╚═╝╚══════╝╚══════╝╚═╝╚═╝  ╚═══╝╚══════╝
-v2.2 — Reasoner
+v2.3 — Reasoner
 </pre>
 
 <!-- Badges -->
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg?style=flat-square&logo=python&logoColor=white)](https://www.python.org/downloads/)
+[![Harness Enhanced](https://img.shields.io/badge/harness-E1%E2%80%93E5%20enhanced-brightgreen)]
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688.svg?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Next.js](https://img.shields.io/badge/Next.js_16-000000.svg?style=flat-square&logo=next.js&logoColor=white)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6.svg?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -34,6 +35,33 @@ v2.2 — Reasoner
 ## 🎯 Project Overview
 
 Reasoner is a **reasoning orchestrator** that decomposes complex problems into structured phases, leverages multiple LLMs in parallel from diverse training ecosystems, applies rigorous independent critique, stress-tests solutions under adversarial conditions, and synthesizes actionable recommendations with epistemic labeling. It features a HyperGate Pre-Router for automatic method selection, supports 20 reasoning methods with 48 presets, ensures cross-lab diversity, and provides real-time streaming of progress and cost.
+
+**New in v2.3:** Harness telemetry pipeline — per-phase cost/duration/model data persisted to queryable SQLite tables, fallback events surfaced through the router call chain, context compression at Phase 2→3 handoff, and a runtime-aware self-healing loop that queries telemetry to inform static analysis.
+
+---
+
+## 📊 Telemetry & Self-Healing
+
+Reasoner v2.3 includes a full telemetry pipeline inspired by *Code as Agent Harness* (arXiv:2605.18747):
+
+| Enhancement | What it does |
+|-------------|-------------|
+| **E1 — Quality-rich Neuro** | `postflight` sends `method`, `total_cost_usd`, `phase_costs`, `phase_durations`, `quality_history`, and `fallback_events` to the Neuro memory — every run's quality signal is preserved for future recall |
+| **E2 — Phase Telemetry Table** | `TelemetryStore` (`phase_telemetry` + `run_telemetry` tables) — queryable SQLite analytics. Ask: *"Average Phase 3 cost for debate-premium over the last 100 runs"* |
+| **E3 — Context Compression** | `smart_compress` applied after Decomposition (Phase 2), before Critique (Phase 3). Gated by existing `TOKEN_OPTIMIZATION["context_compression"]` flag |
+| **E4 — Fallback Surfacing** | `ProviderRouter` now fires `on_fallback(role, intended, actual, reason)` callbacks — wired at `preflight` so all code paths capture fallback events to `PipelineMeta.fallback_events` |
+| **E5 — Healing Exporter** | `healing/telemetry_exporter.py` queries `TelemetryStore`, writes `healing_context.json`. `run_healing.py` loads it before Loop 1 — static healing gets runtime context |
+
+```bash
+# Query telemetry
+python -c "
+from reasoner.infrastructure.persistence.telemetry_store import get_telemetry_store
+import asyncio
+store = get_telemetry_store()
+stats = asyncio.run(store.get_preset_stats('multi-perspective-premium'))
+print(stats)
+"
+```
 
 ---
 
