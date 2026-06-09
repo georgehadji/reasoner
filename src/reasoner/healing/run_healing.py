@@ -58,6 +58,14 @@ def main():
     logger.info("STARTING REASONER SELF-HEALING PIPELINE")
     logger.info("="*80)
 
+    # ── E5: Export runtime telemetry context (non-fatal) ──
+    try:
+        from reasoner.healing.telemetry_exporter import export_healing_context
+        if export_healing_context():
+            logger.info("Telemetry context exported — healing has runtime data")
+    except Exception as exc:
+        logger.debug("Telemetry context export skipped: %s", exc)
+
     # 1. LOOP 1: Static Healing
     # Phase 1.1: Introspection
     if not run_script(HEALING_DIR / "introspection_engine.py", "Loop 1.1: Codebase Introspection"):

@@ -102,6 +102,7 @@ class PipelineMeta:
     phase_results: list["PhaseResult"] = field(default_factory=list)
     quality_hints: dict[str, str] = field(default_factory=dict)
     quality_history: list[dict] = field(default_factory=list)
+    fallback_events: list[dict] = field(default_factory=list)
     preset_name: str | None = None
     method: str | None = None
     context_quality: str = "unknown"  # "good" | "partial" | "contaminated" | "missing"
@@ -146,6 +147,7 @@ class PipelineState:
             'started_at', 'phase_logs', 'phase_tokens', 'phase_durations',
             'phase_models', 'phase_results', 'quality_hints', 'quality_history',
             'preset_name', 'method', 'context_quality',
+            'fallback_events',
         }
         _REMAINDER_FIELDS = {
             'neuro_context', 'reflexion_memory', 'web_discovery_results',

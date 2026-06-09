@@ -54,7 +54,8 @@ class ProviderRouter:
     """
 
     def __init__(
-        self, primary: BaseLLMProvider, routing_table: dict[str, BaseLLMProvider] | None = None, fallback_table: dict[str, BaseLLMProvider] | None = None, verbose: bool = False, cascading_routing: dict[str, list[str]] | None = None
+        self, primary: BaseLLMProvider, routing_table: dict[str, BaseLLMProvider] | None = None, fallback_table: dict[str, BaseLLMProvider] | None = None, verbose: bool = False, cascading_routing: dict[str, list[str]] | None = None,
+        on_fallback: "None | (str, str, str, str) -> None" = None,
         ) -> None:
         self.primary = primary
         self.routing_table: dict[str, BaseLLMProvider] = routing_table or {}
@@ -62,6 +63,7 @@ class ProviderRouter:
         self.fallback_table: dict[str, BaseLLMProvider] = fallback_table or {}
         self.cascading_routing: dict[str, list[str]] = cascading_routing or {}
         self.verbose = verbose
+        self.on_fallback = on_fallback
 
     def get(self, role: str) -> BaseLLMProvider:
         provider = self.routing_table.get(role)
@@ -156,6 +158,8 @@ class ProviderRouter:
                     role, provider.model, effective_timeout, fallback.model if fallback else "N/A",
                 )
                 if fallback:
+                    if self.on_fallback:
+                        self.on_fallback(role, assigned.model, fallback.model, "timeout")
                     return await _execute_call(fallback, is_fallback=True)
                 else:
                     return DegradedLLMResponse(
@@ -179,6 +183,8 @@ class ProviderRouter:
                     role, provider.model, exc, fallback.model if fallback else "N/A",
                 )
                 if fallback:
+                    if self.on_fallback:
+                        self.on_fallback(role, assigned.model, fallback.model, "llm_error")
                     return await _execute_call(fallback, is_fallback=True)
                 else:
                     return DegradedLLMResponse(

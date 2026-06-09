@@ -62,11 +62,13 @@ class PipelineOrchestrator:
         pipeline_service: Any,
         search_service: Any | None = None,
         neuro_client: Any | None = None,
+        telemetry_store: Any | None = None,
     ) -> None:
         self.preset_service = preset_service
         self.pipeline_service = pipeline_service
         self.search_service = search_service
         self._neuro_client = neuro_client  # Injected or None (lazy fallback)
+        self._telemetry_store = telemetry_store
 
     async def preflight(
         self,
@@ -88,6 +90,20 @@ class PipelineOrchestrator:
             custom_routing=custom_routing,
             agent_model=agent_model,
         )
+
+        # E4: Attach a fallback-event buffer to the router at construction time.
+        # Even if execute() is not called (streaming/main paths), events are captured.
+        _fallback_buffer: list[dict] = []
+        import time as _time
+        def _record_fallback(role: str, intended: str, actual: str, reason: str) -> None:
+            _fallback_buffer.append({
+                "role": role, "intended": intended,
+                "actual": actual, "reason": reason,
+                "ts": _time.time(),
+            })
+        router.on_fallback = _record_fallback
+        # Store the buffer on the router so callers can extract it
+        router._fallback_buffer = _fallback_buffer
 
         # ── Neuro Recall ──
         recalled_chunks: list[dict[str, Any]] = []
@@ -201,6 +217,13 @@ class PipelineOrchestrator:
         )
         if decision.recalled_chunks:
             state.neuro_context = decision.recalled_chunks
+
+        # E4: Replay fallback events captured during preflight into state
+        _fallback_buffer = getattr(decision.router, "_fallback_buffer", [])
+        if _fallback_buffer:
+            state.meta.fallback_events.extend(_fallback_buffer)
+            _fallback_buffer.clear()
+
         return await pipeline.run(decision.problem)
 
     async def postflight(
@@ -233,12 +256,45 @@ class PipelineOrchestrator:
                         "metadata": {
                             "preset": getattr(state, "preset_name", ""),
                             "type": "pipeline",
+                            "method": getattr(state.meta, "method", None),
+                            "total_cost_usd": round(state.cost_state.total_cost_usd, 6),
+                            "phase_costs": dict(state.cost_state.phase_costs),
+                            "phase_durations": {k: round(v, 2) for k, v in state.meta.phase_durations.items()},
+                            "quality_history": state.meta.quality_history[-10:],
+                            "fallback_events": getattr(state.meta, "fallback_events", []),
                         },
                     },
                     timeout=5.0,
                 )
         except Exception as exc:
             logger.debug("Neuro persist failed: %s", exc)
+
+        # ── Telemetry Persist (E2) ──
+        if self._telemetry_store and run_id:
+            try:
+                # Build phase telemetry from canonical cost/duration/quality dicts
+                phase_results: list[dict] = []
+                phase_keys = set(state.cost_state.phase_costs_by_key.keys()) | set(state.meta.phase_durations.keys())
+                for phase_key in sorted(phase_keys):
+                    phase_results.append({
+                        "phase_name": phase_key,
+                        "cost_usd": state.cost_state.phase_costs_by_key.get(phase_key, 0.0),
+                        "duration_ms": int(state.meta.phase_durations.get(phase_key, 0.0) * 1000),
+                        "retries_used": int(state.cost_state.phase_costs_by_key.get(f"{phase_key}_retries", 0)),
+                        "quality_score": None,
+                        "quality_passed": None,
+                        "models": list(state.cost_state._phase_models_by_key.get(phase_key, [])),
+                    })
+                await self._telemetry_store.save_run(
+                    run_id=run_id,
+                    preset=getattr(state, "preset_name", ""),
+                    method=getattr(state.meta, "method", None),
+                    phase_results=phase_results,
+                    fallback_events=getattr(state.meta, "fallback_events", []),
+                    total_cost_usd=state.cost_state.total_cost_usd,
+                )
+            except Exception as exc:
+                logger.debug("Telemetry persist failed: %s", exc)
 
     async def stream_direct_answer(
         self,

@@ -214,6 +214,33 @@ class ReasonerPipeline:
         # ── Mandatory: Fusion (Classification + Decomposition) ──
         await self._phase_fusion(state)
 
+        # ── E3: Context compression after fusion, gated by flag ──
+        if TOKEN_OPTIMIZATION.get("context_compression") and state.candidates:
+            try:
+                from reasoner.neuro.compression import smart_compress
+                import dataclasses as _dc
+                compressed = []
+                for c in state.candidates:
+                    content = getattr(c, "content", None) or (c.get("content") if isinstance(c, dict) else None)
+                    if not content:
+                        compressed.append(c)
+                        continue
+                    compressed_content = smart_compress(content, level="minimal")
+                    if hasattr(c, "model_copy"):  # Pydantic v2
+                        compressed.append(c.model_copy(update={"content": compressed_content}))
+                    elif _dc.is_dataclass(c) and not isinstance(c, type):  # stdlib dataclass
+                        compressed.append(_dc.replace(c, content=compressed_content))
+                    elif isinstance(c, dict):  # plain dict
+                        compressed.append({**c, "content": compressed_content})
+                    else:
+                        compressed.append(c)
+                state.candidates = compressed
+                logger.debug("E3: Compressed %d candidates after fusion", len(compressed))
+            except Exception as exc:
+                logger.debug("E3: Context compression skipped: %s", exc)
+        else:
+            logger.debug("E3: Context compression disabled or no candidates")
+
         # --- DYNAMIC METHOD DISPATCH ---
         if self.flow_factory.is_migrated(method):
             from reasoner.application.flows.services import PipelineWorkflowServices
