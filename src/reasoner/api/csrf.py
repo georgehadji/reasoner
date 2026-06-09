@@ -30,6 +30,9 @@ def _get_csrf_secret() -> bytes:
     """Get the CSRF signing secret. CSRF_SECRET must be set independently of ADMIN_API_KEY."""
     raw = settings.CSRF_SECRET or ""
     if not raw:
+        if not settings.CSRF_ENFORCE_BACKEND:
+            # Dev/CI: generate a random in-process secret (tokens won't survive restarts)
+            return secrets.token_bytes(32)
         raise RuntimeError(
             "CSRF_SECRET must be set for CSRF protection. "
             "Set CSRF_SECRET in your .env file (do not reuse ADMIN_API_KEY)."

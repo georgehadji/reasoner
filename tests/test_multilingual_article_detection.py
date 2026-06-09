@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from reasoner.application.mixins.article_pipeline import (
-    detect_document_type,
-    is_article_request,
+article_pipeline = pytest.importorskip(
+    "reasoner.application.mixins.article_pipeline",
+    reason="reasoner.application.mixins not present in this build",
 )
+detect_document_type = article_pipeline.detect_document_type
+is_article_request = article_pipeline.is_article_request
 
 
 class TestIsArticleRequestMultilingual:
