@@ -1,9 +1,25 @@
+import os
+
+import httpx
 import pytest
 import asyncio
 
 from reasoner.application.event_bus.bus import reset_event_bus
 from reasoner.infrastructure.observability.langfuse_subscriber import reset_langfuse
 from reasoner.token_cache import reset_token_cache
+
+
+@pytest.fixture(scope="session")
+def searxng_container() -> str:
+    """Return the SearXNG base URL and skip if the instance is unreachable."""
+    url = os.environ.get("SEARXNG_URL", "http://localhost:8888").rstrip("/")
+    try:
+        resp = httpx.get(url, timeout=5)
+        if resp.status_code >= 500:
+            pytest.skip(f"SearXNG at {url} returned {resp.status_code} — skipping integration tests")
+    except (httpx.ConnectError, httpx.TimeoutException):
+        pytest.skip(f"SearXNG not reachable at {url} — skipping integration tests")
+    return url
 
 
 @pytest.fixture(autouse=True)

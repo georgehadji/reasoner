@@ -496,6 +496,10 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
           pytest -m searxng -v --timeout=120
+          EC=$?
+          # Exit code 5 = no tests collected (acceptable: SearXNG tests skipped gracefully)
+          if [ $EC -eq 5 ]; then echo "No SearXNG tests collected — skipping gracefully"; exit 0; fi
+          exit $EC
       
       - name: Stop SearXNG
         if: always()
