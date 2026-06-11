@@ -17,7 +17,7 @@ def searxng_container() -> str:
         resp = httpx.get(url, timeout=5)
         if resp.status_code >= 500:
             pytest.skip(f"SearXNG at {url} returned {resp.status_code} — skipping integration tests")
-    except (httpx.ConnectError, httpx.TimeoutException):
+    except (httpx.ConnectError, httpx.TimeoutException, httpx.RemoteProtocolError):
         pytest.skip(f"SearXNG not reachable at {url} — skipping integration tests")
     return url
 
