@@ -1,4 +1,4 @@
-<!-- Generated: 2026-06-10 | Files scanned: 378 | Token estimate: ~700 -->
+<!-- Generated: 2026-06-11 | Files scanned: 380 | Token estimate: ~700 -->
 
 # Data Models — Reasoner
 

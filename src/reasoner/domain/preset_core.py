@@ -99,6 +99,10 @@ _KNOWN_ROUTING_ROLES: frozenset[str] = frozenset({
     "brainstorm_develop",
     # Prism integration
     "prism_classify",
+    # ArticleFlow roles (4-phase source-grounded article: retrieve, draft, verify, refine)
+    "writing_draft",
+    "writing_factcheck",
+    "writing_assemble",
 })
 
 
@@ -132,6 +136,8 @@ def get_method_from_preset(preset: str) -> str:
         return "cove"
     if "brainstorming" in preset:
         return "brainstorming"
+    if "article" in preset:
+        return "article"
     if "writing" in preset:
         return "writing"
     if "sot" in preset:
@@ -183,6 +189,7 @@ _METHOD_TO_SLUG: dict[str, str] = {
     "self_discover": "self-discover",
     "writing": "writing",
     "brainstorming": "brainstorming",
+    "article": "article",
 }
 
 
