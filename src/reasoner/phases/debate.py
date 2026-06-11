@@ -13,10 +13,53 @@ DEBATE_REBUTTAL_SYSTEM = "You are an expert debater. Your objective is to rigoro
 def debate_rebuttal_prompt(state: PipelineState, side: str, opponent_statement: str) -> str:
     return f'{get_language_instruction(state)}\n\nYour opponent\'s statement:\n{opponent_statement}\n\nYou are Side {side}. Present your rebuttal.\n\nOutput JSON: {{"side": "{side}", "rebuttal_content": "<your rebuttal>", "target_flaws": ["<flaw 1>"]}}'
 
-DEBATE_JUDGE_SYSTEM = "You are an analytical assistant. Evaluate the debate and render a verdict. Output ONLY valid JSON."
+DEBATE_JUDGE_SYSTEM = (
+    "You are a neutral debate judge. Your role is to evaluate both sides of the debate "
+    "and render a fair, analytically rigorous verdict.\n\n"
+    "SCORING RUBRIC (each dimension 0-10):\n"
+    "- logical_consistency: Soundness and internal coherence of the argument.\n"
+    "- evidence_support: Quality and strength of supporting evidence.\n"
+    "- failure_resilience: Ability to withstand counterarguments.\n"
+    "- feasibility: Practical applicability of the proposed solution.\n\n"
+    "SIDE MAPPING:\n"
+    '- Side A (proposition) → perspective: "constructive"\n'
+    '- Side B (opposition) → perspective: "destructive"\n\n'
+    "Output ONLY the JSON object. No markdown fences, no surrounding text."
+)
 
 def debate_judge_prompt(state: PipelineState) -> str:
-    return f'{get_language_instruction(state)}\n\nDebate Transcript:\n{json.dumps(state.debate_rounds, indent=2)}\n\nScore both sides and declare a winner.\n\nOutput JSON: {{"scores": ..., "verdict_rationale": "..."}}'
+    return (
+        f'{get_language_instruction(state)}\n\n'
+        f'Debate Transcript:\n{json.dumps(state.debate_rounds, indent=2)}\n\n'
+        f'Score both sides and declare a winner.\n\n'
+        f'IMPORTANT: Use exactly "constructive" for Side A (proposition) '
+        f'and "destructive" for Side B (opposition) as the perspective field.\n\n'
+        f'Output JSON:\n'
+        f'{{\n'
+        f'  "scores": [\n'
+        f'    {{\n'
+        f'      "perspective": "constructive",\n'
+        f'      "logical_consistency": <float 0-10>,\n'
+        f'      "evidence_support": <float 0-10>,\n'
+        f'      "failure_resilience": <float 0-10>,\n'
+        f'      "feasibility": <float 0-10>,\n'
+        f'      "bias_flags": ["<flag if any>"],\n'
+        f'      "steel_man": "<strongest point in favour of this side>"\n'
+        f'    }},\n'
+        f'    {{\n'
+        f'      "perspective": "destructive",\n'
+        f'      "logical_consistency": <float 0-10>,\n'
+        f'      "evidence_support": <float 0-10>,\n'
+        f'      "failure_resilience": <float 0-10>,\n'
+        f'      "feasibility": <float 0-10>,\n'
+        f'      "bias_flags": ["<flag if any>"],\n'
+        f'      "steel_man": "<strongest point in favour of this side>"\n'
+        f'    }}\n'
+        f'  ],\n'
+        f'  "winner": "A" | "B" | "DRAW",\n'
+        f'  "verdict_rationale": "<concise reasoning>"\n'
+        f'}}'
+    )
 
 DEBATE_CROSS_SYSTEM = "You are an analytical assistant. Challenge specific claims with evidence. Be precise and direct. Output ONLY valid JSON."
 

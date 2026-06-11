@@ -97,8 +97,8 @@ _PRESET_CONFIGS: list[dict] = [
             "fusion": ["ministral-3b", "glm-4-air"],
             "context_vetting": ["ministral-3b", "glm-4-air"],
             "perspective": ["ministral-3b", "glm-4-air"],
-            "scoring": ["gemini-flash-lite", "qwen3-plus"],
-            "synthesis": ["gemini-flash-lite", "qwen3-plus"],
+            "scoring": ["deepseek-v4-flash", "qwen3-plus"],  # v3.3: gemini-flash-lite → deepseek-v4-flash
+            "synthesis": ["deepseek-v4-flash", "qwen3-plus"],  # v3.3: gemini-flash-lite → deepseek-v4-flash
         },
     },
     {
@@ -148,16 +148,16 @@ _PRESET_CONFIGS: list[dict] = [
     {
         "id": "debate-budget",
         "name": "Debate (Budget)",
-        "description": "Adversarial debate with 3 cheap cross-lab models. DeepSeek (Model A) vs Qwen (Model B), judged by GLM. 3 different training lineages.",
-        "primary_id": "gemini-flash-lite",
+        "description": "Adversarial debate with 3 cheap cross-lab models. Mistral Small (Model A) vs Qwen 3.7 Max (Model B), judged by GLM-5.1. 3 different training lineages.",
+        "primary_id": "gemini-flash",
         "routing": {
-            "prompt_enhancement": "gemini-flash-lite",
-            "classification": "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini for JSON adherence
+            "prompt_enhancement": "mimo-v2-flash",  # v3.3: gemini-flash-lite → mimo-v2-flash (Xiaomi lab diversity)
+            "classification": "gpt-5-mini",
             "decomposition": "deepseek-v3",
-            "constructive": "gemini-flash-lite",
-            "destructive": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
-            "systemic": "glm-5.1",  # v3.1: upgraded from glm-4.7-flash
-            "minimalist": "minimax-m3",  # v3.1: upgraded from minimax-m2.5
+            "constructive": "mistral-small",  # v3.4: seed-2.0-mini → mistral-small (seed-2.0-mini saturates 120s timeout)
+            "destructive": "qwen3.7-max",
+            "systemic": "glm-5.1",
+            "minimalist": "minimax-m3",
             "scoring": "qwen3.5-flash",
             "stress_testing": "mistral-small",
             "synthesis": "deepseek-v3"
@@ -175,12 +175,12 @@ _PRESET_CONFIGS: list[dict] = [
             "synthesis": "glm-4-air"
         },
         "notes": [
-            "MiniMax M2.5: minimalist pilot — MiniMax lab diversity, fallback to ministral-3b if unavailable",
-            "DeepSeek + Qwen + GLM: genuine cross-lab debate",
-            "Gemma 4 26B for classification: cheap but capable",
-            "Estimated <$0.015 per debate run",
-            "DeepSeek V3: decomposition backbone — stronger structured reasoning than Gemini Flash Lite at comparable cost.",
-            "Gemini Flash Lite: reserved for coordination roles (prompt_enhancement, constructive) — JSON formatting, low-stakes structure."
+            "Mistral Small (Model A) + Qwen 3.7 Max (Model B) — different training lineages",
+            "Mistral Small already known-working in this preset (stress_testing), typical latency <30s",
+            "seed-2.0-mini removed — consistently saturated 120s timeout in testing",
+            "HyperGate primary: gemini-flash (was gemini-flash-lite) — faster preflight, fresher model",
+            "GLM-5.1: debate judge — uses explicit CritiqueScore schema for reliable JSON output",
+            "Full run estimated <$0.02"
         ],
     },
     {
@@ -231,10 +231,10 @@ _PRESET_CONFIGS: list[dict] = [
         "description": "6-model jury with cheap cross-lab diversity. DeepSeek + Qwen + GLM + Gemma + Mistral + Ministral. All different labs.",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "prompt_enhancement": "gemini-flash-lite",
+            "prompt_enhancement": "mimo-v2-flash",  # v3.3: gemini-flash-lite → mimo-v2-flash (Xiaomi lab diversity)
             "classification": "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini for JSON adherence
             "decomposition": "deepseek-v3",
-            "constructive": "gemini-flash-lite",
+            "constructive": "seed-2.0-mini",  # v3.3: gemini-flash-lite → seed-2.0-mini (ByteDance, Feb 2026)
             "destructive": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
             "systemic": "glm-5.1",  # v3.1: upgraded from glm-4.7-flash
             "minimalist": "minimax-m3",  # v3.1: upgraded from minimax-m2.5
@@ -320,10 +320,10 @@ _PRESET_CONFIGS: list[dict] = [
         "description": "Deep iterative search with cheap models. DeepSeek for reasoning, Qwen for synthesis, Gemma for classification.",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "prompt_enhancement": "gemini-flash-lite",
+            "prompt_enhancement": "mimo-v2-flash",  # v3.3: gemini-flash-lite → mimo-v2-flash (Xiaomi lab diversity)
             "classification": "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini for JSON adherence
             "decomposition": "deepseek-v3",
-            "constructive": "gemini-flash-lite",
+            "constructive": "seed-2.0-mini",  # v3.3: gemini-flash-lite → seed-2.0-mini (ByteDance, Feb 2026)
             "destructive": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
             "systemic": "glm-5.1",  # v3.1: upgraded from glm-4.7-flash
             "minimalist": "ministral-3b",
@@ -335,7 +335,7 @@ _PRESET_CONFIGS: list[dict] = [
             "article_synthesize": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
             "article_pre_mortem": "mistral-small",
             "article_critic": "qwen3.5-flash",
-            "article_revise": "gemini-flash-lite",
+            "article_revise": "seed-2.0-mini",  # v3.3: gemini-flash-lite → seed-2.0-mini (ByteDance, revision)
             "article_humanize": "ministral-3b",
         },
         "fallback_routing": {
@@ -417,10 +417,10 @@ _PRESET_CONFIGS: list[dict] = [
         "description": "Hypothesis-test-evaluate cycle with cheap models. DeepSeek for hypothesis generation, Qwen for testing, GLM for evaluation.",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "prompt_enhancement": "gemini-flash-lite",
+            "prompt_enhancement": "mimo-v2-flash",  # v3.3: gemini-flash-lite → mimo-v2-flash (Xiaomi lab diversity)
             "classification": "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini for JSON adherence
             "decomposition": "deepseek-v3",
-            "constructive": "gemini-flash-lite",
+            "constructive": "seed-2.0-mini",  # v3.3: gemini-flash-lite → seed-2.0-mini (ByteDance, Feb 2026)
             "destructive": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
             "systemic": "glm-5.1",  # v3.1: upgraded from glm-4.7-flash
             "minimalist": "ministral-3b",
@@ -494,10 +494,10 @@ _PRESET_CONFIGS: list[dict] = [
         "description": "Socratic questioning with cheap models. DeepSeek for questions, Qwen for answers, GLM for evaluation.",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "prompt_enhancement": "gemini-flash-lite",
+            "prompt_enhancement": "mimo-v2-flash",  # v3.3: gemini-flash-lite → mimo-v2-flash (Xiaomi lab diversity)
             "classification": "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini for JSON adherence
             "decomposition": "deepseek-v3",
-            "constructive": "gemini-flash-lite",
+            "constructive": "seed-2.0-mini",  # v3.3: gemini-flash-lite → seed-2.0-mini (ByteDance, Feb 2026)
             "destructive": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
             "systemic": "glm-5.1",  # v3.1: upgraded from glm-4.7-flash
             "minimalist": "ministral-3b",
@@ -571,10 +571,10 @@ _PRESET_CONFIGS: list[dict] = [
         "description": "Failure-mode analysis with cheap models. DeepSeek for failure scenarios, Qwen for backtracking, GLM for signals.",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "prompt_enhancement": "gemini-flash-lite",
+            "prompt_enhancement": "mimo-v2-flash",  # v3.3: gemini-flash-lite → mimo-v2-flash (Xiaomi lab diversity)
             "classification": "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini for JSON adherence
             "decomposition": "deepseek-v3",
-            "constructive": "gemini-flash-lite",
+            "constructive": "seed-2.0-mini",  # v3.3: gemini-flash-lite → seed-2.0-mini (ByteDance, Feb 2026)
             "destructive": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
             "systemic": "glm-5.1",  # v3.1: upgraded from glm-4.7-flash
             "minimalist": "ministral-3b",
@@ -648,10 +648,10 @@ _PRESET_CONFIGS: list[dict] = [
         "description": "Probabilistic reasoning with cheap models. DeepSeek for priors, Qwen for likelihood, GLM for posterior.",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "prompt_enhancement": "gemini-flash-lite",
+            "prompt_enhancement": "mimo-v2-flash",  # v3.3: gemini-flash-lite → mimo-v2-flash (Xiaomi lab diversity)
             "classification": "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini for JSON adherence
             "decomposition": "deepseek-v3",
-            "constructive": "gemini-flash-lite",
+            "constructive": "seed-2.0-mini",  # v3.3: gemini-flash-lite → seed-2.0-mini (ByteDance, Feb 2026)
             "destructive": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
             "systemic": "glm-5.1",  # v3.1: upgraded from glm-4.7-flash
             "minimalist": "ministral-3b",
@@ -725,10 +725,10 @@ _PRESET_CONFIGS: list[dict] = [
         "description": "Thesis-antithesis-synthesis with cheap models. DeepSeek for thesis, Qwen for antithesis, GLM for synthesis.",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "prompt_enhancement": "gemini-flash-lite",
+            "prompt_enhancement": "mimo-v2-flash",  # v3.3: gemini-flash-lite → mimo-v2-flash (Xiaomi lab diversity)
             "classification": "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini for JSON adherence
             "decomposition": "deepseek-v3",
-            "constructive": "gemini-flash-lite",
+            "constructive": "seed-2.0-mini",  # v3.3: gemini-flash-lite → seed-2.0-mini (ByteDance, Feb 2026)
             "destructive": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
             "systemic": "glm-5.1",  # v3.1: upgraded from glm-4.7-flash
             "minimalist": "ministral-3b",
@@ -802,10 +802,10 @@ _PRESET_CONFIGS: list[dict] = [
         "description": "Structure-mapping and transfer with cheap models. DeepSeek for abstraction, Qwen for domain search, GLM for mapping.",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "prompt_enhancement": "gemini-flash-lite",
+            "prompt_enhancement": "mimo-v2-flash",  # v3.3: gemini-flash-lite → mimo-v2-flash (Xiaomi lab diversity)
             "classification": "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini for JSON adherence
             "decomposition": "deepseek-v3",
-            "constructive": "gemini-flash-lite",
+            "constructive": "seed-2.0-mini",  # v3.3: gemini-flash-lite → seed-2.0-mini (ByteDance, Feb 2026)
             "destructive": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
             "systemic": "glm-5.1",  # v3.1: upgraded from glm-4.7-flash
             "minimalist": "ministral-3b",
@@ -879,10 +879,10 @@ _PRESET_CONFIGS: list[dict] = [
         "description": "Structured expert consensus with cheap models. 4 cheap models (DeepSeek, Qwen, GLM, Gemma) in round-robin consensus.",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "prompt_enhancement": "gemini-flash-lite",
+            "prompt_enhancement": "mimo-v2-flash",  # v3.3: gemini-flash-lite → mimo-v2-flash (Xiaomi lab diversity)
             "classification": "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini for JSON adherence
             "decomposition": "deepseek-v3",
-            "constructive": "gemini-flash-lite",
+            "constructive": "seed-2.0-mini",  # v3.3: gemini-flash-lite → seed-2.0-mini (ByteDance, Feb 2026)
             "destructive": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
             "systemic": "glm-5.1",  # v3.1: upgraded from glm-4.7-flash
             "minimalist": "ministral-3b",
@@ -977,13 +977,13 @@ _PRESET_CONFIGS: list[dict] = [
         "description": "Draft-verify-revise cycle with cheap models. DeepSeek for drafting, Qwen for verification, GLM for revision.",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "prompt_enhancement": "gemini-flash-lite",
+            "prompt_enhancement": "mimo-v2-flash",  # v3.3: gemini-flash-lite → mimo-v2-flash (Xiaomi lab diversity)
             "classification": "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini for JSON adherence
             "decomposition": "deepseek-v3",
             "cove_draft": "deepseek-v3",
             "cove_verify": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
             "cove_answer": "glm-5.1",
-            "cove_revise": "gemini-flash-lite",
+            "cove_revise": "seed-2.0-mini",  # v3.3: gemini-flash-lite → seed-2.0-mini (ByteDance, revision)
             "scoring": "qwen3.5-flash",
             "stress_testing": "mistral-small",
             "synthesis": "qwen3.7-max"  # v3.1: upgraded to qwen3.7
@@ -1054,7 +1054,7 @@ _PRESET_CONFIGS: list[dict] = [
         "description": "Skeleton-then-flesh reasoning with cheap models. DeepSeek for skeleton, Qwen for solving, GLM for assembly.",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "prompt_enhancement": "gemini-flash-lite",
+            "prompt_enhancement": "mimo-v2-flash",  # v3.3: gemini-flash-lite → mimo-v2-flash (Xiaomi lab diversity)
             "classification": "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini for JSON adherence
             "decomposition": "deepseek-v3",
             "sot_skeleton": "deepseek-v3",
@@ -1127,13 +1127,13 @@ _PRESET_CONFIGS: list[dict] = [
         "description": "Branching reasoning with cheap models. DeepSeek for decomposition, Qwen for generation, GLM for evaluation.",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "prompt_enhancement": "gemini-flash-lite",
+            "prompt_enhancement": "mimo-v2-flash",  # v3.3: gemini-flash-lite → mimo-v2-flash (Xiaomi lab diversity)
             "classification": "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini for JSON adherence
             "decomposition": "deepseek-v3",
             "tot_decompose": "deepseek-v3",
             "tot_generate": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
             "tot_evaluate": "glm-4-air",
-            "tot_backtrack": "gemini-flash-lite",
+            "tot_backtrack": "seed-2.0-mini",  # v3.3: gemini-flash-lite → seed-2.0-mini (ByteDance, avoids double-DeepSeek)
             "scoring": "qwen3.5-flash",
             "stress_testing": "mistral-small",
             "synthesis": "qwen3.7-max"  # v3.1: upgraded to qwen3.7
@@ -1204,7 +1204,7 @@ _PRESET_CONFIGS: list[dict] = [
         "description": "Code-first reasoning with cheap models. DeepSeek for generation, Qwen for execution, GLM for interpretation.",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "prompt_enhancement": "gemini-flash-lite",
+            "prompt_enhancement": "mimo-v2-flash",  # v3.3: gemini-flash-lite → mimo-v2-flash (Xiaomi lab diversity)
             "classification": "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini for JSON adherence
             "decomposition": "deepseek-v3",
             "pot_generate": "deepseek-v3",
@@ -1277,7 +1277,7 @@ _PRESET_CONFIGS: list[dict] = [
         "description": "Self-adaptive reasoning with cheap models. DeepSeek for selection, Qwen for adaptation, GLM for implementation.",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "prompt_enhancement": "gemini-flash-lite",
+            "prompt_enhancement": "mimo-v2-flash",  # v3.3: gemini-flash-lite → mimo-v2-flash (Xiaomi lab diversity)
             "classification": "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini for JSON adherence
             "decomposition": "deepseek-v3",
             "sd_select": "deepseek-v3",
@@ -1352,10 +1352,10 @@ _PRESET_CONFIGS: list[dict] = [
         "description": "Per-subagent routing with cheap cross-lab models. Each subagent gets a dedicated model + fallback.",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "prompt_enhancement": "gemini-flash-lite",
+            "prompt_enhancement": "mimo-v2-flash",  # v3.3: gemini-flash-lite → mimo-v2-flash (Xiaomi lab diversity)
             "classification": "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini for JSON adherence
             "decomposition": "deepseek-v3",
-            "constructive": "gemini-flash-lite",
+            "constructive": "seed-2.0-mini",  # v3.3: gemini-flash-lite → seed-2.0-mini (ByteDance, Feb 2026)
             "destructive": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
             "systemic": "glm-5.1",  # v3.1: upgraded from glm-4.7-flash
             "minimalist": "ministral-3b",
@@ -1368,7 +1368,7 @@ _PRESET_CONFIGS: list[dict] = [
             "subagent_critique_evidence": "deepseek-v3",
             "subagent_critique_bias": "mistral-small",
             "subagent_critique_counter": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
-            "subagent_enhancement": "gemini-flash-lite",
+            "subagent_enhancement": "mimo-v2-flash",  # v3.3: gemini-flash-lite → mimo-v2-flash (Xiaomi, consistent with prompt_enhancement)
             "subagent_decomposition": "deepseek-v3",
             "subagent_search_query": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
             "subagent_search_eval": "glm-4-air",
@@ -1473,7 +1473,7 @@ _PRESET_CONFIGS: list[dict] = [
             "article_decompose": "deepseek-v3",
             "article_claim_extract": "mistral-small",
             "article_cove_verify": "deepseek-v3",
-            "article_cove_answer": "gemini-flash-lite",
+            "article_cove_answer": "seed-2.0-mini",  # v3.3: gemini-flash-lite → seed-2.0-mini (ByteDance, short structured answers)
             "article_cove_revise": "glm-4-air",
             "article_verifier": "glm-4-air",
             "article_sot_skeleton": "deepseek-v3",
@@ -1620,7 +1620,7 @@ _PRESET_CONFIGS: list[dict] = [
         "description": "5-phase production code generation: spec → parallel file generation → adversarial security review → test generation → final assembly. DeepSeek V3 generates (HumanEval 82.6%), Qwen3-Max reviews adversarially, Kimi K2.6 assembles. Cross-lab diversity enforced.",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "coding_spec": "gemini-flash-lite",
+            "coding_spec": "deepseek-v4-flash",  # v3.3: gemini-flash-lite → deepseek-v4-flash (DeepSeek code spec, Apr 2026)
             "coding_generate": "deepseek-v3",
             "coding_review": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
             "coding_tests": "deepseek-v3",
@@ -1684,10 +1684,10 @@ _PRESET_CONFIGS: list[dict] = [
         "description": "Multi-perspective reasoning with DeepL translation. Non-English problems are translated to English for reasoning, then the synthesis is translated back to the source language. Uses cheapest cross-lab models.",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "prompt_enhancement": "gemini-flash-lite",
+            "prompt_enhancement": "mimo-v2-flash",  # v3.3: gemini-flash-lite → mimo-v2-flash (Xiaomi lab diversity)
             "classification": "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini for JSON adherence
             "decomposition": "deepseek-v3",
-            "constructive": "gemini-flash-lite",
+            "constructive": "seed-2.0-mini",  # v3.3: gemini-flash-lite → seed-2.0-mini (ByteDance, Feb 2026)
             "destructive": "mistral-small",
             "systemic": "glm-5.1",  # v3.1: upgraded from glm-4.7-flash
             "minimalist": "ministral-3b",
@@ -1810,11 +1810,11 @@ _PRESET_CONFIGS: list[dict] = [
         ),
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "prompt_enhancement":  "gemini-flash-lite",
+            "prompt_enhancement":  "mimo-v2-flash",  # v3.3: gemini-flash-lite → mimo-v2-flash (Xiaomi lab diversity)
             "classification":      "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini
             "decomposition":       "deepseek-v3",
             "brainstorm_generate": "qwen3.7-max",  # v3.1: upgraded from qwen3-max
-            "brainstorm_cluster":  "gemini-flash-lite",
+            "brainstorm_cluster":  "seed-2.0-mini",  # v3.3: gemini-flash-lite → seed-2.0-mini (ByteDance, clustering)
             "brainstorm_develop":  "deepseek-v3",
             "synthesis":           "qwen3.7-max",  # v3.1: upgraded from qwen3-max
         },
@@ -1915,7 +1915,7 @@ _PRESET_CONFIGS: list[dict] = [
         "primary_id": "deepseek-v3",
         "required_tier": "free",
         "routing": {
-            "prompt_enhancement": "gemini-flash-lite",
+            "prompt_enhancement": "mimo-v2-flash",  # v3.3: gemini-flash-lite → mimo-v2-flash (Xiaomi lab diversity)
             "classification": "gpt-5-mini",
             "decomposition": "deepseek-v3",
             "expert_1": "deepseek-v3",

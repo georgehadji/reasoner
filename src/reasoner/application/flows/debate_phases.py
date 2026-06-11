@@ -144,6 +144,11 @@ async def run_debate_cross_examine_phase(state: PipelineState, services: Workflo
         })
 
 async def run_debate_judge_phase(state: PipelineState, services: WorkflowServices) -> None:
+    if not state.debate_rounds:
+        msg = "Debate judging skipped: no rounds in transcript"
+        services.log("DEBATE", msg, state)
+        state.errors.append(msg)
+        return
     services.log("DEBATE", "Round 3: Judging", state)
     raw, _ = await services.call_llm(
         role="systemic", 

@@ -588,6 +588,18 @@ def _parse_critique_scores(raw_scores: list[dict]) -> list[CritiqueScore]:
     state.scores for the entire run.  Additionally, `perspective` arrives as a
     plain string and must be coerced to the PerspectiveType enum.
     """
+    # Defensive normalisation: if the LLM returned a keyed dict instead of a list,
+    # coerce to list of values.  If the input is not iterable at all, return empty
+    # so callers don't crash with "string indices must be integers" etc.
+    if isinstance(raw_scores, dict):
+        raw_scores = list(raw_scores.values())
+    if not isinstance(raw_scores, list):
+        import logging
+        logging.getLogger(__name__).warning(
+            "CritiqueScore input is not a list (%s) — skipping",
+            type(raw_scores).__name__,
+        )
+        return []
     out: list[CritiqueScore] = []
     for s in raw_scores:
         try:

@@ -42,7 +42,8 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # Google
     MODEL_GEMINI_PRO:   {"model": "google/gemini-3.5-flash"},  # v3.2: 2.5-pro → 3.5-flash (near-Pro coding at Flash cost)
     MODEL_GEMINI_FLASH: {"model": "google/gemini-3.5-flash"},
-    "gemini-flash-lite": {"model": "google/gemini-3.1-flash-lite"},  # v3.2: 2.5-lite → 3.1-lite ($0.25/$1.50 per M)
+    "gemini-flash-lite": {"model": "stepfun/step-3.7-flash"},  # v3.2: Google 3.1-lite ($0.25) → StepFun 3.7 Flash ($0.20, fresher cutoff)
+    "gemini-3.1-flash-lite": {"model": "google/gemini-3.1-flash-lite"},  # explicit alias if someone needs Google specifically
     "gemma-4-26b":      {"model": "google/gemma-4-26b-a4b-it"},
     "gemma-4-31b":      {"model": "google/gemma-4-31b-it"},
     # xAI
@@ -60,7 +61,8 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # Mistral
     "mistral-large-3":  {"model": "mistralai/mistral-large-2512"},
     "mistral-medium":   {"model": "mistralai/mistral-medium-3.1"},
-    "mistral-small":    {"model": "mistralai/mistral-small-3.2-24b-instruct"},
+    "mistral-small":    {"model": "mistralai/mistral-small-2603"},  # v3.3: 3.2-24b (2023-10) → 2603 (Mar 2026, +28 months)
+    "mistral-small-2603": {"model": "mistralai/mistral-small-2603"},  # v3.3: explicit alias for preset pinning
     "codestral":        {"model": "mistralai/codestral-2501"},
     "codestral-2508":   {"model": "mistralai/codestral-2508"},
     "devstral":         {"model": "mistralai/devstral-2512"},
@@ -135,6 +137,8 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "minimax-m1":       {"model": "minimax/minimax-m1"},
     # Tencent
     "hy3-preview":      {"model": "tencent/hy3-preview"},
+    # ByteDance Seed
+    "seed-2.0-mini":    {"model": "bytedance-seed/seed-2.0-mini"},  # v3.3: $0.10/$0.40 per M — 262K ctx, Feb 2026 born
     # Baidu
     "qianfan-ocr-fast": {"model": "baidu/qianfan-ocr-fast:free"},
     # inclusionAI (Ant Group)
