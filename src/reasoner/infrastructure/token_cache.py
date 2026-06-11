@@ -119,9 +119,9 @@ class TokenAwareCache:
         finally:
             self._loaded = True
     
-    def _compute_key(self, problem: str, phase: str, model_id: str, prompt: str) -> str:
-        """Compute cache key from inputs."""
-        content = f"{problem}:{phase}:{model_id}:{prompt}"
+    def _compute_key(self, problem: str, phase: str, model_id: str, prompt: str, agent_id: str = "") -> str:
+        """Compute cache key. agent_id scopes the cache to a user/session."""
+        content = f"{agent_id}:{problem}:{phase}:{model_id}:{prompt}"
         return hashlib.sha256(content.encode()).hexdigest()[:32]
     
     def _compute_prompt_hash(self, prompt: str) -> str:
@@ -154,6 +154,7 @@ class TokenAwareCache:
         model_id: str,
         prompt: str,
         semantic_threshold: float = 0.85,
+        agent_id: str = "",
     ) -> Optional[str]:
         """
         Get cached response.
@@ -166,7 +167,7 @@ class TokenAwareCache:
         """
         async with self._lock:
             await self._ensure_loaded()
-            key = self._compute_key(problem, phase, model_id, prompt)
+            key = self._compute_key(problem, phase, model_id, prompt, agent_id=agent_id)
             prompt_hash = self._compute_prompt_hash(prompt)
 
             # Check exact match first
@@ -222,11 +223,12 @@ class TokenAwareCache:
         response: str,
         tokens_used: int,
         ttl_seconds: Optional[int] = None,
+        agent_id: str = "",
     ) -> None:
         """Store response in cache."""
         async with self._lock:
             await self._ensure_loaded()
-            key = self._compute_key(problem, phase, model_id, prompt)
+            key = self._compute_key(problem, phase, model_id, prompt, agent_id=agent_id)
             
             # Check if we need to evict
             while self._current_tokens + tokens_used > self.max_tokens or len(self._entries) >= self.max_entries:

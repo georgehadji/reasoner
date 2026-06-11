@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 import logging
 from collections import deque
-from dataclasses import dataclass, field, asdict, fields as dc_fields
+from dataclasses import dataclass, field, asdict, fields as dc_fields, MISSING as _DC_MISSING
 from enum import Enum
 from datetime import datetime, timezone
 from pathlib import Path
@@ -214,17 +214,30 @@ class PipelineState:
         # Run post-init migration logic
         self.__post_init__()
 
+        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+        self._ensure_fields_initialized()
+        object.__setattr__(self, '_initialized', True)
+
+    def _ensure_fields_initialized(self) -> None:
+        """Initialize missing dataclass fields for backward-compatible --resume loading.
+
+        Called only when _initialized is not yet set, meaning this is a partially
+        deserialized state. After the first call completes, sets _initialized=True
+        so subsequent calls are a no-op.
+        """
+        if getattr(self, '_initialized', False):
+            return
+        for f in dc_fields(self):
+            if not hasattr(self, f.name):
+                if f.default_factory is not _DC_MISSING:
+                    object.__setattr__(self, f.name, f.default_factory())
+                elif f.default is not _DC_MISSING:
+                    object.__setattr__(self, f.name, f.default)
+        object.__setattr__(self, '_initialized', True)
+
     # ─────────────────────────────────────────────────────────────────────
     # Backward-compatible property aliases for core fields
     # ─────────────────────────────────────────────────────────────────────
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
     @property
     def problem(self) -> str:
         return self.core.problem
@@ -233,14 +246,7 @@ class PipelineState:
     def problem(self, value: str) -> None:
         self.core.problem = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def enhanced_problem(self) -> str:
         return self.core.enhanced_problem
@@ -249,14 +255,7 @@ class PipelineState:
     def enhanced_problem(self, value: str) -> None:
         self.core.enhanced_problem = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def task_type(self) -> TaskType | None:
         return self.core.task_type
@@ -265,14 +264,7 @@ class PipelineState:
     def task_type(self, value: TaskType | None) -> None:
         self.core.task_type = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def task_type_rationale(self) -> str:
         return self.core.task_type_rationale
@@ -281,14 +273,7 @@ class PipelineState:
     def task_type_rationale(self, value: str) -> None:
         self.core.task_type_rationale = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def language(self) -> str:
         return self.core.language
@@ -297,14 +282,7 @@ class PipelineState:
     def language(self, value: str) -> None:
         self.core.language = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def complexity(self) -> str | None:
         return self.core.complexity
@@ -313,14 +291,7 @@ class PipelineState:
     def complexity(self, value: str | None) -> None:
         self.core.complexity = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def decomposition(self) -> Decomposition | None:
         return self.core.decomposition
@@ -329,14 +300,7 @@ class PipelineState:
     def decomposition(self, value: Decomposition | None) -> None:
         self.core.decomposition = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def candidates(self) -> list[SolutionCandidate]:
         return self.core.candidates
@@ -345,14 +309,7 @@ class PipelineState:
     def candidates(self, value: list[SolutionCandidate]) -> None:
         self.core.candidates = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def scores(self) -> list[CritiqueScore]:
         return self.core.scores
@@ -361,14 +318,7 @@ class PipelineState:
     def scores(self, value: list[CritiqueScore]) -> None:
         self.core.scores = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def top_candidates(self) -> list[SolutionCandidate]:
         return self.core.top_candidates
@@ -377,14 +327,7 @@ class PipelineState:
     def top_candidates(self, value: list[SolutionCandidate]) -> None:
         self.core.top_candidates = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def stress_results(self) -> list[StressTestResult]:
         return self.core.stress_results
@@ -393,14 +336,7 @@ class PipelineState:
     def stress_results(self, value: list[StressTestResult]) -> None:
         self.core.stress_results = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def final_solution(self) -> FinalSolution | None:
         return self.core.final_solution
@@ -409,14 +345,7 @@ class PipelineState:
     def final_solution(self, value: FinalSolution | None) -> None:
         self.core.final_solution = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def errors(self) -> list[str]:
         return self.core.errors
@@ -425,14 +354,7 @@ class PipelineState:
     def errors(self, value: list[str]) -> None:
         self.core.errors = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def attachments(self) -> list[dict[str, Any]]:
         return self.core.attachments
@@ -441,14 +363,7 @@ class PipelineState:
     def attachments(self, value: list[dict[str, Any]]) -> None:
         self.core.attachments = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def generation_candidates(self) -> list["GenerationCandidate"]:
         return self.core.generation_candidates
@@ -457,14 +372,7 @@ class PipelineState:
     def generation_candidates(self, value: list["GenerationCandidate"]) -> None:
         self.core.generation_candidates = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def critic_scores(self) -> list["CriticScore"]:
         return self.core.critic_scores
@@ -473,14 +381,7 @@ class PipelineState:
     def critic_scores(self, value: list["CriticScore"]) -> None:
         self.core.critic_scores = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def verification_results(self) -> list["VerificationResult"]:
         return self.core.verification_results
@@ -489,14 +390,7 @@ class PipelineState:
     def verification_results(self, value: list["VerificationResult"]) -> None:
         self.core.verification_results = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def meta_evaluation(self) -> "MetaEvaluation | None":
         return self.core.meta_evaluation
@@ -508,14 +402,7 @@ class PipelineState:
     # ─────────────────────────────────────────────────────────────────────
     # Backward-compatible property aliases for meta fields
     # ─────────────────────────────────────────────────────────────────────
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def started_at(self) -> "datetime":
         return self.meta.started_at
@@ -524,14 +411,7 @@ class PipelineState:
     def started_at(self, value: "datetime") -> None:
         self.meta.started_at = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def phase_logs(self) -> list[str]:
         return self.meta.phase_logs
@@ -540,14 +420,7 @@ class PipelineState:
     def phase_logs(self, value: list[str]) -> None:
         self.meta.phase_logs = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def phase_tokens(self) -> dict[str, dict[str, int]]:
         return self.meta.phase_tokens
@@ -556,14 +429,7 @@ class PipelineState:
     def phase_tokens(self, value: dict[str, dict[str, int]]) -> None:
         self.meta.phase_tokens = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def phase_durations(self) -> dict[str, float]:
         return self.meta.phase_durations
@@ -572,14 +438,7 @@ class PipelineState:
     def phase_durations(self, value: dict[str, float]) -> None:
         self.meta.phase_durations = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def phase_models(self) -> dict[str, str]:
         return self.meta.phase_models
@@ -588,14 +447,7 @@ class PipelineState:
     def phase_models(self, value: dict[str, str]) -> None:
         self.meta.phase_models = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def phase_results(self) -> list["PhaseResult"]:
         return self.meta.phase_results
@@ -604,14 +456,7 @@ class PipelineState:
     def phase_results(self, value: list["PhaseResult"]) -> None:
         self.meta.phase_results = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def quality_hints(self) -> dict[str, str]:
         return self.meta.quality_hints
@@ -620,14 +465,7 @@ class PipelineState:
     def quality_hints(self, value: dict[str, str]) -> None:
         self.meta.quality_hints = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def quality_history(self) -> list[dict]:
         return self.meta.quality_history
@@ -636,14 +474,7 @@ class PipelineState:
     def quality_history(self, value: list[dict]) -> None:
         self.meta.quality_history = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def preset_name(self) -> str | None:
         return self.meta.preset_name
@@ -652,14 +483,7 @@ class PipelineState:
     def preset_name(self, value: str | None) -> None:
         self.meta.preset_name = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def method(self) -> str | None:
         return self.meta.method
@@ -668,14 +492,7 @@ class PipelineState:
     def method(self, value: str | None) -> None:
         self.meta.method = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def context_quality(self) -> str:
         return self.meta.context_quality
@@ -687,14 +504,7 @@ class PipelineState:
     # ─────────────────────────────────────────────────────────────────────
     # Backward-compatible property aliases for remainder fields
     # ─────────────────────────────────────────────────────────────────────
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def neuro_context(self) -> list[dict[str, Any]]:
         return self.remainder.neuro_context
@@ -703,14 +513,7 @@ class PipelineState:
     def neuro_context(self, value: list[dict[str, Any]]) -> None:
         self.remainder.neuro_context = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def reflexion_memory(self) -> list[str]:
         return self.remainder.reflexion_memory
@@ -719,14 +522,7 @@ class PipelineState:
     def reflexion_memory(self, value: list[str]) -> None:
         self.remainder.reflexion_memory = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def web_discovery_results(self) -> list[dict[str, Any]]:
         return self.remainder.web_discovery_results
@@ -735,14 +531,7 @@ class PipelineState:
     def web_discovery_results(self, value: list[dict[str, Any]]) -> None:
         self.remainder.web_discovery_results = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def vetted_context(self) -> list[dict[str, Any]]:
         return self.remainder.vetted_context
@@ -751,14 +540,7 @@ class PipelineState:
     def vetted_context(self, value: list[dict[str, Any]]) -> None:
         self.remainder.vetted_context = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def synthesis_subagent_outputs(self) -> list[dict[str, Any]]:
         return self.remainder.synthesis_subagent_outputs
@@ -767,14 +549,7 @@ class PipelineState:
     def synthesis_subagent_outputs(self, value: list[dict[str, Any]]) -> None:
         self.remainder.synthesis_subagent_outputs = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def critique_subagent_outputs(self) -> list[dict[str, Any]]:
         return self.remainder.critique_subagent_outputs
@@ -783,14 +558,7 @@ class PipelineState:
     def critique_subagent_outputs(self, value: list[dict[str, Any]]) -> None:
         self.remainder.critique_subagent_outputs = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def decomposition_subagent_outputs(self) -> list[dict[str, Any]]:
         return self.remainder.decomposition_subagent_outputs
@@ -799,14 +567,7 @@ class PipelineState:
     def decomposition_subagent_outputs(self, value: list[dict[str, Any]]) -> None:
         self.remainder.decomposition_subagent_outputs = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def enhancement_subagent_outputs(self) -> list[dict[str, Any]]:
         return self.remainder.enhancement_subagent_outputs
@@ -815,14 +576,7 @@ class PipelineState:
     def enhancement_subagent_outputs(self, value: list[dict[str, Any]]) -> None:
         self.remainder.enhancement_subagent_outputs = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def search_subagent_outputs(self) -> list[dict[str, Any]]:
         return self.remainder.search_subagent_outputs
@@ -831,14 +585,7 @@ class PipelineState:
     def search_subagent_outputs(self, value: list[dict[str, Any]]) -> None:
         self.remainder.search_subagent_outputs = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def pending_events(self) -> list[dict[str, Any]]:
         return self.remainder.pending_events
@@ -847,14 +594,7 @@ class PipelineState:
     def pending_events(self, value: list[dict[str, Any]]) -> None:
         self.remainder.pending_events = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def _followup_cache(self) -> str | None:
         return self.remainder._followup_cache
@@ -863,14 +603,7 @@ class PipelineState:
     def _followup_cache(self, value: str | None) -> None:
         self.remainder._followup_cache = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def synthesis(self) -> dict[str, Any] | None:
         """Compatibility layer for old handler code expecting a dict."""
@@ -888,14 +621,7 @@ class PipelineState:
     # ─────────────────────────────────────────────────────────────────────
     # Backward-compatible property aliases for method state fields
     # ─────────────────────────────────────────────────────────────────────
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def jury_guidelines(self) -> list[str]:
         return self.method_state.data.setdefault("jury", {}).setdefault("guidelines", [])
@@ -904,14 +630,7 @@ class PipelineState:
     def jury_guidelines(self, value: list[str]) -> None:
         self.method_state.data.setdefault("jury", {})["guidelines"] = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def debate_rounds(self) -> list[dict[str, Any]]:
         return self.method_state.data.setdefault("debate", {}).setdefault("rounds", [])
@@ -920,14 +639,7 @@ class PipelineState:
     def debate_rounds(self, value: list[dict[str, Any]]) -> None:
         self.method_state.data.setdefault("debate", {})["rounds"] = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def scientific_state(self) -> dict[str, Any]:
         return self.method_state.data.setdefault("scientific", {})
@@ -936,14 +648,7 @@ class PipelineState:
     def scientific_state(self, value: dict[str, Any]) -> None:
         self.method_state.data["scientific"] = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def socratic_state(self) -> dict[str, Any]:
         return self.method_state.data.setdefault("socratic", {})
@@ -952,14 +657,7 @@ class PipelineState:
     def socratic_state(self, value: dict[str, Any]) -> None:
         self.method_state.data["socratic"] = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def jury_weighted_ranking(self) -> list[str]:
         return self.method_state.data.setdefault("jury", {}).setdefault("weighted_ranking", [])
@@ -968,14 +666,7 @@ class PipelineState:
     def jury_weighted_ranking(self, value: list[str]) -> None:
         self.method_state.data.setdefault("jury", {})["weighted_ranking"] = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def pre_mortem_state(self) -> dict[str, Any]:
         return self.method_state.data.setdefault("pre_mortem", {})
@@ -984,14 +675,7 @@ class PipelineState:
     def pre_mortem_state(self, value: dict[str, Any]) -> None:
         self.method_state.data["pre_mortem"] = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def bayesian_state(self) -> dict[str, Any]:
         return self.method_state.data.setdefault("bayesian", {})
@@ -1000,14 +684,7 @@ class PipelineState:
     def bayesian_state(self, value: dict[str, Any]) -> None:
         self.method_state.data["bayesian"] = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def dialectical_state(self) -> dict[str, Any]:
         return self.method_state.data.setdefault("dialectical", {})
@@ -1016,14 +693,7 @@ class PipelineState:
     def dialectical_state(self, value: dict[str, Any]) -> None:
         self.method_state.data["dialectical"] = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def analogical_state(self) -> dict[str, Any]:
         return self.method_state.data.setdefault("analogical", {})
@@ -1032,14 +702,7 @@ class PipelineState:
     def analogical_state(self, value: dict[str, Any]) -> None:
         self.method_state.data["analogical"] = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def delphi_state(self) -> dict[str, Any]:
         return self.method_state.data.setdefault("delphi", {})
@@ -1048,14 +711,7 @@ class PipelineState:
     def delphi_state(self, value: dict[str, Any]) -> None:
         self.method_state.data["delphi"] = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def cove_state(self) -> dict[str, Any]:
         return self.method_state.data.setdefault("cove", {})
@@ -1064,14 +720,7 @@ class PipelineState:
     def cove_state(self, value: dict[str, Any]) -> None:
         self.method_state.data["cove"] = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def sot_state(self) -> dict[str, Any]:
         return self.method_state.data.setdefault("sot", {})
@@ -1080,14 +729,7 @@ class PipelineState:
     def sot_state(self, value: dict[str, Any]) -> None:
         self.method_state.data["sot"] = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def tot_state(self) -> dict[str, Any]:
         return self.method_state.data.setdefault("tot", {})
@@ -1096,14 +738,7 @@ class PipelineState:
     def tot_state(self, value: dict[str, Any]) -> None:
         self.method_state.data["tot"] = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def pot_state(self) -> dict[str, Any]:
         return self.method_state.data.setdefault("pot", {})
@@ -1112,14 +747,7 @@ class PipelineState:
     def pot_state(self, value: dict[str, Any]) -> None:
         self.method_state.data["pot"] = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def self_discover_state(self) -> dict[str, Any]:
         return self.method_state.data.setdefault("self_discover", {})
@@ -1128,14 +756,7 @@ class PipelineState:
     def self_discover_state(self, value: dict[str, Any]) -> None:
         self.method_state.data["self_discover"] = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def writing_state(self) -> dict[str, Any]:
         return self.method_state.data.setdefault("writing", {})
@@ -1144,14 +765,7 @@ class PipelineState:
     def writing_state(self, value: dict[str, Any]) -> None:
         self.method_state.data["writing"] = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def coding_state(self) -> dict[str, Any]:
         return self.method_state.data.setdefault("coding", {})
@@ -1160,14 +774,7 @@ class PipelineState:
     def coding_state(self, value: dict[str, Any]) -> None:
         self.method_state.data["coding"] = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def brainstorming_state(self) -> dict[str, Any]:
         return self.method_state.data.setdefault("brainstorming", {})
@@ -1176,14 +783,7 @@ class PipelineState:
     def brainstorming_state(self, value: dict[str, Any]) -> None:
         self.method_state.data["brainstorming"] = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def cross_language_state(self) -> dict[str, Any]:
         return self.method_state.data.setdefault("cross_language", {})
@@ -1226,14 +826,7 @@ class PipelineState:
             else:
                 self.conversation_state = ConversationState()
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def total_cost_usd(self) -> float:
         return self.cost_state.total_cost_usd
@@ -1242,14 +835,7 @@ class PipelineState:
     def total_cost_usd(self, value: float) -> None:
         self.cost_state.total_cost_usd = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def phase_costs(self) -> dict[str, float]:
         return self.cost_state.phase_costs
@@ -1258,14 +844,7 @@ class PipelineState:
     def phase_costs(self, value: dict[str, float]) -> None:
         self.cost_state.phase_costs = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def detailed_token_usage(self) -> dict[str, dict[str, int]]:
         return self.cost_state.detailed_token_usage
@@ -1274,14 +853,7 @@ class PipelineState:
     def detailed_token_usage(self, value: dict[str, dict[str, int]]) -> None:
         self.cost_state.detailed_token_usage = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def conversation_history(self) -> list[dict[str, str]]:
         return self.conversation_state.conversation_history
@@ -1290,14 +862,7 @@ class PipelineState:
     def conversation_history(self, value: list[dict[str, str]]) -> None:
         self.conversation_state.conversation_history = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def conversation_id(self) -> str:
         return self.conversation_state.conversation_id
@@ -1306,14 +871,7 @@ class PipelineState:
     def conversation_id(self, value: str) -> None:
         self.conversation_state.conversation_id = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def turn_number(self) -> int:
         return self.conversation_state.turn_number
@@ -1322,14 +880,7 @@ class PipelineState:
     def turn_number(self, value: int) -> None:
         self.conversation_state.turn_number = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def previous_synthesis(self) -> str:
         return self.conversation_state.previous_synthesis
@@ -1338,14 +889,7 @@ class PipelineState:
     def previous_synthesis(self, value: str) -> None:
         self.conversation_state.previous_synthesis = value
 
-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
-        import dataclasses
-        for f in dataclasses.fields(self):
-            if not hasattr(self, f.name):
-                if f.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default_factory())
-                elif f.default is not dataclasses.MISSING:
-                    object.__setattr__(self, f.name, f.default)
+        self._ensure_fields_initialized()
     @property
     def agent_model(self) -> str | None:
         return self.conversation_state.agent_model

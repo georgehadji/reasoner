@@ -44,10 +44,6 @@ from .phase_executor import (
     run_phase_with_keepalive,
 )
 
-from .serializers import (
-    _ser_synthesis,
-)
-
 logger = logging.getLogger(__name__)
 
 
@@ -307,6 +303,13 @@ async def run_stream(
     pipeline_service: PipelineService | None = None,
     request=None,
 ) -> AsyncGenerator[str, None]:
+    from reasoner.core.settings import settings as _settings
+    if not _settings.CQRS_BYPASS_STREAMING:
+        # Phase 2 path: route through CQRS handler (not yet implemented)
+        raise NotImplementedError(
+            "CQRS_BYPASS_STREAMING=False requires RunPipelineCommandHandler "
+            "to support SSE callbacks. See docs/ENHANCEMENT_PLAN.md C1."
+        )
     if preset_service is None:
         preset_service = PresetService()
     if pipeline_service is None:
@@ -395,14 +398,14 @@ async def run_stream(
             logger.debug(f"Injected brainstorming config: {_bs_preset.brainstorming_config}")
 
         # --- ARTICLE DETECTION: must happen BEFORE the start event so the frontend
-        # receives auto_selected_method="writing" and renders the correct phase list.
+        # receives auto_selected_method="article" and renders the correct phase list.
         from reasoner.phases._shared import is_article_request
         if is_article_request(state.problem):
             state.task_type = TaskType.TECHNICAL
             state.decomposition = ["article workflow"]
-            state.method = "writing"
-            auto_selected_method = "writing"
-            logger.info("Article request detected in stream — routing to writing method")
+            state.method = "article"
+            auto_selected_method = "article"
+            logger.info("Article request detected in stream — routing to article method")
 
         logger.info(f"Pipeline start with routing: {router.describe()}")
         start_payload: dict = {"type": "start", "preset": effective_preset_name}
@@ -476,11 +479,6 @@ async def run_stream(
         else:
             logger.error(f"No strategy found for method: {method}")
 
-        last_phase_num = max(p[0] for p in phases) if phases else 5
-        synthesis_phase_num = last_phase_num + 1
-        if state.method != "writing":
-            phases += [(synthesis_phase_num, "Synthesis", pipeline._phase_synthesis, _ser_synthesis)]
-
         # CRITICAL_PHASES computed via get_critical_phases(phases, step_metadata)
 
         # _PHASE_ROLE_HINTS moved to api/phase_executor.py
@@ -497,17 +495,16 @@ async def run_stream(
                 yield _event({"type": "cancelled", "message": "Pipeline stopped by user"})
                 return
 
-            # Disconnect check — bail before starting next phase (B-13)
-            if request is not None and await request.is_disconnected():
-                logger.info(
-                    "Client disconnected before phase %s (run %s)", name, run_id
-                )
-                yield _event({
-                    "type": "cancelled",
-                    "run_id": run_id,
-                    "reason": "client_disconnected",
-                })
-                return
+            # Disconnect detection (B-13): request.is_disconnected() calls
+            # _receive() which blocks indefinitely during SSE streaming (POST
+            # body already consumed, client sends no further data).  The ASGI
+            # spec provides no non-blocking disconnect poll.
+            #
+            # Cleanup is instead handled by the finally block which cancels
+            # all tracked broadcast tasks and removes the run from the store.
+            # When the streaming response generator is garbage-collected
+            # (client disconnect), aclose() propagates GeneratorExit into
+            # run_stream(), triggering the existing finally block.
 
             # Silent no-ops (e.g. writing pipeline skips generic decomposition/vetting)
             if getattr(fn, "_is_silent_noop", False):  # v3.1: relaxed from identity check
@@ -756,9 +753,11 @@ async def run_stream(
             try:
                 from reasoner.core.memory import TaggedMemory
 
+                import re as _re
+                _sanitize = lambda s: _re.sub(r'[^a-zA-Z0-9_-]', '_', s or 'unknown')
                 tagged = TaggedMemory(HISTORY_DIR)
-                method_tag = f"method:{entry.method}"
-                preset_tag = f"preset:{entry.preset}"
+                method_tag = f"method_{_sanitize(entry.method)}"
+                preset_tag = f"preset_{_sanitize(entry.preset)}"
                 tagged.add(method_tag, entry.model_dump())
                 tagged.add(preset_tag, entry.model_dump())
             except Exception as tag_err:

@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from reasoner.core.constants import OPENROUTER_BASE_URL, PERPLEXITY_BASE_URL
+from reasoner.core.constants_models import MODEL_GEMINI_FLASH, MODEL_CLAUDE_HAIKU
 from reasoner.core.settings import settings
 
 
@@ -290,13 +291,13 @@ def _apply_defaults(cfg: NeuroConfig) -> NeuroConfig:
         cfg.reasoning.fallbacks = [
             ProviderConfig(
                 provider="openrouter",
-                model=fallbacks[0] if len(fallbacks) > 0 else "google/gemini-2.0-flash-001",
+                model=fallbacks[0] if len(fallbacks) > 0 else MODEL_GEMINI_FLASH,
                 api_key=p.api_key,
                 api_base=OPENROUTER_BASE_URL,
             ),
             ProviderConfig(
                 provider="openrouter",
-                model=fallbacks[1] if len(fallbacks) > 1 else "anthropic/claude-3-haiku",
+                model=fallbacks[1] if len(fallbacks) > 1 else MODEL_CLAUDE_HAIKU,
                 api_key=p.api_key,
                 api_base=OPENROUTER_BASE_URL,
             ),

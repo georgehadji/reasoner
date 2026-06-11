@@ -11,6 +11,8 @@ from typing import Any
 import httpx
 
 from reasoner.core.constants import TRUNCATION, YOUTUBE_OEMBED_URL, YOUTUBE_WATCH_BASE_URL
+from reasoner.core.constants_limits import get_token_budget
+from reasoner.core.settings import settings
 from reasoner.infrastructure.search.discovery import get_discovery_client
 from reasoner.core.search import (
     _should_include_result,
@@ -128,7 +130,7 @@ async def run_context_vetting_phase(
                 phase_key="disambiguation",
                 system_prompt=phases.DISAMBIGUATION_SYSTEM,
                 user_prompt=phases.disambiguation_prompt(state.problem, state.task_type.value if state.task_type else None),
-                max_tokens=256,
+                max_tokens=get_token_budget("search_disambiguation"),
                 state=state,
             )
             disam_data = extract_json(raw_disam) or {}
@@ -253,6 +255,21 @@ async def run_context_vetting_phase(
         state.web_discovery_results = current_results
         services.log("VETTING", "Applied BM25 + freshness re-ranking to search results.", state)
 
+        if settings.SEMANTIC_RERANK_VETTING and len(current_results) > 1:
+            try:
+                from reasoner.core.rerank import rerank_documents
+                reranked = await rerank_documents(
+                    query=problem_for_rank,
+                    documents=current_results,
+                    top_n=len(current_results),
+                )
+                if reranked:
+                    current_results = reranked
+                    state.web_discovery_results = current_results
+                    services.log("VETTING", f"Semantic reranking applied ({len(current_results)} results).", state)
+            except Exception as rerank_exc:
+                services.log("VETTING", f"Semantic reranking skipped: {rerank_exc}", state)
+
     await vet_results(state, current_results, services)
 
 async def vet_results(state: PipelineState, results: list[dict], services: WorkflowServices) -> None:
@@ -342,7 +359,7 @@ async def run_deep_read_phase(state: PipelineState, services: WorkflowServices, 
                 system_prompt=phases.DEEP_READ_SYSTEM,
                 user_prompt=phases.deep_read_prompt(state, url="internal-knowledge", title="General knowledge", content=f"Provide a brief, factual overview of topics relevant to: {state.problem}"),
                 phase_key="deep_read",
-                max_tokens=1024,
+                max_tokens=get_token_budget("deep_read"),
                 state=state,
             )
             extraction = extract_json(raw)
@@ -378,7 +395,7 @@ async def run_deep_read_phase(state: PipelineState, services: WorkflowServices, 
                         system_prompt=phases.DEEP_READ_SYSTEM,
                         user_prompt=phases.deep_read_prompt(state, url, title, sanitized_content),
                         phase_key="deep_read",
-                        max_tokens=1024,
+                        max_tokens=get_token_budget("deep_read"),
                         state=state,
                     )
                     extraction = extract_json(raw_extraction)
@@ -403,7 +420,7 @@ async def run_deep_read_phase(state: PipelineState, services: WorkflowServices, 
                         phase_key="deep_read",
                         system_prompt=phases.SHALLOW_READ_SYSTEM,
                         user_prompt=phases.shallow_read_prompt(state, url, title, snippet),
-                        max_tokens=512,
+                        max_tokens=get_token_budget("deep_read_shallow"),
                         state=state,
                     )
                     fallback = extract_json(raw_fallback)

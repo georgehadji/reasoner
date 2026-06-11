@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from reasoner.core.constants_limits import get_token_budget
+
 if TYPE_CHECKING:
     from reasoner.application.flows.base import WorkflowServices
     from reasoner.domain.pipeline_state import PipelineState
@@ -65,7 +67,7 @@ async def classify_query(
         system_prompt=_CLASSIFY_SYSTEM,
         user_prompt=problem,
         state=state,
-        max_tokens=256,
+        max_tokens=get_token_budget("prism_classify"),
     )
     data = extract_json(raw) or {}
     cls = data.get("classification", {})

@@ -70,6 +70,11 @@ class Settings:
     UVICORN_WORKERS: int = int(os.getenv("UVICORN_WORKERS", "1"))
     ENABLE_LEGACY_API_KEY: bool = os.getenv("ENABLE_LEGACY_API_KEY", "false").lower() in ("1", "true", "yes")
 
+    # ── CQRS ──
+    # When True, streaming runs bypass RunPipelineCommandHandler and go directly
+    # through PipelineOrchestrator. See docs/ENHANCEMENT_PLAN.md C1 for migration plan.
+    CQRS_BYPASS_STREAMING: bool = os.getenv("CQRS_BYPASS_STREAMING", "true").lower() in ("1", "true", "yes")
+
     # ── Cohere Rerank (via OpenRouter) ──
     COHERE_RERANK_ENABLED: bool = os.getenv("COHERE_RERANK_ENABLED", "true").lower() in ("1", "true", "yes")
     COHERE_RERANK_MODEL: str = os.getenv("COHERE_RERANK_MODEL", "cohere/rerank-4-fast")
@@ -128,10 +133,10 @@ class Settings:
     OPENROUTER_APP_TITLE: str = os.getenv("OPENROUTER_APP_TITLE", "Reasoner")
 
     # ── Neuro Memory Models ──
-    NEURO_REASONING_MODEL: str = os.getenv("NEURO_REASONING_MODEL", "openai/gpt-4o-mini")
+    NEURO_REASONING_MODEL: str = os.getenv("NEURO_REASONING_MODEL", "gpt-4o-mini")
     NEURO_REASONING_FALLBACK_MODELS: str = os.getenv(
         "NEURO_REASONING_FALLBACK_MODELS",
-        "google/gemini-2.0-flash-001,anthropic/claude-3-haiku",
+        "gemini-flash,claude-haiku",
     )
     NEURO_EMBEDDING_MODEL: str = os.getenv("NEURO_EMBEDDING_MODEL", "qwen/qwen3-embedding-8b")
     NEURO_EMBEDDING_FALLBACK_MODELS: str = os.getenv(
@@ -158,6 +163,14 @@ class Settings:
 
     # ── Rerank ──
     RERANK_API_BASE: str = os.getenv("RERANK_API_BASE", "https://openrouter.ai/api/v1")
+    # Nemotron Rerank VL: free NVIDIA reranker via OpenRouter chat completions + logprobs.
+    # Used as fallback when Cohere rerank fails, or as primary when NEMOTRON_RERANK_ENABLED=true.
+    NEMOTRON_RERANK_ENABLED: bool = os.getenv("NEMOTRON_RERANK_ENABLED", "false").lower() in ("1", "true", "yes")
+    NEMOTRON_RERANK_MODEL: str = os.getenv("NEMOTRON_RERANK_MODEL", "nvidia/llama-nemotron-rerank-vl-1b-v2:free")
+    NEMOTRON_RERANK_CONCURRENCY: int = int(os.getenv("NEMOTRON_RERANK_CONCURRENCY", "5"))
+    # When true, applies semantic cross-encoder reranking after BM25+freshness sort and before LLM vetting.
+    # Adds ~1-2s latency but meaningfully improves context quality for research/article methods.
+    SEMANTIC_RERANK_VETTING: bool = os.getenv("SEMANTIC_RERANK_VETTING", "false").lower() in ("1", "true", "yes")
 
     # ── Database ──
     DATABASE_URL: str = os.getenv("DATABASE_URL", "")
@@ -182,6 +195,13 @@ class Settings:
     def neuro_embedding_fallbacks(self) -> list[str]:
         """Parse NEURO_EMBEDDING_FALLBACK_MODELS into a list."""
         return [m.strip() for m in self.NEURO_EMBEDDING_FALLBACK_MODELS.split(",") if m.strip()]
+
+    # ── Token Optimization Flags ──
+    TOKEN_DYNAMIC_BUDGETS: bool = os.getenv("TOKEN_DYNAMIC_BUDGETS", "true").lower() == "true"
+    TOKEN_CONTEXT_COMPRESSION: bool = os.getenv("TOKEN_CONTEXT_COMPRESSION", "true").lower() == "true"
+    TOKEN_PROMPT_COMPRESSION: bool = os.getenv("TOKEN_PROMPT_COMPRESSION", "true").lower() == "true"
+    TOKEN_NEURO_COMPRESSION: bool = os.getenv("TOKEN_NEURO_COMPRESSION", "false").lower() == "true"
+    TOKEN_CACHING: bool = os.getenv("TOKEN_CACHING", "true").lower() == "true"
 
     # ── Trusted Proxies ──
     TRUSTED_PROXIES: list[str] = [

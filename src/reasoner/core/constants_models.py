@@ -3,6 +3,7 @@
 # ═════════════════════════════════════════════════════════════════════
 
 MODEL_CLAUDE_SONNET: str = "claude-sonnet"
+MODEL_CLAUDE_HAIKU: str = "claude-haiku"
 MODEL_GEMINI_FLASH: str = "gemini-flash"
 MODEL_GEMINI_PRO: str = "gemini-pro"
 MODEL_GPT4O_MINI: str = "gpt-4o-mini"
@@ -48,4 +49,10 @@ MODEL_MIMO_V2_FLASH: str = "mimo-v2-flash"
 MODEL_GEMINI_FLASH_LITE: str = "gemini-flash-lite"
 MODEL_GLM_47_FLASH: str = "glm-4.7-flash"
 MODEL_MISTRAL_SMALL: str = "mistral-small"
+
+# v3.2 — new ultra-VFM models
+MODEL_STEPFUN_37_FLASH: str = "stepfun-3.7-flash"
+MODEL_RING_26_1T: str = "ring-2.6-1t"
+MODEL_NEX_N2_PRO_FREE: str = "nex-n2-pro-free"
+MODEL_NEMOTRON_3_ULTRA_FREE: str = "nemotron-3-ultra-free"
 

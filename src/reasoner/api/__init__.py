@@ -96,11 +96,12 @@ async def lifespan(app: FastAPI):
                 "Each worker maintains its own token bucket, allowing rate-limit bypass. "
                 "Set RATE_LIMITER_MODE to a shared backend (e.g., 'redis')."
             )
-            if settings.ENVIRONMENT == "production":
+            # Raise in any non-development environment, not just production.
+            if settings.ENVIRONMENT != "development":
                 logger.critical(message)
                 raise RuntimeError(
                     f"Unsafe rate limiter configuration: RATE_LIMITER_MODE=memory with "
-                    f"UVICORN_WORKERS={uvicorn_workers} in production. "
+                    f"UVICORN_WORKERS={uvicorn_workers} in {settings.ENVIRONMENT}. "
                     f"Set RATE_LIMITER_MODE=redis."
                 )
             logger.warning(message)
@@ -111,6 +112,19 @@ async def lifespan(app: FastAPI):
                 "Set CIRCUIT_BREAKER_MODE to a shared backend (e.g., 'redis') for production.",
                 uvicorn_workers,
             )
+        # Redis reachability probe when RATE_LIMITER_MODE=redis
+        if settings.RATE_LIMITER_MODE == "redis":
+            try:
+                from reasoner.infrastructure.redis.client import get_redis
+                _probe_redis = get_redis()
+                await _probe_redis.set("_startup_probe", "1", ex=10, nx=True)
+                logger.info("Redis rate limiter probe: reachable")
+            except Exception as probe_exc:
+                raise RuntimeError(
+                    f"RATE_LIMITER_MODE=redis but Redis is unreachable at startup: {probe_exc}. "
+                    f"Fix the Redis connection or set RATE_LIMITER_MODE=memory "
+                    f"(only safe for UVICORN_WORKERS=1)."
+                ) from probe_exc
 
     logger.info("Reasoner startup complete")
     logger.info(f"Web UI: http://{settings.SERVER_HOST}:{settings.SERVER_PORT}")
@@ -161,6 +175,9 @@ async def lifespan(app: FastAPI):
         await _active_users_task
     except asyncio.CancelledError:
         pass
+
+    # Drain event bus before closing connections
+    await bus.stop()
 
     # ── Shutdown ──
     global _event_store, _health_postgres_pool
@@ -476,6 +493,12 @@ async def run_pipeline(
     # Idempotency: reject duplicate client_run_id if already in-flight
     if req.client_run_id:
         from reasoner.infrastructure.redis.run_state import _run_state_manager
+        if not _run_state_manager.is_authoritative():
+            raise HTTPException(
+                status_code=503,
+                detail="Run state store unavailable. Retry after Redis recovers.",
+                headers={"Retry-After": "10"},
+            )
         existing = await _run_state_manager.get_cancel_event(req.client_run_id)
         if existing is not None:
             raise HTTPException(

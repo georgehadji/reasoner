@@ -26,7 +26,8 @@ logger = logging.getLogger(__name__)
 
 # Dead-letter log for events that exhaust all retries
 _DEAD_LETTER_PATH = Path(__file__).parent.parent.parent / "logs" / "dead_letter_events.jsonl"
-_DEAD_LETTER_PATH.parent.mkdir(parents=True, exist_ok=True)
+# Note: _DEAD_LETTER_PATH.parent.mkdir() moved to EventBus.start() to avoid
+# PermissionError on read-only filesystems at import time.
 
 
 # Type alias for event handlers
@@ -53,6 +54,7 @@ class EventBus:
         self._task_queue: asyncio.Queue[tuple[DomainEvent, EventHandler]] | None = None
         self._semaphore = asyncio.Semaphore(200)  # Max 200 concurrent handler executions
         self._dropped_event_count: int = 0
+        self._dead_letter_enabled: bool = True
     
     def subscribe(
         self,
@@ -98,6 +100,15 @@ class EventBus:
         """Start the background queue consumer."""
         if self._running:
             return
+        try:
+            _DEAD_LETTER_PATH.parent.mkdir(parents=True, exist_ok=True)
+            self._dead_letter_enabled = True
+        except PermissionError:
+            logger.warning(
+                "Cannot create dead-letter log directory %s — dead-letter logging disabled.",
+                _DEAD_LETTER_PATH.parent,
+            )
+            self._dead_letter_enabled = False
         self._task_queue = asyncio.Queue(maxsize=self._max_queue_size)
         self._running = True
         self._worker_task = asyncio.create_task(self._queue_worker())
@@ -118,12 +129,32 @@ class EventBus:
         if not self._running:
             return
         self._running = False
+        await self.drain(timeout=5.0)
         if hasattr(self, "_worker_task"):
             self._worker_task.cancel()
             try:
                 await self._worker_task
             except asyncio.CancelledError:
                 pass
+
+    async def drain(self, timeout: float = 5.0) -> None:
+        """Process all queued events before shutdown.
+
+        Waits up to ``timeout`` seconds for the queue to empty.
+        Events not processed within the timeout are logged to dead-letter.
+        """
+        if self._task_queue is None or self._task_queue.empty():
+            return
+        try:
+            await asyncio.wait_for(self._task_queue.join(), timeout=timeout)
+        except asyncio.TimeoutError:
+            remaining = self._task_queue.qsize()
+            logger.warning(
+                "EventBus drain timed out after %.1fs with %d events remaining.",
+                timeout,
+                remaining,
+            )
+            self._dropped_event_count += remaining
 
     async def _queue_worker(self) -> None:
         """Background worker that consumes the event queue."""
@@ -224,6 +255,8 @@ class EventBus:
 
     async def _log_to_dead_letter(self, event: DomainEvent, error_message: str, handler_name: str = "") -> None:
         """Log event to dead-letter file."""
+        if not getattr(self, '_dead_letter_enabled', True):
+            return
         try:
             entry = {
                 "event_type": event.event_type.value,
@@ -241,6 +274,15 @@ class EventBus:
             await asyncio.to_thread(_write_dead_letter)
         except Exception as dl_exc:
             logger.error("Failed to write dead-letter entry: %s", dl_exc)
+
+    def stats(self) -> dict[str, int | bool]:
+        """Return observable metrics for the event bus."""
+        return {
+            "dropped_event_count": self._dropped_event_count,
+            "queue_size": self._task_queue.qsize() if self._task_queue else 0,
+            "total_subscribers": self.total_subscribers,
+            "running": self._running,
+        }
 
     def clear(self) -> None:
         """Clear all subscriptions."""

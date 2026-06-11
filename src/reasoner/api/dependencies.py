@@ -286,12 +286,12 @@ async def check_rate_limit(
             status_code=429,
             detail={
                 "error": "Rate limit exceeded",
-                "retry_after": int(info.get("retry_after", 60)),
+                "retry_after": int(info.get("retry_after") or 60),
                 "limit_minute": info.get("limit_minute"),
                 "remaining_minute": info.get("remaining_minute", 0),
             },
             headers={
-                "Retry-After": str(int(info.get("retry_after", 60))),
+                "Retry-After": str(int(info.get("retry_after") or 60)),
                 "X-RateLimit-Limit": str(info.get("limit_minute")),
                 "X-RateLimit-Remaining": str(info.get("remaining_minute", 0)),
             },

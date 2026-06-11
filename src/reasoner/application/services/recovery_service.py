@@ -6,6 +6,7 @@ import logging
 from dataclasses import asdict
 
 from reasoner.core.constants import TRUNCATION
+from reasoner.core.constants_limits import get_token_budget
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.domain.core_types import (
     SolutionCandidate,
@@ -35,7 +36,7 @@ class RecoveryService:
                 role="recovery_path",
                 system_prompt=phases.CROSS_VERIFICATION_SYSTEM,
                 user_prompt=phases.cross_verification_prompt(state, candidate_solution=asdict(candidate_to_verify)),
-                max_tokens=1024, 
+                max_tokens=get_token_budget("recovery_path"), 
                 state=state
             )
             verification_data = extract_json(raw_verification)

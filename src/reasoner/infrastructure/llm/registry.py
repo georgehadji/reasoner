@@ -25,7 +25,7 @@ from reasoner.infrastructure.llm.providers.openai_compat import (
 _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # Anthropic
     "claude-opus":      {"model": "qwen/qwen3.6-plus"},
-    MODEL_CLAUDE_SONNET: {"model": "anthropic/claude-sonnet-4.6"},
+    MODEL_CLAUDE_SONNET: {"model": "anthropic/claude-sonnet-4.6"},  # v3.2: still current as of Jun 2026
     "claude-haiku":     {"model": "anthropic/claude-haiku-4.5"},
     # OpenAI
     "gpt-5":            {"model": "openai/gpt-5.4"},
@@ -40,9 +40,9 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "o3":               {"model": "openai/o3"},
     "o3-mini":          {"model": "openai/o3-mini"},
     # Google
-    MODEL_GEMINI_PRO:   {"model": "google/gemini-2.5-pro"},
-    MODEL_GEMINI_FLASH: {"model": "google/gemini-2.5-flash"},
-    "gemini-flash-lite": {"model": "google/gemini-2.5-flash-lite"},
+    MODEL_GEMINI_PRO:   {"model": "google/gemini-3.5-flash"},  # v3.2: 2.5-pro → 3.5-flash (near-Pro coding at Flash cost)
+    MODEL_GEMINI_FLASH: {"model": "google/gemini-3.5-flash"},
+    "gemini-flash-lite": {"model": "google/gemini-3.1-flash-lite"},  # v3.2: 2.5-lite → 3.1-lite ($0.25/$1.50 per M)
     "gemma-4-26b":      {"model": "google/gemma-4-26b-a4b-it"},
     "gemma-4-31b":      {"model": "google/gemma-4-31b-it"},
     # xAI
@@ -77,11 +77,11 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "deepseek-v4-flash-free": {"model": "deepseek/deepseek-v4-flash:free"},
     "deepseek-v4-pro":  {"model": "deepseek/deepseek-v4-pro"},
     # Qwen
-    "qwen3-max":           {"model": "qwen/qwen3.6-plus"},  # v3.1: kept qwen3.6-plus (qwen3.7 not available on OpenRouter),
+    "qwen3-max":           {"model": "qwen/qwen3.7-plus"},  # v3.2: upgraded to 3.7-plus ($0.40/$1.60 per M)
     "qwen3.7-max":         {"model": "qwen/qwen3.7-max"},
-    "qwen3.6-plus":        {"model": "qwen/qwen3.6-plus"},
-    "qwen3-plus":          {"model": "qwen/qwen3.5-plus-02-15"},
-    "qwen3.5-plus":        {"model": "qwen/qwen3.5-plus-20260420"},
+    "qwen3.6-plus":        {"model": "qwen/qwen3.7-plus"},  # v3.2: alias → 3.7-plus (better & cheaper)
+    "qwen3-plus":          {"model": "qwen/qwen3.7-plus"},  # v3.2: ancient 3.5-02-15 → 3.7-plus
+    "qwen3.5-plus":        {"model": "qwen/qwen3.7-plus"},  # v3.2: 20260420 → 3.7-plus
     "qwen3-turbo":         {"model": "qwen/qwen-turbo"},
     "qwen3-coder":         {"model": "qwen/qwen3-coder-plus"},
     "qwen3-coder-next":    {"model": "qwen/qwen3-coder-next"},
@@ -139,6 +139,20 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "qianfan-ocr-fast": {"model": "baidu/qianfan-ocr-fast:free"},
     # inclusionAI (Ant Group)
     "ling-2.6-flash-free": {"model": "inclusionai/ling-2.6-flash:free"},
+    "ring-2.6-1t":         {"model": "inclusionai/ring-2.6-1t"},  # v3.2: $0.075/$0.625 per M — 63B active/1T total thinking model
+    # StepFun — ultra-cheap multimodal MoE
+    "stepfun-3.7-flash":   {"model": "stepfun/step-3.7-flash"},  # v3.2: $0.20/$1.15 per M — 196B MoE, 11B active
+    # Nex AGI — free MoE
+    "nex-n2-pro-free":     {"model": "nex-agi/nex-n2-pro:free"},  # v3.2: FREE — 17B active/397B total MoE
+    # NVIDIA Nemotron — free reasoning model
+    "nemotron-3-ultra-free": {"model": "nvidia/nemotron-3-ultra-550b-a55b:free"},  # v3.2: FREE — 55B active/550B MoE
+    # Meta (via OpenRouter)
+    "llama-3.3-70b":      {"model": "meta-llama/llama-3.3-70b-instruct:free"},
+    # NVIDIA (via OpenRouter)
+    # Discriminative reranker — returns relevance scores via logprobs, not generated text.
+    # Use rerank_via_nemotron() in core/rerank.py; do NOT call via router.call() for text generation.
+    "nvidia-nemotron-rerank-vl":  {"model": "nvidia/llama-nemotron-rerank-vl-1b-v2:free"},
+    "nvidia-nemotron-nano-8b":    {"model": "nvidia/llama-3.1-nemotron-nano-8b-v1:free"},
     # NVIDIA NIM (direct, not via OpenRouter)
     "nvidia-nemotron-super": {
         "cls": "compat",

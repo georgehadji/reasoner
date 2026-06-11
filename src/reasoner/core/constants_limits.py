@@ -9,7 +9,7 @@ unexpected initialization order issues.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from reasoner.core.constants_models import MODEL_GEMINI_FLASH  # needed for IMAGE_GEN_ENHANCEMENT_MODEL
+from reasoner.core.constants_models import MODEL_GEMINI_FLASH, MODEL_GEMINI_FLASH_LITE  # needed for IMAGE_GEN_ENHANCEMENT_MODEL + QUALITY_JUDGE_MODELS
 from typing import Literal
 
 # ═════════════════════════════════════════════════════════════════════
@@ -63,6 +63,7 @@ HYPERGATE_METHOD_THRESHOLD: float = 0.70   # MethodClassifier confidence floor
 HYPERGATE_AMBIGUOUS_FLOOR: float = 0.45    # Below this on all agents → hard fallback
 HYPERGATE_TIMEOUT_SECONDS: float = 6.0     # Per-sub-agent call timeout
 HYPERGATE_CACHE_SIZE: int = 512            # LRU size (per sub-agent + top-level)
+HYPERGATE_CACHE_TTL_SECONDS: int = 3600  # 1-hour TTL for top-level routing decisions
 HYPERGATE_MAX_TOKENS_LANGUAGE: int = 80
 HYPERGATE_MAX_TOKENS_COMPLEXITY: int = 80
 HYPERGATE_MAX_TOKENS_DIRECT: int = 100
@@ -103,7 +104,12 @@ PHASE_TOKEN_BUDGETS: dict[str, int] = {
     "research": 4096,
     "verification": 1024,
     "deep_read": 2048,
+    "deep_read_shallow": 512,
     "cross_verify": 1024,
+    # Additional roles
+    "prism_classify":         256,
+    "recovery_path":         1024,
+    "search_disambiguation":  256,
     # Default fallback
     "default": 1536,
 }
@@ -141,9 +147,9 @@ def get_phase_retry_budget(phase_name: str) -> int:
 # ═════════════════════════════════════════════════════════════════════
 
 QUALITY_JUDGE_MODELS: dict[str, str] = {
-    "budget":  "gemini-flash-lite",
-    "premium": "google/gemini-2.0-flash-001",
-    "default": "gemini-flash-lite",
+    "budget":  MODEL_GEMINI_FLASH_LITE,
+    "premium": MODEL_GEMINI_FLASH,
+    "default": MODEL_GEMINI_FLASH_LITE,
 }
 
 QUALITY_JUDGE_THRESHOLDS: dict[str, float] = {

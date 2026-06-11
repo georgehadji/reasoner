@@ -9,6 +9,8 @@ from __future__ import annotations
 PHASE_TEMPERATURES: dict[str, float] = {
     "classification":   0.3,
     "decomposition":    0.4,
+    "fusion":           0.2,
+
     "perspective":      1.0,
     "scoring":          0.3,
     "stress_testing":   0.5,

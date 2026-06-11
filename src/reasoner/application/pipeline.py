@@ -70,15 +70,15 @@ import reasoner.phases as phases
 
 logger = logging.getLogger(__name__)
 
-TOKEN_OPTIMIZATION = {
-    "dynamic_budgets": True,
-    "context_compression": True,
-    "prompt_compression": True,
-    "neuro_compression": False,
-    "caching": True,
-}
-
 from reasoner.core.settings import settings
+
+TOKEN_OPTIMIZATION = {
+    "dynamic_budgets":     settings.TOKEN_DYNAMIC_BUDGETS,
+    "context_compression": settings.TOKEN_CONTEXT_COMPRESSION,
+    "prompt_compression":  settings.TOKEN_PROMPT_COMPRESSION,
+    "neuro_compression":   settings.TOKEN_NEURO_COMPRESSION,
+    "caching":             settings.TOKEN_CACHING,
+}
 
 USE_PHASE_SUBAGENTS = {
     "enhancement": settings.USE_SUBAGENT_ENHANCEMENT,

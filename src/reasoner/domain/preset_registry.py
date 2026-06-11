@@ -11,85 +11,81 @@ from reasoner.domain.preset_core import PipelinePreset
 from reasoner.domain.saas import SubscriptionTier
 
 
-# Declarative configuration for all 24 presets (2 per method).
 _PRESET_CONFIGS: list[dict] = [
     # ── Multi-Perspective ───────────────────────────────────────────
     {
         "id": "multi-perspective-budget",
         "name": "Multi-Perspective (Budget)",
-        "description": "Standard 6-phase pipeline with 3-lab Phase 2 diversity. Google (constructive) + Mistral Small (destructive) + Zhipu GLM (systemic) + Ministral-3B (minimalist). Qwen scores independently. Pennies per run.",
-        "primary_id": "gemini-flash-lite",
+        "description": "Standard 6-phase pipeline with 3-lab Phase 2 diversity. Gemini 3.5 Flash (constructive) + Mistral Small (destructive) + Zhipu GLM (systemic) + StepFun 3.7 Flash (minimalist). Qwen scores independently. Ultra-low cost per run.",
+        "primary_id": "gemini-flash",
         "routing": {
-            "prompt_enhancement": "gemini-flash-lite",
-            "classification": "gpt-5-mini",  # v3.1: upgraded from gpt-4o-mini for JSON adherence
+            "prompt_enhancement": "stepfun-3.7-flash",
+            "classification": "gpt-5-mini",
             "decomposition": "deepseek-v3",
-            "constructive": "gemini-flash-lite",
+            "constructive": "gemini-flash",
             "destructive": "mistral-small",
-            "systemic": "glm-5.1",  # v3.1: upgraded from glm-4.7-flash
-            "minimalist": "ministral-3b",
+            "systemic": "glm-5.1",
+            "minimalist": "stepfun-3.7-flash",  # v3.2: Ministral-3B → StepFun ($0.20/$1.15)
             "scoring": "qwen3.5-flash",
             "stress_testing": "mistral-small",
-            "synthesis": "qwen3.7-max"  # v3.1: upgraded to qwen3.7
+            "synthesis": "qwen3.7-max"
         },
         "fallback_routing": {
-            "prompt_enhancement": "glm-4-air",
-            "classification": "glm-4-air",
-            "decomposition": "glm-4-air",
-            "constructive": "qwen3-plus",
+            "prompt_enhancement": "ring-2.6-1t",
+            "classification": "ring-2.6-1t",
+            "decomposition": "ring-2.6-1t",
+            "constructive": "qwen3.7-max",
             "destructive": "deepseek-v3",
-            "systemic": "qwen3-plus",
+            "systemic": "qwen3.7-max",
             "minimalist": "deepseek-v3",
             "scoring": "qwen3.5-flash",
-            "stress_testing": "qwen3-plus",
-            "synthesis": "glm-4-air"
+            "stress_testing": "qwen3.7-max",
+            "synthesis": "ring-2.6-1t"
         },
         "notes": [
-            "Phase 2: Google + Mistral + Zhipu = 3 labs; Ministral-3B (minimalist) stays Mistral lab",
+            "v3.2: StepFun 3.7 Flash replaces Ministral-3B/GLM-4-Air — 196B MoE at $0.20/$1.15 per M, vastly better VFM",
+            "v3.2: Gemini 3.5 Flash replaces Gemini Flash Lite — near-Pro coding at Flash cost ($1.50/$9.00)",
+            "v3.2: Ring-2.6-1T as fallback — 63B active thinking model at $0.075/$0.625 per M",
+            "Phase 2: Google + Mistral + Zhipu = 3 labs; StepFun (minimalist) adds 4th independent lab",
             "Scoring: Qwen 3.5 Flash (Alibaba) — independent lab, prevents same-lab scorer bias",
-            "Stress testing: Mistral Small — stronger adversarial reasoning than Gemini Flash Lite",
-            "Ministral-3B for minimalist: smallest Mistral model enforces conciseness by design",
-            "Full run estimated at <$0.02 total",
-            "DeepSeek V3: decomposition backbone — stronger structured reasoning than Gemini Flash Lite at comparable cost.",
-            "Gemini Flash Lite: reserved for coordination roles (prompt_enhancement, constructive) — JSON formatting, low-stakes structure."
+            "Stress testing: Mistral Small — stronger adversarial reasoning",
+            "Full run estimated at <$0.015 total — cheaper and better than v3.1",
         ],
     },
     {
         "id": "multi-perspective-ultra-budget",
         "name": "Multi-Perspective (Ultra-Budget)",
-        "description": "Minimal 5-phase pipeline: fusion, context vetting, 1 perspective, critique, synthesis. No prompt enhancement, no stress test, no deep read. Uses cheapest models (Ministral-3B, Gemini Flash Lite). Designed for maximum cost savings and speed on simple problems.",
-        "primary_id": "ministral-3b",
+        "description": "Minimal 5-phase pipeline with ultra-cheap models. StepFun 3.7 Flash + Ring-2.6-1T + Nex-N2-Pro (free). No prompt enhancement, stress test, or deep read. Sub-penny per run.",
+        "primary_id": "stepfun-3.7-flash",
         "routing": {
-            "fusion": "ministral-3b",
-            "context_vetting": "ministral-3b",
-            "perspective": "ministral-3b",
-            "constructive": "ministral-3b",
-            "destructive": "ministral-3b", # Still needed for method type, but only 1 perspective will run due to top_k=1
-            "systemic": "ministral-3b",   # Still needed for method type
-            "minimalist": "ministral-3b", # Still needed for method type
-            "scoring": "gemini-flash-lite",
-            "synthesis": "gemini-flash-lite"
+            "fusion": "stepfun-3.7-flash",
+            "context_vetting": "stepfun-3.7-flash",
+            "perspective": "stepfun-3.7-flash",
+            "constructive": "stepfun-3.7-flash",
+            "destructive": "stepfun-3.7-flash",
+            "systemic": "stepfun-3.7-flash",
+            "minimalist": "stepfun-3.7-flash",
+            "scoring": "ring-2.6-1t",
+            "synthesis": "ring-2.6-1t"
         },
         "fallback_routing": {
-            "fusion": "glm-4-air",
-            "context_vetting": "glm-4-air",
-            "perspective": "glm-4-air",
-            "constructive": "glm-4-air",
-            "destructive": "glm-4-air",
-            "systemic": "glm-4-air",
-            "minimalist": "glm-4-air",
-            "scoring": "qwen3-plus",
-            "synthesis": "qwen3-plus"
+            "fusion": "nex-n2-pro-free",
+            "context_vetting": "nex-n2-pro-free",
+            "perspective": "nex-n2-pro-free",
+            "constructive": "nex-n2-pro-free",
+            "destructive": "nex-n2-pro-free",
+            "systemic": "nex-n2-pro-free",
+            "minimalist": "nex-n2-pro-free",
+            "scoring": "stepfun-3.7-flash",
+            "synthesis": "stepfun-3.7-flash"
         },
         "notes": [
-            "Fusion phase: Ministral-3B (Mistral) for classification + decomposition.",
-            "Context vetting: Ministral-3B (Mistral) for initial RAG query.",
-            "Perspective: Ministral-3B (Mistral) for single perspective generation.",
-            "Scoring: Gemini Flash Lite (Google) for critique — independent lab for bias reduction.",
-            "Synthesis: Gemini Flash Lite (Google) for final output.",
-            "top_k=1 ensures only one perspective runs, saving 3 calls.",
-            "parallel_perspectives=False ensures sequential execution (if top_k > 1 logic allows).",
-            "enhance_prompt=False, skip_stress_test=True, skip_deep_read=True further reduce calls.",
-            "Full run estimated at <$0.01 total.",
+            "v3.2: Complete overhaul — StepFun 3.7 Flash ($0.20/$1.15) + Ring-2.6-1T ($0.075/$0.625)",
+            "v3.2: Fallback: Nex-N2-Pro (FREE — 17B active/397B MoE) + StepFun",
+            "StepFun 3.7 Flash: 196B MoE, 11B active, native image/video understanding",
+            "Ring-2.6-1T: 63B active thinking model, tool-use native, $0.075/$0.625 per M",
+            "Scoring + Synthesis: Ring-2.6-1T (independent lab from StepFun for bias reduction)",
+            "Full run estimated at <$0.005 total — 5x cheaper than v3.1 with better models",
         ],
         "top_k": 1,
         "parallel_perspectives": False,
@@ -1563,6 +1559,60 @@ _PRESET_CONFIGS: list[dict] = [
             "Critical bottleneck (CoVE verify + verifier): Claude's constitutional AI for contradiction detection",
         ],
     },
+    # ── Article (4-Phase Source-Grounded Article) ───────────────────
+    {
+        "id": "article-budget",
+        "name": "Article (Budget)",
+        "description": "4-phase source-grounded article pipeline: retrieve sources, draft, adversarial verify, refine. DeepSeek V3 plans retrieval and drafts, Mistral Small adversarially verifies claims, Qwen3.7-Max synthesizes. Estimated <$0.05 per article.",
+        "primary_id": "deepseek-v3",
+        "routing": {
+            "writing_draft":    "deepseek-v3",
+            "writing_factcheck": "mistral-small",
+            "writing_assemble": "qwen3-plus",
+            "synthesis":        "qwen3.7-max",
+        },
+        "fallback_routing": {
+            "writing_draft":    "qwen3-plus",
+            "writing_factcheck": "deepseek-v3",
+            "writing_assemble": "glm-4-air",
+            "synthesis":        "glm-4-air",
+        },
+        "notes": [
+            "DeepSeek V3: retrieval planning + drafting — HumanEval 82.6%, strong structured prose",
+            "Mistral Small: adversarial verification — different lab prevents same-model confirmation bias",
+            "Qwen3-Plus: refinement assembly — 32B MoE, coherent long-form editing",
+            "Qwen3.7-Max: synthesis — state-of-the-art Alibaba model for final polish",
+            "3-lab diversity: DeepSeek + Mistral + Alibaba",
+            "Estimated <$0.05 per article",
+        ],
+    },
+    {
+        "id": "article-premium",
+        "name": "Article (Premium)",
+        "description": "4-phase premium source-grounded article pipeline: retrieve sources, draft, adversarial verify, refine. Claude Sonnet plans and drafts, Gemini Pro adversarially verifies, GLM-5.1 refines and synthesizes. Estimated $0.15–$0.25 per article.",
+        "primary_id": "claude-sonnet",
+        "required_tier": "pro",
+        "routing": {
+            "writing_draft":    "claude-sonnet",
+            "writing_factcheck": "gemini-pro",
+            "writing_assemble": "glm-5.1",
+            "synthesis":        "gemini-pro",
+        },
+        "fallback_routing": {
+            "writing_draft":    "gemini-pro",
+            "writing_factcheck": "claude-sonnet",
+            "writing_assemble": "claude-sonnet",
+            "synthesis":        "claude-sonnet",
+        },
+        "notes": [
+            "Claude Sonnet: retrieval planning + drafting — best long-form coherence and source integration",
+            "Gemini Pro: adversarial fact verification + synthesis — 2M context, strong reasoning",
+            "GLM-5.1: refinement assembly — 200K context, 34% hallucination rate, excellent editing",
+            "Cross-ecosystem: Anthropic + Google + Zhipu for maximum epistemic diversity",
+            "Fallback maintains cross-lab independence: Anthropic ↔ Google on failure",
+            "Estimated $0.15–$0.25 per article",
+        ],
+    },
     # ── Coding (Production Code Generation) ─────────────────────────
     {
         "id": "coding-budget",
@@ -1923,3 +1973,15 @@ PRESETS: dict[str, PipelinePreset] = {
     )
     for cfg in _PRESET_CONFIGS
 }
+
+# Every method must have exactly one Budget and one Premium variant.
+_preset_ids = list(PRESETS.keys())
+assert len(_preset_ids) % 2 == 0, (
+    f"Expected an even number of presets (Budget+Premium pairs), got {len(_preset_ids)}. "
+    f"Add or remove a preset to restore pairing. Presets: {_preset_ids}"
+)
+
+assert len(PRESETS) % 2 == 0, (
+    f"PRESETS count must be even (budget+premium pairs): got {len(PRESETS)}. "
+    "Add the missing paired preset or mark the lone preset as experimental."
+)

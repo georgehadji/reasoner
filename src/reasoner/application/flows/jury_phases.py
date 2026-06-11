@@ -19,6 +19,7 @@ from reasoner.domain.core_types import (
 from reasoner.models import ClaimLabel
 from reasoner.parsing import extract_json
 from reasoner.core.constants import TRUNCATION
+from reasoner.core.constants_limits import get_token_budget
 import reasoner.phases as phases
 from reasoner.application.flows.base import WorkflowServices
 from reasoner.application.services.recovery_service import RecoveryService
@@ -36,7 +37,7 @@ async def run_recovery_path(state: PipelineState, services: WorkflowServices, ca
             system_prompt=phases.CROSS_VERIFICATION_SYSTEM,
             user_prompt=phases.cross_verification_prompt(state, candidate_solution=asdict(candidate_to_verify)),
             state=state,
-            max_tokens=1024
+            max_tokens=get_token_budget("recovery_path")
         )
         verification_data = extract_json(raw_verification)
         if verification_data.get("verification_findings"):
