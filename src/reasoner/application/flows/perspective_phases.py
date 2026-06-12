@@ -106,12 +106,19 @@ async def run_perspectives_phase(
                 msg = f"Perspective '{p_name}' failed: {r}"
                 services.log("PHASE-2", msg, state)
                 state.errors.append(msg)
+            elif not r.content or not r.content.strip():
+                msg = f"Perspective '{p_name}' returned empty content — skipping"
+                services.log("PHASE-2", msg, state)
+                state.errors.append(msg)
             else:
                 if _is_perspective_hallucinated(r):
                     services.log("PHASE-2", f"Filtering hallucinated perspective '{p_name}'; regenerating once.", state)
                     try:
                         replacement = await _get_perspective(p_name)
-                        state.candidates.append(replacement)
+                        if replacement.content and replacement.content.strip():
+                            state.candidates.append(replacement)
+                        else:
+                            services.log("PHASE-2", f"Regeneration for '{p_name}' also empty — skipping", state)
                     except Exception as exc:
                         services.log("PHASE-2", f"Regeneration failed for '{p_name}': {exc}", state)
                 else:
@@ -121,9 +128,16 @@ async def run_perspectives_phase(
             p_name = _perspective_name(p)
             try:
                 candidate = await _get_perspective(p_name)
+                if not candidate.content or not candidate.content.strip():
+                    services.log("PHASE-2", f"Perspective '{p_name}' returned empty content — skipping", state)
+                    state.errors.append(f"Perspective '{p_name}' returned empty content")
+                    continue
                 if _is_perspective_hallucinated(candidate):
                     services.log("PHASE-2", f"Filtering hallucinated perspective '{p_name}'; regenerating once.", state)
                     candidate = await _get_perspective(p_name)
+                    if not candidate.content or not candidate.content.strip():
+                        services.log("PHASE-2", f"Regeneration for '{p_name}' also empty — skipping", state)
+                        continue
                 state.candidates.append(candidate)
             except Exception as e:
                 msg = f"Perspective '{p_name}' failed: {e}"

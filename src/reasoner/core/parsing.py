@@ -31,6 +31,28 @@ def strip_perplexity_citations(text: str) -> str:
     return text
 
 
+# Known provider-injected artifacts that leak into LLM responses.
+_PROVIDER_ARTIFACTS: tuple[str, ...] = (
+    "Please sign in to continue your reasoning session",
+    "Please sign in to continue",
+    "Sign in to continue your session",
+    "Your session has expired",
+    "Rate limit exceeded. Please try again",
+    "This content has been blocked",
+    "I'm sorry, but I can't assist with that",
+)
+
+
+def strip_provider_artifacts(text: str) -> str:
+    """Remove known provider-injected artifacts from LLM responses."""
+    for artifact in _PROVIDER_ARTIFACTS:
+        idx = text.find(artifact)
+        if idx != -1:
+            # Remove the artifact and everything after it (usually trailing junk)
+            text = text[:idx].rstrip()
+    return text
+
+
 def strip_prose_preamble(text: str) -> str:
     """Remove leading prose before the first JSON object or array."""
     start = min(
@@ -101,6 +123,7 @@ def extract_json_any(text: str) -> Any:
         text = text[:MAX_INPUT_LENGTH]
     
     text = strip_perplexity_citations(text.strip())
+    text = strip_provider_artifacts(text)
     text = _strip_reasoning_tags(text)
     text = strip_prose_preamble(text)
     if not text:
