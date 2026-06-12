@@ -77,6 +77,19 @@ def extract_json_list(text: str) -> list[Any]:
     )
 
 
+def _strip_reasoning_tags(text: str) -> str:
+    """Strip <think>...</think> and similar reasoning artifacts from LLM output.
+
+    Models like Gemini 3.5 Flash, DeepSeek R1, and Qwen thinking-mode can leak
+    chain-of-thought inside <think> tags even when JSON-only output is requested.
+    """
+    # Strip <think>...</think> blocks (greedy — handles nested content)
+    text = re.sub(r"<think>[\s\S]*?</think>", "", text)
+    # Strip <reasoning>...</reasoning> (some models use this variant)
+    text = re.sub(r"<reasoning>[\s\S]*?</reasoning>", "", text)
+    return text.strip()
+
+
 def extract_json_any(text: str) -> Any:
     """
     Core extraction engine. Handles markdown fences, prose, and malformed JSON.
@@ -88,6 +101,8 @@ def extract_json_any(text: str) -> Any:
         text = text[:MAX_INPUT_LENGTH]
     
     text = strip_perplexity_citations(text.strip())
+    text = _strip_reasoning_tags(text)
+    text = strip_prose_preamble(text)
     if not text:
         return None
 
