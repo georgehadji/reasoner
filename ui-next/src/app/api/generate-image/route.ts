@@ -27,11 +27,19 @@ export async function POST(req: NextRequest) {
 
     const headers = new Headers(sanitizeRequestHeaders(req.headers));
     headers.set('Content-Type', 'application/json');
-    const upstream = await fetch(`${apiBase}${API.GENERATE_IMAGE}`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body),
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 120_000); // 120s — covers 90s backend + network overhead
+    let upstream: Response;
+    try {
+      upstream = await fetch(`${apiBase}${API.GENERATE_IMAGE}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
 
     return new Response(upstream.body, {
       status: upstream.status,
@@ -40,6 +48,13 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     if (err instanceof ValidationError) {
       return NextResponse.json({ error: err.message }, { status: 400 });
+    }
+    const isTimeout = err instanceof DOMException && err.name === 'AbortError';
+    if (isTimeout) {
+      return NextResponse.json(
+        { error: 'Image generation timed out. Try a simpler prompt or fewer images.' },
+        { status: 504 }
+      );
     }
     console.error('Generate image proxy error:', err);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

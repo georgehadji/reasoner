@@ -91,6 +91,9 @@ async def describe_image(content: bytes, filename: str) -> str:
                 max_tokens=1024,
                 temperature=0.3,
             )
+            if not response.choices:
+                logger.warning("Image captioning returned empty choices for %s", model_id)
+                continue
             description = response.choices[0].message.content or "[No description returned]"
             _image_cache[image_hash] = description
             return description
@@ -155,6 +158,9 @@ async def ocr_image(content: bytes, filename: str) -> str:
                 max_tokens=2048,
                 temperature=0.1,
             )
+            if not response.choices:
+                logger.warning("OCR returned empty choices for %s", model_id)
+                continue
             text = response.choices[0].message.content or ""
             text = text.strip()
             _image_cache[cache_key] = text

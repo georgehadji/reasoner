@@ -24,6 +24,21 @@ logger = logging.getLogger(__name__)
 # Lazy import to avoid circular deps
 _error_store = None
 
+# Track background tasks to prevent GC
+_BACKGROUND_TASKS: set = set()
+
+
+def _track_background_task(task, what: str) -> None:
+    """Track a background task and clean up on completion."""
+    _BACKGROUND_TASKS.add(task)
+
+    def cleanup_task(t):
+        _BACKGROUND_TASKS.discard(t)
+        if t.exception() and not t.cancelled():
+            logger.error("Background task failed (%s): %s", what, t.exception())
+
+    task.add_done_callback(cleanup_task)
+
 
 def _get_error_store():
     """Lazy initialization of error store."""
@@ -102,8 +117,9 @@ def _log_error(
             traceback=traceback,
             extra=extra,
         )
-        # Schedule async insert without awaiting
-        asyncio.create_task(store.insert(entry))
+        # Schedule async insert without awaiting (tracked to prevent GC)
+        task = asyncio.create_task(store.insert(entry))
+        _track_background_task(task, "error_store.insert")
     except Exception as store_exc:
         logger.warning("Failed to persist error to ErrorStore: %s", store_exc)
 

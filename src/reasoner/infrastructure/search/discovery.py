@@ -122,13 +122,17 @@ def reset_discovery_client() -> None:
         try:
             # Running inside an async context — schedule close as a fire-and-forget task.
             loop = asyncio.get_running_loop()
-            loop.create_task(old.close())
+            task = loop.create_task(old.close())
+            task.add_done_callback(
+                lambda t: logger.error(
+                    "Discovery client close failed: %s", t.exception()
+                )
+                if not t.cancelled() and t.exception()
+                else None
+            )
         except RuntimeError:
-            # No running event loop (CLI, test, sync context) — safe to use asyncio.run().
-            try:
-                asyncio.run(old.close())
-            except Exception:
-                pass
+            # No running event loop — cannot close async client
+            logger.warning("No event loop to close discovery client; resources may leak.")
 
 
 # ─────────────────────────────────────────────
