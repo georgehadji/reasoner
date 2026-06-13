@@ -336,19 +336,29 @@ _REGISTRY: dict[str, dict] = {
     },
     "coding-budget": {
         "method": "coding",
-        # NOTE: kimi-k2.x "code" reasoning models emit output in a separate
-        # reasoning channel, leaving `content` empty → empty responses. deepseek-v3
-        # returns content reliably but is too slow for the 120s coding-phase budget.
-        # gemini-flash is fast, reliable, and code-capable — the right budget primary.
-        "primary_id": "gemini-flash",
+        # qwen3-coder-flash is a dedicated coding model: reliable content,
+        # fast (~11s/call, well within the 120s coding-phase budget), and far
+        # stronger at code than a general-purpose flash model.
+        # NOTE: avoid kimi-k2.x "code" and glm-4.7-flash here — both are reasoning
+        # models that emit output in a separate channel, leaving `content` empty.
+        # deepseek-v3 is reliable but too slow (times out at 120s).
+        "primary_id": "qwen3-coder-flash",
         "routing": {
             "synthesis": "fireworks/firefunction-v2",
         },
-        # Cross-lab fallback so an empty/failed primary degrades gracefully
-        # rather than crashing the pipeline (coding_generate/coding_tests have
-        # no per-role fallback otherwise).
+        # Single-model fallback for the lighter coding roles (spec/tests/assemble)
+        # that route through primary. codestral-2508 is fast (~3s), code-specialized,
+        # and cross-lab (Mistral vs Qwen).
         "fallback_routing": {
-            "primary": "deepseek-v3",
+            "primary": "codestral-2508",
+        },
+        # Multi-model fallback chains (tried in order, with a quality gate that skips
+        # empty/degraded/low-quality responses before moving to the next model):
+        #   - coding_generate: 1 primary + 2 fallbacks, escalating fast → cross-lab → most-capable
+        #   - coding_review:   cross-lab critique (Google → DeepSeek → Mistral) for independent review
+        "cascading_routing": {
+            "coding_generate": ["qwen3-coder-flash", "codestral-2508", "qwen3-coder"],
+            "coding_review": ["gemini-flash", "deepseek-v3", "codestral-2508"],
         },
         "tags": ["budget", "coding", "software-development"],
     },

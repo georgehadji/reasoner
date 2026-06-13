@@ -73,7 +73,14 @@ class PresetService:
         for role, mid in preset.fallback_routing.items():
             if mid not in _REGISTRY:
                 raise ValueError(f"Preset '{preset_name}' role '{role}' fallback uses unknown model '{mid}'")
-                
+
+        for role, model_ids in preset.cascading_routing.items():
+            for mid in model_ids:
+                if mid not in _REGISTRY:
+                    raise ValueError(
+                        f"Preset '{preset_name}' role '{role}' cascade uses unknown model '{mid}'"
+                    )
+
         filtered_routing = self.filter_routing(preset.routing, preset.primary_id)
 
         if agent_model:
