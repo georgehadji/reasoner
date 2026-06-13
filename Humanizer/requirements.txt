@@ -1,7 +1,0 @@
-fastapi
-uvicorn
-celery
-redis
-requests
-openai
-gunicorn

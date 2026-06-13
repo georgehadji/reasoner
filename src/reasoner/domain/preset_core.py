@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Literal, Optional
+from typing import TYPE_CHECKING, Literal, Optional, List
 
 # Removed ProviderRouter and _REGISTRY imports to restore domain purity.
 # Validation logic will be moved to an application service.
@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 # When adding a new perspective, add its routing_key here.
 _KNOWN_ROUTING_ROLES: frozenset[str] = frozenset({
     # Phase roles
+    "primary",
     "fusion",
     "classification",
     "decomposition",
@@ -26,6 +27,8 @@ _KNOWN_ROUTING_ROLES: frozenset[str] = frozenset({
     "synthesis",
     "context_vetting",
     "deep_read",
+    "perspective_analysis",
+    "perspective_cot",
     # Default perspective roles (must match PerspectiveDefinition.routing_key values)
     "constructive",
     "destructive",
@@ -103,6 +106,8 @@ _KNOWN_ROUTING_ROLES: frozenset[str] = frozenset({
     "writing_draft",
     "writing_factcheck",
     "writing_assemble",
+    # Image generation roles
+    "image_generate",
 })
 
 
@@ -217,12 +222,15 @@ FOLLOWUP_AGENT_MODELS: dict[str, str] = {
 @dataclass
 class PipelinePreset:
     """A named routing configuration with metadata."""
-    name: str
-    description: str
+    id: str
+    method: str
     primary_id: str
+    name: str = ""
+    description: str = ""
     routing: dict[str, str] = field(default_factory=dict)
     notes: list[str] = field(default_factory=list)
     required_env_vars: list[str] = field(default_factory=list)
+    tags: List[str] = field(default_factory=list)
     # Per-role fallback model IDs. If a role's provider fails, this model is tried next.
     # Roles absent here fall back to primary automatically (if they use a non-primary model).
     fallback_routing: dict[str, str] = field(default_factory=dict)
@@ -241,6 +249,11 @@ class PipelinePreset:
 
     def __post_init__(self) -> None:
         """Validate routing keys at construction time."""
+        if not self.name:
+            self.name = self.id.replace('-', ' ').title()
+        if not self.description:
+            self.description = f"{self.method.title()} method preset"
+
         unknown_roles = set(self.routing.keys()) - _KNOWN_ROUTING_ROLES
         if unknown_roles:
             raise ValueError(

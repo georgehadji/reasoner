@@ -88,6 +88,8 @@ class PresetService:
         router = ProviderRouter.from_model_ids(
             primary_id=preset.primary_id,
             routing=filtered_routing,
+            fallback_routing=preset.fallback_routing or None,
+            cascading_routing=preset.cascading_routing or None,
         )
         return preset_name, router
 

@@ -17,6 +17,8 @@ from reasoner.core.settings import settings
 
 router = APIRouter()
 
+_health_postgres_pool = None
+
 
 @router.get("/api/health")
 async def health_check(request: Request):
@@ -72,35 +74,47 @@ async def health_check(request: Request):
     }
 
     # Postgres check
-    from reasoner.api.cache import _health_postgres_pool
-    global _health_postgres_pool  # noqa: PLW0603
-    try:
-        if _health_postgres_pool is None:
-            import asyncpg
-            dsn = settings.DATABASE_URL.replace("+asyncpg", "")
-            _health_postgres_pool = await asyncpg.create_pool(dsn, min_size=1, max_size=2)
-        await _health_postgres_pool.fetchval("SELECT 1")
-        health["checks"]["postgres"] = {"status": "ok"}
-        from reasoner.metrics import REASONER_POSTGRES_POOL_SIZE, REASONER_POSTGRES_POOL_FREE
-        REASONER_POSTGRES_POOL_SIZE.set(_health_postgres_pool.get_size())
-        REASONER_POSTGRES_POOL_FREE.set(
-            _health_postgres_pool.get_size() - _health_postgres_pool.get_idle_size()
-        )
-    except Exception as e:
-        health["checks"]["postgres"] = {"status": "error", "reason": str(e)}
-        _health_postgres_pool = None
+    if not settings.DATABASE_URL:
+        health["checks"]["postgres"] = {"status": "ok", "reason": "not configured"}
+    else:
+        global _health_postgres_pool  # noqa: PLW0603
+        try:
+            if _health_postgres_pool is None:
+                import asyncio
+                import asyncpg
+                dsn = settings.DATABASE_URL.replace("+asyncpg", "")
+                _health_postgres_pool = await asyncio.wait_for(
+                    asyncpg.create_pool(dsn, min_size=1, max_size=2),
+                    timeout=5.0,
+                )
+            await _health_postgres_pool.fetchval("SELECT 1")
+            health["checks"]["postgres"] = {"status": "ok"}
+            from reasoner.metrics import REASONER_POSTGRES_POOL_SIZE, REASONER_POSTGRES_POOL_FREE
+            REASONER_POSTGRES_POOL_SIZE.set(_health_postgres_pool.get_size())
+            REASONER_POSTGRES_POOL_FREE.set(
+                _health_postgres_pool.get_size() - _health_postgres_pool.get_idle_size()
+            )
+        except Exception as e:
+            health["checks"]["postgres"] = {"status": "error", "reason": str(e)}
+            _health_postgres_pool = None
 
     # Redis check
-    try:
-        from reasoner.infrastructure.redis.client import get_redis
-        redis = get_redis()
-        await redis.ping()
-        health["checks"]["redis"] = {"status": "ok"}
-        from reasoner.metrics import REASONER_REDIS_POOL_SIZE
-        pool_info = redis.connection_pool.max_connections
-        REASONER_REDIS_POOL_SIZE.set(pool_info or 0)
-    except Exception as e:
-        health["checks"]["redis"] = {"status": "error", "reason": str(e)}
+    import os as _os_redis
+    _redis_url = _os_redis.environ.get("REDIS_URL", "")
+    if not _redis_url:
+        health["checks"]["redis"] = {"status": "ok", "reason": "not configured"}
+    else:
+        try:
+            import asyncio as _aio_redis
+            from reasoner.infrastructure.redis.client import get_redis
+            redis = get_redis()
+            await _aio_redis.wait_for(redis.ping(), timeout=5.0)
+            health["checks"]["redis"] = {"status": "ok"}
+            from reasoner.metrics import REASONER_REDIS_POOL_SIZE
+            pool_info = redis.connection_pool.max_connections
+            REASONER_REDIS_POOL_SIZE.set(pool_info or 0)
+        except Exception as e:
+            health["checks"]["redis"] = {"status": "error", "reason": str(e)}
 
     # Stripe check
     try:
