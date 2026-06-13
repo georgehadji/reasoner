@@ -354,11 +354,16 @@ _REGISTRY: dict[str, dict] = {
         },
         # Multi-model fallback chains (tried in order, with a quality gate that skips
         # empty/degraded/low-quality responses before moving to the next model):
-        #   - coding_generate: 1 primary + 2 fallbacks, escalating fast → cross-lab → most-capable
-        #   - coding_review:   cross-lab critique (Google → DeepSeek → Mistral) for independent review
+        #   - coding_generate: 1 primary + 2 fallbacks (Qwen → Mistral → DeepSeek)
+        #   - coding_review:   cross-lab critique (DeepSeek → Mistral → OpenAI)
+        # deepseek-v4-flash leads both chains: reliable content (verified 2/2, no empty
+        # trap), cheapest model here ($0.09/$0.18/M), 1M context, cross-lab from the Qwen
+        # generator. gpt-5.1-codex-mini is demoted to a last-resort review slot — it is
+        # codex-class but intermittently returns empty content on larger prompts (observed
+        # live), so the quality gate handles it only as a final fallback, never as a primary.
         "cascading_routing": {
-            "coding_generate": ["qwen3-coder-flash", "codestral-2508", "qwen3-coder"],
-            "coding_review": ["gemini-flash", "deepseek-v3", "codestral-2508"],
+            "coding_generate": ["qwen3-coder-flash", "codestral-2508", "deepseek-v4-flash"],
+            "coding_review": ["deepseek-v4-flash", "codestral-2508", "gpt-5.1-codex-mini"],
         },
         "tags": ["budget", "coding", "software-development"],
     },
