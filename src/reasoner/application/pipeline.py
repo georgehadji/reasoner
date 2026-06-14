@@ -333,7 +333,11 @@ class ReasonerPipeline:
             user_prompt=phases.fusion_prompt(state, lang),
             state=state,
         )
-        data = extract_json(raw)
+        try:
+            data = extract_json(raw)
+        except Exception:
+            self._log("PHASE-FUSION", "JSON extraction failed, using defaults", state)
+            data = {}
         state.task_type = TaskType.coerce(data.get("task_type"))
         detected_lang = data.get("language") or lang
         if detected_lang == "English" and lang != "English":

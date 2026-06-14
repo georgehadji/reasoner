@@ -3,19 +3,24 @@ import json
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.phases._shared import get_language_instruction, _wrap_user_input
 
-DEBATE_OPENING_SYSTEM = "You are an expert debater. Your objective is to present a compelling, evidence-based opening argument for your assigned stance. Focus on making strong claims, supported by logic and any provided context. Do NOT describe the debate process or your role; execute your role as a debater. Output ONLY valid JSON."
+DEBATE_OPENING_SYSTEM = ("You are an expert debater. You MUST produce a valid JSON object ONLY. "
+                           "Do not include any introductory text, concluding remarks, or conversational markdown. "
+                           "Any output that is not a strictly valid JSON object is a fatal error.")
 
 def debate_opening_prompt(state: PipelineState, side: str, stance: str) -> str:
     return f'{get_language_instruction(state)}\n\nProblem: {_wrap_user_input(state.problem)}\n\nYou are Side {side}. Your assigned stance is: {stance}.\nPresent your opening statement defending this specific stance.\n\nOutput JSON: {{"side": "{side}", "stance": "{stance}", "content": "<your statement>", "key_claims": ["<claim 1>"]}}'
 
-DEBATE_REBUTTAL_SYSTEM = "You are an expert debater. Your objective is to rigorously attack your opponent's opening statement, exposing its weaknesses, logical fallacies, or lack of evidence. Simultaneously, you must defend your own key claims from potential attacks. CRITICAL RULE: Do NOT be neutral or conciliatory. Your tone must be adversarial. Do NOT describe the debate process or your role; execute your role as a debater. Output ONLY valid JSON."
+DEBATE_REBUTTAL_SYSTEM = ("You are an expert debater. You MUST produce a valid JSON object ONLY. "
+                          "Do not include any introductory text, concluding remarks, or conversational markdown. "
+                          "Any output that is not a strictly valid JSON object is a fatal error.")
 
 def debate_rebuttal_prompt(state: PipelineState, side: str, opponent_statement: str) -> str:
     return f'{get_language_instruction(state)}\n\nYour opponent\'s statement:\n{opponent_statement}\n\nYou are Side {side}. Present your rebuttal.\n\nOutput JSON: {{"side": "{side}", "rebuttal_content": "<your rebuttal>", "target_flaws": ["<flaw 1>"]}}'
 
 DEBATE_JUDGE_SYSTEM = (
-    "You are a neutral debate judge. Your role is to evaluate both sides of the debate "
-    "and render a fair, analytically rigorous verdict.\n\n"
+    "You are a neutral debate judge. You MUST produce a valid JSON object ONLY. "
+    "Do not include any introductory text, concluding remarks, or conversational markdown. "
+    "Any output that is not a strictly valid JSON object is a fatal error.\n\n"
     "SCORING RUBRIC (each dimension 0-10):\n"
     "- logical_consistency: Soundness and internal coherence of the argument.\n"
     "- evidence_support: Quality and strength of supporting evidence.\n"
@@ -23,8 +28,7 @@ DEBATE_JUDGE_SYSTEM = (
     "- feasibility: Practical applicability of the proposed solution.\n\n"
     "SIDE MAPPING:\n"
     '- Side A (proposition) → perspective: "constructive"\n'
-    '- Side B (opposition) → perspective: "destructive"\n\n'
-    "Output ONLY the JSON object. No markdown fences, no surrounding text."
+    '- Side B (opposition) → perspective: "destructive"'
 )
 
 def debate_judge_prompt(state: PipelineState) -> str:
@@ -61,7 +65,9 @@ def debate_judge_prompt(state: PipelineState) -> str:
         f'}}'
     )
 
-DEBATE_CROSS_SYSTEM = "You are an analytical assistant. Challenge specific claims with evidence. Be precise and direct. Output ONLY valid JSON."
+DEBATE_CROSS_SYSTEM = ("You are an analytical assistant. You MUST produce a valid JSON object ONLY. "
+                       "Do not include any introductory text, concluding remarks, or conversational markdown. "
+                       "Any output that is not a strictly valid JSON object is a fatal error.")
 
 def debate_cross_examine_prompt(state: PipelineState, side: str, opponent_claims: list) -> str:
     return (

@@ -145,7 +145,17 @@ async def run_tot_decompose_phase(state: PipelineState, services: WorkflowServic
         user_prompt=phases.tot_decompose_prompt(state), 
         state=state
     )
-    data = extract_json(raw)
+    try:
+        data = extract_json(raw)
+    except Exception:
+        services.log("ToT", "Decompose phase failed JSON extraction, retrying...", state)
+        raw, _ = await services.call_llm(
+            role="tot_decompose",
+            system_prompt="You are an analytical assistant. You MUST produce a valid JSON object ONLY. Do not include introductory text or markdown. Output JSON ONLY.",
+            user_prompt=f"Previous attempt failed JSON parsing. Please re-generate the JSON for: {phases.tot_decompose_prompt(state)}",
+            state=state
+        )
+        data = extract_json(raw)
     state.tot_state["decision_points"] = data.get("decision_points", [])
     state.tot_state["current_path"] = []
 
@@ -162,7 +172,17 @@ async def run_tot_generate_phase(state: PipelineState, services: WorkflowService
         user_prompt=phases.tot_generate_prompt(state, current_dp), 
         state=state
     )
-    data = extract_json(raw)
+    try:
+        data = extract_json(raw)
+    except Exception:
+        services.log("ToT", "Generate phase failed JSON extraction, retrying...", state)
+        raw, _ = await services.call_llm(
+            role="tot_generate",
+            system_prompt="You are an analytical assistant. You MUST produce a valid JSON object ONLY. Do not include introductory text or markdown. Output JSON ONLY.",
+            user_prompt=f"Previous attempt failed JSON parsing. Please re-generate the JSON for: {phases.tot_generate_prompt(state, current_dp)}",
+            state=state
+        )
+        data = extract_json(raw)
     state.tot_state["current_candidates"] = data.get("candidates", [])
 
 async def run_tot_evaluate_phase(state: PipelineState, services: WorkflowServices) -> None:
@@ -177,7 +197,17 @@ async def run_tot_evaluate_phase(state: PipelineState, services: WorkflowService
         user_prompt=phases.tot_evaluate_prompt(state, candidates), 
         state=state
     )
-    data = extract_json(raw)
+    try:
+        data = extract_json(raw)
+    except Exception:
+        services.log("ToT", "Evaluate phase failed JSON extraction, retrying...", state)
+        raw, _ = await services.call_llm(
+            role="tot_evaluate",
+            system_prompt="You are an analytical assistant. You MUST produce a valid JSON object ONLY. Do not include introductory text or markdown. Output JSON ONLY.",
+            user_prompt=f"Previous attempt failed JSON parsing. Please re-generate the JSON for: {phases.tot_evaluate_prompt(state, candidates)}",
+            state=state
+        )
+        data = extract_json(raw)
     state.tot_state["evaluations"] = data.get("evaluations", [])
     state.tot_state["best_candidate"] = data.get("best_candidate", "")
     best = data.get("best_candidate", "")
@@ -192,7 +222,17 @@ async def run_tot_backtrack_phase(state: PipelineState, services: WorkflowServic
         user_prompt=phases.tot_backtrack_prompt(state), 
         state=state
     )
-    data = extract_json(raw)
+    try:
+        data = extract_json(raw)
+    except Exception:
+        services.log("ToT", "Backtrack phase failed JSON extraction, retrying...", state)
+        raw, _ = await services.call_llm(
+            role="tot_backtrack",
+            system_prompt="You are an analytical assistant. You MUST produce a valid JSON object ONLY. Do not include introductory text or markdown. Output JSON ONLY.",
+            user_prompt=f"Previous attempt failed JSON parsing. Please re-generate the JSON for: {phases.tot_backtrack_prompt(state)}",
+            state=state
+        )
+        data = extract_json(raw)
     state.tot_state["backtrack_decision"] = data.get("decision", "terminate")
     state.tot_state["final_path"] = data.get("final_path", [])
     state.tot_state["tot_confidence"] = data.get("confidence", 0.0)
@@ -292,19 +332,31 @@ async def run_sd_adapt_phase(state: PipelineState, services: WorkflowServices) -
 
 async def run_sd_implement_phase(state: PipelineState, services: WorkflowServices) -> None:
     services.log("SELF-DISCOVER", "Implementing adapted reasoning pipeline...", state)
-    raw, _ = await services.call_llm(
+    raw, model = await services.call_llm(
         role="sd_implement",
         system_prompt=phases.SD_IMPLEMENT_SYSTEM,
         user_prompt=phases.sd_implement_prompt(state), 
         state=state
     )
     data = extract_json(raw)
+    
+    # Rescue loop
+    if not data:
+        services.log("SELF-DISCOVER", "Implement phase failed JSON extraction, retrying...", state)
+        raw, model = await services.call_llm(
+            role="sd_implement",
+            system_prompt="You are an analytical assistant. You MUST produce a valid JSON object ONLY. Do not include introductory text or markdown. Output JSON ONLY.",
+            user_prompt=f"Previous attempt failed JSON parsing. Please re-generate the JSON for: {phases.sd_implement_prompt(state)}",
+            state=state
+        )
+        data = extract_json(raw)
+
     state.self_discover_state["module_outputs"] = data.get("module_outputs", [])
     state.self_discover_state["final_answer"] = data.get("final_answer", "")
     state.self_discover_state["module_attribution"] = data.get("module_attribution", {})
     state.candidates.append(SolutionCandidate(
         perspective=PerspectiveType.CONSTRUCTIVE,
         content=state.self_discover_state.get("final_answer", ""),
-        key_insights=[m.get("output", "") for m in state.self_discover_state.get("module_outputs", [])],
-        model_used="unknown",
+        key_insights=[m.get("output", "") for m in state.self_discover_state.get("module_outputs", []) if isinstance(m, dict)],
+        model_used=model,
     ))

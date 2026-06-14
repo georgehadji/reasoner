@@ -6,6 +6,7 @@ from reasoner.application.services.renderers._shared import (
     render_routing_table, render_perspective_content,
 )
 from reasoner.domain.pipeline_state import PipelineState
+from reasoner.domain.models import PerspectiveType
 
 from rich.panel import Panel
 from rich.table import Table

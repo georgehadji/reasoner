@@ -15,18 +15,19 @@ from reasoner.domain.preset_core import (
     _METHOD_TO_SLUG,
 )
 from reasoner.domain.preset_registry import (
-    _PRESET_CONFIGS,
-    PRESETS,
+    get_preset as get_preset_from_registry,
+    list_presets as list_presets_from_registry,
 )
 from reasoner.infrastructure.llm.router import ProviderRouter
+
+# Re-export PRESETS as a dict for backward compatibility with main.py
+_all_presets = list_presets_from_registry()
+PRESETS = {p.id: p for p in _all_presets}
 
 
 def get_preset(name: str) -> PipelinePreset:
     """Get a preset by name. Raises ValueError if not found."""
-    if name not in PRESETS:
-        available = ", ".join(sorted(PRESETS.keys()))
-        raise ValueError(f"Unknown preset: {name!r}. Available: {available}")
-    return PRESETS[name]
+    return get_preset_from_registry(name)
 
 
 def is_valid_preset_name(name: str) -> bool:
@@ -40,7 +41,6 @@ def resolve_preset_name(name: str) -> str:
         available = ", ".join(sorted(PRESETS.keys()))
         raise ValueError(f"Unknown preset: {name!r}. Available: {available}")
     return name
-
 
 
 def get_method_from_preset(preset: str) -> str:
@@ -112,27 +112,29 @@ def print_presets_summary() -> None:
     from rich.table import Table
     from rich import box
 
-    console = Console()
-    table = Table(title="Reasoner v2.0 — Available Pipeline Presets", box=box.ROUNDED)
+    import sys
+    import io
+    safe_out = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    console = Console(file=safe_out)
+    table = Table(title="Reasoner v2.0 - Available Pipeline Presets", box=box.ROUNDED)
     table.add_column("Preset ID", style="cyan", width=22)
     table.add_column("Name", width=30)
     table.add_column("Primary Model", width=18)
     table.add_column("API Keys Needed", width=40)
 
-    for pid, preset in PRESETS.items():
+    for preset in _all_presets:
         missing = preset.missing_keys()
         key_status = (
             "[green]✓ All set[/green]" if not missing
             else f"[red]Missing: {', '.join(missing)}[/red]"
         )
-        table.add_row(pid, preset.name, preset.primary_id, key_status)
+        table.add_row(preset.id, preset.name, preset.primary_id, key_status)
 
     console.print(table)
 
 
 __all__ = [
     "_KNOWN_ROUTING_ROLES",
-    "_PRESET_CONFIGS",
     "PRESETS",
     "PipelinePreset",
     "get_method_from_preset",

@@ -28,11 +28,12 @@ def _render_jury(state: PipelineState) -> None:
         for gc in state.generation_candidates:
             filled = int(gc.confidence * 10)
             conf_bar = "#" * filled + "-" * (10 - filled)
+            # Ensure attributes are strings or renderable objects
             gen_table.add_row(
-                gc.generator_id,
-                gc.model_used or "?",
+                str(gc.generator_id),
+                str(gc.model_used or "?"),
                 f"{gc.confidence:.0%} {conf_bar}",
-                gc.approach_summary[:60] + ("…" if len(gc.approach_summary) > 60 else ""),
+                str(gc.approach_summary[:60] + ("…" if len(gc.approach_summary) > 60 else "")),
             )
         console.print(gen_table)
 

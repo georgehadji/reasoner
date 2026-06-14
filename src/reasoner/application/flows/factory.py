@@ -56,6 +56,9 @@ class WorkflowFactory:
             "self_discover": SelfDiscoverFlow,
             "iterative_critique": IterativeCritiqueFlow,
             "article": ArticleFlow,
+            "cross_language": MultiPerspectiveFlow,
+            "subagent": MultiPerspectiveFlow,
+            "image_gen": MultiPerspectiveFlow,
         }
         
     def get_strategy(self, method: str) -> WorkflowStrategy:

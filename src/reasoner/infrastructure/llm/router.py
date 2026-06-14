@@ -65,17 +65,20 @@ class ProviderRouter:
         self.verbose = verbose
         self.on_fallback = on_fallback
 
+    def resolve(self, role: str) -> BaseLLMProvider:
+        """Return the provider for a role, with per-instance caching."""
+        if not hasattr(self, '_resolved_cache'):
+            self._resolved_cache: dict[str, BaseLLMProvider] = {}
+        if role not in self._resolved_cache:
+            provider = self.routing_table.get(role)
+            if provider is None:
+                logger.debug("Role '%s' not in routing_table, using primary", role)
+                provider = self.primary
+            self._resolved_cache[role] = provider
+        return self._resolved_cache[role]
+
     def get(self, role: str) -> BaseLLMProvider:
-        provider = self.routing_table.get(role)
-        if provider is None:
-            if role != "primary" and self.verbose:
-                logger.warning(
-                    "Role '%s' not found in routing table — falling back to primary '%s'. "
-                    "Check preset routing configuration.",
-                    role, self.primary.model
-                )
-            return self.primary
-        return provider
+        return self.resolve(role)
 
     def _timeout_for_role(self, role: str, override: float | None) -> float:
         if override is not None:
@@ -123,6 +126,9 @@ class ProviderRouter:
         # Skip any fallback that resolves to the same model as the failing provider —
         # retrying an identical endpoint after a timeout is guaranteed to waste time.
         explicit = self.fallback_table.get(role)
+        if explicit is None and assigned is self.primary:
+            explicit = self.fallback_table.get("primary")
+
         candidates: list[BaseLLMProvider] = []
         if explicit and explicit is not assigned:
             candidates.append(explicit)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from dataclasses import asdict
 from typing import Any
@@ -48,6 +49,32 @@ async def run_recovery_path(state: PipelineState, services: WorkflowServices, ca
         services.log("RECOVERY", f"Recovery Path failed for {candidate_id}: {e}", state)
         state.errors.append(f"Recovery Path failed for {candidate_id}: {e}")
 
+def _create_generation_candidate(data: dict[str, Any] | str | list[Any], generator_id: str, model_used: str) -> GenerationCandidate:
+    """Factory to safely instantiate GenerationCandidate from potentially malformed LLM response data."""
+    # Ensure data is a dict
+    if not isinstance(data, dict):
+        # If it's a string that contains JSON, try parsing it
+        if isinstance(data, str):
+            try:
+                data = json.loads(data)
+            except json.JSONDecodeError:
+                data = {}
+        else:
+            data = {}
+
+    # 1. Handle potential wrapping in 'results' key
+    if "results" in data and isinstance(data["results"], list) and len(data["results"]) > 0:
+        data = data["results"][0]
+    
+    return GenerationCandidate(
+        generator_id=generator_id,
+        model_used=model_used,
+        solution=str(data.get("solution", "")),
+        confidence=float(data.get("confidence") or 0.0),
+        key_claims=list(data.get("key_claims", [])),
+        approach_summary=str(data.get("approach_summary", ""))
+    )
+
 async def run_jury_generate_phase(state: PipelineState, services: WorkflowServices, gen_roles: list[str] | None = None) -> None:
     services.log("JURY", "Generating independent solutions...", state)
     
@@ -55,14 +82,26 @@ async def run_jury_generate_phase(state: PipelineState, services: WorkflowServic
         gen_roles = ["generator_1", "generator_2", "generator_3"]
             
     async def _get_generator(gen_id: str):
-        raw, _ = await services.call_llm(
+        raw, model = await services.call_llm(
             role=gen_id,
             system_prompt=phases.JURY_GENERATOR_SYSTEM,
             user_prompt=phases.jury_generator_prompt(state, gen_id), 
             state=state
         )
         data = extract_json(raw)
-        return GenerationCandidate(**data, model_used="")
+        
+        # Rescue loop: If data is empty or malformed (empty dict after extraction), try one more time
+        if not data:
+            services.log("JURY", f"Generator {gen_id} failed JSON extraction, retrying...", state)
+            raw, model = await services.call_llm(
+                role=gen_id,
+                system_prompt="You are an analytical assistant. You MUST produce a valid JSON object ONLY. Do not include introductory text or markdown. Output JSON ONLY.",
+                user_prompt=f"Previous attempt failed JSON parsing. Please re-generate the JSON for: {phases.jury_generator_prompt(state, gen_id)}",
+                state=state
+            )
+            data = extract_json(raw)
+
+        return _create_generation_candidate(data, gen_id, model)
 
     tasks = [_get_generator(role) for role in gen_roles]
     results = await asyncio.gather(*tasks, return_exceptions=True)

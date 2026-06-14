@@ -33,7 +33,19 @@ async def run_scientific_test_phase(state: PipelineState, services: WorkflowServ
         user_prompt=phases.scientific_test_prompt(state), 
         state=state
     )
-    data = extract_json(raw)
+    
+    try:
+        data = extract_json(raw)
+    except ParseError:
+        services.log("SCIENTIFIC", "Scientific test phase failed JSON extraction, retrying...", state)
+        raw, _ = await services.call_llm(
+            role="scoring",
+            system_prompt="You are an analytical assistant. You MUST produce a valid JSON object ONLY. Do not include introductory text or markdown. Output JSON ONLY.",
+            user_prompt=f"Previous attempt failed JSON parsing. Please re-generate the JSON for: {phases.scientific_test_prompt(state)}",
+            state=state
+        )
+        data = extract_json(raw)
+
     state.scientific_state["test_results"] = data.get("test_results", [])
     
     # Bayesian posterior update
@@ -150,7 +162,7 @@ async def run_bayesian_posterior_phase(state: PipelineState, services: WorkflowS
     raw, _ = await services.call_llm(
         role="scoring",
         system_prompt=phases.BAYESIAN_POSTERIOR_SYSTEM,
-        user_prompt=phases.bayesian_posterior_prompt(state), 
+        user_prompt=phases.bayesian_posterior_prompt(state),
         state=state
     )
     data = extract_json(raw)

@@ -3,7 +3,9 @@ import json
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.phases._shared import get_language_instruction, _wrap_user_input
 
-JURY_GENERATOR_SYSTEM = "You are an analytical assistant. Produce your best possible solution. Output ONLY valid JSON."
+JURY_GENERATOR_SYSTEM = ("You are an analytical assistant. You MUST produce a valid JSON object ONLY. "
+                           "Do not include any introductory text, concluding remarks, or conversational markdown (e.g., ```json). "
+                           "Any output that is not a strictly valid JSON object is a fatal error.")
 
 def jury_generator_prompt(state: PipelineState, generator_id: str) -> str:
     return (

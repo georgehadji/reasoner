@@ -16,10 +16,8 @@ from typing import Any
 
 from reasoner.core.constants import DEFAULT_CLI_PRESET
 from reasoner.core.events.domain_events import make_event, EventType
-from reasoner.domain.preset_registry import PRESETS as _PRESETS
 from reasoner.hypergate import HyperGateAgent
 from reasoner.infrastructure.llm.router import ProviderRouter
-from reasoner.infrastructure.llm.registry import _REGISTRY
 from reasoner.infrastructure.persistence.event_store import get_event_store
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.models import TaskType

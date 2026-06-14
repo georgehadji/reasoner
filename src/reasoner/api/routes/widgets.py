@@ -14,7 +14,7 @@ from reasoner.api.auth_deps import require_csrf
 
 from reasoner.api.schemas import SuggestionRequestModel
 from reasoner.application.commands import ExecuteWidgetCommand
-from reasoner.domain.preset_registry import PRESETS
+from reasoner.presets import PRESETS
 from reasoner.infrastructure.llm.registry import list_models
 from reasoner.sanitization import sanitize_for_prompt
 from reasoner.suggestions import generate_suggestions_async, SuggestionRequest

@@ -25,6 +25,7 @@ from reasoner.infrastructure.llm.providers.openai_compat import (
 _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # Anthropic
     "claude-opus":      {"model": "qwen/qwen3.6-plus"},
+    "anthropic/claude-3-haiku": {"model": "anthropic/claude-haiku-4.5"},
     MODEL_CLAUDE_SONNET: {"model": "anthropic/claude-sonnet-4.6"},  # v3.2: still current as of Jun 2026
     "claude-haiku":     {"model": "anthropic/claude-haiku-4.5"},
     # OpenAI
@@ -40,9 +41,10 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "o3":               {"model": "openai/o3"},
     "o3-mini":          {"model": "openai/o3-mini"},
     # Google
+    "google/gemma-2-9b-it": {"model": "google/gemma-3-12b-it"},
     MODEL_GEMINI_PRO:   {"model": "google/gemini-3.5-flash"},  # v3.2: 2.5-pro → 3.5-flash (near-Pro coding at Flash cost)
     MODEL_GEMINI_FLASH: {"model": "google/gemini-3.5-flash"},
-    "gemini-flash-lite": {"model": "stepfun/step-3.7-flash"},  # v3.2: Google 3.1-lite ($0.25) → StepFun 3.7 Flash ($0.20, fresher cutoff)
+    "gemini-flash-lite": {"model": "google/gemini-3.5-flash"},  # v3.2: step-3.7-flash → 3.5-flash (more reliable)
     "gemini-3.1-flash-lite": {"model": "google/gemini-3.1-flash-lite"},  # explicit alias if someone needs Google specifically
     "gemma-4-26b":      {"model": "google/gemma-4-26b-a4b-it"},
     "gemma-4-31b":      {"model": "google/gemma-4-31b-it"},
@@ -72,6 +74,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "ministral-3b":     {"model": "mistralai/mistral-small-3.2-24b-instruct"},
     # DeepSeek
     "deepseek-v3":      {"model": "deepseek/deepseek-v3.2"},
+    "deepseek/deepseek-chat": {"model": "deepseek/deepseek-chat"},
     "deepseek-v3.1-nex-n1": {"model": "nex-agi/deepseek-v3.1-nex-n1"},
     "deepseek-r1":      {"model": "deepseek/deepseek-r1-0528"},
     "deepseek-r1t2-chimera": {"model": "tngtech/deepseek-r1t2-chimera"},
@@ -102,6 +105,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # Kimi
     "kimi-k2-5":        {"model": "moonshotai/kimi-k2.5"},
     "kimi-k2-6":        {"model": "moonshotai/kimi-k2.6"},
+    "kimi-k2-7-code":   {"model": "moonshotai/kimi-k2.7-code"},
     # Laguna (Poolside)
     MODEL_LAGUNA_XS_FREE: {"model": "poolside/laguna-xs.2:free"},
     MODEL_LAGUNA_M_FREE:  {"model": "poolside/laguna-m.1:free"},
@@ -117,6 +121,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # Elephant
     "elephant-alpha":   {"model": "openrouter/elephant-alpha"},
     # OpenRouter
+    "fireworks/firefunction-v2": {"model": "openai/gpt-4o-mini"},
     "owl-alpha":        {"model": "openrouter/owl-alpha"},
     "pareto-code":      {"model": "openrouter/pareto-code"},
     # Arcee AI
@@ -145,7 +150,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "ling-2.6-flash-free": {"model": "inclusionai/ling-2.6-flash:free"},
     "ring-2.6-1t":         {"model": "inclusionai/ring-2.6-1t"},  # v3.2: $0.075/$0.625 per M — 63B active/1T total thinking model
     # StepFun — ultra-cheap multimodal MoE
-    "stepfun-3.7-flash":   {"model": "stepfun/step-3.7-flash"},  # v3.2: $0.20/$1.15 per M — 196B MoE, 11B active
+    "stepfun/step-3.7-flash":   {"model": "stepfun/step-3.7-flash"},  # v3.2: $0.20/$1.15 per M — 196B MoE, 11B active
     # Nex AGI — free MoE
     "nex-n2-pro-free":     {"model": "nex-agi/nex-n2-pro:free"},  # v3.2: FREE — 17B active/397B total MoE
     # NVIDIA Nemotron — free reasoning model
@@ -223,10 +228,11 @@ def build_provider(model_id: str, api_key: str | None = None) -> "BaseLLMProvide
     from reasoner.infrastructure.llm.base import BaseLLMProvider
 
     if model_id not in _REGISTRY:
-        available = "\n  ".join(sorted(_REGISTRY.keys()))
+        available = ", ".join(sorted(_REGISTRY.keys()))
         raise ValueError(
-            f"Unknown model ID: {model_id!r}\n"
-            f"Available models:\n  {available}"
+            f"""Unknown model ID: {model_id!r}
+Available models:
+  {available}"""
         )
     cfg = _REGISTRY[model_id]
     key = api_key or os.environ.get(cfg["env"], "")
