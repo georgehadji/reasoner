@@ -132,7 +132,15 @@ class LLMExecutor:
             model_id_for_cache = self.cascading_routing.get(role, [self.router.get(role).model])[0]
             cache_prompt = (
                 user_prompt
-                if role in ("synthesis", "context_vetting", "primary")
+                if role in (
+                    "synthesis", "context_vetting", "primary",
+                    # Coding roles: each file has a unique prompt body after the
+                    # shared problem prefix, so truncating to PROBLEM chars would
+                    # produce identical cache keys for all parallel generate calls
+                    # and serve the first file's response for every subsequent file.
+                    "coding_generate", "coding_spec", "coding_review",
+                    "coding_tests", "coding_assemble",
+                )
                 else user_prompt[: TRUNCATION.PROBLEM]
             )
             cached_response = await self._token_cache.get(

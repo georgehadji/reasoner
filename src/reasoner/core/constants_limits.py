@@ -110,6 +110,14 @@ PHASE_TOKEN_BUDGETS: dict[str, int] = {
     "prism_classify":         256,
     "recovery_path":         1024,
     "search_disambiguation":  256,
+    # Coding pipeline — each generate call produces a full file; 1536 (default)
+    # truncates mid-JSON for any real-world module. 8192 fits most files; assemble
+    # consolidates multiple files so it needs the largest budget of the group.
+    "coding_spec":      4096,
+    "coding_generate":  8192,
+    "coding_review":    4096,
+    "coding_tests":     8192,
+    "coding_assemble": 16384,
     # Default fallback
     "default": 1536,
 }

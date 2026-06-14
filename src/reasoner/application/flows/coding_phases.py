@@ -65,16 +65,21 @@ async def run_coding_generate_phase(state: PipelineState, services: WorkflowServ
         state.errors.append("CODING: No files in spec — cannot generate.")
         return
 
+    # Cap concurrent LLM calls to avoid rate-limit exhaustion on premium models.
+    # 14 simultaneous calls to claude-sonnet reliably triggers 429s; 4 is safe.
+    _sem = asyncio.Semaphore(4)
+
     async def _generate_one(file_spec: dict[str, Any]) -> dict[str, Any]:
-        raw, _ = await services.call_llm(
-            role="coding_generate",
-            system_prompt=phases.CODING_GENERATE_SYSTEM,
-            user_prompt=phases.coding_generate_prompt(state, file_spec),
-            state=state,
-        )
-        result = _safe_extract_json(raw, services, state, "generate")
-        if not result.get("path"):
-            result["path"] = file_spec.get("path", "unknown")
+        async with _sem:
+            raw, _ = await services.call_llm(
+                role="coding_generate",
+                system_prompt=phases.CODING_GENERATE_SYSTEM,
+                user_prompt=phases.coding_generate_prompt(state, file_spec),
+                state=state,
+            )
+        result = _safe_extract_json(raw, services, state, "generate", fallback={"path": file_spec.get("path")})
+        # Always enforce the expected path — never let the model override it.
+        result["path"] = file_spec.get("path", result.get("path", "unknown"))
         if not result.get("content"):
             # On JSON-parse failure the raw model output is preserved under "raw";
             # use it as the file content rather than discarding the generated code.
@@ -121,13 +126,19 @@ async def run_coding_tests_phase(state: PipelineState, services: WorkflowService
 
 async def run_coding_assemble_phase(state: PipelineState, services: WorkflowServices) -> None:
     services.log("CODING", "Assembling final production-ready output...", state)
-    raw, _ = await services.call_llm(
-        role="coding_assemble",
-        system_prompt=phases.CODING_ASSEMBLE_SYSTEM,
-        user_prompt=phases.coding_assemble_prompt(state),
-        state=state,
-    )
-    data = _safe_extract_json(raw, services, state, "assemble")
+    data: dict = {}
+    try:
+        raw, _ = await services.call_llm(
+            role="coding_assemble",
+            system_prompt=phases.CODING_ASSEMBLE_SYSTEM,
+            user_prompt=phases.coding_assemble_prompt(state),
+            state=state,
+        )
+        data = _safe_extract_json(raw, services, state, "assemble")
+    except Exception as exc:
+        # Assemble is an enhancement pass; when the consolidated prompt is too large
+        # or the LLM times out, fall back to the already-generated files directly.
+        services.log("CODING", f"assemble LLM call failed ({exc}); using generated files as-is", state)
     # If assemble fails to return structured files, fall back to the files already
     # produced by the generate phase so the final output is never empty.
     final_files = data.get("files") or state.coding_state.get("generated_files", [])
@@ -137,11 +148,19 @@ async def run_coding_assemble_phase(state: PipelineState, services: WorkflowServ
     state.coding_state["known_limitations"] = data.get("known_limitations", [])
 
     readme = state.coding_state.get("readme", "")
-    files_summary = "\n\n".join(
-        f"### {f['path']}\n```\n{f.get('content', '')[:1200]}\n```"
+    # Add a compact file index to candidates — NOT full file content.
+    # Full file content can be thousands of tokens per file; including it
+    # verbatim would cause the downstream synthesis phase to overflow the
+    # context window (128k for claude-sonnet-4.6). The actual files are
+    # stored in coding_state["final_files"] and don't need to be duplicated.
+    files_index = "\n".join(
+        f"- {f.get('path', '?')} ({len(f.get('content', '').splitlines())} lines)"
         for f in state.coding_state.get("final_files", [])
     )
-    full_output = f"{readme}\n\n{files_summary}".strip()
+    full_output = (
+        f"{readme}\n\n## Generated Files\n{files_index}"
+        if readme else f"## Generated Files\n{files_index}"
+    ).strip()
 
     state.candidates.append(
         SolutionCandidate(
@@ -150,4 +169,24 @@ async def run_coding_assemble_phase(state: PipelineState, services: WorkflowServ
             key_insights=data.get("fixes_applied", []),
             model_used="",
         )
+    )
+
+    # Populate final_solution so the pipeline state is complete even without
+    # a downstream synthesis phase (coding skips synthesis — see coding.py).
+    from reasoner.domain.core_types import FinalSolution, MetaCognitiveAudit
+    state.final_solution = FinalSolution(
+        core_solution=full_output,
+        critical_insights=data.get("fixes_applied", []),
+        action_blueprint=[],
+        open_questions=data.get("known_limitations", []),
+        claim_labels={},
+        meta_audit=MetaCognitiveAudit(
+            most_dangerous_assumption="",
+            dominant_bias="",
+            remaining_uncertainty="",
+            assumption_failure_impact="",
+            non_obvious_insight="",
+        ),
+        sources=[],
+        layout_hints={"type": "code"},
     )
