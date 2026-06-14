@@ -12,13 +12,16 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-from reasoner.domain.core_types import CritiqueScore
+from reasoner.domain.core_types import CritiqueScore, ReviewHypothesis
 from reasoner.models import PerspectiveRegistry
 from reasoner.utils.json_safe import safe_json_loads, JSONDepthExceededError
 
 
 class ParseError(Exception):
     """Raised when LLM response cannot be parsed into expected structure."""
+    def __init__(self, message, original_content=None):
+        super().__init__(message)
+        self.original_content = original_content
 
 
 def strip_perplexity_citations(text: str) -> str:
@@ -71,12 +74,30 @@ def extract_json(text: str) -> dict[str, Any]:
     if not text or not text.strip():
         return {}
     
+    # 1. Strip markdown fences and any surrounding whitespace
+    text = text.strip()
+    if text.startswith("```json"):
+        text = text[7:].strip()
+    if text.startswith("```"):
+        text = text[3:].strip()
+    if text.endswith("```"):
+        text = text[:-3].strip()
+    
+    # 2. Extract using core engine
     parsed = extract_json_any(text)
+    
+    # 3. Validate - if it's already a dict, it was successfully extracted
     if isinstance(parsed, dict):
         return parsed
     
+    # If it's a list (which extract_json_any can return if the JSON root is an array),
+    # treat it as a list of results wrapped in a "results" key to maintain dict-like behavior.
+    if isinstance(parsed, list):
+        return {"results": parsed}
+    
     raise ParseError(
         f"Could not extract valid JSON object from response. "
+        f"Parsed type: {type(parsed).__name__}. "
         f"First 200 chars: {text[:200]!r}"
     )
 
@@ -654,4 +675,53 @@ def _parse_critique_scores(raw_scores: list[dict]) -> list[CritiqueScore]:
         except (KeyError, ValueError, TypeError) as exc:
             import logging
             logging.getLogger(__name__).warning("Skipping malformed CritiqueScore entry: %s", exc)
+    return out
+
+
+_VALID_SEVERITIES = {"HIGH", "MED", "LOW"}
+
+
+def _parse_review_hypotheses(raw_hypotheses: Any) -> list[ReviewHypothesis]:
+    """Safely build ReviewHypothesis objects from VS-critique LLM output.
+
+    Defensive in the same spirit as `_parse_critique_scores`: coerce a keyed
+    dict to a list, tolerate missing fields via `.get()`, clamp probability to
+    [0, 1], normalise severity, and skip malformed entries rather than emptying
+    the whole list. Hypotheses are returned sorted by descending probability so
+    downstream consumers (display, Phase-4 seeding) can take the top-N directly.
+    """
+    if isinstance(raw_hypotheses, dict):
+        raw_hypotheses = list(raw_hypotheses.values())
+    if not isinstance(raw_hypotheses, list):
+        if raw_hypotheses:
+            logger.warning(
+                "ReviewHypothesis input is not a list (%s) — skipping",
+                type(raw_hypotheses).__name__,
+            )
+        return []
+    out: list[ReviewHypothesis] = []
+    for h in raw_hypotheses:
+        if not isinstance(h, dict):
+            continue
+        try:
+            prob = float(h.get("probability") or 0.0)
+            prob = max(0.0, min(1.0, prob))
+            severity = str(h.get("severity") or "LOW").strip().upper()
+            if severity not in _VALID_SEVERITIES:
+                severity = "LOW"
+            claim = str(h.get("claim") or "").strip()
+            if not claim:
+                continue  # a hypothesis with no claim carries no signal
+            out.append(ReviewHypothesis(
+                claim=claim,
+                probability=prob,
+                severity=severity,
+                evidence_for=str(h.get("evidence_for") or ""),
+                evidence_against=str(h.get("evidence_against") or ""),
+                verification=str(h.get("verification") or ""),
+                cost_if_wrong=str(h.get("cost_if_wrong") or ""),
+            ))
+        except (ValueError, TypeError) as exc:
+            logger.warning("Skipping malformed ReviewHypothesis entry: %s", exc)
+    out.sort(key=lambda x: x.probability, reverse=True)
     return out

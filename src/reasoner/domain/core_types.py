@@ -2,7 +2,7 @@
 Domain core dataclasses extracted from models.py.
 
 Contains: ScenarioType, SubProblem, Assumption, Decomposition,
-          SolutionCandidate, CritiqueScore, StressTestResult,
+          SolutionCandidate, CritiqueScore, ReviewHypothesis, StressTestResult,
           MetaCognitiveAudit, GenerationCandidate, CriticDimensionScore,
           CriticScore, VerificationResult, MetaEvaluation, FinalSolution
 """
@@ -105,6 +105,28 @@ class CritiqueScore:
             + self.feasibility
         ) / 4.0
         return max(0.0, base - self.confidence_vs_accuracy_penalty)
+
+
+@dataclass
+class ReviewHypothesis:
+    """One independent failure hypothesis from Verbalized-Sampling critique.
+
+    Unlike CritiqueScore (which rates each perspective candidate), a hypothesis
+    is a distinct, probability-ranked suspected flaw spanning the whole solution
+    set. Forcing the critic to verbalize a *distribution* of non-overlapping
+    hypotheses — each with falsifying evidence and a concrete check — counters
+    the "looks good overall" mode collapse of single-path review.
+
+    All fields carry defaults so older state files (which lack this block)
+    deserialize cleanly on --resume.
+    """
+    claim: str = ""                  # the suspected flaw / risk
+    probability: float = 0.0         # 0.0-1.0 self-estimated likelihood it is real
+    severity: str = "LOW"            # "HIGH" | "MED" | "LOW"
+    evidence_for: str = ""           # what supports the hypothesis
+    evidence_against: str = ""       # what argues against it
+    verification: str = ""           # concrete test/check to confirm or falsify
+    cost_if_wrong: str = ""          # impact if shipped uncaught
 
 
 @dataclass

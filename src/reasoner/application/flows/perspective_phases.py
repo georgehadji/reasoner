@@ -17,7 +17,8 @@ from reasoner.models import (
     PerspectiveRegistry,
     PerspectiveType,
 )
-from reasoner.parsing import ParseError, extract_json, _parse_critique_scores
+from reasoner.parsing import ParseError, extract_json, _parse_critique_scores, _parse_review_hypotheses
+from reasoner.domain.preset_core import get_preset_price_tier
 import reasoner.phases as phases
 from reasoner.application.flows.base import WorkflowServices
 from reasoner.application.services.recovery_service import RecoveryService
@@ -150,17 +151,33 @@ async def run_critique_phase(state: PipelineState, services: WorkflowServices) -
         services.log("PHASE-3", "No candidates to critique. Skipping.", state)
         return
 
+    # VS critique is a premium-tier opt-in: budget runs stay byte-identical.
+    preset_name = getattr(state, "preset_name", None) or getattr(state.meta, "preset_name", None) or ""
+    with_hypotheses = get_preset_price_tier(preset_name) == "premium"
+
     raw, _ = await services.call_llm(
         role="scoring",
         system_prompt=phases.CRITIQUE_SYSTEM,
-        user_prompt=phases.critique_prompt(state),
+        user_prompt=phases.critique_prompt(state, with_hypotheses=with_hypotheses),
         state=state,
     )
     try:
         data = extract_json(raw)
         scores = _parse_critique_scores(data.get("scores", []))
         state.scores = scores
-        
+
+        if with_hypotheses:
+            hypotheses = _parse_review_hypotheses(data.get("review_hypotheses", []))
+            state.review_hypotheses = hypotheses
+            if hypotheses:
+                top = hypotheses[0]
+                services.log(
+                    "PHASE-3",
+                    f"VS critique: {len(hypotheses)} failure hypotheses "
+                    f"(top: {top.severity} p={top.probability:.2f} — {top.claim[:80]})",
+                    state,
+                )
+
         # Recovery path check
         for score in state.scores:
             if score.confidence_vs_accuracy_penalty > 5.0: # Threshold for triggering recovery

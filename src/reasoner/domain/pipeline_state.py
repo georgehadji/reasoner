@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any, TYPE_CHECKING
 
 from reasoner.domain.core_types import (
-    SolutionCandidate, CritiqueScore, StressTestResult,
+    SolutionCandidate, CritiqueScore, ReviewHypothesis, StressTestResult,
     MetaCognitiveAudit, GenerationCandidate, CriticScore,
     VerificationResult, MetaEvaluation, Decomposition, FinalSolution,
 )
@@ -79,6 +79,8 @@ class PipelineCore:
     decomposition: Decomposition | None = None
     candidates: list[SolutionCandidate] = field(default_factory=list)
     scores: list[CritiqueScore] = field(default_factory=list)
+    # VS critique: probability-ranked failure hypotheses (premium tier only).
+    review_hypotheses: list[ReviewHypothesis] = field(default_factory=list)
     top_candidates: list[SolutionCandidate] = field(default_factory=list)
     stress_results: list[StressTestResult] = field(default_factory=list)
     final_solution: FinalSolution | None = None
@@ -139,7 +141,8 @@ class PipelineState:
         _CORE_FIELDS = {
             'problem', 'enhanced_problem', 'task_type', 'task_type_rationale',
             'language', 'complexity', 'decomposition', 'candidates', 'scores',
-            'top_candidates', 'stress_results', 'final_solution', 'errors',
+            'review_hypotheses', 'top_candidates', 'stress_results',
+            'final_solution', 'errors',
             'attachments', 'generation_candidates', 'critic_scores',
             'verification_results', 'meta_evaluation',
         }
@@ -317,6 +320,15 @@ class PipelineState:
     @scores.setter
     def scores(self, value: list[CritiqueScore]) -> None:
         self.core.scores = value
+
+        self._ensure_fields_initialized()
+    @property
+    def review_hypotheses(self) -> list[ReviewHypothesis]:
+        return self.core.review_hypotheses
+
+    @review_hypotheses.setter
+    def review_hypotheses(self, value: list[ReviewHypothesis]) -> None:
+        self.core.review_hypotheses = value
 
         self._ensure_fields_initialized()
     @property
@@ -1339,7 +1351,8 @@ class PipelineState:
             core_fields = {}
             for key in ('problem', 'enhanced_problem', 'task_type', 'task_type_rationale',
                         'language', 'complexity', 'decomposition', 'candidates', 'scores',
-                        'top_candidates', 'stress_results', 'final_solution', 'errors',
+                        'review_hypotheses', 'top_candidates', 'stress_results',
+                        'final_solution', 'errors',
                         'attachments', 'generation_candidates', 'critic_scores',
                         'verification_results', 'meta_evaluation'):
                 if key in data:
@@ -1475,6 +1488,26 @@ class PipelineState:
                 except (ValueError, KeyError):
                     pass # skip malformed score
             core['scores'] = _scores
+
+        # Reconstruct review_hypotheses (VS critique). All-optional fields, so
+        # use .get() and skip malformed entries — older state files omit this
+        # block entirely and must still load.
+        if core.get('review_hypotheses'):
+            _hypotheses: list[ReviewHypothesis] = []
+            for h in core['review_hypotheses']:
+                try:
+                    _hypotheses.append(ReviewHypothesis(
+                        claim=h.get('claim', ''),
+                        probability=float(h.get('probability') or 0.0),
+                        severity=h.get('severity', 'LOW'),
+                        evidence_for=h.get('evidence_for', ''),
+                        evidence_against=h.get('evidence_against', ''),
+                        verification=h.get('verification', ''),
+                        cost_if_wrong=h.get('cost_if_wrong', ''),
+                    ))
+                except (ValueError, TypeError, AttributeError):
+                    pass  # skip malformed hypothesis entry
+            core['review_hypotheses'] = _hypotheses
 
         # Reconstruct top_candidates
         if core.get('top_candidates'):

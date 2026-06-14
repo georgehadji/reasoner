@@ -8,6 +8,10 @@ VS_K_PROBES = 5
 VS_K_COVERAGE = 3
 VS_K_CLAIMS = 5
 VS_K_RADIOLOGY_GENERATION = 7
+VS_K_CRITIQUE_HYPOTHESES = 8  # Phase-3 review hypotheses (premium tier)
+
+# Number of top-probability critique hypotheses seeded into Phase-4 stress testing
+VS_CRITIQUE_STRESS_SEED_TOP_N = 3
 
 # Tail thresholds per vertical
 VS_TAIL_THRESHOLD_RADIOLOGY = 0.10
@@ -49,6 +53,7 @@ LOG_VS_PROBE_COUNT = "vs_probe_count"
 LOG_VS_NLI_SCORES = "vs_nli_scores"
 LOG_VS_K = "vs_k"
 LOG_VS_MODE_COLLAPSE = "vs_mode_collapse"
+LOG_VS_CRITIQUE_HYPOTHESES = "vs_critique_hypotheses"
 
 # Deployment profiles
 class VSDeploymentProfile:

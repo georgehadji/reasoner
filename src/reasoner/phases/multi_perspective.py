@@ -2,6 +2,10 @@ from __future__ import annotations
 import json
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.core.constants import TRUNCATION
+from reasoner.core.vs_constants import (
+    VS_K_CRITIQUE_HYPOTHESES,
+    VS_CRITIQUE_STRESS_SEED_TOP_N,
+)
 from reasoner.phases._shared import get_language_instruction, _followup_context, _wrap_user_input
 
 PERSPECTIVE_SYSTEMS = {
@@ -23,12 +27,43 @@ def perspective_prompt(state: PipelineState, perspective: str) -> str:
 
 CRITIQUE_SYSTEM = "You are an analytical assistant. Score solutions honestly. Output ONLY valid JSON."
 
-def critique_prompt(state: PipelineState) -> str:
+def _vs_hypotheses_instruction() -> str:
+    """Verbalized-Sampling block appended to the critique prompt (premium tier).
+
+    Asks the critic to verbalize a probability-ranked distribution of distinct
+    failure hypotheses spanning the whole candidate set, each with falsifying
+    evidence and a concrete check. This is orthogonal to per-candidate scoring
+    and exists to counter "looks good overall" review mode collapse.
+    """
+    return (
+        f'\n\nADDITIONALLY, perform a Verbalized-Sampling failure audit across ALL '
+        f'candidates combined. Generate up to {VS_K_CRITIQUE_HYPOTHESES} INDEPENDENT, '
+        f'NON-OVERLAPPING failure hypotheses — distinct suspected flaws, risks, or '
+        f'wrong assumptions in the proposed solutions. Rank them by probability '
+        f'(descending). For each hypothesis assign a probability (0.0-1.0) that it '
+        f'is a real problem, and provide both supporting AND contradicting evidence '
+        f'plus a concrete test that would falsify it. Make the hypotheses '
+        f'substantially different from each other — do not restate one flaw in '
+        f'multiple forms.\n\n'
+        f'Add this top-level key to your JSON output:\n'
+        f'"review_hypotheses": [{{'
+        f'"claim": "<the suspected flaw or risk>", '
+        f'"probability": <0.0-1.0>, '
+        f'"severity": "HIGH|MED|LOW", '
+        f'"evidence_for": "<what supports it>", '
+        f'"evidence_against": "<what argues against it>", '
+        f'"verification": "<concrete test/check to confirm or falsify it>", '
+        f'"cost_if_wrong": "<impact if shipped uncaught>"'
+        f'}}]'
+    )
+
+
+def critique_prompt(state: PipelineState, with_hypotheses: bool = False) -> str:
     candidates_summary = [
         {"perspective": c.perspective.value, "one_liner": c.content[:TRUNCATION.API_STORAGE], "key_insights": c.key_insights[:TRUNCATION.MEMORY]}
         for c in state.candidates
     ]
-    return (
+    base = (
         f'{get_language_instruction(state)}\n\n'
         f'Problem: {_wrap_user_input(state.problem)}\n\n'
         f'Evaluate these candidates:\n{json.dumps(candidates_summary, indent=2)}\n\n'
@@ -48,6 +83,9 @@ def critique_prompt(state: PipelineState) -> str:
         f'"bias_flags": ["<bias if any>"]'
         f'}}]}}'
     )
+    if with_hypotheses:
+        base += _vs_hypotheses_instruction()
+    return base
 
 STRESS_SYSTEM = "You are an analytical assistant. Simulate adversarial conditions. Be specific about real-world failure mechanics. Output ONLY valid JSON."
 
@@ -57,12 +95,33 @@ def stress_test_prompt(state: PipelineState) -> str:
         for c in state.top_candidates
     ]
     task_type_str = state.task_type.value if hasattr(state.task_type, 'value') else str(state.task_type)
+
+    # VS handoff: seed stress scenarios from the highest-probability critique
+    # hypotheses so Phase-4 verifies the flaws the critic already flagged rather
+    # than rediscovering generic risks. No-op when review_hypotheses is empty.
+    seed_block = ""
+    hypotheses = getattr(state, "review_hypotheses", []) or []
+    if hypotheses:
+        seeds = [
+            {
+                "claim": h.claim,
+                "severity": h.severity,
+                "verification": h.verification,
+            }
+            for h in hypotheses[:VS_CRITIQUE_STRESS_SEED_TOP_N]
+        ]
+        seed_block = (
+            f'\n\nPRIORITY FAILURE HYPOTHESES (from critique — design at least one '
+            f'scenario that exercises each):\n{json.dumps(seeds, indent=2)}\n'
+        )
+
     return (
         f'{get_language_instruction(state)}\n\n'
         f'Problem Domain: {_wrap_user_input(state.problem[:TRUNCATION.API_STORAGE])}\n'
         f'Task Type: {task_type_str}\n\n'
         f'Test these solutions under optimal, constraint_violation, and adversarial scenarios:\n'
-        f'{json.dumps(top_candidates_summary, indent=2)}\n\n'
+        f'{json.dumps(top_candidates_summary, indent=2)}\n'
+        f'{seed_block}\n'
         f'CRITICAL INSTRUCTION: Scenarios MUST be highly specific to the Problem Domain and Task Type. Do NOT generate generic business risks (like supply-chain collapse) unless they directly apply to the specific problem. Describe concrete failure mechanics relevant to the domain.\n'
         f'Do NOT describe LLM processing errors like truncation, formatting issues, length limits, or off-topic responses. '
         f'Output JSON: {{"stress_tests": [{{"scenario": "<name>", "survival_rate": <0.0-1.0>, "failure_mode": "<desc>"}}]}}'
