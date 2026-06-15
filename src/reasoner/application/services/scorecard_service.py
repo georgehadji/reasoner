@@ -48,15 +48,16 @@ class ScorecardService:
 
         store = self._get_store()
 
-        # Fetch all three aggregations in parallel
+        # Fetch all four aggregations in parallel
         import asyncio
 
         phase_rows_task = store.get_scorecard_rows(window_days)
         fallback_events_task = store.get_scorecard_fallback_events(window_days)
         recovery_task = store.get_recovery_count(window_days)
+        run_counts_task = store.get_run_counts(window_days)
 
-        phase_rows, fallback_by_preset, recovery_counts = await asyncio.gather(
-            phase_rows_task, fallback_events_task, recovery_task,
+        phase_rows, fallback_by_preset, recovery_counts, run_counts = await asyncio.gather(
+            phase_rows_task, fallback_events_task, recovery_task, run_counts_task,
         )
 
         # Group rows into PresetScorecard objects
@@ -82,16 +83,17 @@ class ScorecardService:
             )
             presets[preset_name].phase_metrics.append(pm)
 
-        # Attach fallback events and recovery counts
+        # Attach run counts, fallback events, and recovery counts
         for preset_name, preset in presets.items():
+            counts = run_counts.get(preset_name, {})
+            preset.total_runs = counts.get("total_runs", 0)
+            preset.completed_runs = counts.get("completed_runs", 0)
+            preset.failed_runs = counts.get("failed_runs", 0)
             preset.fallback_events = fallback_by_preset.get(preset_name, [])
             preset.recovery_count = recovery_counts.get(preset_name, 0)
-            # Fallback events count = unique fallback runs; total_runs needs separate query
-            # For now, total_runs = sum of total_calls across phases (approximate)
-            preset.total_runs = max(
-                (len(fallback_by_preset.get(preset_name, [])) if preset.fallback_events else 0),
-                1,
-            )
+            # Aggregate total cost and duration from phase metrics
+            preset.total_cost_usd = sum(pm.total_cost_usd for pm in preset.phase_metrics)
+            preset.total_duration_ms = sum(pm.total_duration_ms for pm in preset.phase_metrics)
 
         # Compute summary-level totals
         total_cost = sum(p.total_cost_usd for p in presets.values())

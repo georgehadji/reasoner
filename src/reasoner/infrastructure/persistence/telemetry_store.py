@@ -253,6 +253,37 @@ class TelemetryStore:
             return by_preset
         return await self._run_in_executor(_sync)
 
+    async def get_run_counts(
+        self, window_days: int = 7
+    ) -> dict[str, dict[str, int]]:
+        """Return per-preset run counts (total, completed, failed) over a window.
+
+        Returns a dict keyed by preset name, each value a dict with keys
+        'total_runs', 'completed_runs', 'failed_runs'.
+        """
+        def _sync():
+            conn = self._get_connection()
+            rows = conn.execute("""
+                SELECT preset,
+                       COUNT(*)                                                                  AS total_runs,
+                       COUNT(*)                                                                  AS all_runs,
+                       COALESCE(SUM(CASE WHEN total_cost_usd > 0 THEN 1 ELSE 0 END), 0)          AS completed_runs
+                  FROM run_telemetry
+                 WHERE ts >= datetime('now', '-' || ? || ' days')
+                 GROUP BY preset
+            """, (window_days,))
+            result: dict[str, dict[str, int]] = {}
+            for r in rows.fetchall():
+                total = r["total_runs"]
+                completed = r["completed_runs"]
+                result[r["preset"]] = {
+                    "total_runs": total,
+                    "completed_runs": completed,
+                    "failed_runs": total - completed,
+                }
+            return result
+        return await self._run_in_executor(_sync)
+
     async def get_recovery_count(
         self, window_days: int = 7
     ) -> dict[str, int]:

@@ -8,6 +8,8 @@ from reasoner.application.handlers import (
     GetHarnessScorecardQuery,
     handle_get_harness_scorecard,
 )
+from reasoner.api.auth_deps import optional_auth
+from reasoner.domain.saas import User
 
 router = APIRouter()
 
@@ -15,6 +17,7 @@ router = APIRouter()
 @router.get("/api/telemetry/scorecard")
 async def get_scorecard(
     window_days: int = Query(default=7, ge=1, le=365, description="Days of telemetry to aggregate"),
+    user: User | None = Depends(optional_auth),
 ) -> dict:
     """Return harness-level scorecard metrics for the last N days.
 
