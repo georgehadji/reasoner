@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, TYPE_CHECKING
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.application.flows.base import WorkflowServices, PhaseStep
+from reasoner.core.ports.code_executor import CodeExecutorPort
 
 if TYPE_CHECKING:
     from reasoner.pipeline import ReasonerPipeline
@@ -17,6 +18,7 @@ class PipelineWorkflowServices(WorkflowServices):
         self._pipeline = pipeline
         self.router = pipeline.router
         self._runner = runner
+        self.code_executor = None
         
     def log(self, phase: str, message: str, state: PipelineState) -> None:
         self._pipeline._log(phase, message, state)

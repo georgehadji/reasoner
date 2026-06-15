@@ -32,6 +32,7 @@ class PipelineEventType(str, Enum):
     LLM_GENERATION_COMPLETED = "llm_generation_completed"
     RESEARCH_STEP_EMITTED = "research_step_emitted"
     RESEARCH_CITATIONS_READY = "research_citations_ready"
+    CODE_EXECUTED = "code_executed"
 
 
 class WidgetEventType(str, Enum):
@@ -391,6 +392,7 @@ PIPELINE_EVENT_CLASSES: dict[PipelineEventType, type[DomainEvent]] = {
     PipelineEventType.LLM_GENERATION_COMPLETED: LLMGenerationCompleted,
     PipelineEventType.RESEARCH_STEP_EMITTED: ResearchStepEmitted,
     PipelineEventType.RESEARCH_CITATIONS_READY: ResearchCitationsReady,
+    PipelineEventType.CODE_EXECUTED: DomainEvent,
 }
 
 WIDGET_EVENT_CLASSES: dict[WidgetEventType, type[DomainEvent]] = {

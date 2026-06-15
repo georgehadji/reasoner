@@ -268,17 +268,37 @@ async def run_pot_execute_phase(state: PipelineState, services: WorkflowServices
         state.pot_state["execution_output"] = ""
         state.pot_state["execution_error"] = "No code was generated"
         return
-    raw, _ = await services.call_llm(
-        role="pot_execute",
-        system_prompt=phases.POT_EXECUTE_SYSTEM,
-        user_prompt=phases.pot_execute_prompt(state), 
-        state=state
-    )
-    data = extract_json(raw)
-    state.pot_state["execution_output"] = data.get("output", "")
-    state.pot_state["execution_success"] = data.get("success", False)
-    state.pot_state["execution_error"] = data.get("error", "")
-    state.pot_state["intermediate_steps"] = data.get("intermediate_steps", [])
+
+    # Use real code executor if available, otherwise fall back to LLM simulation
+    executor = getattr(services, "code_executor", None)
+    if executor is not None:
+        result = await executor.execute(code)
+        state.pot_state["execution_output"] = result.stdout
+        state.pot_state["execution_success"] = result.success
+        state.pot_state["execution_error"] = result.stderr
+        state.pot_state["execution_exit_code"] = result.exit_code
+        state.pot_state["execution_timed_out"] = result.timed_out
+        state.pot_state["execution_truncated"] = result.truncated
+        state.pot_state["execution_evidence_id"] = str(result.exit_code)  # simplified evidence link
+
+        if not result.success:
+            services.log("PoT", f"Execution failed: {result.summary}", state)
+        else:
+            services.log("PoT", f"Execution OK: {result.summary}", state)
+    else:
+        # Fallback — use LLM to simulate execution (original path)
+        services.log("PoT", "No code executor available; using LLM simulation.", state)
+        raw, _ = await services.call_llm(
+            role="pot_execute",
+            system_prompt=phases.POT_EXECUTE_SYSTEM,
+            user_prompt=phases.pot_execute_prompt(state), 
+            state=state
+        )
+        data = extract_json(raw)
+        state.pot_state["execution_output"] = data.get("output", "")
+        state.pot_state["execution_success"] = data.get("success", False)
+        state.pot_state["execution_error"] = data.get("error", "")
+        state.pot_state["intermediate_steps"] = data.get("intermediate_steps", [])
 
 async def run_pot_interpret_phase(state: PipelineState, services: WorkflowServices) -> None:
     services.log("PoT", "Interpreting execution results...", state)
