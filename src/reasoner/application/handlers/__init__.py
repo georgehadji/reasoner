@@ -15,6 +15,10 @@ from reasoner.application.handlers.handlers import (
     HandlerRegistry,
     get_handler_registry,
 )
+from reasoner.application.queries.get_harness_scorecard import (
+    GetHarnessScorecardQuery,
+    handle_get_harness_scorecard,
+)
 
 __all__ = [
     'RunPipelineCommandHandler',
@@ -26,4 +30,6 @@ __all__ = [
     'ListPresetsQueryHandler',
     'HandlerRegistry',
     'get_handler_registry',
+    'GetHarnessScorecardQuery',
+    'handle_get_harness_scorecard',
 ]

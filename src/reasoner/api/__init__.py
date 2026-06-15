@@ -712,7 +712,9 @@ from reasoner.api.routes.errors import router as errors_router
 app.include_router(errors_router)
 
 from reasoner.api.routes.health import router as health_router
+from reasoner.api.routes.telemetry import router as telemetry_router
 app.include_router(health_router)
+app.include_router(telemetry_router)
 
 from reasoner.api.routes.admin import router as admin_router
 app.include_router(admin_router)

@@ -202,6 +202,73 @@ class TelemetryStore:
             return {**run_row, "phases": phases}
         return await self._run_in_executor(_sync)
 
+    async def get_scorecard_rows(self, window_days: int = 7) -> list[dict[str, Any]]:
+        """Return per-phase aggregated metrics for all presets over a time window.
+
+        Each row is a dict with preset, phase, model, and aggregated cost/
+        duration/quality/fallback stats. Used by ScorecardService.
+        """
+        def _sync():
+            conn = self._get_connection()
+            rows = conn.execute("""
+                SELECT
+                    pt.preset,
+                    pt.phase,
+                    pt.models,
+                    COUNT(*)                    AS total_calls,
+                    COALESCE(SUM(pt.cost_usd), 0.0)   AS total_cost_usd,
+                    COALESCE(SUM(pt.duration_ms), 0)  AS total_duration_ms,
+                    COALESCE(AVG(pt.quality_score), 0.0) AS avg_quality_score,
+                    COALESCE(SUM(pt.quality_passed), 0)  AS quality_passed,
+                    COALESCE(SUM(CASE WHEN pt.quality_passed = 0 AND pt.quality_score IS NOT NULL THEN 1 ELSE 0 END), 0) AS quality_failed,
+                    COALESCE(SUM(pt.retries), 0)  AS total_retries,
+                    COALESCE(SUM(pt.is_fallback), 0) AS fallback_count
+                FROM phase_telemetry pt
+                WHERE pt.ts >= datetime('now', '-' || ? || ' days')
+                GROUP BY pt.preset, pt.phase, pt.models
+                ORDER BY pt.preset, pt.phase
+            """, (window_days,))
+            return [dict(r) for r in rows.fetchall()]
+        return await self._run_in_executor(_sync)
+
+    async def get_scorecard_fallback_events(
+        self, window_days: int = 7
+    ) -> dict[str, list[dict[str, Any]]]:
+        """Return fallback events grouped by preset over the time window."""
+        def _sync():
+            conn = self._get_connection()
+            rows = conn.execute("""
+                SELECT run_id, preset, fallback_events
+                FROM run_telemetry
+                WHERE fallback_count > 0
+                  AND ts >= datetime('now', '-' || ? || ' days')
+                ORDER BY ts DESC
+            """, (window_days,))
+            by_preset: dict[str, list[dict[str, Any]]] = {}
+            for r in rows.fetchall():
+                preset = r["preset"]
+                events = json.loads(r["fallback_events"] or "[]")
+                if isinstance(events, list):
+                    by_preset.setdefault(preset, []).extend(events)
+            return by_preset
+        return await self._run_in_executor(_sync)
+
+    async def get_recovery_count(
+        self, window_days: int = 7
+    ) -> dict[str, int]:
+        """Count runs per preset that had fallbacks but still completed."""
+        def _sync():
+            conn = self._get_connection()
+            rows = conn.execute("""
+                SELECT preset, COUNT(*) AS recovery_count
+                FROM run_telemetry
+                WHERE fallback_count > 0
+                  AND ts >= datetime('now', '-' || ? || ' days')
+                GROUP BY preset
+            """, (window_days,))
+            return {r["preset"]: r["recovery_count"] for r in rows.fetchall()}
+        return await self._run_in_executor(_sync)
+
     def close(self) -> None:
         if self._connection:
             self._connection.close()
