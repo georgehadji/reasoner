@@ -188,3 +188,48 @@ class HarnessMutation:
             "rollback": self.rollback,
             "risk_tier": self.risk_tier,
         }
+
+
+@dataclass
+class ReplayResult:
+    """Result of evaluating a HarnessMutation against held-out problems."""
+    mutation: HarnessMutation = field(default_factory=HarnessMutation)
+    passed: bool = False
+    delta_improvement: float = 0.0
+    max_regression: float = 0.0
+    total_cost_usd_before: float = 0.0
+    total_cost_usd_after: float = 0.0
+    problems_evaluated: int = 0
+    regressions: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        return {
+            "passed": self.passed,
+            "delta_improvement": round(self.delta_improvement, 4),
+            "max_regression": round(self.max_regression, 4),
+            "cost_before": round(self.total_cost_usd_before, 6),
+            "cost_after": round(self.total_cost_usd_after, 6),
+            "problems_evaluated": self.problems_evaluated,
+            "regression_count": len(self.regressions),
+        }
+
+
+@dataclass
+class PromotionRecord:
+    """Auditable record of a promoted harness mutation."""
+    mutation: HarnessMutation = field(default_factory=HarnessMutation)
+    result: ReplayResult = field(default_factory=ReplayResult)
+    promoted_at: str = ""
+    promoted_by: str = ""      # "auto" for safe, "user:<name>" for HITL
+    artifact_path: str = ""    # path to the JSON patch artifact
+    status: str = "pending"    # "pending" | "promoted" | "rolled_back"
+
+    def to_dict(self) -> dict:
+        return {
+            **self.mutation.to_dict(),
+            "promoted_at": self.promoted_at,
+            "promoted_by": self.promoted_by,
+            "artifact_path": self.artifact_path,
+            "status": self.status,
+            "result": self.result.to_dict(),
+        }
