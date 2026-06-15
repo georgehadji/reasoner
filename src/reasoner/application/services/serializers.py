@@ -1027,6 +1027,7 @@ def _ser_synthesis(state: PipelineState) -> dict:
             "action_blueprint": clean_bp,
             "open_questions": _get_v(fs, "open_questions", []),
             "claim_labels": clean_labels,
+            "evidence": _get_v(fs, "evidence", {}),
             "meta_audit": meta_audit,
             "layout_hints": _get_v(fs, "layout_hints", {}),
             "tokens": {"input": total_input, "output": total_output},

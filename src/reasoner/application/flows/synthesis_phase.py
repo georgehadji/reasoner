@@ -16,7 +16,7 @@ from reasoner.models import (
     ClaimLabel,
     TaskType,
 )
-from reasoner.parsing import extract_solution_prose, extract_json, strip_json_fences, ParseError
+from reasoner.parsing import extract_solution_prose, extract_json, strip_json_fences, ParseError, parse_evidence_bundles
 from reasoner.sanitization import clean_llm_artifacts
 import reasoner.phases as phases
 from reasoner.application.flows.base import WorkflowServices
@@ -103,6 +103,18 @@ async def run_synthesis_phase(state: PipelineState, services: WorkflowServices) 
         except Exception:
             clean_labels[k] = ClaimLabel.UNKNOWN
 
+    # Parse evidence bundles
+    raw_evidence = json_data.get("evidence", {})
+    evidence_bundles = parse_evidence_bundles(raw_evidence)
+
+    # Apply promotion rules: model-sourced VERIFIED is capped at HYPOTHESIS
+    # This import is lazy to avoid circular dependency at module level
+    try:
+        from reasoner.application.services.evidence_service import apply_promotion_rules
+        evidence_bundles = apply_promotion_rules(evidence_bundles)
+    except Exception:
+        pass
+
     # Safely handle meta audit
     meta_audit_data = json_data.get("meta_audit", {})
     if not isinstance(meta_audit_data, dict): meta_audit_data = {}
@@ -148,5 +160,6 @@ async def run_synthesis_phase(state: PipelineState, services: WorkflowServices) 
             non_obvious_insight=meta_audit_data.get("non_obvious_insight", "")
         ),
         sources=_coerce_sources(json_data.get("sources", [])),
-        layout_hints=json_data.get("layout_hints", {})
+        layout_hints=json_data.get("layout_hints", {}),
+        evidence=evidence_bundles,
     )

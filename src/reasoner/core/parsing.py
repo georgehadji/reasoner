@@ -725,3 +725,54 @@ def _parse_review_hypotheses(raw_hypotheses: Any) -> list[ReviewHypothesis]:
             logger.warning("Skipping malformed ReviewHypothesis entry: %s", exc)
     out.sort(key=lambda x: x.probability, reverse=True)
     return out
+
+
+def parse_evidence_bundle(data: dict[str, Any]) -> "EvidenceBundle":
+    """Tolerantly parse an EvidenceBundle from raw {label, checks_run, ...} dict.
+
+    Returns an all-default bundle on any parse failure (``--resume`` safe).
+    """
+    from reasoner.domain.core_types import EvidenceBundle
+
+    try:
+        return EvidenceBundle(
+            label=str(data.get("label", "UNKNOWN")).upper(),
+            checks_run=list(data.get("checks_run") or []),
+            evidence_refs=list(data.get("evidence_refs") or []),
+            untested=str(data.get("untested") or ""),
+            residual_risk=str(data.get("residual_risk") or ""),
+            source=str(data.get("source", "model")),
+        )
+    except (ValueError, TypeError) as exc:
+        logger.warning("Skipping malformed EvidenceBundle entry: %s", exc)
+        return EvidenceBundle()
+
+
+def parse_evidence_bundles(
+    raw: list[dict[str, Any]] | dict[str, Any] | None,
+) -> dict[str, "EvidenceBundle"]:
+    """Parse a dict of {claim_text: bundle_dict} from synthesis LLM output.
+
+    Accepts list[dict] (coerces to dict by index), dict, or None.
+    Returns a dict keyed by claim text.
+    """
+    from reasoner.domain.core_types import EvidenceBundle
+
+    result: dict[str, EvidenceBundle] = {}
+
+    if isinstance(raw, list):
+        # List of {claim, label, checks_run, ...} — index by claim
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            claim = str(item.get("claim") or "").strip()
+            if not claim:
+                continue
+            result[claim] = parse_evidence_bundle(item)
+    elif isinstance(raw, dict):
+        # {claim_text: bundle_dict}
+        for claim, bundle_data in raw.items():
+            if not isinstance(bundle_data, dict):
+                continue
+            result[str(claim)] = parse_evidence_bundle(bundle_data)
+    return result

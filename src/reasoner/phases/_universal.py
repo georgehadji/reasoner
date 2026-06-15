@@ -110,7 +110,7 @@ LANGUAGE RULE (CRITICAL):
 FORMAT RULES:
 - Use this exact format: [SOLUTION]...prose with structured headings and citations...[/SOLUTION] followed by a JSON block in ```json...```
 - If you cannot produce the [SOLUTION] tag, return ONLY the JSON block; the pipeline will synthesize prose for you.
-- Output valid JSON inside the fence with fields: critical_insights, action_blueprint, open_questions, claim_labels, meta_audit, sources, layout_hints.
+- Output valid JSON inside the fence with fields: critical_insights, action_blueprint, open_questions, claim_labels, meta_audit, sources, layout_hints, evidence.
 
 CITATION REQUIREMENTS:
 - Use format: [source_title](url) after each claim from a source.
@@ -171,7 +171,7 @@ def synthesis_prompt(state: PipelineState) -> str:
     followup = _followup_context(state)
     quality_note = f"\nCONTEXT QUALITY: {state.context_quality}\n" if state.context_quality and state.context_quality != "unknown" else ""
 
-    return f'{get_language_instruction(state)}\n\nFinal Context:\n{_wrap_external_content(json.dumps(final_context, indent=2))}\n{_wrap_external_content(sources_info)}{followup}{quality_note}\n\n{method_hint}\n\nUse this exact format: [SOLUTION]...prose with structured headings and citations...[/SOLUTION] ```json...``` with fields: critical_insights, action_blueprint, open_questions, claim_labels, meta_audit, sources, layout_hints.'
+    return f'{get_language_instruction(state)}\n\nFinal Context:\n{_wrap_external_content(json.dumps(final_context, indent=2))}\n{_wrap_external_content(sources_info)}{followup}{quality_note}\n\n{method_hint}\n\nUse this exact format: [SOLUTION]...prose with structured headings and citations...[/SOLUTION] ```json...``` with fields: critical_insights, action_blueprint, open_questions, claim_labels, meta_audit, sources, layout_hints, evidence.'
 
 COT_DETECTION_SYSTEM = """You are a meticulous, skeptical, and ruthless analytical assistant. Your primary function is to shield the reasoning pipeline from low-quality, irrelevant, or misleading information. Review retrieved text for factual errors, unsubstantiated claims, obvious speculation, or low relevance to the user's core problem. Output ONLY valid JSON.
 

@@ -130,6 +130,25 @@ class ReviewHypothesis:
 
 
 @dataclass
+class EvidenceBundle:
+    """Provenance bundle linking a claim to its supporting evidence.
+
+    All-default fields for ``--resume`` backward compatibility.
+
+    Source tiers:
+      - "sensor": backed by a deterministic check (#1 executor, search, test)
+      - "model": asserted by an LLM with no external verification
+      - "search": grounded in retrieved web/document context
+    """
+    label: str = "UNKNOWN"                         # mirrors ClaimLabel
+    checks_run: list[str] = field(default_factory=list)     # "executed: exit 0"
+    evidence_refs: list[str] = field(default_factory=list)  # execution_evidence_ids, source URLs
+    untested: str = ""                             # what hasn't been checked
+    residual_risk: str = ""                        # remaining risk despite checks
+    source: str = "model"                          # "model" | "sensor" | "search"
+
+
+@dataclass
 class StressTestResult:
     scenario: ScenarioType
     survival_rate: float             # 0.0 - 1.0
@@ -219,5 +238,7 @@ class FinalSolution:
     critic_weighting: dict[str, float] = field(default_factory=dict)  # critic_id → weight based on reliability
     # Post-synthesis cross-model verification audit
     verification_audit: dict[str, Any] = field(default_factory=dict)
+    # Evidence bundles per claim (keyed by claim text, value = EvidenceBundle)
+    evidence: dict[str, EvidenceBundle] = field(default_factory=dict)
 
 
