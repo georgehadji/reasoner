@@ -176,6 +176,12 @@ def get_quality_judge_model(preset_name: str) -> str:
     return QUALITY_JUDGE_MODELS["default"]
 
 
+# ── Evidence Bundle Promotion Tiers (#3) ──
+# Sources eligible for VERIFIED status (deterministic/grounded only).
+EVIDENCE_SENSOR_SOURCES: tuple[str, ...] = ("sensor", "search")
+# Sources capped at HYPOTHESIS (self-attested by LLM).
+EVIDENCE_MODEL_SOURCES: tuple[str, ...] = ("model",)
+
 def get_quality_judge_threshold(preset_name: str) -> float:
     """Return the minimum score required to pass quality evaluation."""
     if "premium" in preset_name:

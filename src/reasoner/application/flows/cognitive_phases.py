@@ -292,6 +292,17 @@ async def run_pot_execute_phase(state: PipelineState, services: WorkflowServices
                      exit_code=result.exit_code,
                      success=result.success,
                      duration_ms=result.duration_ms)
+
+        # Link execution evidence to claims for #3 evidence bundles
+        try:
+            from reasoner.application.services.evidence_service import attach_execution_evidence
+            if hasattr(state, 'final_solution') and state.final_solution:
+                state.final_solution.evidence = attach_execution_evidence(
+                    state.final_solution.evidence,
+                    f"pot_exec:{result.exit_code}:{result.duration_ms}ms",
+                )
+        except Exception:
+            pass
     else:
         # Fallback — use LLM to simulate execution (original path)
         services.log("PoT", "No code executor available; using LLM simulation.", state)

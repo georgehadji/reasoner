@@ -147,6 +147,27 @@ class EvidenceBundle:
     residual_risk: str = ""                        # remaining risk despite checks
     source: str = "model"                          # "model" | "sensor" | "search"
 
+    def to_dict(self) -> dict:
+        return {
+            "label": self.label,
+            "checks_run": self.checks_run,
+            "evidence_refs": self.evidence_refs,
+            "untested": self.untested,
+            "residual_risk": self.residual_risk,
+            "source": self.source,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "EvidenceBundle":
+        return cls(
+            label=data.get("label", "UNKNOWN"),
+            checks_run=data.get("checks_run") or [],
+            evidence_refs=data.get("evidence_refs") or [],
+            untested=data.get("untested", ""),
+            residual_risk=data.get("residual_risk", ""),
+            source=data.get("source", "model"),
+        )
+
 
 @dataclass
 class StressTestResult:

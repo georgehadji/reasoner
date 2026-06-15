@@ -13,7 +13,7 @@
 | Attribute | Value |
 |-----------|-------|
 | **Architecture Style** | Hexagonal DDD + CQRS + Event Sourcing + Workflow Strategy Composition |
-| **Backend** | Python 3.12+, FastAPI 0.109+, Pydantic v2, ~391 source files |
+| **Backend** | Python 3.12+, FastAPI 0.109+, Pydantic v2, ~392 source files |
 | **Frontend** | Next.js 16 (App Router), React 19, TypeScript 5, Tailwind CSS v4 |
 | **State Model** | `PipelineState` (~60 fields) + `PipelineAggregate` (event-sourced) |
 | **LLM Routing** | OpenRouter primary (350+ models), 12+ direct provider adapters, Ollama local |

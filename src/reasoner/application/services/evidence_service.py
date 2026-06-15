@@ -11,9 +11,9 @@ from __future__ import annotations
 
 from reasoner.domain.core_types import EvidenceBundle, FinalSolution
 from reasoner.domain.models import ClaimLabel
+from reasoner.core.constants_limits import EVIDENCE_SENSOR_SOURCES
 
-# Sources eligible for VERIFIED status.
-_SENSOR_SOURCES = {"sensor", "search"}  # "model" alone cannot reach VERIFIED
+_SENSOR_SOURCES = set(EVIDENCE_SENSOR_SOURCES)
 
 
 def apply_promotion_rules(
