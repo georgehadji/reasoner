@@ -176,6 +176,15 @@ def get_quality_judge_model(preset_name: str) -> str:
     return QUALITY_JUDGE_MODELS["default"]
 
 
+# ── Plan Contract / Feedback Router (#5) ──
+# Maximum number of validation commands in a plan contract.
+MAX_VALIDATION_COMMANDS: int = 10
+# Keywords that flag a coding operation as risky (triggers review).
+RISKY_OP_KEYWORDS: tuple[str, ...] = (
+    "drop table", "delete from", "rm -rf", "sudo",
+    "chmod 777", "format", "mkfs", "dd if=",
+)
+
 # ── Evidence Bundle Promotion Tiers (#3) ──
 # Sources eligible for VERIFIED status (deterministic/grounded only).
 EVIDENCE_SENSOR_SOURCES: tuple[str, ...] = ("sensor", "search")

@@ -170,6 +170,44 @@ class EvidenceBundle:
 
 
 @dataclass
+class PlanContract:
+    """Inspectable plan contract for the Coding method (#5).
+
+    All-default fields for ``--resume`` backward compatibility.
+    """
+    targets: list[str] = field(default_factory=list)
+    invariants: list[str] = field(default_factory=list)
+    validation_commands: list[str] = field(default_factory=list)
+    rollback_points: list[str] = field(default_factory=list)
+    risky_ops: list[str] = field(default_factory=list)
+    read_set: list[str] = field(default_factory=list)
+    write_set: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        return {
+            "targets": self.targets,
+            "invariants": self.invariants,
+            "validation_commands": self.validation_commands,
+            "rollback_points": self.rollback_points,
+            "risky_ops": self.risky_ops,
+            "read_set": self.read_set,
+            "write_set": self.write_set,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "PlanContract":
+        return cls(
+            targets=list(data.get("targets") or []),
+            invariants=list(data.get("invariants") or []),
+            validation_commands=list(data.get("validation_commands") or []),
+            rollback_points=list(data.get("rollback_points") or []),
+            risky_ops=list(data.get("risky_ops") or []),
+            read_set=list(data.get("read_set") or []),
+            write_set=list(data.get("write_set") or []),
+        )
+
+
+@dataclass
 class StressTestResult:
     scenario: ScenarioType
     survival_rate: float             # 0.0 - 1.0
