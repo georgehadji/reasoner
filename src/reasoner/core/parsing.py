@@ -748,6 +748,30 @@ def parse_evidence_bundle(data: dict[str, Any]) -> "EvidenceBundle":
         return EvidenceBundle()
 
 
+def parse_plan_contract(data: dict[str, Any]) -> "PlanContract":
+    """Tolerantly parse a PlanContract from raw decomposition LLM output.
+
+    Returns an all-default contract on any parse failure (``--resume`` safe).
+    """
+    from reasoner.domain.core_types import PlanContract
+
+    try:
+        return PlanContract(
+            targets=[str(t) for t in (data.get("targets") or [])],
+            invariants=[str(i) for i in (data.get("invariants") or [])],
+            validation_commands=[
+                str(c) for c in (data.get("validation_commands") or [])
+            ],
+            rollback_points=[str(r) for r in (data.get("rollback_points") or [])],
+            risky_ops=[str(o) for o in (data.get("risky_ops") or [])],
+            read_set=[str(s) for s in (data.get("read_set") or [])],
+            write_set=[str(s) for s in (data.get("write_set") or [])],
+        )
+    except (ValueError, TypeError) as exc:
+        logger.warning("Skipping malformed PlanContract: %s", exc)
+        return PlanContract()
+
+
 def parse_evidence_bundles(
     raw: list[dict[str, Any]] | dict[str, Any] | None,
 ) -> dict[str, "EvidenceBundle"]:

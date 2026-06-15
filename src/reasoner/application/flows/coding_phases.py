@@ -50,6 +50,13 @@ async def run_coding_spec_phase(state: PipelineState, services: WorkflowServices
     state.coding_state["spec"] = data
     state.coding_state["language"] = data.get("language", "")
     state.coding_state["framework"] = data.get("framework", "")
+
+    # Parse plan contract from decomposition output (code-as-harness #5)
+    contract_data = data.get("contract", {})
+    if contract_data:
+        from reasoner.core.parsing import parse_plan_contract
+        state.coding_state["contract"] = parse_plan_contract(contract_data)
+
     files = data.get("files", [])
     if not files:
         # Spec parse failed or returned no files. Synthesize a single default
@@ -97,6 +104,28 @@ async def run_coding_generate_phase(state: PipelineState, services: WorkflowServ
             generated.append(res)
 
     state.coding_state["generated_files"] = generated
+
+    # ── Contract validation (code-as-harness #5) ──
+    # If the spec produced a plan contract with validation_commands,
+    # run them through the code executor and feed results to evidence bundles.
+    contract = state.coding_state.get("contract")
+    if contract and contract.validation_commands and getattr(services, "code_executor", None):
+        services.log("CODING", f"Validating contract — {len(contract.validation_commands)} commands", state)
+        try:
+            from reasoner.application.services.evidence_service import attach_execution_evidence
+            # Concatenate validation commands as a single script for execution
+            validation_script = "\n".join(contract.validation_commands)
+            result = await services.code_executor.execute(validation_script)
+            state.coding_state["contract_validation_result"] = result.__dict__
+            if hasattr(state, 'final_solution') and state.final_solution:
+                state.final_solution.evidence = attach_execution_evidence(
+                    state.final_solution.evidence,
+                    f"contract_validate:exit={result.exit_code}",
+                )
+            if not result.success:
+                services.log("CODING", f"Contract validation failed: {result.summary}", state)
+        except Exception as exc:
+            services.log("CODING", f"Contract validation error: {exc}", state)
 
 async def run_coding_review_phase(state: PipelineState, services: WorkflowServices) -> None:
     services.log("CODING", "Running adversarial security and quality review...", state)
