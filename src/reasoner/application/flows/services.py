@@ -18,7 +18,20 @@ class PipelineWorkflowServices(WorkflowServices):
         self._pipeline = pipeline
         self.router = pipeline.router
         self._runner = runner
-        self.code_executor = None
+        self.code_executor: CodeExecutorPort | None = None
+        self._init_executor()
+
+    def _init_executor(self) -> None:
+        """Lazy-init the code executor if EXEC_SANDBOX_ENABLED is true."""
+        from reasoner.core.settings import settings
+        if not settings.EXEC_SANDBOX_ENABLED:
+            return
+        try:
+            from reasoner.infrastructure.execution.subprocess_executor import SubprocessExecutor
+            self.code_executor = SubprocessExecutor()
+        except Exception:
+            from reasoner.infrastructure.execution.noop_executor import NoopExecutor
+            self.code_executor = NoopExecutor()
         
     def log(self, phase: str, message: str, state: PipelineState) -> None:
         self._pipeline._log(phase, message, state)

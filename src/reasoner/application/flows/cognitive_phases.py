@@ -285,6 +285,13 @@ async def run_pot_execute_phase(state: PipelineState, services: WorkflowServices
             services.log("PoT", f"Execution failed: {result.summary}", state)
         else:
             services.log("PoT", f"Execution OK: {result.summary}", state)
+
+        # Emit CodeExecuted domain event for audit trail
+        state._emit("CODE_EXECUTED",
+                     phase_name="pot_execute",
+                     exit_code=result.exit_code,
+                     success=result.success,
+                     duration_ms=result.duration_ms)
     else:
         # Fallback — use LLM to simulate execution (original path)
         services.log("PoT", "No code executor available; using LLM simulation.", state)

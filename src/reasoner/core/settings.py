@@ -203,6 +203,9 @@ class Settings:
     TOKEN_NEURO_COMPRESSION: bool = os.getenv("TOKEN_NEURO_COMPRESSION", "false").lower() == "true"
     TOKEN_CACHING: bool = os.getenv("TOKEN_CACHING", "true").lower() == "true"
 
+    # ── Code Execution Sandbox (#1) ──
+    EXEC_SANDBOX_ENABLED: bool = os.getenv("EXEC_SANDBOX_ENABLED", "true").lower() == "true"
+
     # ── Trusted Proxies ──
     TRUSTED_PROXIES: list[str] = [
         p.strip() for p in os.getenv("TRUSTED_PROXIES", "").split(",") if p.strip()

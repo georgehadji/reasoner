@@ -110,6 +110,18 @@ class SubprocessExecutor:
                 "HOME": tmpdir.as_posix(),
             }
 
+            # POSIX: resource.RLIMIT_AS memory cap
+            preexec_fn = None
+            if not _IS_WINDOWS:
+                import resource
+                mem_bytes = limits.memory_limit_mb * 1024 * 1024
+                def _set_limits():
+                    try:
+                        resource.setrlimit(resource.RLIMIT_AS, (mem_bytes, mem_bytes))
+                    except Exception:
+                        pass
+                preexec_fn = _set_limits
+
             # 5. Execute with timeout
             t0 = asyncio.get_event_loop().time()
             timeout_sec = limits.timeout_ms / 1000.0
@@ -122,7 +134,8 @@ class SubprocessExecutor:
                     stderr=asyncio.subprocess.PIPE,
                     cwd=str(tmpdir),
                     env=env,
-                    # Windows: CREATE_NO_WINDOW, HIGH_PRIORITY_CLASS
+                    preexec_fn=preexec_fn,
+                    # Windows: CREATE_NO_WINDOW
                     creationflags=(
                         0x08000000  # CREATE_NO_WINDOW
                         if _IS_WINDOWS else 0
