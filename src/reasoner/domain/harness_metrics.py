@@ -151,3 +151,40 @@ class HarnessScorecard:
                 "presets_used": self.preset_count,
             },
         }
+
+
+_RISK_TIERS = frozenset({"safe", "cost", "safety"})
+_COMPONENT_TYPES = frozenset({"preset", "routing", "budget", "threshold", "prompt"})
+
+
+@dataclass(frozen=True)
+class HarnessMutation:
+    """A governed change-contract for harness mutation (#4).
+
+    Immutable once created. Validated by HarnessGuard before evaluation.
+    Promoted only after regression-free evaluation against held-out problems.
+    """
+    target: str = ""              # "preset:debate-budget.scoring"
+    component: str = ""            # preset | routing | budget | threshold | prompt
+    failure_mode: str = ""         # what symptom it targets
+    predicted_effect: str = ""     # measurable hypothesis
+    invariant_preserved: str = ""  # e.g. "scoring stays cross-lab"
+    rollback: str = ""             # how to revert
+    risk_tier: str = "safe"        # safe | cost | safety
+
+    def __post_init__(self) -> None:
+        if self.risk_tier not in _RISK_TIERS:
+            object.__setattr__(self, "risk_tier", "safe")
+        if self.component not in _COMPONENT_TYPES:
+            object.__setattr__(self, "component", "preset")
+
+    def to_dict(self) -> dict:
+        return {
+            "target": self.target,
+            "component": self.component,
+            "failure_mode": self.failure_mode,
+            "predicted_effect": self.predicted_effect,
+            "invariant_preserved": self.invariant_preserved,
+            "rollback": self.rollback,
+            "risk_tier": self.risk_tier,
+        }
