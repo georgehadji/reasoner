@@ -397,11 +397,11 @@ async def run_stream(
             state.brainstorming_state["config"] = _bs_preset.brainstorming_config
             logger.debug(f"Injected brainstorming config: {_bs_preset.brainstorming_config}")
 
-        # --- ARTICLE DETECTION: must happen BEFORE the start event so the frontend
-        # receives auto_selected_method="article" and renders the correct phase list.
-        # Only auto-detect when the method hasn't been explicitly set by a preset.
-        from reasoner.phases._shared import is_article_request
-        if is_article_request(state.problem) and not state.method:
+        # --- ARTICLE DETECTION: only for auto-detected methods where the
+        # orchestrator already set auto_selected_method to "writing".
+        # Explicit presets (coding-budget, debate-budget, etc.) set their own
+        # method — the orchestrator leaves auto_selected_method=None for them.
+        if auto_selected_method == "writing":
             state.task_type = TaskType.TECHNICAL
             state.decomposition = ["article workflow"]
             state.method = "article"
