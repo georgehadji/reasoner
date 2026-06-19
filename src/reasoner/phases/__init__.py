@@ -28,6 +28,7 @@ from reasoner.phases.tot import *
 from reasoner.phases.pot import *
 from reasoner.phases.self_discover import *
 from reasoner.phases.writing import *
+from reasoner.phases.article import *
 from reasoner.phases.coding import *
 from reasoner.phases.brainstorming import (  # noqa: F401
     VS_GENERATION_SYSTEM,
