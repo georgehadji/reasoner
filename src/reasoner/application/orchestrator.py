@@ -151,7 +151,10 @@ class PipelineOrchestrator:
                 decision.auto_selected_method = gate_decision.method
 
         # ── Article detection ──
-        if is_article_request(req.problem):
+        # Only auto-detect when the preset didn't specify a method.
+        # Explicit presets (coding-budget, debate-budget, etc.) must not
+        # be overridden by pattern-matching on the user's prompt.
+        if is_auto and is_article_request(req.problem):
             decision.auto_selected_method = "writing"
 
         return decision

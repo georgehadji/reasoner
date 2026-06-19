@@ -399,8 +399,9 @@ async def run_stream(
 
         # --- ARTICLE DETECTION: must happen BEFORE the start event so the frontend
         # receives auto_selected_method="article" and renders the correct phase list.
+        # Only auto-detect when the method hasn't been explicitly set by a preset.
         from reasoner.phases._shared import is_article_request
-        if is_article_request(state.problem):
+        if is_article_request(state.problem) and not state.method:
             state.task_type = TaskType.TECHNICAL
             state.decomposition = ["article workflow"]
             state.method = "article"
