@@ -56,10 +56,10 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "grok-3":           {"model": "x-ai/grok-3"},
     "grok-3-mini":      {"model": "x-ai/grok-3-mini"},
     # Perplexity
-    "sonar-pro":        {"model": "perplexity/sonar-pro",      "extra_body": {"web_search_options": {"search_context_size": "medium"}}},
+    "sonar-pro":        {"model": "perplexity/sonar-pro",      "extra_body": {"web_search_options": {"search_context_size": "high"}}},
     "sonar":            {"model": "perplexity/sonar",          "extra_body": {"web_search_options": {"search_context_size": "low"}}},
-    "sonar-reasoning-pro": {"model": "perplexity/sonar-reasoning-pro", "extra_body": {"web_search_options": {"search_context_size": "medium"}}},
-    "sonar-deep-research": {"model": "perplexity/sonar-deep-research", "extra_body": {"reasoning_effort": "low"}},
+    "sonar-reasoning-pro": {"model": "perplexity/sonar-reasoning-pro", "extra_body": {"web_search_options": {"search_context_size": "high"}}},
+    "sonar-deep-research": {"model": "perplexity/sonar-deep-research", "extra_body": {"reasoning_effort": "high"}},
     # Mistral
     "mistral-large-3":  {"model": "mistralai/mistral-large-2512"},
     "mistral-medium":   {"model": "mistralai/mistral-medium-3.1"},

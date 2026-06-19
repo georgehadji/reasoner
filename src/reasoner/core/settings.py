@@ -163,6 +163,14 @@ class Settings:
 
     # ── Rerank ──
     RERANK_API_BASE: str = os.getenv("RERANK_API_BASE", "https://openrouter.ai/api/v1")
+    # Multi-backend search
+    BRAVE_SEARCH_API_KEY: str = os.getenv("BRAVE_SEARCH_API_KEY", "")
+    BRAVE_SEARCH_ENABLED: bool = os.getenv("BRAVE_SEARCH_ENABLED", "true").lower() == "true"
+    TAVILY_API_KEY: str = os.getenv("TAVILY_API_KEY", "")
+    TAVILY_SEARCH_ENABLED: bool = os.getenv("TAVILY_SEARCH_ENABLED", "true").lower() == "true"
+    TAVILY_EXTRACT_ENABLED: bool = os.getenv("TAVILY_EXTRACT_ENABLED", "true").lower() == "true"
+    OPENROUTER_WEB_SEARCH_ENABLED: bool = os.getenv("OPENROUTER_WEB_SEARCH_ENABLED", "true").lower() == "true"
+    PERPLEXITY_SEARCH_TIER: str = os.getenv("PERPLEXITY_SEARCH_TIER", "sonar-pro")
     # Nemotron Rerank VL: free NVIDIA reranker via OpenRouter chat completions + logprobs.
     # Used as fallback when Cohere rerank fails, or as primary when NEMOTRON_RERANK_ENABLED=true.
     NEMOTRON_RERANK_ENABLED: bool = os.getenv("NEMOTRON_RERANK_ENABLED", "false").lower() in ("1", "true", "yes")

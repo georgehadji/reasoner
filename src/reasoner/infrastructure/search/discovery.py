@@ -337,6 +337,63 @@ def get_searxng_base_url() -> str:
     return settings.SEARXNG_URL.rstrip("/")
 
 
+async def get_search_client_for_method(
+    method: str = "multi_perspective",
+    tier: str = "budget",
+    source_type: Optional[SourceType] = None,
+) -> tuple[Any, Optional[SourceType]]:
+    """Return the best search client for a method+tier, trying backends in order.
+
+    Tries the chain for the given method/tier (from SEARCH_METHOD_CHAINS) and
+    returns the first working client. Falls back to existing Perplexity client
+    if none of the new backends are configured.
+
+    Args:
+        method: Method name (multi_perspective, article, research, prism, direct).
+        tier:  Price tier (budget, premium).
+        source_type: Source type filter.
+
+    Returns:
+        (search_client, source_type) — same type as get_search_client().
+    """
+    from reasoner.core.constants_limits import SEARCH_METHOD_CHAINS
+    from reasoner.core.settings import settings
+
+    chain = SEARCH_METHOD_CHAINS.get(method, {}).get(tier, [])
+
+    for backend in chain:
+        if backend == "perplexity" or backend == "perplexity_deep":
+            # Perplexity-based search — reuse existing get_search_client path
+            # get_search_client already handles SearXNG → Perplexity fallback
+            if settings.OPENROUTER_API_KEY:
+                from reasoner.infrastructure.search.discovery import get_search_client
+                return await get_search_client(source_type=source_type)
+
+        elif backend == "brave":
+            if settings.BRAVE_SEARCH_API_KEY and settings.BRAVE_SEARCH_ENABLED:
+                from reasoner.infrastructure.search.brave_adapter import BraveSearchAdapter
+                return BraveSearchAdapter(), source_type
+
+        elif backend == "brave_llm":
+            if settings.BRAVE_SEARCH_API_KEY and settings.BRAVE_SEARCH_ENABLED:
+                from reasoner.infrastructure.search.brave_adapter import BraveSearchAdapter
+                return BraveSearchAdapter(), source_type
+
+        elif backend == "tavily":
+            if settings.TAVILY_API_KEY and settings.TAVILY_SEARCH_ENABLED:
+                from reasoner.infrastructure.search.tavily_adapter import TavilyAdapter
+                return TavilyAdapter(), source_type
+
+        elif backend == "openrouter_web":
+            # Handled directly by the router/streaming layer — no adapter needed.
+            # Return None to signal "use inline web_search parameter".
+            return None, source_type
+
+    # Ultimate fallback: existing Perplexity/get_search_client
+    from reasoner.infrastructure.search.discovery import get_search_client
+    return await get_search_client(source_type=source_type)
+
+
 async def get_discovery_client(
     base_url: str | None = None,
     source_type: Optional[SourceType] = None,

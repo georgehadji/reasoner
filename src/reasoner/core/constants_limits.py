@@ -176,6 +176,31 @@ def get_quality_judge_model(preset_name: str) -> str:
     return QUALITY_JUDGE_MODELS["default"]
 
 
+# ── Multi-Backend Search — method-tier chains ──
+# Each method + tier maps to a list of backend names (tried in order).
+SEARCH_METHOD_CHAINS: dict[str, dict[str, list[str]]] = {
+    "multi_perspective": {
+        "budget":  ["perplexity", "tavily", "searxng"],
+        "premium": ["perplexity", "brave_llm", "tavily"],
+    },
+    "article": {
+        "budget":  ["brave", "tavily", "searxng"],
+        "premium": ["brave_llm", "perplexity_deep", "tavily"],
+    },
+    "research": {
+        "budget":  ["perplexity", "brave", "tavily"],
+        "premium": ["perplexity_deep", "brave_llm", "tavily"],
+    },
+    "prism": {
+        "budget":  ["tavily", "brave", "perplexity"],
+        "premium": ["brave_llm", "tavily", "perplexity"],
+    },
+    "direct": {
+        "budget":  ["openrouter_web", "tavily", "perplexity"],
+        "premium": ["openrouter_web", "brave_llm", "perplexity"],
+    },
+}
+
 # ── Plan Contract / Feedback Router (#5) ──
 # Maximum number of validation commands in a plan contract.
 MAX_VALIDATION_COMMANDS: int = 10
