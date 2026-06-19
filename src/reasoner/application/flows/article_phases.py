@@ -11,14 +11,17 @@ from reasoner.parsing import extract_json
 import reasoner.phases as phases
 from reasoner.application.flows.base import WorkflowServices
 from reasoner.core.constants import ARTICLE_MIN_SOURCE_COUNT, ARTICLE_MIN_CLAIM_SUPPORT_RATIO, TRUNCATION
+from reasoner.infrastructure.search.discovery import get_search_client_for_method
 
 logger = logging.getLogger(__name__)
 
 async def run_article_retrieve_sources_phase(state: PipelineState, services: WorkflowServices, domain: str | None = None) -> None:
     services.log("WRITING", "Retrieving targeted sources for article...", state)
     try:
-        from reasoner.infrastructure.search.discovery import get_discovery_client
-        client, _ = await get_discovery_client(source_type="general")
+        method = "article"
+        from reasoner.presets import get_preset_price_tier
+        tier = get_preset_price_tier(state.preset_name) or "budget"
+        client, _ = await get_search_client_for_method(method, tier, source_type="general")
         
         raw_plan, _ = await services.call_llm(
             role="primary",

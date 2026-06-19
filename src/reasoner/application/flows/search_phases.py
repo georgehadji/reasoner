@@ -13,7 +13,7 @@ import httpx
 from reasoner.core.constants import TRUNCATION, YOUTUBE_OEMBED_URL, YOUTUBE_WATCH_BASE_URL
 from reasoner.core.constants_limits import get_token_budget
 from reasoner.core.settings import settings
-from reasoner.infrastructure.search.discovery import get_discovery_client
+from reasoner.infrastructure.search.discovery import get_search_client_for_method
 from reasoner.core.search import (
     _should_include_result,
     _normalize_url,
@@ -146,7 +146,10 @@ async def run_context_vetting_phase(
     seen_urls: set[str] = set()
 
     try:
-        client, _ = await get_discovery_client(source_type=source_type)
+        method = "multi_perspective"
+        from reasoner.presets import get_preset_price_tier
+        tier = get_preset_price_tier(state.preset_name) or "budget"
+        client, _ = await get_search_client_for_method(method, tier, source_type=source_type)
     except Exception as e:
         services.log("VETTING", f"Failed to initialize discovery client: {e}", state)
         state.errors.append(f"Vetting: Client init failed: {e}")
@@ -342,7 +345,10 @@ async def run_deep_read_phase(state: PipelineState, services: WorkflowServices, 
     if not sources_to_scrape:
         services.log("DEEP_READ", "No sources available for deep reading. Attempting fallback search...", state)
         try:
-            client, _ = await get_discovery_client(source_type="general")
+            method = "multi_perspective"
+            from reasoner.presets import get_preset_price_tier
+            tier = get_preset_price_tier(state.preset_name) or "budget"
+            client, _ = await get_search_client_for_method(method, tier, source_type="general")
             fallback_results = await client.search(state.problem, num_results=5, source_type="general", domain=domain)
             if fallback_results:
                 sources_to_scrape = [r.get("url") for r in fallback_results[:max_sources] if r.get("url")]

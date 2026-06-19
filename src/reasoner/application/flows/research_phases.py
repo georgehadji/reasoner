@@ -8,7 +8,7 @@ from typing import Any
 
 from reasoner.core.constants import TRUNCATION
 from reasoner.core.settings import settings
-from reasoner.infrastructure.search.discovery import get_discovery_client
+from reasoner.infrastructure.search.discovery import get_search_client_for_method
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.parsing import ParseError, extract_json
 import reasoner.phases as phases
@@ -41,7 +41,9 @@ async def run_research_web_search_phase(
 
     if settings.PRISM_RESEARCHER_ENABLED:
         from reasoner.application.flows.prism_research import run_prism_research_phase
-        client, _ = await get_discovery_client()
+        from reasoner.presets import get_preset_price_tier
+        tier = get_preset_price_tier(state.preset_name) or "budget"
+        client, _ = await get_search_client_for_method("prism", tier)
         file_search = None
         if settings.PRISM_FILE_SEARCH_ENABLED:
             from reasoner.infrastructure.prism.file_search import PrismFileSearch
@@ -63,7 +65,9 @@ async def run_research_web_search_phase(
     current_knowledge = []
     
     try:
-        client, _ = await get_discovery_client()
+        from reasoner.presets import get_preset_price_tier
+        tier = get_preset_price_tier(state.preset_name) or "budget"
+        client, _ = await get_search_client_for_method("research", tier)
     except Exception as e:
         services.log("RESEARCH", f"Failed to initialize discovery client: {e}", state)
         state.errors.append(f"Research: Client init failed: {e}")
