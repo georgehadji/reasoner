@@ -391,7 +391,7 @@ async def run_stream(
 
         # --- BRAINSTORMING CONFIG: inject VS runtime parameters from preset metadata
         # before any phase runs so _phase_brainstorm_generate can read them.
-        from reasoner.domain.preset_registry import PRESETS as _PRESETS
+        from reasoner.presets import PRESETS as _PRESETS
         _bs_preset = _PRESETS.get(effective_preset_name)
         if _bs_preset and _bs_preset.brainstorming_config:
             state.brainstorming_state["config"] = _bs_preset.brainstorming_config

@@ -461,6 +461,10 @@ _REGISTRY: dict[str, dict] = {
     },
 }
 
+# Public alias for backward compatibility
+PRESETS = _REGISTRY
+
+
 def get_preset(preset_id: str) -> PipelinePreset:
     """Return a copy of the preset."""
     if preset_id not in _REGISTRY:
