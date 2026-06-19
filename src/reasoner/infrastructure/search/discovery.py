@@ -363,8 +363,16 @@ async def get_search_client_for_method(
 
     for backend in chain:
         if backend == "perplexity" or backend == "perplexity_deep":
-            # Perplexity-based search — reuse existing get_search_client path
-            # get_search_client already handles SearXNG → Perplexity fallback
+            # Prefer Tavily/Brave over SearXNG when API keys are set.
+            # SearXNG is the legacy fallback — new adapters have better latency
+            # (Tavily 180ms p50 vs SearXNG 2-5s) and fresher indexes.
+            if settings.TAVILY_API_KEY and settings.TAVILY_SEARCH_ENABLED:
+                from reasoner.infrastructure.search.tavily_adapter import TavilyAdapter
+                return TavilyAdapter(), source_type
+            if settings.BRAVE_SEARCH_API_KEY and settings.BRAVE_SEARCH_ENABLED:
+                from reasoner.infrastructure.search.brave_adapter import BraveSearchAdapter
+                return BraveSearchAdapter(), source_type
+            # Fall back to SearXNG → Perplexity legacy path
             if settings.OPENROUTER_API_KEY:
                 from reasoner.infrastructure.search.discovery import get_search_client
                 return await get_search_client(source_type=source_type)
