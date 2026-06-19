@@ -381,9 +381,11 @@ async def run_deep_read_phase(state: PipelineState, services: WorkflowServices, 
                             "source": "tavily:extract",
                             "freshness_score": 0.6,
                         })
-                services.log("DEEP_READ", f"Tavily extracted {len(extracted)} sources — skipping per-URL scrape", state)
-                # Mark extraction as done by emptying sources_to_scrape
-                sources_to_scrape = []
+                # Only remove URLs that Tavily successfully extracted — remaining
+                # URLs fall through to the per-URL scraping loop.
+                extracted_urls = {item.get("url", "") for item in extracted}
+                sources_to_scrape = [u for u in sources_to_scrape if u not in extracted_urls]
+                services.log("DEEP_READ", f"Tavily extracted {len(extracted)} sources — {len(sources_to_scrape)} remaining for per-URL scrape", state)
         except Exception as exc:
             services.log("DEEP_READ", f"Tavily extract failed, falling back to per-URL scraping: {exc}", state)
 
