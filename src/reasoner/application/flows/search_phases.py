@@ -357,6 +357,36 @@ async def run_deep_read_phase(state: PipelineState, services: WorkflowServices, 
         except Exception as exc:
             services.log("DEEP_READ", f"Fallback search failed: {exc}", state)
     
+    # Try Tavily Extract as a batch replacement for per-URL scraping
+    if sources_to_scrape and settings.TAVILY_EXTRACT_ENABLED and settings.TAVILY_API_KEY:
+        try:
+            from reasoner.infrastructure.search.tavily_adapter import TavilyAdapter
+            tavily = TavilyAdapter()
+            extracted = await tavily.extract(sources_to_scrape[:5])
+            if extracted:
+                for item in extracted:
+                    url = item.get("url", "")
+                    services.log("DEEP_READ", f"Tavily extracted: {item.get('title', url)[:80]}", state)
+                    # Store extracted content directly into vetted_context
+                    found = next((r for r in state.vetted_context if r.get("url") == url), None)
+                    if found:
+                        found["full_content"] = item.get("content", "")
+                    else:
+                        state.vetted_context.append({
+                            "url": url,
+                            "title": item.get("title", url),
+                            "full_content": item.get("content", ""),
+                            "content": (item.get("content", "") or "")[:2048],
+                            "snippet": (item.get("content", "") or "")[:500],
+                            "source": "tavily:extract",
+                            "freshness_score": 0.6,
+                        })
+                services.log("DEEP_READ", f"Tavily extracted {len(extracted)} sources — skipping per-URL scrape", state)
+                # Mark extraction as done by emptying sources_to_scrape
+                sources_to_scrape = []
+        except Exception as exc:
+            services.log("DEEP_READ", f"Tavily extract failed, falling back to per-URL scraping: {exc}", state)
+
     if not sources_to_scrape:
         services.log("DEEP_READ", "No sources found. Extracting general knowledge fallback...", state)
         try:

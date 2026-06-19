@@ -26,25 +26,43 @@ async def _call_with_circuit(
     max_tokens: int,
     temperature: float,
     effective_timeout: float,
+    extra_body: dict[str, Any] | None = None,
 ) -> str:
-    """Call a provider with circuit-breaker protection."""
+    """Call a provider with circuit-breaker protection.
+
+    Args:
+        extra_body: Optional additional body params to merge into the API call.
+                    Used for web_search: true injection on supported providers.
+    """
     from reasoner.circuit_breaker import get_circuit_breaker
 
     circuit = get_circuit_breaker(f"llm:{provider.model}")
-    if not await circuit.can_execute():
-        raise LLMError(f"Circuit open for {provider.model}")
+
+    # Inject extra_body if provider supports it (OpenRouterProvider has extra_body)
+    _saved_extra = None
+    if extra_body and hasattr(provider, "extra_body") and provider.extra_body is not None:
+        _saved_extra = dict(provider.extra_body)
+        provider.extra_body = {**provider.extra_body, **extra_body}
+    elif extra_body and hasattr(provider, "extra_body"):
+        provider.extra_body = dict(extra_body)
     try:
+        if not await circuit.can_execute():
+            raise LLMError(f"Circuit open for {provider.model}")
         coro = provider.complete_with_retry(system_prompt, user_prompt, max_tokens, temperature)
         result = await asyncio.wait_for(coro, timeout=effective_timeout)
         await circuit.record_success()
         return result
     except asyncio.CancelledError:
-        # BUG-FIX: Re-raise CancelledError without poisoning the circuit breaker.
-        # Task cancellation (client disconnect, timeout from upstream) is not a provider failure.
         raise
     except Exception:
         await circuit.record_failure()
         raise
+    finally:
+        # Restore original extra_body
+        if _saved_extra is not None and hasattr(provider, "extra_body"):
+            provider.extra_body = _saved_extra
+        elif extra_body and hasattr(provider, "extra_body"):
+            provider.extra_body = {}
 
 
 class ProviderRouter:
@@ -108,6 +126,7 @@ class ProviderRouter:
         temperature: float = DEFAULT_TEMPERATURE,
         timeout_seconds: float | None = None,
         stream: bool = False,
+        extra_body: dict[str, Any] | None = None,
     ) -> tuple[str | DegradedLLMResponse, dict[str, Any]] | AsyncIterator[str | DegradedLLMResponse]:
         """
         Call LLM for role. On LLMError or timeout, tries a fallback provider:
@@ -143,7 +162,8 @@ class ProviderRouter:
             actual_provider = provider
             try:
                 response = await _call_with_circuit(
-                    provider, system_prompt, user_prompt, max_tokens, temperature, effective_timeout
+                    provider, system_prompt, user_prompt, max_tokens, temperature,
+                    effective_timeout, extra_body=extra_body,
                 )
                 if not response or not response.strip():
                     raise LLMError(f"Empty response from {provider.model} for role={role}")

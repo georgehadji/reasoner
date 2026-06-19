@@ -126,6 +126,7 @@ async def _stream_direct_answer(
     previous_synthesis: str = "",
     turn_number: int = 1,
     preset_name: str = "",
+    web_search: bool = False,
 ) -> AsyncGenerator[str, None]:
     """Stream a direct LLM answer as a virtual single-phase pipeline for UI compatibility."""
     yield _event({"type": "start"})
@@ -187,13 +188,12 @@ async def _stream_direct_answer(
         try:
             if model_id == _primary_model:
                 # Use existing router (primary or routing table)
-                response, meta = await router.call(
-                    role="primary",
-                    system_prompt=system_prompt,
-                    user_prompt=user_prompt,
-                    max_tokens=max_tokens,
-                    temperature=temperature,
-                )
+                _call_kw = dict(role="primary", system_prompt=system_prompt,
+                                user_prompt=user_prompt, max_tokens=max_tokens,
+                                temperature=temperature)
+                if web_search:
+                    _call_kw["extra_body"] = {"plugins": [{"id": "web"}]}
+                response, meta = await router.call(**_call_kw)
                 from reasoner.infrastructure.llm.ports import DegradedLLMResponse
                 if isinstance(response, DegradedLLMResponse):
                     logger.warning(
@@ -350,8 +350,17 @@ async def run_stream(
                 yield chunk
             return
         if preflight.action == "web_search":
-            async for chunk in _stream_web_search_results(req.problem, run_id, cancel_event=cancel_event):
-                yield chunk
+            # Route through OpenRouter web_search when enabled (no SearXNG roundtrip)
+            if settings.OPENROUTER_WEB_SEARCH_ENABLED:
+                async for chunk in _stream_direct_answer(
+                    preflight.router, req.problem, run_id, cancel_event,
+                    web_search=True,
+                    preset_name=preflight.effective_preset_name,
+                ):
+                    yield chunk
+            else:
+                async for chunk in _stream_web_search_results(req.problem, run_id, cancel_event=cancel_event):
+                    yield chunk
             return
 
         router = preflight.router
