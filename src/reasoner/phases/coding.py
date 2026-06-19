@@ -22,6 +22,31 @@ __all__ = [
     "coding_assemble_prompt",
 ]
 
+# ── Verbalized sampling helpers ──────────────────────────────────────────────
+
+def _with_reasoning(system_prompt: str, focus: str) -> str:
+    """Prefix a system prompt with verbalized-sampling instruction.
+
+    When CODING_VERBALIZED_SAMPLING is enabled, models are instructed to
+    reason inside <think> tags before producing their output. The parser
+    already strips these tags; they are invisible to downstream consumers.
+    """
+    return (
+        f"<think>\n"
+        f"Before producing your output, reason step-by-step about: {focus}.\n"
+        f"Consider edge cases, error handling, security boundaries, and testability.\n"
+        f"Be concise — no more than 5-10 sentences of reasoning.\n"
+        f"</think>\n\n"
+        f"{system_prompt}"
+    )
+
+
+def strip_reasoning_from_code(raw_code: str) -> str:
+    """Strip <think> blocks from generated code before writing to file."""
+    import re
+    return re.sub(r"<think>[\s\S]*?</think>", "", raw_code).strip()
+
+
 # ── Quality contract appended to every generation prompt ──────────────────────
 _CODE_QUALITY_CONTRACT = (
     "\n\nPRODUCTION CODE CONTRACT — every file you write MUST satisfy ALL of these:\n"
@@ -280,4 +305,33 @@ def coding_assemble_prompt(state: PipelineState) -> str:
         '  "fixes_applied": ["<description of each fix applied>", ...],\n'
         '  "known_limitations": ["<any remaining caveat>", ...]\n'
         "}"
+    )
+
+
+# ── Conditional verbalized-sampling wrapping ──────────────────────────
+# When CODING_VERBALIZED_SAMPLING is enabled, all system prompts are
+# prefixed with a <think> instruction. The parser already strips these
+# tags; downstream consumers see clean output.
+from reasoner.core.settings import settings as _settings
+
+if _settings.CODING_VERBALIZED_SAMPLING:
+    CODING_SPEC_SYSTEM = _with_reasoning(
+        CODING_SPEC_SYSTEM,
+        focus="architecture, file boundaries, dependencies, error strategy",
+    )
+    CODING_GENERATE_SYSTEM = _with_reasoning(
+        CODING_GENERATE_SYSTEM,
+        focus="edge cases, type contracts, input validation, error propagation, async safety",
+    )
+    CODING_REVIEW_SYSTEM = _with_reasoning(
+        CODING_REVIEW_SYSTEM,
+        focus="security audit, code quality gaps, anti-patterns, test coverage",
+    )
+    CODING_TESTS_SYSTEM = _with_reasoning(
+        CODING_TESTS_SYSTEM,
+        focus="coverage strategy, edge-case enumeration, mock boundaries, integration points",
+    )
+    CODING_ASSEMBLE_SYSTEM = _with_reasoning(
+        CODING_ASSEMBLE_SYSTEM,
+        focus="integration surface, deployment readiness, documentation completeness",
     )

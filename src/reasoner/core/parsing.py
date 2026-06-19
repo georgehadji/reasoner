@@ -133,6 +133,10 @@ def _strip_reasoning_tags(text: str) -> str:
     return text.strip()
 
 
+# Public alias for use by coding phases (verbalized sampling)
+strip_reasoning_tags = _strip_reasoning_tags
+
+
 def extract_json_any(text: str) -> Any:
     """
     Core extraction engine. Handles markdown fences, prose, and malformed JSON.

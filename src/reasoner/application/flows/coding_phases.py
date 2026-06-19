@@ -91,6 +91,11 @@ async def run_coding_generate_phase(state: PipelineState, services: WorkflowServ
             # On JSON-parse failure the raw model output is preserved under "raw";
             # use it as the file content rather than discarding the generated code.
             result["content"] = result.get("raw") or f"# Generation failed for {file_spec.get('path', '?')}"
+
+        # Strip verbalized-sampling <think> tags from generated code
+        if "<think>" in str(result.get("content", "")):
+            from reasoner.core.parsing import strip_reasoning_tags
+            result["content"] = strip_reasoning_tags(result["content"])
         return result
 
     results = await asyncio.gather(*[_generate_one(f) for f in files_to_generate], return_exceptions=True)

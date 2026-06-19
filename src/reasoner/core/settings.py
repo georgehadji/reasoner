@@ -206,6 +206,9 @@ class Settings:
     # ── Code Execution Sandbox (#1) ──
     EXEC_SANDBOX_ENABLED: bool = os.getenv("EXEC_SANDBOX_ENABLED", "true").lower() == "true"
 
+    # ── Verbalized Sampling (Coding) ──
+    CODING_VERBALIZED_SAMPLING: bool = os.getenv("CODING_VERBALIZED_SAMPLING", "true").lower() == "true"
+
     # ── Trusted Proxies ──
     TRUSTED_PROXIES: list[str] = [
         p.strip() for p in os.getenv("TRUSTED_PROXIES", "").split(",") if p.strip()
