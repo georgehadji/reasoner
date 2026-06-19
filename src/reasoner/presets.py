@@ -44,7 +44,17 @@ def resolve_preset_name(name: str) -> str:
 
 
 def get_method_from_preset(preset: str) -> str:
-    """Extract method name from preset string."""
+    """Extract method name from preset string.
+
+    First checks the preset registry for an explicit method field.
+    Falls back to name-based pattern matching for backward compatibility.
+    """
+    # Check the registry for an explicit method field
+    if preset in PRESETS:
+        explicit = getattr(PRESETS[preset], "method", None)
+        if explicit:
+            return explicit
+
     if "debate" in preset:
         return "debate"
     if "iterative" in preset:
@@ -75,6 +85,10 @@ def get_method_from_preset(preset: str) -> str:
         return "brainstorming"
     if "writing" in preset:
         return "writing"
+    if "coding" in preset:
+        return "coding"
+    if "article" in preset:
+        return "article"
     if "sot" in preset:
         return "sot"
     if "tot" in preset:
