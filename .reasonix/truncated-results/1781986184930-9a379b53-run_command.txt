@@ -1,0 +1,181 @@
+$ python -c "
+import sys, asyncio, time, os
+sys.path.insert(0, 'src')
+import logging
+for n in list(logging.root.manager.loggerDict.keys()):
+    logging.getLogger(n).setLevel(logging.CRITICAL)
+
+from reasoner.application.orchestrator import PipelineOrchestrator
+from reasoner.application.services.preset_service import PresetService
+from reasoner.application.services.pipeline_service import PipelineService
+from reasoner.domain.pipeline_state import PipelineState
+from reasoner.pipeline import ReasonerPipeline
+
+PRESETS = [
+    'socratic-premium','debate-premium','jury-premium','scientific-premium',
+    'pre-mortem-premium','bayesian-premium','dialectical-premium','analogical-premium',
+]
+
+class A:
+    problem = 'What are the key strategic considerations for a company transitioning to a 4-day work week?'
+    preset = ''
+    routing = ''; top_k = 2; sequential = False; quiet = True
+    force_pipeline = False; source_type = 'general'; domain = None; enhance_prompt = False
+
+async def test_one(preset):
+    try:
+        a = A(); a.preset = preset
+        ps = PresetService(); pls = PipelineService()
+        orch = PipelineOrchestrator(ps, pls)
+        state = PipelineState(problem=a.problem, preset_name=a.preset)
+        pf = await asyncio.wait_for(orch.preflight(a, state), timeout=60)
+        if pf.action != 'pipeline':
+            return ('skipped', f'routed to {pf.action}')
+        pipeline = ReasonerPipeline(router=pf.router, initial_state=state, top_k=2,
+            parallel_perspectives=True, preset_name=pf.effective_preset_name, source_type='general')
+        t0 = time.monotonic()
+        result = await asyncio.wait_for(pipeline.run(a.problem), timeout=300)
+        dt = time.monotonic() - t0
+        if result.errors: return ('errors', f'{len(result.errors)} errs: {result.errors[0][:80]}')
+        if result.final_solution: return ('success', f'{dt:.0f}s')
+        return ('no_output', f'{dt:.0f}s')
+    except asyncio.TimeoutError:
+        return ('timeout', '')
+    except Exception as e:
+        return ('exception', f'{type(e).__name__}: {str(e)[:120]}')
+
+async def main():
+    for p in PRESETS:
+        s, d = await test_one(p)
+        icon = {'success':'✅','errors':'⚠️','timeout':'⏱️','exception':'❌','skipped':'⏭️'}.get(s,'❓')
+        print(f'{icon} {p:25s} {s:10s} {d}')
+
+asyncio.run(main())
+" 2>&1
+[killed after timeout]
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — allowing call (fail-open)
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — allowing call (fail-open)
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — allowing call (fail-open)
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — allowing call (fail-open)
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — allowing call (fail-open)
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — success recorded locally only
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — success recorded locally only
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — success recorded locally only
+Role 'primary' provider 'google/gemini-3.5-flash' failed (Empty response from google/gemini-3.5-flash for role=primary) — retrying with fallback 'N/A'
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — success recorded locally only
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — success recorded locally only
+Role 'primary' provider 'google/gemini-3.5-flash' failed (Empty response from google/gemini-3.5-flash for role=primary) — retrying with fallback 'N/A'
+Redis circuit breaker unavailable for llm:deepseek/deepseek-v4-pro — allowing call (fail-open)
+Redis circuit breaker unavailable for llm:deepseek/deepseek-v4-pro — success recorded locally only
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — allowing call (fail-open)
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — success recorded locally only
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — allowing call (fail-open)
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — success recorded locally only
+Redis circuit breaker unavailable for llm:deepseek/deepseek-v4-pro — allowing call (fail-open)
+Redis circuit breaker unavailable for llm:deepseek/deepseek-v4-pro — success recorded locally only
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — allowing call (fail-open)
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — success recorded locally only
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — allowing call (fail-open)
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — allowing call (fail-open)
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — allowing call (fail-open)
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — allowing call (fail-open)
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — allowing call (fail-open)
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — success recorded locally only
+Role 'primary' provider 'google/gemini-3.5-flash' failed (Empty response from google/gemini-3.5-flash for role=primary) — retrying with fallback 'N/A'
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — success recorded locally only
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — success recorded locally only
+{"timestamp": "2026-06-20T19:59:52.235475Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 allowing call (fail-open)", "correlation_id": "1738ed3b", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T19:59:52.475426Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 allowing call (fail-open)", "correlation_id": "b536e112", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T19:59:52.476391Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 allowing call (fail-open)", "correlation_id": "563378b3", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T19:59:52.477436Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 allowing call (fail-open)", "correlation_id": "f2638c02", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T19:59:52.478390Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 allowing call (fail-open)", "correlation_id": "bb53f9ab", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T19:59:55.900107Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 success recorded locally only", "correlation_id": "1738ed3b", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T19:59:56.084178Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 success recorded locally only", "correlation_id": "b536e112", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T19:59:56.332010Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 success recorded locally only", "correlation_id": "563378b3", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T19:59:56.393699Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 success recorded locally only", "correlation_id": "f2638c02", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T19:59:56.566311Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 success recorded locally only", "correlation_id": "bb53f9ab", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T19:59:59.282951Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:deepseek/deepseek-v4-pro \u2014 allowing call (fail-open)", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:01:54.748702Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:deepseek/deepseek-v4-pro \u2014 success recorded locally only", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:01:56.778253Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 allowing call (fail-open)", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:02:11.114813Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 success recorded locally only", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:02:13.108124Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 allowing call (fail-open)", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:02:29.165517Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 success recorded locally only", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:02:31.180439Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:deepseek/deepseek-v4-pro \u2014 allowing call (fail-open)", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:03:50.848507Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:deepseek/deepseek-v4-pro \u2014 success recorded locally only", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:03:52.869163Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 allowing call (fail-open)", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:04:08.434629Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 success recorded locally only", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+✅ socratic-premium          success    251s
+{"timestamp": "2026-06-20T20:04:12.414678Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 allowing call (fail-open)", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:04:12.417679Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 allowing call (fail-open)", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:04:12.418679Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 allowing call (fail-open)", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:04:12.422679Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 allowing call (fail-open)", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:04:12.424683Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 allowing call (fail-open)", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:04:16.072154Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 success recorded locally only", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:04:16.199625Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 success recorded locally only", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:04:16.400876Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 success recorded locally only", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:04:16.663897Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 success recorded locally only", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — success recorded locally only
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — success recorded locally only
+Redis circuit breaker unavailable for llm:anthropic/claude-sonnet-4.6 — allowing call (fail-open)
+Redis circuit breaker unavailable for llm:deepseek/deepseek-v4-pro — allowing call (fail-open)
+Redis circuit breaker unavailable for llm:anthropic/claude-sonnet-4.6 — success recorded locally only
+Redis circuit breaker unavailable for llm:deepseek/deepseek-v4-pro — success recorded locally only
+Redis circuit breaker unavailable for llm:anthropic/claude-sonnet-4.6 — allowing call (fail-open)
+Redis circuit breaker unavailable for llm:deepseek/deepseek-v4-pro — allowing call (fail-open)
+Redis circuit breaker unavailable for llm:anthropic/claude-sonnet-4.6 — success recorded locally only
+Redis circuit breaker unavailable for llm:deepseek/deepseek-v4-pro — success recorded locally only
+Redis circuit breaker unavailable for llm:anthropic/claude-sonnet-4.6 — allowing call (fail-open)
+Redis circuit breaker unavailable for llm:deepseek/deepseek-v4-pro — allowing call (fail-open)
+Redis circuit breaker unavailable for llm:anthropic/claude-sonnet-4.6 — success recorded locally only
+Redis circuit breaker unavailable for llm:deepseek/deepseek-v4-pro — success recorded locally only
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — allowing call (fail-open)
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — success recorded locally only
+Redis circuit breaker unavailable for llm:deepseek/deepseek-v4-pro — allowing call (fail-open)
+Redis circuit breaker unavailable for llm:deepseek/deepseek-v4-pro — failure recorded locally only
+Role 'synthesis' provider 'deepseek/deepseek-v4-pro' timed out after 120s — retrying with fallback 'google/gemini-3.5-flash'
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — allowing call (fail-open)
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — allowing call (fail-open)
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — allowing call (fail-open)
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — allowing call (fail-open)
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — allowing call (fail-open)
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — allowing call (fail-open)
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — success recorded locally only
+Role 'primary' provider 'google/gemini-3.5-flash' failed (Empty response from google/gemini-3.5-flash for role=primary) — retrying with fallback 'N/A'
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — success recorded locally only
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — success recorded locally only
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — success recorded locally only
+Role 'primary' provider 'google/gemini-3.5-flash' failed (Empty response from google/gemini-3.5-flash for role=primary) — retrying with fallback 'N/A'
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — success recorded locally only
+
+{"timestamp": "2026-06-20T20:04:16.711412Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 success recorded locally only", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:04:18.722849Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:anthropic/claude-sonnet-4.6 \u2014 allowing call (fail-open)", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:04:18.723850Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:deepseek/deepseek-v4-pro \u2014 allowing call (fail-open)", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:04:32.830527Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:anthropic/claude-sonnet-4.6 \u2014 success recorded locally only", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:04:48.670502Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:deepseek/deepseek-v4-pro \u2014 success recorded locally only", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:04:50.679960Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:anthropic/claude-sonnet-4.6 \u2014 allowing call (fail-open)", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:04:50.681926Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:deepseek/deepseek-v4-pro \u2014 allowing call (fail-open)", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:05:06.324630Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:anthropic/claude-sonnet-4.6 \u2014 success recorded locally only", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:05:34.975059Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:deepseek/deepseek-v4-pro \u2014 success recorded locally only", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:05:36.969842Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:anthropic/claude-sonnet-4.6 \u2014 allowing call (fail-open)", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:05:36.972845Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:deepseek/deepseek-v4-pro \u2014 allowing call (fail-open)", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:05:56.026587Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:anthropic/claude-sonnet-4.6 \u2014 success recorded locally only", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:06:10.569235Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:deepseek/deepseek-v4-pro \u2014 success recorded locally only", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:06:12.585876Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 allowing call (fail-open)", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:06:21.307403Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 success recorded locally only", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:06:23.316706Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:deepseek/deepseek-v4-pro \u2014 allowing call (fail-open)", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:08:25.343366Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:deepseek/deepseek-v4-pro \u2014 failure recorded locally only", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:08:27.356942Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 allowing call (fail-open)", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+⏱️ debate-premium            timeout    
+{"timestamp": "2026-06-20T20:09:21.122589Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 allowing call (fail-open)", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:09:21.123585Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 allowing call (fail-open)", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:09:21.124585Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 allowing call (fail-open)", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:09:21.125585Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 allowing call (fail-open)", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:09:21.126586Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 allowing call (fail-open)", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:09:25.467246Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 success recorded locally only", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:09:25.781108Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 success recorded locally only", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:09:28.055963Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 success recorded locally only", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:09:28.259260Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 success recorded locally only", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:09:28.321263Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 success recorded locally only", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-06-20T20:09:30.316011Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:google/gemini-3.5-flash \u2014 allowing call (fail-open)", "correlation_id": "3a680d79", "extra": {}, "user_id": null, "tier": null, "preset": null}Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — allowing call (fail-open)
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — allowing call (fail-open)
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — allowing call (fail-open)
+Redis circuit breaker unavailable for llm:google/gemini-3.5-flash — success recorded locally only

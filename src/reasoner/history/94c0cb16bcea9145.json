@@ -1,0 +1,1 @@
+{"id": "94c0cb16bcea9145", "user_id": null, "problem": "Analyze whether quantum computing poses a realistic threat to RSA-2048 encryption within this decade. Include citations from recent research.", "preset": "auto-budget", "method": "multi-perspective", "timestamp": "2026-06-19T21:22:08.172928+00:00", "tokens": {"input": 2538, "output": 6594, "total": 9132}, "status": "error"}

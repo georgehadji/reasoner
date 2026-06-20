@@ -1,0 +1,547 @@
+$ git diff HEAD~1 -- src/ knowledge.md CLAUDE.md
+[exit 0]
+warning: in the working copy of 'knowledge.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/reasoner/api/csrf.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/reasoner/api/routes/errors.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/reasoner/infrastructure/persistence/error_store.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/reasoner/infrastructure/persistence/event_store.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/reasoner/infrastructure/persistence/feedback_store.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/reasoner/infrastructure/persistence/telemetry_store.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/reasoner/neuro/providers.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/reasoner/phases/__init__.py', LF will be replaced by CRLF the next time Git touches it
+diff --git a/CLAUDE.md b/CLAUDE.md
+index 3ecb602..9229c44 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -18,7 +18,7 @@ Hexagonal DDD + CQRS + Event Sourcing + Mixin Composition. `PipelineState` (~60
+ 
+ **Dependency Rule:** Domain has no outer dependencies → Application depends on Domain/Core only → Infrastructure implements Core ports → API/Interface depends on Application.
+ 
+-**Known violations:** `domain/preset_core.py` imports from `infrastructure.llm.registry`. `api/streaming.py` directly instantiates the pipeline rather than routing through CQRS handlers. `application/flows/__init__.py` imports from `api.serializers`.
++**Known violations:** `api/streaming.py` directly instantiates the pipeline rather than routing through CQRS handlers — tracked as intentional via `CQRS_BYPASS_STREAMING=true` (see `core/settings.py`). `application/flows/__init__.py` imports from `api.serializers`.
+ 
+ ---
+ 
+@@ -169,7 +169,7 @@ HyperGate → Phase 0: Classification (task type, language)
+           → Phase 5: Synthesis (VERIFIED/HYPOTHESIS/UNKNOWN + Action Blueprint)
+ ```
+ 
+-### Reasoning Methods (19 top-level + Verbalized Sampling sub-phases)
++### Reasoning Methods (20 top-level + Verbalized Sampling sub-phases)
+ 
+ | Method | Description |
+ |--------|-------------|
+@@ -192,8 +192,9 @@ HyperGate → Phase 0: Classification (task type, language)
+ | **Writing** | Creative writing with hallucination guards |
+ | **Brainstorming** | Divergent idea generation |
+ | **Coding** | Code-focused structured reasoning |
++| **Article** | 4-phase source-grounded article: retrieve → draft → adversarial verify → refine |
+ 
+-### Presets (48)
++### Presets (50)
+ 
+ Every method has **Budget** (~$0.02/run) and **Premium** (~$0.15–$0.30/run) tiers. The UI orders Budget → Balanced → Premium, defaulting to the first (cheapest) method/preset.
+ 
+diff --git a/knowledge.md b/knowledge.md
+index 6423d8f..c545795 100644
+--- a/knowledge.md
++++ b/knowledge.md
+@@ -1,13 +1,13 @@
+-# Project Knowledge — Reasoner v2.2
++# Project Knowledge — Reasoner v2.3
+ 
+-A production-grade, multi-LLM reasoning orchestrator that decomposes complex problems into structured phases, runs perspectives across diverse model ecosystems, and synthesizes evidence-grounded answers with epistemic labeling. Supports 16 reasoning methodologies (debate, scientific, Bayesian, tree-of-thoughts, etc.) plus a HyperGate auto-router.
++A production-grade, multi-LLM reasoning orchestrator that decomposes complex problems into structured phases, runs perspectives across diverse model ecosystems, and synthesizes evidence-grounded answers with epistemic labeling. Supports **20 reasoning methodologies** (debate, scientific, Bayesian, tree-of-thoughts, article, etc.) plus a HyperGate auto-router. Hexagonal DDD + CQRS + Event Sourcing + Mixin composition.
+ 
+ ## Quickstart
+ 
+ ### Prerequisites
+ - **Python 3.12+**
+ - **Node.js 20+** (frontend)
+-- **OpenRouter API key** recommended (single key → 350+ models). Individual provider keys also supported (OpenAI, Anthropic, Google, DeepSeek, Mistral, xAI, Perplexity, Ollama).
++- **OpenRouter API key** recommended (single key → 350+ models). Individual provider keys also supported (OpenAI, Anthropic, Google, DeepSeek, Mistral, xAI, Perplexity, Qwen, Kimi, GLM, MiniMax, Ollama).
+ 
+ ### Setup
+ ```bash
+@@ -33,6 +33,7 @@ Individual services:
+ ```bash
+ uvicorn asgi:app --reload --port 8003
+ cd ui-next && npm run dev
++docker-compose -f docker-compose.searxng.yml up -d
+ ```
+ 
+ ### CLI
+@@ -44,6 +45,7 @@ python main.py --list-presets
+ python main.py --list-models
+ python main.py --problem "..." --sequential    # for rate-limited providers
+ python main.py --problem-file problem.txt --output results.json
++python main.py --save-state s.json --problem "..." && python main.py --resume s.json
+ ```
+ 
+ ### Test
+@@ -51,6 +53,7 @@ python main.py --problem-file problem.txt --output results.json
+ python -m pytest tests/ -v                                  # full suite (800+ tests)
+ python -m pytest tests/ -v -m "not slow and not integration"
+ python -m pytest tests/ --cov=src/reasoner --cov-report=html
++pytest -n auto                                              # parallel (pytest-xdist)
+ ```
+ 
+ ### Lint / Format
+@@ -58,101 +61,119 @@ python -m pytest tests/ --cov=src/reasoner --cov-report=html
+ ruff check src/reasoner/
+ ruff format src/reasoner/
+ cd ui-next && npm run lint
++cd ui-next && npx tsc --noEmit
++cd ui-next && npx playwright test
+ ```
+ 
+ ## Architecture
+ 
++### Hexagonal layering (dependency rule)
++Domain → Application → Infrastructure / API. Domain has no outer deps. `PipelineState` (~60 fields, `domain/pipeline_state.py`) is the canonical state model. `PipelineAggregate` provides event-sourced replay.
++
++**Known intentional violations:** `api/streaming.py` bypasses CQRS handlers (tracked via `CQRS_BYPASS_STREAMING=true` in `core/settings.py`). `application/flows/__init__.py` imports from `api.serializers`.
++
+ ### Pipeline phases (orchestrated default)
+-1. **Classification** — task type + language detection
+-2. **Decomposition** — break problem into sub-problems + assumptions
+-3. **Context Vetting (universal RAG)** — iterative search loop, max 3 iterations
+-4. **Deep read_file** (optional) — fetch full content of critical sources
+-5. **Generation / Perspectives** — competing answers across diverse models
+-6. **Critique / Scoring** — independent scorer panel
+-7. **Stress Testing / Verification** — adversarial checks
+-8. **Synthesis** — final answer with epistemic label (`VERIFIED` / `HYPOTHESIS` / `UNKNOWN`)
++HyperGate Pre-Router → Phase 0 (Classification) → Phase 1 (Decomposition) → Phase 2 (Multi-Perspective Generation, parallel cross-lab) → Phase 3 (Critique & Pruning, top-k) → Phase 4 (Stress Testing) → Phase 5 (Synthesis with `VERIFIED` / `HYPOTHESIS` / `UNKNOWN` + Action Blueprint).
++
++### HyperGate Pre-Router
++Five sub-agents in parallel (`LanguageDetector`, `ComplexityEstimator`, `DirectDetector`, `WebSearchDetector`, `MethodClassifier`) → `TieBreaker` → routes to **DIRECT** | **WEB_SEARCH** | **PIPELINE** (auto-method). Real method names are masked behind opaque letters (B–Q) in sub-agent prompts.
+ 
+ ### Key directories
+ - `src/reasoner/` — core Python package
+-  - `pipeline.py` — phase orchestrator
+-  - `phases.py`, `phases/` — per-phase prompts + logic (incl. `_universal.py`)
+-  - `llm.py` — `ProviderRouter`, model registry, fallback logic
+-  - `presets.py` — named routing configurations (budget / premium per method)
+-  - `models.py` — Pydantic data models + pipeline state
+-  - `parsing.py` — JSON extraction/repair for LLM output
+-  - `hypergate/` — auto-method-selection pre-router
+-  - `application/` — event bus, mixins (article pipeline, perspective)
+-  - `infrastructure/` — provider routing, caching, events DB
+-  - `api/` — FastAPI serializers + SSE streaming
+-  - `renderer.py` — CLI terminal rendering
+-- `main.py`, `asgi.py`, `api.py` — entry points (CLI, ASGI app, API)
+-- `ui-next/` — Next.js 16 + React 19 + TypeScript 5 + Tailwind CSS 4 frontend
+-- `tests/` — pytest suites (name pattern: `test_<area>.py`)
+-- `cache/tokens/` — server-side response cache (JSON files, keyed by hash)
+-- `src/reasoner/history/` — pipeline state snapshots
+-- `legacy/` — legacy modules (kept on `PYTHONPATH` in CI)
+-- `graphify-out/` — knowledge graph outputs (see `graphify-out/GRAPH_REPORT.md`)
+-
+-### Data flow
+-CLI/API → `ProviderRouter` (routes each phase to a configured model) → phase modules run via async pipeline → streamed events via SSE → final `state.final_solution` with `core_solution`, `epistemic_label`, `total_cost_usd`.
++  - `api/` — FastAPI HTTP/SSE (~30 endpoints), serializers, schemas, middleware, auth, route modules
++  - `application/` — `pipeline.py` (real `ReasonerPipeline`), `orchestrator.py` (preflight), `flows/` (phase functions), `handlers/` (CQRS), `mixins/` (per-method), `services/`
++  - `core/` — `constants_limits.py`, `constants_models.py`, `settings.py`, `ports/` (LLMPort, SearchServicePort), `events/`, `aggregates/`
++  - `domain/` — `pipeline_state.py`, `preset_core.py` (PipelinePreset, build_auto_preset), `preset_registry.py` (~48 presets)
++  - `infrastructure/` — `llm/registry.py` (model whitelist + `_REGISTRY`), `llm/router.py` (`ProviderRouter`), `llm/providers/`, `persistence/` (EventStore, telemetry_store, postgres_store), `redis/`, `websocket/`
++  - `hypergate/` — `hyperagent.py`, `base_sub_agent.py`, `sub_agents/`
++  - `phases/` — 31 prompt modules: `_shared`, `_universal` + 29 method modules
++  - `subagents/` — enhancement, decomposition, critique, synthesis, search
++  - `neuro/` — L1/L2/L3 tiered memory + embedding search
++  - `healing/` — introspection_engine, test_generation_engine, telemetry_exporter
++  - `models.py`, `pipeline.py` — backward-compat shims
++- `main.py`, `asgi.py` — CLI / ASGI entry points
++- `ui-next/` — Next.js 16 + React 19 + TypeScript 5 + Tailwind v4 + Zustand v5 + SWR + IndexedDB
++- `tests/` — pytest suites (`test_<area>.py`, ~60+ files)
++- `cache/tokens/` — server-side response cache (hash-keyed JSON)
++- `legacy/` — kept on `PYTHONPATH` in CI
++- `graphify-out/` — knowledge graph (see `GRAPH_REPORT.md`)
++- `migrations/` — SQL migrations
++- `scripts/` — `update_mindmap_meta.py` (post-commit hook), `migrate_encryption_v2.py`, smoke tests
+ 
+ ### Tech stack
+-- **Backend:** Python 3.12, FastAPI, Uvicorn, Pydantic, asyncio
+-- **Frontend:** Next.js 16, React 19, TypeScript 5, Tailwind 4
+-- **LLMs:** native SDKs (Anthropic, Google, Mistral) + OpenAI-compatible endpoints for everything else
+-- **Persistence:** file-based response cache, SQLite (`events.db`, `errors.db`, `feedback.db`), client-side IndexedDB for history
+-- **Search:** SearXNG (dockerized)
+-- **Security:** TLS 1.3 end-to-end, internal PKI, AES-256-GCM at-rest (see `ENCRYPTION.md`)
++- **Backend:** Python 3.12, FastAPI 0.109+, Uvicorn, Pydantic v2, httpx, asyncio
++- **Frontend:** Next.js 16 (App Router), React 19, TypeScript 5, Tailwind CSS v4, Zustand v5, SWR v2
++- **LLMs:** OpenRouter primary + 12 direct adapters (Anthropic, OpenAI, Google, Perplexity, DeepSeek, Mistral, xAI, Qwen, Kimi, GLM, MiniMax, Ollama)
++- **Persistence:** SQLite event store, aiosqlite, PostgreSQL (asyncpg), file-based response cache, client-side IndexedDB
++- **Search:** SearXNG (Docker), Perplexity Sonar
++- **Security:** TLS 1.3 end-to-end, internal PKI, AES-256-GCM at-rest, CSRF (HMAC-SHA256), rate limiter, circuit breaker, prompt-injection defense
++
++### v2.3 Telemetry & Self-Healing (E1–E5)
++- **E1** — `postflight` ships method, total/phase costs, durations, quality history, fallback events to Neuro memory
++- **E2** — `TelemetryStore` (`phase_telemetry` + `run_telemetry` SQLite tables), queryable analytics
++- **E3** — Context compression at Phase 2→3 handoff (gated by `TOKEN_OPTIMIZATION["context_compression"]`)
++- **E4** — `ProviderRouter.on_fallback(role, intended, actual, reason)` callbacks captured to `PipelineMeta.fallback_events`
++- **E5** — `healing/telemetry_exporter.py` writes `healing_context.json` consumed by `run_healing.py` Loop 1
+ 
+ ## Conventions
+ 
+ ### Python style
+-- 4-space indentation
+-- `snake_case` for functions, variables, modules
+-- `PascalCase` for classes, Enums, dataclasses
+-- Type hints required on public APIs and complex logic
+-- JSON output parsing goes through `parsing.py` (has repair logic) — don't hand-roll `json.loads` on LLM output
++- 4-space indent · `snake_case` functions/vars · `PascalCase` classes/Enums · type hints on public APIs
++- **All LLM JSON output goes through `parsing.extract_json()`** — never hand-roll `json.loads` on model output (parser has repair logic)
++- **All user-supplied text gates through `sanitization.sanitize_for_prompt()`** before entering any prompt
++
++### Method-specific state
++Use `dict[str, Any]` fields with `field(default_factory=dict)`. Always access via `.get()`, never direct subscript — enables `--resume` with older state files.
+ 
+ ### Frontend
+-- All UI changes confined to `ui-next/`
+-- React + TypeScript + Tailwind patterns; follow existing component structure
++- All UI in `ui-next/`; React + TypeScript + Tailwind patterns
++- **Tailwind v4 is CSS-native** via `@import "tailwindcss"` in `globals.css`. **Do NOT create `tailwind.config.ts`.**
+ 
+ ### Testing
+-- `pytest`, test files named `test_<area>.py`; group related cases in `Test...` classes
+-- Add regression tests whenever fixing parsing or routing bugs
+-- Pytest markers: `slow`, `integration` (skippable)
++- pytest, files named `test_<area>.py`, group cases in `Test...` classes
++- Markers: `slow`, `integration`, `searxng` (skippable); `searxng` needs live SearXNG
++- Add a regression test whenever fixing a parsing or routing bug
++- Coverage gates in self-healing CI: 60% fail / 80% warn
+ 
+ ### Commits
+-- Conventional Commits: `feat:`, `fix:`, `docs:`, `ui:`, etc.
+-- Note any `.env` or API key changes in the commit message
++- Conventional Commits: `feat:`, `fix:`, `docs:`, `ui:`, `ci:`, etc.
++- Note `.env` or API key changes in commit message
+ 
+ ### Routing philosophy (cross-lab diversity)
+-- Phase 2 perspectives: ≥3 different labs (budget), ≥4 (premium) — avoids echo chamber
++- Phase 2 perspectives: ≥3 labs (Budget), ≥4 labs (Premium) — avoids echo chamber
+ - Phase 3 scorer: different ecosystem from dominant Phase-2 generator
+-- Fallbacks: route to **cross-lab equivalent**, not always the preset primary
+-- Phase 0 (classification): optimize for speed/cost over diversity
+-- Phase 5 (synthesis): optimize for coherence; diversity secondary
++- Fallbacks route to **cross-lab equivalent**, not blindly to preset primary
++- Phase 0 (Classification): optimize for speed/cost
++- Phase 5 (Synthesis): optimize for coherence; diversity secondary
+ 
+ ## Gotchas
+ 
+-- **Windows shell quirks:** project runs on Windows (`win32`). Use `.venv\Scripts\activate`, `dir`/`del`/`copy` in cmd, or bash equivalents. `mkdir -p` is not valid in cmd.
++- **Windows shell quirks:** project runs on Windows (`win32`). Use `.venv\Scripts\activate`, `dir`/`del`/`copy` in cmd. `mkdir -p` is invalid in cmd.
++- **Tailwind v4 — no `tailwind.config.ts`.** Config is via `@import "tailwindcss"` in `globals.css`.
+ - **CI `PYTHONPATH`:** `.github/workflows/self-healing-ci.yml` sets `PYTHONPATH=src/reasoner:legacy`. Local imports (`circuit_breaker`, `health_check`, `retry_utils`) rely on this — run scripts from repo root.
+-- **Server port:** default backend port is **8003** (`SERVER_PORT` env var), not 8000. Only one uvicorn instance per port.
+-- **Sequential mode:** use `--sequential` (CLI) or UI toggle when hitting rate limits on parallel-heavy methods (jury, multi-perspective).
+-- **Structured output fragility:** some models (e.g., Perplexity) need specific `response_format` — see `llm.py` provider-specific handling.
+-- **Epistemic labels are heuristic**, not ground truth — don't treat `VERIFIED` as a factual guarantee.
+-- **Token cache is hash-keyed** by `(problem_hash, phase, model_id, prompt_hash)` in `cache/tokens/`. Stale/irrelevant entries are safe to delete.
++- **Server port:** default backend is **8003** (`SERVER_PORT`), not 8000. One uvicorn per port.
++- **Sequential mode:** use `--sequential` (CLI) or UI toggle when hitting rate limits on parallel-heavy methods (jury, multi-perspective, nvidia-nemotron-test).
++- **Production rate limiter:** `RATE_LIMITER_MODE` **must** be `redis` in production — app refuses to start in `memory` mode in prod.
++- **`CSRF_ENFORCE_BACKEND=false`** in CI envs (no `CSRF_SECRET` available locally).
++- **Structured output fragility:** some models (e.g., Perplexity) need specific `response_format` — see provider-specific handling in `infrastructure/llm/`.
++- **Epistemic labels are heuristic**, not ground truth — don't treat `VERIFIED` as factual guarantee.
++- **Token cache** is hash-keyed by `(problem_hash, phase, model_id, prompt_hash)` in `cache/tokens/`. Stale entries safe to delete.
+ - **Do not cast to `Any`** in Python or TypeScript to silence type errors — fix the underlying type.
+-- **Presets use model aliases** (e.g. `gemini-flash-lite`, `gemini-pro`, `deepseek-v3.1-nex-n1`) defined in `llm.py` / `presets.py`; don't hardcode vendor model strings.
+-- **graphify knowledge graph:** for cross-module "how does X relate to Y" questions, prefer `graphify query "..."` / `graphify path "A" "B"` over grep. Run `graphify update .` after significant code edits (AST-only, no API cost).
++- **Presets use model aliases** (e.g. `gemini-flash-lite`, `gemini-pro`, `kimi-k2.6`) defined in `infrastructure/llm/registry.py` and `domain/preset_registry.py` — don't hardcode vendor model strings.
++- **`pipeline.py` and `models.py` at package root are shims** — real impls live in `application/pipeline.py` and `domain/pipeline_state.py`.
++- **graphify knowledge graph:** for cross-module "how does X relate to Y" questions, prefer `graphify query "..."` / `graphify path "A" "B"` over grep. Run `graphify update .` after significant edits (AST-only, no API cost).
++- **Living docs:** `ARCHITECTURE_MINDMAP.md` is patched automatically by `scripts/update_mindmap_meta.py` on `post-commit`. `graphify-out/` rebuilds on `post-commit` and `post-checkout`.
+ 
+ ## Entry points
+ 
+ | Purpose | Command |
+-|--------|---------|
++|---------|---------|
+ | Run everything | `python start_all.py` |
+ | Backend only | `uvicorn asgi:app --reload --port 8003` |
+ | Frontend only | `cd ui-next && npm run dev` |
++| SearXNG only | `docker-compose -f docker-compose.searxng.yml up -d` |
+ | CLI reasoning | `python main.py --problem "..." [--preset ...]` |
+ | Tests | `python -m pytest tests/ -v` |
+ | Lint | `ruff check src/reasoner/` |
++| Frontend typecheck | `cd ui-next && npx tsc --noEmit` |
++| Query telemetry | `from reasoner.infrastructure.persistence.telemetry_store import get_telemetry_store` |
+diff --git a/src/reasoner/api/__init__.py b/src/reasoner/api/__init__.py
+index b712f61..ab99ce5 100644
+--- a/src/reasoner/api/__init__.py
++++ b/src/reasoner/api/__init__.py
+@@ -96,11 +96,12 @@ async def lifespan(app: FastAPI):
+                 "Each worker maintains its own token bucket, allowing rate-limit bypass. "
+                 "Set RATE_LIMITER_MODE to a shared backend (e.g., 'redis')."
+             )
+-            if settings.ENVIRONMENT == "production":
++            # Raise in any non-development environment, not just production.
++            if settings.ENVIRONMENT != "development":
+                 logger.critical(message)
+                 raise RuntimeError(
+                     f"Unsafe rate limiter configuration: RATE_LIMITER_MODE=memory with "
+-                    f"UVICORN_WORKERS={uvicorn_workers} in production. "
++                    f"UVICORN_WORKERS={uvicorn_workers} in {settings.ENVIRONMENT}. "
+                     f"Set RATE_LIMITER_MODE=redis."
+                 )
+             logger.warning(message)
+@@ -111,6 +112,19 @@ async def lifespan(app: FastAPI):
+                 "Set CIRCUIT_BREAKER_MODE to a shared backend (e.g., 'redis') for production.",
+                 uvicorn_workers,
+             )
++        # Redis reachability probe when RATE_LIMITER_MODE=redis
++        if settings.RATE_LIMITER_MODE == "redis":
++            try:
++                from reasoner.infrastructure.redis.client import get_redis
++                _probe_redis = get_redis()
++                await _probe_redis.set("_startup_probe", "1", ex=10, nx=True)
++                logger.info("Redis rate limiter probe: reachable")
++            except Exception as probe_exc:
++                raise RuntimeError(
++                    f"RATE_LIMITER_MODE=redis but Redis is unreachable at startup: {probe_exc}. "
++                    f"Fix the Redis connection or set RATE_LIMITER_MODE=memory "
++                    f"(only safe for UVICORN_WORKERS=1)."
++                ) from probe_exc
+ 
+     logger.info("Reasoner startup complete")
+     logger.info(f"Web UI: http://{settings.SERVER_HOST}:{settings.SERVER_PORT}")
+@@ -162,6 +176,9 @@ async def lifespan(app: FastAPI):
+     except asyncio.CancelledError:
+         pass
+ 
++    # Drain event bus before closing connections
++    await bus.stop()
++
+     # ── Shutdown ──
+     global _event_store, _health_postgres_pool
+     if _event_store and hasattr(_event_store, 'close'):
+@@ -476,6 +493,12 @@ async def run_pipeline(
+     # Idempotency: reject duplicate client_run_id if already in-flight
+     if req.client_run_id:
+         from reasoner.infrastructure.redis.run_state import _run_state_manager
++        if not _run_state_manager.is_authoritative():
++            raise HTTPException(
++                status_code=503,
++                detail="Run state store unavailable. Retry after Redis recovers.",
++                headers={"Retry-After": "10"},
++            )
+         existing = await _run_state_manager.get_cancel_event(req.client_run_id)
+         if existing is not None:
+             raise HTTPException(
+diff --git a/src/reasoner/api/csrf.py b/src/reasoner/api/csrf.py
+index 7c30dd1..f8d03c1 100644
+--- a/src/reasoner/api/csrf.py
++++ b/src/reasoner/api/csrf.py
+@@ -75,16 +75,28 @@ def verify_csrf_token(signed: str) -> bool:
+     if not hmac.compare_digest(provided_sig, expected_sig):
+         return False
+ 
+-    # Validate embedded signed expiry to enforce token max-age
++    # Validate embedded timestamp to enforce token max-age.
++    # Supports two token formats:
++    #   Backend:  {expiry}:{nonce}:{sig16}  (3 colon-separated parts, expiry = future unix ts)
++    #   Frontend: {ts}:{rand}               (2 colon-separated parts, ts = issue unix ts)
+     try:
+-        expiry, nonce, sig = token.rsplit(":", 2)
+-        payload = f"{expiry}:{nonce}"
+-        expected_payload_sig = hmac.new(
+-            _CSRF_SECRET, payload.encode(), hashlib.sha256
+-        ).hexdigest()[:16]
+-        if not secrets.compare_digest(sig, expected_payload_sig):
++        parts = token.split(":", 2)
++        if len(parts) == 3:
++            # Backend-generated token: first part is future expiry
++            expiry_str, nonce, inner_sig = parts
++            payload = f"{expiry_str}:{nonce}"
++            expected_inner = hmac.new(
++                _CSRF_SECRET, payload.encode(), hashlib.sha256
++            ).hexdigest()[:16]
++            if not secrets.compare_digest(inner_sig, expected_inner):
++                return False
++            return int(time.time()) < int(expiry_str)
++        elif len(parts) == 2:
++            # Frontend-generated token: first part is issue timestamp
++            issue_ts_str = parts[0]
++            return int(time.time()) - int(issue_ts_str) < _CSRF_TOKEN_MAX_AGE
++        else:
+             return False
+-        return int(time.time()) < int(expiry)
+     except (ValueError, IndexError):
+         return False
+ 
+diff --git a/src/reasoner/api/dependencies.py b/src/reasoner/api/dependencies.py
+index d3c68e4..4416b9c 100644
+--- a/src/reasoner/api/dependencies.py
++++ b/src/reasoner/api/dependencies.py
+@@ -286,12 +286,12 @@ async def check_rate_limit(
+             status_code=429,
+             detail={
+                 "error": "Rate limit exceeded",
+-                "retry_after": int(info.get("retry_after", 60)),
++                "retry_after": int(info.get("retry_after") or 60),
+                 "limit_minute": info.get("limit_minute"),
+                 "remaining_minute": info.get("remaining_minute", 0),
+             },
+             headers={
+-                "Retry-After": str(int(info.get("retry_after", 60))),
++                "Retry-After": str(int(info.get("retry_after") or 60)),
+                 "X-RateLimit-Limit": str(info.get("limit_minute")),
+                 "X-RateLimit-Remaining": str(info.get("remaining_minute", 0)),
+             },
+diff --git a/src/reasoner/api/routes/errors.py b/src/reasoner/api/routes/errors.py
+index 203fe87..8f3dfd9 100644
+--- a/src/reasoner/api/routes/errors.py
++++ b/src/reasoner/api/routes/errors.py
+@@ -28,7 +28,7 @@ class ClientErrorReport(BaseModel):
+     user_agent: str | None = None
+ 
+ 
+-@router.post("/api/error-report")
++@router.post("/api/error-report", dependencies=[Depends(check_rate_limit)])
+ async def report_client_error(req: ClientErrorReport, request: Request):
+     """Accept error reports from the frontend. No auth required."""
+     from reasoner.logging_utils import get_correlation_id
+@@ -53,7 +53,7 @@ async def error_logs(
+     offset: int = Query(0, ge=0),
+     level: str | None = Query(None),
+     source: str | None = Query(None),
+-    hours: int | None = Query(None),
++    hours: int | None = Query(None, ge=1, le=8760),
+     admin_key: str | None = Header(default=None, alias="X-Admin-Key"),
+     user: User = Depends(get_current_user),
+ ):
+diff --git a/src/reasoner/api/streaming.py b/src/reasoner/api/streaming.py
+index cef86ae..c91838a 100644
+--- a/src/reasoner/api/streaming.py
++++ b/src/reasoner/api/streaming.py
+@@ -44,10 +44,6 @@ from .phase_executor import (
+     run_phase_with_keepalive,
+ )
+ 
+-from .serializers import (
+-    _ser_synthesis,
+-)
+-
+ logger = logging.getLogger(__name__)
+ 
+ 
+@@ -307,6 +303,13 @@ async def run_stream(
+     pipeline_service: PipelineService | None = None,
+     request=None,
+ ) -> AsyncGenerator[str, None]:
++    from reasoner.core.settings import settings as _settings
++    if not _settings.CQRS_BYPASS_STREAMING:
++        # Phase 2 path: route through CQRS handler (not yet implemented)
++        raise NotImplementedError(
++            "CQRS_BYPASS_STREAMING=False requires RunPipelineCommandHandler "
++            "to support SSE callbacks. See docs/ENHANCEMENT_PLAN.md C1."
++        )
+     if preset_service is None:
+         preset_service = PresetService()
+     if pipeline_service is None:
+@@ -395,14 +398,14 @@ async def run_stream(
+             logger.debug(f"Injected brainstorming config: {_bs_preset.brainstorming_config}")
+ 
+         # --- ARTICLE DETECTION: must happen BEFORE the start event so the frontend
+-        # receives auto_selected_method="writing" and renders the correct phase list.
++        # receives auto_selected_method="article" and renders the correct phase list.
+         from reasoner.phases._shared import is_article_request
+         if is_article_request(state.problem):
+             state.task_type = TaskType.TECHNICAL
+             state.decomposition = ["article workflow"]
+-            state.method = "writing"
+-            auto_selected_method = "writing"
+-            logger.info("Article request detected in stream — routing to writing method")
++            state.method = "article"
++            auto_selected_method = "article"
++            logger.info("Article request detected in stream — routing to article method")
+ 
+         logger.info(f"Pipeline start with routing: {router.describe()}")
+         start_payload: dict = {"type": "start", "preset": effective_preset_name}
+@@ -476,11 +479,6 @@ async def run_stream(
+         else:
+             logger.error(f"No strategy found for method: {method}")
+ 
+-        last_phase_num = max(p[0] for p in phases) if phases else 5
+-        synthesis_phase_num = last_phase_num + 1
+-        if state.method != "writing":
+-            phases += [(synthesis_phase_num, "Synthesis", pipeline._phase_synthesis, _ser_synthesis)]
+-
+         # CRITICAL_PHASES computed via get_critical_phases(phases, step_metadata)
+ 
+         # _PHASE_ROLE_HINTS moved to api/phase_executor.py
+@@ -497,17 +495,16 @@ async def run_stream(
+                 yield _event({"type": "cancelled", "message": "Pipeline stopped by user"})
+                 return
+ 
+-            # Disconnect check — bail before starting next phase (B-13)
+-            if request is not None and await request.is_disconnected():
+-                logger.info(
+-                    "Client disconnected before phase %s (run %s)", name, run_id
+-                )
+-                yield _event({
+-                    "type": "cancelled",
+-                    "run_id": run_id,
+-                    "reason": "client_disconnected",
+-                })
+-                return
++            # Disconnect detection (B-13): request.is_disconnected() calls
++            # _receive() which blocks indefinitely during SSE streaming (POST
++            # body already consumed, client sends no further data).  The ASGI
++            # spec provides no non-blocking disconnect poll.
++            #
++            # Cleanup is instead handled by the finally block which cancels
++            # all tracked broadcast tasks and removes the run from the store.
++            # When the streaming response generator is garbage-collected
++            # (client disconnect), aclose() propagates GeneratorExit into
++            # run_stream(), triggering the existing finally block.
+ 
+             # Silent no-ops (e.g. writing pipeline skips generic decomposition/vetting)
+             if getattr(fn, "_is_silent_noop", False):  # v3.1: relaxed from identity check
+@@ -756,9 +753,11 @@ async def run_stream(
+             try:
+                 from reasoner.core.memory import TaggedMemory
+ 
++                import re as _re
++                _sanitize = lambda s: _re.sub(r'[^a-zA-Z0-9_-]', '_', s or 'unknown')
+                 tagged = TaggedMemory(HISTORY_DIR)
+-                method_tag = f"method:{entry.method}"
+-                preset_tag = f"preset:{entry.preset}"
++                method_tag = f"method_{_sanitize(entry.method)}"
++                preset_tag = f"preset_{_sanitize(entry.preset)}"
+                 tagged.add(method_tag, entry.model_dump())
+                 tagged.add(preset_tag, entry.model_dump())
+             except Exception as tag_err:
+diff --git a/src/reasoner/application/event_bus/bus.py b/src/reasoner/application/event_bus/bus.py
+index b40b387..de73eec 100644
+--- a/src/reasoner/application/event_bus/bus.py
++++ b/src/reasoner/application/event_bus/bus.py
+@@ -26,7 +26,8 @@ logger = logging.getLogger(__name__)
+ 
+ # Dead-letter log for events that exhaust all retries
+ _DEAD_LETTER_PATH = Path(__file__).parent.parent.parent / "logs" / "dead_letter_events.jsonl"
+-_DEAD_LETTER_PATH.parent.mkdir(parents=True, exist_ok=True)
++# Note: _DEAD_LETTER_PATH.parent.mkdir() moved to EventBus.start() to avoid
++# PermissionError on read-only filesystems at import time.
+ 
+ 
+ # Type alias for event handlers
+@@ -53,6 +54,7 @@ class EventBus:
+         self._task_queue: asyncio.Queue[tuple[DomainEvent, EventHandler]] | None = None
+         self._semaphore = asyncio.Semaphore(200)  # Max 200 concurrent handler executions
+         self._dropped_event_count: int = 0
++        self._dead_letter_enabled: bool = True
+     
+     def subscribe(
+         self,
+@@ -98,6 +100,15 @@ class EventBus:
+         """Start the background queue consumer."""
+         if self._running:
+             return
++        try:
++            _DEAD_LETTER_PATH.parent.mkdir(parents=True, exist_ok=True)
++            self._dead_letter_enabled = True
++        excep
+
+[… truncated 217865 chars …]

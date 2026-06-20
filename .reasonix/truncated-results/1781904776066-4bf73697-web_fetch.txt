@@ -1,0 +1,749 @@
+Tavily 接入指南：让 AI Agent 拥有实时联网能力 · Lixx Blog
+https://lixx.cn/posts/tech/tavily-integration-guide/
+
+<!doctype html>Tavily 接入指南：让 AI Agent 拥有实时联网能力 · Lixx Blog
+
+Tavily 接入指南：让 AI Agent 拥有实时联网能力
+
+2026-05-09
+
+6 分钟
+
+-
+
+Lixx
+•
+GLM-5.1
+
+技术
+
+AI
+•
+Tavily
+•
+AI Agent
+•
+MCP
+•
+CLI
+•
+搜索引擎
+
+目录
+
+本文基于 Tavily 官方文档 整理，涵盖四种接入方式的原理、配置与实战示例，帮助你快速选择最适合自己场景的集成方案。
+
+Tavily 是什么
+
+链接到标题
+
+Tavily 是一个专为 AI Agent 和 LLM 优化的搜索引擎 API。与 Google、Bing 等传统搜索 API 不同，Tavily 不仅仅是返回一串 URL 和摘要——它在一次 API 调用中完成搜索、抓取、过滤、提取和排序，直接把最相关的结构化内容喂给你的模型。
+
+核心能力：
+
+能力说明
+
+SearchAI 优化的网页搜索，支持深度、领域、时间范围等精细控制
+
+Extract从 URL 提取干净的 Markdown/文本，支持 JS 渲染页面
+
+Crawl批量爬取网站多页面内容，支持语义过滤和路径筛选
+
+Map发现网站所有 URL，不提取内容，用于构建站点地图
+
+ResearchAI 驱动的深度研究，自动搜索、分析、生成带引用的报告
+
+免费额度： 每月 1,000 API Credits，无需信用卡。注册即用。
+
+四种接入方式概览
+
+链接到标题
+
+Tavily 提供了四种接入方式，覆盖从「终端命令行」到「AI 编程助手」到「自定义 Agent」的全部场景：
+
+方式适合谁复杂度灵活度
+
+Tavily CLI终端用户、脚本、CI/CD★☆☆★★☆
+
+Agent SkillsClaude Code / Cursor 等用户★☆☆★★★
+
+MCP ServerClaude Desktop / Cursor / OpenAI★★☆★★★
+
+API / SDK后端开发者、自建 Agent★★★★★★
+
+下面逐一讲解。
+
+方式一：Tavily CLI —— 命令行直连
+
+链接到标题
+
+tvly 是 Tavily 的命令行工具，一条命令即可搜索、提取、爬取、研究。所有命令支持 --json 输出，方便接入脚本和管道。
+
+安装
+
+链接到标题
+
+<code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span></code><code class=language-bash data-lang=bash><span class=line><span class=cl>curl -fsSL https://cli.tavily.com/install.sh <span class=p>|</span> bash
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1># 或用 pip / uv</span>
+</span></span><span class=line><span class=cl>pip install tavily-cli
+</span></span><span class=line><span class=cl><span class=c1># uv tool install tavily-cli</span>
+</span></span></code>
+
+认证
+
+链接到标题
+
+<code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span></code><code class=language-bash data-lang=bash><span class=line><span class=cl><span class=c1># 方式一：API Key 登录（推荐）</span>
+</span></span><span class=line><span class=cl>tvly login --api-key tvly-YOUR_API_KEY
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1># 方式二：浏览器 OAuth</span>
+</span></span><span class=line><span class=cl>tvly login
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1># 方式三：环境变量</span>
+</span></span><span class=line><span class=cl><span class=nb>export</span> <span class=nv>TAVILY_API_KEY</span><span class=o>=</span>tvly-YOUR_API_KEY
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1># 验证状态</span>
+</span></span><span class=line><span class=cl>tvly auth
+</span></span></code>
+
+常用命令速查
+
+链接到标题
+
+搜索：
+
+<code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span></code><code class=language-bash data-lang=bash><span class=line><span class=cl><span class=c1># 基础搜索</span>
+</span></span><span class=line><span class=cl>tvly search <span class=s2>"AI 编程助手 2025"</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1># 高级搜索 + AI 生成答案</span>
+</span></span><span class=line><span class=cl>tvly search <span class=s2>"transformer 架构原理"</span> --depth advanced --include-answer advanced
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1># 限定领域 + 时间范围</span>
+</span></span><span class=line><span class=cl>tvly search <span class=s2>"Python 异步编程"</span> --include-domains docs.python.org --time-range month
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1># 新闻搜索</span>
+</span></span><span class=line><span class=cl>tvly search <span class=s2>"AI 监管"</span> --topic news --time-range week
+</span></span></code>
+
+提取网页内容：
+
+<code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span></code><code class=language-bash data-lang=bash><span class=line><span class=cl><span class=c1># 单个 URL</span>
+</span></span><span class=line><span class=cl>tvly extract <span class=s2>"https://example.com/article"</span> --json
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1># 多个 URL（最多 20 个）</span>
+</span></span><span class=line><span class=cl>tvly extract <span class=s2>"https://a.com/p1"</span> <span class=s2>"https://b.com/p2"</span> --json
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1># JS 渲染页面</span>
+</span></span><span class=line><span class=cl>tvly extract <span class=s2>"https://spa-site.com"</span> --extract-depth advanced --json
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1># 按查询相关性过滤</span>
+</span></span><span class=line><span class=cl>tvly extract <span class=s2>"https://docs.python.org/3/"</span> --query <span class=s2>"list comprehension"</span> --chunks-per-source <span class=m>3</span>
+</span></span></code>
+
+爬取整站：
+
+<code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span><span class=lnt>6
+</span><span class=lnt>7
+</span><span class=lnt>8
+</span></code><code class=language-bash data-lang=bash><span class=line><span class=cl><span class=c1># 爬取文档站</span>
+</span></span><span class=line><span class=cl>tvly crawl <span class=s2>"https://docs.example.com"</span> --max-depth <span class=m>2</span> --limit <span class=m>50</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1># 按路径过滤 + 保存为本地 Markdown</span>
+</span></span><span class=line><span class=cl>tvly crawl <span class=s2>"https://example.com"</span> --select-paths <span class=s2>"/api/.*"</span> --output-dir ./api-docs/
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1># 语义引导爬取</span>
+</span></span><span class=line><span class=cl>tvly crawl <span class=s2>"https://docs.example.com"</span> --instructions <span class=s2>"只关注认证相关的页面"</span>
+</span></span></code>
+
+站点地图发现：
+
+<code><span class=lnt>1
+</span></code><code class=language-bash data-lang=bash><span class=line><span class=cl>tvly map <span class=s2>"https://docs.example.com"</span> --max-depth <span class=m>3</span> --limit <span class=m>200</span>
+</span></span></code>
+
+深度研究：
+
+<code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span><span class=lnt>6
+</span><span class=lnt>7
+</span><span class=lnt>8
+</span></code><code class=language-bash data-lang=bash><span class=line><span class=cl><span class=c1># 快速研究</span>
+</span></span><span class=line><span class=cl>tvly research <span class=s2>"React vs Vue 2025 技术选型对比"</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1># 专业模式 + 实时流式输出</span>
+</span></span><span class=line><span class=cl>tvly research <span class=s2>"AI 对医疗行业的影响"</span> --model pro --stream
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1># 保存报告（带引用格式）</span>
+</span></span><span class=line><span class=cl>tvly research <span class=s2>"远程办公对生产力的影响"</span> --citation-format apa -o report.md
+</span></span></code>
+
+交互模式：
+
+<code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span></code><code class=language-bash data-lang=bash><span class=line><span class=cl>tvly <span class=c1># 进入 REPL</span>
+</span></span><span class=line><span class=cl><span class=c1># > search "最新 AI 新闻"</span>
+</span></span><span class=line><span class=cl><span class=c1># > extract https://example.com</span>
+</span></span><span class=line><span class=cl><span class=c1># > exit</span>
+</span></span></code>
+
+小贴士
+
+链接到标题
+
+所有命令加 --json 可获得机器可读输出，方便 jq 管道处理
+
+人类可读信息输出到 stderr，JSON 数据输出到 stdout，互不干扰
+
+退出码：0 成功，2 参数错误，3 认证失败，4 API 错误
+
+方式二：Agent Skills —— AI 编程助手一键接入
+
+链接到标题
+
+如果你使用 Claude Code、OpenCode、Cursor、Cline、Windsurf 等 AI 编程助手，Agent Skills 是最省心的接入方式。安装后，AI 会自动判断何时调用 Tavily，无需手动配置。
+
+安装
+
+链接到标题
+
+<code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span><span class=lnt>6
+</span><span class=lnt>7
+</span><span class=lnt>8
+</span></code><code class=language-bash data-lang=bash><span class=line><span class=cl><span class=c1># 第一步：安装 Tavily CLI（Skills 的底层引擎）</span>
+</span></span><span class=line><span class=cl>curl -fsSL https://cli.tavily.com/install.sh <span class=p>|</span> bash
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1># 第二步：安装所有 Skills</span>
+</span></span><span class=line><span class=cl>npx skills add tavily-ai/skills --all
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1># 或只安装单个 Skill</span>
+</span></span><span class=line><span class=cl>npx skills add tavily-ai/skills --skill tavily-search
+</span></span></code>
+
+安装后重启你的 AI 编程助手即可。
+
+安装范围：项目级 vs 全局
+
+链接到标题
+
+npx skills add 的安装位置取决于你的工作目录：
+
+<code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span></code><code class=language-bash data-lang=bash><span class=line><span class=cl><span class=c1># 在项目目录下安装 → 仅该项目生效（写入 .agents/skills/）</span>
+</span></span><span class=line><span class=cl><span class=nb>cd</span> /your/project <span class=o>&&</span> npx skills add tavily-ai/skills --all
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1># 加 -g 参数 → 全局安装（写入 ~/.agents/skills/），所有项目生效</span>
+</span></span><span class=line><span class=cl>npx skills add tavily-ai/skills --all -g
+</span></span></code>
+
+目录对应关系：
+
+安装方式文件位置作用范围
+
+项目级（默认）<project>/.agents/skills/仅当前项目
+
+全局（-g）~/.agents/skills/所有项目
+
+查看当前安装情况：
+
+<code><span class=lnt>1
+</span><span class=lnt>2
+</span></code><code class=language-bash data-lang=bash><span class=line><span class=cl>npx skills list <span class=c1># 查看项目级 Skills</span>
+</span></span><span class=line><span class=cl>npx skills list -g <span class=c1># 查看全局 Skills</span>
+</span></span></code>
+
+如果之前在项目目录安装了 Skills，想改为全局可用，可以手动移动：
+
+<code><span class=lnt>1
+</span></code><code class=language-bash data-lang=bash><span class=line><span class=cl>mv /your/project/.agents/skills/tavily-* ~/.agents/skills/
+</span></span></code>
+
+也可以在 ~ 目录下直接执行安装命令，效果等同于 -g。
+
+更新 Skills
+
+链接到标题
+
+Skills 支持更新，当上游仓库发布新版本时，可以一键升级：
+
+<code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span></code><code class=language-bash data-lang=bash><span class=line><span class=cl><span class=c1># 更新所有 Skills（会提示选择更新项目级还是全局）</span>
+</span></span><span class=line><span class=cl>npx skills update
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1># 仅更新项目级</span>
+</span></span><span class=line><span class=cl>npx skills update -p
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1># 仅更新全局</span>
+</span></span><span class=line><span class=cl>npx skills update -g
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1># 更新指定 Skill</span>
+</span></span><span class=line><span class=cl>npx skills update tavily-search
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1># 跳过确认提示，自动检测范围</span>
+</span></span><span class=line><span class=cl>npx skills update -y
+</span></span></code>
+
+更新机制会从 GitHub 源仓库拉取最新的 SKILL.md 文件覆盖本地版本，同时更新 skills-lock.json 中的哈希值。
+
+卸载 Skills
+
+链接到标题
+
+<code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span><span class=lnt>6
+</span><span class=lnt>7
+</span><span class=lnt>8
+</span></code><code class=language-bash data-lang=bash><span class=line><span class=cl><span class=c1># 交互式选择要卸载的 Skills</span>
+</span></span><span class=line><span class=cl>npx skills remove
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1># 卸载指定 Skill</span>
+</span></span><span class=line><span class=cl>npx skills remove tavily-search
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1># 从全局范围卸载</span>
+</span></span><span class=line><span class=cl>npx skills remove tavily-search -g
+</span></span></code>
+
+可用 Skills 一览
+
+链接到标题
+
+Skill功能触发场景
+
+tavily-search网页搜索&ldquo;搜索最新的 AI 监管新闻&rdquo;
+
+tavily-extractURL 内容提取&ldquo;提取这篇文章的内容&rdquo;
+
+tavily-crawl站点批量爬取&ldquo;爬取 Stripe API 文档&rdquo;
+
+tavily-mapURL 发现&ldquo;列出这个站点的所有页面&rdquo;
+
+tavily-research深度研究报告&ldquo;研究 AI Agent 框架的竞争格局&rdquo;
+
+tavily-best-practices最佳实践参考&ldquo;/tavily-best-practices&rdquo;
+
+使用方式
+
+链接到标题
+
+自动触发 —— 直接用自然语言描述需求，AI 自动选择合适的 Skill：
+
+<code><span class=lnt>1
+</span></code><code class=language-md data-lang=md><span class=line><span class=cl>搜索最新的 AI 监管新闻
+</span></span></code>
+
+<code><span class=lnt>1
+</span></code><code class=language-md data-lang=md><span class=line><span class=cl>爬取 Stripe API 文档并保存到本地
+</span></span></code>
+
+<code><span class=lnt>1
+</span></code><code class=language-md data-lang=md><span class=line><span class=cl>研究 AI 编程助手的竞争格局
+</span></span></code>
+
+显式调用 —— 使用斜杠命令精确控制：
+
+<code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span></code><code class=language-sh data-lang=sh><span class=line><span class=cl>/tavily-search React 最佳实践
+</span></span><span class=line><span class=cl>/tavily-extract https://example.com/blog/post
+</span></span><span class=line><span class=cl>/tavily-crawl https://docs.example.com
+</span></span><span class=line><span class=cl>/tavily-research AI Agent 框架对比 -o report.json
+</span></span></code>
+
+高效工作流：Map → Extract
+
+链接到标题
+
+<code><span class=lnt>1
+</span><span class=lnt>2
+</span></code><code class=language-md data-lang=md><span class=line><span class=cl>先 /tavily-map 发现站点结构，找到目标页面 URL
+</span></span><span class=line><span class=cl>再 /tavily-extract 提取特定页面内容
+</span></span></code>
+
+这比爬取整个站点更高效。
+
+方式三：MCP Server —— 模型上下文协议接入
+
+链接到标题
+
+MCP（Model Context Protocol）是 Anthropic 制定的开放标准，让 AI 系统能与外部数据源和工具双向通信。Tavily MCP Server 让任何 MCP 客户端直接使用 Tavily 的搜索和提取能力。
+
+远程 MCP（推荐，零安装）
+
+链接到标题
+
+最简单的方式，只需一个 URL：
+
+<code><span class=lnt>1
+</span></code><code class=language-sh data-lang=sh><span class=line><span class=cl>https://mcp.tavily.com/mcp/?tavilyApiKey<span class=o>=</span><your-api-key>
+</span></span></code>
+
+接入 Cursor
+
+链接到标题
+
+在 mcp.json 中添加：
+
+<code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span><span class=lnt>6
+</span><span class=lnt>7
+</span><span class=lnt>8
+</span></code><code class=language-json data-lang=json><span class=line><span class=cl><span class=p>{</span>
+</span></span><span class=line><span class=cl> <span class=nt>"mcpServers"</span><span class=p>:</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl> <span class=nt>"tavily-remote-mcp"</span><span class=p>:</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl> <span class=nt>"command"</span><span class=p>:</span> <span class=s2>"npx -y mcp-remote https://mcp.tavily.com/mcp/?tavilyApiKey=<your-api-key>"</span><span class=p>,</span>
+</span></span><span class=line><span class=cl> <span class=nt>"env"</span><span class=p>:</span> <span class=p>{}</span>
+</span></span><span class=line><span class=cl> <span class=p>}</span>
+</span></span><span class=line><span class=cl> <span class=p>}</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span></code>
+
+接入 Claude Desktop
+
+链接到标题
+
+打开 Claude Desktop → 点击双滑块按钮 → 添加集成 → 输入远程 MCP URL → 确认。
+
+接入 Claude Code
+
+链接到标题
+
+<code><span class=lnt>1
+</span></code><code class=language-bash data-lang=bash><span class=line><span class=cl>claude mcp add tavily-remote-mcp --transport http https://mcp.tavily.com/mcp/
+</span></span></code>
+
+首次使用时会打开浏览器完成 OAuth 授权，无需在 URL 中放 API Key。
+
+或手动配置 .claude/settings.json：
+
+<code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span><span class=lnt>6
+</span><span class=lnt>7
+</span><span class=lnt>8
+</span></code><code class=language-json data-lang=json><span class=line><span class=cl><span class=p>{</span>
+</span></span><span class=line><span class=cl> <span class=nt>"mcpServers"</span><span class=p>:</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl> <span class=nt>"tavily-remote-mcp"</span><span class=p>:</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl> <span class=nt>"type"</span><span class=p>:</span> <span class=s2>"http"</span><span class=p>,</span>
+</span></span><span class=line><span class=cl> <span class=nt>"url"</span><span class=p>:</span> <span class=s2>"https://mcp.tavily.com/mcp/"</span>
+</span></span><span class=line><span class=cl> <span class=p>}</span>
+</span></span><span class=line><span class=cl> <span class=p>}</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span></code>
+
+接入 OpenAI
+
+链接到标题
+
+<code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span></code><code class=language-python data-lang=python><span class=line><span class=cl><span class=kn>from</span> <span class=nn>openai</span> <span class=kn>import</span> <span class=n>OpenAI</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=n>client</span> <span class=o>=</span> <span class=n>OpenAI</span><span class=p>()</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=n>resp</span> <span class=o>=</span> <span class=n>client</span><span class=o>.</span><span class=n>responses</span><span class=o>.</span><span class=n>create</span><span class=p>(</span>
+</span></span><span class=line><span class=cl> <span class=n>model</span><span class=o>=</span><span class=s2>"gpt-4.1"</span><span class=p>,</span>
+</span></span><span class=line><span class=cl> <span class=n>tools</span><span class=o>=</span><span class=p>[</span>
+</span></span><span class=line><span class=cl> <span class=p>{</span>
+</span></span><span class=line><span class=cl> <span class=s2>"type"</span><span class=p>:</span> <span class=s2>"mcp"</span><span class=p>,</span>
+</span></span><span class=line><span class=cl> <span class=s2>"server_label"</span><span class=p>:</span> <span class=s2>"tavily"</span><span class=p>,</span>
+</span></span><span class=line><span class=cl> <span class=s2>"server_url"</span><span class=p>:</span> <span class=s2>"https://mcp.tavily.com/mcp/?tavilyApiKey=<your-api-key>"</span><span class=p>,</span>
+</span></span><span class=line><span class=cl> <span class=s2>"require_approval"</span><span class=p>:</span> <span class=s2>"never"</span><span class=p>,</span>
+</span></span><span class=line><span class=cl> <span class=p>},</span>
+</span></span><span class=line><span class=cl> <span class=p>],</span>
+</span></span><span class=line><span class=cl> <span class=nb>input</span><span class=o>=</span><span class=s2>"搜索最新的量子计算进展"</span><span class=p>,</span>
+</span></span><span class=line><span class=cl><span class=p>)</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=nb>print</span><span class=p>(</span><span class=n>resp</span><span class=o>.</span><span class=n>output_text</span><span class=p>)</span>
+</span></span></code>
+
+设置默认参数
+
+链接到标题
+
+通过 DEFAULT_PARAMETERS 头部或环境变量预设默认行为：
+
+<code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span></code><code class=language-json data-lang=json><span class=line><span class=cl><span class=p>{</span>
+</span></span><span class=line><span class=cl> <span class=nt>"include_images"</span><span class=p>:</span> <span class=kc>true</span><span class=p>,</span>
+</span></span><span class=line><span class=cl> <span class=nt>"search_depth"</span><span class=p>:</span> <span class=s2>"advanced"</span><span class=p>,</span>
+</span></span><span class=line><span class=cl> <span class=nt>"max_results"</span><span class=p>:</span> <span class=mi>10</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span></code>
+
+本地 MCP
+
+链接到标题
+
+需要 Node.js v20+：
+
+<code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span></code><code class=language-json data-lang=json><span class=line><span class=cl><span class=p>{</span>
+</span></span><span class=line><span class=cl> <span class=nt>"mcpServers"</span><span class=p>:</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl> <span class=nt>"tavily-mcp"</span><span class=p>:</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl> <span class=nt>"command"</span><span class=p>:</span> <span class=s2>"npx"</span><span class=p>,</span>
+</span></span><span class=line><span class=cl> <span class=nt>"args"</span><span class=p>:</span> <span class=p>[</span><span class=s2>"-y"</span><span class=p>,</span> <span class=s2>"tavily-mcp@0.1.3"</span><span class=p>],</span>
+</span></span><span class=line><span class=cl> <span class=nt>"env"</span><span class=p>:</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl> <span class=nt>"TAVILY_API_KEY"</span><span class=p>:</span> <span class=s2>"tvly-YOUR_API_KEY"</span><span class=p>,</span>
+</span></span><span class=line><span class=cl> <span class=nt>"DEFAULT_PARAMETERS"</span><span class=p>:</span> <span class=s2>"{\"search_depth\": \"advanced\", \"max_results\": 15}"</span>
+</span></span><span class=line><span class=cl> <span class=p>}</span>
+</span></span><span class=line><span class=cl> <span class=p>}</span>
+</span></span><span class=line><span class=cl> <span class=p>}</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span></code>
+
+OAuth 认证
+
+链接到标题
+
+远程 MCP 支持 OAuth 认证，无需在 URL 中暴露 API Key。使用 mcp_auth_default 命名的 Key 可控制 OAuth 场景下使用哪个 API Key（个人 Key 优先于团队 Key）。
+
+清除 OAuth 凭证重新认证：
+
+<code><span class=lnt>1
+</span></code><code class=language-bash data-lang=bash><span class=line><span class=cl>rm -rf ~/.mcp-auth
+</span></span></code>
+
+方式四：API / SDK —— 自定义集成
+
+链接到标题
+
+适合后端开发者和自建 Agent 场景。Tavily 提供了 Python SDK、JavaScript SDK 和 REST API。
+
+Python 示例：
+
+<code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span><span class=lnt>6
+</span><span class=lnt>7
+</span><span class=lnt>8
+</span><span class=lnt>9
+</span></code><code class=language-python data-lang=python><span class=line><span class=cl><span class=kn>from</span> <span class=nn>tavily_python</span> <span class=kn>import</span> <span class=n>TavilyClient</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=n>client</span> <span class=o>=</span> <span class=n>TavilyClient</span><span class=p>(</span><span class=n>api_key</span><span class=o>=</span><span class=s2>"tvly-YOUR_API_KEY"</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1># 搜索</span>
+</span></span><span class=line><span class=cl><span class=n>results</span> <span class=o>=</span> <span class=n>client</span><span class=o>.</span><span class=n>search</span><span class=p>(</span><span class=s2>"AI agent frameworks"</span><span class=p>,</span> <span class=n>max_results</span><span class=o>=</span><span class=mi>5</span><span class=p>,</span> <span class=n>search_depth</span><span class=o>=</span><span class=s2>"advanced"</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1># 提取</span>
+</span></span><span class=line><span class=cl><span class=n>extracted</span> <span class=o>=</span> <span class=n>client</span><span class=o>.</span><span class=n>extract</span><span class=p>([</span><span class=s2>"https://example.com/article"</span><span class=p>])</span>
+</span></span></code>
+
+JavaScript 示例：
+
+<code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span><span class=lnt>6
+</span><span class=lnt>7
+</span><span class=lnt>8
+</span></code><code class=language-javascript data-lang=javascript><span class=line><span class=cl><span class=kr>import</span> <span class=p>{</span> <span class=nx>tavily</span> <span class=p>}</span> <span class=nx>from</span> <span class=s2>"@tavily/core"</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=kr>const</span> <span class=nx>client</span> <span class=o>=</span> <span class=nx>tavily</span><span class=p>({</span> <span class=nx>apiKey</span><span class=o>:</span> <span class=s2>"tvly-YOUR_API_KEY"</span> <span class=p>});</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=kr>const</span> <span class=nx>results</span> <span class=o>=</span> <span class=kr>await</span> <span class=nx>client</span><span class=p>.</span><span class=nx>search</span><span class=p>(</span><span class=s2>"AI agent frameworks"</span><span class=p>,</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl> <span class=nx>maxResults</span><span class=o>:</span> <span class=mi>5</span><span class=p>,</span>
+</span></span><span class=line><span class=cl> <span class=nx>searchDepth</span><span class=o>:</span> <span class=s2>"advanced"</span><span class=p>,</span>
+</span></span><span class=line><span class=cl><span class=p>});</span>
+</span></span></code>
+
+Tavily 还与 LangChain、LlamaIndex、Vercel AI SDK、CrewAI、Dify、n8n 等 20+ 框架和平台有官方集成。
+
+如何选择
+
+链接到标题
+
+<code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span></code><code class=language-md data-lang=md><span class=line><span class=cl>你用什么工具？
+</span></span><span class=line><span class=cl>│
+</span></span><span class=line><span class=cl>├─ 终端 / 脚本 ────────→ Tavily CLI
+</span></span><span class=line><span class=cl>│
+</span></span><span class=line><span class=cl>├─ Claude Code / Cursor ─→ Agent Skills（自动生效）
+</span></span><span class=line><span class=cl>│
+</span></span><span class=line><span class=cl>├─ Claude Desktop ──────→ MCP Server（远程）
+</span></span><span class=line><span class=cl>│
+</span></span><span class=line><span class=cl>├─ 自建 Agent / 后端 ───→ API / SDK
+</span></span><span class=line><span class=cl>│
+</span></span><span class=line><span class=cl>└─ 其他 MCP 客户端 ─────→ MCP Server（远程或本地）
+</span></span></code>
+
+你的场景推荐方式理由
+
+快速搜索、脚本自动化CLI最轻量，一行命令搞定
+
+日常 AI 编程、让 AI 自动联网Skills零配置，AI 自动判断何时调用
+
+Claude Desktop / Cursor 深度集成MCP原生协议支持，双向通信
+
+生产级 Agent、RAG 系统API/SDK完全控制，灵活定制
+
+常见问题
+
+链接到标题
+
+Q: 免费额度够用吗？
+每月 1,000 Credits。一次基础搜索约 1 Credit，高级搜索约 2 Credits，提取约 1 Credit。轻度使用完全够，生产环境可升级付费计划。
+
+Q: CLI 和 Skills 是什么关系？
+Skills 底层调用的是 CLI（tvly 命令）。Skills 安装后会在 AI 编程助手中注册指令，AI 根据上下文自动选择合适的 CLI 命令执行。
+
+Q: MCP 和 Skills 有什么区别？
+MCP 是标准协议，任何 MCP 客户端都能用；Skills 是专为 AI 编程助手（Claude Code、Cursor 等）设计的，通过 CLI 工作。如果你同时用 Cursor 和 Claude Desktop，可以 MCP + Skills 同时安装。
+
+Q: 支持中文搜索吗？
+完全支持。搜索结果取决于互联网上的内容，中文查询会返回中文结果。
+
+Q: API Key 在哪里获取？
+app.tavily.com 免费注册，在 Dashboard 中即可看到 API Key。
+
+Q: Skills 装在项目目录下还是全局？有什么区别？
+默认装在当前项目目录的 .agents/skills/ 下，仅在该项目生效。加 -g 参数或在 ~ 目录下安装则全局生效。全局安装后所有项目都能使用这些 Skills。
+
+Q: Skills 怎么更新？能更新吗？
+可以。npx skills update 一键更新所有 Skills，npx skills update -g 更新全局的，npx skills update <skill-name> 更新单个。更新会从 GitHub 拉取最新版本并覆盖本地文件。
+
+参考链接
+
+链接到标题
+
+官方文档：docs.tavily.com
+
+API Key 注册：app.tavily.com
+
+MCP Server GitHub：github.com/tavily-ai/tavily-mcp
+
+Agent Skills GitHub：github.com/tavily-ai/skills
+
+CLI PyPI：pypi.org/project/tavily-cli
+
+API Playground：app.tavily.com/playground

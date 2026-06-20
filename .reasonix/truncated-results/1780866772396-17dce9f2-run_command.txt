@@ -1,0 +1,775 @@
+$ git diff -- src/reasoner/api/__init__.py src/reasoner/api/auth_deps.py src/reasoner/api/middleware.py src/reasoner/api/routes/context.py src/reasoner/api/sse_utils.py src/reasoner/api/streaming.py src/reasoner/circuit_breaker.py src/reasoner/exceptions.py src/reasoner/clients.py src/reasoner/core/settings.py src/reasoner/core/search.py src/reasoner/core/events/__init__.py src/reasoner/gate_agent.py src/reasoner/infrastructure/llm/executor.py src/reasoner/infrastructure/llm/router.py src/reasoner/infrastructure/persistence/postgres_store.py src/reasoner/infrastructure/redis/client.py
+[exit 0]
+warning: in the working copy of 'src/reasoner/api/auth_deps.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/reasoner/api/middleware.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/reasoner/api/sse_utils.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/reasoner/infrastructure/llm/router.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/reasoner/infrastructure/persistence/postgres_store.py', LF will be replaced by CRLF the next time Git touches it
+diff --git a/src/reasoner/api/__init__.py b/src/reasoner/api/__init__.py
+index 0f2dd9e..a433a40 100644
+--- a/src/reasoner/api/__init__.py
++++ b/src/reasoner/api/__init__.py
+@@ -122,9 +122,20 @@ async def lifespan(app: FastAPI):
+     # Background task: update active users gauge (Critical Enhancement 7.3)
+     _active_users_task = asyncio.create_task(_update_active_users_loop())
+ 
++    # Background task: token cache eviction (B-18 fix)
++    from reasoner.infrastructure.token_cache import get_token_cache
++    _token_cache = get_token_cache()
++    _cache_cleanup_task = await _token_cache.start_background_cleanup(interval_seconds=300)
++
+     yield
+ 
+-    # Cancel background task on shutdown
++    # Cancel background tasks on shutdown (reverse order)
++    _cache_cleanup_task.cancel()
++    try:
++        await _cache_cleanup_task
++    except asyncio.CancelledError:
++        pass
++
+     _active_users_task.cancel()
+     try:
+         await _active_users_task
+@@ -367,7 +378,8 @@ async def get_csrf_token():
+ 
+ 
+ async def _run_stream_with_metrics(
+-    req: RunRequest, 
++    req: RunRequest,
++    request: Request,
+     user: User | None,
+     preset_service: PresetService,
+     pipeline_service: PipelineService,
+@@ -391,7 +403,8 @@ async def _run_stream_with_metrics(
+     has_error = False
+     try:
+         async for chunk in run_stream_cached(
+-            req, 
++            req,
++            request=request,
+             user_id=str(user.id) if user else None,
+             preset_service=preset_service,
+             pipeline_service=pipeline_service,
+@@ -451,7 +464,7 @@ async def run_pipeline(
+             )
+     # TODO(#502): use actual user tier from subscription DB
+     return StreamingResponse(
+-        _run_stream_with_metrics(req, user, preset_service, pipeline_service),
++        _run_stream_with_metrics(req, request, user, preset_service, pipeline_service),
+         media_type="text/event-stream",
+         headers={
+             "Cache-Control": "no-cache",
+@@ -475,7 +488,7 @@ async def run_followup_pipeline(
+     """
+     _require_auth_if_legacy_disabled(user)
+     return StreamingResponse(
+-        run_followup_stream(req, user_id=str(user.id) if user else None),
++        run_followup_stream(req, request=request, user_id=str(user.id) if user else None),
+         media_type="text/event-stream",
+         headers={
+             "Cache-Control": "no-cache",
+diff --git a/src/reasoner/api/auth_deps.py b/src/reasoner/api/auth_deps.py
+index e3a1d00..17dd092 100644
+--- a/src/reasoner/api/auth_deps.py
++++ b/src/reasoner/api/auth_deps.py
+@@ -11,12 +11,13 @@ from fastapi import Depends, HTTPException, Request, Security
+ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+ 
+ from reasoner.auth import AuthenticationError, get_auth_manager
++from reasoner.infrastructure.auth_legacy import AuthManager
+ from reasoner.api.client_ip import get_client_ip
+ from reasoner.api.csrf import verify_csrf_token
+ 
+ logger = logging.getLogger(__name__)
+ from reasoner.core.settings import settings
+-from reasoner.rate_limiter import RateLimitConfig, get_rate_limiter
++from reasoner.rate_limiter import RateLimitConfig, RateLimiter, get_rate_limiter
+ from reasoner.exceptions import RateLimitError
+ 
+ # ── Rate Limiter Singleton (for auth_deps) ──
+diff --git a/src/reasoner/api/middleware.py b/src/reasoner/api/middleware.py
+index a8c0d80..72ab171 100644
+--- a/src/reasoner/api/middleware.py
++++ b/src/reasoner/api/middleware.py
+@@ -90,16 +90,19 @@ class AuditMiddleware(BaseHTTPMiddleware):
+         response = await call_next(request)
+ 
+         if request.method in ("POST", "DELETE", "PUT", "PATCH"):
+-            user = getattr(request.state, "user", None)
+-            path = _sanitize_url_for_audit(request.url.path, request.url.query)
+-            logger.info(
+-                "audit: method=%s path=%s user=%s status=%d ip=%s",
+-                request.method,
+-                path,
+-                str(user.id) if user else None,
+-                response.status_code,
+-                _anonymize_ip(request.client.host if request.client else None),
+-            )
++            try:
++                user = getattr(request.state, "user", None)
++                path = _sanitize_url_for_audit(request.url.path, request.url.query)
++                logger.info(
++                    "audit: method=%s path=%s user=%s status=%d ip=%s",
++                    request.method,
++                    path,
++                    str(user.id) if user else None,
++                    response.status_code,
++                    _anonymize_ip(request.client.host if request.client else None),
++                )
++            except Exception as exc:
++                logger.error("Audit logging failed: %s", exc)
+ 
+         return response
+ 
+@@ -118,6 +121,7 @@ class MemoryLimitMiddleware(BaseHTTPMiddleware):
+         self.memory_limit_mb = memory_limit_mb
+         self.warning_mb = warning_mb
+         self._warning_logged = False
++        self._lock = asyncio.Lock()
+ 
+     async def dispatch(self, request: Request, call_next):
+         try:
+@@ -135,13 +139,14 @@ class MemoryLimitMiddleware(BaseHTTPMiddleware):
+                     status_code=503,
+                 )
+ 
+-            if memory_mb > self.warning_mb and not self._warning_logged:
+-                logger.warning(
+-                    f"Memory usage high: {memory_mb:.1f}MB (limit: {self.memory_limit_mb}MB)"
+-                )
+-                self._warning_logged = True
+-            elif memory_mb < self.warning_mb * 0.8:
+-                self._warning_logged = False
++            async with self._lock:
++                if memory_mb > self.warning_mb and not self._warning_logged:
++                    logger.warning(
++                        f"Memory usage high: {memory_mb:.1f}MB (limit: {self.memory_limit_mb}MB)"
++                    )
++                    self._warning_logged = True
++                elif memory_mb < self.warning_mb * 0.8:
++                    self._warning_logged = False
+ 
+         except ImportError:
+             pass
+diff --git a/src/reasoner/api/routes/context.py b/src/reasoner/api/routes/context.py
+index 4a1cdbb..b6088bb 100644
+--- a/src/reasoner/api/routes/context.py
++++ b/src/reasoner/api/routes/context.py
+@@ -15,7 +15,6 @@ from reasoner.api.dependencies import (
+ from reasoner.api.schemas import ContextAnalysisRequest
+ from reasoner.domain.saas import User
+ from reasoner.domain.pipeline_state import PipelineState
+-from reasoner.pipeline import ReasonerPipeline
+ 
+ logger = logging.getLogger(__name__)
+ router = APIRouter()
+@@ -53,19 +52,32 @@ async def run_with_context(
+ 
+     try:
+         from reasoner.application.services.preset_service import PresetService
++        from reasoner.application.services.pipeline_service import PipelineService
++        from reasoner.application.orchestrator import PipelineOrchestrator
+ 
+         _preset_service = PresetService()
++        _orchestrator = PipelineOrchestrator(
++            preset_service=_preset_service,
++            pipeline_service=PipelineService(),
++        )
++
++        # Resolve preset and build router via orchestrator
++        effective_preset, _router = _preset_service.build_router(req.preset)
+ 
+-        # Get preset and build router
+-        _, router = _preset_service.build_router(req.preset)
++        from reasoner.application.orchestrator import PreflightDecision
++        _decision = PreflightDecision(
++            action="pipeline",
++            router=_router,
++            effective_preset_name=effective_preset,
++            problem=req.problem,
++        )
+ 
+-        # Create pipeline
+-        pipeline = ReasonerPipeline(
+-            router=router,
++        # Create pipeline via orchestrator (removes direct ReasonerPipeline import)
++        pipeline = _orchestrator.create_pipeline(
++            _decision,
+             top_k=req.top_k,
+             parallel_perspectives=True,
+             verbose=False,
+-            preset_name=req.preset,
+             domain=req.domain if hasattr(req, "domain") else None,
+         )
+ 
+diff --git a/src/reasoner/api/sse_utils.py b/src/reasoner/api/sse_utils.py
+index 5eabb26..a991ad2 100644
+--- a/src/reasoner/api/sse_utils.py
++++ b/src/reasoner/api/sse_utils.py
+@@ -36,7 +36,12 @@ async def _broadcast_ws(run_id: str, payload: dict[str, Any]) -> None:
+     try:
+         from reasoner.infrastructure.websocket import get_websocket_manager
+         manager = get_websocket_manager()
+-        asyncio.create_task(manager.broadcast_event(payload, run_id))
++        task = asyncio.create_task(manager.broadcast_event(payload, run_id))
++        task.add_done_callback(
++            lambda t: logger.warning("WS broadcast failed for run %s: %s", run_id, t.exception())
++            if not t.cancelled() and t.exception()
++            else None
++        )
+     except Exception:
+         logger.warning("WS broadcast failed for run %s", run_id, exc_info=True)
+ 
+diff --git a/src/reasoner/api/streaming.py b/src/reasoner/api/streaming.py
+index d23b9f2..65b7c1d 100644
+--- a/src/reasoner/api/streaming.py
++++ b/src/reasoner/api/streaming.py
+@@ -305,6 +305,7 @@ async def run_stream(
+     user_id: str | None = None,
+     preset_service: PresetService | None = None,
+     pipeline_service: PipelineService | None = None,
++    request=None,
+ ) -> AsyncGenerator[str, None]:
+     if preset_service is None:
+         preset_service = PresetService()
+@@ -317,6 +318,15 @@ async def run_stream(
+     state: PipelineState | None = None
+     cancel_event = await _run_store.add(run_id, user_id=user_id)
+     _save_pipeline_owner(run_id, user_id)
++
++    # Track per-run WS broadcast tasks so they can be cancelled on disconnect (B-13)
++    _run_tasks: set[asyncio.Task] = set()
++
++    def _tracked_broadcast(run_id: str, payload: dict) -> None:
++        task = asyncio.create_task(_broadcast_ws(run_id, payload))
++        _run_tasks.add(task)
++        task.add_done_callback(_run_tasks.discard)
++
+     # Yield a "connecting" event immediately so the UI has content to render
+     # while the preflight (HyperGate LLM calls) completes.
+     yield _event({"type": "connecting", "message": "Running system check…"})
+@@ -387,7 +397,7 @@ async def run_stream(
+         start_payload: dict = {"type": "start", "preset": effective_preset_name}
+         if auto_selected_method:
+             start_payload["auto_selected_method"] = auto_selected_method
+-        await _broadcast_ws(run_id, start_payload)
++        _tracked_broadcast(run_id, start_payload)
+         yield _event(start_payload)
+ 
+         # Persist pipeline start event
+@@ -476,6 +486,18 @@ async def run_stream(
+                 yield _event({"type": "cancelled", "message": "Pipeline stopped by user"})
+                 return
+ 
++            # Disconnect check — bail before starting next phase (B-13)
++            if request is not None and await request.is_disconnected():
++                logger.info(
++                    "Client disconnected before phase %s (run %s)", name, run_id
++                )
++                yield _event({
++                    "type": "cancelled",
++                    "run_id": run_id,
++                    "reason": "client_disconnected",
++                })
++                return
++
+             # Silent no-ops (e.g. writing pipeline skips generic decomposition/vetting)
+             if getattr(fn, "_is_silent_noop", False):  # v3.1: relaxed from identity check
+                 await fn(state)
+@@ -487,7 +509,7 @@ async def run_stream(
+             start_payload: dict[str, Any] = {"type": "phase_start", "phase": num, "name": name}
+             if phase_start_models:
+                 start_payload["models"] = phase_start_models
+-            await _broadcast_ws(run_id, start_payload)
++            _tracked_broadcast(run_id, start_payload)
+             yield _event(start_payload)
+ 
+             # Emit domain event for phase start
+@@ -523,9 +545,9 @@ async def run_stream(
+                         "phase": num,
+                         "phase_name": name,
+                     }
+-                    await _broadcast_ws(run_id, err_payload)
++                    _tracked_broadcast(run_id, err_payload)
+                     yield _event(err_payload)
+-                    await _broadcast_ws(run_id, {"type": "phase_error", "phase": num, "error": err_msg})
++                    _tracked_broadcast(run_id, {"type": "phase_error", "phase": num, "error": err_msg})
+                     yield _event({"type": "phase_error", "phase": num, "error": err_msg})
+                     fail_evt = make_event(
+                         EventType.PHASE_FAILED,
+@@ -561,9 +583,9 @@ async def run_stream(
+                         "phase": num,
+                         "phase_name": name,
+                     }
+-                    await _broadcast_ws(run_id, err_payload)
++                    _tracked_broadcast(run_id, err_payload)
+                     yield _event(err_payload)
+-                    await _broadcast_ws(run_id, {"type": "phase_error", "phase": num, "error": err_msg})
++                    _tracked_broadcast(run_id, {"type": "phase_error", "phase": num, "error": err_msg})
+                     yield _event({"type": "phase_error", "phase": num, "error": err_msg})
+                     fail_evt = make_event(
+                         EventType.PHASE_FAILED,
+@@ -592,7 +614,7 @@ async def run_stream(
+                     "attempt": retry_attempt + 1,
+                 }
+                 yield _event(quality_payload)
+-                await _broadcast_ws(run_id, quality_payload)
++                _tracked_broadcast(run_id, quality_payload)
+ 
+                 # Record quality score in state history for downstream context
+                 state.quality_history.append({
+@@ -618,7 +640,7 @@ async def run_stream(
+                     "reason": quality_result.reason,
+                 }
+                 yield _event(retry_payload)
+-                await _broadcast_ws(run_id, retry_payload)
++                _tracked_broadcast(run_id, retry_payload)
+ 
+                 reset_phase_state(name, state)
+ 
+@@ -677,7 +699,7 @@ async def run_stream(
+                 "name": name,
+                 "data": data,
+             }
+-            await _broadcast_ws(run_id, phase_complete_payload)
++            _tracked_broadcast(run_id, phase_complete_payload)
+             yield _event(phase_complete_payload)
+ 
+             # Emit domain event for phase completion
+@@ -741,7 +763,7 @@ async def run_stream(
+             "total_cost_usd": getattr(state, 'total_cost_usd', 0.0),
+             "phase_costs": getattr(state, 'phase_costs', {}),
+         }
+-        await _broadcast_ws(run_id, done_payload)
++        _tracked_broadcast(run_id, done_payload)
+         yield _event(done_payload)
+ 
+         # Persist pipeline completion
+@@ -777,14 +799,20 @@ async def run_stream(
+         )
+         await _persist_event(fail_evt)
+ 
+-        await _broadcast_ws(run_id, {"type": "done", "errors": [err_msg]})
++        _tracked_broadcast(run_id, {"type": "done", "errors": [err_msg]})
+         yield _event({"type": "done", "errors": [err_msg]})
+     finally:
++        # Cancel all pending broadcast tasks for this run (B-13)
++        for t in list(_run_tasks):
++            if not t.done():
++                t.cancel()
++        if _run_tasks:
++            await asyncio.gather(*_run_tasks, return_exceptions=True)
+         await _run_store.remove(run_id)
+ 
+ 
+ async def run_followup_stream(
+-    req: FollowupRequest, user_id: str | None = None
++    req: FollowupRequest, request=None, user_id: str | None = None
+ ) -> AsyncGenerator[str, None]:
+     """Run the full Reasoner pipeline for a follow-up question with conversation context."""
+     from reasoner.presets import FOLLOWUP_AGENT_MODELS
+@@ -815,7 +843,7 @@ async def run_followup_stream(
+         attachments=getattr(req, "attachments", []) or [],
+         client_run_id=req.client_run_id,
+     )
+-    async for chunk in run_stream(run_req, initial_state=state, user_id=user_id):
++    async for chunk in run_stream(run_req, initial_state=state, user_id=user_id, request=request):
+         yield chunk
+ 
+     try:
+@@ -847,7 +875,8 @@ async def run_followup_stream(
+ 
+ 
+ async def run_stream_cached(
+-    req: RunRequest, 
++    req: RunRequest,
++    request=None,
+     user_id: str | None = None,
+     preset_service: PresetService | None = None,
+     pipeline_service: PipelineService | None = None,
+@@ -878,21 +907,26 @@ async def run_stream_cached(
+                 logger.info(f"Ignoring cached result for {key} due to stored errors.")
+ 
+     collected: list[dict] = []
+-    async for chunk in run_stream(
+-        req, 
+-        user_id=user_id, 
+-        preset_service=preset_service, 
+-        pipeline_service=pipeline_service
+-    ):
+-        yield chunk
+-        # Force flush after each event so the browser receives SSE events
+-        # in real-time instead of buffering them until the buffer fills.
+-        await asyncio.sleep(SSE_FLUSH_INTERVAL)
+-        if chunk.startswith("data: "):
+-            try:
+-                ev = json.loads(chunk[6:])
+-                collected.append(ev)
+-                if ev.get("type") == "done" and not req.no_cache:
+-                    await _save_cache(key, collected)
+-            except Exception:
+-                pass
+\ No newline at end of file
++    gen = run_stream(
++        req,
++        request=request,
++        user_id=user_id,
++        preset_service=preset_service,
++        pipeline_service=pipeline_service,
++    )
++    try:
++        async for chunk in gen:
++            yield chunk
++            # Force flush after each event so the browser receives SSE events
++            # in real-time instead of buffering them until the buffer fills.
++            await asyncio.sleep(SSE_FLUSH_INTERVAL)
++            if chunk.startswith("data: "):
++                try:
++                    ev = json.loads(chunk[6:])
++                    collected.append(ev)
++                    if ev.get("type") == "done" and not req.no_cache:
++                        await _save_cache(key, collected)
++                except Exception:
++                    pass
++    finally:
++        await gen.aclose()
+\ No newline at end of file
+diff --git a/src/reasoner/circuit_breaker.py b/src/reasoner/circuit_breaker.py
+index 1471489..d865d03 100644
+--- a/src/reasoner/circuit_breaker.py
++++ b/src/reasoner/circuit_breaker.py
+@@ -1,353 +1,2 @@
+-"""
+-Reasoner Pipeline - Circuit Breaker Pattern
+-Provides fault tolerance for LLM provider calls.
+-
+-ARCHITECTURAL NOTE:
+-    The circuit breaker registry stores state in-memory. In a multi-worker
+-    or horizontally-scaled deployment each process maintains its own circuit
+-    state, which means a failing provider may not be detected consistently
+-    across workers. Set CIRCUIT_BREAKER_MODE to a shared backend (e.g.,
+-    'redis') or accept per-worker degradation for production multi-instance
+-    deployments.
+-"""
+-
+-from __future__ import annotations
+-
+-import asyncio
+-import threading
+-import time
+-from dataclasses import dataclass, field
+-from enum import Enum
+-from typing import Any, Callable, TypeVar
+-
+-from reasoner.logging_utils import llm_logger
+-
+-try:
+-    from reasoner.metrics import (
+-        REASONER_CIRCUIT_BREAKER_STATE,
+-        REASONER_CIRCUIT_BREAKER_REJECTED,
+-    )
+-    _METRICS_AVAILABLE = True
+-except Exception:
+-    _METRICS_AVAILABLE = False
+-
+-T = TypeVar("T")
+-
+-
+-class CircuitState(str, Enum):
+-    CLOSED = "closed"       # Normal operation
+-    OPEN = "open"           # Failing, reject calls
+-    HALF_OPEN = "half_open"  # Testing if recovered
+-
+-
+-@dataclass
+-class CircuitBreakerConfig:
+-    """Configuration for circuit breaker behavior."""
+-    failure_threshold: int = 5          # Failures before opening
+-    success_threshold: int = 3          # Successes in half-open to close
+-    timeout_seconds: float = 30.0       # Time before trying half-open
+-    half_open_max_calls: int = 3        # Max concurrent calls in half-open
+-
+-
+-@dataclass
+-class CircuitBreakerStats:
+-    """Statistics for circuit breaker."""
+-    total_calls: int = 0
+-    successful_calls: int = 0
+-    failed_calls: int = 0
+-    rejected_calls: int = 0
+-    last_failure_time: float = 0.0
+-    last_success_time: float = 0.0
+-    consecutive_failures: int = 0
+-    consecutive_successes: int = 0
+-    # Track concurrent calls in HALF_OPEN state to enforce limit
+-    half_open_current_calls: int = 0
+-
+-
+-class CircuitBreaker:
+-    """
+-    Circuit breaker implementation for LLM provider calls.
+-
+-    States:
+-    - CLOSED: Normal operation, calls pass through
+-    - OPEN: Too many failures, calls are rejected immediately
+-    - HALF_OPEN: Testing recovery, limited calls allowed
+-
+-    Thread Safety:
+-    - All state transitions are atomic (protected by _lock)
+-    - HALF_OPEN state enforces half_open_max_calls limit
+-    - Concurrent call tracking prevents race conditions
+-    """
+-
+-    def __init__(
+-        self,
+-        name: str,
+-        config: CircuitBreakerConfig | None = None,
+-    ):
+-        self.name = name
+-        self.config = config or CircuitBreakerConfig()
+-        self._state = CircuitState.CLOSED
+-        self._stats = CircuitBreakerStats()
+-        self._lock = asyncio.Lock()
+-        self._last_state_change = time.monotonic()
+-
+-    def _update_metrics(self) -> None:
+-        """Export circuit state to Prometheus gauges."""
+-        if not _METRICS_AVAILABLE:
+-            return
+-        state_value = {"closed": 0, "half_open": 1, "open": 2}.get(self._state.value, 0)
+-        REASONER_CIRCUIT_BREAKER_STATE.labels(name=self.name).set(state_value)
+-
+-    @property
+-    def state(self) -> CircuitState:
+-        return self._state
+-
+-    @property
+-    def stats(self) -> CircuitBreakerStats:
+-        return self._stats
+-
+-    async def _try_acquire_call(self) -> bool:
+-        """
+-        Atomically check availability and acquire call slot if in HALF_OPEN.
+-        Must be called within _lock context.
+-        
+-        Returns:
+-            bool: True if call is allowed, False if circuit is OPEN or HALF_OPEN at capacity
+-        """
+-        if self._state == CircuitState.CLOSED:
+-            return True
+-
+-        if self._state == CircuitState.OPEN:
+-            # Check if timeout has passed to transition to half-open
+-            elapsed = time.monotonic() - self._last_state_change
+-            if elapsed >= self.config.timeout_seconds:
+-                # Atomic transition: OPEN → HALF_OPEN
+-                self._state = CircuitState.HALF_OPEN
+-                self._last_state_change = time.monotonic()
+-                self._stats.half_open_current_calls = 0  # Reset counter for new half-open period
+-                llm_logger.info(
+-                    f"Circuit '{self.name}' transitioning to HALF_OPEN",
+-                    extra={"circuit": self.name, "state": "half_open"},
+-                )
+-                # Fall through to HALF_OPEN logic
+-            else:
+-                return False  # Still OPEN, reject call
+-
+-        # HALF_OPEN state - enforce concurrent call limit
+-        if self._state == CircuitState.HALF_OPEN:
+-            if self._stats.half_open_current_calls >= self.config.half_open_max_calls:
+-                return False  # At capacity, reject call
+-            # Acquire slot atomically
+-            self._stats.half_open_current_calls += 1
+-            return True
+-
+-        return False  # Unknown state, reject for safety
+-
+-    def _release_call(self) -> None:
+-        """
+-        Release call slot (decrement half_open_current_calls).
+-        Must be called within _lock context.
+-        """
+-        if self._state == CircuitState.HALF_OPEN:
+-            self._stats.half_open_current_calls = max(0, self._stats.half_open_current_calls - 1)
+-
+-    async def call(
+-        self,
+-        func: Callable[..., T],
+-        *args: Any,
+-        **kwargs: Any,
+-    ) -> T:
+-        """
+-        Execute function with circuit breaker protection.
+-        
+-        Thread Safety:
+-        - Uses atomic _try_acquire_call to prevent race conditions
+-        - Properly releases call slot on completion (success or failure)
+-        - All state transitions protected by _lock
+-        """
+-        async with self._lock:
+-            # Atomically check availability and acquire slot if needed
+-            if not await self._try_acquire_call():
+-                self._stats.rejected_calls += 1
+-                if _METRICS_AVAILABLE:
+-                    REASONER_CIRCUIT_BREAKER_REJECTED.labels(name=self.name).inc()
+-                llm_logger.warning(
+-                    f"Circuit '{self.name}' is OPEN or at HALF_OPEN capacity, rejecting call",
+-                    extra={
+-                        "circuit": self.name,
+-                        "state": self._state.value,
+-                        "rejected_calls": self._stats.rejected_calls,
+-                    },
+-                )
+-                raise CircuitOpenError(
+-                    f"Circuit '{self.name}' is open",
+-                    circuit_name=self.name,
+-                )
+-            self._stats.total_calls += 1
+-
+-        # Execute the call (outside lock to allow concurrent execution)
+-        try:
+-            if asyncio.iscoroutinefunction(func):
+-                result = await func(*args, **kwargs)
+-            else:
+-                result = func(*args, **kwargs)
+-
+-            await self._on_success()
+-            return result
+-
+-        except Exception as e:
+-            await self._on_failure()
+-            raise
+-        
+-        finally:
+-            # Always release the call slot (outside lock to avoid deadlock)
+-            async with self._lock:
+-                self._release_call()
+-
+-    async def _on_success(self) -> None:
+-        """Handle successful call."""
+-        async with self._lock:
+-            self._stats.successful_calls += 1
+-            self._stats.consecutive_successes += 1
+-            self._stats.consecutive_failures = 0
+-            self._stats.last_success_time = time.monotonic()
+-
+-            if self._state == CircuitState.HALF_OPEN:
+-                # Slot release is handled by _release_call() in the caller's
+-                # finally block. We do NOT decrement here — doing so would
+-                # double-free the slot and disable the half_open_max_calls
+-                # capacity limit. Only transition to CLOSED when threshold met.
+-                if self._stats.consecutive_successes >= self.config.success_threshold:
+-                    self._state = CircuitState.CLOSED
+-                    self._stats.consecutive_successes = 0
+-                    self._stats.half_open_current_calls = 0  # Reset counter when closing
+-                    self._last_state_change = time.monotonic()
+-                    self._update_metrics()
+-                    llm_logger.info(
+-                        f"Circuit '{self.name}' CLOSED after recovery",
+-                        extra={"circuit": self.name, "state": "closed"},
+-                    )
+-
+-    async def _on_failure(self) -> None:
+-        """Handle failed call."""
+-        async with self._lock:
+-            self._stats.failed_calls += 1
+-            self._stats.consecutive_failures += 1
+-            self._stats.consecutive_successes = 0
+-            self._stats.last_failure_time = time.monotonic()
+-
+-            if self._state == CircuitState.HALF_OPEN:
+-                # Any failure in half-open goes back to open
+-                self._state = CircuitState.OPEN
+-                self._stats.half_open_current_calls = 0  # Reset counter when opening
+-                self._last_state_change = time.monotonic()
+-                self._update_metrics()
+-                llm_logger.warning(
+-                    f"Circuit '{self.name}' reopened after half-open failure",
+-                    extra={"circuit": self.name, "state": "open"},
+-                )
+-            elif self._state == CircuitState.CLOSED:
+-                if self._stats.consecutive_failures >= self.config.failure_threshold:
+-                    self._state = CircuitState.OPEN
+-                    self._stats.half_open_current_calls = 0  # Reset counter when opening
+-                    self._last_state_change = time.monotonic()
+-                    self._update_metrics()
+-                    llm_logger.warning(
+-                        f"Circuit '{self.name}' opened after {self._stats.consecutive_failures} failures",
+-                        extra={
+-                            "circuit": self.name,
+-                            "state": "open",
+-                            "consecutive_failures": self._stats.consecutive_failures,
+-                        },
+-                    )
+-
+-    def get_health_status(self) -> dict[str, Any]:
+-        """Get health status for monitoring."""
+-        return {
+-            "name": self.name,
+-            "state": self._state.value,
+-            "stats": asdict(self._stats),
+-            "config": asdict(self.config),
+-        }
+-
+-    async def reset(self) -> None:
+-        """Manually reset circuit to closed state."""
+-        async with self._lock:
+-            self._state = CircuitState.CLOSED
+-            self._stats = CircuitBreakerStats()
+-            self._last_state_change = time.monotonic()
+-        llm_logger.info(
+-            f"Circuit '{self.name}' manually reset",
+-            extra={"circuit": self.name, "state": "closed"},
+-        )
+-
+-    async def can_execute(self) -> bool:
+-        """Return True if the circuit allows a call right now.
+-
+-        For use by callers that manage their own execution lifecycle
+-        (e.g., ProviderRouter) and only need a gate check.
+-        """
+-        async with self._lock:
+-            return await self._try_acquire_call()
+-
+-    async def record_success(self) -> None:
+-        """Record a successful call (for manual use outside ``call()``)."""
+-        await self._on_success()
+-
+-    async def record_failure(self) -> None:
+-        """Record a failed call (for manual use outside ``call()``)."""
+-        await self._on_failure()
+-
+-
+-class CircuitOpenError(Exception):
+-    """Raised when circuit breaker is open."""
+-    def __init__(self, message: str, circuit_name: str):
+-        super().__init__(message)
+-        self.circuit_name = circuit_name
+-
+-
+-# Global circuit breaker registry
+-# NOTE: This is a per-process registry. For horizontal scaling, circuit state
+-# should be externalized (e.g., Redis) or per-worker degradation accepted.
+-_circuit_breakers: dict[str, CircuitBreaker] = {}
+-from reasoner.core.constants import MAX_CIRCUIT_BREAKER_REGISTRY_SIZE
+-_MAX_REGISTRY_SIZE: int = MAX_CIRCUIT_BREAKER_REGISTRY_SIZE
+-_circuit_breaker_lock = threading.Lock()
+-
+-
+-def get_circuit_breaker(name: str) -> CircuitBreaker:
+-    """Get or create a circuit breaker by name."""
+-    with _circuit_breaker_lock:
+-        if name not in _circuit_breakers:
+-            if len(_circuit_breakers) >= _MAX_REGISTRY_SIZE:
+-                # Evict oldest entry to prevent unbounded growth
+-                oldest = next(iter(_circuit_breakers))
+-                del _circuit_breakers[oldest]
+-            _circuit_breakers[name] = CircuitBreaker(name)
+-        return _circuit_breakers[name]
+-
+-
+-def get_all_circuit_breakers() -> dict[str, dict[str, Any]]:
+-    """Get status of all circuit breake
+
+[… truncated 32972 chars …]

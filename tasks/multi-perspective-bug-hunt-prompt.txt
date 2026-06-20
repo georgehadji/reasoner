@@ -1,0 +1,67 @@
+Apply the Multi-Perspective reasoning method to the "Reasoner" codebase — a production AI reasoning orchestrator built with FastAPI + Python 3.12, Hexagonal DDD + CQRS + Event Sourcing + Mixin Composition.
+
+ARCHITECTURE:
+- src/reasoner/api/ — FastAPI routes, SSE streaming, auth deps, CSRF, middleware
+- src/reasoner/application/ — CQRS handlers, orchestrator, pipeline.py (~900 lines), mixins/ (12 mixins), event_bus/, flows/
+- src/reasoner/core/ — domain protocols, settings, constants, search clients. No external deps allowed.
+- src/reasoner/domain/ — PresetCore, PresetRegistry (42 presets, 17 methods), PipelineState (~60 fields)
+- src/reasoner/infrastructure/ — LLM adapters (12 providers + OpenRouter), rate_limiter, token_cache, circuit_breaker, auth, billing/webhooks, redis/, postgres_store
+
+KEY DESIGN FACTS:
+- Circuit breaker state is in-memory per worker — not shared across workers
+- SSE generators use async_generator; client disconnect handling is manual
+- Token cache: Jaccard similarity match on raw_prompt, lazy TTL eviction (no background sweep)
+- Redis: required for rate limiting, circuit breaking, webhook dedup, and token cache
+- Event bus retries handlers 3x with backoff before dead-lettering
+- LLM fallback chain returns DegradedLLMResponse on total failure
+- PipelineState fields per method (e.g., socratic_state, debate_state) are dict[str, Any] — never subscripted directly
+- Known layer violation: domain/preset_core.py imports from infrastructure.llm.registry
+- Known layer violation: api/streaming.py instantiates ReasonerPipeline directly (bypasses CQRS)
+
+ALREADY FIXED BUGS (exclude from analysis):
+- B-01 to B-12: Rate limiter Lua path, undefined loggers, CSRF secret, raw_prompt field, AuthManager lock, calculator injection, create_task leaks, CSRF source mismatch, AuditMiddleware, MemoryLimitMiddleware race, _execute_stream bypasses circuit breaker, missing type imports
+- B-13 to B-15: SSE disconnect resource leak, Redis unbounded pool, circuit breaker in-memory state (known limitation, not fixed)
+- Circuit breaker: wrong attribute (max_half_open_calls vs half_open_max_calls) — FIXED
+- Circuit breaker: StructuredLogger.warning() positional args — FIXED
+- B-16 to B-18 (from latest run): event bus dead-letter exception masking, postgres_store fire-and-forget, WebSocket broadcast silent failure
+
+PROBLEM TO ANALYZE:
+What are the highest-impact remaining bugs and design weaknesses in this system — specifically in its concurrency model, error propagation, and data integrity guarantees?
+
+---
+
+Analyze this problem from ALL FOUR perspectives simultaneously. For each perspective, produce a core_analysis (3-6 paragraphs) with inline epistemic labels [VERIFIED], [HYPOTHESIS], or [UNKNOWN] on every factual claim, plus 3-5 key_insights.
+
+PERSPECTIVE 1 — CONSTRUCTIVE:
+Build the strongest case for where the system's defenses actually hold. Which subsystems are genuinely sound? Where do the layered safeguards (circuit breaker + fallback + degraded response) compose correctly? What does the system reliably guarantee even under failure? Cite specific mechanisms and explain why they work.
+
+PERSPECTIVE 2 — DESTRUCTIVE:
+Find every crack. What are the most likely failure modes that have NOT yet been fixed? Focus on: async cancellation paths not covered by try/finally, error types that escape the fallback chain, state fields that can be mutated concurrently, and places where a single uncaught exception silently terminates a long-running background operation. Name the specific file and code path for each.
+
+PERSPECTIVE 3 — SYSTEMIC:
+Trace the 2nd and 3rd-order effects. What happens when failures compound? If Redis goes down while an SSE stream is mid-flight and a Stripe webhook arrives simultaneously — what is the exact cascade? Identify hidden coupling between subsystems that appear independent: where does a failure in the token cache propagate into the billing layer, or where does a circuit breaker opening affect the event bus? Map the blast radius.
+
+PERSPECTIVE 4 — MINIMALIST:
+Apply Occam's Razor. What is the single simplest remaining bug with the highest real-world impact? The fix should be ≤5 lines. Do not propose architectural refactors — find the one small, concrete defect (a missing await, an unhandled exception type, a missing None check, an off-by-one in a retry counter) that, if triggered in production, would cause the most damage. Justify why this and not something more complex.
+
+---
+
+After all four perspectives, produce:
+
+CRITIQUE:
+Score each perspective on:
+- logical_consistency (0-10): Is the reasoning internally sound?
+- evidence_support (0-10): Are claims grounded in the architecture facts above?
+- failure_resilience (0-10): Does it hold up if one assumption is wrong?
+- feasibility (0-10): Are the bugs named actually reproducible?
+- confidence_vs_accuracy_penalty (0.0-10.0): Penalize confident claims that are likely unsubstantiated given incomplete visibility into the code.
+- steel_man: The strongest charitable case for this perspective's findings.
+- bias_flags: Any analytical bias (e.g., recency bias toward recently fixed bugs, negativity bias in the destructive view).
+
+STRESS TEST:
+Put the top findings from all four perspectives under three scenarios:
+- optimal: Normal load, all dependencies healthy. Do the bugs still manifest?
+- constraint_violation: Redis is unavailable, one LLM provider is returning 500s. What fails first?
+- adversarial: A client deliberately triggers slow SSE streams while submitting webhook events. What is the attack surface?
+
+Output each scenario with: survival_rate (0.0-1.0) and failure_mode (specific, not generic).

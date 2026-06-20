@@ -1,0 +1,367 @@
+Brave Search API | Brave
+https://brave.com/search/api/
+
+<!DOCTYPE html>
+
+Brave Search API | Brave
+
+Brave Search API
+API features
+
+Developer docs
+
+Use cases
+
+How-to guides
+
+Latest API news
+
+Tools & integrations
+
+MCP Server
+
+Log in / sign up
+
+API features
+More Search API pages
+API features
+
+Developer docs
+
+Use cases
+
+How-to guides
+
+Latest API news
+
+Tools & integrations
+
+MCP Server
+
+Log in / sign up
+
+Brave Search API
+
+Power your agents & chatbots with the world's largest independent index of the Web.
+
+Get started*
+Read the docs
+
+*with $5 in free monthly credits
+
+Plans
+
+Search
+
+The real-time search data your chatbots & agents need to generate answers.
+
+Complete search results (URLs, text, news, images, and more), with additional LLM context optimized for AI.
+
+$5 per 1,000 requests
+
+Get started
+
+Includes $5 in free credits every month
+
+Credits are automatically applied to your account
+
+Special features
+
+Goggles: Custom reranking & result filtering
+
+Extra alternate snippets
+
+Schema-enriched results + added metadata
+
+Capacity
+
+50 queries per second
+
+Answers
+
+Summarized, completed answers to any question.
+
+Answers grounded on a single search or multiple searches for better accuracy & reduced hallucinations.
+
+$4 per 1,000 requests
+
++ $5 per million input/output tokens
+
+Get started
+
+Includes $5 in free credits every month
+
+Credits are automatically applied to your account
+
+Special features
+
+Grounding supported by citations
+
+Streaming
+
+OpenAI SDK compatible
+
+Capacity
+
+2 queries per second
+
+Enterprise
+
+Need custom terms, capacity, or endpoints? Contact us about bespoke plans for large-scale deployments.
+
+Special features
+
+Full-funnel Zero Data Retention
+
+Custom agreements & NDAs
+
+Invoicing & enterprise-grade support
+
+Contact us
+
+Build with the power of the web
+
+Power agentic search
+
+Chatbots, coding assistants, and AI-search engines all need real-time data to reduce hallucinations and ground their responses with multiple sources. The Brave Search API excels in RAG pipelines, and it’s the leading search tool for applications that use Claude MCP.
+
+Train foundation models
+
+The open Web is a critical source of training data for today&rsquo;s state-of-the-art AI models. With up to five snippets from over 30 billion pages, the Brave Search API is the best blend of scale, quality, and cost.
+
+Create search-enabled tools
+
+Build comprehensive company profiles in CRM platforms, gather citations for ed-tech apps, or fetch the latest news for a stock trading assistant. Thousands of teams rely on the Brave Search API to connect their apps to the Web.
+
+Trusted by industry leaders
+
+The Brave Search API provides accurate search results for our academic citation services. It delivers high-quality data at a reasonable price, and with intuitive data structuring. Its speed and precision have been crucial.
+
+—Ben Tucker, SVP of Engineering,
+Chegg
+
+Key features
+
+World-class quality
+
+In blinded testing, Brave Search performs on par with—or better than—incumbent search giants.
+
+Specialized endpoints
+
+Adapt results with different specialized endpoints, including local, images, AI summaries, and more.
+
+Comprehensive and fresh
+
+Brave’s index includes over 30 billion pages, kept fresh by over 100 million page updates every day.
+
+Search Goggles
+
+Discard domains or re-rank results for better control of the response to your query via the Brave Search Goggles feature.
+
+Extra snippets
+
+Get up to five snippets picked in real time to maximize contextual relevance to a search.
+
+Schema-enriched results
+
+Get additional formatted data for popular formats like movie reviews and wikis.
+
+Web
+LLM Context
+Answers
+Image
+Video
+News
+Suggest
+Spellcheck
+
+Web
+LLM Context
+Answers
+Image
+Video
+News
+Suggest
+Spellcheck
+
+Python
+
+cURL
+
+JavaScript
+
+GO
+
+<code class="language-python" data-lang="python"><span class="line"><span class="ln"> 1</span><span class="cl"><span class="ch">#!/usr/bin/env python</span>
+</span></span><span class="line"><span class="ln"> 2</span><span class="cl">
+</span></span><span class="line"><span class="ln"> 3</span><span class="cl"><span class="kn">import</span> <span class="nn">requests</span>
+</span></span><span class="line"><span class="ln"> 4</span><span class="cl">
+</span></span><span class="line"><span class="ln"> 5</span><span class="cl"><span class="nb">print</span><span class="p">(</span>
+</span></span><span class="line"><span class="ln"> 6</span><span class="cl"> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+</span></span><span class="line"><span class="ln"> 7</span><span class="cl"> <span class="s2">"https://api.search.brave.com/res/v1/web/search"</span><span class="p">,</span>
+</span></span><span class="line"><span class="ln"> 8</span><span class="cl"> <span class="n">headers</span><span class="o">=</span><span class="p">{</span>
+</span></span><span class="line"><span class="ln"> 9</span><span class="cl"> <span class="s2">"X-Subscription-Token"</span><span class="p">:</span> <span class="s2">"<BRAVE_SEARCH_API_KEY>"</span><span class="p">,</span>
+</span></span><span class="line"><span class="ln">10</span><span class="cl"> <span class="p">},</span>
+</span></span><span class="line"><span class="ln">11</span><span class="cl"> <span class="n">params</span><span class="o">=</span><span class="p">{</span>
+</span></span><span class="line"><span class="ln">12</span><span class="cl"> <span class="s2">"q"</span><span class="p">:</span> <span class="s2">"greek restaurants in san francisco"</span><span class="p">,</span>
+</span></span><span class="line"><span class="ln">13</span><span class="cl"> <span class="s2">"count"</span><span class="p">:</span> <span class="mi">20</span><span class="p">,</span>
+</span></span><span class="line"><span class="ln">14</span><span class="cl"> <span class="s2">"country"</span><span class="p">:</span> <span class="s2">"us"</span><span class="p">,</span>
+</span></span><span class="line"><span class="ln">15</span><span class="cl"> <span class="s2">"search_lang"</span><span class="p">:</span> <span class="s2">"en"</span><span class="p">,</span>
+</span></span><span class="line"><span class="ln">16</span><span class="cl"> <span class="p">},</span>
+</span></span><span class="line"><span class="ln">17</span><span class="cl"> <span class="p">)</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+</span></span><span class="line"><span class="ln">18</span><span class="cl"><span class="p">)</span></span></span></code>
+
+<code class="language-bash" data-lang="bash"><span class="line"><span class="ln">1</span><span class="cl">curl -s --compressed <span class="s2">"https://api.search.brave.com/res/v1/web/search?q=greek+restaurants+in+san+francisco"</span> <span class="se">\
+</span></span></span><span class="line"><span class="ln">2</span><span class="cl"><span class="se"></span> -H <span class="s2">"Accept: application/json"</span> <span class="se">\
+</span></span></span><span class="line"><span class="ln">3</span><span class="cl"><span class="se"></span> -H <span class="s2">"Accept-Encoding: gzip"</span> <span class="se">\
+</span></span></span><span class="line"><span class="ln">4</span><span class="cl"><span class="se"></span> -H <span class="s2">"X-Subscription-Token: <YOUR_API_KEY>"</span></span></span></code>
+
+<code class="language-javascript" data-lang="javascript"><span class="line"><span class="ln"> 1</span><span class="cl"><span class="ch">#!/usr/bin/env node
+</span></span></span><span class="line"><span class="ln"> 2</span><span class="cl"><span class="ch"></span>
+</span></span><span class="line"><span class="ln"> 3</span><span class="cl"><span class="nx">fetch</span><span class="p">(</span>
+</span></span><span class="line"><span class="ln"> 4</span><span class="cl"> <span class="sb">`https://api.search.brave.com/res/v1/web/search?</span><span class="si">${</span><span class="k">new</span> <span class="nx">URLSearchParams</span><span class="p">({</span>
+</span></span><span class="line"><span class="ln"> 5</span><span class="cl"> <span class="nx">q</span><span class="o">:</span> <span class="s2">"greek restaurants in san francisco"</span><span class="p">,</span>
+</span></span><span class="line"><span class="ln"> 6</span><span class="cl"> <span class="nx">count</span><span class="o">:</span> <span class="mi">10</span><span class="p">,</span>
+</span></span><span class="line"><span class="ln"> 7</span><span class="cl"> <span class="nx">country</span><span class="o">:</span> <span class="s2">"us"</span><span class="p">,</span>
+</span></span><span class="line"><span class="ln"> 8</span><span class="cl"> <span class="nx">search_lang</span><span class="o">:</span> <span class="s2">"en"</span><span class="p">,</span>
+</span></span><span class="line"><span class="ln"> 9</span><span class="cl"> <span class="si">}</span><span class="sb">)}`</span><span class="p">,</span>
+</span></span><span class="line"><span class="ln">10</span><span class="cl"> <span class="p">{</span>
+</span></span><span class="line"><span class="ln">11</span><span class="cl"> <span class="nx">headers</span><span class="o">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="ln">12</span><span class="cl"> <span class="s2">"X-Subscription-Token"</span><span class="o">:</span> <span class="s2">"<BRAVE_SEARCH_API_KEY>"</span><span class="p">,</span>
+</span></span><span class="line"><span class="ln">13</span><span class="cl"> <span class="p">},</span>
+</span></span><span class="line"><span class="ln">14</span><span class="cl"> <span class="p">},</span>
+</span></span><span class="line"><span class="ln">15</span><span class="cl"><span class="p">)</span>
+</span></span><span class="line"><span class="ln">16</span><span class="cl"> <span class="p">.</span><span class="nx">then</span><span class="p">((</span><span class="nx">response</span><span class="p">)</span> <span class="p">=></span> <span class="nx">response</span><span class="p">.</span><span class="nx">json</span><span class="p">())</span>
+</span></span><span class="line"><span class="ln">17</span><span class="cl"> <span class="p">.</span><span class="nx">then</span><span class="p">((</span><span class="nx">data</span><span class="p">)</span> <span class="p">=></span> <span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="nx">data</span><span class="p">));</span></span></span></code>
+
+<code class="language-go" data-lang="go"><span class="line"><span class="ln"> 1</span><span class="cl"><span class="kn">package</span> <span class="nx">main</span>
+</span></span><span class="line"><span class="ln"> 2</span><span class="cl">
+</span></span><span class="line"><span class="ln"> 3</span><span class="cl"><span class="kn">import</span> <span class="p">(</span>
+</span></span><span class="line"><span class="ln"> 4</span><span class="cl"> <span class="s">"fmt"</span>
+</span></span><span class="line"><span class="ln"> 5</span><span class="cl"> <span class="s">"io"</span>
+</span></span><span class="line"><span class="ln"> 6</span><span class="cl"> <span class="s">"net/http"</span>
+</span></span><span class="line"><span class="ln"> 7</span><span class="cl"> <span class="s">"net/url"</span>
+</span></span><span class="line"><span class="ln"> 8</span><span class="cl"><span class="p">)</span>
+</span></span><span class="line"><span class="ln"> 9</span><span class="cl">
+</span></span><span class="line"><span class="ln">10</span><span class="cl"><span class="kd">func</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="ln">11</span><span class="cl"> <span class="nx">u</span><span class="p">,</span> <span class="nx">_</span> <span class="o">:=</span> <span class="nx">url</span><span class="p">.</span><span class="nf">Parse</span><span class="p">(</span><span class="s">"https://api.search.brave.com/res/v1/web/search"</span><span class="p">)</span>
+</span></span><span class="line"><span class="ln">12</span><span class="cl"> <span class="nx">q</span> <span class="o">:=</span> <span class="nx">u</span><span class="p">.</span><span class="nf">Query</span><span class="p">()</span>
+</span></span><span class="line"><span class="ln">13</span><span class="cl"> <span class="nx">q</span><span class="p">.</span><span class="nf">Set</span><span class="p">(</span><span class="s">"q"</span><span class="p">,</span> <span class="s">"greek restaurants in san francisco"</span><span class="p">)</span>
+</span></span><span class="line"><span class="ln">14</span><span class="cl"> <span class="nx">q</span><span class="p">.</span><span class="nf">Set</span><span class="p">(</span><span class="s">"count"</span><span class="p">,</span> <span class="s">"10"</span><span class="p">)</span>
+</span></span><span class="line"><span class="ln">15</span><span class="cl"> <span class="nx">q</span><span class="p">.</span><span class="nf">Set</span><span class="p">(</span><span class="s">"country"</span><span class="p">,</span> <span class="s">"us"</span><span class="p">)</span>
+</span></span><span class="line"><span class="ln">16</span><span class="cl"> <span class="nx">q</span><span class="p">.</span><span class="nf">Set</span><span class="p">(</span><span class="s">"search_lang"</span><span class="p">,</span> <span class="s">"en"</span><span class="p">)</span>
+</span></span><span class="line"><span class="ln">17</span><span class="cl"> <span class="nx">u</span><span class="p">.</span><span class="nx">RawQuery</span> <span class="p">=</span> <span class="nx">q</span><span class="p">.</span><span class="nf">Encode</span><span class="p">()</span>
+</span></span><span class="line"><span class="ln">18</span><span class="cl">
+</span></span><span class="line"><span class="ln">19</span><span class="cl"> <span class="nx">req</span><span class="p">,</span> <span class="nx">_</span> <span class="o">:=</span> <span class="nx">http</span><span class="p">.</span><span class="nf">NewRequest</span><span class="p">(</span><span class="s">"GET"</span><span class="p">,</span> <span class="nx">u</span><span class="p">.</span><span class="nf">String</span><span class="p">(),</span> <span class="kc">nil</span><span class="p">)</span>
+</span></span><span class="line"><span class="ln">20</span><span class="cl"> <span class="nx">req</span><span class="p">.</span><span class="nx">Header</span><span class="p">.</span><span class="nf">Set</span><span class="p">(</span><span class="s">"X-Subscription-Token"</span><span class="p">,</span> <span class="s">"<BRAVE_SEARCH_API_KEY>"</span><span class="p">)</span>
+</span></span><span class="line"><span class="ln">21</span><span class="cl">
+</span></span><span class="line"><span class="ln">22</span><span class="cl"> <span class="nx">resp</span><span class="p">,</span> <span class="nx">_</span> <span class="o">:=</span> <span class="nx">http</span><span class="p">.</span><span class="nx">DefaultClient</span><span class="p">.</span><span class="nf">Do</span><span class="p">(</span><span class="nx">req</span><span class="p">)</span>
+</span></span><span class="line"><span class="ln">23</span><span class="cl"> <span class="k">defer</span> <span class="nx">resp</span><span class="p">.</span><span class="nx">Body</span><span class="p">.</span><span class="nf">Close</span><span class="p">()</span>
+</span></span><span class="line"><span class="ln">24</span><span class="cl">
+</span></span><span class="line"><span class="ln">25</span><span class="cl"> <span class="nx">body</span><span class="p">,</span> <span class="nx">_</span> <span class="o">:=</span> <span class="nx">io</span><span class="p">.</span><span class="nf">ReadAll</span><span class="p">(</span><span class="nx">resp</span><span class="p">.</span><span class="nx">Body</span><span class="p">)</span>
+</span></span><span class="line"><span class="ln">26</span><span class="cl"> <span class="nx">fmt</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="nb">string</span><span class="p">(</span><span class="nx">body</span><span class="p">))</span>
+</span></span><span class="line"><span class="ln">27</span><span class="cl"><span class="p">}</span></span></span></code>
+
+JSON
+
+<code class="language-json" data-lang="json"><span class="line"><span class="ln"> 1</span><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="ln"> 2</span><span class="cl"> <span class="nt">"type"</span><span class="p">:</span> <span class="s2">"search"</span><span class="p">,</span>
+</span></span><span class="line"><span class="ln"> 3</span><span class="cl"> <span class="nt">"web"</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="ln"> 4</span><span class="cl"> <span class="nt">"type"</span><span class="p">:</span> <span class="s2">"search"</span><span class="p">,</span>
+</span></span><span class="line"><span class="ln"> 5</span><span class="cl"> <span class="nt">"results"</span><span class="p">:</span> <span class="p">[</span>
+</span></span><span class="line"><span class="ln"> 6</span><span class="cl"> <span class="p">{</span>
+</span></span><span class="line"><span class="ln"> 7</span><span class="cl"> <span class="nt">"title"</span><span class="p">:</span> <span class="s2">"THE 10 BEST Greek Restaurants in San Francisco (Updated 2025)"</span><span class="p">,</span>
+</span></span><span class="line"><span class="ln"> 8</span><span class="cl"> <span class="nt">"url"</span><span class="p">:</span> <span class="s2">"https://www.tripadvisor.com/Restaurants-g60713-c23-San_Francisco_California.html"</span><span class="p">,</span>
+</span></span><span class="line"><span class="ln"> 9</span><span class="cl"> <span class="nt">"is_source_local"</span><span class="p">:</span> <span class="kc">false</span><span class="p">,</span>
+</span></span><span class="line"><span class="ln">10</span><span class="cl"> <span class="nt">"is_source_both"</span><span class="p">:</span> <span class="kc">false</span><span class="p">,</span>
+</span></span><span class="line"><span class="ln">11</span><span class="cl"> <span class="nt">"description"</span><span class="p">:</span> <span class="s2">"Best <strong>Greek</strong> <strong>Restaurants</strong> <strong>in</strong> <strong>San</strong> <strong>Francisco</strong>, California: Find Tripadvisor traveller reviews of <strong>San</strong> <strong>Francisco</strong> <strong>Greek</strong> <strong>restaurants</strong> and search by price, location, and more."</span><span class="p">,</span>
+</span></span><span class="line"><span class="ln">12</span><span class="cl"> <span class="nt">"profile"</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="ln">13</span><span class="cl"> <span class="nt">"name"</span><span class="p">:</span> <span class="s2">"Tripadvisor"</span><span class="p">,</span>
+</span></span><span class="line"><span class="ln">14</span><span class="cl"> <span class="nt">"url"</span><span class="p">:</span> <span class="s2">"https://www.tripadvisor.com/Restaurants-g60713-c23-San_Francisco_California.html"</span><span class="p">,</span>
+</span></span><span class="line"><span class="ln">15</span><span class="cl"> <span class="nt">"long_name"</span><span class="p">:</span> <span class="s2">"tripadvisor.com"</span><span class="p">,</span>
+</span></span><span class="line"><span class="ln">16</span><span class="cl"> <span class="nt">"img"</span><span class="p">:</span> <span class="s2">"https://imgs.search.brave.com/OEuNbeVBPVl2AlxDmpKDNcYk4RuERMK4gTlMyVzbpSw/rs:fit:32:32:1:0/g:ce/aHR0cDovL2Zhdmlj/b25zLnNlYXJjaC5i/cmF2ZS5jb20vaWNv/bnMvZjQ1MjliOWZi/NmMxZWRhYmY2MmYy/MmNjMmM0ZWM3MTA4/ZTUxM2E1M2JlMzgx/ODM0N2E2NzY5OTJk/YjQwNmNlNi93d3cu/dHJpcGFkdmlzb3Iu/Y29tLw"</span>
+</span></span><span class="line"><span class="ln">17</span><span class="cl"> <span class="p">}</span><span class="err">…</span></span></span></code>
+
+Python
+
+cURL
+
+JavaScript
+
+GO
+
+<code class="language-python" data-lang="python"><span class="line"><span class="ln"> 1</span><span class="cl"><span class="ch">#!/usr/bin/env python</span>
+</span></span><span class="line"><span class="ln"> 2</span><span class="cl">
+</span></span><span class="line"><span class="ln"> 3</span><span class="cl"><span class="kn">import</span> <span class="nn">requests</span>
+</span></span><span class="line"><span class="ln"> 4</span><span class="cl">
+</span></span><span class="line"><span class="ln"> 5</span><span class="cl"><span class="nb">print</span><span class="p">(</span>
+</span></span><span class="line"><span class="ln"> 6</span><span class="cl"> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+</span></span><span class="line"><span class="ln"> 7</span><span class="cl"> <span class="s2">"https://api.search.brave.com/res/v1/llm/context"</span><span class="p">,</span>
+</span></span><span class="line"><span class="ln"> 8</span><span class="cl"> <span class="n">headers</span><span class="o">=</span><span class="p">{</span>
+</span></span><span class="line"><span class="ln"> 9</span><span class="cl"> <span class="s2">"X-Subscription-Token"</span><span class="p">:</span> <span class="s2">"<BRAVE_SEARCH_API_KEY>"</span><span class="p">,</span>
+</span></span><span class="line"><span class="ln">10</span><span class="cl"> <span class="p">},</span>
+</span></span><span class="line"><span class="ln">11</span><span class="cl"> <span class="n">params</span><span class="o">=</span><span class="p">{</span>
+</span></span><span class="line"><span class="ln">12</span><span class="cl"> <span class="s2">"q"</span><span class="p">:</span> <span class="s2">"what is tallest mountain in solar system"</span><span class="p">,</span>
+</span></span><span class="line"><span class="ln">13</span><span class="cl"> <span class="p">},</span>
+</span></span><span class="line"><span class="ln">14</span><span class="cl"> <span class="p">)</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+</span></span><span class="line"><span class="ln">15</span><span class="cl"><span class="p">)</span></span></span></code>
+
+<code class="language-bash" data-lang="bash"><span class="line"><span class="ln">1</span><span class="cl">curl -s --compressed <span class="s2">"https://api.search.brave.com/res/v1/llm/context?q=what+is+tallest+mountain+in+solar+system"</span> <span class="se">\
+</span></span></span><span class="line"><span class="ln">2</span><span class="cl"><span class="se"></span> -H <span class="s2">"Accept: application/json"</span> <span class="se">\
+</span></span></span><span class="line"><span class="ln">3</span><span class="cl"><span class="se"></span> -H <span class="s2">"Accept-Encoding: gzip"</span> <span class="se">\
+</span></span></span><span class="line"><span class="ln">4</span><span class="cl"><span class="se"></span> -H <span class="s2">"X-Subscription-Token: <YOUR_API_KEY>"</span></span></span></code>
+
+<code class="language-javascript" data-lang="javascript"><span class="line"><span class="ln"> 1</span><span class="cl"><span class="ch">#!/usr/bin/env node
+</span></span></span><span class="line"><span class="ln"> 2</span><span class="cl"><span class="ch"></span>
+</span></span><span class="line"><span class="ln"> 3</span><span class="cl"><span class="nx">fetch</span><span class="p">(</span>
+</span></span><span class="line"><span class="ln"> 4</span><span class="cl"> <span class="sb">`https://api.search.brave.com/res/v1/llm/context?</span><span class="si">${</span><span class="k">new</span> <span class="nx">URLSearchParams</span><span class="p">({</span>
+</span></span><span class="line"><span class="ln"> 5</span><span class="cl"> <span class="nx">q</span><span class="o">:</span> <span class="s2">"what is tallest mountain in solar system"</span><span class="p">,</span>
+</span></span><span class="line"><span class="ln"> 6</span><span class="cl"> <span class="si">}</span><span class="sb">)}`</span><span class="p">,</span>
+</span></span><span class="line"><span class="ln"> 7</span><span class="cl"> <span class="p">{</span>
+</span></span><span class="line"><span class="ln"> 8</span><span class="cl"> <span class="nx">headers</span><span class="o">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="ln"> 9</span><span class="cl"> <span class="s2">"X-Subscription-Token"</span><span class="o">:</span> <span class="s2">"<BRAVE_SEARCH_API_KEY>"</span><span class="p">,</span>
+</span></span><span class="line"><span class="ln">10</span><span class="cl"> <span class="p">},</span>
+</span></span><span class="line"><span class="ln">11</span><span class="cl"> <span class="p">},</span>
+</span></span><span class="line"><span class="ln">12</span><span class="cl"><span class="p">)</span>
+</span></span><span class="line"><span class="ln">13</span><span class="cl"> <span class="p">.</span><span class="nx">then</span><span class="p">((</span><span class="nx">response</span><span class="p">)</span> <span class="p">=></span> <span class="nx">response</span><span class="p">.</span><span class="nx">json</span><span class="p">())</span>
+</span></span><span class="line"><span class="ln">14</span><span class="cl"> <span class="p">.</span><span class="nx">then</span><span class="p">((</span><span class="nx">data</span><span class="p">)</span> <span class="p">=></span> <span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="nx">data</span><span class="p">));</span></span></span></code>
+
+<code class="language-go" data-lang="go"><span class="line"><span class="ln"> 1</span><span class="cl"><span class="kn">package</span> <span class="nx">main</span>
+</span></span><span class="line"><span class="ln"> 2</span><span class="cl">
+</span></span><span class="line"><span class="ln"> 3</span><span class="cl"><span class="kn">import</span> <span class="p">(</span>
+</span></span><span class="line"><span class="ln"> 4</span><span class="cl"> <span class="s">"fmt"</span>
+</span></span><span class="line"><span class="ln"> 5</span><span class="cl"> <span class="s">"io/ioutil"</span>
+</span></span><span class="line"><span class="ln"> 6</span><span class="cl"> <span class="s">"net/http"</span>
+</span></span><span class="line"><span class="ln"> 7</span><span class="cl"><span class="p">)</span>
+</span></span><span class="line"><span class="ln"> 8</span><span class="cl">
+</span></span><span class="line"><span class="ln"> 9</span><span class="cl"><span class="kd">func</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="ln">10</span><span class="cl"> <span class="nx">client</span> <span class="o">:=</span> <span class="o">&</span><span class="nx">http</span><span class="p">.</span><span class="nx">Client</span><span class="p">{}</span>
+</span></span><span class="line"><span class="ln">11</span><span class="cl"> <span class="nx">req</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">http</span><span class="p">.</span><span class="nf">NewRequest</span><span class="p">(</span><span class="s">"GET"</span><span class="p">,</span> <span class="s">"https://api.search.brave.com/res/v1/llm/context?q=what+is+tallest+mountain+in+solar+system"</span><span class="p">,</span> <span class="kc">nil</span><span class="p">)</span>
+</span></span><span class="line"><span class="ln">12</span><span class="cl"> <span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="ln">13</span><span class="cl"> <span class="nb">panic</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+</span></span><span class="line"><span class="ln">14</span><span class="cl"> <span class="p">}</span>
+</span></span><span class="line"><span class="ln">15</span><span class="cl">
+</span></span><span class="line"><span class="ln">16</span><span class="cl"> <span class="nx">req</span><span class="p">.</span><span class="nx">Header</span><span class="p">.</span><span class="nf">Set</span><span class="p">(</span><span class="s">"Accept"</span><span class="p">,</span> <span class="s">"application/json"</span><span class="p">)</span>
+</span></span><span class="line"><span class="ln">17</span><span class="cl"> <span class="nx">req</span><span class="p">.</span><span class="nx">Header</span><span class="p">.</span><span class="nf">Set</span><span class="p">(</span><span class="s">"Accept-Encoding"</span><span class="p">,</span> <span class="s">"gzip"</span><span class="p">)</span>
+</span></span><span class="line"><span class="ln">18</span><span class="cl"> <span class="nx">req</span><span class="p">.</span><span class="nx">Header</span><span class="p">.</span><span class="nf">Set</span><span class="p">(</span><span class="s">"X-Subscription-Token"</span><span class="p">,</span> <span class="s">"<YOUR_API_KEY>"</span><span class="p">)</span>
+</span></span><span class="line"><span class="ln">19</span><span class="cl">
+</span></span><span class="line"><span class="ln">20</span><span class="cl"> <span class="nx">resp</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">client</span><span class="p">.</span><span class="nf">Do</span><span class="p">(</span><span class="nx">req</span><span class="p">)</span>
+</span></span><span class="line"><span class="ln">21</span><span class="cl"> <span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="ln">22</span><span class="cl"> <span class="nb">panic</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+</span></span><span class="line"><span class="ln">23</span><span class="cl"> <span class="p">}</span>
+</span></span><span class="line"><span class="ln">24</span><span class="cl"> <span class="k">defer</span> <span class="nx">resp</span><span class="p">.</span><span class="nx">Body</span><span class="p">.</span><span class="nf">Close</span><span class="p">()</span>
+</span></span><span class="line"><span class="ln">25</span><span class="cl">
+</span></span><span class="line"><span class="ln">26</span><span class="cl"> <span class="nx">body</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">ioutil</span><span class="p">.</span><span class="nf">ReadAll</span><span class="p">(</span><span class="nx">resp</span><span class="p">.</span><span class="nx">Body</span><span class="p">)</span>
+</span></span><span class="line"><span class="ln">27</span><span class="cl"> <span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="ln">28</span><span class="cl"> <span class="nb">panic</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+</span></span><span class="line"><span class="ln">29</span><span class="cl"> <span class="p">}</span>
+</span></span><span class="line"><span class="ln">30</span><span class="cl">
+</span></span><span class="line"><span class="ln">31</span><span class="cl"> <span class="nx">fmt</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="nb">string</span><span class="p">(</span><span class="nx">body</span><span class="p">))</span>
+</span></span><span class="line"><span class="ln">32</span><span class="cl"><span class="p">}</span></span></span></code>
+
+JSON
+
+<code class="language-json" data-lang="json"><span class="line"><span class="ln"> 1</span><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="ln"> 2</span><span class="cl"> <span class="nt">"grounding"</span><span class="p">:</spa
+
+[… truncated 128488 chars …]

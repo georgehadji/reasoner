@@ -1,0 +1,354 @@
+================================================================================================================================================================
+Model ID                                           Name                                          Input/$    Output/$   Context    Max Out    Modality                 
+================================================================================================================================================================
+openrouter/bodybuilder                             Body Builder (beta)                           $-1000000.0000 $-1000000.0000 128000     N/A        text->text               
+openrouter/auto                                    Auto Router                                   $-1000000.0000 $-1000000.0000 2000000    N/A        text+image+file+audio+video->text+image
+openrouter/elephant-alpha                          Elephant                                      $0.0000    $0.0000    262144     32768      text->text               
+google/gemma-4-26b-a4b-it:free                     Google: Gemma 4 26B A4B  (free)               $0.0000    $0.0000    262144     32768      text+image+video->text   
+google/gemma-4-31b-it:free                         Google: Gemma 4 31B (free)                    $0.0000    $0.0000    262144     32768      text+image+video->text   
+google/lyria-3-pro-preview                         Google: Lyria 3 Pro Preview                   $0.0000    $0.0000    1048576    65536      text+image->text+audio   
+google/lyria-3-clip-preview                        Google: Lyria 3 Clip Preview                  $0.0000    $0.0000    1048576    65536      text+image->text+audio   
+nvidia/nemotron-3-super-120b-a12b:free             NVIDIA: Nemotron 3 Super (free)               $0.0000    $0.0000    262144     262144     text->text               
+minimax/minimax-m2.5:free                          MiniMax: MiniMax M2.5 (free)                  $0.0000    $0.0000    196608     8192       text->text               
+openrouter/free                                    Free Models Router                            $0.0000    $0.0000    200000     N/A        text+image->text         
+arcee-ai/trinity-large-preview:free                Arcee AI: Trinity Large Preview (free)        $0.0000    $0.0000    131000     N/A        text->text               
+liquid/lfm-2.5-1.2b-thinking:free                  LiquidAI: LFM2.5-1.2B-Thinking (free)         $0.0000    $0.0000    32768      N/A        text->text               
+liquid/lfm-2.5-1.2b-instruct:free                  LiquidAI: LFM2.5-1.2B-Instruct (free)         $0.0000    $0.0000    32768      N/A        text->text               
+nvidia/nemotron-3-nano-30b-a3b:free                NVIDIA: Nemotron 3 Nano 30B A3B (free)        $0.0000    $0.0000    256000     N/A        text->text               
+nvidia/nemotron-nano-12b-v2-vl:free                NVIDIA: Nemotron Nano 12B 2 VL (free)         $0.0000    $0.0000    128000     128000     text+image+video->text   
+qwen/qwen3-next-80b-a3b-instruct:free              Qwen: Qwen3 Next 80B A3B Instruct (free)      $0.0000    $0.0000    262144     N/A        text->text               
+nvidia/nemotron-nano-9b-v2:free                    NVIDIA: Nemotron Nano 9B V2 (free)            $0.0000    $0.0000    128000     N/A        text->text               
+openai/gpt-oss-120b:free                           OpenAI: gpt-oss-120b (free)                   $0.0000    $0.0000    131072     131072     text->text               
+openai/gpt-oss-20b:free                            OpenAI: gpt-oss-20b (free)                    $0.0000    $0.0000    131072     8192       text->text               
+z-ai/glm-4.5-air:free                              Z.ai: GLM 4.5 Air (free)                      $0.0000    $0.0000    131072     96000      text->text               
+qwen/qwen3-coder:free                              Qwen: Qwen3 Coder 480B A35B (free)            $0.0000    $0.0000    262000     262000     text->text               
+cognitivecomputations/dolphin-mistral-24b-venice-edition:free Venice: Uncensored (free)                     $0.0000    $0.0000    32768      N/A        text->text               
+google/gemma-3n-e2b-it:free                        Google: Gemma 3n 2B (free)                    $0.0000    $0.0000    8192       2048       text->text               
+google/gemma-3n-e4b-it:free                        Google: Gemma 3n 4B (free)                    $0.0000    $0.0000    8192       2048       text->text               
+google/gemma-3-4b-it:free                          Google: Gemma 3 4B (free)                     $0.0000    $0.0000    32768      8192       text+image->text         
+google/gemma-3-12b-it:free                         Google: Gemma 3 12B (free)                    $0.0000    $0.0000    32768      8192       text+image->text         
+google/gemma-3-27b-it:free                         Google: Gemma 3 27B (free)                    $0.0000    $0.0000    131072     8192       text+image->text         
+meta-llama/llama-3.3-70b-instruct:free             Meta: Llama 3.3 70B Instruct (free)           $0.0000    $0.0000    65536      N/A        text->text               
+meta-llama/llama-3.2-3b-instruct:free              Meta: Llama 3.2 3B Instruct (free)            $0.0000    $0.0000    131072     N/A        text->text               
+nousresearch/hermes-3-llama-3.1-405b:free          Nous: Hermes 3 405B Instruct (free)           $0.0000    $0.0000    131072     N/A        text->text               
+google/gemma-3n-e4b-it                             Google: Gemma 3n 4B                           $0.0200    $0.0400    32768      N/A        text->text               
+mistralai/mistral-nemo                             Mistral: Mistral Nemo                         $0.0200    $0.0400    131072     16384      text->text               
+meta-llama/llama-3.1-8b-instruct                   Meta: Llama 3.1 8B Instruct                   $0.0200    $0.0500    16384      16384      text->text               
+meta-llama/llama-3-8b-instruct                     Meta: Llama 3 8B Instruct                     $0.0300    $0.0400    8192       16384      text->text               
+sao10k/l3-lunaris-8b                               Sao10K: Llama 3 8B Lunaris                    $0.0400    $0.0500    8192       N/A        text->text               
+google/gemma-3-4b-it                               Google: Gemma 3 4B                            $0.0400    $0.0800    131072     N/A        text+image->text         
+gryphe/mythomax-l2-13b                             MythoMax 13B                                  $0.0600    $0.0600    4096       4096       text->text               
+ibm-granite/granite-4.0-h-micro                    IBM: Granite 4.0 Micro                        $0.0170    $0.1100    131000     N/A        text->text               
+mistralai/mistral-small-24b-instruct-2501          Mistral: Mistral Small 3                      $0.0500    $0.0800    32768      16384      text->text               
+qwen/qwen-2.5-7b-instruct                          Qwen: Qwen2.5 7B Instruct                     $0.0400    $0.1000    32768      32768      text->text               
+liquid/lfm-2-24b-a2b                               LiquidAI: LFM2-24B-A2B                        $0.0300    $0.1200    32768      N/A        text->text               
+qwen/qwen-turbo                                    Qwen: Qwen-Turbo                              $0.0325    $0.1300    131072     8192       text->text               
+openai/gpt-oss-20b                                 OpenAI: gpt-oss-20b                           $0.0300    $0.1400    131072     N/A        text->text               
+google/gemma-3-12b-it                              Google: Gemma 3 12B                           $0.0400    $0.1300    131072     N/A        text+image->text         
+qwen/qwen3-235b-a22b-2507                          Qwen: Qwen3 235B A22B Instruct 2507           $0.0710    $0.1000    262144     N/A        text->text               
+amazon/nova-micro-v1                               Amazon: Nova Micro 1.0                        $0.0350    $0.1400    128000     5120       text->text               
+cohere/command-r7b-12-2024                         Cohere: Command R7B (12-2024)                 $0.0375    $0.1500    128000     4000       text->text               
+arcee-ai/trinity-mini                              Arcee AI: Trinity Mini                        $0.0450    $0.1500    131072     131072     text->text               
+rekaai/reka-edge                                   Reka Edge                                     $0.1000    $0.1000    16384      16384      text+image+video->text   
+qwen/qwen3.5-9b                                    Qwen: Qwen3.5-9B                              $0.0500    $0.1500    256000     32768      text+image+video->text   
+mistralai/ministral-3b-2512                        Mistral: Ministral 3 3B 2512                  $0.1000    $0.1000    131072     N/A        text+image->text         
+z-ai/glm-4-32b                                     Z.ai: GLM 4 32B                               $0.1000    $0.1000    128000     N/A        text->text               
+nvidia/nemotron-nano-9b-v2                         NVIDIA: Nemotron Nano 9B V2                   $0.0400    $0.1600    131072     N/A        text->text               
+microsoft/phi-4                                    Microsoft: Phi 4                              $0.0650    $0.1400    16384      16384      text->text               
+meta-llama/llama-3.2-1b-instruct                   Meta: Llama 3.2 1B Instruct                   $0.0270    $0.2000    60000      N/A        text->text               
+openai/gpt-oss-120b                                OpenAI: gpt-oss-120b                          $0.0390    $0.1900    131072     N/A        text->text               
+google/gemma-3-27b-it                              Google: Gemma 3 27B                           $0.0800    $0.1600    131072     16384      text+image->text         
+nvidia/nemotron-3-nano-30b-a3b                     NVIDIA: Nemotron 3 Nano 30B A3B               $0.0500    $0.2000    262144     N/A        text->text               
+allenai/olmo-2-0325-32b-instruct                   AllenAI: Olmo 2 32B Instruct                  $0.0500    $0.2000    128000     N/A        text->text               
+mistralai/mistral-small-3.2-24b-instruct           Mistral: Mistral Small 3.2 24B                $0.0750    $0.2000    128000     N/A        text+image->text         
+nousresearch/hermes-2-pro-llama-3-8b               NousResearch: Hermes 2 Pro - Llama-3 8B       $0.1400    $0.1400    8192       8192       text->text               
+essentialai/rnj-1-instruct                         EssentialAI: Rnj 1 Instruct                   $0.1500    $0.1500    32768      N/A        text->text               
+mistralai/ministral-8b-2512                        Mistral: Ministral 3 8B 2512                  $0.1500    $0.1500    262144     N/A        text+image->text         
+bytedance/ui-tars-1.5-7b                           ByteDance: UI-TARS 7B                         $0.1000    $0.2000    128000     2048       text+image->text         
+qwen/qwen3-14b                                     Qwen: Qwen3 14B                               $0.0600    $0.2400    40960      40960      text->text               
+rekaai/reka-flash-3                                Reka Flash 3                                  $0.1000    $0.2000    65536      65536      text->text               
+amazon/nova-lite-v1                                Amazon: Nova Lite 1.0                         $0.0600    $0.2400    300000     5120       text+image->text         
+mistralai/mistral-7b-instruct-v0.1                 Mistral: Mistral 7B Instruct v0.1             $0.1100    $0.1900    2824       N/A        text->text               
+qwen/qwen3-32b                                     Qwen: Qwen3 32B                               $0.0800    $0.2400    40960      40960      text->text               
+qwen/qwen3.5-flash-02-23                           Qwen: Qwen3.5-Flash                           $0.0650    $0.2600    1000000    65536      text+image+video->text   
+qwen/qwen3-coder-30b-a3b-instruct                  Qwen: Qwen3 Coder 30B A3B Instruct            $0.0700    $0.2700    160000     32768      text->text               
+baidu/ernie-4.5-21b-a3b-thinking                   Baidu: ERNIE 4.5 21B A3B Thinking             $0.0700    $0.2800    131072     65536      text->text               
+baidu/ernie-4.5-21b-a3b                            Baidu: ERNIE 4.5 21B A3B                      $0.0700    $0.2800    120000     8000       text->text               
+arcee-ai/spotlight                                 Arcee AI: Spotlight                           $0.1800    $0.1800    131072     65537      text+image->text         
+meta-llama/llama-guard-4-12b                       Meta: Llama Guard 4 12B                       $0.1800    $0.1800    163840     N/A        text+image->text         
+qwen/qwen3-30b-a3b                                 Qwen: Qwen3 30B A3B                           $0.0800    $0.2800    40960      40960      text->text               
+bytedance-seed/seed-1.6-flash                      ByteDance Seed: Seed 1.6 Flash                $0.0750    $0.3000    262144     32768      text+image+video->text   
+openai/gpt-oss-safeguard-20b                       OpenAI: gpt-oss-safeguard-20b                 $0.0750    $0.3000    131072     65536      text->text               
+google/gemini-2.0-flash-lite-001                   Google: Gemini 2.0 Flash Lite                 $0.0750    $0.3000    1048576    8192       text+image+file+audio+video->text
+xiaomi/mimo-v2-flash                               Xiaomi: MiMo-V2-Flash                         $0.0900    $0.2900    262144     65536      text->text               
+meta-llama/llama-4-scout                           Meta: Llama 4 Scout                           $0.0800    $0.3000    327680     16384      text+image->text         
+qwen/qwen3-30b-a3b-instruct-2507                   Qwen: Qwen3 30B A3B Instruct 2507             $0.0900    $0.3000    262144     262144     text->text               
+meta-llama/llama-3.2-3b-instruct                   Meta: Llama 3.2 3B Instruct                   $0.0510    $0.3400    80000      N/A        text->text               
+stepfun/step-3.5-flash                             StepFun: Step 3.5 Flash                       $0.1000    $0.3000    262144     65536      text->text               
+mistralai/mistral-small-creative                   Mistral: Mistral Small Creative               $0.1000    $0.3000    32768      N/A        text->text               
+mistralai/ministral-14b-2512                       Mistral: Ministral 3 14B 2512                 $0.2000    $0.2000    262144     N/A        text+image->text         
+mistralai/voxtral-small-24b-2507                   Mistral: Voxtral Small 24B 2507               $0.1000    $0.3000    32000      N/A        text+audio->text         
+mistralai/devstral-small                           Mistral: Devstral Small 1.1                   $0.1000    $0.3000    131072     N/A        text->text               
+meta-llama/llama-3.3-70b-instruct                  Meta: Llama 3.3 70B Instruct                  $0.1000    $0.3200    131072     16384      text->text               
+google/gemma-4-26b-a4b-it                          Google: Gemma 4 26B A4B                       $0.0800    $0.3500    262144     N/A        text+image+video->text   
+openai/gpt-5-nano                                  OpenAI: GPT-5 Nano                            $0.0500    $0.4000    400000     N/A        text+image+file->text    
+qwen/qwen3-8b                                      Qwen: Qwen3 8B                                $0.0500    $0.4000    40960      8192       text->text               
+z-ai/glm-4.7-flash                                 Z.ai: GLM 4.7 Flash                           $0.0600    $0.4000    202752     N/A        text->text               
+qwen/qwen3-30b-a3b-thinking-2507                   Qwen: Qwen3 30B A3B Thinking 2507             $0.0800    $0.4000    131072     131072     text->text               
+meta-llama/llama-3.2-11b-vision-instruct           Meta: Llama 3.2 11B Vision Instruct           $0.2450    $0.2450    131072     16384      text+image->text         
+bytedance-seed/seed-2.0-mini                       ByteDance Seed: Seed-2.0-Mini                 $0.1000    $0.4000    262144     131072     text+image+video->text   
+nvidia/llama-3.3-nemotron-super-49b-v1.5           NVIDIA: Llama 3.3 Nemotron Super 49B V1.5     $0.1000    $0.4000    131072     N/A        text->text               
+google/gemini-2.5-flash-lite-preview-09-2025       Google: Gemini 2.5 Flash Lite Preview 09-2025 $0.1000    $0.4000    1048576    65535      text+image+file+audio+video->text
+google/gemini-2.5-flash-lite                       Google: Gemini 2.5 Flash Lite                 $0.1000    $0.4000    1048576    65535      text+image+file+audio+video->text
+openai/gpt-4.1-nano                                OpenAI: GPT-4.1 Nano                          $0.1000    $0.4000    1047576    32768      text+image+file->text    
+google/gemini-2.0-flash-001                        Google: Gemini 2.0 Flash                      $0.1000    $0.4000    1048576    8192       text+image+file+audio+video->text
+google/gemma-4-31b-it                              Google: Gemma 4 31B                           $0.1300    $0.3800    262144     N/A        text+image+video->text   
+meta-llama/llama-guard-3-8b                        Llama Guard 3 8B                              $0.4800    $0.0300    131072     N/A        text->text               
+qwen/qwen-2.5-72b-instruct                         Qwen2.5 72B Instruct                          $0.1200    $0.3900    32768      16384      text->text               
+qwen/qwen3-vl-32b-instruct                         Qwen: Qwen3 VL 32B Instruct                   $0.1040    $0.4160    131072     32768      text+image->text         
+nousresearch/hermes-4-70b                          Nous: Hermes 4 70B                            $0.1300    $0.4000    131072     N/A        text->text               
+alibaba/tongyi-deepresearch-30b-a3b                Tongyi DeepResearch 30B A3B                   $0.0900    $0.4500    131072     131072     text->text               
+qwen/qwen-vl-plus                                  Qwen: Qwen VL Plus                            $0.1365    $0.4095    131072     8192       text+image->text         
+qwen/qwen3-vl-8b-instruct                          Qwen: Qwen3 VL 8B Instruct                    $0.0800    $0.5000    131072     32768      text+image->text         
+deepseek/deepseek-r1-distill-qwen-32b              DeepSeek: R1 Distill Qwen 32B                 $0.2900    $0.2900    32768      32768      text->text               
+nvidia/nemotron-3-super-120b-a12b                  NVIDIA: Nemotron 3 Super                      $0.1000    $0.5000    262144     N/A        text->text               
+thedrummer/rocinante-12b                           TheDrummer: Rocinante 12B                     $0.1700    $0.4300    32768      32768      text->text               
+nousresearch/hermes-3-llama-3.1-70b                Nous: Hermes 3 70B Instruct                   $0.3000    $0.3000    131072     N/A        text->text               
+nex-agi/deepseek-v3.1-nex-n1                       Nex AGI: DeepSeek V3.1 Nex N1                 $0.1350    $0.5000    131072     163840     text->text               
+deepseek/deepseek-v3.2                             DeepSeek: DeepSeek V3.2                       $0.2600    $0.3800    163840     N/A        text->text               
+allenai/olmo-3-32b-think                           AllenAI: Olmo 3 32B Think                     $0.1500    $0.5000    65536      65536      text->text               
+qwen/qwen3-vl-30b-a3b-instruct                     Qwen: Qwen3 VL 30B A3B Instruct               $0.1300    $0.5200    131072     32768      text+image->text         
+deepseek/deepseek-v3.2-exp                         DeepSeek: DeepSeek V3.2 Exp                   $0.2700    $0.4100    163840     65536      text->text               
+x-ai/grok-4.1-fast                                 xAI: Grok 4.1 Fast                            $0.2000    $0.5000    2000000    30000      text+image+file->text    
+x-ai/grok-4-fast                                   xAI: Grok 4 Fast                              $0.2000    $0.5000    2000000    30000      text+image+file->text    
+baidu/ernie-4.5-vl-28b-a3b                         Baidu: ERNIE 4.5 VL 28B A3B                   $0.1400    $0.5600    30000      8000       text+image->text         
+tencent/hunyuan-a13b-instruct                      Tencent: Hunyuan A13B Instruct                $0.1400    $0.5700    131072     131072     text->text               
+qwen/qwq-32b                                       Qwen: QwQ 32B                                 $0.1500    $0.5800    131072     131072     text->text               
+mistralai/mistral-small-2603                       Mistral: Mistral Small 4                      $0.1500    $0.6000    262144     N/A        text+image->text         
+upstage/solar-pro-3                                Upstage: Solar Pro 3                          $0.1500    $0.6000    128000     N/A        text->text               
+meta-llama/llama-4-maverick                        Meta: Llama 4 Maverick                        $0.1500    $0.6000    1048576    16384      text+image->text         
+openai/gpt-4o-mini-search-preview                  OpenAI: GPT-4o-mini Search Preview            $0.1500    $0.6000    128000     16384      text->text               
+cohere/command-r-08-2024                           Cohere: Command R (08-2024)                   $0.1500    $0.6000    128000     4000       text->text               
+openai/gpt-4o-mini-2024-07-18                      OpenAI: GPT-4o-mini (2024-07-18)              $0.1500    $0.6000    128000     16384      text+image+file->text    
+openai/gpt-4o-mini                                 OpenAI: GPT-4o-mini                           $0.1500    $0.6000    128000     16384      text+image+file->text    
+allenai/olmo-3.1-32b-instruct                      AllenAI: Olmo 3.1 32B Instruct                $0.2000    $0.6000    65536      N/A        text->text               
+nvidia/nemotron-nano-12b-v2-vl                     NVIDIA: Nemotron Nano 12B 2 VL                $0.2000    $0.6000    131072     N/A        text+image+video->text   
+qwen/qwen2.5-vl-32b-instruct                       Qwen: Qwen2.5 VL 32B Instruct                 $0.2000    $0.6000    128000     N/A        text+image->text         
+mistralai/mistral-saba                             Mistral: Saba                                 $0.2000    $0.6000    32768      N/A        text->text               
+thedrummer/unslopnemo-12b                          TheDrummer: UnslopNemo 12B                    $0.4000    $0.4000    32768      32768      text->text               
+meta-llama/llama-3.1-70b-instruct                  Meta: Llama 3.1 70B Instruct                  $0.4000    $0.4000    131072     N/A        text->text               
+thedrummer/cydonia-24b-v4.1                        TheDrummer: Cydonia 24B V4.1                  $0.3000    $0.5000    131072     131072     text->text               
+x-ai/grok-3-mini                                   xAI: Grok 3 Mini                              $0.3000    $0.5000    131072     N/A        text->text               
+x-ai/grok-3-mini-beta                              xAI: Grok 3 Mini Beta                         $0.3000    $0.5000    131072     N/A        text->text               
+qwen/qwen3-next-80b-a3b-thinking                   Qwen: Qwen3 Next 80B A3B Thinking             $0.0975    $0.7800    131072     32768      text->text               
+deepseek/deepseek-chat-v3.1                        DeepSeek: DeepSeek V3.1                       $0.1500    $0.7500    32768      7168       text->text               
+mistralai/mistral-small-3.1-24b-instruct           Mistral: Mistral Small 3.1 24B                $0.3500    $0.5600    128000     N/A        text+image->text         
+qwen/qwen3-coder-next                              Qwen: Qwen3 Coder Next                        $0.1500    $0.8000    262144     262144     text->text               
+deepseek/deepseek-chat-v3-0324                     DeepSeek: DeepSeek V3 0324                    $0.2000    $0.7700    163840     N/A        text->text               
+z-ai/glm-4.5-air                                   Z.ai: GLM 4.5 Air                             $0.1300    $0.8500    131072     98304      text->text               
+deepseek/deepseek-v3.1-terminus                    DeepSeek: DeepSeek V3.1 Terminus              $0.2100    $0.7900    163840     N/A        text->text               
+inception/mercury-2                                Inception: Mercury 2                          $0.2500    $0.7500    128000     50000      text->text               
+inception/mercury                                  Inception: Mercury                            $0.2500    $0.7500    128000     32000      text->text               
+inception/mercury-coder                            Inception: Mercury Coder                      $0.2500    $0.7500    128000     32000      text->text               
+qwen/qwen-plus-2025-07-28:thinking                 Qwen: Qwen Plus 0728 (thinking)               $0.2600    $0.7800    1000000    32768      text->text               
+qwen/qwen-plus-2025-07-28                          Qwen: Qwen Plus 0728                          $0.2600    $0.7800    1000000    32768      text->text               
+qwen/qwen-plus                                     Qwen: Qwen-Plus                               $0.2600    $0.7800    1000000    32768      text->text               
+arcee-ai/trinity-large-thinking                    Arcee AI: Trinity Large Thinking              $0.2200    $0.8500    262144     262144     text->text               
+qwen/qwen3-vl-235b-a22b-instruct                   Qwen: Qwen3 VL 235B A22B Instruct             $0.2000    $0.8800    262144     N/A        text+image->text         
+mistralai/mixtral-8x7b-instruct                    Mistral: Mixtral 8x7B Instruct                $0.5400    $0.5400    32768      16384      text->text               
+undi95/remm-slerp-l2-13b                           ReMM SLERP 13B                                $0.4500    $0.6500    6144       4096       text->text               
+minimax/minimax-m2.5                               MiniMax: MiniMax M2.5                         $0.1180    $0.9900    196608     65536      text->text               
+qwen/qwen3-coder-flash                             Qwen: Qwen3 Coder Flash                       $0.1950    $0.9750    1000000    65536      text->text               
+qwen/qwen3-next-80b-a3b-instruct                   Qwen: Qwen3 Next 80B A3B Instruct             $0.0900    $1.1000    262144     N/A        text->text               
+z-ai/glm-4.6v                                      Z.ai: GLM 4.6V                                $0.3000    $0.9000    131072     131072     text+image+video->text   
+mistralai/codestral-2508                           Mistral: Codestral 2508                       $0.3000    $0.9000    256000     N/A        text->text               
+deepseek/deepseek-chat                             DeepSeek: DeepSeek V3                         $0.3200    $0.8900    163840     163840     text->text               
+qwen/qwen3-coder                                   Qwen: Qwen3 Coder 480B A35B                   $0.2200    $1.0000    262144     N/A        text->text               
+minimax/minimax-m2.1                               MiniMax: MiniMax M2.1                         $0.2900    $0.9500    196608     196608     text->text               
+microsoft/wizardlm-2-8x22b                         WizardLM-2 8x22B                              $0.6200    $0.6200    65535      8000       text->text               
+meta-llama/llama-3-70b-instruct                    Meta: Llama 3 70B Instruct                    $0.5100    $0.7400    8192       8000       text->text               
+minimax/minimax-m2                                 MiniMax: MiniMax M2                           $0.2550    $1.0000    196608     196608     text->text               
+arcee-ai/coder-large                               Arcee AI: Coder Large                         $0.5000    $0.8000    32768      N/A        text->text               
+prime-intellect/intellect-3                        Prime Intellect: INTELLECT-3                  $0.2000    $1.1000    131072     131072     text->text               
+minimax/minimax-01                                 MiniMax: MiniMax-01                           $0.2000    $1.1000    1000192    1000192    text+image->text         
+google/gemma-2-27b-it                              Google: Gemma 2 27B                           $0.6500    $0.6500    8192       2048       text->text               
+thedrummer/skyfall-36b-v2                          TheDrummer: Skyfall 36B V2                    $0.5500    $0.8000    32768      32768      text->text               
+baidu/ernie-4.5-300b-a47b                          Baidu: ERNIE 4.5 300B A47B                    $0.2800    $1.1000    123000     12000      text->text               
+sao10k/l3.3-euryale-70b                            Sao10K: Llama 3.3 Euryale 70B                 $0.6500    $0.7500    131072     16384      text->text               
+tngtech/deepseek-r1t2-chimera                      TNG: DeepSeek R1T2 Chimera                    $0.3000    $1.1000    163840     163840     text->text               
+openai/gpt-5.4-nano                                OpenAI: GPT-5.4 Nano                          $0.2000    $1.2500    400000     128000     text+image+file->text    
+qwen/qwen3.5-35b-a3b                               Qwen: Qwen3.5-35B-A3B                         $0.1625    $1.3000    262144     65536      text+image+video->text   
+qwen/qwen3-vl-8b-thinking                          Qwen: Qwen3 VL 8B Thinking                    $0.1170    $1.3650    131072     32768      text+image->text         
+kwaipilot/kat-coder-pro-v2                         Kwaipilot: KAT-Coder-Pro V2                   $0.3000    $1.2000    256000     80000      text->text               
+minimax/minimax-m2.7                               MiniMax: MiniMax M2.7                         $0.3000    $1.2000    196608     N/A        text->text               
+minimax/minimax-m2-her                             MiniMax: MiniMax M2-her                       $0.3000    $1.2000    65536      2048       text->text               
+deepseek/deepseek-r1-distill-llama-70b             DeepSeek: R1 Distill Llama 70B                $0.7000    $0.8000    131072     16384      text->text               
+anthropic/claude-3-haiku                           Anthropic: Claude 3 Haiku                     $0.2500    $1.2500    200000     4096       text+image->text         
+deepseek/deepseek-v3.2-speciale                    DeepSeek: DeepSeek V3.2 Speciale              $0.4000    $1.2000    163840     163840     text->text               
+qwen/qwen2.5-vl-72b-instruct                       Qwen: Qwen2.5 VL 72B Instruct                 $0.8000    $0.8000    32768      32768      text+image->text         
+qwen/qwen3-235b-a22b-thinking-2507                 Qwen: Qwen3 235B A22B Thinking 2507           $0.1495    $1.4950    131072     N/A        text->text               
+qwen/qwen-2.5-coder-32b-instruct                   Qwen2.5 Coder 32B Instruct                    $0.6600    $1.0000    32768      N/A        text->text               
+baidu/ernie-4.5-vl-424b-a47b                       Baidu: ERNIE 4.5 VL 424B A47B                 $0.4200    $1.2500    123000     16000      text+image->text         
+qwen/qwen3-vl-30b-a3b-thinking                     Qwen: Qwen3 VL 30B A3B Thinking               $0.1300    $1.5600    131072     32768      text+image->text         
+x-ai/grok-code-fast-1                              xAI: Grok Code Fast 1                         $0.2000    $1.5000    256000     10000      text->text               
+sao10k/l3.1-euryale-70b                            Sao10K: Llama 3.1 Euryale 70B v2.2            $0.8500    $0.8500    131072     16384      text->text               
+google/gemini-3.1-flash-lite-preview               Google: Gemini 3.1 Flash Lite Preview         $0.2500    $1.5000    1048576    65536      text+image+file+audio+video->text
+mancer/weaver                                      Mancer: Weaver (alpha)                        $0.7500    $1.0000    8000       2000       text->text               
+qwen/qwen3.5-27b                                   Qwen: Qwen3.5-27B                             $0.1950    $1.5600    262144     65536      text+image+video->text   
+qwen/qwen3.5-plus-02-15                            Qwen: Qwen3.5 Plus 2026-02-15                 $0.2600    $1.5600    1000000    65536      text+image+video->text   
+arcee-ai/virtuoso-large                            Arcee AI: Virtuoso Large                      $0.7500    $1.2000    131072     64000      text->text               
+openai/gpt-4.1-mini                                OpenAI: GPT-4.1 Mini                          $0.4000    $1.6000    1047576    32768      text+image+file->text    
+mistralai/mistral-large-2512                       Mistral: Mistral Large 3 2512                 $0.5000    $1.5000    262144     N/A        text+image->text         
+morph/morph-v3-fast                                Morph: Morph V3 Fast                          $0.8000    $1.2000    81920      38000      text->text               
+alfredpros/codellama-7b-instruct-solidity          AlfredPros: CodeLLaMa 7B Instruct Solidity    $0.8000    $1.2000    4096       4096       text->text               
+perplexity/sonar                                   Perplexity: Sonar                             $1.0000    $1.0000    127072     N/A        text+image->text         
+nousresearch/hermes-3-llama-3.1-405b               Nous: Hermes 3 405B Instruct                  $1.0000    $1.0000    131072     16384      text->text               
+openai/gpt-3.5-turbo                               OpenAI: GPT-3.5 Turbo                         $0.5000    $1.5000    16385      4096       text->text               
+aion-labs/aion-1.0-mini                            AionLabs: Aion-1.0-Mini                       $0.7000    $1.4000    131072     32768      text->text               
+relace/relace-apply-3                              Relace: Relace Apply 3                        $0.8500    $1.2500    256000     128000     text->text               
+moonshotai/kimi-k2.5                               MoonshotAI: Kimi K2.5                         $0.3827    $1.7200    262144     65535      text+image->text         
+z-ai/glm-4.7                                       Z.ai: GLM 4.7                                 $0.3900    $1.7500    202752     65535      text->text               
+bytedance-seed/seed-2.0-lite                       ByteDance Seed: Seed-2.0-Lite                 $0.2500    $2.0000    262144     131072     text+image+video->text   
+bytedance-seed/seed-1.6                            ByteDance Seed: Seed 1.6                      $0.2500    $2.0000    262144     32768      text+image+video->text   
+openai/gpt-5.1-codex-mini                          OpenAI: GPT-5.1-Codex-Mini                    $0.2500    $2.0000    400000     128000     text+image->text         
+openai/gpt-5-mini                                  OpenAI: GPT-5 Mini                            $0.2500    $2.0000    400000     128000     text+image+file->text    
+qwen/qwen3.6-plus                                  Qwen: Qwen3.6 Plus                            $0.3250    $1.9500    1000000    65536      text+image+video->text   
+qwen/qwen3-235b-a22b                               Qwen: Qwen3 235B A22B                         $0.4550    $1.8200    131072     8192       text->text               
+z-ai/glm-4.6                                       Z.ai: GLM 4.6                                 $0.3900    $1.9000    204800     204800     text->text               
+qwen/qwen3.5-122b-a10b                             Qwen: Qwen3.5-122B-A10B                       $0.2600    $2.0800    262144     65536      text+image+video->text   
+xiaomi/mimo-v2-omni                                Xiaomi: MiMo-V2-Omni                          $0.4000    $2.0000    262144     65536      text+image+audio+video->text
+aion-labs/aion-2.0                                 AionLabs: Aion-2.0                            $0.8000    $1.6000    131072     32768      text->text               
+mistralai/devstral-2512                            Mistral: Devstral 2 2512                      $0.4000    $2.0000    262144     N/A        text->text               
+moonshotai/kimi-k2-0905                            MoonshotAI: Kimi K2 0905                      $0.4000    $2.0000    262144     262144     text->text               
+mistralai/mistral-medium-3.1                       Mistral: Mistral Medium 3.1                   $0.4000    $2.0000    131072     N/A        text+image->text         
+z-ai/glm-4.5v                                      Z.ai: GLM 4.5V                                $0.6000    $1.8000    65536      16384      text+image->text         
+mistralai/devstral-medium                          Mistral: Devstral Medium                      $0.4000    $2.0000    131072     N/A        text->text               
+mistralai/mistral-medium-3                         Mistral: Mistral Medium 3                     $0.4000    $2.0000    131072     N/A        text+image->text         
+aion-labs/aion-rp-llama-3.1-8b                     AionLabs: Aion-RP 1.0 (8B)                    $0.8000    $1.6000    32768      32768      text->text               
+nvidia/llama-3.1-nemotron-70b-instruct             NVIDIA: Llama 3.1 Nemotron 70B Instruct       $1.2000    $1.2000    131072     16384      text->text               
+deepcogito/cogito-v2.1-671b                        Deep Cogito: Cogito v2.1 671B                 $1.2500    $1.2500    128000     N/A        text->text               
+minimax/minimax-m1                                 MiniMax: MiniMax M1                           $0.4000    $2.2000    1000000    40000      text->text               
+qwen/qwen-vl-max                                   Qwen: Qwen VL Max                             $0.5200    $2.0800    131072     32768      text+image->text         
+deepseek/deepseek-r1-0528                          DeepSeek: R1 0528                             $0.5000    $2.1500    163840     N/A        text->text               
+qwen/qwen3.5-397b-a17b                             Qwen: Qwen3.5 397B A17B                       $0.3900    $2.3400    262144     65536      text+image+video->text   
+amazon/nova-2-lite-v1                              Amazon: Nova 2 Lite                           $0.3000    $2.5000    1000000    65535      text+image+file+video->text
+google/gemini-2.5-flash-image                      Google: Nano Banana (Gemini 2.5 Flash Image)  $0.3000    $2.5000    32768      32768      text+image->text+image   
+morph/morph-v3-large                               Morph: Morph V3 Large                         $0.9000    $1.9000    262144     131072     text->text               
+google/gemini-2.5-flash                            Google: Gemini 2.5 Flash                      $0.3000    $2.5000    1048576    65535      text+image+file+audio+video->text
+z-ai/glm-4.5                                       Z.ai: GLM 4.5                                 $0.6000    $2.2000    131072     98304      text->text               
+qwen/qwen3-vl-235b-a22b-thinking                   Qwen: Qwen3 VL 235B A22B Thinking             $0.2600    $2.6000    131072     32768      text+image->text         
+moonshotai/kimi-k2                                 MoonshotAI: Kimi K2 0711                      $0.5700    $2.3000    131072     131072     text->text               
+sao10k/l3-euryale-70b                              Sao10k: Llama 3 Euryale 70B v2.1              $1.4800    $1.4800    8192       8192       text->text               
+openai/gpt-audio-mini                              OpenAI: GPT Audio Mini                        $0.6000    $2.4000    128000     16384      text+audio->text+audio   
+openai/gpt-3.5-turbo-0613                          OpenAI: GPT-3.5 Turbo (older v0613)           $1.0000    $2.0000    4095       4096       text->text               
+z-ai/glm-5                                         Z.ai: GLM 5                                   $0.7200    $2.3000    80000      131072     text->text               
+moonshotai/kimi-k2-thinking                        MoonshotAI: Kimi K2 Thinking                  $0.6000    $2.5000    262144     262144     text->text               
+deepseek/deepseek-r1                               DeepSeek: R1                                  $0.7000    $2.5000    64000      16000      text->text               
+google/gemini-3.1-flash-image-preview              Google: Nano Banana 2 (Gemini 3.1 Flash Image Preview) $0.5000    $3.0000    65536      65536      text+image->text+image   
+google/gemini-3-flash-preview                      Google: Gemini 3 Flash Preview                $0.5000    $3.0000    1048576    65536      text+image+file+audio+video->text
+openai/gpt-3.5-turbo-instruct                      OpenAI: GPT-3.5 Turbo Instruct                $1.5000    $2.0000    4095       4096       text->text               
+qwen/qwen3-coder-plus                              Qwen: Qwen3 Coder Plus                        $0.6500    $3.2500    1000000    65536      text->text               
+amazon/nova-pro-v1                                 Amazon: Nova Pro 1.0                          $0.8000    $3.2000    300000     5120       text+image->text         
+xiaomi/mimo-v2-pro                                 Xiaomi: MiMo-V2-Pro                           $1.0000    $3.0000    1048576    131072     text->text               
+relace/relace-search                               Relace: Relace Search                         $1.0000    $3.0000    256000     128000     text->text               
+nousresearch/hermes-4-405b                         Nous: Hermes 4 405B                           $1.0000    $3.0000    131072     N/A        text->text               
+z-ai/glm-5.1                                       Z.ai: GLM 5.1                                 $0.9500    $3.1500    202752     65535      text->text               
+arcee-ai/maestro-reasoning                         Arcee AI: Maestro Reasoning                   $0.9000    $3.3000    131072     32000      text->text               
+switchpoint/router                                 Switchpoint Router                            $0.8500    $3.4000    131072     N/A        text->text               
+openai/gpt-5-image-mini                            OpenAI: GPT-5 Image Mini                      $2.5000    $2.0000    400000     128000     text+image+file->text+image
+qwen/qwen3-max-thinking                            Qwen: Qwen3 Max Thinking                      $0.7800    $3.9000    262144     32768      text->text               
+qwen/qwen3-max                                     Qwen: Qwen3 Max                               $0.7800    $3.9000    262144     32768      text->text               
+anthropic/claude-3.5-haiku                         Anthropic: Claude 3.5 Haiku                   $0.8000    $4.0000    200000     8192       text+image->text         
+z-ai/glm-5v-turbo                                  Z.ai: GLM 5V Turbo                            $1.2000    $4.0000    202752     131072     text+image+video->text   
+z-ai/glm-5-turbo                                   Z.ai: GLM 5 Turbo                             $1.2000    $4.0000    202752     131072     text->text               
+qwen/qwen-max                                      Qwen: Qwen-Max                                $1.0400    $4.1600    32768      8192       text->text               
+openai/gpt-5.4-mini                                OpenAI: GPT-5.4 Mini                          $0.7500    $4.5000    400000     128000     text+image+file->text    
+openai/o4-mini-high                                OpenAI: o4 Mini High                          $1.1000    $4.4000    200000     100000     text+image+file->text    
+openai/o4-mini                                     OpenAI: o4 Mini                               $1.1000    $4.4000    200000     100000     text+image+file->text    
+openai/o3-mini-high                                OpenAI: o3 Mini High                          $1.1000    $4.4000    200000     100000     text+file->text          
+openai/o3-mini                                     OpenAI: o3 Mini                               $1.1000    $4.4000    200000     100000     text+file->text          
+anthropic/claude-haiku-4.5                         Anthropic: Claude Haiku 4.5                   $1.0000    $5.0000    200000     64000      text+image->text         
+sao10k/l3.1-70b-hanami-x1                          Sao10K: Llama 3.1 70B Hanami x1               $3.0000    $3.0000    16000      N/A        text->text               
+writer/palmyra-x5                                  Writer: Palmyra X5                            $0.6000    $6.0000    1040000    8192       text->text               
+openai/gpt-3.5-turbo-16k                           OpenAI: GPT-3.5 Turbo 16k                     $3.0000    $4.0000    16385      4096       text->text               
+x-ai/grok-4.20-multi-agent                         xAI: Grok 4.20 Multi-Agent                    $2.0000    $6.0000    2000000    N/A        text+image+file->text    
+x-ai/grok-4.20                                     xAI: Grok 4.20                                $2.0000    $6.0000    2000000    N/A        text+image+file->text    
+mistralai/mistral-large-2411                       Mistral Large 2411                            $2.0000    $6.0000    131072     N/A        text->text               
+mistralai/mistral-large-2407                       Mistral Large 2407                            $2.0000    $6.0000    131072     N/A        text->text               
+mistralai/pixtral-large-2411                       Mistral: Pixtral Large 2411                   $2.0000    $6.0000    131072     N/A        text+image->text         
+anthracite-org/magnum-v4-72b                       Magnum v4 72B                                 $3.0000    $5.0000    16384      2048       text->text               
+mistralai/mixtral-8x22b-instruct                   Mistral: Mixtral 8x22B Instruct               $2.0000    $6.0000    65536      N/A        text->text               
+mistralai/mistral-large                            Mistral Large                                 $2.0000    $6.0000    128000     N/A        text->text               
+openai/o4-mini-deep-research                       OpenAI: o4 Mini Deep Research                 $2.0000    $8.0000    200000     100000     text+image+file->text    
+ai21/jamba-large-1.7                               AI21: Jamba Large 1.7                         $2.0000    $8.0000    256000     4096       text->text               
+openai/o3                                          OpenAI: o3                                    $2.0000    $8.0000    200000     100000     text+image+file->text    
+openai/gpt-4.1                                     OpenAI: GPT-4.1                               $2.0000    $8.0000    1047576    N/A        text+image+file->text    
+perplexity/sonar-reasoning-pro                     Perplexity: Sonar Reasoning Pro               $2.0000    $8.0000    128000     N/A        text+image->text         
+perplexity/sonar-deep-research                     Perplexity: Sonar Deep Research               $2.0000    $8.0000    128000     N/A        text->text               
+openai/gpt-5.1-codex-max                           OpenAI: GPT-5.1-Codex-Max                     $1.2500    $10.0000   400000     128000     text+image->text         
+openai/gpt-5.1                                     OpenAI: GPT-5.1                               $1.2500    $10.0000   400000     128000     text+image+file->text    
+openai/gpt-5.1-chat                                OpenAI: GPT-5.1 Chat                          $1.2500    $10.0000   128000     16384      text+image+file->text    
+openai/gpt-5.1-codex                               OpenAI: GPT-5.1-Codex                         $1.2500    $10.0000   400000     128000     text+image->text         
+openai/gpt-5-codex                                 OpenAI: GPT-5 Codex                           $1.2500    $10.0000   400000     128000     text+image->text         
+openai/gpt-5-chat                                  OpenAI: GPT-5 Chat                            $1.2500    $10.0000   128000     16384      text+image+file->text    
+openai/gpt-5                                       OpenAI: GPT-5                                 $1.2500    $10.0000   400000     128000     text+image+file->text    
+google/gemini-2.5-pro                              Google: Gemini 2.5 Pro                        $1.2500    $10.0000   1048576    65536      text+image+file+audio+video->text
+google/gemini-2.5-pro-preview                      Google: Gemini 2.5 Pro Preview 06-05          $1.2500    $10.0000   1048576    65536      text+image+file+audio->text
+google/gemini-2.5-pro-preview-05-06                Google: Gemini 2.5 Pro Preview 05-06          $1.2500    $10.0000   1048576    65535      text+image+file+audio+video->text
+alpindale/goliath-120b                             Goliath 120B                                  $3.7500    $7.5000    6144       1024       text->text               
+aion-labs/aion-1.0                                 AionLabs: Aion-1.0                            $4.0000    $8.0000    131072     32768      text->text               
+openai/gpt-audio                                   OpenAI: GPT Audio                             $2.5000    $10.0000   128000     16384      text+audio->text+audio   
+openai/gpt-4o-audio-preview                        OpenAI: GPT-4o Audio                          $2.5000    $10.0000   128000     16384      text+audio->text+audio   
+cohere/command-a                                   Cohere: Command A                             $2.5000    $10.0000   256000     8192       text->text               
+openai/gpt-4o-search-preview                       OpenAI: GPT-4o Search Preview                 $2.5000    $10.0000   128000     16384      text->text               
+openai/gpt-4o-2024-11-20                           OpenAI: GPT-4o (2024-11-20)                   $2.5000    $10.0000   128000     16384      text+image+file->text    
+inflection/inflection-3-productivity               Inflection: Inflection 3 Productivity         $2.5000    $10.0000   8000       1024       text->text               
+inflection/inflection-3-pi                         Inflection: Inflection 3 Pi                   $2.5000    $10.0000   8000       1024       text->text               
+cohere/command-r-plus-08-2024                      Cohere: Command R+ (08-2024)                  $2.5000    $10.0000   128000     4000       text->text               
+openai/gpt-4o-2024-08-06                           OpenAI: GPT-4o (2024-08-06)                   $2.5000    $10.0000   128000     16384      text+image+file->text    
+openai/gpt-4o                                      OpenAI: GPT-4o                                $2.5000    $10.0000   128000     16384      text+image+file->text    
+google/gemini-3.1-pro-preview-customtools          Google: Gemini 3.1 Pro Preview Custom Tools   $2.0000    $12.0000   1048576    65536      text+image+file+audio+video->text
+google/gemini-3.1-pro-preview                      Google: Gemini 3.1 Pro Preview                $2.0000    $12.0000   1048576    65536      text+image+file+audio+video->text
+google/gemini-3-pro-image-preview                  Google: Nano Banana Pro (Gemini 3 Pro Image Preview) $2.0000    $12.0000   65536      32768      text+image->text+image   
+amazon/nova-premier-v1                             Amazon: Nova Premier 1.0                      $2.5000    $12.5000   1000000    32000      text+image->text         
+openai/gpt-5.3-chat                                OpenAI: GPT-5.3 Chat                          $1.7500    $14.0000   128000     16384      text+image+file->text    
+openai/gpt-5.3-codex                               OpenAI: GPT-5.3-Codex                         $1.7500    $14.0000   400000     128000     text+image+file->text    
+openai/gpt-5.2-codex                               OpenAI: GPT-5.2-Codex                         $1.7500    $14.0000   400000     128000     text+image->text         
+openai/gpt-5.2-chat                                OpenAI: GPT-5.2 Chat                          $1.7500    $14.0000   128000     32000      text+image+file->text    
+openai/gpt-5.2                                     OpenAI: GPT-5.2                               $1.7500    $14.0000   400000     128000     text+image+file->text    
+openai/gpt-5.4                                     OpenAI: GPT-5.4                               $2.5000    $15.0000   1050000    128000     text+image+file->text    
+anthropic/claude-sonnet-4.6                        Anthropic: Claude Sonnet 4.6                  $3.0000    $15.0000   1000000    128000     text+image->text         
+perplexity/sonar-pro-search                        Perplexity: Sonar Pro Search                  $3.0000    $15.0000   200000     8000       text+image->text         
+anthropic/claude-sonnet-4.5                        Anthropic: Claude Sonnet 4.5                  $3.0000    $15.0000   1000000    64000      text+image+file->text    
+x-ai/grok-4                                        xAI: Grok 4                                   $3.0000    $15.0000   256000     N/A        text+image+file->text    
+x-ai/grok-3                                        xAI: Grok 3                                   $3.0000    $15.0000   131072     N/A        text->text               
+anthropic/claude-sonnet-4                          Anthropic: Claude Sonnet 4                    $3.0000    $15.0000   1000000    64000      text+image+file->text    
+x-ai/grok-3-beta                                   xAI: Grok 3 Beta                              $3.0000    $15.0000   131072     N/A        text->text               
+perplexity/sonar-pro                               Perplexity: Sonar Pro                         $3.0000    $15.0000   200000     8000       text+image->text         
+anthropic/claude-3.7-sonnet                        Anthropic: Claude 3.7 Sonnet                  $3.0000    $15.0000   200000     128000     text+image+file->text    
+anthropic/claude-3.7-sonnet:thinking               Anthropic: Claude 3.7 Sonnet (thinking)       $3.0000    $15.0000   200000     64000      text+image+file->text    
+openai/gpt-5-image                                 OpenAI: GPT-5 Image                           $10.0000   $10.0000   400000     128000     text+image+file->text+image
+openai/gpt-4o-2024-05-13                           OpenAI: GPT-4o (2024-05-13)                   $5.0000    $15.0000   128000     4096       text+image+file->text    
+openai/gpt-4o:extended                             OpenAI: GPT-4o (extended)                     $6.0000    $18.0000   128000     64000      text+image+file->text    
+anthropic/claude-opus-4.6                          Anthropic: Claude Opus 4.6                    $5.0000    $25.0000   1000000    128000     text+image->text         
+anthropic/claude-opus-4.5                          Anthropic: Claude Opus 4.5                    $5.0000    $25.0000   200000     64000      text+image+file->text    
+openai/gpt-4-turbo                                 OpenAI: GPT-4 Turbo                           $10.0000   $30.0000   128000     4096       text+image->text         
+openai/gpt-4-turbo-preview                         OpenAI: GPT-4 Turbo Preview                   $10.0000   $30.0000   128000     4096       text->text               
+openai/gpt-4-1106-preview                          OpenAI: GPT-4 Turbo (older v1106)             $10.0000   $30.0000   128000     4096       text->text               
+openai/o3-deep-research                            OpenAI: o3 Deep Research                      $10.0000   $40.0000   200000     100000     text+image+file->text    
+openai/o1                                          OpenAI: o1                                    $15.0000   $60.0000   200000     100000     text+image+file->text    
+anthropic/claude-opus-4.1                          Anthropic: Claude Opus 4.1                    $15.0000   $75.0000   200000     32000      text+image+file->text    
+anthropic/claude-opus-4                            Anthropic: Claude Opus 4                      $15.0000   $75.0000   200000     32000      text+image+file->text    
+openai/gpt-4-0314                                  OpenAI: GPT-4 (older v0314)                   $30.0000   $60.0000   8191       4096       text->text               
+openai/gpt-4                                       OpenAI: GPT-4                                 $30.0000   $60.0000   8191       4096       text->text               
+openai/o3-pro                                      OpenAI: o3 Pro                                $20.0000   $80.0000   200000     100000     text+image+file->text    
+openai/gpt-5-pro                                   OpenAI: GPT-5 Pro                             $15.0000   $120.0000  400000     128000     text+image+file->text    
+anthropic/claude-opus-4.6-fast                     Anthropic: Claude Opus 4.6 (Fast)             $30.0000   $150.0000  1000000    128000     text+image->text         
+openai/gpt-5.2-pro                                 OpenAI: GPT-5.2 Pro                           $21.0000   $168.0000  400000     128000     text+image+file->text    
+openai/gpt-5.4-pro                                 OpenAI: GPT-5.4 Pro                           $30.0000   $180.0000  1050000    128000     text+image+file->text    
+openai/o1-pro                                      OpenAI: o1-pro                                $150.0000  $600.0000  200000     100000     text+image+file->text    
+
+Total models: 346
+Free models: 28
+Cheap models (<$1 total per 1M tokens): 146
+Expensive models (>$50 total per 1M tokens): 11

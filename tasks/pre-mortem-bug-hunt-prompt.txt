@@ -1,0 +1,43 @@
+14 months after the "Reasoner" platform launched in production, three separate incidents occurred. Write a detailed post-mortem for each one.
+
+PLATFORM OVERVIEW:
+Reasoner is a production AI reasoning orchestrator built with FastAPI + Python 3.12. It uses 12 LLM providers via OpenRouter, Redis-backed rate limiting / circuit breaking / webhook deduplication, SSE streaming to browser clients, Stripe + PayPal billing webhooks, an async in-process event bus, a token cache with disk backing, and a PostgreSQL event store.
+
+KNOWN DESIGN DECISIONS GOING INTO PRODUCTION:
+- Circuit breaker state is in-memory per worker, not shared across workers
+- SSE generators are not explicitly closed on client disconnect
+- Token cache TTL eviction is lazy — only on access, no background sweep
+- Redis is required for rate limiting, circuit breaking, dedup, and token cache
+- Webhook deduplication uses atomic SET NX in Redis
+- The event bus retries handlers 3x with backoff before dead-lettering
+- The LLM provider chain returns a DegradedLLMResponse on total failure
+- OpenRouter aggregates 350+ models; individual model availability fluctuates
+
+---
+
+INCIDENT 1: "The Redis Cascade"
+Redis went down for 47 minutes during peak traffic (8 PM on a weekday).
+
+Write the post-mortem: What broke first, in what order, and why? Which components degraded gracefully and which failed hard? Was there data loss? What was the blast radius for end users? Name the exact line of code or design choice that turned a dependency outage into a production catastrophe.
+
+---
+
+INCIDENT 2: "The Runaway Cost Incident"
+Over 72 hours, API costs climbed from $40/day to $3,800/day with no alerts firing.
+
+Write the post-mortem: What was the exact chain of events that caused costs to spiral? Which safeguard should have caught it but did not, and why? What did the logs and metrics show in the first 24 hours that, in hindsight, were clear warnings? Name the minimal code change that would have prevented it.
+
+---
+
+INCIDENT 3: "The Silent Cache Poisoning"
+For 11 days, a subset of users received incorrect reasoning results — either stale cached results that no longer matched their query, or results from another user's session.
+
+Write the post-mortem: How did this happen at the data layer? Which component was the root cause? Why did the corruption go undetected for 11 days? What monitoring gap made it silent? Name the specific code path responsible.
+
+---
+
+For each incident, provide:
+1. Failure narrative in chronological order
+2. The single pivot decision that made the failure possible
+3. Three early warning signals that appeared in the first week but went unnoticed
+4. The minimal code fix that would have prevented it

@@ -1,0 +1,18 @@
+Recommended Temperature Values by Phase
+=======================================
+
+Phase 0 - Classification:    temperature = 0.3
+Phase 1 - Decomposition:     temperature = 0.4
+Phase 2 - Perspectives:      temperature = 1.0
+Phase 3 - Critique:          temperature = 0.3
+Phase 4 - Stress Testing:    temperature = 0.5
+Phase 5 - Synthesis:         temperature = 0.5
+
+Rationale
+---------
+- Low  (0.3-0.4): Phases requiring consistency, structured output, and precision
+                  (Classification, Decomposition, Critique).
+- Mid  (0.5):     Phases needing systematic rigor with minor variability
+                  (Stress Testing, Synthesis).
+- High (1.0):     Phase benefiting from creative exploration and diverse viewpoints
+                  (Perspectives).

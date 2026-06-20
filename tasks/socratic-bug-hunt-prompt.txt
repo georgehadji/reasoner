@@ -1,0 +1,41 @@
+The "Reasoner" codebase (Python 3.12 + FastAPI) makes the following claims about its own correctness and safety. Apply the Socratic method — through elenchus — to expose which of these claims are false, self-contradictory, or rest on unexamined assumptions.
+
+CLAIMS THE CODEBASE MAKES ABOUT ITSELF:
+
+1. "The circuit breaker prevents cascading failures by stopping requests to failing LLM providers."
+   Supporting evidence: CircuitBreaker class tracks failures and opens the circuit after a threshold.
+
+2. "The rate limiter fairly enforces per-client request limits using a sliding window."
+   Supporting evidence: Redis Lua script counts requests in a 60-second window per IP.
+
+3. "The CQRS pattern decouples command execution from query reads, with the PipelineOrchestrator as the single entry point."
+   Supporting evidence: PipelineOrchestrator.preflight/execute/postflight, RunPipelineCommandHandler.
+
+4. "SSE streaming is safe under concurrent load — each run has its own isolated PipelineState."
+   Supporting evidence: PipelineState is created fresh per request in run_stream().
+
+5. "The token cache prevents redundant LLM calls by matching semantically similar prompts."
+   Supporting evidence: Jaccard similarity on raw_prompt field, TTL-based expiry.
+
+6. "The application correctly handles partial failures in the LLM provider chain — degraded responses are returned rather than crashing."
+   Supporting evidence: DegradedLLMResponse return type, fallback chain in ProviderRouter.
+
+7. "Webhook processing is idempotent — the same Stripe event cannot be processed twice."
+   Supporting evidence: Redis completed_key and processing_key with two-phase deduplication.
+
+8. "The pipeline's async execution is free of race conditions — each phase reads and writes to its own fields in PipelineState."
+   Supporting evidence: PipelineState uses separate dict fields per method (e.g., socratic_state, debate_state).
+
+9. "The API is protected against prompt injection — user input is sanitized before being passed to LLMs."
+   Supporting evidence: sanitize_for_prompt() called on all user inputs.
+
+10. "Authentication is token-scoped — different API tokens have different permission levels."
+    Supporting evidence: AuthManager validates scopes per token.
+
+FOR EACH CLAIM:
+- Ask 1-2 probing Socratic questions that challenge the stated assumption
+- Identify the specific condition or edge case under which the claim breaks
+- Name the aporia: the point of contradiction between what the claim says and what the code actually guarantees
+- Assign a confidence that the claim is false: HIGH / MEDIUM / LOW
+
+Do not accept any claim at face value. Question everything. The goal is to find the cracks — the places where the system believes it is safe but is not.

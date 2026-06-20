@@ -1,0 +1,18 @@
+https://coolors.co/palette/181818-fafafa-2a2a2a-6e6e6e-cfcfcf
+
+
+~Carbon Black
+#181818
+Matte intensity of black with a hint of graphite, portraying modern minimalism, absolute boldness and unwavering depth.
+~Bright Snow
+#fafafa
+Clean, icy hue reflecting untouched snow, conveying ultimate freshness, purity, and uplifting clarity to any project.
+~Graphite
+#2a2a2a
+Neutral, balanced darkness with subtle silvery reflections, echoing graphite pencil marks and shadowy urban towers.
+~Dim Grey
+#6e6e6e
+A powerful shade embodying resilience and understated elegance, suitable for grounded, enduring visual themes.
+~Dust Grey
+#cfcfcf
+Subtle, soft tone mirroring dusted stone, ideal for inviting warmth and understated sophistication.

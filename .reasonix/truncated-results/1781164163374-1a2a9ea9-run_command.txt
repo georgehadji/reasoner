@@ -1,0 +1,709 @@
+$ git diff HEAD~1..HEAD -- src/reasoner/api/streaming.py src/reasoner/core/rerank.py src/reasoner/api/__init__.py src/reasoner/infrastructure/token_cache.py src/reasoner/domain/pipeline_state.py src/reasoner/core/settings.py 2>&1
+[exit 0]
+diff --git a/src/reasoner/api/__init__.py b/src/reasoner/api/__init__.py
+index b712f61..ab99ce5 100644
+--- a/src/reasoner/api/__init__.py
++++ b/src/reasoner/api/__init__.py
+@@ -96,11 +96,12 @@ async def lifespan(app: FastAPI):
+                 "Each worker maintains its own token bucket, allowing rate-limit bypass. "
+                 "Set RATE_LIMITER_MODE to a shared backend (e.g., 'redis')."
+             )
+-            if settings.ENVIRONMENT == "production":
++            # Raise in any non-development environment, not just production.
++            if settings.ENVIRONMENT != "development":
+                 logger.critical(message)
+                 raise RuntimeError(
+                     f"Unsafe rate limiter configuration: RATE_LIMITER_MODE=memory with "
+-                    f"UVICORN_WORKERS={uvicorn_workers} in production. "
++                    f"UVICORN_WORKERS={uvicorn_workers} in {settings.ENVIRONMENT}. "
+                     f"Set RATE_LIMITER_MODE=redis."
+                 )
+             logger.warning(message)
+@@ -111,6 +112,19 @@ async def lifespan(app: FastAPI):
+                 "Set CIRCUIT_BREAKER_MODE to a shared backend (e.g., 'redis') for production.",
+                 uvicorn_workers,
+             )
++        # Redis reachability probe when RATE_LIMITER_MODE=redis
++        if settings.RATE_LIMITER_MODE == "redis":
++            try:
++                from reasoner.infrastructure.redis.client import get_redis
++                _probe_redis = get_redis()
++                await _probe_redis.set("_startup_probe", "1", ex=10, nx=True)
++                logger.info("Redis rate limiter probe: reachable")
++            except Exception as probe_exc:
++                raise RuntimeError(
++                    f"RATE_LIMITER_MODE=redis but Redis is unreachable at startup: {probe_exc}. "
++                    f"Fix the Redis connection or set RATE_LIMITER_MODE=memory "
++                    f"(only safe for UVICORN_WORKERS=1)."
++                ) from probe_exc
+ 
+     logger.info("Reasoner startup complete")
+     logger.info(f"Web UI: http://{settings.SERVER_HOST}:{settings.SERVER_PORT}")
+@@ -162,6 +176,9 @@ async def lifespan(app: FastAPI):
+     except asyncio.CancelledError:
+         pass
+ 
++    # Drain event bus before closing connections
++    await bus.stop()
++
+     # ── Shutdown ──
+     global _event_store, _health_postgres_pool
+     if _event_store and hasattr(_event_store, 'close'):
+@@ -476,6 +493,12 @@ async def run_pipeline(
+     # Idempotency: reject duplicate client_run_id if already in-flight
+     if req.client_run_id:
+         from reasoner.infrastructure.redis.run_state import _run_state_manager
++        if not _run_state_manager.is_authoritative():
++            raise HTTPException(
++                status_code=503,
++                detail="Run state store unavailable. Retry after Redis recovers.",
++                headers={"Retry-After": "10"},
++            )
+         existing = await _run_state_manager.get_cancel_event(req.client_run_id)
+         if existing is not None:
+             raise HTTPException(
+diff --git a/src/reasoner/api/streaming.py b/src/reasoner/api/streaming.py
+index cef86ae..c91838a 100644
+--- a/src/reasoner/api/streaming.py
++++ b/src/reasoner/api/streaming.py
+@@ -44,10 +44,6 @@ from .phase_executor import (
+     run_phase_with_keepalive,
+ )
+ 
+-from .serializers import (
+-    _ser_synthesis,
+-)
+-
+ logger = logging.getLogger(__name__)
+ 
+ 
+@@ -307,6 +303,13 @@ async def run_stream(
+     pipeline_service: PipelineService | None = None,
+     request=None,
+ ) -> AsyncGenerator[str, None]:
++    from reasoner.core.settings import settings as _settings
++    if not _settings.CQRS_BYPASS_STREAMING:
++        # Phase 2 path: route through CQRS handler (not yet implemented)
++        raise NotImplementedError(
++            "CQRS_BYPASS_STREAMING=False requires RunPipelineCommandHandler "
++            "to support SSE callbacks. See docs/ENHANCEMENT_PLAN.md C1."
++        )
+     if preset_service is None:
+         preset_service = PresetService()
+     if pipeline_service is None:
+@@ -395,14 +398,14 @@ async def run_stream(
+             logger.debug(f"Injected brainstorming config: {_bs_preset.brainstorming_config}")
+ 
+         # --- ARTICLE DETECTION: must happen BEFORE the start event so the frontend
+-        # receives auto_selected_method="writing" and renders the correct phase list.
++        # receives auto_selected_method="article" and renders the correct phase list.
+         from reasoner.phases._shared import is_article_request
+         if is_article_request(state.problem):
+             state.task_type = TaskType.TECHNICAL
+             state.decomposition = ["article workflow"]
+-            state.method = "writing"
+-            auto_selected_method = "writing"
+-            logger.info("Article request detected in stream — routing to writing method")
++            state.method = "article"
++            auto_selected_method = "article"
++            logger.info("Article request detected in stream — routing to article method")
+ 
+         logger.info(f"Pipeline start with routing: {router.describe()}")
+         start_payload: dict = {"type": "start", "preset": effective_preset_name}
+@@ -476,11 +479,6 @@ async def run_stream(
+         else:
+             logger.error(f"No strategy found for method: {method}")
+ 
+-        last_phase_num = max(p[0] for p in phases) if phases else 5
+-        synthesis_phase_num = last_phase_num + 1
+-        if state.method != "writing":
+-            phases += [(synthesis_phase_num, "Synthesis", pipeline._phase_synthesis, _ser_synthesis)]
+-
+         # CRITICAL_PHASES computed via get_critical_phases(phases, step_metadata)
+ 
+         # _PHASE_ROLE_HINTS moved to api/phase_executor.py
+@@ -497,17 +495,16 @@ async def run_stream(
+                 yield _event({"type": "cancelled", "message": "Pipeline stopped by user"})
+                 return
+ 
+-            # Disconnect check — bail before starting next phase (B-13)
+-            if request is not None and await request.is_disconnected():
+-                logger.info(
+-                    "Client disconnected before phase %s (run %s)", name, run_id
+-                )
+-                yield _event({
+-                    "type": "cancelled",
+-                    "run_id": run_id,
+-                    "reason": "client_disconnected",
+-                })
+-                return
++            # Disconnect detection (B-13): request.is_disconnected() calls
++            # _receive() which blocks indefinitely during SSE streaming (POST
++            # body already consumed, client sends no further data).  The ASGI
++            # spec provides no non-blocking disconnect poll.
++            #
++            # Cleanup is instead handled by the finally block which cancels
++            # all tracked broadcast tasks and removes the run from the store.
++            # When the streaming response generator is garbage-collected
++            # (client disconnect), aclose() propagates GeneratorExit into
++            # run_stream(), triggering the existing finally block.
+ 
+             # Silent no-ops (e.g. writing pipeline skips generic decomposition/vetting)
+             if getattr(fn, "_is_silent_noop", False):  # v3.1: relaxed from identity check
+@@ -756,9 +753,11 @@ async def run_stream(
+             try:
+                 from reasoner.core.memory import TaggedMemory
+ 
++                import re as _re
++                _sanitize = lambda s: _re.sub(r'[^a-zA-Z0-9_-]', '_', s or 'unknown')
+                 tagged = TaggedMemory(HISTORY_DIR)
+-                method_tag = f"method:{entry.method}"
+-                preset_tag = f"preset:{entry.preset}"
++                method_tag = f"method_{_sanitize(entry.method)}"
++                preset_tag = f"preset_{_sanitize(entry.preset)}"
+                 tagged.add(method_tag, entry.model_dump())
+                 tagged.add(preset_tag, entry.model_dump())
+             except Exception as tag_err:
+diff --git a/src/reasoner/core/rerank.py b/src/reasoner/core/rerank.py
+index 26dc45c..9d56aad 100644
+--- a/src/reasoner/core/rerank.py
++++ b/src/reasoner/core/rerank.py
+@@ -8,6 +8,7 @@ from __future__ import annotations
+ 
+ import asyncio
+ import logging
++import math
+ import os
+ import re
+ import unicodedata
+@@ -49,7 +50,7 @@ async def _is_circuit_open() -> bool:
+         global _failure_count, _last_failure_time
+         if _failure_count < _CIRCUIT_THRESHOLD:
+             return False
+-        elapsed = asyncio.get_event_loop().time() - _last_failure_time
++        elapsed = asyncio.get_running_loop().time() - _last_failure_time
+         if elapsed >= _CIRCUIT_COOLDOWN_SECONDS:
+             _failure_count = 0
+             return False
+@@ -60,7 +61,7 @@ async def _record_failure() -> None:
+     async with _failure_lock:
+         global _failure_count, _last_failure_time
+         _failure_count += 1
+-        _last_failure_time = asyncio.get_event_loop().time()
++        _last_failure_time = asyncio.get_running_loop().time()
+ 
+ 
+ async def _record_success() -> None:
+@@ -91,6 +92,12 @@ async def rerank_documents(
+         Documents reordered by relevance score, or unchanged on any error.
+     """
+     # ── Feature gating ──
++    # If Nemotron is the primary reranker, delegate entirely.
++    if settings.NEMOTRON_RERANK_ENABLED:
++        return await rerank_via_nemotron(
++            query, documents, top_n=top_n, api_key=api_key, api_base=api_base
++        )
++
+     if not settings.COHERE_RERANK_ENABLED:
+         return documents
+ 
+@@ -148,15 +155,19 @@ async def rerank_documents(
+             data = resp.json()
+     except Exception as exc:
+         await _record_failure()
+-        logger.warning("Rerank API call failed: %s", exc)
+-        return documents
++        logger.warning("Cohere rerank failed (%s); falling back to Nemotron reranker.", exc)
++        return await rerank_via_nemotron(
++            query, documents, top_n=top_n, api_key=api_key, api_base=api_base
++        )
+ 
+     # ── Reorder documents by rerank results ──
+     results = data.get("results", [])
+     if not results:
+         await _record_failure()
+-        logger.warning("Rerank API returned empty results.")
+-        return documents
++        logger.warning("Cohere rerank returned empty results; falling back to Nemotron reranker.")
++        return await rerank_via_nemotron(
++            query, documents, top_n=top_n, api_key=api_key, api_base=api_base
++        )
+ 
+     indexed = {i: doc for i, doc in enumerate(documents)}
+     reranked: list[dict[str, Any]] = []
+@@ -172,6 +183,156 @@ async def rerank_documents(
+     return reranked
+ 
+ 
++async def _score_document_nemotron(
++    query: str,
++    document_text: str,
++    model: str,
++    api_key: str,
++    api_base: str,
++    semaphore: asyncio.Semaphore,
++) -> float:
++    """Score a single document against a query using Nemotron Rerank VL via logprobs.
++
++    The model is discriminative — it does not generate text. Relevance is read from
++    the log-probability of the positive token ("Yes") in the first output position.
++    Returns a float in [0, 1]; returns 0.5 on any error (neutral/unknown relevance).
++    """
++    prompt = (
++        "Given the following query and document, determine whether the document is relevant "
++        "to answering the query.\n\n"
++        f"Query: {query}\n\n"
++        f"Document: {document_text}\n\n"
++        "Is this document relevant to the query? Answer with a single word."
++    )
++    payload = {
++        "model": model,
++        "messages": [{"role": "user", "content": prompt}],
++        "max_tokens": 1,
++        "temperature": 0.0,
++        "logprobs": True,
++        "top_logprobs": 5,
++    }
++    headers = {
++        "Authorization": f"Bearer {api_key}",
++        "Content-Type": "application/json",
++        "HTTP-Referer": settings.OPENROUTER_HTTP_REFERER,
++        "X-Title": settings.OPENROUTER_APP_TITLE,
++    }
++    async with semaphore:
++        try:
++            async with httpx.AsyncClient(timeout=_RERANK_TIMEOUT_SECONDS) as client:
++                resp = await client.post(
++                    f"{api_base}/chat/completions",
++                    headers=headers,
++                    json=payload,
++                )
++                resp.raise_for_status()
++                data = resp.json()
++        except Exception as exc:
++            logger.debug("Nemotron score call failed: %s", exc)
++            return 0.5  # neutral on error
++
++    # Extract logprob for "Yes" from the top_logprobs of the first output token
++    try:
++        top_logprobs: list[dict] = (
++            data["choices"][0]["logprobs"]["content"][0]["top_logprobs"]
++        )
++        for entry in top_logprobs:
++            token = entry.get("token", "").strip().lower()
++            if token in ("yes", "yes.", "true", "1", "relevant"):
++                return min(1.0, max(0.0, math.exp(entry["logprob"])))
++        # If "Yes" is not in top-5, the model is confident in "No" — return low score
++        return 0.05
++    except (KeyError, IndexError, TypeError):
++        return 0.5
++
++
++async def rerank_via_nemotron(
++    query: str,
++    documents: list[dict[str, Any]],
++    top_n: int = 10,
++    api_key: str | None = None,
++    model: str | None = None,
++    api_base: str | None = None,
++) -> list[dict[str, Any]]:
++    """Rerank documents using NVIDIA Nemotron Rerank VL (free, via OpenRouter).
++
++    Unlike Cohere's dedicated /rerank endpoint, Nemotron uses the chat completions
++    API with logprobs. Each document is scored in a separate request, run in parallel
++    with bounded concurrency (NEMOTRON_RERANK_CONCURRENCY, default 5).
++
++    Use cases in Reasoner:
++    - Search result reranking (context vetting phase, Phase 1.25)
++    - Neuro memory chunk selection before compression (L3 recall)
++    - Fallback when Cohere rerank is unavailable or disabled
++    - Multimodal document queries (supports text+image VL inputs)
++
++    Args:
++        query: The query to rank documents against.
++        documents: List of result dicts with 'title', 'content', or 'snippet' keys.
++        top_n: How many top results to return after reranking.
++        api_key: OpenRouter API key (falls back to OPENROUTER_API_KEY).
++        model: Override the default Nemotron model.
++        api_base: Override the default OpenRouter base URL.
++
++    Returns:
++        Documents sorted by descending relevance score, truncated to top_n.
++        Each document gets a 'rerank_score' float added.
++        Returns input unchanged on any global failure.
++    """
++    if len(documents) <= 1:
++        return documents
++
++    key = api_key or settings.OPENROUTER_API_KEY or ""
++    if not key:
++        logger.debug("Nemotron rerank skipped: no API key available.")
++        return documents
++
++    model_id = model or settings.NEMOTRON_RERANK_MODEL
++    base = api_base or settings.RERANK_API_BASE
++    concurrency = settings.NEMOTRON_RERANK_CONCURRENCY
++
++    query = _sanitize_text(query, _MAX_QUERY_LENGTH)
++    if not query:
++        return documents
++
++    docs = documents[:_MAX_DOCUMENTS]
++
++    semaphore = asyncio.Semaphore(concurrency)
++
++    async def _score(doc: dict[str, Any]) -> tuple[dict[str, Any], float]:
++        title = doc.get("title", "")
++        content = doc.get("content", "") or doc.get("snippet", "") or doc.get("body", "")
++        text = f"{title}\n{content}".strip() if title else content.strip()
++        text = _sanitize_text(text, _MAX_DOC_LENGTH)
++        score = await _score_document_nemotron(query, text or " ", model_id, key, base, semaphore)
++        return doc, score
++
++    try:
++        results: list[tuple[dict[str, Any], float]] = await asyncio.gather(
++            *[_score(d) for d in docs],
++            return_exceptions=False,
++        )
++    except Exception as exc:
++        logger.warning("Nemotron rerank batch failed: %s", exc)
++        return documents
++
++    scored = sorted(results, key=lambda t: t[1], reverse=True)
++    reranked: list[dict[str, Any]] = []
++    for doc, score in scored[:top_n]:
++        doc = dict(doc)
++        doc["rerank_score"] = score
++        reranked.append(doc)
++
++    logger.debug(
++        "Nemotron reranked %d → top %d (top score: %.3f)",
++        len(docs),
++        len(reranked),
++        reranked[0]["rerank_score"] if reranked else 0.0,
++    )
++    return reranked
++
++
+ async def rerank_memory_chunks(
+     query: str,
+     chunks: list[Any],
+@@ -190,7 +351,7 @@ async def rerank_memory_chunks(
+     Returns:
+         Chunks reordered by relevance, or unchanged on error.
+     """
+-    if not settings.COHERE_RERANK_ENABLED:
++    if not settings.COHERE_RERANK_ENABLED and not settings.NEMOTRON_RERANK_ENABLED:
+         return chunks
+ 
+     if len(chunks) <= 1:
+diff --git a/src/reasoner/core/settings.py b/src/reasoner/core/settings.py
+index efccf36..5fbe762 100644
+--- a/src/reasoner/core/settings.py
++++ b/src/reasoner/core/settings.py
+@@ -70,6 +70,11 @@ class Settings:
+     UVICORN_WORKERS: int = int(os.getenv("UVICORN_WORKERS", "1"))
+     ENABLE_LEGACY_API_KEY: bool = os.getenv("ENABLE_LEGACY_API_KEY", "false").lower() in ("1", "true", "yes")
+ 
++    # ── CQRS ──
++    # When True, streaming runs bypass RunPipelineCommandHandler and go directly
++    # through PipelineOrchestrator. See docs/ENHANCEMENT_PLAN.md C1 for migration plan.
++    CQRS_BYPASS_STREAMING: bool = os.getenv("CQRS_BYPASS_STREAMING", "true").lower() in ("1", "true", "yes")
++
+     # ── Cohere Rerank (via OpenRouter) ──
+     COHERE_RERANK_ENABLED: bool = os.getenv("COHERE_RERANK_ENABLED", "true").lower() in ("1", "true", "yes")
+     COHERE_RERANK_MODEL: str = os.getenv("COHERE_RERANK_MODEL", "cohere/rerank-4-fast")
+@@ -128,10 +133,10 @@ class Settings:
+     OPENROUTER_APP_TITLE: str = os.getenv("OPENROUTER_APP_TITLE", "Reasoner")
+ 
+     # ── Neuro Memory Models ──
+-    NEURO_REASONING_MODEL: str = os.getenv("NEURO_REASONING_MODEL", "openai/gpt-4o-mini")
++    NEURO_REASONING_MODEL: str = os.getenv("NEURO_REASONING_MODEL", "gpt-4o-mini")
+     NEURO_REASONING_FALLBACK_MODELS: str = os.getenv(
+         "NEURO_REASONING_FALLBACK_MODELS",
+-        "google/gemini-2.0-flash-001,anthropic/claude-3-haiku",
++        "gemini-flash,claude-haiku",
+     )
+     NEURO_EMBEDDING_MODEL: str = os.getenv("NEURO_EMBEDDING_MODEL", "qwen/qwen3-embedding-8b")
+     NEURO_EMBEDDING_FALLBACK_MODELS: str = os.getenv(
+@@ -158,6 +163,14 @@ class Settings:
+ 
+     # ── Rerank ──
+     RERANK_API_BASE: str = os.getenv("RERANK_API_BASE", "https://openrouter.ai/api/v1")
++    # Nemotron Rerank VL: free NVIDIA reranker via OpenRouter chat completions + logprobs.
++    # Used as fallback when Cohere rerank fails, or as primary when NEMOTRON_RERANK_ENABLED=true.
++    NEMOTRON_RERANK_ENABLED: bool = os.getenv("NEMOTRON_RERANK_ENABLED", "false").lower() in ("1", "true", "yes")
++    NEMOTRON_RERANK_MODEL: str = os.getenv("NEMOTRON_RERANK_MODEL", "nvidia/llama-nemotron-rerank-vl-1b-v2:free")
++    NEMOTRON_RERANK_CONCURRENCY: int = int(os.getenv("NEMOTRON_RERANK_CONCURRENCY", "5"))
++    # When true, applies semantic cross-encoder reranking after BM25+freshness sort and before LLM vetting.
++    # Adds ~1-2s latency but meaningfully improves context quality for research/article methods.
++    SEMANTIC_RERANK_VETTING: bool = os.getenv("SEMANTIC_RERANK_VETTING", "false").lower() in ("1", "true", "yes")
+ 
+     # ── Database ──
+     DATABASE_URL: str = os.getenv("DATABASE_URL", "")
+@@ -183,6 +196,13 @@ class Settings:
+         """Parse NEURO_EMBEDDING_FALLBACK_MODELS into a list."""
+         return [m.strip() for m in self.NEURO_EMBEDDING_FALLBACK_MODELS.split(",") if m.strip()]
+ 
++    # ── Token Optimization Flags ──
++    TOKEN_DYNAMIC_BUDGETS: bool = os.getenv("TOKEN_DYNAMIC_BUDGETS", "true").lower() == "true"
++    TOKEN_CONTEXT_COMPRESSION: bool = os.getenv("TOKEN_CONTEXT_COMPRESSION", "true").lower() == "true"
++    TOKEN_PROMPT_COMPRESSION: bool = os.getenv("TOKEN_PROMPT_COMPRESSION", "true").lower() == "true"
++    TOKEN_NEURO_COMPRESSION: bool = os.getenv("TOKEN_NEURO_COMPRESSION", "false").lower() == "true"
++    TOKEN_CACHING: bool = os.getenv("TOKEN_CACHING", "true").lower() == "true"
++
+     # ── Trusted Proxies ──
+     TRUSTED_PROXIES: list[str] = [
+         p.strip() for p in os.getenv("TRUSTED_PROXIES", "").split(",") if p.strip()
+diff --git a/src/reasoner/domain/pipeline_state.py b/src/reasoner/domain/pipeline_state.py
+index 10029b8..71ad4db 100644
+--- a/src/reasoner/domain/pipeline_state.py
++++ b/src/reasoner/domain/pipeline_state.py
+@@ -10,7 +10,7 @@ from __future__ import annotations
+ import json
+ import logging
+ from collections import deque
+-from dataclasses import dataclass, field, asdict, fields as dc_fields
++from dataclasses import dataclass, field, asdict, fields as dc_fields, MISSING as _DC_MISSING
+ from enum import Enum
+ from datetime import datetime, timezone
+ from pathlib import Path
+@@ -214,17 +214,30 @@ class PipelineState:
+         # Run post-init migration logic
+         self.__post_init__()
+ 
+-    # ─────────────────────────────────────────────────────────────────────
+-    # Backward-compatible property aliases for core fields
+-    # ─────────────────────────────────────────────────────────────────────
+         # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+-        import dataclasses
+-        for f in dataclasses.fields(self):
++        self._ensure_fields_initialized()
++        object.__setattr__(self, '_initialized', True)
++
++    def _ensure_fields_initialized(self) -> None:
++        """Initialize missing dataclass fields for backward-compatible --resume loading.
++
++        Called only when _initialized is not yet set, meaning this is a partially
++        deserialized state. After the first call completes, sets _initialized=True
++        so subsequent calls are a no-op.
++        """
++        if getattr(self, '_initialized', False):
++            return
++        for f in dc_fields(self):
+             if not hasattr(self, f.name):
+-                if f.default_factory is not dataclasses.MISSING:
++                if f.default_factory is not _DC_MISSING:
+                     object.__setattr__(self, f.name, f.default_factory())
+-                elif f.default is not dataclasses.MISSING:
++                elif f.default is not _DC_MISSING:
+                     object.__setattr__(self, f.name, f.default)
++        object.__setattr__(self, '_initialized', True)
++
++    # ─────────────────────────────────────────────────────────────────────
++    # Backward-compatible property aliases for core fields
++    # ─────────────────────────────────────────────────────────────────────
+     @property
+     def problem(self) -> str:
+         return self.core.problem
+@@ -233,14 +246,7 @@ class PipelineState:
+     def problem(self, value: str) -> None:
+         self.core.problem = value
+ 
+-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+-        import dataclasses
+-        for f in dataclasses.fields(self):
+-            if not hasattr(self, f.name):
+-                if f.default_factory is not dataclasses.MISSING:
+-                    object.__setattr__(self, f.name, f.default_factory())
+-                elif f.default is not dataclasses.MISSING:
+-                    object.__setattr__(self, f.name, f.default)
++        self._ensure_fields_initialized()
+     @property
+     def enhanced_problem(self) -> str:
+         return self.core.enhanced_problem
+@@ -249,14 +255,7 @@ class PipelineState:
+     def enhanced_problem(self, value: str) -> None:
+         self.core.enhanced_problem = value
+ 
+-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+-        import dataclasses
+-        for f in dataclasses.fields(self):
+-            if not hasattr(self, f.name):
+-                if f.default_factory is not dataclasses.MISSING:
+-                    object.__setattr__(self, f.name, f.default_factory())
+-                elif f.default is not dataclasses.MISSING:
+-                    object.__setattr__(self, f.name, f.default)
++        self._ensure_fields_initialized()
+     @property
+     def task_type(self) -> TaskType | None:
+         return self.core.task_type
+@@ -265,14 +264,7 @@ class PipelineState:
+     def task_type(self, value: TaskType | None) -> None:
+         self.core.task_type = value
+ 
+-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+-        import dataclasses
+-        for f in dataclasses.fields(self):
+-            if not hasattr(self, f.name):
+-                if f.default_factory is not dataclasses.MISSING:
+-                    object.__setattr__(self, f.name, f.default_factory())
+-                elif f.default is not dataclasses.MISSING:
+-                    object.__setattr__(self, f.name, f.default)
++        self._ensure_fields_initialized()
+     @property
+     def task_type_rationale(self) -> str:
+         return self.core.task_type_rationale
+@@ -281,14 +273,7 @@ class PipelineState:
+     def task_type_rationale(self, value: str) -> None:
+         self.core.task_type_rationale = value
+ 
+-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+-        import dataclasses
+-        for f in dataclasses.fields(self):
+-            if not hasattr(self, f.name):
+-                if f.default_factory is not dataclasses.MISSING:
+-                    object.__setattr__(self, f.name, f.default_factory())
+-                elif f.default is not dataclasses.MISSING:
+-                    object.__setattr__(self, f.name, f.default)
++        self._ensure_fields_initialized()
+     @property
+     def language(self) -> str:
+         return self.core.language
+@@ -297,14 +282,7 @@ class PipelineState:
+     def language(self, value: str) -> None:
+         self.core.language = value
+ 
+-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+-        import dataclasses
+-        for f in dataclasses.fields(self):
+-            if not hasattr(self, f.name):
+-                if f.default_factory is not dataclasses.MISSING:
+-                    object.__setattr__(self, f.name, f.default_factory())
+-                elif f.default is not dataclasses.MISSING:
+-                    object.__setattr__(self, f.name, f.default)
++        self._ensure_fields_initialized()
+     @property
+     def complexity(self) -> str | None:
+         return self.core.complexity
+@@ -313,14 +291,7 @@ class PipelineState:
+     def complexity(self, value: str | None) -> None:
+         self.core.complexity = value
+ 
+-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+-        import dataclasses
+-        for f in dataclasses.fields(self):
+-            if not hasattr(self, f.name):
+-                if f.default_factory is not dataclasses.MISSING:
+-                    object.__setattr__(self, f.name, f.default_factory())
+-                elif f.default is not dataclasses.MISSING:
+-                    object.__setattr__(self, f.name, f.default)
++        self._ensure_fields_initialized()
+     @property
+     def decomposition(self) -> Decomposition | None:
+         return self.core.decomposition
+@@ -329,14 +300,7 @@ class PipelineState:
+     def decomposition(self, value: Decomposition | None) -> None:
+         self.core.decomposition = value
+ 
+-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+-        import dataclasses
+-        for f in dataclasses.fields(self):
+-            if not hasattr(self, f.name):
+-                if f.default_factory is not dataclasses.MISSING:
+-                    object.__setattr__(self, f.name, f.default_factory())
+-                elif f.default is not dataclasses.MISSING:
+-                    object.__setattr__(self, f.name, f.default)
++        self._ensure_fields_initialized()
+     @property
+     def candidates(self) -> list[SolutionCandidate]:
+         return self.core.candidates
+@@ -345,14 +309,7 @@ class PipelineState:
+     def candidates(self, value: list[SolutionCandidate]) -> None:
+         self.core.candidates = value
+ 
+-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+-        import dataclasses
+-        for f in dataclasses.fields(self):
+-            if not hasattr(self, f.name):
+-                if f.default_factory is not dataclasses.MISSING:
+-                    object.__setattr__(self, f.name, f.default_factory())
+-                elif f.default is not dataclasses.MISSING:
+-                    object.__setattr__(self, f.name, f.default)
++        self._ensure_fields_initialized()
+     @property
+     def scores(self) -> list[CritiqueScore]:
+         return self.core.scores
+@@ -361,14 +318,7 @@ class PipelineState:
+     def scores(self, value: list[CritiqueScore]) -> None:
+         self.core.scores = value
+ 
+-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+-        import dataclasses
+-        for f in dataclasses.fields(self):
+-            if not hasattr(self, f.name):
+-                if f.default_factory is not dataclasses.MISSING:
+-                    object.__setattr__(self, f.name, f.default_factory())
+-                elif f.default is not dataclasses.MISSING:
+-                    object.__setattr__(self, f.name, f.default)
++        self._ensure_fields_initialized()
+     @property
+     def top_candidates(self) -> list[SolutionCandidate]:
+         return self.core.top_candidates
+@@ -377,14 +327,7 @@ class PipelineState:
+     def top_candidates(self, value: list[SolutionCandidate]) -> None:
+         self.core.top_candidates = value
+ 
+-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+-        import dataclasses
+-        for f in dataclasses.fields(self):
+-            if not hasattr(self, f.name):
+-                if f.default_factory is not dataclasses.MISSING:
+-                    object.__setattr__(self, f.name, f.default_factory())
+-                elif f.default is not dataclasses.MISSING:
+-                    object.__setattr__(self, f.name, f.default)
++        self._ensure_fields_initialized()
+     @property
+     def stress_results(self) -> list[StressTestResult]:
+         return self.core.stress_results
+@@ -393,14 +336,7 @@ class PipelineState:
+     def stress_results(self, value: list[StressTestResult]) -> None:
+         self.core.stress_results = value
+ 
+-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+-        import dataclasses
+-        for f in dataclasses.fields(self):
+-            if not hasattr(self, f.name):
+-                if f.default_factory is not dataclasses.MISSING:
+-                    object.__setattr__(self, f.name, f.default_factory())
+-                elif f.default is not dataclasses.MISSING:
+-                    object.__setattr__(self, f.name, f.default)
++        self._ensure_fields_initialized()
+     @property
+     def final_solution(self) -> FinalSolution | None:
+         return self.core.final_solution
+@@ -409,14 +345,7 @@ class PipelineState:
+     def final_solution(self, value: FinalSolution | None) -> None:
+         self.core.final_solution = value
+ 
+-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+-        import dataclasses
+-        for f in dataclasses.fields(self):
+-            if not hasattr(self, f.name):
+-                if f.default_factory is not dataclasses.MISSING:
+-                    object.__setattr__(self, f.name, f.default_factory())
+-                elif f.default is not dataclasses.MISSING:
+-                    object.__setattr__(self, f.name, f.default)
++        self._ensure_fields_initialized()
+     @property
+     def errors(self) -> list[str]:
+         return self.core.errors
+@@ -425,14 +354,7 @@ class PipelineState:
+     def errors(self, value: list[str]) -> None:
+         self.core.errors = value
+ 
+-        # v3.1: Initialize dataclass fields with defaults that weren't explicitly set
+-        import dataclasses
+-        for f i
+
+[… truncated 45732 chars …]

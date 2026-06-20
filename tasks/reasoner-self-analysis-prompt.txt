@@ -1,0 +1,42 @@
+You are analyzing a production Python codebase called "Reasoner" — an AI reasoning orchestrator built with Hexagonal DDD + CQRS + Event Sourcing + Mixin Composition (FastAPI backend, Next.js 16 frontend).
+
+ARCHITECTURE OVERVIEW:
+- src/reasoner/core/ — domain protocols, settings, constants, search clients. No external deps.
+- src/reasoner/domain/ — PresetCore, PresetRegistry (42 presets), PipelineState (~60 fields, ~2000 lines).
+- src/reasoner/application/ — CQRS handlers, orchestrator, pipeline.py, mixins/, services/, flows/.
+- src/reasoner/infrastructure/ — LLM adapters, persistence, rate limiter, token cache, auth, billing, widgets.
+- src/reasoner/api/ — FastAPI routes, SSE streaming, auth deps, middleware, schemas.
+
+KNOWN LAYER VIOLATIONS (already documented, not to analyze):
+1. domain/preset_core.py imports from infrastructure.llm.registry
+2. api/streaming.py directly instantiates ReasonerPipeline instead of routing through CQRS handlers
+3. application/flows/__init__.py imports from api.serializers
+
+BUGS ALREADY FIXED THIS SESSION (do NOT re-surface these):
+- B-01: Wrong Lua script path (double "infrastructure/" segment) in rate_limiter.py — FIXED
+- B-02: Undefined logger in rate_limiter.py, token_cache.py, search/discovery.py — FIXED
+- B-03: CSRF module-level RuntimeError on import when CSRF_SECRET unset — FIXED
+- B-04: token_cache._save_to_disk omits raw_prompt field — FIXED
+- B-05: AuthManager fast-path cache read/write outside asyncio.Lock — FIXED
+- B-06: simpleeval calculator widget lacks identifier allowlist — FIXED
+- B-07: asyncio.create_task without retained reference in uploader.py — FIXED
+- B-08: CSRF generate/verify use different secret sources — FIXED
+
+QUESTION:
+What are the most critical production bugs, race conditions, security vulnerabilities, data loss risks, and silent failure patterns that STILL EXIST in this codebase — bugs that are NOT in the already-fixed list above?
+
+Focus your analysis on:
+1. Infrastructure layer (rate_limiter.py, token_cache.py, auth.py, auth_legacy.py, billing/, llm/executor.py, llm/router.py, llm/providers/)
+2. Application layer (pipeline.py, orchestrator.py, handlers.py, mixins/, flows/)
+3. API layer (streaming.py, middleware.py, auth_deps.py, routes/)
+4. Concurrency bugs (asyncio misuse, missing locks, shared mutable state)
+5. Security vulnerabilities (injection, auth bypass, SSRF, timing attacks)
+6. Data integrity (missing validation, partial writes, inconsistent state)
+
+For each bug found, provide:
+- Severity: CRITICAL / HIGH / MEDIUM
+- File path and approximate line number
+- What the bug is and why it matters
+- Minimal fix (diff or pseudocode)
+
+Be specific. Only report bugs you can identify from architecture knowledge and common Python/FastAPI/asyncio patterns. Do not hallucinate file contents.
