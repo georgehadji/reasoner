@@ -46,7 +46,7 @@ _REGISTRY: dict[str, dict] = {
         "routing": {
             "perspective_cot": "claude-sonnet",
             "perspective_analysis": "claude-sonnet",
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "deepseek-v4-pro",
         },
         "tags": ["premium", "balanced", "multilingual"],
     },
@@ -54,7 +54,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "debate",
         "primary_id": "gemini-flash",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "gpt-4o-mini",
         },
         "tags": ["budget", "argumentative", "robust"],
     },
@@ -65,7 +65,7 @@ _REGISTRY: dict[str, dict] = {
             "constructive": "gemini-pro",
             "destructive": "gemini-pro",
             "systemic": "gemini-pro",
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "deepseek-v4-pro",
         },
         "tags": ["premium", "argumentative", "robust"],
     },
@@ -73,7 +73,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "jury",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "gpt-4o-mini",
         },
         "tags": ["budget", "governance", "decision-making"],
     },
@@ -81,7 +81,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "jury",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "deepseek-v4-pro",
         },
         "tags": ["premium", "governance", "decision-making"],
     },
@@ -89,7 +89,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "research",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "gpt-4o-mini",
         },
         "tags": ["budget", "research", "web-search"],
     },
@@ -97,7 +97,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "research",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "deepseek-v4-pro",
         },
         "tags": ["premium", "research", "web-search"],
     },
@@ -108,7 +108,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "scientific",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "gpt-4o-mini",
         },
         "tags": ["budget", "scientific", "structured"],
     },
@@ -116,7 +116,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "scientific",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "deepseek-v4-pro",
         },
         "tags": ["premium", "scientific", "structured"],
     },
@@ -124,7 +124,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "socratic",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "gpt-4o-mini",
         },
         "tags": ["budget", "educational", "inquisitive"],
     },
@@ -132,7 +132,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "socratic",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "deepseek-v4-pro",
         },
         "tags": ["premium", "educational", "inquisitive"],
     },
@@ -140,7 +140,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "pre-mortem",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "gpt-4o-mini",
         },
         "tags": ["budget", "risk-assessment", "strategic"],
     },
@@ -148,15 +148,15 @@ _REGISTRY: dict[str, dict] = {
         "method": "pre-mortem",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "deepseek-v4-pro",
         },
         "tags": ["premium", "risk-assessment", "strategic"],
     },
     "bayesian-budget": {
         "method": "bayesian",
-        "primary_id": "anthropic/claude-3-haiku",
+        "primary_id": "claude-haiku",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "gpt-4o-mini",
         },
         "tags": ["budget", "analytical", "probabilistic"],
     },
@@ -164,7 +164,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "bayesian",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "deepseek-v4-pro",
         },
         "tags": ["premium", "analytical", "probabilistic"],
     },
@@ -172,7 +172,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "dialectical",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "gpt-4o-mini",
         },
         "tags": ["budget", "argumentative", "philosophical"],
     },
@@ -180,7 +180,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "dialectical",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "deepseek-v4-pro",
         },
         "tags": ["premium", "argumentative", "philosophical"],
     },
@@ -188,7 +188,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "analogical",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "gpt-4o-mini",
         },
         "tags": ["budget", "creative", "reasoning"],
     },
@@ -196,7 +196,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "analogical",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "deepseek-v4-pro",
         },
         "tags": ["premium", "creative", "reasoning"],
     },
@@ -204,7 +204,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "delphi",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "gpt-4o-mini",
         },
         "tags": ["budget", "collaborative", "forecasting"],
     },
@@ -212,7 +212,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "delphi",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "deepseek-v4-pro",
         },
         "tags": ["premium", "collaborative", "forecasting"],
     },
@@ -220,7 +220,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "cove",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "gpt-4o-mini",
         },
         "tags": ["budget", "verification", "fact-checking"],
     },
@@ -228,7 +228,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "cove",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "deepseek-v4-pro",
         },
         "tags": ["premium", "verification", "fact-checking"],
     },
@@ -236,7 +236,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "sot",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "gpt-4o-mini",
         },
         "tags": ["budget", "structured-thinking", "outlining"],
     },
@@ -244,7 +244,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "sot",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "deepseek-v4-pro",
         },
         "tags": ["premium", "structured-thinking", "outlining"],
     },
@@ -252,7 +252,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "tot",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "gpt-4o-mini",
         },
         "tags": ["budget", "problem-solving", "exploration"],
     },
@@ -260,7 +260,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "tot",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "deepseek-v4-pro",
         },
         "tags": ["premium", "problem-solving", "exploration"],
     },
@@ -268,7 +268,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "pot",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "gpt-4o-mini",
         },
         "tags": ["budget", "programming", "code-generation"],
     },
@@ -276,7 +276,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "pot",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "deepseek-v4-pro",
         },
         "tags": ["premium", "programming", "code-generation"],
     },
@@ -284,7 +284,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "self-discover",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "gpt-4o-mini",
         },
         "tags": ["budget", "reasoning", "self-improvement"],
     },
@@ -292,7 +292,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "self-discover",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "deepseek-v4-pro",
         },
         "tags": ["premium", "reasoning", "self-improvement"],
     },
@@ -300,7 +300,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "subagent",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "gpt-4o-mini",
         },
         "tags": ["budget", "multi-agent", "delegation"],
     },
@@ -308,7 +308,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "subagent",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "deepseek-v4-pro",
         },
         "tags": ["premium", "multi-agent", "delegation"],
     },
@@ -316,7 +316,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "writing",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "gpt-4o-mini",
         },
         "tags": ["budget", "writing", "content-creation"],
     },
@@ -324,7 +324,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "writing",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "deepseek-v4-pro",
         },
         "tags": ["premium", "writing", "content-creation"],
     },
@@ -332,7 +332,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "article",
         "primary_id": "deepseek-v3",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "gpt-4o-mini",
         },
         "tags": ["budget", "writing", "article"],
     },
@@ -340,7 +340,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "article",
         "primary_id": "claude-sonnet",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "deepseek-v4-pro",
         },
         "tags": ["premium", "writing", "article"],
     },
@@ -354,7 +354,7 @@ _REGISTRY: dict[str, dict] = {
         # deepseek-v3 is reliable but too slow (times out at 120s).
         "primary_id": "qwen3-coder-flash",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "gpt-4o-mini",
         },
         # Single-model fallback for the lighter coding roles (spec/tests/assemble)
         # that route through primary. codestral-2508 is fast (~3s), code-specialized,
@@ -381,7 +381,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "coding",
         "primary_id": "claude-sonnet",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "deepseek-v4-pro",
         },
         "tags": ["premium", "coding", "software-development"],
     },
@@ -389,7 +389,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "cross-language",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "gpt-4o-mini",
         },
         "tags": ["budget", "translation", "multilingual"],
     },
@@ -397,7 +397,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "cross-language",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "deepseek-v4-pro",
         },
         "tags": ["premium", "translation", "multilingual"],
     },
@@ -416,14 +416,14 @@ _REGISTRY: dict[str, dict] = {
     },
     "brainstorming-budget": {
         "method": "brainstorming",
-        "primary_id": "anthropic/claude-3-haiku",
+        "primary_id": "claude-haiku",
         "routing": {
             "brainstorm_cluster": "google/gemma-2-9b-it",
             "brainstorm_develop": "deepseek/deepseek-chat",
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "gpt-4o-mini",
         },
         "fallback_routing": {
-            "primary": "anthropic/claude-3-haiku",
+            "primary": "claude-haiku",
         },
         "tags": ["budget", "creative"],
     },
@@ -433,7 +433,7 @@ _REGISTRY: dict[str, dict] = {
         "routing": {
             "brainstorm_cluster": "claude-sonnet",
             "brainstorm_develop": "claude-sonnet",
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "deepseek-v4-pro",
         },
         "tags": ["premium", "creative"],
     },
@@ -455,9 +455,9 @@ _REGISTRY: dict[str, dict] = {
     },
     "iterative-critique-budget": {
         "method": "iterative-critique",
-        "primary_id": "anthropic/claude-3-haiku",
+        "primary_id": "claude-haiku",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "gpt-4o-mini",
         },
         "tags": ["budget", "iterative", "critique"],
     },
@@ -465,7 +465,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "iterative-critique",
         "primary_id": "gpt-5",
         "routing": {
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "deepseek-v4-pro",
         },
         "tags": ["premium", "iterative", "critique"],
     },
