@@ -24,8 +24,7 @@ from reasoner.infrastructure.llm.providers.openai_compat import (
 # Whitelist of supported models.  Everything except Ollama routes through OpenRouter.
 _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # Anthropic
-    "claude-opus":      {"model": "qwen/qwen3.6-plus"},
-    "anthropic/claude-3-haiku": {"model": "anthropic/claude-haiku-4.5"},
+    "claude-opus":      {"model": "deepseek/deepseek-v4-pro"},
     MODEL_CLAUDE_SONNET: {"model": "anthropic/claude-sonnet-4.6"},  # v3.2: still current as of Jun 2026
     "claude-haiku":     {"model": "anthropic/claude-haiku-4.5"},
     # OpenAI
