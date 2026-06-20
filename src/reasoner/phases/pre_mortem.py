@@ -22,6 +22,8 @@ PRE_MORTEM_BACKTRACK_SYSTEM = "You are an analytical assistant. Given a failure,
 
 def pre_mortem_backtrack_prompt(state: PipelineState) -> str:
     failure = state.pre_mortem_state.get("failure_narrative", {})
+    if not isinstance(failure, dict):
+        failure = {"what_happened": str(failure)}
     return (
         f'{get_language_instruction(state)}\n\n'
         f'Original Problem: {_wrap_user_input(state.problem)}\n\n'
@@ -38,6 +40,8 @@ PRE_MORTEM_SIGNALS_SYSTEM = "You are an analytical assistant. Identify observabl
 
 def pre_mortem_signals_prompt(state: PipelineState) -> str:
     root_cause = state.pre_mortem_state.get("root_cause", {})
+    if not isinstance(root_cause, dict):
+        root_cause = {"pivot_decision": str(root_cause)}
     return (
         f'{get_language_instruction(state)}\n\n'
         f'Root Cause:\n{json.dumps(root_cause, indent=2)}\n\n'
@@ -52,12 +56,18 @@ PRE_MORTEM_REDESIGN_SYSTEM = "You are an analytical assistant. Redesign the orig
 
 def pre_mortem_redesign_prompt(state: PipelineState) -> str:
     pm = state.pre_mortem_state
+    failure_narrative = pm.get("failure_narrative", {})
+    if not isinstance(failure_narrative, dict):
+        failure_narrative = {}
+    root_cause = pm.get("root_cause", {})
+    if not isinstance(root_cause, dict):
+        root_cause = {}
     return (
         f'{get_language_instruction(state)}\n\n'
         f'Problem: {_wrap_user_input(state.problem)}\n\n'
-        f'Failure: {json.dumps(pm.get("failure_narrative", {}).get("what_happened", ""), indent=0)}\n'
-        f'Root Cause: {json.dumps(pm.get("root_cause", {}).get("pivot_decision", ""), indent=0)}\n'
-        f'Early Signals: {json.dumps([s.get("signal") for s in pm.get("early_signals", [])], indent=0)}\n\n'
+        f'Failure: {json.dumps(failure_narrative.get("what_happened", ""), indent=0)}\n'
+        f'Root Cause: {json.dumps(root_cause.get("pivot_decision", ""), indent=0)}\n'
+        f'Early Signals: {json.dumps([s.get("signal") if isinstance(s, dict) else s for s in pm.get("early_signals", [])], indent=0)}\n\n'
         f'Redesign the solution to be robust against these failure modes. '
         f'Add specific safeguards, checkpoints, and rollback mechanisms.\n\n'
         f'Output JSON: {{"hardened_solution": "<redesigned approach>", '

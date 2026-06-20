@@ -93,6 +93,8 @@ async def run_pre_mortem_failure_phase(state: PipelineState, services: WorkflowS
         state=state
     )
     data = extract_json(raw)
+    if not isinstance(data, dict):
+        data = {"what_happened": str(data)[:500], "immediate_triggers": [], "severity": "unknown"}
     state.pre_mortem_state["failure_narrative"] = data
 
 async def run_pre_mortem_backtrack_phase(state: PipelineState, services: WorkflowServices) -> None:
@@ -104,6 +106,8 @@ async def run_pre_mortem_backtrack_phase(state: PipelineState, services: Workflo
         state=state
     )
     data = extract_json(raw)
+    if not isinstance(data, dict):
+        data = {"pivot_decision": str(data)[:300], "cascade": []}
     state.pre_mortem_state["root_cause"] = data
 
 async def run_pre_mortem_signals_phase(state: PipelineState, services: WorkflowServices) -> None:
@@ -127,6 +131,8 @@ async def run_pre_mortem_redesign_phase(state: PipelineState, services: Workflow
         state=state
     )
     data = extract_json(raw)
+    if not isinstance(data, dict):
+        data = {"hardened_solution": str(data)[:500]}
     state.pre_mortem_state["hardened_solution"] = data.get("hardened_solution", "")
     state.pre_mortem_state["safeguards"] = data.get("safeguards", [])
     state.pre_mortem_state["checkpoints"] = data.get("checkpoints", [])
