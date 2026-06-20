@@ -9,7 +9,24 @@ unexpected initialization order issues.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from reasoner.core.constants_models import MODEL_GEMINI_FLASH, MODEL_GEMINI_FLASH_LITE  # needed for IMAGE_GEN_ENHANCEMENT_MODEL + QUALITY_JUDGE_MODELS
+from reasoner.core.constants_models import (
+    MODEL_GEMINI_FLASH,
+    MODEL_GEMINI_FLASH_LITE,
+    MODEL_GEMINI_FLASH_IMAGE,
+    MODEL_GEMINI_PRO_IMAGE,
+    MODEL_GEMINI_31_FLASH_IMAGE_PREVIEW,
+    MODEL_GPT5_IMAGE,
+    MODEL_GPT54_IMAGE_2,
+    MODEL_FLUX_2_PRO,
+    MODEL_RECRAFT_V41_PRO,
+    MODEL_RECRAFT_V41_UTILITY,
+    MODEL_RECRAFT_V4_PRO,
+    MODEL_GROK_IMAGINE,
+    MODEL_MAI_IMAGE_25,
+    MODEL_SEEDREAM_45,
+    MODEL_RIVERFLOW_V2_FAST_PREVIEW,
+    MODEL_STEPFUN_37_FLASH,
+)
 from typing import Literal
 
 # ═════════════════════════════════════════════════════════════════════
@@ -51,7 +68,7 @@ GATE_MAX_TOKENS: int = 256
 GATE_TEMPERATURE: float = 0.0
 GATE_TIMEOUT_SECONDS: float = 5.0
 GATE_CONFIDENCE_THRESHOLD: float = 0.70
-GATE_DEFAULT_MODEL: str = "gemini-flash"  # non-OpenAI model that supports temperature=0
+GATE_DEFAULT_MODEL: str = MODEL_GEMINI_FLASH  # non-OpenAI model that supports temperature=0
 
 # ═════════════════════════════════════════════════════════════════════
 # HYPERGATE AGENT (sub-agent orchestrator replacing GateAgent)
@@ -371,18 +388,20 @@ IMAGE_GEN_DEFAULT_WIDTH: int = 1024
 IMAGE_GEN_DEFAULT_HEIGHT: int = 1024
 IMAGE_GEN_REMOTE_TIMEOUT_SECONDS: float = 20.0
 IMAGE_GEN_COMPLETION_TIMEOUT_SECONDS: float = 90.0
+IMAGE_GEN_PROMPT_MAX_TOKENS: int = 512
+IMAGE_GEN_PROMPT_TEMPERATURE: float = 0.7
 IMAGE_GEN_ENHANCEMENT_MODEL: str = MODEL_GEMINI_FLASH
 IMAGE_GEN_PRESETS: dict[str, list[str]] = {
-    "budget": ["grok-imagine", "riverflow-v2-fast-preview", "gemini-flash-image"],
-    "premium": ["gpt-5.4-image-2", "recraft-v4.1-pro"],
-    IMAGE_GEN_BUDGET_PRESET: ["grok-imagine", "riverflow-v2-fast-preview", "gemini-flash-image"],
-    IMAGE_GEN_PREMIUM_PRESET: ["gpt-5.4-image-2", "recraft-v4.1-pro"],
+    "budget": [MODEL_GROK_IMAGINE, MODEL_RIVERFLOW_V2_FAST_PREVIEW, MODEL_GEMINI_FLASH_IMAGE],
+    "premium": [MODEL_GPT54_IMAGE_2, MODEL_RECRAFT_V41_PRO],
+    IMAGE_GEN_BUDGET_PRESET: [MODEL_GROK_IMAGINE, MODEL_RIVERFLOW_V2_FAST_PREVIEW, MODEL_GEMINI_FLASH_IMAGE],
+    IMAGE_GEN_PREMIUM_PRESET: [MODEL_GPT54_IMAGE_2, MODEL_RECRAFT_V41_PRO],
 }
 IMAGE_GEN_FALLBACKS: dict[str, list[str]] = {
-    "budget": ["seedream-4.5", "flux.2-pro", "recraft-v4.1-utility"],
-    "premium": ["gpt-5-image", "gemini-3.1-flash-image-preview", "mai-image-2.5", "recraft-v4-pro"],
-    IMAGE_GEN_BUDGET_PRESET: ["seedream-4.5", "flux.2-pro", "recraft-v4.1-utility"],
-    IMAGE_GEN_PREMIUM_PRESET: ["gpt-5-image", "gemini-3.1-flash-image-preview", "mai-image-2.5", "recraft-v4-pro"],
+    "budget": [MODEL_SEEDREAM_45, MODEL_FLUX_2_PRO, MODEL_RECRAFT_V41_UTILITY],
+    "premium": [MODEL_GPT5_IMAGE, MODEL_GEMINI_31_FLASH_IMAGE_PREVIEW, MODEL_MAI_IMAGE_25, MODEL_RECRAFT_V4_PRO],
+    IMAGE_GEN_BUDGET_PRESET: [MODEL_SEEDREAM_45, MODEL_FLUX_2_PRO, MODEL_RECRAFT_V41_UTILITY],
+    IMAGE_GEN_PREMIUM_PRESET: [MODEL_GPT5_IMAGE, MODEL_GEMINI_31_FLASH_IMAGE_PREVIEW, MODEL_MAI_IMAGE_25, MODEL_RECRAFT_V4_PRO],
 }
 IMAGE_GEN_ENHANCEMENT_SYSTEM_PROMPT: str = ""  # moved to constants_prompts.py
 IMAGE_GEN_POLICY_REWRITE_SYSTEM_PROMPT: str = ""  # moved to constants_prompts.py

@@ -681,7 +681,12 @@ class PipelineState:
         self._ensure_fields_initialized()
     @property
     def pre_mortem_state(self) -> dict[str, Any]:
-        return self.method_state.data.setdefault("pre_mortem", {})
+        val = self.method_state.data.setdefault("pre_mortem", {})
+        # Defensive: if corrupted to non-dict (e.g. from old serialization), reset
+        if not isinstance(val, dict):
+            val = {}
+            self.method_state.data["pre_mortem"] = val
+        return val
 
     @pre_mortem_state.setter
     def pre_mortem_state(self, value: dict[str, Any]) -> None:

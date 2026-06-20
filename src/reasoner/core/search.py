@@ -298,12 +298,9 @@ def _should_include_result(result: dict[str, Any]) -> bool:
 from reasoner.core.ports.search_port import SearchServicePort
 
 # DiscoveryClient and URL helpers moved to infrastructure/search/discovery.py in v3.
-# Re-export here so existing callers (widgets, legacy code) keep working unchanged.
-from reasoner.infrastructure.search.discovery import (  # noqa: E402
-    DiscoveryClient,
-    get_searxng_urls,
-    get_searxng_base_url,
-    get_discovery_client,
-)
+# Module-level re-export removed (v3.4) to break circular import chain:
+#   search.py → discovery.py → searxng_adapter.py → search.py
+# All callers already use lazy imports — import directly from discovery.py instead:
+#   from reasoner.infrastructure.search.discovery import DiscoveryClient, get_discovery_client
 
 

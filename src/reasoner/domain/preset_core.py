@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Literal, Optional, List
 # Removed ProviderRouter and _REGISTRY imports to restore domain purity.
 # Validation logic will be moved to an application service.
 from reasoner.domain.saas import SubscriptionTier
+from reasoner.core.constants_models import MODEL_GROK_420, MODEL_KIMI_K2_6
 
 if TYPE_CHECKING:
     from reasoner.core.protocol import PhaseConfig
@@ -23,6 +24,8 @@ _KNOWN_ROUTING_ROLES: frozenset[str] = frozenset({
     "classification",
     "decomposition",
     "scoring",
+    "verifier",
+    "meta_evaluator",
     "stress_testing",
     "synthesis",
     "context_vetting",
@@ -104,6 +107,7 @@ _KNOWN_ROUTING_ROLES: frozenset[str] = frozenset({
     "prism_classify",
     # ArticleFlow roles (4-phase source-grounded article: retrieve, draft, verify, refine)
     "writing_draft",
+    "writing_outline",
     "writing_factcheck",
     "writing_assemble",
     # Image generation roles
@@ -214,8 +218,8 @@ def build_auto_preset(method: str, tier: str = "budget") -> str:
 # Agent model used for follow-up synthesis / classification / decomposition.
 # This ensures a consistent conversational persona across all methods.
 FOLLOWUP_AGENT_MODELS: dict[str, str] = {
-    "budget": "kimi-k2-6",
-    "premium": "grok-4.20",
+    "budget": MODEL_KIMI_K2_6,
+    "premium": MODEL_GROK_420,
 }
 
 
@@ -266,6 +270,34 @@ class PipelinePreset:
             raise ValueError(
                 f"Preset '{self.name}' has unknown fallback routing keys: {sorted(unknown_fb_roles)}. "
                 f"Valid roles: {sorted(_KNOWN_ROUTING_ROLES)}"
+            )
+
+        # ── Model alias validation (v3.4) ──
+        # Verify every model reference is a registered alias. Catches typos
+        # and references to removed models at construction time, not runtime.
+        from reasoner.infrastructure.llm.registry import _REGISTRY as _MODEL_REGISTRY
+        _model_errors: list[str] = []
+
+        if self.primary_id and self.primary_id not in _MODEL_REGISTRY:
+            _model_errors.append(f"primary_id='{self.primary_id}'")
+
+        for role, model_id in self.routing.items():
+            if model_id not in _MODEL_REGISTRY:
+                _model_errors.append(f"routing['{role}']='{model_id}'")
+
+        for role, model_id in self.fallback_routing.items():
+            if model_id not in _MODEL_REGISTRY:
+                _model_errors.append(f"fallback_routing['{role}']='{model_id}'")
+
+        for role, chain in self.cascading_routing.items():
+            for model_id in chain:
+                if model_id not in _MODEL_REGISTRY:
+                    _model_errors.append(f"cascading_routing['{role}']='{model_id}'")
+
+        if _model_errors:
+            raise ValueError(
+                f"Preset '{self.name}' references unknown model aliases:\n  "
+                + "\n  ".join(_model_errors)
             )
 
     def check_keys(self) -> dict[str, bool]:

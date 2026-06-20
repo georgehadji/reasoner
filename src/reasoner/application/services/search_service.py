@@ -104,6 +104,6 @@ class SearchService:
 
     async def close(self) -> None:
         """Close discovery client."""
-        from reasoner.core.search import reset_discovery_client
+        from reasoner.infrastructure.search.discovery import reset_discovery_client
 
         reset_discovery_client()

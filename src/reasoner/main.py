@@ -59,7 +59,11 @@ from reasoner.application.services.preset_service import PresetService
 from reasoner.renderer import export_to_json, render_pipeline_result
 from reasoner.infrastructure.llm.registry import list_models
 from reasoner.core.settings import settings  # triggers dotenv load
-from reasoner.core.constants import DEFAULT_CLI_PRESET
+from reasoner.core.constants import (
+    DEFAULT_CLI_PRESET,
+    DIRECT_ANSWER_MAX_TOKENS,
+    DIRECT_ANSWER_TEMPERATURE,
+)
 from reasoner.presets import (
     PRESETS,
     get_preset,
@@ -188,8 +192,8 @@ async def main(args: argparse.Namespace) -> None:
                 role="primary",
                 system_prompt="You are an analytical assistant. Provide a clear, concise answer.",
                 user_prompt=problem,
-                max_tokens=2048,
-                temperature=0.7,
+                max_tokens=DIRECT_ANSWER_MAX_TOKENS,
+                temperature=DIRECT_ANSWER_TEMPERATURE,
             )
             from reasoner.infrastructure.llm.ports import DegradedLLMResponse
             if isinstance(response, DegradedLLMResponse):

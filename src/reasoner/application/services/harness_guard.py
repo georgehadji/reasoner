@@ -18,32 +18,59 @@ from reasoner.core.evolution_constants import (
 _MODEL_LABS: dict[str, str] = {
     # Anthropic
     "claude-sonnet": "anthropic", "claude-haiku": "anthropic",
-    # OpenAI
-    "gpt-5": "openai", "gpt-5-mini": "openai", "o3": "openai",
-    # Google
-    "gemini-flash": "google", "gemini-pro": "google",
+    # OpenAI — GPT
+    "gpt-5": "openai", "gpt-5.5": "openai", "gpt-5.5-pro": "openai",
+    "gpt-5-mini": "openai", "gpt-5.4-mini": "openai", "gpt-5.4-nano": "openai",
+    "gpt-latest": "openai", "gpt-mini-latest": "openai",
+    "gpt-4o-mini": "openai", "o3": "openai", "o3-mini": "openai",
+    # Google — Gemini
+    "gemini-flash": "google", "gemini-pro-real": "google",
+    "gemini-flash-lite-real": "google", "gemini-2.5-flash-lite": "google",
+    "gemini-pro-latest": "google", "gemini-flash-latest": "google",
+    # Note: gemini-pro → Anthropic (claude-sonnet), gemini-flash-lite → Qwen (qwen3.5-flash)
     # Meta
     "llama-3.3-70b": "meta",
     # Mistral
     "mistral-large-3": "mistral", "mistral-small": "mistral",
+    "ministral-8b": "mistral", "codestral-2508": "mistral",
     # DeepSeek
-    "deepseek-v3": "deepseek", "deepseek-r1": "deepseek",
+    "deepseek-v3": "deepseek", "deepseek-v3.2": "deepseek", "deepseek-r1": "deepseek",
+    "deepseek-v4-pro": "deepseek", "deepseek-v4-flash": "deepseek",
+    "deepseek/deepseek-chat": "deepseek",
     # Qwen (Alibaba)
-    "qwen3.7-max": "qwen", "qwen3.7-plus": "qwen", "qwen3.5-flash": "qwen",
+    "qwen3-max": "qwen", "qwen3.7-max": "qwen", "qwen3.7-plus": "qwen", "qwen3.5-flash": "qwen",
+    "qwen3-max-thinking": "qwen", "qwen3.6-flash": "qwen", "qwen3.6-plus-real": "qwen",
+    "qwen3-coder-flash": "qwen", "qwen3-coder-30b-a3b": "qwen",
     # GLM (Zhipu)
     "glm-5.1": "zhipu", "glm-4-air": "zhipu",
     # MiniMax
-    "minimax-m3": "minimax", "minimax-m2.5": "minimax",
+    "minimax-m3": "minimax", "minimax-m2.7": "minimax", "minimax-m2.5": "minimax",
+    "minimax-m2.1": "minimax", "minimax-m2": "minimax", "minimax-m1": "minimax",
     # Moonshot (Kimi)
     "kimi-k2-6": "moonshot",
     # StepFun
     "stepfun-3.7-flash": "stepfun",
+    # OpenAI — Codex
+    "gpt-5.1-codex-mini": "openai",
+    # Google — misc
+    "google/gemma-2-9b-it": "google", "gemini-flash-lite": "qwen",
+    "gemini-pro": "anthropic", "gemini-pro-image": "google",
+    # NVIDIA
+    "nvidia-nemotron-super": "nvidia",
+    # Sourceful
+    "riverflow-v2-fast-preview": "sourceful",
     # InclusionAI (Ant Group)
     "ring-2.6-1t": "inclusionai", "ling-2.6-flash-free": "inclusionai",
-    # Xiaomi
-    "mimo-v2-flash": "xiaomi", "mimo-v2-pro": "xiaomi",
+    # Xiaomi — MiMo
+    "mimo-v2.5-pro": "xiaomi", "mimo-v2.5": "xiaomi",
+    "mimo-v2-pro": "xiaomi", "mimo-v2-flash": "xiaomi",
+    # xAI — Grok
+    "grok-4.20": "xai", "grok-4.20-multi-agent": "xai", "grok-4.3": "xai",
+    "grok-build-0.1": "xai",
     # NVIDIA
-    "nemotron-3-ultra-free": "nvidia",
+    "nemotron-3-ultra-free": "nvidia", "nemotron-3-super-free": "nvidia",
+    "nemotron-nano-omni-free": "nvidia", "nemotron-nano-30b-free": "nvidia",
+    "llama-nemotron-super-49b": "nvidia",
 }
 
 

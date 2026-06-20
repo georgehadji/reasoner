@@ -11,6 +11,12 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from reasoner.core.constants_models import (
+    MODEL_CLAUDE_HAIKU,
+    MODEL_GEMINI_FLASH,
+    MODEL_GPT4O_MINI,
+)
+
 try:
     from dotenv import load_dotenv
 
@@ -133,10 +139,10 @@ class Settings:
     OPENROUTER_APP_TITLE: str = os.getenv("OPENROUTER_APP_TITLE", "Reasoner")
 
     # ── Neuro Memory Models ──
-    NEURO_REASONING_MODEL: str = os.getenv("NEURO_REASONING_MODEL", "gpt-4o-mini")
+    NEURO_REASONING_MODEL: str = os.getenv("NEURO_REASONING_MODEL", MODEL_GPT4O_MINI)
     NEURO_REASONING_FALLBACK_MODELS: str = os.getenv(
         "NEURO_REASONING_FALLBACK_MODELS",
-        "gemini-flash,claude-haiku",
+        f"{MODEL_GEMINI_FLASH},{MODEL_CLAUDE_HAIKU}",
     )
     NEURO_EMBEDDING_MODEL: str = os.getenv("NEURO_EMBEDDING_MODEL", "qwen/qwen3-embedding-8b")
     NEURO_EMBEDDING_FALLBACK_MODELS: str = os.getenv(

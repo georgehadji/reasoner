@@ -11,10 +11,22 @@ import uuid
 from typing import Any, AsyncGenerator
 
 from reasoner.core.constants import (
+    CREATIVE_MAX_TOKENS,
+    CREATIVE_TEMPERATURE,
+    DIRECT_ANSWER_MAX_TOKENS,
+    DIRECT_ANSWER_TEMPERATURE,
     SSE_FLUSH_INTERVAL,
     TRUNCATION,
     get_phase_retry_budget,
     get_phase_timeout,
+)
+from reasoner.core.constants_models import (
+    MODEL_CLAUDE_SONNET,
+    MODEL_GEMINI_PRO,
+    MODEL_GPT5,
+    MODEL_KIMI_K2_6,
+    MODEL_MISTRAL_LARGE_3,
+    MODEL_QWEN36_PLUS,
 )
 from reasoner.quality import PhaseMonitor, reset_phase_state
 from reasoner.infrastructure.llm.router import ProviderRouter
@@ -85,14 +97,14 @@ async def _emit_widget_event(
 # Creative-writing model tiers with 2 fallbacks each.
 # Format: (model_id, description)
 _CREATIVE_MODELS_BUDGET: list[tuple[str, str]] = [
-    ("kimi-k2-6", "Kimi K2.6 — 1T MoE, best value creative"),
-    ("qwen3.6-plus", "Qwen 3.6 Plus — multilingual fallback"),
-    ("mistral-large-3", "Mistral Large — European language fallback"),
+    (MODEL_KIMI_K2_6, "Kimi K2.6 — 1T MoE, best value creative"),
+    (MODEL_QWEN36_PLUS, "Qwen 3.6 Plus — multilingual fallback"),
+    (MODEL_MISTRAL_LARGE_3, "Mistral Large — European language fallback"),
 ]
 _CREATIVE_MODELS_PREMIUM: list[tuple[str, str]] = [
-    ("claude-sonnet", "Claude Sonnet — gold standard creative"),
-    ("gpt-5", "GPT-5 — structured/academic fallback"),
-    ("gemini-pro", "Gemini Pro — research-backed fallback"),
+    (MODEL_CLAUDE_SONNET, "Claude Sonnet — gold standard creative"),
+    (MODEL_GPT5, "GPT-5 — structured/academic fallback"),
+    (MODEL_GEMINI_PRO, "Gemini Pro — research-backed fallback"),
 ]
 
 # Enhanced system prompt for creative writing with hallucination guards.
@@ -155,16 +167,16 @@ async def _stream_direct_answer(
 
     if is_creative:
         system_prompt = _CREATIVE_SYSTEM_PROMPT
-        max_tokens = 4096
-        temperature = 0.8
+        max_tokens = CREATIVE_MAX_TOKENS
+        temperature = CREATIVE_TEMPERATURE
         tier = get_preset_price_tier(preset_name)
         creative_models = (
             _CREATIVE_MODELS_PREMIUM if tier == "premium" else _CREATIVE_MODELS_BUDGET
         )
     else:
         system_prompt = "You are an analytical assistant. Provide a clear, concise answer."
-        max_tokens = 2048
-        temperature = 0.7
+        max_tokens = DIRECT_ANSWER_MAX_TOKENS
+        temperature = DIRECT_ANSWER_TEMPERATURE
         creative_models = []
 
     # ── LLM call with fallback chain ──

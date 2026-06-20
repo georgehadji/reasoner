@@ -7,7 +7,12 @@ import json
 import logging
 from typing import TYPE_CHECKING
 
-from reasoner.core.constants import get_quality_judge_model, get_quality_judge_threshold
+from reasoner.core.constants import (
+    GATE_MAX_TOKENS,
+    GATE_TEMPERATURE,
+    get_quality_judge_model,
+    get_quality_judge_threshold,
+)
 from reasoner.quality.criteria import PhaseQualityResult, evaluate_rules
 
 if TYPE_CHECKING:
@@ -214,8 +219,8 @@ class PhaseMonitor:
             model_id=self._judge_model,
             messages=messages,
             system=_JUDGE_SYSTEM,
-            max_tokens=256,
-            temperature=0.0,
+            max_tokens=GATE_MAX_TOKENS,
+            temperature=GATE_TEMPERATURE,
         )
 
         raw = (response.content or "").strip()

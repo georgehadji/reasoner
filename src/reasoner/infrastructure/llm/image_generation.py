@@ -30,6 +30,8 @@ from reasoner.core.constants import (
     IMAGE_GEN_FALLBACKS,
     IMAGE_GEN_POLICY_REWRITE_SYSTEM_PROMPT,
     IMAGE_GEN_PRESETS,
+    IMAGE_GEN_PROMPT_MAX_TOKENS,
+    IMAGE_GEN_PROMPT_TEMPERATURE,
     IMAGE_GEN_REMOTE_TIMEOUT_SECONDS,
     OPENROUTER_BASE_URL,
 )
@@ -439,8 +441,8 @@ async def _enhance_image_prompt(user_prompt: str, api_key: str | None = None) ->
         enhanced = await provider.complete(
             system_prompt=IMAGE_GEN_ENHANCEMENT_SYSTEM_PROMPT,
             user_prompt=f"Original description: {user_prompt}",
-            max_tokens=512,
-            temperature=0.7,
+            max_tokens=IMAGE_GEN_PROMPT_MAX_TOKENS,
+            temperature=IMAGE_GEN_PROMPT_TEMPERATURE,
         )
         enhanced = enhanced.strip().strip('"').strip("'")
         if enhanced:
