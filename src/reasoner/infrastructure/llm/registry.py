@@ -24,7 +24,7 @@ from reasoner.infrastructure.llm.providers.openai_compat import (
 # Whitelist of supported models.  Everything except Ollama routes through OpenRouter.
 _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # Anthropic
-    "claude-opus":      {"model": "deepseek/deepseek-v4-pro"},
+    "claude-opus":      {"model": "anthropic/claude-opus-4.8"},
     MODEL_CLAUDE_SONNET: {"model": "anthropic/claude-sonnet-4.6"},  # v3.2: still current as of Jun 2026
     "claude-haiku":     {"model": "anthropic/claude-haiku-4.5"},
     # OpenAI
@@ -43,7 +43,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "google/gemma-2-9b-it": {"model": "google/gemma-3-12b-it"},
     MODEL_GEMINI_PRO:   {"model": "google/gemini-3.5-flash"},  # v3.2: 2.5-pro → 3.5-flash (near-Pro coding at Flash cost)
     MODEL_GEMINI_FLASH: {"model": "google/gemini-3.5-flash"},
-    "gemini-flash-lite": {"model": "google/gemini-3.5-flash"},  # v3.2: step-3.7-flash → 3.5-flash (more reliable)
+    "gemini-flash-lite": {"model": "stepfun/step-3.7-flash"},  # v3.2: cheapest quality model ($0.20/$1.15)
     "gemini-3.1-flash-lite": {"model": "google/gemini-3.1-flash-lite"},  # explicit alias if someone needs Google specifically
     "gemma-4-26b":      {"model": "google/gemma-4-26b-a4b-it"},
     "gemma-4-31b":      {"model": "google/gemma-4-31b-it"},
@@ -70,8 +70,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "devstral-medium":  {"model": "mistralai/devstral-medium"},
     "devstral-small":   {"model": "mistralai/devstral-small"},
     "ministral-8b":     {"model": "mistralai/mistral-small-3.2-24b-instruct"},
-    "ministral-3b":     {"model": "mistralai/mistral-small-3.2-24b-instruct"},
-    # DeepSeek
+    # ministral-3b removed — no known OpenRouter model; use ministral-8b or stepfun-3.7-flash    # DeepSeek
     "deepseek-v3":      {"model": "deepseek/deepseek-v3.2"},
     "deepseek/deepseek-chat": {"model": "deepseek/deepseek-chat"},
     "deepseek-v3.1-nex-n1": {"model": "nex-agi/deepseek-v3.1-nex-n1"},
@@ -120,7 +119,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # Elephant
     "elephant-alpha":   {"model": "openrouter/elephant-alpha"},
     # OpenRouter
-    "fireworks/firefunction-v2": {"model": "openai/gpt-4o-mini"},
+
     "owl-alpha":        {"model": "openrouter/owl-alpha"},
     "pareto-code":      {"model": "openrouter/pareto-code"},
     # Arcee AI
