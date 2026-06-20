@@ -16,7 +16,12 @@ _REGISTRY: dict[str, dict] = {
         "routing": {
             "perspective_cot": "qwen3-turbo",
             "perspective_analysis": "qwen3-turbo",
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "deepseek-v4-pro",
+            # ── Per-perspective cross-lab diversity (4 labs) ──
+            "constructive":  "deepseek-v3",      # 🇨🇳 DeepSeek — $0.229/$0.343
+            "destructive":   "ring-2.6-1t",      # 🇨🇳 inclusionAI — $0.075/$0.625
+            "systemic":      "qwen3-max",        # 🇨🇳 Qwen/Alibaba — $0.40/$1.60
+            "minimalist":    "ministral-8b",     # 🇫🇷 Mistral — $0.075/$0.20
         },
         "tags": ["budget", "balanced"],
     },
@@ -26,7 +31,12 @@ _REGISTRY: dict[str, dict] = {
         "routing": {
             "perspective_cot": "qwen3.5-9b",
             "perspective_analysis": "qwen3.5-9b",
-            "synthesis": "fireworks/firefunction-v2",
+            "synthesis": "stepfun-3.7-flash",
+            # ── Per-perspective cross-lab diversity (4 labs, ultra-cheap) ──
+            "constructive":  "stepfun-3.7-flash",    # 🇨🇳 StepFun — $0.20/$1.15
+            "destructive":   "ling-2.6-flash-free",  # 🇨🇳 inclusionAI — FREE
+            "systemic":      "qwen3.6-flash",        # 🇨🇳 Qwen — cheap flash
+            "minimalist":    "ministral-8b",         # 🇫🇷 Mistral — $0.075/$0.20
         },
         "tags": ["budget", "creative", "fast"],
     },
