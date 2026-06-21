@@ -707,6 +707,9 @@ from reasoner.api.routes.estimate import router as estimate_router
 app.include_router(feedback_router)
 app.include_router(estimate_router)
 
+from reasoner.api.routes.gdpr import router as gdpr_router
+app.include_router(gdpr_router)
+
 from reasoner.api.routes.errors import router as errors_router
 app.include_router(errors_router)
 

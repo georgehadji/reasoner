@@ -587,6 +587,23 @@ class EventStore:
 
         return await self._run_in_executor(_count_events_sync)
 
+    async def list_aggregate_ids_for_user(self, user_id: str) -> list[str]:
+        """Return all aggregate IDs for a given user (GDPR erasure support).
+
+        Scans pipeline_owners.json for user -> pipeline_id mapping.
+        Returns an empty list on any error.
+        """
+        try:
+            from reasoner.domain.pipeline_owner import _PIPELINE_OWNERS_PATH
+            if not _PIPELINE_OWNERS_PATH.exists():
+                return []
+            import json
+            mapping = json.loads(_PIPELINE_OWNERS_PATH.read_text(encoding="utf-8"))
+            return [pid for pid, uid in mapping.items() if uid == user_id]
+        except Exception as exc:
+            logger.warning("Failed to list aggregates for user %s: %s", user_id, exc)
+            return []
+
     async def delete_aggregate(self, aggregate_id: str) -> None:
         """
         Delete aggregate and all its events (for GDPR compliance).
