@@ -16,6 +16,59 @@ from reasoner.infrastructure.llm.base import BaseLLMProvider, LLMError
 from reasoner.infrastructure.llm.registry import build_provider
 from reasoner.infrastructure.llm.ports import DegradedLLMResponse
 
+# Multi-provider fallback (v3.4) — retry OpenRouter failures via direct API keys
+_FALLBACK_PROVIDER_CHAIN: list[str] = ["anthropic", "openai", "google"]
+
+
+async def _try_direct_fallback(
+    role: str,
+    system_prompt: str,
+    user_prompt: str,
+    original_error: Exception,
+    max_tokens: int,
+    temperature: float,
+    extra_body: dict[str, Any] | None = None,
+) -> tuple[str, dict[str, Any]] | None:
+    """Try direct API providers when OpenRouter fails.
+
+    Returns (response, metadata) on success, None if all fallbacks fail.
+    Only active when MULTI_PROVIDER_FALLBACK_ENABLED is true.
+    """
+    try:
+        from reasoner.core.settings import settings
+        if not settings.MULTI_PROVIDER_FALLBACK_ENABLED:
+            return None
+    except Exception:
+        return None  # Settings not available — skip silently
+
+    from reasoner.infrastructure.llm.providers.direct import build_fallback_provider
+
+    for provider_name in _FALLBACK_PROVIDER_CHAIN:
+        try:
+            provider = build_fallback_provider(provider_name)
+            logger.warning(
+                "Multi-provider fallback: trying %s for role '%s' after: %s",
+                provider_name, role, original_error,
+            )
+            response = await provider.complete(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                max_tokens=max_tokens,
+                temperature=temperature,
+            )
+            if not response or not response.strip():
+                logger.warning("Multi-provider fallback %s returned empty — trying next", provider_name)
+                continue
+            metadata: dict[str, Any] = {"model": f"{provider_name}:{provider.model}", "is_fallback": True}
+            logger.info("Multi-provider fallback %s succeeded for role '%s'", provider_name, role)
+            return response, metadata
+        except Exception as e:
+            logger.warning("Multi-provider fallback %s failed for role '%s': %s", provider_name, role, e)
+            continue
+
+    logger.error("All multi-provider fallbacks exhausted for role '%s'", role)
+    return None
+
 logger = logging.getLogger(__name__)
 
 
@@ -171,12 +224,17 @@ class ProviderRouter:
             except asyncio.TimeoutError:
                 if is_fallback:
                     logger.error(
-                        "Role '%s' fallback '%s' timed out after %.0fs; returning degraded response",
+                        "Role '%s' fallback '%s' timed out after %.0fs; trying direct fallback...",
                         role, provider.model, effective_timeout,
                     )
+                    direct = await _try_direct_fallback(
+                        role, system_prompt, user_prompt, original_error=exc,
+                        max_tokens=max_tokens, temperature=temperature, extra_body=extra_body,
+                    )
+                    if direct:
+                        return direct
                     return DegradedLLMResponse(
-                        text="",
-                        error=f"{provider.model} timed out",
+                        text="", error=f"{provider.model} timed out",
                         metadata={"model": provider.model},
                     ), {}
                 logger.warning(
@@ -189,19 +247,23 @@ class ProviderRouter:
                     return await _execute_call(fallback, is_fallback=True)
                 else:
                     return DegradedLLMResponse(
-                        text="",
-                        error=f"{assigned.model} timed out — no fallback",
+                        text="", error=f"{assigned.model} timed out — no fallback",
                         metadata={"model": assigned.model},
                     ), {}
             except LLMError as exc:
                 if is_fallback:
                     logger.error(
-                        "Role '%s' fallback '%s' failed (%s); returning degraded response",
+                        "Role '%s' fallback '%s' failed (%s); trying direct fallback...",
                         role, provider.model, exc,
                     )
+                    direct = await _try_direct_fallback(
+                        role, system_prompt, user_prompt, original_error=exc,
+                        max_tokens=max_tokens, temperature=temperature, extra_body=extra_body,
+                    )
+                    if direct:
+                        return direct
                     return DegradedLLMResponse(
-                        text="",
-                        error=str(exc),
+                        text="", error=str(exc),
                         metadata={"model": provider.model},
                     ), {}
                 logger.warning(
@@ -214,8 +276,7 @@ class ProviderRouter:
                     return await _execute_call(fallback, is_fallback=True)
                 else:
                     return DegradedLLMResponse(
-                        text="",
-                        error=str(exc),
+                        text="", error=str(exc),
                         metadata={"model": assigned.model},
                     ), {}
 
@@ -258,6 +319,13 @@ class ProviderRouter:
             except LLMError as exc:
                 await circuit.record_failure()
                 if is_fallback:
+                    direct = await _try_direct_fallback(
+                        role, system_prompt, user_prompt, original_error=exc,
+                        max_tokens=max_tokens, temperature=temperature, extra_body=extra_body,
+                    )
+                    if direct:
+                        yield direct
+                        return
                     yield DegradedLLMResponse(
                         text="",
                         error=str(exc),

@@ -150,6 +150,11 @@ class Settings:
         "openai/text-embedding-3-small,baai/bge-m3",
     )
 
+    # ── Multi-Provider Fallback ──
+    MULTI_PROVIDER_FALLBACK_ENABLED: bool = os.getenv(
+        "MULTI_PROVIDER_FALLBACK_ENABLED", "false"
+    ).lower() in ("1", "true", "yes")
+
     # ── Sentry ──
     SENTRY_DSN: str | None = os.getenv("SENTRY_DSN")
     SENTRY_TRACES_SAMPLE_RATE: float = float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1"))
