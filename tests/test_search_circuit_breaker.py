@@ -11,10 +11,12 @@ from reasoner.circuit_breaker import CircuitState
 @pytest.fixture(autouse=True)
 async def reset_searxng_circuit():
     """Reset the SearXNG circuit breaker before each test."""
-    from reasoner.core.search import _SEARXNG_CB
-    await _SEARXNG_CB.reset()
+    from reasoner.core.search import _get_searxng_cb
+    cb = _get_searxng_cb()
+    await cb.reset()
     yield
-    await _SEARXNG_CB.reset()
+    cb = _get_searxng_cb()
+    await cb.reset()
 
 
 class TestSearXNGCircuitBreaker:
@@ -23,7 +25,8 @@ class TestSearXNGCircuitBreaker:
     @pytest.mark.asyncio
     async def test_search_records_success_on_ok_response(self):
         """When SearXNG returns results, circuit records success."""
-        from reasoner.core.search import DiscoveryClient, _SEARXNG_CB
+        from reasoner.infrastructure.search.discovery import DiscoveryClient
+        from reasoner.core.search import _SEARXNG_CB
 
         client = DiscoveryClient(base_url="http://localhost:8888")
         with patch.object(client, "_fetch_page", new_callable=AsyncMock) as mock_fetch:
@@ -40,7 +43,8 @@ class TestSearXNGCircuitBreaker:
     @pytest.mark.asyncio
     async def test_search_records_failure_on_exception(self):
         """When SearXNG throws, circuit records failure."""
-        from reasoner.core.search import DiscoveryClient, _SEARXNG_CB
+        from reasoner.infrastructure.search.discovery import DiscoveryClient
+        from reasoner.core.search import _SEARXNG_CB
 
         client = DiscoveryClient(base_url="http://localhost:8888")
         with patch.object(client, "_fetch_page", new_callable=AsyncMock) as mock_fetch:
@@ -53,7 +57,8 @@ class TestSearXNGCircuitBreaker:
     @pytest.mark.asyncio
     async def test_open_circuit_returns_empty_immediately(self):
         """When circuit is open, search returns [] without calling SearXNG."""
-        from reasoner.core.search import DiscoveryClient, _SEARXNG_CB
+        from reasoner.infrastructure.search.discovery import DiscoveryClient
+        from reasoner.core.search import _SEARXNG_CB
 
         # Force circuit open (default failure_threshold = 5)
         for _ in range(5):
@@ -70,7 +75,8 @@ class TestSearXNGCircuitBreaker:
     @pytest.mark.asyncio
     async def test_circuit_half_open_then_closes_on_success(self):
         """After timeout, circuit enters half-open and closes on success."""
-        from reasoner.core.search import DiscoveryClient, _SEARXNG_CB
+        from reasoner.infrastructure.search.discovery import DiscoveryClient
+        from reasoner.core.search import _SEARXNG_CB
 
         # Lower threshold so one success closes the circuit
         original_threshold = _SEARXNG_CB.config.success_threshold

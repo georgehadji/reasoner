@@ -8,10 +8,12 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
+from reasoner.core.settings import settings as _settings
 from reasoner.infrastructure.search.discovery import (
     get_searxng_urls,
     get_searxng_base_url,
     get_discovery_client,
+    reset_discovery_client,
 )
 
 
@@ -20,7 +22,7 @@ class TestSearXNGUrlHelpers:
 
     def test_get_searxng_urls_default(self):
         """Default URLs should point to localhost:8888."""
-        with patch.dict(os.environ, {}, clear=True):
+        with patch.object(_settings, 'SEARXNG_URL', 'http://localhost:8888'):
             urls = get_searxng_urls()
             assert urls == [
                 "http://localhost:8888/search",
@@ -29,7 +31,7 @@ class TestSearXNGUrlHelpers:
 
     def test_get_searxng_urls_from_env(self):
         """Respecting SEARXNG_URL env var."""
-        with patch.dict(os.environ, {"SEARXNG_URL": "http://search.local:9999"}, clear=True):
+        with patch.object(_settings, 'SEARXNG_URL', 'http://search.local:9999'):
             urls = get_searxng_urls()
             assert urls == [
                 "http://search.local:9999/search",
@@ -38,16 +40,16 @@ class TestSearXNGUrlHelpers:
 
     def test_get_searxng_urls_trailing_slash_stripped(self):
         """Trailing slash should be stripped from env var."""
-        with patch.dict(os.environ, {"SEARXNG_URL": "http://localhost:8888/"}, clear=True):
+        with patch.object(_settings, 'SEARXNG_URL', 'http://localhost:8888/'):
             urls = get_searxng_urls()
             assert urls[0] == "http://localhost:8888/search"
 
     def test_get_searxng_base_url_default(self):
-        with patch.dict(os.environ, {}, clear=True):
+        with patch.object(_settings, 'SEARXNG_URL', 'http://localhost:8888'):
             assert get_searxng_base_url() == "http://localhost:8888"
 
     def test_get_searxng_base_url_from_env(self):
-        with patch.dict(os.environ, {"SEARXNG_URL": "http://custom:9000"}, clear=True):
+        with patch.object(_settings, 'SEARXNG_URL', 'http://custom:9000'):
             assert get_searxng_base_url() == "http://custom:9000"
 
 
@@ -57,9 +59,8 @@ class TestDiscoveryClientRespectsEnv:
     @pytest.mark.asyncio
     async def test_get_discovery_client_uses_env_url(self):
         """When SEARXNG_URL is set, the client should use it."""
-        from reasoner.core.search import reset_discovery_client
         reset_discovery_client()
-        with patch.dict(os.environ, {"SEARXNG_URL": "http://searxng.test:7777"}, clear=True):
+        with patch.object(_settings, 'SEARXNG_URL', 'http://searxng.test:7777'):
             client, _ = await get_discovery_client()
             assert client.base_url == "http://searxng.test:7777"
         reset_discovery_client()
@@ -67,9 +68,8 @@ class TestDiscoveryClientRespectsEnv:
     @pytest.mark.asyncio
     async def test_get_discovery_client_explicit_url_overrides_env(self):
         """An explicit base_url argument should override the env var."""
-        from reasoner.core.search import reset_discovery_client
         reset_discovery_client()
-        with patch.dict(os.environ, {"SEARXNG_URL": "http://env.test:6666"}, clear=True):
+        with patch.object(_settings, 'SEARXNG_URL', 'http://env.test:6666'):
             client, _ = await get_discovery_client(base_url="http://explicit.test:5555")
             assert client.base_url == "http://explicit.test:5555"
         reset_discovery_client()
@@ -82,7 +82,7 @@ class TestWidgetSearXNGUrlUnification:
     async def test_search_searxng_uses_helper(self):
         """widgets.search_searxng should call get_searxng_urls."""
         import reasoner.widgets as widgets
-        with patch("reasoner.core.search.get_searxng_urls") as mock_urls:
+        with patch("reasoner.infrastructure.search.discovery.get_searxng_urls") as mock_urls:
             mock_urls.return_value = ["http://localhost:8888/search"]
             with patch("httpx.AsyncClient.get") as mock_get:
                 mock_get.return_value = MagicMock(status_code=200, json=lambda: {"results": []})
@@ -94,7 +94,7 @@ class TestWidgetSearXNGUrlUnification:
         """DiscoverWidget should call get_searxng_urls."""
         from reasoner.infrastructure.widgets.discover import DiscoverWidget
         widget = DiscoverWidget()
-        with patch("reasoner.core.search.get_searxng_urls") as mock_urls:
+        with patch("reasoner.infrastructure.search.discovery.get_searxng_urls") as mock_urls:
             mock_urls.return_value = ["http://localhost:8888/search"]
             with patch("httpx.AsyncClient.get") as mock_get:
                 mock_get.return_value = MagicMock(status_code=200, json=lambda: {"results": []})
@@ -106,7 +106,7 @@ class TestWidgetSearXNGUrlUnification:
         """ImageSearchWidget should call get_searxng_urls."""
         from reasoner.infrastructure.widgets.image_search import ImageSearchWidget
         widget = ImageSearchWidget()
-        with patch("reasoner.core.search.get_searxng_urls") as mock_urls:
+        with patch("reasoner.infrastructure.search.discovery.get_searxng_urls") as mock_urls:
             mock_urls.return_value = ["http://localhost:8888/search"]
             with patch("httpx.AsyncClient.get") as mock_get:
                 mock_get.return_value = MagicMock(status_code=200, json=lambda: {"results": []})
@@ -118,7 +118,7 @@ class TestWidgetSearXNGUrlUnification:
         """VideoSearchWidget should call get_searxng_urls."""
         from reasoner.infrastructure.widgets.video_search import VideoSearchWidget
         widget = VideoSearchWidget()
-        with patch("reasoner.core.search.get_searxng_urls") as mock_urls:
+        with patch("reasoner.infrastructure.search.discovery.get_searxng_urls") as mock_urls:
             mock_urls.return_value = ["http://localhost:8888/search"]
             with patch("httpx.AsyncClient.get") as mock_get:
                 mock_get.return_value = MagicMock(status_code=200, json=lambda: {"results": []})

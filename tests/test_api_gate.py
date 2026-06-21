@@ -55,7 +55,7 @@ async def test_force_pipeline_skips_gate(valid_run_payload):
     req = RunRequest(**valid_run_payload, force_pipeline=True)
     fake_router = FakeRouter()
 
-    with patch("reasoner.api.streaming.HyperGateAgent") as mock_gate_cls:
+    with patch("reasoner.application.orchestrator.HyperGateAgent") as mock_gate_cls:
         mock_gate_cls.return_value.decide = AsyncMock(return_value=None)
         with patch("reasoner.llm.ProviderRouter.from_model_ids", return_value=fake_router):
             with patch("reasoner.pipeline.ReasonerPipeline._phase_0_classify", return_value=None):
@@ -78,7 +78,7 @@ async def test_direct_answer_stream_format(valid_run_payload):
     fake_decision = GateDecision(action="direct", method=None, confidence=0.95, reasoning="Simple factual question")
     fake_router = FakeRouter()
 
-    with patch("reasoner.api.streaming.HyperGateAgent") as mock_gate_cls:
+    with patch("reasoner.application.orchestrator.HyperGateAgent") as mock_gate_cls:
         mock_gate = mock_gate_cls.return_value
         mock_gate.decide = AsyncMock(return_value=fake_decision)
 
@@ -119,7 +119,7 @@ async def test_gate_failure_falls_back_to_pipeline(valid_run_payload):
     req = RunRequest(**valid_run_payload)
     fake_router = FakeRouter()
 
-    with patch("reasoner.api.streaming.HyperGateAgent") as mock_gate_cls:
+    with patch("reasoner.application.orchestrator.HyperGateAgent") as mock_gate_cls:
         mock_gate = mock_gate_cls.return_value
         mock_gate.decide = AsyncMock(side_effect=RuntimeError("unexpected"))
 
