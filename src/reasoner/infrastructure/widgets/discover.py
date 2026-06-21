@@ -131,7 +131,7 @@ class DiscoverWidget(BaseWidget):
     async def _search_searxng(self, query: str) -> list[dict[str, Any]]:
         """Search using SearXNG."""
         import httpx
-        from reasoner.core.search import get_searxng_urls
+        from reasoner.infrastructure.search.discovery import get_searxng_urls
         
         searxng_urls = get_searxng_urls()
         

@@ -441,7 +441,7 @@ DISCOVER_TOPICS = {
 
 async def search_searxng(query: str, engines: list[str] = None) -> list[dict[str, Any]]:
     """Search using SearXNG."""
-    from reasoner.core.search import get_searxng_urls
+    from reasoner.infrastructure.search.discovery import get_searxng_urls
     searxng_urls = get_searxng_urls()
     
     for url in searxng_urls:
@@ -522,7 +522,7 @@ def search_images(query: str, limit: int = 20) -> dict[str, Any]:
     results = []
     
     # Try SearXNG
-    from reasoner.core.search import get_searxng_urls
+    from reasoner.infrastructure.search.discovery import get_searxng_urls
     searxng_urls = get_searxng_urls()
     
     for url in searxng_urls:
@@ -562,7 +562,7 @@ def search_videos(query: str, limit: int = 20) -> dict[str, Any]:
     results = []
     
     # Try SearXNG
-    from reasoner.core.search import get_searxng_urls
+    from reasoner.infrastructure.search.discovery import get_searxng_urls
     searxng_urls = get_searxng_urls()
     
     for url in searxng_urls:

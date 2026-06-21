@@ -72,7 +72,7 @@ class ImageSearchWidget(BaseWidget):
     async def _search_images(self, query: str, limit: int) -> list[dict[str, Any]]:
         """Search images using SearXNG."""
         import httpx
-        from reasoner.core.search import get_searxng_urls
+        from reasoner.infrastructure.search.discovery import get_searxng_urls
         
         searxng_urls = get_searxng_urls()
         
