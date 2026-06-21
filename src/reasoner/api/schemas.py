@@ -73,6 +73,8 @@ class RunRequest(BaseModel):
     file_ids: list[str] = []
     client_run_id: str | None = None
 
+    model_config = {"extra": "forbid"}
+
     @field_validator("problem")
     @classmethod
     def validate_problem(cls, v: str) -> str:
@@ -167,6 +169,8 @@ class FollowupRequest(BaseModel):
     attachments: list[AttachmentRef] = []
     file_ids: list[str] = []
     client_run_id: str | None = None
+
+    model_config = {"extra": "forbid"}
 
     @field_validator("question")
     @classmethod

@@ -155,6 +155,13 @@ class Settings:
         "MULTI_PROVIDER_FALLBACK_ENABLED", "false"
     ).lower() in ("1", "true", "yes")
 
+    # ── Cache Isolation ──
+    CACHE_SHARE_ANONYMOUS: bool = os.getenv(
+        "CACHE_SHARE_ANONYMOUS", "false"
+    ).lower() in ("1", "true", "yes")
+        "MULTI_PROVIDER_FALLBACK_ENABLED", "false"
+    ).lower() in ("1", "true", "yes")
+
     # ── Sentry ──
     SENTRY_DSN: str | None = os.getenv("SENTRY_DSN")
     SENTRY_TRACES_SAMPLE_RATE: float = float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1"))

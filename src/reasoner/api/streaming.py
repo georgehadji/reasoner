@@ -919,7 +919,7 @@ async def run_stream_cached(
         from reasoner.application.services.pipeline_service import PipelineService
         pipeline_service = PipelineService()
 
-    key = _cache_key(req)
+    key = _cache_key(req, user_id=user_id)
     if not req.no_cache:
         cached = await _load_cache(key)
         if cached:

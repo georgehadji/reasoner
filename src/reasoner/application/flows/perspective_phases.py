@@ -189,6 +189,9 @@ async def run_critique_phase(state: PipelineState, services: WorkflowServices) -
         # Rank candidates by score
         score_map = {s.perspective: s.total for s in scores}
         state.candidates.sort(key=lambda c: score_map.get(c.perspective, 0.0), reverse=True)
+        # Cap candidates to prevent unbounded memory growth (P4)
+        if len(state.candidates) > 8:
+            state.candidates = state.candidates[:8]
         state.top_candidates = state.candidates[:2]
         services.log("PHASE-3", f"Top candidates selected: {[c.perspective.value for c in state.top_candidates]}", state)
     except Exception as e:
