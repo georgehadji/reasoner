@@ -61,6 +61,9 @@ class EventStore:
                 check_same_thread=False,
             )
             self._connection.row_factory = sqlite3.Row
+            # WAL mode for concurrent reads without writer lock (DM8)
+            self._connection.execute("PRAGMA journal_mode=WAL")
+            self._connection.execute("PRAGMA synchronous=NORMAL")
         return self._connection
 
     async def _run_in_executor(self, func: Callable, *args) -> Any:
@@ -129,6 +132,16 @@ class EventStore:
                 state TEXT NOT NULL,
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
+
+            -- Dead-letter queue for un-persistable events (DM8)
+            CREATE TABLE IF NOT EXISTS dead_letter_queue (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_id TEXT,
+                event_type TEXT NOT NULL,
+                raw_payload TEXT NOT NULL,
+                error TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
         """)
         
         conn.commit()
@@ -184,13 +197,44 @@ class EventStore:
                 conn.rollback()
                 logger.error(f"Database error saving events: {e}")
                 raise
-            except json.JSONDecodeError as e:
+            except (json.JSONDecodeError, TypeError, ValueError) as e:
                 conn.rollback()
-                logger.error(f"Failed to serialize event payload: {e}")
+                logger.error(f"Failed to serialize event payload — writing to DLQ: {e}")
+                # Write raw event data to dead-letter queue (DM8)
+                for event in events:
+                    try:
+                        conn.execute("""
+                            INSERT INTO dead_letter_queue
+                            (event_id, event_type, raw_payload, error)
+                            VALUES (?, ?, ?, ?)
+                        """, (
+                            event.event_id,
+                            str(event.event_type.value) if hasattr(event.event_type, 'value') else str(event.event_type),
+                            str({k: v for k, v in vars(event).items()}),
+                            str(e),
+                        ))
+                    except Exception:
+                        pass  # DLQ write failure is non-fatal
+                conn.commit()
                 raise
             except Exception as e:
                 conn.rollback()
-                logger.error(f"Unexpected error saving events: {e}")
+                logger.error(f"Unexpected error saving events — writing to DLQ: {e}")
+                try:
+                    for event in events:
+                        conn.execute("""
+                            INSERT INTO dead_letter_queue
+                            (event_id, event_type, raw_payload, error)
+                            VALUES (?, ?, ?, ?)
+                        """, (
+                            event.event_id,
+                            str(event.event_type.value) if hasattr(event.event_type, 'value') else str(event.event_type),
+                            str(event)[:2000],
+                            str(e)[:500],
+                        ))
+                except Exception:
+                    pass
+                conn.commit()
                 raise
 
         await self._run_in_executor(_save_events_sync)
