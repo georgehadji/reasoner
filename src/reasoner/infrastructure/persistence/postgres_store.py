@@ -66,7 +66,7 @@ class PostgreSQLEventStore:
     def __init__(
         self,
         connection_string: str | None = None,
-        pool_size: int = 10,
+        pool_size: int = 20,  # v3.4: C5 — raised from 10 to match UVICORN_WORKERS
         use_read_replica: bool = False,
         read_replica_url: str | None = None,
         circuit_breaker_enabled: bool = True,
@@ -943,7 +943,7 @@ _postgres_store: PostgreSQLEventStore | None = None
 
 def get_postgres_store(
     connection_string: str | None = None,
-    pool_size: int = 10,
+    pool_size: int = 20,  # v3.4: C5 — raised from 10 to match UVICORN_WORKERS
 ) -> PostgreSQLEventStore:
     """Get or create PostgreSQL event store."""
     global _postgres_store
@@ -957,7 +957,7 @@ def get_postgres_store(
 
 async def initialize_postgres_store(
     connection_string: str | None = None,
-    pool_size: int = 10,
+    pool_size: int = 20,  # v3.4: C5 — raised from 10 to match UVICORN_WORKERS
 ) -> PostgreSQLEventStore:
     """Initialize PostgreSQL event store."""
     store = get_postgres_store(connection_string, pool_size)

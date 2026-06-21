@@ -329,6 +329,8 @@ async def run_stream(
         pipeline_service = PipelineService()
 
     run_id = req.client_run_id or str(uuid.uuid4())
+    from reasoner.core.logging_utils import set_correlation_id
+    set_correlation_id(run_id)
     event_version = 1
     state: PipelineState | None = None
     cancel_event = await _run_store.add(run_id, user_id=user_id)

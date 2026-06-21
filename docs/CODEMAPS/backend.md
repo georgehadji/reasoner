@@ -1,4 +1,4 @@
-<!-- Generated: 2026-06-21 | Files scanned: 403 | Token estimate: ~900 -->
+<!-- Generated: 2026-06-22 | Files scanned: 405 | Token estimate: ~900 -->
 
 # Backend Structure — Reasoner
 

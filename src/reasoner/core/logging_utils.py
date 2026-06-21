@@ -182,6 +182,39 @@ def set_correlation_id(correlation_id: str) -> None:
     _correlation_id.set(correlation_id)
 
 
+class CorrelationIdFilter(logging.Filter):
+    """Logging filter that injects correlation_id into every log record (O3).
+
+    Attach to any handler so standard logging.getLogger() calls carry
+    the request's run_id/correlation_id without needing StructuredLogger.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        cid = get_correlation_id()
+        record.correlation_id = cid or ""
+        return True
+
+
+# Install filter on root logger by default (O3)
+_CORRELATION_FILTER_INSTALLED = False
+
+
+def _ensure_correlation_filter() -> None:
+    """Install CorrelationIdFilter on the root logger once."""
+    global _CORRELATION_FILTER_INSTALLED
+    if not _CORRELATION_FILTER_INSTALLED:
+        root = logging.getLogger()
+        # Check if already installed to avoid duplicates
+        already = any(isinstance(f, CorrelationIdFilter) for f in root.filters)
+        if not already:
+            root.addFilter(CorrelationIdFilter())
+        _CORRELATION_FILTER_INSTALLED = True
+
+
+# Auto-install on import
+_ensure_correlation_filter()
+
+
 class StructuredLogger:
     """
     Logger that outputs structured JSON logs with correlation IDs.
