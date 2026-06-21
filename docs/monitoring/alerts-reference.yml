@@ -32,3 +32,12 @@ groups:
           severity: critical
         annotations:
           summary: "Postgres connection pool exhausted"
+
+      - alert: CIHealingHeartbeatStale
+        expr: time() - ci_heartbeat_timestamp > 90000  # 25 hours
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Self-healing CI has not fired in >25h"
+          description: "Check .github/workflows/self-healing-ci.yml nightly schedule. Trigger manually via workflow_dispatch."
