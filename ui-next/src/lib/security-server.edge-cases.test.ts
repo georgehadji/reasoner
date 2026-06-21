@@ -355,6 +355,7 @@ describe('rateLimit — edge cases', () => {
     const req = new NextRequest('http://localhost/api/unknown', {
       headers: { 'x-forwarded-for': '10.0.0.3' },
     });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = rateLimit(req, 'unknown-action' as any);
     expect(result.allowed).toBe(true);
   });

@@ -20,6 +20,10 @@ class DiscoveryClient(SearchServicePort):
     def __init__(self, base_url: str = DEFAULT_SEARXNG_URL):
         self.adapter = SearXNGAdapter(base_url=base_url)
 
+    @property
+    def base_url(self) -> str:
+        return self.adapter.base_url
+
     async def search(
         self,
         query: str,
