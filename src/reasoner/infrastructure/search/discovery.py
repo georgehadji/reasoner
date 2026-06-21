@@ -8,7 +8,10 @@ function used by research, article, and search flow phases.
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Any, Optional, Protocol
+
+logger = logging.getLogger(__name__)
 
 from reasoner.core.ports.search_port import SearchServicePort, SourceType
 from reasoner.core.constants import DEFAULT_SEARCH_RESULTS, DEFAULT_SEARXNG_URL, TIMEOUTS, MODEL_QWEN35_9B, MODEL_QWEN35_FLASH, MODEL_GEMINI_FLASH
