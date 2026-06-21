@@ -36,6 +36,14 @@ class RunStateStore:
         self._created_at: dict[str, float] = {}
         self._lock = asyncio.Lock()
 
+    def try_register(self, client_run_id: str, ttl: int = 3600) -> bool:
+        """Check-and-register for idempotency (C2). Non-atomic under concurrency."""
+        if client_run_id in self._active_runs:
+            return False  # already registered
+        self._active_runs.add(client_run_id)
+        self._created_at[client_run_id] = _time.monotonic()
+        return True  # newly created
+
     async def add(self, run_id: str, user_id: str | None = None) -> asyncio.Event:
         """Register a new run and return its cancel event."""
         async with self._lock:

@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 class AnthropicDirectProvider(BaseLLMProvider):
     """Direct Anthropic API provider (uses anthropic SDK)."""
 
-    def __init__(self, api_key: str | None = None, model: str = "claude-sonnet-4-20250514"):
+    def __init__(self, api_key: str | None = None, model: str = "claude-sonnet-4.6"):
         super().__init__(model)
         self._api_key = api_key
 

@@ -102,6 +102,24 @@ class RunStateManager:
 
     # ── Public API ──
 
+    async def try_register(self, client_run_id: str, ttl: int = 3600) -> bool:
+        """Atomically register a run. Returns True if newly created, False if already exists.
+
+        Uses Redis SET NX for atomic check-and-register (C2). In-memory fallback
+        uses a plain set check (not atomic under concurrency, but acceptable for
+        single-worker deployments where the race window does not exist).
+        """
+        try:
+            return await self._redis_op(lambda: self._try_register_redis(client_run_id, ttl))
+        except _RedisUnavailable:
+            return self._get_fallback().try_register(client_run_id, ttl)
+
+    async def _try_register_redis(self, client_run_id: str, ttl: int) -> bool:
+        redis = self._get_redis()
+        # SET NX returns None if key already exists (not created)
+        result = await redis.set(f"run:{client_run_id}", "1", nx=True, ex=ttl)
+        return result is not None  # True = newly created, False = already exists
+
     async def add(self, run_id: str, user_id: str | None = None) -> asyncio.Event:
         """Register a new run and return its cancel event."""
         try:

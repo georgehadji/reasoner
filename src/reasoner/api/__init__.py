@@ -490,7 +490,7 @@ async def run_pipeline(
     Authenticated users get higher rate limits and priority processing.
     """
     _require_auth_if_legacy_disabled(user)
-    # Idempotency: reject duplicate client_run_id if already in-flight
+    # Idempotency: atomically register client_run_id (C2)
     if req.client_run_id:
         from reasoner.infrastructure.redis.run_state import _run_state_manager
         if not _run_state_manager.is_authoritative():
@@ -499,8 +499,7 @@ async def run_pipeline(
                 detail="Run state store unavailable. Retry after Redis recovers.",
                 headers={"Retry-After": "10"},
             )
-        existing = await _run_state_manager.get_cancel_event(req.client_run_id)
-        if existing is not None:
+        if not await _run_state_manager.try_register(req.client_run_id):
             raise HTTPException(
                 status_code=409,
                 detail=f"Run {req.client_run_id} is already in progress",

@@ -12,6 +12,7 @@ Responsible for:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 import time # Ensure time is imported once
@@ -70,6 +71,7 @@ class LLMExecutor:
         self.cascading_quality_check = cascading_quality_check
         self.prompt_compression = prompt_compression
         self._event_publisher = event_publisher
+        self._token_lock = asyncio.Lock()  # C1: guard parallel token accumulation
 
     async def execute(
         self,
@@ -153,7 +155,7 @@ class LLMExecutor:
                 logger.info(f"[CACHE] HIT for {role} (saved ~{len(cached_response)//4} tokens)")
                 estimated_input = len(user_prompt) // 4
                 estimated_output = len(cached_response) // 4
-                self._accumulate_tokens(state, role, estimated_input, estimated_output, model_id_for_cache)
+                await self._accumulate_tokens(state, role, estimated_input, estimated_output, model_id_for_cache)
                 token_meta = {
                     "input": estimated_input,
                     "output": estimated_output,
@@ -262,7 +264,7 @@ class LLMExecutor:
                             response=raw,
                             tokens_used=metadata.get("input_tokens", 0) + metadata.get("output_tokens", 0),
                         )
-                    self._accumulate_tokens(state, role, metadata.get("input_tokens", 0), metadata.get("output_tokens", 0), model_id)
+                    await self._accumulate_tokens(state, role, metadata.get("input_tokens", 0), metadata.get("output_tokens", 0), model_id)
 
                     # Emit LLMGenerationCompleted event for successful cascading call
                     bus = self._event_publisher or _get_event_bus()
@@ -418,7 +420,7 @@ class LLMExecutor:
                 state.total_cost_usd += cost_usd
                 state.phase_costs[role] = cost_usd
 
-            self._accumulate_tokens(state, role, input_tokens, output_tokens, model)
+            await self._accumulate_tokens(state, role, input_tokens, output_tokens, model)
 
             if self._token_cache and self._caching_enabled:
                 model_id = self.router.get(role).model if hasattr(self.router, "get") else "unknown"
@@ -533,34 +535,35 @@ class LLMExecutor:
             yield chunk_or_degraded
 
     @staticmethod
-    def _accumulate_tokens(
+    async def _accumulate_tokens(
         state: PipelineState,
         role: str,
         input_tokens: int,
         output_tokens: int,
         model: str,
     ) -> None:
-        """Update all token and model tracking fields on state."""
-        state.phase_models[role] = model
+        """Update all token and model tracking fields on state. Thread-safe (C1)."""
+        async with self._token_lock:
+            state.phase_models[role] = model
 
-        prior = state.detailed_token_usage.get(role, {"input": 0, "output": 0, "total": 0})
-        state.detailed_token_usage[role] = {
-            "input": prior["input"] + input_tokens,
-            "output": prior["output"] + output_tokens,
-            "total": prior["total"] + input_tokens + output_tokens,
-        }
+            prior = state.detailed_token_usage.get(role, {"input": 0, "output": 0, "total": 0})
+            state.detailed_token_usage[role] = {
+                "input": prior["input"] + input_tokens,
+                "output": prior["output"] + output_tokens,
+                "total": prior["total"] + input_tokens + output_tokens,
+            }
 
-        tracking_key = getattr(state, "_current_phase_key", None)
-        if tracking_key:
-            if tracking_key not in state.phase_tokens:
-                state.phase_tokens[tracking_key] = {"input": 0, "output": 0}
-            state.phase_tokens[tracking_key]["input"] += input_tokens
-            state.phase_tokens[tracking_key]["output"] += output_tokens
+            tracking_key = getattr(state, "_current_phase_key", None)
+            if tracking_key:
+                if tracking_key not in state.phase_tokens:
+                    state.phase_tokens[tracking_key] = {"input": 0, "output": 0}
+                state.phase_tokens[tracking_key]["input"] += input_tokens
+                state.phase_tokens[tracking_key]["output"] += output_tokens
 
-            if tracking_key not in state.cost_state._phase_models_by_key:
-                state.cost_state._phase_models_by_key[tracking_key] = []
-            if model not in state.cost_state._phase_models_by_key[tracking_key]:
-                state.cost_state._phase_models_by_key[tracking_key].append(model)
+                if tracking_key not in state.cost_state._phase_models_by_key:
+                    state.cost_state._phase_models_by_key[tracking_key] = []
+                if model not in state.cost_state._phase_models_by_key[tracking_key]:
+                    state.cost_state._phase_models_by_key[tracking_key].append(model)
 
     # Map common markdown language tags to file extensions
     _LANG_TO_EXT: ClassVar[dict[str, str]] = {
