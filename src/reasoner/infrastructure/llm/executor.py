@@ -534,8 +534,8 @@ class LLMExecutor:
                 return
             yield chunk_or_degraded
 
-    @staticmethod
     async def _accumulate_tokens(
+        self,
         state: PipelineState,
         role: str,
         input_tokens: int,
