@@ -559,13 +559,8 @@ jobs:
         run: |
           # Record job completion timestamp for monitoring.
           # If this heartbeat ages > 25h, the scheduled run has silently failed.
-          echo "HEARTBEAT_TIMESTAMP=$(date -Iseconds)" >> "$GITHUB_ENV"
-          echo "HEARTBEAT_RUN_ID=${{ github.run_id }}" >> "$GITHUB_ENV"
-          echo "HEARTBEAT_STATUS=alive" >> "$GITHUB_ENV"
-          echo "Next scheduled run: $(date -d 'next 2:00' -Iseconds)" >> "$GITHUB_ENV"
-          echo "Monitoring: check heartbeat age < 25h to confirm CI is healthy"
           mkdir -p healing/heartbeat
-          date -Iseconds > healing/heartbeat/latest.txt
+          date -u +%Y-%m-%dT%H:%M:%SZ > healing/heartbeat/latest.txt
           echo "alive" >> healing/heartbeat/latest.txt
 
       - name: Generate Healing Summary
@@ -612,8 +607,8 @@ jobs:
 
       - name: Alert Reference
         run: |
-          echo "=== CI DEAD MAN SWITCH (O4) ==="
-          echo "Alert rule: heartbeat age > 25h"
-          echo "Check: ci-heartbeat artifact has latest.txt with timestamp"
-          echo "Recovery: trigger workflow_dispatch on self-healing-ci.yml"
-          echo "Documented in: docs/monitoring/alerts-reference.yml"
+          printf '=== CI DEAD MAN SWITCH (O4) ===\n'
+          printf 'Alert rule: heartbeat age > 25h\n'
+          printf 'Check: ci-heartbeat artifact has latest.txt with timestamp\n'
+          printf 'Recovery: trigger workflow_dispatch on self-healing-ci.yml\n'
+          printf 'Documented in: docs/monitoring/alerts-reference.yml\n'
