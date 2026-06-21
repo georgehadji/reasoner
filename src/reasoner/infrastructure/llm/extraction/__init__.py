@@ -23,8 +23,16 @@ _CAPTION_MODELS = [MODEL_GEMINI_FLASH, MODEL_GLM_4_AIRX, MODEL_GEMINI_PRO]
 # OCR-optimized models — free/cheap models that specialize in verbatim text extraction
 _OCR_MODELS = [MODEL_QIANFAN_OCR_FAST, MODEL_GEMINI_FLASH]
 
-# Cache to avoid re-describing the same image
+# Cache to avoid re-describing the same image (LRU-bounded, v3.4)
+_MAX_IMAGE_CACHE = 128
 _image_cache: dict[str, str] = {}
+
+
+def _cache_put(key: str, value: str) -> None:
+    """Store in image cache with LRU eviction when full."""
+    if len(_image_cache) >= _MAX_IMAGE_CACHE:
+        _image_cache.pop(next(iter(_image_cache)), None)
+    _image_cache[key] = value
 
 
 def _compute_image_hash(content: bytes) -> str:
@@ -101,7 +109,7 @@ async def describe_image(content: bytes, filename: str) -> str:
                 logger.warning("Image captioning returned empty choices for %s", model_id)
                 continue
             description = response.choices[0].message.content or "[No description returned]"
-            _image_cache[image_hash] = description
+            _cache_put(image_hash, description)
             return description
 
         except Exception as e:
@@ -169,7 +177,7 @@ async def ocr_image(content: bytes, filename: str) -> str:
                 continue
             text = response.choices[0].message.content or ""
             text = text.strip()
-            _image_cache[cache_key] = text
+            _cache_put(cache_key, text)
             return text
 
         except Exception as e:

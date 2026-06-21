@@ -133,6 +133,14 @@ PHASE_DURATION = Histogram(
     buckets=[0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0],
 )
 
+# Phase quality scores (v3.4)
+PHASE_QUALITY_SCORE = Histogram(
+    "reasoner_phase_quality_score",
+    "LLM judge quality score per phase (0-10)",
+    ["phase", "passed"],
+    buckets=[0.0, 2.0, 4.0, 6.0, 7.0, 8.0, 9.0, 10.0],
+)
+
 # Circuit breaker metrics
 REASONER_CIRCUIT_BREAKER_STATE = Gauge(
     "reasoner_circuit_breaker_state",

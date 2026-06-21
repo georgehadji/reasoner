@@ -120,16 +120,19 @@ def extract_json_list(text: str) -> list[Any]:
     )
 
 
+# Compiled once at module level (v3.4 — was re.compiled per call)
+_THINK_TAG_RE = re.compile(r"<think>[\s\S]*?</think>")
+_REASONING_TAG_RE = re.compile(r"<reasoning>[\s\S]*?</reasoning>")
+
+
 def _strip_reasoning_tags(text: str) -> str:
     """Strip <think>...</think> and similar reasoning artifacts from LLM output.
 
     Models like Gemini 3.5 Flash, DeepSeek R1, and Qwen thinking-mode can leak
     chain-of-thought inside <think> tags even when JSON-only output is requested.
     """
-    # Strip <think>...</think> blocks (greedy — handles nested content)
-    text = re.sub(r"<think>[\s\S]*?</think>", "", text)
-    # Strip <reasoning>...</reasoning> (some models use this variant)
-    text = re.sub(r"<reasoning>[\s\S]*?</reasoning>", "", text)
+    text = _THINK_TAG_RE.sub("", text)
+    text = _REASONING_TAG_RE.sub("", text)
     return text.strip()
 
 

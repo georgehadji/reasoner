@@ -858,6 +858,19 @@ def get_preset(preset_id: str) -> PipelinePreset:
     config = _REGISTRY[preset_id]
     return PipelinePreset(**config, id=preset_id)
 
+# Cached after first load — presets are immutable at runtime (v3.4)
+_preset_cache: list[PipelinePreset] | None = None
+
+
 def list_presets() -> list[PipelinePreset]:
-    """Return all presets."""
-    return [get_preset(pid) for pid in sorted(_REGISTRY)]
+    """Return all presets (cached after first call)."""
+    global _preset_cache
+    if _preset_cache is None:
+        _preset_cache = [get_preset(pid) for pid in sorted(_REGISTRY)]
+    return _preset_cache
+
+
+def invalidate_preset_cache() -> None:
+    """Invalidate the preset cache. Call after modifying _REGISTRY at runtime."""
+    global _preset_cache
+    _preset_cache = None

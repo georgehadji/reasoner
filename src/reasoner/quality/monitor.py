@@ -234,6 +234,15 @@ class PhaseMonitor:
         reason = str(parsed.get("reason", rule_result.reason))
         suggestions = list(parsed.get("suggestions", rule_result.suggestions))
 
+        # Export phase quality metric (best-effort, v3.4)
+        try:
+            from reasoner.metrics import PHASE_QUALITY_SCORE
+            PHASE_QUALITY_SCORE.labels(
+                phase=phase_name, passed=str(passed).lower()
+            ).observe(score)
+        except Exception:
+            pass  # Metrics are best-effort
+
         return PhaseQualityResult(
             passed=passed,
             score=score,

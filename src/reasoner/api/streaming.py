@@ -938,6 +938,7 @@ async def run_stream_cached(
             else:
                 logger.info(f"Ignoring cached result for {key} due to stored errors.")
 
+    MAX_COLLECTED_EVENTS = 200  # cap in-memory buffer (v3.4)
     collected: list[dict] = []
     gen = run_stream(
         req,
@@ -949,13 +950,12 @@ async def run_stream_cached(
     try:
         async for chunk in gen:
             yield chunk
-            # Force flush after each event so the browser receives SSE events
-            # in real-time instead of buffering them until the buffer fills.
             await asyncio.sleep(SSE_FLUSH_INTERVAL)
             if chunk.startswith("data: "):
                 try:
                     ev = json.loads(chunk[6:])
-                    collected.append(ev)
+                    if len(collected) < MAX_COLLECTED_EVENTS:
+                        collected.append(ev)
                     if ev.get("type") == "done" and not req.no_cache:
                         await _save_cache(key, collected)
                 except Exception:
