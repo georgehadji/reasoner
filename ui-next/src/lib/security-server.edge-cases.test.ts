@@ -93,6 +93,7 @@ describe('validateRunRequest — edge cases', () => {
   });
 
   it('rejects non-boolean sequential', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(() => validateRunRequest({ ...valid, sequential: 'true' } as any)).toThrow('Invalid sequential');
   });
 
@@ -129,6 +130,7 @@ describe('validateRunFollowupRequest — edge cases', () => {
   });
 
   it('rejects invalid history format', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(() => validateRunFollowupRequest({ ...valid, history: 'not-array' } as any)).toThrow('Invalid history');
   });
 
@@ -136,6 +138,7 @@ describe('validateRunFollowupRequest — edge cases', () => {
     expect(() => validateRunFollowupRequest({
       ...valid,
       history: [{ role: 'evil', content: 'x' }],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any)).toThrow(/role/);
   });
 
@@ -143,6 +146,7 @@ describe('validateRunFollowupRequest — edge cases', () => {
     expect(() => validateRunFollowupRequest({
       ...valid,
       previous_synthesis: 123,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any)).toThrow('Invalid previous_synthesis');
   });
 
@@ -198,6 +202,7 @@ describe('validateSearchRequest — edge cases', () => {
   });
 
   it('rejects invalid source_type', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(() => validateSearchRequest({ ...valid, source_type: 'evil' } as any)).toThrow('Invalid source_type');
   });
 
@@ -207,11 +212,13 @@ describe('validateSearchRequest — edge cases', () => {
   });
 
   it('defaults smart to false when missing', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = validateSearchRequest({ query: 'q', source_type: 'general', num_results: 5 } as any);
     expect(result.smart).toBe(false);
   });
 
   it('defaults source_type to general when missing', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = validateSearchRequest({ query: 'q', num_results: 5 } as any);
     expect(result.source_type).toBe('general');
   });

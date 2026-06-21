@@ -204,6 +204,7 @@ describe('app-store — active run management', () => {
 
 describe('app-store — auth management', () => {
   it('setUser updates auth state', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mockUser = { id: 'user-1', email: 'test@test.com' } as any;
     useAppStore.getState().setUser(mockUser);
     expect(useAppStore.getState().user).toBe(mockUser);
@@ -211,6 +212,7 @@ describe('app-store — auth management', () => {
   });
 
   it('setUser with null clears auth', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mockUser = { id: 'user-1' } as any;
     useAppStore.getState().setUser(mockUser);
     useAppStore.getState().setUser(null);
@@ -219,6 +221,7 @@ describe('app-store — auth management', () => {
   });
 
   it('logout clears user and sets authenticated false', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mockUser = { id: 'user-1' } as any;
     useAppStore.getState().setUser(mockUser);
     useAppStore.getState().logout();

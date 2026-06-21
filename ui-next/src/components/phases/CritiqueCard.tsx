@@ -20,7 +20,7 @@ export function CritiqueCard({ data }: CritiqueCardProps) {
       {criticScores.map((cs: Record<string, unknown>, idx: number) => {
         const criticId = typeof cs.critic_id === 'string' ? cs.critic_id : '?';
         const criticModel = typeof cs.critic_model === 'string' ? cs.critic_model : '';
-        const candidateScores = cs.candidate_scores as Record<string, any>;
+        const candidateScores = cs.candidate_scores as Record<string, unknown>;
         const dissentingNote = typeof cs.dissenting_note === 'string' ? cs.dissenting_note : '';
 
         return (

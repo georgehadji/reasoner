@@ -29,6 +29,7 @@ vi.mock('next/navigation', () => ({
 
 // Mock next/image
 vi.mock('next/image', () => ({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   default: (props: any) => {
     // eslint-disable-next-line @next/next/no-img-element
     return React.createElement('img', { ...props, fill: undefined });

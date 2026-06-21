@@ -56,10 +56,12 @@ export async function reportError(
 /**
  * Wrap an async function with automatic error reporting.
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function withErrorReporting<T extends (...args: any[]) => Promise<any>>(
   fn: T,
   options: Parameters<typeof reportError>[1] = {},
 ): T {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (async (...args: any[]) => {
     try {
       return await fn(...args);

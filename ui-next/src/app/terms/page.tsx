@@ -61,14 +61,14 @@ export default function TermsPage() {
                 <li>Generate illegal or harmful content.</li>
                 <li>Attempt to reverse-engineer our proprietary reasoning methodologies.</li>
                 <li>Exceed assigned rate limits or bypass security controls.</li>
-                <li>Use automated systems to "scrape" or extract data without authorization.</li>
+                <li>Use automated systems to &quot;scrape&quot; or extract data without authorization.</li>
               </ul>
             </section>
 
             <section>
               <h3 className="text-2xl font-bold mb-6 text-[var(--text)]">5. Service Availability & Termination</h3>
               <p>
-                While we strive for 99.9% uptime, Reasoner is provided "as is". We reserve the right to 
+                While we strive for 99.9% uptime, Reasoner is provided &quot;as is&quot;. We reserve the right to
                 modify or discontinue the service with reasonable notice to enterprise customers. 
                 We may suspend accounts that violate our security policies or terms of use.
               </p>

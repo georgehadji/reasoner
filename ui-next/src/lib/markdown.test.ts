@@ -256,6 +256,7 @@ describe('Markdown builder — XSS prevention', () => {
   });
 
   it('does not crash on deeply nested data', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const deep: any = { solution: 'ok' };
     let current = deep;
     for (let i = 0; i < 100; i++) {
@@ -267,6 +268,7 @@ describe('Markdown builder — XSS prevention', () => {
   });
 
   it('does not crash on circular references in data', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const circular: any = { solution: 'before loop' };
     circular.self = circular;
     const md = buildMarkdownFromPhase(0, 5, 'Synthesis', circular);

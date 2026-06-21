@@ -56,6 +56,7 @@ export function createMockPhase(
   overrides?: Partial<{
     name: string;
     status: 'pending' | 'running' | 'completed' | 'error';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     result: any;
   }>,
 ) {
@@ -71,6 +72,7 @@ export function createMockMessage(
   overrides?: Partial<{
     role: 'user' | 'assistant';
     content: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     phases: any[];
   }>,
 ) {
