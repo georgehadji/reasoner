@@ -72,6 +72,9 @@ print(stats)
 -   **Python 3.12+**
 -   **Node.js 20+** (for the web UI)
 -   **OpenRouter API Key** (recommended — single key, 350+ models)
+-   **Docker** (optional — for Redis, SearXNG, and database services)
+-   **Redis** (optional — rate limiting and distributed run state; falls back to in-memory)
+-   **PostgreSQL** (optional — event store; defaults to SQLite for single-node)
 
 ### 1. Clone & Setup
 

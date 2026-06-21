@@ -37,6 +37,42 @@ Usage:
 
 from __future__ import annotations
 
+from enum import Enum
+
+
+class ErrorCode(str, Enum):
+    """Structured error codes for SSE events and API responses (WI-12).
+
+    Each code maps to a distinct failure mode for programmatic handling.
+    """
+    # Authentication / Authorization
+    AUTH_INVALID_KEY = "AUTH_INVALID_KEY"
+    AUTH_EXPIRED = "AUTH_EXPIRED"
+    AUTH_INSUFFICIENT_SCOPE = "AUTH_INSUFFICIENT_SCOPE"
+
+    # Provider / Model
+    PROVIDER_UNAVAILABLE = "PROVIDER_UNAVAILABLE"
+    PROVIDER_TIMEOUT = "PROVIDER_TIMEOUT"
+    PROVIDER_RATE_LIMITED = "PROVIDER_RATE_LIMITED"
+    MODEL_NOT_FOUND = "MODEL_NOT_FOUND"
+    EMPTY_RESPONSE = "EMPTY_RESPONSE"
+    ALL_FALLBACKS_EXHAUSTED = "ALL_FALLBACKS_EXHAUSTED"
+
+    # Pipeline / Phase
+    PIPELINE_TIMEOUT = "PIPELINE_TIMEOUT"
+    PHASE_FAILED = "PHASE_FAILED"
+    PARSE_ERROR = "PARSE_ERROR"
+    EXTRACTION_FAILED = "EXTRACTION_FAILED"
+
+    # Input
+    INVALID_INPUT = "INVALID_INPUT"
+    RATE_LIMIT_EXCEEDED = "RATE_LIMIT_EXCEEDED"
+    QUOTA_EXCEEDED = "QUOTA_EXCEEDED"
+
+    # General
+    INTERNAL_ERROR = "INTERNAL_ERROR"
+    UNKNOWN = "UNKNOWN"
+
 
 class ReasonerError(Exception):
     """
@@ -218,6 +254,35 @@ def is_retryable(error: Exception) -> bool:
 
     # Unknown errors are not retryable by default
     return False
+
+
+def error_code_for_exception(error: Exception) -> str:
+    """Map an exception to its canonical ErrorCode string (WI-12).
+
+    Returns the ErrorCode value, falling back to ErrorCode.UNKNOWN.
+    """
+    if isinstance(error, AuthenticationError):
+        return ErrorCode.AUTH_INVALID_KEY.value
+    elif isinstance(error, RateLimitError):
+        return ErrorCode.RATE_LIMIT_EXCEEDED.value
+    elif isinstance(error, ModelNotFoundError):
+        return ErrorCode.MODEL_NOT_FOUND.value
+    elif isinstance(error, ProviderTimeoutError):
+        return ErrorCode.PROVIDER_TIMEOUT.value
+    elif isinstance(error, ProviderUnavailableError):
+        return ErrorCode.PROVIDER_UNAVAILABLE.value
+    elif isinstance(error, ParseError):
+        return ErrorCode.PARSE_ERROR.value
+    elif isinstance(error, PipelineError):
+        return ErrorCode.PHASE_FAILED.value
+    error_name = type(error).__name__
+    if error_name in ("AuthenticationError", "PermissionDeniedError"):
+        return ErrorCode.AUTH_INVALID_KEY.value
+    if error_name == "RateLimitError":
+        return ErrorCode.RATE_LIMIT_EXCEEDED.value
+    if "timeout" in error_name.lower():
+        return ErrorCode.PROVIDER_TIMEOUT.value
+    return ErrorCode.UNKNOWN.value
 
 
 def classify_error(error: Exception) -> str:

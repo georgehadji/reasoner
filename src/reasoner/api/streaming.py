@@ -37,6 +37,7 @@ from reasoner.application.services.pipeline_service import PipelineService
 from reasoner.application.services.search_service import SearchService
 from reasoner.application.orchestrator import PipelineOrchestrator
 from reasoner.exceptions import classify_error, is_retryable
+from reasoner.core.exceptions import ErrorCode, error_code_for_exception
 from reasoner.presets import (
     get_method_from_preset,
     get_preset_price_tier,
@@ -571,6 +572,7 @@ async def run_stream(
                     err_payload = {
                         "type": "error",
                         "error_type": "timeout",
+                        "error_code": ErrorCode.PROVIDER_TIMEOUT.value,
                         "message": err_msg,
                         "retryable": True,
                         "retry_after": 5,
@@ -579,8 +581,8 @@ async def run_stream(
                     }
                     _tracked_broadcast(run_id, err_payload)
                     yield _event(err_payload)
-                    _tracked_broadcast(run_id, {"type": "phase_error", "phase": num, "error": err_msg})
-                    yield _event({"type": "phase_error", "phase": num, "error": err_msg})
+                    _tracked_broadcast(run_id, {"type": "phase_error", "phase": num, "error": err_msg, "error_code": ErrorCode.PROVIDER_TIMEOUT.value})
+                    yield _event({"type": "phase_error", "phase": num, "error": err_msg, "error_code": ErrorCode.PROVIDER_TIMEOUT.value})
                     fail_evt = make_event(
                         EventType.PHASE_FAILED,
                         aggregate_id=run_id,
@@ -606,9 +608,11 @@ async def run_stream(
                     else:
                         err_msg = f"{type(exc).__name__}: {str(exc)[:120]}"
                     state.errors.append(err_msg)
+                    error_code = error_code_for_exception(exc)
                     err_payload = {
                         "type": "error",
                         "error_type": err_type,
+                        "error_code": error_code,
                         "message": err_msg,
                         "retryable": is_retryable(exc),
                         "retry_after": getattr(exc, 'retry_after', None),
@@ -617,8 +621,8 @@ async def run_stream(
                     }
                     _tracked_broadcast(run_id, err_payload)
                     yield _event(err_payload)
-                    _tracked_broadcast(run_id, {"type": "phase_error", "phase": num, "error": err_msg})
-                    yield _event({"type": "phase_error", "phase": num, "error": err_msg})
+                    _tracked_broadcast(run_id, {"type": "phase_error", "phase": num, "error": err_msg, "error_code": error_code})
+                    yield _event({"type": "phase_error", "phase": num, "error": err_msg, "error_code": error_code})
                     fail_evt = make_event(
                         EventType.PHASE_FAILED,
                         aggregate_id=run_id,
