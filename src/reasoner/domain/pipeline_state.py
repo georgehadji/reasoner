@@ -658,3 +658,14 @@ class PipelineState:
         # COMPAT: Delegated to PipelineService — this method is deprecated.
         from reasoner.application.services.pipeline_service import PipelineService
         return PipelineService.to_context_dict(self, phase=phase, compression=compression, use_neuro=use_neuro)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize state to a plain dict (delegates to PipelineSerializationService)."""
+        from reasoner.application.services.pipeline_service import PipelineSerializationService
+        return PipelineSerializationService.to_dict(self)
+
+    @classmethod
+    def _from_dict(cls, data: dict[str, Any]) -> "PipelineState":
+        """Reconstruct PipelineState from a plain dict (delegates to PipelineSerializationService)."""
+        from reasoner.application.services.pipeline_service import PipelineSerializationService
+        return PipelineSerializationService._from_dict(data)
