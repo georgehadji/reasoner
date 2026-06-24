@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, AsyncMock
 @pytest.mark.asyncio
 async def test_cqrs_vs_direct_parity():
     """Both paths should return PipelineState with matching problem."""
+    from unittest.mock import patch
     from reasoner.application.commands import RunPipelineCommand
     from reasoner.domain.pipeline_state import PipelineState
     from reasoner.infrastructure.llm.router import ProviderRouter
@@ -35,13 +36,19 @@ async def test_cqrs_vs_direct_parity():
     from reasoner.core.settings import settings
     original_env = settings.ENVIRONMENT
     settings.ENVIRONMENT = "development"
-    try:
-        decision = await orchestrator.preflight(command)
-        assert decision is not None
-        assert decision.action in ("pipeline", "direct", "web_search")
-        print(f"Direct path OK: preflight decision={decision.action}")
-    finally:
-        settings.ENVIRONMENT = original_env
+    # Patch build_provider so no real API key is required — this test covers
+    # routing/preflight logic only, not actual LLM construction.
+    with patch(
+        "reasoner.infrastructure.llm.router.build_provider",
+        return_value=MagicMock(),
+    ):
+        try:
+            decision = await orchestrator.preflight(command)
+            assert decision is not None
+            assert decision.action in ("pipeline", "direct", "web_search")
+            print(f"Direct path OK: preflight decision={decision.action}")
+        finally:
+            settings.ENVIRONMENT = original_env
 
 
 @pytest.mark.asyncio
