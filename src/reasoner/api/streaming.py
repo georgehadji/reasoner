@@ -121,7 +121,7 @@ async def run_stream(
         parallel=not getattr(req, "sequential", False)
     )
     
-    queue = asyncio.Queue()
+    queue = asyncio.Queue(maxsize=256)
     
     async def sse_emit(event: dict | str) -> None:
         if isinstance(event, dict):
