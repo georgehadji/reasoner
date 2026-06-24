@@ -29,21 +29,23 @@ async def PhaseSpan(
     phase_name: str,
     phase_number: int | float,
     router: Any = None,
+    state: Any = None,
 ):
     """Context manager wrapping a phase execution in a Langfuse span.
 
     Creates a child span under the active Langfuse trace for this run.
-    On exit, updates the span with duration, token counts, cost, and
-    any error that occurred. Gracefully degrades if Langfuse is not
-    configured or unavailable.
+    On exit, updates the span with duration, token counts, cost,
+    model information, and any error.
+
+    Gracefully degrades if Langfuse is not configured or unavailable.
 
     Args:
         run_id: Pipeline run ID (matches Langfuse trace ID).
         phase_name: Human-readable phase name for the span.
         phase_number: Phase step number.
         router: Optional ProviderRouter for model/fallback metadata.
+        state: Optional PipelineState for token/cost enrichment on exit.
     """
-    # Lazy import to avoid crash if langfuse is not installed
     span: Any = None
     _langfuse: Any = None
     t0 = time.monotonic()
@@ -58,16 +60,26 @@ async def PhaseSpan(
     except Exception:
         _langfuse = None
 
+    # Capture model info from router on entry
+    model_hint = ""
+    if router and hasattr(router, 'describe'):
+        try:
+            model_hint = router.describe()[:100]
+        except Exception:
+            pass
+
     # Create span
     if _langfuse is not None:
         try:
-            input_tokens = 0
-            if router and hasattr(router, 'describe'):
-                input_tokens = 0  # populated on exit from state
             span = _langfuse.span(
                 name=f"Phase {phase_number}: {phase_name}",
                 trace_id=run_id,
-                input={"phase": phase_name, "phase_number": phase_number, "start_time": t0},
+                input={
+                    "phase": phase_name,
+                    "phase_number": phase_number,
+                    "start_time": t0,
+                    "model": model_hint,
+                },
             )
         except Exception:
             span = None
@@ -85,13 +97,45 @@ async def PhaseSpan(
 
         if span is not None and _langfuse is not None:
             try:
-                span.update(
-                    output={
-                        "success": success,
-                        "duration_seconds": round(duration, 3),
-                        "error": error,
-                    },
-                    end_time=time.time(),
-                )
+                # Enrich with token/cost data from state if available
+                phase_key = f"Phase {phase_number}: {phase_name}"
+                output: dict[str, Any] = {
+                    "success": success,
+                    "duration_seconds": round(duration, 3),
+                    "error": error,
+                    "model": model_hint,
+                }
+
+                # Extract token counts from state
+                if state is not None:
+                    try:
+                        tokens = state.phase_tokens.get(phase_key, {}) if hasattr(state, 'phase_tokens') else {}
+                        if tokens:
+                            output["tokens_in"] = tokens.get("input", 0)
+                            output["tokens_out"] = tokens.get("output", 0)
+                            output["tokens_total"] = tokens.get("input", 0) + tokens.get("output", 0)
+                    except Exception:
+                        pass
+
+                    # Extract cost from state
+                    try:
+                        if hasattr(state, 'cost_state') and state.cost_state is not None:
+                            costs = state.cost_state.phase_costs_by_key if hasattr(state.cost_state, 'phase_costs_by_key') else {}
+                            phase_cost = costs.get(phase_key, 0.0) if costs else 0.0
+                            if phase_cost:
+                                output["cost_usd"] = round(phase_cost, 6)
+                    except Exception:
+                        pass
+
+                    # Extract fallback info from state
+                    try:
+                        if hasattr(state, 'meta') and state.meta is not None:
+                            fallbacks = getattr(state.meta, 'fallback_events', [])
+                            if fallbacks:
+                                output["fallback_count"] = len(fallbacks)
+                    except Exception:
+                        pass
+
+                span.update(output=output, end_time=time.time())
             except Exception:
                 pass

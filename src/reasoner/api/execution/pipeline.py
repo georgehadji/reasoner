@@ -299,7 +299,7 @@ class PipelineExecutionService:
                 try:
                     phase_timeout = get_phase_timeout(name)
                     from reasoner.core.observability.phase_span import PhaseSpan
-                    async with PhaseSpan(run_id, phase_name=name, phase_number=num, router=router):
+                    async with PhaseSpan(run_id, phase_name=name, phase_number=num, router=router, state=state):
                         async for _ka in run_phase_with_keepalive(fn, state, cancel_event, timeout_seconds=phase_timeout):
                             await sse_emit(_ka)
                     if cancel_event.is_set():
