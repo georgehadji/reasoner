@@ -45,6 +45,7 @@ ignore_imports=
     reasoner.application.flows.services -> reasoner.infrastructure.execution.noop_executor
     reasoner.application.flows.services -> reasoner.infrastructure.execution.subprocess_executor
     reasoner.application.flows.research_phases -> reasoner.infrastructure.prism.file_search
-    reasoner.core.protocol -> reasoner.infrastructure.llm.router
+    # core/search.py has runtime lazy imports of circuit_breaker and registry.
+    # core/protocol.py has TYPE_CHECKING-only import (false positive, removed).
     reasoner.core.search -> reasoner.infrastructure.circuit_breaker
     reasoner.core.search -> reasoner.infrastructure.llm.registry

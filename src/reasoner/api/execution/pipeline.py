@@ -431,8 +431,7 @@ class PipelineExecutionService:
                 continue
 
             duration = time.monotonic() - phase_start
-            while emitter.pending_events:
-                ev = emitter.pending_events.pop(0)
+            for ev in emitter.pop_pending_events():
                 await sse_emit(ev)
             state.phase_durations[phase_key] = duration
             if name == "Synthesis":
