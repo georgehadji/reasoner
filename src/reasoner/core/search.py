@@ -31,39 +31,36 @@ from reasoner.core.constants import (
     MODEL_QWEN35_FLASH,
 )
 
-# Deferred import to avoid circular dependencies at module load time
-_build_provider = None
+# ── Dependency Injection for core → infrastructure boundary ───────
+# These are set by api/__init__.py during bootstrap, inverting the
+# dependency: core defines the port, infrastructure provides the impl.
+# Thread-safe via single assignment (not atomic, but set once at startup).
 import threading
-_build_provider_lock = threading.Lock()
-
-def _get_build_provider():
-    global _build_provider
-    if _build_provider is None:
-        with _build_provider_lock:
-            if _build_provider is None:
-                from reasoner.infrastructure.llm.registry import build_provider
-                _build_provider = build_provider
-    return _build_provider
-
-logger = logging.getLogger(__name__)
-
-# Circuit breaker for SearXNG — prevents 30s hangs when instance is down
-# Deferred to avoid core → infrastructure import at module load time
 _SEARXNG_CB = None
 _SEARXNG_CB_LOCK = threading.Lock()
 
+_BUILD_PROVIDER = None
+
+def set_build_provider(fn):
+    """Inject provider builder function (called from api/__init__.py)."""
+    global _BUILD_PROVIDER
+    _BUILD_PROVIDER = fn
+
+def _get_build_provider():
+    global _BUILD_PROVIDER
+    return _BUILD_PROVIDER
+
+def set_searxng_circuit_breaker(cb):
+    """Inject SearXNG circuit breaker (called from api/__init__.py)."""
+    global _SEARXNG_CB
+    with _SEARXNG_CB_LOCK:
+        _SEARXNG_CB = cb
+
 def _get_searxng_cb():
     global _SEARXNG_CB
-    if _SEARXNG_CB is None:
-        with _SEARXNG_CB_LOCK:
-            if _SEARXNG_CB is None:
-                from reasoner.infrastructure.circuit_breaker import get_circuit_breaker
-                cb = get_circuit_breaker("searxng")
-                cb.config.failure_threshold = 3
-                cb.config.success_threshold = 2
-                cb.config.timeout_seconds = 30.0
-                _SEARXNG_CB = cb
     return _SEARXNG_CB
+
+logger = logging.getLogger(__name__)
 
 # Source type categories for specialized searches
 SOURCE_TYPE_ENGINES: dict[str, list[str]] = {

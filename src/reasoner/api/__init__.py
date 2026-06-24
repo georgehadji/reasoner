@@ -139,6 +139,26 @@ async def lifespan(app: FastAPI):
                     f"(only safe for UVICORN_WORKERS=1)."
                 ) from probe_exc
 
+    # ── Inject core → infra boundary dependencies ──
+    # Inverts the dependency: core defines ports, infra provides impls.
+    try:
+        from reasoner.core.search import (
+            set_build_provider,
+            set_searxng_circuit_breaker,
+        )
+        from reasoner.infrastructure.llm.registry import build_provider
+        set_build_provider(build_provider)
+
+        from reasoner.infrastructure.circuit_breaker import get_circuit_breaker
+        cb = get_circuit_breaker("searxng")
+        cb.config.failure_threshold = 3
+        cb.config.success_threshold = 2
+        cb.config.timeout_seconds = 30.0
+        set_searxng_circuit_breaker(cb)
+        logger.info("Core→infra dependencies injected: build_provider, searxng_cb")
+    except Exception as exc:
+        logger.warning("Failed to inject core→infra deps: %s", exc)
+
     logger.info("Reasoner startup complete")
     logger.info(f"Web UI: http://{settings.SERVER_HOST}:{settings.SERVER_PORT}")
     logger.info(f"API Docs: http://{settings.SERVER_HOST}:{settings.SERVER_PORT}/docs")
