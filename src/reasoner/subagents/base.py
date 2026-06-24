@@ -78,7 +78,10 @@ class PhaseSubAgent(ABC):
             return cached
 
         # Emit agent_start event for real-time UI tracking
-        state.append_pending_event({
+        from reasoner.application.services.event_emission_service import get_event_emitter
+        _emitter = get_event_emitter()
+        if _emitter:
+            _emitter.append_pending_event({
             "type": "agent_start",
             "agent": self.AGENT_NAME,
             "role": self.ROLE,
@@ -137,13 +140,14 @@ class PhaseSubAgent(ABC):
         )
 
         # Emit agent_complete event
-        state.append_pending_event({
-            "type": "agent_complete",
-            "agent": self.AGENT_NAME,
-            "duration_ms": out.duration_ms,
-            "model": out.model,
-            "error": out.error,
-        })
+        if _emitter:
+            _emitter.append_pending_event({
+                "type": "agent_complete",
+                "agent": self.AGENT_NAME,
+                "duration_ms": out.duration_ms,
+                "model": out.model,
+                "error": out.error,
+            })
 
         # Cache clean, confident results
         if out.error is None and out.confidence >= HYPERGATE_METHOD_THRESHOLD:

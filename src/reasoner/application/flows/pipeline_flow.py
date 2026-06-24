@@ -10,8 +10,7 @@ from reasoner.domain.pipeline_state import PipelineState
 
 
 class PhaseFn(Protocol):
-    async def __call__(self, state: PipelineState) -> None: ...
-
+    async def __call__(self, state: PipelineState) -> Any: ...
 
 @dataclass(frozen=True)
 class PhaseStep:
@@ -50,7 +49,7 @@ class PipelineFlow:
 async def execute_phases_dag(
     phases: list[PhaseStep],
     state: PipelineState,
-    run_phase_fn: Callable[[PhaseFn, PipelineState], None],
+    run_phase_fn: Callable[[PhaseFn, PipelineState], Any],
 ) -> None:
     """Execute phases respecting dependencies. Independent phases run in parallel.
 
@@ -59,10 +58,13 @@ async def execute_phases_dag(
         state: Shared PipelineState mutated by each phase.
         run_phase_fn: Callable that actually executes a single phase function
             against the state (e.g. wraps keepalive, timeout, SSE emission).
+            Now returns an optional PhaseOutput delta.
 
     Raises:
         RuntimeError: If a circular dependency is detected.
     """
+    from reasoner.domain.pipeline_state import PhaseOutput
+
     completed: set[str] = set()
     pending = list(phases)
 
@@ -82,14 +84,23 @@ async def execute_phases_dag(
             pending.remove(p)
 
         # Execute ready phases in parallel
-        async def _run_step(step: PhaseStep) -> str:
-            await run_phase_fn(step.fn, state)
-            return step.name
+        async def _run_step(step: PhaseStep) -> tuple[str, Any]:
+            result = await run_phase_fn(step.fn, state)
+            return step.name, result
 
         results = await asyncio.gather(
             *[_run_step(s) for s in ready], return_exceptions=True
         )
-        for name, result in zip([s.name for s in ready], results):
-            if isinstance(result, Exception):
-                raise result
-            completed.add(name)
+        for step, result_tuple in zip(ready, results):
+            if isinstance(result_tuple, BaseException):
+                import logging
+                logging.getLogger(__name__).error("Phase %s failed: %s", step.name, result_tuple)
+                state.errors.append(f"Phase '{step.name}' failed: {result_tuple}")
+                if step.critical:
+                    return  # Stop execution of the DAG for critical failure
+            else:
+                name, output = result_tuple
+                completed.add(name)
+                # Apply the delta sequentially if provided
+                if isinstance(output, PhaseOutput):
+                    output.apply_to(state)

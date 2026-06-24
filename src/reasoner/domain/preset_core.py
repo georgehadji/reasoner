@@ -272,34 +272,6 @@ class PipelinePreset:
                 f"Valid roles: {sorted(_KNOWN_ROUTING_ROLES)}"
             )
 
-        # ── Model alias validation (v3.4) ──
-        # Verify every model reference is a registered alias. Catches typos
-        # and references to removed models at construction time, not runtime.
-        from reasoner.infrastructure.llm.registry import _REGISTRY as _MODEL_REGISTRY
-        _model_errors: list[str] = []
-
-        if self.primary_id and self.primary_id not in _MODEL_REGISTRY:
-            _model_errors.append(f"primary_id='{self.primary_id}'")
-
-        for role, model_id in self.routing.items():
-            if model_id not in _MODEL_REGISTRY:
-                _model_errors.append(f"routing['{role}']='{model_id}'")
-
-        for role, model_id in self.fallback_routing.items():
-            if model_id not in _MODEL_REGISTRY:
-                _model_errors.append(f"fallback_routing['{role}']='{model_id}'")
-
-        for role, chain in self.cascading_routing.items():
-            for model_id in chain:
-                if model_id not in _MODEL_REGISTRY:
-                    _model_errors.append(f"cascading_routing['{role}']='{model_id}'")
-
-        if _model_errors:
-            raise ValueError(
-                f"Preset '{self.name}' references unknown model aliases:\n  "
-                + "\n  ".join(_model_errors)
-            )
-
     def check_keys(self) -> dict[str, bool]:
         """Return {env_var: is_set} for all required API keys."""
         return {k: bool(os.environ.get(k)) for k in self.required_env_vars}

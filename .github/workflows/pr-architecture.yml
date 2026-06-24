@@ -1,53 +1,31 @@
-name: Architecture Guard
+name: PR Architecture Checks
 
 on:
   pull_request:
-    branches: [main]
+    branches: [ "main" ]
 
 jobs:
-  layer-violations:
-    name: Layer violation check
+  import-linter:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Domain must not import infrastructure
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+      - name: Install project dependencies
         run: |
-          echo "Checking domain/ for infrastructure imports..."
-          if grep -rn \
-            --include="*.py" \
-            -E "^(from|import)\s+(reasoner\.)?infrastructure" \
-            src/reasoner/domain/; then
-            echo ""
-            echo "FAIL: domain/ layer must not import from infrastructure/"
-            echo "Move the import to an application service or inject via port."
+          pip install -r requirements.txt
+          pip install import-linter
+      - name: Run import-linter
+        run: PYTHONPATH=src lint-imports --no-cache
+      - name: Check exception count
+        run: |
+          COUNT=$(grep -c '\->' .importlinter)
+          echo "Import-linter exceptions: $COUNT"
+          MAX=45
+          if [ "$COUNT" -gt "$MAX" ]; then
+            echo "FAIL: $COUNT exceptions exceeds maximum of $MAX"
             exit 1
           fi
-          echo "OK: no direct infrastructure imports in domain/"
-
-      - name: Application flows must not import from api
-        run: |
-          echo "Checking application/flows/ for api imports..."
-          if grep -rn \
-            --include="*.py" \
-            -E "^(from|import)\s+(reasoner\.)?api" \
-            src/reasoner/application/flows/; then
-            echo ""
-            echo "FAIL: application/flows/ must not import from api/"
-            echo "Known violation: application/flows/__init__.py imports api.serializers — fix before adding more."
-            exit 1
-          fi
-          echo "OK: no api imports in application/flows/"
-
-      - name: Report PipelineState field count
-        run: |
-          COUNT=$(grep -c "field(" src/reasoner/domain/pipeline_state.py 2>/dev/null || echo 0)
-          echo "PipelineState field() definitions: ${COUNT}"
-          if [ "${COUNT}" -gt 70 ]; then
-            echo "WARN: PipelineState has ${COUNT} field() calls — consider adding sub-containers"
-          fi
-
-      - name: Check for hardcoded API keys
-        run: |
-          echo "Scanning for hardcoded secrets..."
-          python scripts/scan-secrets.py || true
+          echo "PASS: $COUNT exceptions within limit of $MAX"

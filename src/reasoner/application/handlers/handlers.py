@@ -39,20 +39,59 @@ def _get_event_bus():
 # COMMAND HANDLERS
 # ─────────────────────────────────────────────────────────────────────
 
+from typing import Callable, Awaitable, Protocol
+
+from reasoner.application.commands import RunPipelineCommand
+from reasoner.infrastructure.llm.router import ProviderRouter
+from reasoner.domain.pipeline_state import PipelineState
+
+
+class PipelineExecutionPort(Protocol):
+    """Interface for pipeline execution — application layer depends on this port,
+    not on api-layer implementations. The api layer provides the concrete
+    implementation (PipelineExecutionService from api/execution/pipeline.py).
+
+    This inverts the dependency: handlers.py (application) defines the port;
+    api/execution/pipeline.py (api) implements it.
+    """
+
+    async def execute_run(
+        self,
+        command: RunPipelineCommand,
+        router: ProviderRouter,
+        sse_emit: Callable[[dict | str], Awaitable[None]],
+        user_id: str | None = None,
+        initial_state: PipelineState | None = None,
+    ) -> PipelineState:
+        ...
+
+
 class RunPipelineCommandHandler:
     """
     Handler for RunPipelineCommand.
     
     Orchestrates pipeline execution using new architecture.
+    Accepts an optional PipelineExecutionPort for SSE streaming;
+    falls back to direct pipeline.run() when not provided.
     """
     
-    def __init__(self, llm_router: Any, event_store: Any | None = None):
+    def __init__(
+        self,
+        llm_router: Any,
+        event_store: Any | None = None,
+        pipeline_executor: PipelineExecutionPort | None = None,
+    ):
         self.llm_router = llm_router
         self.event_store = event_store
         self.event_bus = _get_event_bus()
+        self._pipeline_executor = pipeline_executor
     
-    async def handle(self, command: RunPipelineCommand) -> PipelineAggregate:
-        """Execute pipeline command."""
+    async def handle(
+        self, 
+        command: RunPipelineCommand, 
+        sse_emit: Callable[[dict], Awaitable[None]] | None = None
+    ) -> PipelineAggregate:
+        """Execute pipeline command, optionally emitting SSE events."""
         # Create aggregate
         aggregate = PipelineAggregate(aggregate_id=command.command_id)
         
@@ -73,6 +112,9 @@ class RunPipelineCommandHandler:
         )
         aggregate.record_event(start_event)
         
+        if sse_emit:
+            await sse_emit({"type": "start"})
+
         # Persist event
         if self.event_store:
             await self.event_store.save_events([start_event])
@@ -95,21 +137,37 @@ class RunPipelineCommandHandler:
         )
         
         try:
-            # Run pipeline
-            state = await pipeline.run(problem=command.problem)
+            from reasoner.application.services.pipeline_service import PipelineService
+            from reasoner.application.orchestrator import PipelineOrchestrator
+            
+            if sse_emit:
+                if self._pipeline_executor:
+                    state = await self._pipeline_executor.execute_run(
+                        command, router, sse_emit
+                    )
+                else:
+                    raise RuntimeError(
+                        "SSE streaming requested but no PipelineExecutionPort injected"
+                    )
+            else:
+                # Old behavior
+                state = await pipeline.run(problem=command.problem)
             
             # Record completion event
             completion_event = make_event(
                 EventType.PIPELINE_COMPLETED,
                 aggregate_id=command.command_id,
                 version=aggregate.version + 1,
-                solution={"core_solution": state.synthesis.get("core_solution", "") if state.synthesis else ""},
-                total_tokens=state.total_tokens,
-                total_duration_seconds=state.end_time - state.start_time if state.end_time and state.start_time else 0,
-                phases_completed=len(state.phase_results),
+                solution={"core_solution": getattr(state.core, "final_solution", "") if hasattr(state, "core") else ""},
+                total_tokens=getattr(state.meta, "total_tokens", 0) if hasattr(state, "meta") else 0,
+                total_duration_seconds=getattr(state.meta, "total_duration", 0) if hasattr(state, "meta") else 0,
+                phases_completed=len(getattr(state.meta, "phase_results", []) if hasattr(state, "meta") else []),
             )
             aggregate.record_event(completion_event)
             
+            if sse_emit:
+                await sse_emit({"type": "end", "data": {"synthesis": {"core_solution": "Completed"}}})
+
             # Persist and publish
             if self.event_store:
                 await self.event_store.save_events([completion_event])
@@ -117,6 +175,8 @@ class RunPipelineCommandHandler:
             
         except Exception as e:
             logger.error(f"Pipeline execution failed: {e}")
+            if sse_emit:
+                await sse_emit({"type": "error", "error": str(e)})
             
             # Record failure event
             failure_event = make_event(
@@ -125,7 +185,7 @@ class RunPipelineCommandHandler:
                 version=aggregate.version + 1,
                 error=str(e),
                 phase_at_failure=aggregate.get_last_phase() or "",
-                phases_completed=len(aggregate.state_data.phase_results),
+                phases_completed=len(aggregate.state_data.phase_results) if hasattr(aggregate, "state_data") else 0,
             )
             aggregate.record_event(failure_event)
             
@@ -400,13 +460,18 @@ class ListPresetsQueryHandler:
 class HandlerRegistry:
     """Central registry for all command and query handlers."""
     
-    def __init__(self, llm_router: Any, event_store: Any | None = None):
+    def __init__(
+        self,
+        llm_router: Any,
+        event_store: Any | None = None,
+        pipeline_executor: PipelineExecutionPort | None = None,
+    ):
         self.llm_router = llm_router
         self.event_store = event_store
         
         # Initialize handlers
         self.command_handlers = {
-            "RunPipelineCommand": RunPipelineCommandHandler(llm_router, event_store),
+            "RunPipelineCommand": RunPipelineCommandHandler(llm_router, event_store, pipeline_executor),
             "ResumePipelineCommand": ResumePipelineCommandHandler(event_store, llm_router),
             "StopPipelineCommand": StopPipelineCommandHandler(event_store),
             "ExecuteWidgetCommand": ExecuteWidgetCommandHandler(),
@@ -443,12 +508,16 @@ class HandlerRegistry:
 _handler_registry: HandlerRegistry | None = None
 
 
-def get_handler_registry(llm_router: Any = None, event_store: Any = None) -> HandlerRegistry:
+def get_handler_registry(
+    llm_router: Any = None,
+    event_store: Any = None,
+    pipeline_executor: PipelineExecutionPort | None = None,
+) -> HandlerRegistry:
     """Get or create global handler registry."""
     global _handler_registry
     if _handler_registry is None:
         if llm_router is None:
             from reasoner.infrastructure.llm.router import ProviderRouter
             llm_router = ProviderRouter()
-        _handler_registry = HandlerRegistry(llm_router, event_store)
+        _handler_registry = HandlerRegistry(llm_router, event_store, pipeline_executor)
     return _handler_registry

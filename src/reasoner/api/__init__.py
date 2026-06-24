@@ -37,7 +37,7 @@ init_sentry()
 # --- Action 1.2: Observability Strictness & Metrics --- START
 if settings.ENVIRONMENT == "production":
     if not settings.LANGFUSE_PUBLIC_KEY or not settings.LANGFUSE_SECRET_KEY:
-        logger.critical("CRITICAL: Langfuse keys (LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY) are missing in production environment. LLM observability will be severely limited.")
+        raise RuntimeError("CRITICAL: Langfuse keys (LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY) are missing in production environment. Observability is mandatory in production.")
 # --- Action 1.2: Observability Strictness & Metrics --- END
 
 # Register global exception handlers (Critical Enhancement 7.7)
@@ -86,6 +86,19 @@ async def lifespan(app: FastAPI):
 
     from reasoner.core.health_validator import validate_all
     await validate_all()
+
+    # Mandatory Redis check for production
+    if settings.ENVIRONMENT == "production":
+        try:
+            from reasoner.infrastructure.redis.client import get_redis
+            _probe_redis = get_redis()
+            await _probe_redis.set("_prod_startup_probe", "1", ex=10, nx=True)
+            logger.info("Redis probe (production): reachable")
+        except Exception as probe_exc:
+            raise RuntimeError(
+                f"Redis is mandatory in production (ENVIRONMENT=production) "
+                f"for cross-worker cancellation, but is unreachable: {probe_exc}"
+            ) from probe_exc
 
     # Warn if running in multi-worker mode with in-memory rate limiting / circuit breaker
     uvicorn_workers = settings.UVICORN_WORKERS
@@ -320,7 +333,11 @@ def get_architecture_components():
             
             primary_provider = DummyProvider(model="dummy")
         
-        _handler_registry = get_handler_registry(primary_provider, _event_store)
+        from reasoner.api.execution.pipeline import PipelineExecutionService
+        _handler_registry = get_handler_registry(
+            primary_provider, _event_store,
+            pipeline_executor=PipelineExecutionService(),
+        )
     
     return _event_store, _handler_registry
 

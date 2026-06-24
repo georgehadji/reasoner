@@ -45,5 +45,13 @@ from reasoner.domain.models import (
 )
 
 # Backward-compat: standalone load/save for auto-generated tests
-load = PipelineState.load
-save = PipelineState.save
+# Moved to PipelineService (C3 refactor — I/O off domain object).
+# Use lazy import to avoid circular chain:
+#   models.py → pipeline_service → pipeline → application.pipeline → models.py
+def load(path: "str | Path") -> "PipelineState":
+    from reasoner.application.services.pipeline_service import PipelineService
+    return PipelineService.load(path)
+
+def save(state: "PipelineState", path: "str | Path") -> None:
+    from reasoner.application.services.pipeline_service import PipelineService
+    return PipelineService.save(state, path)

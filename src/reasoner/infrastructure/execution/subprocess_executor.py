@@ -123,7 +123,7 @@ class SubprocessExecutor:
                 preexec_fn = _set_limits
 
             # 5. Execute with timeout
-            t0 = asyncio.get_event_loop().time()
+            t0 = time.monotonic()
             timeout_sec = limits.timeout_ms / 1000.0
 
             try:
@@ -154,7 +154,7 @@ class SubprocessExecutor:
                         await proc.wait()
                     except Exception:
                         pass
-                    elapsed = int((asyncio.get_event_loop().time() - t0) * 1000)
+                    elapsed = int((time.monotonic() - t0) * 1000)
                     return ExecutionResult(
                         success=False,
                         stderr=f"Execution timed out after {timeout_sec}s",
@@ -163,7 +163,7 @@ class SubprocessExecutor:
                         duration_ms=min(elapsed, limits.timeout_ms),
                     )
 
-                elapsed = int((asyncio.get_event_loop().time() - t0) * 1000)
+                elapsed = int((time.monotonic() - t0) * 1000)
 
                 # Decode and clip output
                 stdout_str = stdout_bytes.decode("utf-8", errors="replace") if stdout_bytes else ""

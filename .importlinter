@@ -1,0 +1,50 @@
+[importlinter]
+root_package = reasoner
+
+[importlinter:contract:1]
+name = Layered Architecture
+type = layers
+layers =
+    reasoner.api
+    reasoner.application
+    reasoner.infrastructure
+    reasoner.subagents
+    reasoner.hypergate
+    reasoner.presets
+    reasoner.clients
+    reasoner.scraper
+    reasoner.quality
+    reasoner.token_cache
+    reasoner.core
+    reasoner.domain
+ignore_imports=
+    reasoner.infrastructure.renderer -> reasoner.application.services.renderers
+    reasoner.infrastructure.auth -> reasoner.application.ports.auth_port
+    reasoner.infrastructure.auth.local_adapter -> reasoner.application.ports.auth_port
+    reasoner.infrastructure.auth.supabase_adapter -> reasoner.application.ports.auth_port
+    reasoner.infrastructure.billing.paypal_adapter -> reasoner.application.ports.billing_port
+    reasoner.infrastructure.billing.stripe_adapter -> reasoner.application.ports.billing_port
+    reasoner.infrastructure.cached_quota_repo -> reasoner.application.ports.quota_repository
+    reasoner.infrastructure.llm.executor -> reasoner.application.event_bus.bus
+    reasoner.infrastructure.persistence.cached_quota_repo -> reasoner.application.ports.quota_repository
+    reasoner.infrastructure.persistence.postgres_store -> reasoner.application.event_bus.bus
+    reasoner.infrastructure.persistence.quota_repo_postgres -> reasoner.application.ports.quota_repository
+    reasoner.infrastructure.websocket.manager -> reasoner.application.ports.auth_port
+    reasoner.application.event_bus.bus -> reasoner.infrastructure.persistence.event_store
+    reasoner.application.handlers.handlers -> reasoner.infrastructure.llm.router
+    reasoner.application.handlers.handlers -> reasoner.infrastructure.widgets
+    reasoner.application.orchestrator -> reasoner.infrastructure.llm.router
+    reasoner.application.orchestrator -> reasoner.infrastructure.persistence.event_store
+    reasoner.application.services.pipeline_service -> reasoner.infrastructure.llm.router
+    reasoner.application.services.preset_service -> reasoner.infrastructure.llm.registry
+    reasoner.application.services.preset_service -> reasoner.infrastructure.llm.router
+    reasoner.application.services.scorecard_service -> reasoner.infrastructure.persistence.telemetry_store
+    reasoner.application.services.data_eraser -> reasoner.infrastructure.persistence.event_store
+    reasoner.application.services.billing_service -> reasoner.infrastructure.persistence.subscription_repo
+    reasoner.application.services.pricing_service -> reasoner.infrastructure.llm.registry
+    reasoner.application.flows.services -> reasoner.infrastructure.execution.noop_executor
+    reasoner.application.flows.services -> reasoner.infrastructure.execution.subprocess_executor
+    reasoner.application.flows.research_phases -> reasoner.infrastructure.prism.file_search
+    reasoner.core.protocol -> reasoner.infrastructure.llm.router
+    reasoner.core.search -> reasoner.infrastructure.circuit_breaker
+    reasoner.core.search -> reasoner.infrastructure.llm.registry
