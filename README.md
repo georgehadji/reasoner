@@ -65,6 +65,41 @@ print(stats)
 
 ---
 
+## 🌐 Language-Bias Mitigation
+
+Reasoner v2.3 includes a two-part system to reduce language-induced ideological drift (Buyl et al., *npj AI* 2026):
+
+### Part A: English Pivot (Always On)
+Internally reasons in English, then translates output back to the user's language. Removes variance from language choice while preserving accuracy.
+
+- **Key-free translation:** CompositeTranslator tries DeepL → LLM fallback → identity. No external API keys required.
+- **Explicit reasoning:** `state.language` = "English" (internal), `state.output_language` = user's language (final).
+- **Complete translate-out:** All `FinalSolution` fields translated + ISO-code bug fixed.
+- **Method exemptions:** Writing, brainstorming, and article methods generate natively (avoid pivot for creative integrity).
+
+**Control:**
+```bash
+LANGUAGE_PIVOT_ENABLED=true  # Enable pivot (default: on)
+DEEPL_API_KEY="..."          # Optional fast path; LLM fallback used if missing
+```
+
+### Part B: Cross-Lingual Probe (Canary, Premium Only)
+For ideologically-sensitive queries, re-runs synthesis in the user's native language and compares outputs. If material divergence detected, downgrades claims to HYPOTHESIS and surfaces an epistemic warning.
+
+- **Sensitivity detection:** Regex classifier (zero LLM calls) over 5 axes: politics, geopolitics, governance, religion, history.
+- **Divergence judgment:** LLM-judge compares English synthesis vs. native-language synthesis.
+- **Epistemic labeling:** Downgrade `VERIFIED → HYPOTHESIS` + append `language_note` when diverged.
+
+**Control:**
+```bash
+LANGUAGE_PROBE_ENABLED=true    # Enable probe (default: off); flip for canary presets
+LANGUAGE_DIVERGENCE_COSINE=0.15 # Cosine distance threshold (tune to adjust sensitivity)
+```
+
+**Rationale:** Language does not introduce *neutrality* (English baseline has its own tilt), but the pivot + probe system makes residual bias *visible* and *labeled* rather than hidden.
+
+---
+
 ## 🚀 Quick Start
 
 ### Prerequisites
