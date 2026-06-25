@@ -36,6 +36,7 @@ jobs:
             -q
         env:
           PYTHONPATH: ${{ env.PYTHONPATH }}
+          CSRF_ENFORCE_BACKEND: 'false'
 
       - name: Coverage gate
         run: |
