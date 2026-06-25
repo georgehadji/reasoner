@@ -46,14 +46,3 @@ ignore_imports=
     reasoner.application.flows.services -> reasoner.infrastructure.execution.subprocess_executor
     reasoner.application.flows.research_phases -> reasoner.infrastructure.prism.file_search
     # core→infra imports eliminated via DI (set_build_provider, set_searxng_circuit_breaker)
-    # subagents→infrastructure: phase hyper-agents construct ProviderRouter directly.
-    # Pre-existing debt — previously masked by a grimp parser crash on non-ASCII chars.
-    reasoner.subagents.base -> reasoner.infrastructure.llm.router
-    reasoner.subagents.base -> reasoner.infrastructure.llm.ports
-    reasoner.subagents.synthesis.hyper_agent -> reasoner.infrastructure.llm.router
-    reasoner.subagents.decomposition.hyper_agent -> reasoner.infrastructure.llm.router
-    reasoner.subagents.search.hyper_agent -> reasoner.infrastructure.llm.router
-    reasoner.subagents.critique.hyper_agent -> reasoner.infrastructure.llm.router
-    reasoner.subagents.enhancement.hyper_agent -> reasoner.infrastructure.llm.router
-    # core→application via the reasoner.models backward-compat shim.
-    reasoner.models -> reasoner.application.services.pipeline_service

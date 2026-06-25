@@ -1,13 +1,13 @@
 """
-SynthesisHyperAgent - orchestrates 3 parallel analysis subagents + 1 writer.
+SynthesisHyperAgent — orchestrates 3 parallel analysis subagents + 1 writer.
 
 Phase 1 (parallel):
-  - ConsensusMapperSubAgent     -> what do all perspectives agree on?
-  - ContradictionResolverSubAgent -> where do they disagree?
-  - EvidenceWeighterSubAgent    -> which arguments have strongest evidence?
+  - ConsensusMapperSubAgent     → what do all perspectives agree on?
+  - ContradictionResolverSubAgent → where do they disagree?
+  - EvidenceWeighterSubAgent    → which arguments have strongest evidence?
 
 Phase 2 (sequential):
-  - SynthesisWriterSubAgent     -> writes final answer using all analyses
+  - SynthesisWriterSubAgent     → writes final answer using all analyses
 
 All subagent outputs are stored in state.synthesis_subagent_outputs for transparency.
 """
@@ -40,7 +40,7 @@ class SynthesisHyperAgent:
     async def execute(self, state: PipelineState, router: ProviderRouter) -> FinalSolution:
         logger.info("[SynthesisHyperAgent] starting Phase 1: 3 parallel analysis subagents")
 
-        # -- Phase 1: parallel analysis --------------------------------
+        # ── Phase 1: parallel analysis ────────────────────────────────
         results = await asyncio.gather(
             self._consensus.execute(state, router),
             self._contradiction.execute(state, router),
@@ -82,7 +82,7 @@ class SynthesisHyperAgent:
             evidence_out.confidence,
         )
 
-        # -- Phase 2: synthesis writer ---------------------------------
+        # ── Phase 2: synthesis writer ─────────────────────────────────
         writer = SynthesisWriterSubAgent(context={
             "consensus": consensus_out,
             "contradictions": contradiction_out,
@@ -97,10 +97,10 @@ class SynthesisHyperAgent:
             writer_out.model,
         )
 
-        # -- Build FinalSolution ---------------------------------------
+        # ── Build FinalSolution ───────────────────────────────────────
         result = writer_out.result
         from reasoner.domain.core_types import MetaCognitiveAudit
-        from reasoner.models import ClaimLabel
+from reasoner.models import ClaimLabel
 
         meta_audit_raw = result.get("meta_audit", {})
         meta_audit = MetaCognitiveAudit(
