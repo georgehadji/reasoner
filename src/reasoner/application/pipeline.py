@@ -215,6 +215,15 @@ class ReasonerPipeline:
         if _pivot_eligible:
             await self._phase_cross_language_translate_in(state)
 
+        # ── B1: Sensitivity classification (regex fast path) ──────────
+        if state.output_language != "English":
+            from reasoner.application.services.sensitivity_service import classify_sensitivity
+            _sensitive, _axis = classify_sensitivity(state.problem)
+            state.language_sensitive = _sensitive
+            if _sensitive:
+                state.language_divergence = {"axis": _axis}
+                self._log("LANG-PROBE", f"Sensitive axis detected: {_axis}", state)
+
         # ── Optional: Prompt Enhancement ──
         if self.enhance_prompt:
             await self._phase_enhance_prompt(state)
@@ -266,6 +275,13 @@ class ReasonerPipeline:
 
         # ── Optional: Post-Synthesis Verification ──
         await self._phase_post_synthesis_verify(state)
+
+        # ── Optional: B2-B4 Cross-Lingual Probe ─────────────────────────
+        if state.language_sensitive and state.pivot_active:
+            from reasoner.application.flows.language_probe_phase import run_language_probe_phase
+            from reasoner.application.flows.services import PipelineWorkflowServices
+            _probe_services = PipelineWorkflowServices(self)
+            await run_language_probe_phase(state, _probe_services)
 
         # ── Optional: Cross-Language Translate Out ──
         if state.pivot_active:

@@ -123,6 +123,10 @@ NATIVE_LANGUAGE_METHODS: frozenset[str] = frozenset({
     "article",
 })
 
+# Cosine distance threshold above which two synthesis texts are considered
+# materially divergent.  Tune upward to reduce false positives.
+LANGUAGE_DIVERGENCE_COSINE: float = 0.15
+
 # ═════════════════════════════════════════════════════════════════════
 # TOKEN BUDGETS
 # ═════════════════════════════════════════════════════════════════════

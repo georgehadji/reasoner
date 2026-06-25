@@ -238,8 +238,10 @@ class Settings:
     # ── Verbalized Sampling (Coding) ──
     CODING_VERBALIZED_SAMPLING: bool = os.getenv("CODING_VERBALIZED_SAMPLING", "true").lower() == "true"
 
-    # ── Language Pivot ──
+    # ── Language Pivot & Probe ──
     LANGUAGE_PIVOT_ENABLED: bool = os.getenv("LANGUAGE_PIVOT_ENABLED", "true").lower() in ("1", "true", "yes")
+    # Cross-lingual probe: off by default; enable for premium canary presets.
+    LANGUAGE_PROBE_ENABLED: bool = os.getenv("LANGUAGE_PROBE_ENABLED", "false").lower() in ("1", "true", "yes")
 
     # ── Trusted Proxies ──
     TRUSTED_PROXIES: list[str] = [

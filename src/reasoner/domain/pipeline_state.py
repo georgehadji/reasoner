@@ -114,6 +114,7 @@ class PipelineCore:
     language: str = "English"  # Reasoning language (forced to "English" when pivot is active)
     output_language: str = "English"  # User's detected language — applied only at translate-out
     pivot_active: bool = False  # True when English pivot is engaged
+    language_sensitive: bool = False  # True when problem touches ideologically-sensitive axes
     complexity: str | None = None  # Estimated problem complexity (simple, medium, complex)
     decomposition: Decomposition | None = None
     candidates: list[SolutionCandidate] = field(default_factory=list)
@@ -223,7 +224,7 @@ class PipelineState:
         """Backward-compatible init: accepts both old flat kwargs and new nested kwargs."""
         _CORE_FIELDS = {
             'problem', 'enhanced_problem', 'task_type', 'task_type_rationale',
-            'language', 'output_language', 'pivot_active',
+            'language', 'output_language', 'pivot_active', 'language_sensitive',
             'complexity', 'decomposition', 'candidates', 'scores',
             'review_hypotheses', 'top_candidates', 'stress_results',
             'final_solution', 'errors',
@@ -332,6 +333,7 @@ class PipelineState:
     language = PipelineField("core")
     output_language = PipelineField("core")
     pivot_active = PipelineField("core")
+    language_sensitive = PipelineField("core")
     complexity = PipelineField("core")
     decomposition = PipelineField("core")
     candidates = PipelineField("core")
@@ -569,6 +571,14 @@ class PipelineState:
     @cross_language_state.setter
     def cross_language_state(self, value: dict[str, Any]) -> None:
         self.method_state.data["cross_language"] = value
+
+    @property
+    def language_divergence(self) -> dict[str, Any]:
+        return self.method_state.data.setdefault("language_divergence", {})
+
+    @language_divergence.setter
+    def language_divergence(self, value: dict[str, Any]) -> None:
+        self.method_state.data["language_divergence"] = value
 
     def __post_init__(self) -> None:
         """Backward-compat migration for --resume with old-format state files.
