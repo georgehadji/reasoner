@@ -15,6 +15,7 @@ from reasoner.phases.multi_perspective import *
 from reasoner.phases.debate import *
 from reasoner.phases.jury import *
 from reasoner.phases.research import *
+from reasoner.phases._prism import *
 from reasoner.phases.scientific import *
 from reasoner.phases.socratic import *
 from reasoner.phases.pre_mortem import *

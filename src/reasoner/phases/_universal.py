@@ -168,6 +168,17 @@ def synthesis_prompt(state: PipelineState) -> str:
         sources_info += "\n\n" + prism_context
 
     method_hint = "Synthesize the best possible solution."
+    is_research = state.preset_name and "research" in state.preset_name.lower()
+    if is_research:
+        method_hint += (
+            "\n\nRESEARCH METHOD CITATION AND REPORT DISCIPLINE:\n"
+            "Because this is a dedicated Research/web-grounded synthesis, you MUST apply strict report formatting and citation discipline:\n"
+            "1. REPORT STRUCTURE: Deliver an exhaustive, professional-grade research-report structure targeting comprehensive depth.\n"
+            "2. INLINE CITATIONS: Every factual assertion or claim MUST be backed by a clear inline reference using the format [n] (e.g. \"According to recent studies [1]...\") referencing the gathered citation index numbers.\n"
+            "3. EPISTEMIC LABELLING: If a statement is speculative or cannot be supported by any of the gathered citations, you MUST explicitly label it as [HYPOTHESIS] or [UNKNOWN] using the project's standard epistemic vocabulary. Do NOT present unverified claims with confidence.\n"
+            "4. SOURCE INTEGRITY: Rely only on the provided WEB SOURCES. Never fabricate citations or URLs."
+        )
+
     followup = _followup_context(state)
     quality_note = f"\nCONTEXT QUALITY: {state.context_quality}\n" if state.context_quality and state.context_quality != "unknown" else ""
 

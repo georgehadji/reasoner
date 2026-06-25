@@ -16,28 +16,14 @@ from reasoner.core.search import _normalize_url
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.application.flows.base import WorkflowServices
 from reasoner.parsing import extract_json, ParseError
+from reasoner.core.constants_limits import TRUNCATION
+from reasoner.core.settings import settings
+from reasoner.phases import prism_research_system
 
 logger = logging.getLogger(__name__)
 
 ResearchMode = Literal["speed", "balanced", "quality"]
 _MODE_MAX_ITERS: dict[ResearchMode, int] = {"speed": 2, "balanced": 6, "quality": 25}
-
-_PRISM_RESEARCH_SYSTEM = (
-    "You are an iterative research agent. Your goal is to gather high-quality, "
-    "verifiable external sources to answer the user's problem. "
-    "You MUST NOT rely on your internal training knowledge — always verify claims with external sources. "
-    "At each step, choose an action and provide reasoning. Output ONLY valid JSON.\n\n"
-    "AVAILABLE ACTIONS:\n"
-    '- "webSearch": run general web search queries\n'
-    '- "academicSearch": search academic sources\n'
-    '- "discussionSearch": search social/discussion platforms\n'
-    '- "scrape": fetch and read specific URLs for deeper content\n'
-    '- "uploadsSearch": search within uploaded documents (only if files are attached)\n'
-    '- "done": finish research and summarize findings\n\n'
-    "OUTPUT FORMAT (JSON):\n"
-    '{"action": "webSearch|academicSearch|discussionSearch|scrape|uploadsSearch|done", '
-    '"queries": ["query1", "query2"], "urls": ["url1"], "reasoning": "<why>"}'
-)
 
 
 @dataclass
@@ -48,13 +34,37 @@ class _Citation:
     source_type: str  # "web" | "academic" | "discussion" | "file" | "scraped"
 
 
-def _cosine_similarity(a: list[float], b: list[float]) -> float:
-    dot = sum(x * y for x, y in zip(a, b))
-    norm_a = math.sqrt(sum(x * x for x in a))
-    norm_b = math.sqrt(sum(x * x for x in b))
-    if norm_a == 0 or norm_b == 0:
-        return 0.0
-    return dot / (norm_a * norm_b)
+async def _rank_citations(
+    problem: str,
+    citations: list[_Citation],
+) -> list[_Citation]:
+    """BM25 pre-sort (free) → optional semantic rerank (gated)."""
+    if len(citations) <= 1:
+        return citations
+
+    from reasoner.core.search import _bm25_score
+    scored = [
+        (c, _bm25_score(problem, {"title": c.title, "content": c.snippet}))
+        for c in citations
+    ]
+    scored.sort(key=lambda t: t[1], reverse=True)
+    ranked = [c for c, _ in scored]
+
+    if not settings.PRISM_RERANK_ENABLED:
+        return ranked
+
+    try:
+        from reasoner.core.rerank import rerank_documents
+        docs = [
+            {"title": c.title, "content": c.snippet, "url": c.url, "_cit": c}
+            for c in ranked
+        ]
+        reranked = await rerank_documents(problem, docs, top_n=len(docs))
+        if reranked:
+            return [d["_cit"] for d in reranked if d.get("_cit")]
+    except Exception as exc:
+        logger.warning("Prism rerank skipped: %s", exc)
+    return ranked
 
 
 async def run_prism_standalone(
@@ -69,7 +79,7 @@ async def run_prism_standalone(
     """
     max_iterations = _MODE_MAX_ITERS.get(mode, 6)
     citations: list[_Citation] = []
-    seen_norms: set[str] = set()
+    by_url: dict[str, _Citation] = {}
     data: dict[str, Any] = {}
 
     actions: dict[str, Callable[[list[str]], asyncio.Coroutine[Any, Any, list[_Citation]]]] = {
@@ -84,7 +94,7 @@ async def run_prism_standalone(
         try:
             raw, _ = await router.call(
                 role="primary",
-                system_prompt=_PRISM_RESEARCH_SYSTEM,
+                system_prompt=prism_research_system(mode),
                 user_prompt=prompt,
                 max_tokens=512,
             )
@@ -124,15 +134,20 @@ async def run_prism_standalone(
 
         for c in new_citations:
             norm = _normalize_url(c.url)
-            if norm and norm in seen_norms:
+            if not norm:
+                citations.append(c)
                 continue
-            if norm:
-                seen_norms.add(norm)
-            citations.append(c)
+            existing = by_url.get(norm)
+            if existing is None:
+                by_url[norm] = c
+                citations.append(c)
+            elif c.snippet and c.snippet not in existing.snippet:
+                existing.snippet = f"{existing.snippet}\n\n{c.snippet}"[:TRUNCATION.CONTENT]
 
+    ranked_citations = await _rank_citations(problem, citations)
     citation_dicts = [
         {"url": c.url, "title": c.title, "snippet": c.snippet, "source_type": c.source_type}
-        for c in citations
+        for c in ranked_citations
     ]
     return citation_dicts, data.get("summary", "")
 
@@ -147,7 +162,7 @@ async def run_prism_research_phase(
     """Iterative researcher loop: plan → search → refine → done."""
     max_iterations = _MODE_MAX_ITERS.get(mode, 6)
     citations: list[_Citation] = []
-    seen_norms: set[str] = set()
+    by_url: dict[str, _Citation] = {}
     iteration_log: list[str] = []
 
     prism_state = state.method_state.get("prism")
@@ -186,7 +201,7 @@ async def run_prism_research_phase(
         raw, _ = await services.call_llm(
             role="primary",
             phase_key="prism_research",
-            system_prompt=_PRISM_RESEARCH_SYSTEM,
+            system_prompt=prism_research_system(mode),
             user_prompt=prompt,
             state=state,
             max_tokens=512,
@@ -240,28 +255,34 @@ async def run_prism_research_phase(
         added = 0
         for c in new_citations:
             norm = _normalize_url(c.url)
-            if norm and norm in seen_norms:
+            if not norm:
+                citations.append(c)
+                added += 1
                 continue
-            if norm:
-                seen_norms.add(norm)
-            citations.append(c)
-            added += 1
+            existing = by_url.get(norm)
+            if existing is None:
+                by_url[norm] = c
+                citations.append(c)
+                added += 1
 
-            # Emit SourceAdded event via pending_events
-            state.pending_events.append({
-                "type": "source_added",
-                "url": c.url,
-                "title": c.title,
-                "source_type": c.source_type,
-                "relevance_score": 1.0,
-            })
+                # Emit SourceAdded event via pending_events
+                state.pending_events.append({
+                    "type": "source_added",
+                    "url": c.url,
+                    "title": c.title,
+                    "source_type": c.source_type,
+                    "relevance_score": 1.0,
+                })
+            elif c.snippet and c.snippet not in existing.snippet:
+                existing.snippet = f"{existing.snippet}\n\n{c.snippet}"[:TRUNCATION.CONTENT]
 
         services.log("RESEARCH", f"Action {action} added {added} new citations (total: {len(citations)})", state)
 
     # Store results in method_state
+    ranked_citations = await _rank_citations(problem, citations)
     citation_dicts = [
         {"url": c.url, "title": c.title, "snippet": c.snippet, "source_type": c.source_type}
-        for c in citations
+        for c in ranked_citations
     ]
     state.method_state.set("prism", {
         **state.method_state.get("prism"),

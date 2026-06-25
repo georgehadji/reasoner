@@ -76,11 +76,6 @@ class Settings:
     UVICORN_WORKERS: int = int(os.getenv("UVICORN_WORKERS", "1"))
     ENABLE_LEGACY_API_KEY: bool = os.getenv("ENABLE_LEGACY_API_KEY", "false").lower() in ("1", "true", "yes")
 
-    # ── CQRS ──
-    # When True, streaming runs bypass RunPipelineCommandHandler and go directly
-    # through PipelineOrchestrator. See docs/ENHANCEMENT_PLAN.md C1 for migration plan.
-    CQRS_BYPASS_STREAMING: bool = os.getenv("CQRS_BYPASS_STREAMING", "true").lower() in ("1", "true", "yes")
-
     # ── Cohere Rerank (via OpenRouter) ──
     COHERE_RERANK_ENABLED: bool = os.getenv("COHERE_RERANK_ENABLED", "true").lower() in ("1", "true", "yes")
     COHERE_RERANK_MODEL: str = os.getenv("COHERE_RERANK_MODEL", "cohere/rerank-4-fast")
@@ -89,6 +84,7 @@ class Settings:
     PRISM_RESEARCHER_ENABLED: bool = os.getenv("PRISM_RESEARCHER_ENABLED", "false").lower() in ("1", "true", "yes")
     PRISM_CLASSIFIER_ENABLED: bool = os.getenv("PRISM_CLASSIFIER_ENABLED", "false").lower() in ("1", "true", "yes")
     PRISM_FILE_SEARCH_ENABLED: bool = os.getenv("PRISM_FILE_SEARCH_ENABLED", "false").lower() in ("1", "true", "yes")
+    PRISM_RERANK_ENABLED: bool = os.getenv("PRISM_RERANK_ENABLED", "false").lower() in ("1", "true", "yes")
 
     # ── Document Semantic Retrieval (Phase 4, opt-in) ──
     DOCUMENT_SEMANTIC_RETRIEVAL_ENABLED: bool = os.getenv("DOCUMENT_SEMANTIC_RETRIEVAL_ENABLED", "false").lower() in ("1", "true", "yes")
@@ -107,6 +103,14 @@ class Settings:
     CSRF_SECRET: str | None = os.getenv("CSRF_SECRET")
     CSRF_ENFORCE_BACKEND: bool = os.getenv("CSRF_ENFORCE_BACKEND", "true").lower() in ("1", "true", "yes")
 
+
+    # ── Database & Persistence ──
+    DATABASE_URL: str | None = os.getenv("DATABASE_URL")
+    # Default to sqlite for dev, postgres for production if URL provided
+    EVENT_STORE_BACKEND: str = os.getenv(
+        "EVENT_STORE_BACKEND", 
+        "postgres" if os.getenv("DATABASE_URL") and os.getenv("ENVIRONMENT") == "production" else "sqlite"
+    )
 
     # ── Auth / Supabase ──
     AUTH_PERSISTENCE_ENABLED: bool = os.getenv("AUTH_PERSISTENCE_ENABLED", "false").lower() in ("1", "true", "yes")
