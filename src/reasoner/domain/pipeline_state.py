@@ -48,7 +48,10 @@ class PipelineField:
         if obj is None:
             return self
         target = getattr(obj, self._target)
-        return getattr(target, self._name)
+        val = getattr(target, self._name)
+        if self._name == "phase_tokens" and val is None:
+            return {}
+        return val
 
     def __set__(self, obj: object, value: Any) -> None:
         target = getattr(obj, self._target)
@@ -108,7 +111,9 @@ class PipelineCore:
     enhanced_problem: str = ""  # Auto-rewritten prompt for clarity and context
     task_type: TaskType | None = None
     task_type_rationale: str = ""
-    language: str = "English"  # Detected language from the problem
+    language: str = "English"  # Reasoning language (forced to "English" when pivot is active)
+    output_language: str = "English"  # User's detected language — applied only at translate-out
+    pivot_active: bool = False  # True when English pivot is engaged
     complexity: str | None = None  # Estimated problem complexity (simple, medium, complex)
     decomposition: Decomposition | None = None
     candidates: list[SolutionCandidate] = field(default_factory=list)
@@ -218,7 +223,8 @@ class PipelineState:
         """Backward-compatible init: accepts both old flat kwargs and new nested kwargs."""
         _CORE_FIELDS = {
             'problem', 'enhanced_problem', 'task_type', 'task_type_rationale',
-            'language', 'complexity', 'decomposition', 'candidates', 'scores',
+            'language', 'output_language', 'pivot_active',
+            'complexity', 'decomposition', 'candidates', 'scores',
             'review_hypotheses', 'top_candidates', 'stress_results',
             'final_solution', 'errors',
             'attachments', 'generation_candidates', 'critic_scores',
@@ -324,6 +330,8 @@ class PipelineState:
     task_type = PipelineField("core")
     task_type_rationale = PipelineField("core")
     language = PipelineField("core")
+    output_language = PipelineField("core")
+    pivot_active = PipelineField("core")
     complexity = PipelineField("core")
     decomposition = PipelineField("core")
     candidates = PipelineField("core")
