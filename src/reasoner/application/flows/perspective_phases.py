@@ -37,16 +37,42 @@ async def run_perspectives_phase(
         from reasoner.core import DEFAULT_PERSPECTIVES
         perspectives = list(DEFAULT_PERSPECTIVES)
 
-    # Warn when all perspective roles resolve to the same model (diversity collapse).
+    # Warn on diversity collapse: all perspectives resolve to the same model, or
+    # all to a single geopolitical bloc. Cross-bloc spread (not just cross-company)
+    # is what mitigates creator ideology (Buyl et al. npj AI 2026) — so we surface
+    # both failure modes and recommend keys across blocs, not one ecosystem.
     _perspective_roles = {"constructive", "destructive", "systemic", "minimalist"}
     _active_models = {
         getattr(services.router.routing_table.get(r, services.router.primary), "model", "")
         for r in _perspective_roles
     }
+    # Bloc inferred from the resolved vendor prefix (e.g. "anthropic/…" → US).
+    _US = {"anthropic", "openai", "google", "x-ai", "perplexity", "meta-llama",
+           "poolside", "arcee-ai", "nvidia", "nousresearch", "morph"}
+    _CN = {"deepseek", "qwen", "moonshotai", "z-ai", "xiaomi", "tencent",
+           "bytedance-seed", "inclusionai", "stepfun", "minimax", "baidu"}
+    _EU = {"mistralai"}
+
+    def _bloc(model: str) -> str:
+        vendor = model.lstrip("~").split("/", 1)[0]
+        if vendor in _US:
+            return "US"
+        if vendor in _CN:
+            return "CN"
+        if vendor in _EU:
+            return "EU"
+        return "OTHER"
+
+    _active_blocs = {_bloc(m) for m in _active_models if m} - {"OTHER"}
     if len(_active_models) < 2:
         state.pending_events.append({
             "type": "phase_warning",
-            "message": "All perspectives using the same model — cross-lab diversity unavailable. Add API keys for Anthropic, OpenAI, or Google to improve result quality.",
+            "message": "All perspectives using the same model — diversity collapsed. Add API keys spanning blocs (e.g. Anthropic/OpenAI 🇺🇸, DeepSeek/Qwen 🇨🇳, Mistral 🇪🇺) to restore cross-bloc reasoning.",
+        })
+    elif len(_active_blocs) < 2:
+        state.pending_events.append({
+            "type": "phase_warning",
+            "message": "All perspectives resolve to a single geopolitical bloc — creator-ideology bias is not mitigated. Add API keys from a different bloc (🇺🇸/🇨🇳/🇪🇺) for cross-bloc diversity.",
         })
 
     _PERSPECTIVE_HALLUCINATION_KEYWORDS = {"greek text", "greek characters", "parsing errors", "encoding issues", "unicode problems"}
