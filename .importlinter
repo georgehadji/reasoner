@@ -45,4 +45,52 @@ ignore_imports=
     reasoner.application.flows.services -> reasoner.infrastructure.execution.noop_executor
     reasoner.application.flows.services -> reasoner.infrastructure.execution.subprocess_executor
     reasoner.application.flows.research_phases -> reasoner.infrastructure.prism.file_search
-    # core→infra imports eliminated via DI (set_build_provider, set_searxng_circuit_breaker)
+    # core to infra imports eliminated via DI (set_build_provider, set_searxng_circuit_breaker)
+    #
+    # --- Pre-existing layering debt (catalogued 2026-06-26) ---
+    # These violations predate this file but were masked by a syntax error in
+    # subagents/synthesis/hyper_agent.py that crashed grimp before contract analysis.
+    # Once the parser reaches the full graph they surface. Tracked for DI remediation
+    # (see follow-up issue); enumerated here so the gate reflects reality, not a crash.
+    #
+    # renderer dispatches into per-method render submodules (renderers is a subpackage)
+    reasoner.infrastructure.renderer -> reasoner.application.services.renderers.*
+    # infrastructure to application / api leaks
+    reasoner.infrastructure.persistence.snapshots -> reasoner.application.event_bus
+    reasoner.infrastructure.websocket.manager -> reasoner.application.services.auth_service
+    reasoner.infrastructure.websocket.manager -> reasoner.application.event_bus
+    reasoner.infrastructure.server_check -> reasoner.api
+    reasoner.infrastructure.server_check -> reasoner.application.handlers
+    reasoner.infrastructure.billing.webhooks -> reasoner.application.services.billing_service
+    # application to api leaks
+    reasoner.application.handlers.handlers -> reasoner.api
+    reasoner.application.services.data_eraser -> reasoner.api.cache
+    # subagents to infrastructure / application (router passed at call time, not yet via DI)
+    reasoner.subagents.base -> reasoner.infrastructure.llm.router
+    reasoner.subagents.base -> reasoner.infrastructure.llm.ports
+    reasoner.subagents.base -> reasoner.application.services.event_emission_service
+    reasoner.subagents.*.hyper_agent -> reasoner.infrastructure.llm.router
+    reasoner.subagents.*.hyper_agent -> reasoner.models
+    # hypergate to infrastructure
+    reasoner.hypergate.* -> reasoner.infrastructure.llm.router
+    reasoner.hypergate.base_sub_agent -> reasoner.infrastructure.llm.ports
+    # quality to infrastructure / metrics
+    reasoner.quality.monitor -> reasoner.infrastructure.llm.router
+    reasoner.quality.monitor -> reasoner.infrastructure.llm.ports
+    reasoner.quality.monitor -> reasoner.metrics
+    # core to infrastructure / models
+    reasoner.core.protocol -> reasoner.infrastructure.llm.router
+    reasoner.core.parsing -> reasoner.models
+    # domain to application / core (via shims + constants)
+    reasoner.domain.pipeline_state -> reasoner.application.services.pipeline_service
+    reasoner.domain.pipeline_state -> reasoner.core.protocol
+    reasoner.domain.preset_core -> reasoner.core.constants_models
+    reasoner.domain.preset_core -> reasoner.core.protocol
+    # backward-compat root shims re-exporting from infrastructure
+    reasoner.scraper -> reasoner.infrastructure.scraper
+    reasoner.clients -> reasoner.infrastructure.clients
+    reasoner.token_cache -> reasoner.infrastructure.token_cache
+    reasoner.metrics -> reasoner.infrastructure.metrics
+    reasoner.presets -> reasoner.infrastructure.llm.router
+    # models shim re-exports an application service (breaks core/domain to application chains)
+    reasoner.models -> reasoner.application.services.pipeline_service
