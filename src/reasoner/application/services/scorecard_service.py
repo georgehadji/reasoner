@@ -56,9 +56,21 @@ class ScorecardService:
         recovery_task = store.get_recovery_count(window_days)
         run_counts_task = store.get_run_counts(window_days)
 
-        phase_rows, fallback_by_preset, recovery_counts, run_counts = await asyncio.gather(
+        results = await asyncio.gather(
             phase_rows_task, fallback_events_task, recovery_task, run_counts_task,
+            return_exceptions=True
         )
+        
+        parsed_results = []
+        for i, res in enumerate(results):
+            if isinstance(res, BaseException):
+                import logging
+                logging.getLogger(__name__).warning("Scorecard metric fetch failed (index %d): %s", i, res)
+                parsed_results.append([] if i == 0 else {})
+            else:
+                parsed_results.append(res)
+                
+        phase_rows, fallback_by_preset, recovery_counts, run_counts = parsed_results
 
         # Group rows into PresetScorecard objects
         presets: dict[str, PresetScorecard] = {}

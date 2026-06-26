@@ -68,7 +68,7 @@ class EventStore:
 
     async def _run_in_executor(self, func: Callable, *args) -> Any:
         """Run sync function in thread pool with locking."""
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         executor = self._get_executor()
 
         def locked_func():
@@ -821,11 +821,16 @@ class EventStore:
 _event_store: EventStore | None = None
 
 
-def get_event_store(db_path: str | Path | None = None) -> EventStore:
+def get_event_store(db_path: str | Path | None = None) -> Any:
     """Get or create global event store."""
     global _event_store
     if _event_store is None:
-        _event_store = EventStore(db_path)
+        from reasoner.core.settings import settings
+        if settings.EVENT_STORE_BACKEND == "postgres" and settings.DATABASE_URL:
+            from reasoner.infrastructure.persistence.postgres_store import PostgreSQLEventStore
+            _event_store = PostgreSQLEventStore(settings.DATABASE_URL)
+        else:
+            _event_store = EventStore(db_path)
     return _event_store
 
 

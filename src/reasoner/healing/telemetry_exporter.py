@@ -52,8 +52,23 @@ async def _build_context() -> dict[str, Any]:
     }
 
 
-def export_healing_context() -> bool:
-    """Write healing_context.json. Returns True on success."""
+async def export_healing_context_async() -> bool:
+    """Write healing_context.json asynchronously. Returns True on success."""
+    try:
+        context = await _build_context()
+        CONTEXT_PATH.write_text(json.dumps(context, indent=2), encoding="utf-8")
+        logger.info(
+            "Healing context written to %s (%d runs)",
+            CONTEXT_PATH, context.get("run_count", 0),
+        )
+        return True
+    except Exception as exc:
+        logger.warning("Healing context export failed (non-fatal): %s", exc)
+        return False
+
+
+def export_healing_context_sync() -> bool:
+    """Write healing_context.json synchronously. Returns True on success."""
     try:
         context = asyncio.run(_build_context())
         CONTEXT_PATH.write_text(json.dumps(context, indent=2), encoding="utf-8")
@@ -65,3 +80,14 @@ def export_healing_context() -> bool:
     except Exception as exc:
         logger.warning("Healing context export failed (non-fatal): %s", exc)
         return False
+
+
+def export_healing_context() -> bool:
+    """Auto-detects running loop and calls appropriate export function."""
+    try:
+        asyncio.get_running_loop()
+        # Create a background task for async execution so we don't block
+        asyncio.create_task(export_healing_context_async())
+        return True
+    except RuntimeError:
+        return export_healing_context_sync()

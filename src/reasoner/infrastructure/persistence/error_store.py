@@ -100,7 +100,7 @@ class ErrorStore:
 
     async def _run_in_executor(self, func: Callable, *args) -> Any:
         """Run sync function in thread pool with locking."""
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         executor = self._get_executor()
 
         def locked_func():

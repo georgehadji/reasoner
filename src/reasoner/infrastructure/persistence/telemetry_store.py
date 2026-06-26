@@ -80,7 +80,7 @@ class TelemetryStore:
         return self._connection
 
     async def _run_in_executor(self, func, *args) -> Any:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         def locked():
             with self._lock:
                 return func(*args)
