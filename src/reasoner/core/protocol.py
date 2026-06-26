@@ -40,6 +40,9 @@ class PhaseConfig:
     timeout_seconds: float | None = None  # None = no timeout
     role: str = "primary"                 # ProviderRouter lookup key
     temperature_strategy: TemperatureStrategy = TemperatureStrategy.FIXED
+    # OpenRouter reasoning effort: max|xhigh|high|medium|low|minimal|none.
+    # None = leave model/registry default. Ignored by non-reasoning models.
+    reasoning_effort: str | None = None
 
     def with_overrides(self, **kwargs: Any) -> "PhaseConfig":
         """Return a new PhaseConfig with selected fields replaced."""
