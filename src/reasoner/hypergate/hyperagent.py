@@ -158,6 +158,55 @@ class HyperGateAgent:
         self._method = MethodClassifierSubAgent()
         self._tiebreaker = TieBreakerSubAgent()
 
+    async def _get_l2_cache(self, problem_hash: str) -> GateDecision | None:
+        """Fetch from shared Redis L2 cache if available."""
+        from reasoner.infrastructure.redis.client import get_redis
+        import json
+        try:
+            r = get_redis()
+            val = await r.get(f"hypergate:{problem_hash}")
+            if val:
+                data = json.loads(val)
+                return GateDecision(
+                    action=data.get("action", "pipeline"),
+                    method=data.get("method"),
+                    confidence=data.get("confidence", 0.0),
+                    reasoning=data.get("reasoning", ""),
+                    complexity=data.get("complexity", "unknown"),
+                    language=data.get("language")
+                )
+        except Exception as e:
+            logger.debug("HyperGate L2 cache get failed: %s", e)
+        return None
+
+    async def _set_l2_cache(self, problem_hash: str, decision: GateDecision) -> None:
+        """Save to shared Redis L2 cache with short TTL."""
+        from reasoner.infrastructure.redis.client import get_redis
+        import json
+        try:
+            r = get_redis()
+            data = {
+                "action": decision.action,
+                "method": decision.method,
+                "confidence": decision.confidence,
+                "reasoning": decision.reasoning,
+                "complexity": decision.complexity,
+                "language": decision.language,
+            }
+            # 1 hour TTL
+            await r.setex(f"hypergate:{problem_hash}", 3600, json.dumps(data))
+        except Exception as e:
+            logger.debug("HyperGate L2 cache set failed: %s", e)
+
+    def _cache_set(self, problem_hash: str, decision: GateDecision) -> None:
+        """Set in L1 and dispatch async task for L2."""
+        self._cache[problem_hash] = decision
+        if len(self._cache) > self._MAX_CACHE:
+            self._cache.pop(next(iter(self._cache)))
+        # Fire-and-forget L2 set to not block the critical path
+        import asyncio
+        asyncio.create_task(self._set_l2_cache(problem_hash, decision))
+
     # ── Public API (same signature as GateAgent.decide) ──────────────
 
     async def decide(self, problem: str) -> GateDecision:
@@ -166,6 +215,15 @@ class HyperGateAgent:
         if cached := self._cache.get(problem_hash):
             logger.debug("HyperGateAgent top-level cache hit hash=%s…", problem_hash[:16])
             return cached
+            
+        # Try L2 cache
+        if l2_cached := await self._get_l2_cache(problem_hash):
+            logger.debug("HyperGateAgent L2 cache hit hash=%s…", problem_hash[:16])
+            # Warm up L1
+            self._cache[problem_hash] = l2_cached
+            if len(self._cache) > self._MAX_CACHE:
+                self._cache.pop(next(iter(self._cache)))
+            return l2_cached
 
         if len(problem.strip()) < 10:
             return GateDecision(
@@ -183,7 +241,7 @@ class HyperGateAgent:
                 reasoning="Detected research-backed writing intent (article/essay/blog/report)",
                 complexity="complex"
             )
-            self._cache[problem_hash] = decision
+            self._cache_set(problem_hash, decision)
             logger.info(
                 "HyperGateAgent fast-path: writing-intent hash=%s action=pipeline method=writing",
                 problem_hash[:16],
@@ -199,7 +257,7 @@ class HyperGateAgent:
                 reasoning="Detected real-time data query (prices/news/weather/scores)",
                 complexity="simple",
             )
-            self._cache[problem_hash] = decision
+            self._cache_set(problem_hash, decision)
             logger.info(
                 "HyperGateAgent fast-path: realtime hash=%s action=web_search",
                 problem_hash[:16],
@@ -215,7 +273,7 @@ class HyperGateAgent:
                 reasoning="Detected simple factual lookup, assumed direct answer",
                 complexity="simple",
             )
-            self._cache[problem_hash] = decision
+            self._cache_set(problem_hash, decision)
             logger.info(
                 "HyperGateAgent fast-path: factual-lookup hash=%s action=direct",
                 problem_hash[:16],
@@ -239,9 +297,7 @@ class HyperGateAgent:
         if decision.confidence >= HYPERGATE_METHOD_THRESHOLD and (
             not decision.reasoning or "fallback" not in decision.reasoning.lower()
         ):
-            self._cache[problem_hash] = decision
-            if len(self._cache) > self._MAX_CACHE:
-                self._cache.pop(next(iter(self._cache)))
+            self._cache_set(problem_hash, decision)
 
         return decision
 
