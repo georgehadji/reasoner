@@ -89,6 +89,45 @@ HYPERGATE_MAX_TOKENS_METHOD: int = 128
 HYPERGATE_MAX_TOKENS_TIEBREAK: int = 200
 
 # ═════════════════════════════════════════════════════════════════════
+# LANGUAGE PIVOT
+# ═════════════════════════════════════════════════════════════════════
+
+# Maps human-readable language names (from state.language) to ISO 639-1 codes
+# used by DeepL.  Unknown languages return None → DeepL adapter is skipped.
+LANG_NAME_TO_ISO: dict[str, str] = {
+    "Greek": "EL",
+    "Russian": "RU",
+    "Arabic": "AR",
+    "Chinese": "ZH",
+    "Japanese": "JA",
+    "Korean": "KO",
+    "Spanish": "ES",
+    "German": "DE",
+    "Turkish": "TR",
+    "French": "FR",
+    "Italian": "IT",
+    "Portuguese": "PT",
+    "Dutch": "NL",
+    "Polish": "PL",
+    "Swedish": "SV",
+    "Norwegian": "NB",
+    "Danish": "DA",
+    "Finnish": "FI",
+}
+
+# Methods that generate output natively in the user's language; bypass the
+# English pivot so that creative/stylistic integrity is preserved.
+NATIVE_LANGUAGE_METHODS: frozenset[str] = frozenset({
+    "writing",
+    "brainstorming",
+    "article",
+})
+
+# Cosine distance threshold above which two synthesis texts are considered
+# materially divergent.  Tune upward to reduce false positives.
+LANGUAGE_DIVERGENCE_COSINE: float = 0.15
+
+# ═════════════════════════════════════════════════════════════════════
 # TOKEN BUDGETS
 # ═════════════════════════════════════════════════════════════════════
 

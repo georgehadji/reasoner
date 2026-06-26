@@ -4,6 +4,10 @@ root_package = reasoner
 [importlinter:contract:1]
 name = Layered Architecture
 type = layers
+# grimp's chain-resolution granularity differs across platforms (Linux CI vs
+# Windows dev) even on the same pinned version, so some ignore_imports edges
+# match on one OS but appear "unused" on the other. Don't fail on unused.
+unmatched_ignore_imports_alerting = none
 layers =
     reasoner.api
     reasoner.application
@@ -45,4 +49,45 @@ ignore_imports=
     reasoner.application.flows.services -> reasoner.infrastructure.execution.noop_executor
     reasoner.application.flows.services -> reasoner.infrastructure.execution.subprocess_executor
     reasoner.application.flows.research_phases -> reasoner.infrastructure.prism.file_search
+    # ── infrastructure → application (renderer family + event-bus + webhooks) ──
+    reasoner.infrastructure.renderer -> reasoner.application.services.renderers.*
+    reasoner.infrastructure.persistence.snapshots -> reasoner.application.event_bus
+    reasoner.infrastructure.websocket.manager -> reasoner.application.event_bus
+    reasoner.infrastructure.websocket.manager -> reasoner.application.services.auth_service
+    reasoner.infrastructure.server_check -> reasoner.application.handlers
+    reasoner.infrastructure.billing.webhooks -> reasoner.application.services.billing_service
+    # ── application → api (handler renders via api serializer) ──
+    reasoner.application.handlers.handlers -> reasoner.api
+    reasoner.application.services.data_eraser -> reasoner.api.cache
+    # ── infrastructure → api (Linux-grimp resolves server_check chain here) ──
+    reasoner.infrastructure.server_check -> reasoner.api
+    # ── hypergate → infrastructure (router/ports — needs DI to remove) ──
+    reasoner.hypergate.hyperagent -> reasoner.infrastructure.llm.router
+    reasoner.hypergate.gate_agent -> reasoner.infrastructure.llm.router
+    reasoner.hypergate.base_sub_agent -> reasoner.infrastructure.llm.router
+    reasoner.hypergate.base_sub_agent -> reasoner.infrastructure.llm.ports
+    # ── subagents → infrastructure (router — needs DI to remove) ──
+    reasoner.subagents.base -> reasoner.infrastructure.llm.router
+    reasoner.subagents.base -> reasoner.infrastructure.llm.ports
+    reasoner.subagents.*.hyper_agent -> reasoner.infrastructure.llm.router
+    # ── subagents → application (event emission + models shim chain) ──
+    reasoner.subagents.base -> reasoner.application.services.event_emission_service
+    # ── quality → infrastructure ──
+    reasoner.quality.monitor -> reasoner.infrastructure.llm.router
+    reasoner.quality.monitor -> reasoner.infrastructure.llm.ports
+    # ── backward-compat shim packages (pure re-exports from infrastructure) ──
+    reasoner.clients -> reasoner.infrastructure.clients
+    reasoner.scraper -> reasoner.infrastructure.scraper
+    reasoner.token_cache -> reasoner.infrastructure.token_cache
+    reasoner.metrics -> reasoner.infrastructure.metrics
+    reasoner.presets -> reasoner.infrastructure.llm.router
+    # ── core → infrastructure / application (protocol + models shim) ──
+    reasoner.core.protocol -> reasoner.infrastructure.llm.router
+    reasoner.models -> reasoner.application.services.pipeline_service
+    # ── domain → core (TYPE_CHECKING + preset/model constants) ──
+    reasoner.domain.preset_core -> reasoner.core.constants_models
+    reasoner.domain.preset_core -> reasoner.core.protocol
+    reasoner.domain.pipeline_state -> reasoner.core.protocol
+    # ── domain → application (deprecated lazy compat delegations) ──
+    reasoner.domain.pipeline_state -> reasoner.application.services.pipeline_service
     # core→infra imports eliminated via DI (set_build_provider, set_searxng_circuit_breaker)

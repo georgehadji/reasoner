@@ -7,5 +7,17 @@ from reasoner.infrastructure.translation.deepl_client import (
     get_deepl_client,
     reset_deepl_client,
 )
+from reasoner.infrastructure.translation.composite import (
+    CompositeTranslator,
+    get_composite_translator,
+    reset_composite_translator,
+)
 
-__all__ = ["DeepLClient", "get_deepl_client", "reset_deepl_client"]
+__all__ = [
+    "DeepLClient",
+    "get_deepl_client",
+    "reset_deepl_client",
+    "CompositeTranslator",
+    "get_composite_translator",
+    "reset_composite_translator",
+]

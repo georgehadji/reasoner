@@ -23,10 +23,12 @@ _MODEL_LABS: dict[str, str] = {
     "gpt-5-mini": "openai", "gpt-5.4-mini": "openai", "gpt-5.4-nano": "openai",
     "gpt-latest": "openai", "gpt-mini-latest": "openai",
     "gpt-4o-mini": "openai", "o3": "openai", "o3-mini": "openai",
+    "gpt-oss-120b": "openai", "gpt-oss-20b": "openai",
     # Google — Gemini
     "gemini-flash": "google", "gemini-pro-real": "google",
     "gemini-flash-lite-real": "google", "gemini-2.5-flash-lite": "google",
     "gemini-pro-latest": "google", "gemini-flash-latest": "google",
+    "gemini-flash-image": "google", "gemini-pro-image": "google",
     # Note: gemini-pro → Anthropic (claude-sonnet), gemini-flash-lite → Qwen (qwen3.5-flash)
     # Meta
     "llama-3.3-70b": "meta",
@@ -34,15 +36,13 @@ _MODEL_LABS: dict[str, str] = {
     "mistral-large-3": "mistral", "mistral-small": "mistral",
     "ministral-8b": "mistral", "codestral-2508": "mistral",
     # DeepSeek
-    "deepseek-v3": "deepseek", "deepseek-v3.2": "deepseek", "deepseek-r1": "deepseek",
     "deepseek-v4-pro": "deepseek", "deepseek-v4-flash": "deepseek",
-    "deepseek/deepseek-chat": "deepseek",
     # Qwen (Alibaba)
     "qwen3-max": "qwen", "qwen3.7-max": "qwen", "qwen3.7-plus": "qwen", "qwen3.5-flash": "qwen",
     "qwen3-max-thinking": "qwen", "qwen3.6-flash": "qwen", "qwen3.6-plus-real": "qwen",
     "qwen3-coder-flash": "qwen", "qwen3-coder-30b-a3b": "qwen",
     # GLM (Zhipu)
-    "glm-5.1": "zhipu", "glm-4-air": "zhipu",
+    "glm-5.2": "zhipu",
     # MiniMax
     "minimax-m3": "minimax", "minimax-m2.7": "minimax", "minimax-m2.5": "minimax",
     "minimax-m2.1": "minimax", "minimax-m2": "minimax", "minimax-m1": "minimax",
@@ -67,6 +67,9 @@ _MODEL_LABS: dict[str, str] = {
     # xAI — Grok
     "grok-4.20": "xai", "grok-4.20-multi-agent": "xai", "grok-4.3": "xai",
     "grok-build-0.1": "xai",
+    # Perplexity
+    "sonar-pro": "perplexity", "sonar-pro-search": "perplexity",
+    "sonar": "perplexity", "sonar-reasoning-pro": "perplexity", "sonar-deep-research": "perplexity",
     # NVIDIA
     "nemotron-3-ultra-free": "nvidia", "nemotron-3-super-free": "nvidia",
     "nemotron-nano-omni-free": "nvidia", "nemotron-nano-30b-free": "nvidia",

@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from reasoner.domain.preset_registry import list_presets, _REGISTRY as PRESETS
 from reasoner.domain.preset_core import _KNOWN_ROUTING_ROLES
-from reasoner.infrastructure.llm.registry import _REGISTRY as MODELS
+from reasoner.infrastructure.llm.registry import _REGISTRY as MODELS, bloc_of
 
 # ── Lab taxonomy for cross-lab diversity check ──
 _LABS: dict[str, str] = {
@@ -115,6 +115,47 @@ def main() -> int:
                 if len(roles) >= 3 and lab != "UNKNOWN":
                     errors.append(
                         f"{name}: all debate roles use same lab — {lab}"
+                    )
+
+        # ── Cross-BLOC diversity (Buyl et al. npj AI 2026) ──
+        # Geopolitical bloc, not company, is the dominant ideological axis. Two
+        # Chinese labs are NOT diverse. bloc_of() resolves aliases to the real
+        # vendor (e.g. gemini-flash-lite → Qwen → CN).
+        #
+        # Invariant A: synthesis bloc ≠ scoring bloc (final voice and its pruning
+        # critic must span two blocs).
+        synth = preset.routing.get("synthesis")
+        score = preset.routing.get("scoring")
+        if synth and score:
+            b_synth, b_score = bloc_of(synth), bloc_of(score)
+            if b_synth != "OTHER" and b_synth == b_score:
+                errors.append(
+                    f"{name}: synthesis and scoring share bloc {b_synth} "
+                    f"({synth} / {score}) — final voice and its critic must be cross-bloc"
+                )
+
+        # Invariant B: generator roles span ≥2 blocs, ≤2 of any single bloc.
+        gen_roles: set[str] = set()
+        if preset.method == "multi-perspective":
+            gen_roles = {"constructive", "destructive", "systemic", "minimalist"}
+        elif preset.method == "debate":
+            gen_roles = {"constructive", "destructive", "systemic"}
+        if gen_roles:
+            blocs_used: dict[str, list[str]] = {}
+            for r in gen_roles:
+                model = preset.routing.get(r) or preset.primary_id
+                blocs_used.setdefault(bloc_of(model), []).append(r)
+            known = {b: rs for b, rs in blocs_used.items() if b != "OTHER"}
+            if len(known) < 2:
+                errors.append(
+                    f"{name}: generator roles span <2 known blocs ({blocs_used}) "
+                    f"— need cross-bloc generation"
+                )
+            for b, rs in known.items():
+                if len(rs) > 2:
+                    errors.append(
+                        f"{name}: bloc {b} dominates generation ({', '.join(sorted(rs))}) "
+                        f"— max 2 generator roles per bloc"
                     )
 
     if errors:

@@ -1,8 +1,8 @@
 # CODEBASE_MINDMAP.md — Reasoner (v3.0 Post-Refactor)
 
 > High-fidelity codebase reconstruction.  
-> **Last updated:** 2026-06-24  
-> **Python source files:** 412 | **Models:** 164 | **Presets:** 50 | **Methods:** 30 | **Phase modules:** 32
+> **Last updated:** 2026-06-26  
+> **Python source files:** 418 | **Models:** 143 | **Presets:** 50 | **Methods:** 30 | **Phase modules:** 32
 
 ---
 
@@ -24,10 +24,10 @@
 
 | Component | Count |
 |-----------|-------|
-| Python modules | 375 |
+| Python modules | 422 |
 | LLM models (whitelist) | 131 |
-| Presets | 49 |
-| Reasoning methods | 19 |
+| Presets | 50 |
+| Reasoning methods | 30 |
 | Phase prompt modules | 32 |
 | FastAPI routes | 30+ |
 | Domain events | 18 |
@@ -469,6 +469,27 @@ Input → CSRF Check → Auth → Rate Limit → Input Sanitization
 
 Domain events → SQLite persistence → Subscriber callbacks → WebSocket broadcast
 
+### Language-Bias Mitigation (Part A & B)
+
+**Part A: English Pivot** (`core/ports/translation_port.py`, `infrastructure/translation/`)
+- Explicit reasoning in English; native-language output translation only
+- `TranslationPort` protocol — implementation via `CompositeTranslator` (DeepL → LLM → identity)
+- `LLMTranslator` uses existing `ProviderRouter` on `"translation"` role — key-free fallback
+- `PipelineState` fields: `output_language` (user lang), `language` (reasoning=English), `pivot_active` (gate)
+- Complete translate-out: all `FinalSolution` fields + ISO code mapping (`LANG_NAME_TO_ISO`)
+- Method exemptions: writing/brainstorming/article bypass pivot (native generation)
+- Default: `LANGUAGE_PIVOT_ENABLED=true` (always on)
+
+**Part B: Cross-Lingual Probe** (`application/services/sensitivity_service.py`, `application/flows/language_probe_phase.py`)
+- Regex sensitivity classifier (5 axes: politics, geopolitics, governance, religion, history) — zero LLM calls
+- `PipelineState` fields: `language_sensitive`, `language_divergence` (method-state backed)
+- Probe phase: re-runs synthesis in native language, LLM-judges divergence
+- On divergence: downgrade `VERIFIED → HYPOTHESIS`, append epistemic `language_note`
+- Default: `LANGUAGE_PROBE_ENABLED=false` (opt-in for premium canary presets)
+- Threshold: `LANGUAGE_DIVERGENCE_COSINE=0.15` (tune for sensitivity)
+
+**Rationale:** Buyl et al. (*npj AI* 2026) shows same model shifts ideology by language. Pivot removes variance; probe makes residual bias visible and labeled.
+
 ---
 
 ## 9. Self-Healing CI/CD
@@ -511,9 +532,9 @@ python main.py --problem "..." --preset debate-premium
 
 | Field | Value |
 |-------|-------|
-| **Last Updated** | 2026-06-08 |
-| **Version** | v3.0 (post-refactor) |
-| **Python Files** | 375 |
+| **Last Updated** | 2026-06-26 |
+| **Version** | v3.1 (language-bias mitigation) |
+| **Python Files** | 422 |
 | **Models** | 131 |
 | **Presets** | 49 |
 | **Methods** | 19 |

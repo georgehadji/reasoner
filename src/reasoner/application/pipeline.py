@@ -57,7 +57,7 @@ from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.infrastructure.llm.executor import LLMExecutor
 from reasoner.core import PhaseConfig, make_phase_result, DEFAULT_PERSPECTIVES
 from reasoner.core.protocol import TemperatureStrategy
-from reasoner.core.temperatures import PHASE_TEMPERATURES
+from reasoner.core.temperatures import PHASE_TEMPERATURES, PHASE_REASONING_EFFORT
 from reasoner.core.constants import (
     PHASE_TOKEN_BUDGETS,
     get_token_budget,
@@ -100,10 +100,10 @@ class ReasonerPipeline:
     Now uses WorkflowStrategy composition instead of Mixin inheritance.
     """
     _PHASE_CONFIGS: dict[str, PhaseConfig] = {
-        "classification": PhaseConfig(role="classification", temperature=PHASE_TEMPERATURES["classification"], temperature_strategy=TemperatureStrategy.DEESCALATE),
-        "decomposition": PhaseConfig(role="decomposition", temperature=PHASE_TEMPERATURES["decomposition"], temperature_strategy=TemperatureStrategy.DEESCALATE),
-        "synthesis": PhaseConfig(role="synthesis", temperature=PHASE_TEMPERATURES["synthesis"], temperature_strategy=TemperatureStrategy.DEESCALATE),
-        "fusion": PhaseConfig(role="fusion", temperature=PHASE_TEMPERATURES.get("fusion", 0.1), temperature_strategy=TemperatureStrategy.DEESCALATE),
+        "classification": PhaseConfig(role="classification", temperature=PHASE_TEMPERATURES["classification"], temperature_strategy=TemperatureStrategy.DEESCALATE, reasoning_effort=PHASE_REASONING_EFFORT.get("classification")),
+        "decomposition": PhaseConfig(role="decomposition", temperature=PHASE_TEMPERATURES["decomposition"], temperature_strategy=TemperatureStrategy.DEESCALATE, reasoning_effort=PHASE_REASONING_EFFORT.get("decomposition")),
+        "synthesis": PhaseConfig(role="synthesis", temperature=PHASE_TEMPERATURES["synthesis"], temperature_strategy=TemperatureStrategy.DEESCALATE, reasoning_effort=PHASE_REASONING_EFFORT.get("synthesis")),
+        "fusion": PhaseConfig(role="fusion", temperature=PHASE_TEMPERATURES.get("fusion", 0.1), temperature_strategy=TemperatureStrategy.DEESCALATE, reasoning_effort=PHASE_REASONING_EFFORT.get("fusion")),
     }
 
     def __init__(
@@ -204,8 +204,25 @@ class ReasonerPipeline:
         self._log("ORCHESTRATOR", f"Routing to '{method}' method pipeline.", state)
 
         # ── Optional: Cross-Language Translate In ──
-        if state.language and state.language != "English":
+        from reasoner.core.settings import settings as _settings
+        from reasoner.core.constants_limits import NATIVE_LANGUAGE_METHODS
+        _pivot_eligible = (
+            _settings.LANGUAGE_PIVOT_ENABLED
+            and state.language
+            and state.language != "English"
+            and method not in NATIVE_LANGUAGE_METHODS
+        )
+        if _pivot_eligible:
             await self._phase_cross_language_translate_in(state)
+
+        # ── B1: Sensitivity classification (regex fast path) ──────────
+        if state.output_language != "English":
+            from reasoner.application.services.sensitivity_service import classify_sensitivity
+            _sensitive, _axis = classify_sensitivity(state.problem)
+            state.language_sensitive = _sensitive
+            if _sensitive:
+                state.language_divergence = {"axis": _axis}
+                self._log("LANG-PROBE", f"Sensitive axis detected: {_axis}", state)
 
         # ── Optional: Prompt Enhancement ──
         if self.enhance_prompt:
@@ -259,8 +276,15 @@ class ReasonerPipeline:
         # ── Optional: Post-Synthesis Verification ──
         await self._phase_post_synthesis_verify(state)
 
+        # ── Optional: B2-B4 Cross-Lingual Probe ─────────────────────────
+        if state.language_sensitive and state.pivot_active:
+            from reasoner.application.flows.language_probe_phase import run_language_probe_phase
+            from reasoner.application.flows.services import PipelineWorkflowServices
+            _probe_services = PipelineWorkflowServices(self)
+            await run_language_probe_phase(state, _probe_services)
+
         # ── Optional: Cross-Language Translate Out ──
-        if state.cross_language_state:
+        if state.pivot_active:
             await self._phase_cross_language_translate_out(state)
 
         # ── Publish Pipeline Completed Event ──
@@ -372,48 +396,95 @@ class ReasonerPipeline:
             self._log("POST-SYNTHESIS", f"Verification failed: {e}", state)
 
     async def _phase_cross_language_translate_in(self, state: PipelineState) -> None:
-        from reasoner.infrastructure.translation import get_deepl_client
+        from reasoner.infrastructure.translation import get_composite_translator
         source_lang = state.language
-        if not source_lang or source_lang.lower() in ("english", "en", "unknown", ""): return
+        if not source_lang or source_lang.lower() in ("english", "en", "unknown", ""):
+            return
         original_problem = state.problem
         original_enhanced = state.enhanced_problem
-        self._log("CROSS-LANG", f"Translating problem from {source_lang} to English...", state)
+        self._log("CROSS-LANG", f"Pivot: translating problem from {source_lang} to English.", state)
+        # Record user's detected language before overwriting state.language.
+        state.output_language = source_lang
         try:
-            client = get_deepl_client()
-            result = await client.translate(original_problem, target_lang="EN")
-            translated = result.get("text") or original_problem
-            detected = result.get("detected_source_language", source_lang)
+            translator = get_composite_translator(router=self.router)
+            result = await translator.translate(original_problem, target_lang="EN", source_lang=source_lang)
+            translated = result.text or original_problem
             state.problem = translated
             if original_enhanced and original_enhanced != original_problem:
-                enh_result = await client.translate(original_enhanced, target_lang="EN")
-                state.enhanced_problem = enh_result.get("text") or original_enhanced
+                enh_result = await translator.translate(original_enhanced, target_lang="EN", source_lang=source_lang)
+                state.enhanced_problem = enh_result.text or original_enhanced
             else:
                 state.enhanced_problem = translated
+            # Explicit pivot: set reasoning language to English; get_language_instruction()
+            # keys on state.language so all 25 phase modules automatically reason in English.
+            state.language = "English"
+            state.pivot_active = True
+            # Keep cross_language_state for legacy callers / resume compat.
             state.cross_language_state = {
                 "original_problem": original_problem,
                 "original_enhanced": original_enhanced,
-                "source_language": detected,
+                "source_language": source_lang,
                 "translated_problem": translated,
                 "direction": "in",
             }
         except Exception as e:
-            self._log("CROSS-LANG", f"Translation in failed: {e}", state)
+            self._log("CROSS-LANG", f"Translate-in failed ({e}); pivot aborted — reasoning in {source_lang}.", state)
 
     async def _phase_cross_language_translate_out(self, state: PipelineState) -> None:
-        from reasoner.infrastructure.translation import get_deepl_client
-        if not state.cross_language_state or not state.cross_language_state.get("source_language"): return
-        source_lang = state.cross_language_state["source_language"]
-        target_lang = source_lang.upper()
-        synthesis_text = state.final_solution.core_solution if state.final_solution else ""
-        if not synthesis_text and state.candidates: synthesis_text = state.candidates[0].content
-        if not synthesis_text: return
-        self._log("CROSS-LANG", f"Translating synthesis back to {target_lang}...", state)
+        from reasoner.infrastructure.translation import get_composite_translator
+        from reasoner.core.constants_limits import LANG_NAME_TO_ISO
+        if not state.pivot_active or not state.output_language or state.output_language == "English":
+            return
+        target_lang_name = state.output_language
+        target_lang_iso = LANG_NAME_TO_ISO.get(target_lang_name, target_lang_name.upper()[:2])
+        if not state.final_solution:
+            self._log("CROSS-LANG", "No final_solution to translate out; skipping.", state)
+            return
+        self._log("CROSS-LANG", f"Translating output to {target_lang_name} ({target_lang_iso}).", state)
         try:
-            client = get_deepl_client()
-            result = await client.translate(synthesis_text, target_lang=target_lang, source_lang="EN")
-            translated = result.get("text") or synthesis_text
-            if state.final_solution: state.final_solution.core_solution = translated
-            state.cross_language_state["translated_synthesis"] = translated
-            state.cross_language_state["direction"] = "out"
+            translator = get_composite_translator(router=self.router)
+            fs = state.final_solution
+
+            async def _t(text: str) -> str:
+                if not text or not text.strip():
+                    return text
+                res = await translator.translate(text, target_lang=target_lang_iso, source_lang="EN")
+                return res.text or text
+
+            fs.core_solution = await _t(fs.core_solution)
+            fs.critical_insights = [await _t(s) for s in (fs.critical_insights or [])]
+            fs.open_questions = [await _t(s) for s in (fs.open_questions or [])]
+
+            translated_blueprint = []
+            for step in (fs.action_blueprint or []):
+                if isinstance(step, dict):
+                    translated_step = dict(step)
+                    for key in ("step", "action", "rationale", "expected_outcome"):
+                        if key in translated_step and isinstance(translated_step[key], str):
+                            translated_step[key] = await _t(translated_step[key])
+                    translated_blueprint.append(translated_step)
+                else:
+                    translated_blueprint.append(step)
+            fs.action_blueprint = translated_blueprint
+
+            audit = fs.meta_audit
+            if audit is not None:
+                for attr in (
+                    "most_dangerous_assumption",
+                    "dominant_bias",
+                    "remaining_uncertainty",
+                    "assumption_failure_impact",
+                    "non_obvious_insight",
+                ):
+                    val = getattr(audit, attr, None)
+                    if isinstance(val, str):
+                        setattr(audit, attr, await _t(val))
+
+            for src in (fs.sources or []):
+                if isinstance(src, dict) and "title" in src:
+                    src["title"] = await _t(src["title"])
+
+            if state.cross_language_state:
+                state.cross_language_state["direction"] = "out"
         except Exception as e:
-            self._log("CROSS-LANG", f"Translation out failed: {e}", state)
+            self._log("CROSS-LANG", f"Translate-out failed ({e}); output stays in English.", state)

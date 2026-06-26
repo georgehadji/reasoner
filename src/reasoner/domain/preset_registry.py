@@ -4,6 +4,15 @@ from reasoner.domain.preset_core import PipelinePreset
 
 # ======================================================================================
 #  NOTE: When adding a new preset, run `python scripts/validate_presets.py`
+#
+#  CROSS-BLOC DIVERSITY (Buyl et al., npj AI 2026): the creator's geopolitical bloc
+#  is the dominant axis of an LLM's ideological bias, so "cross-lab" at the company
+#  level is not enough — two Chinese labs share a bloc. Invariants enforced by the
+#  validator and tests/unit/test_preset_bloc_diversity.py:
+#    A. synthesis bloc ≠ scoring bloc  (the final voice and its pruning critic must
+#       span two blocs).
+#    B. the perspective/debate generator roles span ≥2 blocs, ≤2 of any single bloc.
+#  Bloc tags in comments: 🇺🇸 US · 🇨🇳 CN · 🇫🇷/🇪🇺 EU.
 # ======================================================================================
 
 _REGISTRY: dict[str, dict] = {
@@ -16,18 +25,18 @@ _REGISTRY: dict[str, dict] = {
         "routing": {
             "perspective_cot": "mimo-v2.5",           # Xiaomi 🇨🇳 — $0.14/$0.28, cheapest 1M ctx omnimodal
             "perspective_analysis": "qwen3.6-flash",   # was qwen3-turbo (DEAD) → stronger reasoning
-            "synthesis": "deepseek-v4-pro",
-            # ── Per-perspective cross-lab diversity (4 labs) ──
-            "constructive":  "deepseek-v3",      # 🇨🇳 DeepSeek — $0.229/$0.343
+            "synthesis": "gpt-4o-mini",                # 🇺🇸 OpenAI — cross-bloc final voice vs CN-heavy generation/scoring
+            # ── Per-perspective cross-bloc diversity (2🇨🇳 + 1🇺🇸 + 1🇫🇷) ──
+            "constructive":  "deepseek-v4-flash",      # 🇨🇳 DeepSeek — $0.229/$0.343
             "destructive":   "ring-2.6-1t",      # 🇨🇳 inclusionAI — $0.075/$0.625
-            "systemic":      "qwen3-max",        # 🇨🇳 Qwen/Alibaba — $0.40/$1.60
+            "systemic":      "gpt-oss-120b",     # 🇺🇸 OpenAI open-weight — $0.039/$0.18 (was qwen3-max, added US bloc)
             "minimalist":    "ministral-8b",     # 🇫🇷 Mistral — $0.075/$0.20
         # ── Reasoning model assignments (budget, v3.4) ──
-        "fusion":         "deepseek-v3.2",
+        "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
-        "scoring":        "deepseek-v3.2",
+        "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget) (🇨🇳 → 🇨🇳 different labs)
+        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
         },
         "tags": ["budget", "balanced"],
     },
@@ -37,18 +46,18 @@ _REGISTRY: dict[str, dict] = {
         "routing": {
             "perspective_cot": "qwen3.5-flash",       # was qwen3.5-9b → 1M ctx (vs 262K), multimodal
             "perspective_analysis": "qwen3.6-flash",   # was qwen3.5-9b → stronger reasoning, 1M ctx
-            "synthesis": "stepfun-3.7-flash",
-            # ── Per-perspective cross-lab diversity (4 labs, ultra-cheap) ──
+            "synthesis": "gpt-4o-mini",                # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring (was stepfun 🇨🇳)
+            # ── Per-perspective cross-bloc diversity (2🇨🇳 + 1🇺🇸 + 1🇫🇷, ultra-cheap) ──
             "constructive":  "stepfun-3.7-flash",    # 🇨🇳 StepFun — $0.20/$1.15
             "destructive":   "ling-2.6-flash-free",  # 🇨🇳 inclusionAI — FREE
-            "systemic":      "qwen3.6-flash",        # 🇨🇳 Qwen — cheap flash
+            "systemic":      "gpt-oss-20b",          # 🇺🇸 OpenAI open-weight — $0.029/$0.14 (was qwen3.6-flash, added US bloc)
             "minimalist":    "ministral-8b",         # 🇫🇷 Mistral — $0.075/$0.20
         # ── Reasoning model assignments (budget, v3.4) ──
-        "fusion":         "deepseek-v3.2",
+        "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
-        "scoring":        "deepseek-v3.2",
+        "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget) (🇨🇳 → 🇨🇳 different labs)
+        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
         },
         "tags": ["budget", "creative", "fast"],
     },
@@ -58,18 +67,18 @@ _REGISTRY: dict[str, dict] = {
         "routing": {
             "perspective_cot": "claude-sonnet",
             "perspective_analysis": "claude-sonnet",
-            "synthesis": "deepseek-v4-pro",
-            # ── Per-perspective cross-lab diversity (4 labs, premium) ──
+            "synthesis": "gpt-5.5",                  # 🇺🇸 OpenAI — cross-bloc final voice (counters CN-heavy generation)
+            # ── Per-perspective cross-bloc diversity (1🇺🇸 + 2🇨🇳 + 1🇪🇺) ──
             "constructive":  "claude-sonnet",    # 🇺🇸 Anthropic — $3/$15 per M
             "destructive":   "deepseek-v4-pro",  # 🇨🇳 DeepSeek — $0.435/$0.87 per M
             "systemic":      "qwen3.7-max",      # 🇨🇳 Qwen/Alibaba — $1.25/$3.75 per M
-            "minimalist":    "mistral-large-3",  # 🇫🇷 Mistral — $2/$8 per M
+            "minimalist":    "mistral-large-3",  # 🇪🇺 Mistral — distinct EU bloc (was glm-5.2 🇨🇳)
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
         "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
-        "scoring":        "qwen3-max-thinking",  # cross-lab from synthesis (DeepSeek 🇨🇳 → Qwen 🇨🇳)
-        "stress_testing": "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
+        "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
+        "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         },
         "tags": ["premium", "balanced", "multilingual"],
@@ -78,17 +87,17 @@ _REGISTRY: dict[str, dict] = {
         "method": "debate",
         "primary_id": "gemini-flash",
         "routing": {
-            # ── Cross-lab adversarial diversity (3 labs, budget) ──
-            "constructive": "deepseek-v3.2",    # 🇨🇳 DeepSeek — constructive argumentation
-            "destructive":  "ring-2.6-1t",      # 🇨🇳 inclusionAI — adversarial critique
+            # ── Cross-bloc adversarial diversity (🇨🇳 vs 🇺🇸, 🇺🇸 judge) ──
+            "constructive": "deepseek-v4-flash",    # 🇨🇳 DeepSeek — constructive argumentation
+            "destructive":  "gpt-oss-120b",     # 🇺🇸 OpenAI open-weight — adversarial critique (was ring 🇨🇳, cross-bloc debate)
             "systemic":     "gemini-flash",     # 🇺🇸 Google — judging (keep)
-            "synthesis": "gpt-4o-mini",
+            "synthesis": "gpt-4o-mini",         # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
-        "fusion":         "deepseek-v3.2",
+        "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
-        "scoring":        "deepseek-v3.2",
+        "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget) (🇨🇳 → 🇨🇳 different labs)
+        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
         },
         "tags": ["budget", "argumentative", "robust"],
     },
@@ -96,17 +105,17 @@ _REGISTRY: dict[str, dict] = {
         "method": "debate",
         "primary_id": "gemini-pro",
         "routing": {
-            # ── Cross-lab adversarial diversity (3 labs) ──
+            # ── Cross-bloc adversarial diversity (🇺🇸 vs 🇨🇳, 🇺🇸 judge) ──
             "constructive": "claude-sonnet",     # 🇺🇸 Anthropic — strongest argumentation
             "destructive":  "deepseek-v4-pro",   # 🇨🇳 DeepSeek — adversarial reasoning
             "systemic":     "gemini-pro",        # 🇺🇸 Google — judging (keep)
-            "synthesis": "deepseek-v4-pro",
+            "synthesis": "gpt-5.5",              # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
         "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
-        "scoring":        "qwen3-max-thinking",  # cross-lab from synthesis (DeepSeek 🇨🇳 → Qwen 🇨🇳)
-        "stress_testing": "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
+        "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
+        "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         },
         "tags": ["premium", "argumentative", "robust"],
@@ -115,13 +124,13 @@ _REGISTRY: dict[str, dict] = {
         "method": "jury",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "gpt-4o-mini",
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
-        "fusion":         "deepseek-v3.2",
+        "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
-        "scoring":        "deepseek-v3.2",
+        "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget) (🇨🇳 → 🇨🇳 different labs)
+        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
         },
         "tags": ["budget", "governance", "decision-making"],
     },
@@ -129,13 +138,13 @@ _REGISTRY: dict[str, dict] = {
         "method": "jury",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "deepseek-v4-pro",
+            "synthesis": "gpt-5.5",              # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
         "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
-        "scoring":        "qwen3-max-thinking",  # cross-lab from synthesis (DeepSeek 🇨🇳 → Qwen 🇨🇳)
-        "stress_testing": "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
+        "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
+        "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         },
         "tags": ["premium", "governance", "decision-making"],
@@ -144,13 +153,14 @@ _REGISTRY: dict[str, dict] = {
         "method": "research",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "gpt-4o-mini",
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
-        "fusion":         "deepseek-v3.2",
+        "deep_read":      "sonar",               # Perplexity 🇺🇸 — live web grounding, $1/$1 per M, 1505ms
+        "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
-        "scoring":        "deepseek-v3.2",
+        "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget) (🇨🇳 → 🇨🇳 different labs)
+        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
         },
         "tags": ["budget", "research", "web-search"],
     },
@@ -158,13 +168,13 @@ _REGISTRY: dict[str, dict] = {
         "method": "research",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "deepseek-v4-pro",
+            "synthesis": "deepseek-v4-pro",      # 🇨🇳 DeepSeek — cross-bloc from 🇺🇸 sonar scoring (web-grounded fact-check stays US)
         # ── Reasoning model assignments (premium, v3.4) ──
-        "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
+        "deep_read":      "sonar-pro",           # Perplexity 🇺🇸 — live web grounding, search_context_size: high, $3/$15 per M
         "fusion":         "deepseek-v4-pro",
         "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
-        "scoring":        "qwen3-max-thinking",  # cross-lab from synthesis (DeepSeek 🇨🇳 → Qwen 🇨🇳)
-        "stress_testing": "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
+        "scoring":        "sonar-pro",           # Perplexity 🇺🇸 — web-grounded fact-checked scoring, cross-bloc from 🇨🇳 synthesis
+        "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         },
         "tags": ["premium", "research", "web-search"],
@@ -176,13 +186,13 @@ _REGISTRY: dict[str, dict] = {
         "method": "scientific",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "gpt-4o-mini",
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
-        "fusion":         "deepseek-v3.2",
+        "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
-        "scoring":        "deepseek-v3.2",
+        "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget) (🇨🇳 → 🇨🇳 different labs)
+        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
         },
         "tags": ["budget", "scientific", "structured"],
     },
@@ -190,13 +200,13 @@ _REGISTRY: dict[str, dict] = {
         "method": "scientific",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "deepseek-v4-pro",
+            "synthesis": "gpt-5.5",              # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
         "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
-        "scoring":        "qwen3-max-thinking",  # cross-lab from synthesis (DeepSeek 🇨🇳 → Qwen 🇨🇳)
-        "stress_testing": "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
+        "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
+        "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         },
         "tags": ["premium", "scientific", "structured"],
@@ -205,13 +215,13 @@ _REGISTRY: dict[str, dict] = {
         "method": "socratic",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "gpt-4o-mini",
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
-        "fusion":         "deepseek-v3.2",
+        "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
-        "scoring":        "deepseek-v3.2",
+        "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget) (🇨🇳 → 🇨🇳 different labs)
+        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
         },
         "tags": ["budget", "educational", "inquisitive"],
     },
@@ -219,13 +229,13 @@ _REGISTRY: dict[str, dict] = {
         "method": "socratic",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "deepseek-v4-pro",
+            "synthesis": "gpt-5.5",              # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
         "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
-        "scoring":        "qwen3-max-thinking",  # cross-lab from synthesis (DeepSeek 🇨🇳 → Qwen 🇨🇳)
-        "stress_testing": "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
+        "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
+        "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         },
         "tags": ["premium", "educational", "inquisitive"],
@@ -234,13 +244,13 @@ _REGISTRY: dict[str, dict] = {
         "method": "pre-mortem",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "gpt-4o-mini",
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
-        "fusion":         "deepseek-v3.2",
+        "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
-        "scoring":        "deepseek-v3.2",
+        "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget) (🇨🇳 → 🇨🇳 different labs)
+        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
         },
         "tags": ["budget", "risk-assessment", "strategic"],
     },
@@ -248,13 +258,13 @@ _REGISTRY: dict[str, dict] = {
         "method": "pre-mortem",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "deepseek-v4-pro",
+            "synthesis": "gpt-5.5",              # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
         "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
-        "scoring":        "qwen3-max-thinking",  # cross-lab from synthesis (DeepSeek 🇨🇳 → Qwen 🇨🇳)
-        "stress_testing": "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
+        "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
+        "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         },
         "tags": ["premium", "risk-assessment", "strategic"],
@@ -263,13 +273,13 @@ _REGISTRY: dict[str, dict] = {
         "method": "bayesian",
         "primary_id": "claude-haiku",
         "routing": {
-            "synthesis": "gpt-4o-mini",
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
-        "fusion":         "deepseek-v3.2",
+        "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
-        "scoring":        "deepseek-v3.2",
+        "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget) (🇨🇳 → 🇨🇳 different labs)
+        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
         },
         "tags": ["budget", "analytical", "probabilistic"],
     },
@@ -277,13 +287,13 @@ _REGISTRY: dict[str, dict] = {
         "method": "bayesian",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "deepseek-v4-pro",
+            "synthesis": "gpt-5.5",              # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
         "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
-        "scoring":        "qwen3-max-thinking",  # cross-lab from synthesis (DeepSeek 🇨🇳 → Qwen 🇨🇳)
-        "stress_testing": "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
+        "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
+        "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         },
         "tags": ["premium", "analytical", "probabilistic"],
@@ -292,13 +302,13 @@ _REGISTRY: dict[str, dict] = {
         "method": "dialectical",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "gpt-4o-mini",
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
-        "fusion":         "deepseek-v3.2",
+        "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
-        "scoring":        "deepseek-v3.2",
+        "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget) (🇨🇳 → 🇨🇳 different labs)
+        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
         },
         "tags": ["budget", "argumentative", "philosophical"],
     },
@@ -306,13 +316,13 @@ _REGISTRY: dict[str, dict] = {
         "method": "dialectical",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "deepseek-v4-pro",
+            "synthesis": "gpt-5.5",              # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
         "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
-        "scoring":        "qwen3-max-thinking",  # cross-lab from synthesis (DeepSeek 🇨🇳 → Qwen 🇨🇳)
-        "stress_testing": "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
+        "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
+        "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         },
         "tags": ["premium", "argumentative", "philosophical"],
@@ -321,13 +331,13 @@ _REGISTRY: dict[str, dict] = {
         "method": "analogical",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "gpt-4o-mini",
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
-        "fusion":         "deepseek-v3.2",
+        "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
-        "scoring":        "deepseek-v3.2",
+        "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget) (🇨🇳 → 🇨🇳 different labs)
+        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
         },
         "tags": ["budget", "creative", "reasoning"],
     },
@@ -335,13 +345,13 @@ _REGISTRY: dict[str, dict] = {
         "method": "analogical",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "deepseek-v4-pro",
+            "synthesis": "gpt-5.5",              # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
         "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
-        "scoring":        "qwen3-max-thinking",  # cross-lab from synthesis (DeepSeek 🇨🇳 → Qwen 🇨🇳)
-        "stress_testing": "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
+        "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
+        "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         },
         "tags": ["premium", "creative", "reasoning"],
@@ -350,13 +360,13 @@ _REGISTRY: dict[str, dict] = {
         "method": "delphi",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "gpt-4o-mini",
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
-        "fusion":         "deepseek-v3.2",
+        "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
-        "scoring":        "deepseek-v3.2",
+        "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget) (🇨🇳 → 🇨🇳 different labs)
+        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
         },
         "tags": ["budget", "collaborative", "forecasting"],
     },
@@ -364,13 +374,13 @@ _REGISTRY: dict[str, dict] = {
         "method": "delphi",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "deepseek-v4-pro",
+            "synthesis": "gpt-5.5",              # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
         "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
-        "scoring":        "qwen3-max-thinking",  # cross-lab from synthesis (DeepSeek 🇨🇳 → Qwen 🇨🇳)
-        "stress_testing": "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
+        "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
+        "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         },
         "tags": ["premium", "collaborative", "forecasting"],
@@ -379,16 +389,16 @@ _REGISTRY: dict[str, dict] = {
         "method": "cove",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "gpt-4o-mini",
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
-        "cove_answer":    "deepseek-v3.2",
-        "cove_revise":    "deepseek-v3.2",
-        "cove_verify":    "deepseek-v3.2",
-        "fusion":         "deepseek-v3.2",
+        "cove_answer":    "deepseek-v4-flash",
+        "cove_revise":    "deepseek-v4-flash",
+        "cove_verify":    "deepseek-v4-flash",
+        "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
-        "scoring":        "deepseek-v3.2",
+        "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget) (🇨🇳 → 🇨🇳 different labs)
+        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
         },
         "tags": ["budget", "verification", "fact-checking"],
     },
@@ -396,16 +406,16 @@ _REGISTRY: dict[str, dict] = {
         "method": "cove",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "deepseek-v4-pro",
+            "synthesis": "gpt-5.5",              # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "cove_answer":    "deepseek-v4-pro",
-        "cove_revise":    "deepseek-v3.2",
+        "cove_revise":    "deepseek-v4-flash",
         "cove_verify":    "deepseek-v4-pro",
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
         "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
-        "scoring":        "qwen3-max-thinking",  # cross-lab from synthesis (DeepSeek 🇨🇳 → Qwen 🇨🇳)
-        "stress_testing": "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
+        "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
+        "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         },
         "tags": ["premium", "verification", "fact-checking"],
@@ -414,13 +424,13 @@ _REGISTRY: dict[str, dict] = {
         "method": "sot",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "gpt-4o-mini",
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
-        "fusion":         "deepseek-v3.2",
+        "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
-        "scoring":        "deepseek-v3.2",
+        "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget) (🇨🇳 → 🇨🇳 different labs)
+        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
         },
         "tags": ["budget", "structured-thinking", "outlining"],
     },
@@ -428,13 +438,13 @@ _REGISTRY: dict[str, dict] = {
         "method": "sot",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "deepseek-v4-pro",
+            "synthesis": "gpt-5.5",              # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
         "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
-        "scoring":        "qwen3-max-thinking",  # cross-lab from synthesis (DeepSeek 🇨🇳 → Qwen 🇨🇳)
-        "stress_testing": "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
+        "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
+        "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         },
         "tags": ["premium", "structured-thinking", "outlining"],
@@ -443,16 +453,16 @@ _REGISTRY: dict[str, dict] = {
         "method": "tot",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "gpt-4o-mini",
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
-        "fusion":         "deepseek-v3.2",
+        "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
-        "scoring":        "deepseek-v3.2",
+        "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
-        "tot_backtrack":  "deepseek-v3.2",
-        "tot_decompose":  "deepseek-v3.2",
-        "tot_evaluate":   "deepseek-v3.2",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget) (🇨🇳 → 🇨🇳 different labs)
+        "tot_backtrack":  "deepseek-v4-flash",
+        "tot_decompose":  "deepseek-v4-flash",
+        "tot_evaluate":   "deepseek-v4-flash",
+        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
         },
         "tags": ["budget", "problem-solving", "exploration"],
     },
@@ -460,16 +470,16 @@ _REGISTRY: dict[str, dict] = {
         "method": "tot",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "deepseek-v4-pro",
+            "synthesis": "gpt-5.5",              # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
         "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
-        "scoring":        "qwen3-max-thinking",  # cross-lab from synthesis (DeepSeek 🇨🇳 → Qwen 🇨🇳)
-        "stress_testing": "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
-        "tot_backtrack":  "deepseek-v3.2",
+        "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
+        "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
+        "tot_backtrack":  "deepseek-v4-flash",
         "tot_decompose":  "claude-sonnet",
-        "tot_evaluate":   "deepseek-v3.2",
+        "tot_evaluate":   "deepseek-v4-flash",
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         },
         "tags": ["premium", "problem-solving", "exploration"],
@@ -478,13 +488,13 @@ _REGISTRY: dict[str, dict] = {
         "method": "pot",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "gpt-4o-mini",
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
-        "fusion":         "deepseek-v3.2",
+        "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
-        "scoring":        "deepseek-v3.2",
+        "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget) (🇨🇳 → 🇨🇳 different labs)
+        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
         },
         "tags": ["budget", "programming", "code-generation"],
     },
@@ -492,13 +502,13 @@ _REGISTRY: dict[str, dict] = {
         "method": "pot",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "deepseek-v4-pro",
+            "synthesis": "gpt-5.5",              # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
         "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
-        "scoring":        "qwen3-max-thinking",  # cross-lab from synthesis (DeepSeek 🇨🇳 → Qwen 🇨🇳)
-        "stress_testing": "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
+        "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
+        "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         },
         "tags": ["premium", "programming", "code-generation"],
@@ -507,16 +517,16 @@ _REGISTRY: dict[str, dict] = {
         "method": "self-discover",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "gpt-4o-mini",
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
-        "fusion":         "deepseek-v3.2",
+        "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
-        "scoring":        "deepseek-v3.2",
-        "sd_adapt":       "deepseek-v3.2",
-        "sd_implement":   "deepseek-v3.2",
-        "sd_select":      "deepseek-v3.2",
+        "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
+        "sd_adapt":       "deepseek-v4-flash",
+        "sd_implement":   "deepseek-v4-flash",
+        "sd_select":      "deepseek-v4-flash",
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget) (🇨🇳 → 🇨🇳 different labs)
+        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
         },
         "tags": ["budget", "reasoning", "self-improvement"],
     },
@@ -524,16 +534,16 @@ _REGISTRY: dict[str, dict] = {
         "method": "self-discover",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "gpt-5.5",              # OpenAI 🇺🇸 — AI² Intel 54.8, 1M ctx (was deepseek-v4-pro)
+            "synthesis": "gpt-5.5",              # OpenAI 🇺🇸 — AI² Intel 54.8, 1M ctx, cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
         "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
-        "scoring":        "qwen3-max-thinking",  # cross-lab from synthesis (DeepSeek 🇨🇳 → Qwen 🇨🇳)
+        "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
         "sd_adapt":       "deepseek-v4-pro",
         "sd_implement":   "deepseek-v4-pro",
         "sd_select":      "deepseek-v4-pro",
-        "stress_testing": "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
+        "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         },
         "tags": ["premium", "reasoning", "self-improvement"],
@@ -542,17 +552,17 @@ _REGISTRY: dict[str, dict] = {
         "method": "subagent",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "gpt-4o-mini",
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
-        "fusion":                     "deepseek-v3.2",
+        "fusion":                     "deepseek-v4-flash",
         "meta_evaluator":             "qwen3.7-plus",  # cross-lab from DeepSeek scoring
-        "scoring":                    "deepseek-v3.2",
+        "scoring":                    "deepseek-v4-flash",  # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing":             "ring-2.6-1t",
-        "subagent_critique_bias":     "deepseek-v3.2",
-        "subagent_critique_counter":  "deepseek-v3.2",
-        "subagent_critique_evidence": "deepseek-v3.2",
-        "subagent_critique_logic":    "deepseek-v3.2",
-        "subagent_decomposition":     "deepseek-v3.2",
+        "subagent_critique_bias":     "deepseek-v4-flash",
+        "subagent_critique_counter":  "deepseek-v4-flash",
+        "subagent_critique_evidence": "deepseek-v4-flash",
+        "subagent_critique_logic":    "deepseek-v4-flash",
+        "subagent_decomposition":     "deepseek-v4-flash",
         "verifier":                   "qwen3.7-plus",  # cross-lab from DeepSeek scoring
         },
         "tags": ["budget", "multi-agent", "delegation"],
@@ -561,19 +571,19 @@ _REGISTRY: dict[str, dict] = {
         "method": "subagent",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "deepseek-v4-pro",
+            "synthesis": "gpt-5.5",              # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":                  "claude-sonnet",
         "fusion":                     "deepseek-v4-pro",
-        "meta_evaluator":             "qwen3.7-max",  # cross-lab from synthesis (DeepSeek 🇨🇳 → Qwen 🇨🇳)
-        "scoring":                    "qwen3-max-thinking",  # cross-lab from synthesis (DeepSeek 🇨🇳 → Qwen 🇨🇳)
+        "meta_evaluator":             "qwen3.7-max",  # 🇨🇳 Qwen — cross-bloc from 🇺🇸 synthesis
+        "scoring":                    "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing":             "claude-sonnet",
         "subagent_critique_bias":     "deepseek-v4-pro",
         "subagent_critique_counter":  "deepseek-v4-pro",
         "subagent_critique_evidence": "deepseek-v4-pro",
         "subagent_critique_logic":    "deepseek-v4-pro",
         "subagent_decomposition":     "claude-sonnet",
-        "verifier":                   "qwen3-max-thinking",  # cross-lab from synthesis (DeepSeek 🇨🇳 → Qwen 🇨🇳)
+        "verifier":                   "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc from 🇺🇸 synthesis
         },
         "tags": ["premium", "multi-agent", "delegation"],
     },
@@ -581,16 +591,16 @@ _REGISTRY: dict[str, dict] = {
         "method": "writing",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "gpt-4o-mini",
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
-        "fusion":            "deepseek-v3.2",
+        "fusion":            "deepseek-v4-flash",
         "meta_evaluator":    "qwen3.7-plus",  # cross-lab from DeepSeek scoring
-        "scoring":           "deepseek-v3.2",
+        "scoring":           "deepseek-v4-flash",  # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing":    "ring-2.6-1t",
         "verifier":          "qwen3.7-plus",  # cross-lab from DeepSeek scoring
-        "writing_assemble":  "deepseek-v3.2",
-        "writing_factcheck": "deepseek-v3.2",
-        "writing_outline":   "deepseek-v3.2",
+        "writing_assemble":  "deepseek-v4-flash",
+        "writing_factcheck": "deepseek-v4-flash",
+        "writing_outline":   "deepseek-v4-flash",
         },
         "tags": ["budget", "writing", "content-creation"],
     },
@@ -598,14 +608,14 @@ _REGISTRY: dict[str, dict] = {
         "method": "writing",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "deepseek-v4-pro",
+            "synthesis": "gpt-5.5",              # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":         "claude-sonnet",
         "fusion":            "deepseek-v4-pro",
-        "meta_evaluator":    "qwen3.7-max",  # cross-lab from synthesis (DeepSeek 🇨🇳 → Qwen 🇨🇳)
-        "scoring":           "qwen3-max-thinking",  # cross-lab from synthesis (DeepSeek 🇨🇳 → Qwen 🇨🇳)
+        "meta_evaluator":    "qwen3.7-max",  # 🇨🇳 Qwen — cross-bloc from 🇺🇸 synthesis
+        "scoring":           "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing":    "claude-sonnet",
-        "verifier":          "qwen3-max-thinking",  # cross-lab from synthesis (DeepSeek 🇨🇳 → Qwen 🇨🇳)
+        "verifier":          "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc from 🇺🇸 synthesis
         "writing_assemble":  "claude-sonnet",
         "writing_factcheck": "deepseek-v4-pro",
         "writing_outline":   "claude-sonnet",
@@ -614,15 +624,15 @@ _REGISTRY: dict[str, dict] = {
     },
     "article-budget": {
         "method": "article",
-        "primary_id": "deepseek-v3",
+        "primary_id": "deepseek-v4-flash",
         "routing": {
-            "synthesis": "gpt-4o-mini",
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
-        "article_critic":   "deepseek-v3.2",
-        "article_verifier": "deepseek-v3.2",
-        "fusion":           "deepseek-v3.2",
+        "article_critic":   "deepseek-v4-flash",
+        "article_verifier": "deepseek-v4-flash",
+        "fusion":           "deepseek-v4-flash",
         "meta_evaluator":   "qwen3.7-plus",  # cross-lab from DeepSeek scoring
-        "scoring":          "deepseek-v3.2",
+        "scoring":          "deepseek-v4-flash",  # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing":   "ring-2.6-1t",
         "verifier":         "qwen3.7-plus",  # cross-lab from DeepSeek scoring
         },
@@ -632,17 +642,17 @@ _REGISTRY: dict[str, dict] = {
         "method": "article",
         "primary_id": "claude-sonnet",
         "routing": {
-            "synthesis": "gpt-5.5",              # OpenAI 🇺🇸 — AI² Intel 54.8, 1M ctx (was deepseek-v4-pro)
+            "synthesis": "gpt-5.5",              # OpenAI 🇺🇸 — AI² Intel 54.8, 1M ctx, cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "article_critic":    "deepseek-v4-pro",
         "article_decompose": "claude-sonnet",
         "article_verifier":  "deepseek-v4-pro",
         "deep_read":         "claude-sonnet",
         "fusion":            "deepseek-v4-pro",
-        "meta_evaluator":    "qwen3.7-max",  # cross-lab from synthesis (DeepSeek 🇨🇳 → Qwen 🇨🇳)
-        "scoring":           "qwen3-max-thinking",  # cross-lab from synthesis (DeepSeek 🇨🇳 → Qwen 🇨🇳)
+        "meta_evaluator":    "qwen3.7-max",  # 🇨🇳 Qwen — cross-bloc from 🇺🇸 synthesis
+        "scoring":           "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing":    "claude-sonnet",
-        "verifier":          "qwen3-max-thinking",  # cross-lab from synthesis (DeepSeek 🇨🇳 → Qwen 🇨🇳)
+        "verifier":          "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc from 🇺🇸 synthesis
         },
         "tags": ["premium", "writing", "article"],
     },
@@ -651,20 +661,20 @@ _REGISTRY: dict[str, dict] = {
         # qwen3-coder-flash is a dedicated coding model: reliable content,
         # fast (~11s/call, well within the 120s coding-phase budget), and far
         # stronger at code than a general-purpose flash model.
-        # NOTE: avoid kimi-k2.x "code" and glm-4.7-flash here — both are reasoning
+        # NOTE: avoid kimi-k2.x "code" here — reasoning models that emit output in separate channel
         # models that emit output in a separate channel, leaving `content` empty.
-        # deepseek-v3 is reliable but too slow (times out at 120s).
+        # deepseek-v4-flash preferred over older V3 (timed out at 120s).
         "primary_id": "qwen3-coder-flash",
         "routing": {
-            "synthesis": "gpt-4o-mini",
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
         "coding_assemble": "deepseek-v4-flash",
         "coding_review":   "deepseek-v4-flash",
         "coding_spec":     "qwen3-coder-flash",
         "coding_tests":    "deepseek-v4-flash",
-        "fusion":          "deepseek-v3.2",
+        "fusion":          "deepseek-v4-flash",
         "meta_evaluator":  "qwen3.7-plus",  # cross-lab from DeepSeek scoring
-        "scoring":         "deepseek-v3.2",
+        "scoring":         "deepseek-v4-flash",  # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing":  "ring-2.6-1t",
         "verifier":        "qwen3.7-plus",  # cross-lab from DeepSeek scoring
         },
@@ -693,7 +703,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "coding",
         "primary_id": "claude-sonnet",
         "routing": {
-            "synthesis": "deepseek-v4-pro",
+            "synthesis": "gpt-5.5",              # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "coding_assemble": "deepseek-v4-flash",
         "coding_review":   "deepseek-v4-flash",
@@ -701,10 +711,10 @@ _REGISTRY: dict[str, dict] = {
         "coding_tests":    "deepseek-v4-flash",
         "deep_read":       "claude-sonnet",
         "fusion":          "deepseek-v4-pro",
-        "meta_evaluator":  "qwen3.7-max",  # cross-lab from synthesis (DeepSeek 🇨🇳 → Qwen 🇨🇳)
-        "scoring":         "qwen3-max-thinking",  # cross-lab from synthesis (DeepSeek 🇨🇳 → Qwen 🇨🇳)
+        "meta_evaluator":  "qwen3.7-max",  # 🇨🇳 Qwen — cross-bloc from 🇺🇸 synthesis
+        "scoring":         "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing":  "claude-sonnet",
-        "verifier":        "qwen3-max-thinking",  # cross-lab from synthesis (DeepSeek 🇨🇳 → Qwen 🇨🇳)
+        "verifier":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc from 🇺🇸 synthesis
         },
         "tags": ["premium", "coding", "software-development"],
     },
@@ -712,13 +722,13 @@ _REGISTRY: dict[str, dict] = {
         "method": "cross-language",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "gpt-4o-mini",
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
-        "fusion":         "deepseek-v3.2",
+        "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
-        "scoring":        "deepseek-v3.2",
+        "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget) (🇨🇳 → 🇨🇳 different labs)
+        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
         },
         "tags": ["budget", "translation", "multilingual"],
     },
@@ -726,14 +736,14 @@ _REGISTRY: dict[str, dict] = {
         "method": "cross-language",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "deepseek-v4-pro",
+            "synthesis": "glm-5.2",              # Zhipu 🇨🇳 — multilingual strength; cross-bloc from 🇺🇸 scoring
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
         "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
-        "scoring":        "qwen3-max-thinking",  # cross-lab from synthesis (DeepSeek 🇨🇳 → Qwen 🇨🇳)
-        "stress_testing": "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
-        "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "scoring":        "gemini-pro-real",     # 🇺🇸 Google — multilingual cross-bloc critic of 🇨🇳 synthesis (was qwen 🇨🇳)
+        "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
+        "verifier":       "glm-5.2",             # Zhipu 🇨🇳 — distinct training signal for multilingual verification
         },
         "tags": ["premium", "translation", "multilingual"],
     },
@@ -755,14 +765,14 @@ _REGISTRY: dict[str, dict] = {
         "primary_id": "claude-haiku",
         "routing": {
             "brainstorm_cluster": "google/gemma-2-9b-it",
-            "brainstorm_develop": "deepseek/deepseek-chat",
-            "synthesis": "gpt-4o-mini",
+            "brainstorm_develop": "deepseek-v4-flash",
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
-        "fusion":         "deepseek-v3.2",
+        "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
-        "scoring":        "deepseek-v3.2",
+        "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget) (🇨🇳 → 🇨🇳 different labs)
+        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
         },
         "fallback_routing": {
             "primary": "claude-haiku",
@@ -775,13 +785,13 @@ _REGISTRY: dict[str, dict] = {
         "routing": {
             "brainstorm_cluster": "claude-sonnet",
             "brainstorm_develop": "claude-sonnet",
-            "synthesis": "deepseek-v4-pro",
+            "synthesis": "gpt-5.5",              # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
         "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
-        "scoring":        "qwen3-max-thinking",  # cross-lab from synthesis (DeepSeek 🇨🇳 → Qwen 🇨🇳)
-        "stress_testing": "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
+        "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
+        "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         },
         "tags": ["premium", "creative"],
@@ -790,13 +800,13 @@ _REGISTRY: dict[str, dict] = {
         "method": "image-gen",
         "primary_id": "gemini-flash",
         "routing": {
-            "image_generate": "riverflow-v2-fast-preview",
+            "image_generate": "gemini-flash-image",
         # ── Reasoning model assignments (budget, v3.4) ──
-        "fusion":         "deepseek-v3.2",
+        "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
-        "scoring":        "deepseek-v3.2",
+        "scoring":        "deepseek-v4-flash",
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget) (🇨🇳 → 🇨🇳 different labs)
+        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
         },
         "tags": ["image-generation", "creative", "budget"],
     },
@@ -809,8 +819,8 @@ _REGISTRY: dict[str, dict] = {
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
         "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
-        "scoring":        "qwen3-max-thinking",  # cross-lab from synthesis (DeepSeek 🇨🇳 → Qwen 🇨🇳)
-        "stress_testing": "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
+        "scoring":        "qwen3-max-thinking",
+        "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         },
         "tags": ["image-generation", "creative", "premium"],
@@ -819,13 +829,13 @@ _REGISTRY: dict[str, dict] = {
         "method": "iterative-critique",
         "primary_id": "claude-haiku",
         "routing": {
-            "synthesis": "gpt-4o-mini",
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
-        "fusion":         "deepseek-v3.2",
+        "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
-        "scoring":        "deepseek-v3.2",
+        "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget) (🇨🇳 → 🇨🇳 different labs)
+        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
         },
         "tags": ["budget", "iterative", "critique"],
     },
@@ -833,13 +843,13 @@ _REGISTRY: dict[str, dict] = {
         "method": "iterative-critique",
         "primary_id": "gpt-5",
         "routing": {
-            "synthesis": "gpt-5.5",              # OpenAI 🇺🇸 — AI² Intel 54.8, 1M ctx (was deepseek-v4-pro)
+            "synthesis": "gpt-5.5",              # OpenAI 🇺🇸 — AI² Intel 54.8, 1M ctx, cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
         "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
-        "scoring":        "qwen3-max-thinking",  # cross-lab from synthesis (DeepSeek 🇨🇳 → Qwen 🇨🇳)
-        "stress_testing": "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
+        "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
+        "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         },
         "tags": ["premium", "iterative", "critique"],

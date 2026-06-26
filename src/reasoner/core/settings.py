@@ -85,6 +85,7 @@ class Settings:
     PRISM_CLASSIFIER_ENABLED: bool = os.getenv("PRISM_CLASSIFIER_ENABLED", "false").lower() in ("1", "true", "yes")
     PRISM_FILE_SEARCH_ENABLED: bool = os.getenv("PRISM_FILE_SEARCH_ENABLED", "false").lower() in ("1", "true", "yes")
     PRISM_RERANK_ENABLED: bool = os.getenv("PRISM_RERANK_ENABLED", "false").lower() in ("1", "true", "yes")
+    PRISM_TOOL_CALLING_ENABLED: bool = os.getenv("PRISM_TOOL_CALLING_ENABLED", "false").lower() in ("1", "true", "yes")
 
     # ── Document Semantic Retrieval (Phase 4, opt-in) ──
     DOCUMENT_SEMANTIC_RETRIEVAL_ENABLED: bool = os.getenv("DOCUMENT_SEMANTIC_RETRIEVAL_ENABLED", "false").lower() in ("1", "true", "yes")
@@ -236,6 +237,11 @@ class Settings:
 
     # ── Verbalized Sampling (Coding) ──
     CODING_VERBALIZED_SAMPLING: bool = os.getenv("CODING_VERBALIZED_SAMPLING", "true").lower() == "true"
+
+    # ── Language Pivot & Probe ──
+    LANGUAGE_PIVOT_ENABLED: bool = os.getenv("LANGUAGE_PIVOT_ENABLED", "true").lower() in ("1", "true", "yes")
+    # Cross-lingual probe: off by default; enable for premium canary presets.
+    LANGUAGE_PROBE_ENABLED: bool = os.getenv("LANGUAGE_PROBE_ENABLED", "false").lower() in ("1", "true", "yes")
 
     # ── Trusted Proxies ──
     TRUSTED_PROXIES: list[str] = [

@@ -122,6 +122,17 @@ class LLMExecutor:
                 else:
                     kwargs["temperature"] = base_temp
 
+                # ── Reasoning effort injection ─────────────────────────────
+                # Per-phase reasoning effort overrides the registry default for
+                # reasoning-capable models. Merged under "reasoning" so a
+                # caller-supplied extra_body is preserved. Non-reasoning models
+                # ignore this; OpenRouter normalizes it across providers.
+                effort = getattr(cfg, "reasoning_effort", None)
+                if effort:
+                    existing = kwargs.get("extra_body") or {}
+                    if "reasoning" not in existing:
+                        kwargs["extra_body"] = {**existing, "reasoning": {"effort": effort}}
+
         # ── Cache lookup ──────────────────────────────────────────────────
         # Caching for streaming is complex. For now, disable caching for streaming calls.
         # A robust streaming cache would need to store/retrieve partial streams.
