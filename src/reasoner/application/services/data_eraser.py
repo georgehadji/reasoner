@@ -13,6 +13,8 @@ from reasoner.infrastructure.persistence.event_store import EventStore
 logger = logging.getLogger(__name__)
 
 
+from typing import Callable
+
 class UserDataEraser:
     """Application service for GDPR right-to-be-forgotten erasure.
 
@@ -22,8 +24,13 @@ class UserDataEraser:
       - Neuro: clear session data for user (best-effort)
     """
 
-    def __init__(self, event_store: EventStore) -> None:
+    def __init__(
+        self,
+        event_store: EventStore,
+        clear_cache_fn: Callable[[], None] | None = None,
+    ) -> None:
         self._event_store = event_store
+        self._clear_cache_fn = clear_cache_fn
 
     async def erase(self, user_id: str) -> dict:
         """Erase all data for *user_id*. Returns an erasure receipt.
@@ -47,12 +54,12 @@ class UserDataEraser:
 
         # 2. Evict cache entries for this user
         cache_evicted = False
-        try:
-            from reasoner.api.cache import clear_memory_cache
-            clear_memory_cache()
-            cache_evicted = True
-        except Exception as exc:
-            logger.warning("GDPR erasure: cache eviction failed for user %s: %s", user_id, exc)
+        if self._clear_cache_fn:
+            try:
+                self._clear_cache_fn()
+                cache_evicted = True
+            except Exception as exc:
+                logger.warning("GDPR erasure: cache eviction failed for user %s: %s", user_id, exc)
 
         # 3. Neuro memory — best-effort clear
         try:

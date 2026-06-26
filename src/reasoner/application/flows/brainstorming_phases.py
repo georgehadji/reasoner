@@ -82,8 +82,9 @@ async def run_brainstorm_cluster_phase(state: PipelineState, services: WorkflowS
         top_ideas: list[dict] = [
             idea
             for cluster in clusters
-            for idea in cluster.get("ideas", [])
-            if idea.get("keep", True)
+            if isinstance(cluster, dict)
+            for idea in (cluster.get("ideas") or [])
+            if isinstance(idea, dict) and idea.get("keep", True)
         ]
         state.brainstorming_state["top_ideas"] = top_ideas
         services.log(

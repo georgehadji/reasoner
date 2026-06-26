@@ -92,3 +92,47 @@ class TestPipelineFieldDescriptor:
         assert s.candidates == []  # default
         assert s.scores == []  # default
         assert s.total_cost_usd == 0.0  # default
+
+    def test_phase_tokens_none_fallback(self):
+        """Verify that accessing phase_tokens returns an empty dictionary if meta.phase_tokens is None."""
+        from reasoner.domain.pipeline_state import PipelineState
+
+        s = PipelineState(problem="test", preset_name="test")
+        s.meta.phase_tokens = None
+        assert s.phase_tokens == {}
+
+    def test_critic_scores_serializer_robustness(self):
+        """Verify that _ser_3 serializes CriticScore correctly when critic_scores is deserialized as a list of dicts."""
+        from reasoner.domain.pipeline_state import PipelineState
+        from reasoner.application.services.serializers import _ser_3
+
+        s = PipelineState(problem="test", preset_name="test")
+        s.meta.phase_tokens = None
+        s.core.critic_scores = [
+            {
+                "critic_id": "c1",
+                "critic_model": "gpt4",
+                "candidate_scores": {
+                    "cand_1": {
+                        "factuality": 4.5,
+                        "reasoning": 4.0,
+                        "completeness": 4.5,
+                        "helpfulness": 5.0,
+                        "total": 4.4,
+                    }
+                },
+                "ranking": ["cand_1"],
+                "dissenting_note": "A good candidate.",
+            }
+        ]
+        
+        res = _ser_3(s)
+        scores = res["critic_scores"]
+        assert len(scores) == 1
+        assert scores[0]["critic_id"] == "c1"
+        assert scores[0]["critic_model"] == "gpt4"
+        assert scores[0]["candidate_scores"]["cand_1"]["factuality"] == 4.5
+        assert scores[0]["candidate_scores"]["cand_1"]["total"] == 4.4
+        assert scores[0]["ranking"] == ["cand_1"]
+        assert scores[0]["dissenting_note"] == "A good candidate."
+        assert res["tokens"] == {"input": 0, "output": 0}

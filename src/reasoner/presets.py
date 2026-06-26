@@ -109,7 +109,7 @@ def build_custom_router(routing_dict: dict[str, str]) -> ProviderRouter:
             "primary":        "claude-sonnet",
             "constructive":   "kimi-k2-6",
             "scoring":        "sonar-pro",
-            "synthesis":      "glm-5",
+            "synthesis":      "glm-5.2",
         })
     """
     if "primary" not in routing_dict:

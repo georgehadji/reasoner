@@ -21,11 +21,11 @@ USAGE — CUSTOM ROUTING
 ================================================================
 # Fully custom routing (JSON dict, must include "primary"):
 python main.py --problem "..." --routing '{
-  "primary":       "deepseek-v3",
+  "primary":       "deepseek-v4-flash",
   "constructive":  "kimi-k2-6",
   "destructive":   "qwen3-max",
   "scoring":       "sonar-pro",
-  "synthesis":     "glm-5"
+  "synthesis":     "glm-5.2"
 }'
 
 ================================================================
@@ -333,7 +333,7 @@ def parse_args() -> argparse.Namespace:
         metavar="JSON",
         help=(
             'Custom JSON routing dict. Must include "primary". '
-            'Example: \'{"primary":"deepseek-v3","scoring":"sonar-pro"}\''
+            'Example: \'{"primary":"deepseek-v4-flash","scoring":"sonar-pro"}\''
         ),
     )
 

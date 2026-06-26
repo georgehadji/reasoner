@@ -127,16 +127,25 @@ class DocumentVectorStore:
         # Embed chunks in parallel batches to avoid overwhelming the API
         batch_size = 8
         embeddings: list[list[float]] = []
+        successful_chunks = []
         for i in range(0, len(chunks), batch_size):
             batch = chunks[i : i + batch_size]
             try:
-                batch_embeddings = await asyncio.gather(
-                    *[embedder.embed(chunk) for chunk in batch]
+                batch_embeddings_raw = await asyncio.gather(
+                    *[embedder.embed(chunk) for chunk in batch],
+                    return_exceptions=True
                 )
-                embeddings.extend(batch_embeddings)
+                for chunk, res in zip(batch, batch_embeddings_raw):
+                    if isinstance(res, BaseException):
+                        logger.warning("Embedding chunk failed for %s: %s", file_id, res)
+                    else:
+                        embeddings.append(res)
+                        successful_chunks.append(chunk)
             except Exception as exc:
                 logger.warning("Embedding batch failed for %s: %s", file_id, exc)
                 return 0
+
+        chunks = successful_chunks
 
         sidecar = {
             "file_id": file_id,

@@ -396,24 +396,32 @@ def _ser_3(state: PipelineState) -> dict:
 
     critic_scores = _get_v(state, 'critic_scores', [])
     if critic_scores:
+        serialized_scores = []
+        for cs in critic_scores:
+            candidate_scores = _get_v(cs, 'candidate_scores', {})
+            serialized_candidates = {}
+            
+            # Extract items from candidate_scores safely
+            items = candidate_scores.items() if hasattr(candidate_scores, 'items') else []
+            for gid, ds in items:
+                serialized_candidates[gid] = {
+                    "factuality": _get_v(ds, 'factuality'),
+                    "reasoning": _get_v(ds, 'reasoning'),
+                    "completeness": _get_v(ds, 'completeness'),
+                    "helpfulness": _get_v(ds, 'helpfulness'),
+                    "total": _get_v(ds, 'total'),
+                }
+                
+            serialized_scores.append({
+                "critic_id": _get_v(cs, 'critic_id'),
+                "critic_model": _get_v(cs, 'critic_model'),
+                "candidate_scores": serialized_candidates,
+                "ranking": _get_v(cs, 'ranking'),
+                "dissenting_note": _get_v(cs, 'dissenting_note'),
+            })
+            
         return {
-            "critic_scores": [
-                {
-                    "critic_id": cs.critic_id,
-                    "critic_model": cs.critic_model,
-                    "candidate_scores": {
-                        gid: {
-                            "factuality": ds.factuality,
-                            "reasoning": ds.reasoning,
-                            "completeness": ds.completeness,
-                            "helpfulness": ds.helpfulness,
-                            "total": ds.total,
-                        } for gid, ds in cs.candidate_scores.items()
-                    },
-                    "ranking": cs.ranking,
-                    "dissenting_note": cs.dissenting_note,
-                } for cs in critic_scores
-            ],
+            "critic_scores": serialized_scores,
             "tokens": state.phase_tokens.get("Phase 3: Critic Pool", {"input": 0, "output": 0}),
         }
 

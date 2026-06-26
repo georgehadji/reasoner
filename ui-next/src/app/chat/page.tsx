@@ -728,9 +728,8 @@ export default function ChatPage() {
           const totalDuration = ev.duration;
           setCurrentPhase(undefined);
 
-          // Final update to assistant message, clear streaming content, set tokens and duration
-          dispatchMessages({ type: 'UPDATE_MESSAGE', payload: { messageId: assistantId, updates: {
-            content: buildMarkdownFromPhases(phases),
+          const finalContent = buildMarkdownFromPhases(phases);
+          const doneUpdates: any = {
             phases: [...phases],
             isStreaming: false,
             currentPhaseName: undefined,
@@ -738,7 +737,13 @@ export default function ChatPage() {
             streamingContent: undefined,
             duration: totalDuration,
             cost: ev.total_cost_usd,
-          }}});
+          };
+          if (finalContent) {
+            doneUpdates.content = finalContent;
+          }
+
+          // Final update to assistant message, clear streaming content, set tokens and duration
+          dispatchMessages({ type: 'UPDATE_MESSAGE', payload: { messageId: assistantId, updates: doneUpdates }});
           
           if (finalErrors.length > 0) {
             // Add error messages if any
@@ -861,6 +866,7 @@ export default function ChatPage() {
       dispatchMessages({ type: 'ADD_MESSAGES', payload: [{ id: 'err-' + Date.now(), role: 'error', content: msg }] });
       setCurrentPhase(undefined);
     } finally {
+      dispatchMessages({ type: 'UPDATE_MESSAGE', payload: { messageId: assistantId, updates: { isStreaming: false } } });
       wsDisconnect();
       clientRunIdRef.current = null;
       setRunning(false);

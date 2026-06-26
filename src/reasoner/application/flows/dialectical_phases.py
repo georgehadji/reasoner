@@ -52,9 +52,11 @@ async def run_scientific_test_phase(state: PipelineState, services: WorkflowServ
     hypotheses = state.scientific_state.get("hypotheses", [])
     test_results = state.scientific_state.get("test_results", [])
     for hyp in hypotheses:
+        if not isinstance(hyp, dict):
+            continue
         hyp_id = hyp.get("id", "")
-        tests = [t for t in test_results if t.get("hypothesis_id") == hyp_id]
-        supported = sum(1 for t in tests if t.get("result") == "SUPPORTED")
+        tests = [t for t in test_results if isinstance(t, dict) and t.get("hypothesis_id") == hyp_id]
+        supported = sum(1 for t in tests if isinstance(t, dict) and t.get("result") == "SUPPORTED")
         hyp["posterior_probability"] = round(supported / max(len(tests), 1), 2)
     state.scientific_state["hypotheses"] = hypotheses
 

@@ -308,13 +308,19 @@ async def rerank_via_nemotron(
         score = await _score_document_nemotron(query, text or " ", model_id, key, base, semaphore)
         return doc, score
 
-    try:
-        results: list[tuple[dict[str, Any], float]] = await asyncio.gather(
-            *[_score(d) for d in docs],
-            return_exceptions=False,
-        )
-    except Exception as exc:
-        logger.warning("Nemotron rerank batch failed: %s", exc)
+    results_raw = await asyncio.gather(
+        *[_score(d) for d in docs],
+        return_exceptions=True,
+    )
+    
+    results: list[tuple[dict[str, Any], float]] = []
+    for res in results_raw:
+        if isinstance(res, BaseException):
+            logger.warning("Nemotron rerank task failed: %s", res)
+        else:
+            results.append(res)
+            
+    if not results:
         return documents
 
     scored = sorted(results, key=lambda t: t[1], reverse=True)

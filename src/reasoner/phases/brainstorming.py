@@ -74,7 +74,10 @@ def vs_generation_prompt(
 
     prev_section = ""
     if previous_ideas:
-        titles = "\n".join(f"- {i.get('title', '?')}" for i in previous_ideas)
+        titles = "\n".join(
+            f"- {i.get('title', '?')}" if isinstance(i, dict) else f"- {i}"
+            for i in previous_ideas
+        )
         prev_section = (
             f"\n\nPreviously generated ideas (do NOT repeat; generate genuinely new ones):\n{titles}"
         )
