@@ -58,3 +58,12 @@ settings.json
 
 # SQLite database files (may contain session data / false-positive secret patterns)
 *.db
+*.db-shm
+*.db-wal
+
+# Generated runtime artifacts — never commit
+cache/
+src/reasoner/cache/
+src/reasoner/history/
+graphify-out/
+tasks/

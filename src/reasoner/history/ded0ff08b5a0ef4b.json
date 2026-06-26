@@ -1,1 +1,0 @@
-{"id": "ded0ff08b5a0ef4b", "user_id": null, "problem": "write an article for the New Yorker in the style of Malcolm gladwel about Mythos, the new model oa anthropic.", "preset": "auto-budget", "method": "multi-perspective", "timestamp": "2026-05-01T20:56:26.572598+00:00", "tokens": {"input": 48011, "output": 18890, "total": 66901}, "status": "error"}

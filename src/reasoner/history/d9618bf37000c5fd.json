@@ -1,1 +1,0 @@
-{"id": "d9618bf37000c5fd", "problem": "i want to debug a python codebase. Give me a megaprompt", "preset": "auto-budget", "method": "multi-perspective", "timestamp": "2026-04-24T11:38:50.385117", "tokens": {"input": 8412, "output": 4483, "total": 12895}, "status": "error"}

@@ -1,1 +1,0 @@
-{"id": "aceb35c5822f5c33", "user_id": null, "problem": "write an article for the \"Foreign affairs\" magazine in the style of Malcolm Gladweel about the consequences of AI in climate crisis", "preset": "auto-budget", "method": "multi-perspective", "timestamp": "2026-05-01T14:37:51.435997+00:00", "tokens": {"input": 51331, "output": 17538, "total": 68869}, "status": "error"}

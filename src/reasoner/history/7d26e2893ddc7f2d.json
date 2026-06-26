@@ -1,1 +1,0 @@
-{"id": "7d26e2893ddc7f2d", "problem": "a project that uses mainly python for the backend and next.js for the frontend, which programming paradigms must use and which design paterns", "preset": "auto-budget", "method": "multi-perspective", "timestamp": "2026-04-24T13:01:45.707238", "tokens": {"input": 4705, "output": 3245, "total": 7950}, "status": "error"}

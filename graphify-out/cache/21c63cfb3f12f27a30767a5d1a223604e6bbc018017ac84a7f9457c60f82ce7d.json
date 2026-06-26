@@ -1,1 +1,0 @@
-{"nodes": [], "edges": [{"source": "test_core_temperatures", "target": "temperatures_phasetemperatures", "relation": "calls", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "tests/test_core_temperatures.py", "source_location": null, "weight": 1.0}], "hyperedges": []}

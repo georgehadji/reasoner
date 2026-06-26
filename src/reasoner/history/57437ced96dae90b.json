@@ -1,1 +1,0 @@
-{"id": "57437ced96dae90b", "user_id": null, "problem": "what are the last 5 papers in arxiv on celestial mechanics about?", "preset": "auto-budget", "method": "multi-perspective", "timestamp": "2026-04-28T08:00:37.321901+00:00", "tokens": {"input": 6403, "output": 4262, "total": 10665}, "status": "completed"}

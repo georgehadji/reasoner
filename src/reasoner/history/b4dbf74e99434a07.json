@@ -1,1 +1,0 @@
-{"id": "b4dbf74e99434a07", "problem": "test critical halt", "preset": "multi-perspective-budget", "method": "multi-perspective", "timestamp": "2026-04-20T20:28:12.594072", "tokens": {"input": 10, "output": 15, "total": 25}, "status": "error"}

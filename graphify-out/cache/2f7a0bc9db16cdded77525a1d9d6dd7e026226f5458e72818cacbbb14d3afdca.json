@@ -1,1 +1,0 @@
-{"nodes": [], "edges": [{"source": "manager_websocketmanager", "target": "history_get_pipeline_owner", "relation": "calls", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "tests/test_websocket_authz.py", "source_location": null, "weight": 1.0}], "hyperedges": []}

@@ -1,1 +1,0 @@
-{"id": "56e476c1b7bf255f", "problem": "test non-critical error", "preset": "multi-perspective-budget", "method": "multi-perspective", "timestamp": "2026-04-18T15:45:00.644548", "tokens": {"input": 90, "output": 90, "total": 180}, "status": "error"}

@@ -1,1 +1,0 @@
-{"nodes": [], "edges": [{"source": "registry_widgetregistry", "target": "protocol_basewidget", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "tests/test_widgets.py", "source_location": null, "weight": 1.0}], "hyperedges": []}

@@ -1,1 +1,0 @@
-{"nodes": [], "edges": [{"source": "vs_generation_generationcandidate", "target": "vs_claim_extraction_extract_claims_from_vs_candidates", "relation": "shares_data_with", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "tests/test_vs_claim_extraction.py", "source_location": null, "weight": 1.0}], "hyperedges": []}

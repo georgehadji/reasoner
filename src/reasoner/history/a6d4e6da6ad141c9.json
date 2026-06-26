@@ -1,1 +1,0 @@
-{"id": "a6d4e6da6ad141c9", "user_id": null, "problem": "φτιάξε ένα πρόγραμμα υπολογισμού lyapunov exponent στο standard map", "preset": "auto-budget", "method": "multi-perspective", "timestamp": "2026-04-27T13:41:12.413113+00:00", "tokens": {"input": 864, "output": 1803, "total": 2667}, "status": "error"}

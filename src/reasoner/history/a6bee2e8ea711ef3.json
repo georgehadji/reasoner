@@ -1,1 +1,0 @@
-{"id": "a6bee2e8ea711ef3", "user_id": null, "problem": "write an article for \"the atlantic\" magazine about the last anthropic's llm model, in the style of Malcolm Gladwell", "preset": "auto-budget", "method": "multi-perspective", "timestamp": "2026-06-10T21:09:38.144123+00:00", "tokens": {"input": 2085, "output": 1154, "total": 3239}, "status": "error"}

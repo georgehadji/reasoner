@@ -1,1 +1,0 @@
-{"id": "77c920a0025ffa87", "problem": "Είναι καλύτερο να νοικιάσεις ένα σπίτι ή να αγοράσεις ένα με δάνειο;", "preset": "auto-budget", "method": "multi-perspective", "timestamp": "2026-04-18T16:21:40.602479", "tokens": {"input": 20117, "output": 11052, "total": 31169}, "status": "completed"}
