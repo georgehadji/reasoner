@@ -468,7 +468,8 @@ async def _run_stream_with_metrics(
     # Metrics are optional — degrade gracefully if QueryTimer is missing
     timer = None
     try:
-        from reasoner.metrics import REASONER_QUERIES_TOTAL, QueryTimer
+        from reasoner.metrics import REASONER_QUERIES_TOTAL
+        from reasoner.api.metrics import QueryTimer
         timer = QueryTimer(preset=preset)
         timer.start()
     except (ImportError, AttributeError):
