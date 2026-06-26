@@ -16,8 +16,6 @@ from reasoner.core.constants import (
     DEFAULT_MAX_TOKENS,
     DEFAULT_TEMPERATURE,
     OPENROUTER_BASE_URL as _OPENROUTER_BASE_URL,
-    MODEL_GEMINI_PRO,
-    MODEL_GEMINI_FLASH,
     TIMEOUTS,
 )
 from reasoner.infrastructure.llm.base import BaseLLMProvider
@@ -133,39 +131,34 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                 if chunk.choices and chunk.choices[0].delta.content:
                     yield chunk.choices[0].delta.content
 
-    # Models that support custom temperature values (0.0-2.0 range).
-    # Note: OpenAI models (gpt-*, o1, o3) do NOT accept temperature parameters - they use temperature=1.0 fixed.
-    _TEMPERATURE_SUPPORTED_MODELS = frozenset({
-        # Kimi
-        'kimi-k2-5', 'kimi-k2-6',
-        # GLM/ZhipuAI
-        'glm-5', 'glm-4-plus', 'glm-4-air', 'glm-4',
-        # MiniMax
-        'minimax-01', 'minimax-text', 'minimax-m2.5', 'minimax-m2.5-free', 'minimax-m2.7', 'minimax-m1',
-        # Mistral
-        'mistral-large-latest', 'mistral-medium', 'mistral-small', 'codestral', 'codestral-2508',
-        'devstral', 'devstral-medium', 'devstral-small',
-        # Google Gemini
-        'gemini-2.0-pro-exp', 'gemini-2.0-flash-exp', MODEL_GEMINI_PRO, MODEL_GEMINI_FLASH,
-        # xAI Grok
-        'grok-4', 'grok-4.3', 'grok-3', 'grok-3-mini', 'grok-beta',
-        # Perplexity (search-grounded, temperature has limited effect)
-        'sonar-pro', 'sonar', 'sonar-deep-research',
-        # Xiaomi
-        'mimo-v2-pro', 'mimo-v2-flash', 'mimo-v2-omni',
-        # inclusionAI
-        'ling-2.6',
-        # NVIDIA
-        'nemotron',
-        # DeepSeek
-        'deepseek-v3', 'deepseek-v3.1', 'deepseek-r1', 'deepseek-r1t2', 'deepseek-v4', 'deepseek-v4-flash',
-        # Qwen
-        'qwen3', 'qwen3-coder', 'qwen3-coder-next', 'qwen3-coder-flash',
-        # Tencent
-        'hy3',
-        # OpenRouter
-        'owl-alpha', 'pareto-code',
-    })
+    # Substrings identifying models that REJECT a custom temperature (fixed at
+    # 1.0 internally). Authoritative as of Jun 2026 OpenRouter capability data
+    # (supported_parameters lacks "temperature"). This is a denylist: every
+    # other model is assumed to accept temperature, so newly added models get
+    # their tuned per-phase temperature by default instead of silently losing it.
+    #
+    #   OpenAI GPT-4/GPT-5/o-series + codex .... reasoning/fixed-temp
+    #   anthropic claude-opus, claude-fable ..... fixed-temp premium tiers
+    #   openrouter/pareto-code .................. fixed-temp router
+    # Note: gpt-oss-* DOES accept temperature and is intentionally not matched.
+    _FIXED_TEMPERATURE_MARKERS = (
+        "gpt-4", "gpt-5",          # openai/gpt-4o-mini, all gpt-5.x (+ codex/mini/nano/pro)
+        "/o1", "/o3", "/o4",       # openai o-series via OpenRouter
+        "claude-opus", "claude-fable",
+        "pareto-code",
+    )
+
+    def _supports_temperature(self) -> bool:
+        """True when the model accepts a custom ``temperature`` parameter."""
+        m = self.model.lower()
+        # Direct (non-OpenRouter) OpenAI models: bare gpt-/o-series prefixes.
+        if m.startswith(("gpt-", "o1", "o3", "o4")):
+            return False
+        return not any(marker in m for marker in self._FIXED_TEMPERATURE_MARKERS)
+
+    def _uses_completion_tokens(self) -> bool:
+        """True for direct OpenAI endpoints that require ``max_completion_tokens``."""
+        return self.model.lower().startswith(("gpt-", "o1", "o3", "o4"))
 
     async def complete(
         self,
@@ -174,49 +167,23 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         max_tokens: int = 2048,
         temperature: float = 0.7,
     ) -> str:
-        # Determine which parameter name to use based on model
-        if self.model.startswith(('gpt-', 'o3', 'o1')):
-            # OpenAI models (GPT, O1, O3) do NOT accept temperature parameters.
-            # They use a fixed temperature=1.0 internally.
-            # Sending any temperature value will cause an error.
-            kwargs: dict[str, Any] = {
-                "model": self.model,
-                "max_completion_tokens": max_tokens,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user",   "content": user_prompt},
-                ],
-            }
-            # DO NOT send temperature - OpenAI models don't accept it
-        elif self.model.startswith(('claude-',)):
-            # Anthropic models via OpenAI-compatible endpoint
-            kwargs: dict[str, Any] = {
-                "model": self.model,
-                "max_tokens": max_tokens,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user",   "content": user_prompt},
-                ],
-            }
-            # Anthropic Claude models support temperature (0.0-1.0)
-            # Only send if not default to avoid "unsupported value" errors
-            if temperature != 1.0:
-                kwargs["temperature"] = temperature
+        kwargs: dict[str, Any] = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user",   "content": user_prompt},
+            ],
+        }
+        # Direct OpenAI endpoints use max_completion_tokens; everything else
+        # (including OpenRouter-routed OpenAI models) accepts max_tokens.
+        if self._uses_completion_tokens():
+            kwargs["max_completion_tokens"] = max_tokens
         else:
-            # Other models: check if temperature is supported
-            kwargs: dict[str, Any] = {
-                "model": self.model,
-                "max_tokens": max_tokens,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user",   "content": user_prompt},
-                ],
-            }
-            # Only send temperature for models known to support it
-            # This prevents "unsupported value" errors for models that only accept default temperature
-            if any(supported in self.model.lower() for supported in self._TEMPERATURE_SUPPORTED_MODELS):
-                if temperature != 1.0:  # Omit default to reduce token usage and avoid errors
-                    kwargs["temperature"] = temperature
+            kwargs["max_tokens"] = max_tokens
+        # Send temperature only to models that accept it, and only when it
+        # differs from the model default (1.0) to avoid wasted tokens/errors.
+        if self._supports_temperature() and temperature != 1.0:
+            kwargs["temperature"] = temperature
 
         if self.extra_body:
             kwargs["extra_body"] = self.extra_body
@@ -260,6 +227,70 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             # Cost is not consistently available in the SDK response object;
             # leave last_cost_usd untouched so callers can estimate via pricing.py.
         return response.choices[0].message.content or ""
+
+    def supports_tools(self) -> bool:
+        return True
+
+    async def call_with_tools(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        tools: list[dict[str, Any]],
+        max_tokens: int = 2048,
+        temperature: float = 0.7,
+    ) -> tuple[str, list[dict[str, Any]]]:
+        import json
+        kwargs: dict[str, Any] = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user",   "content": user_prompt},
+            ],
+            "tools": tools,
+        }
+        if self._uses_completion_tokens():
+            kwargs["max_completion_tokens"] = max_tokens
+        else:
+            kwargs["max_tokens"] = max_tokens
+
+        if self._supports_temperature() and temperature != 1.0:
+            kwargs["temperature"] = temperature
+
+        if self.extra_body:
+            kwargs["extra_body"] = self.extra_body
+
+        response = await self.client.chat.completions.create(**kwargs)
+        if not response.choices:
+            raise ProviderUnavailableError(
+                f"Provider returned empty choices (model={self.model}; possible content filtering)"
+            )
+
+        # Track token usage when available
+        usage = getattr(response, "usage", None)
+        if usage is not None:
+            if hasattr(self, "last_input_tokens"):
+                self.last_input_tokens = getattr(usage, "prompt_tokens", 0) or 0
+            if hasattr(self, "last_output_tokens"):
+                self.last_output_tokens = getattr(usage, "completion_tokens", 0) or 0
+
+        message = response.choices[0].message
+        content = message.content or ""
+        tool_calls_out = []
+        if message.tool_calls:
+            for tc in message.tool_calls:
+                args = {}
+                try:
+                    if tc.function.arguments:
+                        args = json.loads(tc.function.arguments)
+                except Exception:
+                    pass
+                tool_calls_out.append({
+                    "id": tc.id,
+                    "name": tc.function.name,
+                    "arguments": args,
+                })
+
+        return content, tool_calls_out
 
 
 class OpenRouterProvider(OpenAICompatibleProvider):

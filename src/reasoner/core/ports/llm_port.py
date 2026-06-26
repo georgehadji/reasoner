@@ -24,4 +24,17 @@ class LLMPort(Protocol):
         stream: bool = False,
     ) -> tuple[str, dict[str, Any]]: ...
 
+    async def call_with_tools(
+        self,
+        role: str,
+        system_prompt: str,
+        user_prompt: str,
+        tools: list[dict[str, Any]],
+        max_tokens: int = ...,
+        temperature: float = ...,
+        timeout_seconds: float | None = ...,
+    ) -> tuple[str, dict[str, Any], list[dict[str, Any]]]: ...
+
     def get(self, role: str) -> Any: ...
+
+    def supports_tools(self) -> bool: ...

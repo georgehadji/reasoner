@@ -48,6 +48,45 @@ class BaseLLMProvider(ABC):
         temperature: float = DEFAULT_TEMPERATURE,
     ) -> AsyncIterator[str]: ...
 
+    def supports_tools(self) -> bool:
+        return False
+
+    async def call_with_tools(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        tools: list[dict[str, Any]],
+        max_tokens: int = DEFAULT_MAX_TOKENS,
+        temperature: float = DEFAULT_TEMPERATURE,
+    ) -> tuple[str, list[dict[str, Any]]]:
+        raise NotImplementedError("This provider does not support native tool calling.")
+
+    async def call_with_tools_with_retry(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        tools: list[dict[str, Any]],
+        max_tokens: int = 2048,
+        temperature: float = 0.7,
+    ) -> tuple[str, list[dict[str, Any]]]:
+        last_error: Exception | None = None
+        for attempt in range(self.max_retries + 1):
+            try:
+                return await self.call_with_tools(
+                    system_prompt, user_prompt, tools, max_tokens, temperature
+                )
+            except Exception as exc:
+                last_error = exc
+                # Don't retry non-retryable errors
+                if not is_retryable(exc):
+                    raise
+                if attempt < self.max_retries:
+                    await asyncio.sleep(min(2 ** attempt, 4) + random.uniform(0, 0.5))
+        raise LLMError(
+            f"{self.__class__.__name__}({self.model}) with tools failed "
+            f"after {self.max_retries} retries: {last_error}"
+        ) from last_error
+
     async def complete_with_retry(
         self,
         system_prompt: str,

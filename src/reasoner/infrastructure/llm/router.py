@@ -81,7 +81,7 @@ async def _call_with_circuit(
     effective_timeout: float,
     extra_body: dict[str, Any] | None = None,
 ) -> str:
-    """Call a provider with circuit-breaker protection.
+    """Call a provider with circuit-breaker protection and concurrency bounding.
 
     Args:
         extra_body: Optional additional body params to merge into the API call.
@@ -101,8 +101,12 @@ async def _call_with_circuit(
     try:
         if not await circuit.can_execute():
             raise LLMError(f"Circuit open for {provider.model}")
-        coro = provider.complete_with_retry(system_prompt, user_prompt, max_tokens, temperature)
-        result = await asyncio.wait_for(coro, timeout=effective_timeout)
+            
+        semaphore = _get_llm_semaphore()
+        async with semaphore:
+            coro = provider.complete_with_retry(system_prompt, user_prompt, max_tokens, temperature)
+            result = await asyncio.wait_for(coro, timeout=effective_timeout)
+            
         await circuit.record_success()
         return result
     except asyncio.CancelledError:
@@ -117,6 +121,66 @@ async def _call_with_circuit(
         elif extra_body and hasattr(provider, "extra_body"):
             provider.extra_body = {}
 
+
+async def _call_with_tools_circuit(
+    provider: BaseLLMProvider,
+    system_prompt: str,
+    user_prompt: str,
+    tools: list[dict[str, Any]],
+    max_tokens: int,
+    temperature: float,
+    effective_timeout: float,
+    extra_body: dict[str, Any] | None = None,
+) -> tuple[str, list[dict[str, Any]]]:
+    """Call a provider with tools using circuit-breaker protection and concurrency bounding."""
+    from reasoner.circuit_breaker import get_circuit_breaker
+
+    circuit = get_circuit_breaker(f"llm:{provider.model}")
+
+    # Inject extra_body if provider supports it
+    _saved_extra = None
+    if extra_body and hasattr(provider, "extra_body") and provider.extra_body is not None:
+        _saved_extra = dict(provider.extra_body)
+        provider.extra_body = {**provider.extra_body, **extra_body}
+    elif extra_body and hasattr(provider, "extra_body"):
+        provider.extra_body = dict(extra_body)
+    try:
+        if not await circuit.can_execute():
+            raise LLMError(f"Circuit open for {provider.model}")
+            
+        semaphore = _get_llm_semaphore()
+        async with semaphore:
+            coro = provider.call_with_tools_with_retry(system_prompt, user_prompt, tools, max_tokens, temperature)
+            result = await asyncio.wait_for(coro, timeout=effective_timeout)
+            
+        await circuit.record_success()
+        return result
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        await circuit.record_failure()
+        raise
+    finally:
+        # Restore original extra_body
+        if _saved_extra is not None and hasattr(provider, "extra_body"):
+            provider.extra_body = _saved_extra
+        elif extra_body and hasattr(provider, "extra_body"):
+            provider.extra_body = {}
+
+
+_GLOBAL_RESOLVED_CACHE: dict[str, BaseLLMProvider] = {}
+_LLM_CONCURRENCY_SEMAPHORE: asyncio.Semaphore | None = None
+
+def _get_llm_semaphore() -> asyncio.Semaphore:
+    """Get or create the global LLM concurrency semaphore."""
+    global _LLM_CONCURRENCY_SEMAPHORE
+    if _LLM_CONCURRENCY_SEMAPHORE is None:
+        import os
+        # Bound concurrent LLM calls per worker to avoid socket exhaustion
+        # and prevent overwhelming rate limits locally.
+        limit = int(os.environ.get("LLM_CONCURRENCY_LIMIT", "30"))
+        _LLM_CONCURRENCY_SEMAPHORE = asyncio.Semaphore(limit)
+    return _LLM_CONCURRENCY_SEMAPHORE
 
 class ProviderRouter:
     """
@@ -137,16 +201,24 @@ class ProviderRouter:
         self.on_fallback = on_fallback
 
     def resolve(self, role: str) -> BaseLLMProvider:
-        """Return the provider for a role, with per-instance caching."""
-        if not hasattr(self, '_resolved_cache'):
-            self._resolved_cache: dict[str, BaseLLMProvider] = {}
-        if role not in self._resolved_cache:
-            provider = self.routing_table.get(role)
-            if provider is None:
-                logger.debug("Role '%s' not in routing_table, using primary", role)
-                provider = self.primary
-            self._resolved_cache[role] = provider
-        return self._resolved_cache[role]
+        """Return the provider for a role, with global process-level caching."""
+        # Use provider string keys for global cache to avoid collisions between identical roles but different preset configurations
+        provider = self.routing_table.get(role)
+        if provider is None:
+            provider = self.primary
+        
+        # We don't want to re-instantiate identical providers, but we don't have
+        # a unique preset string here. We can just use the memory id of the config or model.
+        # Actually, the routing_table already holds instances.
+        # But if ProviderRouter is created multiple times per request,
+        # self.routing_table contains NEW instances.
+        # So we can cache by the provider's model and type.
+        cache_key = f"{type(provider).__name__}::{provider.model}"
+        
+        if cache_key not in _GLOBAL_RESOLVED_CACHE:
+            _GLOBAL_RESOLVED_CACHE[cache_key] = provider
+            
+        return _GLOBAL_RESOLVED_CACHE[cache_key]
 
     def get(self, role: str) -> BaseLLMProvider:
         return self.resolve(role)
@@ -221,7 +293,7 @@ class ProviderRouter:
                 if not response or not response.strip():
                     raise LLMError(f"Empty response from {provider.model} for role={role}")
                 return response, self._build_metadata(actual_provider, response)
-            except asyncio.TimeoutError:
+            except asyncio.TimeoutError as exc:
                 if is_fallback:
                     logger.error(
                         "Role '%s' fallback '%s' timed out after %.0fs; trying direct fallback...",
@@ -234,7 +306,7 @@ class ProviderRouter:
                     if direct:
                         return direct
                     return DegradedLLMResponse(
-                        text="", error=f"{provider.model} timed out",
+                        text="", error=f"{provider.model} timed out — primary and fallback both failed",
                         metadata={"model": provider.model},
                     ), {}
                 logger.warning(
@@ -291,10 +363,12 @@ class ProviderRouter:
                 )
                 return
             try:
-                async for chunk in provider.stream_complete_with_retry(
-                    system_prompt, user_prompt, max_tokens, temperature
-                ):
-                    yield chunk
+                semaphore = _get_llm_semaphore()
+                async with semaphore:
+                    async for chunk in provider.stream_complete_with_retry(
+                        system_prompt, user_prompt, max_tokens, temperature
+                    ):
+                        yield chunk
                 await circuit.record_success()
             except asyncio.CancelledError:
                 raise
@@ -356,6 +430,61 @@ class ProviderRouter:
             suffix = f" -> {fb.model}" if fb else ""
             result[role] = f"{p.model}{suffix}"
         return result
+
+    def supports_tools(self) -> bool:
+        """True if the primary provider supports native tool calling."""
+        return self.primary.supports_tools()
+
+    async def call_with_tools(
+        self,
+        role: str,
+        system_prompt: str,
+        user_prompt: str,
+        tools: list[dict[str, Any]],
+        max_tokens: int = 2048,
+        temperature: float = 0.7,
+        timeout_seconds: float | None = None,
+    ) -> tuple[str, dict[str, Any], list[dict[str, Any]]]:
+        """Call a provider with tools using circuit-breaker protection and fallback logic."""
+        assigned = self.get(role)
+        effective_timeout = self._timeout_for_role(role, timeout_seconds)
+
+        # Fallback resolution logic: explicit > primary > none.
+        explicit = self.fallback_table.get(role)
+        if explicit is None and assigned is self.primary:
+            explicit = self.fallback_table.get("primary")
+
+        candidates: list[BaseLLMProvider] = []
+        if explicit and explicit is not assigned:
+            candidates.append(explicit)
+        if self.primary is not assigned and self.primary not in candidates:
+            candidates.append(self.primary)
+        fallback: BaseLLMProvider | None = next(
+            (p for p in candidates if p.model != assigned.model), None
+        )
+
+        async def _execute_tool_call(provider: BaseLLMProvider, is_fallback: bool = False):
+            try:
+                content, tool_calls = await _call_with_tools_circuit(
+                    provider, system_prompt, user_prompt, tools, max_tokens, temperature,
+                    effective_timeout,
+                )
+                return content, self._build_metadata(provider, content), tool_calls
+            except Exception as exc:
+                if is_fallback:
+                    raise exc
+                logger.warning(
+                    "Role '%s' provider '%s' failed tool call (%s) — retrying with fallback '%s'",
+                    role, provider.model, exc, fallback.model if fallback else "N/A",
+                )
+                if fallback:
+                    if self.on_fallback:
+                        self.on_fallback(role, assigned.model, fallback.model, "llm_error")
+                    return await _execute_tool_call(fallback, is_fallback=True)
+                else:
+                    raise exc
+
+        return await _execute_tool_call(assigned)
 
     @classmethod
     def from_model_ids(

@@ -55,7 +55,6 @@ MODEL_MIMO_V2_FLASH: str = "mimo-v2-flash"
 # DeepSeek (reasoning-effort modes)
 # Verified low-latency models: gemini-pro / gemini-flash-lite
 MODEL_GEMINI_FLASH_LITE: str = "gemini-flash-lite"
-MODEL_GLM_47_FLASH: str = "glm-4.7-flash"
 MODEL_MISTRAL_SMALL: str = "mistral-small"
 
 # v3.2 — new ultra-VFM models
@@ -115,11 +114,8 @@ MODEL_DEVSTRAL_SMALL: str = "devstral-small"
 MODEL_MINISTRAL_8B: str = "ministral-8b"
 
 # DeepSeek
-MODEL_DEEPSEEK_V3_2: str = "deepseek-v3.2"
 MODEL_DEEPSEEK_V4_FLASH: str = "deepseek-v4-flash"
 MODEL_DEEPSEEK_V4_PRO: str = "deepseek-v4-pro"
-MODEL_DEEPSEEK_R1: str = "deepseek-r1"
-MODEL_DEEPSEEK_CHAT: str = "deepseek/deepseek-chat"
 
 # Qwen
 MODEL_QWEN37_MAX: str = "qwen3.7-max"
@@ -144,15 +140,11 @@ MODEL_KIMI_K2_6: str = "kimi-k2-6"
 MODEL_KIMI_K2_7_CODE: str = "kimi-k2-7-code"
 
 # GLM (Zhipu)
-MODEL_GLM_5: str = "glm-5"
-MODEL_GLM_5_1: str = "glm-5.1"
-MODEL_GLM_4_PLUS: str = "glm-4-plus"
-MODEL_GLM_4_AIR: str = "glm-4-air"
-MODEL_GLM_4_AIRX: str = "glm-4-airx"
-MODEL_GLM_4_LONG: str = "glm-4-long"
+MODEL_GLM_5_2: str = "glm-5.2"
 
 # Perplexity
 MODEL_SONAR_PRO: str = "sonar-pro"
+MODEL_SONAR_PRO_SEARCH: str = "sonar-pro-search"
 MODEL_SONAR: str = "sonar"
 MODEL_SONAR_REASONING_PRO: str = "sonar-reasoning-pro"
 MODEL_SONAR_DEEP_RESEARCH: str = "sonar-deep-research"
@@ -194,7 +186,4 @@ MODEL_RIVERFLOW_V2_FAST: str = "riverflow-v2-fast"
 MODEL_RIVERFLOW_V2_MAX_PREVIEW: str = "riverflow-v2-max-preview"
 MODEL_RIVERFLOW_V2_STANDARD_PREVIEW: str = "riverflow-v2-standard-preview"
 MODEL_RIVERFLOW_V2_FAST_PREVIEW: str = "riverflow-v2-fast-preview"
-
-# TNG Tech
-MODEL_DEEPSEEK_R1T2_CHIMERA: str = "deepseek-r1t2-chimera"
 
