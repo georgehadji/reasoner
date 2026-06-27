@@ -99,13 +99,13 @@ async def health_check(request: Request):
             _health_postgres_pool = None
 
     # Redis check
-    import os as _os_redis
-    _redis_url = _os_redis.environ.get("REDIS_URL", "")
+    import os
+    _redis_url = os.environ.get("REDIS_URL", "")
     if not _redis_url:
         health["checks"]["redis"] = {"status": "ok", "reason": "not configured"}
     else:
         try:
-            import asyncio as _aio_redis
+            import asyncio
             from reasoner.infrastructure.redis.client import get_redis
             redis = get_redis()
             await _aio_redis.wait_for(redis.ping(), timeout=5.0)

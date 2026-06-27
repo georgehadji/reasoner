@@ -18,7 +18,7 @@ from datetime import datetime
 from dataclasses import asdict
 from concurrent.futures import ThreadPoolExecutor
 
-from reasoner.core.events.domain_events import DomainEvent, EventType
+from reasoner.core.events.domain_events import DomainEvent, PipelineEventType, WidgetEventType, MemoryEventType, SaaSEventType, ALL_EVENT_TYPES
 
 logger = logging.getLogger(__name__)
 
@@ -92,8 +92,8 @@ class EventStore:
                 version INTEGER NOT NULL,
                 timestamp REAL NOT NULL,
                 payload TEXT NOT NULL,
-                created_at TEXT NOT NULL DEFAULT (datetime('now')),
-                UNIQUE(aggregate_id, version)
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                -- UNIQUE(aggregate_id, version) removed: version always 1, see GH-###
             );
             
             -- Indexes for common queries
@@ -239,28 +239,33 @@ class EventStore:
 
         await self._run_in_executor(_save_events_sync)
     
-    def _get_aggregate_type(self, event_type: EventType) -> str:
+    def _get_aggregate_type(self, event_type: PipelineEventType | WidgetEventType | MemoryEventType | SaaSEventType) -> str:
         """Determine aggregate type from event type."""
         if event_type in (
-            EventType.PIPELINE_STARTED,
-            EventType.PHASE_STARTED,
-            EventType.PHASE_COMPLETED,
-            EventType.PHASE_FAILED,
-            EventType.PIPELINE_COMPLETED,
-            EventType.PIPELINE_FAILED,
+            PipelineEventType.PIPELINE_STARTED,
+            PipelineEventType.PHASE_STARTED,
+            PipelineEventType.PHASE_COMPLETED,
+            PipelineEventType.PHASE_FAILED,
+            PipelineEventType.PIPELINE_COMPLETED,
+            PipelineEventType.PIPELINE_FAILED,
         ):
             return "pipeline"
         elif event_type in (
-            EventType.WIDGET_DETECTED,
-            EventType.WIDGET_EXECUTED,
-            EventType.WIDGET_FAILED,
+            WidgetEventType.WIDGET_DETECTED,
+            WidgetEventType.WIDGET_EXECUTED,
+            WidgetEventType.WIDGET_FAILED,
         ):
             return "widget"
         elif event_type in (
-            EventType.MEMORY_STORED,
-            EventType.MEMORY_RECALLED,
+            MemoryEventType.MEMORY_STORED,
+            MemoryEventType.MEMORY_RECALLED,
         ):
             return "memory"
+        elif event_type in (
+            SaaSEventType.USER_REGISTERED,
+            SaaSEventType.USER_LOGGED_IN,
+        ):
+            return "saas"
         else:
             return "generic"
     
@@ -385,8 +390,16 @@ class EventStore:
         try:
             payload = json.loads(row["payload"])
             
+            event_type_str = row["event_type"]
+            event_type = ALL_EVENT_TYPES.get(event_type_str)
+            if event_type is None:
+                logger.warning(
+                    "Unknown event type '%s' (aggregate %s v%s) — skipping",
+                    event_type_str, row["aggregate_id"], row["version"],
+                )
+                return None
             event = make_event(
-                EventType(row["event_type"]),
+                event_type,
                 aggregate_id=row["aggregate_id"],
                 version=row["version"],
                 **payload,

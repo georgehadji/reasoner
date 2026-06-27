@@ -26,9 +26,16 @@ try:
     _AsyncpgError: type[Exception] = asyncpg.PostgresError
 except ImportError:
     asyncpg = None  # type: ignore[assignment]
-    _AsyncpgError = Exception  # fallback so except clauses compile
 
-from reasoner.core.events.domain_events import DomainEvent, EventType
+    class _AsyncpgError(Exception):
+        """Sentinel for when asyncpg is not installed.
+
+        Using a dedicated class instead of bare `Exception` prevents
+        `except _AsyncpgError` from inadvertently catching unrelated
+        errors like KeyError, TypeError, or ValueError in the try blocks.
+        """
+
+from reasoner.core.events.domain_events import DomainEvent, PipelineEventType, WidgetEventType, MemoryEventType, SaaSEventType, ALL_EVENT_TYPES
 from reasoner.core.constants import DEFAULT_DB_COMMAND_TIMEOUT
 from reasoner.security.encryption import get_encryption_service
 
@@ -308,23 +315,27 @@ class PostgreSQLEventStore:
             logger.error(f"Unexpected error saving events: {e}")
             raise
     
-    def _get_aggregate_type(self, event_type: EventType) -> str:
+    def _get_aggregate_type(self, event_type: PipelineEventType | WidgetEventType | MemoryEventType | SaaSEventType) -> str:
         """Determine aggregate type from event."""
         if event_type in (
-            EventType.PIPELINE_STARTED, EventType.PHASE_STARTED,
-            EventType.PHASE_COMPLETED, EventType.PHASE_FAILED,
-            EventType.PIPELINE_COMPLETED, EventType.PIPELINE_FAILED,
+            PipelineEventType.PIPELINE_STARTED, PipelineEventType.PHASE_STARTED,
+            PipelineEventType.PHASE_COMPLETED, PipelineEventType.PHASE_FAILED,
+            PipelineEventType.PIPELINE_COMPLETED, PipelineEventType.PIPELINE_FAILED,
         ):
             return "pipeline"
         elif event_type in (
-            EventType.WIDGET_DETECTED, EventType.WIDGET_EXECUTED,
-            EventType.WIDGET_FAILED,
+            WidgetEventType.WIDGET_DETECTED, WidgetEventType.WIDGET_EXECUTED,
+            WidgetEventType.WIDGET_FAILED,
         ):
             return "widget"
         elif event_type in (
-            EventType.MEMORY_STORED, EventType.MEMORY_RECALLED,
+            MemoryEventType.MEMORY_STORED, MemoryEventType.MEMORY_RECALLED,
         ):
             return "memory"
+        elif event_type in (
+            SaaSEventType.USER_REGISTERED, SaaSEventType.USER_LOGGED_IN,
+        ):
+            return "saas"
         else:
             return "generic"
     
@@ -431,8 +442,16 @@ class PostgreSQLEventStore:
                 decrypted_json = self._encryption.decrypt(payload["_e"])
                 payload = json.loads(decrypted_json)
 
+            event_type_str = row["event_type"]
+            event_type = ALL_EVENT_TYPES.get(event_type_str)
+            if event_type is None:
+                logger.warning(
+                    "Unknown event type '%s' (aggregate %s v%s) — skipping",
+                    event_type_str, row["aggregate_id"], row["version"],
+                )
+                return None
             event = make_event(
-                EventType(row["event_type"]),
+                event_type,
                 aggregate_id=row["aggregate_id"],
                 version=row["version"],
                 **payload,
