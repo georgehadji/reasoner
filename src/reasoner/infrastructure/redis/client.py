@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from typing import Optional
 
-import redis.asyncio as aioredis
+import valkey.asyncio as aioredis
 
 _pool: Optional[aioredis.Redis] = None
 

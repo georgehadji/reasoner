@@ -182,19 +182,19 @@ services:
         max-file: "3"
 
   redis:
-    image: redis:7-alpine
+    image: valkey/valkey:8.1.8
     volumes:
       - redis_data:/data
       - internal_certs:/certs:ro
     command: >
-      redis-server
+      valkey-server
       --port 0
       --tls-port 6379
       --tls-cert-file /certs/redis.crt
       --tls-key-file /certs/redis.key
       --tls-ca-cert-file /certs/ca.crt
     healthcheck:
-      test: ["CMD", "redis-cli", "--tls", "--cert", "/certs/redis.crt", "--key", "/certs/redis.key", "--cacert", "/certs/ca.crt", "ping"]
+      test: ["CMD", "valkey-cli", "--tls", "--cert", "/certs/redis.crt", "--key", "/certs/redis.key", "--cacert", "/certs/ca.crt", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5

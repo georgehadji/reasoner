@@ -24,7 +24,7 @@ import math # Added math for ceil in Lua script error fallback
 
 logger = logging.getLogger(__name__)
 
-import redis.asyncio as aioredis
+import valkey.asyncio as aioredis
 from reasoner.infrastructure.redis.client import get_redis
 from reasoner.core.constants import MAX_RATE_LIMIT_BUCKETS # Imported MAX_RATE_LIMIT_BUCKETS
 
