@@ -518,6 +518,30 @@ def get_handler_registry(
     if _handler_registry is None:
         if llm_router is None:
             from reasoner.infrastructure.llm.router import ProviderRouter
-            llm_router = ProviderRouter()
+            from reasoner.infrastructure.llm.ports import BaseLLMProvider, LLMResponse
+
+            class _DummyProvider(BaseLLMProvider):
+                def __init__(self):
+                    super().__init__(model="dummy")
+
+                @property
+                def provider_name(self) -> str:
+                    return "dummy"
+
+                async def _complete_impl(self, messages, config):
+                    return LLMResponse(
+                        content="Dummy provider — configure API keys.",
+                        model_used="dummy",
+                        tokens_prompt=0,
+                    )
+
+                async def _complete_stream_impl(self, messages, config):
+                    yield "Dummy provider — configure API keys."
+                    return
+
+            llm_router = ProviderRouter(primary=_DummyProvider())
+        if pipeline_executor is None:
+            from reasoner.api.execution.pipeline import PipelineExecutionService
+            pipeline_executor = PipelineExecutionService()
         _handler_registry = HandlerRegistry(llm_router, event_store, pipeline_executor)
     return _handler_registry

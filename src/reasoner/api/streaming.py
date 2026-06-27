@@ -112,6 +112,7 @@ async def run_stream(
     run_id = req.client_run_id or str(uuid.uuid4())
     command = RunPipelineCommand(
         command_id=run_id,
+        timestamp=time.time(),
         problem=req.problem,
         preset=req.preset,
         method=getattr(req, "method", None),

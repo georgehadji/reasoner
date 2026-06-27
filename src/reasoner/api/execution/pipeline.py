@@ -45,7 +45,6 @@ class PipelineExecutionService:
         req = RunRequest(
             problem=command.problem,
             preset=command.preset,
-            method=command.method,
             top_k=command.top_k,
             source_type=command.source_type,
             domain=command.domain,
@@ -57,14 +56,7 @@ class PipelineExecutionService:
         pipeline_service = PipelineService()
         request = None
         
-
         from reasoner.core.settings import settings as _settings
-
-        if preset_service is None:
-            preset_service = PresetService()
-        if pipeline_service is None:
-            from reasoner.application.services.pipeline_service import PipelineService
-            pipeline_service = PipelineService()
 
         run_id = req.client_run_id or str(uuid.uuid4())
         from reasoner.core.logging_utils import set_correlation_id
