@@ -729,6 +729,7 @@ export default function ChatPage() {
           setCurrentPhase(undefined);
 
           const finalContent = buildMarkdownFromPhases(phases);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const doneUpdates: any = {
             phases: [...phases],
             isStreaming: false,

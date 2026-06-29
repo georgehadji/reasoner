@@ -12,7 +12,7 @@ Tags:
 
 import pytest
 
-from tests.integration.sse_utils import collect_pipeline_events
+from .sse_utils import collect_pipeline_events
 
 
 # ── Parameterized test cases ──────────────────────────────────────────
