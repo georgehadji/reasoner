@@ -800,7 +800,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "image-gen",
         "primary_id": "gemini-flash",
         "routing": {
-            "image_generate": "gemini-flash-image",
+            "image_generate": "gemini-3.1-flash-lite-image",
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
