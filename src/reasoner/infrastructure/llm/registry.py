@@ -14,6 +14,7 @@ from reasoner.core.constants import (
     MODEL_LAGUNA_XS_FREE,
     MODEL_LAGUNA_M_FREE,
     NVIDIA_BASE_URL,
+    MODEL_GEMINI_31_FLASH_LITE_IMAGE,
 )
 from reasoner.infrastructure.llm.providers.openai_compat import (
     OpenAICompatibleProvider,
@@ -28,7 +29,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ═══════════════════════════════════════════════════════════════
     "claude-fable-5":    {"model": "anthropic/claude-fable-5"},      # ultra-premium creative/synthesis — $10/$50 per M, 1M ctx
     "claude-opus":       {"model": "anthropic/claude-opus-4.8"},     # $5/$25 per M, 1M ctx
-    MODEL_CLAUDE_SONNET: {"model": "anthropic/claude-sonnet-4.6"},   # v3.2: still current as of Jun 2026 — $3/$15 per M
+    MODEL_CLAUDE_SONNET: {"model": "anthropic/claude-sonnet-5"},     # v3.6: current as of Jun 2026 — $2/$10 per M, 1M ctx
     "claude-haiku":      {"model": "anthropic/claude-haiku-4.5"},    # $1/$5 per M, 200K ctx
     # ═══════════════════════════════════════════════════════════════
     # OpenAI — GPT series
@@ -69,7 +70,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ═══════════════════════════════════════════════════════════════
     # gemini-pro -> claude-sonnet (premium primary, not Google — changed v3.4)
     # gemini-flash-lite -> qwen3.5-flash (budget primary, not Google — changed v3.4)
-    MODEL_GEMINI_PRO:   {"model": "anthropic/claude-sonnet-4.6"},   # premium primary (Anthropic, not Google)
+    MODEL_GEMINI_PRO:   {"model": "anthropic/claude-sonnet-5"},     # premium primary (Anthropic, not Google)
     MODEL_GEMINI_FLASH: {"model": "google/gemini-3.5-flash"},       # budget primary — $1.50/$9 per M, AI^2 Intel 50.2, 1M ctx
     "gemini-flash-lite": {"model": "qwen/qwen3.5-flash-02-23"},     # budget primary — $0.065/$0.26, fast & reliable
     # ── Real Google models (not aliased to other labs) ──
@@ -274,6 +275,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "gemini-flash-image":             {"model": "google/gemini-2.5-flash-image",      "extra_body": {"include_images": True}},
     "gemini-pro-image":               {"model": "google/gemini-3-pro-image-preview",  "extra_body": {"include_images": True}},
     "gemini-3.1-flash-image-preview": {"model": "google/gemini-3.1-flash-image-preview", "extra_body": {"include_images": True}},
+    MODEL_GEMINI_31_FLASH_LITE_IMAGE: {"model": "google/gemini-3.1-flash-lite-image", "extra_body": {"include_images": True}},
     "gpt-5-image":                    {"model": "openai/gpt-5-image",       "extra_body": {"include_images": True}},
     "gpt-5-image-mini":               {"model": "openai/gpt-5-image-mini",  "extra_body": {"include_images": True}},
     "gpt-5.4-image-2":                {"model": "openai/gpt-5.4-image-2",   "extra_body": {"include_images": True}},
@@ -312,11 +314,34 @@ Available models:
   {available}"""
         )
     cfg = _REGISTRY[model_id]
-    key = api_key or os.environ.get(cfg["env"], "")
+    
+    # xAI direct routing logic
+    is_xai = model_id.startswith("grok-") or _vendor_of(model_id) == "x-ai"
+    using_xai_direct = False
+    
+    key = api_key
+    if is_xai and not key:
+        xai_key = os.environ.get("XAI_API_KEY", "")
+        if xai_key:
+            key = xai_key
+            using_xai_direct = True
+            
+    if not key:
+        key = os.environ.get(cfg["env"], "")
+
     if not key and not cfg.get("is_local"):
         raise ValueError(
             f"API key for '{model_id}' is not set. "
             f"Set the {cfg['env']} environment variable."
+        )
+
+    if using_xai_direct:
+        direct_model = cfg["model"].lstrip("~").replace("x-ai/", "")
+        return OpenAICompatibleProvider(
+            model=direct_model,
+            api_key=key,
+            base_url="https://api.x.ai/v1",
+            extra_body=cfg.get("extra_body"),
         )
 
     match cfg["cls"]:

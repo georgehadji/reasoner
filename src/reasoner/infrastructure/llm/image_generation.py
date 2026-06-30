@@ -688,6 +688,13 @@ async def generate_image_with_model(
         except ValueError:
             pass
 
+    # Sanitize resolution for Gemini 3.1 Flash Lite Image (limits to 1K / 1024px max to avoid API errors)
+    if "gemini-3.1-flash-lite-image" in model_id.lower():
+        if width > 1024:
+            width = 1024
+        if height > 1024:
+            height = 1024
+
     image_config = {
         "aspect_ratio": aspect_ratio,
         "width": width,

@@ -29,6 +29,7 @@ _MODEL_LABS: dict[str, str] = {
     "gemini-flash-lite-real": "google", "gemini-2.5-flash-lite": "google",
     "gemini-pro-latest": "google", "gemini-flash-latest": "google",
     "gemini-flash-image": "google", "gemini-pro-image": "google",
+    "gemini-3.1-flash-image-preview": "google", "gemini-3.1-flash-lite-image": "google",
     # Note: gemini-pro → Anthropic (claude-sonnet), gemini-flash-lite → Qwen (qwen3.5-flash)
     # Meta
     "llama-3.3-70b": "meta",
