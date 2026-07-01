@@ -827,7 +827,7 @@ _REGISTRY: dict[str, dict] = {
     },
     "iterative-critique-budget": {
         "method": "iterative-critique",
-        "primary_id": "kimi-k2-6",
+        "primary_id": "grok-4.3",
         "routing": {
             "synthesis": "claude-sonnet",          # Anthropic 🇺🇸 — strongest reasoning in budget tier, 128K output
         # ── Reasoning model assignments (budget, v3.6, 7-lab diversity) ──
