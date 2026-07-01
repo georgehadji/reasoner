@@ -120,10 +120,20 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # V4 family: 1M ctx, MoE
     #   Pro:   1.6T total / 49B active — $0.435/$0.87  per M
     #   Flash: 284B total / 13B active — $0.09/$0.18   per M — PRIMARY budget choice
-    "deepseek-v4-pro":   {"model": "deepseek/deepseek-v4-pro",
-                          "extra_body": {"reasoning": {"effort": "high"}}},
-    "deepseek-v4-flash": {"model": "deepseek/deepseek-v4-flash",        # $0.09/$0.18, 1M ctx — best DeepSeek VFM
-                          "extra_body": {"reasoning": {"effort": "high"}}},
+    "deepseek-v4-pro": {
+        "cls": "compat",
+        "model": "deepseek/deepseek-v4-pro",
+        "base": "https://api.deepseek.com/v1",
+        "env": "DEEPSEEK_API_KEY",
+        "extra_body": {"reasoning": {"effort": "high"}},
+    },
+    "deepseek-v4-flash": {
+        "cls": "compat",
+        "model": "deepseek/deepseek-v4-flash",        # $0.09/$0.18, 1M ctx — best DeepSeek VFM
+        "base": "https://api.deepseek.com/v1",
+        "env": "DEEPSEEK_API_KEY",
+        "extra_body": {"reasoning": {"effort": "high"}},
+    },
     # ═══════════════════════════════════════════════════════════════
     # Qwen (Alibaba) — 3.5 -> 3.7 series
     # ═══════════════════════════════════════════════════════════════
@@ -324,6 +334,16 @@ Available models:
         if xai_key:
             key = xai_key
             using_xai_direct = True
+
+    # DeepSeek direct routing logic (try DEEPSEEK_API_KEY first, fall back to OpenRouter)
+    is_deepseek = model_id.startswith("deepseek-") or _vendor_of(model_id) == "deepseek"
+    using_deepseek_direct = False
+
+    if is_deepseek and not key and not using_xai_direct:
+        ds_key = os.environ.get("DEEPSEEK_API_KEY", "")
+        if ds_key:
+            key = ds_key
+            using_deepseek_direct = True
             
     if not key:
         key = os.environ.get(cfg["env"], "")
@@ -340,6 +360,15 @@ Available models:
             model=direct_model,
             api_key=key,
             base_url="https://api.x.ai/v1",
+            extra_body=cfg.get("extra_body"),
+        )
+
+    if using_deepseek_direct:
+        direct_model = cfg["model"].lstrip("~").replace("deepseek/", "")
+        return OpenAICompatibleProvider(
+            model=direct_model,
+            api_key=key,
+            base_url="https://api.deepseek.com/v1",
             extra_body=cfg.get("extra_body"),
         )
 

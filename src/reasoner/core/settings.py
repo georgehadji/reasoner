@@ -55,6 +55,8 @@ class Settings:
     OPENAI_API_KEY: str | None = os.getenv("OPENAI_API_KEY")
     ANTHROPIC_API_KEY: str | None = os.getenv("ANTHROPIC_API_KEY")
     MISTRAL_API_KEY: str | None = os.getenv("MISTRAL_API_KEY")
+    DEEPSEEK_API_KEY: str | None = os.getenv("DEEPSEEK_API_KEY")
+    XAI_API_KEY: str | None = os.getenv("XAI_API_KEY")
     FINE_TUNED_API_KEY: str | None = os.getenv("FINE_TUNED_API_KEY")
     PERPLEXITY_API_KEY: str | None = os.getenv("PERPLEXITY_API_KEY")
     NVIDIA_API_KEY: str | None = os.getenv("NVIDIA_API_KEY")
