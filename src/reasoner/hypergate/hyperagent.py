@@ -369,7 +369,7 @@ class HyperGateAgent:
         # Prevents misrouting of queries like 'room-temperature superconductivity
         # breakthroughs' that Claude classifies as simple known-fact questions.
         research_override = any(
-            re.search(p, ctx.problem, re.I)
+            p.search(ctx.problem)
             for p in _RESEARCH_INDICATORS
         ) if ctx.problem else False
 
