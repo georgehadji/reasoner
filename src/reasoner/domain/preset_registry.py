@@ -184,7 +184,7 @@ _REGISTRY: dict[str, dict] = {
     # ----------------------------------------------------------------------------------
     "scientific-budget": {
         "method": "scientific",
-        "primary_id": "gemini-flash-lite",
+        "primary_id": "claude-haiku",
         "routing": {
             "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
