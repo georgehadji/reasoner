@@ -390,6 +390,8 @@ PHASE_TIMEOUTS: dict[str, float] = {
     # Brainstorming (Verbalized Sampling) — sequential multi-round LLM calls need headroom
     "VS Idea Generation": 300.0,   # 5 rounds × ~45s each worst-case
     "Cluster & Score": 120.0,
+    # Iterative Critique — adversarial debate runs sustained LLM back-and-forth
+    "Adversarial Debate": 180.0,
     "Deep Development": 180.0,
     "default": 90.0,
 }
