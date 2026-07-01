@@ -26,7 +26,7 @@ v2.3 — Reasoner
 
 **A production-grade reasoning engine that orchestrates 20 LLM methodologies — from multi-perspective analysis to verbalized sampling brainstorming — with automatic method selection, cross-lab diversity, and real-time streaming.**
 
-[🚀 Quick Start](#quick-start) · [🧠 Methods](#reasoning-methods) · [🎛️ Presets](#available-presets) · [💻 Development](#development)
+[🚀 Quick Start](#quick-start) · [🤖 Agent API](#-agent-api) · [🧠 Methods](#reasoning-methods) · [🎛️ Presets](#available-presets) · [💻 Development](#development)
 
 </div>
 
@@ -500,6 +500,116 @@ python scripts/migrate_encryption_v2.py \
 -   **Backward Compatibility:** The Reasoner application is designed to gracefully handle both old and new encryption formats during reads, allowing for a zero-downtime migration.
 
 For more technical details, see [ENCRYPTION.md](./ENCRYPTION.md).
+
+---
+
+## 🤖 Agent API
+
+Reasoner exposes three agent-friendly endpoints that use `Authorization: Bearer <key>` instead of CSRF tokens — designed for AI agents (Claude, LangChain, Cursor, custom scripts) that need programmatic access.
+
+### Authentication
+
+Generate an API key (requires admin scope) or use the `ADMIN_API_KEY` from your `.env`:
+
+```bash
+# Use your admin API key directly, or generate a scoped key
+curl -s -X POST http://localhost:8003/api/agent/run/sync \
+  -H "Authorization: Bearer ${ADMIN_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"problem": "Why is the sky blue?", "preset": "scientific-budget"}'
+```
+
+### Endpoints
+
+| Endpoint | Description | Response |
+|----------|-------------|----------|
+| `POST /api/agent/run` | Run pipeline, returns SSE event stream | `text/event-stream` |
+| `POST /api/agent/run/sync` | Run pipeline, returns aggregated JSON | `application/json` — `RunResult` schema |
+| `POST /api/agent/tools` | Discover available agent tools and their schemas | `application/json` — OpenAI function-calling format |
+
+### Sync Mode (Recommended for Agents)
+
+The `/api/agent/run/sync` endpoint collects all SSE events internally and returns a single JSON object. No streaming parsing needed.
+
+**Request:**
+```bash
+curl -s -X POST http://localhost:8003/api/agent/run/sync \
+  -H "Authorization: Bearer sk-..." \
+  -H "Content-Type: application/json" \
+  -d '{"problem": "Explain the Fermi paradox", "preset": "scientific-budget"}'
+```
+
+**Response (`RunResult`):**
+```json
+{
+  "preset": "scientific-budget",
+  "errors": [],
+  "total_tokens": {"input": 2822, "output": 3614, "total": 6436},
+  "duration_seconds": 45.1,
+  "synthesis": "### Understanding Why the Sky is Blue\nThe color of the sky is...",
+  "critical_insights": ["The sky appears blue due to Rayleigh scattering..."],
+  "open_questions": ["How does atmospheric pollution affect sky color?"],
+  "citations": [
+    {"url": "https://en.wikipedia.org/wiki/Rayleigh_scattering", "title": "Rayleigh scattering", "snippet": "...", "source_type": "web"}
+  ],
+  "models_used": ["qwen/qwen3.5-flash-02-23", "deepseek/deepseek-v4-flash", "openai/gpt-4o-mini"]
+}
+```
+
+### Tool Discovery
+
+```bash
+curl -s http://localhost:8003/api/agent/tools | jq
+```
+
+Returns an array of tool definitions in OpenAI function-calling format, consumable by LangChain, CrewAI, and Claude tools.
+
+### LangChain Integration
+
+```python
+from langchain.tools import StructuredTool
+from pydantic import BaseModel, Field
+import httpx
+
+REASONER_API_KEY = "sk-..."
+
+class ReasonerInput(BaseModel):
+    problem: str = Field(description="The problem to reason about")
+    preset: str = Field(default="scientific-budget")
+
+async def reasoner_tool(problem: str, preset: str) -> str:
+    async with httpx.AsyncClient(timeout=300) as client:
+        r = await client.post(
+            "http://localhost:8003/api/agent/run/sync",
+            json={"problem": problem, "preset": preset},
+            headers={"Authorization": f"Bearer {REASONER_API_KEY}"},
+        )
+        return r.json()["synthesis"]
+
+tool = StructuredTool.from_function(
+    name="reasoner",
+    description="Research complex topics using multi-model reasoning pipelines",
+    func=reasoner_tool,
+    args_schema=ReasonerInput,
+)
+```
+
+### Streaming Mode (for Real-time UI)
+
+```python
+import httpx, json
+
+async with httpx.AsyncClient() as client:
+    async with client.stream("POST", "http://localhost:8003/api/agent/run",
+        json={"problem": "Why is the sky blue?", "preset": "scientific-budget"},
+        headers={"Authorization": "Bearer sk-..."},
+    ) as response:
+        async for line in response.aiter_lines():
+            if line.startswith("data: "):
+                ev = json.loads(line[6:])
+                if ev["type"] == "text_chunk":
+                    print(ev["text"], end="")
+```
 
 ---
 
