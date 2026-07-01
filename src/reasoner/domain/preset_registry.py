@@ -155,7 +155,7 @@ _REGISTRY: dict[str, dict] = {
         "routing": {
             "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
-        "deep_read":      "sonar",               # Perplexity 🇺🇸 — live web grounding, $1/$1 per M, 1505ms
+        "deep_read":      "sonar-pro-search",    # Perplexity 🇺🇸 — higher search context, $1/$1 per M
         "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
@@ -170,10 +170,10 @@ _REGISTRY: dict[str, dict] = {
         "routing": {
             "synthesis": "deepseek-v4-pro",      # 🇨🇳 DeepSeek — cross-bloc from 🇺🇸 sonar scoring (web-grounded fact-check stays US)
         # ── Reasoning model assignments (premium, v3.4) ──
-        "deep_read":      "sonar-pro",           # Perplexity 🇺🇸 — live web grounding, search_context_size: high, $3/$15 per M
+        "deep_read":      "sonar-reasoning-pro", # Perplexity 🇺🇸 — reasoning + high-context search, $3/$15 per M
         "fusion":         "deepseek-v4-pro",
         "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
-        "scoring":        "sonar-pro",           # Perplexity 🇺🇸 — web-grounded fact-checked scoring, cross-bloc from 🇨🇳 synthesis
+        "scoring":        "sonar-deep-research", # Perplexity 🇺🇸 — explicit deep research mode, web-grounded scoring
         "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         },
