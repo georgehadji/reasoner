@@ -24,7 +24,7 @@ class IterativeCritiqueFlow(WorkflowStrategy):
 
     def get_phases(self, state: PipelineState) -> List[PhaseStep]:
         return [
-            PhaseStep(3, "Adversarial Debate", self._run_debate_loop, _ser_5, critical=True),
+            PhaseStep(3, "Adversarial Debate", self._run_debate_loop, _ser_5, critical=False),
             PhaseStep(4, "Synthesis", run_synthesis_phase, _ser_5),
         ]
 

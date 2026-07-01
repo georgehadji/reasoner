@@ -843,7 +843,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "iterative-critique",
         "primary_id": "claude-sonnet",
         "routing": {
-            "synthesis": "gpt-5.5-pro",          # OpenAI 🇺🇸 — AI² Intel 54.8+, 1M ctx, premium final voice
+            "synthesis": "claude-sonnet",        # Anthropic 🇺🇸 — 128K output, 15× cheaper than gpt-5.5-pro, faster synthesis
         # ── Reasoning model assignments (premium, v3.5, 8-lab diversity) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "mistral-large-3",     # Mistral 🇫🇷 — large-context integration across lab boundaries
