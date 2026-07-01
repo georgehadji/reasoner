@@ -96,11 +96,11 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ═══════════════════════════════════════════════════════════════
     # Perplexity
     # ═══════════════════════════════════════════════════════════════
-    "sonar-pro":          {"model": "perplexity/sonar-pro",        "extra_body": {"web_search_options": {"search_context_size": "high"}}},   # $3/$15, 200K ctx, 1998ms — deep_read + scoring in research-premium
-    "sonar-pro-search":   {"model": "perplexity/sonar-pro-search",  "extra_body": {"web_search_options": {"search_context_size": "high"}}},   # $3/$15, 200K ctx, 4676ms — search-first variant, thorough retrieval
-    "sonar":              {"model": "perplexity/sonar",              "extra_body": {"web_search_options": {"search_context_size": "low"}}},    # $1/$1,  127K ctx, 1505ms — deep_read in research-budget
-    "sonar-reasoning-pro":  {"model": "perplexity/sonar-reasoning-pro",  "extra_body": {"web_search_options": {"search_context_size": "high"}}},  # $2/$8, 128K ctx — emits <think>, excluded from structured output
-    "sonar-deep-research":  {"model": "perplexity/sonar-deep-research",  "extra_body": {"reasoning_effort": "high"}},                             # $2/$8, 128K ctx, 98s — excluded from structured output, timeout risk
+    "sonar-pro":          {"model": "perplexity/sonar-pro",        "extra_body": {"web_search_options": {"search_context_size": "high"}, "search_domain_filter": ["-reddit.com","-facebook.com","-pinterest.com","-quora.com"], "search_recency_filter": "year"}},
+    "sonar-pro-search":   {"model": "perplexity/sonar-pro-search",  "extra_body": {"web_search_options": {"search_context_size": "high"}, "search_domain_filter": ["-reddit.com","-facebook.com","-pinterest.com","-quora.com"], "search_recency_filter": "year"}},
+    "sonar":              {"model": "perplexity/sonar",              "extra_body": {"web_search_options": {"search_context_size": "low"}, "search_domain_filter": ["-reddit.com","-facebook.com","-pinterest.com","-quora.com"], "search_recency_filter": "year"}},
+    "sonar-reasoning-pro":  {"model": "perplexity/sonar-reasoning-pro",  "extra_body": {"web_search_options": {"search_context_size": "high"}, "search_domain_filter": ["-reddit.com","-facebook.com","-pinterest.com","-quora.com"], "search_recency_filter": "month"}},
+    "sonar-deep-research":  {"model": "perplexity/sonar-deep-research",  "extra_body": {"reasoning_effort": "high", "search_domain_filter": ["-reddit.com","-facebook.com","-pinterest.com","-quora.com"], "search_recency_filter": "month"}},
     # ═══════════════════════════════════════════════════════════════
     # Mistral
     # ═══════════════════════════════════════════════════════════════
