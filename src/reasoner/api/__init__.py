@@ -394,6 +394,7 @@ from .cache import (
 
 from reasoner.api.schemas import (
     FollowupRequest,
+    RunResult,
     RunRequest,
     SearchRequest,
 )
@@ -425,7 +426,7 @@ from reasoner.api.streaming import (
     run_stream_cached,
 )
 
-from reasoner.api.auth_deps import optional_auth, require_csrf
+from reasoner.api.auth_deps import optional_auth, require_api_key, require_csrf
 from reasoner.api.dependencies import (
     check_rate_limit, 
     get_current_user, 
@@ -508,6 +509,129 @@ def _require_auth_if_legacy_disabled(user: User | None) -> None:
             status_code=401,
             detail="Authentication required. Set ENABLE_LEGACY_API_KEY=true for v1 backward compatibility.",
         )
+
+
+# ── Agent-Facing Endpoints ──────────────────────────────────────
+# These use Authorization: Bearer <key> instead of CSRF tokens,
+# making them callable by AI agents (Claude, LangChain, curl, etc.).
+
+
+@app.post("/api/agent/tools", include_in_schema=False)
+async def agent_tools():
+    """Return compact function-calling schema for agent consumption."""
+    return [
+        {
+            "name": "reasoner_run",
+            "description": "Run a multi-model reasoning pipeline on a problem. Returns SSE stream of events.",
+            "endpoint": "POST /api/agent/run",
+            "parameters": {
+                "problem": {"type": "string", "required": True, "description": "The question or problem to reason about"},
+                "preset": {"type": "string", "required": False, "default": "scientific-budget", "description": "Pipeline preset name"},
+                "top_k": {"type": "integer", "required": False, "default": 2},
+                "source_type": {"type": "string", "required": False, "enum": ["general", "academic", "news"]},
+            },
+            "auth": "Bearer API key in Authorization header",
+        },
+        {
+            "name": "reasoner_run_sync",
+            "description": "Run pipeline and return aggregated JSON result. Best for agents that want a single response.",
+            "endpoint": "POST /api/agent/run/sync",
+            "parameters": {
+                "problem": {"type": "string", "required": True, "description": "The question or problem to reason about"},
+                "preset": {"type": "string", "required": False, "default": "scientific-budget"},
+                "top_k": {"type": "integer", "required": False, "default": 2},
+            },
+            "auth": "Bearer API key in Authorization header",
+        },
+        {
+            "name": "reasoner_health",
+            "description": "Check if Reasoner is running and healthy.",
+            "endpoint": "GET /api/health",
+            "parameters": {},
+            "auth": "None",
+        },
+    ]
+
+
+@app.post("/api/agent/run")
+async def agent_run_pipeline(
+    request: Request,
+    req: RunRequest,
+    api_key = Depends(require_api_key),
+    rate_limit_checked = Depends(check_rate_limit),
+):
+    """Run pipeline with API key auth. No CSRF token needed — designed for agents.
+
+    Returns SSE stream identical to /api/run.
+    """
+    from reasoner.api.streaming import run_stream_cached
+    return StreamingResponse(
+        run_stream_cached(req, request=request, user_id=api_key.name),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@app.post("/api/agent/run/sync", response_model=RunResult)
+async def agent_run_sync(
+    request: Request,
+    req: RunRequest,
+    api_key = Depends(require_api_key),
+    rate_limit_checked = Depends(check_rate_limit),
+):
+    """Run pipeline synchronously and return aggregated JSON result.
+
+    Best for agents that want a single response without parsing SSE.
+    """
+    from reasoner.api.streaming import run_stream_cached
+    events: list[dict] = []
+    errors: list[str] = []
+
+    async for sse_line in run_stream_cached(req, request=request, user_id=api_key.name):
+        if sse_line.startswith("data: "):
+            try:
+                ev = json.loads(sse_line[6:])
+                events.append(ev)
+                if ev.get("type") == "error":
+                    errors.append(str(ev.get("error", "")))
+            except json.JSONDecodeError:
+                pass
+
+    # Extract synthesis from the last phase_complete with core_solution (reverse search)
+    synthesis = ""
+    for ev in reversed(events):
+        if ev.get("type") == "phase_complete":
+            data = ev.get("data", {})
+            core = data.get("core_solution", "") or data.get("core_solution", "")
+            if isinstance(core, dict):
+                core = core.get("core_solution", "") or core.get("synthesis", "")
+            if core and isinstance(core, str):
+                synthesis = core
+                break
+
+    done = next((e for e in events if e.get("type") in ("done", "end")), {})
+    models_used = list(dict.fromkeys(
+        m for e in events if e.get("type") == "phase_complete"
+        for m in (e.get("data", {}).get("models", []) if isinstance(e.get("data"), dict) else [])
+    ))
+
+    return RunResult(
+        preset=req.preset,
+        errors=errors,
+        total_tokens=done.get("total_tokens", {"input": 0, "output": 0, "total": 0}),
+        duration_seconds=done.get("duration", 0.0),
+        synthesis=synthesis,
+        critical_insights=done.get("critical_insights", []),
+        open_questions=done.get("open_questions", []),
+        citations=done.get("citations", []),
+        models_used=models_used,
+    )
+
+
+# ── Main pipeline endpoint ───────────────────────────────────────
 
 
 @app.post("/api/run")

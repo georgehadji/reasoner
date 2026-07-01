@@ -102,6 +102,34 @@ async def check_rate_limit(
     return True
 
 
+async def require_api_key(
+    credentials: HTTPAuthorizationCredentials = Security(security)
+):
+    """
+    Require valid API key for agent access.
+    Unlike require_auth, this is for headless agents that use
+    Authorization: Bearer <key> and skip CSRF entirely.
+
+    Raises HTTPException if authentication fails.
+    """
+    auth_manager = get_auth_manager()
+    if not credentials:
+        raise HTTPException(
+            status_code=401,
+            detail="Missing API key. Use Authorization: Bearer <key>",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    try:
+        api_key = await auth_manager.authenticate(credentials.credentials)
+        return api_key
+    except AuthenticationError as e:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid API key",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
 async def require_auth(
     credentials: HTTPAuthorizationCredentials = Security(security)
 ):

@@ -284,6 +284,19 @@ class CalculationRequest(BaseModel):
     expression: str
 
 
+class RunResult(BaseModel):
+    """Aggregated pipeline result for agent consumption (non-streaming)."""
+    preset: str
+    errors: list[str] = []
+    total_tokens: dict[str, int] = {"input": 0, "output": 0, "total": 0}
+    duration_seconds: float = 0.0
+    synthesis: str = ""
+    critical_insights: list[str] = []
+    open_questions: list[str] = []
+    citations: list[dict] = []
+    models_used: list[str] = []
+
+
 class DiscoverRequest(BaseModel):
     topic: str = "tech"
     mode: str = "normal"
