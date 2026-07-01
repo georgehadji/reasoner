@@ -34,7 +34,7 @@ _MODEL_LABS: dict[str, str] = {
     # Meta
     "llama-3.3-70b": "meta",
     # Mistral
-    "mistral-large-3": "mistral", "mistral-small": "mistral",
+    "mistral-large-3": "mistral", "mistral-small": "mistral", "mistral-small-2603": "mistral",
     "ministral-8b": "mistral", "codestral-2508": "mistral",
     # DeepSeek
     "deepseek-v4-pro": "deepseek", "deepseek-v4-flash": "deepseek",
