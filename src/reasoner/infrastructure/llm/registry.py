@@ -96,11 +96,11 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ═══════════════════════════════════════════════════════════════
     # Perplexity
     # ═══════════════════════════════════════════════════════════════
-    "sonar-pro":          {"model": "perplexity/sonar-pro",        "extra_body": {"web_search_options": {"search_context_size": "high"}, "search_domain_filter": ["-reddit.com","-facebook.com","-pinterest.com","-quora.com"], "search_recency_filter": "year"}},
-    "sonar-pro-search":   {"model": "perplexity/sonar-pro-search",  "extra_body": {"web_search_options": {"search_context_size": "high"}, "search_domain_filter": ["-reddit.com","-facebook.com","-pinterest.com","-quora.com"], "search_recency_filter": "year"}},
-    "sonar":              {"model": "perplexity/sonar",              "extra_body": {"web_search_options": {"search_context_size": "low"}, "search_domain_filter": ["-reddit.com","-facebook.com","-pinterest.com","-quora.com"], "search_recency_filter": "year"}},
-    "sonar-reasoning-pro":  {"model": "perplexity/sonar-reasoning-pro",  "extra_body": {"web_search_options": {"search_context_size": "high"}, "search_domain_filter": ["-reddit.com","-facebook.com","-pinterest.com","-quora.com"], "search_recency_filter": "month"}},
-    "sonar-deep-research":  {"model": "perplexity/sonar-deep-research",  "extra_body": {"reasoning_effort": "high", "search_domain_filter": ["-reddit.com","-facebook.com","-pinterest.com","-quora.com"], "search_recency_filter": "month"}},
+    "sonar-pro":          {"model": "perplexity/sonar-pro",        "extra_body": {"web_search_options": {"search_context_size": "high"}, "search_domain_filter": ["-reddit.com","-facebook.com","-pinterest.com","-quora.com"], "search_recency_filter": "year", "return_sources": True}},
+    "sonar-pro-search":   {"model": "perplexity/sonar-pro-search",  "extra_body": {"web_search_options": {"search_context_size": "high"}, "search_domain_filter": ["-reddit.com","-facebook.com","-pinterest.com","-quora.com"], "search_recency_filter": "year", "return_sources": True}},
+    "sonar":              {"model": "perplexity/sonar",              "extra_body": {"web_search_options": {"search_context_size": "low"}, "search_domain_filter": ["-reddit.com","-facebook.com","-pinterest.com","-quora.com"], "search_recency_filter": "year", "return_sources": True}},
+    "sonar-reasoning-pro":  {"model": "perplexity/sonar-reasoning-pro",  "extra_body": {"web_search_options": {"search_context_size": "high"}, "search_domain_filter": ["-reddit.com","-facebook.com","-pinterest.com","-quora.com"], "search_recency_filter": "month", "return_sources": True, "return_images": True, "return_related_questions": True}},
+    "sonar-deep-research":  {"model": "perplexity/sonar-deep-research",  "extra_body": {"reasoning_effort": "high", "search_domain_filter": ["-reddit.com","-facebook.com","-pinterest.com","-quora.com"], "search_recency_filter": "month", "return_sources": True, "return_images": True, "return_related_questions": True}},
     # ═══════════════════════════════════════════════════════════════
     # Mistral
     # ═══════════════════════════════════════════════════════════════
