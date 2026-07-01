@@ -827,7 +827,7 @@ _REGISTRY: dict[str, dict] = {
     },
     "iterative-critique-budget": {
         "method": "iterative-critique",
-        "primary_id": "deepseek-v4-pro",
+        "primary_id": "claude-haiku",
         "routing": {
             "synthesis": "claude-sonnet",          # Anthropic 🇺🇸 — strongest reasoning in budget tier, 128K output
         # ── Reasoning model assignments (budget, v3.5, 6-lab diversity) ──
