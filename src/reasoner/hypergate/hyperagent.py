@@ -365,12 +365,21 @@ class HyperGateAgent:
         # means the query is plainly real-time and wins over the research method label.
         web_research_overlap = needs_search and category == "G" and web_conf < 0.85
 
+        # Research-heavy queries: force pipeline even when DirectDetector says direct.
+        # Prevents misrouting of queries like 'room-temperature superconductivity
+        # breakthroughs' that Claude classifies as simple known-fact questions.
+        research_override = any(
+            re.search(p, ctx.problem, re.I)
+            for p in _RESEARCH_INDICATORS
+        ) if ctx.problem else False
+
         # Step 1 — direct answer
         if (
             is_direct
             and direct_conf >= HYPERGATE_DIRECT_THRESHOLD
             and complexity == "simple"
             and not direct_method_conflict
+            and not research_override
         ):
             return GateDecision(
                 action="direct",

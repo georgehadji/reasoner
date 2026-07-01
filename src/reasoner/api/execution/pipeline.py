@@ -589,6 +589,12 @@ class PipelineExecutionService:
             # Cancel all pending broadcast tasks for this run (B-13)
             await conn_context.cleanup()
             await _run_store.remove(run_id)
+            # Close neuro HTTP client to prevent connection pool exhaustion
+            try:
+                from reasoner.clients import close_neuro_client
+                await close_neuro_client()
+            except Exception:
+                pass
 
 
 
