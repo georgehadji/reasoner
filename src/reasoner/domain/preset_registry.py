@@ -186,11 +186,11 @@ _REGISTRY: dict[str, dict] = {
         "method": "scientific",
         "primary_id": "claude-haiku",
         "routing": {
-            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
-        # ── Reasoning model assignments (budget, v3.4) ──
+            "synthesis": "gpt-4o-mini",          # OpenAI 🇺🇸 — cross-bloc final voice
+        # ── Reasoning model assignments (budget, v3.5, cross-lab falsification) ──
         "fusion":         "deepseek-v4-flash",
-        "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
-        "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
+        "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "scoring":        "qwen3.6-flash",           # Qwen 🇨🇳 — cross-lab falsification (≠ Anthropic primary)
         "stress_testing": "ring-2.6-1t",
         "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
         },
