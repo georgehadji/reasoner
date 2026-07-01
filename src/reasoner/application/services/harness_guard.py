@@ -48,7 +48,7 @@ _MODEL_LABS: dict[str, str] = {
     "minimax-m3": "minimax", "minimax-m2.7": "minimax", "minimax-m2.5": "minimax",
     "minimax-m2.1": "minimax", "minimax-m2": "minimax", "minimax-m1": "minimax",
     # Moonshot (Kimi)
-    "kimi-k2-6": "moonshot", "kimi-k2-thinking": "moonshot", "kimi-k2-5": "moonshot", "kimi-k2": "moonshot", "kimi-k2-7-code": "moonshot",
+    "kimi-k2-6": "moonshot", "kimi-k2-5": "moonshot", "kimi-k2": "moonshot", "kimi-k2-7-code": "moonshot",
     # StepFun
     "stepfun-3.7-flash": "stepfun",
     # OpenAI — Codex

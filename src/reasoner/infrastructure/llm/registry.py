@@ -164,7 +164,6 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # Kimi (Moonshot AI)
     # ═══════════════════════════════════════════════════════════════
     "kimi-k2":          {"model": "moonshotai/kimi-k2"},           # $0.57/$2.30 per M, 131K ctx
-    "kimi-k2-thinking": {"model": "moonshotai/kimi-k2-thinking"},  # $0.60/$2.50 per M, 262K ctx — reasoning variant
     "kimi-k2-5":        {"model": "moonshotai/kimi-k2.5"},
     "kimi-k2-6":        {"model": "moonshotai/kimi-k2.6"},
     "kimi-k2-7-code":   {"model": "moonshotai/kimi-k2.7-code"},

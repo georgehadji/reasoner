@@ -847,7 +847,7 @@ _REGISTRY: dict[str, dict] = {
         # ── Reasoning model assignments (premium, v3.5, 8-lab diversity) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "mistral-large-3",     # Mistral 🇫🇷 — large-context integration across lab boundaries
-        "meta_evaluator": "kimi-k2-thinking",    # Moonshot 🇨🇳 — reasoning-focused meta-critique
+        "meta_evaluator": "kimi-k2-6",           # Moonshot 🇨🇳 — best value creative, reasoning-focused meta-critique
         "scoring":        "qwen3-max-thinking",  # Qwen 🇨🇳 — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "grok-4.3",            # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "deepseek-v4-pro",     # DeepSeek 🇨🇳 — strong structured verification
