@@ -428,7 +428,9 @@ class PipelineExecutionService:
                     core = ""
                     if state.final_solution and hasattr(state.final_solution, "core_solution"):
                         core = state.final_solution.core_solution or ""
-                    if core:
+                    if isinstance(core, dict):
+                        core = core.get("core_solution", core.get("synthesis", "")) or ""
+                    if core and isinstance(core, str):
                         import re
                         sentences = re.split(r'(?<=[.!?])\s+', core)
                         for sentence in sentences:
