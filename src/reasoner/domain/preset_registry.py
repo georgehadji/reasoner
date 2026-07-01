@@ -835,7 +835,7 @@ _REGISTRY: dict[str, dict] = {
         "meta_evaluator": "mistral-small-2603",    # Mistral 🇫🇷 — meta-level debate structure critique
         "scoring":        "qwen3.6-flash",         # Qwen 🇨🇳 — structured numerical evaluation
         "stress_testing": "ring-2.6-1t",           # InclusionAI 🇺🇸 — τ²-Bench proven adversarial testing
-        "verifier":       "gpt-oss-120b",          # OpenAI 🇺🇸 — 120B param, strong fact-checking, free tier
+        "verifier":       "gemini-flash-lite-real", # Google 🇺🇸 — Gemini 3.1 Flash Lite, structured fact-checking
         },
         "tags": ["budget", "iterative", "critique"],
     },
