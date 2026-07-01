@@ -841,16 +841,16 @@ _REGISTRY: dict[str, dict] = {
     },
     "iterative-critique-premium": {
         "method": "iterative-critique",
-        "primary_id": "gpt-5",
+        "primary_id": "claude-sonnet",
         "routing": {
-            "synthesis": "gpt-5.5",              # OpenAI 🇺🇸 — AI² Intel 54.8, 1M ctx, cross-bloc final voice
-        # ── Reasoning model assignments (premium, v3.4) ──
+            "synthesis": "gpt-5.5-pro",          # OpenAI 🇺🇸 — AI² Intel 54.8+, 1M ctx, premium final voice
+        # ── Reasoning model assignments (premium, v3.5, 8-lab diversity) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
-        "fusion":         "deepseek-v4-pro",
-        "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
-        "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
-        "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
-        "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "fusion":         "mistral-large-3",     # Mistral 🇫🇷 — large-context integration across lab boundaries
+        "meta_evaluator": "kimi-k2-thinking",    # Moonshot 🇨🇳 — reasoning-focused meta-critique
+        "scoring":        "qwen3-max-thinking",  # Qwen 🇨🇳 — cross-bloc critic of 🇺🇸 synthesis
+        "stress_testing": "grok-4.3",            # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
+        "verifier":       "deepseek-v4-pro",     # DeepSeek 🇨🇳 — strong structured verification
         },
         "tags": ["premium", "iterative", "critique"],
     },
