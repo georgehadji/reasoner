@@ -827,15 +827,15 @@ _REGISTRY: dict[str, dict] = {
     },
     "iterative-critique-budget": {
         "method": "iterative-critique",
-        "primary_id": "claude-haiku",
+        "primary_id": "deepseek-v4-pro",
         "routing": {
-            "synthesis": "claude-sonnet",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
-        # ── Reasoning model assignments (budget, v3.4) ──
-        "fusion":         "deepseek-v4-flash",
-        "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
-        "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
-        "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+            "synthesis": "claude-sonnet",          # Anthropic 🇺🇸 — strongest reasoning in budget tier, 128K output
+        # ── Reasoning model assignments (budget, v3.5, 6-lab diversity) ──
+        "fusion":         "claude-haiku",          # Anthropic 🇺🇸 — fast integration across lab boundaries
+        "meta_evaluator": "mistral-small-2603",    # Mistral 🇫🇷 — meta-level debate structure critique
+        "scoring":        "qwen3.6-flash",         # Qwen 🇨🇳 — structured numerical evaluation
+        "stress_testing": "ring-2.6-1t",           # InclusionAI 🇺🇸 — τ²-Bench proven adversarial testing
+        "verifier":       "gpt-oss-120b",          # OpenAI 🇺🇸 — 120B param, strong fact-checking, free tier
         },
         "tags": ["budget", "iterative", "critique"],
     },
