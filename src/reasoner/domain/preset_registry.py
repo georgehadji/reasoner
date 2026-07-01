@@ -829,7 +829,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "iterative-critique",
         "primary_id": "claude-haiku",
         "routing": {
-            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
+            "synthesis": "claude-sonnet",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
