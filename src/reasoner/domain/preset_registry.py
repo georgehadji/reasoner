@@ -827,11 +827,11 @@ _REGISTRY: dict[str, dict] = {
     },
     "iterative-critique-budget": {
         "method": "iterative-critique",
-        "primary_id": "claude-haiku",
+        "primary_id": "kimi-k2-6",
         "routing": {
             "synthesis": "claude-sonnet",          # Anthropic 🇺🇸 — strongest reasoning in budget tier, 128K output
-        # ── Reasoning model assignments (budget, v3.5, 6-lab diversity) ──
-        "fusion":         "claude-haiku",          # Anthropic 🇺🇸 — fast integration across lab boundaries
+        # ── Reasoning model assignments (budget, v3.6, 7-lab diversity) ──
+        "fusion":         "deepseek-v4-flash",     # DeepSeek 🇨🇳 — fast, cheap analytical integration
         "meta_evaluator": "mistral-small-2603",    # Mistral 🇫🇷 — meta-level debate structure critique
         "scoring":        "qwen3.6-flash",         # Qwen 🇨🇳 — structured numerical evaluation
         "stress_testing": "ring-2.6-1t",           # InclusionAI 🇺🇸 — τ²-Bench proven adversarial testing
