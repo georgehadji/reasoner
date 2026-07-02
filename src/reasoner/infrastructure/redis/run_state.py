@@ -129,11 +129,14 @@ class RunStateManager:
 
     async def add(self, run_id: str, user_id: str | None = None) -> asyncio.Event:
         """Register a new run and return its cancel event."""
+        from reasoner.infrastructure.redis.in_memory import RunStateStore
+        in_memory = None
         try:
             await self._redis_op(lambda: self._add_redis(run_id))
+            in_memory = RunStateStore()
         except _RedisUnavailable:
-            pass
-        return await self._get_fallback().add(run_id, user_id=user_id)
+            in_memory = self._get_fallback()
+        return await in_memory.add(run_id, user_id=user_id)
 
     async def _add_redis(self, run_id: str) -> None:
         redis = self._get_redis()
@@ -143,11 +146,14 @@ class RunStateManager:
 
     async def remove(self, run_id: str) -> None:
         """Clean up a run's state."""
+        from reasoner.infrastructure.redis.in_memory import RunStateStore
+        in_memory = None
         try:
             await self._redis_op(lambda: self._remove_redis(run_id))
+            in_memory = RunStateStore()
         except _RedisUnavailable:
-            pass
-        await self._get_fallback().remove(run_id)
+            in_memory = self._get_fallback()
+        await in_memory.remove(run_id)
 
     async def _remove_redis(self, run_id: str) -> None:
         redis = self._get_redis()
@@ -156,15 +162,28 @@ class RunStateManager:
 
     async def get_cancel_event(self, run_id: str) -> asyncio.Event | None:
         """Get the cancel event for a run."""
-        return await self._get_fallback().get_cancel_event(run_id)
+        event = await self._get_fallback().get_cancel_event(run_id)
+        if event is None:
+            # No in-memory event yet — check Redis for pre-existing cancellation
+            try:
+                cancelled = await self._redis_op(lambda: self._is_cancelled_redis(run_id))
+                if cancelled:
+                    await self._get_fallback().request_cancel(run_id)
+                    event = await self._get_fallback().get_cancel_event(run_id)
+            except _RedisUnavailable:
+                pass
+        return event
 
     async def request_cancel(self, run_id: str) -> bool:
         """Signal cancellation for a run."""
+        from reasoner.infrastructure.redis.in_memory import RunStateStore
+        in_memory = None
         try:
             await self._redis_op(lambda: self._cancel_redis(run_id))
+            in_memory = RunStateStore()
         except _RedisUnavailable:
-            pass
-        return await self._get_fallback().request_cancel(run_id)
+            in_memory = self._get_fallback()
+        return await in_memory.request_cancel(run_id)
 
     # Alias for compatibility with plan examples
     cancel = request_cancel
@@ -236,7 +255,11 @@ class RunStateManager:
     async def is_cancelled(self, run_id: str) -> bool:
         """Check if a run has been requested to cancel."""
         try:
-            return await self._redis_op(lambda: self._is_cancelled_redis(run_id))
+            cancelled = await self._redis_op(lambda: self._is_cancelled_redis(run_id))
+            if cancelled:
+                # Propagate to in-memory fallback so local cancel_event fires
+                await self._get_fallback().request_cancel(run_id)
+            return cancelled
         except _RedisUnavailable:
             pass
         event = await self._get_fallback().get_cancel_event(run_id)
