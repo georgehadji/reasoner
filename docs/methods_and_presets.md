@@ -401,14 +401,14 @@
 | primary | `gemini-flash` | google/gemini-3.5-flash | google |
 | perspective_cot | `mimo-v2.5` | xiaomi/mimo-v2.5 | xiaomi |
 | perspective_analysis | `qwen3.6-flash` | qwen/qwen3.6-flash | qwen |
-| constructive | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
-| destructive | `ring-2.6-1t` | inclusionai/ring-2.6-1t | inclusionai |
-| systemic | `gpt-oss-120b` | openai/gpt-oss-120b | openai |
+| constructive | `deepseek-v3` | deepseek/deepseek-v3.2 | deepseek |
+| destructive | `hermes-4-70b` | nousresearch/hermes-4-70b | nousresearch |
+| systemic | `qwen3.7-plus` | qwen/qwen3.7-plus | qwen |
 | minimalist | `ministral-8b` | mistralai/mistral-small-3.2-24b-instruct | mistral |
-| synthesis | `gpt-4o-mini` | openai/gpt-4o-mini | openai |
+| synthesis | `qwen3-max` | qwen/qwen3.7-plus | qwen |
 | fusion | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
 | meta_evaluator | `qwen3.5-flash` | qwen/qwen3.5-flash-02-23 | qwen |
-| scoring | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
+| scoring | `gpt-4o-mini` | openai/gpt-4o-mini | openai |
 | stress_testing | `ring-2.6-1t` | inclusionai/ring-2.6-1t | inclusionai |
 | verifier | `qwen3.5-flash` | qwen/qwen3.5-flash-02-23 | qwen |
 

@@ -25,18 +25,19 @@ _REGISTRY: dict[str, dict] = {
         "routing": {
             "perspective_cot": "mimo-v2.5",           # Xiaomi 🇨🇳 — $0.14/$0.28, cheapest 1M ctx omnimodal
             "perspective_analysis": "qwen3.6-flash",   # was qwen3-turbo (DEAD) → stronger reasoning
-            "synthesis": "gpt-4o-mini",                # 🇺🇸 OpenAI — cross-bloc final voice vs CN-heavy generation/scoring
-            # ── Per-perspective cross-bloc diversity (2🇨🇳 + 1🇺🇸 + 1🇫🇷) ──
-            "constructive":  "deepseek-v4-flash",      # 🇨🇳 DeepSeek — $0.229/$0.343
-            "destructive":   "ring-2.6-1t",      # 🇨🇳 inclusionAI — $0.075/$0.625
-            "systemic":      "gpt-oss-120b",     # 🇺🇸 OpenAI open-weight — $0.039/$0.18 (was qwen3-max, added US bloc)
+            "synthesis": "qwen3-max",                  # 🇨🇳 Qwen/Alibaba (alias→3.7-plus) — cross-bloc final voice (was gpt-4o-mini 🇺🇸)
+            # ── Per-perspective echo-chamber-resistant diversity (4 labs, 3 blocs: 2🇨🇳 + 1🇺🇸 + 1🇫🇷) ──
+            "constructive":  "deepseek-v3",           # 🇨🇳 DeepSeek V3.2 — $0.12/$0.50 (was v4-flash, 4-lab diversity)
+            "destructive":   "hermes-4-70b",      # 🇺🇸 Nous Research — critic-specialized ($0.13/$0.40) (was ring-2.6-1t 🇨🇳, cross-bloc echo resistance)
+            "systemic":      "qwen3.7-plus",     # 🇨🇳 Qwen/Alibaba — broad systems thinking ($0.32/$1.28) (was gpt-4o-mini 🇺🇸, stronger multi-domain reasoning)
             "minimalist":    "ministral-8b",     # 🇫🇷 Mistral — $0.075/$0.20
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
-        "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
+        "scoring":        "gpt-4o-mini",              # 🇺🇸 OpenAI — cross-bloc critic of 🇨🇳 synthesis (was deepseek-v4-flash 🇨🇳)
         "stress_testing": "ring-2.6-1t",
         "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "balanced"],
     },
@@ -58,6 +59,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
         "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "creative", "fast"],
     },
@@ -80,6 +82,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "balanced", "multilingual"],
     },
@@ -98,6 +101,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
         "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "argumentative", "robust"],
     },
@@ -117,6 +121,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "argumentative", "robust"],
     },
@@ -131,6 +136,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
         "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "governance", "decision-making"],
     },
@@ -146,6 +152,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "governance", "decision-making"],
     },
@@ -161,6 +168,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
         "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "research", "web-search"],
     },
@@ -176,6 +184,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "sonar-deep-research", # Perplexity 🇺🇸 — explicit deep research mode, web-grounded scoring
         "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "research", "web-search"],
     },
@@ -193,6 +202,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "qwen3.6-flash",           # Qwen 🇨🇳 — cross-lab falsification (≠ Anthropic primary)
         "stress_testing": "ring-2.6-1t",
         "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "scientific", "structured"],
     },
@@ -208,6 +218,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "scientific", "structured"],
     },
@@ -222,6 +233,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
         "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "educational", "inquisitive"],
     },
@@ -237,6 +249,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "educational", "inquisitive"],
     },
@@ -251,6 +264,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
         "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "risk-assessment", "strategic"],
     },
@@ -266,6 +280,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "risk-assessment", "strategic"],
     },
@@ -280,6 +295,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
         "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "analytical", "probabilistic"],
     },
@@ -295,6 +311,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "analytical", "probabilistic"],
     },
@@ -309,6 +326,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
         "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "argumentative", "philosophical"],
     },
@@ -324,6 +342,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "argumentative", "philosophical"],
     },
@@ -338,6 +357,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
         "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "creative", "reasoning"],
     },
@@ -353,6 +373,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "creative", "reasoning"],
     },
@@ -367,6 +388,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
         "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "collaborative", "forecasting"],
     },
@@ -382,6 +404,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "collaborative", "forecasting"],
     },
@@ -399,6 +422,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
         "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "verification", "fact-checking"],
     },
@@ -417,6 +441,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "verification", "fact-checking"],
     },
@@ -431,6 +456,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
         "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "structured-thinking", "outlining"],
     },
@@ -446,6 +472,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "structured-thinking", "outlining"],
     },
@@ -463,6 +490,7 @@ _REGISTRY: dict[str, dict] = {
         "tot_decompose":  "deepseek-v4-flash",
         "tot_evaluate":   "deepseek-v4-flash",
         "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "problem-solving", "exploration"],
     },
@@ -481,6 +509,7 @@ _REGISTRY: dict[str, dict] = {
         "tot_decompose":  "claude-sonnet",
         "tot_evaluate":   "deepseek-v4-flash",
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "problem-solving", "exploration"],
     },
@@ -495,6 +524,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
         "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "programming", "code-generation"],
     },
@@ -510,6 +540,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "programming", "code-generation"],
     },
@@ -527,6 +558,7 @@ _REGISTRY: dict[str, dict] = {
         "sd_select":      "deepseek-v4-flash",
         "stress_testing": "ring-2.6-1t",
         "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "reasoning", "self-improvement"],
     },
@@ -545,6 +577,7 @@ _REGISTRY: dict[str, dict] = {
         "sd_select":      "deepseek-v4-pro",
         "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "reasoning", "self-improvement"],
     },
@@ -564,6 +597,7 @@ _REGISTRY: dict[str, dict] = {
         "subagent_critique_logic":    "deepseek-v4-flash",
         "subagent_decomposition":     "deepseek-v4-flash",
         "verifier":                   "qwen3.7-plus",  # cross-lab from DeepSeek scoring
+        "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "multi-agent", "delegation"],
     },
@@ -584,6 +618,7 @@ _REGISTRY: dict[str, dict] = {
         "subagent_critique_logic":    "deepseek-v4-pro",
         "subagent_decomposition":     "claude-sonnet",
         "verifier":                   "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc from 🇺🇸 synthesis
+        "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "multi-agent", "delegation"],
     },
@@ -592,15 +627,14 @@ _REGISTRY: dict[str, dict] = {
         "primary_id": "gemini-flash-lite",
         "routing": {
             "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
+        # ── Article-flow roles (budget, v3.5) ──
+        "primary":           "sonar",              # Perplexity 🇺🇸 — native web search for source retrieval
+        "writing_factcheck": "sonar",              # Perplexity 🇺🇸 — live web verification
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":            "deepseek-v4-flash",
-        "meta_evaluator":    "qwen3.7-plus",  # cross-lab from DeepSeek scoring
-        "scoring":           "deepseek-v4-flash",  # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
-        "stress_testing":    "ring-2.6-1t",
-        "verifier":          "qwen3.7-plus",  # cross-lab from DeepSeek scoring
         "writing_assemble":  "deepseek-v4-flash",
-        "writing_factcheck": "deepseek-v4-flash",
         "writing_outline":   "deepseek-v4-flash",
+        "post_synthesis_verify": "sonar",
         },
         "tags": ["budget", "writing", "content-creation"],
     },
@@ -609,16 +643,14 @@ _REGISTRY: dict[str, dict] = {
         "primary_id": "gemini-pro",
         "routing": {
             "synthesis": "gpt-5.5",              # 🇺🇸 OpenAI — cross-bloc final voice
+        # ── Article-flow roles (premium, v3.5) ──
+        "primary":           "sonar-pro",          # Perplexity 🇺🇸 — native web search for source retrieval
+        "writing_factcheck": "sonar-pro",          # Perplexity 🇺🇸 — live web verification
         # ── Reasoning model assignments (premium, v3.4) ──
-        "deep_read":         "claude-sonnet",
         "fusion":            "deepseek-v4-pro",
-        "meta_evaluator":    "qwen3.7-max",  # 🇨🇳 Qwen — cross-bloc from 🇺🇸 synthesis
-        "scoring":           "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
-        "stress_testing":    "claude-sonnet",
-        "verifier":          "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc from 🇺🇸 synthesis
         "writing_assemble":  "claude-sonnet",
-        "writing_factcheck": "deepseek-v4-pro",
         "writing_outline":   "claude-sonnet",
+        "post_synthesis_verify": "sonar-pro",
         },
         "tags": ["premium", "writing", "content-creation"],
     },
@@ -627,14 +659,14 @@ _REGISTRY: dict[str, dict] = {
         "primary_id": "deepseek-v4-flash",
         "routing": {
             "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
-        # ── Reasoning model assignments (budget, v3.4) ──
-        "article_critic":   "deepseek-v4-flash",
-        "article_verifier": "deepseek-v4-flash",
+        # ── Article-flow roles (budget, v3.5) ──
+        "primary":           "sonar",              # Perplexity 🇺🇸 — native web search + real citations for research
+        "writing_draft":     "deepseek-v4-flash",  # best price/quality for long-form creative writing, 1M ctx
+        "writing_factcheck": "sonar",              # Perplexity 🇺🇸 — live web verification against current sources
+        "writing_assemble":  "deepseek-v4-flash",  # voice consistency with draft model
+        # ── Reasoning model assignments (budget, v3.5) ──
         "fusion":           "deepseek-v4-flash",
-        "meta_evaluator":   "qwen3.7-plus",  # cross-lab from DeepSeek scoring
-        "scoring":          "deepseek-v4-flash",  # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
-        "stress_testing":   "ring-2.6-1t",
-        "verifier":         "qwen3.7-plus",  # cross-lab from DeepSeek scoring
+        "post_synthesis_verify": "sonar",
         },
         "tags": ["budget", "writing", "article"],
     },
@@ -643,16 +675,12 @@ _REGISTRY: dict[str, dict] = {
         "primary_id": "claude-sonnet",
         "routing": {
             "synthesis": "gpt-5.5",              # OpenAI 🇺🇸 — AI² Intel 54.8, 1M ctx, cross-bloc final voice
-        # ── Reasoning model assignments (premium, v3.4) ──
-        "article_critic":    "deepseek-v4-pro",
-        "article_decompose": "claude-sonnet",
-        "article_verifier":  "deepseek-v4-pro",
-        "deep_read":         "claude-sonnet",
+        # ── Article-flow roles (premium, v3.5) ──
+        "primary":           "sonar-pro",          # Perplexity 🇺🇸 — native web search + citations for premium research
+        "writing_factcheck": "sonar-pro",          # Perplexity 🇺🇸 — live web verification, cross-bloc from CN scoring
+        # ── Reasoning model assignments (premium, v3.5) ──
         "fusion":            "deepseek-v4-pro",
-        "meta_evaluator":    "qwen3.7-max",  # 🇨🇳 Qwen — cross-bloc from 🇺🇸 synthesis
-        "scoring":           "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
-        "stress_testing":    "claude-sonnet",
-        "verifier":          "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc from 🇺🇸 synthesis
+        "post_synthesis_verify": "sonar-pro",
         },
         "tags": ["premium", "writing", "article"],
     },
@@ -668,7 +696,7 @@ _REGISTRY: dict[str, dict] = {
         "routing": {
             "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
-        "coding_assemble": "deepseek-v4-flash",
+        "coding_assemble": "laguna-xs-2.1",    # 🇺🇸 Poolside ($0.06/$0.12) — dedicated coding agent (was deepseek-v4-flash)
         "coding_review":   "deepseek-v4-flash",
         "coding_spec":     "qwen3-coder-flash",
         "coding_tests":    "deepseek-v4-flash",
@@ -677,6 +705,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":         "deepseek-v4-flash",  # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing":  "ring-2.6-1t",
         "verifier":        "qwen3.7-plus",  # cross-lab from DeepSeek scoring
+        "post_synthesis_verify": "sonar",  # added v3.5
         },
         # Single-model fallback for the lighter coding roles (spec/tests/assemble)
         # that route through primary. codestral-2508 is fast (~3s), code-specialized,
@@ -686,7 +715,7 @@ _REGISTRY: dict[str, dict] = {
         },
         # Multi-model fallback chains (tried in order, with a quality gate that skips
         # empty/degraded/low-quality responses before moving to the next model):
-        #   - coding_generate: 1 primary + 2 fallbacks (Qwen → Mistral → DeepSeek)
+        #   - coding_generate: Qwen → Poolside → Mistral → DeepSeek (cross-lab, coding-optimized)
         #   - coding_review:   cross-lab critique (DeepSeek → Mistral → OpenAI)
         # deepseek-v4-flash leads both chains: reliable content (verified 2/2, no empty
         # trap), cheapest model here ($0.09/$0.18/M), 1M context, cross-lab from the Qwen
@@ -694,7 +723,7 @@ _REGISTRY: dict[str, dict] = {
         # codex-class but intermittently returns empty content on larger prompts (observed
         # live), so the quality gate handles it only as a final fallback, never as a primary.
         "cascading_routing": {
-            "coding_generate": ["qwen3-coder-flash", "codestral-2508", "grok-build-0.1", "deepseek-v4-flash"],
+            "coding_generate": ["qwen3-coder-flash", "laguna-xs-2.1", "codestral-2508", "grok-build-0.1", "deepseek-v4-flash"],
             "coding_review": ["deepseek-v4-flash", "mimo-v2.5-pro", "codestral-2508", "gpt-5.1-codex-mini"],
         },
         "tags": ["budget", "coding", "software-development"],
@@ -715,6 +744,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":         "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing":  "claude-sonnet",
         "verifier":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc from 🇺🇸 synthesis
+        "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "coding", "software-development"],
     },
@@ -729,6 +759,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
         "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "translation", "multilingual"],
     },
@@ -744,6 +775,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "gemini-pro-real",     # 🇺🇸 Google — multilingual cross-bloc critic of 🇨🇳 synthesis (was qwen 🇨🇳)
         "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "glm-5.2",             # Zhipu 🇨🇳 — distinct training signal for multilingual verification
+        "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "translation", "multilingual"],
     },
@@ -757,6 +789,7 @@ _REGISTRY: dict[str, dict] = {
             "perspective_cot": "nvidia-nemotron-super",
             "perspective_analysis": "nvidia-nemotron-super",
             "synthesis": "nvidia-nemotron-super",
+        "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["experimental", "nvidia"],
     },
@@ -773,6 +806,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
         "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "post_synthesis_verify": "sonar",  # added v3.5
         },
         "fallback_routing": {
             "primary": "claude-haiku",
@@ -793,6 +827,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "creative"],
     },
@@ -807,6 +842,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "deepseek-v4-flash",
         "stress_testing": "ring-2.6-1t",
         "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["image-generation", "creative", "budget"],
     },
@@ -822,6 +858,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "qwen3-max-thinking",
         "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["image-generation", "creative", "premium"],
     },
@@ -836,6 +873,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "qwen3.6-flash",         # Qwen 🇨🇳 — structured numerical evaluation
         "stress_testing": "ring-2.6-1t",           # InclusionAI 🇺🇸 — τ²-Bench proven adversarial testing
         "verifier":       "gemini-flash-lite-real", # Google 🇺🇸 — Gemini 3.1 Flash Lite, structured fact-checking
+        "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "iterative", "critique"],
     },
@@ -851,6 +889,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "qwen3-max-thinking",  # Qwen 🇨🇳 — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "grok-4.3",            # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
         "verifier":       "deepseek-v4-pro",     # DeepSeek 🇨🇳 — strong structured verification
+        "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "iterative", "critique"],
     },

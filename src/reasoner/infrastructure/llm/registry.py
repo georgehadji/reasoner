@@ -13,6 +13,7 @@ from reasoner.core.constants import (
     MODEL_GPT4O_MINI,
     MODEL_LAGUNA_XS_FREE,
     MODEL_LAGUNA_M_FREE,
+    MODEL_LAGUNA_XS_21,
     NVIDIA_BASE_URL,
     MODEL_GEMINI_31_FLASH_LITE_IMAGE,
 )
@@ -115,7 +116,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "ministral-8b":       {"model": "mistralai/mistral-small-3.2-24b-instruct"},
     # devstral-medium, devstral-small removed — no longer on OpenRouter
     # ═══════════════════════════════════════════════════════════════
-    # DeepSeek — V4 family only
+    # DeepSeek — V3.2 + V4 family
     # ═══════════════════════════════════════════════════════════════
     # V4 family: 1M ctx, MoE
     #   Pro:   1.6T total / 49B active — $0.435/$0.87  per M
@@ -133,6 +134,13 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
         "base": "https://api.deepseek.com/v1",
         "env": "DEEPSEEK_API_KEY",
         "extra_body": {"reasoning": {"effort": "high"}},
+    },
+    # V3.2: DeepSeek's VFM-tier model, strong reasoning at lower cost than V4
+    "deepseek-v3": {
+        "cls": "compat",
+        "model": "deepseek/deepseek-v3.2",            # $0.12/$0.50, 1M ctx — budget VFM
+        "base": "https://api.deepseek.com/v1",
+        "env": "DEEPSEEK_API_KEY",
     },
     # ═══════════════════════════════════════════════════════════════
     # Qwen (Alibaba) — 3.5 -> 3.7 series
@@ -187,6 +195,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ═══════════════════════════════════════════════════════════════
     MODEL_LAGUNA_XS_FREE: {"model": "poolside/laguna-xs.2:free"},
     MODEL_LAGUNA_M_FREE:  {"model": "poolside/laguna-m.1:free"},
+    MODEL_LAGUNA_XS_21:   {"model": "poolside/laguna-xs-2.1"},  # $0.06/$0.12 per M, 262K ctx — Poolside coding agent (Jul '26)
     # ═══════════════════════════════════════════════════════════════
     # GLM (Zhipu AI / z-ai)
     # ═══════════════════════════════════════════════════════════════

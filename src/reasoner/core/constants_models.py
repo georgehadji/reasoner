@@ -45,6 +45,7 @@ MODEL_MINIMAX_M1: str = "minimax-m1"
 # Poolside (temperature-supporting, non-OpenAI, cross-lab diversity)
 MODEL_LAGUNA_XS_FREE: str = "laguna-xs-free"
 MODEL_LAGUNA_M_FREE: str = "laguna-m-free"
+MODEL_LAGUNA_XS_21: str = "laguna-xs-2.1"
 
 # Xiaomi — MiMo series (v2.5, Apr 2026)
 MODEL_MIMO_V25_PRO: str = "mimo-v2.5-pro"
