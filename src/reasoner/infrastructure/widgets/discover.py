@@ -90,9 +90,9 @@ class DiscoverWidget(BaseWidget):
         results = []
         seen_urls = set()
         
-        # Search using SearXNG
+        # Search using multi-backend client
         for query in topic_config['queries']:
-            search_results = await self._search_searxng(query)
+            search_results = await self._search_web(query)
             
             for result in search_results[:5]:
                 url = result.get('url', '')
@@ -115,7 +115,7 @@ class DiscoverWidget(BaseWidget):
                 {
                     'title': f'Latest {topic} news - Demo Mode',
                     'url': f"https://{topic_config['sites'][0]}",
-                    'content': f'Install SearXNG for live {topic} content',
+                    'content': f'Configure search API keys for live {topic} content',
                     'source': topic_config['sites'][0],
                     'published': '',
                 },
@@ -128,31 +128,11 @@ class DiscoverWidget(BaseWidget):
             'sources': topic_config['sites'],
         }
     
-    async def _search_searxng(self, query: str) -> list[dict[str, Any]]:
-        """Search using SearXNG."""
-        import httpx
-        from reasoner.infrastructure.search.discovery import get_searxng_urls
-        
-        searxng_urls = get_searxng_urls()
-        
-        for url in searxng_urls:
-            from reasoner.core.constants import TIMEOUTS
-            try:
-                async with httpx.AsyncClient(timeout=TIMEOUTS.WIDGET_SHORT) as client:
-                    response = await client.get(
-                        url,
-                        params={
-                            'q': query,
-                            'format': 'json',
-                            'engines': 'bing news',
-                        },
-                    )
-                    
-                    if response.status_code == 200:
-                        data = response.json()
-                        return data.get('results', [])
-                        
-            except Exception:
-                continue
-        
-        return []
+    async def _search_web(self, query: str) -> list[dict[str, Any]]:
+        """Search using multi-backend search client."""
+        from reasoner.infrastructure.search.discovery import get_search_client
+        try:
+            client, _ = await get_search_client()
+            return await client.search(query, num_results=5)
+        except Exception:
+            return []

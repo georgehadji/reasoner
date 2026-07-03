@@ -6,11 +6,23 @@ from reasoner.phases._shared import get_language_instruction, _wrap_user_input
 PRE_MORTEM_FAILURE_SYSTEM = "You are an analytical assistant. Assume failure has already occurred and reconstruct why. Be specific and unflinching. Output ONLY valid JSON."
 
 def pre_mortem_failure_prompt(state: PipelineState) -> str:
+    web_context = ""
+    if state.web_discovery_results:
+        web_snippets = [
+            f"  - {r.get('title', '')}: {r.get('snippet', '')[:300]}"
+            for r in state.web_discovery_results[:5]
+            if r.get('title') or r.get('snippet')
+        ]
+        if web_snippets:
+            web_context = "\n\nRelevant real-world case studies of similar failures:\n" + "\n".join(web_snippets) + "\n"
+
     return (
         f'{get_language_instruction(state)}\n\n'
         f'Problem: {_wrap_user_input(state.problem)}\n\n'
+        f'{web_context}'
         f'It is exactly 1 year later. The solution to this problem catastrophically failed. '
-        f'Write the post-mortem as if it already happened. Be vivid, specific, and brutally honest.\n\n'
+        f'Write the post-mortem as if it already happened. Be vivid, specific, and brutally honest. '
+        f'Draw on the real-world case studies provided above for concrete details.\n\n'
         f'Output JSON: {{"scenario": "<failure scenario name>", '
         f'"what_happened": "<narrative of the failure>", '
         f'"immediate_triggers": ["<trigger>"], '

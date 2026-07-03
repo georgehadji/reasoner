@@ -52,6 +52,61 @@ def _normalize_sources_cited(
 
     return normalized
 
+async def run_writing_source_retrieval_phase(state: PipelineState, services: WorkflowServices) -> None:
+    """Retrieve sources to ground article writing."""
+    services.log("WRITING", "Retrieving sources for article...", state)
+    try:
+        raw_plan, meta = await services.call_llm(
+            role="primary",
+            system_prompt=phases.ARTICLE_RETRIEVAL_PLAN_SYSTEM,
+            user_prompt=phases.article_retrieval_plan_prompt(state),
+            state=state
+        )
+
+        # Sonar native path: parse inline citations
+        model_used = (meta or {}).get("model", "")
+        is_sonar = "sonar" in model_used.lower() or "perplexity" in model_used.lower()
+
+        if is_sonar:
+            from reasoner.application.flows.article_phases import _parse_sonar_citations
+            sources = _parse_sonar_citations(raw_plan)
+            if sources:
+                state.writing_state["retrieved_sources"] = sources
+                services.log("WRITING", f"Sonar retrieved {len(sources)} sources.", state)
+                return
+
+        # Standard path: JSON queries → external search
+        plan = extract_json(raw_plan)
+        queries = plan.get("queries", [])[:5]
+
+        from reasoner.presets import get_preset_price_tier
+        from reasoner.infrastructure.search.discovery import get_search_client_for_method
+        tier = get_preset_price_tier(state.preset_name) or "budget"
+        client, _ = await get_search_client_for_method("article", tier, source_type="general")
+
+        import asyncio as _asyncio
+        async def _search(q):
+            try: return await client.search(q, num_results=5)
+            except Exception: return []
+
+        results = await _asyncio.gather(*[_search(q) for q in queries], return_exceptions=True)
+        flattened = []
+        seen = set()
+        for r_list in results:
+            if isinstance(r_list, list):
+                for r in r_list:
+                    url = r.get("url", "")
+                    if url not in seen:
+                        seen.add(url)
+                        flattened.append(r)
+
+        state.writing_state["retrieved_sources"] = flattened
+        if flattened:
+            services.log("WRITING", f"Found {len(flattened)} sources.", state)
+    except Exception as e:
+        services.log("WRITING", f"Source retrieval failed: {e}", state)
+
+
 async def run_writing_outline_phase(state: PipelineState, services: WorkflowServices) -> None:
     services.log("WRITING", "Generating article outline from sources...", state)
     raw, _ = await services.call_llm(

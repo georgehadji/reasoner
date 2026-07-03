@@ -439,25 +439,14 @@ DISCOVER_TOPICS = {
 }
 
 
-async def search_searxng(query: str, engines: list[str] = None) -> list[dict[str, Any]]:
-    """Search using SearXNG."""
-    from reasoner.infrastructure.search.discovery import get_searxng_urls
-    searxng_urls = get_searxng_urls()
-    
-    for url in searxng_urls:
-        try:
-            async with httpx.AsyncClient(timeout=TIMEOUTS.WIDGET_SHORT) as client:
-                response = await client.get(
-                    url,
-                    params={"q": query, "format": "json", "engines": ",".join(engines) if engines else ""},
-                )
-                if response.status_code == 200:
-                    data = response.json()
-                    return data.get("results", [])
-        except Exception:
-            continue
-    
-    return []
+async def search_web(query: str, engines: list[str] = None) -> list[dict[str, Any]]:
+    """Search using multi-backend search client."""
+    from reasoner.infrastructure.search.discovery import get_search_client
+    try:
+        client, _ = await get_search_client()
+        return await client.search(query, num_results=10)
+    except Exception:
+        return []
 
 
 async def get_discover_content(topic: str = "tech", mode: str = "normal") -> dict[str, Any]:
@@ -476,10 +465,10 @@ async def get_discover_content(topic: str = "tech", mode: str = "normal") -> dic
 
     # Search for each query
     for query in topic_config["queries"]:
-        # Try SearXNG
-        searxng_results = await search_searxng(query, ["bing news"])
+        # Try multi-backend search
+        search_results = await search_web(query)
         
-        for result in searxng_results[:5]:
+        for result in search_results[:5]:
             if result.get("url") not in seen_urls:
                 seen_urls.add(result.get("url"))
                 results.append({
@@ -493,13 +482,13 @@ async def get_discover_content(topic: str = "tech", mode: str = "normal") -> dic
         if len(results) >= 10:
             break
     
-    # If no results from SearXNG, return curated list
+    # If no results from search, return curated list
     if not results:
         results = [
             {
                 "title": f"Latest {topic} news - Demo Mode",
                 "url": f"https://{topic_config['sites'][0]}",
-                "content": f"Install SearXNG for live {topic} content",
+                "content": f"Configure search API keys for live {topic} content",
                 "source": topic_config["sites"][0],
                 "published": "",
             },
@@ -517,34 +506,24 @@ async def get_discover_content(topic: str = "tech", mode: str = "normal") -> dic
 # IMAGE SEARCH
 # ─────────────────────────────────────────────────────────────────────
 
-def search_images(query: str, limit: int = 20) -> dict[str, Any]:
-    """Search for images using SearXNG."""
-    results = []
-    
-    # Try SearXNG
-    from reasoner.infrastructure.search.discovery import get_searxng_urls
-    searxng_urls = get_searxng_urls()
-    
-    for url in searxng_urls:
-        try:
-            response = httpx.get(
-                url,
-                params={"q": query, "format": "json", "categories": "images"},
-                timeout=TIMEOUTS.WIDGET_SHORT,
-            )
-            if response.status_code == 200:
-                data = response.json()
-                for result in data.get("results", [])[:limit]:
-                    results.append({
-                        "title": result.get("title", ""),
-                        "url": result.get("url", ""),
-                        "img_src": result.get("img_src", ""),
-                        "thumbnail": result.get("thumbnail", ""),
-                        "source": result.get("source", ""),
-                    })
-                break
-        except Exception:
-            continue
+async def search_images_async(query: str, limit: int = 20) -> dict[str, Any]:
+    """Search for images using multi-backend search client."""
+    from reasoner.infrastructure.search.discovery import get_search_client
+    try:
+        client, _ = await get_search_client()
+        results_raw = await client.search(query, num_results=limit)
+        results = [
+            {
+                "title": r.get("title", ""),
+                "url": r.get("url", ""),
+                "img_src": r.get("img_src", r.get("url", "")),
+                "thumbnail": r.get("thumbnail", ""),
+                "source": r.get("source", ""),
+            }
+            for r in results_raw
+        ]
+    except Exception:
+        results = []
     
     return {
         "query": query,
@@ -553,38 +532,49 @@ def search_images(query: str, limit: int = 20) -> dict[str, Any]:
     }
 
 
+def search_images(query: str, limit: int = 20) -> dict[str, Any]:
+    """Search for images (sync wrapper)."""
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    return loop.run_until_complete(search_images_async(query, limit))
+
+
 # ─────────────────────────────────────────────────────────────────────
 # VIDEO SEARCH
 # ─────────────────────────────────────────────────────────────────────
 
 def search_videos(query: str, limit: int = 20) -> dict[str, Any]:
-    """Search for videos using SearXNG."""
+    """Search for videos using multi-backend search."""
     results = []
     
-    # Try SearXNG
-    from reasoner.infrastructure.search.discovery import get_searxng_urls
-    searxng_urls = get_searxng_urls()
+    # Use multi-backend search
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
     
-    for url in searxng_urls:
-        try:
-            response = httpx.get(
-                url,
-                params={"q": query, "format": "json", "categories": "videos"},
-                timeout=TIMEOUTS.WIDGET_SHORT,
-            )
-            if response.status_code == 200:
-                data = response.json()
-                for result in data.get("results", [])[:limit]:
-                    results.append({
-                        "title": result.get("title", ""),
-                        "url": result.get("url", ""),
-                        "thumbnail": result.get("thumbnail", ""),
-                        "source": result.get("source", ""),
-                        "duration": result.get("duration", ""),
-                    })
-                break
-        except Exception:
-            continue
+    async def _search():
+        from reasoner.infrastructure.search.discovery import get_search_client
+        client, _ = await get_search_client()
+        return await client.search(query, num_results=limit)
+    
+    raw = loop.run_until_complete(_search())
+    results = [
+        {
+            "title": r.get("title", ""),
+            "url": r.get("url", ""),
+            "thumbnail": r.get("thumbnail", ""),
+            "source": r.get("source", ""),
+            "duration": r.get("duration", ""),
+        }
+        for r in raw
+    ]
     
     return {
         "query": query,

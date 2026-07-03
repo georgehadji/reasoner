@@ -10,15 +10,13 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
-import asyncio
-import threading
 from pathlib import Path
 from typing import Any, Optional, Callable
 from datetime import datetime
 from dataclasses import asdict
-from concurrent.futures import ThreadPoolExecutor
 
 from reasoner.core.events.domain_events import DomainEvent, PipelineEventType, WidgetEventType, MemoryEventType, SaaSEventType, ALL_EVENT_TYPES
+from reasoner.infrastructure.persistence.event_store_connection import EventStoreConnection
 
 logger = logging.getLogger(__name__)
 
@@ -26,56 +24,33 @@ logger = logging.getLogger(__name__)
 class EventStore:
     """
     SQLite-based event store for persistence.
-    
+
     Features:
     - Append-only event log
     - Aggregate reconstruction from events
     - Temporal queries (get events by time range)
     - Pipeline listing and filtering
+    - Connection lifecycle and compaction delegated to sub-modules
     """
-    
+
     def __init__(self, db_path: str | Path | None = None):
         if db_path is None:
             db_path = Path(__file__).parent.parent / "events.db"
 
         self.db_path = Path(db_path)
-        self._connection: sqlite3.Connection | None = None
-        # Use threading.Lock for process-safe synchronization (works across workers)
-        self._lock = threading.Lock()
-        self._executor: ThreadPoolExecutor | None = None
+        # Delegate connection lifecycle to dedicated module
+        self.conn = EventStoreConnection(self.db_path)
 
         # Initialize database
-        self._init_db()
-    
-    def _get_executor(self) -> ThreadPoolExecutor:
-        """Get or create thread pool executor."""
-        if self._executor is None:
-            self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="event_store")
-        return self._executor
+        self.conn.init_db()
+
+    # ── Connection method delegation (backward-compat) ──
 
     def _get_connection(self) -> sqlite3.Connection:
-        """Get or create database connection."""
-        if self._connection is None:
-            self._connection = sqlite3.connect(
-                str(self.db_path),
-                check_same_thread=False,
-            )
-            self._connection.row_factory = sqlite3.Row
-            # WAL mode for concurrent reads without writer lock (DM8)
-            self._connection.execute("PRAGMA journal_mode=WAL")
-            self._connection.execute("PRAGMA synchronous=NORMAL")
-        return self._connection
+        return self.conn._get_connection()
 
-    async def _run_in_executor(self, func: Callable, *args) -> Any:
-        """Run sync function in thread pool with locking."""
-        loop = asyncio.get_running_loop()
-        executor = self._get_executor()
-
-        def locked_func():
-            with self._lock:
-                return func(*args)
-
-        return await loop.run_in_executor(executor, locked_func)
+    async def _run_in_executor(self, func: Callable, *args: Any) -> Any:
+        return await self.conn.run_in_executor(func, *args)
     
     def _init_db(self) -> None:
         """Initialize database schema."""

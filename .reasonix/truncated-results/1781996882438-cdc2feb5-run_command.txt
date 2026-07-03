@@ -1,0 +1,383 @@
+$ git add -A && git commit -m "chore: cleanup temp scripts, finalize batch testing" && git push
+[killed after timeout]
+warning: in the working copy of '.claude/skills/reasoner-model-routing/SKILL.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.claude/skills/reasoner-pipeline/SKILL.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.claude/skills/reasoner-testing/SKILL.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.github/workflows/coverage.yml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.github/workflows/pr-architecture.yml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.github/workflows/test.yml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.reasonix/truncated-results/1780518393161-67c2a5be-run_command.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.reasonix/truncated-results/1780519022787-78a42e22-run_command.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.reasonix/truncated-results/1780866755565-9c5b7029-run_command.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.reasonix/truncated-results/1780866772396-17dce9f2-run_command.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.reasonix/truncated-results/1780866776022-c366cea8-run_command.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.reasonix/truncated-results/1781120922698-e9277179-web_fetch.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.reasonix/truncated-results/1781162184865-8996cc8f-run_command.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.reasonix/truncated-results/1781162499091-2e638dcb-run_command.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.reasonix/truncated-results/1781162518484-498ed9e7-run_command.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.reasonix/truncated-results/1781164163374-1a2a9ea9-run_command.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.reasonix/truncated-results/1781164189182-56abeaf7-run_command.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.reasonix/truncated-results/1781171537097-4ed0f276-web_fetch.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.reasonix/truncated-results/1781171545951-e660ffc0-run_command.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.reasonix/truncated-results/1781171608459-d7ea38dc-run_command.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.reasonix/truncated-results/1781189631102-fbee732b-run_command.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.reasonix/truncated-results/1781904684249-e3066d7e-web_fetch.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.reasonix/truncated-results/1781904763142-e4c46d02-web_fetch.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.reasonix/truncated-results/1781904776066-4bf73697-web_fetch.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.reasonix/truncated-results/1781904784848-0d0cfca9-web_fetch.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.reasonix/truncated-results/1781955099029-dbf2ab9e-web_fetch.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.reasonix/truncated-results/1781955105425-4f5b7194-run_command.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.reasonix/truncated-results/1781966260803-f2089a97-web_fetch.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.reasonix/truncated-results/1781973621569-d3d5a413-run_command.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.reasonix/truncated-results/1781976410448-ab13c689-web_fetch.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.reasonix/truncated-results/1781982342602-b499b761-run_command.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.reasonix/truncated-results/1781982955353-cd9337eb-run_command.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.reasonix/truncated-results/1781986184930-9a379b53-run_command.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.reasonix/truncated-results/1781986551009-4247806c-web_fetch.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.reasonix/truncated-results/1781986760034-6cb0aa0c-web_fetch.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.reasonix/truncated-results/1781987501032-12dcd295-run_skill.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.reasonix/truncated-results/1781992221353-531df2d9-run_command.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.reasonix/truncated-results/1781993466054-60a5eebb-run_command.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.tmp_manual_temp/run_prism_tests.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'REASONIX.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SSOT_FIX_PLAN.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'audit/01_EXECUTIVE_SUMMARY.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'audit/02_FINDINGS_REGISTER.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'audit/03_IMPLEMENTATION_PLAN.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'audit/04_IMPLEMENTATION_INSTRUCTIONS.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'audit/05_ARCHITECTURE_REVIEW.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'audit/06_TESTING_GAPS.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/ARCHITECTURAL_AUDIT_V5.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/AUDIT_REPORT.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/CODE_AS_HARNESS_ENHANCEMENT_PLAN.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/DEBATE_FIX_PLAN.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/DESIGN.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/E2E_ENCRYPTION_RESEARCH.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/ENHANCEMENT_PLAN.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/ENVIRONMENT.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/HARNESS_ENHANCEMENTS_PLAN.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/HEALTH_UPLIFT_PLAN.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/METHODS.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/METHOD_COMPARISON.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/MODEL_REPLACEMENT_GEMINI_FLASH_LITE.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/MULTI_BACKEND_SEARCH_PLAN.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/NEURO_MEMORY.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/OPENROUTER_IMPLEMENTATION_SUMMARY.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/OPENROUTER_MIGRATION.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/PHASE1_PLAN.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/PHASE2_PLAN.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/PHASE3_PLAN.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/PHASE4_PLAN.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/PHASE5_PLAN.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/PHASE6_PLAN.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/PHASE7_PLAN.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/PHASE8_PLAN.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/PHASE9_PLAN.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/PHASE_ENHANCEMENTS.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/PLAN_StrategyA_Step5_and_Tests.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/PLAN_StrategyB.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/POST_CRITIQUE_EPISTEMIC_FILTER_PLAN.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/SCALING.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/SEARCH_ENHANCEMENTS_PLAN.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/SETUP_MINDMAP.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/STRATEGY_A_EXECUTION_SUMMARY.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/SUGGESTIONS_PLAN.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/Temperature Values.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/UI_UX_AUDIT_AND_OPTIMIZATION_PLAN.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/UX_OPTIMIZATION.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/UX_OPTIMIZATION_RESEARCH.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/VERBALIZED_SAMPLING_PLAN.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/VS.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/agent_memory_structures_2.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/architecture-audit-2026-06-02.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/architecture-audit-finale-2026-06-02.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/architecture-refactoring-plan-v3-optimized.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/architecture-refactoring-plan-v3.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/bugs-b13-b17-b18-fix-plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/decisions/searxng-p0-implementation-plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/decisions/vs-constants.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/monitoring/README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/monitoring/alerts-reference.yml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/multi-perspective-fix-plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/p2a-event-retention-compaction-plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/prism-integration-plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/reasoner-self-analysis-plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/security/threat-model.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/v3.1-implementation-plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'node_modules/@supabase/ssr/docs/design.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'parse_models.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tasks/arch-score-9-plan-v2.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tasks/bayesian-bug-hunt-prompt.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tasks/cove-bug-hunt-prompt.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tasks/multi-perspective-bug-hunt-prompt.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tasks/pre-mortem-bug-hunt-prompt.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tasks/reasoner-self-analysis-prompt.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tasks/socratic-bug-hunt-prompt.txt', LF will be replaced by CRLF the next time Git touches it
+E:\Documents\Vibe-Coding\Reasoner\.git\hooks/post-commit: line 23: warning: command substitution: ignored null byte in input
+[graphify hook] launching background rebuild (log: /c/Users/tesse/.cache/graphify-rebuild.log)
+[mindmap] No metadata changes detected.
+[main 0bba257] chore: cleanup temp scripts, finalize batch testing
+ 3832 files changed, 10336992 insertions(+), 279159 deletions(-)
+ create mode 100644 .claude/skills/reasoner-model-routing/SKILL.md
+ create mode 100644 .claude/skills/reasoner-pipeline/SKILL.md
+ create mode 100644 .claude/skills/reasoner-testing/SKILL.md
+ create mode 100644 .github/workflows/coverage.yml
+ create mode 100644 .github/workflows/pr-architecture.yml
+ create mode 100644 .github/workflows/test.yml
+ create mode 100644 .graphify_python
+ create mode 100644 .reasonix/truncated-results/1780518393161-67c2a5be-run_command.txt
+ create mode 100644 .reasonix/truncated-results/1780519022787-78a42e22-run_command.txt
+ create mode 100644 .reasonix/truncated-results/1780866755565-9c5b7029-run_command.txt
+ create mode 100644 .reasonix/truncated-results/1780866772396-17dce9f2-run_command.txt
+ create mode 100644 .reasonix/truncated-results/1780866776022-c366cea8-run_command.txt
+ create mode 100644 .reasonix/truncated-results/1781120922698-e9277179-web_fetch.txt
+ create mode 100644 .reasonix/truncated-results/1781162184865-8996cc8f-run_command.txt
+ create mode 100644 .reasonix/truncated-results/1781162499091-2e638dcb-run_command.txt
+ create mode 100644 .reasonix/truncated-results/1781162518484-498ed9e7-run_command.txt
+ create mode 100644 .reasonix/truncated-results/1781164163374-1a2a9ea9-run_command.txt
+ create mode 100644 .reasonix/truncated-results/1781164189182-56abeaf7-run_command.txt
+ create mode 100644 .reasonix/truncated-results/1781171537097-4ed0f276-web_fetch.txt
+ create mode 100644 .reasonix/truncated-results/1781171545951-e660ffc0-run_command.txt
+ create mode 100644 .reasonix/truncated-results/1781171608459-d7ea38dc-run_command.txt
+ create mode 100644 .reasonix/truncated-results/1781189631102-fbee732b-run_command.txt
+ create mode 100644 .reasonix/truncated-results/1781904684249-e3066d7e-web_fetch.txt
+ create mode 100644 .reasonix/truncated-results/1781904763142-e4c46d02-web_fetch.txt
+ create mode 100644 .reasonix/truncated-results/1781904776066-4bf73697-web_fetch.txt
+ create mode 100644 .reasonix/truncated-results/1781904784848-0d0cfca9-web_fetch.txt
+ create mode 100644 .reasonix/truncated-results/1781955099029-dbf2ab9e-web_fetch.txt
+ create mode 100644 .reasonix/truncated-results/1781955105425-4f5b7194-run_command.txt
+ create mode 100644 .reasonix/truncated-results/1781966260803-f2089a97-web_fetch.txt
+ create mode 100644 .reasonix/truncated-results/1781973621569-d3d5a413-run_command.txt
+ create mode 100644 .reasonix/truncated-results/1781976410448-ab13c689-web_fetch.txt
+ create mode 100644 .reasonix/truncated-results/1781982342602-b499b761-run_command.txt
+ create mode 100644 .reasonix/truncated-results/1781982955353-cd9337eb-run_command.txt
+ create mode 100644 .reasonix/truncated-results/1781986184930-9a379b53-run_command.txt
+ create mode 100644 .reasonix/truncated-results/1781986551009-4247806c-web_fetch.txt
+ create mode 100644 .reasonix/truncated-results/1781986760034-6cb0aa0c-web_fetch.txt
+ create mode 100644 .reasonix/truncated-results/1781987501032-12dcd295-run_skill.txt
+ create mode 100644 .reasonix/truncated-results/1781992221353-531df2d9-run_command.txt
+ create mode 100644 .reasonix/truncated-results/1781993466054-60a5eebb-run_command.txt
+ create mode 100644 .tmp_manual_temp/run_prism_tests.py
+ create mode 100644 REASONIX.md
+ create mode 100644 SSOT_FIX_PLAN.md
+ create mode 100644 audit/01_EXECUTIVE_SUMMARY.md
+ create mode 100644 audit/02_FINDINGS_REGISTER.md
+ create mode 100644 audit/03_IMPLEMENTATION_PLAN.md
+ create mode 100644 audit/04_IMPLEMENTATION_INSTRUCTIONS.md
+ create mode 100644 audit/05_ARCHITECTURE_REVIEW.md
+ create mode 100644 audit/06_TESTING_GAPS.md
+ create mode 100644 cache/tokens/0083ffc66887f564b53a978c6f862eb0.json
+ create mode 100644 cache/tokens/0445d12ac9205454c2caa276bbabc6ed.json
+ create mode 100644 cache/tokens/0682e9e84b3861d81befc115d7111118.json
+ create mode 100644 cache/tokens/077a30ab3a15eb2d3a1003e579f17888.json
+ create mode 100644 cache/tokens/079c4cfecbeacbcba171c16f35fa5355.json
+ create mode 100644 cache/tokens/0859f85b0a78e5ca75f119b3a9471d8f.json
+ create mode 100644 cache/tokens/09a56480ac332858297367d51e40b160.json
+ create mode 100644 cache/tokens/09f5cf6ef95c16561f20156ffbfdb2a7.json
+ create mode 100644 cache/tokens/12fb5150cc4b5bbd17aebeae54fb9e9f.json
+ create mode 100644 cache/tokens/13ebd34d23dc74315498b6164b6acc9c.json
+ create mode 100644 cache/tokens/1764850de8123cb977ef40f825712810.json
+ create mode 100644 cache/tokens/179c7053bab7dccda16c89b642a15474.json
+ create mode 100644 cache/tokens/18c76e8730639a0e2bbb68c0d6dc8f3e.json
+ create mode 100644 cache/tokens/193fc179e3098412df3a3446507cbe55.json
+ create mode 100644 cache/tokens/21d43ea2cf0d304a75abac0961f0d54b.json
+ create mode 100644 cache/tokens/276072efd281b647d8ec89d0fff9af8a.json
+ create mode 100644 cache/tokens/335e900952c8708ba46b3b3504984afe.json
+ create mode 100644 cache/tokens/341f32284c3c935e2945369f0bd7a7c1.json
+ create mode 100644 cache/tokens/39e7fe5ce9ea5c5c4793e063edd21cf8.json
+ create mode 100644 cache/tokens/3b7b69cac6cad2543c2ab7422bc66b92.json
+ create mode 100644 cache/tokens/42282db48866549941aa055ac6372d1c.json
+ create mode 100644 cache/tokens/444a3628c552654393da25539098b5de.json
+ create mode 100644 cache/tokens/451a796c84ba1ce504dadae7697d7db8.json
+ create mode 100644 cache/tokens/49ba47f268c8a0ba0be8da93b0bb8cd7.json
+ create mode 100644 cache/tokens/4d27747aaf7b4bced7398c3ffc14802e.json
+ create mode 100644 cache/tokens/50800a637a17936f70bc4aacdb3a7a28.json
+ create mode 100644 cache/tokens/54de850324b2586c9168bb8d91b78c06.json
+ create mode 100644 cache/tokens/553a850b4dd56fd767646d4fe65a9ad7.json
+ create mode 100644 cache/tokens/565e57771d63f820bc40aac1aaa53641.json
+ create mode 100644 cache/tokens/56ac4bf44f25ac7e4d0068fb3756a073.json
+ create mode 100644 cache/tokens/56cb41489a4921a52b004b1917e0c052.json
+ create mode 100644 cache/tokens/60ab399ddf7e63b3759715f180373cc0.json
+ create mode 100644 cache/tokens/66d7d43b838fdffb20951f0557b8807e.json
+ create mode 100644 cache/tokens/686dac0dc8941180ec106fdb05c0f361.json
+ create mode 100644 cache/tokens/6c097971fe8021a767c3198475ce0598.json
+ create mode 100644 cache/tokens/6d834a67157c5f149618bb85617a7876.json
+ create mode 100644 cache/tokens/6db8f0886dee619597f5e1856f1daa31.json
+ create mode 100644 cache/tokens/6ec3ae1a09541b94890c1f18f66c7266.json
+ create mode 100644 cache/tokens/6fe74d51a68f2dda248bd13f7ae7a2ca.json
+ create mode 100644 cache/tokens/74bbd2c3fd1b3ee98a1254461db0c7b9.json
+ create mode 100644 cache/tokens/77efbd3d08be7c1e7b475f70d85881e1.json
+ create mode 100644 cache/tokens/7b31f383ae4d1a8d16a907e87c9678d7.json
+ create mode 100644 cache/tokens/7b511cc28e3864e7a4b7c02fecca917e.json
+ create mode 100644 cache/tokens/825e7904dd5ca27ea0268918b5ea9e6c.json
+ create mode 100644 cache/tokens/865778695a08e506db801efaf827d30f.json
+ create mode 100644 cache/tokens/87f9910a462bb0df3f8ac9922da746d3.json
+ create mode 100644 cache/tokens/8d0149e6079a1c457a58c5a96315b7c8.json
+ create mode 100644 cache/tokens/8e72452929dfdabdd0ddd4104b6ec2ba.json
+ create mode 100644 cache/tokens/908bb29335c95acac2dfd3795ef5bad7.json
+ create mode 100644 cache/tokens/92f5ed76910a7841a51827d2618958a5.json
+ create mode 100644 cache/tokens/9a75f4329e426d56d8d943c73a57970b.json
+ create mode 100644 cache/tokens/a006b40987cc772e3133c2e0e3f87182.json
+ create mode 100644 cache/tokens/a1a8bd159af2ea8c31accd5514544da0.json
+ create mode 100644 cache/tokens/a528dbe160893ed6268772c8fc04e637.json
+ create mode 100644 cache/tokens/a73cb415bba5c383ce72769932c3ee16.json
+ create mode 100644 cache/tokens/ab81492e8180aebecb7513dc5b53f3d6.json
+ create mode 100644 cache/tokens/ac54a51e394048e56a628528582adf14.json
+ create mode 100644 cache/tokens/b231c36ef71b6a7981f66ced23c954b4.json
+ create mode 100644 cache/tokens/b6fc27896225bba307b53e9e65cf6c65.json
+ create mode 100644 cache/tokens/bd3de3e3e23590400dc99ea9123b0700.json
+ create mode 100644 cache/tokens/c042c93e2624c1e1daad74af2b6271ad.json
+ create mode 100644 cache/tokens/c1bba995b9ad042c5510e6a7604595d4.json
+ create mode 100644 cache/tokens/c2bfdf09eae035ff6aa307c0bea4068d.json
+ create mode 100644 cache/tokens/cb1135f3021cdf342ae9a551f69ab6cf.json
+ create mode 100644 cache/tokens/cbc6bafb35ace55c546bcf26afddf4b0.json
+ create mode 100644 cache/tokens/cbcb9e2a5b6b1606e0d3c3a54b084cd8.json
+ create mode 100644 cache/tokens/ce868e64e274d14f05ab396ead161d07.json
+ create mode 100644 cache/tokens/e15d510ccf2ae813725081e47efdb4ae.json
+ create mode 100644 cache/tokens/e16344bbeb2032aa5487b94a718d2aff.json
+ create mode 100644 cache/tokens/e223b0a6bdb160a335087dee35a1e258.json
+ create mode 100644 cache/tokens/e673b72b008d9efcb8e5a8d5c050117b.json
+ create mode 100644 cache/tokens/ea9079b36d5cc36e4b9c9dfdadece62e.json
+ create mode 100644 cache/tokens/ecc8cfa2a15d27a9817b848bdb5a2399.json
+ create mode 100644 cache/tokens/eef9ffc3ab239daf1033ce6af6d9cfd8.json
+ create mode 100644 cache/tokens/f0930c2cfd33a05a2b5242f0cc659d37.json
+ create mode 100644 cache/tokens/f134794ca48ede1bf0d495f972ffaa74.json
+ create mode 100644 cache/tokens/f191b1f1819f64cfd3919db8cb4f3985.json
+ create mode 100644 cache/tokens/f5e9944b545e0cd1050996e4efd8a4f6.json
+ create mode 100644 cache/tokens/f84916c38864ac0298eaad8c9718c651.json
+ create mode 100644 cache/tokens/fa750620da6138d761f07ac7f929398a.json
+ create mode 100644 cache/tokens/fb3b098f300ae8501b91165fa73bdcce.json
+ create mode 100644 cache/tokens/fc52d56347b9ea3db21256aa12eab17a.json
+ create mode 100644 cache/tokens/fd33709ad4d897940c94c60cb20552a3.json
+ create mode 100644 cache/tokens/ff584c2bce25f63913e416f9bdd9cd82.json
+ create mode 100644 check_config.py
+ create mode 100644 check_keys.py
+ create mode 100644 docs/ARCHITECTURAL_AUDIT_V5.md
+ create mode 100644 docs/AUDIT_REPORT.md
+ create mode 100644 docs/CODE_AS_HARNESS_ENHANCEMENT_PLAN.md
+ create mode 100644 docs/Color Palette.txt
+ create mode 100644 docs/DEBATE_FIX_PLAN.md
+ create mode 100644 docs/DESIGN.md
+ create mode 100644 docs/E2E_ENCRYPTION_RESEARCH.md
+ create mode 100644 docs/ENHANCEMENT_PLAN.md
+ create mode 100644 docs/ENVIRONMENT.md
+ create mode 100644 docs/HARNESS_ENHANCEMENTS_PLAN.md
+ create mode 100644 docs/HEALTH_UPLIFT_PLAN.md
+ create mode 100644 docs/METHODS.md
+ create mode 100644 docs/METHOD_COMPARISON.md
+ create mode 100644 docs/MODEL_REPLACEMENT_GEMINI_FLASH_LITE.md
+ create mode 100644 docs/MULTI_BACKEND_SEARCH_PLAN.md
+ create mode 100644 docs/NEURO_MEMORY.md
+ create mode 100644 docs/OPENROUTER_IMPLEMENTATION_SUMMARY.md
+ create mode 100644 docs/OPENROUTER_MIGRATION.md
+ create mode 100644 docs/PHASE1_PLAN.md
+ create mode 100644 docs/PHASE2_PLAN.md
+ create mode 100644 docs/PHASE3_PLAN.md
+ create mode 100644 docs/PHASE4_PLAN.md
+ create mode 100644 docs/PHASE5_PLAN.md
+ create mode 100644 docs/PHASE6_PLAN.md
+ create mode 100644 docs/PHASE7_PLAN.md
+ create mode 100644 docs/PHASE8_PLAN.md
+ create mode 100644 docs/PHASE9_PLAN.md
+ create mode 100644 docs/PHASE_ENHANCEMENTS.md
+ create mode 100644 docs/PLAN_StrategyA_Step5_and_Tests.md
+ create mode 100644 docs/PLAN_StrategyB.md
+ create mode 100644 docs/POST_CRITIQUE_EPISTEMIC_FILTER_PLAN.md
+ create mode 100644 docs/SCALING.md
+ create mode 100644 docs/SEARCH_ENHANCEMENTS_PLAN.md
+ create mode 100644 docs/SETUP_MINDMAP.md
+ create mode 100644 docs/STRATEGY_A_EXECUTION_SUMMARY.md
+ create mode 100644 docs/SUGGESTIONS_PLAN.md
+ create mode 100644 docs/Temperature Values.txt
+ create mode 100644 docs/UI_UX_AUDIT_AND_OPTIMIZATION_PLAN.md
+ create mode 100644 docs/UX_OPTIMIZATION.md
+ create mode 100644 docs/UX_OPTIMIZATION_RESEARCH.md
+ create mode 100644 docs/VERBALIZED_SAMPLING_PLAN.md
+ create mode 100644 docs/VS.md
+ create mode 100644 docs/agent_memory_structures_2.md
+ create mode 100644 docs/architecture-audit-2026-06-02.md
+ create mode 100644 docs/architecture-audit-finale-2026-06-02.md
+ create mode 100644 docs/architecture-refactoring-plan-v3-optimized.md
+ create mode 100644 docs/architecture-refactoring-plan-v3.md
+ create mode 100644 docs/bugs-b13-b17-b18-fix-plan.md
+ create mode 100644 docs/decisions/searxng-p0-implementation-plan.md
+ create mode 100644 docs/decisions/vs-constants.md
+ create mode 100644 docs/model_routing_research.md
+ create mode 100644 docs/monitoring/README.md
+ create mode 100644 docs/monitoring/alerts-reference.yml
+ create mode 100644 docs/multi-perspective-fix-plan.md
+ create mode 100644 docs/openrouter_final_recommendations.md
+ create mode 100644 docs/openrouter_models.json
+ create mode 100644 docs/openrouter_models_formatted.txt
+ create mode 100644 docs/openrouter_recommendations.md
+ create mode 100644 docs/p2a-event-retention-compaction-plan.md
+ create mode 100644 docs/prism-integration-plan.md
+ create mode 100644 docs/prompting.md
+ create mode 100644 docs/reasoner-self-analysis-plan.md
+ create mode 100644 docs/security/threat-model.md
+ create mode 100644 docs/v3.1-implementation-plan.md
+ create mode 100644 "docs/\316\225\317\201\317\211\317\204\316\256\316\274\316\261\317\204\316\261 \316\261\316\275\316\254 Method.txt"
+ create mode 100644 graphify-out/2026-06-02/.graphify_labels.json
+ create mode 100644 graphify-out/2026-06-02/GRAPH_REPORT.md
+ create mode 100644 graphify-out/2026-06-02/cost.json
+ create mode 100644 graphify-out/2026-06-02/graph.json
+ create mode 100644 graphify-out/2026-06-02/manifest.json
+ create mode 100644 graphify-out/2026-06-06/.graphify_labels.json
+ create mode 100644 graphify-out/2026-06-06/GRAPH_REPORT.md
+ create mode 100644 graphify-out/2026-06-06/cost.json
+ create mode 100644 graphify-out/2026-06-06/graph.json
+ create mode 100644 graphify-out/2026-06-06/manifest.json
+ create mode 100644 graphify-out/2026-06-08/.graphify_labels.json
+ create mode 100644 graphify-out/2026-06-08/GRAPH_REPORT.md
+ create mode 100644 graphify-out/2026-06-08/cost.json
+ create mode 100644 graphify-out/2026-06-08/graph.json
+ create mode 100644 graphify-out/2026-06-08/manifest.json
+ create mode 100644 graphify-out/2026-06-09/.graphify_labels.json
+ create mode 100644 graphify-out/2026-06-09/GRAPH_REPORT.md
+ create mode 100644 graphify-out/2026-06-09/cost.json
+ create mode 100644 graphify-out/2026-06-09/graph.json
+ create mode 100644 graphify-out/2026-06-09/manifest.json
+ create mode 100644 graphify-out/2026-06-10/.graphify_labels.json
+ create mode 100644 graphify-out/2026-06-10/GRAPH_REPORT.md
+ create mode 100644 graphify-out/2026-06-10/cost.json
+ create mode 100644 graphify-out/2026-06-10/graph.json
+ create mode 100644 graphify-out/2026-06-10/manifest.json
+ create mode 100644 graphify-out/2026-06-11/.graphify_labels.json
+ create mode 100644 graphify-out/2026-06-11/GRAPH_REPORT.md
+ create mode 100644 graphify-out/2026-06-11/cost.json
+ create mode 100644 graphify-out/2026-06-11/graph.json
+ create mode 100644 graphify-out/2026-06-11/manifest.json
+ create mode 100644 graphify-out/2026-06-12/.graphify_labels.json
+ create mode 100644 graphify-out/2026-06-12/GRAPH_REPORT.md
+ create mode 100644 graphify-out/2026-06-12/cost.json
+ create mode 100644 graphify-out/2026-06-12/graph.json
+ create mode 100644 graphify-out/2026-06-12/manifest.json
+ create mode 100644 graphify-out/2026-06-14/.graphify_labels.json
+ create mode 100644 graphify-out/2026-06-14/GRAPH_REPORT.md
+ create mode 100644 graphify-out/2026-06-14/cost.json
+ create mode 100644 graphify-out/2026-06-14/graph.json
+ create mode 100644 graphify-out/2026-06-14/manifest.json
+ create mode 100644 graphify-out/2026-06-15/.graphify_labels.json
+ create mode 100644 graphify-out/2026-06-15/GRAPH_REPORT.md
+ create mode 100644 graphify-out/2026-06-15/cost.json
+ create mode 100644 graphify-out/2026-06-15/graph.json
+ create mode 100644 graphify-out/2026-06-15/manifest.json
+ create mode 100644 graphify-out/2026-06-19/.graphify_labels.json
+ create mode 100644 graphify-out/2026-06-19/GRAPH_REPORT.md
+ create mode 100644 graphify-out/2026-06-19/cost.json
+ create mode 100644 graphify-out/2026-06-19/graph.json
+ create mode 100644 graphify-out/2026-06-19/manifest.json
+ create mode 100644 graphify-out/2026-06-20/.graphify_labels.json
+ create mode 100644 graphify-out/2026-06-20/GRAPH_REPORT.md
+ create mode 100644 graphify-out/2026-06-20/cost.json
+ create mode 100644 graphify-out/2026-06-20/graph.json
+ create mode 100644 graphify-out/2026-06-20/manifest.json
+ create mode 100644 graphify-out/2026-06-21/.graphify_labels.json
+ create mode 100644 graphify-out/2026-06-21/GRAPH_REPORT.md
+ create mode 100644 graphify-out/2026-06-21/cost.json
+ create mode 100644 graphify-out/2026-06-21/graph.json
+ create mode 100644 graphify-out/2026-06-21/manifest.json
+ create mode 100644 graphify-out/cache/ast/0014e24c33c02b45d697b1b7db822ae97f294ae0ee316a2fb2cad8b14076f37b.json
+ create mode 100644 graphify-out/cache/ast/0
+
+[… truncated 224000 chars …]

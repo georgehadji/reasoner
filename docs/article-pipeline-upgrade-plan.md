@@ -1,6 +1,6 @@
 # Article Pipeline — Editorial Methodology Upgrade Plan
 
-**Status:** Draft  
+**Status:** In Progress  
 **Last updated:** 2026-07-03  
 **Scope:** `src/reasoner/application/flows/article*.py`, `src/reasoner/phases/article.py`, `src/reasoner/domain/preset_registry.py`, `src/reasoner/domain/preset_core.py`
 

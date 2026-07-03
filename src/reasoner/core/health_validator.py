@@ -95,7 +95,7 @@ async def validate_all() -> HealthReport:
     report.results.append(ValidationResult(
         feature="Perplexity Search (OpenRouter)",
         enabled=or_ok,
-        reason="OpenRouter key available — Perplexity search enabled" if or_ok else "OPENROUTER_API_KEY missing — web search will use SearXNG fallback",
+        reason="OpenRouter key available — Perplexity search enabled" if or_ok else "OPENROUTER_API_KEY missing — web search will use Tavily/Brave fallback",
     ))
 
     # ── 4. Perplexity Embed (native API, opt-in via neuro.yaml) ──
@@ -125,36 +125,21 @@ async def validate_all() -> HealthReport:
             reason="Active" if settings.DOCUMENT_SEMANTIC_RETRIEVAL_ENABLED else "Disabled by configuration (opt-in)",
         ))
 
-    # ── 5. SearXNG ──
-    searxng_url = settings.SEARXNG_URL
-    searxng_ok = False
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            resp = await client.head(searxng_url, follow_redirects=True)
-            searxng_ok = resp.status_code < 500
-    except Exception:
-        pass
-
+    # ── 5. Tavily Search ──
+    tavily_ok = bool(settings.TAVILY_API_KEY and settings.TAVILY_SEARCH_ENABLED)
     report.results.append(ValidationResult(
-        feature="SearXNG Search",
-        enabled=searxng_ok,
-        reason=f"Responding at {searxng_url}" if searxng_ok else f"Unreachable at {searxng_url} — web search will return empty results",
+        feature="Tavily Search",
+        enabled=tavily_ok,
+        reason="TAVILY_API_KEY configured and enabled" if tavily_ok else "TAVILY_API_KEY missing or disabled — will use Brave/Perplexity fallback",
     ))
 
-    # ── 6. SearXNG Secret (SEC-026) ──
-    searxng_secret = settings.SEARXNG_SECRET_KEY
-    if not searxng_secret or searxng_secret == "!not_set_change_me!":
-        report.results.append(ValidationResult(
-            feature="SearXNG Security",
-            enabled=False,
-            reason="SEARXNG_SECRET_KEY is not set or uses default — set a strong secret in .env",
-        ))
-    else:
-        report.results.append(ValidationResult(
-            feature="SearXNG Security",
-            enabled=True,
-            reason="SEARXNG_SECRET_KEY is configured",
-        ))
+    # ── 6. Brave Search ──
+    brave_ok = bool(settings.BRAVE_SEARCH_API_KEY and settings.BRAVE_SEARCH_ENABLED)
+    report.results.append(ValidationResult(
+        feature="Brave Search",
+        enabled=brave_ok,
+        reason="BRAVE_SEARCH_API_KEY configured and enabled" if brave_ok else "BRAVE_SEARCH_API_KEY missing or disabled — will use Perplexity fallback",
+    ))
 
     logger.info("\n%s", report.summary())
     return report

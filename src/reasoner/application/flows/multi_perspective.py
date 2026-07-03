@@ -6,6 +6,7 @@ from typing import List
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.application.flows.base import WorkflowStrategy, WorkflowServices, PhaseStep
 from reasoner.application.flows.perspective_phases import (
+    run_multi_perspective_research_phase,
     run_perspectives_phase,
     run_critique_phase,
     run_stress_test_phase
@@ -24,6 +25,7 @@ class MultiPerspectiveFlow(WorkflowStrategy):
     
     def get_phases(self, state: PipelineState) -> List[PhaseStep]:
         phases = [
+            PhaseStep(1.5, "Evidence Search", run_multi_perspective_research_phase, _ser_2),
             PhaseStep(2, "Perspectives", run_perspectives_phase, _ser_2),
             PhaseStep(3, "Critique & Pruning", run_critique_phase, _ser_3, critical=True),
         ]

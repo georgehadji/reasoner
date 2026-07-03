@@ -1,0 +1,171 @@
+Search Filters - Perplexity
+https://docs.perplexity.ai/docs/sonar/filters
+
+<!DOCTYPE html>Search Filters - Perplexity
+
+Documentation Index
+
+Fetch the complete documentation index at: /llms.txt
+
+Use this file to discover all available pages before exploring further.
+
+Skip to main content
+
+For AI agents: see the complete llms.txt documentation index.
+
+Perplexity home page
+
+Docs
+
+Cookbook
+
+API Reference
+
+Search...
+
+Navigation
+
+Features
+
+Search Filters
+
+Features
+
+Search Filters
+
+Copy page
+
+Control and customize Sonar API search results with filters
+
+Copy page
+
+Control which websites appear in search results, filter by date and location, target specific languages, and fine-tune search behavior using Sonar API filters.
+
+​
+
+Domain Filters
+
+Control which websites are included or excluded from search results using search_domain_filter. Supports both domain-level and URL-level filtering.
+Key parameters:
+
+search_domain_filter: Array of domains or URLs (max 20)
+
+Allowlist mode: Include only specified domains (no prefix)
+
+Denylist mode: Exclude domains (prefix with -)
+
+<code language="python" numberOfLines="17"><span class="line"><span style="color:#CF222E;--shiki-dark:#C586C0">from</span><span style="color:#1F2328;--shiki-dark:#D4D4D4"> perplexity </span><span style="color:#CF222E;--shiki-dark:#C586C0">import</span><span style="color:#1F2328;--shiki-dark:#D4D4D4"> Perplexity</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#1F2328;--shiki-dark:#D4D4D4">client </span><span style="color:#CF222E;--shiki-dark:#D4D4D4">=</span><span style="color:#1F2328;--shiki-dark:#D4D4D4"> Perplexity()</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6E7781;--shiki-dark:#6A9955"># Allowlist: Only search specific domains</span></span>
+<span class="line"><span style="color:#1F2328;--shiki-dark:#D4D4D4">completion </span><span style="color:#CF222E;--shiki-dark:#D4D4D4">=</span><span style="color:#1F2328;--shiki-dark:#D4D4D4"> client.chat.completions.create(</span></span>
+<span class="line"><span style="color:#953800;--shiki-dark:#9CDCFE"> model</span><span style="color:#CF222E;--shiki-dark:#D4D4D4">=</span><span style="color:#0A3069;--shiki-dark:#CE9178">"sonar"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#953800;--shiki-dark:#9CDCFE"> messages</span><span style="color:#CF222E;--shiki-dark:#D4D4D4">=</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">[{</span><span style="color:#0A3069;--shiki-dark:#CE9178">"role"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"user"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">, </span><span style="color:#0A3069;--shiki-dark:#CE9178">"content"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"Explain how LIGO detects gravitational waves and summarize the GW150914 binary black hole merger detection."</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">}],</span></span>
+<span class="line"><span style="color:#953800;--shiki-dark:#9CDCFE"> search_domain_filter</span><span style="color:#CF222E;--shiki-dark:#D4D4D4">=</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">[</span><span style="color:#0A3069;--shiki-dark:#CE9178">"nasa.gov"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">, </span><span style="color:#0A3069;--shiki-dark:#CE9178">"wikipedia.org"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">, </span><span style="color:#0A3069;--shiki-dark:#CE9178">"space.com"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">]</span></span>
+<span class="line"><span style="color:#1F2328;--shiki-dark:#D4D4D4">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6E7781;--shiki-dark:#6A9955"># Denylist: Exclude specific domains</span></span>
+<span class="line"><span style="color:#1F2328;--shiki-dark:#D4D4D4">completion </span><span style="color:#CF222E;--shiki-dark:#D4D4D4">=</span><span style="color:#1F2328;--shiki-dark:#D4D4D4"> client.chat.completions.create(</span></span>
+<span class="line"><span style="color:#953800;--shiki-dark:#9CDCFE"> model</span><span style="color:#CF222E;--shiki-dark:#D4D4D4">=</span><span style="color:#0A3069;--shiki-dark:#CE9178">"sonar"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#953800;--shiki-dark:#9CDCFE"> messages</span><span style="color:#CF222E;--shiki-dark:#D4D4D4">=</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">[{</span><span style="color:#0A3069;--shiki-dark:#CE9178">"role"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"user"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">, </span><span style="color:#0A3069;--shiki-dark:#CE9178">"content"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"Explain the dominant grid-scale battery storage chemistries (lithium-ion, vanadium flow, sodium-ion): operating principle, typical use case, and cost dimensions."</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">}],</span></span>
+<span class="line"><span style="color:#953800;--shiki-dark:#9CDCFE"> search_domain_filter</span><span style="color:#CF222E;--shiki-dark:#D4D4D4">=</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">[</span><span style="color:#0A3069;--shiki-dark:#CE9178">"-reddit.com"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">, </span><span style="color:#0A3069;--shiki-dark:#CE9178">"-pinterest.com"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">]</span></span>
+<span class="line"><span style="color:#1F2328;--shiki-dark:#D4D4D4">)</span></span>
+</code>
+
+Response — Explain how LIGO detects gravitational waves and summarize the GW150914 binary black ho...
+
+<code language="json" numberOfLines="131"><span class="line"><span style="color:#1F2328;--shiki-dark:#D4D4D4">{</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "id"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"f5e40c51-a377-4599-bde4-851660e90515"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "choices"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: [</span></span>
+<span class="line"><span style="color:#1F2328;--shiki-dark:#D4D4D4"> {</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "delta"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: {</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "content"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">""</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "role"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"assistant"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "reasoning_steps"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0550AE;--shiki-dark:#569CD6">null</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "tool_call_id"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0550AE;--shiki-dark:#569CD6">null</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "tool_calls"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0550AE;--shiki-dark:#569CD6">null</span></span>
+<span class="line"><span style="color:#1F2328;--shiki-dark:#D4D4D4"> },</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "index"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0550AE;--shiki-dark:#B5CEA8">0</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "message"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: {</span></span>
+<span class="line"><span> "content": "LIGO has detected gravitational waves by using exquisitely sensitive laser interferometers, and its first major success was the observation of GW150914, a merger of two stellar-mass black holes. Here’s a concise explanation of both parts.\n\n---\n\n## 1. How LIGO detects gravitational waves\n\n### Basic idea: measure tiny changes in length\n\nA passing gravitational wave stretches space in one direction and squeezes it in the perpendicular direction. LIGO measures this as a tiny change in the relative lengths of two perpendicular arms using **laser interferometry**.\n\n**Core setup (Michelson interferometer):**\n\n- A very stable laser produces a beam of light.\n- A **beam splitter** divides the beam into two equal parts that travel down two **perpendicular 4 km arms**.\n- At the end of each arm, a highly polished, extremely isolated **test mass (mirror)** reflects the light back.\n- The returning beams recombine at the beam splitter and are sent to a **photodetector**.\n\nBecause the arms are tuned so that the two beams are normally **out of phase**, they destructively interfere and the detector sees almost *no light* (“dark fringe”).\n\n### What a gravitational wave does\n\nWhen a gravitational wave passes:\n\n- One arm is stretched while the other is squeezed; the roles then oscillate as the wave passes.\n- This changes the distance the light travels in each arm by about **10⁻¹⁸ m** (roughly ten‑thousandth the width of a proton for a 4 km arm).\n- That tiny difference makes the two light beams **no longer perfectly out of phase**.\n- The recombined light intensity **flickers** at the photodetector.\n\nLIGO’s computers continuously monitor this intensity:\n\n- The signal is a time-varying pattern of light intensity.\n- Data analysis looks for specific oscillatory patterns (“chirps”) predicted by **general relativity** for systems like orbiting and merging black holes or neutron stars.\n\n### Key technologies that make this possible\n\n- **Long arms and optical cavities**: Light bounces back and forth ~300 times between mirrors in each arm, effectively increasing the path length to hundreds of km, amplifying the effect of a given strain.\n- **Ultra-stable laser**: Single, well-defined wavelength so the “ruler” doesn’t change (otherwise the interference pattern would be meaningless).\n- **Vibration isolation**: Test mass mirrors are suspended in multi-stage pendulum systems and isolated from ground vibrations, seismic noise, and thermal noise, so they “feel” almost like they’re floating in space.\n- **Two detectors**: Twin observatories (Hanford, WA and Livingston, LA) separated by ~3000 km. A true gravitational-wave signal:\n - Arrives at both with a time delay up to ~10 ms.\n - Shows a consistent pattern in both instruments.\n - This helps distinguish real astrophysical signals from local noise or glitches.\n\n---\n\n## 2. The GW150914 binary black hole merger\n\n**Event name:** GW150914 \n**Date of detection:** 2015-09-14, at 09:50:45 UTC \n**Published/announced:** February 2016 \n\nThis was **the first direct detection of gravitational waves** and the **first direct observation of a binary black hole merger**.\n\n### What LIGO observed\n\n- A short signal, lasting about **0.2 seconds** in the LIGO band.\n- The frequency and amplitude increased over time in a characteristic **“chirp”**:\n - Frequency swept from ~35 Hz up to ~150 Hz (and beyond) as the black holes spiraled together and merged.\n- The signal was observed in **both** LIGO detectors (Hanford and Livingston) with a time delay of about **7 ms**, consistent with a wavefront crossing Earth at the speed of light.\n\n### What produced the waves\n\nBy matching the observed waveform with general-relativistic models:\n\n- The source was identified as a **binary black hole system**:\n - One black hole: ~36 solar masses\n - The other: ~29 solar masses\n- They orbited each other at relativistic speeds and, in the last few orbits:\n - Reached **fraction-of-light-speed** orbital velocities.\n - Produced rapidly increasing gravitational waves as they spiraled inward.\n\nAt the moment of merger:\n\n- They formed a single black hole of about **62 solar masses**.\n- The mass difference (~3 solar masses) was converted almost entirely into **gravitational-wave energy**, according to \\(E = mc^2\\).\n- Peak power output was briefly greater than the combined luminosity of all the stars in the observable universe, but carried away as gravitational waves.\n\n### Distance and scale\n\n- The source was located about **1.3 billion light-years** away.\n- By the time the waves reached Earth, the strain in spacetime they produced at LIGO was about:\n - **h ~ 10⁻²¹**, corresponding to:\n - A change in a 4 km arm length of about **4 × 10⁻¹⁸ m**.\n- That’s roughly **10,000 times smaller than an atomic nucleus**.\n\n### Why GW150914 was historic\n\n- **First direct detection** of gravitational waves, confirming a major prediction of Einstein’s general relativity from 1916.\n- **First direct evidence** that:\n - Stellar-mass black hole binaries exist.\n - They can merge within the age of the universe.\n- Demonstrated that gravitational-wave astronomy is feasible, opening an entirely new way to observe the universe, complementary to telescopes that detect light (electromagnetic waves).\n\nIf you’d like, I can also summarize how the waveform carries information about the black holes’ masses and spins, or how data analysis separates such a tiny signal from noise.",</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "role"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"assistant"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "reasoning_steps"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0550AE;--shiki-dark:#569CD6">null</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "tool_call_id"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0550AE;--shiki-dark:#569CD6">null</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "tool_calls"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0550AE;--shiki-dark:#569CD6">null</span></span>
+<span class="line"><span style="color:#1F2328;--shiki-dark:#D4D4D4"> },</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "finish_reason"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"stop"</span></span>
+<span class="line"><span style="color:#1F2328;--shiki-dark:#D4D4D4"> }</span></span>
+<span class="line"><span style="color:#1F2328;--shiki-dark:#D4D4D4"> ],</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "created"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0550AE;--shiki-dark:#B5CEA8">1779391555</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "model"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"sonar-pro"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "citations"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: [</span></span>
+<span class="line"><span style="color:#0A3069;--shiki-dark:#CE9178"> "https://news.mit.edu/2016/ligo-first-detection-gravitational-waves-0211"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#0A3069;--shiki-dark:#CE9178"> "https://www.ligo.caltech.edu/page/ligo-technology"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#0A3069;--shiki-dark:#CE9178"> "https://www.nasa.gov/universe/nsfs-ligo-has-detected-gravitational-waves/"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#0A3069;--shiki-dark:#CE9178"> "https://www.youtube.com/watch?v=o7D8h_53jOM"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#0A3069;--shiki-dark:#CE9178"> "https://www.youtube.com/watch?v=XJ-lgnkovMc"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#0A3069;--shiki-dark:#CE9178"> "https://www.ligo.caltech.edu/page/what-are-gw"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#0A3069;--shiki-dark:#CE9178"> "https://www.ligo.caltech.edu/video/ligo20171016v8"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#0A3069;--shiki-dark:#CE9178"> "https://en.wikipedia.org/wiki/LIGO"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#0A3069;--shiki-dark:#CE9178"> "https://pressbooks.howardcc.edu/jrip1/chapter/ligo-analysis-direct-detection-of-gravitational-waves/"</span></span>
+<span class="line"><span style="color:#1F2328;--shiki-dark:#D4D4D4"> ],</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "object"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"chat.completion"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "search_results"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: [</span></span>
+<span class="line"><span style="color:#1F2328;--shiki-dark:#D4D4D4"> {</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "title"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"Scientists make first direct detection of gravitational waves | MIT News"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "url"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"https://news.mit.edu/2016/ligo-first-detection-gravitational-waves-0211"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "date"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"2016-02-11"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "last_updated"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"2026-05-16"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "snippet"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"Now LIGO has made the first direct observation of gravitational waves with an instrument on Earth. The researchers detected the gravitational ..."</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "source"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"web"</span></span>
+<span class="line"><span style="color:#1F2328;--shiki-dark:#D4D4D4"> },</span></span>
+<span class="line"><span style="color:#1F2328;--shiki-dark:#D4D4D4"> {</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "title"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"LIGO Technology | LIGO Lab | Caltech"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "url"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"https://www.ligo.caltech.edu/page/ligo-technology"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "date"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0550AE;--shiki-dark:#569CD6">null</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "last_updated"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"2026-05-18"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "snippet"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"LIGO detects gravitational waves by generating a laser beam, splitting it in half, and sending each half down an arm of the interferometer. Inside each arm ..."</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "source"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"web"</span></span>
+<span class="line"><span style="color:#1F2328;--shiki-dark:#D4D4D4"> },</span></span>
+<span class="line"><span style="color:#1F2328;--shiki-dark:#D4D4D4"> {</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "title"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"NSF's LIGO Has Detected Gravitational Waves - NASA"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "url"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"https://www.nasa.gov/universe/nsfs-ligo-has-detected-gravitational-waves/"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "date"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"2016-02-11"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "last_updated"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"2026-05-15"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "snippet"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"LIGO is sensitive to gravitational waves within the range of 10 to 1,000 cycles per second (10 to 1,000 Hz). A space-based system would be able ..."</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "source"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"web"</span></span>
+<span class="line"><span style="color:#1F2328;--shiki-dark:#D4D4D4"> },</span></span>
+<span class="line"><span style="color:#1F2328;--shiki-dark:#D4D4D4"> {</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "title"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"How LIGO Detects Gravitational Waves - YouTube"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "url"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"https://www.youtube.com/watch?v=o7D8h_53jOM"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "date"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"2022-04-04"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "last_updated"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"2026-05-18"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "snippet"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"Share your videos with friends, family, and the world."</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "source"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"web"</span></span>
+<span class="line"><span style="color:#1F2328;--shiki-dark:#D4D4D4"> },</span></span>
+<span class="line"><span style="color:#1F2328;--shiki-dark:#D4D4D4"> {</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "title"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"Laser Interferometer Gravitational-Wave Observatory (LIGO) Explained"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "url"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"https://www.youtube.com/watch?v=XJ-lgnkovMc"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "date"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"2025-02-14"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "last_updated"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"2026-03-31"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "snippet"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"Jonathan Richardson, an experimental physicist at UC Riverside who works on gravitational wave detection, explains what gravitational waves ..."</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "source"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"web"</span></span>
+<span class="line"><span style="color:#1F2328;--shiki-dark:#D4D4D4"> },</span></span>
+<span class="line"><span style="color:#1F2328;--shiki-dark:#D4D4D4"> {</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "title"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"What are Gravitational Waves? | LIGO Lab | Caltech"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "url"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"https://www.ligo.caltech.edu/page/what-are-gw"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "date"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0550AE;--shiki-dark:#569CD6">null</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "last_updated"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"2026-05-19"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "snippet"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"In fact, by the time gravitational waves from LIGO's first detection reached us, the amount of space-time wobbling they generated was 10,000 times smaller than ..."</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "source"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"web"</span></span>
+<span class="line"><span style="color:#1F2328;--shiki-dark:#D4D4D4"> },</span></span>
+<span class="line"><span style="color:#1F2328;--shiki-dark:#D4D4D4"> {</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "title"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"Video | Ripples of Gravity, Flashes of Light | LIGO Lab | Caltech"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "url"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"https://www.ligo.caltech.edu/video/ligo20171016v8"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "date"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"2017-10-16"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "last_updated"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"2026-04-15"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<span class="line"><span style="color:#116329;--shiki-dark:#9CDCFE"> "snippet"</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">: </span><span style="color:#0A3069;--shiki-dark:#CE9178">"On Aug. 17, 2017, the Laser Interferometer Gravitational-wave Observatory (LIGO) and Virgo detected, for the first time, gravitational waves ..."</span><span style="color:#1F2328;--shiki-dark:#D4D4D4">,</span></span>
+<
+
+[… truncated 580847 chars …]

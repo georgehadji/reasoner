@@ -6,6 +6,8 @@ from typing import Any, List
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.application.flows.base import WorkflowStrategy, WorkflowServices, PhaseStep
 from reasoner.application.flows.coding_phases import (
+    run_coding_library_search_phase,
+    run_coding_cve_search_phase,
     run_coding_spec_phase,
     run_coding_generate_phase,
     run_coding_review_phase,
@@ -32,8 +34,10 @@ class CodingFlow(WorkflowStrategy):
 
     def get_phases(self, state: PipelineState) -> List[PhaseStep]:
         return [
+            PhaseStep(1.5, "Library Research", run_coding_library_search_phase, _ser_2),
             PhaseStep(2, "Spec Analysis", run_coding_spec_phase, _ser_2),
             PhaseStep(3, "Code Generation", run_coding_generate_phase, _ser_3),
+            PhaseStep(3.4, "CVE Search", run_coding_cve_search_phase, _ser_3),
             PhaseStep(3.5, "Security Review", run_coding_review_phase, _ser_3, critical=True),
             PhaseStep(4, "Test Generation", run_coding_tests_phase, _ser_4),
             PhaseStep(5, "Final Assembly", run_coding_assemble_phase, _ser_5),

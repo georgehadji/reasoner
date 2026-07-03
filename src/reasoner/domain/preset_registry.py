@@ -664,6 +664,12 @@ _REGISTRY: dict[str, dict] = {
         "writing_draft":     "deepseek-v4-flash",  # best price/quality for long-form creative writing, 1M ctx
         "writing_factcheck": "sonar",              # Perplexity 🇺🇸 — live web verification against current sources
         "writing_assemble":  "deepseek-v4-flash",  # voice consistency with draft model
+        # ── Article editorial roles (budget, v3.6) ──
+        "article_sot_skeleton": "deepseek-v4-flash",  # 🇨🇳 DeepSeek — fast structured planning
+        "article_critic":       "hermes-4-70b",       # 🇺🇸 Nous Research — critic-specialized adversarial review
+        "article_revise":       "deepseek-v3",         # 🇨🇳 DeepSeek — voice-consistent developmental editing
+        "article_humanize":     "qwen3.7-plus",        # 🇨🇳 Qwen — editorial refinement, style matching
+        "article_verifier":     "qwen3.7-plus",        # 🇨🇳 Qwen — structured final audit
         # ── Reasoning model assignments (budget, v3.5) ──
         "fusion":           "deepseek-v4-flash",
         "post_synthesis_verify": "sonar",
@@ -678,8 +684,17 @@ _REGISTRY: dict[str, dict] = {
         # ── Article-flow roles (premium, v3.5) ──
         "primary":           "sonar-pro",          # Perplexity 🇺🇸 — native web search + citations for premium research
         "writing_factcheck": "sonar-pro",          # Perplexity 🇺🇸 — live web verification, cross-bloc from CN scoring
+        # ── Article editorial roles (premium, v3.6) ──
+        "writing_draft":       "claude-sonnet",       # 🇺🇸 Anthropic — best long-form prose
+        "writing_outline":     "claude-sonnet",       # 🇺🇸 Anthropic — outline alias for consistency
+        "article_sot_skeleton": "claude-sonnet",      # 🇺🇸 Anthropic — best planning/outlining
+        "article_critic":      "grok-4.3",           # 🇺🇸 xAI — τ²-Bench 97.7% adversarial reasoning
+        "article_revise":      "gpt-5",              # 🇺🇸 OpenAI — strong editorial judgment
+        "article_humanize":    "claude-sonnet",      # 🇺🇸 Anthropic — best voice-preserving refinement
+        "article_verifier":    "qwen3.7-max",        # 🇨🇳 Qwen — cross-bloc final audit
         # ── Reasoning model assignments (premium, v3.5) ──
         "fusion":            "deepseek-v4-pro",
+        "writing_assemble":  "gpt-4o-mini",         # 🇺🇸 OpenAI — cheap, reliable copy edit
         "post_synthesis_verify": "sonar-pro",
         },
         "tags": ["premium", "writing", "article"],

@@ -6,6 +6,7 @@ from typing import Any, List
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.application.flows.base import WorkflowStrategy, WorkflowServices, PhaseStep
 from reasoner.application.flows.writing_phases import (
+    run_writing_source_retrieval_phase,
     run_writing_outline_phase,
     run_writing_draft_phase,
     run_writing_factcheck_phase,
@@ -26,6 +27,7 @@ class WritingFlow(WorkflowStrategy):
     
     def get_phases(self, state: PipelineState) -> List[PhaseStep]:
         return [
+            PhaseStep(1.5, "Source Retrieval", run_writing_source_retrieval_phase, _ser_2),
             PhaseStep(2, "Outline", run_writing_outline_phase, _ser_2),
             PhaseStep(3, "Draft", run_writing_draft_phase, _ser_3),
             PhaseStep(3.5, "Fact-Check", run_writing_factcheck_phase, _ser_3, critical=True),

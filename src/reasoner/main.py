@@ -123,13 +123,13 @@ async def main(args: argparse.Namespace) -> None:
 
     # Handle resume from saved state
     if args.resume:
-        from reasoner.domain.pipeline_state import PipelineState
+        from reasoner.models import load as load_state
         state_path = Path(args.resume)
         if not state_path.exists():
             print(f"[ERROR] State file not found: {args.resume}")
             sys.exit(1)
         try:
-            state = PipelineState.load(args.resume)
+            state = load_state(args.resume)
             print(f"\n{'='*60}")
             print(f"  Reasoner v2.0 — Resumed from saved state")
             print(f"{'='*60}")
@@ -163,7 +163,8 @@ async def main(args: argparse.Namespace) -> None:
         initial_state = None
         if args.resume:
             try:
-                initial_state = PipelineState.load(args.resume)
+                from reasoner.models import load as load_state
+                initial_state = load_state(args.resume)
             except Exception as exc:
                 print(f"[ERROR] Failed to load initial state for pipeline: {exc}")
                 sys.exit(1)
@@ -263,7 +264,8 @@ async def main(args: argparse.Namespace) -> None:
             print(f"\n[OK] Full state exported -> {args.output}")
 
         if getattr(args, 'save_state', None) and isinstance(args.save_state, str):
-            state.save(args.save_state)
+            from reasoner.models import save
+            save(state, args.save_state)
             print(f"\n[OK] State saved -> {args.save_state}")
 
     finally:

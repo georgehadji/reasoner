@@ -80,46 +80,60 @@ async def _call_with_circuit(
     temperature: float,
     effective_timeout: float,
     extra_body: dict[str, Any] | None = None,
+    single_attempt: bool = False,
 ) -> str:
     """Call a provider with circuit-breaker protection and concurrency bounding.
+
+    When ``single_attempt=True`` (used by the router fallback path), the call
+    uses ``provider.complete_once()`` — zero retries — instead of the default
+    ``provider.complete_with_retry()`` (2 retries). This avoids the dual-layer
+    retry problem where provider-level retries * router-level fallbacks
+    compound into 6+ LLM calls for one logical request.
 
     Args:
         extra_body: Optional additional body params to merge into the API call.
                     Used for web_search: true injection on supported providers.
+        single_attempt: If True, skip retry — one shot only.
     """
     from reasoner.circuit_breaker import get_circuit_breaker
 
     circuit = get_circuit_breaker(f"llm:{provider.model}")
 
-    # Inject extra_body if provider supports it (OpenRouterProvider has extra_body)
-    _saved_extra = None
-    if extra_body and hasattr(provider, "extra_body") and provider.extra_body is not None:
-        _saved_extra = dict(provider.extra_body)
-        provider.extra_body = {**provider.extra_body, **extra_body}
-    elif extra_body and hasattr(provider, "extra_body"):
-        provider.extra_body = dict(extra_body)
-    try:
-        if not await circuit.can_execute():
-            raise LLMError(f"Circuit open for {provider.model}")
-            
-        semaphore = _get_llm_semaphore()
-        async with semaphore:
-            coro = provider.complete_with_retry(system_prompt, user_prompt, max_tokens, temperature)
-            result = await asyncio.wait_for(coro, timeout=effective_timeout)
-            
-        await circuit.record_success()
-        return result
-    except asyncio.CancelledError:
-        raise
-    except Exception:
-        await circuit.record_failure()
-        raise
-    finally:
-        # Restore original extra_body
-        if _saved_extra is not None and hasattr(provider, "extra_body"):
-            provider.extra_body = _saved_extra
+    # Check circuit BEFORE acquiring the semaphore (lightweight check).
+    if not await circuit.can_execute():
+        raise LLMError(f"Circuit open for {provider.model}")
+
+    semaphore = _get_llm_semaphore(provider.model)
+    async with semaphore:
+        # Mutate extra_body INSIDE the per-model semaphore so concurrent
+        # calls to this provider model are serialized — no concurrent
+        # caller sees mutated state. Save/restore is still needed for
+        # the try/except/finally within this critical section.
+        _saved_extra = None
+        if extra_body and hasattr(provider, "extra_body") and provider.extra_body is not None:
+            _saved_extra = dict(provider.extra_body)
+            provider.extra_body = {**provider.extra_body, **extra_body}
         elif extra_body and hasattr(provider, "extra_body"):
-            provider.extra_body = {}
+            provider.extra_body = dict(extra_body)
+        try:
+            if single_attempt:
+                coro = provider.complete_once(system_prompt, user_prompt, max_tokens, temperature)
+            else:
+                coro = provider.complete_with_retry(system_prompt, user_prompt, max_tokens, temperature)
+            result = await asyncio.wait_for(coro, timeout=effective_timeout)
+            await circuit.record_success()
+            return result
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            await circuit.record_failure()
+            raise
+        finally:
+            # Restore original extra_body
+            if _saved_extra is not None and hasattr(provider, "extra_body"):
+                provider.extra_body = _saved_extra
+            elif extra_body and hasattr(provider, "extra_body"):
+                provider.extra_body = {}
 
 
 async def _call_with_tools_circuit(
@@ -137,50 +151,88 @@ async def _call_with_tools_circuit(
 
     circuit = get_circuit_breaker(f"llm:{provider.model}")
 
-    # Inject extra_body if provider supports it
-    _saved_extra = None
-    if extra_body and hasattr(provider, "extra_body") and provider.extra_body is not None:
-        _saved_extra = dict(provider.extra_body)
-        provider.extra_body = {**provider.extra_body, **extra_body}
-    elif extra_body and hasattr(provider, "extra_body"):
-        provider.extra_body = dict(extra_body)
-    try:
-        if not await circuit.can_execute():
-            raise LLMError(f"Circuit open for {provider.model}")
-            
-        semaphore = _get_llm_semaphore()
-        async with semaphore:
+    if not await circuit.can_execute():
+        raise LLMError(f"Circuit open for {provider.model}")
+
+    semaphore = _get_llm_semaphore(provider.model)
+    async with semaphore:
+        # Mutate extra_body inside the per-model critical section
+        _saved_extra = None
+        if extra_body and hasattr(provider, "extra_body") and provider.extra_body is not None:
+            _saved_extra = dict(provider.extra_body)
+            provider.extra_body = {**provider.extra_body, **extra_body}
+        elif extra_body and hasattr(provider, "extra_body"):
+            provider.extra_body = dict(extra_body)
+        try:
             coro = provider.call_with_tools_with_retry(system_prompt, user_prompt, tools, max_tokens, temperature)
             result = await asyncio.wait_for(coro, timeout=effective_timeout)
-            
-        await circuit.record_success()
-        return result
-    except asyncio.CancelledError:
-        raise
-    except Exception:
-        await circuit.record_failure()
-        raise
-    finally:
-        # Restore original extra_body
-        if _saved_extra is not None and hasattr(provider, "extra_body"):
-            provider.extra_body = _saved_extra
-        elif extra_body and hasattr(provider, "extra_body"):
-            provider.extra_body = {}
+            await circuit.record_success()
+            return result
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            await circuit.record_failure()
+            raise
+        finally:
+            # Restore original extra_body
+            if _saved_extra is not None and hasattr(provider, "extra_body"):
+                provider.extra_body = _saved_extra
+            elif extra_body and hasattr(provider, "extra_body"):
+                provider.extra_body = {}
 
 
 _GLOBAL_RESOLVED_CACHE: dict[str, BaseLLMProvider] = {}
-_LLM_CONCURRENCY_SEMAPHORE: asyncio.Semaphore | None = None
+_PER_MODEL_SEMAPHORES: dict[str, asyncio.Semaphore] = {}
+_SEMAPHORE_CONFIG: dict[str, int] | None = None
 
-def _get_llm_semaphore() -> asyncio.Semaphore:
-    """Get or create the global LLM concurrency semaphore."""
-    global _LLM_CONCURRENCY_SEMAPHORE
-    if _LLM_CONCURRENCY_SEMAPHORE is None:
-        import os
-        # Bound concurrent LLM calls per worker to avoid socket exhaustion
-        # and prevent overwhelming rate limits locally.
-        limit = int(os.environ.get("LLM_CONCURRENCY_LIMIT", "30"))
-        _LLM_CONCURRENCY_SEMAPHORE = asyncio.Semaphore(limit)
-    return _LLM_CONCURRENCY_SEMAPHORE
+def _parse_semaphore_config() -> dict[str, int]:
+    """Parse LLM_CONCURRENCY_LIMIT_PER_MODEL env var into a model→limit dict.
+
+    Format: ``"claude-sonnet:10,gpt-5:15,*:10"`` — models not listed use ``*``
+    default.  If the env var is not set, all models default to 30.
+    """
+    import os
+    raw = os.environ.get("LLM_CONCURRENCY_LIMIT_PER_MODEL", "")
+    if not raw:
+        return {}  # all models use the fallback below
+    config: dict[str, int] = {}
+    for entry in raw.split(","):
+        entry = entry.strip()
+        if ":" not in entry:
+            continue
+        model, limit_str = entry.split(":", 1)
+        try:
+            config[model.strip()] = int(limit_str.strip())
+        except ValueError:
+            continue
+    return config
+
+
+def _get_model_limit(model_name: str) -> int:
+    """Return the concurrency limit for a given model name."""
+    global _SEMAPHORE_CONFIG
+    if _SEMAPHORE_CONFIG is None:
+        _SEMAPHORE_CONFIG = _parse_semaphore_config()
+    if model_name in _SEMAPHORE_CONFIG:
+        return _SEMAPHORE_CONFIG[model_name]
+    # Wildcard fallback
+    if "*" in _SEMAPHORE_CONFIG:
+        return _SEMAPHORE_CONFIG["*"]
+    # Default: 30 (original single-semaphore value)
+    return int(os.environ.get("LLM_CONCURRENCY_LIMIT", "30"))
+
+
+def _get_llm_semaphore(model_name: str) -> asyncio.Semaphore:
+    """Get or create a per-model concurrency semaphore.
+
+    Each model has its own limit so slow providers (e.g. claude-sonnet
+    with rate-limit retries) can't starve fast providers (e.g. gpt-5-nano).
+    Limits are configured via ``LLM_CONCURRENCY_LIMIT_PER_MODEL`` env var.
+    """
+    if model_name not in _PER_MODEL_SEMAPHORES:
+        limit = _get_model_limit(model_name)
+        _PER_MODEL_SEMAPHORES[model_name] = asyncio.Semaphore(limit)
+    return _PER_MODEL_SEMAPHORES[model_name]
 
 class ProviderRouter:
     """
@@ -289,6 +341,7 @@ class ProviderRouter:
                 response = await _call_with_circuit(
                     provider, system_prompt, user_prompt, max_tokens, temperature,
                     effective_timeout, extra_body=extra_body,
+                    single_attempt=is_fallback,
                 )
                 if not response or not response.strip():
                     raise LLMError(f"Empty response from {provider.model} for role={role}")
@@ -363,7 +416,7 @@ class ProviderRouter:
                 )
                 return
             try:
-                semaphore = _get_llm_semaphore()
+                semaphore = _get_llm_semaphore(provider.model)
                 async with semaphore:
                     async for chunk in provider.stream_complete_with_retry(
                         system_prompt, user_prompt, max_tokens, temperature

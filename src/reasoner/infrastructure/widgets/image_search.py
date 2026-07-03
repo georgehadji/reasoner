@@ -1,7 +1,7 @@
 """
 Image Search Widget
 
-Searches for images using SearXNG.
+Searches for images using multi-backend search.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from reasoner.infrastructure.widgets.protocol import BaseWidget, WidgetResult, W
 
 class ImageSearchWidget(BaseWidget):
     """
-    Image search widget using SearXNG.
+    Image search widget using multi-backend search.
     
     Features:
     - Visual search results
@@ -70,43 +70,21 @@ class ImageSearchWidget(BaseWidget):
         }
     
     async def _search_images(self, query: str, limit: int) -> list[dict[str, Any]]:
-        """Search images using SearXNG."""
-        import httpx
-        from reasoner.infrastructure.search.discovery import get_searxng_urls
+        """Search images using multi-backend search client."""
+        from reasoner.infrastructure.search.discovery import get_search_client
         
-        searxng_urls = get_searxng_urls()
-        
-        for url in searxng_urls:
-            from reasoner.core.constants import TIMEOUTS
-            try:
-                async with httpx.AsyncClient(timeout=TIMEOUTS.WIDGET_SHORT) as client:
-                    response = await client.get(
-                        url,
-                        params={
-                            'q': query,
-                            'format': 'json',
-                            'categories': 'images',
-                        },
-                    )
-                    
-                    if response.status_code == 200:
-                        data = response.json()
-                        results = []
-                        
-                        for result in data.get('results', [])[:limit]:
-                            results.append({
-                                'title': result.get('title', ''),
-                                'url': result.get('url', ''),
-                                'img_src': result.get('img_src', ''),
-                                'thumbnail': result.get('thumbnail', ''),
-                                'source': result.get('source', ''),
-                                'width': result.get('width'),
-                                'height': result.get('height'),
-                            })
-                        
-                        return results
-                        
-            except Exception:
-                continue
-        
-        return []
+        try:
+            client, _ = await get_search_client()
+            results = await client.search(query, num_results=limit)
+            return [
+                {
+                    'title': r.get('title', ''),
+                    'url': r.get('url', ''),
+                    'img_src': r.get('img_src', r.get('url', '')),
+                    'thumbnail': r.get('thumbnail', ''),
+                    'source': r.get('source', ''),
+                }
+                for r in results
+            ]
+        except Exception:
+            return []

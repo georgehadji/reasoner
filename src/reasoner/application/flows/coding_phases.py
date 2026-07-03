@@ -12,8 +12,91 @@ from reasoner.models import PerspectiveType
 from reasoner.parsing import extract_json
 import reasoner.phases as phases
 from reasoner.application.flows.base import WorkflowServices
+from reasoner.infrastructure.search.discovery import get_search_client_for_method
 
 logger = logging.getLogger(__name__)
+
+
+async def run_coding_library_search_phase(state: PipelineState, services: WorkflowServices) -> None:
+    """Search for library docs, API references, and existing solutions."""
+    services.log("CODING", "Searching for library docs and API references...", state)
+    try:
+        from reasoner.presets import get_preset_price_tier
+        tier = get_preset_price_tier(state.preset_name) or "budget"
+        client, _ = await get_search_client_for_method("research", tier, source_type="code")
+
+        # Extract technology keywords from the problem
+        raw_plan, _ = await services.call_llm(
+            role="primary",
+            system_prompt=phases.ARTICLE_RETRIEVAL_PLAN_SYSTEM,
+            user_prompt=phases.article_retrieval_plan_prompt(state),
+            state=state
+        )
+        plan = extract_json(raw_plan)
+        queries = plan.get("queries", [])[:3]
+
+        import asyncio as _asyncio
+        async def _search(q):
+            try: return await client.search(q, num_results=5)
+            except Exception: return []
+
+        results = await _asyncio.gather(*[_search(q) for q in queries], return_exceptions=True)
+        flattened = []
+        seen = set()
+        for r_list in results:
+            if isinstance(r_list, list):
+                for r in r_list:
+                    url = r.get("url", "")
+                    if url not in seen:
+                        seen.add(url)
+                        flattened.append(r)
+
+        state.web_discovery_results = flattened[:10]
+        if flattened:
+            services.log("CODING", f"Found {len(flattened)} relevant references.", state)
+    except Exception as e:
+        services.log("CODING", f"Library search failed: {e}", state)
+
+
+async def run_coding_cve_search_phase(state: PipelineState, services: WorkflowServices) -> None:
+    """Search for known vulnerabilities and security patterns for the technology stack."""
+    services.log("CODING", "Searching for known vulnerabilities and security patterns...", state)
+    try:
+        # Extract the spec's language/framework to target CVE search
+        spec = state.coding_state.get("spec", {})
+        lang = spec.get("language", "")
+        framework = spec.get("framework", "")
+
+        queries = [f"{lang} {framework} security vulnerabilities CVE"]
+        if framework:
+            queries.append(f"{framework} OWASP security best practices")
+        queries.append(f"{lang} secure coding guidelines")
+
+        from reasoner.presets import get_preset_price_tier
+        tier = get_preset_price_tier(state.preset_name) or "budget"
+        client, _ = await get_search_client_for_method("research", tier, source_type="general")
+
+        import asyncio as _asyncio
+        async def _search(q):
+            try: return await client.search(q, num_results=5)
+            except Exception: return []
+
+        results = await _asyncio.gather(*[_search(q) for q in queries], return_exceptions=True)
+        flattened = []
+        seen = set()
+        for r_list in results:
+            if isinstance(r_list, list):
+                for r in r_list:
+                    url = r.get("url", "")
+                    if url not in seen:
+                        seen.add(url)
+                        flattened.append(r)
+
+        state.coding_state["cve_search_results"] = flattened[:10]
+        if flattened:
+            services.log("CODING", f"Found {len(flattened)} security references.", state)
+    except Exception as e:
+        services.log("CODING", f"CVE search failed: {e}", state)
 
 
 def _safe_extract_json(
@@ -185,7 +268,7 @@ async def run_coding_assemble_phase(state: PipelineState, services: WorkflowServ
     # Add a compact file index to candidates — NOT full file content.
     # Full file content can be thousands of tokens per file; including it
     # verbatim would cause the downstream synthesis phase to overflow the
-    # context window (128k for claude-sonnet-4.6). The actual files are
+    # context window (1M for claude-sonnet-5). The actual files are
     # stored in coding_state["final_files"] and don't need to be duplicated.
     files_index = "\n".join(
         f"- {f.get('path', '?')} ({len(f.get('content', '').splitlines())} lines)"

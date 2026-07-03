@@ -1,0 +1,431 @@
+$ set PYTHONPATH=E:\Documents\Vibe-Coding\Reasoner\src && set REASONER_TEST_TIMEOUT=180 && python -m pytest tests/integration/test_preset_pipeline.py -k "scientific or bayesian or debate" -v -s -n 0 -o "addopts=" 2>&1
+[exit 1]
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.7.0) or chardet (6.0.0.post1)/charset_normalizer (3.4.7) doesn't match a supported version!
+  warnings.warn(
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-8.4.2, pluggy-1.6.0 -- C:\Users\tesse\AppData\Local\Programs\Python\Python312\python.EXE
+cachedir: .pytest_cache
+rootdir: E:\Documents\Vibe-Coding\Reasoner
+configfile: pytest.ini
+plugins: anyio-4.13.0, dash-4.0.0, langsmith-0.7.25, asyncio-0.24.0, cov-7.0.0, mock-3.15.1, timeout-2.4.0, xdist-3.8.0
+asyncio: mode=Mode.AUTO, default_loop_scope=session
+collecting ... collected 17 items / 14 deselected / 3 selected
+
+tests/integration/test_preset_pipeline.py::test_preset_pipeline[scientific-budget] ERROR
+tests/integration/test_preset_pipeline.py::test_preset_pipeline[bayesian-budget] ERROR
+tests/integration/test_preset_pipeline.py::test_preset_pipeline[debate-budget] ERROR
+
+=================================== ERRORS ====================================
+__________ ERROR at setup of test_preset_pipeline[scientific-budget] __________
+
+    @contextlib.contextmanager
+    def map_httpcore_exceptions() -> typing.Iterator[None]:
+        global HTTPCORE_EXC_MAP
+        if len(HTTPCORE_EXC_MAP) == 0:
+            HTTPCORE_EXC_MAP = _load_httpcore_exceptions()
+        try:
+>           yield
+
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_transports\default.py:101: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_transports\default.py:394: in handle_async_request
+    resp = await self._pool.handle_async_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpcore\_async\connection_pool.py:256: in handle_async_request
+    raise exc from None
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpcore\_async\connection_pool.py:236: in handle_async_request
+    response = await connection.handle_async_request(
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpcore\_async\connection.py:103: in handle_async_request
+    return await self._connection.handle_async_request(request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpcore\_async\http11.py:136: in handle_async_request
+    raise exc
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpcore\_async\http11.py:106: in handle_async_request
+    ) = await self._receive_response_headers(**kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpcore\_async\http11.py:177: in _receive_response_headers
+    event = await self._receive_event(timeout=timeout)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpcore\_async\http11.py:217: in _receive_event
+    data = await self._network_stream.read(
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpcore\_backends\anyio.py:32: in read
+    with map_exceptions(exc_map):
+         ^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\contextlib.py:158: in __exit__
+    self.gen.throw(value)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+map = {<class 'TimeoutError'>: <class 'httpcore.ReadTimeout'>, <class 'anyio.BrokenResourceError'>: <class 'httpcore.ReadErr... 'anyio.ClosedResourceError'>: <class 'httpcore.ReadError'>, <class 'anyio.EndOfStream'>: <class 'httpcore.ReadError'>}
+
+    @contextlib.contextmanager
+    def map_exceptions(map: ExceptionMapping) -> typing.Iterator[None]:
+        try:
+            yield
+        except Exception as exc:  # noqa: PIE786
+            for from_exc, to_exc in map.items():
+                if isinstance(exc, from_exc):
+>                   raise to_exc(exc) from exc
+E                   httpcore.ReadTimeout
+
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpcore\_exceptions.py:14: ReadTimeout
+
+The above exception was the direct cause of the following exception:
+
+request = <SubRequest 'csrf_token' for <Coroutine test_preset_pipeline[scientific-budget]>>
+kwargs = {'base_url': 'http://localhost:8003'}
+event_loop_fixture_id = '_session_event_loop'
+setup = <function _wrap_async_fixture.<locals>._async_fixture_wrapper.<locals>.setup at 0x000001F6DBCFFF60>
+
+    @functools.wraps(fixture)
+    def _async_fixture_wrapper(request: FixtureRequest, **kwargs: Any):
+        func = _perhaps_rebind_fixture_func(fixture, request.instance)
+        event_loop_fixture_id = _get_event_loop_fixture_id_for_async_fixture(
+            request, func
+        )
+        event_loop = request.getfixturevalue(event_loop_fixture_id)
+        kwargs.pop(event_loop_fixture_id, None)
+    
+        async def setup():
+            res = await func(**_add_kwargs(func, kwargs, event_loop, request))
+            return res
+    
+>       return event_loop.run_until_complete(setup())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:366: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py:691: in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:363: in setup
+    res = await func(**_add_kwargs(func, kwargs, event_loop, request))
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\integration\conftest.py:32: in csrf_token
+    r = await client.post(f"{base_url}/api/csrf")
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_client.py:1859: in post
+    return await self.request(
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_client.py:1540: in request
+    return await self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_client.py:1629: in send
+    response = await self._send_handling_auth(
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_client.py:1657: in _send_handling_auth
+    response = await self._send_handling_redirects(
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_client.py:1694: in _send_handling_redirects
+    response = await self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_client.py:1730: in _send_single_request
+    response = await transport.handle_async_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_transports\default.py:393: in handle_async_request
+    with map_httpcore_exceptions():
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\contextlib.py:158: in __exit__
+    self.gen.throw(value)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    @contextlib.contextmanager
+    def map_httpcore_exceptions() -> typing.Iterator[None]:
+        global HTTPCORE_EXC_MAP
+        if len(HTTPCORE_EXC_MAP) == 0:
+            HTTPCORE_EXC_MAP = _load_httpcore_exceptions()
+        try:
+            yield
+        except Exception as exc:
+            mapped_exc = None
+    
+            for from_exc, to_exc in HTTPCORE_EXC_MAP.items():
+                if not isinstance(exc, from_exc):
+                    continue
+                # We want to map to the most specific exception we can find.
+                # Eg if `exc` is an `httpcore.ReadTimeout`, we want to map to
+                # `httpx.ReadTimeout`, not just `httpx.TimeoutException`.
+                if mapped_exc is None or issubclass(to_exc, mapped_exc):
+                    mapped_exc = to_exc
+    
+            if mapped_exc is None:  # pragma: no cover
+                raise
+    
+            message = str(exc)
+>           raise mapped_exc(message) from exc
+E           httpx.ReadTimeout
+
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_transports\default.py:118: ReadTimeout
+___________ ERROR at setup of test_preset_pipeline[bayesian-budget] ___________
+
+    @contextlib.contextmanager
+    def map_httpcore_exceptions() -> typing.Iterator[None]:
+        global HTTPCORE_EXC_MAP
+        if len(HTTPCORE_EXC_MAP) == 0:
+            HTTPCORE_EXC_MAP = _load_httpcore_exceptions()
+        try:
+>           yield
+
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_transports\default.py:101: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_transports\default.py:394: in handle_async_request
+    resp = await self._pool.handle_async_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpcore\_async\connection_pool.py:256: in handle_async_request
+    raise exc from None
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpcore\_async\connection_pool.py:236: in handle_async_request
+    response = await connection.handle_async_request(
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpcore\_async\connection.py:103: in handle_async_request
+    return await self._connection.handle_async_request(request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpcore\_async\http11.py:136: in handle_async_request
+    raise exc
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpcore\_async\http11.py:106: in handle_async_request
+    ) = await self._receive_response_headers(**kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpcore\_async\http11.py:177: in _receive_response_headers
+    event = await self._receive_event(timeout=timeout)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpcore\_async\http11.py:217: in _receive_event
+    data = await self._network_stream.read(
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpcore\_backends\anyio.py:32: in read
+    with map_exceptions(exc_map):
+         ^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\contextlib.py:158: in __exit__
+    self.gen.throw(value)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+map = {<class 'TimeoutError'>: <class 'httpcore.ReadTimeout'>, <class 'anyio.BrokenResourceError'>: <class 'httpcore.ReadErr... 'anyio.ClosedResourceError'>: <class 'httpcore.ReadError'>, <class 'anyio.EndOfStream'>: <class 'httpcore.ReadError'>}
+
+    @contextlib.contextmanager
+    def map_exceptions(map: ExceptionMapping) -> typing.Iterator[None]:
+        try:
+            yield
+        except Exception as exc:  # noqa: PIE786
+            for from_exc, to_exc in map.items():
+                if isinstance(exc, from_exc):
+>                   raise to_exc(exc) from exc
+E                   httpcore.ReadTimeout
+
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpcore\_exceptions.py:14: ReadTimeout
+
+The above exception was the direct cause of the following exception:
+
+request = <SubRequest 'csrf_token' for <Coroutine test_preset_pipeline[scientific-budget]>>
+kwargs = {'base_url': 'http://localhost:8003'}
+event_loop_fixture_id = '_session_event_loop'
+setup = <function _wrap_async_fixture.<locals>._async_fixture_wrapper.<locals>.setup at 0x000001F6DBCFFF60>
+
+    @functools.wraps(fixture)
+    def _async_fixture_wrapper(request: FixtureRequest, **kwargs: Any):
+        func = _perhaps_rebind_fixture_func(fixture, request.instance)
+        event_loop_fixture_id = _get_event_loop_fixture_id_for_async_fixture(
+            request, func
+        )
+        event_loop = request.getfixturevalue(event_loop_fixture_id)
+        kwargs.pop(event_loop_fixture_id, None)
+    
+        async def setup():
+            res = await func(**_add_kwargs(func, kwargs, event_loop, request))
+            return res
+    
+>       return event_loop.run_until_complete(setup())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:366: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py:691: in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:363: in setup
+    res = await func(**_add_kwargs(func, kwargs, event_loop, request))
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\integration\conftest.py:32: in csrf_token
+    r = await client.post(f"{base_url}/api/csrf")
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_client.py:1859: in post
+    return await self.request(
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_client.py:1540: in request
+    return await self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_client.py:1629: in send
+    response = await self._send_handling_auth(
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_client.py:1657: in _send_handling_auth
+    response = await self._send_handling_redirects(
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_client.py:1694: in _send_handling_redirects
+    response = await self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_client.py:1730: in _send_single_request
+    response = await transport.handle_async_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_transports\default.py:393: in handle_async_request
+    with map_httpcore_exceptions():
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\contextlib.py:158: in __exit__
+    self.gen.throw(value)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    @contextlib.contextmanager
+    def map_httpcore_exceptions() -> typing.Iterator[None]:
+        global HTTPCORE_EXC_MAP
+        if len(HTTPCORE_EXC_MAP) == 0:
+            HTTPCORE_EXC_MAP = _load_httpcore_exceptions()
+        try:
+            yield
+        except Exception as exc:
+            mapped_exc = None
+    
+            for from_exc, to_exc in HTTPCORE_EXC_MAP.items():
+                if not isinstance(exc, from_exc):
+                    continue
+                # We want to map to the most specific exception we can find.
+                # Eg if `exc` is an `httpcore.ReadTimeout`, we want to map to
+                # `httpx.ReadTimeout`, not just `httpx.TimeoutException`.
+                if mapped_exc is None or issubclass(to_exc, mapped_exc):
+                    mapped_exc = to_exc
+    
+            if mapped_exc is None:  # pragma: no cover
+                raise
+    
+            message = str(exc)
+>           raise mapped_exc(message) from exc
+E           httpx.ReadTimeout
+
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_transports\default.py:118: ReadTimeout
+____________ ERROR at setup of test_preset_pipeline[debate-budget] ____________
+
+    @contextlib.contextmanager
+    def map_httpcore_exceptions() -> typing.Iterator[None]:
+        global HTTPCORE_EXC_MAP
+        if len(HTTPCORE_EXC_MAP) == 0:
+            HTTPCORE_EXC_MAP = _load_httpcore_exceptions()
+        try:
+>           yield
+
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_transports\default.py:101: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_transports\default.py:394: in handle_async_request
+    resp = await self._pool.handle_async_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpcore\_async\connection_pool.py:256: in handle_async_request
+    raise exc from None
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpcore\_async\connection_pool.py:236: in handle_async_request
+    response = await connection.handle_async_request(
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpcore\_async\connection.py:103: in handle_async_request
+    return await self._connection.handle_async_request(request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpcore\_async\http11.py:136: in handle_async_request
+    raise exc
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpcore\_async\http11.py:106: in handle_async_request
+    ) = await self._receive_response_headers(**kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpcore\_async\http11.py:177: in _receive_response_headers
+    event = await self._receive_event(timeout=timeout)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpcore\_async\http11.py:217: in _receive_event
+    data = await self._network_stream.read(
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpcore\_backends\anyio.py:32: in read
+    with map_exceptions(exc_map):
+         ^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\contextlib.py:158: in __exit__
+    self.gen.throw(value)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+map = {<class 'TimeoutError'>: <class 'httpcore.ReadTimeout'>, <class 'anyio.BrokenResourceError'>: <class 'httpcore.ReadErr... 'anyio.ClosedResourceError'>: <class 'httpcore.ReadError'>, <class 'anyio.EndOfStream'>: <class 'httpcore.ReadError'>}
+
+    @contextlib.contextmanager
+    def map_exceptions(map: ExceptionMapping) -> typing.Iterator[None]:
+        try:
+            yield
+        except Exception as exc:  # noqa: PIE786
+            for from_exc, to_exc in map.items():
+                if isinstance(exc, from_exc):
+>                   raise to_exc(exc) from exc
+E                   httpcore.ReadTimeout
+
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpcore\_exceptions.py:14: ReadTimeout
+
+The above exception was the direct cause of the following exception:
+
+request = <SubRequest 'csrf_token' for <Coroutine test_preset_pipeline[scientific-budget]>>
+kwargs = {'base_url': 'http://localhost:8003'}
+event_loop_fixture_id = '_session_event_loop'
+setup = <function _wrap_async_fixture.<locals>._async_fixture_wrapper.<locals>.setup at 0x000001F6DBCFFF60>
+
+    @functools.wraps(fixture)
+    def _async_fixture_wrapper(request: FixtureRequest, **kwargs: Any):
+        func = _perhaps_rebind_fixture_func(fixture, request.instance)
+        event_loop_fixture_id = _get_event_loop_fixture_id_for_async_fixture(
+            request, func
+        )
+        event_loop = request.getfixturevalue(event_loop_fixture_id)
+        kwargs.pop(event_loop_fixture_id, None)
+    
+        async def setup():
+            res = await func(**_add_kwargs(func, kwargs, event_loop, request))
+            return res
+    
+>       return event_loop.run_until_complete(setup())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:366: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py:691: in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:363: in setup
+    res = await func(**_add_kwargs(func, kwargs, event_loop, request))
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\integration\conftest.py:32: in csrf_token
+    r = await client.post(f"{base_url}/api/csrf")
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_client.py:1859: in post
+    return await self.request(
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_client.py:1540: in request
+    return await self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_client.py:1629: in send
+    response = await self._send_handling_auth(
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_client.py:1657: in _send_handling_auth
+    response = await self._send_handling_redirects(
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_client.py:1694: in _send_handling_redirects
+    response = await self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_client.py:1730: in _send_single_request
+    response = await transport.handle_async_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_transports\default.py:393: in handle_async_request
+    with map_httpcore_exceptions():
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\contextlib.py:158: in __exit__
+    self.gen.throw(value)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    @contextlib.contextmanager
+    def map_httpcore_exceptions() -> typing.Iterator[None]:
+        global HTTPCORE_EXC_MAP
+        if len(HTTPCORE_EXC_MAP) == 0:
+            HTTPCORE_EXC_MAP = _load_httpcore_exceptions()
+        try:
+            yield
+        except Exception as exc:
+            mapped_exc = None
+    
+            for from_exc, to_exc in HTTPCORE_EXC_MAP.items():
+                if not isinstance(exc, from_exc):
+                    continue
+                # We want to map to the most specific exception we can find.
+                # Eg if `exc` is an `httpcore.ReadTimeout`, we want to map to
+                # `httpx.ReadTimeout`, not just `httpx.TimeoutException`.
+                if mapped_exc is None or issubclass(to_exc, mapped_exc):
+                    mapped_exc = to_exc
+    
+            if mapped_exc is None:  # pragma: no cover
+                raise
+    
+            message = str(exc)
+>           raise mapped_exc(message) from exc
+E           httpx.ReadTimeout
+
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\httpx\_transports\default.py:118: ReadTimeout
+=========================== short test summary info ===========================
+ERROR tests/integration/test_preset_pipeline.py::test_preset_pipeline[scientific-budget]
+ERROR tests/integration/test_preset_pipeline.py::test_preset_pipeline[bayesian-budget]
+ERROR tests/integration/test_preset_pipeline.py::test_preset_pipeline[debate-budget]
+====================== 14 deselected, 3 errors in 11.83s ======================

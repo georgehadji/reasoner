@@ -118,22 +118,25 @@ def main():
         return len(registry.list_widgets()) > 0
     checks.append(check_component("Widgets", check_widgets))
     
-    # Check 8: SearXNG (soft check - warns but does not fail)
-    def check_searxng():
-        from reasoner.core.settings import settings
-        from reasoner.core.constants import TIMEOUTS
-        import httpx
-        url = settings.SEARXNG_URL + "/healthz"
-        r = httpx.get(url, timeout=TIMEOUTS.HEALTH_CHECK)
-        return r.status_code == 200
+    # Check 8: Search Backend (soft check — warns but does not fail)
+    def check_search():
+        from reasoner.infrastructure.search.discovery import get_search_client
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        client, _ = loop.run_until_complete(get_search_client())
+        return client is not None
     
     try:
-        if check_searxng():
-            print("[OK]   SearXNG: OK")
+        if check_search():
+            print("[OK]   Search Backend: OK")
         else:
-            print("[WARN] SearXNG: Not reachable (web search will be disabled)")
+            print("[WARN] Search Backend: No backends available (web search disabled)")
     except Exception as e:
-        print(f"[WARN] SearXNG: Not reachable ({e}) - web search will be disabled")
+        print(f"[WARN] Search Backend: Not available ({e}) - web search disabled")
     
     print()
     print("=" * 60)

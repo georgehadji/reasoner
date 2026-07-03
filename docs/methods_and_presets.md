@@ -11,7 +11,7 @@
 | # | Method | Presets | Purpose |
 |---|--------|---------|---------|
 | 1 | `analogical` | 2 | Cross-domain analogy mapping and transfer |
-| 2 | `article` | 2 | Long-form article generation |
+| 2 | `article` | 2 | 7-phase editorial: outline→draft→verify→critique→dev edit→copy edit→audit |
 | 3 | `bayesian` | 2 | Prior→likelihood→posterior→sensitivity reasoning |
 | 4 | `brainstorming` | 2 | Verbalized Sampling: multi-round divergent + convergent ideation |
 | 5 | `coding` | 2 | 5-phase production code: spec→generate→review→test→assemble |
@@ -66,33 +66,38 @@
 
 ### article
 
-#### `article-budget` — 8 roles
+#### `article-budget` — 12 roles
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|
-| primary | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
+| primary | `sonar` | perplexity/sonar | perplexity |
 | synthesis | `gpt-4o-mini` | openai/gpt-4o-mini | openai |
-| article_critic | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
-| article_verifier | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
 | fusion | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
-| meta_evaluator | `qwen3.7-plus` | qwen/qwen3.7-plus | qwen |
-| scoring | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
-| stress_testing | `ring-2.6-1t` | inclusionai/ring-2.6-1t | inclusionai |
-| verifier | `qwen3.7-plus` | qwen/qwen3.7-plus | qwen |
+| writing_draft | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
+| writing_factcheck | `sonar` | perplexity/sonar | perplexity |
+| writing_assemble | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
+| article_sot_skeleton | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
+| article_critic | `hermes-4-70b` | nousresearch/hermes-4-70b | nousresearch |
+| article_revise | `deepseek-v3` | deepseek/deepseek-v3.2 | deepseek |
+| article_humanize | `qwen3.7-plus` | qwen/qwen3.7-plus | qwen |
+| article_verifier | `qwen3.7-plus` | qwen/qwen3.7-plus | qwen |
+| post_synthesis_verify | `sonar` | perplexity/sonar | perplexity |
 
-#### `article-premium` — 11 roles
+#### `article-premium` — 14 roles
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|
-| primary | `claude-sonnet` | anthropic/claude-sonnet-5 | anthropic |
+| primary | `sonar-pro` | perplexity/sonar-pro | perplexity |
 | synthesis | `gpt-5.5` | openai/gpt-5.5 | openai |
-| article_critic | `deepseek-v4-pro` | deepseek/deepseek-v4-pro | deepseek |
-| article_decompose | `claude-sonnet` | anthropic/claude-sonnet-5 | anthropic |
-| article_verifier | `deepseek-v4-pro` | deepseek/deepseek-v4-pro | deepseek |
-| deep_read | `claude-sonnet` | anthropic/claude-sonnet-5 | anthropic |
 | fusion | `deepseek-v4-pro` | deepseek/deepseek-v4-pro | deepseek |
-| meta_evaluator | `qwen3.7-max` | qwen/qwen3.7-max | qwen |
-| scoring | `qwen3-max-thinking` | qwen/qwen3-max-thinking | qwen |
-| stress_testing | `claude-sonnet` | anthropic/claude-sonnet-5 | anthropic |
-| verifier | `qwen3-max-thinking` | qwen/qwen3-max-thinking | qwen |
+| writing_draft | `claude-sonnet` | anthropic/claude-sonnet-5 | anthropic |
+| writing_factcheck | `sonar-pro` | perplexity/sonar-pro | perplexity |
+| writing_outline | `claude-sonnet` | anthropic/claude-sonnet-5 | anthropic |
+| writing_assemble | `gpt-4o-mini` | openai/gpt-4o-mini | openai |
+| article_sot_skeleton | `claude-sonnet` | anthropic/claude-sonnet-5 | anthropic |
+| article_critic | `grok-4.3` | x-ai/grok-4.3 | xai |
+| article_revise | `gpt-5` | openai/gpt-5 | openai |
+| article_humanize | `claude-sonnet` | anthropic/claude-sonnet-5 | anthropic |
+| article_verifier | `qwen3.7-max` | qwen/qwen3.7-max | qwen |
+| post_synthesis_verify | `sonar-pro` | perplexity/sonar-pro | perplexity |
 
 ### bayesian
 

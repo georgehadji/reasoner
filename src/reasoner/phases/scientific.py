@@ -8,7 +8,17 @@ SCIENTIFIC_HYPOTHESIS_SYSTEM = ("You are an analytical assistant. You MUST produ
                                 "Any output that is not a strictly valid JSON object is a fatal error.")
 
 def scientific_hypothesis_prompt(state: PipelineState) -> str:
-    return f'{get_language_instruction(state)}\n\nObservations: {_wrap_user_input(state.problem)}\n\nGenerate 3 competing hypotheses.\n\nOutput JSON: {{"hypotheses": [{{"id": "H1", "statement": "...", "falsifiability": "..."}}]}}'
+    web_context = ""
+    if state.web_discovery_results:
+        web_snippets = [
+            f"  - {r.get('title', '')}: {r.get('snippet', '')[:300]}"
+            for r in state.web_discovery_results[:5]
+            if r.get('title') or r.get('snippet')
+        ]
+        if web_snippets:
+            web_context = f"\n\nRelevant Web Sources:\n" + "\n".join(web_snippets) + "\n\nBase your hypotheses on these sources where applicable."
+
+    return f'{get_language_instruction(state)}\n\nObservations: {_wrap_user_input(state.problem)}{web_context}\n\nGenerate 3 competing hypotheses.\n\nOutput JSON: {{"hypotheses": [{{"id": "H1", "statement": "...", "falsifiability": "..."}}]}}'
 
 SCIENTIFIC_TEST_SYSTEM = ("You are an analytical assistant. You MUST produce a valid JSON object ONLY. "
                           "Do not include any introductory text, concluding remarks, or conversational markdown (e.g., ```json). "

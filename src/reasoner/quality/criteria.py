@@ -166,7 +166,7 @@ def _check_retrieve_sources(state: PipelineState) -> PhaseQualityResult:
     if not sources:
         return _fail(
             "Retrieve Sources found no sources.",
-            ["Check SearXNG availability; fall back to knowledge-only synthesis."],
+            ["Check search backend availability; fall back to knowledge-only synthesis."],
             score=4.0,
         )
     return _ok()
@@ -222,7 +222,7 @@ def _check_context_vetting(state: PipelineState) -> PhaseQualityResult:
     if quality == "missing":
         return _fail(
             "Context quality flagged as missing — no usable search context.",
-            ["Ensure SearXNG is running and reachable, or enable knowledge-only fallback."],
+            ["Ensure search backend is configured and reachable, or enable knowledge-only fallback."],
             score=4.0,
         )
     score = 7.0 if quality == "partial" else 9.0

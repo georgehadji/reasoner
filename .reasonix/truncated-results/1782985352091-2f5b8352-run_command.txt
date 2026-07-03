@@ -1,0 +1,256 @@
+$ python /tmp/run_budget_fixed.py 2>&1
+[exit 1]
+12:39:35 | WARNING  | Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 — allowing call (fail-open)
+12:39:36 | WARNING  | Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 — allowing call (fail-open)
+12:39:36 | WARNING  | Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 — allowing call (fail-open)
+12:39:36 | WARNING  | Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 — allowing call (fail-open)
+12:39:36 | WARNING  | Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 — allowing call (fail-open)
+12:39:36 | INFO     | HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+12:39:36 | INFO     | HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+12:39:36 | INFO     | HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+12:39:37 | INFO     | HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+12:39:37 | INFO     | HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+12:39:40 | WARNING  | Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 — success recorded locally only
+12:39:43 | WARNING  | Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 — success recorded locally only
+12:39:43 | WARNING  | Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 — success recorded locally only
+12:39:44 | WARNING  | Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 — failure recorded locally only
+12:39:44 | WARNING  | Role 'primary' provider 'qwen/qwen3.5-flash-02-23' timed out after 6s — retrying with fallback 'N/A'
+12:39:44 | WARNING  | Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 — failure recorded locally only
+12:39:44 | WARNING  | Role 'primary' provider 'qwen/qwen3.5-flash-02-23' timed out after 6s — retrying with fallback 'N/A'
+12:39:44 | INFO     | HyperGateAgent triggering TieBreaker (ambiguous Phase-1 signals)
+12:39:46 | WARNING  | Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 — allowing call (fail-open)
+12:39:46 | INFO     | HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+12:39:50 | WARNING  | Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 — success recorded locally only
+12:39:50 | INFO     | HyperGateAgent hash=68d825ebc95eb567 action=pipeline method=multi_perspective confidence=0.90
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.7.0) or chardet (6.0.0.post1)/charset_normalizer (3.4.7) doesn't match a supported version!
+  warnings.warn(
+12:39:52 | INFO     | [ORCHESTRATOR] Routing to 'analogical' method pipeline.
+12:39:52 | INFO     | [PHASE-FUSION] Classifying task and decomposing problem...
+12:39:52 | INFO     | [CACHE] MISS for fusion
+12:39:54 | WARNING  | Redis circuit breaker unavailable for llm:deepseek-v4-flash — allowing call (fail-open)
+12:40:12 | WARNING  | Redis circuit breaker unavailable for llm:deepseek-v4-flash — success recorded locally only
+12:40:12 | INFO     | [PHASE-FUSION] Task type: analytical, Language: English
+12:40:12 | INFO     | [TIMING] _phase_fusion completed in 19484.0ms
+12:40:12 | INFO     | [ANALOGICAL] Extracting abstract problem structure...
+12:40:12 | INFO     | [CACHE] MISS for systemic
+12:40:14 | WARNING  | Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 — allowing call (fail-open)
+12:40:37 | WARNING  | Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 — success recorded locally only
+12:40:37 | INFO     | [ANALOGICAL] Searching for isomorphic source domains...
+12:40:37 | INFO     | [CACHE] MISS for systemic
+12:40:39 | WARNING  | Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 — allowing call (fail-open)
+12:40:58 | WARNING  | Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 — success recorded locally only
+12:40:58 | INFO     | [ANALOGICAL] Mapping source domain elements to target problem...
+12:40:58 | INFO     | [CACHE] MISS for systemic
+12:41:00 | WARNING  | Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 — allowing call (fail-open)
+12:41:26 | WARNING  | Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 — success recorded locally only
+12:41:26 | INFO     | [ANALOGICAL] Transferring and adapting solution from source domain...
+12:41:26 | INFO     | [CACHE] MISS for synthesis
+12:41:28 | WARNING  | Redis circuit breaker unavailable for llm:openai/gpt-4o-mini — allowing call (fail-open)
+12:41:36 | WARNING  | Redis circuit breaker unavailable for llm:openai/gpt-4o-mini — success recorded locally only
+12:41:36 | INFO     | [SYNTHESIS] Synthesizing final solution...
+12:41:36 | INFO     | [CACHE] MISS for synthesis
+12:41:38 | WARNING  | Redis circuit breaker unavailable for llm:openai/gpt-4o-mini — allowing call (fail-open)
+12:42:11 | WARNING  | Redis circuit breaker unavailable for llm:openai/gpt-4o-mini — success recorded locally only
+12:42:11 | INFO     | [POST-SYNTHESIS] Running cross-model verification...
+12:42:11 | INFO     | [CACHE] MISS for post_synthesis_verify
+12:42:13 | WARNING  | Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 — allowing call (fail-open)
+12:42:31 | WARNING  | Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 — success recorded locally only
+12:42:31 | INFO     | [TIMING] _phase_post_synthesis_verify completed in 20390.0ms
+┌──────────────────────── Abstract Problem Structure ─────────────────────────┐
+│ A control architecture mediating between automated signal processing and    │
+│ human cognitive capacity to optimize temporal efficiency without inducing   │
+│ system saturation.                                                          │
+│                                                                             │
+│ Constraints:                                                                │
+│   • Bounded cognitive bandwidth                                             │
+│   • Strict temporal deadlines                                               │
+│   • Maximum information noise tolerance                                     │
+│   • Defined hierarchical routing paths                                      │
+│                                                                             │
+│ Objectives:                                                                 │
+│   • Minimize temporal latency of resolution                                 │
+│   • Maximize signal-to-noise fidelity                                       │
+│   • Enable iterative system learning                                        │
+│                                                                             │
+│ Actors:                                                                     │
+│   • Automated Processing Units                                              │
+│   • Human Cognitive Agents                                                  │
+│   • System Governance Entities                                              │
+│                                                                             │
+│ Core Dynamics:                                                              │
+│   • Tension between automation depth and oversight                          │
+│   • Feedback-driven parameter adaptation                                    │
+│   • Priority escalation flow                                                │
+│                                                                             │
+│ Structural Type: optimization                                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+                   Source Domains with Isomorphic Solutions                    
+                                                                               
+  Domain        Solved Problem           Key Mechanism             Relevance   
+ ───────────────────────────────────────────────────────────────────────────── 
+  Engineering   Maintaining flight       Flight envelope           high        
+                stability without        protection and mode                   
+                pilot disengagement or   annunciation logic                    
+                cognitive overload                                             
+  Military      Filtering battlefield    Data fusion algorithms    high        
+                sensor noise for         and priority tagging                  
+                command                  protocols                             
+                decision-making under                                          
+                fire                                                           
+  Biology       Pathogen detection       Signal thresholding and   medium      
+                without autoimmune       cytokine cascade                      
+                overreaction or immune   amplification                         
+                exhaustion                                                     
+                                                                               
+                          Structural Analogy Mappings                          
+                                                                               
+  Source Element          Target Element          Mapping Type     Confidence  
+ ───────────────────────────────────────────────────────────────────────────── 
+  Maintaining flight      Minimizing MTTR while   higher-order     high        
+  stability without       avoiding alert                                       
+  pilot disengagement     fatigue                                              
+  or cognitive overload                                                        
+  Flight envelope         Automated remediation   relational       high        
+  protection              guardrails                                           
+  Mode annunciation       Alert prioritization    relational       high        
+  logic                   and context                                          
+                          enrichment                                           
+  Optimizes temporal      Minimize temporal       higher-order     high        
+  efficiency via          latency of resolution                                
+  automation                                                                   
+  Preventing cognitive    Bounded cognitive       relational       medium      
+  overload through        bandwidth                                            
+  structured human                                                             
+  oversight triggers                                                           
+  Pilot disengagement     Alert fatigue leading   relational       high        
+                          to ignored incidents                                 
+                                                                               
+┌─────────────────────────────── Transfer Plan ───────────────────────────────┐
+│ Transfer Steps:                                                             │
+│   1. Develop automated remediation guardrails that activate based on        │
+│ incident severity, ensuring that routine incidents are handled by the       │
+│ system while critical ones are flagged for human oversight.                 │
+│   2. Create a mode annunciation logic system that enriches alerts with      │
+│ contextual data for prioritization, thus helping operators quickly identify │
+│ the most urgent incidents without overwhelming them with unnecessary        │
+│ alerts.                                                                     │
+│                                                                             │
+│ Adaptations Required:                                                       │
+│   ~ The specific nature of incidents in the tech domain (software/hardware  │
+│ issues) differs from flight emergencies; the response logic must be         │
+│ tailored to accommodate the unique characteristics of tech incidents.       │
+│   ~ Human intervention workflows must be established that differ from pilot │
+│ actions since the operational context and required human judgement in tech  │
+│ incidents may not be directly analogous to aviation.                        │
+│                                                                             │
+│ Caveats:                                                                    │
+│   ! The success of this adapted solution is highly dependent on the quality │
+│ and reliability of the initial incident data and the ongoing machine        │
+│ learning capabilities integrated into the system, which must be regularly   │
+│ updated.                                                                    │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+┌────────────────── Transferred Solution (confidence: high) ──────────────────┐
+│ Implement an automated incident response system equipped with a tiered      │
+│ alerting mechanism to prioritize incidents based on severity and context,   │
+│ enabling real-time remediation actions that align with predefined           │
+│ thresholds while allowing human operators to intervene at critical points.  │
+│ Use analytics to fine-tune a feedback loop for optimizing the alerting      │
+│ system based on past incident data to prevent fatigue and optimize response │
+│ times.                                                                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────── Analogy Limitations ────────────────────────────┐
+│ Where the analogy breaks down:                                              │
+│   x The Airbus Fly-By-Wire system design principles do not directly         │
+│ transfer because the operational feedback in tech incident response         │
+│ requires a different set of design principles tailored to software          │
+│ interactions rather than mechanical flight operations.                      │
+│   x Historical examples from aviation may not always provide relevant       │
+│ insights for tech incident responses as the dynamics of incidents and       │
+│ consequences differ significantly in both domains.                          │
+│                                                                             │
+│ Unmapped Source Elements:                                                   │
+│   ? Airbus Fly-By-Wire system design principles                             │
+│   ? historical_example                                                      │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+                               Action Blueprint                                
+                                                                               
+  #     Action             Horizon        Go Criteria        Fallback          
+ ───────────────────────────────────────────────────────────────────────────── 
+  De…   Activate based     1-2 months     Successful         Manual oversight  
+  au…   on incident                       automation of at   will be           
+  re…   severity to                       least 70% of       maintained        
+  gu…   manage incidents                  routine            during initial    
+        effectively.                      incidents.         deployment.       
+  Cr…   Enrich alerts to   2-3 months     Increase           Simplify alert    
+  a     help operators                    operator           features          
+  co…   identify urgent                   response speed     temporarily       
+  al…   incidents                         to high-priority   while gathering   
+  pr…   quickly.                          alerts.            user feedback.    
+  sy…                                                                          
+  Es…   Use data to        Ongoing,       Demonstrated       Collect           
+  an    refine response    quarterly      reduction in       qualitative       
+  an…   mechanisms and     evaluations.   MTTR over          feedback for      
+  pr…   thresholds.                       successive         adjustments if    
+  for                                     evaluations.       needed.           
+  al…                                                                          
+  ca…                                                                          
+                                                                               
+12:42:31 | INFO     | Pipeline state exported to /tmp/analogical_budget_fixed_result.json
+12:42:31 | INFO     | Shared HTTP connection pool closed successfully
+
+============================================================
+  Reasoner v2.0 — Reasoner
+============================================================
+  Problem: How should a mid-sized tech company design an efficient incident response system that minimizes MTTR while avoiding aler...
+  Top-K candidates: 1
+  Parallel perspectives: True
+============================================================
+
+{"timestamp": "2026-07-02T09:39:35.271919Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 \u2014 allowing call (fail-open)", "correlation_id": "32a76906", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-07-02T09:39:36.036917Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 \u2014 allowing call (fail-open)", "correlation_id": "54c037a1", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-07-02T09:39:36.038917Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 \u2014 allowing call (fail-open)", "correlation_id": "0dae4672", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-07-02T09:39:36.041427Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 \u2014 allowing call (fail-open)", "correlation_id": "b466dbae", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-07-02T09:39:36.043439Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 \u2014 allowing call (fail-open)", "correlation_id": "f7378f4d", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-07-02T09:39:40.997789Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 \u2014 success recorded locally only", "correlation_id": "32a76906", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-07-02T09:39:43.486220Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 \u2014 success recorded locally only", "correlation_id": "54c037a1", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-07-02T09:39:43.769038Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 \u2014 success recorded locally only", "correlation_id": "b466dbae", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-07-02T09:39:44.068155Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 \u2014 failure recorded locally only", "correlation_id": "0dae4672", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-07-02T09:39:44.069167Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 \u2014 failure recorded locally only", "correlation_id": "f7378f4d", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-07-02T09:39:46.086458Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 \u2014 allowing call (fail-open)", "correlation_id": "d66469f1", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-07-02T09:39:50.831373Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 \u2014 success recorded locally only", "correlation_id": "d66469f1", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-07-02T09:39:54.817616Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:deepseek-v4-flash \u2014 allowing call (fail-open)", "correlation_id": "d66469f1", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-07-02T09:40:12.150504Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:deepseek-v4-flash \u2014 success recorded locally only", "correlation_id": "d66469f1", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-07-02T09:40:14.175526Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 \u2014 allowing call (fail-open)", "correlation_id": "d66469f1", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-07-02T09:40:37.679973Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 \u2014 success recorded locally only", "correlation_id": "d66469f1", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-07-02T09:40:39.690959Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 \u2014 allowing call (fail-open)", "correlation_id": "d66469f1", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-07-02T09:40:58.055028Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 \u2014 success recorded locally only", "correlation_id": "d66469f1", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-07-02T09:41:00.070670Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 \u2014 allowing call (fail-open)", "correlation_id": "d66469f1", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-07-02T09:41:26.328760Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 \u2014 success recorded locally only", "correlation_id": "d66469f1", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-07-02T09:41:28.346855Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:openai/gpt-4o-mini \u2014 allowing call (fail-open)", "correlation_id": "d66469f1", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-07-02T09:41:36.723704Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:openai/gpt-4o-mini \u2014 success recorded locally only", "correlation_id": "d66469f1", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-07-02T09:41:38.729626Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:openai/gpt-4o-mini \u2014 allowing call (fail-open)", "correlation_id": "d66469f1", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-07-02T09:42:11.239321Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:openai/gpt-4o-mini \u2014 success recorded locally only", "correlation_id": "d66469f1", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-07-02T09:42:13.254570Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 \u2014 allowing call (fail-open)", "correlation_id": "d66469f1", "extra": {}, "user_id": null, "tier": null, "preset": null}
+{"timestamp": "2026-07-02T09:42:31.641680Z", "level": "WARNING", "source": "llm", "message": "Redis circuit breaker unavailable for llm:qwen/qwen3.5-flash-02-23 \u2014 success recorded locally only", "correlation_id": "d66469f1", "extra": {}, "user_id": null, "tier": null, "preset": null}
+
+[OK] Full state exported -> /tmp/analogical_budget_fixed_result.json
+Traceback (most recent call last):
+  File "E:\tmp\run_budget_fixed.py", line 28, in <module>
+    asyncio.run(main(args))
+  File "C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\asyncio\runners.py", line 195, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\asyncio\runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 691, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "E:\Documents\Vibe-Coding\Reasoner\src\reasoner\main.py", line 268, in main
+    save(state, args.save_state)
+  File "E:\Documents\Vibe-Coding\Reasoner\src\reasoner\models.py", line 57, in save
+    return PipelineService.save(state, path)
+           ^^^^^^^^^^^^^^^^^^^^
+AttributeError: type object 'PipelineService' has no attribute 'save'

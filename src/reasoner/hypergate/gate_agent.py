@@ -40,6 +40,27 @@ class GateDecision(BaseModel):
 
 
 # Internal opaque taxonomy. The LLM sees only the letters (A-L), never the real method names.
+#
+# ═══════════════════════════════════════════════════════════════════
+# GATE TAXONOMY vs. PHASES INVENTORY
+# ═══════════════════════════════════════════════════════════════════
+# Methods mapped to gate categories: (19 pipeline methods in phases/)
+#   debate, scientific, socratic, multi_perspective, iterative,
+#   research, pre_mortem, bayesian, dialectical, analogical,
+#   delphi, cove, sot, tot, pot, self_discover  ← 16 mapped
+#   jury, brainstorming, writing, article, coding  ← 5 NOT mapped
+#
+# Intentionally excluded (preset-only, not auto-routable):
+#   - jury:      requires explicit panel configuration (jurors, criteria)
+#   - article:   requires source material + target venue/format
+#   - writing:   requires domain expertise + style config
+#   - coding:    requires language/framework/constraints spec
+#   - brainstorming: requires ideation constraints (quantity, diversity)
+#
+# These methods are accessible only via explicit --preset or --method flags.
+# They are NOT gate-routable because they require structured parameters
+# that the gate prompt cannot elicit from a natural-language query.
+# ═══════════════════════════════════════════════════════════════════
 _TAXONOMY = {
     "A": ("direct", None),
     "B": ("pipeline", "debate"),

@@ -127,25 +127,6 @@ services:
         max-size: "100m"
         max-file: "3"
 
-  searxng:
-    image: searxng/searxng:latest
-    volumes:
-      - ./.searxng-settings.yml:/etc/searxng/settings.yml:ro
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
-        reservations:
-          cpus: '0.25'
-          memory: 256M
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "100m"
-        max-file: "3"
-
   postgres:
     image: postgres:16-alpine
     environment:

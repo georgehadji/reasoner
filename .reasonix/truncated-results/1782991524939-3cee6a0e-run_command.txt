@@ -1,0 +1,264 @@
+$ python -m pytest tests/unit/test_preset_bloc_diversity.py -v 2>&1
+[exit 0]
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.7.0) or chardet (6.0.0.post1)/charset_normalizer (3.4.7) doesn't match a supported version!
+  warnings.warn(
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.7.0) or chardet (6.0.0.post1)/charset_normalizer (3.4.7) doesn't match a supported version!
+  warnings.warn(
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.7.0) or chardet (6.0.0.post1)/charset_normalizer (3.4.7) doesn't match a supported version!
+  warnings.warn(
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.7.0) or chardet (6.0.0.post1)/charset_normalizer (3.4.7) doesn't match a supported version!
+  warnings.warn(
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.7.0) or chardet (6.0.0.post1)/charset_normalizer (3.4.7) doesn't match a supported version!
+  warnings.warn(
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.7.0) or chardet (6.0.0.post1)/charset_normalizer (3.4.7) doesn't match a supported version!
+  warnings.warn(
+C:\Users\tesse\AppData\Local\Programs\Python\Python312\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.7.0) or chardet (6.0.0.post1)/charset_normalizer (3.4.7) doesn't match a supported version!
+  warnings.warn(
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-8.4.2, pluggy-1.6.0 -- C:\Users\tesse\AppData\Local\Programs\Python\Python312\python.EXE
+cachedir: .pytest_cache
+rootdir: E:\Documents\Vibe-Coding\Reasoner
+configfile: pytest.ini
+plugins: anyio-4.13.0, dash-4.0.0, langsmith-0.7.25, asyncio-0.24.0, cov-7.0.0, mock-3.15.1, timeout-2.4.0, xdist-3.8.0
+asyncio: mode=Mode.AUTO, default_loop_scope=session
+created: 6/6 workers
+6 workers [101 items]
+
+scheduling tests via LoadScopeScheduling
+
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[analogical-budget] 
+[gw1] [  0%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[analogical-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[analogical-premium] 
+[gw1] [  1%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[analogical-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[article-budget] 
+[gw1] [  2%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[article-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[article-budget-sonar] 
+[gw1] [  3%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[article-budget-sonar] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[article-premium] 
+[gw1] [  4%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[article-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[bayesian-budget] 
+[gw1] [  5%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[bayesian-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[bayesian-premium] 
+[gw1] [  6%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[bayesian-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[brainstorming-budget] 
+[gw1] [  7%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[brainstorming-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[brainstorming-premium] 
+[gw1] [  8%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[brainstorming-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[coding-budget] 
+[gw1] [  9%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[coding-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[coding-premium] 
+[gw1] [ 10%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[coding-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[cove-budget] 
+[gw1] [ 11%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[cove-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[cove-premium] 
+[gw1] [ 12%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[cove-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[cross-language-budget] 
+[gw1] [ 13%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[cross-language-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[cross-language-premium] 
+[gw1] [ 14%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[cross-language-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[debate-budget] 
+[gw1] [ 15%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[debate-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[debate-premium] 
+[gw1] [ 16%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[debate-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[delphi-budget] 
+[gw1] [ 17%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[delphi-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[delphi-premium] 
+[gw1] [ 18%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[delphi-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[dialectical-budget] 
+[gw1] [ 19%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[dialectical-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[dialectical-premium] 
+[gw1] [ 20%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[dialectical-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[image-gen-budget] 
+[gw1] [ 21%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[image-gen-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[image-gen-premium] 
+[gw1] [ 22%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[image-gen-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[iterative-critique-budget] 
+[gw1] [ 23%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[iterative-critique-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[iterative-critique-premium] 
+[gw1] [ 24%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[iterative-critique-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[jury-budget] 
+[gw1] [ 25%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[jury-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[jury-premium] 
+[gw1] [ 26%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[jury-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[multi-perspective-budget] 
+[gw1] [ 27%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[multi-perspective-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[multi-perspective-premium] 
+[gw1] [ 28%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[multi-perspective-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[multi-perspective-ultra-budget] 
+[gw1] [ 29%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[multi-perspective-ultra-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[pot-budget] 
+[gw1] [ 30%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[pot-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[pot-premium] 
+[gw1] [ 31%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[pot-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[pre-mortem-budget] 
+[gw1] [ 32%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[pre-mortem-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[pre-mortem-premium] 
+[gw1] [ 33%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[pre-mortem-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[research-budget] 
+[gw1] [ 34%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[research-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[research-premium] 
+[gw1] [ 35%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[research-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[scientific-budget] 
+[gw1] [ 36%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[scientific-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[scientific-premium] 
+[gw1] [ 37%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[scientific-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[self-discover-budget] 
+[gw1] [ 38%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[self-discover-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[self-discover-premium] 
+[gw1] [ 39%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[self-discover-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[socratic-budget] 
+[gw1] [ 40%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[socratic-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[socratic-premium] 
+[gw1] [ 41%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[socratic-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[sot-budget] 
+[gw1] [ 42%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[sot-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[sot-premium] 
+[gw1] [ 43%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[sot-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[subagent-budget] 
+[gw1] [ 44%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[subagent-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[subagent-premium] 
+[gw1] [ 45%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[subagent-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[tot-budget] 
+[gw1] [ 46%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[tot-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[tot-premium] 
+[gw1] [ 47%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[tot-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[writing-budget] 
+[gw1] [ 48%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[writing-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[writing-premium] 
+[gw1] [ 49%] PASSED tests/unit/test_preset_bloc_diversity.py::test_synthesis_and_scoring_are_cross_bloc[writing-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[analogical-budget] 
+[gw1] [ 50%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[analogical-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[analogical-premium] 
+[gw1] [ 51%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[analogical-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[article-budget] 
+[gw1] [ 52%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[article-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[article-budget-sonar] 
+[gw1] [ 53%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[article-budget-sonar] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[article-premium] 
+[gw1] [ 54%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[article-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[bayesian-budget] 
+[gw1] [ 55%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[bayesian-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[bayesian-premium] 
+[gw1] [ 56%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[bayesian-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[brainstorming-budget] 
+[gw1] [ 57%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[brainstorming-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[brainstorming-premium] 
+[gw1] [ 58%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[brainstorming-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[coding-budget] 
+[gw1] [ 59%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[coding-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[coding-premium] 
+[gw1] [ 60%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[coding-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[cove-budget] 
+[gw1] [ 61%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[cove-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[cove-premium] 
+[gw1] [ 62%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[cove-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[cross-language-budget] 
+[gw1] [ 63%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[cross-language-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[cross-language-premium] 
+[gw1] [ 64%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[cross-language-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[debate-budget] 
+[gw1] [ 65%] PASSED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[debate-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[debate-premium] 
+[gw1] [ 66%] PASSED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[debate-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[delphi-budget] 
+[gw1] [ 67%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[delphi-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[delphi-premium] 
+[gw1] [ 68%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[delphi-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[dialectical-budget] 
+[gw1] [ 69%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[dialectical-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[dialectical-premium] 
+[gw1] [ 70%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[dialectical-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[image-gen-budget] 
+[gw1] [ 71%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[image-gen-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[image-gen-premium] 
+[gw1] [ 72%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[image-gen-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[iterative-critique-budget] 
+[gw1] [ 73%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[iterative-critique-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[iterative-critique-premium] 
+[gw1] [ 74%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[iterative-critique-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[jury-budget] 
+[gw1] [ 75%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[jury-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[jury-premium] 
+[gw1] [ 76%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[jury-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[multi-perspective-budget] 
+[gw1] [ 77%] PASSED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[multi-perspective-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[multi-perspective-premium] 
+[gw1] [ 78%] PASSED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[multi-perspective-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[multi-perspective-ultra-budget] 
+[gw1] [ 79%] PASSED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[multi-perspective-ultra-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[pot-budget] 
+[gw1] [ 80%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[pot-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[pot-premium] 
+[gw1] [ 81%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[pot-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[pre-mortem-budget] 
+[gw1] [ 82%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[pre-mortem-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[pre-mortem-premium] 
+[gw1] [ 83%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[pre-mortem-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[research-budget] 
+[gw1] [ 84%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[research-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[research-premium] 
+[gw1] [ 85%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[research-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[scientific-budget] 
+[gw1] [ 86%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[scientific-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[scientific-premium] 
+[gw1] [ 87%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[scientific-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[self-discover-budget] 
+[gw1] [ 88%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[self-discover-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[self-discover-premium] 
+[gw1] [ 89%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[self-discover-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[socratic-budget] 
+[gw1] [ 90%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[socratic-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[socratic-premium] 
+[gw1] [ 91%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[socratic-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[sot-budget] 
+[gw1] [ 92%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[sot-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[sot-premium] 
+[gw1] [ 93%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[sot-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[subagent-budget] 
+[gw1] [ 94%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[subagent-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[subagent-premium] 
+[gw1] [ 95%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[subagent-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[tot-budget] 
+[gw1] [ 96%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[tot-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[tot-premium] 
+[gw1] [ 97%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[tot-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[writing-budget] 
+[gw1] [ 98%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[writing-budget] 
+tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[writing-premium] 
+[gw1] [ 99%] SKIPPED tests/unit/test_preset_bloc_diversity.py::test_generation_spans_multiple_blocs[writing-premium] 
+tests/unit/test_preset_bloc_diversity.py::test_bloc_of_resolves_cross_vendor_aliases 
+[gw1] [100%] PASSED tests/unit/test_preset_bloc_diversity.py::test_bloc_of_resolves_cross_vendor_aliases 
+
+============================== warnings summary ===============================
+tests\unit\test_preset_bloc_diversity.py:34
+tests\unit\test_preset_bloc_diversity.py:34
+tests\unit\test_preset_bloc_diversity.py:34
+tests\unit\test_preset_bloc_diversity.py:34
+tests\unit\test_preset_bloc_diversity.py:34
+tests\unit\test_preset_bloc_diversity.py:34
+  E:\Documents\Vibe-Coding\Reasoner\tests\unit\test_preset_bloc_diversity.py:34: PytestUnknownMarkWarning: Unknown pytest.mark.unit - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.unit
+
+tests\unit\test_preset_bloc_diversity.py:52
+tests\unit\test_preset_bloc_diversity.py:52
+tests\unit\test_preset_bloc_diversity.py:52
+tests\unit\test_preset_bloc_diversity.py:52
+tests\unit\test_preset_bloc_diversity.py:52
+tests\unit\test_preset_bloc_diversity.py:52
+  E:\Documents\Vibe-Coding\Reasoner\tests\unit\test_preset_bloc_diversity.py:52: PytestUnknownMarkWarning: Unknown pytest.mark.unit - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.unit
+
+tests\unit\test_preset_bloc_diversity.py:83
+tests\unit\test_preset_bloc_diversity.py:83
+tests\unit\test_preset_bloc_diversity.py:83
+tests\unit\test_preset_bloc_diversity.py:83
+tests\unit\test_preset_bloc_diversity.py:83
+tests\unit\test_preset_bloc_diversity.py:83
+  E:\Documents\Vibe-Coding\Reasoner\tests\unit\test_preset_bloc_diversity.py:83: PytestUnknownMarkWarning: Unknown pytest.mark.unit - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.unit
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+============================ slowest 10 durations =============================
+
+(10 durations < 0.005s hidden.  Use -vv to show these durations.)
+================= 54 passed, 47 skipped, 18 warnings in 8.80s =================

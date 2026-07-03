@@ -109,17 +109,46 @@ class RunStateManager:
 
     # ── Public API ──
 
+    async def is_authoritative(self) -> bool:
+        """True if the manager holds an authoritative (Redis) connection.
+
+        Callers that need atomic idempotency gating MUST check this before
+        calling try_register(). When not authoritative, try_register() will
+        raise RuntimeError — the caller is expected to respond with a 503
+        (or equivalent backpressure) rather than silently accepting duplicates.
+        """
+        # Fast path: we know Redis is OK from a recent operation
+        if self._redis_ok:
+            return True
+        # Probe: if we haven't checked lately, try a lightweight round-trip
+        if self._should_try_redis():
+            try:
+                redis = self._get_redis()
+                await redis.ping()
+                self._redis_ok = True
+                self._redis_last_fail = 0.0
+                return True
+            except Exception:
+                self._redis_ok = False
+                self._redis_last_fail = time.monotonic()
+        return False
+
     async def try_register(self, client_run_id: str, ttl: int = 3600) -> bool:
         """Atomically register a run. Returns True if newly created, False if already exists.
 
-        Uses Redis SET NX for atomic check-and-register (C2). In-memory fallback
-        uses a plain set check (not atomic under concurrency, but acceptable for
-        single-worker deployments where the race window does not exist).
+        Uses Redis SET NX for atomic check-and-register (C2).
+
+        Raises RuntimeError if the backing store is non-authoritative (in-memory
+        fallback). Callers MUST gate behind is_authoritative() and respond with
+        503 unless they explicitly accept the lack of atomicity.
         """
-        try:
-            return await self._redis_op(lambda: self._try_register_redis(client_run_id, ttl))
-        except _RedisUnavailable:
-            return self._get_fallback().try_register(client_run_id, ttl)
+        if not self._redis_ok:
+            raise RuntimeError(
+                "RunStateManager is in fallback mode — try_register() cannot guarantee "
+                "atomic idempotency. Call is_authoritative() first and respond 503 when "
+                "it returns False."
+            )
+        return await self._redis_op(lambda: self._try_register_redis(client_run_id, ttl))
 
     async def _try_register_redis(self, client_run_id: str, ttl: int) -> bool:
         redis = self._get_redis()

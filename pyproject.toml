@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=64.0"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "reasoner"
+version = "2.1.0"
+description = "Multi-model reasoning pipeline orchestrator"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+timeout = 120
+xfail_strict = true
+filterwarnings = [
+    "ignore::DeprecationWarning:reasoner.*",
+]
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+disallow_untyped_defs = false
+disallow_any_unimported = false
+
+[[tool.mypy.overrides]]
+module = "reasoner.infrastructure.llm.providers.*"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "reasoner.infrastructure.widgets.*"
+ignore_errors = true

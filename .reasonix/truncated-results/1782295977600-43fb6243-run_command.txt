@@ -1,0 +1,306 @@
+$ git status --short 2>&1
+[exit 0]
+ m .claude/worktrees/agent-a4c618c7
+ m .claude/worktrees/agent-ac1f84a2
+ m .claude/worktrees/agent-ad6a6db7
+ m .claude/worktrees/agent-ae2a64f7
+ m .claude/worktrees/agent-aeaed081
+ m .claude/worktrees/agent-afad94bc
+ M REASONIX.md
+ D cache/tokens/0083ffc66887f564b53a978c6f862eb0.json
+ D cache/tokens/0445d12ac9205454c2caa276bbabc6ed.json
+ D cache/tokens/0682e9e84b3861d81befc115d7111118.json
+ D cache/tokens/077a30ab3a15eb2d3a1003e579f17888.json
+ D cache/tokens/079c4cfecbeacbcba171c16f35fa5355.json
+ D cache/tokens/0859f85b0a78e5ca75f119b3a9471d8f.json
+ D cache/tokens/09a56480ac332858297367d51e40b160.json
+ D cache/tokens/09f5cf6ef95c16561f20156ffbfdb2a7.json
+ D cache/tokens/12fb5150cc4b5bbd17aebeae54fb9e9f.json
+ D cache/tokens/13ebd34d23dc74315498b6164b6acc9c.json
+ D cache/tokens/1764850de8123cb977ef40f825712810.json
+ D cache/tokens/179c7053bab7dccda16c89b642a15474.json
+ D cache/tokens/18c76e8730639a0e2bbb68c0d6dc8f3e.json
+ D cache/tokens/193fc179e3098412df3a3446507cbe55.json
+ D cache/tokens/21d43ea2cf0d304a75abac0961f0d54b.json
+ D cache/tokens/276072efd281b647d8ec89d0fff9af8a.json
+ D cache/tokens/335e900952c8708ba46b3b3504984afe.json
+ D cache/tokens/341f32284c3c935e2945369f0bd7a7c1.json
+ D cache/tokens/39e7fe5ce9ea5c5c4793e063edd21cf8.json
+ D cache/tokens/3b7b69cac6cad2543c2ab7422bc66b92.json
+ D cache/tokens/42282db48866549941aa055ac6372d1c.json
+ D cache/tokens/444a3628c552654393da25539098b5de.json
+ D cache/tokens/451a796c84ba1ce504dadae7697d7db8.json
+ D cache/tokens/49ba47f268c8a0ba0be8da93b0bb8cd7.json
+ D cache/tokens/4d27747aaf7b4bced7398c3ffc14802e.json
+ D cache/tokens/50800a637a17936f70bc4aacdb3a7a28.json
+ D cache/tokens/54de850324b2586c9168bb8d91b78c06.json
+ D cache/tokens/553a850b4dd56fd767646d4fe65a9ad7.json
+ D cache/tokens/565e57771d63f820bc40aac1aaa53641.json
+ D cache/tokens/56ac4bf44f25ac7e4d0068fb3756a073.json
+ D cache/tokens/56cb41489a4921a52b004b1917e0c052.json
+ D cache/tokens/60ab399ddf7e63b3759715f180373cc0.json
+ D cache/tokens/66d7d43b838fdffb20951f0557b8807e.json
+ D cache/tokens/686dac0dc8941180ec106fdb05c0f361.json
+ D cache/tokens/6c097971fe8021a767c3198475ce0598.json
+ D cache/tokens/6d834a67157c5f149618bb85617a7876.json
+ D cache/tokens/6db8f0886dee619597f5e1856f1daa31.json
+ D cache/tokens/6ec3ae1a09541b94890c1f18f66c7266.json
+ D cache/tokens/6fe74d51a68f2dda248bd13f7ae7a2ca.json
+ D cache/tokens/74bbd2c3fd1b3ee98a1254461db0c7b9.json
+ D cache/tokens/77efbd3d08be7c1e7b475f70d85881e1.json
+ D cache/tokens/7b31f383ae4d1a8d16a907e87c9678d7.json
+ D cache/tokens/7b511cc28e3864e7a4b7c02fecca917e.json
+ D cache/tokens/825e7904dd5ca27ea0268918b5ea9e6c.json
+ D cache/tokens/865778695a08e506db801efaf827d30f.json
+ D cache/tokens/87f9910a462bb0df3f8ac9922da746d3.json
+ D cache/tokens/8d0149e6079a1c457a58c5a96315b7c8.json
+ D cache/tokens/8e72452929dfdabdd0ddd4104b6ec2ba.json
+ D cache/tokens/908bb29335c95acac2dfd3795ef5bad7.json
+ D cache/tokens/92f5ed76910a7841a51827d2618958a5.json
+ D cache/tokens/9a75f4329e426d56d8d943c73a57970b.json
+ D cache/tokens/a006b40987cc772e3133c2e0e3f87182.json
+ D cache/tokens/a1a8bd159af2ea8c31accd5514544da0.json
+ D cache/tokens/a528dbe160893ed6268772c8fc04e637.json
+ D cache/tokens/a73cb415bba5c383ce72769932c3ee16.json
+ D cache/tokens/ab81492e8180aebecb7513dc5b53f3d6.json
+ D cache/tokens/ac54a51e394048e56a628528582adf14.json
+ D cache/tokens/b231c36ef71b6a7981f66ced23c954b4.json
+ D cache/tokens/b6fc27896225bba307b53e9e65cf6c65.json
+ D cache/tokens/bd3de3e3e23590400dc99ea9123b0700.json
+ D cache/tokens/c042c93e2624c1e1daad74af2b6271ad.json
+ D cache/tokens/c1bba995b9ad042c5510e6a7604595d4.json
+ D cache/tokens/c2bfdf09eae035ff6aa307c0bea4068d.json
+ D cache/tokens/cb1135f3021cdf342ae9a551f69ab6cf.json
+ D cache/tokens/cbc6bafb35ace55c546bcf26afddf4b0.json
+ D cache/tokens/cbcb9e2a5b6b1606e0d3c3a54b084cd8.json
+ D cache/tokens/ce868e64e274d14f05ab396ead161d07.json
+ D cache/tokens/e15d510ccf2ae813725081e47efdb4ae.json
+ D cache/tokens/e16344bbeb2032aa5487b94a718d2aff.json
+ D cache/tokens/e223b0a6bdb160a335087dee35a1e258.json
+ D cache/tokens/e673b72b008d9efcb8e5a8d5c050117b.json
+ D cache/tokens/ea9079b36d5cc36e4b9c9dfdadece62e.json
+ D cache/tokens/ecc8cfa2a15d27a9817b848bdb5a2399.json
+ D cache/tokens/eef9ffc3ab239daf1033ce6af6d9cfd8.json
+ D cache/tokens/f0930c2cfd33a05a2b5242f0cc659d37.json
+ D cache/tokens/f134794ca48ede1bf0d495f972ffaa74.json
+ D cache/tokens/f191b1f1819f64cfd3919db8cb4f3985.json
+ D cache/tokens/f5e9944b545e0cd1050996e4efd8a4f6.json
+ D cache/tokens/f84916c38864ac0298eaad8c9718c651.json
+ D cache/tokens/fa750620da6138d761f07ac7f929398a.json
+ D cache/tokens/fb3b098f300ae8501b91165fa73bdcce.json
+ D cache/tokens/fc52d56347b9ea3db21256aa12eab17a.json
+ D cache/tokens/fd33709ad4d897940c94c60cb20552a3.json
+ D cache/tokens/ff584c2bce25f63913e416f9bdd9cd82.json
+ M graphify-out/.graphify_labels.json
+ M graphify-out/2026-06-21/.graphify_labels.json
+ M graphify-out/2026-06-21/GRAPH_REPORT.md
+ M graphify-out/2026-06-21/graph.json
+ M graphify-out/2026-06-21/manifest.json
+ M graphify-out/GRAPH_REPORT.md
+ M graphify-out/cache/stat-index.json
+ M graphify-out/graph.json
+ M graphify-out/manifest.json
+ M implementation_audit_report.md
+ M requirements.txt
+ M src/reasoner/api/routes/gdpr.py
+ M src/reasoner/application/services/data_eraser.py
+ M src/reasoner/application/services/scorecard_service.py
+ M src/reasoner/core/rerank.py
+ M src/reasoner/core/settings.py
+ M src/reasoner/documents/vector_store.py
+ M src/reasoner/healing/telemetry_exporter.py
+ M src/reasoner/hypergate/hyperagent.py
+ M src/reasoner/infrastructure/llm/router.py
+ M src/reasoner/infrastructure/persistence/error_store.py
+ M src/reasoner/infrastructure/persistence/event_store.py
+ M src/reasoner/infrastructure/persistence/feedback_store.py
+ M src/reasoner/infrastructure/persistence/telemetry_store.py
+ M src/reasoner/infrastructure/redis/run_state.py
+ M src/reasoner/infrastructure/server_check.py
+ M src/reasoner/subagents/synthesis/hyper_agent.py
+?? .reasonix/truncated-results/1781996882438-cdc2feb5-run_command.txt
+?? .reasonix/truncated-results/1782081559402-35f04443-run_skill.txt
+?? .reasonix/truncated-results/1782118260709-35ad711e-run_command.txt
+?? .reasonix/truncated-results/1782118266269-4e4a0163-run_command.txt
+?? ARCH-AUDIT-V2-REPORT.md
+?? ARCHITECTURE_REMEDIATION_PLAN.md
+?? ARCH_AUDIT_REPORT_V2.md
+?? audit-babeltele.md
+?? graphify-out/2026-06-22/
+?? graphify-out/2026-06-24/
+?? graphify-out/cache/ast/0135d70738e33952c53b22146e9528f97ac3247fd6cadaf281447ee7218ba024.json
+?? graphify-out/cache/ast/0203b7952dda066091d2ff715f71a570ea6071169a6858eefce8f9839efefa8f.json
+?? graphify-out/cache/ast/07402f2464a4b8337743d68b20765c46deda84d3c30979b32db033df9809f491.json
+?? graphify-out/cache/ast/077b69d2231c86c82e813e2df2db3ed26d48ad6444a865beee6df84f9c899c94.json
+?? graphify-out/cache/ast/0a702359d8111bb4963799a20186d55acfe20e553a2a5824adac9a2ff1c36e71.json
+?? graphify-out/cache/ast/0d0ea47240c883f1fd0e3e38f01568a19ceafe0bea1da23bdb3374fc15e222f3.json
+?? graphify-out/cache/ast/0dc73d29abc316d6dfc68ded6dfd8d053860ebdb43a773063c2ef0f2e9f6c12c.json
+?? graphify-out/cache/ast/13a77b2fcd2c5c5d54ada06a79a0d7313312411bbb325a352e4eda88da773d66.json
+?? graphify-out/cache/ast/156539ca4badf5ee57034d24016fca0f07d9eed1e9190ea2001f1dbfdfbb96e9.json
+?? graphify-out/cache/ast/18c0a750e07a4d24776616241685bc8d09f592786eeedfe1fe71dbb26388b51b.json
+?? graphify-out/cache/ast/19998925fcd26e9c6c54fa21b90af57a7750a16950de829b9386cfed91c03b8d.json
+?? graphify-out/cache/ast/1e76dc50004dafd6a0d78d33904489d564c77b467850a5cf12f4c20f40fbc56f.json
+?? graphify-out/cache/ast/1f015c068b12e527618e116c3ee8eaffae4ae59836bdaeefbfca7f11ec010f62.json
+?? graphify-out/cache/ast/1f2c28816ab2eeaf8130b9e77839ef8c1af3759ceb7e26c8653347a62f999297.json
+?? graphify-out/cache/ast/2111f3731dd35a489a65099ae5f5738a957390d01138537459fe140c4f2d1505.json
+?? graphify-out/cache/ast/228c008ca7676b35ac0990a51ec8b73901f36a575d622ba7b14729ec584192ca.json
+?? graphify-out/cache/ast/258e2e20af8f963c4bcda9bdca109c0e6fde6d5d20fbaa4408ade2bbce78266d.json
+?? graphify-out/cache/ast/29106eaaef0ad151aba2524ee961e590e325b2b468e2059d6a780bcc9c9c1d25.json
+?? graphify-out/cache/ast/2b31b981a51e75c0a4f758e4c7b9651b615497cc25f71d62fac9dac34feb0b8c.json
+?? graphify-out/cache/ast/2c369b658efddc23d0216bd61ae936d113074e1efadffe806447df04efe1d652.json
+?? graphify-out/cache/ast/2d6f9a456ee7aad7bca25f8f415e47e146dfcfecc4858edd51e8beb405d20670.json
+?? graphify-out/cache/ast/2e8767b97b0fef5b7b41755094f741acb6a0786f248dc5a6375c01b70a396197.json
+?? graphify-out/cache/ast/30746744d48fd8003411632bd9deeab29a85151bfe9c839861a9586ae2b6019d.json
+?? graphify-out/cache/ast/3198be2e49a50796bdc55d9b129ee4e5a1bf6f35f357bb092e8a055938e6b6e0.json
+?? graphify-out/cache/ast/31fdf1473817f03dfacdd4108ef259454c4b98b35b17a82c2d8f01291a5444b1.json
+?? graphify-out/cache/ast/337aec8bff191034ff0ea60225b34395359b8079a58063c91603c891927801fb.json
+?? graphify-out/cache/ast/3601c115e29a88377f4cf366dc61674d5583ee15463419bfbfe815d14424bace.json
+?? graphify-out/cache/ast/372b095ad14f552d48f2add2720fe34015daea4d3641a4877f27f13481870dde.json
+?? graphify-out/cache/ast/378684b4fe395db0ac398a5a14d955aaec2c6733059c1e549fd8f2856748b30c.json
+?? graphify-out/cache/ast/3a51e38b0cd472099095a3baaf95f098595b58539f5a44fd2c41141b7cc9ab4b.json
+?? graphify-out/cache/ast/3c8f0e9d7ebabd6991d6147bbf0c9bddbeaf5c6b78e6c378a540caf4a54d0d3a.json
+?? graphify-out/cache/ast/3cfcdac0cf45f125c3614b8c9bd16e05645b08cb4f87ed4fd3096b09d00f4951.json
+?? graphify-out/cache/ast/3f2eb6b14a4d48546f934c8b8c2b2d115cc85d704a26ecb2c8064a9c7b4439fc.json
+?? graphify-out/cache/ast/400be4f7f03424cd0aa0a5f4e78f8508f879f9bc097d68eb7144e85c57aeecf8.json
+?? graphify-out/cache/ast/406c70a88dfaecec8b05e216f221d416d671c7a8d2e9ec6ee4ed9927a81bf82a.json
+?? graphify-out/cache/ast/40f72017b025bd76cd18be8195148f260030cc24419dfbe41eb9a5bec552968c.json
+?? graphify-out/cache/ast/41adc43ef2eaa3000737734939a65e84bc5e0ca2a1b4ad158486e13d6a06d6bf.json
+?? graphify-out/cache/ast/4253d771f6bc51a047643513213653d3dcd96067b40664c56cde8a404d2ad95f.json
+?? graphify-out/cache/ast/42d16f78f1dd4998f20f5e5649de74a2f73a9cd854cc728e2a416d396355db84.json
+?? graphify-out/cache/ast/44785719b7dd51b41486184155a4e9317b9ab233fb6574c0ace684200350e351.json
+?? graphify-out/cache/ast/45b5b20e7ead05b3103a7781b5fadb3107f79abfd4f864ab20a78bdc2d5d9fb0.json
+?? graphify-out/cache/ast/4639b3ab9fae8e1a4a59df211fab88ca531baeb0c4413347960ab76038067af9.json
+?? graphify-out/cache/ast/4ab16f2eec9d0d3a2a5049e81667e03cbe2f91e2e334ab783a1f4d9c12fba4b4.json
+?? graphify-out/cache/ast/4c1727167e645accc604847f854f3e59a07bbd7ffda1a3cece4dcbe6746ac370.json
+?? graphify-out/cache/ast/4f38a3bb0ed05e0e01180edb11f51d30ba713c2c3e23f8cea3726c4a44b13983.json
+?? graphify-out/cache/ast/510edbc4878096ae632cec64f214015f31c06b4f68755ec3ed479e81f1106920.json
+?? graphify-out/cache/ast/525c29a3b6dbdf95cfb6d6c2e8a0e1e285c15eee09a5fe6c328528f420143660.json
+?? graphify-out/cache/ast/54cc6d54c9ae72cbea72937dbd49b2076a3325e03f80075c1cee4ba54920f04a.json
+?? graphify-out/cache/ast/5659ae285a3991a0581513dca6954f8220d4e82f366d478d9091e86df39670d5.json
+?? graphify-out/cache/ast/587729e7ee835269a02a154286c87d054b0a8e0d609e91873676010bb78fdcf2.json
+?? graphify-out/cache/ast/58dc75ebd4cefc53756e64655ac24286637ace19c36014f8b51313da34f9a42e.json
+?? graphify-out/cache/ast/5910831915c675a10d96d1cb8bdbea7b17cdf4de704d1c7fb756949580407d0c.json
+?? graphify-out/cache/ast/59f56988b3a5fcd86e481d74af543e741fc4f88b04f921345c9ef1721ffe94c5.json
+?? graphify-out/cache/ast/5a639e7fd52c64ab733dd2a9c2abf00d45f4dad09fed80f5af2ac3444f34b43e.json
+?? graphify-out/cache/ast/5aa47ebb973756ba30952964a389cbd53e1f6d27c3967d517fffe99b3cf11e6f.json
+?? graphify-out/cache/ast/5e82397b3329b199181b8722ae88e7bad57b18818a91641c99aaceb2b686fed9.json
+?? graphify-out/cache/ast/60eccad65f3fda951ba9fe5112970981c91c14cec956d99160a8b4eebad25ce7.json
+?? graphify-out/cache/ast/639f94dfaa140d88a0fd0ba925366d00c2ef755f4c21bd70bfdc1d19c66863b0.json
+?? graphify-out/cache/ast/6543026f15374a4456d7d7597ba16c200d6ae59baeb475415880c5614d09c74c.json
+?? graphify-out/cache/ast/66fe3ca8bc579eddb74abd1c0703f2ec4c9996d406b6e0c246a3d52796eff4aa.json
+?? graphify-out/cache/ast/68f4200c8752dd35f352b9d13f7b265f4f0bdf5626a1ea4a39431a4aba2bb492.json
+?? graphify-out/cache/ast/69ee5dbababb37b5071f3d0846e8195bbcea8f3dcfdf3c96b4e0f91d7cb99803.json
+?? graphify-out/cache/ast/6a1d0e496ec9d306a17cb6ddbdffd9e6d7c4a795067756496aaf6dc429ddf799.json
+?? graphify-out/cache/ast/6b6913da102cf37e969f4b74e37abc5fcd60109b292ad5638e16e94060953369.json
+?? graphify-out/cache/ast/6c77fb43055b5ad9f5ca423395c0c0a2f24e76a4eb45b666f2161b19f7022ae2.json
+?? graphify-out/cache/ast/6e8b3ae3f8d5f067a343e6e2c7896653dac14ae86d17bbac7e31b1532d6fc3d0.json
+?? graphify-out/cache/ast/703c38904f04f3a162b35797bae6962cf451958e51ae52c04f5733b84aa88ca2.json
+?? graphify-out/cache/ast/71938942030e24d0386151f50035507b27571b581ef2fa2f821537a6bd4fa594.json
+?? graphify-out/cache/ast/728c3e7bfa6f8d74e7b7031e592829596edb5835ba4b412969c57aa6e1cac105.json
+?? graphify-out/cache/ast/72b6b40bd89a6aa91a9bc57e1260fb5dba118bfd1c9439d98c46d58b44f3d3b4.json
+?? graphify-out/cache/ast/742a79a68a3fb92d0d675b054abb574422e888106b3ea22376b19166ffb44aad.json
+?? graphify-out/cache/ast/75d16b56d7297f05acf49b4a6dd8c291675f0b8b4f88d3609c0e9e8d54c439f8.json
+?? graphify-out/cache/ast/775beebc508aa72f8ee82c994564bdb323a4cff5f7b902bf887319cb826b00af.json
+?? graphify-out/cache/ast/78d3e3e495bf5a3d0e539d79d3efbe9f70ce16b73503b671264f6bbdc0d755c3.json
+?? graphify-out/cache/ast/79789fe4426adcd891176eaa6d06c32a0fa496de8f24cb60c73b9e9010392ce9.json
+?? graphify-out/cache/ast/79a42bc8bef9b763a14a9ddec6473eac145e09503a70c022b9a7dc7a0f39dbea.json
+?? graphify-out/cache/ast/7afb9efd2866926d0ceecd2b3f00649065d8072b5847a4a3e6d948c2009e8510.json
+?? graphify-out/cache/ast/7b18f00377a74a303ac1eb59adff569509f2a056cbcbf424cfea4f41f27b7a40.json
+?? graphify-out/cache/ast/7e6baa6e4f0efabce1b76732ecf2956af41d8d2affb47522922d22b0a34e56c1.json
+?? graphify-out/cache/ast/7f1f445691c21f2bdbf09d14522cde879672d35e0cad3f576b52e0232434e898.json
+?? graphify-out/cache/ast/822b3fecbc0aab573897f90d7ea8239c97d80ac8731aacf939a1a08c33fe8244.json
+?? graphify-out/cache/ast/829d1e183835671062efa09cc797b6508fc9de20c9d0e8787589be684ac6c92f.json
+?? graphify-out/cache/ast/889d89bb5be0e7b1f8267faaff7388bf8adc2e0c7fe5d8139bdcbbe66143626d.json
+?? graphify-out/cache/ast/89da694c2d7b39ec3aca5615ab3a32d90a0e8ed651bbb825008be86ed2b247a6.json
+?? graphify-out/cache/ast/8adc53fa656afff4ffbffa79635ceaa3a8ff7b6c8f70c4e80923905f0bb538cc.json
+?? graphify-out/cache/ast/8b7fbbe245537d87b7f76d24238d4b1dd7e6cdd0ac36c08254fb8ac7dc8e9b7f.json
+?? graphify-out/cache/ast/8e86bb38c2c4876c5285ef04ed437b94c695133ca102620b304e4243e58219b9.json
+?? graphify-out/cache/ast/904193ab4207c4e70efad61326f240302dc949a77cbc9581ad8ee6e3d50a6d6a.json
+?? graphify-out/cache/ast/91c8289b96c15c6b50857a4f64802d5f21aad5033ab4555ce93bd90dedcbc3fb.json
+?? graphify-out/cache/ast/930796da127dce253d831c156a918c4f7f1977ee754ceaf35b1721912f5add0c.json
+?? graphify-out/cache/ast/935c29da3e0c393f3227693347da70e6fd364b2efa46f70ba9c393acd52aac99.json
+?? graphify-out/cache/ast/97c379563d9620c51e09b2b676daf1ac666a511dcbfe646d730b0c08c615bd46.json
+?? graphify-out/cache/ast/9a87158e1741d4448c36626136ca9bd168dfa62d9e5e119ed25c94950cb6681e.json
+?? graphify-out/cache/ast/9cafd160aa2a5bc30f69dd8c5471f14322ec7524633532d2ef8d219f070ae7c7.json
+?? graphify-out/cache/ast/9ee72360b1f8d0ef05c2e33714b8a2bfe4d7d3b4e15d54604069905fe406809d.json
+?? graphify-out/cache/ast/9f76d0604be4423ab6f04526c66158332f6afe50c74ff6bd6644ef1ced328f01.json
+?? graphify-out/cache/ast/a2ee6a38e9651b359a7eb70144ad9cfc7cf1b728cecf79fdb462fc41388c3bf1.json
+?? graphify-out/cache/ast/a356db52074ad3257ba1766c9b7808dcfec6be90651152da692491f05e4eb6dc.json
+?? graphify-out/cache/ast/a503990c1bee23983aba7bed16a5d39e4666f41bd77172d8354c8877bea3d72c.json
+?? graphify-out/cache/ast/a804b4009ba3e92adbc2197a3f2bae6cb0f76de0577a7cc007ef0f912346584f.json
+?? graphify-out/cache/ast/a9e5689a2046f03efaadd57cdd046ed3e87740d57a967072bbcb6db2a5d95bd6.json
+?? graphify-out/cache/ast/abf40da210679d8f89b1189e960cca499a25b672f8df322812fdf7c4a2c8aec7.json
+?? graphify-out/cache/ast/ac34856501fa5e37e3441a847e3c568924278c6dd593c8123a1566ff40cdc189.json
+?? graphify-out/cache/ast/ad281a3a6afc3f6c7f82fd207f8564b5769babc7ca89f1b8ce8b53389dcbf5cc.json
+?? graphify-out/cache/ast/ad97a881beaed5b7a49fe03e8ee4768e68c8ad9881f2467c4d9fdc79e30c88e0.json
+?? graphify-out/cache/ast/ae1fa863889d845680bf404d171c435c0de5338134183c2c3f17f6db8d811a11.json
+?? graphify-out/cache/ast/ae23905c3c50ca22947ae30fd4d7b6704090b929c8beddd8af55d477077af45c.json
+?? graphify-out/cache/ast/af8ae37511194be24a7060d76c940951f0b5b6414b28cd8bf913d0d4fd4564e8.json
+?? graphify-out/cache/ast/aff217071fa40e17e0681c18abbde1ddd7287b06d7bf3cb4675d0b62178ac62e.json
+?? graphify-out/cache/ast/b0a7e53dc620a4510a0627b13015811efe3cb03d4cc7a7cec0f85f506c630b77.json
+?? graphify-out/cache/ast/b30efc72398872eb33f7ec89414c98b85ca44e06eaa60e6cc4fe2a54b796db3c.json
+?? graphify-out/cache/ast/b4598c7521f796852a0f5b9de7ae50f94778a4b884510c347969024b042e6282.json
+?? graphify-out/cache/ast/b513d6db666077617cc3f45af8fc80d1fb355f5b2a1f3017aed75a343ed412d8.json
+?? graphify-out/cache/ast/b5d54dc599e3a84afbe479f6c8302fb940ca2c67f7c39444ad3c45b8b994598f.json
+?? graphify-out/cache/ast/b6bbc228123920214d984e838557efce69e03756f582012959c87f02bc742539.json
+?? graphify-out/cache/ast/b71a17295bc89f2a47d6ac0021d97d4af8ea991e7236a38a0d6156b4aa9c1afd.json
+?? graphify-out/cache/ast/b741be056ff4e2108fd93715441b39e76c19fd01c80a67d134307db77f76b352.json
+?? graphify-out/cache/ast/b77a142ea137151382fdd1b85fb66f3261d9b33cf3b1de1a0c77abfcc75d9664.json
+?? graphify-out/cache/ast/b914914e087b69d69100c8143cf578754421ab3290fad41e356b6539f14bb55a.json
+?? graphify-out/cache/ast/bb4ccd0b57dd4441abf2c8d30bd91f100ff485690e44485b26e9fe277466c3ac.json
+?? graphify-out/cache/ast/bf33d1f1313014bd9eed9ff51dc6e323e06fac674ff678caa4df2b35b2e483ee.json
+?? graphify-out/cache/ast/c2be13e4be7fdc4ce4d9596e7bb9a3a342858a01d9d17dd846b1a49cd517a847.json
+?? graphify-out/cache/ast/c4fdfa0b0d7234966bf4c33624f1b0ba29aeefec6dd8f6ce8a5da240a40bd8a3.json
+?? graphify-out/cache/ast/c7e4ebfb84f698d23491ffbeda26ce202f12644be7be4ec1894e1b43d4e7862e.json
+?? graphify-out/cache/ast/c80e39d2d99e4b7c860078eb14c490a38856ed1a700196c37d70197b8ea92d00.json
+?? graphify-out/cache/ast/cd28f5ddeb7af8d9464e557acc29cab74cfc14f660192d7eae05b8519d23a403.json
+?? graphify-out/cache/ast/cdf4d496c8bbe6f73e2a8f2df9c392302b8fbf553ef3d17a348cf533b92b54a5.json
+?? graphify-out/cache/ast/ceb7d31dccf46a31b543c1c5ab08aa6d0c4c2c6f4a477f731ac3585e19658145.json
+?? graphify-out/cache/ast/d0201219be6e0a0cad15529106041e03f44f262bbe81da39ce4bbf92914c5e35.json
+?? graphify-out/cache/ast/d2acecd534ba1c4e1eb6cbac4590bb4d00be34212e11b858d909b32a4e042515.json
+?? graphify-out/cache/ast/d41482105b2eccc19d3029893d8c37d2f6169f65da1b5b9850911cc498bb6866.json
+?? graphify-out/cache/ast/d67bb024b4bc7763529e70b2097074b7baa061b1166ca7a433680af82931fbd0.json
+?? graphify-out/cache/ast/d7107c04b398eb2feb8b0ab5453f994d01b92c5635b312ce77004b242e3a7945.json
+?? graphify-out/cache/ast/d7e4a31537ee595a8ea39af6b5ab502015b79cb4d7e2792f93989623d8182c61.json
+?? graphify-out/cache/ast/d7f8591d3cef669d8c647851257f0883bee64aebe8c69cde1299f7378ed41852.json
+?? graphify-out/cache/ast/d96472a600625dd21eff94935413c21a7d61cc0225cf58a4b7e0f6950f9e93db.json
+?? graphify-out/cache/ast/de2f7ec5eb33bcf2fe8f734dd89bfa959575aed76bda7a13ff9bbcd2a399977a.json
+?? graphify-out/cache/ast/de6c8025263f276446748e5308724dee79b0d3d8853f7cf3c9913016767407b9.json
+?? graphify-out/cache/ast/dedf9cd9c0fbe13a61ea23ebb4a87e35de0b8544394322310a9d7e0bb34f62df.json
+?? graphify-out/cache/ast/dfeaa5af0cd1c1a841cbcb944fe1811c5937d12123484013e019ac2516ee2458.json
+?? graphify-out/cache/ast/e42139f1a39f39c5fc3b67a7969fcde83a4f702e0a783845c7379a3c53b21043.json
+?? graphify-out/cache/ast/e44871b27f2fdb12e0e625d9208145d81fffcb8e236324d5ab2b6c31cee6d448.json
+?? graphify-out/cache/ast/e888be2ed4bc2b8aaf33c3ae8ea10c4a583ee01173a8074403046f20675d2e63.json
+?? graphify-out/cache/ast/e96c5b9d59c60df0a59d2530f7fd1e6c8272f413ec11840ac099323cfb9da165.json
+?? graphify-out/cache/ast/e9fefbc6bf814f4095e5c1231a769d1d9b5725258dd7c9d03ba109def0adb83d.json
+?? graphify-out/cache/ast/eaac7d4bc961ae74102ae7dc22545a6600f42cde9d8112c3d5d23996d5d9882d.json
+?? graphify-out/cache/ast/ec02b0cd87ec2a480aa72c0aaad1f7a49f70decff9f449e36e4146e5d5893207.json
+?? graphify-out/cache/ast/f0545b38442f8b3df2652da2c7d1883100563a44f90549795583860dfe03650a.json
+?? graphify-out/cache/ast/f06b3d154c985609118b8523baa9810e9c7a3eab63ae9d4232731360245c6a53.json
+?? graphify-out/cache/ast/f08143a4ac21a8cdba7a1ccd427cad3fb0b23b762c770eb1eea7c7ccfb928dc6.json
+?? graphify-out/cache/ast/f5ceeea250115fb2827bc0b4c2539f44a0b2a14a2eebd01466023e2c1f984ce3.json
+?? graphify-out/cache/ast/f7b73df6b781f477cba6e540371da8ef25f106517d322da6146200d97e16a0e0.json
+?? graphify-out/cache/ast/f7be9da3727a76f63a2b816bd73176f0780f0b6c2180987de73e4cd5b01b8264.json
+?? graphify-out/cache/ast/fa55e880d57b7ff3fcda78ca97b549e70b8d30dc55637675d18068bb4216c3fb.json
+?? graphify-out/cache/ast/fa950d9fd048433a427e30153cf0825e20062dbabcdaa034d579f554b0a81d2f.json
+?? graphify-out/cache/ast/fab6ad600a427c7c145534ced52a6f6d6afb2219a5c2f7c38e8987da9c9d95ca.json
+?? graphify-out/cache/ast/fd59ed95041a2879eb1f811ce226d16592c0c14ec69608cf10d5e0e849fa0b75.json
+?? graphify-out/cache/ast/fe161be9c0ce47049a807949046cbe7c9d9a99fd6a3f3a549431b899830308a1.json
+?? graphify-out/cache/ast/ff4c1b4684bb9861246dd4d9b4cf4e4d1641bad06d1b07e8cdb2c5a9819efccb.json
+?? implementation_plan.md
+?? implementation_plan_babeltele.md
+?? meta-review-babeltele.md
+?? remediation-plan-v2-9.5.md
+?? remediation-status-report.md
+?? review-babeltele-reconciled.md
+?? scripts/cleanup_streaming.py
+?? scripts/extract_e1.py
+?? scripts/extract_run_stream.py
+?? scripts/fix_importlinter.py
+?? scripts/migrate_events_sqlite_to_pg.py
+?? scripts/move_methods.py
+?? scripts/re_extract_e1.py
+?? scripts/run_batch4.py
+?? src/reasoner/api/execution/cancel.py
+?? src/reasoner/api/execution/direct.py
+?? src/reasoner/api/execution/web_search.py

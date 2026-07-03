@@ -325,6 +325,16 @@ POST_SYNTHESIS_VERIFY_SYSTEM = (
     + JSON_ONLY_FOOTER
 )
 
+POST_SYNTHESIS_VERIFY_SYSTEM_SONAR = (
+    "You are an independent fact-checker with live web search capability. "
+    "Given a synthesized answer, generate verification questions and independently verify "
+    "each claim against current, authoritative sources. "
+    "Use your web search to check every factual assertion. "
+    "Mark claims as 'verified' only when you can confirm them via live search. "
+    "Flag any claims that appear unsupported, contradictory, or overstated. "
+    + JSON_ONLY_FOOTER
+)
+
 def post_synthesis_verify_prompt(synthesis_text: str, state: PipelineState) -> str:
     return (
         f'{get_language_instruction(state)}\n\n'

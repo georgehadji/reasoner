@@ -1,0 +1,761 @@
+$ git -C "E:\Documents\Vibe-Coding\Reasoner" diff main..origin/fix/autonomous-bug-fixes-session -- src/reasoner/api/streaming.py --stat
+[exit 0]
+diff --git a/src/reasoner/api/streaming.py b/src/reasoner/api/streaming.py
+index 1ce7dec..7b84751 100644
+--- a/src/reasoner/api/streaming.py
++++ b/src/reasoner/api/streaming.py
+@@ -11,54 +11,40 @@ import uuid
+ from typing import Any, AsyncGenerator
+ 
+ from reasoner.core.constants import (
+-    CREATIVE_MAX_TOKENS,
+-    CREATIVE_TEMPERATURE,
+-    DIRECT_ANSWER_MAX_TOKENS,
+-    DIRECT_ANSWER_TEMPERATURE,
+     SSE_FLUSH_INTERVAL,
++    TIMEOUTS,
+     TRUNCATION,
+-    get_phase_retry_budget,
+-    get_phase_timeout,
++    VALIDATION_TEST_MAX_TOKENS,
+ )
+-from reasoner.core.constants_models import (
+-    MODEL_CLAUDE_SONNET,
+-    MODEL_GEMINI_PRO,
+-    MODEL_GPT5,
+-    MODEL_KIMI_K2_6,
+-    MODEL_MISTRAL_LARGE_3,
+-    MODEL_QWEN36_PLUS,
+-)
+-from reasoner.quality import PhaseMonitor, reset_phase_state
+-from reasoner.infrastructure.llm.router import ProviderRouter
+-from reasoner.domain.pipeline_state import PipelineState
+-from reasoner.models import TaskType
++from reasoner.hypergate import HyperGateAgent
++from reasoner.llm import ProviderRouter, _REGISTRY
++from reasoner.models import PipelineState
++from reasoner.pipeline import ARAPipeline
+ from reasoner.application.services.preset_service import PresetService
+-from reasoner.application.services.pipeline_service import PipelineService
+ from reasoner.application.services.search_service import SearchService
+-from reasoner.application.orchestrator import PipelineOrchestrator
+ from reasoner.exceptions import classify_error, is_retryable
+-from reasoner.core.exceptions import ErrorCode, error_code_for_exception
+ from reasoner.presets import (
++    build_auto_preset,
+     get_method_from_preset,
++    get_preset_tier,
+     get_preset_price_tier,
+ )
+ from reasoner.phases._shared import build_followup_context, _wrap_user_input
+ 
+-from .cache import _cache_key, _load_cache, _save_cache
+-from .history import HISTORY_DIR, HistoryEntry, _save_history_entry, _save_pipeline_owner
++from .cache import CACHE_DIR, _cache_key, _load_cache, _save_cache
++from .history import HISTORY_DIR, HistoryEntry, _save_history_entry
+ from reasoner.infrastructure.redis.run_state import _run_state_manager as _run_store
+-from reasoner.core.events.domain_events import make_event, EventType
+ from .schemas import FollowupRequest, RunRequest
+-# SSE protocol helpers shared across streaming endpoints.
+-from .sse_utils import _event, _broadcast_ws, _persist_event
+-from .phase_executor import (
+-    get_phase_start_models,
+-    get_critical_phases,
+-    run_phase_with_keepalive,
++from .serializers import (
++    _event,
++    _ser_0,
++    _ser_1,
++    _ser_1_5,
++    _ser_5,
+ )
+ 
+ logger = logging.getLogger(__name__)
+-
++_preset_service = PresetService()
+ 
+ 
+ def _get_phase_subagents(state: PipelineState, phase_name: str) -> list[dict[str, Any]]:
+@@ -95,64 +81,589 @@ async def _emit_widget_event(
+     })
+ 
+ 
++async def _broadcast_ws(run_id: str, payload: dict[str, Any]) -> None:
++    """Broadcast an event to WebSocket subscribers for this run.
++
++    Fire-and-forget: never blocks the SSE stream on WS delivery.
++    """
++    try:
++        from reasoner.infrastructure.websocket import get_websocket_manager
++
++        manager = get_websocket_manager()
++        await manager.broadcast_event(payload, run_id)
++    except Exception:
++        pass
++
+ 
+-async def run_stream(
+-    req: RunRequest,
+-    initial_state: PipelineState | None = None,
+-    user_id: str | None = None,
+-    preset_service: PresetService | None = None,
+-    pipeline_service: PipelineService | None = None,
+-    request=None,
++# Creative-writing model tiers with 2 fallbacks each.
++# Format: (model_id, description)
++_CREATIVE_MODELS_BUDGET: list[tuple[str, str]] = [
++    ("kimi-k2-6", "Kimi K2.6 — 1T MoE, best value creative"),
++    ("qwen3.6-plus", "Qwen 3.6 Plus — multilingual fallback"),
++    ("mistral-large-3", "Mistral Large — European language fallback"),
++]
++_CREATIVE_MODELS_PREMIUM: list[tuple[str, str]] = [
++    ("claude-sonnet", "Claude Sonnet — gold standard creative"),
++    ("gpt-5", "GPT-5 — structured/academic fallback"),
++    ("gemini-pro", "Gemini Pro — research-backed fallback"),
++]
++
++# Enhanced system prompt for creative writing with hallucination guards.
++_CREATIVE_SYSTEM_PROMPT = (
++    "You are an expert writer and creative assistant.\n"
++    "\n"
++    "WRITING PRINCIPLES:\n"
++    "1. Produce well-structured, engaging, and original content.\n"
++    "2. Follow the user's instructions precisely regarding tone, length, format, and style.\n"
++    "3. Maintain a consistent voice and perspective throughout the piece.\n"
++    "\n"
++    "HALLUCINATION PREVENTION:\n"
++    "1. If you include historical events, real people, statistics, or scientific claims, "
++    "ensure they are accurate and widely accepted. Do NOT invent studies, citations, dates, or data.\n"
++    "2. Clearly distinguish between factual claims and creative interpretation, opinion, or speculation.\n"
++    "3. If you are uncertain about a fact, rephrase it as a general observation or omit it.\n"
++    "4. Do NOT fabricate quotes, sources, or references.\n"
++    "\n"
++    "SELF-CORRECTION:\n"
++    "Before finalizing, mentally review your draft for any unsupported factual claims. "
++    "Replace dubious claims with safer, more general statements.\n"
++)
++
++
++async def _stream_direct_answer(
++    router: ProviderRouter,
++    problem: str,
++    run_id: str,
++    cancel_event: asyncio.Event | None = None,
++    conversation_history: list[dict[str, str]] | None = None,
++    previous_synthesis: str = "",
++    turn_number: int = 1,
++    preset_name: str = "",
+ ) -> AsyncGenerator[str, None]:
+-    from reasoner.application.commands import RunPipelineCommand
+-    from reasoner.application.handlers.handlers import get_handler_registry
+-    import asyncio
+-    import uuid
+-    
+-    run_id = req.client_run_id or str(uuid.uuid4())
+-    command = RunPipelineCommand(
+-        command_id=run_id,
+-        problem=req.problem,
+-        preset=req.preset,
+-        method=getattr(req, "method", None),
+-        top_k=getattr(req, "top_k", 2),
+-        source_type=getattr(req, "source_type", "general"),
+-        domain=getattr(req, "domain", None),
+-        parallel=not getattr(req, "sequential", False)
++    """Stream a direct LLM answer as a virtual single-phase pipeline for UI compatibility."""
++    yield _event({"type": "start"})
++
++    if cancel_event and cancel_event.is_set():
++        yield _event({"type": "cancelled", "message": "Pipeline stopped by user"})
++        return
++
++    yield _event({"type": "phase_start", "phase": 0, "name": "Direct Response"})
++    phase_start = time.monotonic()
++
++    # Build conversation context for follow-up turns
++    context_block = build_followup_context(
++        conversation_history,
++        previous_synthesis=previous_synthesis[:2000],
++        turn_number=turn_number,
+     )
+-    
+-    queue = asyncio.Queue(maxsize=256)
+-    
+-    async def sse_emit(event: dict | str) -> None:
+-        if isinstance(event, dict):
+-            await queue.put(_event(event))
+-        else:
+-            await queue.put(event)
+-            
+-    async def run_task():
++    if context_block:
++        user_prompt = f"{context_block}\nCURRENT USER REQUEST:\n{_wrap_user_input(problem)}"
++    else:
++        user_prompt = _wrap_user_input(problem)
++
++    # Choose system prompt and creative model based on task type and preset tier
++    from reasoner.hypergate.hyperagent import _is_creative_writing
++    is_creative = _is_creative_writing(problem)
++
++    if is_creative:
++        system_prompt = _CREATIVE_SYSTEM_PROMPT
++        max_tokens = 4096
++        temperature = 0.8
++        tier = get_preset_price_tier(preset_name)
++        creative_models = (
++            _CREATIVE_MODELS_PREMIUM if tier == "premium" else _CREATIVE_MODELS_BUDGET
++        )
++    else:
++        system_prompt = "You are an analytical assistant. Provide a clear, concise answer."
++        max_tokens = 2048
++        temperature = 0.7
++        creative_models = []
++
++    # ── LLM call with fallback chain ──
++    response: str = ""
++    meta: dict[str, Any] = {}
++    last_error: Exception | None = None
++    models_to_try: list[tuple[str, str]] = []
++
++    # Resolve primary provider safely (handles test fakes without .primary)
++    _primary_provider = getattr(router, "primary", None) or getattr(router, "_primary", None)
++    _primary_model = getattr(_primary_provider, "model", "unknown") if _primary_provider else "unknown"
++
++    if is_creative and creative_models:
++        # Build fallback chain: try creative models first, then fall back to primary
++        models_to_try = list(creative_models)
++        models_to_try.append((_primary_model, "primary fallback"))
++    else:
++        models_to_try = [(_primary_model, "primary")]
++
++    for model_id, reason in models_to_try:
+         try:
+-            registry = get_handler_registry()
+-            handler = registry.command_handlers["RunPipelineCommand"]
+-            await handler.handle(command, sse_emit=sse_emit)
+-        except Exception as e:
+-            import traceback
+-            traceback.print_exc()
+-        finally:
+-            await queue.put(None)
+-            
+-    task = asyncio.create_task(run_task())
+-    
+-    while True:
+-        chunk = await queue.get()
+-        if chunk is None:
++            if model_id == _primary_model:
++                # Use existing router (primary or routing table)
++                response, meta = await router.call(
++                    role="primary",
++                    system_prompt=system_prompt,
++                    user_prompt=user_prompt,
++                    max_tokens=max_tokens,
++                    temperature=temperature,
++                )
++            else:
++                # Build a temporary provider for the creative model
++                from reasoner.infrastructure.llm.registry import build_provider
++                provider = build_provider(model_id)
++                response = await provider.complete_with_retry(
++                    system_prompt, user_prompt, max_tokens, temperature
++                )
++                meta = {"model": model_id, "input_tokens": 0, "output_tokens": 0}
++            logger.info(
++                "Direct answer succeeded with %s (%s) for creative=%s",
++                model_id, reason, is_creative,
++            )
+             break
+-        yield chunk
++        except Exception as exc:
++            last_error = exc
++            logger.warning(
++                "Direct answer failed with %s (%s): %s — trying next fallback",
++                model_id, reason, exc,
++            )
++            continue
++    else:
++        # All fallbacks exhausted
++        logger.error("Direct answer failed after all fallbacks: %s", last_error)
++        err_msg = f"{type(last_error).__name__ if last_error else 'Unknown'}: {str(last_error)[:120] if last_error else 'All models failed'}"
++        yield _event({"type": "phase_error", "phase": 0, "error": err_msg})
++        yield _event({
++            "type": "done",
++            "errors": [err_msg],
++            "total_tokens": {"input": 0, "output": 0, "total": 0},
++            "duration": time.monotonic() - phase_start,
++        })
++        return
++
++    duration = time.monotonic() - phase_start
++    data = {
++        "solution": response,
++        "tokens": {
++            "input": meta.get("input_tokens", 0),
++            "output": meta.get("output_tokens", 0),
++        },
++        "duration": duration,
++    }
++    yield _event({
++        "type": "phase_complete",
++        "phase": 0,
++        "name": "Direct Response",
++        "data": data,
++    })
++
++    total_input = meta.get("input_tokens", 0)
++    total_output = meta.get("output_tokens", 0)
++    yield _event({
++        "type": "done",
++        "errors": [],
++        "total_tokens": {
++            "input": total_input,
++            "output": total_output,
++            "total": total_input + total_output,
++        },
++        "duration": duration,
++    })
++
++
++_search_service = SearchService()
+ 
+ 
+-async def run_followup_stream(
+-    req: FollowupRequest, request=None, user_id: str | None = None
++async def _stream_web_search_results(
++    problem: str,
++    run_id: str,
++    num_results: int = 10,
++    cancel_event: asyncio.Event | None = None,
+ ) -> AsyncGenerator[str, None]:
+-    """Run the full Reasoner pipeline for a follow-up question with conversation context."""
++    """Stream SearXNG web search results as a virtual single-phase pipeline."""
++    async for chunk in _search_service.stream_web_search_results(
++        problem, run_id, num_results=num_results, cancel_event=cancel_event
++    ):
++        yield chunk
++
++
++async def _recall_neuro_context(problem: str, agent_id: str | None = None) -> list[dict[str, Any]]:
++    """Fetch relevant past context from Neuro memory."""
++    try:
++        import httpx
++
++        from reasoner.core.settings import settings
++
++        async with httpx.AsyncClient(timeout=5.0) as client:
++            resp = await client.post(
++                f"{settings.internal_api_base_url}/neuro/recall",
++                json={
++                    "prompt": problem,
++                    "agent_id": agent_id,
++                    "max_results": 5,
++                    "compression": "none",
++                },
++            )
++            if resp.status_code == 200:
++                data = resp.json()
++                return [
++                    {"content": c["content"], "source": c["source"], "relevance": c["relevance"]}
++                    for c in data.get("chunks", [])
++                ]
++    except Exception as exc:
++        logger.debug("Neuro recall failed, proceeding without memory: %s", exc)
++    return []
++
++
++async def run_stream(req: RunRequest, initial_state: PipelineState | None = None) -> AsyncGenerator[str, None]:
++    run_id = req.client_run_id or str(uuid.uuid4())
++    cancel_event = await _run_store.add(run_id)
++    try:
++        # ── Neuro Recall ──
++        recalled_chunks: list[dict[str, Any]] = []
++        if not req.no_cache:
++            conversation_id = initial_state.conversation_id if initial_state else None
++            recalled_chunks = await _recall_neuro_context(req.problem, agent_id=conversation_id)
++            if recalled_chunks:
++                logger.info("Neuro recall returned %d chunks", len(recalled_chunks))
++                yield _event({
++                    "type": "recall_used",
++                    "memory_count": len(recalled_chunks),
++                    "memory_ids": [c.get("source", "") for c in recalled_chunks if c.get("source")],
++                })
++
++        raw_preset = req.preset or "auto-budget"
++        gate_preset_name, is_auto, auto_tier = _preset_service.resolve(raw_preset)
++        auto_selected_method: str | None = None
++
++        agent_model = initial_state.agent_model if initial_state else None
++        effective_preset_name, router = _preset_service.build_router(
++            gate_preset_name,
++            custom_routing=req.routing,
++            agent_model=agent_model,
++        )
++
++        if not req.force_pipeline:
++            gate = HyperGateAgent(router)
++            decision = await gate.decide(req.problem)
++            if decision.action == "direct":
++                async for chunk in _stream_direct_answer(
++                    router, req.problem, run_id, cancel_event,
++                    conversation_history=initial_state.conversation_history if initial_state else None,
++                    previous_synthesis=initial_state.previous_synthesis if initial_state else "",
++                    turn_number=initial_state.turn_number if initial_state else 1,
++                    preset_name=effective_preset_name,
++                ):
++                    yield chunk
++                return
++            if decision.action == "web_search":
++                async for chunk in _stream_web_search_results(req.problem, run_id, cancel_event=cancel_event):
++                    yield chunk
++                return
++
++            if is_auto and decision.method and not req.routing:
++                effective_preset_name, router = _preset_service.build_auto_router(
++                    decision.method,
++                    auto_tier,
++                    agent_model=agent_model,
++                )
++                auto_selected_method = decision.method
++
++        pipeline = ARAPipeline(
++            router=router,
++            top_k=req.top_k,
++            parallel_perspectives=(not req.sequential) if "multi-perspective" not in effective_preset_name else True,
++            verbose=False,
++            preset_name=effective_preset_name,
++            source_type=req.source_type,
++            domain=req.domain,
++            enhance_prompt=req.enhance_prompt,
++            expert=req.expert,
++            web_search=req.web_search,
++            smart_search=req.smart_search,
++            attachments=getattr(req, "attachments", []) or [],
++        )
++        state = initial_state or PipelineState(problem=req.problem, preset_name=effective_preset_name)
++        if recalled_chunks:
++            state.memory_context = recalled_chunks
++
++        logger.info(f"Pipeline start with routing: {router.describe()}")
++        start_payload: dict = {"type": "start", "preset": effective_preset_name}
++        if auto_selected_method:
++            start_payload["auto_selected_method"] = auto_selected_method
++        await _broadcast_ws(run_id, start_payload)
++        yield _event(start_payload)
++
++        if req.enhance_prompt and not state.enhanced_problem:
++            try:
++                await pipeline._phase_enhance_prompt(state)
++                if state.enhanced_problem and state.enhanced_problem != state.problem:
++                    yield _event({"type": "prompt_enhanced", "original": state.problem, "enhanced": state.enhanced_problem})
++            except Exception as exc:
++                logger.warning("Prompt enhancement failed, using original: %s", exc)
++                state.enhanced_problem = state.problem
++
++        async def decompose_and_vet(state: PipelineState):
++            await pipeline._phase_1_decompose(state)
++            await pipeline._phase_context_vetting(state, source_type=req.source_type)
++
++        from reasoner.application.flows import build_default_flow_registry
++
++        phases = [
++            (0, "Classification", pipeline._phase_0_classify, _ser_0),
++            (1, "Decomposition", decompose_and_vet, _ser_1),
++            (1.5, "Deep Read", pipeline._phase_deep_read, _ser_1_5),
++        ]
++
++        flow = build_default_flow_registry(pipeline)
++        method = pipeline._get_method_from_preset()
++        for step in flow.get_sequence(method):
++            phases.append((step.num, step.name, step.fn, step.serializer))
++
++        last_phase_num = max(p[0] for p in phases) if phases else 5
++        synthesis_phase_num = last_phase_num + 1
++        phases += [(synthesis_phase_num, "Synthesis", pipeline._phase_synthesis, _ser_5)]
++
++        CRITICAL_PHASES = {name for _, name, _, _ in phases}
++        _LEGACY_CRITICAL = {
++            "Decomposition", "Perspectives", "Opening Statements",
++            "Hypotheses", "Maieutic Questions", "Generation Pool",
++            "Deep Research",
++        }
++        CRITICAL_PHASES = CRITICAL_PHASES & _LEGACY_CRITICAL
++
++        _PHASE_ROLE_HINTS: dict[str, list[str]] = {
++            "Classification": ["classification"],
++            "Decomposition": ["decomposition"],
++            "Deep Read": ["primary"],
++            "Perspectives": ["constructive", "destructive", "systemic", "minimalist"],
++            "Opening Statements": ["constructive", "destructive"],
++            "Rebuttals": ["constructive", "destructive"],
++            "Cross-Examination": ["systemic"],
++            "Hypotheses": ["primary"],
++            "Falsification Tests": ["scoring"],
++            "Maieutic Questions": ["destructive"],
++            "Dialectic Answers": ["constructive"],
++            "Generation Pool": ["generator_1", "generator_2", "generator_3"],
++            "Critic Pool": ["critic_1", "critic_2", "critic_3"],
++            "Verification & Meta": ["verifier", "meta_evaluator"],
++            "Deep Research": ["primary"],
++            "Critique & Pruning": ["scoring"],
++            "Stress Testing": ["stress_testing"],
++            "Synthesis": ["synthesis"],
++        }
++
++        def _get_phase_start_models(phase_name: str) -> list[str]:
++            roles = _PHASE_ROLE_HINTS.get(phase_name, [])
++            models: list[str] = []
++            for role in roles:
++                try:
++                    provider = router.get(role)
++                    if provider and hasattr(provider, "model") and provider.model and provider.model not in models:
++                        models.append(provider.model)
++                except Exception:
++                    continue
++            return models
++
++        async def _run_phase_cancellable(coro_fn, state: PipelineState) -> bool:
++            """Run a phase coroutine; cancel it if cancel_event fires. Returns True if cancelled."""
++            phase_task = asyncio.ensure_future(coro_fn(state))
++            cancel_task = asyncio.ensure_future(cancel_event.wait())
++            done, pending = await asyncio.wait(
++                {phase_task, cancel_task},
++                return_when=asyncio.FIRST_COMPLETED,
++            )
++            for t in pending:
++                t.cancel()
++                try:
++                    await t
++                except (asyncio.CancelledError, Exception):
++                    pass
++            if cancel_task in done:
++                # Cancel the phase task if still running
++                if not phase_task.done():
++                    phase_task.cancel()
++                    try:
++                        await phase_task
++                    except (asyncio.CancelledError, Exception):
++                        pass
++                return True
++            # Phase finished — propagate any exception
++            exc = phase_task.exception()
++            if exc:
++                raise exc
++            return False
++
++        run_start = time.monotonic()
++        for num, name, fn, serializer in phases:
++            if cancel_event.is_set():
++                yield _event({"type": "cancelled", "message": "Pipeline stopped by user"})
++                return
++
++            phase_key = f"Phase {num}: {name}"
++            state._current_phase_key = phase_key
++            phase_start_models = _get_phase_start_models(name)
++            start_payload: dict[str, Any] = {"type": "phase_start", "phase": num, "name": name}
++            if phase_start_models:
++                start_payload["models"] = phase_start_models
++            await _broadcast_ws(run_id, start_payload)
++            yield _event(start_payload)
++            phase_start = time.monotonic()
++            try:
++                cancelled = await _run_phase_cancellable(fn, state)
++                if cancelled:
++                    yield _event({"type": "cancelled", "message": "Pipeline stopped by user"})
++                    return
++            except Exception as exc:
++                logger.error("Phase %s (%s) failed: %s", num, name, exc, exc_info=True)
++                err_msg = f"{type(exc).__name__}: {str(exc)[:120]}"
++                state.errors.append(err_msg)
++                err_type = classify_error(exc)
++                err_payload = {
++                    "type": "error",
++                    "error_type": err_type,
++                    "message": err_msg,
++                    "retryable": is_retryable(exc),
++                    "retry_after": getattr(exc, 'retry_after', None),
++                    "phase": num,
++                    "phase_name": name,
++                }
++                await _broadcast_ws(run_id, err_payload)
++                yield _event(err_payload)
++                # Keep emitting legacy phase_error for backwards compatibility
++                await _broadcast_ws(run_id, {"type": "phase_error", "phase": num, "error": err_msg})
++                yield _event({"type": "phase_error", "phase": num, "error": err_msg})
++                if name in CRITICAL_PHASES:
++                    break
++                continue
++            duration = time.monotonic() - phase_start
++            while state.pending_events:
++                ev = state.pending_events.pop(0)
++                yield _event(ev)
++            state.phase_durations[phase_key] = duration
++            if name == "Synthesis":
++                core = ""
++                if state.final_solution and hasattr(state.final_solution, "core_solution"):
++                    core = state.final_solution.core_solution or ""
++                if core:
++                    words = core.split()
++                    chunk_size = 2
++                    for i in range(0, len(words), chunk_size):
++                        chunk = " ".join(words[i:i + chunk_size])
++                        if i + chunk_size < len(words):
++                            chunk += " "
++                        yield _event({"type": "text_chunk", "text": chunk})
++                        await asyncio.sleep(0.1)
++            data = serializer(state)
++            if isinstance(data, dict):
++                data["tokens"] = state.phase_tokens.get(phase_key, {"input": 0, "output": 0})
++                data["duration"] = duration
++                phase_models = state.cost_state._phase_models_by_key.get(phase_key, [])
++                if phase_models:
++                    data["models"] = phase_models
++                subagent_outputs = _get_phase_subagents(state, name)
++                if subagent_outputs:
++                    data["subagents"] = [
++                        {
++                            "name": s.get("agent_name", "unknown"),
++                            "model": s.get("model", "unknown"),
++                            "tokens_in": s.get("tokens_in", 0),
++                            "tokens_out": s.get("tokens_out", 0),
++                            "duration_ms": s.get("duration_ms", 0),
++                            "error": s.get("error"),
++                        }
++                        for s in subagent_outputs
++                    ]
++            phase_complete_payload = {
++                "type": "phase_complete",
++                "phase": num,
++                "name": name,
++                "data": data,
++            }
++            await _broadcast_ws(run_id, phase_complete_payload)
++            yield _event(phase_complete_payload)
++
++        token_source = state.detailed_token_usage if state.detailed_token_usage else state.phase_tokens
++        total_input = sum(t.get("input", 0) for t in token_source.values())
++        total_output = sum(t.get("output", 0) for t in token_source.values())
++        total_tokens = total_input + total_output
++
++        try:
++            from datetime import datetime
++
++            entry = HistoryEntry(
++                id=hashlib.sha256(f"{req.problem}{datetime.now().isoformat()}".encode()).hexdigest()[:16],
++                problem=req.problem[:TRUNCATION.API_STORAGE],
++                preset=req.preset,
++                method=get_method_from_preset(req.preset),
++                timestamp=datetime.now().isoformat(),
++                tokens={"input": total_input, "output": total_output, "total": total_tokens},
++                status="completed" if not state.errors else "error",
++            )
++            _save_history_entry(entry)
++
++            try:
++                from reasoner.core.memory import TaggedMemory
++
++                tagged = TaggedMemory(HISTORY_DIR)
++                method_tag = f"method:{entry.method}"
++                preset_tag = f"preset:{entry.preset}"
++                tagged.add(method_tag, entry.model_dump())
++                tagged.add(preset_tag, entry.model_dump())
++            except Exception as tag_err:
++                logger.warning(f"Failed to save tagged history: {tag_err}")
++        except Exception as e:
++            logger.warning(f"Failed to save history: {e}")
++
++        done_payload = {
++            "type": "done",
++            "errors": state.errors,
++            "total_tokens": {"input": total_input, "output": total_output, "total": total_tokens},
++            "duration": time.monotonic() - run_start,
++            "total_cost_usd": getattr(state, 'total_cost_usd', 0.0),
++            "phase_costs": getattr(state, 'phase_costs', {}),
++        }
++        await _broadcast_ws(run_id, done_payload)
++        yield _event(done_payload)
++
++        # ── Neuro Persist (main pipeline) ──
++        try:
++            import httpx
++
++            from reasoner.core.settings import settings
++
++            async with httpx.AsyncClient(timeout=5.0) as client:
++                await client.post(
++                    f"{settings.internal_api_base_url}/neuro/learn",
++                    json={
++                        "prompt": req.problem,
++                        "response": (
++                            state.final_solution.core_solution
++                            if state.final_solution
++                            else getattr(state, 'previous_synthesis', '')
++                        ),
++                        "agent_id": getattr(state, 'conversation_id', None),
++                        "metadata": {
++                            "preset": effective_preset_name,
++                            "tokens": {"input": total_input, "output": total_output},
++                            "type": "pipeline",
++                        },
++                    },
++                    timeout=5.0,
++                )
++        except Exception:
++            pass
++
++    except Exception as exc:
++        logger.error("Pipeline error for run %s: %s", run_id, exc, exc_info=True)
++        err_msg = f"Pipeline processing error: {type(exc).__name__}: {str(exc)[:120]}"
++        await _broadcast_ws(run_id, {"type": "done", "errors": [err_msg]})
++        yield _event({"type": "done", "errors": [err_msg]})
++    finally:
++        await _run_store.remove(run_id)
++
++
++async def run_followup_stream(req: FollowupRequest) -> AsyncGenerator[str, None]:
++    """Run the full ARA pipeline for a follow-up question with conversation context."""
+     from reasoner.presets import FOLLOWUP_AGENT_MODELS
+ 
+     tier = get_preset_price_tier(req.preset)
+@@ -181,61 +692,45 @@ async def run_followup_stream(
+         attachments=getattr(req, "attachments", []) or [],
+         client_run_id=req.client_run_id,
+     )
+-    async for chunk in run_stream(run_req, initial_state=state, user_id=user_id, request=request):
++    async for chunk in run_stream(run_req, initial_state=state):
+         yield chunk
+ 
+     try:
+-        from reasoner.clients import get_neuro_client
++        import httpx
++
+         from reasoner.core.settings import settings
+ 
+-        client = get_neuro_client()
+-        await client.post(
+-            f"{settings.internal_api_base_url}/api/neuro/learn",
+-            json={
+-                "prompt": req.question,
+-                "response": (
+-                    state.final_solution.core_solution
+-                    if state.final_solution
+-                    else state.previous_synthesis
+-                ),
+-                "agent_id": req.conversation_id,
+-                "metadata": {
+-                    "turn_number": state.turn_number,
+-                    "preset": req.preset,
+-                    "agent_model": state.agent_model,
+-                    "type": "followup",
++        async with httpx.AsyncClient() as client:
++            await client.post(
++                f"{settings.internal_api_base_url}/neuro/learn",
++                json={
++                    "prompt": req.question,
++                    "response": (
++                        state.final_solution.core_solution
++                        if state.final_solution
++                        else state.previous_synthesis
++                    ),
++                    "agent
+
+[… truncated 3253 chars …]

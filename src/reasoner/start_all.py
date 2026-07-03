@@ -25,7 +25,6 @@ import time
 from pathlib import Path
 
 from reasoner.core.settings import settings
-from reasoner.core.constants import DEFAULT_SEARXNG_URL
 
 # ─────────────────────────────────────────────────────────────────────
 # Configuration
@@ -36,8 +35,7 @@ MAIN_SERVER_CMD = [sys.executable, "-m", "uvicorn", "asgi:app", "--host", settin
 NEURO_SERVER_CMD = [sys.executable, "-m", "reasoner.neuro.cli", "start"]
 FRONTEND_DIR = REPO_ROOT / "ui-next"
 FRONTEND_CMD = ["npm", "run", "dev"]
-SEARXNG_COMPOSE_FILE = REPO_ROOT / "docker-compose.searxng.yml"
-SEARXNG_URL = settings.SEARXNG_URL.rstrip("/")
+
 
 # ─────────────────────────────────────────────────────────────────────
 # Helpers
@@ -209,77 +207,7 @@ def spawn_process(
     return proc
 
 
-def _searxng_is_healthy() -> bool:
-    """Check if SearXNG is already responding."""
-    import urllib.request
-    try:
-        urllib.request.urlopen(f"{SEARXNG_URL}/healthz", timeout=3)
-        return True
-    except Exception:
-        pass
-    try:
-        urllib.request.urlopen(f"{SEARXNG_URL}/", timeout=3)
-        return True
-    except Exception:
-        return False
 
-
-def _docker_available() -> bool:
-    """Check if docker compose CLI is available and the daemon responds."""
-    if shutil.which("docker") is None:
-        return False
-    try:
-        result = subprocess.run(
-            ["docker", "info"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        return result.returncode == 0
-    except Exception:
-        return False
-
-
-def _start_searxng() -> bool:
-    """Start SearXNG via docker compose. Returns True on success."""
-    if not SEARXNG_COMPOSE_FILE.exists():
-        print(f"[WARN] SearXNG compose file not found at {SEARXNG_COMPOSE_FILE}")
-        return False
-    cmd = [
-        "docker", "compose",
-        "-f", str(SEARXNG_COMPOSE_FILE),
-        "up", "-d",
-    ]
-    print(f"[START] SearXNG via Docker Compose ({SEARXNG_URL})")
-    try:
-        result = subprocess.run(cmd, cwd=str(REPO_ROOT), timeout=30)
-    except subprocess.TimeoutExpired:
-        print("[WARN] Docker Compose timed out after 30s. Daemon may be unresponsive or pulling images.")
-        return False
-    if result.returncode != 0:
-        print("[WARN] Failed to start SearXNG container.")
-        return False
-    print("[WAIT]  Polling SearXNG health...")
-    for _ in range(30):
-        if _searxng_is_healthy():
-            print("[OK]    SearXNG is healthy")
-            return True
-        time.sleep(1)
-    print("[WARN] SearXNG container started but health check timed out.")
-    return False
-
-
-def _stop_searxng() -> None:
-    """Stop the SearXNG container if we started it."""
-    if not SEARXNG_COMPOSE_FILE.exists():
-        return
-    cmd = [
-        "docker", "compose",
-        "-f", str(SEARXNG_COMPOSE_FILE),
-        "down",
-    ]
-    print("[STOP]  SearXNG (docker compose down)")
-    subprocess.run(cmd, cwd=str(REPO_ROOT), capture_output=True)
 
 
 def shutdown_process(name: str, proc: subprocess.Popen):
@@ -312,7 +240,6 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Start all Reasoner servers")
     parser.add_argument("--no-neuro", action="store_true", help="Skip the standalone neuro server")
     parser.add_argument("--no-frontend", action="store_true", help="Skip the Next.js frontend dev server")
-    parser.add_argument("--no-searxng", action="store_true", help="Skip auto-starting SearXNG")
     parser.add_argument("--check", action="store_true", help="Run pre-flight checks before starting")
     parser.add_argument("--main-port", type=int, default=8003, help="Port for the main API server")
     parser.add_argument("--neuro-port", type=int, default=50001, help="Port for the standalone neuro server")
@@ -363,20 +290,8 @@ def main() -> int:
             return 1
 
     processes: list[tuple[str, subprocess.Popen]] = []
-    searxng_started_by_us = False
 
     try:
-        # ── SearXNG ──────────────────────────────────────────────────
-        if not args.no_searxng:
-            if _searxng_is_healthy():
-                print(f"[OK]    SearXNG already running at {SEARXNG_URL}")
-            elif _docker_available():
-                searxng_started_by_us = _start_searxng()
-                if not searxng_started_by_us:
-                    print("[WARN]  SearXNG unavailable. Web search will return empty results.")
-            else:
-                print("[WARN]  Docker not found. SearXNG cannot be auto-started.")
-                print("        Install Docker or start SearXNG manually on port 8888.")
 
         # Start Next.js frontend dev server first (it takes longest to boot)
         if not args.no_frontend:
@@ -441,7 +356,6 @@ def main() -> int:
             print(f"  Frontend:     http://localhost:{args.frontend_port}")
         if not args.no_neuro:
             print(f"  Neuro API:    http://localhost:{args.neuro_port}/neuro/health")
-        print(f"  SearXNG:      {SEARXNG_URL}")
         print()
         print("  Press Ctrl+C to stop all servers")
         print("-" * 64)
@@ -461,8 +375,6 @@ def main() -> int:
     finally:
         for name, proc in processes:
             shutdown_process(name, proc)
-        if searxng_started_by_us:
-            _stop_searxng()
         print("[DONE] All servers stopped.")
 
     return 0

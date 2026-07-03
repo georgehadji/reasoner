@@ -52,7 +52,7 @@ Note: Ensure only one Uvicorn instance is running on the same port at a time.
 ### Running the CLI
 ```bash
 # Basic run
-python main.py --problem "Your question" --preset basic-budget
+python main.py --problem "Your question" --preset research-budget
 
 # List available presets and models
 python main.py --list-presets
@@ -111,6 +111,7 @@ To maintain code quality and consistency:
 - **Routing & Fallbacks:** The system has a robust `ProviderRouter` in `llm.py` that handles provider-specific nuances and implements fallback logic if a primary model fails.
 - **Structured Output:** The system heavily relies on JSON extraction (see `parsing.py`). Some models (like Perplexity) use specific `response_format` configurations.
 - **Rate Limits:** Use `--sequential` in the CLI or the "Sequential" toggle in the UI for methods involving many parallel calls to rate-limited providers.
+- **Dependencies (Optional):** Redis is optional for local development but recommended for high-load production environments to enable cross-worker state management and advanced caching.
 
 
 ## Workflow Orchestration

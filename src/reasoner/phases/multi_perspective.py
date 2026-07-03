@@ -21,6 +21,14 @@ def perspective_prompt(state: PipelineState, perspective: str) -> str:
         context["chain"] = len(state.decomposition.get("causal_chain", []))
     if state.reflexion_memory:
         context["memory"] = state.reflexion_memory[:TRUNCATION.MEMORY]
+    if state.web_discovery_results:
+        web_snippets = [
+            f"  - {r.get('title', '')}: {r.get('snippet', '')[:300]}"
+            for r in state.web_discovery_results[:5]
+            if r.get('title') or r.get('snippet')
+        ]
+        if web_snippets:
+            context["web_sources"] = web_snippets
     followup = _followup_context(state)
     
     return f'{get_language_instruction(state)}\n\nContext: {json.dumps(context)}{followup}\n\nAnalyze from {perspective} perspective.\n\nYou MUST return EXACTLY this JSON structure with no additional keys. Put all analysis inside "core_analysis" as a single string (3-6 paragraphs). Label factual claims inline with [VERIFIED], [HYPOTHESIS], or [UNKNOWN].\n\nJSON: {{"perspective": "{perspective}", "core_analysis": "<your detailed analysis with inline epistemic labels>", "key_insights": ["<insight 1>", "<insight 2>", "<insight 3>"]}}'

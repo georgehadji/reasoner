@@ -16,6 +16,7 @@ import hashlib
 import json
 import logging
 import time
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 from pathlib import Path
@@ -95,7 +96,8 @@ class TokenAwareCache:
         self.semantic_threshold = semantic_threshold
         self.max_entries = max_entries
         
-        self._entries: Dict[str, CacheEntry] = {}
+        self._entries: OrderedDict[str, CacheEntry] = OrderedDict()
+        self._lru_max_entries: int = 512  # LRU cap — oldest evicted on overflow
         self._current_tokens = 0
         self._stats = CacheStats()
         self._lock = asyncio.Lock()
@@ -180,10 +182,11 @@ class TokenAwareCache:
                     self._stats.misses += 1
                     return None
 
-                # Exact prompt match
+                # Exact prompt match — LRU promote
                 if entry.prompt_hash == prompt_hash:
                     entry.access_count += 1
                     entry.last_accessed = time.time()
+                    self._entries.move_to_end(key)  # LRU promotion
                     self._stats.hits += 1
                     self._stats.total_tokens_saved += entry.tokens_used
                     return entry.response
@@ -198,6 +201,7 @@ class TokenAwareCache:
                 # Exact prompt match within same problem group (fast path)
                 if entry.prompt_hash == prompt_hash:
                     entry.access_count += 1
+                    self._entries.move_to_end(ck)  # LRU promotion
                     entry.last_accessed = time.time()
                     self._stats.hits += 1
                     self._stats.total_tokens_saved += entry.tokens_used
@@ -230,8 +234,10 @@ class TokenAwareCache:
             await self._ensure_loaded()
             key = self._compute_key(problem, phase, model_id, prompt, agent_id=agent_id)
             
-            # Check if we need to evict
-            while self._current_tokens + tokens_used > self.max_tokens or len(self._entries) >= self.max_entries:
+            # Check if we need to evict — token budget, max entries, or LRU cap
+            while (self._current_tokens + tokens_used > self.max_tokens
+                   or len(self._entries) >= self.max_entries
+                   or len(self._entries) >= self._lru_max_entries):
                 await self._evict_lru()
             
             # Create entry

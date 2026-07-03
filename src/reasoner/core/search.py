@@ -21,7 +21,6 @@ from reasoner.core.temperatures import NON_PHASE_TEMPERATURES
 from reasoner.core.settings import settings
 from reasoner.core.rerank import rerank_documents
 from reasoner.core.constants import (
-    DEFAULT_SEARXNG_URL,
     TIMEOUTS,
     DEFAULT_MAX_DECOMPOSED_QUERIES,
     DEFAULT_SEARCH_RESULTS,
@@ -36,8 +35,6 @@ from reasoner.core.constants import (
 # dependency: core defines the port, infrastructure provides the impl.
 # Thread-safe via single assignment (not atomic, but set once at startup).
 import threading
-_SEARXNG_CB = None
-_SEARXNG_CB_LOCK = threading.Lock()
 
 _BUILD_PROVIDER = None
 
@@ -49,16 +46,6 @@ def set_build_provider(fn):
 def _get_build_provider():
     global _BUILD_PROVIDER
     return _BUILD_PROVIDER
-
-def set_searxng_circuit_breaker(cb):
-    """Inject SearXNG circuit breaker (called from api/__init__.py)."""
-    global _SEARXNG_CB
-    with _SEARXNG_CB_LOCK:
-        _SEARXNG_CB = cb
-
-def _get_searxng_cb():
-    global _SEARXNG_CB
-    return _SEARXNG_CB
 
 logger = logging.getLogger(__name__)
 
@@ -221,7 +208,7 @@ def _bm25_score(query: str, result: dict, k1: float = 1.5, b: float = 0.75) -> f
 
 def _parse_freshness(result: dict) -> float:
     """
-    Derive a freshness score in [0, 1] from SearXNG's publishedDate field.
+    Derive a freshness score in [0, 1] from a result's publishedDate field.
 
     Returns 0.5 (neutral) when no date is available so non-dated results
     are not unfairly penalised against fresh content.
@@ -293,11 +280,5 @@ def _should_include_result(result: dict[str, Any]) -> bool:
 # ─────────────────────────────────────────────
 
 from reasoner.core.ports.search_port import SearchServicePort
-
-# DiscoveryClient and URL helpers moved to infrastructure/search/discovery.py in v3.
-# Module-level re-export removed (v3.4) to break circular import chain:
-#   search.py → discovery.py → searxng_adapter.py → search.py
-# All callers already use lazy imports — import directly from discovery.py instead:
-#   from reasoner.infrastructure.search.discovery import DiscoveryClient, get_discovery_client
 
 

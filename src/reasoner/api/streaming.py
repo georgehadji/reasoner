@@ -15,6 +15,7 @@ from reasoner.core.constants import (
     CREATIVE_TEMPERATURE,
     DIRECT_ANSWER_MAX_TOKENS,
     DIRECT_ANSWER_TEMPERATURE,
+    PIPELINE_ABSOLUTE_TIMEOUT_SECONDS,
     SSE_FLUSH_INTERVAL,
     TRUNCATION,
     get_phase_retry_budget,
@@ -135,14 +136,60 @@ async def run_stream(
             registry = get_handler_registry()
             handler = registry.command_handlers["RunPipelineCommand"]
             await handler.handle(command, sse_emit=sse_emit)
+        except asyncio.CancelledError:
+            # asyncio.wait_for() cancels our task on timeout via CancelledError,
+            # NOT TimeoutError. TimeoutError is raised to the _timed_task wrapper.
+            # We catch CancelledError here so the error event is emitted before
+            # the stream closes.
+            await sse_emit({
+                "type": "error",
+                "error": f"Pipeline exceeded absolute timeout of {PIPELINE_ABSOLUTE_TIMEOUT_SECONDS}s",
+                "code": "PIPELINE_TIMEOUT",
+            })
         except Exception as e:
             import traceback
             traceback.print_exc()
+            await sse_emit({
+                "type": "error",
+                "error": str(e),
+                "code": "INTERNAL_ERROR",
+            })
         finally:
             await queue.put(None)
             
-    task = asyncio.create_task(run_task())
-    
+    # Emit a phase_start keepalive BEFORE any pipeline work.
+    # This ensures the SSE client sees its first event immediately,
+    # even when preflight (HyperGate LLM call + neuro recall) takes
+    # several seconds. Without this, the client hangs on an empty
+    # connection until preflight completes — which can take 3-5s.
+    yield _event({
+        "type": "phase_start",
+        "phase": "Preflight",
+        "phase_index": 0,
+        "total_phases": 0,
+        "status": "preparing",
+        "message": "Preparing pipeline (resolving preset, routing, and recall)",
+    })
+
+    timeout = PIPELINE_ABSOLUTE_TIMEOUT_SECONDS
+    has_timeout = timeout > 0
+
+    if has_timeout:
+        # Wrap the run_task in an absolute wall-clock timeout
+        # so no SSE connection stays open longer than the configured limit.
+        async def _timed_task():
+            try:
+                await asyncio.wait_for(run_task(), timeout=timeout)
+            except asyncio.TimeoutError:
+                # run_task catches CancelledError (thrown by wait_for's
+                # internal cancel) and emits the error event + queue sentinel.
+                # Nothing left to do — just return cleanly.
+                pass
+
+        task = asyncio.create_task(_timed_task())
+    else:
+        task = asyncio.create_task(run_task())
+
     while True:
         chunk = await queue.get()
         if chunk is None:

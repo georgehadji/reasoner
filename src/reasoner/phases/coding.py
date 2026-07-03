@@ -125,6 +125,17 @@ def coding_generate_prompt(state: PipelineState, file_spec: dict) -> str:
     deps = ", ".join(file_spec.get("dependencies", [])) or "none"
     interface = ", ".join(file_spec.get("public_interface", [])) or "as needed"
 
+    # Include library search context if available
+    lib_context = ""
+    if state and state.web_discovery_results:
+        lib_snippets = [
+            f"  - {r.get('title', '')}: {r.get('snippet', '')[:300]}"
+            for r in state.web_discovery_results[:5]
+            if r.get('title') or r.get('snippet')
+        ]
+        if lib_snippets:
+            lib_context = "\n\nRelevant API/docs references:\n" + "\n".join(lib_snippets) + "\n"
+
     return (
         f"Original request:\n{problem}\n\n"
         f"Architecture: {arch}\n"
@@ -173,9 +184,21 @@ def coding_review_prompt(state: PipelineState) -> str:
             f"[Key decisions: {decisions or 'none stated'}]\n"
         )
 
+    cve_context = ""
+    cve_results = state.coding_state.get("cve_search_results", [])
+    if cve_results:
+        cve_snippets = [
+            f"  - {r.get('title', '')}: {r.get('snippet', '')[:300]}"
+            for r in cve_results[:5]
+            if r.get('title') or r.get('snippet')
+        ]
+        if cve_snippets:
+            cve_context = "\nKnown vulnerability references for this stack:\n" + "\n".join(cve_snippets) + "\n"
+
     return (
         f"Architecture: {spec.get('architecture_summary', 'N/A')}\n"
-        f"Error strategy: {spec.get('error_strategy', 'N/A')}\n\n"
+        f"Error strategy: {spec.get('error_strategy', 'N/A')}\n"
+        f"{cve_context}\n"
         f"Generated files (content preview):{files_summary}\n\n"
         "Return JSON with your adversarial findings:\n"
         "{\n"

@@ -26,9 +26,8 @@ import logging
 # Setup logger
 logger = logging.getLogger(__name__)
 
-# Wire safe-logging filter so ALL output is redacted
-from reasoner.logging_utils import SafeLoggingFilter
-logging.getLogger().addFilter(SafeLoggingFilter())
+# SafeLoggingFilter is installed at the package level in reasoner/__init__.py
+# so it applies to CLI, tests, and all entry points — not just the API.
 
 # Initialize Sentry (Critical Enhancement 7.2)
 from reasoner.api.sentry import init_sentry
@@ -38,6 +37,21 @@ init_sentry()
 if settings.ENVIRONMENT == "production":
     if not settings.LANGFUSE_PUBLIC_KEY or not settings.LANGFUSE_SECRET_KEY:
         raise RuntimeError("CRITICAL: Langfuse keys (LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY) are missing in production environment. Observability is mandatory in production.")
+    # Lightweight Langfuse connectivity probe: verify the SDK is reachable
+    # by attempting a simple public-key check.  Connection errors are logged
+    # but non-fatal — the app can run without observability in degraded mode.
+    try:
+        from langfuse import Langfuse
+        _langfuse = Langfuse(
+            public_key=settings.LANGFUSE_PUBLIC_KEY,
+            secret_key=settings.LANGFUSE_SECRET_KEY,
+        )
+        _langfuse.auth_check()
+        logger.info("Langfuse connectivity probe: OK")
+    except Exception as probe_exc:
+        logger.warning(
+            "Langfuse connectivity check failed (non-fatal): %s", probe_exc
+        )
 # --- Action 1.2: Observability Strictness & Metrics --- END
 
 # Register global exception handlers (Critical Enhancement 7.7)
@@ -142,20 +156,10 @@ async def lifespan(app: FastAPI):
     # ── Inject core → infra boundary dependencies ──
     # Inverts the dependency: core defines ports, infra provides impls.
     try:
-        from reasoner.core.search import (
-            set_build_provider,
-            set_searxng_circuit_breaker,
-        )
+        from reasoner.core.search import set_build_provider
         from reasoner.infrastructure.llm.registry import build_provider
         set_build_provider(build_provider)
-
-        from reasoner.infrastructure.circuit_breaker import get_circuit_breaker
-        cb = get_circuit_breaker("searxng")
-        cb.config.failure_threshold = 3
-        cb.config.success_threshold = 2
-        cb.config.timeout_seconds = 30.0
-        set_searxng_circuit_breaker(cb)
-        logger.info("Core→infra dependencies injected: build_provider, searxng_cb")
+        logger.info("Core→infra dependencies injected: build_provider")
     except Exception as exc:
         logger.warning("Failed to inject core→infra deps: %s", exc)
 
@@ -212,28 +216,48 @@ async def lifespan(app: FastAPI):
     # Drain event bus before closing connections
     await bus.stop()
 
-    # ── Shutdown ──
+    # ── Shutdown (each close wrapped in try/except so one failure doesn't skip others) ──
     global _event_store, _health_postgres_pool
+
     if _event_store and hasattr(_event_store, 'close'):
-        _event_store.close()
+        try:
+            _event_store.close()
+        except Exception as exc:
+            logger.warning("Event store close failed: %s", exc)
 
-    from reasoner.infrastructure.llm.providers.openai_compat import OpenAICompatibleProvider
-    await OpenAICompatibleProvider.close_shared_pool()
+    try:
+        from reasoner.infrastructure.llm.providers.openai_compat import OpenAICompatibleProvider
+        await OpenAICompatibleProvider.close_shared_pool()
+    except Exception as exc:
+        logger.warning("OpenAI shared pool close failed: %s", exc)
 
-    from reasoner.scraper import close_scraper_client
-    await close_scraper_client()
+    try:
+        from reasoner.scraper import close_scraper_client
+        await close_scraper_client()
+    except Exception as exc:
+        logger.warning("Scraper client close failed: %s", exc)
 
-    # Close Redis connection (Critical Enhancement 5.5.2)
-    from reasoner.infrastructure.redis.client import close_redis
-    await close_redis()
+    try:
+        # Close Redis connection (Critical Enhancement 5.5.2)
+        from reasoner.infrastructure.redis.client import close_redis
+        await close_redis()
+    except Exception as exc:
+        logger.warning("Redis close failed: %s", exc)
 
-    # Close shared neuro HTTP client (B4 fix — resource leak)
-    from reasoner.clients import close_neuro_client
-    await close_neuro_client()
+    try:
+        # Close shared neuro HTTP client (B4 fix — resource leak)
+        from reasoner.clients import close_neuro_client
+        await close_neuro_client()
+    except Exception as exc:
+        logger.warning("Neuro client close failed: %s", exc)
 
-    # Close health-check Postgres pool
-    if _health_postgres_pool is not None:
-        await _health_postgres_pool.close()
+    try:
+        # Close health-check Postgres pool
+        if _health_postgres_pool is not None:
+            await _health_postgres_pool.close()
+            _health_postgres_pool = None
+    except Exception as exc:
+        logger.warning("Health-check Postgres pool close failed: %s", exc)
         _health_postgres_pool = None
 
     logger.info("Reasoner shutdown complete")
@@ -332,26 +356,8 @@ def get_architecture_components():
         
         # If no provider available, create a dummy one
         if primary_provider is None:
-            from reasoner.infrastructure.llm.ports import BaseLLMProvider, LLMResponse, LLMConfig, Message
-            from reasoner.infrastructure.llm.exceptions import LLMError
-            
-            class DummyProvider(BaseLLMProvider):
-                async def _complete_impl(self, messages, config):
-                    return LLMResponse(
-                        content="Dummy provider - configure API keys",
-                        model_used="dummy",
-                        tokens_prompt=0,
-                        tokens_completion=0,
-                    )
-                
-                async def _complete_stream_impl(self, messages, config):
-                    yield "Dummy provider"
-                
-                @property
-                def provider_name(self):
-                    return "dummy"
-            
-            primary_provider = DummyProvider(model="dummy")
+            from reasoner.infrastructure.llm.providers.noop import NoopProvider
+            primary_provider = NoopProvider(model="dummy")
         
         from reasoner.api.execution.pipeline import PipelineExecutionService
         _handler_registry = get_handler_registry(
@@ -655,7 +661,7 @@ async def run_pipeline(
     # Idempotency: atomically register client_run_id (C2)
     if req.client_run_id:
         from reasoner.infrastructure.redis.run_state import _run_state_manager
-        if not _run_state_manager.is_authoritative():
+        if not await _run_state_manager.is_authoritative():
             raise HTTPException(
                 status_code=503,
                 detail="Run state store unavailable. Retry after Redis recovers.",
@@ -712,7 +718,7 @@ async def search_web(
 ):
     _require_auth_if_legacy_disabled(user)
     """
-    Advanced web search via SearXNG.
+    Advanced web search via multi-backend search pipeline.
     Returns raw discovery results. When smart=True, the query is decomposed
     into focused sub-queries via a lightweight LLM, searched in parallel,
     deduplicated, and grouped.

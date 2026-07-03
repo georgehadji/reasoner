@@ -1,8 +1,9 @@
 """
-DiscoveryClient — wraps SearXNGAdapter for web search.
+DiscoveryClient — multi-backend search client factory.
 
-Extracted from core/search.py. Provides the `get_discovery_client` factory
-function used by research, article, and search flow phases.
+Extracted from core/search.py. Provides the `get_search_client` and
+`get_search_client_for_method` factories used by research, article,
+and search flow phases.
 """
 
 from __future__ import annotations
@@ -14,33 +15,8 @@ from typing import Any, Optional, Protocol
 logger = logging.getLogger(__name__)
 
 from reasoner.core.ports.search_port import SearchServicePort, SourceType
-from reasoner.core.constants import DEFAULT_SEARCH_RESULTS, DEFAULT_SEARXNG_URL, TIMEOUTS, MODEL_QWEN35_9B, MODEL_QWEN35_FLASH, MODEL_GEMINI_FLASH
+from reasoner.core.constants import DEFAULT_SEARCH_RESULTS, TIMEOUTS, MODEL_QWEN35_9B, MODEL_QWEN35_FLASH, MODEL_GEMINI_FLASH
 from reasoner.core.settings import settings
-from reasoner.infrastructure.search.searxng_adapter import SearXNGAdapter
-
-# DiscoveryClient now wraps SearXNGAdapter to conform to SearchServicePort
-class DiscoveryClient(SearchServicePort):
-    def __init__(self, base_url: str = DEFAULT_SEARXNG_URL):
-        self.adapter = SearXNGAdapter(base_url=base_url)
-
-    @property
-    def base_url(self) -> str:
-        return self.adapter.base_url
-
-    async def search(
-        self,
-        query: str,
-        num_results: int = DEFAULT_SEARCH_RESULTS,
-        categories: Optional[list[str]] = None,
-        source_type: Optional[SourceType] = None,
-        domain: Optional[str] = None,
-    ) -> list[dict[str, Any]]:
-        return await self.adapter.search(
-            query, num_results, categories, source_type, domain
-        )
-
-    async def close(self) -> None:
-        await self.adapter.close()
 
 
 # ─────────────────────────────────────────────
@@ -117,29 +93,7 @@ class SearchClient(Protocol):
     async def close(self): ...
 
 
-_default_client: Optional[DiscoveryClient] = None
 
-
-def reset_discovery_client() -> None:
-    """Reset the global discovery client. Call this if base_url changes."""
-    global _default_client
-    old = _default_client
-    _default_client = None
-    if old is not None:
-        try:
-            # Running inside an async context — schedule close as a fire-and-forget task.
-            loop = asyncio.get_running_loop()
-            task = loop.create_task(old.close())
-            task.add_done_callback(
-                lambda t: logger.error(
-                    "Discovery client close failed: %s", t.exception()
-                )
-                if not t.cancelled() and t.exception()
-                else None
-            )
-        except RuntimeError:
-            # No running event loop — cannot close async client
-            logger.warning("No event loop to close discovery client; resources may leak.")
 
 
 # ─────────────────────────────────────────────
@@ -323,25 +277,7 @@ async def smart_search(
 #  Utilities
 # ─────────────────────────────────────────────
 
-def get_searxng_urls() -> list[str]:
-    """Return the list of SearXNG URLs to try, respecting SEARXNG_URL env var."""
-    base = settings.SEARXNG_URL.rstrip("/")
-    urls = [f"{base}/search"]
-    # Always include fallback to 127.0.0.1:8888 (default SearXNG port)
-    # If base already uses localhost, also include IP version
-    if "localhost" in base:
-        ip_base = base.replace("localhost", "127.0.0.1")
-        urls.append(f"{ip_base}/search")
-    else:
-        # Include default IP fallback regardless of custom URL
-        fallback_base = DEFAULT_SEARXNG_URL.replace("localhost", "127.0.0.1")
-        urls.append(f"{fallback_base}/search")
-    return urls
 
-
-def get_searxng_base_url() -> str:
-    """Return the configured SearXNG base URL."""
-    return settings.SEARXNG_URL.rstrip("/")
 
 
 async def get_search_client_for_method(
@@ -370,16 +306,14 @@ async def get_search_client_for_method(
 
     for backend in chain:
         if backend == "perplexity" or backend == "perplexity_deep":
-            # Prefer Tavily/Brave over SearXNG when API keys are set.
-            # SearXNG is the legacy fallback — new adapters have better latency
-            # (Tavily 180ms p50 vs SearXNG 2-5s) and fresher indexes.
+            # Try Tavily/Brave when API keys are set.
             if settings.TAVILY_API_KEY and settings.TAVILY_SEARCH_ENABLED:
                 from reasoner.infrastructure.search.tavily_adapter import TavilyAdapter
                 return TavilyAdapter(), source_type
             if settings.BRAVE_SEARCH_API_KEY and settings.BRAVE_SEARCH_ENABLED:
                 from reasoner.infrastructure.search.brave_adapter import BraveSearchAdapter
                 return BraveSearchAdapter(), source_type
-            # Fall back to SearXNG → Perplexity legacy path
+            # Fall back to Perplexity
             if settings.OPENROUTER_API_KEY:
                 from reasoner.infrastructure.search.discovery import get_search_client
                 return await get_search_client(source_type=source_type)
@@ -409,52 +343,31 @@ async def get_search_client_for_method(
     return await get_search_client(source_type=source_type)
 
 
-async def get_discovery_client(
-    base_url: str | None = None,
-    source_type: Optional[SourceType] = None,
-) -> tuple[DiscoveryClient, Optional[SourceType]]:
-    """Get or create the shared discovery client."""
-    global _default_client
-    resolved_base = (base_url or get_searxng_base_url()).rstrip("/")
-    
-    if _default_client is not None and _default_client.base_url != resolved_base:
-        reset_discovery_client()
-
-    if _default_client is None:
-        _default_client = DiscoveryClient(base_url=resolved_base)
-    return _default_client, source_type
-
-
 async def get_search_client(
     source_type: Optional[SourceType] = None,
 ) -> tuple[SearchClient, Optional[SourceType]]:
-    """Factory: returns SearXNG when healthy, Perplexity when SearXNG is down or
-    when OpenRouter key is available and SearXNG fails."""
-    from reasoner.core.search import _get_searxng_cb
-    cb = _get_searxng_cb()
-    searxng_healthy = cb is not None and await cb.can_execute()
+    """Factory: returns the best available search client.
 
-    # Strategy 1: SearXNG is healthy — try it first for raw source diversity
-    if searxng_healthy:
-        try:
-            client, resolved_type = await get_discovery_client(source_type=source_type)
-            # Quick health check: perform a lightweight search
-            health_results = await client.search("test", num_results=1)
-            # Must return at least one result to be considered truly healthy
-            if health_results:
-                return client, resolved_type
-            logger.warning("SearXNG health check returned 0 results — considering fallback")
-        except Exception as exc:
-            logger.warning("SearXNG health check failed (%s) — considering fallback", exc)
-
-    # Strategy 2: SearXNG is down or unhealthy — use Perplexity if available
+    Tries Perplexity (via OpenRouter) first, then Tavily, then Brave.
+    All backends gate on their API keys.
+    """
+    # Strategy 1: Perplexity via OpenRouter
     if settings.OPENROUTER_API_KEY:
-        logger.info("SearXNG circuit OPEN/unhealthy/empty — using Perplexity fallback")
         try:
             return PerplexitySearchClient(), source_type
         except ValueError:
-            logger.warning("Perplexity client init failed — falling back to SearXNG")
+            logger.warning("Perplexity client init failed — trying Tavily/Brave fallback")
 
-    # Strategy 3: Last resort — return SearXNG even if circuit breaker suggests it's open.
-    # The caller's error handling will deal with actual failures.
-    return await get_discovery_client(source_type=source_type)
+    # Strategy 2: Tavily
+    if settings.TAVILY_API_KEY and settings.TAVILY_SEARCH_ENABLED:
+        from reasoner.infrastructure.search.tavily_adapter import TavilyAdapter
+        return TavilyAdapter(), source_type
+
+    # Strategy 3: Brave
+    if settings.BRAVE_SEARCH_API_KEY and settings.BRAVE_SEARCH_ENABLED:
+        from reasoner.infrastructure.search.brave_adapter import BraveSearchAdapter
+        return BraveSearchAdapter(), source_type
+
+    # Strategy 4: Return empty client — caller handles gracefully
+    logger.warning("No search backend available — all API keys missing")
+    return PerplexitySearchClient(), source_type

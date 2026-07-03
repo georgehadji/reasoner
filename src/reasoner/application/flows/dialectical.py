@@ -6,14 +6,17 @@ from typing import Any, List
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.application.flows.base import WorkflowServices, WorkflowStrategy, PhaseStep
 from reasoner.application.flows.dialectical_phases import (
+    run_scientific_literature_search_phase,
     run_scientific_hypothesize_phase,
     run_scientific_test_phase,
     run_socratic_question_phase,
     run_socratic_answer_phase,
+    run_pre_mortem_case_study_phase,
     run_pre_mortem_failure_phase,
     run_pre_mortem_backtrack_phase,
     run_pre_mortem_signals_phase,
     run_pre_mortem_redesign_phase,
+    run_bayesian_prior_search_phase,
     run_bayesian_priors_phase,
     run_bayesian_likelihood_phase,
     run_bayesian_posterior_phase,
@@ -22,6 +25,7 @@ from reasoner.application.flows.dialectical_phases import (
     run_dialectical_antithesis_phase,
     run_dialectical_contradictions_phase,
     run_dialectical_aufhebung_phase,
+    run_analogical_web_search_phase,
     run_analogical_abstraction_phase,
     run_analogical_domain_search_phase,
     run_analogical_mapping_phase,
@@ -35,6 +39,7 @@ class ScientificFlow(WorkflowStrategy):
     """Scientific reasoning workflow."""
     def get_phases(self, state: PipelineState) -> List[PhaseStep]:
         return [
+            PhaseStep(1.5, "Literature Search", run_scientific_literature_search_phase, _ser_2),
             PhaseStep(2, "Hypothesize", run_scientific_hypothesize_phase, _ser_2),
             PhaseStep(3, "Falsification Tests", run_scientific_test_phase, _ser_3),
             PhaseStep(4, "Stress Testing", run_stress_test_phase, _ser_4),
@@ -68,6 +73,7 @@ class PreMortemFlow(WorkflowStrategy):
     """Pre-Mortem reasoning workflow."""
     def get_phases(self, state: PipelineState) -> List[PhaseStep]:
         return [
+            PhaseStep(1.5, "Case Study Research", run_pre_mortem_case_study_phase, _ser_2),
             PhaseStep(2, "Failure Narrative", run_pre_mortem_failure_phase, _ser_2),
             PhaseStep(3, "Root Cause Analysis", run_pre_mortem_backtrack_phase, _ser_3),
             PhaseStep(4, "Early Warning Signals", run_pre_mortem_signals_phase, _ser_4),
@@ -86,6 +92,7 @@ class BayesianFlow(WorkflowStrategy):
     """Bayesian reasoning workflow."""
     def get_phases(self, state: PipelineState) -> List[PhaseStep]:
         return [
+            PhaseStep(1.5, "Prior Research", run_bayesian_prior_search_phase, _ser_2),
             PhaseStep(2, "Priors", run_bayesian_priors_phase, _ser_2),
             PhaseStep(3, "Likelihood Update", run_bayesian_likelihood_phase, _ser_3),
             PhaseStep(4, "Posterior Analysis", run_bayesian_posterior_phase, _ser_4),
@@ -122,6 +129,7 @@ class AnalogicalFlow(WorkflowStrategy):
     """Analogical reasoning workflow."""
     def get_phases(self, state: PipelineState) -> List[PhaseStep]:
         return [
+            PhaseStep(1.5, "Web Domain Search", run_analogical_web_search_phase, _ser_2),
             PhaseStep(2, "Abstraction", run_analogical_abstraction_phase, _ser_2),
             PhaseStep(3, "Domain Search", run_analogical_domain_search_phase, _ser_3),
             PhaseStep(4, "Mapping", run_analogical_mapping_phase, _ser_4),

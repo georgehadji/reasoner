@@ -61,8 +61,7 @@ class Settings:
     PERPLEXITY_API_KEY: str | None = os.getenv("PERPLEXITY_API_KEY")
     NVIDIA_API_KEY: str | None = os.getenv("NVIDIA_API_KEY")
     OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-    SEARXNG_URL: str = os.getenv("SEARXNG_URL", "http://localhost:8888")
-    SEARXNG_SECRET_KEY: str = os.getenv("SEARXNG_SECRET_KEY", "")
+
     ADMIN_API_KEY: str | None = os.getenv("ADMIN_API_KEY")
     REASONER_DEEP_READ_LLM: bool = os.getenv("REASONER_DEEP_READ_LLM", "1") != "0"
 
@@ -108,7 +107,6 @@ class Settings:
 
 
     # ── Database & Persistence ──
-    DATABASE_URL: str | None = os.getenv("DATABASE_URL")
     # Default to sqlite for dev, postgres for production if URL provided
     EVENT_STORE_BACKEND: str = os.getenv(
         "EVENT_STORE_BACKEND", 

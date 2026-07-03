@@ -236,11 +236,11 @@ def get_quality_judge_model(preset_name: str) -> str:
 # Each method + tier maps to a list of backend names (tried in order).
 SEARCH_METHOD_CHAINS: dict[str, dict[str, list[str]]] = {
     "multi_perspective": {
-        "budget":  ["perplexity", "tavily", "searxng"],
+        "budget":  ["perplexity", "tavily", "brave"],
         "premium": ["perplexity", "brave_llm", "tavily"],
     },
     "article": {
-        "budget":  ["brave", "tavily", "searxng"],
+        "budget":  ["brave", "tavily", "perplexity"],
         "premium": ["brave_llm", "perplexity_deep", "tavily"],
     },
     "research": {
@@ -283,7 +283,7 @@ def get_quality_judge_threshold(preset_name: str) -> float:
 # BASE URLs
 # ═════════════════════════════════════════════════════════════════════
 
-DEFAULT_SEARXNG_URL: str = "http://localhost:8888"
+
 DEFAULT_NEURO_URL: str = "http://localhost:50001"
 DEFAULT_OLLAMA_URL: str = "http://localhost:11434"
 OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
@@ -321,6 +321,13 @@ class Timeouts:
     CLASSIFICATION: float = 20.0
     DECOMPOSITION: float = 60.0
     SYNTHESIS: float = 120.0   # synthesis legitimately needs more time
+
+# Maximum wall-clock time for an entire pipeline run (seconds).
+# Set to 0 to disable (unbounded — original behavior).
+# Enforced in streaming.py:run_stream() via asyncio.wait_for.
+# 600s = 10 minutes covers even research-premium with web search;
+# should be generously above the sum of phase timeouts.
+PIPELINE_ABSOLUTE_TIMEOUT_SECONDS: float = 600.0
 
 
 # Maps routing role names to their specific call timeout.

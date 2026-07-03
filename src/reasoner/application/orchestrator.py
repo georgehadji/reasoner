@@ -14,7 +14,14 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
-from reasoner.core.constants import DEFAULT_CLI_PRESET
+from reasoner.core.constants import DEFAULT_CLI_PRESET, GATE_TIMEOUT_SECONDS
+from reasoner.application.ports.service_protocols import (
+    NeuroClientProtocol,
+    PipelineServiceProtocol,
+    PresetServiceProtocol,
+    SearchServiceProtocol,
+    TelemetryStoreProtocol,
+)
 from reasoner.core.events.domain_events import make_event, EventType
 from reasoner.hypergate import HyperGateAgent
 from reasoner.infrastructure.llm.router import ProviderRouter
@@ -56,11 +63,11 @@ class PipelineOrchestrator:
 
     def __init__(
         self,
-        preset_service: Any,
-        pipeline_service: Any,
-        search_service: Any | None = None,
-        neuro_client: Any | None = None,
-        telemetry_store: Any | None = None,
+        preset_service: "PresetServiceProtocol",
+        pipeline_service: "PipelineServiceProtocol",
+        search_service: "SearchServiceProtocol | None" = None,
+        neuro_client: "NeuroClientProtocol | None" = None,
+        telemetry_store: "TelemetryStoreProtocol | None" = None,
     ) -> None:
         self.preset_service = preset_service
         self.pipeline_service = pipeline_service
@@ -103,16 +110,43 @@ class PipelineOrchestrator:
         # Store the buffer on the router so callers can extract it
         router._fallback_buffer = _fallback_buffer
 
-        # ── Neuro Recall ──
+        # ── Neuro Recall + HyperGate (composite block with 5s timeout) ──
+        # Both are LLM calls that can stall. When they exceed 5s combined,
+        # we fall back to a default pipeline decision so the client gets
+        # an event promptly rather than an empty spinner.
         recalled_chunks: list[dict[str, Any]] = []
-        if not getattr(req, "no_cache", False):
-            conversation_id = getattr(initial_state, "conversation_id", None) if initial_state else None
-            try:
-                recalled_chunks = await self._recall_neuro_context(
-                    req.problem, agent_id=conversation_id
+        gate_decision_fb: Any | None = None  # fallback capture
+
+        async def _preflight_checks():
+            nonlocal recalled_chunks, gate_decision_fb
+            # Neuro recall
+            if not getattr(req, "no_cache", False):
+                conversation_id = (
+                    getattr(initial_state, "conversation_id", None)
+                    if initial_state else None
                 )
-            except Exception as exc:
-                logger.debug("Neuro recall failed: %s", exc)
+                try:
+                    recalled_chunks = await self._recall_neuro_context(
+                        req.problem, agent_id=conversation_id
+                    )
+                except Exception as exc:
+                    logger.debug("Neuro recall failed: %s", exc)
+            # HyperGate
+            if not getattr(req, "force_pipeline", False):
+                gate = HyperGateAgent(router)
+                gate_decision_fb = await gate.decide(req.problem)
+
+        _preflight_timeout = max(GATE_TIMEOUT_SECONDS * 2, 5.0)
+
+        try:
+            await asyncio.wait_for(_preflight_checks(), timeout=_preflight_timeout)
+        except asyncio.TimeoutError:
+            logger.warning(
+                "Preflight checks (neuro + HyperGate) exceeded %.0fs. "
+                "Falling back to default pipeline.",
+                _preflight_timeout,
+            )
+            gate_decision_fb = None  # force pipeline fallback
 
         decision = PreflightDecision(
             action="pipeline",
@@ -122,12 +156,9 @@ class PipelineOrchestrator:
             problem=req.problem,
         )
 
-        # ── HyperGate: decide direct answer vs web search vs pipeline ──
-        if not getattr(req, "force_pipeline", False):
-            gate = HyperGateAgent(router)
-            gate_decision = await gate.decide(req.problem)
-
-            if gate_decision.action == "direct":
+        # ── Act on HyperGate decision (or fallback) ──
+        if gate_decision_fb is not None:
+            if gate_decision_fb.action == "direct":
                 decision.action = "direct"
                 history = getattr(initial_state, "conversation_history", None)
                 decision.conversation_history = history
@@ -135,20 +166,20 @@ class PipelineOrchestrator:
                 decision.turn_number = getattr(initial_state, "turn_number", 1)
                 return decision
 
-            if gate_decision.action == "web_search":
+            if gate_decision_fb.action == "web_search":
                 decision.action = "web_search"
                 return decision
 
             # Auto-method: rebuild router with gate-selected method
-            if is_auto and gate_decision.method and not custom_routing:
+            if is_auto and gate_decision_fb.method and not custom_routing:
                 effective_preset_name, router = self.preset_service.build_auto_router(
-                    gate_decision.method,
+                    gate_decision_fb.method,
                     auto_tier,
                     agent_model=agent_model,
                 )
                 decision.router = router
                 decision.effective_preset_name = effective_preset_name
-                decision.auto_selected_method = gate_decision.method
+                decision.auto_selected_method = gate_decision_fb.method
 
         # ── Article detection ──
         # Only auto-detect when the preset didn't specify a method.

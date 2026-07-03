@@ -91,7 +91,7 @@ class PipelineExecutionService:
                     await sse_emit(chunk)
                 return
             if preflight.action == "web_search":
-                # Route through OpenRouter web_search when enabled (no SearXNG roundtrip)
+                # Route through OpenRouter web_search when enabled
                 if _settings.OPENROUTER_WEB_SEARCH_ENABLED:
                     async for chunk in _stream_direct_answer(
                         preflight.router, req.problem, run_id, cancel_event,

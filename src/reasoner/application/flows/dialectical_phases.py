@@ -9,10 +9,55 @@ from reasoner.domain.pipeline_state import PipelineState
 from reasoner.parsing import extract_json, ParseError
 import reasoner.phases as phases
 from reasoner.application.flows.base import WorkflowServices
+from reasoner.infrastructure.search.discovery import get_search_client_for_method
 
 logger = logging.getLogger(__name__)
 
 # --- Scientific ---
+
+async def run_scientific_literature_search_phase(state: PipelineState, services: WorkflowServices) -> None:
+    """Search for relevant literature to ground hypothesis generation."""
+    services.log("SCIENTIFIC", "Searching for relevant literature...", state)
+    try:
+        from reasoner.presets import get_preset_price_tier
+        tier = get_preset_price_tier(state.preset_name) or "budget"
+        client, _ = await get_search_client_for_method("research", tier, source_type="academic")
+
+        # Generate targeted search queries from the problem
+        raw_plan, _ = await services.call_llm(
+            role="primary",
+            system_prompt=phases.ARTICLE_RETRIEVAL_PLAN_SYSTEM,
+            user_prompt=phases.article_retrieval_plan_prompt(state),
+            state=state
+        )
+
+        import json as _json
+        plan = extract_json(raw_plan)
+        queries = plan.get("queries", [])[:3]
+
+        import asyncio as _asyncio
+        async def _search(q):
+            try: return await client.search(q, num_results=5)
+            except Exception: return []
+
+        results = await _asyncio.gather(*[_search(q) for q in queries], return_exceptions=True)
+        flattened = []
+        seen = set()
+        for r_list in results:
+            if isinstance(r_list, list):
+                for r in r_list:
+                    url = r.get("url", "")
+                    if url not in seen:
+                        seen.add(url)
+                        flattened.append(r)
+
+        state.web_discovery_results = flattened[:10]
+        if flattened:
+            services.log("SCIENTIFIC", f"Found {len(flattened)} relevant sources.", state)
+        else:
+            services.log("SCIENTIFIC", "No sources found — proceeding with LLM knowledge.", state)
+    except Exception as e:
+        services.log("SCIENTIFIC", f"Literature search failed: {e}", state)
 
 async def run_scientific_hypothesize_phase(state: PipelineState, services: WorkflowServices) -> None:
     services.log("SCIENTIFIC", "Generating hypotheses...", state)
@@ -86,6 +131,50 @@ async def run_socratic_answer_phase(state: PipelineState, services: WorkflowServ
 
 # --- Pre-Mortem ---
 
+async def run_pre_mortem_case_study_phase(state: PipelineState, services: WorkflowServices) -> None:
+    """Search for real-world case studies of similar failures."""
+    services.log("PRE-MORTEM", "Searching for real-world failure case studies...", state)
+    try:
+        from reasoner.presets import get_preset_price_tier
+        tier = get_preset_price_tier(state.preset_name) or "budget"
+        client, _ = await get_search_client_for_method("research", tier, source_type="general")
+
+        raw_plan, _ = await services.call_llm(
+            role="primary",
+            system_prompt=phases.ARTICLE_RETRIEVAL_PLAN_SYSTEM,
+            user_prompt=phases.article_retrieval_plan_prompt(state),
+            state=state
+        )
+        plan = extract_json(raw_plan)
+        queries = plan.get("queries", [])[:3]
+
+        import asyncio as _asyncio
+        async def _search(q):
+            try:
+                # Add "failure case study" or "postmortem" to find real incidents
+                failure_q = f"{q} failure case study OR postmortem OR lessons learned"
+                return await client.search(failure_q, num_results=5)
+            except Exception:
+                return []
+
+        results = await _asyncio.gather(*[_search(q) for q in queries], return_exceptions=True)
+        flattened = []
+        seen = set()
+        for r_list in results:
+            if isinstance(r_list, list):
+                for r in r_list:
+                    url = r.get("url", "")
+                    if url not in seen:
+                        seen.add(url)
+                        flattened.append(r)
+
+        state.web_discovery_results = flattened[:10]
+        if flattened:
+            services.log("PRE-MORTEM", f"Found {len(flattened)} relevant case studies.", state)
+    except Exception as e:
+        services.log("PRE-MORTEM", f"Case study search failed: {e}", state)
+
+
 async def run_pre_mortem_failure_phase(state: PipelineState, services: WorkflowServices) -> None:
     services.log("PRE-MORTEM", "Constructing failure narrative...", state)
     raw, _ = await services.call_llm(
@@ -141,6 +230,42 @@ async def run_pre_mortem_redesign_phase(state: PipelineState, services: Workflow
     state.pre_mortem_state["rollback_plan"] = data.get("rollback_plan", "")
 
 # --- Bayesian ---
+
+async def run_bayesian_prior_search_phase(state: PipelineState, services: WorkflowServices) -> None:
+    """Search for real-world base rates and prior probabilities."""
+    services.log("BAYESIAN", "Searching for real-world base rates and data...", state)
+    try:
+        from reasoner.presets import get_preset_price_tier
+        tier = get_preset_price_tier(state.preset_name) or "budget"
+        client, _ = await get_search_client_for_method("research", tier, source_type="general")
+        raw_plan, _ = await services.call_llm(
+            role="primary",
+            system_prompt=phases.ARTICLE_RETRIEVAL_PLAN_SYSTEM,
+            user_prompt=phases.article_retrieval_plan_prompt(state),
+            state=state
+        )
+        plan = extract_json(raw_plan)
+        queries = plan.get("queries", [])[:3]
+        import asyncio as _asyncio
+        async def _search(q):
+            try: return await client.search(q, num_results=5)
+            except Exception: return []
+        results = await _asyncio.gather(*[_search(q) for q in queries], return_exceptions=True)
+        flattened = []
+        seen = set()
+        for r_list in results:
+            if isinstance(r_list, list):
+                for r in r_list:
+                    url = r.get("url", "")
+                    if url not in seen:
+                        seen.add(url)
+                        flattened.append(r)
+        state.web_discovery_results = flattened[:10]
+        if flattened:
+            services.log("BAYESIAN", f"Found {len(flattened)} data sources.", state)
+    except Exception as e:
+        services.log("BAYESIAN", f"Prior search failed: {e}", state)
+
 
 async def run_bayesian_priors_phase(state: PipelineState, services: WorkflowServices) -> None:
     services.log("BAYESIAN", "Eliciting prior distributions...", state)
@@ -253,6 +378,42 @@ async def run_dialectical_aufhebung_phase(state: PipelineState, services: Workfl
     state.dialectical_state["new_insights"] = data.get("new_insights", [])
 
 # --- Analogical ---
+
+async def run_analogical_web_search_phase(state: PipelineState, services: WorkflowServices) -> None:
+    """Search the web for real cross-domain analogs to ground domain search."""
+    services.log("ANALOGICAL", "Searching web for real cross-domain analogs...", state)
+    try:
+        from reasoner.presets import get_preset_price_tier
+        tier = get_preset_price_tier(state.preset_name) or "budget"
+        client, _ = await get_search_client_for_method("research", tier, source_type="general")
+        raw_plan, _ = await services.call_llm(
+            role="primary",
+            system_prompt=phases.ARTICLE_RETRIEVAL_PLAN_SYSTEM,
+            user_prompt=phases.article_retrieval_plan_prompt(state),
+            state=state
+        )
+        plan = extract_json(raw_plan)
+        queries = plan.get("queries", [])[:3]
+        import asyncio as _asyncio
+        async def _search(q):
+            try: return await client.search(q, num_results=5)
+            except Exception: return []
+        results = await _asyncio.gather(*[_search(q) for q in queries], return_exceptions=True)
+        flattened = []
+        seen = set()
+        for r_list in results:
+            if isinstance(r_list, list):
+                for r in r_list:
+                    url = r.get("url", "")
+                    if url not in seen:
+                        seen.add(url)
+                        flattened.append(r)
+        state.web_discovery_results = flattened[:10]
+        if flattened:
+            services.log("ANALOGICAL", f"Found {len(flattened)} potential source domains.", state)
+    except Exception as e:
+        services.log("ANALOGICAL", f"Web domain search failed: {e}", state)
+
 
 async def run_analogical_abstraction_phase(state: PipelineState, services: WorkflowServices) -> None:
     services.log("ANALOGICAL", "Extracting abstract problem structure...", state)

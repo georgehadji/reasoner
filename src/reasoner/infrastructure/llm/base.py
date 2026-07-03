@@ -26,7 +26,7 @@ class LLMError(ReasonerError):
 
 
 class BaseLLMProvider(ABC):
-    def __init__(self, model: str, max_retries: int = 3) -> None:
+    def __init__(self, model: str, max_retries: int = 2) -> None:
         self.model = model
         self.max_retries = max_retries
 
@@ -86,6 +86,22 @@ class BaseLLMProvider(ABC):
             f"{self.__class__.__name__}({self.model}) with tools failed "
             f"after {self.max_retries} retries: {last_error}"
         ) from last_error
+
+    async def complete_once(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        max_tokens: int = 2048,
+        temperature: float = 0.7,
+    ) -> str:
+        """Single attempt — no retry. Used by the router fallback path.
+
+        The router owns the retry budget; this is a raw single-shot wrapper
+        so the fallback doesn't multiply retries (avoiding the dual-layer
+        retry problem where provider-level retries + router-level fallbacks
+        compound into 6+ LLM calls).
+        """
+        return await self.complete(system_prompt, user_prompt, max_tokens, temperature)
 
     async def complete_with_retry(
         self,

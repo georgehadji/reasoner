@@ -18,7 +18,7 @@ async def _stream_web_search_results(
     num_results: int = 10,
     cancel_event: asyncio.Event | None = None,
 ) -> AsyncGenerator[str, None]:
-    """Stream SearXNG web search results as a virtual single-phase pipeline."""
+    """Stream web search results as a virtual single-phase pipeline."""
     async for chunk in _search_service.stream_web_search_results(
         problem, run_id, num_results=num_results, cancel_event=cancel_event
     ):

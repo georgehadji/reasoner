@@ -12,7 +12,7 @@
 |---|---|---|---|---|---|---|---|---|---|
 | **Claude Opus 4.7** | Anthropic | `anthropic/claude-opus-4.7` | 1M | $5.00 | $25.00 | ✅ | ❌ | ❌ | Frontier coding, async agents |
 | **Claude Opus 4.6** | Anthropic | `anthropic/claude-opus-4.6` | 1M | $5.00 | $25.00 | ✅ | ❌ | ❌ | Complex refactors, knowledge work |
-| **Claude Sonnet 4.6** | Anthropic | `anthropic/claude-sonnet-4.6` | 1M | $3.00 | $15.00 | ✅ | ❌ | ❌ | Default production, agents, coding |
+| **Claude Sonnet 5** | Anthropic | `anthropic/claude-sonnet-5` | 1M | $2.00 | $10.00 | ✅ | ❌ | ❌ | Default production, agents, coding, adaptive thinking |
 | **Claude Haiku 4.5** | Anthropic | `anthropic/claude-haiku-4.5` | 200K | $1.00 | $5.00 | ✅ | ❌ | ❌ | High-volume, sub-agents, triage |
 | **Gemini 3.1 Pro** | Google | `google/gemini-3.1-pro-preview` | 1M | $2.00 | $12.00 | ✅ | ✅ | ✅ | Frontier reasoning, agentic coding |
 | **Gemini 3 Flash** | Google | `google/gemini-3-flash-preview` | 1M | $0.50 | $3.00 | ✅ | ✅ | ✅ | Agentic workflows, near-Pro speed |
@@ -83,22 +83,22 @@
 
 ---
 
-### Claude Sonnet 4.6
+### Claude Sonnet 5
 | Spec | Value |
 |---|---|
-| **OpenRouter Path** | `anthropic/claude-sonnet-4.6` |
-| **Release** | February 17, 2026 |
+| **OpenRouter Path** | `anthropic/claude-sonnet-5` |
+| **Release** | June 30, 2026 |
 | **Context** | 1,000,000 tokens |
 | **Max Output** | 128,000 tokens |
-| **Input** | $3.00 / 1M tokens |
-| **Output** | $15.00 / 1M tokens |
-| **Prompt Caching** | Read: $0.30 / 1M; Write: $3.75 / 1M |
-| **Capabilities** | Vision, reasoning, function calling, prompt caching, computer use, extended thinking |
+| **Input** | $2.00 / 1M tokens |
+| **Output** | $10.00 / 1M tokens |
+| **Prompt Caching** | Read: $0.20 / 1M; Write: $2.50 / 1M |
+| **Capabilities** | Vision, reasoning, function calling, prompt caching, computer use, adaptive thinking (low, medium, high, max, x-high) |
 
 **Benchmarks:**
-- Intelligence: 42.6 (92nd percentile)
-- Coding: major improvement over Sonnet 4.5
-- Computer use: major improvement over prior generations
+- Intelligence: Anthropic's most capable Sonnet-class model with frontier performance
+- Coding: major improvement over prior models
+- Adaptive thinking: native reasoning effort level control
 
 ---
 
@@ -609,7 +609,7 @@
 | Use Case | Top Pick | Runner-up | Budget Pick |
 |---|---|---|---|
 | **Frontier coding + vision** | Claude Opus 4.7 | GLM-5.1 | Kimi K2.5 |
-| **General production default** | Claude Sonnet 4.6 | GPT-5.4 | Gemini 2.5 Flash |
+| **General production default** | Claude Sonnet 5 | GPT-5.4 | Gemini 2.5 Flash |
 | **Ultra-low latency vision** | Gemini 2.5 Flash-Lite | Grok 4.1 Fast | Gemma 3 27B |
 | **Maximum context + vision** | Grok 4.1 Fast (2M) | MiniMax-01 (1M) | Gemini 3 Flash (1M) |
 | **Audio + video + vision** | MiMo V2 Omni | Gemini 3.1 Pro | Gemini 3 Flash |
@@ -617,7 +617,7 @@
 | **Open-source vision** | Molmo 2 (Apache 2.0) | Gemma 3 (Gemma License) | Qwen3-VL 8B |
 | **Scientific reasoning + vision** | Gemini 3.1 Pro | Claude Opus 4.7 | o4-mini |
 | **Agent swarm + vision** | Kimi K2.6 | Kimi K2.5 | Grok 4.1 Fast |
-| **Honest/low hallucination** | GLM-5.1 (~34%) | Claude Sonnet 4.6 | — |
+| **Honest/low hallucination** | GLM-5.1 (~34%) | Claude Sonnet 5 | — |
 | **GUI control + visual coding** | Qwen3-VL 235B | Kimi K2.5 | — |
 | **Video understanding** | Molmo 2 | Qwen3-VL 235B | Gemini 2.5 Flash |
 
@@ -628,7 +628,7 @@
 ### Vision-Capable Models Already in Reasoner Registry
 | Reasoner ID | OpenRouter Path | Vision? |
 |---|---|---|
-| `claude-sonnet` | `anthropic/claude-sonnet-4.6` | ✅ |
+| `claude-sonnet` | `anthropic/claude-sonnet-5` | ✅ |
 | `claude-opus` | `qwen/qwen3.6-plus` (alias) | ❌ (wrong alias) |
 | `gpt-5` | `openai/gpt-5.4` | ✅ |
 | `gpt-5-mini` | `openai/gpt-5.4-mini` | ✅ |
