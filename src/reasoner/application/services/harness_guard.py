@@ -37,7 +37,7 @@ _MODEL_LABS: dict[str, str] = {
     "mistral-large-3": "mistral", "mistral-small": "mistral", "mistral-small-2603": "mistral",
     "ministral-8b": "mistral", "codestral-2508": "mistral",
     # DeepSeek
-    "deepseek-v4-pro": "deepseek", "deepseek-v4-flash": "deepseek",
+    "deepseek-v3": "deepseek", "deepseek-v4-pro": "deepseek", "deepseek-v4-flash": "deepseek",
     # Qwen (Alibaba)
     "qwen3-max": "qwen", "qwen3.7-max": "qwen", "qwen3.7-plus": "qwen", "qwen3.5-flash": "qwen",
     "qwen3-max-thinking": "qwen", "qwen3.6-flash": "qwen", "qwen3.6-plus-real": "qwen",
@@ -58,6 +58,10 @@ _MODEL_LABS: dict[str, str] = {
     "gemini-pro": "anthropic", "gemini-pro-image": "google",
     # NVIDIA
     "nvidia-nemotron-super": "nvidia",
+    # NousResearch
+    "hermes-4-70b": "nousresearch",
+    # Poolside
+    "laguna-xs-2.1": "poolside",
     # Sourceful
     "riverflow-v2-fast-preview": "sourceful",
     # InclusionAI (Ant Group)
