@@ -47,6 +47,15 @@ def _get_build_provider():
     global _BUILD_PROVIDER
     return _BUILD_PROVIDER
 
+# SearXNG circuit breaker — injected by api/__init__.py at startup.
+# Tests patch this directly: `search_module._SEARXNG_CB = test_cb`
+_SEARXNG_CB = None
+
+def set_searxng_cb(cb) -> None:
+    """Inject SearXNG circuit breaker (called from api/__init__.py)."""
+    global _SEARXNG_CB
+    _SEARXNG_CB = cb
+
 logger = logging.getLogger(__name__)
 
 # Source type categories for specialized searches

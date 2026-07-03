@@ -184,6 +184,9 @@ class Settings:
 
     # ── Rerank ──
     RERANK_API_BASE: str = os.getenv("RERANK_API_BASE", "https://openrouter.ai/api/v1")
+    # ── SearXNG ──
+    SEARXNG_URL: str = os.getenv("SEARXNG_URL", "http://localhost:8888")
+
     # Multi-backend search
     BRAVE_SEARCH_API_KEY: str = os.getenv("BRAVE_SEARCH_API_KEY", "")
     BRAVE_SEARCH_ENABLED: bool = os.getenv("BRAVE_SEARCH_ENABLED", "true").lower() == "true"

@@ -343,6 +343,104 @@ async def get_search_client_for_method(
     return await get_search_client(source_type=source_type)
 
 
+# ─────────────────────────────────────────────
+#  SearXNG Adapter + DiscoveryClient
+# ─────────────────────────────────────────────
+
+class SearXNGAdapter:
+    """Thin HTTP adapter for a single SearXNG instance."""
+
+    def __init__(self, base_url: str) -> None:
+        self._base_url = base_url.rstrip("/")
+
+    async def _fetch_page(
+        self, query: str, params: dict | None = None
+    ) -> tuple[list[dict], int]:
+        import httpx
+        url = f"{self._base_url}/search"
+        async with httpx.AsyncClient(timeout=10.0) as http:
+            resp = await http.get(
+                url,
+                params={"q": query, "format": "json", **(params or {})},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+        results: list[dict] = data.get("results", [])
+        return results, len(results)
+
+
+class DiscoveryClient:
+    """Search client backed by SearXNG with circuit-breaker integration."""
+
+    def __init__(self, base_url: str) -> None:
+        self.base_url = base_url.rstrip("/")
+        self.adapter = SearXNGAdapter(base_url=self.base_url)
+
+    async def search(self, query: str, **kwargs) -> list[dict]:
+        import reasoner.core.search as _search_module
+        cb = _search_module._SEARXNG_CB
+        if cb is not None and not await cb.can_execute():
+            return []
+        try:
+            results, _ = await self.adapter._fetch_page(query)
+            if cb is not None:
+                await cb.record_success()
+            return results
+        except Exception:
+            if cb is not None:
+                await cb.record_failure()
+            return []
+
+    async def close(self) -> None:
+        pass
+
+
+# ─────────────────────────────────────────────
+#  SearXNG URL helpers
+# ─────────────────────────────────────────────
+
+def get_searxng_base_url() -> str:
+    """Return SearXNG base URL (no trailing slash) from settings."""
+    return settings.SEARXNG_URL.rstrip("/")
+
+
+def get_searxng_urls() -> list[str]:
+    """Return ordered list of SearXNG search URLs to try.
+
+    Primary: from SEARXNG_URL setting.
+    Secondary: hardcoded 127.0.0.1:8888 Docker-internal fallback.
+    """
+    base = get_searxng_base_url()
+    return [f"{base}/search", "http://127.0.0.1:8888/search"]
+
+
+# Module-level singleton for the default DiscoveryClient.
+_discovery_client: "DiscoveryClient | None" = None
+
+
+async def get_discovery_client(
+    base_url: str | None = None,
+    source_type: Optional[SourceType] = None,
+) -> tuple["DiscoveryClient", Optional[SourceType]]:
+    """Factory: return a DiscoveryClient for SearXNG.
+
+    If *base_url* is given, always creates a fresh client with that URL.
+    Otherwise returns (or lazily creates) the module-level singleton.
+    """
+    global _discovery_client
+    if base_url is not None:
+        return DiscoveryClient(base_url=base_url), source_type
+    if _discovery_client is None:
+        _discovery_client = DiscoveryClient(base_url=get_searxng_base_url())
+    return _discovery_client, source_type
+
+
+def reset_discovery_client() -> None:
+    """Clear the module-level DiscoveryClient singleton (for testing)."""
+    global _discovery_client
+    _discovery_client = None
+
+
 async def get_search_client(
     source_type: Optional[SourceType] = None,
 ) -> tuple[SearchClient, Optional[SourceType]]:
