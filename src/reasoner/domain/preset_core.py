@@ -112,6 +112,8 @@ _KNOWN_ROUTING_ROLES: frozenset[str] = frozenset({
     "writing_assemble",
     # Image generation roles
     "image_generate",
+    # Post-synthesis verification (all presets, v3.5)
+    "post_synthesis_verify",
 })
 
 

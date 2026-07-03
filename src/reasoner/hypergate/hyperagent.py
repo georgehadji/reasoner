@@ -23,7 +23,7 @@ from reasoner.core.constants import (
     HYPERGATE_METHOD_THRESHOLD,
     HYPERGATE_WEB_THRESHOLD,
 )
-from reasoner.gate_agent import GateDecision
+from reasoner.hypergate.gate_agent import GateDecision
 from reasoner.hypergate.models import HyperContext, SubAgentInput, SubAgentOutput
 from reasoner.hypergate.sub_agents import (
     ComplexityEstimatorSubAgent,
