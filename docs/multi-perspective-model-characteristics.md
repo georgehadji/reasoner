@@ -548,3 +548,250 @@ scoring:       qwen3-max-thinking 🇨🇳 Qwen           (cross-bloc from synth
 **Invariants:** A: 🇺🇸(OpenAI)≠🇨🇳(Qwen) ✅ · B: 1🇺🇸+2🇨🇳+1🇪🇺 ≤2 ✅  
 **constructive↔destructive divergence:** Maximum (US Constitutional AI vs CN reasoning MoE)  
 **No changes needed.** Already optimal for echo-chamber resistance.
+
+---
+
+# Article Method — Model Recommendations Per Phase
+
+> **Source:** [`src/reasoner/infrastructure/llm/registry.py`](src/reasoner/infrastructure/llm/registry.py) for all model data. **[DESIGN JUDGMENT]** on prose quality and editorial judgment is opinion, not measurement.
+
+## Phase Characteristics
+
+| Phase | Role | Temp | Effort | Primary Need |
+|---|---|---|---|---|
+| Evidence | `primary` | 0.7 | medium | Live web search with citations |
+| Outline | `article_sot_skeleton` | 0.3 | low | Structured JSON planning |
+| Draft | `writing_draft` | 0.7 | medium | **Long-form prose writing** — most important phase |
+| Fact Check | `writing_factcheck` | 0.3 | high | Live adversarial verification |
+| Structural Review | `article_critic` | 0.1 | high | Logic critique, counterarguments |
+| Dev Edit | `article_revise` | 0.2 | high | Substantive revision, voice preservation |
+| Style Edit | `article_humanize` | 0.7 | medium | Readability, rhythm, publication match |
+| Copy Edit | `writing_assemble` | 0.2 | low | Mechanical — grammar, consistency |
+| Final Audit | `article_verifier` | 0.3 | high | Structured checklist evaluation |
+| Synthesis | `synthesis` | 0.5 | high | Final output formatting |
+
+## Budget Tier (`article-budget`)
+
+**Cost target:** ≤ ~$0.50/M input per model, ~$0.005-0.01 per article total.
+
+### Evidence Collection — `primary`
+
+| Rank | Model | Cost (in/out per M) | Bloc | Rationale |
+|---|---|---|---|---|
+| **1** | `sonar` | — | 🇺🇸 | Perplexity live web search. Native citations, real URLs. Current routing. |
+
+### Argument Map / Outline — `article_sot_skeleton`
+
+| Rank | Model | Cost (in/out per M) | Context | Rationale |
+|---|---|---|---|---|
+| **1** | `deepseek-v4-flash` | $0.09/$0.18 | 1M | Fast structured JSON. Cheapest 1M-ctx model with reliable planning. Current routing. |
+| 2 | `qwen3.5-flash` | $0.065/$0.26 | 1M | Cheaper alternative. Slightly weaker at structured argumentation. |
+| 3 | `qwen3.7-plus` | $0.32/$1.28 | 1M | Stronger argument mapping — worth the cost if outline quality is bottleneck. |
+
+### First Draft — `writing_draft` ⭐ **highest-impact phase**
+
+| Rank | Model | Cost (in/out per M) | Context | Rationale |
+|---|---|---|---|---|
+| **1** | `qwen3.7-plus` | $0.32/$1.28 | 1M | **[DESIGN JUDGMENT]** Best VFM prose writer under $0.50/M. 1M ctx handles all sources + argument map. Noticeably better paragraph structure, transitions, and voice consistency than deepseek-v4-flash. |
+| 2 | `deepseek-v3` | $0.12/$0.50 | 1M | Strong reasoning at budget price. Good prose quality. Current for constructive elsewhere. |
+| 3 | `deepseek-v4-flash` | $0.09/$0.18 | 1M | Current routing. Serviceable but weakest prose of the three. |
+
+**Recommendation:** Upgrade to `qwen3.7-plus`. The draft is the single most consequential LLM call — every downstream phase (fact check, structural review, dev edit, style, copy, audit, synthesis) depends on its output. +$0.23/M for dramatically better prose is the highest-ROI upgrade in the budget tier.
+
+### Fact Check + Claim Ledger — `writing_factcheck`
+
+| Rank | Model | Rationale |
+|---|---|---|
+| **1** | `sonar` | Perplexity live web verification. Current routing. |
+
+### Structural Adversarial Review — `article_critic`
+
+| Rank | Model | Cost (in/out per M) | Context | Rationale |
+|---|---|---|---|---|
+| **1** | `hermes-4-70b` | $0.13/$0.40 | 131K | Nous Research critic-specialized. Current routing. Best adversarial model under $0.20/M. |
+| 2 | `ring-2.6-1t` | $0.075/$0.625 | 1M | InclusionAI thinking model. 1M ctx handles full draft. Slightly cheaper, different adversarial style. |
+| 3 | `deepseek-v4-flash` | $0.09/$0.18 | 1M | Serviceable but less adversarial by nature. |
+
+### Developmental Edit — `article_revise`
+
+| Rank | Model | Cost (in/out per M) | Context | Rationale |
+|---|---|---|---|---|
+| **1** | `deepseek-v3` | $0.12/$0.50 | 1M | Same model family as qwen3.7-plus draft — good for voice-consistent revision. Current routing. |
+| 2 | `qwen3.7-plus` | $0.32/$1.28 | 1M | Stronger editorial judgment. Use if draft model is also qwen3.7-plus (self-revision works). |
+| 3 | `deepseek-v4-flash` | $0.09/$0.18 | 1M | Budget fallback — weaker editorial judgment but functional. |
+
+### Style Edit — `article_humanize`
+
+| Rank | Model | Cost (in/out per M) | Context | Rationale |
+|---|---|---|---|---|
+| **1** | `qwen3.7-plus` | $0.32/$1.28 | 1M | Strong editorial refinement. Handles publication style matching and rhythm. Current routing. |
+| 2 | `deepseek-v3` | $0.12/$0.50 | 1M | Decent style work at lower cost. Less refined than qwen3.7-plus. |
+| 3 | `gpt-4o-mini` | $0.15/$0.60 | 128K | OpenAI prose quality, but limited context window. |
+
+### Copy Edit — `writing_assemble`
+
+| Rank | Model | Cost (in/out per M) | Context | Rationale |
+|---|---|---|---|---|
+| **1** | `qwen3.5-flash` | $0.065/$0.26 | 1M | Cheapest 1M-ctx model. Mechanical tasks don't need strong reasoning — just grammar and consistency. Saves $0.025/M vs current. |
+| 2 | `deepseek-v4-flash` | $0.09/$0.18 | 1M | Current routing. Slightly more expensive than qwen3.5-flash for no mechanical gain. |
+| 3 | `gpt-5-nano` | $0.05/$0.40 | 400K | Cheapest OpenAI. 400K ctx adequate for final draft. |
+
+### Final Audit — `article_verifier`
+
+| Rank | Model | Cost (in/out per M) | Context | Rationale |
+|---|---|---|---|---|
+| **1** | `qwen3.5-flash` | $0.065/$0.26 | 1M | Checklist evaluation is a structured scoring task — doesn't need strong reasoning. Current uses qwen3.7-plus at 5× the cost. |
+| 2 | `qwen3.7-plus` | $0.32/$1.28 | 1M | Current routing. Overqualified for checklist scoring. |
+| 3 | `gpt-4o-mini` | $0.15/$0.60 | 128K | OpenAI evaluator — good for US-bloc diversity. |
+
+### Synthesis — `synthesis`
+
+| Rank | Model | Cost (in/out per M) | Rationale |
+|---|---|---|---|
+| **1** | `gpt-4o-mini` | $0.15/$0.60 | Proven synthesis. Cross-bloc from CN-heavy phases. Current routing. |
+
+### Budget — Optimal Routing
+
+```
+primary:               sonar              🇺🇸 Perplexity   web search
+article_sot_skeleton:  deepseek-v4-flash  🇨🇳 DeepSeek     structured planning
+writing_draft:         qwen3.7-plus       🇨🇳 Qwen         ⭐ upgraded prose
+writing_factcheck:     sonar              🇺🇸 Perplexity   live verification
+article_critic:        hermes-4-70b       🇺🇸 Nous         adversarial review
+article_revise:        deepseek-v3        🇨🇳 DeepSeek     voice-consistent editing
+article_humanize:      qwen3.7-plus       🇨🇳 Qwen         style refinement
+writing_assemble:      qwen3.5-flash      🇨🇳 Qwen         mechanical copy (cheaper)
+article_verifier:      qwen3.5-flash      🇨🇳 Qwen         checklist audit (cheaper)
+synthesis:             gpt-4o-mini        🇺🇸 OpenAI       final output
+```
+
+**Changes from current:** 3 (draft upgrade, copy downgrade to cheaper, audit downgrade to cheaper). Net cost: +$0.23/M (draft) − $0.025/M (copy) − $0.255/M (audit) = **−$0.05/M net savings with better draft quality.**
+
+---
+
+## Premium Tier (`article-premium`)
+
+**Cost target:** Best-in-class per role, secondary consideration.
+
+### Evidence Collection — `primary`
+
+| Rank | Model | Rationale |
+|---|---|---|
+| **1** | `sonar-pro` | Perplexity high-context search. Current routing. |
+
+### Argument Map / Outline — `article_sot_skeleton`
+
+| Rank | Model | Cost (in/out per M) | Context | Rationale |
+|---|---|---|---|---|
+| **1** | `claude-sonnet` | $2/$10 | 1M | Best planning/outlining. Structured argumentation with exceptional clarity. Current routing. |
+| 2 | `gpt-5.5` | $5/$30 | 1M | Stronger raw intelligence but 2.5× cost for marginal outline improvement. |
+| 3 | `gpt-5` | $1.25/$10 | 400K | Strong alternative at lower cost. Limited context may clip on large source sets. |
+
+### First Draft — `writing_draft` ⭐
+
+| Rank | Model | Cost (in/out per M) | Context | Rationale |
+|---|---|---|---|---|
+| **1** | `claude-sonnet` | $2/$10 | 1M | **[DESIGN JUDGMENT]** Best long-form prose writer overall. Claude's narrative voice, paragraph rhythm, and stylistic range are superior to GPT-5.5 for article-length composition, even though GPT-5.5 scores higher on reasoning benchmarks. Current routing. |
+| 2 | `gpt-5.5` | $5/$30 | 1M | Frontier intelligence, excellent prose. 2.5× cost of Claude for marginal writing gain. |
+| 3 | `claude-fable-5` | $10/$50 | 1M | Ultra-premium creative — best absolute prose. 5× cost for boutique quality. |
+
+### Fact Check + Claim Ledger — `writing_factcheck`
+
+| Rank | Model | Rationale |
+|---|---|---|
+| **1** | `sonar-pro` | Perplexity high-context live verification. Current routing. |
+
+### Structural Adversarial Review — `article_critic`
+
+| Rank | Model | Cost (in/out per M) | Context | Rationale |
+|---|---|---|---|---|
+| **1** | `grok-4.3` | $1.25/$2.50 | 1M | τ²-Bench 97.7% adversarial, configurable reasoning. Best adversarial model available. Current routing. |
+| 2 | `grok-4.20` | $1.25/$2.50 | 2M | Same price, 2M ctx — can ingest full draft + sources. Slightly broader reasoning. |
+| 3 | `claude-sonnet` | $2/$10 | 1M | Excellent critic when instructed adversarially, but doesn't match Grok's natural adversarial tendency. |
+
+### Developmental Edit — `article_revise`
+
+| Rank | Model | Cost (in/out per M) | Context | Rationale |
+|---|---|---|---|---|
+| **1** | `claude-sonnet` | $2/$10 | 1M | Better editorial judgment than gpt-5. Claude's prose revision preserves voice while fixing substance — the hardest editorial skill. Same model as draft ensures voice consistency. |
+| 2 | `gpt-5` | $1.25/$10 | 400K | Current routing. Strong editorial judgment. 400K ctx may be tight for full article + feedback. |
+| 3 | `gpt-5.5` | $5/$30 | 1M | Overkill for editing — 2.5× cost of Claude for marginal editorial gain. |
+
+**Recommendation:** Upgrade to `claude-sonnet`. Same model as draft = best voice preservation. $2 vs $1.25 is a small premium for the most important editing phase.
+
+### Style Edit — `article_humanize`
+
+| Rank | Model | Cost (in/out per M) | Context | Rationale |
+|---|---|---|---|---|
+| **1** | `claude-sonnet` | $2/$10 | 1M | Best voice-preserving refinement. Handles rhythm, publication matching, and tonal adjustment without flattening. Current routing. |
+
+### Copy Edit — `writing_assemble`
+
+| Rank | Model | Cost (in/out per M) | Rationale |
+|---|---|---|---|---|
+| **1** | `gpt-4o-mini` | $0.15/$0.60 | Cheap, reliable. Mechanical copy editing doesn't need premium models. Current routing. |
+
+### Final Audit — `article_verifier`
+
+| Rank | Model | Cost (in/out per M) | Context | Rationale |
+|---|---|---|---|---|
+| **1** | `qwen3.7-max` | $1.25/$3.75 | 1M | Cross-bloc evaluation of US-heavy pipeline. Current routing. |
+| 2 | `qwen3-max-thinking` | $0.78/$3.90 | 262K | Dedicated reasoning for structured evaluation. Cheaper but smaller context. |
+
+### Synthesis — `synthesis`
+
+| Rank | Model | Cost (in/out per M) | Rationale |
+|---|---|---|---|---|
+| **1** | `gpt-5.5` | $5/$30 | Frontier writing. AI² Intel 54.8. Current routing. |
+| 2 | `claude-sonnet` | $2/$10 | Excellent synthesis at 40% of the cost. |
+
+### Premium — Optimal Routing
+
+```
+primary:               sonar-pro          🇺🇸 Perplexity   high-context search
+article_sot_skeleton:  claude-sonnet      🇺🇸 Anthropic    best planning
+writing_draft:         claude-sonnet      🇺🇸 Anthropic    best prose ⭐
+writing_factcheck:     sonar-pro          🇺🇸 Perplexity   live verification
+article_critic:        grok-4.3           🇺🇸 xAI          adversarial
+article_revise:        claude-sonnet      🇺🇸 Anthropic    ⭐ upgraded (voice-consistent)
+article_humanize:      claude-sonnet      🇺🇸 Anthropic    style refinement
+writing_assemble:      gpt-4o-mini        🇺🇸 OpenAI       mechanical copy
+article_verifier:      qwen3.7-max        🇨🇳 Qwen         cross-bloc audit
+synthesis:             gpt-5.5            🇺🇸 OpenAI       frontier writing
+```
+
+**Changes from current:** 1 (dev edit upgrade from gpt-5 to claude-sonnet). +$0.75/M for voice-consistent editorial judgment.
+
+---
+
+## Cross-Lab Diversity (Article)
+
+### Budget
+
+| Lab | Roles | Bloc |
+|---|---|---|
+| Perplexity | primary, factcheck | 🇺🇸 |
+| DeepSeek | outline, dev edit | 🇨🇳 |
+| Qwen | draft, style, copy, audit | 🇨🇳 |
+| Nous Research | critic | 🇺🇸 |
+| OpenAI | synthesis | 🇺🇸 |
+
+**5 labs, 2 blocs.** CN-heavy but with US adversarial critic + US synthesis final voice. Acceptable for budget tier.
+
+### Premium
+
+| Lab | Roles | Bloc |
+|---|---|---|
+| Perplexity | primary, factcheck | 🇺🇸 |
+| Anthropic | outline, draft, dev edit, style | 🇺🇸 |
+| xAI | critic | 🇺🇸 |
+| OpenAI | copy, synthesis | 🇺🇸 |
+| Qwen | audit | 🇨🇳 |
+
+**5 labs, 2 blocs.** US-heavy with cross-bloc CN audit. The critic (xAI Grok) provides genuine adversarial diversity within the US bloc — Grok's unfiltered style diverges from Anthropic's Constitutional AI.
+
+### Echo Chamber Risk (Article)
+
+The article pipeline has **lower echo-chamber risk than multi-perspective** because each phase consumes DIFFERENT input rather than answering the same question. The outline architect, draft writer, structural critic, and copy editor all operate on distinct artifacts — they can't converge on the same output even if they share training distributions.
+
+**One risk to watch:** If `claude-sonnet` handles outline + draft + dev edit + style (4 phases in premium), the article inherits a single model's prose conventions and cognitive patterns. This is a voice-consistency FEATURE, not a bug — but worth monitoring for stylistic uniformity across the four Claude-dependent phases.
