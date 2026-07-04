@@ -369,6 +369,36 @@ class SearXNGAdapter:
         return results, len(results)
 
 
+_SOURCE_TYPE_CATEGORIES: dict[str, str] = {
+    "academic": "science",
+    "code": "it",
+    "social": "social media",
+    "news": "news",
+}
+
+_REQUIRED_RESULT_KEYS = ("title", "url", "content", "snippet", "source", "full_content")
+
+
+def _normalize_result(r: dict) -> dict:
+    engine = r.get("engine", "")
+    if not engine:
+        engines = r.get("engines", [])
+        engine = engines[0] if engines else ""
+    content = r.get("content", "")
+    normalized: dict = {
+        "title": r.get("title", ""),
+        "url": r.get("url", ""),
+        "content": content,
+        "snippet": content,
+        "source": engine,
+        "full_content": content,
+    }
+    for k, v in r.items():
+        if k not in normalized:
+            normalized[k] = v
+    return normalized
+
+
 class DiscoveryClient:
     """Search client backed by SearXNG with circuit-breaker integration."""
 
@@ -376,16 +406,32 @@ class DiscoveryClient:
         self.base_url = base_url.rstrip("/")
         self.adapter = SearXNGAdapter(base_url=self.base_url)
 
-    async def search(self, query: str, **kwargs) -> list[dict]:
+    async def search(
+        self,
+        query: str,
+        num_results: int = 10,
+        source_type: str | None = None,
+        domain: str | None = None,
+        **kwargs,
+    ) -> list[dict]:
         import reasoner.core.search as _search_module
         cb = _search_module._SEARXNG_CB
         if cb is not None and not await cb.can_execute():
             return []
+
+        effective_query = f"{query} site:{domain}" if domain else query
+
+        params: dict = {}
+        if source_type and source_type != "general":
+            category = _SOURCE_TYPE_CATEGORIES.get(source_type)
+            if category:
+                params["categories"] = category
+
         try:
-            results, _ = await self.adapter._fetch_page(query)
+            results, _ = await self.adapter._fetch_page(effective_query, params=params)
             if cb is not None:
                 await cb.record_success()
-            return results
+            return [_normalize_result(r) for r in results[:num_results]]
         except Exception:
             if cb is not None:
                 await cb.record_failure()
