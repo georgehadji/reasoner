@@ -663,7 +663,7 @@ _REGISTRY: dict[str, dict] = {
         "primary":           "sonar",              # Perplexity 🇺🇸 — native web search + real citations for research
         "writing_draft":     "claude-sonnet",       # 🇺🇸 Anthropic — best long-form prose, 1M ctx (was deepseek-v4-flash)
         "writing_factcheck": "sonar",              # Perplexity 🇺🇸 — live web verification against current sources
-        "writing_assemble":  "deepseek-v4-flash",  # voice consistency with draft model
+        "writing_assemble":  "gpt-4o-mini",       # 🇺🇸 OpenAI — same bloc as draft, proven reliable copy edit (was deepseek-v4-flash)
         # ── Article editorial roles (budget, v3.6) ──
         "article_sot_skeleton": "deepseek-v4-flash",  # 🇨🇳 DeepSeek — fast structured planning
         "article_critic":       "hermes-4-70b",       # 🇺🇸 Nous Research — critic-specialized adversarial review
@@ -689,12 +689,12 @@ _REGISTRY: dict[str, dict] = {
         "writing_outline":     "claude-sonnet",       # 🇺🇸 Anthropic — outline alias for consistency
         "article_sot_skeleton": "claude-sonnet",      # 🇺🇸 Anthropic — best planning/outlining
         "article_critic":      "grok-4.3",           # 🇺🇸 xAI — τ²-Bench 97.7% adversarial reasoning
-        "article_revise":      "gpt-5",              # 🇺🇸 OpenAI — strong editorial judgment
+        "article_revise":      "gpt-5.5",           # 🇺🇸 OpenAI — same model as draft, frontier editorial revision (was gpt-5)
         "article_humanize":    "gpt-5.5",           # 🇺🇸 OpenAI — same model as draft, frontier style refinement (was claude-sonnet)
         "article_verifier":    "qwen3.7-max",        # 🇨🇳 Qwen — cross-bloc final audit
         # ── Reasoning model assignments (premium, v3.5) ──
         "fusion":            "deepseek-v4-pro",
-        "writing_assemble":  "gpt-4o-mini",         # 🇺🇸 OpenAI — cheap, reliable copy edit
+        "writing_assemble":  "gpt-5-mini",         # 🇺🇸 OpenAI — same lab as draft, 400K ctx (was gpt-4o-mini)
         "post_synthesis_verify": "sonar-pro",
         },
         "tags": ["premium", "writing", "article"],
