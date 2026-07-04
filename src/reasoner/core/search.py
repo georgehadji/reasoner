@@ -56,6 +56,16 @@ def set_searxng_cb(cb) -> None:
     global _SEARXNG_CB
     _SEARXNG_CB = cb
 
+# Re-export discovery client helpers so tests can import them from core.search.
+# Lazy to avoid circular imports at module load time.
+def get_discovery_client(*args, **kwargs):
+    from reasoner.infrastructure.search.discovery import get_discovery_client as _f
+    return _f(*args, **kwargs)
+
+def reset_discovery_client(*args, **kwargs):
+    from reasoner.infrastructure.search.discovery import reset_discovery_client as _f
+    return _f(*args, **kwargs)
+
 logger = logging.getLogger(__name__)
 
 # Source type categories for specialized searches
