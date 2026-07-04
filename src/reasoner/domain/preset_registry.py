@@ -661,7 +661,7 @@ _REGISTRY: dict[str, dict] = {
             "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Article-flow roles (budget, v3.5) ──
         "primary":           "sonar",              # Perplexity 🇺🇸 — native web search + real citations for research
-        "writing_draft":     "deepseek-v4-flash",  # best price/quality for long-form creative writing, 1M ctx
+        "writing_draft":     "claude-sonnet",       # 🇺🇸 Anthropic — best long-form prose, 1M ctx (was deepseek-v4-flash)
         "writing_factcheck": "sonar",              # Perplexity 🇺🇸 — live web verification against current sources
         "writing_assemble":  "deepseek-v4-flash",  # voice consistency with draft model
         # ── Article editorial roles (budget, v3.6) ──
@@ -685,7 +685,7 @@ _REGISTRY: dict[str, dict] = {
         "primary":           "sonar-pro",          # Perplexity 🇺🇸 — native web search + citations for premium research
         "writing_factcheck": "sonar-pro",          # Perplexity 🇺🇸 — live web verification, cross-bloc from CN scoring
         # ── Article editorial roles (premium, v3.6) ──
-        "writing_draft":       "claude-sonnet",       # 🇺🇸 Anthropic — best long-form prose
+        "writing_draft":       "gpt-5.5",            # 🇺🇸 OpenAI — frontier writing, AI² Intel 54.8 (was claude-sonnet)
         "writing_outline":     "claude-sonnet",       # 🇺🇸 Anthropic — outline alias for consistency
         "article_sot_skeleton": "claude-sonnet",      # 🇺🇸 Anthropic — best planning/outlining
         "article_critic":      "grok-4.3",           # 🇺🇸 xAI — τ²-Bench 97.7% adversarial reasoning
