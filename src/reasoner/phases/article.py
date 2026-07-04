@@ -158,77 +158,12 @@ def article_verify_prompt(state: PipelineState, use_sonar: bool = False) -> str:
         f'}}], '
         f'"metrics": {{"total_claims": 0, "supported": 0, "unsupported": 0, "claim_support_ratio": 0.0}}, '
         f'"gaps": ["<topic needing more evidence>"], '
-        f'"high_risk_sentences": ["<sentence with unverifiable claim>"]}}\n\n'
-        f'Additionally, produce a structured claim ledger cataloging EVERY claim in the article:\n'
-        f'{{\n'
-        f'  "claim_ledger": [{{\n'
-        f'    "claim": "<exact claim from article>",\n'
-        f'    "source": "<supporting source or null>",\n'
-        f'    "status": "verified|supported|speculative|unsupported"\n'
-        f'  }}]\n'
-        f'}}'
-    )
-
-
-# ── Refinement ────────────────────────────────────────────────────────────────
-
-ARTICLE_REFINE_SYSTEM = (
-    "You are a senior editor refining a draft article based on fact-check feedback. "
-    "Your goal is to produce the cleanest, most accurate, most publishable version. "
-    "Remove or caveat every unsupported claim. Strengthen the narrative where evidence allows. "
-    "Preserve the author's voice and style intent. "
-    "Do NOT invent new facts. Do NOT change inline citations. "
-    "Output the full refined article as a single prose document — do not use JSON."
-)
-
-
-def article_refine_prompt(state: PipelineState) -> str:
-    draft = state.writing_state.get("final_article", "")
-    verification = state.writing_state.get("verification", {})
-    gaps = verification.get("gaps", [])
-    high_risk = verification.get("high_risk_sentences", [])
-    metrics = state.writing_state.get("metrics", {})
-    support_ratio = metrics.get("claim_support_ratio", 1.0)
-
-    issues_block = ""
-    if high_risk:
-        issues_block += "Sentences to fix or remove:\n" + "\n".join(f"  - {s}" for s in high_risk[:10]) + "\n\n"
-    if gaps:
-        issues_block += "Evidence gaps (add caveats or remove):\n" + "\n".join(f"  - {g}" for g in gaps[:5]) + "\n\n"
-
-    quality_note = (
-        f"Claim support ratio from fact-check: {support_ratio:.0%}. "
-        + ("The draft needs significant tightening." if support_ratio < 0.6 else "Minor fixes needed.")
-    )
-
-    style_brief = state.writing_state.get("style_brief", {})
-    style_block = ""
-    if isinstance(style_brief, dict) and (style_brief.get("author") or style_brief.get("publication")):
-        author = style_brief.get("author", "")
-        pub = style_brief.get("publication", "")
-        parts = []
-        if author:
-            parts.append(f"in the style of {author}")
-        if pub:
-            parts.append(f"for {pub}")
-        style_block = (
-            f"PRESERVE STYLE: This article was written {', '.join(parts)}. "
-            f"When removing unsupported claims, rewrite the surrounding prose to "
-            f"maintain that distinctive voice — do not flatten it into generic language.\n\n"
-        )
-
-    return (
-        f"{get_language_instruction(state)}\n\n"
-        f"{style_block}"
-        f"{quality_note}\n\n"
-        f"{issues_block}"
-        f"Draft Article:\n{_wrap_external_content(draft)}\n\n"
-        f"Produce the final, publication-ready version. Rules:\n"
-        f"- Remove or caveat all high-risk / unsupported sentences listed above\n"
-        f"- Keep all properly sourced claims and inline citations\n"
-        f"- Maintain narrative flow — patch any gaps left by removed claims\n"
-        f"- End with a ## Sources section listing every URL cited in the body\n"
-        f"- Do NOT add new factual claims not present in the draft"
+        f'"high_risk_sentences": ["<sentence with unverifiable claim>"], '
+        f'"claim_ledger": [{{'
+        f'"claim": "<exact claim from article>", '
+        f'"source": "<supporting source URL or null>", '
+        f'"status": "verified|supported|speculative|unsupported"'
+        f'}}]}}'
     )
 
 

@@ -17,6 +17,26 @@ from reasoner.infrastructure.search.discovery import get_search_client_for_metho
 logger = logging.getLogger(__name__)
 
 
+def _extract_source_metadata(sources: list[dict[str, str]]) -> list[dict[str, str]]:
+    """Extract structured metadata (author, date, publisher) from source dicts.
+
+    Search results vary by provider — this extracts whatever structured fields
+    are available and fills missing fields with empty strings.
+    """
+    metadata = []
+    for src in sources:
+        meta = {
+            "title": str(src.get("title", "")).strip(),
+            "url": str(src.get("url", "")).strip(),
+            "author": str(src.get("author", "")).strip(),
+            "date": str(src.get("date", "")).strip(),
+            "publisher": str(src.get("publisher", "")).strip(),
+            "snippet": str(src.get("snippet", "")).strip()[:500],
+        }
+        metadata.append(meta)
+    return metadata
+
+
 def _parse_sonar_citations(raw_text: str) -> list[dict[str, str]]:
     """Parse inline [Title](URL) citations from a response (sonar or any model).
 
@@ -72,6 +92,7 @@ async def run_article_retrieve_sources_phase(state: PipelineState, services: Wor
             sources = _parse_sonar_citations(raw_plan)
             if sources:
                 state.writing_state["retrieved_sources"] = sources
+                state.writing_state["source_metadata"] = _extract_source_metadata(sources)
                 services.log("WRITING", f"Sonar retrieved {len(sources)} sources via native search.", state)
                 return
 
@@ -84,6 +105,7 @@ async def run_article_retrieve_sources_phase(state: PipelineState, services: Wor
             sources = _parse_sonar_citations(raw_plan)
             if sources:
                 state.writing_state["retrieved_sources"] = sources
+                state.writing_state["source_metadata"] = _extract_source_metadata(sources)
                 services.log("WRITING", f"Parsed {len(sources)} inline citations from response.", state)
                 return
 
@@ -107,6 +129,7 @@ async def run_article_retrieve_sources_phase(state: PipelineState, services: Wor
                         flattened.append(r)
 
         state.writing_state["retrieved_sources"] = flattened
+        state.writing_state["source_metadata"] = _extract_source_metadata(flattened)
         if not flattened:
             state.writing_state["insufficient_evidence"] = True
             services.log("WRITING", "No sources found. Triggering insufficient evidence gate.", state)
@@ -149,23 +172,13 @@ async def run_article_adversarial_verify_phase(state: PipelineState, services: W
     )
     data = extract_json(raw)
     state.writing_state["verification"] = data
+    state.writing_state["claim_ledger"] = data.get("claim_ledger", [])
     metrics = data.get("metrics", {})
     state.writing_state["metrics"] = metrics
     
     if metrics.get("claim_support_ratio", 1.0) < ARTICLE_MIN_CLAIM_SUPPORT_RATIO:
         services.log("WRITING", "Low claim support ratio. Identifying gaps.", state)
         state.writing_state["gaps_noted"] = data.get("gaps", [])
-
-async def run_article_refine_phase(state: PipelineState, services: WorkflowServices) -> None:
-    services.log("WRITING", "Refining article based on verification feedback...", state)
-    raw, _ = await services.call_llm(
-        role="writing_assemble",
-        system_prompt=phases.ARTICLE_REFINE_SYSTEM,
-        user_prompt=phases.article_refine_prompt(state),
-        state=state
-    )
-    state.writing_state["final_article"] = raw
-
 
 # ── Argument Map / Outline ────────────────────────────────────────────────────
 
@@ -216,7 +229,7 @@ async def run_article_structural_review_phase(state: PipelineState, services: Wo
         data = {}
 
     state.writing_state["structural_critique"] = data
-    rigor = data.get("overall_rigor_score", 0.5)
+    rigor = data.get("overall_rigor_score", 0.0)
     services.log(
         "WRITING",
         f"Structural review complete: rigor score={rigor}, "
@@ -246,13 +259,18 @@ async def run_article_developmental_edit_phase(state: PipelineState, services: W
 async def run_article_style_copy_edit_phase(state: PipelineState, services: WorkflowServices) -> None:
     """Two sequential passes: style edit (article_humanize) then copy edit (writing_assemble)."""
     services.log("WRITING", "Running style edit...", state)
-    styled, _ = await services.call_llm(
-        role="article_humanize",
-        system_prompt=phases.ARTICLE_STYLE_EDIT_SYSTEM,
-        user_prompt=phases.article_style_edit_prompt(state),
-        state=state,
-    )
-    state.writing_state["final_article"] = styled
+    try:
+        styled, _ = await services.call_llm(
+            role="article_humanize",
+            system_prompt=phases.ARTICLE_STYLE_EDIT_SYSTEM,
+            user_prompt=phases.article_style_edit_prompt(state),
+            state=state,
+        )
+        if styled and styled.strip():
+            state.writing_state["final_article"] = styled
+    except Exception as exc:
+        services.log("WRITING", f"Style edit failed: {exc} — proceeding to copy edit on pre-style draft.", state)
+        state.errors.append(f"Article style edit: {exc}")
 
     services.log("WRITING", "Running copy edit and final assembly...", state)
     raw, _ = await services.call_llm(

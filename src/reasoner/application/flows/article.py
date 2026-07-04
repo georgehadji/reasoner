@@ -50,6 +50,31 @@ class ArticleFlow(WorkflowStrategy):
         state: PipelineState, 
         services: WorkflowServices,
     ) -> PipelineState:
-        for step in self.get_phases(state):
+        phases = self.get_phases(state)
+        audit_retried = False
+        
+        for step in phases:
             await services.run_phase(step, state)
+            
+            # E2: If final audit fails, retry developmental edit + re-audit once
+            if not audit_retried and "Final Audit" in str(step.label):
+                audit = state.writing_state.get("editorial_audit", {})
+                if not audit.get("passes_audit", True):
+                    services.log("WRITING", "Audit failed — retrying developmental edit and re-audit...", state)
+                    audit_retried = True
+                    # Re-run developmental edit
+                    await services.run_phase(
+                        PhaseStep(5, "Developmental Edit (retry)", run_article_developmental_edit_phase, _ser_4),
+                        state,
+                    )
+                    # Re-run style + copy edit
+                    await services.run_phase(
+                        PhaseStep(6, "Style + Copy Edit (retry)", run_article_style_copy_edit_phase, _ser_5),
+                        state,
+                    )
+                    # Re-run audit
+                    await services.run_phase(
+                        PhaseStep(7, "Final Audit (retry)", run_article_final_audit_phase, _ser_5),
+                        state,
+                    )
         return state
