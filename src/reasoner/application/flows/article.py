@@ -57,7 +57,7 @@ class ArticleFlow(WorkflowStrategy):
             await services.run_phase(step, state)
             
             # E2: If final audit fails, retry developmental edit + re-audit once
-            if not audit_retried and "Final Audit" in str(step.label):
+            if not audit_retried and step.fn is run_article_final_audit_phase:
                 audit = state.writing_state.get("editorial_audit", {})
                 # Default to False if audit data is empty (parse failure = failed audit)
                 if not audit.get("passes_audit", False):
@@ -65,17 +65,17 @@ class ArticleFlow(WorkflowStrategy):
                     audit_retried = True
                     # Re-run developmental edit
                     await services.run_phase(
-                        PhaseStep(5, "Developmental Edit (retry)", run_article_developmental_edit_phase, _ser_4),
+                        PhaseStep(5.1, "Developmental Edit (retry)", run_article_developmental_edit_phase, _ser_4),
                         state,
                     )
                     # Re-run style + copy edit
                     await services.run_phase(
-                        PhaseStep(6, "Style + Copy Edit (retry)", run_article_style_copy_edit_phase, _ser_5),
+                        PhaseStep(5.2, "Style + Copy Edit (retry)", run_article_style_copy_edit_phase, _ser_5),
                         state,
                     )
                     # Re-run audit
                     await services.run_phase(
-                        PhaseStep(7, "Final Audit (retry)", run_article_final_audit_phase, _ser_5),
+                        PhaseStep(5.3, "Final Audit (retry)", run_article_final_audit_phase, _ser_5),
                         state,
                     )
         return state
