@@ -73,6 +73,12 @@ def article_draft_prompt(state: PipelineState) -> str:
             f"Closely emulate the voice, narrative structure, anecdote-driven openings, "
             f"counterintuitive insights, and rhetorical rhythm of that author/publication.\n\n"
         )
+    def _safe_join_list(value) -> str:
+        """Safely join a list value — handles None, int, bool, string gracefully."""
+        if not isinstance(value, (list, tuple)):
+            return str(value) if value else ""
+        return ', '.join(str(v) for v in value)
+
     argument_map = state.writing_state.get("argument_map", {})
     argument_block = ""
     if isinstance(argument_map, dict) and argument_map.get("central_question"):
@@ -80,11 +86,11 @@ def article_draft_prompt(state: PipelineState) -> str:
             f"Argument Blueprint (write within this structure):\n"
             f"  Central question: {argument_map.get('central_question', '')}\n"
             f"  Problem: {argument_map.get('problem', '')}\n"
-            f"  Current explanations: {', '.join(argument_map.get('current_explanations', []))}\n"
-            f"  Limitations: {', '.join(argument_map.get('limitations', []))}\n"
+            f"  Current explanations: {_safe_join_list(argument_map.get('current_explanations', []))}\n"
+            f"  Limitations: {_safe_join_list(argument_map.get('limitations', []))}\n"
             f"  New insight: {argument_map.get('new_insight', '')}\n"
-            f"  Counterarguments to address: {', '.join(argument_map.get('counterarguments', []))}\n"
-            f"  Implications: {', '.join(argument_map.get('implications', []))}\n\n"
+            f"  Counterarguments to address: {_safe_join_list(argument_map.get('counterarguments', []))}\n"
+            f"  Implications: {_safe_join_list(argument_map.get('implications', []))}\n\n"
         )
 
     return (
@@ -315,24 +321,34 @@ def article_developmental_edit_prompt(state: PipelineState) -> str:
     critique = state.writing_state.get("structural_critique", {})
     argument_map = state.writing_state.get("argument_map", {})
 
+    def _safe_iter(items):
+        """Safely iterate critique items — handles non-list values."""
+        if not isinstance(items, (list, tuple)):
+            return []
+        return items[:5]
+
     critique_block = ""
     if critique.get("logical_gaps") or critique.get("ignored_counterarguments"):
         critique_block = "Structural feedback to address:\n"
-        if critique.get("logical_gaps"):
-            critique_block += "Logical gaps:\n" + "\n".join(
-                f"  - [{g['severity'].upper()}] {g['gap']} (section: {g['section']})"
-                for g in critique["logical_gaps"][:5]
-            ) + "\n"
-        if critique.get("ignored_counterarguments"):
-            critique_block += "Ignored counterarguments:\n" + "\n".join(
-                f"  - [{c['relevance'].upper()}] {c['argument']}"
-                for c in critique["ignored_counterarguments"][:5]
-            ) + "\n"
-        if critique.get("implicit_assumptions"):
-            critique_block += "Implicit assumptions:\n" + "\n".join(
-                f"  - [{a['risk'].upper()}] {a['assumption']} (section: {a['section']})"
-                for a in critique["implicit_assumptions"][:5]
-            ) + "\n\n"
+        for gap in _safe_iter(critique.get("logical_gaps")):
+            if isinstance(gap, dict):
+                sev = str(gap.get('severity', 'medium')).upper()
+                g = gap.get('gap', str(gap))
+                sec = gap.get('section', '?')
+                critique_block += f"  - [{sev}] {g} (section: {sec})\n"
+        for carg in _safe_iter(critique.get("ignored_counterarguments")):
+            if isinstance(carg, dict):
+                rel = str(carg.get('relevance', 'medium')).upper()
+                arg = carg.get('argument', str(carg))
+                critique_block += f"  - [{rel}] {arg}\n"
+        for ass in _safe_iter(critique.get("implicit_assumptions")):
+            if isinstance(ass, dict):
+                risk = str(ass.get('risk', 'medium')).upper()
+                a = ass.get('assumption', str(ass))
+                sec = ass.get('section', '?')
+                critique_block += f"  - [{risk}] {a} (section: {sec})\n"
+        if critique_block != "Structural feedback to address:\n":
+            critique_block += "\n"
 
     map_block = (
         f"Original argument blueprint (maintain this structure):\n"

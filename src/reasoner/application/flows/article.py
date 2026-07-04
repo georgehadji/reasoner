@@ -59,7 +59,8 @@ class ArticleFlow(WorkflowStrategy):
             # E2: If final audit fails, retry developmental edit + re-audit once
             if not audit_retried and "Final Audit" in str(step.label):
                 audit = state.writing_state.get("editorial_audit", {})
-                if not audit.get("passes_audit", True):
+                # Default to False if audit data is empty (parse failure = failed audit)
+                if not audit.get("passes_audit", False):
                     services.log("WRITING", "Audit failed — retrying developmental edit and re-audit...", state)
                     audit_retried = True
                     # Re-run developmental edit
