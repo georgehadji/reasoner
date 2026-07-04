@@ -669,7 +669,7 @@ _REGISTRY: dict[str, dict] = {
         "article_critic":       "hermes-4-70b",       # 🇺🇸 Nous Research — critic-specialized adversarial review
         "article_revise":       "claude-sonnet",       # 🇺🇸 Anthropic — same model as draft, best voice-preserving revision (was deepseek-v3)
         "article_humanize":     "claude-sonnet",       # 🇺🇸 Anthropic — same model as draft, voice-preserving style refinement (was qwen3.7-plus)
-        "article_verifier":     "qwen3.7-plus",        # 🇨🇳 Qwen — structured final audit
+        "article_verifier":     "qwen3.5-flash",       # 🇨🇳 Qwen — cross-bloc checklist audit, cheapest 1M ctx (was qwen3.7-plus)
         # ── Reasoning model assignments (budget, v3.5) ──
         "fusion":           "deepseek-v4-flash",
         "post_synthesis_verify": "sonar",
