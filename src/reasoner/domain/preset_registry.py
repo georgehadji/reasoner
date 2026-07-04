@@ -667,7 +667,7 @@ _REGISTRY: dict[str, dict] = {
         # ── Article editorial roles (budget, v3.6) ──
         "article_sot_skeleton": "deepseek-v4-flash",  # 🇨🇳 DeepSeek — fast structured planning
         "article_critic":       "hermes-4-70b",       # 🇺🇸 Nous Research — critic-specialized adversarial review
-        "article_revise":       "deepseek-v3",         # 🇨🇳 DeepSeek — voice-consistent developmental editing
+        "article_revise":       "claude-sonnet",       # 🇺🇸 Anthropic — same model as draft, best voice-preserving revision (was deepseek-v3)
         "article_humanize":     "qwen3.7-plus",        # 🇨🇳 Qwen — editorial refinement, style matching
         "article_verifier":     "qwen3.7-plus",        # 🇨🇳 Qwen — structured final audit
         # ── Reasoning model assignments (budget, v3.5) ──
