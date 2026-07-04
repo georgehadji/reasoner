@@ -70,21 +70,29 @@ class ImageSearchWidget(BaseWidget):
         }
     
     async def _search_images(self, query: str, limit: int) -> list[dict[str, Any]]:
-        """Search images using multi-backend search client."""
-        from reasoner.infrastructure.search.discovery import get_search_client
-        
-        try:
-            client, _ = await get_search_client()
-            results = await client.search(query, num_results=limit)
-            return [
-                {
-                    'title': r.get('title', ''),
-                    'url': r.get('url', ''),
-                    'img_src': r.get('img_src', r.get('url', '')),
-                    'thumbnail': r.get('thumbnail', ''),
-                    'source': r.get('source', ''),
-                }
-                for r in results
-            ]
-        except Exception:
-            return []
+        """Search images using SearXNG via the shared URL helper."""
+        import httpx
+        import reasoner.infrastructure.search.discovery as _disc
+        urls = _disc.get_searxng_urls()
+        for url in urls:
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    resp = await client.get(
+                        url,
+                        params={"q": query, "format": "json", "categories": "images"},
+                    )
+                    if resp.status_code == 200:
+                        results = resp.json().get("results", [])
+                        return [
+                            {
+                                'title': r.get('title', ''),
+                                'url': r.get('url', ''),
+                                'img_src': r.get('img_src', r.get('url', '')),
+                                'thumbnail': r.get('thumbnail', ''),
+                                'source': r.get('source', ''),
+                            }
+                            for r in results[:limit]
+                        ]
+            except Exception:
+                continue
+        return []

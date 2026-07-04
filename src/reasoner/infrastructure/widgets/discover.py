@@ -128,6 +128,21 @@ class DiscoverWidget(BaseWidget):
             'sources': topic_config['sites'],
         }
     
+    async def _search_searxng(self, query: str) -> list[dict[str, Any]]:
+        """Search SearXNG using the shared URL helper."""
+        import httpx
+        import reasoner.infrastructure.search.discovery as _disc
+        urls = _disc.get_searxng_urls()
+        for url in urls:
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    resp = await client.get(url, params={"q": query, "format": "json"})
+                    if resp.status_code == 200:
+                        return resp.json().get("results", [])
+            except Exception:
+                continue
+        return []
+
     async def _search_web(self, query: str) -> list[dict[str, Any]]:
         """Search using multi-backend search client."""
         from reasoner.infrastructure.search.discovery import get_search_client
