@@ -120,6 +120,7 @@ class ReasonerPipeline:
         complexity: str | None = None,
         batch_critique_jury: bool = False,
         phase_configs: dict[str, PhaseConfig] | None = None,
+        augmentation_methods: list[str] | None = None,
     ) -> None:
         self.router = router
         self.initial_state = initial_state
@@ -132,6 +133,7 @@ class ReasonerPipeline:
         self.enhance_prompt = enhance_prompt
         self.complexity = complexity
         self.batch_critique_jury = batch_critique_jury
+        self.augmentation_methods = augmentation_methods
         self.phase_configs = phase_configs or self._PHASE_CONFIGS
         
         from reasoner.application.flows.factory import WorkflowFactory
@@ -190,7 +192,11 @@ class ReasonerPipeline:
             preset_name=self.preset_name,
             complexity=self.complexity or "unknown",
         )
-        
+
+        # ── Carry augmentation methods from preflight ──
+        if self.augmentation_methods:
+            state.meta.augmentation_methods = self.augmentation_methods
+
         # ── Publish Pipeline Started Event ──
         start_evt = make_event(
             EventType.PIPELINE_STARTED,

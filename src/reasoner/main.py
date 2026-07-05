@@ -254,6 +254,7 @@ async def main(args: argparse.Namespace) -> None:
             domain=args.domain or None,
             enhance_prompt=args.enhance_prompt,
             batch_critique_jury=final_preset.batch_critique_jury if final_preset else False,
+            augmentation_methods=preflight.augmentation_methods,
         )
         state = await pipeline.run(problem)
 

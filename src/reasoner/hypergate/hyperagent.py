@@ -75,8 +75,16 @@ _REALTIME_PATTERNS: list[re.Pattern[str]] = [
 _FACTUAL_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"\b(what\s+is|who\s+is|where\s+is|when\s+is|how\s+many|define|explain)\s+(the\s+)?\w+", re.I),
     re.compile(r"\b(capital\s+of|president\s+of|invented)\s+\w+", re.I),
-    re.compile(r"\b(ποιο\s+είναι|ποιος\s+είναι|πού\s+είναι|πότε\s+είναι|πόσα|πόσες|πόσους|ορίζω|εξήγησε)\s+(το\s+|η\s+|ο\s+)?\w+", re.I),
+    re.compile(r"\b(τι\s+είναι|ποιο\s+είναι|ποιος\s+είναι|πού\s+είναι|πότε\s+είναι|πόσα|πόσες|πόσους|ορίζω|εξήγησε)\s+(το\s+|η\s+|ο\s+)?\w+", re.I),
     re.compile(r"\b(πρωτεύουσα\s+της|πρόεδρος\s+της|εφεύρε)\s+\w+", re.I),
+]
+
+# Abstract concept patterns that should NEVER be treated as simple factual lookups.
+# When these concepts appear, the query needs multi-phase reasoning even if it looks
+# like a simple "what is X?" question.
+_DEEP_CONCEPT_PATTERNS: list[re.Pattern[str]] = [
+    re.compile(r"\b(art|beauty|truth|justice|consciousness|reality|knowledge|time|god|freedom|morality|happiness|wisdom|existence|love|ethics|meaning|purpose|soul|infinity|nothingness|being|becoming)\b", re.I),
+    re.compile(r"\b(τέχνη|τέχνες|ομορφιά|αλήθεια|δικαιοσύνη|συνείδηση|πραγματικότητα|γνώση|ελευθερία|ηθική|ύπαρξη|αισθητική|οντολογία|νοήματος|θεός|ψυχή|άπειρο)\b", re.I),
 ]
 
 # Research indicators — used to detect if a writing request is research-backed.
@@ -265,7 +273,9 @@ class HyperGateAgent:
             return decision
 
         # Fast-path: simple factual lookups (e.g., "What is X?")
-        if any(p.search(problem) for p in _FACTUAL_PATTERNS) and len(problem) < 60:
+        # Skip if the question contains deep/abstract concepts that need multi-phase reasoning.
+        is_deep_concept = any(p.search(problem) for p in _DEEP_CONCEPT_PATTERNS)
+        if any(p.search(problem) for p in _FACTUAL_PATTERNS) and len(problem) < 60 and not is_deep_concept:
             decision = GateDecision(
                 action="direct",
                 method=None,
@@ -352,6 +362,9 @@ class HyperGateAgent:
         category = ctx.method_output.result.get("category", "E")
         method_name = ctx.method_output.result.get("method", "multi_perspective")
 
+        # ── Depth detection moved to ArticleFlow (regex-based, no LLM overhead) ──
+        augmentation_methods: list[str] | None = None
+
         # Conflict: DirectDetector says direct but method classifier is very confident
         # about a non-trivial method AND the problem is not actually simple.
         direct_method_conflict = (
@@ -386,7 +399,8 @@ class HyperGateAgent:
                 method=None,
                 confidence=direct_conf,
                 reasoning=ctx.direct_output.reasoning or "DirectDetector: simple direct query",
-                complexity=complexity
+                complexity=complexity,
+                augmentation_methods=None,
             )
 
         # Step 2 — web search
@@ -396,7 +410,8 @@ class HyperGateAgent:
                 method=None,
                 confidence=web_conf,
                 reasoning=ctx.web_output.reasoning or "WebDetector: real-time data required",
-                complexity=complexity
+                complexity=complexity,
+                augmentation_methods=None,
             )
 
         # Step 3 — pipeline with clear method
@@ -406,7 +421,8 @@ class HyperGateAgent:
                 method=method_name,
                 confidence=method_conf,
                 reasoning=ctx.method_output.reasoning or f"MethodClassifier: {category}",
-                complexity=complexity
+                complexity=complexity,
+                augmentation_methods=augmentation_methods,
             )
 
         # Step 4 — ambiguous but some signal: defer to TieBreaker
@@ -419,7 +435,8 @@ class HyperGateAgent:
             method="multi_perspective",
             confidence=0.0,
             reasoning="All sub-agents failed or returned very low confidence, fallback",
-            complexity=complexity
+            complexity=complexity,
+            augmentation_methods=None,
         )
 
     # ── Phase 2: TieBreaker ──────────────────────────────────────────
@@ -438,6 +455,7 @@ class HyperGateAgent:
                 method="multi_perspective",
                 confidence=0.0,
                 reasoning="TieBreaker failed, fallback to pipeline",
+                augmentation_methods=None,
             )
         action: Literal["direct", "pipeline", "web_search"] = out.result.get("action", "pipeline")  # type: ignore[assignment]
         return GateDecision(
@@ -445,5 +463,6 @@ class HyperGateAgent:
             method=out.result.get("method"),
             confidence=out.confidence,
             reasoning=out.reasoning or "TieBreaker resolution",
-            complexity=ctx.complexity
+            complexity=ctx.complexity,
+            augmentation_methods=augmentation_methods if action == "pipeline" else None,
         )

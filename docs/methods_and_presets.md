@@ -2,7 +2,7 @@
 
 **Total presets:** 50  
 **Total methods:** 24  
-**Last updated:** 2026-07-01
+**Last updated:** 2026-07-05
 
 ---
 
@@ -56,13 +56,13 @@
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|
 | primary | `gemini-pro` | anthropic/claude-sonnet-5 | anthropic |
-| synthesis | `gpt-5.5` | openai/gpt-5.5 | openai |
+| synthesis | `glm-5.2` | z-ai/glm-5.2 | zhipu |
 | deep_read | `gemini-pro-real` | google/gemini-3.1-pro-preview | google |
 | fusion | `deepseek-v4-pro` | deepseek/deepseek-v4-pro | deepseek |
 | meta_evaluator | `minimax-m3` | minimax/minimax-m3 | minimax |
 | scoring | `qwen3-max-thinking` | qwen/qwen3-max-thinking | qwen |
 | stress_testing | `grok-4.3` | x-ai/grok-4.3 | xai |
-| verifier | `grok-4.20` | x-ai/grok-4.20 | xai |
+| verifier | `grok-4.3` | x-ai/grok-4.3 | xai |
 
 ### article
 
@@ -86,16 +86,16 @@
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|
 | primary | `sonar-pro` | perplexity/sonar-pro | perplexity |
-| synthesis | `gpt-5.5` | openai/gpt-5.5 | openai |
+| synthesis | `qwen3.7-max` | qwen/qwen3.7-max | qwen |
 | fusion | `deepseek-v4-pro` | deepseek/deepseek-v4-pro | deepseek |
-| writing_draft | `gpt-5.5` | openai/gpt-5.5 | openai |
+| writing_draft | `claude-sonnet` | anthropic/claude-sonnet-5 | anthropic |
 | writing_factcheck | `sonar-pro` | perplexity/sonar-pro | perplexity |
 | writing_outline | `claude-sonnet` | anthropic/claude-sonnet-5 | anthropic |
-| writing_assemble | `gpt-5-mini` | openai/gpt-5-mini | openai |
-| article_sot_skeleton | `gpt-5.5` | openai/gpt-5.5 | openai |
+| writing_assemble | `gpt-4o-mini` | openai/gpt-4o-mini | openai |
+| article_sot_skeleton | `claude-sonnet` | anthropic/claude-sonnet-5 | anthropic |
 | article_critic | `grok-4.3` | x-ai/grok-4.3 | xai |
-| article_revise | `gpt-5.5` | openai/gpt-5.5 | openai |
-| article_humanize | `gpt-5.5` | openai/gpt-5.5 | openai |
+| article_revise | `deepseek-v4-pro` | deepseek/deepseek-v4-pro | deepseek |
+| article_humanize | `claude-sonnet` | anthropic/claude-sonnet-5 | anthropic |
 | article_verifier | `qwen3.7-max` | qwen/qwen3.7-max | qwen |
 | post_synthesis_verify | `sonar-pro` | perplexity/sonar-pro | perplexity |
 
@@ -116,13 +116,13 @@
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|
 | primary | `gemini-pro` | anthropic/claude-sonnet-5 | anthropic |
-| synthesis | `gpt-5.5` | openai/gpt-5.5 | openai |
+| synthesis | `glm-5.2` | z-ai/glm-5.2 | zhipu |
 | deep_read | `gemini-pro-real` | google/gemini-3.1-pro-preview | google |
 | fusion | `deepseek-v4-pro` | deepseek/deepseek-v4-pro | deepseek |
 | meta_evaluator | `minimax-m3` | minimax/minimax-m3 | minimax |
 | scoring | `qwen3-max-thinking` | qwen/qwen3-max-thinking | qwen |
 | stress_testing | `grok-4.3` | x-ai/grok-4.3 | xai |
-| verifier | `grok-4.20` | x-ai/grok-4.20 | xai |
+| verifier | `grok-4.3` | x-ai/grok-4.3 | xai |
 
 ### brainstorming
 
@@ -145,13 +145,13 @@
 | primary | `claude-sonnet` | anthropic/claude-sonnet-5 | anthropic |
 | brainstorm_cluster | `claude-sonnet` | anthropic/claude-sonnet-5 | anthropic |
 | brainstorm_develop | `claude-sonnet` | anthropic/claude-sonnet-5 | anthropic |
-| synthesis | `gpt-5.5` | openai/gpt-5.5 | openai |
+| synthesis | `glm-5.2` | z-ai/glm-5.2 | zhipu |
 | deep_read | `gemini-pro-real` | google/gemini-3.1-pro-preview | google |
 | fusion | `deepseek-v4-pro` | deepseek/deepseek-v4-pro | deepseek |
 | meta_evaluator | `minimax-m3` | minimax/minimax-m3 | minimax |
 | scoring | `qwen3-max-thinking` | qwen/qwen3-max-thinking | qwen |
 | stress_testing | `grok-4.3` | x-ai/grok-4.3 | xai |
-| verifier | `grok-4.20` | x-ai/grok-4.20 | xai |
+| verifier | `grok-4.3` | x-ai/grok-4.3 | xai |
 
 ### coding
 
@@ -174,17 +174,17 @@
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|
 | primary | `claude-sonnet` | anthropic/claude-sonnet-5 | anthropic |
-| synthesis | `gpt-5.5` | openai/gpt-5.5 | openai |
+| synthesis | `glm-5.2` | z-ai/glm-5.2 | zhipu |
 | coding_assemble | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
 | coding_review | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
 | coding_spec | `claude-sonnet` | anthropic/claude-sonnet-5 | anthropic |
 | coding_tests | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
 | deep_read | `claude-sonnet` | anthropic/claude-sonnet-5 | anthropic |
 | fusion | `deepseek-v4-pro` | deepseek/deepseek-v4-pro | deepseek |
-| meta_evaluator | `qwen3.7-max` | qwen/qwen3.7-max | qwen |
+| meta_evaluator | `glm-5.2` | z-ai/glm-5.2 | zhipu |
 | scoring | `qwen3-max-thinking` | qwen/qwen3-max-thinking | qwen |
 | stress_testing | `claude-sonnet` | anthropic/claude-sonnet-5 | anthropic |
-| verifier | `qwen3-max-thinking` | qwen/qwen3-max-thinking | qwen |
+| verifier | `glm-5.2` | z-ai/glm-5.2 | zhipu |
 
 ### cove
 
@@ -206,7 +206,7 @@
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|
 | primary | `gemini-pro` | anthropic/claude-sonnet-5 | anthropic |
-| synthesis | `gpt-5.5` | openai/gpt-5.5 | openai |
+| synthesis | `glm-5.2` | z-ai/glm-5.2 | zhipu |
 | cove_answer | `deepseek-v4-pro` | deepseek/deepseek-v4-pro | deepseek |
 | cove_revise | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
 | cove_verify | `deepseek-v4-pro` | deepseek/deepseek-v4-pro | deepseek |
@@ -215,7 +215,7 @@
 | meta_evaluator | `minimax-m3` | minimax/minimax-m3 | minimax |
 | scoring | `qwen3-max-thinking` | qwen/qwen3-max-thinking | qwen |
 | stress_testing | `grok-4.3` | x-ai/grok-4.3 | xai |
-| verifier | `grok-4.20` | x-ai/grok-4.20 | xai |
+| verifier | `grok-4.3` | x-ai/grok-4.3 | xai |
 
 ### cross-language
 
@@ -265,13 +265,13 @@
 | constructive | `claude-sonnet` | anthropic/claude-sonnet-5 | anthropic |
 | destructive | `deepseek-v4-pro` | deepseek/deepseek-v4-pro | deepseek |
 | systemic | `gemini-pro` | anthropic/claude-sonnet-5 | anthropic |
-| synthesis | `gpt-5.5` | openai/gpt-5.5 | openai |
+| synthesis | `glm-5.2` | z-ai/glm-5.2 | zhipu |
 | deep_read | `gemini-pro-real` | google/gemini-3.1-pro-preview | google |
 | fusion | `deepseek-v4-pro` | deepseek/deepseek-v4-pro | deepseek |
 | meta_evaluator | `minimax-m3` | minimax/minimax-m3 | minimax |
 | scoring | `qwen3-max-thinking` | qwen/qwen3-max-thinking | qwen |
 | stress_testing | `grok-4.3` | x-ai/grok-4.3 | xai |
-| verifier | `grok-4.20` | x-ai/grok-4.20 | xai |
+| verifier | `grok-4.3` | x-ai/grok-4.3 | xai |
 
 ### delphi
 
@@ -290,13 +290,13 @@
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|
 | primary | `gemini-pro` | anthropic/claude-sonnet-5 | anthropic |
-| synthesis | `gpt-5.5` | openai/gpt-5.5 | openai |
+| synthesis | `glm-5.2` | z-ai/glm-5.2 | zhipu |
 | deep_read | `gemini-pro-real` | google/gemini-3.1-pro-preview | google |
 | fusion | `deepseek-v4-pro` | deepseek/deepseek-v4-pro | deepseek |
 | meta_evaluator | `minimax-m3` | minimax/minimax-m3 | minimax |
 | scoring | `qwen3-max-thinking` | qwen/qwen3-max-thinking | qwen |
 | stress_testing | `grok-4.3` | x-ai/grok-4.3 | xai |
-| verifier | `grok-4.20` | x-ai/grok-4.20 | xai |
+| verifier | `grok-4.3` | x-ai/grok-4.3 | xai |
 
 ### dialectical
 
@@ -315,13 +315,13 @@
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|
 | primary | `gemini-pro` | anthropic/claude-sonnet-5 | anthropic |
-| synthesis | `gpt-5.5` | openai/gpt-5.5 | openai |
+| synthesis | `glm-5.2` | z-ai/glm-5.2 | zhipu |
 | deep_read | `gemini-pro-real` | google/gemini-3.1-pro-preview | google |
 | fusion | `deepseek-v4-pro` | deepseek/deepseek-v4-pro | deepseek |
 | meta_evaluator | `minimax-m3` | minimax/minimax-m3 | minimax |
 | scoring | `qwen3-max-thinking` | qwen/qwen3-max-thinking | qwen |
 | stress_testing | `grok-4.3` | x-ai/grok-4.3 | xai |
-| verifier | `grok-4.20` | x-ai/grok-4.20 | xai |
+| verifier | `grok-4.3` | x-ai/grok-4.3 | xai |
 
 ### image-gen
 
@@ -346,7 +346,7 @@
 | meta_evaluator | `minimax-m3` | minimax/minimax-m3 | minimax |
 | scoring | `qwen3-max-thinking` | qwen/qwen3-max-thinking | qwen |
 | stress_testing | `grok-4.3` | x-ai/grok-4.3 | xai |
-| verifier | `grok-4.20` | x-ai/grok-4.20 | xai |
+| verifier | `grok-4.3` | x-ai/grok-4.3 | xai |
 
 ### iterative-critique
 
@@ -390,13 +390,13 @@
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|
 | primary | `gemini-pro` | anthropic/claude-sonnet-5 | anthropic |
-| synthesis | `gpt-5.5` | openai/gpt-5.5 | openai |
+| synthesis | `glm-5.2` | z-ai/glm-5.2 | zhipu |
 | deep_read | `gemini-pro-real` | google/gemini-3.1-pro-preview | google |
 | fusion | `deepseek-v4-pro` | deepseek/deepseek-v4-pro | deepseek |
 | meta_evaluator | `minimax-m3` | minimax/minimax-m3 | minimax |
 | scoring | `qwen3-max-thinking` | qwen/qwen3-max-thinking | qwen |
 | stress_testing | `grok-4.3` | x-ai/grok-4.3 | xai |
-| verifier | `grok-4.20` | x-ai/grok-4.20 | xai |
+| verifier | `grok-4.3` | x-ai/grok-4.3 | xai |
 
 ### multi-perspective
 
@@ -427,13 +427,13 @@
 | destructive | `deepseek-v4-pro` | deepseek/deepseek-v4-pro | deepseek |
 | systemic | `qwen3.7-max` | qwen/qwen3.7-max | qwen |
 | minimalist | `mistral-large-3` | mistralai/mistral-large-2512 | mistral |
-| synthesis | `gpt-5.5` | openai/gpt-5.5 | openai |
+| synthesis | `glm-5.2` | z-ai/glm-5.2 | zhipu |
 | deep_read | `gemini-pro-real` | google/gemini-3.1-pro-preview | google |
 | fusion | `deepseek-v4-pro` | deepseek/deepseek-v4-pro | deepseek |
 | meta_evaluator | `minimax-m3` | minimax/minimax-m3 | minimax |
 | scoring | `qwen3-max-thinking` | qwen/qwen3-max-thinking | qwen |
 | stress_testing | `grok-4.3` | x-ai/grok-4.3 | xai |
-| verifier | `grok-4.20` | x-ai/grok-4.20 | xai |
+| verifier | `grok-4.3` | x-ai/grok-4.3 | xai |
 
 #### `multi-perspective-ultra-budget` — 12 roles
 | Role | Key | Model | Lab |
@@ -477,13 +477,13 @@
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|
 | primary | `gemini-pro` | anthropic/claude-sonnet-5 | anthropic |
-| synthesis | `gpt-5.5` | openai/gpt-5.5 | openai |
+| synthesis | `glm-5.2` | z-ai/glm-5.2 | zhipu |
 | deep_read | `gemini-pro-real` | google/gemini-3.1-pro-preview | google |
 | fusion | `deepseek-v4-pro` | deepseek/deepseek-v4-pro | deepseek |
 | meta_evaluator | `minimax-m3` | minimax/minimax-m3 | minimax |
 | scoring | `qwen3-max-thinking` | qwen/qwen3-max-thinking | qwen |
 | stress_testing | `grok-4.3` | x-ai/grok-4.3 | xai |
-| verifier | `grok-4.20` | x-ai/grok-4.20 | xai |
+| verifier | `grok-4.3` | x-ai/grok-4.3 | xai |
 
 ### pre-mortem
 
@@ -502,13 +502,13 @@
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|
 | primary | `gemini-pro` | anthropic/claude-sonnet-5 | anthropic |
-| synthesis | `gpt-5.5` | openai/gpt-5.5 | openai |
+| synthesis | `glm-5.2` | z-ai/glm-5.2 | zhipu |
 | deep_read | `gemini-pro-real` | google/gemini-3.1-pro-preview | google |
 | fusion | `deepseek-v4-pro` | deepseek/deepseek-v4-pro | deepseek |
 | meta_evaluator | `minimax-m3` | minimax/minimax-m3 | minimax |
 | scoring | `qwen3-max-thinking` | qwen/qwen3-max-thinking | qwen |
 | stress_testing | `grok-4.3` | x-ai/grok-4.3 | xai |
-| verifier | `grok-4.20` | x-ai/grok-4.20 | xai |
+| verifier | `grok-4.3` | x-ai/grok-4.3 | xai |
 
 ### research
 
@@ -534,7 +534,7 @@
 | meta_evaluator | `minimax-m3` | minimax/minimax-m3 | minimax |
 | scoring | `sonar-deep-research` | perplexity/sonar-deep-research | perplexity |
 | stress_testing | `grok-4.3` | x-ai/grok-4.3 | xai |
-| verifier | `grok-4.20` | x-ai/grok-4.20 | xai |
+| verifier | `grok-4.3` | x-ai/grok-4.3 | xai |
 
 ### scientific
 
@@ -553,13 +553,13 @@
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|
 | primary | `gemini-pro` | anthropic/claude-sonnet-5 | anthropic |
-| synthesis | `gpt-5.5` | openai/gpt-5.5 | openai |
+| synthesis | `glm-5.2` | z-ai/glm-5.2 | zhipu |
 | deep_read | `gemini-pro-real` | google/gemini-3.1-pro-preview | google |
 | fusion | `deepseek-v4-pro` | deepseek/deepseek-v4-pro | deepseek |
 | meta_evaluator | `minimax-m3` | minimax/minimax-m3 | minimax |
 | scoring | `qwen3-max-thinking` | qwen/qwen3-max-thinking | qwen |
 | stress_testing | `grok-4.3` | x-ai/grok-4.3 | xai |
-| verifier | `grok-4.20` | x-ai/grok-4.20 | xai |
+| verifier | `grok-4.3` | x-ai/grok-4.3 | xai |
 
 ### self-discover
 
@@ -581,7 +581,7 @@
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|
 | primary | `gemini-pro` | anthropic/claude-sonnet-5 | anthropic |
-| synthesis | `gpt-5.5` | openai/gpt-5.5 | openai |
+| synthesis | `glm-5.2` | z-ai/glm-5.2 | zhipu |
 | deep_read | `gemini-pro-real` | google/gemini-3.1-pro-preview | google |
 | fusion | `deepseek-v4-pro` | deepseek/deepseek-v4-pro | deepseek |
 | meta_evaluator | `minimax-m3` | minimax/minimax-m3 | minimax |
@@ -590,7 +590,7 @@
 | sd_implement | `deepseek-v4-pro` | deepseek/deepseek-v4-pro | deepseek |
 | sd_select | `deepseek-v4-pro` | deepseek/deepseek-v4-pro | deepseek |
 | stress_testing | `grok-4.3` | x-ai/grok-4.3 | xai |
-| verifier | `grok-4.20` | x-ai/grok-4.20 | xai |
+| verifier | `grok-4.3` | x-ai/grok-4.3 | xai |
 
 ### socratic
 
@@ -609,13 +609,13 @@
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|
 | primary | `gemini-pro` | anthropic/claude-sonnet-5 | anthropic |
-| synthesis | `gpt-5.5` | openai/gpt-5.5 | openai |
+| synthesis | `glm-5.2` | z-ai/glm-5.2 | zhipu |
 | deep_read | `gemini-pro-real` | google/gemini-3.1-pro-preview | google |
 | fusion | `deepseek-v4-pro` | deepseek/deepseek-v4-pro | deepseek |
 | meta_evaluator | `minimax-m3` | minimax/minimax-m3 | minimax |
 | scoring | `qwen3-max-thinking` | qwen/qwen3-max-thinking | qwen |
 | stress_testing | `grok-4.3` | x-ai/grok-4.3 | xai |
-| verifier | `grok-4.20` | x-ai/grok-4.20 | xai |
+| verifier | `grok-4.3` | x-ai/grok-4.3 | xai |
 
 ### sot
 
@@ -634,13 +634,13 @@
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|
 | primary | `gemini-pro` | anthropic/claude-sonnet-5 | anthropic |
-| synthesis | `gpt-5.5` | openai/gpt-5.5 | openai |
+| synthesis | `glm-5.2` | z-ai/glm-5.2 | zhipu |
 | deep_read | `gemini-pro-real` | google/gemini-3.1-pro-preview | google |
 | fusion | `deepseek-v4-pro` | deepseek/deepseek-v4-pro | deepseek |
 | meta_evaluator | `minimax-m3` | minimax/minimax-m3 | minimax |
 | scoring | `qwen3-max-thinking` | qwen/qwen3-max-thinking | qwen |
 | stress_testing | `grok-4.3` | x-ai/grok-4.3 | xai |
-| verifier | `grok-4.20` | x-ai/grok-4.20 | xai |
+| verifier | `grok-4.3` | x-ai/grok-4.3 | xai |
 
 ### subagent
 
@@ -664,7 +664,7 @@
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|
 | primary | `gemini-pro` | anthropic/claude-sonnet-5 | anthropic |
-| synthesis | `gpt-5.5` | openai/gpt-5.5 | openai |
+| synthesis | `glm-5.2` | z-ai/glm-5.2 | zhipu |
 | deep_read | `claude-sonnet` | anthropic/claude-sonnet-5 | anthropic |
 | fusion | `deepseek-v4-pro` | deepseek/deepseek-v4-pro | deepseek |
 | meta_evaluator | `qwen3.7-max` | qwen/qwen3.7-max | qwen |
@@ -697,7 +697,7 @@
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|
 | primary | `gemini-pro` | anthropic/claude-sonnet-5 | anthropic |
-| synthesis | `gpt-5.5` | openai/gpt-5.5 | openai |
+| synthesis | `glm-5.2` | z-ai/glm-5.2 | zhipu |
 | deep_read | `gemini-pro-real` | google/gemini-3.1-pro-preview | google |
 | fusion | `deepseek-v4-pro` | deepseek/deepseek-v4-pro | deepseek |
 | meta_evaluator | `minimax-m3` | minimax/minimax-m3 | minimax |
@@ -706,7 +706,7 @@
 | tot_backtrack | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
 | tot_decompose | `claude-sonnet` | anthropic/claude-sonnet-5 | anthropic |
 | tot_evaluate | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
-| verifier | `grok-4.20` | x-ai/grok-4.20 | xai |
+| verifier | `grok-4.3` | x-ai/grok-4.3 | xai |
 
 ### writing
 
@@ -728,7 +728,7 @@
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|
 | primary | `gemini-pro` | anthropic/claude-sonnet-5 | anthropic |
-| synthesis | `gpt-5.5` | openai/gpt-5.5 | openai |
+| synthesis | `glm-5.2` | z-ai/glm-5.2 | zhipu |
 | deep_read | `claude-sonnet` | anthropic/claude-sonnet-5 | anthropic |
 | fusion | `deepseek-v4-pro` | deepseek/deepseek-v4-pro | deepseek |
 | meta_evaluator | `qwen3.7-max` | qwen/qwen3.7-max | qwen |

@@ -299,15 +299,25 @@ WRITING_OUTLINE_SYSTEM = (
 def writing_outline_prompt(state: PipelineState) -> str:
     sources = state.web_discovery_results[:ARTICLE_MAX_SOURCES_FOR_CLAIM_EXTRACTION]
     sources_text = json.dumps(sources, indent=2, ensure_ascii=False) if sources else "No sources available."
+    # ── Inject pre-research insights ──
+    pre_research = state.writing_state.get("pre_research_summary", "")
+    pre_research_block = ""
+    if pre_research:
+        pre_research_block = (
+            f"\nPre-Research Insights (from automated debate/critique/multi-perspective analysis):\n"
+            f"{_wrap_external_content(pre_research)}\n"
+        )
     return (
         f'{get_language_instruction(state)}\n\n'
         f'Problem: {_wrap_user_input(state.problem)}\n\n'
-        f'Available Sources:\n{_wrap_external_content(sources_text)}\n\n'
+        f'Available Sources:\n{_wrap_external_content(sources_text)}'
+        f'{pre_research_block}\n'
         f'Create a detailed article outline. For each section, specify:\n'
         f'1. Section title\n'
         f'2. Key points to cover\n'
         f'3. Required sources (by URL) that support this section\n'
         f'4. Estimated word count\n\n'
+        f'Incorporate the pre-research insights where relevant to strengthen the outline. '
         f'Use the source set aggressively. Aim to cover at least {ARTICLE_MIN_SOURCE_COUNT} distinct sources across the full outline when available.\n\n'
         f'Output JSON: {{"outline": [{{'
         f'"title": "<section title>", '
@@ -336,11 +346,20 @@ def writing_draft_prompt(state: PipelineState) -> str:
     sources = state.web_discovery_results[:ARTICLE_MAX_SOURCES_FOR_CLAIM_EXTRACTION]
     outline_json = json.dumps(outline, indent=2, ensure_ascii=False) if outline else "[]"
     sources_text = json.dumps(sources, indent=2, ensure_ascii=False) if sources else "No sources available."
+    # ── Inject pre-research insights ──
+    pre_research = state.writing_state.get("pre_research_summary", "")
+    pre_research_block = ""
+    if pre_research:
+        pre_research_block = (
+            f"\nPre-Research Insights (analytical findings from debate/critique/multi-perspective):\n"
+            f"{_wrap_external_content(pre_research)}\n"
+        )
     return (
         f'{get_language_instruction(state)}\n\n'
         f'Problem: {_wrap_user_input(state.problem)}\n\n'
         f'Article Outline:\n{_wrap_external_content(outline_json)}\n\n'
-        f'Sources:\n{_wrap_external_content(sources_text)}\n\n'
+        f'Sources:\n{_wrap_external_content(sources_text)}'
+        f'{pre_research_block}\n'
         f'Write the FULL article following the outline. Rules:\n'
         f'1. Use ONLY facts from the provided sources\n'
         f'2. Every factual claim MUST have inline citation in format [Source Title](URL)\n'
@@ -349,7 +368,9 @@ def writing_draft_prompt(state: PipelineState) -> str:
         f'5. Separate FACT paragraphs from INTERPRETATION paragraphs\n'
         f'6. Include a brief abstract at the start\n'
         f'7. Use as many relevant sources as possible, aiming for at least {ARTICLE_MIN_SOURCE_COUNT} distinct URLs when available\n'
-        f'8. End the article with a "Sources" section listing every URL actually cited in the body\n\n'
+        f'8. End the article with a "Sources" section listing every URL actually cited in the body\n'
+        f'9. Incorporate the pre-research insights where relevant — use debate findings to '
+        f'strengthen arguments, critique findings to address weaknesses\n\n'
         f'Output JSON: {{"article": "<full article text>", '
         f'"abstract": "<abstract>", '
         f'"word_count": 1200, '

@@ -31,6 +31,7 @@ from reasoner.models import TaskType
 from reasoner.pipeline import ReasonerPipeline
 from reasoner.phases._shared import is_article_request, build_followup_context
 from reasoner.presets import get_method_from_preset, get_preset_price_tier
+from reasoner.application.flows.augmentation import get_tier_augmentation_methods
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,7 @@ class PreflightDecision:
     router: ProviderRouter
     effective_preset_name: str
     auto_selected_method: str | None = None
+    augmentation_methods: list[str] | None = None
     recalled_chunks: list[dict] = field(default_factory=list)
     problem: str = ""
     conversation_history: list[dict] | None = None
@@ -158,6 +160,13 @@ class PipelineOrchestrator:
 
         # ── Act on HyperGate decision (or fallback) ──
         if gate_decision_fb is not None:
+            # Carry augmentation methods from gate decision (depth-detected pre-processing)
+            decision.augmentation_methods = (
+                gate_decision_fb.augmentation_methods
+                if gate_decision_fb.action == "pipeline"
+                else None
+            )
+
             if gate_decision_fb.action == "direct":
                 decision.action = "direct"
                 history = getattr(initial_state, "conversation_history", None)
@@ -187,6 +196,21 @@ class PipelineOrchestrator:
         # be overridden by pattern-matching on the user's prompt.
         if is_auto and is_article_request(req.problem):
             decision.auto_selected_method = "writing"
+
+        # ── Tier-appropriate augmentation methods ──
+        # Gate decisions carry augmentation_methods=None by default.
+        # Fill in tier-specific defaults so Budget users pay zero extra cost
+        # and Premium users get the full multi-method pre-processing.
+        if decision.action == "pipeline" and not decision.augmentation_methods:
+            tier = get_preset_price_tier(decision.effective_preset_name)
+            decision.augmentation_methods = get_tier_augmentation_methods(tier)
+
+        # ── A/B test: randomly assign baseline arm → disable augmentation ──
+        from reasoner.application.services.augmentation_metrics import should_disable_augmentation_for_ab
+        import hashlib as _hashlib
+        ab_run_id = _hashlib.sha256(req.problem.encode()).hexdigest()[:16]
+        if should_disable_augmentation_for_ab(req.problem, ab_run_id):
+            decision.augmentation_methods = []
 
         return decision
 
@@ -232,6 +256,7 @@ class PipelineOrchestrator:
             router=decision.router,
             preset_name=decision.effective_preset_name,
             initial_state=initial_state,
+            augmentation_methods=decision.augmentation_methods,
             **pipeline_kwargs,
         )
 

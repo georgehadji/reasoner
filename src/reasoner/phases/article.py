@@ -26,14 +26,25 @@ ARTICLE_RETRIEVAL_SONAR_SYSTEM = (
 
 
 def article_retrieval_plan_prompt(state: PipelineState) -> str:
-    return (
+    base = (
         f"{get_language_instruction(state)}\n\n"
         f"Research Topic: {_wrap_user_input(state.problem)}\n\n"
         f"Generate 3-5 distinct search queries to find the most useful sources. "
         f"Each query should target a different facet of the topic (e.g. technical details, "
-        f"expert reactions, historical context, recent developments, critical perspectives).\n\n"
-        f'Output JSON: {{"queries": ["<query 1>", "<query 2>", "<query 3>"]}}'
+        f"expert reactions, historical context, recent developments, critical perspectives)."
     )
+    # ── Inject pre-research insights from augmentation methods ──
+    pre_research = state.writing_state.get("pre_research_summary", "")
+    if pre_research:
+        base += (
+            f"\n\n=== PRE-RESEARCH INSIGHTS (from automated debate/critique/multi-perspective analysis) ===\n"
+            f"{pre_research}\n"
+            f"=== END PRE-RESEARCH ===\n\n"
+            f"Use these insights to refine your search queries — target specific claims, "
+            f"counterarguments, and perspectives identified above."
+        )
+    base += f'\n\nOutput JSON: {{"queries": ["<query 1>", "<query 2>", "<query 3>"]}}'
+    return base
 
 
 # ── Drafting ─────────────────────────────────────────────────────────────────
@@ -93,15 +104,28 @@ def article_draft_prompt(state: PipelineState) -> str:
             f"  Implications: {_safe_join_list(argument_map.get('implications', []))}\n\n"
         )
 
+    # ── Inject pre-research insights ──
+    pre_research = state.writing_state.get("pre_research_summary", "")
+    pre_research_block = ""
+    if pre_research:
+        pre_research_block = (
+            f"\nPre-Research Insights (analytical findings from debate/critique/multi-perspective):\n"
+            f"{_wrap_external_content(pre_research)}\n"
+        )
+
     return (
         f"{get_language_instruction(state)}\n\n"
         f"{style_block}"
         f"{argument_block}"
         f"Assignment: {_wrap_user_input(state.problem[:TRUNCATION.PROMPT])}\n\n"
         f"Sources (use these as your evidence base):\n"
-        f"{_wrap_external_content(sources_text)}\n\n"
+        f"{_wrap_external_content(sources_text)}"
+        f"{pre_research_block}\n"
         f"Write a complete, publication-ready article. Requirements:\n"
         f"- Open with a specific anecdote, scene, or surprising fact — not a generic statement\n"
+        f"- Incorporate the pre-research insights where relevant — use debate findings to "
+        f"strengthen your argument, critique findings to address weaknesses proactively, "
+        f"and multi-perspective findings to show intellectual range\n"
         f"- Cite sources inline as [Source Title](URL) whenever you draw on them\n"
         f"- Mark any claim without a source as [UNVERIFIED]\n"
         f"- Close with a forward-looking or thought-provoking conclusion\n"
@@ -208,11 +232,24 @@ def article_outline_prompt(state: PipelineState) -> str:
         pub = style_brief.get("publication", "")
         style_block = f"\nTarget publication: {pub}\n"
 
+    # ── Inject pre-research insights ──
+    pre_research = state.writing_state.get("pre_research_summary", "")
+    pre_research_block = ""
+    if pre_research:
+        pre_research_block = (
+            f"\nPre-Research Insights (from automated debate/critique/multi-perspective analysis):\n"
+            f"{_wrap_external_content(pre_research)}\n"
+        )
+
     return (
         f"{get_language_instruction(state)}\n\n"
         f"Topic: {_wrap_user_input(state.problem[:TRUNCATION.PROMPT])}{style_block}\n\n"
-        f"Available Sources:\n{_wrap_external_content(sources_text)}\n\n"
-        f"Construct an argument blueprint. Output JSON with this exact structure:\n"
+        f"Available Sources:\n{_wrap_external_content(sources_text)}"
+        f"{pre_research_block}\n"
+        f"Construct an argument blueprint. Incorporate the pre-research insights where "
+        f"relevant to strengthen the argument map (e.g., use debate findings for "
+        f"counterarguments, critique findings for limitations, perspective findings for "
+        f"current_explanations). Output JSON with this exact structure:\n"
         f"{{\n"
         f'  "suggested_title": "<article title>",\n'
         f'  "argument_map": {{\n'

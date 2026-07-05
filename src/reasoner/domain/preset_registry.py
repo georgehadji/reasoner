@@ -69,7 +69,7 @@ _REGISTRY: dict[str, dict] = {
         "routing": {
             "perspective_cot": "claude-sonnet",
             "perspective_analysis": "claude-sonnet",
-            "synthesis": "gpt-5.5",                  # 🇺🇸 OpenAI — cross-bloc final voice (counters CN-heavy generation)
+            "synthesis": "glm-5.2",                  # 🇺🇸 OpenAI — cross-bloc final voice (counters CN-heavy generation)
             # ── Per-perspective cross-bloc diversity (1🇺🇸 + 2🇨🇳 + 1🇪🇺) ──
             "constructive":  "claude-sonnet",    # 🇺🇸 Anthropic — $3/$15 per M
             "destructive":   "deepseek-v4-pro",  # 🇨🇳 DeepSeek — $0.435/$0.87 per M
@@ -81,7 +81,7 @@ _REGISTRY: dict[str, dict] = {
         "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
         "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
-        "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "verifier":       "grok-4.3",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "balanced", "multilingual"],
@@ -113,14 +113,14 @@ _REGISTRY: dict[str, dict] = {
             "constructive": "claude-sonnet",     # 🇺🇸 Anthropic — strongest argumentation
             "destructive":  "deepseek-v4-pro",   # 🇨🇳 DeepSeek — adversarial reasoning
             "systemic":     "gemini-pro",        # 🇺🇸 Google — judging (keep)
-            "synthesis": "gpt-5.5",              # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "glm-5.2",              # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
         "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
         "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
-        "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "verifier":       "grok-4.3",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "argumentative", "robust"],
@@ -144,14 +144,14 @@ _REGISTRY: dict[str, dict] = {
         "method": "jury",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "gpt-5.5",              # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "glm-5.2",              # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
         "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
         "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
-        "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "verifier":       "grok-4.3",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "governance", "decision-making"],
@@ -183,7 +183,7 @@ _REGISTRY: dict[str, dict] = {
         "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
         "scoring":        "sonar-deep-research", # Perplexity 🇺🇸 — explicit deep research mode, web-grounded scoring
         "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
-        "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "verifier":       "grok-4.3",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "research", "web-search"],
@@ -210,14 +210,14 @@ _REGISTRY: dict[str, dict] = {
         "method": "scientific",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "gpt-5.5",              # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "glm-5.2",              # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
         "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
         "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
-        "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "verifier":       "grok-4.3",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "scientific", "structured"],
@@ -241,14 +241,14 @@ _REGISTRY: dict[str, dict] = {
         "method": "socratic",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "gpt-5.5",              # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "glm-5.2",              # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
         "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
         "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
-        "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "verifier":       "grok-4.3",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "educational", "inquisitive"],
@@ -272,14 +272,14 @@ _REGISTRY: dict[str, dict] = {
         "method": "pre-mortem",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "gpt-5.5",              # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "glm-5.2",              # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
         "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
         "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
-        "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "verifier":       "grok-4.3",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "risk-assessment", "strategic"],
@@ -303,14 +303,14 @@ _REGISTRY: dict[str, dict] = {
         "method": "bayesian",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "gpt-5.5",              # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "glm-5.2",              # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
         "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
         "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
-        "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "verifier":       "grok-4.3",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "analytical", "probabilistic"],
@@ -334,14 +334,14 @@ _REGISTRY: dict[str, dict] = {
         "method": "dialectical",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "gpt-5.5",              # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "glm-5.2",              # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
         "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
         "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
-        "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "verifier":       "grok-4.3",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "argumentative", "philosophical"],
@@ -365,14 +365,14 @@ _REGISTRY: dict[str, dict] = {
         "method": "analogical",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "gpt-5.5",              # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "glm-5.2",              # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
         "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
         "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
-        "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "verifier":       "grok-4.3",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "creative", "reasoning"],
@@ -396,14 +396,14 @@ _REGISTRY: dict[str, dict] = {
         "method": "delphi",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "gpt-5.5",              # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "glm-5.2",              # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
         "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
         "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
-        "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "verifier":       "grok-4.3",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "collaborative", "forecasting"],
@@ -430,7 +430,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "cove",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "gpt-5.5",              # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "glm-5.2",              # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "cove_answer":    "deepseek-v4-pro",
         "cove_revise":    "deepseek-v4-flash",
@@ -440,7 +440,7 @@ _REGISTRY: dict[str, dict] = {
         "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
         "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
-        "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "verifier":       "grok-4.3",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "verification", "fact-checking"],
@@ -464,14 +464,14 @@ _REGISTRY: dict[str, dict] = {
         "method": "sot",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "gpt-5.5",              # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "glm-5.2",              # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
         "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
         "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
-        "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "verifier":       "grok-4.3",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "structured-thinking", "outlining"],
@@ -498,7 +498,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "tot",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "gpt-5.5",              # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "glm-5.2",              # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
@@ -508,7 +508,7 @@ _REGISTRY: dict[str, dict] = {
         "tot_backtrack":  "deepseek-v4-flash",
         "tot_decompose":  "claude-sonnet",
         "tot_evaluate":   "deepseek-v4-flash",
-        "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "verifier":       "grok-4.3",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "problem-solving", "exploration"],
@@ -532,14 +532,14 @@ _REGISTRY: dict[str, dict] = {
         "method": "pot",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "gpt-5.5",              # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "glm-5.2",              # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
         "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
         "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
-        "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "verifier":       "grok-4.3",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "programming", "code-generation"],
@@ -566,7 +566,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "self-discover",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "gpt-5.5",              # OpenAI 🇺🇸 — AI² Intel 54.8, 1M ctx, cross-bloc final voice
+            "synthesis": "glm-5.2",              # OpenAI 🇺🇸 — AI² Intel 54.8, 1M ctx, cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
@@ -576,7 +576,7 @@ _REGISTRY: dict[str, dict] = {
         "sd_implement":   "deepseek-v4-pro",
         "sd_select":      "deepseek-v4-pro",
         "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
-        "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "verifier":       "grok-4.3",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "reasoning", "self-improvement"],
@@ -605,7 +605,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "subagent",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "gpt-5.5",              # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "glm-5.2",              # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":                  "claude-sonnet",
         "fusion":                     "deepseek-v4-pro",
@@ -642,7 +642,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "writing",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "gpt-5.5",              # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "glm-5.2",              # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Article-flow roles (premium, v3.5) ──
         "primary":           "sonar-pro",          # Perplexity 🇺🇸 — native web search for source retrieval
         "writing_factcheck": "sonar-pro",          # Perplexity 🇺🇸 — live web verification
@@ -680,17 +680,17 @@ _REGISTRY: dict[str, dict] = {
         "method": "article",
         "primary_id": "claude-sonnet",
         "routing": {
-            "synthesis": "gpt-5.5",              # OpenAI 🇺🇸 — AI² Intel 54.8, 1M ctx, cross-bloc final voice
+            "synthesis": "qwen3.7-max",           # 🇨🇳 Qwen — 1M ctx, cross-bloc final voice, 88% cheaper output (was gpt-5.5)
         # ── Article-flow roles (premium, v3.5) ──
         "primary":           "sonar-pro",          # Perplexity 🇺🇸 — native web search + citations for premium research
         "writing_factcheck": "sonar-pro",          # Perplexity 🇺🇸 — live web verification, cross-bloc from CN scoring
         # ── Article editorial roles (premium, v3.6) ──
-        "writing_draft":       "gpt-5.5",            # 🇺🇸 OpenAI — frontier writing, AI² Intel 54.8 (was claude-sonnet)
+        "writing_draft":       "claude-sonnet",       # 🇺🇸 Anthropic — best long-form prose, 1M ctx, 66% cheaper than gpt-5.5 (was gpt-5.5)
         "writing_outline":     "claude-sonnet",       # 🇺🇸 Anthropic — outline alias for consistency
-        "article_sot_skeleton": "gpt-5.5",           # 🇺🇸 OpenAI — same model as draft, perfect structural alignment (was claude-sonnet)
+        "article_sot_skeleton": "claude-sonnet",       # 🇺🇸 Anthropic — same model as draft, perfect structural alignment (was gpt-5.5)
         "article_critic":      "grok-4.3",           # 🇺🇸 xAI — τ²-Bench 97.7% adversarial reasoning
-        "article_revise":      "gpt-5.5",           # 🇺🇸 OpenAI — same model as draft, frontier editorial revision (was gpt-5)
-        "article_humanize":    "gpt-5.5",           # 🇺🇸 OpenAI — same model as draft, frontier style refinement (was claude-sonnet)
+        "article_revise":      "deepseek-v4-pro",    # 🇨🇳 DeepSeek — cross-bloc dev edit, 1.6T MoE, 97% cheaper output (was gpt-5.5)
+        "article_humanize":    "claude-sonnet",       # 🇺🇸 Anthropic — same model as draft, voice-preserving style refinement (was gpt-5.5)
         "article_verifier":    "qwen3.7-max",        # 🇨🇳 Qwen — cross-bloc final audit
         # ── Reasoning model assignments (premium, v3.5) ──
         "fusion":            "deepseek-v4-pro",
@@ -747,7 +747,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "coding",
         "primary_id": "claude-sonnet",
         "routing": {
-            "synthesis": "gpt-5.5",              # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "glm-5.2",              # 🇨🇳 Zhipu — cross-bloc final voice, $0.95/$3.00 (was gpt-5.5)
         # ── Reasoning model assignments (premium, v3.4) ──
         "coding_assemble": "deepseek-v4-flash",
         "coding_review":   "deepseek-v4-flash",
@@ -755,10 +755,10 @@ _REGISTRY: dict[str, dict] = {
         "coding_tests":    "deepseek-v4-flash",
         "deep_read":       "claude-sonnet",
         "fusion":          "deepseek-v4-pro",
-        "meta_evaluator":  "qwen3.7-max",  # 🇨🇳 Qwen — cross-bloc from 🇺🇸 synthesis
+        "meta_evaluator":  "glm-5.2",       # 🇨🇳 Zhipu — cross-bloc meta-review, $0.95/$3.00 (was qwen3.7-max)
         "scoring":         "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing":  "claude-sonnet",
-        "verifier":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc from 🇺🇸 synthesis
+        "verifier":        "glm-5.2",           # 🇨🇳 Zhipu — cross-bloc verification, $0.95/$3.00 (was qwen3-max-thinking)
         "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "coding", "software-development"],
@@ -834,14 +834,14 @@ _REGISTRY: dict[str, dict] = {
         "routing": {
             "brainstorm_cluster": "claude-sonnet",
             "brainstorm_develop": "claude-sonnet",
-            "synthesis": "gpt-5.5",              # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "glm-5.2",              # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
         "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
         "scoring":        "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
-        "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "verifier":       "grok-4.3",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["premium", "creative"],
@@ -872,7 +872,7 @@ _REGISTRY: dict[str, dict] = {
         "meta_evaluator": "minimax-m3",          # MiniMax 🇨🇳 — AI² Intel 44.4, $0.30/$1.20 (3× cheaper than qwen3.7-max)
         "scoring":        "qwen3-max-thinking",
         "stress_testing": "grok-4.3",             # xAI 🇺🇸 — τ²-Bench 97.7% adversarial, $1.25/$2.50
-        "verifier":       "grok-4.20",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
+        "verifier":       "grok-4.3",           # xAI 🇺🇸 — lowest hallucination rate, 2M ctx
         "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
         "tags": ["image-generation", "creative", "premium"],

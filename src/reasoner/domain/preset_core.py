@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Literal, Optional, List
 # Removed ProviderRouter and _REGISTRY imports to restore domain purity.
 # Validation logic will be moved to an application service.
 from reasoner.domain.saas import SubscriptionTier
-from reasoner.core.constants_models import MODEL_GROK_420, MODEL_KIMI_K2_6
+from reasoner.core.constants_models import MODEL_GROK_43, MODEL_KIMI_K2_6
 
 if TYPE_CHECKING:
     from reasoner.core.protocol import PhaseConfig
@@ -221,7 +221,7 @@ def build_auto_preset(method: str, tier: str = "budget") -> str:
 # This ensures a consistent conversational persona across all methods.
 FOLLOWUP_AGENT_MODELS: dict[str, str] = {
     "budget": MODEL_KIMI_K2_6,
-    "premium": MODEL_GROK_420,
+    "premium": MODEL_GROK_43,
 }
 
 

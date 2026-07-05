@@ -147,6 +147,7 @@ class PipelineMeta:
     fallback_events: list[dict] = field(default_factory=list)
     preset_name: str | None = None
     method: str | None = None
+    augmentation_methods: list[str] | None = None
     context_quality: str = "unknown"  # "good" | "partial" | "contaminated" | "missing"
 
 

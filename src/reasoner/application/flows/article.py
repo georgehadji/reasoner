@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import List
+
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.application.flows.base import WorkflowStrategy, WorkflowServices, PhaseStep
 from reasoner.application.flows.article_phases import (
@@ -16,20 +17,29 @@ from reasoner.application.flows.article_phases import (
     run_article_final_audit_phase,
 )
 from reasoner.application.flows.synthesis_phase import run_synthesis_phase
+from reasoner.application.flows.augmentation import (
+    is_deep_question,
+    DEFAULT_AUGMENTATION_METHODS,
+    AUGMENTATION_PROMPTS,
+    AUGMENTATION_ROLES,
+    run_augmentation,
+)
 from reasoner.application.services.serializers import _ser_2, _ser_3, _ser_4, _ser_5
+
 
 class ArticleFlow(WorkflowStrategy):
     """
     Publication-grade editorial pipeline:
-    1.  Evidence Collection
-    2.  Argument Map / Outline (NEW)
+    1.  [Augmentation] — debate/critique pre-processing for deep questions
+    2.  Evidence Collection
+    2.5 Argument Map / Outline
     3.  First Draft
     4.  Fact Check + Claim Ledger
-    5.  Structural Adversarial Review (NEW)
-    6.  Developmental Edit (NEW)
-    7.  Style + Copy Edit (NEW)
-    8.  Final Editorial Audit (NEW)
-    9.  Synthesis
+    4.5 Structural Adversarial Review
+    5.  Developmental Edit
+    6.  Style + Copy Edit
+    7.  Final Editorial Audit
+    8.  Synthesis
     """
     
     def get_phases(self, state: PipelineState) -> List[PhaseStep]:
@@ -50,6 +60,9 @@ class ArticleFlow(WorkflowStrategy):
         state: PipelineState, 
         services: WorkflowServices,
     ) -> PipelineState:
+        # ── Pre-processing: run augmentation if depth-detected ──
+        await run_augmentation(state, services.call_llm, services.log)
+
         phases = self.get_phases(state)
         audit_retried = False
         

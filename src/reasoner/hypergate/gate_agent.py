@@ -37,6 +37,8 @@ class GateDecision(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
     reasoning: str | None = None
     complexity: str | None = None
+    language: str | None = None
+    augmentation_methods: list[str] | None = None
 
 
 # Internal opaque taxonomy. The LLM sees only the letters (A-L), never the real method names.

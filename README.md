@@ -1,4 +1,4 @@
-<div align="center">
+<div id="top" align="center">
 
 <!-- ASCII Banner -->
 <pre>
@@ -8,7 +8,7 @@
 ██╔══██║██╔══██╗██╔══██║        ██╔═══╝ ██║██╔══██╗██╔══╝  ██║     ██║██║╚██╗██║██╔══╝  
 ██║  ██║██║  ██║██║  ██║        ██║     ██║██║  ██║███████╗███████╗██║██║ ╚████║██╔════╗
 ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝        ╚═╝     ╚═╝╚═╝  ╚═╝╚══════╝╚══════╝╚═╝╚═╝  ╚═══╝╚══════╝
-v2.3 — Reasoner
+v2.3 — Reasoner — Augmented Reasoning Engine
 </pre>
 
 <!-- Badges -->
@@ -241,9 +241,7 @@ async def main():
     )
     pipeline = ReasonerPipeline(router=router, preset_name="multi-perspective-premium")
     state = await pipeline.run("Your complex problem here")
-```
     print(f"Task Type: {state.task_type}")
-    print(f"Sub-problems: {state.sub_problems}")
     print(f"Final Answer: {state.final_solution.core_solution}")
     print(f"Epistemic Label: {state.final_solution.epistemic_label}")
     print(f"Cost: ${state.total_cost_usd:.4f}")
@@ -472,9 +470,69 @@ Different model families are trained on different data distributions, reward fun
 
 ---
 
+## 🧪 Augmented Article Pipeline (v2.3)
+
+Reasoner automatically enriches deep/philosophical article questions with pre-processing augmentation before the main writing pipeline executes. When a question matches abstract concept patterns (Greek + English, 39 + 20 concepts), the pipeline runs **parallel pre-processing** methods and injects their insights into Evidence Collection, Outline, and Draft phases.
+
+### How It Works
+
+```
+User question → HyperGate deep concept guard → is_deep_question() regex
+    ↓ (deep question detected)
+Parallel augmentation (asyncio.gather):
+    ├─ Debate: structured pro/con analysis
+    ├─ Iterative Critique: adversarial self-critique
+    ├─ Jury: multi-expert panel (Premium tier)
+    └─ Socratic: recursive assumption-excavation questions (Premium tier)
+    ↓
+Combined pre_research_summary injected into:
+    ├─ Retrieval planning (refined search queries)
+    ├─ Outline generation (argument map enrichment)
+    └─ Draft composition (insight integration)
+```
+
+### Auto-Detection
+
+| Trigger | Examples |
+|---------|----------|
+| "What is X?" + abstract concept | "What is art?", "What is consciousness?" |
+| Greek philosophical keywords | "Τι είναι δικαιοσύνη;", "Ποια είναι η φύση της ηθικής;" |
+| Definitional framing | "What is the nature of reality?", "What is the purpose of existence?" |
+| Epistemological queries | "Can we ever truly know anything?", "Is there such a thing as free will?" |
+
+Non-philosophical questions ("How to make coffee", "What is the capital of France?") are correctly excluded.
+
+### Per-Tier Augmentation
+
+| Tier | Methods | Extra LLM calls | Cost impact |
+|------|---------|----------------|-------------|
+| Budget | *(none)* | 0 | No extra cost |
+| Standard | `debate` | 1 parallel call | ~$0.001 |
+| Premium | `debate` + `iterative_critique` + `jury` + `socratic` | 4 parallel calls | ~$0.004 |
+
+### Configuration
+
+```bash
+# Global kill switch (default: on)
+AUGMENTATION_ENABLED=true
+
+# LLM depth confirmation — filters regex false positives (default: off)
+AUGMENTATION_LLM_CONFIRM=false
+
+# Result caching — skips LLM calls on repeated deep questions (default: on)
+AUGMENTATION_CACHE_ENABLED=true
+AUGMENTATION_CACHE_MAX_ENTRIES=128
+AUGMENTATION_CACHE_TTL_SECONDS=86400
+
+# A/B quality metrics — 50/50 split augmented vs baseline (default: off)
+AUGMENTATION_AB_TEST=false
+```
+
+---
+
 ## 🔒 Security & Encryption
 
-Reasoner v2.1 implements a comprehensive **Zero-Trust** security architecture to ensure your data is protected at every stage.
+Reasoner v2.3 implements a comprehensive **Zero-Trust** security architecture to ensure your data is protected at every stage.
 
 - **End-to-End Transit Encryption:** All traffic, both external (client-to-proxy) and internal (inter-container), is encrypted via TLS 1.3/1.2.
 - **Internal PKI:** An automated certificate generation system provisions unique internal certificates for all services (`backend`, `frontend`, `database`, `redis`) on every startup.
@@ -643,18 +701,7 @@ cd ui-next && npm run lint
 
 <div align="center">
 
-**[⬆ Back to Top](#reasoner-v22)**
-
-Made with ❤️ and a lot of reasoning
-
-</div>
-es decisions. The epistemic labels (`VERIFIED` / `HYPOTHESIS` / `UNKNOWN`) are heuristic estimates, not guarantees of factual correctness.
-
----
-
-<div align="center">
-
-**[⬆ Back to Top](#reasoner-v22)**
+**[⬆ Back to Top](#top)**
 
 Made with ❤️ and a lot of reasoning
 
