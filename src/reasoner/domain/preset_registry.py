@@ -694,7 +694,7 @@ _REGISTRY: dict[str, dict] = {
         "article_verifier":    "qwen3.7-max",        # 🇨🇳 Qwen — cross-bloc final audit
         # ── Reasoning model assignments (premium, v3.5) ──
         "fusion":            "deepseek-v4-pro",
-        "writing_assemble":  "gpt-5-mini",         # 🇺🇸 OpenAI — same lab as draft, 400K ctx (was gpt-4o-mini)
+        "writing_assemble":  "gpt-4o-mini",         # 🇺🇸 OpenAI — proven reliable copy edit (was gpt-5-mini, empty response)
         "post_synthesis_verify": "sonar-pro",
         },
         "tags": ["premium", "writing", "article"],
