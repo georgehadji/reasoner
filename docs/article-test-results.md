@@ -62,10 +62,11 @@
 
 ## PREMIUM (article-premium)
 
-**Result:** ❌ CRASH  
-**Duration:** ~260s before crash  
+**Result:** ⚠️ PARTIAL (10/11 phases, article completed, synthesis timed out)  
+**Duration:** ~390s  
+**Fix applied:** Copy edit `gpt-5-mini` → `gpt-4o-mini` (confirmed working)
 
-### Phase observations
+### Phase observations (after fix)
 
 | Phase | Model | Result |
 |---|---|---|
@@ -76,18 +77,13 @@
 | Structural Review | `grok-4.3` | ✅ Logic critiqued |
 | Dev Edit | `gpt-5.5` | ✅ Revised |
 | Style Edit | `gpt-5.5` | ✅ Styled |
-| Copy Edit | `gpt-5-mini` | ❌ Empty response → fell back to `claude-sonnet` → ❌ Empty response → **CRASH** |
-| Final Audit | — | Not reached |
-| Synthesis | — | Not reached |
+| Copy Edit | `gpt-4o-mini` | ✅ Grammar corrected (was gpt-5-mini, now fixed) |
+| Final Audit | `qwen3.7-max` | ✅ Audit passed |
+| Synthesis | `gpt-5.5` → `claude-sonnet` | ❌ Both timed out (120s each) — infrastructure issue, not preset |
 
 ### Root cause
 
-`gpt-5-mini` and its fallback `claude-sonnet` both returned empty responses for the `writing_assemble` (copy edit) phase. The fallback chain exhausted, and the pipeline raised `RuntimeError`.
-
-**Fix needed:** The `writing_assemble` role for premium needs a model that reliably returns non-empty output for copy editing tasks. Options:
-- Add a `deepseek-v4-flash` fallback to the premium `writing_assemble` chain
-- Use `gpt-4o-mini` instead of `gpt-5-mini` for premium copy edit (the budget preset uses gpt-4o-mini successfully)
-- Add a third fallback to the cascading chain
+Synthesis phase timed out on both `gpt-5.5` and `claude-sonnet` fallback. The 120s phase timeout is insufficient for the full article + metadata prompt when using premium-tier models. This is an infrastructure timeout configuration issue, not a model routing problem. The article was fully written and edited by the preceding phases.
 
 ---
 
@@ -95,14 +91,13 @@
 
 | Dimension | Budget | Premium |
 |---|---|---|
-| Status | ✅ Complete article | ❌ Crash at phase 8/10 |
-| Article quality | Strong — 700 words, 9 citations | N/A |
-| Phases completed | 11/11 | 8/10 |
-| Total duration | ~7 min | ~4 min (crashed) |
-| Phase failures | 2 (recovered via fallback) | 2 (fatal) |
-| Real citations | Yes — 9 inline source URLs | N/A |
-| Structure | Clear thesis-antithesis-synthesis | N/A |
+| Status | ✅ Complete | ⚠️ Partial (article written, synth timed out) |
+| Phases completed | 11/11 | 10/11 |
+| Phase failures | 2 (recovered) | 1 (synth timeout, infrastructure) |
+| Total duration | ~7 min | ~6.5 min |
+| Real citations | 9 inline source URLs | N/A (output truncated) |
+| Structure | Thesis-antithesis-synthesis | N/A |
 
 ### Key finding
 
-Budget produces a publication-quality article with real citations but has two phase failures (dev edit + synthesis) that fall back gracefully. Premium's copy edit phase is unreliable with current routing — the gpt-5-mini → claude-sonnet fallback chain both fail on empty responses for the `writing_assemble` role.
+Both presets produce articles through all editing phases. Budget has two graceful fallbacks (dev edit + synthesis) that recover. Premium's copy edit fix (gpt-5-mini → gpt-4o-mini) is confirmed working. Synthesis timeout on premium is an infrastructure issue — the 120s phase timeout needs increasing for the full-article synthesis prompt size.
