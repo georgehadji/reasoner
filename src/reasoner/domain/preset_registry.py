@@ -667,7 +667,7 @@ _REGISTRY: dict[str, dict] = {
         # ── Article editorial roles (budget, v3.6) ──
         "article_sot_skeleton": "gpt-4o-mini",        # 🇺🇸 OpenAI — same bloc as draft, US-aligned structural planning (was deepseek-v4-flash)
         "article_critic":       "hermes-4-70b",       # 🇺🇸 Nous Research — critic-specialized adversarial review
-        "article_revise":       "claude-sonnet",       # 🇺🇸 Anthropic — same model as draft, best voice-preserving revision (was deepseek-v3)
+        "article_revise":       "deepseek-v4-flash",   # 🇨🇳 DeepSeek — reliable dev edit (was claude-sonnet, 2/3 empty responses)
         "article_humanize":     "claude-sonnet",       # 🇺🇸 Anthropic — same model as draft, voice-preserving style refinement (was qwen3.7-plus)
         "article_verifier":     "qwen3.5-flash",       # 🇨🇳 Qwen — cross-bloc checklist audit, cheapest 1M ctx (was qwen3.7-plus)
         # ── Reasoning model assignments (budget, v3.5) ──
