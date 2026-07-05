@@ -320,7 +320,7 @@ class Timeouts:
     # Phase-specific timeouts — tighter budgets per role
     CLASSIFICATION: float = 20.0
     DECOMPOSITION: float = 60.0
-    SYNTHESIS: float = 180.0   # v3.7: raised from 120s — article synthesis with full metadata exceeds 120s
+    SYNTHESIS: float = 240.0   # v3.7: raised from 120→180→240 — article synthesis with full metadata requires 4 min
 
 # Maximum wall-clock time for an entire pipeline run (seconds).
 # Set to 0 to disable (unbounded — original behavior).
