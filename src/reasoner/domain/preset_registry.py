@@ -69,7 +69,7 @@ _REGISTRY: dict[str, dict] = {
         "routing": {
             "perspective_cot": "claude-sonnet",
             "perspective_analysis": "claude-sonnet",
-            "synthesis": "glm-5.2",                  # 🇺🇸 OpenAI — cross-bloc final voice (counters CN-heavy generation)
+            "synthesis": "gpt-4o-mini",              # 🇺🇸 OpenAI — cross-bloc final voice (counters CN-heavy generation)
             # ── Per-perspective cross-bloc diversity (1🇺🇸 + 2🇨🇳 + 1🇪🇺) ──
             "constructive":  "claude-sonnet",    # 🇺🇸 Anthropic — $3/$15 per M
             "destructive":   "deepseek-v4-pro",  # 🇨🇳 DeepSeek — $0.435/$0.87 per M
@@ -113,7 +113,7 @@ _REGISTRY: dict[str, dict] = {
             "constructive": "claude-sonnet",     # 🇺🇸 Anthropic — strongest argumentation
             "destructive":  "deepseek-v4-pro",   # 🇨🇳 DeepSeek — adversarial reasoning
             "systemic":     "gemini-pro",        # 🇺🇸 Google — judging (keep)
-            "synthesis": "glm-5.2",              # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
@@ -144,7 +144,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "jury",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "glm-5.2",              # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
@@ -210,7 +210,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "scientific",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "glm-5.2",              # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
@@ -241,7 +241,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "socratic",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "glm-5.2",              # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
@@ -272,7 +272,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "pre-mortem",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "glm-5.2",              # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
@@ -303,7 +303,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "bayesian",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "glm-5.2",              # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
@@ -334,7 +334,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "dialectical",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "glm-5.2",              # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
@@ -365,7 +365,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "analogical",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "glm-5.2",              # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
@@ -396,7 +396,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "delphi",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "glm-5.2",              # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
@@ -430,7 +430,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "cove",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "glm-5.2",              # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "cove_answer":    "deepseek-v4-pro",
         "cove_revise":    "deepseek-v4-flash",
@@ -464,7 +464,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "sot",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "glm-5.2",              # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
@@ -498,7 +498,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "tot",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "glm-5.2",              # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
@@ -532,7 +532,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "pot",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "glm-5.2",              # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
@@ -566,7 +566,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "self-discover",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "glm-5.2",              # OpenAI 🇺🇸 — AI² Intel 54.8, 1M ctx, cross-bloc final voice
+            "synthesis": "gpt-4o-mini",          # OpenAI 🇺🇸 — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
@@ -605,7 +605,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "subagent",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "glm-5.2",              # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":                  "claude-sonnet",
         "fusion":                     "deepseek-v4-pro",
@@ -642,7 +642,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "writing",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "glm-5.2",              # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Article-flow roles (premium, v3.5) ──
         "primary":           "sonar-pro",          # Perplexity 🇺🇸 — native web search for source retrieval
         "writing_factcheck": "sonar-pro",          # Perplexity 🇺🇸 — live web verification
@@ -747,7 +747,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "coding",
         "primary_id": "claude-sonnet",
         "routing": {
-            "synthesis": "glm-5.2",              # 🇨🇳 Zhipu — cross-bloc final voice, $0.95/$3.00 (was gpt-5.5)
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice (was glm-5.2 🇨🇳)
         # ── Reasoning model assignments (premium, v3.4) ──
         "coding_assemble": "deepseek-v4-flash",
         "coding_review":   "deepseek-v4-flash",
@@ -834,7 +834,7 @@ _REGISTRY: dict[str, dict] = {
         "routing": {
             "brainstorm_cluster": "claude-sonnet",
             "brainstorm_develop": "claude-sonnet",
-            "synthesis": "glm-5.2",              # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",

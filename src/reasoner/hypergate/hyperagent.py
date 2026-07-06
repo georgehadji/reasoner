@@ -464,5 +464,5 @@ class HyperGateAgent:
             confidence=out.confidence,
             reasoning=out.reasoning or "TieBreaker resolution",
             complexity=ctx.complexity,
-            augmentation_methods=augmentation_methods if action == "pipeline" else None,
+            augmentation_methods=None,
         )
