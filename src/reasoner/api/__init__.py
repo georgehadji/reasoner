@@ -661,16 +661,26 @@ async def run_pipeline(
     # Idempotency: atomically register client_run_id (C2)
     if req.client_run_id:
         from reasoner.infrastructure.redis.run_state import _run_state_manager
-        if not await _run_state_manager.is_authoritative():
+        try:
+            if not await _run_state_manager.is_authoritative():
+                raise HTTPException(
+                    status_code=503,
+                    detail="Run state store unavailable. Retry after Redis recovers.",
+                    headers={"Retry-After": "10"},
+                )
+            if not await _run_state_manager.try_register(req.client_run_id):
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Run {req.client_run_id} is already in progress",
+                )
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.warning("Idempotency check failed due to run-state store error: %s", exc)
             raise HTTPException(
                 status_code=503,
-                detail="Run state store unavailable. Retry after Redis recovers.",
-                headers={"Retry-After": "10"},
-            )
-        if not await _run_state_manager.try_register(req.client_run_id):
-            raise HTTPException(
-                status_code=409,
-                detail=f"Run {req.client_run_id} is already in progress",
+                detail="Idempotency check failed due to temporary storage issue. Please try again.",
+                headers={"Retry-After": "5"},
             )
     # TODO(#502): use actual user tier from subscription DB
     return StreamingResponse(

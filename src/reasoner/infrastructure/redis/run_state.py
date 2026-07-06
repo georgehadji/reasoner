@@ -131,6 +131,12 @@ class RunStateManager:
             except Exception:
                 self._redis_ok = False
                 self._redis_last_fail = time.monotonic()
+        
+        # If in development/non-production, we can proceed with fallback
+        from reasoner.core.settings import settings
+        if settings.ENVIRONMENT != "production":
+            return True
+
         return False
 
     async def try_register(self, client_run_id: str, ttl: int = 3600) -> bool:
@@ -142,13 +148,23 @@ class RunStateManager:
         fallback). Callers MUST gate behind is_authoritative() and respond with
         503 unless they explicitly accept the lack of atomicity.
         """
+        from reasoner.core.settings import settings
+        is_prod = settings.ENVIRONMENT == "production"
+
         if not self._redis_ok:
+            if not is_prod:
+                return self._get_fallback().try_register(client_run_id, ttl)
             raise RuntimeError(
                 "RunStateManager is in fallback mode — try_register() cannot guarantee "
                 "atomic idempotency. Call is_authoritative() first and respond 503 when "
                 "it returns False."
             )
-        return await self._redis_op(lambda: self._try_register_redis(client_run_id, ttl))
+        try:
+            return await self._redis_op(lambda: self._try_register_redis(client_run_id, ttl))
+        except _RedisUnavailable:
+            if not is_prod:
+                return self._get_fallback().try_register(client_run_id, ttl)
+            raise
 
     async def _try_register_redis(self, client_run_id: str, ttl: int) -> bool:
         redis = self._get_redis()
