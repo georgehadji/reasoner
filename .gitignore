@@ -20,7 +20,6 @@ eggs/
 # lib64/
 parts/
 sdist/
-tests/
 var/
 wheels/
 *.egg-info/
@@ -53,6 +52,7 @@ settings.json
 
 # Git worktrees
 .worktrees/
+
 # Local agent profile configs (may contain secrets)
 .openclaude-profile.json
 
@@ -67,3 +67,12 @@ src/reasoner/cache/
 src/reasoner/history/
 graphify-out/
 tasks/
+
+# Pipeline output artifacts — from live runs
+article-budget*.json
+article-premium*.json
+reasoner-output-*.md
+*.graphify_*.json
+autonomous_bug_fix_report.json
+method_test_results.json
+tmp_req.json

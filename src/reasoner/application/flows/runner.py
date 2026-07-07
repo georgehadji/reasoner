@@ -17,6 +17,7 @@ from reasoner.exceptions import classify_error, is_retryable
 
 logger = logging.getLogger(__name__)
 
+
 class WorkflowRunner:
     """
     Executes a WorkflowStrategy with full lifecycle management:
@@ -53,6 +54,12 @@ class WorkflowRunner:
         """
         Execute a single PhaseStep with retries, quality checks, and events.
         Returns True if successful, False if fatal error occurred.
+
+        Note: the SSE streaming path (api/execution/pipeline.py) has its own
+        phase execution loop because it needs SSE keepalive, WebSocket broadcast,
+        and PhaseSpan observability — concerns that don't apply to the CLI
+        WorkflowStrategy path. These are intentionally separate execution
+        contexts, not duplicate code.
         """
         num = step.num
         name = step.name
@@ -62,7 +69,6 @@ class WorkflowRunner:
         phase_key = f"Phase {num}: {name}"
         state._current_phase_key = phase_key
         
-        # 1. Publish Phase Started Event
         start_evt = make_event(
             EventType.PHASE_STARTED,
             aggregate_id=state.conversation_id or "unknown",
@@ -79,13 +85,10 @@ class WorkflowRunner:
         for attempt in range(max_retries + 1):
             try:
                 timeout = get_phase_timeout(name)
-                # Execute the phase function
                 await asyncio.wait_for(fn(state, self.services, **kwargs), timeout=timeout)
                 
-                # Quality check
                 quality_result = await self.monitor.evaluate(name, state, attempt=attempt + 1)
                 
-                # Publish Quality Event
                 quality_evt = make_event(
                     EventType.PHASE_QUALITY_CHECKED,
                     aggregate_id=state.conversation_id or "unknown",
@@ -102,7 +105,6 @@ class WorkflowRunner:
                     break
                 
                 if attempt < max_retries:
-                    # Retry logic
                     if quality_result.suggestions:
                         state.quality_hints[name] = " ".join(quality_result.suggestions)
                     
@@ -139,13 +141,12 @@ class WorkflowRunner:
                     break
                 
                 self.services.log(name, f"Error: {err_msg}. Retrying...", state)
-                await asyncio.sleep(1) # Backoff
+                await asyncio.sleep(1)
 
         if success:
             duration = time.monotonic() - phase_start_time
             state.phase_durations[phase_key] = duration
             
-            # Publish Completed Event
             complete_evt = make_event(
                 EventType.PHASE_COMPLETED,
                 aggregate_id=state.conversation_id or "unknown",
@@ -157,7 +158,7 @@ class WorkflowRunner:
             await self.bus.publish(complete_evt)
             return True
             
-        return not critical # If not critical, we continue even if phase failed quality
+        return not critical
 
     async def _handle_phase_error(self, state: PipelineState, name: str, message: str, is_fatal: bool):
         state.errors.append(message)
