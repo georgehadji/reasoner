@@ -141,6 +141,10 @@ MODEL_KIMI_K2_5: str = "kimi-k2-5"
 MODEL_KIMI_K2_6: str = "kimi-k2-6"
 MODEL_KIMI_K2_7_CODE: str = "kimi-k2-7-code"
 
+# Tencent
+MODEL_HY3: str = "hy3"
+MODEL_HY3_PREVIEW: str = "hy3-preview"
+
 # GLM (Zhipu)
 MODEL_GLM_5_2: str = "glm-5.2"
 

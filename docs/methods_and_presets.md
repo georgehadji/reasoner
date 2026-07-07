@@ -45,7 +45,7 @@
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|
 | primary | `gemini-flash-lite` | qwen/qwen3.5-flash-02-23 | qwen |
-| synthesis | `gpt-4o-mini` | openai/gpt-4o-mini | openai |
+| synthesis | `hy3` | openai/hy3 | tencent |
 | fusion | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
 | meta_evaluator | `qwen3.5-flash` | qwen/qwen3.5-flash-02-23 | qwen |
 | scoring | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
@@ -76,10 +76,10 @@
 | writing_factcheck | `sonar` | perplexity/sonar | perplexity |
 | writing_assemble | `gpt-4o-mini` | openai/gpt-4o-mini | openai |
 | article_sot_skeleton | `gpt-4o-mini` | openai/gpt-4o-mini | openai |
-| article_critic | `hermes-4-70b` | nousresearch/hermes-4-70b | nousresearch |
+| article_critic | `hy3` | nousresearch/hy3 | tencent |
 | article_revise | `claude-sonnet` | anthropic/claude-sonnet-5 | anthropic |
 | article_humanize | `claude-sonnet` | anthropic/claude-sonnet-5 | anthropic |
-| article_verifier | `qwen3.5-flash` | qwen/qwen3.5-flash-02-23 | qwen |
+| article_verifier | `hy3` | qwen/hy3-02-23 | tencent |
 | post_synthesis_verify | `sonar` | perplexity/sonar | perplexity |
 
 #### `article-premium` — 13 roles
@@ -105,7 +105,7 @@
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|
 | primary | `claude-haiku` | anthropic/claude-haiku-4.5 | anthropic |
-| synthesis | `gpt-4o-mini` | openai/gpt-4o-mini | openai |
+| synthesis | `hy3` | openai/hy3 | tencent |
 | fusion | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
 | meta_evaluator | `qwen3.5-flash` | qwen/qwen3.5-flash-02-23 | qwen |
 | scoring | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
@@ -132,7 +132,7 @@
 | primary | `claude-haiku` | anthropic/claude-haiku-4.5 | anthropic |
 | brainstorm_cluster | `google/gemma-2-9b-it` | google/gemma-3-12b-it | google |
 | brainstorm_develop | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
-| synthesis | `gpt-4o-mini` | openai/gpt-4o-mini | openai |
+| synthesis | `hy3` | openai/hy3 | tencent |
 | fusion | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
 | meta_evaluator | `qwen3.5-flash` | qwen/qwen3.5-flash-02-23 | qwen |
 | scoring | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
@@ -159,7 +159,7 @@
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|
 | primary | `qwen3-coder-flash` | qwen/qwen3-coder-flash | qwen |
-| synthesis | `gpt-4o-mini` | openai/gpt-4o-mini | openai |
+| synthesis | `hy3` | openai/hy3 | tencent |
 | coding_assemble | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
 | coding_review | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
 | coding_spec | `qwen3-coder-flash` | qwen/qwen3-coder-flash | qwen |
@@ -192,7 +192,7 @@
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|
 | primary | `gemini-flash-lite` | qwen/qwen3.5-flash-02-23 | qwen |
-| synthesis | `gpt-4o-mini` | openai/gpt-4o-mini | openai |
+| synthesis | `hy3` | openai/hy3 | tencent |
 | cove_answer | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
 | cove_revise | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
 | cove_verify | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
@@ -223,7 +223,7 @@
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|
 | primary | `gemini-flash-lite` | qwen/qwen3.5-flash-02-23 | qwen |
-| synthesis | `gpt-4o-mini` | openai/gpt-4o-mini | openai |
+| synthesis | `hy3` | openai/hy3 | tencent |
 | fusion | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
 | meta_evaluator | `qwen3.5-flash` | qwen/qwen3.5-flash-02-23 | qwen |
 | scoring | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
@@ -251,7 +251,7 @@
 | constructive | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
 | destructive | `gpt-oss-120b` | openai/gpt-oss-120b | openai |
 | systemic | `gemini-flash` | google/gemini-3.5-flash | google |
-| synthesis | `gpt-4o-mini` | openai/gpt-4o-mini | openai |
+| synthesis | `hy3` | openai/hy3 | tencent |
 | fusion | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
 | meta_evaluator | `qwen3.5-flash` | qwen/qwen3.5-flash-02-23 | qwen |
 | scoring | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
@@ -279,7 +279,7 @@
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|
 | primary | `gemini-flash-lite` | qwen/qwen3.5-flash-02-23 | qwen |
-| synthesis | `gpt-4o-mini` | openai/gpt-4o-mini | openai |
+| synthesis | `hy3` | openai/hy3 | tencent |
 | fusion | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
 | meta_evaluator | `qwen3.5-flash` | qwen/qwen3.5-flash-02-23 | qwen |
 | scoring | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
@@ -304,7 +304,7 @@
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|
 | primary | `gemini-flash-lite` | qwen/qwen3.5-flash-02-23 | qwen |
-| synthesis | `gpt-4o-mini` | openai/gpt-4o-mini | openai |
+| synthesis | `hy3` | openai/hy3 | tencent |
 | fusion | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
 | meta_evaluator | `qwen3.5-flash` | qwen/qwen3.5-flash-02-23 | qwen |
 | scoring | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
@@ -379,7 +379,7 @@
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|
 | primary | `gemini-flash-lite` | qwen/qwen3.5-flash-02-23 | qwen |
-| synthesis | `gpt-4o-mini` | openai/gpt-4o-mini | openai |
+| synthesis | `hy3` | openai/hy3 | tencent |
 | fusion | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
 | meta_evaluator | `qwen3.5-flash` | qwen/qwen3.5-flash-02-23 | qwen |
 | scoring | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
@@ -408,12 +408,12 @@
 | perspective_analysis | `qwen3.6-flash` | qwen/qwen3.6-flash | qwen |
 | constructive | `deepseek-v3` | deepseek/deepseek-v3.2 | deepseek |
 | destructive | `hermes-4-70b` | nousresearch/hermes-4-70b | nousresearch |
-| systemic | `qwen3.7-plus` | qwen/qwen3.7-plus | qwen |
+| systemic | `hy3` | qwen/hy3 | tencent |
 | minimalist | `ministral-8b` | mistralai/mistral-small-3.2-24b-instruct | mistral |
 | synthesis | `qwen3-max` | qwen/qwen3.7-plus | qwen |
 | fusion | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
 | meta_evaluator | `qwen3.5-flash` | qwen/qwen3.5-flash-02-23 | qwen |
-| scoring | `gpt-4o-mini` | openai/gpt-4o-mini | openai |
+| scoring | `hy3` | openai/hy3 | tencent |
 | stress_testing | `ring-2.6-1t` | inclusionai/ring-2.6-1t | inclusionai |
 | verifier | `qwen3.5-flash` | qwen/qwen3.5-flash-02-23 | qwen |
 
@@ -445,7 +445,7 @@
 | destructive | `ling-2.6-flash-free` | inclusionai/ling-2.6-flash | inclusionai |
 | systemic | `gpt-oss-20b` | openai/gpt-oss-20b | openai |
 | minimalist | `ministral-8b` | mistralai/mistral-small-3.2-24b-instruct | mistral |
-| synthesis | `gpt-4o-mini` | openai/gpt-4o-mini | openai |
+| synthesis | `hy3` | openai/hy3 | tencent |
 | fusion | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
 | meta_evaluator | `qwen3.5-flash` | qwen/qwen3.5-flash-02-23 | qwen |
 | scoring | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
@@ -466,7 +466,7 @@
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|
 | primary | `gemini-flash-lite` | qwen/qwen3.5-flash-02-23 | qwen |
-| synthesis | `gpt-4o-mini` | openai/gpt-4o-mini | openai |
+| synthesis | `hy3` | openai/hy3 | tencent |
 | fusion | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
 | meta_evaluator | `qwen3.5-flash` | qwen/qwen3.5-flash-02-23 | qwen |
 | scoring | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
@@ -491,7 +491,7 @@
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|
 | primary | `gemini-flash-lite` | qwen/qwen3.5-flash-02-23 | qwen |
-| synthesis | `gpt-4o-mini` | openai/gpt-4o-mini | openai |
+| synthesis | `hy3` | openai/hy3 | tencent |
 | fusion | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
 | meta_evaluator | `qwen3.5-flash` | qwen/qwen3.5-flash-02-23 | qwen |
 | scoring | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
@@ -516,7 +516,7 @@
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|
 | primary | `claude-haiku` | anthropic/claude-haiku-4.5 | anthropic |
-| synthesis | `gpt-4o-mini` | openai/gpt-4o-mini | openai |
+| synthesis | `hy3` | openai/hy3 | tencent |
 | deep_read | `sonar-pro-search` | perplexity/sonar-pro-search | perplexity |
 | fusion | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
 | meta_evaluator | `qwen3.5-flash` | qwen/qwen3.5-flash-02-23 | qwen |
@@ -542,7 +542,7 @@
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|
 | primary | `claude-haiku` | anthropic/claude-haiku-4.5 | anthropic |
-| synthesis | `gpt-4o-mini` | openai/gpt-4o-mini | openai |
+| synthesis | `hy3` | openai/hy3 | tencent |
 | fusion | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
 | meta_evaluator | `qwen3.5-flash` | qwen/qwen3.5-flash-02-23 | qwen |
 | scoring | `qwen3.6-flash` | qwen/qwen3.6-flash | qwen |
@@ -567,7 +567,7 @@
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|
 | primary | `gemini-flash-lite` | qwen/qwen3.5-flash-02-23 | qwen |
-| synthesis | `gpt-4o-mini` | openai/gpt-4o-mini | openai |
+| synthesis | `hy3` | openai/hy3 | tencent |
 | fusion | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
 | meta_evaluator | `qwen3.5-flash` | qwen/qwen3.5-flash-02-23 | qwen |
 | scoring | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
@@ -598,7 +598,7 @@
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|
 | primary | `gemini-flash-lite` | qwen/qwen3.5-flash-02-23 | qwen |
-| synthesis | `gpt-4o-mini` | openai/gpt-4o-mini | openai |
+| synthesis | `hy3` | openai/hy3 | tencent |
 | fusion | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
 | meta_evaluator | `qwen3.5-flash` | qwen/qwen3.5-flash-02-23 | qwen |
 | scoring | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
@@ -623,7 +623,7 @@
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|
 | primary | `gemini-flash-lite` | qwen/qwen3.5-flash-02-23 | qwen |
-| synthesis | `gpt-4o-mini` | openai/gpt-4o-mini | openai |
+| synthesis | `hy3` | openai/hy3 | tencent |
 | fusion | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
 | meta_evaluator | `qwen3.5-flash` | qwen/qwen3.5-flash-02-23 | qwen |
 | scoring | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
@@ -648,7 +648,7 @@
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|
 | primary | `gemini-flash-lite` | qwen/qwen3.5-flash-02-23 | qwen |
-| synthesis | `gpt-4o-mini` | openai/gpt-4o-mini | openai |
+| synthesis | `hy3` | openai/hy3 | tencent |
 | fusion | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
 | meta_evaluator | `qwen3.7-plus` | qwen/qwen3.7-plus | qwen |
 | scoring | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
@@ -683,7 +683,7 @@
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|
 | primary | `gemini-flash-lite` | qwen/qwen3.5-flash-02-23 | qwen |
-| synthesis | `gpt-4o-mini` | openai/gpt-4o-mini | openai |
+| synthesis | `hy3` | openai/hy3 | tencent |
 | fusion | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
 | meta_evaluator | `qwen3.5-flash` | qwen/qwen3.5-flash-02-23 | qwen |
 | scoring | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
@@ -714,7 +714,7 @@
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|
 | primary | `gemini-flash-lite` | qwen/qwen3.5-flash-02-23 | qwen |
-| synthesis | `gpt-4o-mini` | openai/gpt-4o-mini | openai |
+| synthesis | `hy3` | openai/hy3 | tencent |
 | fusion | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |
 | meta_evaluator | `qwen3.7-plus` | qwen/qwen3.7-plus | qwen |
 | scoring | `deepseek-v4-flash` | deepseek/deepseek-v4-flash | deepseek |

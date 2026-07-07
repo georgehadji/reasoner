@@ -234,6 +234,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ═══════════════════════════════════════════════════════════════
     # Tencent
     # ═══════════════════════════════════════════════════════════════
+    "hy3":               {"model": "tencent/hy3"},               # 295B MoE (21B active, 192 experts, top-8), 262K ctx, $0.20/$0.80 per M, configurable reasoning effort (none/low/high CoT), anti-hallucination — answers grounded, flags missing evidence
     "hy3-preview":      {"model": "tencent/hy3-preview"},
     # ═══════════════════════════════════════════════════════════════
     # ByteDance Seed

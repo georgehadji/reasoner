@@ -44,6 +44,8 @@ _MODEL_LABS: dict[str, str] = {
     "qwen3-coder-flash": "qwen", "qwen3-coder-30b-a3b": "qwen",
     # GLM (Zhipu)
     "glm-5.2": "zhipu",
+    # Tencent
+    "hy3": "tencent", "hy3-preview": "tencent",
     # MiniMax
     "minimax-m3": "minimax", "minimax-m2.7": "minimax", "minimax-m2.5": "minimax",
     "minimax-m2.1": "minimax", "minimax-m2": "minimax", "minimax-m1": "minimax",

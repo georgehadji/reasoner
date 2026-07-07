@@ -29,12 +29,12 @@ _REGISTRY: dict[str, dict] = {
             # ── Per-perspective echo-chamber-resistant diversity (4 labs, 3 blocs: 2🇨🇳 + 1🇺🇸 + 1🇫🇷) ──
             "constructive":  "deepseek-v3",           # 🇨🇳 DeepSeek V3.2 — $0.12/$0.50 (was v4-flash, 4-lab diversity)
             "destructive":   "hermes-4-70b",      # 🇺🇸 Nous Research — critic-specialized ($0.13/$0.40) (was ring-2.6-1t 🇨🇳, cross-bloc echo resistance)
-            "systemic":      "qwen3.7-plus",     # 🇨🇳 Qwen/Alibaba — broad systems thinking ($0.32/$1.28) (was gpt-4o-mini 🇺🇸, stronger multi-domain reasoning)
+            "systemic":      "hy3",     # 🇨🇳 Tencent — 295B MoE, anti-hallucination, configurable CoT, $0.20/$0.80 (was qwen3.7-plus)
             "minimalist":    "ministral-8b",     # 🇫🇷 Mistral — $0.075/$0.20
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
-        "scoring":        "gpt-4o-mini",              # 🇺🇸 OpenAI — cross-bloc critic of 🇨🇳 synthesis (was deepseek-v4-flash 🇨🇳)
+        "scoring":        "hy3",              # 🇨🇳 Tencent — anti-hallucination scoring, configurable CoT, $0.20/$0.80 (was gpt-4o-mini)
         "stress_testing": "ring-2.6-1t",
         "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
         "post_synthesis_verify": "sonar",  # added v3.5
@@ -47,7 +47,7 @@ _REGISTRY: dict[str, dict] = {
         "routing": {
             "perspective_cot": "qwen3.5-flash",       # was qwen3.5-9b → 1M ctx (vs 262K), multimodal
             "perspective_analysis": "qwen3.6-flash",   # was qwen3.5-9b → stronger reasoning, 1M ctx
-            "synthesis": "gpt-4o-mini",                # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring (was stepfun 🇨🇳)
+            "synthesis": "hy3",                # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini) vs CN scoring (was stepfun 🇨🇳)
             # ── Per-perspective cross-bloc diversity (2🇨🇳 + 1🇺🇸 + 1🇫🇷, ultra-cheap) ──
             "constructive":  "stepfun-3.7-flash",    # 🇨🇳 StepFun — $0.20/$1.15
             "destructive":   "ling-2.6-flash-free",  # 🇨🇳 inclusionAI — FREE
@@ -69,7 +69,7 @@ _REGISTRY: dict[str, dict] = {
         "routing": {
             "perspective_cot": "claude-sonnet",
             "perspective_analysis": "claude-sonnet",
-            "synthesis": "gpt-4o-mini",              # 🇺🇸 OpenAI — cross-bloc final voice (counters CN-heavy generation)
+            "synthesis": "hy3",              # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini) (counters CN-heavy generation)
             # ── Per-perspective cross-bloc diversity (1🇺🇸 + 2🇨🇳 + 1🇪🇺) ──
             "constructive":  "claude-sonnet",    # 🇺🇸 Anthropic — $3/$15 per M
             "destructive":   "deepseek-v4-pro",  # 🇨🇳 DeepSeek — $0.435/$0.87 per M
@@ -94,7 +94,7 @@ _REGISTRY: dict[str, dict] = {
             "constructive": "deepseek-v4-flash",    # 🇨🇳 DeepSeek — constructive argumentation
             "destructive":  "gpt-oss-120b",     # 🇺🇸 OpenAI open-weight — adversarial critique (was ring 🇨🇳, cross-bloc debate)
             "systemic":     "gemini-flash",     # 🇺🇸 Google — judging (keep)
-            "synthesis": "gpt-4o-mini",         # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
+            "synthesis": "hy3",         # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini) vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
@@ -113,7 +113,7 @@ _REGISTRY: dict[str, dict] = {
             "constructive": "claude-sonnet",     # 🇺🇸 Anthropic — strongest argumentation
             "destructive":  "deepseek-v4-pro",   # 🇨🇳 DeepSeek — adversarial reasoning
             "systemic":     "gemini-pro",        # 🇺🇸 Google — judging (keep)
-            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "hy3",          # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini)
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
@@ -129,7 +129,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "jury",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
+            "synthesis": "hy3",          # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini) vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
@@ -144,7 +144,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "jury",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "hy3",          # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini)
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
@@ -160,7 +160,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "research",
         "primary_id": "claude-haiku",
         "routing": {
-            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
+            "synthesis": "hy3",          # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini) vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
         "deep_read":      "sonar-pro-search",    # Perplexity 🇺🇸 — higher search context, $1/$1 per M
         "fusion":         "deepseek-v4-flash",
@@ -195,7 +195,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "scientific",
         "primary_id": "claude-haiku",
         "routing": {
-            "synthesis": "gpt-4o-mini",          # OpenAI 🇺🇸 — cross-bloc final voice
+            "synthesis": "hy3",          # OpenAI 🇺🇸 — cross-bloc final voice
         # ── Reasoning model assignments (budget, v3.5, cross-lab falsification) ──
         "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
@@ -210,7 +210,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "scientific",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "hy3",          # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini)
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
@@ -226,7 +226,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "socratic",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
+            "synthesis": "hy3",          # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini) vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
@@ -241,7 +241,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "socratic",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "hy3",          # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini)
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
@@ -257,7 +257,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "pre-mortem",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
+            "synthesis": "hy3",          # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini) vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
@@ -272,7 +272,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "pre-mortem",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "hy3",          # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini)
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
@@ -288,7 +288,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "bayesian",
         "primary_id": "claude-haiku",
         "routing": {
-            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
+            "synthesis": "hy3",          # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini) vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
@@ -303,7 +303,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "bayesian",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "hy3",          # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini)
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
@@ -319,7 +319,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "dialectical",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
+            "synthesis": "hy3",          # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini) vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
@@ -334,7 +334,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "dialectical",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "hy3",          # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini)
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
@@ -350,7 +350,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "analogical",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
+            "synthesis": "hy3",          # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini) vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
@@ -365,7 +365,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "analogical",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "hy3",          # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini)
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
@@ -381,7 +381,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "delphi",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
+            "synthesis": "hy3",          # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini) vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
@@ -396,7 +396,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "delphi",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "hy3",          # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini)
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
@@ -412,7 +412,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "cove",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
+            "synthesis": "hy3",          # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini) vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
         "cove_answer":    "deepseek-v4-flash",
         "cove_revise":    "deepseek-v4-flash",
@@ -430,7 +430,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "cove",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "hy3",          # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini)
         # ── Reasoning model assignments (premium, v3.4) ──
         "cove_answer":    "deepseek-v4-pro",
         "cove_revise":    "deepseek-v4-flash",
@@ -449,7 +449,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "sot",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
+            "synthesis": "hy3",          # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini) vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
@@ -464,7 +464,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "sot",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "hy3",          # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini)
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
@@ -480,7 +480,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "tot",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
+            "synthesis": "hy3",          # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini) vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
@@ -498,7 +498,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "tot",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "hy3",          # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini)
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
@@ -517,7 +517,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "pot",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
+            "synthesis": "hy3",          # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini) vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
@@ -532,7 +532,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "pot",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "hy3",          # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini)
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
@@ -548,7 +548,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "self-discover",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
+            "synthesis": "hy3",          # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini) vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
@@ -566,7 +566,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "self-discover",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "gpt-4o-mini",          # OpenAI 🇺🇸 — cross-bloc final voice
+            "synthesis": "hy3",          # OpenAI 🇺🇸 — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
@@ -585,7 +585,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "subagent",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
+            "synthesis": "hy3",          # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini) vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":                     "deepseek-v4-flash",
         "meta_evaluator":             "qwen3.7-plus",  # cross-lab from DeepSeek scoring
@@ -605,7 +605,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "subagent",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "hy3",          # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini)
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":                  "claude-sonnet",
         "fusion":                     "deepseek-v4-pro",
@@ -626,7 +626,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "writing",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
+            "synthesis": "hy3",          # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini) vs CN scoring
         # ── Article-flow roles (budget, v3.5) ──
         "primary":           "sonar",              # Perplexity 🇺🇸 — native web search for source retrieval
         "writing_factcheck": "sonar",              # Perplexity 🇺🇸 — live web verification
@@ -642,7 +642,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "writing",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "hy3",          # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini)
         # ── Article-flow roles (premium, v3.5) ──
         "primary":           "sonar-pro",          # Perplexity 🇺🇸 — native web search for source retrieval
         "writing_factcheck": "sonar-pro",          # Perplexity 🇺🇸 — live web verification
@@ -666,10 +666,10 @@ _REGISTRY: dict[str, dict] = {
         "writing_assemble":  "gpt-4o-mini",       # 🇺🇸 OpenAI — same bloc as draft, proven reliable copy edit (was deepseek-v4-flash)
         # ── Article editorial roles (budget, v3.6) ──
         "article_sot_skeleton": "gpt-4o-mini",        # 🇺🇸 OpenAI — same bloc as draft, US-aligned structural planning (was deepseek-v4-flash)
-        "article_critic":       "hermes-4-70b",       # 🇺🇸 Nous Research — critic-specialized adversarial review
+        "article_critic":       "hy3",       # 🇨🇳 Tencent — 295B MoE, configurable high-CoT for deep critique, $0.20/$0.80 (was hermes-4-70b)
         "article_revise":       "deepseek-v4-flash",   # 🇨🇳 DeepSeek — reliable dev edit (was claude-sonnet, 2/3 empty responses)
         "article_humanize":     "claude-sonnet",       # 🇺🇸 Anthropic — same model as draft, voice-preserving style refinement (was qwen3.7-plus)
-        "article_verifier":     "qwen3.5-flash",       # 🇨🇳 Qwen — cross-bloc checklist audit, cheapest 1M ctx (was qwen3.7-plus)
+        "article_verifier":     "hy3",       # 🇨🇳 Tencent — anti-hallucination audit, 295B MoE, $0.20/$0.80 (was qwen3.5-flash)
         # ── Reasoning model assignments (budget, v3.5) ──
         "fusion":           "deepseek-v4-flash",
         "post_synthesis_verify": "sonar",
@@ -709,7 +709,7 @@ _REGISTRY: dict[str, dict] = {
         # deepseek-v4-flash preferred over older V3 (timed out at 120s).
         "primary_id": "qwen3-coder-flash",
         "routing": {
-            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
+            "synthesis": "hy3",          # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini) vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
         "coding_assemble": "laguna-xs-2.1",    # 🇺🇸 Poolside ($0.06/$0.12) — dedicated coding agent (was deepseek-v4-flash)
         "coding_review":   "deepseek-v4-flash",
@@ -747,7 +747,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "coding",
         "primary_id": "claude-sonnet",
         "routing": {
-            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice (was glm-5.2 🇨🇳)
+            "synthesis": "hy3",          # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini) (was glm-5.2 🇨🇳)
         # ── Reasoning model assignments (premium, v3.4) ──
         "coding_assemble": "deepseek-v4-flash",
         "coding_review":   "deepseek-v4-flash",
@@ -767,7 +767,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "cross-language",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
+            "synthesis": "hy3",          # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini) vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
@@ -814,7 +814,7 @@ _REGISTRY: dict[str, dict] = {
         "routing": {
             "brainstorm_cluster": "google/gemma-2-9b-it",
             "brainstorm_develop": "deepseek-v4-flash",
-            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
+            "synthesis": "hy3",          # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini) vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
@@ -834,7 +834,7 @@ _REGISTRY: dict[str, dict] = {
         "routing": {
             "brainstorm_cluster": "claude-sonnet",
             "brainstorm_develop": "claude-sonnet",
-            "synthesis": "gpt-4o-mini",          # 🇺🇸 OpenAI — cross-bloc final voice
+            "synthesis": "hy3",          # 🇨🇳 Tencent — anti-hallucination synthesis, 295B MoE, $0.20/$0.80 (was gpt-4o-mini)
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",
