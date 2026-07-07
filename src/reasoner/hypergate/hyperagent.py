@@ -206,14 +206,27 @@ class HyperGateAgent:
         except Exception as e:
             logger.debug("HyperGate L2 cache set failed: %s", e)
 
+    @staticmethod
+    def _safe_create_task(coro, name: str) -> None:
+        """Spawn a fire-and-forget task with exception logging."""
+        import asyncio
+        task = asyncio.create_task(coro, name=name)
+        task.add_done_callback(
+            lambda t: logger.warning(
+                "Background task '%s' failed: %s", name, t.exception()
+            ) if t.exception() and not t.cancelled() else None
+        )
+
     def _cache_set(self, problem_hash: str, decision: GateDecision) -> None:
         """Set in L1 and dispatch async task for L2."""
         self._cache[problem_hash] = decision
         if len(self._cache) > self._MAX_CACHE:
             self._cache.pop(next(iter(self._cache)))
         # Fire-and-forget L2 set to not block the critical path
-        import asyncio
-        asyncio.create_task(self._set_l2_cache(problem_hash, decision))
+        self._safe_create_task(
+            self._set_l2_cache(problem_hash, decision),
+            "hypergate_l2_cache_set",
+        )
 
     # ── Public API (same signature as GateAgent.decide) ──────────────
 

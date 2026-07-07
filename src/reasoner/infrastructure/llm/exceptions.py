@@ -42,6 +42,11 @@ class ProviderUnavailableError(LLMError):
     retryable = True
 
 
+class ProviderCreditsExhaustedError(LLMError):
+    """API credit limit reached (HTTP 402). Not retryable — add credits and retry."""
+    retryable = False
+
+
 class SearchError(InfrastructureError):
     """Base exception for search errors."""
     retryable = True

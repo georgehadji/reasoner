@@ -16,6 +16,14 @@ logger = logging.getLogger(__name__)
 class PresetService:
     """Encapsulates all preset-related logic: resolution, filtering, router building."""
 
+    def __init__(self) -> None:
+        # Ensure preset registry caches are fresh on each service instantiation.
+        # Replaces the old delete+reimport pattern (_ensure_fresh_preset_service)
+        # that broke inline interpreters. Safe: only clears internal LRU caches,
+        # never touches sys.modules.
+        from reasoner.domain.preset_registry import invalidate_preset_cache
+        invalidate_preset_cache()
+
     def resolve(self, raw_preset: str) -> tuple[str, bool, str]:
         """
         Resolve a raw preset string into gate preset parameters.

@@ -117,6 +117,18 @@ class BaseLLMProvider(ABC):
                     system_prompt, user_prompt, max_tokens, temperature
                 )
             except Exception as exc:
+                # 402 = credit exhaustion — convert to ProviderCreditsExhaustedError
+                # for graceful degradation upstream instead of crashing the pipeline.
+                status_code = getattr(exc, 'status_code', None)
+                if status_code == 402:
+                    from reasoner.infrastructure.llm.exceptions import ProviderCreditsExhaustedError
+                    logger.warning(
+                        "Credit exhausted for %s: %s. The pipeline will return partial results.",
+                        getattr(self, 'model', 'unknown'), exc,
+                    )
+                    raise ProviderCreditsExhaustedError(
+                        f"API credit limit reached for {getattr(self, 'model', 'unknown')}: {exc}"
+                    ) from exc
                 last_error = exc
                 # Don't retry non-retryable errors
                 if not is_retryable(exc):

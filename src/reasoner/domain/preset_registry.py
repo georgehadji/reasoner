@@ -782,7 +782,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "cross-language",
         "primary_id": "gemini-pro",
         "routing": {
-            "synthesis": "glm-5.2",              # Zhipu 🇨🇳 — multilingual strength; cross-bloc from 🇺🇸 scoring
+            "synthesis": "glm-5.2",              # 🇨🇳 Zhipu — cross-bloc final voice, \$0.95/\$3.00 (was gpt-5.5)
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5
         "fusion":         "deepseek-v4-pro",

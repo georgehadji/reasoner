@@ -101,7 +101,9 @@ async def lifespan(app: FastAPI):
     from reasoner.core.health_validator import validate_all
     await validate_all()
 
-    # Mandatory Redis check for production
+    # Redis probe for production — warn on failure, don't block startup.
+    # All Redis consumers (rate limiter, circuit breaker, HyperGate L2 cache)
+    # handle unreachable Redis gracefully at runtime via in-memory fallback.
     if settings.ENVIRONMENT == "production":
         try:
             from reasoner.infrastructure.redis.client import get_redis
@@ -109,10 +111,13 @@ async def lifespan(app: FastAPI):
             await _probe_redis.set("_prod_startup_probe", "1", ex=10, nx=True)
             logger.info("Redis probe (production): reachable")
         except Exception as probe_exc:
-            raise RuntimeError(
-                f"Redis is mandatory in production (ENVIRONMENT=production) "
-                f"for cross-worker cancellation, but is unreachable: {probe_exc}"
-            ) from probe_exc
+            logger.warning(
+                "Redis is unreachable in production: %s. "
+                "All Redis consumers have in-memory fallbacks, but cross-worker "
+                "cancellation and distributed rate limiting will not work. "
+                "Start Redis or set RATE_LIMITER_MODE=memory (single-worker only).",
+                probe_exc,
+            )
 
     # Warn if running in multi-worker mode with in-memory rate limiting / circuit breaker
     uvicorn_workers = settings.UVICORN_WORKERS
@@ -504,8 +509,8 @@ async def _run_stream_with_metrics(
                 preset=preset,
                 status="error" if has_error else "success",
             ).inc()
-        except NameError:
-            pass
+        except Exception as exc:
+            logger.warning("Failed to record prometheus query metrics: %s", exc)
 
 
 def _require_auth_if_legacy_disabled(user: User | None) -> None:
