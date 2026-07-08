@@ -43,9 +43,9 @@ except ImportError:
 class Settings:
     """Application settings derived from environment variables."""
 
-    RATE_LIMIT_PER_MINUTE: int = int(os.getenv("RATE_LIMIT_PER_MINUTE", "300"))
-    RATE_LIMIT_PER_HOUR: int = int(os.getenv("RATE_LIMIT_PER_HOUR", "5000"))
-    RATE_LIMIT_BURST: int = int(os.getenv("RATE_LIMIT_BURST", "50"))
+    RATE_LIMIT_PER_MINUTE: int = int(os.getenv("RATE_LIMIT_PER_MINUTE", "60"))
+    RATE_LIMIT_PER_HOUR: int = int(os.getenv("RATE_LIMIT_PER_HOUR", "1000"))
+    RATE_LIMIT_BURST: int = int(os.getenv("RATE_LIMIT_BURST", "10"))
     MEMORY_LIMIT_MB: int = int(os.getenv("MEMORY_LIMIT_MB", "4096"))
     MEMORY_WARNING_MB: int = int(os.getenv("MEMORY_WARNING_MB", "3072"))
     REQUEST_TIMEOUT_SECONDS: float = float(
@@ -172,6 +172,17 @@ class Settings:
     # ── Langfuse (LLM Observability) ──
     LANGFUSE_PUBLIC_KEY: str | None = os.getenv("LANGFUSE_PUBLIC_KEY")
     LANGFUSE_SECRET_KEY: str | None = os.getenv("LANGFUSE_SECRET_KEY")
+
+    # ── Spend Caps (P1.9) ──
+    SPEND_CAP_PER_RUN_USD: float = float(
+        os.getenv("SPEND_CAP_PER_RUN_USD", "0.0")
+    )
+    """Maximum USD per pipeline run. 0.0 = unlimited."""
+
+    SPEND_CAP_MONTHLY_USD: float = float(
+        os.getenv("SPEND_CAP_MONTHLY_USD", "0.0")
+    )
+    """Maximum USD per user per month. 0.0 = unlimited."""
 
     # ── Stripe Billing ──
     STRIPE_SECRET_KEY: str | None = os.getenv("STRIPE_SECRET_KEY")

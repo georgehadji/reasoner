@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import asyncio
 import logging
 
 import stripe
@@ -17,6 +18,78 @@ logger = logging.getLogger(__name__)
 
 # TTL for webhook deduplication (24 hours to cover retry window)
 WEBHOOK_DEDUP_TTL_SECONDS = 86400
+
+# Lazy-initialized dead-letter repo
+_dead_letter_repo = None
+
+
+async def _get_dead_letter_repo():
+    """Lazy-initialize the billing dead-letter repository."""
+    global _dead_letter_repo
+    if _dead_letter_repo is not None:
+        return _dead_letter_repo
+    try:
+        pool = await _get_webhook_pool()
+        if pool is not None:
+            from reasoner.infrastructure.persistence.billing_deadletter_repo import (
+                PostgresBillingDeadLetterRepo,
+            )
+            _dead_letter_repo = PostgresBillingDeadLetterRepo(pool)
+            await _dead_letter_repo._ensure_table()
+    except Exception as exc:
+        logger.warning("Dead-letter repo init failed: %s", exc)
+    return _dead_letter_repo
+
+
+async def _record_webhook_failure(
+    provider: str,
+    event_type: str,
+    payload: dict,
+    error: str,
+) -> None:
+    """Record a webhook failure: metric + dead-letter + domain event.
+
+    This is called from the except block of both webhook handlers.
+    It is deliberately fire-and-forget: failures here must never propagate
+    (the webhook handler always returns HTTP 200).
+    """
+    # 1. Prometheus counter
+    try:
+        from reasoner.metrics import WEBHOOK_PROCESSING_FAILURES
+        WEBHOOK_PROCESSING_FAILURES.labels(provider=provider, event_type=event_type).inc()
+    except Exception as exc:
+        logger.warning("Failed to increment webhook failure metric: %s", exc)
+
+    # 2. Durable dead-letter storage
+    try:
+        repo = await _get_dead_letter_repo()
+        if repo is not None:
+            await repo.record_failure(provider, event_type, payload, error)
+    except Exception as exc:
+        logger.warning("Failed to record webhook failure to dead-letter: %s", exc)
+
+    # 3. Domain event on the bus
+    try:
+        from reasoner.application.event_bus.bus import get_event_bus
+        from reasoner.core.events.domain_events import (
+            SaaSEventType,
+            make_event,
+        )
+        bus = get_event_bus()
+        event = make_event(
+            SaaSEventType.WEBHOOK_PROCESSING_FAILED,
+            aggregate_id=f"{provider}:{event_type}",
+            version=1,
+            metadata={
+                "provider": provider,
+                "event_type": event_type,
+                "error": error,
+            },
+        )
+        # Fire-and-forget: don't block the webhook response on the bus
+        asyncio.ensure_future(bus.publish(event))
+    except Exception as exc:
+        logger.warning("Failed to emit webhook failure event: %s", exc)
 
 # ─── DB-backed idempotency (primary guard; survives Redis failure) ────────────
 
@@ -135,6 +208,8 @@ async def handle_stripe_webhook(request: Request) -> dict:
         success = True
     except Exception as exc:
         logger.exception("Stripe webhook processing failed for event %s: %s", event_id, exc)
+        # Record the failure durably (metric + dead-letter + event)
+        await _record_webhook_failure("stripe", event_type, dict(event), str(exc))
         # Still return 200 to prevent Stripe retries (Critical Enhancement 4.3)
 
     # Mark completed ONLY after successful DB commit
@@ -210,6 +285,8 @@ async def handle_paypal_webhook(request: Request) -> dict:
         success = True
     except Exception as exc:
         logger.exception("PayPal webhook processing failed for event %s: %s", event_id, exc)
+        # Record the failure durably (metric + dead-letter + event)
+        await _record_webhook_failure("paypal", event_type, dict(event), str(exc))
 
     if success:
         try:

@@ -98,6 +98,24 @@ class PipelineOrchestrator:
             agent_model=agent_model,
         )
 
+        # P1.9: Short-circuit preflight if spend cap prevents any LLM spend
+        try:
+            from reasoner.core.settings import settings
+            cap = settings.SPEND_CAP_PER_RUN_USD
+            if cap > 0 and cap < 0.001:
+                logger.warning(
+                    "Per-run spend cap of $%.4f is too low for any pipeline — returning direct-action fallback",
+                    cap,
+                )
+                return PreflightDecision(
+                    action="direct",
+                    router=router,
+                    effective_preset_name=effective_preset_name,
+                    problem=getattr(req, "problem", ""),
+                )
+        except Exception:
+            pass
+
         # E4: Attach a fallback-event buffer to the router at construction time.
         # Even if execute() is not called (streaming/main paths), events are captured.
         _fallback_buffer: list[dict] = []

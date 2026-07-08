@@ -358,6 +358,11 @@ class RedisCircuitBreaker:
         return self._script
 
     @property
+    def state(self) -> CircuitState:
+        """Return the last known circuit state (cached from Redis)."""
+        return self._local_state
+
+    @property
     def stats(self) -> CircuitBreakerStats:
         return self._stats
 
@@ -459,7 +464,7 @@ class RedisCircuitBreaker:
         """Get health status for monitoring."""
         return {
             "name": self.name,
-            "state": "redis-backed",  # actual state lives in Redis
+            "state": self._local_state.value,  # last known state cached from Redis
             "stats": asdict(self._stats),
             "config": asdict(self.config),
         }

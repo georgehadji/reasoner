@@ -245,7 +245,7 @@ rich==14.3.4
     # via
     #   curl-cffi
     #   pyiceberg
-simpleeval==0.9.13
+asteval==0.9.32
     # via -r requirements.txt
 six==1.17.0
     # via python-dateutil

@@ -1,0 +1,156 @@
+groups:
+  - name: reasoner
+    rules:
+      # ── Error Rate ──────────────────────────────────────────────────────────
+      - alert: HighErrorRate
+        expr: rate(reasoner_queries_total{status="error"}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | printf \"%.2f\" }} errors/sec (threshold 0.1)"
+
+      - alert: CriticalErrorRate
+        expr: rate(reasoner_queries_total{status="error"}[5m]) > 0.5
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical error rate — immediate investigation required"
+          description: "Error rate is {{ $value | printf \"%.2f\" }} errors/sec"
+
+      # ── Quota ────────────────────────────────────────────────────────────────
+      - alert: QuotaExceededSpike
+        expr: rate(reasoner_quota_exceeded_total[5m]) > 10
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Quota exceeded spike — possible abuse"
+          description: "Rate of quota-exceeded events is {{ $value | printf \"%.2f\" }}/sec"
+
+      # ── Latency ──────────────────────────────────────────────────────────────
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, rate(reasoner_query_duration_seconds_bucket[5m])) > 60
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "P95 latency above 60 seconds"
+          description: "P95 pipeline duration is {{ $value | printf \"%.1f\" }}s"
+
+      - alert: PhaseLatencySpike
+        expr: histogram_quantile(0.95, rate(reasoner_phase_duration_seconds_bucket[5m])) > 120
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "P95 phase latency above 120 seconds"
+          description: "P95 phase duration is {{ $value | printf \"%.1f\" }}s"
+
+      # ── Postgres Pool ────────────────────────────────────────────────────────
+      - alert: PostgresPoolExhaustion
+        expr: reasoner_postgres_pool_free == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Postgres connection pool exhausted"
+          description: "All {{ $value }} Postgres connections are in use"
+
+      - alert: PostgresPoolLow
+        expr: reasoner_postgres_pool_free < 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Postgres pool running low"
+          description: "Only {{ $value }} free connections remaining in pool"
+
+      # ── Webhook Failures (Phase 0.1) ─────────────────────────────────────────
+      - alert: WebhookProcessingFailures
+        expr: rate(reasoner_webhook_processing_failures_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Webhook processing failures detected"
+          description: "{{ $value | printf \"%.2f\" }} webhook failures/sec — check dead-letter table"
+
+      - alert: WebhookProcessingCritical
+        expr: rate(reasoner_webhook_processing_failures_total[5m]) > 5
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical webhook failure rate — billing may be out of sync"
+          description: "{{ $value | printf \"%.2f\" }} webhook failures/sec — immediate investigation required"
+
+      # ── Dead-Letter Rate (Phase 0.3) ─────────────────────────────────────────
+      - alert: DeadLetterEventsAccumulating
+        expr: rate(reasoner_dead_letter_events_total[15m]) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Dead-letter events accumulating"
+          description: "Events are being written to the dead-letter file — check EventBus handlers"
+
+      # ── Memory Usage (Phase 2.10) ────────────────────────────────────────────
+      - alert: MemoryWarning
+        expr: reasoner_memory_usage_mb > on(instance) (reasoner_memory_usage_mb * 0) + 3072
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Memory usage above warning threshold"
+          description: "Current memory: {{ $value | printf \"%.0f\" }}MB (threshold: 3072MB)"
+
+      - alert: MemoryCritical
+        expr: reasoner_memory_usage_mb > on(instance) (reasoner_memory_usage_mb * 0) + 4096
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Memory usage approaching hard limit"
+          description: "Current memory: {{ $value | printf \"%.0f\" }}MB (hard limit: 4096MB)"
+
+      # ── Heartbeat / Stale Cron (Phase 1.7) ───────────────────────────────────
+      - alert: CronHeartbeatStale
+        expr: time() - reasoner_cron_heartbeat_timestamp > 90000  # 25 hours
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Nightly cron heartbeat not received in >25h"
+          description: "Check scheduled tasks (compaction, session archiving, housekeeping)"
+
+      # ── CI Self-Healing ──────────────────────────────────────────────────────
+      - alert: CIHealingHeartbeatStale
+        expr: time() - ci_heartbeat_timestamp > 90000  # 25 hours
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Self-healing CI has not fired in >25h"
+          description: "Check .github/workflows/self-healing-ci.yml nightly schedule. Trigger manually via workflow_dispatch"
+
+      # ── Redis / Circuit Breaker ──────────────────────────────────────────────
+      - alert: CircuitBreakerOpen
+        expr: reasoner_circuit_breaker_state{name=~".+"} == 2
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Circuit breaker is open for {{ $labels.name }}"
+          description: "Circuit breaker '{{ $labels.name }}' has been open for >5m — provider may be down"
+
+      - alert: RateLimitRejectionSpike
+        expr: rate(reasoner_rate_limit_rejected_total[5m]) > 50
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Rate limit rejection spike"
+          description: "{{ $value | printf \"%.2f\" }} requests/sec being rate-limited — possible DoS or misconfigured client"

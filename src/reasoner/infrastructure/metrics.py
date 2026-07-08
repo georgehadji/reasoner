@@ -166,3 +166,42 @@ REASONER_WEBSOCKET_CONNECTIONS = Gauge(
     "reasoner_websocket_connections",
     "Active WebSocket connections",
 )
+
+# Memory usage gauge (Phase 2.10 — exported by MemoryLimitMiddleware)
+REASONER_MEMORY_USAGE_MB = Gauge(
+    "reasoner_memory_usage_mb",
+    "Current process memory usage in MB",
+)
+
+# Cron heartbeat gauge (Phase 1.7 — set by nightly compaction/archive tasks)
+REASONER_CRON_HEARTBEAT_TIMESTAMP = Gauge(
+    "reasoner_cron_heartbeat_timestamp",
+    "Unix timestamp of last successful nightly cron run",
+)
+
+# Webhook processing failures (Phase 0.1 — billing dead-letter)
+WEBHOOK_PROCESSING_FAILURES = Counter(
+    "reasoner_webhook_processing_failures_total",
+    "Webhook processing failures that were silently dropped",
+    ["provider", "event_type"],
+)
+
+# Dead-letter events counter (Phase 0.3 — EventBus dead-letter queue)
+DEAD_LETTER_EVENTS = Counter(
+    "reasoner_dead_letter_events_total",
+    "Events written to dead-letter queue after handler retry exhaustion",
+    ["event_type"],
+)
+
+# Run cost gauge (P1.9 — current pipeline run USD cost)
+REASONER_RUN_COST_USD = Gauge(
+    "reasoner_run_cost_usd",
+    "Accumulated USD cost of the current pipeline run",
+)
+
+# Spend cap exceeded counter (P1.9 — spend cap violations)
+REASONER_SPEND_CAP_EXCEEDED_TOTAL = Counter(
+    "reasoner_spend_cap_exceeded_total",
+    "Pipeline runs halted due to spend cap being exceeded",
+    ["cap_type"],  # "per_run" | "monthly"
+)

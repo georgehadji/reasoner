@@ -184,13 +184,17 @@ async def delete_account(
     """Hard delete user and all data (GDPR Article 17).
 
     Critical Enhancement 6.2: cancels active Stripe subscription first.
+    Phase 0.2 fix: atomic transaction with no-FK deletion-log audit.
     """
     from reasoner.infrastructure.persistence.quota_repo_postgres import PostgresQuotaRepository
     dsn = settings.DATABASE_URL.replace("+asyncpg", "")
     repo = PostgresQuotaRepository(dsn, pool_size=2)
     pool = await repo._get_pool()
 
-    # Find active subscription to cancel billing
+    ip = _anonymize_ip(request.client.host if request.client else None)
+    ua = request.headers.get("User-Agent")
+
+    # Phase 1: Cancel billing subscriptions (BEFORE transaction — external side-effects).
     sub_row = await pool.fetchrow(
         "SELECT stripe_sub_id, paypal_sub_id FROM subscriptions WHERE user_id = $1 AND status = 'active' LIMIT 1",
         str(user.id),
@@ -202,7 +206,6 @@ async def delete_account(
                 adapter = StripeBillingAdapter()
                 await adapter.cancel_subscription(sub_row["stripe_sub_id"])
             except Exception as exc:
-                # Log but proceed with deletion — webhook will eventually sync
                 import logging
                 logging.getLogger(__name__).warning(
                     "Failed to cancel Stripe subscription %s for user %s: %s",
@@ -220,14 +223,24 @@ async def delete_account(
                     sub_row["paypal_sub_id"], user.id, exc,
                 )
 
-    # Comprehensive deletion: DB + uploads + history + vectors + cache (SEC-009)
-    deleted = {"db": False, "uploads": 0, "history": 0, "vectors": 0, "cache": 0}
+    # Phase 2: Atomic DB transaction — audit BEFORE delete
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            # Write deletion-audit to no-FK table BEFORE user delete
+            await conn.execute(
+                """
+                INSERT INTO account_deletion_log (user_id, ip_address, user_agent)
+                VALUES ($1, $2, $3)
+                """,
+                str(user.id), ip, ua,
+            )
+            # Delete user — CASCADE cleans auth_audit_log, subscriptions, quotas
+            await conn.execute("DELETE FROM users WHERE id = $1", str(user.id))
 
-    # 1. Database cascade
-    await pool.execute("DELETE FROM users WHERE id = $1", str(user.id))
-    deleted["db"] = True
+    deleted = {"db": True, "uploads": 0, "history": 0, "vectors": 0, "cache": 0}
 
-    # 2. Uploads
+    # Phase 3: External side-effects (best-effort, AFTER transaction commits)
+    # Uploads
     try:
         from reasoner.uploader import list_uploads, delete_file
         user_uploads = list_uploads(user_id=str(user.id))
@@ -237,7 +250,7 @@ async def delete_account(
     except Exception:
         pass
 
-    # 3. History files
+    # History files
     try:
         from reasoner.api.history import HISTORY_DIR
         import json as _json
@@ -252,7 +265,7 @@ async def delete_account(
     except Exception:
         pass
 
-    # 4. Vector store (best-effort)
+    # Vector store (best-effort)
     try:
         from reasoner.documents.vector_store import DocumentVectorStore
         store = DocumentVectorStore()
@@ -265,7 +278,7 @@ async def delete_account(
     except Exception:
         pass
 
-    # 5. Redis cache keys (best-effort)
+    # Redis cache keys (best-effort)
     try:
         from reasoner.infrastructure.redis.client import get_redis
         redis = get_redis()
@@ -276,12 +289,5 @@ async def delete_account(
             deleted["cache"] = len(keys)
     except Exception:
         pass
-
-    # Audit log before deletion
-    await _log_auth_event(
-        user.id, "account_delete",
-        _anonymize_ip(request.client.host if request.client else None),
-        request.headers.get("User-Agent"),
-    )
 
     return {"status": "deleted", "user_id": str(user.id), "deleted": deleted}

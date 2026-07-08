@@ -99,8 +99,6 @@ MODEL_GEMMA_4_31B: str = "gemma-4-31b"
 MODEL_GEMMA_2_9B_IT: str = "google/gemma-2-9b-it"
 
 # xAI — Grok series (grok-4.1-fast, grok-4, grok-3, grok-3-mini removed — EOL)
-MODEL_GROK_420: str = "grok-4.3"           # aliased — formerly grok-4.20
-MODEL_GROK_420_MULTI_AGENT: str = "grok-4.3"  # aliased — formerly grok-4.20-multi-agent
 MODEL_GROK_43: str = "grok-4.3"
 MODEL_GROK_BUILD_01: str = "grok-build-0.1"
 

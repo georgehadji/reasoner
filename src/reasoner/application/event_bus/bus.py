@@ -13,6 +13,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
+import random
 from pathlib import Path
 from typing import Any, Callable, Awaitable
 from collections import defaultdict
@@ -26,8 +28,25 @@ logger = logging.getLogger(__name__)
 
 # Dead-letter log for events that exhaust all retries
 _DEAD_LETTER_PATH = Path(__file__).parent.parent.parent / "logs" / "dead_letter_events.jsonl"
+_DEAD_LETTER_MAX_BYTES = 100 * 1024 * 1024  # 100 MB cap before rotation
 # Note: _DEAD_LETTER_PATH.parent.mkdir() moved to EventBus.start() to avoid
 # PermissionError on read-only filesystems at import time.
+
+
+async def _rotate_dead_letter_if_needed() -> None:
+    """Rotate the dead-letter JSONL if it exceeds the size cap."""
+    try:
+        if _DEAD_LETTER_PATH.exists() and _DEAD_LETTER_PATH.stat().st_size > _DEAD_LETTER_MAX_BYTES:
+            import time as _time
+            archive_name = f"dead_letter_events_{_time.strftime('%Y%m%d_%H%M%S')}.jsonl"
+            archive_path = _DEAD_LETTER_PATH.with_name(archive_name)
+            _DEAD_LETTER_PATH.rename(archive_path)
+            logger.info(
+                "Rotated dead-letter log: %s -> %s (size exceeded %dMB)",
+                _DEAD_LETTER_PATH.name, archive_name, _DEAD_LETTER_MAX_BYTES // (1024 * 1024),
+            )
+    except Exception as exc:
+        logger.warning("Dead-letter rotation failed: %s", exc)
 
 
 # Type alias for event handlers
@@ -229,7 +248,7 @@ class EventBus:
             except Exception as exc:
                 last_exc = exc
                 if attempt < max_retries:
-                    wait = min(2 ** attempt, 8)  # cap at 8s
+                    wait = min(2 ** attempt, 8) + random.uniform(0, 1.0)  # cap at 8s + jitter
                     logger.warning(
                         "Handler error for %s (attempt %d/%d), retrying in %.1fs: %s",
                         event.event_type.value, attempt + 1, max_retries + 1, wait, exc,
@@ -267,6 +286,14 @@ class EventBus:
                 "timestamp": time.time(),
                 "is_critical": event.is_critical,
             }
+            # Increment dead-letter counter
+            try:
+                from reasoner.metrics import DEAD_LETTER_EVENTS
+                DEAD_LETTER_EVENTS.labels(event_type=event.event_type.value).inc()
+            except Exception:
+                pass
+            # Rotate if needed (async check before blocking write)
+            await _rotate_dead_letter_if_needed()
             # Use asyncio.to_thread for blocking file I/O
             def _write_dead_letter():
                 with _DEAD_LETTER_PATH.open("a", encoding="utf-8") as f:

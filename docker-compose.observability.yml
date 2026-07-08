@@ -1,0 +1,77 @@
+# Docker Compose — Observability Stack (Prometheus + Alertmanager)
+#
+# Usage: docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d
+#
+# Environment variables (set in .env):
+#   SLACK_WEBHOOK_URL          — Slack webhook for alert notifications
+#   PAGERDUTY_ROUTING_KEY      — PagerDuty integration key (optional)
+#   SMTP_HOST / SMTP_PORT etc. — Email alert routing (optional)
+#
+# Prometheus scrapes the backend /api/metrics endpoint.
+# The endpoint is IP-restricted by METRICS_ALLOWED_IPS (see settings.py);
+# Prometheus runs on the docker network so its IP must be allowed.
+# Default: add "172.16.0.0/12" to METRICS_ALLOWED_IPS in production.
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.55.0
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+      - "--web.enable-lifecycle"
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docs/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./docs/monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      backend:
+        condition: service_started
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+      - "--web.external-url=http://localhost:9093"
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./docs/monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+        reservations:
+          cpus: "0.125"
+          memory: 64M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+volumes:
+  prometheus_data:
+  alertmanager_data:

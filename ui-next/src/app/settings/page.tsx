@@ -5,6 +5,7 @@ import { useAppStore } from '@/stores/app-store';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { deleteAccount } from '@/lib/api-client';
 import { User, ShieldAlert, ShieldCheck, Database, History } from 'lucide-react';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
@@ -49,18 +50,28 @@ export default function SettingsPage() {
     if (!confirmed) return;
 
     setLoading(true);
-    // Note: True account deletion usually requires edge functions or admin privileges in Supabase.
-    // For this UI, we'll log them out and show a message if the direct API fails.
+    setMessage({ type: '', text: '' });
+
+    try {
+      // Phase 0.2b: Call backend first (atomic DB deletion + external cleanup)
+      await deleteAccount();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to delete account. Please contact support.';
+      setMessage({ type: 'error', text: msg });
+      setLoading(false);
+      return;
+    }
+
     try {
       if (supabase) {
-         // Attempt RPC or just sign out for safety if RPC isn't configured
-         await supabase.auth.signOut();
+        await supabase.auth.signOut();
       }
       logout();
       router.push('/?deleted=true');
-    } catch (err) {
-      setMessage({ type: 'error', text: 'Failed to delete account. Please contact support.' });
-      setLoading(false);
+    } catch {
+      // Sign-out failure is non-fatal after backend deletion succeeded
+      logout();
+      router.push('/?deleted=true');
     }
   };
 

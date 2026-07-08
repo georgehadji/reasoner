@@ -54,6 +54,8 @@ class AttachmentRef(BaseModel):
     extracted_text: str
     size: int = 0
 
+    model_config = {"extra": "forbid"}
+
 
 class RunRequest(BaseModel):
     problem: str
@@ -233,6 +235,8 @@ class GenerateImageRequest(BaseModel):
                 raise ValueError("Reference images must be image data URLs")
         return v
 
+    model_config = {"extra": "forbid"}
+
 
 class ContextAnalysisRequest(BaseModel):
     """Request model for running pipeline with external context."""
@@ -265,23 +269,33 @@ class ContextAnalysisRequest(BaseModel):
             raise ValueError('Method must be "jury" or "multi-perspective"')
         return v
 
+    model_config = {"extra": "forbid"}
+
 
 class SuggestionRequestModel(BaseModel):
     query: str
     chat_history: list[list[str]] | None = None
     max_suggestions: int = 5
 
+    model_config = {"extra": "forbid"}
+
 
 class WeatherRequest(BaseModel):
     location: str
+
+    model_config = {"extra": "forbid"}
 
 
 class StockRequest(BaseModel):
     symbol: str
 
+    model_config = {"extra": "forbid"}
+
 
 class CalculationRequest(BaseModel):
     expression: str
+
+    model_config = {"extra": "forbid"}
 
 
 class RunResult(BaseModel):
@@ -296,7 +310,11 @@ class RunResult(BaseModel):
     citations: list[dict] = []
     models_used: list[str] = []
 
+    model_config = {"extra": "forbid"}
+
 
 class DiscoverRequest(BaseModel):
     topic: str = "tech"
     mode: str = "normal"
+
+    model_config = {"extra": "forbid"}

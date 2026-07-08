@@ -40,3 +40,58 @@ async def trigger_compaction(request: Request, dry_run: bool = False):
     service = CompactionService(store)
     result = await service.run_once(dry_run=dry_run)
     return {"status": "ok", **result}
+
+
+# ── Dead-Letter Queue (Phase 0.3) ─────────────────────────────────────────────
+
+
+@router.get("/dead-letter")
+async def list_dead_letter_events(
+    request: Request,
+    limit: int = 100,
+    offset: int = 0,
+    event_type: str | None = None,
+):
+    """List dead-letter events with pagination.
+
+    Requires X-Admin-Key header.
+    """
+    _require_admin(request)
+    from reasoner.application.services.deadletter_replay_service import EventBusReplayService
+    service = EventBusReplayService()
+    return await service.list_events(limit=min(limit, 500), offset=offset, event_type_filter=event_type)
+
+
+@router.post("/dead-letter/replay")
+async def replay_dead_letter_events(
+    request: Request,
+    event_ids: list[str] | None = None,
+    max_count: int = 50,
+):
+    """Replay dead-letter events through the EventBus.
+
+    Optionally specify event_ids to replay specific events.
+    Requires X-Admin-Key header.
+    """
+    _require_admin(request)
+    from reasoner.application.services.deadletter_replay_service import EventBusReplayService
+    service = EventBusReplayService()
+    result = await service.replay_events(event_ids=event_ids, max_count=min(max_count, 200))
+    return {"status": "ok", **result}
+
+
+# ── Neuro Lifecycle Maintenance (Phase 1.7) ───────────────────────────────────
+
+
+@router.post("/cron/neuro-maintenance")
+async def trigger_neuro_maintenance(request: Request):
+    """Run neuro lifecycle maintenance: archive hot→warm→cold sessions.
+
+    Sets the cron heartbeat metric on success.
+    Requires X-Admin-Key header.
+    Called by external scheduler (e.g., cron: curl -X POST .../api/admin/cron/neuro-maintenance).
+    """
+    _require_admin(request)
+    from reasoner.api.cron import run_neuro_maintenance
+    result = await run_neuro_maintenance()
+    return {"status": "ok", **result}

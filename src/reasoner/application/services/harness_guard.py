@@ -72,8 +72,7 @@ _MODEL_LABS: dict[str, str] = {
     "mimo-v2.5-pro": "xiaomi", "mimo-v2.5": "xiaomi",
     "mimo-v2-pro": "xiaomi", "mimo-v2-flash": "xiaomi",
     # xAI — Grok
-    "grok-4.3": "xai", "grok-4.20": "xai", "grok-4.20-multi-agent": "xai",
-    "grok-build-0.1": "xai",
+    "grok-4.3": "xai", "grok-build-0.1": "xai",
     # Perplexity
     "sonar-pro": "perplexity", "sonar-pro-search": "perplexity",
     "sonar": "perplexity", "sonar-reasoning-pro": "perplexity", "sonar-deep-research": "perplexity",

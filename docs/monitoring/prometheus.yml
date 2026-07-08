@@ -1,0 +1,48 @@
+# Prometheus configuration for Reasoner backend
+# Scrapes the /api/metrics endpoint and evaluates alerting rules.
+#
+# The metrics endpoint is IP-restricted; ensure Prometheus' IP is
+# included in METRICS_ALLOWED_IPS (in .env / settings.py).
+# Docker compose networks typically use 172.x.x.x ranges.
+#
+# Reload config without restarting:
+#   curl -X POST http://localhost:9090/-/reload
+
+global:
+  scrape_interval:     15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: "reasoner"
+
+# Alerting configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # Alertmanager runs in the same compose file
+          - alertmanager:9093
+
+# Rule files
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+scrape_configs:
+  # Backend metrics endpoint
+  - job_name: "reasoner-backend"
+    metrics_path: "/api/metrics"
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    scheme: https
+    tls_config:
+      insecure_skip_verify: true
+    static_configs:
+      - targets:
+          - backend:8000
+        labels:
+          service: "reasoner-backend"
+
+  # Self-scrape (Prometheus runtime metrics — useful for capacity planning)
+  - job_name: "prometheus"
+    scrape_interval: 30s
+    static_configs:
+      - targets: ["localhost:9090"]

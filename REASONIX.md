@@ -28,7 +28,7 @@
 - Rate limiter: `RATE_LIMITER_MODE=memory` in dev `.env`; switch to `redis` for multi-worker
 
 ## Watch out for
-- **No pyproject.toml** — Python deps in `requirements.txt` only. Ruff/pytest config has no central file (ruff uses defaults, pytest uses `tests/conftest.py`).
+- **pyproject.toml** exists at project root — contains Ruff lint/format config, mypy settings, and pytest options (asyncio_mode, testpaths, timeout). Python deps in `requirements.txt` only. Pytest central config is in `pyproject.toml` + `pytest.ini`.
 - **`_ensure_fresh_preset_service()`** in `api/streaming.py` deletes+reimports modules on first pipeline run — can break inline interpreters. Affects any code path importing presets mid-request.
 - **`QueryTimer` is undefined** in `api/__init__.py: _run_stream_with_metrics` — `try/except ImportError` was added so SSE streaming degrades gracefully; don't reintroduce hard import.
 - **First SSE event yields AFTER preflight** — if orchestrator.preflight() hangs (HyperGate LLM calls or neuro recall), user sees empty spinner with no phase_start event.

@@ -26,6 +26,19 @@ from reasoner.neuro.config import ProviderConfig, ResilientProviderConfig
 
 log = logging.getLogger("neuro.providers")
 
+# Global registry of open resilient wrappers (closed on app shutdown)
+_resilient_wrappers: list = []
+
+
+async def close_all_resilient_wrappers() -> None:
+    """Close all registered resilient wrappers. Called once on app shutdown."""
+    for w in _resilient_wrappers[:]:
+        try:
+            await w.aclose()
+        except Exception as exc:
+            log.warning("Error closing resilient wrapper %s: %s", type(w).__name__, exc)
+    _resilient_wrappers.clear()
+
 
 # ─────────────────────────────────────────────
 #  Base Classes
@@ -176,6 +189,12 @@ class ResilientReasoning:
     async def health_check(self) -> bool:
         return await self.primary.health_check()
 
+    async def aclose(self):
+        """Close all underlying provider clients."""
+        await self.primary.aclose()
+        for fb in self.fallbacks:
+            await fb.aclose()
+
     @property
     def status(self) -> dict:
         return {
@@ -227,6 +246,12 @@ class ResilientEmbedding:
 
     async def health_check(self) -> bool:
         return await self.primary.health_check()
+
+    async def aclose(self):
+        """Close all underlying provider clients."""
+        await self.primary.aclose()
+        for fb in self.fallbacks:
+            await fb.aclose()
 
     @property
     def status(self) -> dict:
@@ -485,8 +510,12 @@ def _create_embedding(config: ProviderConfig) -> EmbeddingProvider:
 
 
 def create_resilient_reasoning(config: ResilientProviderConfig) -> ResilientReasoning:
-    return ResilientReasoning(config)
+    wrapper = ResilientReasoning(config)
+    _resilient_wrappers.append(wrapper)
+    return wrapper
 
 
 def create_resilient_embedding(config: ResilientProviderConfig) -> ResilientEmbedding:
-    return ResilientEmbedding(config)
+    wrapper = ResilientEmbedding(config)
+    _resilient_wrappers.append(wrapper)
+    return wrapper

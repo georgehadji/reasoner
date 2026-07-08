@@ -427,9 +427,66 @@ class LLMExecutor:
             output_tokens = metadata.get("output_tokens", 0)
             model = metadata.get("model", "unknown")
 
+            # P1.9: If the provider didn't return a real cost, estimate from token counts
+            if cost_usd <= 0 and input_tokens > 0:
+                try:
+                    from reasoner.domain.pricing import calculate_model_cost
+                    estimated = calculate_model_cost(model, input_tokens, output_tokens)
+                    if estimated > 0:
+                        cost_usd = estimated
+                except Exception:
+                    pass
+
             if cost_usd > 0:
                 state.total_cost_usd += cost_usd
                 state.phase_costs[role] = cost_usd
+                # Populate phase_costs_by_key (defined but never written)
+                tracking_key = getattr(state, "_current_phase_key", None)
+                if tracking_key:
+                    prev = state.cost_state.phase_costs_by_key.get(tracking_key, 0.0)
+                    state.cost_state.phase_costs_by_key[tracking_key] = prev + cost_usd
+
+            # Update Prometheus run-cost gauge
+            try:
+                from reasoner.infrastructure.metrics import REASONER_RUN_COST_USD
+                REASONER_RUN_COST_USD.set(state.total_cost_usd)
+            except Exception:
+                pass
+
+            # P1.9: Per-run spend cap check — stop further LLM calls once cap exceeded
+            if cost_usd > 0:
+                try:
+                    from reasoner.core.settings import settings
+                    cap = settings.SPEND_CAP_PER_RUN_USD
+                    if cap > 0 and state.total_cost_usd > cap and not getattr(state, "_spend_cap_exceeded", False):
+                        state._spend_cap_exceeded = True
+                        logger.warning(
+                            "Per-run spend cap of $%.2f exceeded (current: $%.2f). Halting further LLM calls.",
+                            cap, state.total_cost_usd,
+                        )
+                        try:
+                            from reasoner.core.events.domain_events import SaaSEventType, make_event
+                            from reasoner.application.event_bus.bus import get_event_bus
+                            evt = make_event(
+                                SaaSEventType.SPEND_CAP_EXCEEDED,
+                                aggregate_id=state.conversation_id or "unknown",
+                                version=1,
+                                metadata={
+                                    "cap_type": "per_run",
+                                    "cap_amount": cap,
+                                    "total_cost": state.total_cost_usd,
+                                },
+                            )
+                            await get_event_bus().publish(evt)
+                        except Exception:
+                            pass
+                        try:
+                            from reasoner.infrastructure.metrics import REASONER_SPEND_CAP_EXCEEDED_TOTAL
+                            REASONER_SPEND_CAP_EXCEEDED_TOTAL.labels(cap_type="per_run").inc()
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
 
             await self._accumulate_tokens(state, role, input_tokens, output_tokens, model)
 

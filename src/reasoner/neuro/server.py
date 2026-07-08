@@ -121,16 +121,53 @@ class AuditResponse(BaseModel):
 # ─────────────────────────────────────────────
 
 class TenantManager:
+    """Manages per-agent tenant state with LRU eviction to prevent unbounded growth.
+
+    Phase 1.8 fix: caps active tenants, evicts idle tenants, and tracks
+    last-access timestamps for TTL-based eviction.
+    """
+
+    MAX_TENANTS = 100
+    IDLE_TTL_SECONDS = 1800  # 30 minutes
+
     def __init__(self, config: NeuroConfig):
         self.config = config
         self._tenants: dict[str, dict] = {}
+        self._last_access: dict[str, float] = {}
         self._lock = asyncio.Lock()
+
+    def _evict_stale_locked(self, now: float) -> int:
+        """Evict tenants idle beyond IDLE_TTL_SECONDS. Caller must hold _lock."""
+        evicted = 0
+        stale = [k for k, t in self._last_access.items() if now - t > self.IDLE_TTL_SECONDS]
+        for k in stale:
+            del self._tenants[k]
+            del self._last_access[k]
+            evicted += 1
+        return evicted
+
+    def _evict_lru_locked(self) -> None:
+        """Evict the least-recently-used tenant. Caller must hold _lock."""
+        if not self._last_access:
+            return
+        oldest_key = min(self._last_access, key=lambda k: self._last_access[k])
+        del self._tenants[oldest_key]
+        del self._last_access[oldest_key]
 
     async def get(self, agent_id: Optional[str] = None) -> dict:
         key = agent_id or "default"
+        now = time.monotonic()
         async with self._lock:
+            # TTL eviction pass
+            self._evict_stale_locked(now)
+
             if key in self._tenants:
+                self._last_access[key] = now
                 return self._tenants[key]
+
+            # LRU cap: evict oldest if at capacity
+            if len(self._tenants) >= self.MAX_TENANTS:
+                self._evict_lru_locked()
 
             data_dir = get_agent_data_dir(self.config, agent_id)
             memory_dir = data_dir / "memory"
@@ -148,6 +185,7 @@ class TenantManager:
                 "sessions": SessionManager(data_dir, SessionConfig()),
             }
             self._tenants[key] = tenant
+            self._last_access[key] = now
             return tenant
 
     @property

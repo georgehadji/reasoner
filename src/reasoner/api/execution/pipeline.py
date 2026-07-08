@@ -421,6 +421,16 @@ class PipelineExecutionService:
                     continue
 
                 duration = time.monotonic() - phase_start
+                # Observe phase duration metric
+                try:
+                    from reasoner.metrics import PHASE_DURATION
+                    PHASE_DURATION.labels(
+                        phase=name,
+                        method=req.preset or "unknown",
+                        preset=req.preset or "unknown",
+                    ).observe(duration)
+                except Exception:
+                    pass
                 for ev in emitter.pop_pending_events():
                     await sse_emit(ev)
                 state.phase_durations[phase_key] = duration

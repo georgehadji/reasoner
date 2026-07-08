@@ -68,7 +68,13 @@ class WorkflowRunner:
 
         phase_key = f"Phase {num}: {name}"
         state._current_phase_key = phase_key
-        
+
+        # P1.9: Skip phase if spend cap was exceeded in a previous phase
+        if getattr(state, "_spend_cap_exceeded", False):
+            logger.info("Spend cap exceeded — skipping phase %s", phase_key)
+            state.phase_tokens[phase_key] = {"input": 0, "output": 0}
+            return True
+
         start_evt = make_event(
             EventType.PHASE_STARTED,
             aggregate_id=state.conversation_id or "unknown",

@@ -257,6 +257,13 @@ async def lifespan(app: FastAPI):
         logger.warning("Neuro client close failed: %s", exc)
 
     try:
+        # Close resilient neuro wrappers (Phase 0.4 — httpx leak)
+        from reasoner.neuro.providers import close_all_resilient_wrappers
+        await close_all_resilient_wrappers()
+    except Exception as exc:
+        logger.warning("Resilient wrapper close failed: %s", exc)
+
+    try:
         # Close health-check Postgres pool
         if _health_postgres_pool is not None:
             await _health_postgres_pool.close()

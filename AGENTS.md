@@ -37,7 +37,7 @@ It is not a chatbot. It is a **reasoning orchestrator** that treats reasoning as
 | File Processing | pypdf, python-docx, pymupdf, python-magic |
 | Web Scraping | lxml |
 | Financial Data | yfinance, yahooquery |
-| Math | simpleeval |
+| Math | asteval (BSD) |
 | Memory/Cache | Custom token cache, Neuro-based long-term memory with embedding search |
 | Security | Custom auth manager, token-bucket rate limiter, circuit breaker, input sanitization, prompt-injection filtering, CSRF HMAC-SHA256 |
 | Production WSGI | gunicorn with uvicorn workers |

@@ -36,7 +36,7 @@ class PayPalBillingAdapter(BillingPort):
         if self._access_token and self._token_expires and datetime.now(timezone.utc) < self._token_expires:
             return self._access_token
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, connect=10.0)) as client:
             resp = await client.post(
                 f"{self.base_url}/v1/oauth2/token",
                 auth=(self.client_id, self.client_secret),
@@ -73,7 +73,7 @@ class PayPalBillingAdapter(BillingPort):
             raise ValueError(f"No PayPal plan configured for tier {tier.value}")
 
         token = await self._get_access_token()
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, connect=10.0)) as client:
             # Create a subscription
             resp = await client.post(
                 f"{self.base_url}/v1/billing/subscriptions",
@@ -193,7 +193,7 @@ class PayPalBillingAdapter(BillingPort):
     async def cancel_subscription(self, paypal_subscription_id: str) -> None:
         """Cancel a PayPal subscription immediately."""
         token = await self._get_access_token()
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, connect=10.0)) as client:
             resp = await client.post(
                 f"{self.base_url}/v1/billing/subscriptions/{paypal_subscription_id}/cancel",
                 headers=self._headers(token),

@@ -76,3 +76,8 @@ reasoner-output-*.md
 autonomous_bug_fix_report.json
 method_test_results.json
 tmp_req.json
+
+# Reasonix agent artifacts (should not be tracked)
+.reasonix/
+reasonix.toml
+=0.9.32

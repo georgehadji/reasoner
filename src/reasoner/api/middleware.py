@@ -130,6 +130,13 @@ class MemoryLimitMiddleware(BaseHTTPMiddleware):
             process = psutil.Process()
             memory_mb = process.memory_info().rss / 1024 / 1024
 
+            # Export memory usage gauge for Prometheus (Phase 2.10)
+            try:
+                from reasoner.metrics import REASONER_MEMORY_USAGE_MB
+                REASONER_MEMORY_USAGE_MB.set(round(memory_mb, 1))
+            except Exception:
+                pass
+
             if memory_mb > self.memory_limit_mb:
                 logger.error(
                     f"Memory limit exceeded: {memory_mb:.1f}MB > {self.memory_limit_mb}MB"

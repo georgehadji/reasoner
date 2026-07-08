@@ -114,7 +114,7 @@ class PostgresQuotaRepository(QuotaRepository):
 
                 # Increment atomically
                 await conn.execute(
-                    "UPDATE usage_quotas SET used_queries = used_queries + 1, updated_at = NOW() "
+                    "UPDATE usage_quotas SET used_queries = used_queries + 1, updated_at = (NOW() AT TIME ZONE 'UTC') "
                     "WHERE user_id = $1",
                     user_id,
                 )
@@ -124,8 +124,8 @@ class PostgresQuotaRepository(QuotaRepository):
     async def reset_monthly(self, user_id: str) -> None:
         pool = await self._get_pool()
         await pool.execute(
-            "UPDATE usage_quotas SET used_queries = 0, period_start = date_trunc('month', NOW()), "
-            "updated_at = NOW() WHERE user_id = $1",
+            "UPDATE usage_quotas SET used_queries = 0, period_start = date_trunc('month', (NOW() AT TIME ZONE 'UTC')), "
+            "updated_at = (NOW() AT TIME ZONE 'UTC') WHERE user_id = $1",
             user_id,
         )
 

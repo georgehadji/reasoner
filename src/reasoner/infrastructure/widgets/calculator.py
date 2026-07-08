@@ -1,7 +1,7 @@
 """
 Calculator Widget
 
-Evaluates mathematical expressions using simpleeval (safe evaluator).
+Evaluates mathematical expressions using asteval (BSD-licensed safe evaluator).
 """
 
 from __future__ import annotations
@@ -73,13 +73,13 @@ class CalculatorWidget(BaseWidget):
         if not expression:
             return {'error': 'No expression provided'}
 
-        # Try simpleeval first (safe expression evaluator)
+        # Try asteval (BSD-licensed safe expression evaluator)
         try:
-            from simpleeval import simple_eval, EvalWithCompoundTypes
+            from asteval import Interpreter
             
             # Create evaluator with math functions
-            evaluator = EvalWithCompoundTypes()
-            evaluator.names.update({
+            evaluator = Interpreter()
+            evaluator.symtable.update({
                 'pi': math.pi,
                 'e': math.e,
                 'sqrt': math.sqrt,
@@ -96,19 +96,36 @@ class CalculatorWidget(BaseWidget):
             })
             
             result = evaluator.eval(expression)
-            
+
+            # asteval returns None on parse/evaluation errors; check error state
+            if evaluator.error:
+                err = evaluator.error
+                evaluator.error = None  # clear for next use
+                return {
+                    'expression': expression,
+                    'error': str(err.get_exc()) if hasattr(err, 'get_exc') else str(err),
+                    'valid': False,
+                }
+
+            if result is None:
+                return {
+                    'expression': expression,
+                    'error': 'Expression evaluation returned no result',
+                    'valid': False,
+                }
+
             return {
                 'expression': expression,
                 'result': result,
                 'result_formatted': self._format_result(result),
                 'valid': True,
-                'engine': 'simpleeval',
+                'engine': 'asteval',
             }
 
         except ImportError:
             return {
                 'expression': expression,
-                'error': 'Expression evaluator not available (simpleeval required)',
+                'error': 'Expression evaluator not available (asteval required)',
                 'valid': False,
             }
         except Exception as e:

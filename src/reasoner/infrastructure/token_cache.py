@@ -260,6 +260,13 @@ class TokenAwareCache:
                 old_entry = self._entries[key]
                 self._current_tokens -= old_entry.tokens_used
                 self._stats.total_size_bytes -= len(old_entry.response.encode())
+                # Phase 2.8: remove old key from problem_index to prevent zombie entries
+                old_idx = self._problem_index.get(old_entry.problem_hash)
+                if old_idx:
+                    try:
+                        old_idx.remove(key)
+                    except ValueError:
+                        pass
             
             self._entries[key] = entry
             self._problem_index.setdefault(entry.problem_hash, []).append(key)

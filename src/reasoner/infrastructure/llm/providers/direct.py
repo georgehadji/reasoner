@@ -11,6 +11,7 @@ import logging
 from typing import Any
 
 from reasoner.core.constants import DEFAULT_MAX_TOKENS, DEFAULT_TEMPERATURE
+from reasoner.core.constants_limits import TIMEOUTS
 from reasoner.infrastructure.llm.base import BaseLLMProvider, LLMError
 
 logger = logging.getLogger(__name__)
@@ -32,7 +33,7 @@ class AnthropicDirectProvider(BaseLLMProvider):
     ) -> str:
         try:
             from anthropic import AsyncAnthropic
-            client = AsyncAnthropic(api_key=self._api_key)
+            client = AsyncAnthropic(api_key=self._api_key, timeout=TIMEOUTS.LLM_CALL)
             response = await client.messages.create(
                 model=self.model,
                 max_tokens=max_tokens,
@@ -72,7 +73,7 @@ class OpenAIDirectProvider(BaseLLMProvider):
     ) -> str:
         try:
             import openai
-            client = openai.AsyncOpenAI(api_key=self._api_key)
+            client = openai.AsyncOpenAI(api_key=self._api_key, timeout=TIMEOUTS.LLM_CALL)
             response = await client.chat.completions.create(
                 model=self.model,
                 max_tokens=max_tokens,
@@ -112,7 +113,7 @@ class GoogleDirectProvider(BaseLLMProvider):
     ) -> str:
         try:
             import google.genai as genai
-            client = genai.aio.Client(api_key=self._api_key)
+            client = genai.aio.Client(api_key=self._api_key, http_options={"timeout": int(TIMEOUTS.LLM_CALL * 1000)})
             response = await client.models.generate_content(
                 model=self.model,
                 contents=f"{system_prompt}\n\n{user_prompt}",

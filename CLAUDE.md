@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 1. Project Overview
 
-**Reasoner** (Adaptive Reasoning Architecture) is a production-grade AI reasoning orchestrator that decomposes complex problems into structured multi-phase pipelines, leverages 131 LLM models from diverse training ecosystems in parallel, applies independent critique, stress-tests solutions, and synthesizes actionable recommendations with epistemic labeling (`VERIFIED` / `HYPOTHESIS` / `UNKNOWN`).
+**Reasoner** (Adaptive Reasoning Architecture) is a production-grade AI reasoning orchestrator that decomposes complex problems into structured multi-phase pipelines, leverages 132 LLM models from diverse training ecosystems in parallel, applies independent critique, stress-tests solutions, and synthesizes actionable recommendations with epistemic labeling (`VERIFIED` / `HYPOTHESIS` / `UNKNOWN`).
 
 - **Version:** 2.2 (Python package 2.1.0) | **Python:** 3.12+ | **Frontend:** Next.js 16 / React 19 / TypeScript 5
 
@@ -70,7 +70,7 @@ src/reasoner/
 │   └── preset_registry.py  # 48 preset configs with model routing and fallbacks
 ├── infrastructure/         # Adapters implementing Core ports
 │   ├── llm/
-│   │   ├── registry.py     # _MODEL_WHITELIST (131 models), _REGISTRY, build_provider()
+│   │   ├── registry.py     # _MODEL_WHITELIST (132 models), _REGISTRY, build_provider()
 │   │   ├── router.py       # ProviderRouter: role-based routing, fallback chain
 │   │   └── providers/      # OpenAICompatibleProvider, OpenRouterProvider, etc.
 │   ├── persistence/        # EventStore (SQLite), snapshots, postgres_store

@@ -220,6 +220,7 @@ export const API = {
   SEARCH: '/api/search',
   UPLOAD: '/api/upload',
   FEEDBACK: '/api/feedback',
+  ACCOUNT_DELETE: '/api/account/delete',
   ERROR_REPORT: '/api/error-report',
   GENERATE_IMAGE: '/api/generate-image',
   NEURO_HEALTH: '/api/neuro/health',

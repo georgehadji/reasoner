@@ -90,9 +90,8 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ═══════════════════════════════════════════════════════════════
     # xAI — Grok series
     # ═══════════════════════════════════════════════════════════════
+    "grok-4.5":               {"model": "x-ai/grok-4.5"},               # 1M ctx, $1.50/$3.00, frontier reasoning (added v3.7)
     "grok-4.3":               {"model": "x-ai/grok-4.3"},               # 1M ctx, $1.25/$2.50, τ²-Bench 97.7%, configurable reasoning effort
-    "grok-4.20":              {"model": "x-ai/grok-4.3"},               # aliased → grok-4.3 (was x-ai/grok-4.20)
-    "grok-4.20-multi-agent":  {"model": "x-ai/grok-4.3"},               # aliased → grok-4.3 (was grok-4.20-multi-agent)
     "grok-build-0.1":         {"model": "x-ai/grok-build-0.1"},         # fast agentic coding, 256K ctx, $1.00/$2.00
     # ═══════════════════════════════════════════════════════════════
     # Perplexity

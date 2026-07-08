@@ -209,6 +209,16 @@ export async function generateImage(
   return data;
 }
 
+export async function deleteAccount(): Promise<{ status: string; user_id?: string; deleted?: Record<string, unknown> }> {
+  const resp = await fetchWithCsrf(API.ACCOUNT_DELETE, { method: 'POST' });
+  const data = await resp.json();
+  if (!resp.ok) {
+    const detail = typeof data.detail === 'string' ? data.detail : (typeof data.error === 'string' ? data.error : `HTTP ${resp.status}`);
+    throw new Error(detail);
+  }
+  return data;
+}
+
 export async function submitFeedback(payload: {
   conversation_id: string;
   message_id: string;

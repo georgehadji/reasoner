@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import json
 import logging
+import logging.handlers
+import queue as queue_module
 import re
 import sys
 import time
@@ -21,6 +23,47 @@ from typing import Any
 # Context variables for log context across async calls
 _correlation_id: ContextVar[str] = ContextVar("correlation_id", default="")
 _log_context: ContextVar[dict[str, Any]] = ContextVar("log_context", default={})
+
+
+# ── Queue-based async logging (Phase 1.4: replaces blocking print()) ──────────
+
+_log_raw_queue: queue_module.Queue | None = None
+_log_listener: logging.handlers.QueueListener | None = None
+
+
+def setup_queue_logging(level: int = logging.INFO) -> None:
+    """Configure queue-based logging to stdout (non-blocking I/O).
+
+    Call once at application startup. Replaces the synchronous ``print()``
+    in ``StructuredLogger._log`` with a QueueHandler + QueueListener.
+    """
+    global _log_raw_queue, _log_listener
+
+    # Close existing listener if reconfiguring
+    if _log_listener is not None:
+        _log_listener.stop()
+
+    q: queue_module.Queue = queue_module.Queue(-1)  # unbounded
+    queue_handler = logging.handlers.QueueHandler(q)
+
+    # JSON stdout handler
+    stream_handler = logging.StreamHandler(sys.stdout)
+    stream_handler.setLevel(level)
+    stream_handler.setFormatter(logging.Formatter("%(message)s"))
+
+    listener = logging.handlers.QueueListener(q, stream_handler, respect_handler_level=True)
+    listener.start()
+
+    _log_raw_queue = q
+    _log_listener = listener
+
+
+def stop_queue_logging() -> None:
+    """Stop the queue listener (call on app shutdown)."""
+    global _log_listener
+    if _log_listener is not None:
+        _log_listener.stop()
+        _log_listener = None
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -250,8 +293,18 @@ class StructuredLogger:
             preset=ctx.get("preset"),
         )
 
-        # Output as JSON to stdout for log aggregation
-        print(entry.to_json(), file=sys.stdout)
+        # Output as JSON via non-blocking queue handler
+        if _log_raw_queue is not None:
+            # Put raw JSON string directly on the queue; QueueListener's
+            # stream_handler writes it to stdout (formatter="%(message)s")
+            msg_log_record = self.logger.makeRecord(
+                self.logger.name, getattr(logging, level.value), "", 0,
+                entry.to_json(), (), None,
+            )
+            _log_raw_queue.put(msg_log_record)
+        else:
+            # Fallback: direct print (before logging is configured)
+            print(entry.to_json(), file=sys.stdout)
 
         # Also log to standard logger for development
         std_level = getattr(logging, level.value)

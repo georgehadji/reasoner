@@ -63,6 +63,8 @@ class SaaSEventType(str, Enum):
     QUERY_LOGGED = "query_logged"
     PAYMENT_FAILED = "payment_failed"
     PAYMENT_SUCCEEDED = "payment_succeeded"
+    WEBHOOK_PROCESSING_FAILED = "webhook_processing_failed"
+    SPEND_CAP_EXCEEDED = "spend_cap_exceeded"
 
 
 # Union type for backward compatibility
@@ -114,6 +116,8 @@ class DomainEvent:
             SaaSEventType.SUBSCRIPTION_CREATED,
             SaaSEventType.SUBSCRIPTION_UPDATED,
             SaaSEventType.SUBSCRIPTION_CANCELLED,
+            SaaSEventType.WEBHOOK_PROCESSING_FAILED,
+            SaaSEventType.SPEND_CAP_EXCEEDED,
             PipelineEventType.ERROR_OCCURRED,
         )
 
@@ -423,6 +427,8 @@ SAAS_EVENT_CLASSES: dict[SaaSEventType, type[DomainEvent]] = {
     SaaSEventType.QUERY_LOGGED: DomainEvent,
     SaaSEventType.PAYMENT_FAILED: DomainEvent,
     SaaSEventType.PAYMENT_SUCCEEDED: DomainEvent,
+    SaaSEventType.WEBHOOK_PROCESSING_FAILED: DomainEvent,
+    SaaSEventType.SPEND_CAP_EXCEEDED: DomainEvent,
 }
 
 # Shorthand backward compat
