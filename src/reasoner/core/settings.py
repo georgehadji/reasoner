@@ -268,6 +268,9 @@ class Settings:
     ACR_MODE: str = os.getenv("ACR_MODE", "shadow")
     """ACR operating mode: ``shadow``, ``advisory``, or ``adaptive``."""
 
+    ACR_LEARNING_ENABLED: bool = os.getenv("ACR_LEARNING_ENABLED", "false").lower() in ("1", "true", "yes")
+    """Online learning separate from telemetry (Phase 6)."""
+
     ACR_EXPLORATION_RATE_BUDGET: float = float(
         os.getenv("ACR_EXPLORATION_RATE_BUDGET", "0.15")
     )
