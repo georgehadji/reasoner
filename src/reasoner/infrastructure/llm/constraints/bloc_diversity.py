@@ -14,7 +14,7 @@ from reasoner.core.ports.routing_constraint_port import (
     ConstraintViolation,
     RoutingConstraintPort,
 )
-from reasoner.infrastructure.llm.registry import bloc_of, _vendor_of
+from reasoner.infrastructure.llm.registry import bloc_of
 
 
 _GENERATOR_ROLES = frozenset({

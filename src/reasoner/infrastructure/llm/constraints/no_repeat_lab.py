@@ -8,7 +8,7 @@ from reasoner.core.ports.routing_constraint_port import (
     ConstraintViolation,
     RoutingConstraintPort,
 )
-from reasoner.infrastructure.llm.registry import bloc_of, _vendor_of
+from reasoner.infrastructure.llm.registry import _vendor_of
 
 # Default: no single vendor can hold more than this fraction of roles
 _DEFAULT_MAX_VENDOR_SHARE = 0.60

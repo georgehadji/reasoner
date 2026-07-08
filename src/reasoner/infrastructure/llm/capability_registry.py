@@ -18,7 +18,6 @@ from reasoner.domain.model_capabilities import (
 )
 from reasoner.domain.task_requirements import TaskConstraints
 from reasoner.infrastructure.llm.registry import _MODEL_WHITELIST, _REGISTRY, bloc_of
-from reasoner.infrastructure.llm.registry import _vendor_of as _vendor_of_model
 
 
 # ── Default bootstrap: hard-coded constraint metadata ──
