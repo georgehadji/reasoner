@@ -135,10 +135,64 @@ class GoogleDirectProvider(BaseLLMProvider):
         raise NotImplementedError("Streaming not supported for fallback providers")
 
 
+class OpenAICompatibleDirectProvider(BaseLLMProvider):
+    """Generic provider for OpenAI-compatible APIs (DeepSeek, Mistral, xAI, Perplexity, Qwen).
+
+    Uses httpx to call the chat completions endpoint directly — no SDK dependency.
+    """
+
+    def __init__(self, api_key: str, model: str, base_url: str):
+        super().__init__(model)
+        self._api_key = api_key
+        self._base_url = base_url.rstrip("/")
+
+    async def complete(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        max_tokens: int = DEFAULT_MAX_TOKENS,
+        temperature: float = DEFAULT_TEMPERATURE,
+    ) -> str:
+        import json
+        import httpx
+        payload = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+        }
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(TIMEOUTS.LLM_CALL, connect=10.0)) as client:
+                resp = await client.post(
+                    f"{self._base_url}/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {self._api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    content=json.dumps(payload),
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                return data["choices"][0]["message"]["content"] or ""
+        except Exception as e:
+            raise LLMError(f"{self.model} direct API failed: {e}") from e
+
+    async def stream_complete(self, *args, **kwargs) -> Any:
+        raise NotImplementedError("Streaming not supported for fallback providers")
+
+
 _FALLBACK_PROVIDER_REGISTRY: dict[str, type[BaseLLMProvider]] = {
     "anthropic": AnthropicDirectProvider,
     "openai": OpenAIDirectProvider,
     "google": GoogleDirectProvider,
+    "mistral": OpenAICompatibleDirectProvider,
+    "deepseek": OpenAICompatibleDirectProvider,
+    "xai": OpenAICompatibleDirectProvider,
+    "perplexity": OpenAICompatibleDirectProvider,
+    "qwen": OpenAICompatibleDirectProvider,
 }
 
 
@@ -155,10 +209,47 @@ def build_fallback_provider(name: str) -> BaseLLMProvider:
         "anthropic": "ANTHROPIC_API_KEY",
         "openai": "OPENAI_API_KEY",
         "google": "GOOGLE_API_KEY",
+        "mistral": "MISTRAL_API_KEY",
+        "deepseek": "DEEPSEEK_API_KEY",
+        "xai": "XAI_API_KEY",
+        "perplexity": "PERPLEXITY_API_KEY",
+        "qwen": "DASHSCOPE_API_KEY",
     }
     api_key = os.environ.get(key_env[name], "")
 
     if not api_key:
         raise LLMError(f"{name} API key not set. Set {key_env[name]} environment variable.")
+
+    # Provider-specific config (base URL + default model) for OpenAI-compatible providers
+    _provider_config = {
+        "mistral": {
+            "base_url": "https://api.mistral.ai/v1",
+            "model": "mistral-large-latest",
+        },
+        "deepseek": {
+            "base_url": "https://api.deepseek.com/v1",
+            "model": "deepseek-chat",
+        },
+        "xai": {
+            "base_url": "https://api.x.ai/v1",
+            "model": "grok-2-latest",
+        },
+        "perplexity": {
+            "base_url": "https://api.perplexity.ai",
+            "model": "sonar-pro",
+        },
+        "qwen": {
+            "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            "model": "qwen-max",
+        },
+    }
+
+    if cls is OpenAICompatibleDirectProvider:
+        cfg = _provider_config.get(name, {})
+        return cls(
+            api_key=api_key,
+            base_url=cfg.get("base_url", "https://api.openai.com/v1"),
+            model=cfg.get("model", name),
+        )
 
     return cls(api_key=api_key)

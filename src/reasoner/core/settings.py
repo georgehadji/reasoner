@@ -157,7 +157,7 @@ class Settings:
 
     # ── Multi-Provider Fallback ──
     MULTI_PROVIDER_FALLBACK_ENABLED: bool = os.getenv(
-        "MULTI_PROVIDER_FALLBACK_ENABLED", "false"
+        "MULTI_PROVIDER_FALLBACK_ENABLED", "true"
     ).lower() in ("1", "true", "yes")
 
     # ── Cache Isolation ──

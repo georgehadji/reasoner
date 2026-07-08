@@ -17,8 +17,14 @@ from reasoner.infrastructure.llm.base import BaseLLMProvider, LLMError
 from reasoner.infrastructure.llm.registry import build_provider
 from reasoner.infrastructure.llm.ports import DegradedLLMResponse
 
-# Multi-provider fallback (v3.4) — retry OpenRouter failures via direct API keys
-_FALLBACK_PROVIDER_CHAIN: list[str] = ["anthropic", "openai", "google"]
+# Multi-provider fallback (v3.4/P3.4) — retry OpenRouter failures via direct API keys
+# Chain includes Big-3 (key-only, no SDK needed) plus OpenAI-compatible providers.
+# The chain tries providers in order; first successful response wins.
+_FALLBACK_PROVIDER_CHAIN: list[str] = [
+    "anthropic", "openai", "google",           # Big-3 (SDK-based)
+    "mistral", "perplexity", "deepseek",       # OpenAI-compatible
+    "xai", "qwen",                             # OpenAI-compatible
+]
 
 
 async def _try_direct_fallback(
