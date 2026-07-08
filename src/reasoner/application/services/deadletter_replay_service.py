@@ -151,6 +151,8 @@ class EventBusReplayService:
 
                 # Mark as replayed in sidecar
                 await self._mark_replayed(event_id)
+                if event_id:
+                    replayed_ids.add(event_id)  # keep in-memory set current for batch
 
             except Exception as exc:
                 results["failed"] += 1
@@ -174,7 +176,15 @@ class EventBusReplayService:
             return
         try:
             async with self._write_lock:
-                # Use synchronous file append via to_thread
-                await asyncio.to_thread(_append)
+                await asyncio.to_thread(
+                    self._append_to_sidecar, self._replayed_sidecar, event_id
+                )
         except Exception as exc:
             logger.warning("Failed to mark event %s as replayed: %s", event_id, exc)
+
+    @staticmethod
+    def _append_to_sidecar(path: Path, event_id: str) -> None:
+        """Append an event ID to the sidecar file (runs in a thread)."""
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(event_id + "\n")
+            f.flush()
