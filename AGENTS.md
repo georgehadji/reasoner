@@ -88,7 +88,8 @@ Reasoner/
 |-- gate_agent.py           # Legacy GateAgent + HyperGateAgent lazy import
 |-- Dockerfile              # Multi-stage backend build (non-root user, healthcheck)
 |-- docker-entrypoint.sh    # Backend container entrypoint (env-driven gunicorn config)
-|-- requirements.txt        # Python dependencies (no pyproject.toml / setup.py / setup.cfg)
+|-- requirements.txt        # Python dependencies
+|-- pyproject.toml          # Ruff lint/format config, mypy settings, pytest options (asyncio_mode, testpaths, timeout)
 |-- pytest.ini              # Test configuration
 |-- alembic.ini             # Alembic migration configuration
 |-- .env / .env.example     # Environment variables (NEVER commit .env)
@@ -101,7 +102,7 @@ Reasoner/
 |-- kill_servers.bat        # Windows batch equivalent
 |-- push_to_github.py       # Git push helper
 |-- push_to_github.bat      # Windows batch equivalent
-|-- tests/                  # 174 pytest files
+|-- tests/                  # 197 pytest files
 |-- src/reasoner/           # Main Python package
 |-- ui-next/                # Next.js frontend
 |-- cache/                  # Run-related cache
@@ -488,7 +489,7 @@ docker compose -f docker-compose.searxng.yml up -d
 - **Type hints:** Prefer type hints when intent is unclear; use `from __future__ import annotations` at the top of files when using modern typing
 - **Docstrings:** Use triple-double-quote docstrings for modules and public functions
 - **Imports:** Group stdlib, third-party, and local imports separately
-- **No formal linter config** (no `ruff.toml`, `mypy.ini`, or `.pre-commit-config.yaml`) exists at repo root. Rely on manual consistency.
+- **Linter config in pyproject.toml:** Ruff lint/format config, mypy settings, and pytest options live in `pyproject.toml` at repo root. No separate `ruff.toml`, `mypy.ini`, or `.pre-commit-config.yaml` files.
 - **Logging safety:** Use `SafeLoggingFilter` from `logging_utils.py` to prevent secrets from leaking into logs.
 
 ### TypeScript / Frontend
@@ -507,7 +508,7 @@ docker compose -f docker-compose.searxng.yml up -d
 ### Backend
 - **Framework:** pytest with pytest-asyncio, pytest-timeout, pytest-xdist
 - **Location:** `tests/` directory at repo root
-- **Count:** 174 test files
+- **Count:** 197 test files
 - **Naming:** `test_*.py` files, `Test...` classes
 - **Configuration:** `pytest.ini` sets `testpaths = tests` and `pythonpath = src`
 - **Parallel execution:** `pytest.ini` enables `-n auto --dist loadscope` by default (requires `pytest-xdist`)

@@ -8,7 +8,7 @@
 
 ## 0. Executive Summary
 
-**Reasoner** is a production-grade, event-sourced, multi-method AI reasoning orchestrator that decomposes complex problems into structured multi-phase pipelines, leverages 143+ LLM models from diverse training ecosystems in parallel, applies independent critique, stress-tests solutions, and synthesizes actionable recommendations with epistemic labeling (`VERIFIED` / `HYPOTHESIS` / `UNKNOWN`).
+**Reasoner** is a production-grade, event-sourced, multi-method AI reasoning orchestrator that decomposes complex problems into structured multi-phase pipelines, leverages 28 directly registered LLM models (350+ via OpenRouter) from diverse training ecosystems in parallel, applies independent critique, stress-tests solutions, and synthesizes actionable recommendations with epistemic labeling (`VERIFIED` / `HYPOTHESIS` / `UNKNOWN`).
 
 | Attribute | Value |
 |-----------|-------|
@@ -19,7 +19,7 @@
 | **LLM Routing** | OpenRouter primary (350+ models), 12+ direct provider adapters, Ollama local |
 | **Reasoning Methods** | 30 (multi-perspective, debate, jury, research, scientific, socratic, pre-mortem, bayesian, dialectical, analogical, delphi, cove, sot, tot, pot, self-discover, writing) |
 | **Presets** | 50+ declarative presets (budget, balanced, premium, experimental tiers per method) |
-| **Models Supported** | 143+ (from OpenRouter: Anthropic, OpenAI, Google, xAI, Perplexity, Mistral, DeepSeek, Qwen, Kimi, GLM, MiniMax, Xiaomi, plus local Ollama) |
+| **Models Supported** | 28 directly registered (350+ via OpenRouter: Anthropic, OpenAI, Google, xAI, Perplexity, Mistral, DeepSeek, Qwen, Kimi, GLM, MiniMax, plus local Ollama) |
 | **Web Search** | SearXNG (self-hosted Docker) + Perplexity Sonar |
 | **Memory** | Neuro L1/L2/L3 tiered cache with embedding search + Cohere rerank |
 | **Security** | Input sanitization, prompt-injection defense, rate limiting, scoped auth, CSRF, circuit breaker |
@@ -191,7 +191,7 @@ src/reasoner/
 ├── infrastructure/            # Adapters (Ports Implementation)
 │   ├── llm/                   # LLM Provider Adapters
 │   │   ├── ports.py           # LLMProvider Protocol, Message, LLMResponse
-│   │   ├── registry.py        # _MODEL_WHITELIST (100+ models), _REGISTRY, build_provider()
+│   │   ├── registry.py        # _MODEL_WHITELIST (28 models), _REGISTRY, build_provider()
 │   │   ├── router.py          # ProviderRouter: role-based routing, fallback chain
 │   │   ├── executor.py        # LLMExecutor: caching, token budgets, cascading
 │   │   ├── utils.py           # LLM utilities
