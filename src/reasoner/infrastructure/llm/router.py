@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import time
+import uuid
 from typing import Any, AsyncIterator
 
 from reasoner.core.constants import (
@@ -16,6 +18,23 @@ from reasoner.core.constants import (
 from reasoner.infrastructure.llm.base import BaseLLMProvider, LLMError
 from reasoner.infrastructure.llm.registry import build_provider
 from reasoner.infrastructure.llm.ports import DegradedLLMResponse
+
+try:
+    from reasoner.core.ports.telemetry_port import CallTelemetryPort
+    _HAS_TELEMETRY_PORT = True
+except Exception:
+    _HAS_TELEMETRY_PORT = False
+
+try:
+    from reasoner.infrastructure.metrics import (
+        LLM_CALL_DURATION,
+        LLM_CALL_SUCCESS,
+        LLM_CALL_FAILURE,
+        LLM_CALL_COST,
+    )
+    _HAS_ACR_METRICS = True
+except Exception:
+    _HAS_ACR_METRICS = False
 
 # Multi-provider fallback (v3.4/P3.4) — retry OpenRouter failures via direct API keys
 # Chain includes Big-3 (key-only, no SDK needed) plus OpenAI-compatible providers.
@@ -250,6 +269,10 @@ class ProviderRouter:
     def __init__(
         self, primary: BaseLLMProvider, routing_table: dict[str, BaseLLMProvider] | None = None, fallback_table: dict[str, BaseLLMProvider] | None = None, verbose: bool = False, cascading_routing: dict[str, list[str]] | None = None,
         on_fallback: "None | (str, str, str, str) -> None" = None,
+        telemetry: "CallTelemetryPort | None" = None,
+        run_id: str = "",
+        preset_id: str = "",
+        method: str = "",
         ) -> None:
         self.primary = primary
         self.routing_table: dict[str, BaseLLMProvider] = routing_table or {}
@@ -258,6 +281,11 @@ class ProviderRouter:
         self.cascading_routing: dict[str, list[str]] = cascading_routing or {}
         self.verbose = verbose
         self.on_fallback = on_fallback
+        # ACR telemetry (Phase 1)
+        self.telemetry = telemetry
+        self.run_id = run_id
+        self.preset_id = preset_id
+        self.method = method
 
     def resolve(self, role: str) -> BaseLLMProvider:
         """Return the provider for a role, with global process-level caching."""
@@ -288,6 +316,50 @@ class ProviderRouter:
         attr = ROLE_TIMEOUTS.get(role)
         return getattr(TIMEOUTS, attr) if attr else TIMEOUTS.LLM_CALL
 
+    async def _attempt_call_and_record(
+        self,
+        role: str,
+        provider: BaseLLMProvider,
+        system_prompt: str,
+        user_prompt: str,
+        max_tokens: int,
+        temperature: float,
+        effective_timeout: float,
+        extra_body: dict[str, Any] | None = None,
+        single_attempt: bool = False,
+    ) -> str:
+        """Call a provider via circuit breaker, recording telemetry and timing."""
+        start = time.perf_counter()
+        try:
+            result = await _call_with_circuit(
+                provider, system_prompt, user_prompt, max_tokens, temperature,
+                effective_timeout, extra_body=extra_body,
+                single_attempt=single_attempt,
+            )
+            latency = (time.perf_counter() - start) * 1000
+            # Successful call — emit telemetry asynchronously (best-effort)
+            if self.telemetry or _HAS_ACR_METRICS:
+                await self._emit_telemetry(
+                    role=role, provider=provider, success=True,
+                    latency_ms=latency, is_fallback=single_attempt,
+                    circuit_state="closed",
+                )
+            return result
+        except Exception:
+            latency = (time.perf_counter() - start) * 1000
+            # Determine circuit state
+            from reasoner.circuit_breaker import get_circuit_breaker
+            cb = get_circuit_breaker(f"llm:{provider.model}")
+            circuit_state = cb.state if hasattr(cb, "state") else "closed"
+            if self.telemetry or _HAS_ACR_METRICS:
+                await self._emit_telemetry(
+                    role=role, provider=provider, success=False,
+                    latency_ms=latency, is_fallback=single_attempt,
+                    fallback_reason="error",
+                    circuit_state=circuit_state,
+                )
+            raise
+
     def _build_metadata(self, provider: BaseLLMProvider, response: str) -> dict[str, Any]:
         """Build metadata dict for the LLM call."""
         metadata = {
@@ -300,6 +372,70 @@ class ProviderRouter:
         if hasattr(provider, "last_cost_usd"):
             metadata["cost_usd"] = provider.last_cost_usd
         return metadata
+
+    async def _emit_telemetry(
+        self,
+        role: str,
+        provider: BaseLLMProvider,
+        success: bool,
+        latency_ms: float,
+        is_fallback: bool = False,
+        fallback_reason: str | None = None,
+        circuit_state: str = "closed",
+    ) -> None:
+        """Emit call-level telemetry and Prometheus metrics (ACR Phase 1)."""
+        if not self.telemetry and not _HAS_ACR_METRICS:
+            return
+
+        from reasoner.infrastructure.llm.registry import bloc_of, _vendor_of
+
+        input_tokens = getattr(provider, "last_input_tokens", 0) or 0
+        output_tokens = getattr(provider, "last_output_tokens", 0) or 0
+        cost_usd = getattr(provider, "last_cost_usd", 0.0) or 0.0
+
+        # Emit Prometheus metrics
+        if _HAS_ACR_METRICS:
+            LLM_CALL_DURATION.labels(
+                model=provider.model, role=role, preset=self.preset_id,
+            ).observe(latency_ms / 1000.0)
+            if success:
+                LLM_CALL_SUCCESS.labels(model=provider.model, role=role).inc()
+            else:
+                LLM_CALL_FAILURE.labels(
+                    model=provider.model, role=role,
+                    reason=fallback_reason or "error",
+                ).inc()
+            LLM_CALL_COST.labels(model=provider.model, role=role).inc(cost_usd)
+
+        # Emit telemetry event
+        if self.telemetry:
+            vendor = _vendor_of(provider.model)
+            bloc = bloc_of(provider.model)
+
+            event = _build_telemetry_event(
+                call_id=str(uuid.uuid4()),
+                run_id=self.run_id,
+                timestamp=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                model_id=provider.model,
+                role=role,
+                preset_id=self.preset_id,
+                method=self.method,
+                phase=0,
+                latency_ms=latency_ms,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                cost_usd=cost_usd,
+                success=success,
+                is_fallback=is_fallback,
+                fallback_reason=fallback_reason,
+                circuit_state=circuit_state,
+                vendor=vendor,
+                bloc=bloc,
+            )
+            try:
+                await self.telemetry.record_call(event)
+            except Exception:
+                logger.debug("Failed to record telemetry event", exc_info=True)
 
     async def call(
         self,
@@ -345,8 +481,8 @@ class ProviderRouter:
         async def _execute_call(provider: BaseLLMProvider, is_fallback: bool = False):
             actual_provider = provider
             try:
-                response = await _call_with_circuit(
-                    provider, system_prompt, user_prompt, max_tokens, temperature,
+                response = await self._attempt_call_and_record(
+                    role, provider, system_prompt, user_prompt, max_tokens, temperature,
                     effective_timeout, extra_body=extra_body,
                     single_attempt=is_fallback,
                 )
@@ -554,9 +690,66 @@ class ProviderRouter:
         fallback_routing: dict[str, str] | None = None,
         cascading_routing: dict[str, list[str]] | None = None,
         verbose: bool = False,
+        telemetry: "CallTelemetryPort | None" = None,
+        run_id: str = "",
+        preset_id: str = "",
+        method: str = "",
     ) -> "ProviderRouter":
         """Build router from model ID strings."""
         primary = build_provider(primary_id)
         table = {role: build_provider(mid) for role, mid in (routing or {}).items()}
         fallback_table = {role: build_provider(mid) for role, mid in (fallback_routing or {}).items()}
-        return cls(primary=primary, routing_table=table, fallback_table=fallback_table, cascading_routing=cascading_routing, verbose=verbose)
+        return cls(
+            primary=primary, routing_table=table, fallback_table=fallback_table,
+            cascading_routing=cascading_routing, verbose=verbose,
+            telemetry=telemetry, run_id=run_id, preset_id=preset_id, method=method,
+        )
+
+
+def _build_telemetry_event(
+    call_id: str,
+    run_id: str,
+    timestamp: str,
+    model_id: str,
+    role: str,
+    preset_id: str,
+    method: str,
+    phase: int,
+    latency_ms: float,
+    input_tokens: int,
+    output_tokens: int,
+    cost_usd: float,
+    success: bool,
+    is_fallback: bool = False,
+    fallback_reason: str | None = None,
+    circuit_state: str = "closed",
+    vendor: str = "",
+    bloc: str = "",
+) -> "LLMCallTelemetry":
+    """Build an LLMCallTelemetry event from raw fields.
+
+    Defined at module level to avoid circular imports inside ProviderRouter.
+    """
+    # Lazy import to avoid circular dependency at module level
+    from reasoner.domain.telemetry import LLMCallTelemetry
+
+    return LLMCallTelemetry(
+        call_id=call_id,
+        run_id=run_id,
+        timestamp=timestamp,
+        model_id=model_id,
+        role=role,
+        preset_id=preset_id,
+        method=method,
+        phase=phase,
+        latency_ms=latency_ms,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cost_usd=cost_usd,
+        success=success,
+        is_fallback=is_fallback,
+        fallback_reason=fallback_reason,
+        circuit_state=circuit_state,
+        vendor=vendor,
+        bloc=bloc,
+    )

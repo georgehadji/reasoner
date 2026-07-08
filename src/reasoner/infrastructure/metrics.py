@@ -205,3 +205,30 @@ REASONER_SPEND_CAP_EXCEEDED_TOTAL = Counter(
     "Pipeline runs halted due to spend cap being exceeded",
     ["cap_type"],  # "per_run" | "monthly"
 )
+
+# ── ACR Phase 1: Call-Level Telemetry Metrics ─────────────────────────────────
+
+LLM_CALL_DURATION = Histogram(
+    "reasoner_llm_call_duration_seconds",
+    "Per-call LLM latency by model and role",
+    ["model", "role", "preset"],
+    buckets=[0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0],
+)
+
+LLM_CALL_SUCCESS = Counter(
+    "reasoner_llm_call_success_total",
+    "Successful LLM calls by model and role",
+    ["model", "role"],
+)
+
+LLM_CALL_FAILURE = Counter(
+    "reasoner_llm_call_failure_total",
+    "Failed LLM calls by model and role",
+    ["model", "role", "reason"],
+)
+
+LLM_CALL_COST = Counter(
+    "reasoner_llm_call_cost_usd_total",
+    "Cumulative cost by model and role",
+    ["model", "role"],
+)

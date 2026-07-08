@@ -261,6 +261,40 @@ class Settings:
     # ── Code Execution Sandbox (#1) ──
     EXEC_SANDBOX_ENABLED: bool = os.getenv("EXEC_SANDBOX_ENABLED", "true").lower() == "true"
 
+    # ── ACR (Adaptive Capability Router) ──
+    ACR_ENABLED: bool = os.getenv("ACR_ENABLED", "false").lower() in ("1", "true", "yes")
+    """Master switch for adaptive routing (Phase 5)."""
+
+    ACR_MODE: str = os.getenv("ACR_MODE", "shadow")
+    """ACR operating mode: ``shadow``, ``advisory``, or ``adaptive``."""
+
+    ACR_EXPLORATION_RATE_BUDGET: float = float(
+        os.getenv("ACR_EXPLORATION_RATE_BUDGET", "0.15")
+    )
+    """Explore rate for budget presets (15% by default)."""
+
+    ACR_EXPLORATION_RATE_PREMIUM: float = float(
+        os.getenv("ACR_EXPLORATION_RATE_PREMIUM", "0.05")
+    )
+    """Explore rate for premium presets (5% by default)."""
+
+    ACR_TELEMETRY_DB: str = os.getenv(
+        "ACR_TELEMETRY_DB",
+        str(Path.home() / ".reasoner" / "acr" / "telemetry.db"),
+    )
+    """Path to the ACR telemetry SQLite database."""
+
+    ACR_PROFILES_PATH: str = os.getenv(
+        "ACR_PROFILES_PATH",
+        str(Path.home() / ".reasoner" / "acr" / "capability_profiles.json"),
+    )
+    """Path to the ACR capability profiles JSON file."""
+
+    ACR_BENCHMARK_WARMUP_CALLS: int = int(
+        os.getenv("ACR_BENCHMARK_WARMUP_CALLS", "50")
+    )
+    """Minimum calls before a model enters the adaptive pool."""
+
     # ── Verbalized Sampling (Coding) ──
     CODING_VERBALIZED_SAMPLING: bool = os.getenv("CODING_VERBALIZED_SAMPLING", "true").lower() == "true"
 
