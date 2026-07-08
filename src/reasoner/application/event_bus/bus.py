@@ -467,3 +467,40 @@ async def init_default_subscribers(bus: EventBus | None = None) -> None:
             bus.subscribe(PipelineEventType.PIPELINE_COMPLETED, langfuse_subscriber.handle_pipeline_completed)
             bus.subscribe(PipelineEventType.PIPELINE_FAILED, langfuse_subscriber.handle_pipeline_failed)
             logger.info("Langfuse subscriber registered with EventBus.")
+
+    # ── Transactional Email Notifications (P2.14) ──
+    _register_notification_subscriber(bus)
+
+
+def _register_notification_subscriber(bus: "EventBus") -> None:
+    """Register the email notification subscriber for critical events."""
+    from reasoner.core.settings import settings as _s
+    if not _s.NOTIFICATION_EMAIL:
+        logger.info("NOTIFICATION_EMAIL not configured — skipping email notification subscriber")
+        return
+
+    adapter = None
+    if _s.RESEND_API_KEY:
+        try:
+            from reasoner.infrastructure.email.resend_adapter import ResendEmailAdapter
+            adapter = ResendEmailAdapter()
+        except Exception as exc:
+            logger.warning("Failed to initialize Resend adapter: %s", exc)
+
+    try:
+        from reasoner.application.services.notification_subscriber import NotificationSubscriber
+        subscriber = NotificationSubscriber(email_adapter=adapter)
+        from reasoner.core.events.domain_events import SaaSEventType, PipelineEventType
+        # Subscribe to critical SaaS events
+        bus.subscribe(SaaSEventType.WEBHOOK_PROCESSING_FAILED, subscriber.handle_critical_event)
+        bus.subscribe(SaaSEventType.SPEND_CAP_EXCEEDED, subscriber.handle_critical_event)
+        bus.subscribe(SaaSEventType.PAYMENT_FAILED, subscriber.handle_critical_event)
+        bus.subscribe(SaaSEventType.PAYMENT_SUCCEEDED, subscriber.handle_critical_event)
+        bus.subscribe(SaaSEventType.SUBSCRIPTION_CANCELLED, subscriber.handle_critical_event)
+        bus.subscribe(PipelineEventType.PIPELINE_FAILED, subscriber.handle_critical_event)
+        logger.info(
+            "Notification subscriber registered%s.",
+            "" if adapter else " (no email adapter — events will be logged only)",
+        )
+    except Exception as exc:
+        logger.warning("Failed to register notification subscriber: %s", exc)

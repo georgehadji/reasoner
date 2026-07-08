@@ -187,6 +187,18 @@ class Settings:
     # ── Stripe Billing ──
     STRIPE_SECRET_KEY: str | None = os.getenv("STRIPE_SECRET_KEY")
 
+    # ── Transactional Email (P2.14) ──
+    RESEND_API_KEY: str | None = os.getenv("RESEND_API_KEY")
+    """Resend API key for sending transactional emails. If unset, emails are logged."""
+
+    RESEND_FROM_ADDRESS: str = os.getenv(
+        "RESEND_FROM_ADDRESS", "Reasoner <notifications@reasoner.app>"
+    )
+    """Sender address for transactional emails."""
+
+    NOTIFICATION_EMAIL: str | None = os.getenv("NOTIFICATION_EMAIL")
+    """Email address to receive admin notifications (webhook failures, spend cap, etc.)."""
+
     # ── Scraping ──
     SCRAPE_USER_AGENT: str = os.getenv(
         "SCRAPE_USER_AGENT",
