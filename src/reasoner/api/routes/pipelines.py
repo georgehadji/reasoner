@@ -48,8 +48,8 @@ async def get_event_stats(user: User = Depends(get_current_user)):
 @router.get("/api/pipelines")
 async def list_pipelines(
     user: User = Depends(get_current_user),
-    limit: int = 50,
-    offset: int = 0,
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
     status: str | None = None,
 ):
     """List pipelines from event store."""

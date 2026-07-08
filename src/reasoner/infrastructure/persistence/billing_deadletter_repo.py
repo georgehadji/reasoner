@@ -39,7 +39,7 @@ class PostgresBillingDeadLetterRepo(BillingDeadLetterPort):
 
     async def _ensure_table(self) -> None:
         """Create the failed_webhook_events table if it doesn't exist."""
-        async with self._pool.acquire() as conn:
+        async with self._pool.acquire(timeout=10.0) as conn:
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS failed_webhook_events (
                     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -73,7 +73,7 @@ class PostgresBillingDeadLetterRepo(BillingDeadLetterPort):
         """Durably record a webhook processing failure."""
         await self._ensure_table()
         failure_id = str(uuid.uuid4())
-        async with self._pool.acquire() as conn:
+        async with self._pool.acquire(timeout=10.0) as conn:
             await conn.execute(
                 """
                 INSERT INTO failed_webhook_events (id, provider, event_type, payload, error)
@@ -123,7 +123,7 @@ class PostgresBillingDeadLetterRepo(BillingDeadLetterPort):
         """
         params.extend([limit, offset])
 
-        async with self._pool.acquire() as conn:
+        async with self._pool.acquire(timeout=10.0) as conn:
             rows = await conn.fetch(query, *params)
 
         return [
@@ -142,7 +142,7 @@ class PostgresBillingDeadLetterRepo(BillingDeadLetterPort):
     async def mark_replayed(self, failure_id: str) -> bool:
         """Mark a recorded failure as successfully replayed."""
         await self._ensure_table()
-        async with self._pool.acquire() as conn:
+        async with self._pool.acquire(timeout=10.0) as conn:
             result = await conn.execute(
                 """
                 UPDATE failed_webhook_events
@@ -157,7 +157,7 @@ class PostgresBillingDeadLetterRepo(BillingDeadLetterPort):
     async def count_unreplayed(self) -> int:
         """Return the count of failures that haven't been replayed."""
         await self._ensure_table()
-        async with self._pool.acquire() as conn:
+        async with self._pool.acquire(timeout=10.0) as conn:
             row = await conn.fetchval(
                 "SELECT COUNT(*) FROM failed_webhook_events WHERE replayed_at IS NULL"
             )

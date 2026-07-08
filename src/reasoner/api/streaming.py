@@ -190,11 +190,22 @@ async def run_stream(
     else:
         task = asyncio.create_task(run_task())
 
+    # Phase 2.2: Poll for SSE client disconnect every 10 iterations
+    _disconnect_check_counter = 0
     while True:
         chunk = await queue.get()
         if chunk is None:
             break
         yield chunk
+        _disconnect_check_counter += 1
+        if _disconnect_check_counter % 10 == 0 and request is not None:
+            try:
+                if request.is_disconnected():
+                    logger.info("SSE client disconnected — cancelling pipeline run %s", run_id)
+                    task.cancel()
+                    break
+            except Exception:
+                pass
 
 
 async def run_followup_stream(

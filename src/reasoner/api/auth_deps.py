@@ -102,6 +102,15 @@ async def check_rate_limit(
     return True
 
 
+def _auth_failure(detail: str = "Authentication required") -> HTTPException:
+    """Shared auth failure response — uniform error format for all auth deps."""
+    return HTTPException(
+        status_code=401,
+        detail=detail,
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
 async def require_api_key(
     credentials: HTTPAuthorizationCredentials = Security(security)
 ):
@@ -114,20 +123,14 @@ async def require_api_key(
     """
     auth_manager = get_auth_manager()
     if not credentials:
-        raise HTTPException(
-            status_code=401,
-            detail="Missing API key. Use Authorization: Bearer <key>",
-            headers={"WWW-Authenticate": "Bearer"},
+        raise _auth_failure(
+            "Missing API key. Use Authorization: Bearer <key>"
         )
     try:
         api_key = await auth_manager.authenticate(credentials.credentials)
         return api_key
     except AuthenticationError as e:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid API key",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise _auth_failure("Invalid API key")
 
 
 async def require_auth(
@@ -139,22 +142,14 @@ async def require_auth(
     """
     auth_manager = _get_auth_manager_instance_auth_deps()
     if not credentials:
-        raise HTTPException(
-            status_code=401,
-            detail="Missing authentication credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise _auth_failure("Missing authentication credentials")
 
     try:
         api_key = await auth_manager.authenticate(credentials.credentials)
         return api_key
     except AuthenticationError as e:
         # Return generic error to prevent information leakage (timing attack defense)
-        raise HTTPException(
-            status_code=401,
-            detail="Authentication failed",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise _auth_failure("Authentication failed")
 
 
 async def optional_auth(

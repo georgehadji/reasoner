@@ -719,6 +719,30 @@ async def run_followup_pipeline(
     Run the Reasoner pipeline for a follow-up question with full conversation context.
     """
     _require_auth_if_legacy_disabled(user)
+    # Idempotency: atomically register client_run_id (Phase 2.1)
+    if req.client_run_id:
+        from reasoner.infrastructure.redis.run_state import _run_state_manager
+        try:
+            if not await _run_state_manager.is_authoritative():
+                raise HTTPException(
+                    status_code=503,
+                    detail="Run state store unavailable. Retry after Redis recovers.",
+                    headers={"Retry-After": "10"},
+                )
+            if not await _run_state_manager.try_register(req.client_run_id):
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Run {req.client_run_id} is already in progress",
+                )
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.warning("Idempotency check failed for followup: %s", exc)
+            raise HTTPException(
+                status_code=503,
+                detail="Idempotency check failed due to temporary storage issue. Please try again.",
+                headers={"Retry-After": "5"},
+            )
     return StreamingResponse(
         run_followup_stream(req, request=request, user_id=str(user.id) if user else None),
         media_type="text/event-stream",

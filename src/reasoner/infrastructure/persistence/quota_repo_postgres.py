@@ -80,7 +80,7 @@ class PostgresQuotaRepository(QuotaRepository):
 
     async def check_and_increment(self, user_id: str, preset: str) -> QuotaResult:
         pool = await self._get_pool()
-        async with pool.acquire() as conn:
+        async with pool.acquire(timeout=10.0) as conn:
             async with conn.transaction():
                 # Lock row and read current state
                 row = await conn.fetchrow(

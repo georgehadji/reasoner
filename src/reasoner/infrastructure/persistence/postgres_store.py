@@ -126,7 +126,7 @@ class PostgreSQLEventStore:
     
     async def _init_schema(self) -> None:
         """Initialize database schema."""
-        async with self._pool.acquire() as conn:
+        async with self._pool.acquire(timeout=10.0) as conn:
             await conn.execute("""
                 -- Enable UUID extension
                 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -252,7 +252,7 @@ class PostgreSQLEventStore:
         Internal method for saving events, allowing external decorators to wrap it.
         """
         try:
-            async with self._pool.acquire() as conn:
+            async with self._pool.acquire(timeout=10.0) as conn:
                 async with conn.transaction():
                     for event in events:
                         # Serialize and ENCRYPT payload (Phase 3: E2EE)
@@ -394,7 +394,7 @@ class PostgreSQLEventStore:
         """Get events for an aggregate."""
         pool = self._read_pool if (self.use_read_replica and self._read_pool is not None) else self._pool
 
-        async with pool.acquire() as conn:
+        async with pool.acquire(timeout=10.0) as conn:
             rows = await conn.fetch("""
                 SELECT * FROM events
                 WHERE aggregate_id = $1 AND version > $2
@@ -514,7 +514,7 @@ class PostgreSQLEventStore:
         """List pipelines with filtering."""
         pool = self._read_pool if self.use_read_replica else self._pool
         
-        async with pool.acquire() as conn:
+        async with pool.acquire(timeout=10.0) as conn:
             query = """
                 SELECT * FROM aggregates
                 WHERE aggregate_type = 'pipeline'
@@ -563,7 +563,7 @@ class PostgreSQLEventStore:
         """Full-text search events."""
         pool = self._read_pool if self.use_read_replica else self._pool
         
-        async with pool.acquire() as conn:
+        async with pool.acquire(timeout=10.0) as conn:
             # Generate blind indexes for the search query
             search_hashes = self._encryption.generate_blind_index(query)
             if not search_hashes:
@@ -641,7 +641,7 @@ class PostgreSQLEventStore:
             encrypted_state = self._encryption.encrypt(state_json)
             final_state = {"_e": encrypted_state}
 
-            async with self._pool.acquire() as conn:
+            async with self._pool.acquire(timeout=10.0) as conn:
                 await conn.execute("""
                     INSERT INTO snapshots
                     (aggregate_id, version, state, snapshot_type, created_at)
@@ -665,7 +665,7 @@ class PostgreSQLEventStore:
         aggregate_id: str,
     ) -> tuple[int, dict[str, Any]] | None:
         """Get latest snapshot."""
-        async with self._pool.acquire() as conn:
+        async with self._pool.acquire(timeout=10.0) as conn:
             row = await conn.fetchrow("""
                 SELECT version, state FROM snapshots 
                 WHERE aggregate_id = $1
@@ -721,7 +721,7 @@ class PostgreSQLEventStore:
             encrypted_data = self._encryption.encrypt(data_json)
             final_data = {"_e": encrypted_data}
 
-            async with self._pool.acquire() as conn:
+            async with self._pool.acquire(timeout=10.0) as conn:
                 await conn.execute("""
                     INSERT INTO read_models
                     (model_name, model_key, data, version, updated_at)
@@ -749,7 +749,7 @@ class PostgreSQLEventStore:
         """Get denormalized read model. Decrypts data (Phase 3: E2EE)."""
         pool = self._read_pool if self.use_read_replica else self._pool
         
-        async with pool.acquire() as conn:
+        async with pool.acquire(timeout=10.0) as conn:
             row = await conn.fetchrow("""
                 SELECT data, version FROM read_models 
                 WHERE model_name = $1 AND model_key = $2
@@ -807,7 +807,7 @@ class PostgreSQLEventStore:
         """Get event store statistics."""
         pool = self._read_pool if self.use_read_replica else self._pool
         
-        async with pool.acquire() as conn:
+        async with pool.acquire(timeout=10.0) as conn:
             # Total events
             total_events = await conn.fetchval("SELECT COUNT(*) FROM events")
             
@@ -852,7 +852,7 @@ class PostgreSQLEventStore:
         logger = logging.getLogger(__name__)
         
         try:
-            async with self._pool.acquire() as conn:
+            async with self._pool.acquire(timeout=10.0) as conn:
                 async with conn.transaction():
                     await conn.execute("""
                         DELETE FROM events WHERE aggregate_id = $1
@@ -890,7 +890,7 @@ class PostgreSQLEventStore:
         if self._pool is None:
             raise RuntimeError("PostgreSQLEventStore not initialized")
 
-        async with self._pool.acquire() as conn:
+        async with self._pool.acquire(timeout=10.0) as conn:
             result = await conn.execute(
                 """
                 WITH to_delete AS (
@@ -932,7 +932,7 @@ class PostgreSQLEventStore:
         if self._pool is None:
             raise RuntimeError("PostgreSQLEventStore not initialized")
 
-        async with self._pool.acquire() as conn:
+        async with self._pool.acquire(timeout=10.0) as conn:
             row = await conn.fetchrow(
                 """
                 SELECT COUNT(*) AS cnt

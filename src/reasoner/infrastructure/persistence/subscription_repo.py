@@ -126,7 +126,7 @@ class PostgresSubscriptionRepository:
         }
         new_max = tier_limits[sub.tier]
 
-        async with pool.acquire() as conn:
+        async with pool.acquire(timeout=10.0) as conn:
             async with conn.transaction():
                 # Lock the row (or nonexistent row) to serialize concurrent updates
                 row = await conn.fetchrow(

@@ -76,9 +76,12 @@ async def upload_file(
 async def get_uploads(
     user: User = Depends(get_current_user),
     rate_limit_checked=Depends(check_rate_limit),
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
 ):
-    """List uploaded files for the current user."""
-    return {"files": list_uploads(user_id=str(user.id))}
+    """List uploaded files for the current user with pagination."""
+    all_files = list_uploads(user_id=str(user.id))
+    return {"files": all_files[offset:offset + limit], "total": len(all_files)}
 
 
 @router.get("/api/upload/{file_id}")
