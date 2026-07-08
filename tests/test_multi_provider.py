@@ -71,9 +71,13 @@ async def test_fallback_chain_order():
     """_FALLBACK_PROVIDER_CHAIN has correct default order."""
     from reasoner.infrastructure.llm.router import _FALLBACK_PROVIDER_CHAIN
 
-    assert _FALLBACK_PROVIDER_CHAIN == ["anthropic", "openai", "google"], (
-        "Fallback chain should try Anthropic first, then OpenAI, then Google"
-    )
+    assert _FALLBACK_PROVIDER_CHAIN == [
+        "anthropic", "openai", "google",
+        "mistral", "perplexity", "deepseek",
+        "xai", "qwen",
+    ], "Fallback chain order mismatch"
+    # Big-3 must stay first
+    assert _FALLBACK_PROVIDER_CHAIN[:3] == ["anthropic", "openai", "google"]
 
 
 @pytest.mark.asyncio
