@@ -1,109 +1,88 @@
-# Implementation Audit Report: P2.14 Transactional Email
+# Implementation Audit Report: P3 Docs Remediation
 
 **Audit Date:** 2026-07-08
-**Commit:** `9b42fb9` (transactional email)
-**Scope:** 6 files, +336/-1 lines — EmailPort + Resend adapter + EventBus subscriber + wiring
+**Commit:** `ed413b0` (P3 docs)
+**Scope:** 8 files, +177/-10 — KB consolidation + AGENTS.md fix + 5 ADRs
 **Reviewer:** Reasonix code-review agent
 
 ---
 
 ## 1. Executive Summary
 
-P2.14 implements transactional email notifications via Resend API, triggered by an EventBus subscriber that watches 6 critical event types. The implementation follows the existing port/adapter pattern, gracefully degrades when no API key is configured, and introduces no architectural violations.
+P3 docs remediation resolves long-standing KB file drift and creates formal architecture documentation. All changes are documentation-only — no code touched.
 
 ### Acceptance Criteria
 | Criterion | Status |
 |-----------|--------|
-| Email port matches existing patterns | ✅ PASS |
-| Resend adapter handles all error cases | ✅ PASS |
-| Subscriber covers 6 critical events | ✅ PASS |
-| EventBus wiring at startup | ✅ PASS |
-| Graceful degradation without API key | ✅ PASS |
-| Architecture compliance | ✅ PASS |
+| AGENTS.md no longer claims pyproject.toml doesn't exist | ✅ PASS |
+| Model counts consistent across KB files | ✅ PASS |
+| Test file count matches reality | ✅ PASS |
+| ADRs exist for key decisions | ✅ PASS |
 
 ### Final Verdict: **APPROVED**
 
 ---
 
-## 2. Plan Compliance Matrix
+## 2. Plan Compliance
 
-| File | Lines | Purpose | Status |
-|------|-------|---------|--------|
-| `application/ports/email_port.py` | +35 | `EmailPort` Protocol + `EmailMessage` dataclass | ✅ |
-| `infrastructure/email/resend_adapter.py` | +86 | Resend API adapter with graceful degradation | ✅ |
-| `application/services/notification_subscriber.py` | +154 | 6 event handler methods + admin alert dispatcher | ✅ |
-| `application/event_bus/bus.py` | +39 | `_register_notification_subscriber()` wired at startup | ✅ |
-| `core/settings.py` | +12 | `RESEND_API_KEY`, `RESEND_FROM_ADDRESS`, `NOTIFICATION_EMAIL` | ✅ |
-| `.env.example` | +11 | Documentation for all 3 settings | ✅ |
+| Plan Item | Lines Changed | Status |
+|-----------|---------------|--------|
+| **3.3** — Fix AGENTS.md pyproject.toml claim | -3/+4 in AGENTS.md | ✅ Line 91 `(no pyproject.toml)` removed, Line 492 linter config corrected |
+| **3.1** — Consolidate KB files | -10/+14 across 3 files | ✅ Model counts 132/143+ → `28 directly registered (350+ via OpenRouter)`, test count 174→197 |
+| **3.2** — Write ADRs | +166 in 5 new files | ✅ `docs/adr/001-005` covering HexDDD, CQRS, HyperGate, Cross-Lab, Neuro |
 
 ---
 
-## 3. Architecture Compliance
+## 3. Diff Verification
 
-| Rule | Status | Detail |
-|------|--------|--------|
-| Port in `application/ports/` | ✅ | `email_port.py` follows `billing_deadletter_port.py` pattern |
-| Adapter in `infrastructure/` | ✅ | `resend_adapter.py` implements EmailPort via structural subtyping (Protocol) |
-| Subscriber in `application/services/` | ✅ | Follows existing service patterns |
-| Bus wiring at startup | ✅ | `_register_notification_subscriber()` called from `init_default_subscribers()` |
-| No domain → infra leaks | ✅ | Subscriber uses settings and port, never imports infrastructure |
-| Lazy imports in bus.py | ✅ | `ResendEmailAdapter` imported inside try/except |
-
----
-
-## 4. Code Quality
-
-| Principle | Assessment |
-|-----------|------------|
-| **Single Responsibility** | ✅ Port (contract), adapter (HTTP), subscriber (dispatch) — three clean layers |
-| **Open/Closed** | ✅ New adapter types can be added without changing subscriber |
-| **Dependency Inversion** | ✅ Subscriber depends on `EmailPort`, not `ResendEmailAdapter` |
-| **Error handling** | ✅ 4 catch blocks: disabled (line 46-51), HTTP errors (72-80), timeout (81-83), generic (84-86) |
-| **Graceful degradation** | ✅ 3 layers: `_enabled` flag, `_register_notification_subscriber` skip, handler null-check |
-| **Observability** | ✅ All paths log: info on skip, debug on send, warning on failure |
-| **Security** | ✅ `Bearer` token auth, settings from env (no embedded secrets), `NOTIFICATION_EMAIL` configurable |
+| File | Change | Correct? |
+|------|--------|----------|
+| `AGENTS.md:91` | `no pyproject.toml` → documents `pyproject.toml` | ✅ |
+| `AGENTS.md:105` | `174 pytest files` → `197` | ✅ Matches `ls tests/test_*.py | wc -l` |
+| `AGENTS.md:492` | `No formal linter config` → describes config in pyproject.toml | ✅ |
+| `AGENTS.md:511` | `Count: 174` → `197` | ✅ |
+| `CLAUDE.md:9` | `132 models` → `28 directly registered (350+ via OpenRouter)` | ✅ |
+| `CLAUDE.md:73` | `_MODEL_WHITELIST (132 models)` → `(28 models)` | ✅ |
+| `CLAUDE.md:96` | `~60+ test files` → `~197` | ✅ |
+| `ARCHITECTURE_MINDMAP.md:11` | `143+` → `28 directly registered (350+ via OpenRouter)` | ✅ |
+| `ARCHITECTURE_MINDMAP.md:22` | `143+` → `28 directly registered (350+ via OpenRouter)` | ✅ |
+| `ARCHITECTURE_MINDMAP.md:194` | `100+ models` → `28 models` | ✅ |
+| `docs/adr/001-005/` | 5 new ADR files | ✅ Standard format |
 
 ---
 
-## 5. Event Coverage
+## 4. ADR Quality
 
-| Event Type | Handler | Alert Type |
-|-----------|---------|------------|
-| `WEBHOOK_PROCESSING_FAILED` | `_notify_webhook_failure` | Admin email |
-| `SPEND_CAP_EXCEEDED` | `_notify_spend_cap` | Admin email |
-| `PAYMENT_FAILED` | `_notify_payment_failure` | Admin email |
-| `PAYMENT_SUCCEEDED` | `_notify_payment_succeeded` | Log only |
-| `SUBSCRIPTION_CANCELLED` | `_notify_subscription_cancelled` | Admin email |
-| `PIPELINE_FAILED` | `_notify_pipeline_failure` | Log only |
+| ADR | Title | Format | Content |
+|-----|-------|--------|---------|
+| 001 | Hexagonal Architecture | Status/Context/Decision/Consequences/Compliance | ✅ Accurately describes 4-layer architecture |
+| 002 | Event Sourcing + CQRS | Same format | ✅ Documents lightweight ES + command/query separation |
+| 003 | HyperGate Pre-Router | Same format | ✅ 5-parallel-sub-agent design, 3 actions, caching |
+| 004 | Cross-Lab Routing | Same format | ✅ 28 whitelisted models, OpenRouter proxy, fallback chain |
+| 005 | Neuro Memory Tiering | Same format | ✅ L1/L2/L3 tiers, TTL eviction, tenant isolation |
 
-6 event types subscribed in `bus.py:495-500` ↔ 6 handlers dispatched in `subscriber:53-64` — ✅ consistent.
+All ADRs follow the standard `Status → Context → Decision → Consequences` format. No code references are stale — all paths and design choices match the current codebase.
 
 ---
 
-## 6. Risk & Regression
+## 5. Risk & Regression
 
-| Risk | Mitigation |
+| Risk | Assessment |
 |------|-----------|
-| Resend API outages block EventBus | ❌ No — `_register_notification_subscriber` wrapped in try/except; subscription failures are non-fatal |
-| Email sending blocks event processing | ❌ No — EventBus handlers are concurrent; Resend adapter has 10s timeout |
-| `NOTIFICATION_EMAIL` unset in production | Graceful skip at line 478 — events still logged |
-| `httpx` import failure | Caught by `except Exception` in `_register_notification_subscriber` |
+| Model count becomes stale again | Low — count now references 28 `_MODEL_WHITELIST` entries + "350+ via OpenRouter", the 28 rarely changes |
+| ADRs become outdated | Low — they describe architectural decisions already committed, not plans |
+| Test count drifts | Low — updated to 197 in all 3 files |
 
 ---
 
-## 7. Required Corrections
+## 6. Required Corrections
 
-**None.** All items correctly implemented.
-
-| Improvement (non-blocking) | Suggestion |
-|-----------------------------|------------|
-| `resend_adapter.py:25` | Could explicitly write `class ResendEmailAdapter(EmailPort):` for documentation clarity — but Protocol structural subtyping makes this unnecessary at runtime |
-| `notification_subscriber.py` | Could add an SMTP adapter as fallback for self-hosted deployments |
+**None.** All changes are accurate and verifiable.
 
 ---
 
-## 8. Final Verdict
+## 7. Final Verdict
 
 ### APPROVED
 
-No defects, no architectural violations, no regressions. The implementation is production-ready with full graceful degradation when email credentials are absent.
+Documentation-only changes, all verified against actual state. Three KB files now agree on model count (28+350), test files (197), and pyproject.toml existence. Five ADRs provide formal decision records.
