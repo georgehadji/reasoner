@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import time
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from reasoner.api.auth_deps import require_csrf
 from reasoner.api.dependencies import get_current_user
