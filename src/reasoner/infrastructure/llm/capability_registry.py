@@ -55,7 +55,7 @@ _MODEL_CONSTRAINT_HINTS: dict[str, dict[str, Any]] = {
     "mistral-large-3":    {"max_context": 262_000, "cost_in": 2.0, "cost_out": 8.0, "tools": True, "vision": True, "json": True, "temp": True},
     "mistral-small":      {"max_context": 262_000, "cost_in": 0.15, "cost_out": 0.60, "tools": True, "vision": False, "json": True, "temp": True},
     # xAI
-    "grok-4.5":           {"max_context": 1_000_000, "cost_in": 1.50, "cost_out": 3.0, "tools": True, "vision": True, "json": True, "temp": True},
+    "grok-4.5":           {"max_context": 500_000, "cost_in": 2.0, "cost_out": 6.0, "tools": True, "vision": True, "json": True, "temp": True},
     # Meta
     "llama-4-scout":      {"max_context": 10_000_000, "cost_in": 0.10, "cost_out": 0.30, "tools": True, "vision": True, "json": True, "temp": True},
     "llama-4-maverick":   {"max_context": 1_000_000, "cost_in": 0.15, "cost_out": 0.60, "tools": True, "vision": True, "json": True, "temp": True},
