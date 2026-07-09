@@ -121,6 +121,29 @@ async def main(args: argparse.Namespace) -> None:
         cmd_list_models()
         return
 
+    # Benchmark mode
+    if args.benchmark:
+        import asyncio
+        from reasoner.infrastructure.benchmarks.engine import BenchmarkEngine
+        from reasoner.infrastructure.llm.registry import build_provider
+
+        async def _run_benchmark():
+            engine = BenchmarkEngine()
+            provider = build_provider(args.benchmark)
+            result = await engine.benchmark_model(args.benchmark, provider)
+            print(f"\nBenchmark results for '{args.benchmark}':")
+            for dim, score in sorted(result["scores"].items()):
+                print(f"  {dim:20s}: {score:.3f}")
+            print(f"\nCost: ${result['cost_usd']:.4f}")
+            print(f"Duration: {result['duration_seconds']:.1f}s")
+
+        asyncio.run(_run_benchmark())
+        return
+
+    if args.benchmark_all:
+        print("Benchmarking all models is not yet implemented. Use --benchmark <model_id> for a single model.")
+        return
+
     # Handle resume from saved state
     if args.resume:
         from reasoner.models import load as load_state
@@ -415,6 +438,21 @@ def parse_args() -> argparse.Namespace:
         "--list-models",
         action="store_true",
         help="List all available model IDs grouped by ecosystem, then exit",
+    )
+
+    # ── Benchmark
+    benchmark_group = parser.add_argument_group("Benchmark (ACR Phase 7)")
+    benchmark_group.add_argument(
+        "--benchmark",
+        type=str,
+        default="",
+        metavar="MODEL_ID",
+        help="Run all benchmark suites on a model to evaluate its capabilities",
+    )
+    benchmark_group.add_argument(
+        "--benchmark-all",
+        action="store_true",
+        help="Run benchmarks on all models in the whitelist",
     )
 
     return parser.parse_args()

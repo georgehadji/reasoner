@@ -271,6 +271,9 @@ class Settings:
     ACR_LEARNING_ENABLED: bool = os.getenv("ACR_LEARNING_ENABLED", "false").lower() in ("1", "true", "yes")
     """Online learning separate from telemetry (Phase 6)."""
 
+    ACR_BENCHMARKS_ENABLED: bool = os.getenv("ACR_BENCHMARKS_ENABLED", "false").lower() in ("1", "true", "yes")
+    """Benchmark engine separate from learning (Phase 7)."""
+
     ACR_EXPLORATION_RATE_BUDGET: float = float(
         os.getenv("ACR_EXPLORATION_RATE_BUDGET", "0.15")
     )
