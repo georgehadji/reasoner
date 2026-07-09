@@ -108,6 +108,7 @@ class PipelineOrchestrator:
         )
 
         # ── ACR Adaptive Routing ──
+        _acr_applied = False
         if self._adaptive_routing is not None and self._adaptive_routing.mode != "shadow":
             try:
                 roles = list(dict.fromkeys(list(router.routing_table.keys()) + ["constructive", "scoring"]))
@@ -121,11 +122,14 @@ class PipelineOrchestrator:
                     router = ProviderRouter.from_model_ids(
                         primary_id=router.primary.model if hasattr(router.primary, "model") else "claude-sonnet",
                         routing=reroute,
+                        fallback_routing=getattr(router, "fallback_table_args", None),
+                        cascading_routing=getattr(router, "cascading_routing_args", None),
                         telemetry=self._telemetry_store,
                         run_id=run_id,
                         preset_id=gate_preset_name,
                         method=gate_preset_name,
                     )
+                    _acr_applied = True
                     logger.info("ACR %s: applied for '%s' (%d roles)", self._adaptive_routing.mode, gate_preset_name, len(reroute))
             except Exception as exc:
                 logger.warning("ACR routing failed, using preset: %s", exc)
@@ -235,6 +239,8 @@ class PipelineOrchestrator:
                     gate_decision_fb.method,
                     auto_tier,
                     agent_model=agent_model,
+                    telemetry=self._telemetry_store,
+                    run_id=run_id,
                 )
                 decision.router = router
                 decision.effective_preset_name = effective_preset_name

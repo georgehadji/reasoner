@@ -137,11 +137,10 @@ async def main(args: argparse.Namespace) -> None:
             print(f"\nCost: ${result['cost_usd']:.4f}")
             print(f"Duration: {result['duration_seconds']:.1f}s")
 
-        asyncio.run(_run_benchmark())
+        await _run_benchmark()
         return
 
     if args.benchmark_all:
-        import asyncio
         from reasoner.infrastructure.benchmarks.engine import BenchmarkEngine
         from reasoner.infrastructure.llm.registry import _MODEL_WHITELIST, build_provider
 
@@ -158,7 +157,7 @@ async def main(args: argparse.Namespace) -> None:
                     print(f"  {mid:30s}: FAILED ({exc})")
             print("\nDone.")
 
-        asyncio.run(_run_benchmark_all())
+        await _run_benchmark_all()
         return
 
     # Handle resume from saved state

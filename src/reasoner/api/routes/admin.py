@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, HTTPException, Request
 
 from reasoner.core.settings import settings
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/admin")
 
@@ -156,7 +160,8 @@ async def acr_leaderboard(
             ],
         }
     except Exception as exc:
-        return {"role": role, "error": str(exc), "leaderboard": []}
+        logger.exception("ACR leaderboard query failed for role '%s'", role)
+        raise HTTPException(status_code=500, detail=f"Leaderboard query failed: {exc}")
 
 
 @router.get("/acr/profile/{model_id}")
@@ -190,7 +195,8 @@ async def acr_profile(request: Request, model_id: str):
             "has_capabilities": profile.has_capabilities,
         }
     except Exception as exc:
-        return {"model_id": model_id, "error": str(exc)}
+        logger.exception("ACR profile query failed for model '%s'", model_id)
+        raise HTTPException(status_code=500, detail=f"Profile query failed: {exc}")
 
 
 @router.post("/acr/mode")
