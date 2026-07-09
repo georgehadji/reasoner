@@ -141,7 +141,24 @@ async def main(args: argparse.Namespace) -> None:
         return
 
     if args.benchmark_all:
-        print("Benchmarking all models is not yet implemented. Use --benchmark <model_id> for a single model.")
+        import asyncio
+        from reasoner.infrastructure.benchmarks.engine import BenchmarkEngine
+        from reasoner.infrastructure.llm.registry import _MODEL_WHITELIST, build_provider
+
+        async def _run_benchmark_all():
+            engine = BenchmarkEngine()
+            model_ids = list(_MODEL_WHITELIST.keys())
+            print(f"\nBenchmarking {len(model_ids)} models...")
+            for mid in model_ids:
+                try:
+                    provider = build_provider(mid)
+                    result = await engine.benchmark_model(mid, provider)
+                    print(f"  {mid:30s}: {', '.join(f'{d}={s:.2f}' for d,s in sorted(result['scores'].items())[:3])} ...")
+                except Exception as exc:
+                    print(f"  {mid:30s}: FAILED ({exc})")
+            print("\nDone.")
+
+        asyncio.run(_run_benchmark_all())
         return
 
     # Handle resume from saved state
