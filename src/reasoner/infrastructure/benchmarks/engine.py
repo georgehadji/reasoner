@@ -96,7 +96,7 @@ class BenchmarkEngine:
                 scores=scores,
                 source="benchmark",
                 measured_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                sample_count=run.duration_seconds,
+                sample_count=sum(r.get("sample_count", 0) for r in run.suite_results),
             )
             try:
                 self.registry.update_capabilities(model_id, caps)
