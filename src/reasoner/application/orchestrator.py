@@ -233,8 +233,8 @@ class PipelineOrchestrator:
                 decision.action = "web_search"
                 return decision
 
-            # Auto-method: rebuild router with gate-selected method
-            if is_auto and gate_decision_fb.method and not custom_routing:
+            # Auto-method: rebuild router with gate-selected method (skip if ACR already applied)
+            if is_auto and gate_decision_fb.method and not custom_routing and not _acr_applied:
                 effective_preset_name, router = self.preset_service.build_auto_router(
                     gate_decision_fb.method,
                     auto_tier,

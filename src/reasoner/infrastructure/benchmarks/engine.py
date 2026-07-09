@@ -80,6 +80,9 @@ class BenchmarkEngine:
         suites = suites or _get_default_suites()
         logger.info("Benchmarking model '%s' with %d suites...", model_id, len(suites))
 
+        # Reset cost accumulator for per-model budget isolation (D01)
+        self.runner.reset_cost()
+
         run = await self.runner.run_all_suites(model_id, suites, provider)
 
         # Build capability scores from results
