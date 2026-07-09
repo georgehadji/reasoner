@@ -71,6 +71,22 @@ class BetaPosterior:
         self.call_count += 1
         self.sum_rewards += reward
 
+    def decay(self, factor: float = 0.95) -> None:
+        """Apply exponential decay to move posterior toward the prior.
+
+        Scales alpha and beta by ``factor``, reducing the influence of
+        older observations. This handles non-stationarity by letting
+        the model adapt to changing performance over time.
+
+        Example: ``decay(0.95)`` applied daily reduces the weight of
+        30-day-old data to ``0.95^30 ≈ 0.21`` of its original weight.
+
+        The prior (α=1, β=1) is preserved so the posterior always
+        maintains at least the prior's strength.
+        """
+        self.alpha = 1.0 + (self.alpha - 1.0) * factor
+        self.beta = 1.0 + (self.beta - 1.0) * factor
+
     def sample(self) -> float:
         """Draw a sample from the Beta posterior.
 

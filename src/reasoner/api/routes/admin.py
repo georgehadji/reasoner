@@ -95,3 +95,118 @@ async def trigger_neuro_maintenance(request: Request):
     from reasoner.api.cron import run_neuro_maintenance
     result = await run_neuro_maintenance()
     return {"status": "ok", **result}
+
+
+# ── ACR (Adaptive Capability Router) Admin —───────────────────────────────────
+
+
+@router.get("/acr/status")
+async def acr_status(request: Request):
+    """Return ACR current mode, model count, telemetry volume.
+
+    Requires X-Admin-Key header.
+    """
+    _require_admin(request)
+    from reasoner.core.settings import settings as app_settings
+    return {
+        "acr_enabled": app_settings.ACR_ENABLED,
+        "acr_mode": app_settings.ACR_MODE,
+        "acr_learning_enabled": app_settings.ACR_LEARNING_ENABLED,
+        "acr_benchmarks_enabled": app_settings.ACR_BENCHMARKS_ENABLED,
+        "exploration_rate_budget": app_settings.ACR_EXPLORATION_RATE_BUDGET,
+        "exploration_rate_premium": app_settings.ACR_EXPLORATION_RATE_PREMIUM,
+        "warmup_calls": app_settings.ACR_BENCHMARK_WARMUP_CALLS,
+    }
+
+
+@router.get("/acr/leaderboard/{role}")
+async def acr_leaderboard(
+    request: Request,
+    role: str,
+    window_hours: int = 168,
+    limit: int = 10,
+):
+    """Top models for a pipeline role, ranked by telemetry quality.
+
+    Requires X-Admin-Key header.
+    """
+    _require_admin(request)
+    try:
+        from reasoner.infrastructure.telemetry.call_telemetry_store import (
+            SQLiteCallTelemetryStore,
+        )
+        store = SQLiteCallTelemetryStore()
+        leaderboard = await store.query_role_leaderboard(
+            role=role, window_hours=window_hours, limit=limit,
+        )
+        return {
+            "role": role,
+            "window_hours": window_hours,
+            "leaderboard": [
+                {
+                    "model_id": s.model_id,
+                    "total_calls": s.total_calls,
+                    "success_rate": s.success_rate,
+                    "avg_latency_ms": s.avg_latency_ms,
+                    "avg_critique_score": s.avg_critique_score,
+                    "vendor": s.vendor,
+                    "bloc": s.bloc,
+                }
+                for s in leaderboard
+            ],
+        }
+    except Exception as exc:
+        return {"role": role, "error": str(exc), "leaderboard": []}
+
+
+@router.get("/acr/profile/{model_id}")
+async def acr_profile(request: Request, model_id: str):
+    """Return a model's capability profile.
+
+    Requires X-Admin-Key header.
+    """
+    _require_admin(request)
+    try:
+        from reasoner.infrastructure.llm.capability_registry import (
+            CapabilityRegistry,
+        )
+        registry = CapabilityRegistry()
+        profile = registry.get_profile(model_id)
+        if profile is None:
+            return {"model_id": model_id, "error": "Unknown model"}
+        return {
+            "model_id": profile.model_id,
+            "constraints": {
+                "max_context_tokens": profile.constraints.max_context_tokens,
+                "cost_per_1k_input_usd": profile.constraints.cost_per_1k_input_usd,
+                "cost_per_1k_output_usd": profile.constraints.cost_per_1k_output_usd,
+                "supports_tools": profile.constraints.supports_tools,
+                "supports_vision": profile.constraints.supports_vision,
+                "supports_json_mode": profile.constraints.supports_json_mode,
+                "vendor": profile.constraints.vendor,
+                "bloc": profile.constraints.bloc,
+            },
+            "capabilities": dict(profile.capabilities.scores) if profile.capabilities else {},
+            "has_capabilities": profile.has_capabilities,
+        }
+    except Exception as exc:
+        return {"model_id": model_id, "error": str(exc)}
+
+
+@router.post("/acr/mode")
+async def acr_set_mode(request: Request, mode: str):
+    """Switch ACR operating mode: shadow, advisory, or adaptive.
+
+    Requires X-Admin-Key header.
+    """
+    _require_admin(request)
+    valid_modes = {"shadow", "advisory", "adaptive"}
+    if mode not in valid_modes:
+        raise HTTPException(status_code=400, detail=f"Invalid mode. Choose from: {', '.join(sorted(valid_modes))}")
+    # Mode change applies to the next pipeline run via settings at runtime
+    import os as _os
+    _os.environ["ACR_MODE"] = mode
+    # Also update the live settings singleton
+    from reasoner.core.settings import settings as app_settings
+    app_settings.ACR_MODE = mode
+    return {"status": "ok", "mode": mode}

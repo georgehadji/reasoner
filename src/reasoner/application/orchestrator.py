@@ -25,6 +25,7 @@ from reasoner.application.ports.service_protocols import (
 from reasoner.core.events.domain_events import make_event, EventType
 from reasoner.hypergate import HyperGateAgent
 from reasoner.infrastructure.llm.router import ProviderRouter
+from reasoner.infrastructure.llm.registry import _REGISTRY
 from reasoner.infrastructure.persistence.event_store import get_event_store
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.models import TaskType
@@ -70,12 +71,14 @@ class PipelineOrchestrator:
         search_service: "SearchServiceProtocol | None" = None,
         neuro_client: "NeuroClientProtocol | None" = None,
         telemetry_store: "TelemetryStoreProtocol | None" = None,
+        adaptive_routing: Any = None,  # AdaptiveRoutingService
     ) -> None:
         self.preset_service = preset_service
         self.pipeline_service = pipeline_service
         self.search_service = search_service
         self._neuro_client = neuro_client  # Injected or None (lazy fallback)
         self._telemetry_store = telemetry_store
+        self._adaptive_routing = adaptive_routing
 
     async def preflight(
         self,
@@ -92,11 +95,40 @@ class PipelineOrchestrator:
 
         agent_model = getattr(initial_state, "agent_model", None) if initial_state else None
         custom_routing = getattr(req, "routing", None)
+
+        # ── ACR Telemetry + Run ID ──
+        run_id = str(__import__("uuid").uuid4())
+
         effective_preset_name, router = self.preset_service.build_router(
             gate_preset_name,
             custom_routing=custom_routing,
             agent_model=agent_model,
+            telemetry=self._telemetry_store,
+            run_id=run_id,
         )
+
+        # ── ACR Adaptive Routing ──
+        if self._adaptive_routing is not None and self._adaptive_routing.mode != "shadow":
+            try:
+                roles = list(dict.fromkeys(list(router.routing_table.keys()) + ["constructive", "scoring"]))
+                static = {}
+                for r in roles:
+                    p = router.get(r)
+                    static[r] = p.model if hasattr(p, "model") else ""
+                acr_routing = await self._adaptive_routing.select_routing_table(roles, static)
+                reroute = {r: m for r, m in acr_routing.items() if m and m in _REGISTRY}
+                if reroute:
+                    router = ProviderRouter.from_model_ids(
+                        primary_id=router.primary.model if hasattr(router.primary, "model") else "claude-sonnet",
+                        routing=reroute,
+                        telemetry=self._telemetry_store,
+                        run_id=run_id,
+                        preset_id=gate_preset_name,
+                        method=gate_preset_name,
+                    )
+                    logger.info("ACR %s: applied for '%s' (%d roles)", self._adaptive_routing.mode, gate_preset_name, len(reroute))
+            except Exception as exc:
+                logger.warning("ACR routing failed, using preset: %s", exc)
 
         # P1.9: Short-circuit preflight if spend cap prevents any LLM spend
         try:

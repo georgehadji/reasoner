@@ -20,7 +20,7 @@ class ConsistencySuite(BenchmarkSuite):
                 response = await judge_provider.complete(
                     system_prompt="Answer concisely and accurately.",
                     user_prompt=_CONSISTENCY_PROMPT,
-                    max_tokens=50, temperature=0.0,
+                    max_tokens=50, temperature=0.7,
                 )
                 if response:
                     responses.append(response.strip().lower())
