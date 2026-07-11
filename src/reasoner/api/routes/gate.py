@@ -16,6 +16,8 @@ from reasoner.application.services.preset_service import PresetService
 from reasoner.core.constants import HYPERGATE_METHOD_THRESHOLD
 from reasoner.domain.preset_core import build_auto_preset
 from reasoner.hypergate import HyperGateAgent
+from reasoner.infrastructure.llm.registry import build_provider
+from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.presets import get_preset_price_tier
 
 router = APIRouter()
@@ -39,7 +41,19 @@ async def gate_decision(
     tier = auto_tier if is_auto else get_preset_price_tier(gate_preset_name)
     _effective_preset_name, router_instance = preset_service.build_router(gate_preset_name)
 
-    gate = HyperGateAgent(router_instance)
+    # Override HyperGate router to use grok-4.5 explicitly (independent of preset primary)
+    hypergate_router = ProviderRouter(
+        primary=build_provider("grok-4.5"),
+        routing_table=router_instance.routing_table,
+        fallback_table=router_instance.fallback_table,
+        cascading_routing=router_instance.cascading_routing,
+        verbose=router_instance.verbose,
+        run_id=router_instance.run_id,
+        preset_id=f"hypergate-{router_instance.preset_id}",
+        method=router_instance.method,
+    )
+
+    gate = HyperGateAgent(hypergate_router)
     decision = await gate.decide(req.problem)
 
     def _with_preset(method: str | None) -> str | None:

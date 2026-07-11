@@ -288,6 +288,15 @@ python scripts/migrate_encryption_v2.py \
 
 Reasoner was built native for **Autonomous AI Agents** (Cursor, custom LLM tools, LangChain, CrewAI). It exposes endpoints that utilize Bearer token authentication, avoiding CSRF restrictions.
 
+### How an agent should call Reasoner
+
+1. Fetch the tool contract from `GET /api/agent/tools` or the full OpenAPI schema from `GET /openapi.json`.
+2. Send every agent request with `Authorization: Bearer <API_KEY>`.
+3. Prefer `POST /api/agent/run/sync` for autonomous agents because it returns one JSON response.
+4. Use `POST /api/agent/run` only if your agent can consume SSE streams.
+5. Put the task in `problem`, and set `preset` explicitly when you want a specific cost/quality tradeoff.
+6. Read `synthesis` as the final answer, then inspect `citations`, `errors`, and `models_used`.
+
 ### Primary Endpoints
 
 | Endpoint | Method | Format | Description |
@@ -309,6 +318,36 @@ curl -X POST http://localhost:8003/api/agent/run/sync \
     "preset": "scientific-premium"
   }'
 ```
+
+### 2. Minimal JSON Payload
+
+```json
+{
+  "problem": "Evaluate whether we should migrate to a monorepo.",
+  "preset": "research-premium",
+  "top_k": 2,
+  "sequential": false,
+  "no_cache": false,
+  "force_pipeline": false,
+  "enhance_prompt": false,
+  "expert": false,
+  "web_search": false,
+  "smart_search": true,
+  "source_type": "general",
+  "domain": null,
+  "attachments": [],
+  "file_ids": [],
+  "client_run_id": "optional-idempotency-key"
+}
+```
+
+### 3. Response Handling
+
+- `synthesis` is the final answer.
+- `citations` contains source references when available.
+- `errors` lists pipeline failures or provider issues.
+- `models_used` shows which models participated in the run.
+- If `synthesis` is empty, retry with a different `preset` or set `web_search=true`.
 
 **JSON Output Schema:**
 ```json
@@ -336,7 +375,7 @@ curl -X POST http://localhost:8003/api/agent/run/sync \
 }
 ```
 
-### 2. LangChain Integration Script
+### 4. LangChain Integration Script
 
 Easily embed the multi-model Reasoner pipeline as a structured tool inside standard AI Agent libraries:
 

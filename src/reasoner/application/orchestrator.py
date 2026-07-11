@@ -192,7 +192,20 @@ class PipelineOrchestrator:
                     logger.debug("Neuro recall failed: %s", exc)
             # HyperGate
             if not getattr(req, "force_pipeline", False):
-                gate = HyperGateAgent(router)
+                # Override HyperGate router to use grok-4.5 explicitly (independent of preset primary)
+                from reasoner.infrastructure.llm.registry import build_provider
+                from reasoner.infrastructure.llm.router import ProviderRouter
+                hypergate_router = ProviderRouter(
+                    primary=build_provider("grok-4.5"),
+                    routing_table=router.routing_table,
+                    fallback_table=router.fallback_table,
+                    cascading_routing=router.cascading_routing,
+                    verbose=router.verbose,
+                    run_id=router.run_id,
+                    preset_id=f"hypergate-{router.preset_id}",
+                    method=router.method,
+                )
+                gate = HyperGateAgent(hypergate_router)
                 gate_decision_fb = await gate.decide(req.problem)
 
         _preflight_timeout = max(GATE_TIMEOUT_SECONDS * 2, 5.0)
