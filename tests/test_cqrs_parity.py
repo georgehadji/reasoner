@@ -38,8 +38,9 @@ async def test_cqrs_vs_direct_parity():
     settings.ENVIRONMENT = "development"
     # Patch build_provider so no real API key is required — this test covers
     # routing/preflight logic only, not actual LLM construction.
+    # Patch the registry module (where orchestrator imports it from directly).
     with patch(
-        "reasoner.infrastructure.llm.router.build_provider",
+        "reasoner.infrastructure.llm.registry.build_provider",
         return_value=MagicMock(),
     ):
         try:
