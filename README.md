@@ -24,9 +24,9 @@ v2.3 — Reasoner — Augmented Reasoning Engine
 [![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/tesse/Reasoner?style=flat-square&logo=github)](https://github.com/tesse/Reasoner)
 
-**A production-grade reasoning engine that orchestrates 20 LLM methodologies — from multi-perspective analysis to verbalized sampling brainstorming — with automatic method selection, cross-lab diversity, and real-time streaming.**
+### A production-grade multi-agent reasoning orchestrator that coordinates 20 reasoning methodologies and 48 presets with automatic method selection, cross-lab model diversity, self-healing telemetry, and real-time streaming.
 
-[🚀 Quick Start](#quick-start) · [🤖 Agent API](#-agent-api) · [🧠 Methods](#reasoning-methods) · [🎛️ Presets](#available-presets) · [💻 Development](#development)
+[🚀 Quick Start](#-quick-start) · [🧠 Core Architecture](#-core-architecture) · [🎛️ Preset Matrix](#%EF%B8%8F-presets-master-matrix) · [📊 Telemetry & Healing](#-telemetry--self-healing) · [🔒 Security](#-security--encryption) · [🤖 Agent API](#-agent-api) · [💻 Development](#-development)
 
 </div>
 
@@ -34,69 +34,50 @@ v2.3 — Reasoner — Augmented Reasoning Engine
 
 ## 🎯 Project Overview
 
-Reasoner is a **reasoning orchestrator** that decomposes complex problems into structured phases, leverages multiple LLMs in parallel from diverse training ecosystems, applies rigorous independent critique, stress-tests solutions under adversarial conditions, and synthesizes actionable recommendations with epistemic labeling. It features a HyperGate Pre-Router for automatic method selection, supports 20 reasoning methods with 48 presets, ensures cross-lab diversity, and provides real-time streaming of progress and cost.
+**Reasoner** is a sophisticated, highly modular multi-agent reasoning system designed to decompose complex questions, strategic decisions, and deep research tasks into structured, phase-by-phase execution pipelines. Instead of relying on one-shot language model outputs, Reasoner orchestrates parallel model ensembles across different model-provider ecosystems (Anthropic, OpenAI, Google, DeepSeek, Mistral, and more). It critiques competing perspectives, performs recursive web-grounded RAG, stress-tests candidate answers under adversarial conditions, and synthesizes final solutions marked with precise epistemic confidence labels.
 
-**New in v2.3:** Harness telemetry pipeline — per-phase cost/duration/model data persisted to queryable SQLite tables, fallback events surfaced through the router call chain, context compression at Phase 2→3 handoff, and a runtime-aware self-healing loop that queries telemetry to inform static analysis.
-
----
-
-## 📊 Telemetry & Self-Healing
-
-Reasoner v2.3 includes a full telemetry pipeline inspired by *Code as Agent Harness* (arXiv:2605.18747):
-
-| Enhancement | What it does |
-|-------------|-------------|
-| **E1 — Quality-rich Neuro** | `postflight` sends `method`, `total_cost_usd`, `phase_costs`, `phase_durations`, `quality_history`, and `fallback_events` to the Neuro memory — every run's quality signal is preserved for future recall |
-| **E2 — Phase Telemetry Table** | `TelemetryStore` (`phase_telemetry` + `run_telemetry` tables) — queryable SQLite analytics. Ask: *"Average Phase 3 cost for debate-premium over the last 100 runs"* |
-| **E3 — Context Compression** | `smart_compress` applied after Decomposition (Phase 2), before Critique (Phase 3). Gated by existing `TOKEN_OPTIMIZATION["context_compression"]` flag |
-| **E4 — Fallback Surfacing** | `ProviderRouter` now fires `on_fallback(role, intended, actual, reason)` callbacks — wired at `preflight` so all code paths capture fallback events to `PipelineMeta.fallback_events` |
-| **E5 — Healing Exporter** | `healing/telemetry_exporter.py` queries `TelemetryStore`, writes `healing_context.json`. `run_healing.py` loads it before Loop 1 — static healing gets runtime context |
-
-```bash
-# Query telemetry
-python -c "
-from reasoner.infrastructure.persistence.telemetry_store import get_telemetry_store
-import asyncio
-store = get_telemetry_store()
-stats = asyncio.run(store.get_preset_stats('multi-perspective-premium'))
-print(stats)
-"
-```
+It is designed for enterprise environments, featuring real-time Server-Sent Events (SSE) streaming, sub-cent pricing telemetry, a self-healing loop utilizing runtime execution context, zero-trust container security, application-layer envelope encryption (AES-256-GCM), and native programmatic endpoints optimized for integration with AI agents.
 
 ---
 
-## 🌐 Language-Bias Mitigation
+## 🧠 Core Architecture
 
-Reasoner v2.3 includes a two-part system to reduce language-induced ideological drift (Buyl et al., *npj AI* 2026):
+Reasoner executes structured reasoning using an **8-Phase Pipeline** managed by the `ReasonerPipeline` engine. The entire flow is modeled asynchronously, allowing for massive parallel generation, context vetting, and synthesis:
 
-### Part A: English Pivot (Always On)
-Internally reasons in English, then translates output back to the user's language. Removes variance from language choice while preserving accuracy.
-
-- **Key-free translation:** CompositeTranslator tries DeepL → LLM fallback → identity. No external API keys required.
-- **Explicit reasoning:** `state.language` = "English" (internal), `state.output_language` = user's language (final).
-- **Complete translate-out:** All `FinalSolution` fields translated + ISO-code bug fixed.
-- **Method exemptions:** Writing, brainstorming, and article methods generate natively (avoid pivot for creative integrity).
-
-**Control:**
-```bash
-LANGUAGE_PIVOT_ENABLED=true  # Enable pivot (default: on)
-DEEPL_API_KEY="..."          # Optional fast path; LLM fallback used if missing
+```
+                  ┌─────────────────────────────────────┐
+                  │      User Question / Problem        │
+                  └──────────────────┬──────────────────┘
+                                     │
+                        [ Phase 1: Classification ]
+                                     │
+                       [ Phase 2: Decomposition ]
+                                     │
+                       [ Phase 3: Context Vetting ] <── (Iterative RAG Loop, Max 3)
+                                     │
+                       [ Phase 4: Deep Source Reading ]
+                                     │
+                        [ Phase 5: Generation ] ───────┐
+                                     │                 │ (Cross-Lab
+                       [ Phase 6: Critique & Scoring ] │  Perspective Ensembles)
+                                     │                 │
+                      [ Phase 7: Stress Testing ] <────┘
+                                     │
+                        [ Phase 8: Synthesis ]
+                                     │
+                  ┌──────────────────▼──────────────────┐
+                  │    Verified Solution with Citations │
+                  └─────────────────────────────────────┘
 ```
 
-### Part B: Cross-Lingual Probe (Canary, Premium Only)
-For ideologically-sensitive queries, re-runs synthesis in the user's native language and compares outputs. If material divergence detected, downgrades claims to HYPOTHESIS and surfaces an epistemic warning.
-
-- **Sensitivity detection:** Regex classifier (zero LLM calls) over 5 axes: politics, geopolitics, governance, religion, history.
-- **Divergence judgment:** LLM-judge compares English synthesis vs. native-language synthesis.
-- **Epistemic labeling:** Downgrade `VERIFIED → HYPOTHESIS` + append `language_note` when diverged.
-
-**Control:**
-```bash
-LANGUAGE_PROBE_ENABLED=true    # Enable probe (default: off); flip for canary presets
-LANGUAGE_DIVERGENCE_COSINE=0.15 # Cosine distance threshold (tune to adjust sensitivity)
-```
-
-**Rationale:** Language does not introduce *neutrality* (English baseline has its own tilt), but the pivot + probe system makes residual bias *visible* and *labeled* rather than hidden.
+1. **Classification (Phase 1):** Identifies task type (e.g., math, research, creative, coding) and primary language, enabling optimal routing.
+2. **Decomposition (Phase 2):** Breaks down complex problems into atomic sub-questions and key underlying assumptions.
+3. **Context Vetting (Phase 3):** Performs universal context vetting via iterative RAG. Includes smart token compression at Phase 2 ➔ 3 handoff.
+4. **Deep Reading (Phase 4):** Parses the full contents of critical sources when web-retrieved snippets are insufficient.
+5. **Generation (Phase 5):** Leverages cross-lab model ensembles to produce multiple competing answers and perspectives.
+6. **Critique & Scoring (Phase 6):** Independent LLM judges critique the generated answers against standard quality dimensions.
+7. **Stress Testing (Phase 7):** Subject survivors to adversarial stress testing to surface hidden logical flaws or factual errors.
+8. **Synthesis (Phase 8):** Consolidates verified perspectives into an evidence-grounded final response, complete with epistemic confidence labeling (`VERIFIED`, `HYPOTHESIS`, or `UNRESOLVED`) and citation references.
 
 ---
 
@@ -104,444 +85,193 @@ LANGUAGE_DIVERGENCE_COSINE=0.15 # Cosine distance threshold (tune to adjust sens
 
 ### Prerequisites
 
--   **Python 3.12+**
--   **Node.js 20+** (for the web UI)
--   **OpenRouter API Key** (recommended — single key, 350+ models)
--   **Docker** (optional — for Redis, SearXNG, and database services)
--   **Redis** (optional — rate limiting and distributed run state; falls back to in-memory)
--   **PostgreSQL** (optional — event store; defaults to SQLite for single-node)
+* **Python 3.12+**
+* **Node.js 20+** (for frontend web UI)
+* **OpenRouter API Key** (recommended — single billing interface for 350+ models)
+* **SearXNG** (optional — local search provider; defaults to free mock search if unavailable)
+* **Redis** (optional — recommended in production for distributed rate limiting)
 
-### 1. Clone & Setup
+### 1. Installation & Environment Setup
 
 ```bash
+# Clone the repository
 git clone https://github.com/tesse/Reasoner.git
 cd Reasoner
 
-# Backend
-cp .env.example .env
-# Edit .env and add: OPENROUTER_API_KEY=sk-or-v1-your-key-here
+# Set up Python virtual environment and install dependencies
 python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
-# Frontend
-cd ui-next && npm install && cd ..
+# Configure environment variables
+cp .env.example .env
+# Edit .env and insert your API credentials (e.g., OPENROUTER_API_KEY="sk-or-v1-...")
 ```
 
-### 2. Start Everything (One Command)
+### 2. Launch Services
+
+Start the FastAPI backend, the Next.js frontend, and the local SearXNG search engine with a single orchestration command:
 
 ```bash
 python start_all.py
 ```
 
-This starts:
--   🐍 **FastAPI Backend** on `http://localhost:8003` (configurable via `SERVER_PORT`)
--   ⚛️ **Next.js Frontend** on `http://localhost:3000`
--   🔍 **SearXNG Search** on `http://localhost:8888`
+* **FastAPI Backend:** `http://localhost:8003` (Port configurable via `SERVER_PORT`)
+* **Next.js Frontend:** `http://localhost:3000`
+* **SearXNG Instance:** `http://localhost:8888`
 
-Open [http://localhost:3000](http://localhost:3000) and start reasoning.
+### 3. Command-Line Interface (CLI) Examples
 
-### 3. CLI Quick Run
+Perform deep, multi-agent reasoning directly from your terminal:
 
 ```bash
-# Default preset — uses a balanced selection of models for quality and cost
-python main.py --problem "How should we prioritize our Q3 product roadmap?"
+# Run with the default balanced reasoning preset
+python main.py --problem "How should we prioritize our Q3 engineering roadmap?"
 
-# Budget option — approximately $0.02 per run
-python main.py --problem "..." --preset debate-budget
+# Run with a highly optimized budget preset (~$0.02 cost)
+python main.py --problem "Explain the long-term impact of quantum cryptography." --preset debate-budget
 
-# Maximum quality — premium models with cross-lab diversity
-python main.py --problem "..." --preset multi-perspective-premium
+# Run a premium multi-perspective analysis using top-tier models (~$0.20 cost)
+python main.py --problem "Evaluate microservices vs monolithic architecture for a startup." --preset multi-perspective-premium
+
+# Stream the reasoning steps sequentially to prevent rate limits
+python main.py --problem "Analyze the Fermat's Last Theorem proof." --preset scientific-premium --sequential
 ```
 
 ---
 
-## ⚙️ Configuration
+## 🎛️ Presets Master Matrix
 
-### Option 1: OpenRouter (Recommended)
+Reasoner ships with **48 presets** across **20 methodologies**. Each method contains highly optimized model combinations divided into cost-efficient **Budget** and quality-focused **Premium** tiers. 
 
-One key. 350+ models. Simplest billing.
+| Methodology | Budget Preset (`-budget`) | Premium Preset (`-premium`) | Core Model Strategy & Diversity | Recommended Use Case |
+| :--- | :--- | :--- | :--- | :--- |
+| **Multi-Perspective** | `multi-perspective-budget` | `multi-perspective-premium` | Cross-lab synthesis (Google + Mistral + Zhipu + DeepSeek) | General complex reasoning |
+| **Debate** | `debate-budget` | `debate-premium` | Generator A vs Generator B, adjudicated by a third independent model | Deciding between binary options |
+| **Jury / Orchestrated** | `jury-budget` | `jury-premium` | Large expert panel (4-6 models) scored by an autonomous judge | High-stakes strategic decisions |
+| **Research** | `research-budget` | `research-premium` | Iterative SearXNG queries, context-vetting, and Sonar Pro fact-checking | Evidence-heavy, real-world search |
+| **Scientific** | `scientific-budget` | `scientific-premium` | Hypothesis generation, falsification checks, and empirical scoring | Technical, medical, & scientific questions |
+| **Socratic** | `socratic-budget` | `socratic-premium` | Recursive question-and-answer loops designed to expose bias | Uncovering hidden assumptions |
+| **Pre-Mortem** | `pre-mortem-budget` | `pre-mortem-premium` | Gary Klein's prospective failure analysis and safety back-testing | Project planning and risk assessment |
+| **Bayesian** | `bayesian-budget` | `bayesian-premium` | Prior probability generation, likelihood updating, and sensitivity tests | Probabilistic forecasting |
+| **Dialectical** | `dialectical-budget` | `dialectical-premium` | Hegelian thesis-antithesis-synthesis progression | Philosophical & conceptual queries |
+| **Analogical** | `analogical-budget` | `analogical-premium` | Cross-domain structure-mapping and conceptual transfer | Creative problem solving |
+| **Delphi** | `delphi-budget` | `delphi-premium` | Structured multi-round expert consensus with convergence tracking | Estimations and future forecasting |
+| **Chain-of-Verification**| `cove-budget` | `cove-premium` | Draft ➔ verify queries ➔ answer queries ➔ final revision loop | Detailed fact-checking |
+| **Skeleton-of-Thought** | `sot-budget` | `sot-premium` | Skeleton outline extraction with parallel chunk generation | Low-latency long-form generation |
+| **Tree-of-Thoughts** | `tot-budget` | `tot-premium` | Depth-first/Breadth-first search with heuristic evaluations | Planning and multi-step math |
+| **Program-of-Thought** | `pot-budget` | `pot-premium` | Generating and executing python code to compute the exact answer | Quantitative, statistical analysis |
+| **Self-Discover** | `self-discover-budget` | `self-discover-premium` | Selects, adapts, and implements reasoning styles on-the-fly | Novel, unstructured problems |
+| **Writing / Article** | `writing-budget` | `writing-premium` | CoVE + SoT + Pre-Mortem pipeline with concept augmentation | Professional documentation & publishing |
+| **Brainstorming** | `brainstorming-budget` | `brainstorming-premium` | Verbalized Sampling (VS-CoT/Standard) with clustering | Idea generation & divergent thinking |
+| **Coding** | `coding-budget` | `coding-premium` | Spec ➔ parallel generation ➔ adversarial review ➔ test writing | Production code & test coverage |
+| **Iterative Critique** | `iterative-critique-budget`| `iterative-critique-premium`| Prompt generator-critic debate loops with convergence guards | Polishing creative/technical copy |
 
-```bash
-# .env
-OPENROUTER_API_KEY="sk-or-v1-..."
-```
+### 🌟 Special & Experimental Presets
 
-### Option 2: Individual Provider Keys
-
-Mix and match direct provider access:
-
-```bash
-OPENAI_API_KEY="sk-..."
-ANTHROPIC_API_KEY="sk-ant-..."
-GOOGLE_API_KEY="..."
-DEEPSEEK_API_KEY="sk-..."
-MISTRAL_API_KEY="..."
-XAI_API_KEY="..."
-PERPLEXITY_API_KEY="..."
-OLLAMA_BASE_URL="http://localhost:11434"
-```
-
-### Optional Settings
-
-```bash
-# Web search engine
-SEARXNG_URL="http://localhost:8888"
-
-# Admin API key for cache clearing and key management
-ADMIN_API_KEY="your-admin-key"
-
-# Rate limiting (REQUIRED 'redis' mode in production)
-# In production environments, RATE_LIMITER_MODE must be set to 'redis'.
-# The application will fail to start if 'memory' mode is detected in production
-# to prevent unsafe unthrottled access across multiple workers.
-RATE_LIMITER_MODE="memory" # or "redis"
-RATE_LIMIT_PER_MINUTE=60
-RATE_LIMIT_PER_HOUR=1000
-```
+* **`multi-perspective-ultra-budget`** (<$0.01): Leverages ultra-light models (Ministral-3B + Gemini Flash Lite) in a streamlined 5-phase execution pipeline.
+* **`subagent-budget` / `subagent-premium`**: Routes every individual pipeline sub-task (e.g., classification, scoring, synthesis) to specialized models.
+* **`image-gen-budget` / `image-gen-premium`**: Orchestrates text-to-image and image-to-image workflows across Midjourney, Flux 2 Pro, and Stable Diffusion architectures.
+* **`nvidia-nemotron-test`**: Experimental preset utilizing high-parameter NVIDIA Nemotron models through official NIM API keys.
 
 ---
 
-## 🎮 Usage
+## 📊 Telemetry & Self-Healing
 
-### CLI
+Reasoner incorporates a production-grade runtime telemetry system inspired by the *Code as Agent Harness* framework (arXiv:2605.18747). This pipeline gathers execution metadata to optimize pricing, route around model failures, and feed context into automated self-healing loops.
 
-```bash
-# List available presets and models
-python main.py --list-presets
-python main.py --list-models
+### Key Telemetry Pillars
 
-# Run with specific preset
-python main.py --problem "Should we adopt microservices?" --preset debate-premium
+| Pillar | Feature Name | Core Mechanism |
+| :--- | :--- | :--- |
+| **E1** | **Quality-Rich Memory** | Sends `method`, `total_cost_usd`, `phase_durations`, `quality_history`, and `fallback_events` to the central Neuro memory for historical analysis. |
+| **E2** | **Phase Telemetry Store** | App-level `TelemetryStore` running on SQLite/PostgreSQL. Records exact model behavior, cost, and duration per phase. |
+| **E3** | **Context Compression** | Automatically applies context compression algorithms (`smart_compress`) at the handoff between Decomposition and Critique to minimize token cost. |
+| **E4** | **Fallback Surfacing** | Detects model failures in `ProviderRouter` and immediately triggers `on_fallback()` callbacks to route around dead endpoints. |
+| **E5** | **Healing Exporter** | Connects `healing/telemetry_exporter.py` to static codebase analysis tools. Generates runtime context data to help heal pipeline code. |
 
-# Custom routing per role
-python main.py --problem "..." --routing '{"primary":"claude-sonnet","scoring":"sonar-pro"}'
+### Accessing Telemetry Programmatically
 
-# Load from file and export JSON
-python main.py --problem-file problem.txt --output results.json --preset multi-perspective-premium
-
-# Sequential mode for rate-limited environments
-python main.py --problem "..." --sequential
-
-# Adjust top-k pruning (default: 2)
-python main.py --problem "..." --top-k 3
-```
-
-### Programmatic API
+You can query the telemetry database using python or SQL:
 
 ```python
 import asyncio
-from reasoner.pipeline import ReasonerPipeline
-from reasoner.llm import ProviderRouter
+from reasoner.infrastructure.persistence.telemetry_store import get_telemetry_store
 
-async def main():
-    router = ProviderRouter.from_model_ids(
-        primary_id="claude-sonnet",
-        routing={"scoring": "sonar-pro", "synthesis": "glm-5"}
-    )
-    pipeline = ReasonerPipeline(router=router, preset_name="multi-perspective-premium")
-    state = await pipeline.run("Your complex problem here")
-    print(f"Task Type: {state.task_type}")
-    print(f"Final Answer: {state.final_solution.core_solution}")
-    print(f"Epistemic Label: {state.final_solution.epistemic_label}")
-    print(f"Cost: ${state.total_cost_usd:.4f}")
+async def view_stats():
+    store = get_telemetry_store()
+    stats = await store.get_preset_stats("multi-perspective-premium")
+    print(f"Average Cost: ${stats['avg_cost_usd']:.4f}")
+    print(f"Success Rate: {stats['success_rate'] * 100}%")
 
-asyncio.run(main())
+asyncio.run(view_stats())
 ```
 
 ---
 
-## 🧠 Reasoning Methods
+## 🌐 Language-Bias Mitigation
 
-Reasoner supports **20 specialized reasoning methodologies**:
+Language choice significantly influences model outputs and ideological leans (Buyl et al., *npj AI* 2026). Reasoner implements a robust, two-part system to neutralize linguistic bias:
 
-| Method | Preset Slug | Description | Best For |
-|--------|-------------|-------------|----------|
-| **Multi-Perspective** | `multi-perspective` | Default 6-phase pipeline with multi-perspective generation across 3–4 labs | General complex problems |
-| **Debate** | `debate` | Two models argue opposing positions; a third judges the winner | Polarized decisions |
-| **Jury / Orchestrated** | `jury` | Multiple generators scored by an independent panel of critics (4–6 experts) | High-stakes decisions |
-| **Research** | `research` | Web-grounded deep research with iterative SearXNG search and article pipeline | Evidence-heavy questions |
-| **Scientific** | `scientific` | Hypothesis generation, falsification tests, evidence scoring | Research & validation |
-| **Socratic** | `socratic` | Elenchus questioning to expose hidden assumptions | Clarifying ambiguous problems |
-| **Pre-Mortem** | `pre-mortem` | Prospective hindsight failure analysis (Gary Klein methodology) | Risk assessment |
-| **Bayesian** | `bayesian` | Prior → likelihood → posterior → sensitivity reasoning | Probabilistic reasoning |
-| **Dialectical** | `dialectical` | Hegelian thesis-antithesis-synthesis progression | Philosophical analysis |
-| **Analogical** | `analogical` | Cross-domain structure-mapping and transfer | Creative problem solving |
-| **Delphi** | `delphi` | Structured multi-round expert consensus with convergence tracking | Forecasting & estimation |
-| **Chain-of-Verification (CoVE)** | `cove` | Draft → verify → answer → revise self-checking loop | Fact-checking |
-| **Skeleton-of-Thought (SoT)** | `sot` | Skeleton → parallel solve → assemble for latency savings | Long structured output |
-| **Tree-of-Thoughts (ToT)** | `tot` | Reasoning as tree search with evaluation and backtracking | Planning & optimization |
-| **Program-of-Thought (PoT)** | `pot` | Executable code as intermediate reasoning step | Quantitative problems |
-| **Self-Discover** | `self-discover` | Dynamic selection and composition of reasoning modules | Novel problem types |
-| **Writing / Article** | `writing` | Research-backed article generation: CoVE + SoT + Pre-Mortem pipeline | Long-form writing |
-| **Brainstorming** | `brainstorming` | Verbalized Sampling (VS-Standard / VS-CoT): multi-round divergent idea generation with semantic clustering | Creative ideation |
-| **Coding** | `coding` | 5-phase production code pipeline: spec → parallel generation → adversarial review → tests → assembly | Production code |
-| **Iterative Critique** | `iterative-critique` | Adversarial generator-critic loop with convergence detection (LLM Debate) | Iterative refinement |
+### 1. The English Pivot (Always On)
+No matter what language a user questions in, Reasoner internally translates the query to **English**, executes the entire deep reasoning pipeline, and translates the finalized synthesis back to the user's native tongue.
+* **Fallback Chain:** Leverages DeepL first. If no API key is set, falls back to lightweight translation LLMs, and finally to local identity matching.
+* **Preservation Exceptions:** Creative writing, creative brainstorming, and specific article generation models bypass the pivot to maintain stylistic fidelity.
+
+### 2. The Cross-Lingual Probe (Canary)
+For highly sensitive geopolitical, historical, or religious topics, the Cross-Lingual Probe evaluates the divergence between English reasoning and native-language reasoning.
+* **Sensitivity Classifier:** Automatically flags queries covering 5 critical domains: geopolitics, governance, history, religion, and politics.
+* **Divergence Metric:** If semantic cosine distance exceeds threshold `0.15`, the system automatically downgrades the solution confidence rating (e.g., `VERIFIED ➔ HYPOTHESIS`) and appends an epistemic linguistic warning.
 
 ---
 
-## 🎛️ Available Presets
+## 🧪 Augmented Article Pipeline
 
-Reasoner ships with **48 presets** — every method has at least a **Budget** (~$0.01–$0.05/run) and **Premium** (~$0.15–$0.35/run) variant.
-
-### Multi-Perspective
-
-| Preset | Tier | Est. Cost | Key Model Diversity |
-|--------|------|-----------|---------------------|
-| `multi-perspective-ultra-budget` | Ultra-Budget | <$0.01 | Ministral-3B + Gemini Flash Lite — minimal 5-phase, top-k=1 |
-| `multi-perspective-budget` | Budget | ~$0.02 | Google (constructive) + Mistral (destructive) + Zhipu GLM (systemic) |
-| `multi-perspective-premium` | Premium | ~$0.20 | Kimi K2.6 + DeepSeek R1T2 + Qwen 3.6 + Gemini Pro |
-
-### Debate
-
-| Preset | Tier | Est. Cost | Key Model Diversity |
-|--------|------|-----------|---------------------|
-| `debate-budget` | Budget | ~$0.015 | DeepSeek (Model A) vs Qwen (Model B), judged by GLM |
-| `debate-premium` | Premium | ~$0.25 | Gemini Pro vs Kimi K2.6, judged by Perplexity Sonar Pro |
-
-### Jury / Orchestrated
-
-| Preset | Tier | Est. Cost | Key Model Diversity |
-|--------|------|-----------|---------------------|
-| `jury-budget` | Budget | ~$0.02 | DeepSeek + Qwen + GLM + MiniMax + Mistral (5 different labs) |
-| `jury-premium` | Premium | ~$0.30 | Claude + Kimi K2.6 + DeepSeek R1T2 + Qwen 3.6, scored by Sonar Pro |
-
-### Research
-
-| Preset | Tier | Est. Cost | Key Model Diversity |
-|--------|------|-----------|---------------------|
-| `research-budget` | Budget | ~$0.02 | DeepSeek + Qwen + Gemini — iterative SearXNG search |
-| `research-premium` | Premium | ~$0.25 | Claude + Kimi K2.6 + DeepSeek + MiMo V2, live fact-check via Sonar Pro |
-
-### Scientific
-
-| Preset | Tier | Est. Cost | Key Model Diversity |
-|--------|------|-----------|---------------------|
-| `scientific-budget` | Budget | ~$0.02 | DeepSeek hypothesis, Qwen testing, GLM evaluation |
-| `scientific-premium` | Premium | ~$0.25 | Claude hypothesis, Kimi K2.6 testing, Sonar Pro evidence |
-
-### Socratic
-
-| Preset | Tier | Est. Cost | Key Model Diversity |
-|--------|------|-----------|---------------------|
-| `socratic-budget` | Budget | ~$0.02 | DeepSeek questions, Qwen answers, GLM evaluation |
-| `socratic-premium` | Premium | ~$0.25 | Claude questions, Kimi K2.6 answers, Sonar Pro evidence |
-
-### Pre-Mortem
-
-| Preset | Tier | Est. Cost | Key Model Diversity |
-|--------|------|-----------|---------------------|
-| `pre-mortem-budget` | Budget | ~$0.02 | DeepSeek failure scenarios, Qwen backtracking, GLM signals |
-| `pre-mortem-premium` | Premium | ~$0.25 | Claude failure scenarios, Kimi K2.6 backtracking, MiMo V2 synthesis |
-
-### Bayesian
-
-| Preset | Tier | Est. Cost | Key Model Diversity |
-|--------|------|-----------|---------------------|
-| `bayesian-budget` | Budget | ~$0.02 | DeepSeek priors, Qwen likelihood, GLM posterior |
-| `bayesian-premium` | Premium | ~$0.25 | Claude priors, Kimi K2.6 likelihood, Sonar Pro evidence |
-
-### Dialectical
-
-| Preset | Tier | Est. Cost | Key Model Diversity |
-|--------|------|-----------|---------------------|
-| `dialectical-budget` | Budget | ~$0.02 | DeepSeek thesis, Qwen antithesis, GLM synthesis |
-| `dialectical-premium` | Premium | ~$0.25 | Claude thesis, Kimi K2.6 antithesis, MiMo V2 synthesis |
-
-### Analogical
-
-| Preset | Tier | Est. Cost | Key Model Diversity |
-|--------|------|-----------|---------------------|
-| `analogical-budget` | Budget | ~$0.02 | DeepSeek abstraction, Qwen domain search, GLM mapping |
-| `analogical-premium` | Premium | ~$0.25 | Claude abstraction, Kimi K2.6 domain search, MiMo V2 synthesis |
-
-### Delphi
-
-| Preset | Tier | Est. Cost | Key Model Diversity |
-|--------|------|-----------|---------------------|
-| `delphi-budget` | Budget | ~$0.03 | DeepSeek + Qwen + GLM + Mistral experts (4 different labs) |
-| `delphi-premium` | Premium | ~$0.30 | Claude + Kimi K2.6 + DeepSeek R1T2 + Qwen 3.6 experts |
-
-### Chain-of-Verification (CoVE)
-
-| Preset | Tier | Est. Cost | Key Model Diversity |
-|--------|------|-----------|---------------------|
-| `cove-budget` | Budget | ~$0.02 | DeepSeek draft → Qwen verify → GLM answer → Gemini revise |
-| `cove-premium` | Premium | ~$0.25 | Claude draft → Kimi K2.6 verify → DeepSeek R1T2 answer → Qwen revise |
-
-### Skeleton-of-Thought (SoT)
-
-| Preset | Tier | Est. Cost | Key Model Diversity |
-|--------|------|-----------|---------------------|
-| `sot-budget` | Budget | ~$0.02 | DeepSeek skeleton → Qwen solve → GLM assemble |
-| `sot-premium` | Premium | ~$0.25 | Claude skeleton → Kimi K2.6 solve → DeepSeek R1T2 assemble |
-
-### Tree-of-Thoughts (ToT)
-
-| Preset | Tier | Est. Cost | Key Model Diversity |
-|--------|------|-----------|---------------------|
-| `tot-budget` | Budget | ~$0.02 | DeepSeek decompose → Qwen generate → GLM evaluate → Gemini backtrack |
-| `tot-premium` | Premium | ~$0.25 | Claude decompose → Kimi K2.6 generate → DeepSeek R1T2 evaluate |
-
-### Program-of-Thought (PoT)
-
-| Preset | Tier | Est. Cost | Key Model Diversity |
-|--------|------|-----------|---------------------|
-| `pot-budget` | Budget | ~$0.02 | DeepSeek generate → Qwen execute → GLM interpret |
-| `pot-premium` | Premium | ~$0.25 | Claude generate → Kimi K2.6 execute → DeepSeek R1T2 interpret |
-
-### Self-Discover
-
-| Preset | Tier | Est. Cost | Key Model Diversity |
-|--------|------|-----------|---------------------|
-| `self-discover-budget` | Budget | ~$0.02 | DeepSeek select → Qwen adapt → DeepSeek implement |
-| `self-discover-premium` | Premium | ~$0.25 | Claude select → Kimi K2.6 adapt → DeepSeek R1T2 implement |
-
-### Writing / Article Generation
-
-| Preset | Tier | Est. Cost | Key Model Diversity |
-|--------|------|-----------|---------------------|
-| `writing-budget` | Budget | ~$0.05 | DeepSeek + Mistral + Kimi K2.6 + GLM — CoVE + SoT + Pre-Mortem |
-| `writing-premium` | Premium | ~$0.20 | Claude (decompose/CoVE/verify) + GLM-5.1 (SoT/assemble) + Gemini Pro (synthesis/critique) |
-
-### Brainstorming (Verbalized Sampling)
-
-| Preset | Tier | Est. Cost | Key Model Diversity |
-|--------|------|-----------|---------------------|
-| `brainstorming-budget` | Budget | ~$0.03 | Qwen3-Max generates (3 rounds × 5 ideas), Gemini clusters, DeepSeek develops top 3 |
-| `brainstorming-premium` | Premium | ~$0.25 | Claude Sonnet VS-CoT (5 rounds × 5 ideas), Gemini Pro clusters, Kimi K2.6 develops top 5 |
-
-### Coding / Code Generation
-
-| Preset | Tier | Est. Cost | Key Model Diversity |
-|--------|------|-----------|---------------------|
-| `coding-budget` | Budget | ~$0.05 | Gemini spec → DeepSeek generate → Qwen review → DeepSeek tests → Kimi K2.6 assemble |
-| `coding-premium` | Premium | ~$0.30 | Claude spec+tests → Kimi K2.6 generate → DeepSeek R1T2 review → GPT-5 assemble |
-
-### Iterative Critique (LLM Debate)
-
-| Preset | Tier | Est. Cost | Key Model Diversity |
-|--------|------|-----------|---------------------|
-| `iterative-critique-budget` | Budget | ~$0.02 | DeepSeek generator vs DeepSeek V4 Flash critic |
-| `iterative-critique-premium` | Premium | ~$0.25 | GPT-5 generator vs Claude Sonnet critic |
-
-### SubAgent (Per-Subagent Routing)
-
-| Preset | Tier | Est. Cost | Key Model Diversity |
-|--------|------|-----------|---------------------|
-| `subagent-budget` | Budget | ~$0.02 | Every subagent (synthesis, critique, search) routed to a dedicated cross-lab model |
-| `subagent-premium` | Premium | ~$0.30 | Gemini Pro + Claude + DeepSeek R1T2 + Sonar Pro per-subagent |
-
-### Cross-Language (DeepL Translation)
-
-| Preset | Tier | Est. Cost | Key Model Diversity |
-|--------|------|-----------|---------------------|
-| `cross-language-budget` | Budget | ~$0.02 | Google + Mistral + Zhipu — requires `DEEPL_API_KEY` |
-| `cross-language-premium` | Premium | ~$0.20 | Gemini Pro + Claude + Qwen 3.6 — requires `DEEPL_API_KEY` |
-
-### Image Generation
-
-| Preset | Tier | Est. Cost | Primary Models |
-|--------|------|-----------|----------------|
-| `image-gen-budget` | Budget | varies | Riverflow v2 Fast Preview + Gemini Flash Image; Seedream 4.5 / Flux 2 Pro fallbacks |
-| `image-gen-premium` | Premium | varies | Gemini 3 Pro Image + GPT-5 Image; Gemini 3.1 Flash Image fallback |
-
-### Experimental
-
-| Preset | Tier | Notes |
-|--------|------|-------|
-| `nvidia-nemotron-test` | Experimental | NVIDIA Nemotron-3-Super-120B via NIM free tier. Use with `--sequential` only (40 RPM cap). |
-
----
-
-## 🔀 Model Routing Philosophy
-
-### Why Cross-Lab Diversity Matters
-
-Different model families are trained on different data distributions, reward functions, and safety paradigms. When multiple perspectives come from the **same lab**, the pipeline converges to an **echo chamber** — the models agree on the same hidden assumptions and miss the same blind spots.
-
-### Design Rules
-
-1.  **Phase 2 (Perspectives)** — Minimum 3 different labs in Budget, 4 in Premium.
-2.  **Phase 3 (Scoring)** — Scorer must be from a different ecosystem than the dominant Phase-2 generator.
-3.  **Fallbacks** — Failures fall back to a **cross-lab equivalent**, not automatically to the preset primary.
-4.  **Phase 0 (Classification)** — Optimized for speed and cost; diversity is secondary.
-5.  **Phase 5 (Synthesis)** — Optimized for coherence and depth; diversity is useful but not at the expense of consistency.
-
----
-
-## 🧪 Augmented Article Pipeline (v2.3)
-
-Reasoner automatically enriches deep/philosophical article questions with pre-processing augmentation before the main writing pipeline executes. When a question matches abstract concept patterns (Greek + English, 39 + 20 concepts), the pipeline runs **parallel pre-processing** methods and injects their insights into Evidence Collection, Outline, and Draft phases.
-
-### How It Works
+For abstract or philosophical inquiries, Reasoner dynamically triggers pre-processing augmentation before launching the primary long-form writing pipeline:
 
 ```
-User question → HyperGate deep concept guard → is_deep_question() regex
-    ↓ (deep question detected)
-Parallel augmentation (asyncio.gather):
-    ├─ Debate: structured pro/con analysis
-    ├─ Iterative Critique: adversarial self-critique
-    ├─ Jury: multi-expert panel (Premium tier)
-    └─ Socratic: recursive assumption-excavation questions (Premium tier)
-    ↓
-Combined pre_research_summary injected into:
-    ├─ Retrieval planning (refined search queries)
-    ├─ Outline generation (argument map enrichment)
-    └─ Draft composition (insight integration)
+[ Philosophical / Abstract Query ]
+               │
+               ▼
+[ HyperGate Deep Concept Guard ]
+               │
+               ▼  (Triggers parallel preprocessing)
+ ┌─────────────┼─────────────┬──────────────────────┐
+ │             │             │                      │
+ ▼             ▼             ▼                      ▼
+[ Debate ]  [ Jury ]  [ Socratic ]  [ Iterative Critique ]
+ └─────────────┼─────────────┴──────────────────────┘
+               │
+               ▼
+  [ Consolidated Pre-Research Context ]
+               │
+               ├─► Retrievals (Refined search keywords)
+               ├─► Outlines (Enriched argumentative maps)
+               └─► Drafting (Integrated synthesis)
 ```
 
-### Auto-Detection
-
-| Trigger | Examples |
-|---------|----------|
-| "What is X?" + abstract concept | "What is art?", "What is consciousness?" |
-| Greek philosophical keywords | "Τι είναι δικαιοσύνη;", "Ποια είναι η φύση της ηθικής;" |
-| Definitional framing | "What is the nature of reality?", "What is the purpose of existence?" |
-| Epistemological queries | "Can we ever truly know anything?", "Is there such a thing as free will?" |
-
-Non-philosophical questions ("How to make coffee", "What is the capital of France?") are correctly excluded.
-
-### Per-Tier Augmentation
-
-| Tier | Methods | Extra LLM calls | Cost impact |
-|------|---------|----------------|-------------|
-| Budget | *(none)* | 0 | No extra cost |
-| Standard | `debate` | 1 parallel call | ~$0.001 |
-| Premium | `debate` + `iterative_critique` + `jury` + `socratic` | 4 parallel calls | ~$0.004 |
-
-### Configuration
+### Configuration Variables
 
 ```bash
-# Global kill switch (default: on)
-AUGMENTATION_ENABLED=true
-
-# LLM depth confirmation — filters regex false positives (default: off)
-AUGMENTATION_LLM_CONFIRM=false
-
-# Result caching — skips LLM calls on repeated deep questions (default: on)
-AUGMENTATION_CACHE_ENABLED=true
-AUGMENTATION_CACHE_MAX_ENTRIES=128
-AUGMENTATION_CACHE_TTL_SECONDS=86400
-
-# A/B quality metrics — 50/50 split augmented vs baseline (default: off)
-AUGMENTATION_AB_TEST=false
+AUGMENTATION_ENABLED=true             # Toggle the pre-processing pipeline
+AUGMENTATION_CACHE_ENABLED=true       # Cache results to prevent redundant LLM calls
+AUGMENTATION_CACHE_TTL_SECONDS=86400  # Cache lifetime (Default: 24 hours)
+AUGMENTATION_AB_TEST=false            # Enables 50/50 split testing of augmented vs baseline outputs
 ```
 
 ---
 
 ## 🔒 Security & Encryption
 
-Reasoner v2.3 implements a comprehensive **Zero-Trust** security architecture to ensure your data is protected at every stage.
+Reasoner features an enterprise-grade security layer guarding data in transit and at rest.
 
-- **End-to-End Transit Encryption:** All traffic, both external (client-to-proxy) and internal (inter-container), is encrypted via TLS 1.3/1.2.
-- **Internal PKI:** An automated certificate generation system provisions unique internal certificates for all services (`backend`, `frontend`, `database`, `redis`) on every startup.
-- **At-Rest Protection:** Sensitive data, including API key metadata, user information, and full pipeline execution states, is encrypted at the application layer using **AES-256-GCM** before storage.
-- **Zero-Trust Networking:** All internal components (PostgreSQL, Redis, FastAPI, Next.js) strictly require TLS, making the internal network opaque even to local attackers.
+* **Mutual TLS (mTLS):** All internal microservices (Redis, DB, Web UI, API) communicate strictly over secure TLS 1.3/1.2 tunnels. Reasoner automatically provisions unique, ephemeral cryptographic certificates for internal containers on startup.
+* **At-Rest AES-256-GCM Envelope Encryption:** Sensitive tables — such as API keys, user data, and long-term execution traces — are encrypted at the application layer.
+* **Blind Indexing:** Search queries on encrypted fields utilize one-way HMAC-SHA256 blind indexing to allow searching without revealing plaintext to the database.
 
-### Legacy Data Encryption Migration
+### Encryption Migration Script
 
-To migrate existing encrypted data to the latest envelope encryption format with blind indexing (introduced in Reasoner v2.2), use the standalone migration script. This is an **idempotent** operation and can be run safely multiple times.
+To safely migrate legacy plain or older format databases to Reasoner v2.3's blind index format:
 
 ```bash
 python scripts/migrate_encryption_v2.py \
@@ -552,84 +282,70 @@ python scripts/migrate_encryption_v2.py \
   --delay-seconds 0.05
 ```
 
-**Important Notes:**
--   **Production:** Run this script during off-peak hours with appropriate batch sizes and delays to minimize database load.
--   **Keys:** Ensure `ENCRYPTION_KEY` and `BLIND_INDEX_KEY` match those used by your running Reasoner application.
--   **Backward Compatibility:** The Reasoner application is designed to gracefully handle both old and new encryption formats during reads, allowing for a zero-downtime migration.
-
-For more technical details, see [ENCRYPTION.md](./ENCRYPTION.md).
-
 ---
 
 ## 🤖 Agent API
 
-Reasoner exposes three agent-friendly endpoints that use `Authorization: Bearer <key>` instead of CSRF tokens — designed for AI agents (Claude, LangChain, Cursor, custom scripts) that need programmatic access.
+Reasoner was built native for **Autonomous AI Agents** (Cursor, custom LLM tools, LangChain, CrewAI). It exposes endpoints that utilize Bearer token authentication, avoiding CSRF restrictions.
 
-### Authentication
+### Primary Endpoints
 
-Generate an API key (requires admin scope) or use the `ADMIN_API_KEY` from your `.env`:
+| Endpoint | Method | Format | Description |
+| :--- | :--- | :--- | :--- |
+| `/api/agent/run/sync` | `POST` | `application/json` | Block and return full compiled pipeline output. |
+| `/api/agent/run` | `POST` | `text/event-stream`| Stream pipeline progress and text chunks in real-time. |
+| `/api/agent/tools` | `GET` | `application/json` | Retrieve standard OpenAPI-spec schemas for agent tools. |
+
+### 1. Synchronous Integration Example
+
+Use `/api/agent/run/sync` to gather all reasoning steps, citations, and models used into a structured JSON payload:
 
 ```bash
-# Use your admin API key directly, or generate a scoped key
-curl -s -X POST http://localhost:8003/api/agent/run/sync \
-  -H "Authorization: Bearer ${ADMIN_API_KEY}" \
+curl -X POST http://localhost:8003/api/agent/run/sync \
+  -H "Authorization: Bearer YOUR_ADMIN_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"problem": "Why is the sky blue?", "preset": "scientific-budget"}'
+  -d '{
+    "problem": "Verify whether the prime number spiral has a mathematical pattern.",
+    "preset": "scientific-premium"
+  }'
 ```
 
-### Endpoints
-
-| Endpoint | Description | Response |
-|----------|-------------|----------|
-| `POST /api/agent/run` | Run pipeline, returns SSE event stream | `text/event-stream` |
-| `POST /api/agent/run/sync` | Run pipeline, returns aggregated JSON | `application/json` — `RunResult` schema |
-| `POST /api/agent/tools` | Discover available agent tools and their schemas | `application/json` — OpenAI function-calling format |
-
-### Sync Mode (Recommended for Agents)
-
-The `/api/agent/run/sync` endpoint collects all SSE events internally and returns a single JSON object. No streaming parsing needed.
-
-**Request:**
-```bash
-curl -s -X POST http://localhost:8003/api/agent/run/sync \
-  -H "Authorization: Bearer sk-..." \
-  -H "Content-Type: application/json" \
-  -d '{"problem": "Explain the Fermi paradox", "preset": "scientific-budget"}'
-```
-
-**Response (`RunResult`):**
+**JSON Output Schema:**
 ```json
 {
-  "preset": "scientific-budget",
+  "preset": "scientific-premium",
   "errors": [],
-  "total_tokens": {"input": 2822, "output": 3614, "total": 6436},
-  "duration_seconds": 45.1,
-  "synthesis": "### Understanding Why the Sky is Blue\nThe color of the sky is...",
-  "critical_insights": ["The sky appears blue due to Rayleigh scattering..."],
-  "open_questions": ["How does atmospheric pollution affect sky color?"],
-  "citations": [
-    {"url": "https://en.wikipedia.org/wiki/Rayleigh_scattering", "title": "Rayleigh scattering", "snippet": "...", "source_type": "web"}
+  "total_tokens": { "input": 4821, "output": 7412, "total": 12233 },
+  "duration_seconds": 38.4,
+  "synthesis": "### Prime Number Spiral Analysis\nThe Ulam spiral exhibits...",
+  "critical_insights": [
+    "Ulam spiral generates diagonal patterns based on quadratic polynomials."
   ],
-  "models_used": ["qwen/qwen3.5-flash-02-23", "deepseek/deepseek-v4-flash", "openai/gpt-4o-mini"]
+  "open_questions": [
+    "Are there asymptotic limits to prime density along specific diagonals?"
+  ],
+  "citations": [
+    {
+      "url": "https://mathworld.wolfram.com/UlamSpiral.html",
+      "title": "Ulam Spiral",
+      "snippet": "A visual representation of prime distribution...",
+      "source_type": "academic"
+    }
+  ],
+  "models_used": ["anthropic/claude-3-5-sonnet", "google/gemini-2-pro", "perplexity/sonar-pro"]
 }
 ```
 
-### Tool Discovery
+### 2. LangChain Integration Script
 
-```bash
-curl -s http://localhost:8003/api/agent/tools | jq
-```
-
-Returns an array of tool definitions in OpenAI function-calling format, consumable by LangChain, CrewAI, and Claude tools.
-
-### LangChain Integration
+Easily embed the multi-model Reasoner pipeline as a structured tool inside standard AI Agent libraries:
 
 ```python
+import httpx
 from langchain.tools import StructuredTool
 from pydantic import BaseModel, Field
-import httpx
 
-REASONER_API_KEY = "sk-..."
+REASONER_API_KEY = "sk-your-reasoner-key"
 
 class ReasonerInput(BaseModel):
     problem: str = Field(description="The problem to reason about")
@@ -646,54 +362,86 @@ async def reasoner_tool(problem: str, preset: str) -> str:
 
 tool = StructuredTool.from_function(
     name="reasoner",
-    description="Research complex topics using multi-model reasoning pipelines",
+    description="Research complex issues utilizing multi-provider reasoning networks.",
     func=reasoner_tool,
     args_schema=ReasonerInput,
 )
 ```
 
-### Streaming Mode (for Real-time UI)
+---
 
-```python
-import httpx, json
+## ⚙️ Configuration Reference
 
-async with httpx.AsyncClient() as client:
-    async with client.stream("POST", "http://localhost:8003/api/agent/run",
-        json={"problem": "Why is the sky blue?", "preset": "scientific-budget"},
-        headers={"Authorization": "Bearer sk-..."},
-    ) as response:
-        async for line in response.aiter_lines():
-            if line.startswith("data: "):
-                ev = json.loads(line[6:])
-                if ev["type"] == "text_chunk":
-                    print(ev["text"], end="")
-```
+Configure your Reasoner instance using environment variables inside your `.env` file:
+
+### API Keys & Providers
+* `OPENROUTER_API_KEY`: Key for OpenRouter integration (Unified Model Access).
+* `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`: Direct provider access keys.
+* `DEEPSEEK_API_KEY`, `MISTRAL_API_KEY`, `XAI_API_KEY`: Optional direct provider keys.
+* `DEEPL_API_KEY`: Key for premium translations in the Language Pivot.
+
+### Application Infrastructure
+* `SERVER_PORT` (Default: `8003`): Port for the FastAPI backend.
+* `ADMIN_API_KEY`: Admin authentication token for accessing cache and managing encryption keys.
+* `RATE_LIMITER_MODE` (Default: `memory`): Mode for rate limits. Set to `redis` in production.
+* `REDIS_URL` (Default: `redis://localhost:6379/0`): URL of your Redis cache and rate limiter.
+* `DATABASE_URL` (Default: `sqlite:///./reasoner.db`): SQLAlchemy database path (PostgreSQL recommended in production).
+* `SEARXNG_URL` (Default: `http://localhost:8888`): Direct address to local Search Engine.
 
 ---
 
-## 🛠️ Development
+## 💻 Development
 
-### Running Tests
+Reasoner enforces strict type compliance, automated linting, and comprehensive unit coverage.
+
+### Project Structure Overview
+
+```
+E:/Documents/Vibe-Coding/Reasoner/
+├── main.py                     # CLI Entry Point
+├── asgi.py                     # FastAPI ASGI Server Entry Point
+├── src/
+│   └── reasoner/
+│       ├── api/                # API controllers & route mappings
+│       ├── application/        # Application services and logic
+│       ├── core/               # Main orchestration models
+│       ├── domain/             # Entities, value objects & models
+│       ├── infrastructure/     # Database persistence, telemetry & cache stores
+│       ├── phases/             # Phase-specific execution schemas and prompts
+│       ├── security/           # Application-layer encryption & PKI setup
+│       └── utils/              # Token, logging & scraper utilities
+├── tests/                      # Unit, integration & behavioral tests
+├── ui-next/                    # Next.js Web UI
+└── scripts/                    # Database, encryption & build scripts
+```
+
+### Running the Test Suite
+
+We use `pytest` for executing and asserting our test suites:
 
 ```bash
-# Full suite
+# Execute the entire test suite
 python -m pytest tests/ -v
 
-# Quick run (skip slow/integration tests)
+# Run lightweight tests only (excluding slow integration tests)
 python -m pytest tests/ -v -m "not slow and not integration"
 
-# With coverage
+# Run with test coverage calculations
 python -m pytest tests/ --cov=src/reasoner --cov-report=html
 ```
 
-### Code Quality
+### Linting & Formatting Standards
+
+Before staging or committing any code changes, run the automated linting checks:
 
 ```bash
-# Python linting
+# Lint the Python codebase
 ruff check src/reasoner/
+
+# Format Python files automatically
 ruff format src/reasoner/
 
-# Frontend linting
+# Lint the Frontend React codebase
 cd ui-next && npm run lint
 ```
 
@@ -703,6 +451,6 @@ cd ui-next && npm run lint
 
 **[⬆ Back to Top](#top)**
 
-Made with ❤️ and a lot of reasoning
+Built with precision and robust engineering standards.
 
 </div>
