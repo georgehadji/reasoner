@@ -192,12 +192,14 @@ class PipelineOrchestrator:
                     logger.debug("Neuro recall failed: %s", exc)
             # HyperGate
             if not getattr(req, "force_pipeline", False):
-                # Override HyperGate router to use grok-4.5 explicitly (independent of preset primary)
+                # Override HyperGate router: grok-4.5 for primary, gemini-flash-lite for sub-agents
                 from reasoner.infrastructure.llm.registry import build_provider
                 from reasoner.infrastructure.llm.router import ProviderRouter
+                hypergate_routing = dict(router.routing_table)
+                hypergate_routing["hypergate_subagent"] = build_provider("gemini-flash-lite")
                 hypergate_router = ProviderRouter(
                     primary=build_provider("grok-4.5"),
-                    routing_table=router.routing_table,
+                    routing_table=hypergate_routing,
                     fallback_table=router.fallback_table,
                     cascading_routing=router.cascading_routing,
                     verbose=router.verbose,

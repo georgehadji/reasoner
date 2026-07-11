@@ -121,7 +121,7 @@ class BaseSubAgent(ABC):
     async def _llm_call(
         self, inp: SubAgentInput, router: ProviderRouter
     ) -> tuple[str, dict[str, Any]]:
-        provider = router.get("primary")
+        provider = router.get("hypergate_subagent")
         model_name = getattr(provider, "model", "").lower()
         is_openai = any(model_name.startswith(p) for p in ("gpt-", "o1", "o3", "openai/"))
 

@@ -41,10 +41,12 @@ async def gate_decision(
     tier = auto_tier if is_auto else get_preset_price_tier(gate_preset_name)
     _effective_preset_name, router_instance = preset_service.build_router(gate_preset_name)
 
-    # Override HyperGate router to use grok-4.5 explicitly (independent of preset primary)
+    # Override HyperGate router: grok-4.5 for primary, gemini-flash-lite for sub-agents
+    hypergate_routing = dict(router_instance.routing_table)
+    hypergate_routing["hypergate_subagent"] = build_provider("gemini-flash-lite")
     hypergate_router = ProviderRouter(
         primary=build_provider("grok-4.5"),
-        routing_table=router_instance.routing_table,
+        routing_table=hypergate_routing,
         fallback_table=router_instance.fallback_table,
         cascading_routing=router_instance.cascading_routing,
         verbose=router_instance.verbose,
