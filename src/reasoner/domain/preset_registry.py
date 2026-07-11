@@ -21,7 +21,7 @@ _REGISTRY: dict[str, dict] = {
     # ----------------------------------------------------------------------------------
     "multi-perspective-budget": {
         "method": "multi-perspective",
-        "primary_id": "gemini-flash",
+        "primary_id": "grok-4.3",
         "routing": {
             "perspective_cot": "mimo-v2.5",           # Xiaomi 🇨🇳 — $0.14/$0.28, cheapest 1M ctx omnimodal
             "perspective_analysis": "qwen3.6-flash",   # was qwen3-turbo (DEAD) → stronger reasoning
@@ -88,12 +88,12 @@ _REGISTRY: dict[str, dict] = {
     },
     "debate-budget": {
         "method": "debate",
-        "primary_id": "gemini-flash",
+        "primary_id": "grok-4.3",
         "routing": {
             # ── Cross-bloc adversarial diversity (🇨🇳 vs 🇺🇸, 🇺🇸 judge) ──
             "constructive": "deepseek-v4-flash",    # 🇨🇳 DeepSeek — constructive argumentation
             "destructive":  "gpt-oss-120b",     # 🇺🇸 OpenAI open-weight — adversarial critique (was ring 🇨🇳, cross-bloc debate)
-            "systemic":     "gemini-flash",     # 🇺🇸 Google — judging (keep)
+            "systemic":     "grok-4.3",     # 🇺🇸 xAI — judging (was Google, swapped to Grok for budget v3.6)
             "synthesis": "gpt-4o-mini",  # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "deepseek-v4-flash",
@@ -848,7 +848,7 @@ _REGISTRY: dict[str, dict] = {
     },
     "image-gen-budget": {
         "method": "image-gen",
-        "primary_id": "gemini-flash",
+        "primary_id": "grok-4.3",
         "routing": {
             "image_generate": "gemini-3.1-flash-lite-image",
         # ── Reasoning model assignments (budget, v3.4) ──

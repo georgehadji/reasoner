@@ -4,7 +4,7 @@
 
 MODEL_CLAUDE_SONNET: str = "claude-sonnet"
 MODEL_CLAUDE_HAIKU: str = "claude-haiku"
-MODEL_GEMINI_FLASH: str = "gemini-flash"
+MODEL_GEMINI_FLASH: str = "grok-4.3"  # Swapped to xAI for budget tier (v3.6)
 MODEL_GEMINI_PRO: str = "gemini-pro"
 MODEL_GPT4O_MINI: str = "gpt-4o-mini"
 MODEL_GEMINI_FLASH_IMAGE: str = "gemini-flash-image"
