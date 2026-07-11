@@ -1,5 +1,6 @@
 import { fetchWithCsrf } from './security-client';
 import { API, LIMITS } from './config';
+import { GateResponse } from './types';
 
 const _widgetCache = new Map<string, { data: unknown; expiry: number }>();
 const WIDGET_TTL_MS = 30_000;
@@ -25,6 +26,15 @@ async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
   const resp = await fetchWithCsrf(url, options);
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
   return resp.json() as Promise<T>;
+}
+
+/** Ask HyperGate which method it would pick, without running the pipeline. */
+export async function fetchGateDecision(problem: string, preset: string): Promise<GateResponse> {
+  return fetchJSON<GateResponse>(API.GATE, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ problem, preset }),
+  });
 }
 
 function formatApiError(status: number, data: unknown): string {

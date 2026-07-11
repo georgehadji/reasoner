@@ -181,7 +181,8 @@ class HyperGateAgent:
                     confidence=data.get("confidence", 0.0),
                     reasoning=data.get("reasoning", ""),
                     complexity=data.get("complexity", "unknown"),
-                    language=data.get("language")
+                    language=data.get("language"),
+                    alternatives=data.get("alternatives"),
                 )
         except Exception as e:
             logger.debug("HyperGate L2 cache get failed: %s", e)
@@ -200,6 +201,7 @@ class HyperGateAgent:
                 "reasoning": decision.reasoning,
                 "complexity": decision.complexity,
                 "language": decision.language,
+                "alternatives": decision.alternatives,
             }
             # 1 hour TTL
             await r.setex(f"hypergate:{problem_hash}", 3600, json.dumps(data))
@@ -374,6 +376,13 @@ class HyperGateAgent:
         needs_search = ctx.web_output.result.get("needs_search", False)
         category = ctx.method_output.result.get("category", "E")
         method_name = ctx.method_output.result.get("method", "multi_perspective")
+        candidates = ctx.method_output.result.get("candidates", []) or []
+        # Alternatives = candidates other than the top pick, already sorted by confidence.
+        method_alternatives = [
+            {"method": c["method"], "confidence": c["confidence"], "rationale": c["rationale"]}
+            for c in candidates
+            if c.get("method") != method_name
+        ] or None
 
         # ── Depth detection moved to ArticleFlow (regex-based, no LLM overhead) ──
         augmentation_methods: list[str] | None = None
@@ -436,6 +445,7 @@ class HyperGateAgent:
                 reasoning=ctx.method_output.reasoning or f"MethodClassifier: {category}",
                 complexity=complexity,
                 augmentation_methods=augmentation_methods,
+                alternatives=method_alternatives,
             )
 
         # Step 4 — ambiguous but some signal: defer to TieBreaker
@@ -471,11 +481,19 @@ class HyperGateAgent:
                 augmentation_methods=None,
             )
         action: Literal["direct", "pipeline", "web_search"] = out.result.get("action", "pipeline")  # type: ignore[assignment]
+        chosen_method = out.result.get("method")
+        candidates = ctx.method_output.result.get("candidates", []) or []
+        tiebreak_alternatives = [
+            {"method": c["method"], "confidence": c["confidence"], "rationale": c["rationale"]}
+            for c in candidates
+            if c.get("method") != chosen_method
+        ] or None
         return GateDecision(
             action=action,
-            method=out.result.get("method"),
+            method=chosen_method,
             confidence=out.confidence,
             reasoning=out.reasoning or "TieBreaker resolution",
             complexity=ctx.complexity,
             augmentation_methods=None,
+            alternatives=tiebreak_alternatives if action == "pipeline" else None,
         )

@@ -25,7 +25,7 @@ export interface TokenCount {
 }
 
 export interface PhaseEvent {
-  type: 'start' | 'prompt_enhanced' | 'phase_start' | 'phase_complete' | 'phase_quality' | 'phase_retry' | 'phase_error' | 'error' | 'cancelled' | 'done' | 'agent_start' | 'agent_complete' | 'text_chunk' | 'widget' | 'recall_used' | 'research_step_emitted' | 'research_citations_ready';
+  type: 'start' | 'prompt_enhanced' | 'phase_start' | 'phase_complete' | 'phase_quality' | 'phase_retry' | 'phase_error' | 'error' | 'cancelled' | 'done' | 'agent_start' | 'agent_complete' | 'text_chunk' | 'widget' | 'recall_used' | 'research_step_emitted' | 'research_citations_ready' | 'method_selected';
   /** phase_quality fields */
   score?: number;
   passed?: boolean;
@@ -71,6 +71,19 @@ export interface PhaseEvent {
   urls?: string[];
   citation_count?: number;
   source_types?: string[];
+  /** `method_selected` fields — HyperGate's routing decision, emitted once per run. */
+  action?: 'direct' | 'pipeline' | 'web_search';
+  method?: string;
+  confidence?: number;
+  reasoning?: string;
+  alternatives?: MethodAlternative[] | null;
+}
+
+/** A runner-up method HyperGate considered but did not pick. */
+export interface MethodAlternative {
+  method: string;
+  confidence: number;
+  rationale: string;
 }
 
 export interface Attachment {
@@ -150,6 +163,21 @@ export interface RunRequest {
   attachments?: AttachmentRef[];
   file_ids?: string[];
   client_run_id?: string;
+  /** Skip HyperGate re-classification — used when the client already resolved
+   *  a specific preset via /api/gate (user confirmed or accepted a method). */
+  force_pipeline?: boolean;
+}
+
+/** Response shape of POST /api/gate. */
+export interface GateResponse {
+  action: 'direct' | 'pipeline' | 'web_search';
+  method: string | null;
+  preset: string | null;
+  confidence: number;
+  reasoning: string | null;
+  complexity: string | null;
+  alternatives: (MethodAlternative & { preset: string | null })[];
+  needs_confirmation: boolean;
 }
 
 export interface RunFollowupRequest {

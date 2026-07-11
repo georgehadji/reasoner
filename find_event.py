@@ -10,5 +10,6 @@ for dirpath, dirnames, fnames in os.walk(root):
                     for i, line in enumerate(f, 1):
                         if re.search(pattern, line):
                             print(f'{fp}:{i}: {line.rstrip()[:120]}')
-            except:
-                pass
+            except Exception as e:
+                import logging
+                logging.error(f"Error reading file: {e}")

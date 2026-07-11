@@ -26,13 +26,14 @@ import { PipelineError } from '@/hooks/usePipelineStream';
 import { ChatFeed, ChatFeedMessage, RenderedPhase } from '@/components/chat/ChatFeed';
 import { ChatErrorBoundary } from '@/components/chat/ChatErrorBoundary';
 import { PipelineSkeleton } from '@/components/chat/PipelineSkeleton';
-import { PhaseEvent, Conversation, RunFollowupRequest, ConversationTurn } from '@/lib/types';
+import { PhaseEvent, Conversation, RunFollowupRequest, ConversationTurn, GateResponse } from '@/lib/types';
 import { METHOD_PHASES, METHOD_DESCRIPTIONS, LIMITS, PIPELINE_DEFAULTS } from '@/lib/config';
 import { buildMarkdownFromPhases } from '@/lib/markdown';
 import { saveConversation } from '@/lib/db';
 import { conversationToMessages } from '@/lib/conversation-history';
 import { readSSEStream } from '@/lib/sse-reader';
-import { clearCache, uploadFiles, generateImage, generateImageEnhancement, resumePipelineStream, submitFeedback } from '@/lib/api-client';
+import { clearCache, uploadFiles, generateImage, generateImageEnhancement, resumePipelineStream, submitFeedback, fetchGateDecision } from '@/lib/api-client';
+import { MethodChoicePrompt, MethodChoiceLoading } from '@/components/chat/MethodChoicePrompt';
 
 // --- Reducer function for managing messages state ---
 type MessagesAction =
@@ -208,6 +209,8 @@ export default function ChatPage() {
   const recentCommands = useAppStore((s) => s.recentCommands);
   const addRecentCommand = useAppStore((s) => s.addRecentCommand);
   const collapsed = useAppStore((s) => s.sidebarCollapsed);
+  const autoMethodAlways = useAppStore((s) => s.autoMethodAlways);
+  const toggleAutoMethodAlways = useAppStore((s) => s.toggleAutoMethodAlways);
 
   const { history, refresh: refreshHistory, remove: removeHistory } = useConversationHistory();
   const { startRun, startFollowup, stopRun } = usePipelineStream();
@@ -230,6 +233,11 @@ export default function ChatPage() {
   const [currentPhase, setCurrentPhase] = useState<number | undefined>(undefined);
   const [phaseDurations, setPhaseDurations] = useState<Record<number, number>>({});
   const [phaseOpenMode, setPhaseOpenMode] = useState<'auto' | 'expand' | 'collapse'>('auto');
+
+  // HyperGate method-confirmation gate — set while /api/gate is in flight,
+  // and when it returns a low-confidence decision needing user input.
+  const [gateChecking, setGateChecking] = useState(false);
+  const [pendingChoice, setPendingChoice] = useState<{ problem: string; decision: GateResponse } | null>(null);
   const phaseStartTimesRef = useRef<Record<number, number>>({});
   const chunkBufferRef = useRef('');
   const chunkFlushRafRef = useRef<number | null>(null);
@@ -281,9 +289,40 @@ export default function ChatPage() {
     onCommandPalette: () => setCommandPaletteOpen((v) => !v),
   });
 
-  const handleSubmit = useCallback(async (providedText?: string) => {
+  const handleSubmit = useCallback(async (
+    providedText?: string,
+    opts?: { presetOverride?: string; skipGate?: boolean },
+  ) => {
     const problem = (providedText ?? composerText).trim();
     if (!problem || running) return;
+
+    // ── HyperGate confirmation gate ──
+    // Ask HyperGate which method it would pick BEFORE running anything. If it's
+    // confident, proceed silently (today's UX). If it's not, pause here and let
+    // the user confirm or pick a runner-up — skipped for image mode, follow-ups
+    // (which don't go through HyperGate at all), and once the user opts out via
+    // "always pick automatically".
+    if (!opts?.skipGate && !isImageMode && !autoMethodAlways) {
+      const lastAssistantMsgForGate = findLastAssistant(messages);
+      const isFollowupForGate = !!lastAssistantMsgForGate && messages.length > 0 && isContinuation(problem);
+      if (!isFollowupForGate) {
+        setGateChecking(true);
+        try {
+          const gateResult = await fetchGateDecision(problem, getAutoPreset());
+          setGateChecking(false);
+          if (gateResult.needs_confirmation && gateResult.preset) {
+            setPendingChoice({ problem, decision: gateResult });
+            return;
+          }
+        } catch (err) {
+          // Fail open — HyperGate confirmation is a UX nicety, not a gate on
+          // being able to submit at all.
+          console.error('Gate check failed, proceeding with auto-routing:', err);
+          setGateChecking(false);
+        }
+      }
+    }
+    setPendingChoice(null);
 
     setComposerText('');
     setRunning(true);
@@ -493,6 +532,27 @@ export default function ChatPage() {
           if (ev.auto_selected_method) {
             runMethod = ev.auto_selected_method;
             setAutoSelectedMethod(ev.auto_selected_method);
+          }
+          break;
+        case 'method_selected':
+          if (ev.action === 'pipeline' && ev.method) {
+            const prettyMethod = ev.method.replace(/_/g, '-').replace(/\b\w/g, (l: string) => l.toUpperCase());
+            const alts = (ev.alternatives || [])
+              .map((a) => a.method.replace(/_/g, '-').replace(/\b\w/g, (l: string) => l.toUpperCase()))
+              .join(', ');
+            const lowConfidence = typeof ev.confidence === 'number' && ev.confidence < 0.7;
+            const content = [
+              `Using: ${prettyMethod}${ev.reasoning ? ` — ${ev.reasoning}` : ''}`,
+              lowConfidence && alts ? `Also considered: ${alts}` : null,
+            ].filter(Boolean).join(' · ');
+            dispatchMessages({
+              type: 'ADD_MESSAGES',
+              payload: [{
+                id: 'info-method-' + Date.now(),
+                role: 'info',
+                content,
+              }],
+            });
           }
           break;
         case 'prompt_enhanced':
@@ -816,7 +876,7 @@ export default function ChatPage() {
         conversationIdRef.current = newConvId;
         const req = {
           problem,
-          preset: getAutoPreset(),
+          preset: opts?.presetOverride || getAutoPreset(),
           top_k: 2,
           sequential: false,
           enhance_prompt: true,
@@ -826,6 +886,9 @@ export default function ChatPage() {
           attachments: uploadedAttachments.length > 0 ? uploadedAttachments : undefined,
           file_ids: uploadedAttachments.length > 0 ? uploadedAttachments.map((a) => a.file_id) : undefined,
           client_run_id: clientRunId,
+          // The user already confirmed a specific method via the gate picker —
+          // skip re-running HyperGate so the chosen preset is locked in.
+          force_pipeline: !!opts?.presetOverride,
         };
         await startRun(req, onEvent);
       }
@@ -873,7 +936,19 @@ export default function ChatPage() {
       setRunning(false);
       clearAttachments();
     }
-  }, [composerText, running, attachments, isImageMode, tier, messages, startRun, startFollowup, wsConnect, wsDisconnect, dispatchMessages, setRunning, setComposerText, clearAttachments, refreshHistory, setCompletedPhases, setErrorPhases, setCurrentPhase, setPhaseDurations, setAutoSelectedMethod, setPhaseOpenMode, isContinuation]);
+  }, [composerText, running, attachments, isImageMode, tier, messages, startRun, startFollowup, wsConnect, wsDisconnect, dispatchMessages, setRunning, setComposerText, clearAttachments, refreshHistory, setCompletedPhases, setErrorPhases, setCurrentPhase, setPhaseDurations, setAutoSelectedMethod, setPhaseOpenMode, isContinuation, getAutoPreset, autoMethodAlways]);
+
+  const handleMethodChoice = useCallback((preset: string) => {
+    const choice = pendingChoice;
+    setPendingChoice(null);
+    if (!choice) return;
+    handleSubmit(choice.problem, { presetOverride: preset, skipGate: true });
+  }, [pendingChoice, handleSubmit]);
+
+  const handleMethodChoiceCancel = useCallback(() => {
+    if (pendingChoice) setComposerText(pendingChoice.problem);
+    setPendingChoice(null);
+  }, [pendingChoice, setComposerText]);
 
   const handleStop = useCallback(() => {
     stopRun();
@@ -1152,7 +1227,19 @@ export default function ChatPage() {
               </ChatErrorBoundary>
             </>
           ) : (
-            <Composer running={running} onSubmit={() => handleSubmit()} onStop={handleStop} centered />
+            <>
+              {gateChecking && <MethodChoiceLoading />}
+              {pendingChoice && (
+                <MethodChoicePrompt
+                  decision={pendingChoice.decision}
+                  alwaysAuto={autoMethodAlways}
+                  onChoose={handleMethodChoice}
+                  onToggleAlwaysAuto={toggleAutoMethodAlways}
+                  onCancel={handleMethodChoiceCancel}
+                />
+              )}
+              <Composer running={running} onSubmit={() => handleSubmit()} onStop={handleStop} centered />
+            </>
           )}
         </div>
 
@@ -1162,6 +1249,16 @@ export default function ChatPage() {
               <div className="mx-auto max-w-3xl px-4 pb-2 text-xs text-muted-foreground">
                 {followupAgentBadge}
               </div>
+            )}
+            {gateChecking && <MethodChoiceLoading />}
+            {pendingChoice && (
+              <MethodChoicePrompt
+                decision={pendingChoice.decision}
+                alwaysAuto={autoMethodAlways}
+                onChoose={handleMethodChoice}
+                onToggleAlwaysAuto={toggleAutoMethodAlways}
+                onCancel={handleMethodChoiceCancel}
+              />
             )}
             <Composer
               running={running}

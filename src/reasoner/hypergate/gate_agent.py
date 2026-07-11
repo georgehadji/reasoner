@@ -39,6 +39,7 @@ class GateDecision(BaseModel):
     complexity: str | None = None
     language: str | None = None
     augmentation_methods: list[str] | None = None
+    alternatives: list[dict[str, Any]] | None = None
 
 
 # Internal opaque taxonomy. The LLM sees only the letters (A-L), never the real method names.

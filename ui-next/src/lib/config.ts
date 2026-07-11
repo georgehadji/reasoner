@@ -214,6 +214,7 @@ export const API = {
   PRESETS: '/api/presets',
   MODELS: '/api/models',
   ESTIMATE: '/api/estimate',
+  GATE: '/api/gate',
   WEATHER: '/api/weather',
   STOCKS: '/api/stocks',
   CALCULATE: '/api/calculate',

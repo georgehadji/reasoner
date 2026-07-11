@@ -75,10 +75,13 @@ DISAMBIGUATION RULES (apply these when choosing between similar categories):
 - S vs P: Choose S for writing software (functions, classes, systems, APIs). Choose P only when the problem is fundamentally mathematical/computational and the code IS the reasoning (e.g. "calculate X", "prove Y programmatically").
 - T vs E: Choose T when the explicit goal is to GENERATE a diverse pool of ideas/options (quantity + novelty), not to analyse one problem from multiple angles. Key signals: "brainstorm", "generate ideas", "come up with options", "think of ways to", "what are creative approaches". Choose E for analytical problems that need multiple perspectives on a single question.
 
-Output ONLY valid JSON with exactly three keys: \
-'category' (one letter B–T), \
-'confidence' (float 0.0–1.0), \
-'rationale' (one short sentence). \
+Output ONLY valid JSON with exactly four keys: \
+'category' (one letter B–T, your top choice), \
+'confidence' (float 0.0–1.0, confidence in the top choice), \
+'rationale' (one short sentence), \
+'alternatives' (a list of 0-2 objects for the next-best categories, each with \
+'category', 'confidence', and 'rationale' keys — omit if there is no plausible \
+runner-up). \
 No markdown, no extra text.\
 """
 
@@ -97,12 +100,41 @@ class MethodClassifierSubAgent(BaseSubAgent):
             if category not in _TAXONOMY:
                 category = "E"  # default to multi_perspective
             action, method = _TAXONOMY[category]
+            confidence = min(1.0, max(0.0, float(data.get("confidence", 0.5))))
+            rationale = str(data.get("rationale", ""))
+
+            candidates = [{
+                "category": category,
+                "method": method,
+                "confidence": confidence,
+                "rationale": rationale,
+            }]
+            for alt in data.get("alternatives", []) or []:
+                if not isinstance(alt, dict):
+                    continue
+                alt_category = str(alt.get("category", "")).strip().upper()
+                if alt_category not in _TAXONOMY or alt_category == category:
+                    continue
+                _, alt_method = _TAXONOMY[alt_category]
+                try:
+                    alt_confidence = min(1.0, max(0.0, float(alt.get("confidence", 0.0))))
+                except (TypeError, ValueError):
+                    continue
+                candidates.append({
+                    "category": alt_category,
+                    "method": alt_method,
+                    "confidence": alt_confidence,
+                    "rationale": str(alt.get("rationale", "")),
+                })
+            candidates.sort(key=lambda c: c["confidence"], reverse=True)
+
             return {
                 "category": category,
                 "action": action,
                 "method": method,
-                "confidence": min(1.0, max(0.0, float(data.get("confidence", 0.5)))),
-                "rationale": str(data.get("rationale", "")),
+                "confidence": confidence,
+                "rationale": rationale,
+                "candidates": candidates[:3],
             }
         except Exception:
             return {
@@ -111,6 +143,7 @@ class MethodClassifierSubAgent(BaseSubAgent):
                 "method": "multi_perspective",
                 "confidence": 0.0,
                 "rationale": "parse error",
+                "candidates": [],
             }
 
     @staticmethod

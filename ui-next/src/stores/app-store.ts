@@ -22,6 +22,8 @@ interface AppState {
   tier: Tier;
   isExpert: boolean;
   isImageMode: boolean;
+  /** When true, skip the HyperGate method-confirmation picker and always auto-route. */
+  autoMethodAlways: boolean;
   sidebarCollapsed: boolean;
   neuroPanelOpen: boolean;
   composerText: string;
@@ -47,6 +49,7 @@ interface AppState {
   toggleTier: () => void;
   toggleExpert: () => void;
   toggleImageMode: () => void;
+  toggleAutoMethodAlways: () => void;
   toggleSidebar: () => void;
   toggleNeuroPanel: () => void;
   setComposerText: (text: string) => void;
@@ -74,6 +77,7 @@ export const useAppStore = create<AppState>()(
       tier: 'budget',
       isExpert: false,
       isImageMode: false,
+      autoMethodAlways: false,
       sidebarCollapsed: false,
       neuroPanelOpen: false,
       composerText: '',
@@ -94,6 +98,7 @@ export const useAppStore = create<AppState>()(
 
       toggleExpert: () => set((state) => ({ isExpert: !state.isExpert })),
       toggleImageMode: () => set((state) => ({ isImageMode: !state.isImageMode })),
+      toggleAutoMethodAlways: () => set((state) => ({ autoMethodAlways: !state.autoMethodAlways })),
       toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
       toggleNeuroPanel: () => set((state) => ({ neuroPanelOpen: !state.neuroPanelOpen })),
       setComposerText: (composerText) => set({ composerText }),
@@ -172,6 +177,7 @@ export const useAppStore = create<AppState>()(
           tier: s.tier === 'premium' ? 'premium' : 'budget',
           isExpert: typeof s.isExpert === 'boolean' ? s.isExpert : false,
           sidebarCollapsed: typeof s.sidebarCollapsed === 'boolean' ? s.sidebarCollapsed : false,
+          autoMethodAlways: typeof s.autoMethodAlways === 'boolean' ? s.autoMethodAlways : false,
           // Force image mode false on migration/load
           isImageMode: false,
           // Preserve recent commands across migrations (was previously dropped)
@@ -184,6 +190,7 @@ export const useAppStore = create<AppState>()(
         isExpert: state.isExpert,
         sidebarCollapsed: state.sidebarCollapsed,
         recentCommands: state.recentCommands,
+        autoMethodAlways: state.autoMethodAlways,
         // Do not persist isImageMode so it defaults to false on next load
         // Do NOT persist user/session — let Supabase handle that
       }),

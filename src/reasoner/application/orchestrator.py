@@ -45,6 +45,9 @@ class PreflightDecision:
     effective_preset_name: str
     auto_selected_method: str | None = None
     augmentation_methods: list[str] | None = None
+    gate_confidence: float | None = None
+    gate_reasoning: str | None = None
+    gate_alternatives: list[dict] | None = None
     recalled_chunks: list[dict] = field(default_factory=list)
     problem: str = ""
     conversation_history: list[dict] | None = None
@@ -220,6 +223,9 @@ class PipelineOrchestrator:
                 if gate_decision_fb.action == "pipeline"
                 else None
             )
+            decision.gate_confidence = gate_decision_fb.confidence
+            decision.gate_reasoning = gate_decision_fb.reasoning
+            decision.gate_alternatives = gate_decision_fb.alternatives
 
             if gate_decision_fb.action == "direct":
                 decision.action = "direct"

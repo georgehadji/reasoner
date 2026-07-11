@@ -80,6 +80,18 @@ class PipelineExecutionService:
             orchestrator = PipelineOrchestrator(preset_service, pipeline_service)
             preflight = await orchestrator.preflight(req, initial_state)
 
+            if preflight.gate_reasoning:
+                await sse_emit({
+                    "type": "method_selected",
+                    "data": {
+                        "action": preflight.action,
+                        "method": preflight.auto_selected_method,
+                        "confidence": preflight.gate_confidence,
+                        "reasoning": preflight.gate_reasoning,
+                        "alternatives": preflight.gate_alternatives,
+                    },
+                })
+
             if preflight.action == "direct":
                 async for chunk in _stream_direct_answer(
                     preflight.router, req.problem, run_id, cancel_event,
