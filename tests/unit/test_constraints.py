@@ -95,6 +95,36 @@ class TestBlocDiversityConstraint:
         us_violations = [v for v in violations if "Bloc 'US'" in v.reason]
         assert len(us_violations) >= 1
 
+    def test_no_duplicate_model_across_generator_roles(self, constraint):
+        """Two generator roles secretly aliasing the same model = violation.
+
+        Regression test for debate-premium bug: "gemini-pro" silently
+        resolves to anthropic/claude-sonnet-5 (v3.4 alias swap), so pairing
+        it with "claude-sonnet" as a distinct role made the same model
+        argue (constructive) and judge (systemic) itself.
+        """
+        assignment = {
+            "constructive": "claude-sonnet",  # -> anthropic/claude-sonnet-5
+            "destructive": "deepseek-v4-pro",  # -> CN, distinct
+            "systemic": "gemini-pro",          # -> anthropic/claude-sonnet-5 (same as constructive!)
+        }
+        violations = constraint.validate(assignment, "test")
+        dup_violations = [v for v in violations if "same underlying model" in v.reason]
+        assert len(dup_violations) == 1
+        assert "constructive" in dup_violations[0].reason
+        assert "systemic" in dup_violations[0].reason
+
+    def test_no_duplicate_model_ok_when_distinct(self, constraint):
+        """Distinct resolved models across generator roles = no duplicate violation."""
+        assignment = {
+            "constructive": "claude-sonnet",     # -> anthropic/claude-sonnet-5
+            "destructive": "deepseek-v4-pro",    # -> CN
+            "systemic": "gemini-pro-real",       # -> google/gemini-3.1-pro-preview
+        }
+        violations = constraint.validate(assignment, "test")
+        dup_violations = [v for v in violations if "same underlying model" in v.reason]
+        assert len(dup_violations) == 0
+
 
 class TestBudgetCeilingConstraint:
     """Budget ceiling ensures cost stays within tier limits."""

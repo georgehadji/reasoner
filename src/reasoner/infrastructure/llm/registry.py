@@ -463,3 +463,16 @@ def bloc_of(model_id: str) -> str:
     One of ``"US"``, ``"CN"``, ``"EU"``, or ``"OTHER"`` (unknown/stealth vendors).
     """
     return _VENDOR_BLOC.get(_vendor_of(model_id), "OTHER")
+
+
+def resolved_model_of(model_id: str) -> str:
+    """Resolve a whitelist model ID to the exact underlying model string.
+
+    Unlike ``_vendor_of`` (vendor prefix only), this returns the full
+    ``vendor/model`` string so callers can detect two differently-named
+    aliases silently pointing at the identical served model (e.g.
+    ``gemini-pro`` and ``claude-sonnet`` both resolving to
+    ``anthropic/claude-sonnet-5``).
+    """
+    cfg = _REGISTRY.get(model_id) or _MODEL_WHITELIST.get(model_id) or {}
+    return str(cfg.get("model", model_id)).lstrip("~")

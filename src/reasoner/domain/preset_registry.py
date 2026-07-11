@@ -112,7 +112,7 @@ _REGISTRY: dict[str, dict] = {
             # ── Cross-bloc adversarial diversity (🇺🇸 vs 🇨🇳, 🇺🇸 judge) ──
             "constructive": "claude-sonnet",     # 🇺🇸 Anthropic — strongest argumentation
             "destructive":  "deepseek-v4-pro",   # 🇨🇳 DeepSeek — adversarial reasoning
-            "systemic":     "gemini-pro",        # 🇺🇸 Google — judging (keep)
+            "systemic":     "gemini-pro-real",   # 🇺🇸 Google (real) — judging; "gemini-pro" alias now routes to Anthropic, would duplicate constructive
             "synthesis": "gpt-4o-mini",  # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-pro-real",     # Google 🇺🇸 — frontier reasoning, AI² Intel 46.5

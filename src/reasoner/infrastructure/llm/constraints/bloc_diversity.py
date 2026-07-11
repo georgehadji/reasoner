@@ -4,17 +4,21 @@ Rules (derived from Buyl et al., npj AI 2026):
 1. synthesis bloc ≠ scoring bloc
 2. Perspective/debate generator roles span ≥2 blocs
 3. No single bloc holds >2 generator roles
+4. No two generator roles resolve to the identical underlying model
+   (catches alias collisions, e.g. "gemini-pro" and "claude-sonnet" both
+   secretly routing to anthropic/claude-sonnet-5 — same model arguing
+   and judging itself)
 """
 
 from __future__ import annotations
 
-from collections import Counter
+from collections import Counter, defaultdict
 
 from reasoner.core.ports.routing_constraint_port import (
     ConstraintViolation,
     RoutingConstraintPort,
 )
-from reasoner.infrastructure.llm.registry import bloc_of
+from reasoner.infrastructure.llm.registry import bloc_of, resolved_model_of
 
 
 _GENERATOR_ROLES = frozenset({
@@ -95,6 +99,25 @@ class BlocDiversityConstraint:
                     reason=(
                         f"Bloc '{bloc}' holds {count} generator roles "
                         f"(max 2): {', '.join(bloc_roles)}"
+                    ),
+                    severity="hard",
+                ))
+
+        # Rule 4: No two generator roles resolve to the identical model
+        model_roles: dict[str, list[str]] = defaultdict(list)
+        for role in _GENERATOR_ROLES:
+            if role in proposed:
+                model_roles[resolved_model_of(proposed[role])].append(role)
+        for model, roles in model_roles.items():
+            if len(roles) > 1:
+                violations.append(ConstraintViolation(
+                    constraint_name="bloc_diversity",
+                    role=roles[0],
+                    model_id=proposed.get(roles[0], ""),
+                    reason=(
+                        f"Roles {', '.join(sorted(roles))} all resolve to the "
+                        f"same underlying model ({model}) despite distinct "
+                        f"aliases — defeats adversarial/perspective diversity"
                     ),
                     severity="hard",
                 ))
