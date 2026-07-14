@@ -31,6 +31,7 @@ SKIP_PATHS = {
     ".git", ".venv", "venv", "node_modules", "__pycache__", ".pytest_cache",
     ".next", "out", "dist", "build", ".mypy_cache", ".ruff_cache",
     "docs", "tasks", "cache", "history", "uploads",
+    "tests",  # test fixtures deliberately contain fake credentials
 }
 
 SKIP_FILES = {
@@ -43,6 +44,7 @@ SKIP_FILES = {
 SKIP_EXTENSIONS = {
     ".md", ".png", ".jpg", ".jpeg", ".gif", ".ico", ".woff", ".woff2",
     ".ttf", ".eot", ".pdf", ".zip", ".tar", ".gz", ".mp4", ".mp3",
+    ".db", ".sqlite", ".sqlite3",  # binary database files
 }
 
 

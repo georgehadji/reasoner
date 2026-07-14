@@ -39,6 +39,8 @@ env:
   # Disable CSRF enforcement in CI — no CSRF_SECRET is available in the CI
   # environment; keeping enforce=true causes a RuntimeError at import time.
   CSRF_ENFORCE_BACKEND: 'false'
+  # Provide a dummy JWT secret so test collection doesn't raise RuntimeError.
+  JWT_SECRET_KEY: 'ci-test-secret-key-not-for-production-use-only'
 
 jobs:
   # ─────────────────────────────────────────────────────────────────────
