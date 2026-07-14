@@ -25,7 +25,9 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-test*.py
+# Root-level scratch test scripts only (test_all.py, test_parse.py, …).
+# Leading slash anchors to repo root so the real suite under tests/ stays tracked.
+/test*.py
 # IDE
 .vscode/
 .idea/
