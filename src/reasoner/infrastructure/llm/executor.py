@@ -470,7 +470,7 @@ class LLMExecutor:
                             cap, state.total_cost_usd,
                         )
                         try:
-                            from reasoner.core.events.domain_events import SaaSEventType, make_event
+                            from reasoner.core.events.domain_events import SaaSEventType
                             from reasoner.application.event_bus.bus import get_event_bus
                             evt = make_event(
                                 SaaSEventType.SPEND_CAP_EXCEEDED,
@@ -509,7 +509,7 @@ class LLMExecutor:
                                 mcap, cid, _MONTHLY_SPEND[cid],
                             )
                             try:
-                                from reasoner.core.events.domain_events import SaaSEventType, make_event
+                                from reasoner.core.events.domain_events import SaaSEventType
                                 from reasoner.application.event_bus.bus import get_event_bus
                                 evt = make_event(
                                     SaaSEventType.SPEND_CAP_EXCEEDED,

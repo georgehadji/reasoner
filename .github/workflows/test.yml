@@ -50,6 +50,10 @@ jobs:
         env:
           PYTHONPATH: ${{ env.PYTHONPATH }}
           CSRF_ENFORCE_BACKEND: 'false'
+          # Dummy placeholder (NOT a real credential): build_provider() only checks
+          # key presence. Mock tests patch ProviderRouter.call, so no network occurs.
+          # Lets router/provider construction succeed for HyperGate models offline.
+          OPENROUTER_API_KEY: 'ci-dummy-openrouter-key-not-a-real-secret'
 
   tsc:
     name: TypeScript type check
