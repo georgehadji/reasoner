@@ -1,7 +1,7 @@
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock
-from src.reasoner.core.search import DiscoveryClient
+from reasoner.core.search import DiscoveryClient
 
 @pytest.mark.asyncio
 async def test_search_no_fallback_to_junk():

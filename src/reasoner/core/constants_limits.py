@@ -284,6 +284,7 @@ def get_quality_judge_threshold(preset_name: str) -> float:
 # ═════════════════════════════════════════════════════════════════════
 
 
+DEFAULT_SEARXNG_URL: str = "http://localhost:8888"
 DEFAULT_NEURO_URL: str = "http://localhost:50001"
 DEFAULT_OLLAMA_URL: str = "http://localhost:11434"
 OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"

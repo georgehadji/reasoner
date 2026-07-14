@@ -300,4 +300,17 @@ def _should_include_result(result: dict[str, Any]) -> bool:
 
 from reasoner.core.ports.search_port import SearchServicePort
 
+# ── Backward-compat re-exports ──
+# These moved to reasoner.infrastructure.search.discovery during the search
+# refactor; re-export from the legacy path for existing importers.
+from reasoner.infrastructure.search.discovery import (  # noqa: E402,F401
+    PerplexitySearchClient,
+    DiscoveryClient,
+    get_search_client,
+    _decompose_query,
+    _extract_search_keywords,
+    _DECOMPOSITION_CACHE,
+    _DECOMPOSITION_TTL_SECONDS,
+)
+
 

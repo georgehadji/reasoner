@@ -327,3 +327,9 @@ async def run_stream_cached(
                     pass
     finally:
         await gen.aclose()
+
+
+# ── Backward-compat re-export ──
+# _stream_direct_answer moved to reasoner.api.execution.direct; re-export from
+# the legacy path for existing importers.
+from reasoner.api.execution.direct import _stream_direct_answer  # noqa: E402,F401
