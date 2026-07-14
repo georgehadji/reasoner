@@ -12,22 +12,25 @@ from unittest.mock import MagicMock
 class MockPipelineState:
     """Mock PipelineState for testing."""
     
-    def __init__(self, final_solution=None, phase_tokens=None):
+    def __init__(self, final_solution=None, phase_tokens=None, method_state=None):
         self.final_solution = final_solution
         self.phase_tokens = phase_tokens or {}
+        self.method_state = method_state or {}
 
 
 class TestSer5DictFormat:
     """Test _ser_5 with dict format (most common case from pipeline.py)."""
     
     def _get_ser_5(self):
-        """Import and return _ser_5 function."""
-        import sys
-        import os
-        # Add project root to path
-        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-        from reasoner.api import _ser_5
-        return _ser_5
+        """Import and return the synthesis serializer.
+
+        The synthesis-dict contract (core_solution / action_blueprint / etc.)
+        moved out of api._ser_5 into services.serializers._ser_synthesis during
+        the serializer refactor; _ser_5 now dispatches method-specific Phase-5
+        state. This suite targets synthesis serialization, so it follows.
+        """
+        from reasoner.application.services.serializers import _ser_synthesis
+        return _ser_synthesis
     
     def test_dict_format_complete(self):
         """Test dict with all fields populated."""
@@ -137,11 +140,8 @@ class TestSer5EdgeCases:
     """Edge case tests for _ser_5."""
     
     def _get_ser_5(self):
-        import sys
-        import os
-        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-        from reasoner.api import _ser_5
-        return _ser_5
+        from reasoner.application.services.serializers import _ser_synthesis
+        return _ser_synthesis
     
     def test_final_solution_none(self):
         """Test when final_solution is None."""
@@ -237,11 +237,8 @@ class TestSer5LegacyObjectFormat:
     """Test _ser_5 with legacy FinalSolution object format."""
     
     def _get_ser_5(self):
-        import sys
-        import os
-        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-        from reasoner.api import _ser_5
-        return _ser_5
+        from reasoner.application.services.serializers import _ser_synthesis
+        return _ser_synthesis
     
     def test_legacy_final_solution_object(self):
         """Test with legacy FinalSolution object (if still used)."""
@@ -274,11 +271,8 @@ class TestIntegrationSmokeTest:
     """Integration smoke tests - verify module integrates correctly."""
     
     def _get_ser_5(self):
-        import sys
-        import os
-        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-        from reasoner.api import _ser_5
-        return _ser_5
+        from reasoner.application.services.serializers import _ser_synthesis
+        return _ser_synthesis
     
     def test_returns_valid_json_serializable_dict(self):
         """Verify return value is JSON serializable."""
