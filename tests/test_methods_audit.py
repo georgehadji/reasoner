@@ -10,6 +10,11 @@ from reasoner.pipeline import ReasonerPipeline
 from reasoner.presets import get_preset
 from reasoner.models import PipelineState
 
+# Real-pipeline audit: every case runs pipeline.run() against live providers and
+# writes test_audit_results.log. Requires a funded OPENROUTER_API_KEY + network,
+# so it belongs to the integration lane, not the unit suite.
+pytestmark = pytest.mark.integration
+
 TEST_CASES = [
     ("multi-perspective-budget", "Should I bootstrap or raise VC for my AI startup?"),
     ("debate-budget", "Is remote work more productive than in-office work? Debate the merits."),
