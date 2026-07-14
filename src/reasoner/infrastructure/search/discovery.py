@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from typing import Any, Optional, Protocol
 
 logger = logging.getLogger(__name__)
@@ -17,6 +18,40 @@ logger = logging.getLogger(__name__)
 from reasoner.core.ports.search_port import SearchServicePort, SourceType
 from reasoner.core.constants import DEFAULT_SEARCH_RESULTS, TIMEOUTS, MODEL_QWEN35_9B, MODEL_QWEN35_FLASH, MODEL_GEMINI_FLASH
 from reasoner.core.settings import settings
+
+
+# ── Lazy build_provider accessor (avoids circular import at module load) ──
+_build_provider = None
+
+
+def _get_build_provider():
+    global _build_provider
+    if _build_provider is None:
+        from reasoner.llm import build_provider
+        _build_provider = build_provider
+    return _build_provider
+
+
+# Stop words + keyword regex for English keyword extraction from mixed-language text
+_STOP_WORDS = frozenset([
+    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
+    "have", "has", "had", "do", "does", "did", "will", "would", "could",
+    "should", "may", "might", "must", "shall", "can", "need", "dare",
+    "ought", "used", "to", "of", "in", "for", "on", "with", "at", "by",
+    "from", "as", "into", "through", "during", "before", "after", "above",
+    "below", "between", "under", "again", "further", "then", "once", "here",
+    "there", "when", "where", "why", "how", "all", "each", "few", "more",
+    "most", "other", "some", "such", "no", "nor", "not", "only", "own",
+    "same", "so", "than", "too", "very", "just", "and", "but", "if", "or",
+    "because", "until", "while", "what", "which", "who", "whom", "this",
+    "that", "these", "those", "i", "me", "my", "myself", "we", "our",
+    "you", "your", "he", "him", "his", "she", "her", "it", "its", "they",
+    "them", "their", "s", "t", "don", "doesn", "didn", "wasn", "weren",
+    "won", "wouldn", "couldn", "shouldn", "isn", "aren", "hasn", "haven",
+    "hadn", "ain", "ma", "mightn", "mustn", "needn", "shan", "shouldn",
+])
+
+_KEYWORD_RE = re.compile(r"[a-zA-Z][a-zA-Z\-]{2,}", re.IGNORECASE)
 
 
 # ─────────────────────────────────────────────
