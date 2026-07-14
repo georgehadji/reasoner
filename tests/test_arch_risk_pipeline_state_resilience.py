@@ -22,6 +22,8 @@ from reasoner.models import (
     MethodState,
     CostTrackingState,
     ConversationState,
+    save,
+    load,
 )
 
 
@@ -215,8 +217,8 @@ def test_roundtrip_with_attachments() -> None:
     ]
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "state.json"
-        state.save(str(path))
-        loaded = PipelineState.load(str(path))
+        save(state, str(path))
+        loaded = load(str(path))
     assert len(loaded.attachments) == 1
     assert loaded.attachments[0]["filename"] == "report.pdf"
 
@@ -227,8 +229,8 @@ def test_roundtrip_with_errors() -> None:
     state.errors = ["error 1", "error 2"]
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "state.json"
-        state.save(str(path))
-        loaded = PipelineState.load(str(path))
+        save(state, str(path))
+        loaded = load(str(path))
     assert loaded.errors == ["error 1", "error 2"]
 
 
@@ -243,8 +245,8 @@ def test_cost_state_roundtrip() -> None:
     )
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "state.json"
-        state.save(str(path))
-        loaded = PipelineState.load(str(path))
+        save(state, str(path))
+        loaded = load(str(path))
     assert loaded.total_cost_usd == 1.23
     assert loaded.phase_costs == {"phase_1": 0.50}
 
@@ -261,8 +263,8 @@ def test_conversation_state_roundtrip() -> None:
     )
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "state.json"
-        state.save(str(path))
-        loaded = PipelineState.load(str(path))
+        save(state, str(path))
+        loaded = load(str(path))
     assert loaded.conversation_id == "conv-123"
     assert loaded.turn_number == 3
     assert loaded.previous_synthesis == "previous answer"
@@ -282,8 +284,8 @@ def test_method_state_roundtrip() -> None:
     )
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "state.json"
-        state.save(str(path))
-        loaded = PipelineState.load(str(path))
+        save(state, str(path))
+        loaded = load(str(path))
     assert loaded.debate_rounds == [{"opening": "x", "rebuttal": "y"}]
     assert loaded.jury_guidelines == ["g1"]
     assert loaded.bayesian_state == {"prior": 0.5}
@@ -296,13 +298,13 @@ def test_save_rejects_directory_traversal() -> None:
     """save() rejects paths with .."""
     state = PipelineState(core=PipelineCore(problem="test"))
     with pytest.raises(ValueError, match="directory traversal"):
-        state.save("../outside.json")
+        save(state, "../outside.json")
 
 
 def test_load_rejects_directory_traversal() -> None:
     """load() rejects paths with .."""
     with pytest.raises(ValueError, match="directory traversal"):
-        PipelineState.load("../nonexistent.json")
+        load("../nonexistent.json")
 
 
 # ── BUG-021 regression: _from_dict direct subscripts ─────────────────
