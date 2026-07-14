@@ -321,7 +321,11 @@ async def main(args: argparse.Namespace) -> None:
 # CLI ARGS
 # ─────────────────────────────────────────────────────────────────────
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    """Parse CLI args. argv=None (default) reads sys.argv, matching prior
+    behavior. Callers building args programmatically (e.g. headless.py) pass
+    an explicit list instead of mutating the process-global sys.argv, which
+    would not be safe under concurrent calls."""
     # Build preset choices dynamically
     preset_choices = sorted(PRESETS.keys())
 
@@ -471,7 +475,7 @@ def parse_args() -> argparse.Namespace:
         help="Run benchmarks on all models in the whitelist",
     )
 
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 if __name__ == "__main__":

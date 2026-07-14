@@ -409,6 +409,48 @@ tool = StructuredTool.from_function(
 
 ---
 
+## 🔌 Headless Usage (No Server Required)
+
+The **Agent API** section above requires `python start_all.py` (or `uvicorn asgi:app`) running. If you don't want to run a server at all — a CI job, a one-off script, another agent shelling out — Reasoner's CLI (`main.py`) runs the full pipeline standalone with no FastAPI/uvicorn/SearXNG process needed.
+
+### Option A — CLI subprocess (any language)
+
+Stable contract: parse the `--output` JSON file, not stdout (stdout is progress logging, format not guaranteed).
+
+```bash
+python main.py --problem "your question" --preset debate-budget --output result.json --quiet
+```
+
+```python
+import subprocess, json
+
+subprocess.run(
+    ["python", "main.py", "--problem", problem, "--preset", "debate-budget",
+     "--output", "result.json", "--quiet"],
+    check=True, cwd="/path/to/Reasoner",
+)
+result = json.load(open("result.json"))
+```
+
+Other useful flags: `--list-presets`, `--list-models`, `--sequential` (rate-limited providers), `--save-state` / `--resume` (session continuity), `--top-k`.
+
+### Option B — In-process Python import (same runtime, lowest latency)
+
+No dedicated wrapper module ships yet — assemble it from the same building blocks `main.py` uses (`src/reasoner/main.py`, `async def main`, lines ~220–318):
+
+1. Build `argv` and call `reasoner.main.parse_args()` — don't hand-roll an args namespace; argparse owns defaults/validation (preset choices, mutually-exclusive `--preset`/`--routing`).
+2. Call `PipelineOrchestrator(PresetService(), None, None).preflight(args, initial_state=None)` for HyperGate routing/preset resolution.
+3. Branch on `preflight.action`: `"direct"` (short-circuit via `preflight.router.call(...)`), `"web_search"`, or fall through to the pipeline.
+4. Construct `ReasonerPipeline(router=preflight.router, preset_name=preflight.effective_preset_name, ...)` and `await pipeline.run(problem)` → returns `PipelineState`.
+5. **Always** close resources in `finally`: `close_scraper_client()` and `OpenAICompatibleProvider.close_shared_pool()` — skipping this leaks httpx connections across repeated calls in a long-lived host process.
+
+Preconditions:
+- `.env` (provider API keys) must load before first import — `reasoner.core.settings` loads it at import time.
+- `sys.path.insert(0, "<repo>/src")` is required unless the package is `pip install -e`'d (no installable-package config ships today — treat that as a prerequisite if you need real packaging).
+- Verify no shared mutable state (`token_cache`, provider connection pools) breaks under concurrent calls in the same process before relying on it under load — the API server already does concurrent per-request calls this way, but a bespoke headless wrapper should confirm it independently.
+
+---
+
 ## ⚙️ Configuration Reference
 
 Configure your Reasoner instance using environment variables inside your `.env` file:
