@@ -497,7 +497,12 @@ jobs:
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
-          pytest -m searxng -v --timeout=120
+          # Scope collection to the dedicated SearXNG suites so unrelated stale
+          # test modules (importing refactored-away internals) can't fail this job.
+          pytest -m searxng -v --timeout=120 \
+            tests/test_searxng_integration.py \
+            tests/test_searxng_pipeline.py \
+            tests/test_searxng_widgets.py
           EC=$?
           # Exit code 5 = no tests collected (acceptable: SearXNG tests skipped gracefully)
           if [ $EC -eq 5 ]; then echo "No SearXNG tests collected — skipping gracefully"; exit 0; fi
