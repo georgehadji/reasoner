@@ -13,6 +13,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from reasoner.models import PipelineState, PerspectiveType, SolutionCandidate
 from reasoner.parsing import extract_json
 
+# Quarantined: every test instantiates ArticlePipelineMixin, removed with the
+# obsolete mixins in c7f3104. Article/writing logic now lives in the Writing
+# flow (application/flows), not a standalone instantiable mixin. Skip until the
+# suite is rewritten against the flow API.
+pytest.skip(
+    "ArticlePipelineMixin removed in c7f3104; suite needs rewrite for Writing flow",
+    allow_module_level=True,
+)
+
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 

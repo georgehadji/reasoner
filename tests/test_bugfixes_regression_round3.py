@@ -124,6 +124,7 @@ class TestCodingTruncationAccess:
 # search_mixin.py: asyncio.gather must use return_exceptions=True
 # ──────────────────────────────────────────────────────────────────────────────
 
+@pytest.mark.skip(reason="search_mixin removed in c7f3104 (obsolete mixins cleanup)")
 class TestSearchMixinGatherErrorHandling:
     """Verify deep-read gather uses return_exceptions=True."""
 
@@ -143,6 +144,7 @@ class TestSearchMixinGatherErrorHandling:
 # article_pipeline.py: client.search() non-list defensive check
 # ──────────────────────────────────────────────────────────────────────────────
 
+@pytest.mark.skip(reason="ArticlePipelineMixin removed in c7f3104; logic moved to Writing flow")
 class TestArticlePipelineSearchDefensive:
     """Verify _search_one handles non-list search results gracefully."""
 
