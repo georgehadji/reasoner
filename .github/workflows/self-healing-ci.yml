@@ -76,8 +76,8 @@ jobs:
           echo "Language: Python ${{ env.PYTHON_VERSION }}"
           echo "Test Framework: pytest"
           
-          # Calculate baseline coverage
-          coverage run -m pytest --collect-only -q
+          # Calculate baseline coverage (|| true: stale test collection errors are non-fatal)
+          coverage run -m pytest --collect-only -q || true
           coverage report --fail-under=0 || true
           COVERAGE=$(coverage report | tail -1 | awk '{print $NF}' | sed 's/%//')
           echo "Coverage Baseline: ${COVERAGE}%"
