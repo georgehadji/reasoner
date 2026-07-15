@@ -53,8 +53,8 @@ async def _check_strict_rate_limit(request: Request):
     if not allowed:
         raise HTTPException(
             status_code=429,
-            detail={"error": "Rate limit exceeded for sensitive endpoint", "retry_after": int(info.get("retry_after", 60))},
-            headers={"Retry-After": str(int(info.get("retry_after", 60)))},
+            detail={"error": "Rate limit exceeded for sensitive endpoint", "retry_after": int(info.get("retry_after") or 60)},
+            headers={"Retry-After": str(int(info.get("retry_after") or 60))},
         )
 
 
