@@ -177,7 +177,14 @@ def get_preset_tier(preset_id: str) -> SubscriptionTier:
     preset = PRESETS.get(preset_id)
     if preset is None:
         return SubscriptionTier.FREE
-    return preset.required_tier
+    # PRESETS values are raw config dicts. Honour an explicit required_tier if
+    # present, else derive from the tier suffix (premium -> PRO, else FREE).
+    if isinstance(preset, dict):
+        explicit = preset.get("required_tier")
+        if explicit is not None:
+            return explicit
+        return SubscriptionTier.PRO if preset_id.endswith("-premium") else SubscriptionTier.FREE
+    return getattr(preset, "required_tier", SubscriptionTier.FREE)
 
 
 _METHOD_TO_SLUG: dict[str, str] = {
