@@ -254,7 +254,7 @@ _REGISTRY: dict[str, dict] = {
         "tags": ["premium", "educational", "inquisitive"],
     },
     "pre-mortem-budget": {
-        "method": "pre-mortem",
+        "method": "pre_mortem",
         "primary_id": "gemini-flash-lite",
         "routing": {
             "synthesis": "gpt-4o-mini",  # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
@@ -269,7 +269,7 @@ _REGISTRY: dict[str, dict] = {
         "tags": ["budget", "risk-assessment", "strategic"],
     },
     "pre-mortem-premium": {
-        "method": "pre-mortem",
+        "method": "pre_mortem",
         "primary_id": "gemini-pro",
         "routing": {
             "synthesis": "gpt-4o-mini",  # 🇺🇸 OpenAI — cross-bloc final voice
@@ -545,7 +545,7 @@ _REGISTRY: dict[str, dict] = {
         "tags": ["premium", "programming", "code-generation"],
     },
     "self-discover-budget": {
-        "method": "self-discover",
+        "method": "self_discover",
         "primary_id": "gemini-flash-lite",
         "routing": {
             "synthesis": "gpt-4o-mini",  # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
@@ -563,7 +563,7 @@ _REGISTRY: dict[str, dict] = {
         "tags": ["budget", "reasoning", "self-improvement"],
     },
     "self-discover-premium": {
-        "method": "self-discover",
+        "method": "self_discover",
         "primary_id": "gemini-pro",
         "routing": {
             "synthesis": "gpt-4o-mini",  # 🇺🇸 OpenAI — cross-bloc final voice
