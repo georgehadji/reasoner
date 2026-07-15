@@ -54,6 +54,9 @@ jobs:
           # key presence. Mock tests patch ProviderRouter.call, so no network occurs.
           # Lets router/provider construction succeed for HyperGate models offline.
           OPENROUTER_API_KEY: 'ci-dummy-openrouter-key-placeholder'
+          # Dummy placeholder (NOT a real credential): LocalAuthAdapter validates
+          # JWT_SECRET_KEY length on instantiation during SaaS/auth test collection.
+          JWT_SECRET_KEY: 'ci-test-secret-key-not-for-production-use-only'
 
   tsc:
     name: TypeScript type check
