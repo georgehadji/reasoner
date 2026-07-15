@@ -310,17 +310,17 @@ class TestPhaseRoleCalls:
 
     @pytest.mark.asyncio
     async def test_classification_role_called(self, state_and_router):
-        _, router = await state_and_router
+        _, router = state_and_router
         assert "classification" in router.called_roles()
 
     @pytest.mark.asyncio
     async def test_decomposition_role_called(self, state_and_router):
-        _, router = await state_and_router
+        _, router = state_and_router
         assert "decomposition" in router.called_roles()
 
     @pytest.mark.asyncio
     async def test_phase_2_perspective_roles_called(self, state_and_router):
-        _, router = await state_and_router
+        _, router = state_and_router
         called = router.called_roles()
         assert "constructive" in called
         assert "destructive" in called
@@ -329,17 +329,17 @@ class TestPhaseRoleCalls:
 
     @pytest.mark.asyncio
     async def test_scoring_role_called(self, state_and_router):
-        _, router = await state_and_router
+        _, router = state_and_router
         assert "scoring" in router.called_roles()
 
     @pytest.mark.asyncio
     async def test_synthesis_role_called(self, state_and_router):
-        _, router = await state_and_router
+        _, router = state_and_router
         assert "synthesis" in router.called_roles()
 
     @pytest.mark.asyncio
     async def test_phase_order_classification_before_decomposition(self, state_and_router):
-        _, router = await state_and_router
+        _, router = state_and_router
         roles = router.called_roles()
         classification_idx = next((i for i, r in enumerate(roles) if r == "classification"), -1)
         decomposition_idx = next((i for i, r in enumerate(roles) if r == "decomposition"), -1)
@@ -349,7 +349,7 @@ class TestPhaseRoleCalls:
 
     @pytest.mark.asyncio
     async def test_synthesis_called_after_scoring(self, state_and_router):
-        _, router = await state_and_router
+        _, router = state_and_router
         roles = router.called_roles()
         scoring_idx = next((i for i, r in enumerate(roles) if r == "scoring"), -1)
         synthesis_idx = next((i for i, r in enumerate(roles) if r == "synthesis"), -1)
