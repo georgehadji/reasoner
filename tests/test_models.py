@@ -1,5 +1,6 @@
 """Tests for models module including state persistence."""
 
+from reasoner.models import save, load
 import json
 import tempfile
 from collections import deque
@@ -76,10 +77,10 @@ class TestPipelineStatePersistence:
             temp_path = f.name
         
         try:
-            state.save(temp_path)
+            save(state, temp_path)
             
             # Load and verify
-            loaded = PipelineState.load(temp_path)
+            loaded = load(temp_path)
             
             assert loaded.problem == state.problem
             assert loaded.task_type == state.task_type
@@ -125,8 +126,8 @@ class TestPipelineStatePersistence:
             temp_path = f.name
         
         try:
-            state.save(temp_path)
-            loaded = PipelineState.load(temp_path)
+            save(state, temp_path)
+            loaded = load(temp_path)
             
             assert loaded.task_type == TaskType.CREATIVE
             assert isinstance(loaded.task_type, TaskType)
@@ -195,7 +196,7 @@ class TestStateDeserializationRobustness:
             temp_path = f.name
 
         try:
-            state.save(temp_path)
+            save(state, temp_path)
 
             # Corrupt the file by removing fields from sub_problems
             import json
@@ -212,7 +213,7 @@ class TestStateDeserializationRobustness:
                 json.dump(data, f)
 
             # Should load without crashing, using defaults for missing fields
-            loaded = PipelineState.load(temp_path)
+            loaded = load(temp_path)
             assert loaded.decomposition is not None
             # Sub_problem should be loaded with default empty values
             assert len(loaded.decomposition.sub_problems) == 1
@@ -240,7 +241,7 @@ class TestStateDeserializationRobustness:
             temp_path = f.name
 
         try:
-            state.save(temp_path)
+            save(state, temp_path)
 
             # Corrupt: change list fields to strings
             import json
@@ -255,7 +256,7 @@ class TestStateDeserializationRobustness:
                 json.dump(data, f)
 
             # Should load with type coercion
-            loaded = PipelineState.load(temp_path)
+            loaded = load(temp_path)
             assert loaded.decomposition is not None
             assert len(loaded.decomposition.sub_problems) == 1
             # Should be coerced to lists
@@ -274,7 +275,7 @@ class TestStateDeserializationRobustness:
             temp_path = f.name
 
         try:
-            state.save(temp_path)
+            save(state, temp_path)
 
             # Corrupt: remove decomposition entirely
             import json
@@ -287,7 +288,7 @@ class TestStateDeserializationRobustness:
                 json.dump(data, f)
 
             # Should load with None decomposition
-            loaded = PipelineState.load(temp_path)
+            loaded = load(temp_path)
             assert loaded.decomposition is None
 
         finally:
@@ -308,7 +309,7 @@ class TestStateDeserializationRobustness:
             temp_path = f.name
 
         try:
-            state.save(temp_path)
+            save(state, temp_path)
 
             # Corrupt: use invalid enum value
             import json
@@ -321,7 +322,7 @@ class TestStateDeserializationRobustness:
                 json.dump(data, f)
 
             # Should load with fallback to UNKNOWN
-            loaded = PipelineState.load(temp_path)
+            loaded = load(temp_path)
             assert loaded.decomposition is not None
             # Invalid label should fallback to UNKNOWN or skip entry
             if len(loaded.decomposition.assumptions) > 0:

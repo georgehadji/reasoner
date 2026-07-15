@@ -1,6 +1,7 @@
 """Tests for MethodState dict wrapper and backward-compatible aliases."""
 
 from __future__ import annotations
+from reasoner.models import save, load
 
 import json
 import tempfile
@@ -106,8 +107,8 @@ def test_save_load_roundtrip() -> None:
 
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "state.json"
-        state.save(str(path))
-        loaded = PipelineState.load(str(path))
+        save(state, str(path))
+        loaded = load(str(path))
 
     assert loaded.problem == "roundtrip test"
     assert loaded.bayesian_state == {"prior": 0.7}

@@ -8,6 +8,7 @@ Verifies that:
 """
 
 from __future__ import annotations
+from reasoner.models import save, load
 
 import os
 import tempfile
@@ -63,8 +64,8 @@ class TestPipelineStateBackwardCompat:
         from reasoner.models import PipelineState
         ps = PipelineState(problem="save-test", language="Spanish")
         tmp = os.path.join(tempfile.gettempdir(), "test_shim_load.json")
-        ps.save(tmp)
-        loaded = PipelineState.load(tmp)
+        save(ps, tmp)
+        loaded = load(tmp)
         assert loaded.problem == "save-test"
         assert loaded.language == "Spanish"
         os.remove(tmp)

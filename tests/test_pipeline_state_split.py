@@ -1,6 +1,7 @@
 """Tests for PipelineState Core/Meta/Remainder split."""
 
 from __future__ import annotations
+from reasoner.models import save, load
 
 import json
 import tempfile
@@ -80,8 +81,8 @@ def test_full_roundtrip() -> None:
 
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "state.json"
-        state.save(str(path))
-        loaded = PipelineState.load(str(path))
+        save(state, str(path))
+        loaded = load(str(path))
 
     assert loaded.problem == "roundtrip test"
     assert loaded.task_type == TaskType.ANALYTICAL

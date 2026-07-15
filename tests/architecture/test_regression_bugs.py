@@ -11,6 +11,8 @@ BUG-006: _get_build_provider race condition
 """
 
 from __future__ import annotations
+from reasoner.models import save, load
+from reasoner.application.services.event_emission_service import EventEmissionService
 
 import asyncio
 import json
@@ -32,8 +34,8 @@ class TestBug001LoadLogging:
         tmp = os.path.join(tempfile.gettempdir(), "bug001_test.json")
 
         try:
-            state.save(tmp)
-            loaded = PipelineState.load(tmp)
+            save(state, tmp)
+            loaded = load(tmp)
             assert loaded.problem == "test"
             assert loaded.language == "English"
         finally:
@@ -51,7 +53,7 @@ class TestBug001LoadLogging:
 
             # Should raise — the corrupted data fails _from_dict
             with pytest.raises((ValueError, TypeError, AttributeError)):
-                PipelineState.load(tmp)
+                load(tmp)
         finally:
             if os.path.exists(tmp):
                 os.remove(tmp)
@@ -117,10 +119,10 @@ class TestBug005EmitCoercion:
                 self.events.append(event)
 
         bus = CollectingBus()
-        state.wire_event_bus(bus, aggregate_id="test-001")
+        emitter = EventEmissionService(bus, aggregate_id="test-001")
 
         # This should not raise (outer try/except catches it)
-        state._emit("PIPELINE_STARTED", problem="test")
+        emitter.emit("PIPELINE_STARTED", problem="test")
 
     def test_emit_with_invalid_event_type(self) -> None:
         """Invalid event type string should not crash the pipeline."""
@@ -133,13 +135,13 @@ class TestBug005EmitCoercion:
                 self.events.append(event)
 
         bus = CollectingBus()
-        state.wire_event_bus(bus, aggregate_id="test-001")
+        emitter = EventEmissionService(bus, aggregate_id="test-001")
 
         # After PATCH-005: invalid type raises ValueError which is caught
         # by outer try/except. BEFORE PATCH-005: ValueError was silently
         # absorbed, then make_event failed with a different error.
         # Both should NOT crash — the outer try/except always catches.
-        state._emit("THIS_IS_NOT_A_VALID_TYPE", problem="test")
+        emitter.emit("THIS_IS_NOT_A_VALID_TYPE", problem="test")
 
 
 class TestBug006RaceCondition:

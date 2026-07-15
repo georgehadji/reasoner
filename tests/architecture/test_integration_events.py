@@ -10,6 +10,7 @@ Uses a mock ProviderRouter so no real LLM calls are made.
 """
 
 from __future__ import annotations
+from reasoner.models import save, load
 
 import asyncio
 import json
@@ -20,6 +21,7 @@ from typing import Any, AsyncGenerator
 
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.application.event_bus.bus import EventBus, get_event_bus, reset_event_bus
+from reasoner.application.services.event_emission_service import EventEmissionService
 from reasoner.infrastructure.persistence.event_store import EventStore, get_event_store as _get_es
 
 
@@ -121,11 +123,11 @@ class TestEventSourcingIntegration:
         assert state2.core.problem == "nested"
 
     async def test_event_bus_noop_when_not_wired(self) -> None:
-        """_emit is safe when no EventBus is wired."""
-        state = PipelineState(problem="noop test")
+        """emit is safe when no EventBus is wired."""
+        emitter = EventEmissionService()  # no bus wired
         # Should not raise
-        state._emit("PHASE_STARTED", phase_name="Test")
-        state._emit("PIPELINE_COMPLETED")
+        emitter.emit("PHASE_STARTED", phase_name="Test")
+        emitter.emit("PIPELINE_COMPLETED")
 
     async def test_save_load_roundtrip(self) -> None:
         """PipelineState can be saved to JSON and loaded back."""
@@ -134,8 +136,8 @@ class TestEventSourcingIntegration:
 
         tmp = os.path.join(tempfile.gettempdir(), "test_integration_roundtrip.json")
         try:
-            state.save(tmp)
-            loaded = PipelineState.load(tmp)
+            save(state, tmp)
+            loaded = load(tmp)
             assert loaded.problem == "roundtrip test"
             assert loaded.language == "Spanish"
             assert "test error" in loaded.errors
@@ -180,9 +182,9 @@ class TestOrchestratorPreflight:
         assert PreflightDecision
 
     async def test_pipeline_state_wiring(self) -> None:
-        """PipelineState wire_event_bus stores the bus reference."""
+        """EventEmissionService.wire stores the bus reference (CE 1.1: moved off PipelineState)."""
         bus = get_event_bus()
-        state = PipelineState(problem="wire test")
-        state.wire_event_bus(bus, aggregate_id="test-123")
-        assert state._event_bus is bus
-        assert state._aggregate_id == "test-123"
+        emitter = EventEmissionService()
+        emitter.wire(bus, aggregate_id="test-123")
+        assert emitter._bus is bus
+        assert emitter._aggregate_id == "test-123"
