@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 from reasoner.models import PipelineState, PerspectiveType, SolutionCandidate, TaskType
+from reasoner.models import load
 
 def test_resume_with_invalid_enum_value(tmp_path):
     """
@@ -37,7 +38,7 @@ def test_resume_with_invalid_enum_value(tmp_path):
         json.dump(data, f)
     
     # This should NOT raise ValueError
-    state = PipelineState.load(state_file)
+    state = load(state_file)
     
     # Verify that the invalid candidate was skipped but the valid one remains
     assert len(state.candidates) == 1

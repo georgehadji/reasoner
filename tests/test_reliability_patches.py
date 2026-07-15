@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from pathlib import Path
 
 from reasoner.models import PipelineState, PerspectiveType, ClaimLabel
+from reasoner.models import load
 from reasoner.hypergate.hyperagent import HyperGateAgent
 from reasoner.gate_agent import GateDecision
 
@@ -34,7 +35,7 @@ def test_pipeline_state_enum_resilience(tmp_path):
     with open(state_file, "w") as f:
         json.dump(data, f)
         
-    state = PipelineState.load(state_file)
+    state = load(state_file)
     
     # 1. Valid candidate preserved
     assert len(state.candidates) == 1
