@@ -19,7 +19,7 @@ class TestSearchServiceRouting:
             {"title": "Test", "url": "http://example.com", "snippet": "result"}
         ]
 
-        with patch("reasoner.core.search.get_search_client") as mock_factory:
+        with patch("reasoner.core.search.get_search_client", new_callable=AsyncMock) as mock_factory:
             mock_factory.return_value = (mock_client, None)
             service = SearchService()
             results = await service.search("test query", source_type="general", num_results=5)
@@ -48,10 +48,10 @@ class TestGetSearchClientFactory:
         """When OPENROUTER_API_KEY is set, return PerplexitySearchClient."""
         from reasoner.core.search import get_search_client, PerplexitySearchClient
 
-        with patch("reasoner.core.search.settings") as mock_settings:
+        with patch("reasoner.infrastructure.search.discovery.settings") as mock_settings:
             mock_settings.OPENROUTER_API_KEY = "sk-or-test-key"
             mock_settings.PERPLEXITY_API_KEY = ""
-            with patch("reasoner.core.search.PerplexitySearchClient") as mock_pplx:
+            with patch("reasoner.infrastructure.search.discovery.PerplexitySearchClient") as mock_pplx:
                 mock_instance = MagicMock()
                 mock_pplx.return_value = mock_instance
                 client, source_type = await get_search_client()
@@ -59,15 +59,21 @@ class TestGetSearchClientFactory:
                 assert client is mock_instance
 
     @pytest.mark.asyncio
-    async def test_searxng_fallback_when_openrouter_key_missing(self):
-        """When OPENROUTER_API_KEY is absent, return DiscoveryClient (SearXNG)."""
-        from reasoner.core.search import get_search_client, DiscoveryClient
+    async def test_fallback_client_when_all_keys_missing(self):
+        """With no backend keys, the factory falls back to PerplexitySearchClient (strategy 4)."""
+        from reasoner.core.search import get_search_client
 
-        with patch("reasoner.core.search.settings") as mock_settings:
+        with patch("reasoner.infrastructure.search.discovery.settings") as mock_settings:
             mock_settings.OPENROUTER_API_KEY = ""
             mock_settings.PERPLEXITY_API_KEY = ""
-            with patch("reasoner.core.search.get_discovery_client") as mock_disc:
-                mock_disc.return_value = (AsyncMock(), "general")
+            mock_settings.TAVILY_API_KEY = ""
+            mock_settings.TAVILY_SEARCH_ENABLED = False
+            mock_settings.BRAVE_SEARCH_API_KEY = ""
+            mock_settings.BRAVE_SEARCH_ENABLED = False
+            with patch("reasoner.infrastructure.search.discovery.PerplexitySearchClient") as mock_pplx:
+                mock_instance = MagicMock()
+                mock_pplx.return_value = mock_instance
                 client, source_type = await get_search_client()
 
-        mock_disc.assert_awaited_once()
+        mock_pplx.assert_called_once()
+        assert client is mock_instance

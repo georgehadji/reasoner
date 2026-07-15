@@ -16,7 +16,7 @@ from typing import Any, Optional, Protocol
 logger = logging.getLogger(__name__)
 
 from reasoner.core.ports.search_port import SearchServicePort, SourceType
-from reasoner.core.constants import DEFAULT_SEARCH_RESULTS, TIMEOUTS, MODEL_QWEN35_9B, MODEL_QWEN35_FLASH, MODEL_GEMINI_FLASH
+from reasoner.core.constants import DEFAULT_SEARCH_RESULTS, TIMEOUTS, MODEL_QWEN35_9B, MODEL_QWEN35_FLASH, MODEL_GEMINI_FLASH, TRUNCATION
 from reasoner.core.settings import settings
 
 

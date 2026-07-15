@@ -12,7 +12,7 @@ class TestPerplexitySearchClient:
     @pytest.mark.asyncio
     async def test_init_without_openrouter_key_raises(self):
         """Without OPENROUTER_API_KEY, build_provider raises ValueError."""
-        with patch("reasoner.core.search._get_build_provider") as mock_get_bp:
+        with patch("reasoner.infrastructure.search.discovery._get_build_provider") as mock_get_bp:
             mock_build = Mock(side_effect=ValueError("API key missing"))
             mock_get_bp.return_value = mock_build
             with pytest.raises(ValueError):
@@ -32,7 +32,7 @@ class TestPerplexitySearchClient:
 
         mock_provider.client.chat.completions.create = AsyncMock(return_value=mock_response)
 
-        with patch("reasoner.core.search._get_build_provider") as mock_get_bp:
+        with patch("reasoner.infrastructure.search.discovery._get_build_provider") as mock_get_bp:
             mock_get_bp.return_value = Mock(return_value=mock_provider)
             client = PerplexitySearchClient()
             results = await client.search("test query")
@@ -50,7 +50,7 @@ class TestPerplexitySearchClient:
         mock_provider.extra_body = None
         mock_provider.client.chat.completions.create = AsyncMock(side_effect=Exception("API Error"))
 
-        with patch("reasoner.core.search._get_build_provider") as mock_get_bp:
+        with patch("reasoner.infrastructure.search.discovery._get_build_provider") as mock_get_bp:
             mock_get_bp.return_value = Mock(return_value=mock_provider)
             client = PerplexitySearchClient()
             results = await client.search("test query")
@@ -63,10 +63,10 @@ class TestSearchClientFactory:
 
     @pytest.mark.asyncio
     async def test_factory_returns_perplexity_when_openrouter_key_set(self):
-        with patch("reasoner.core.search.settings") as mock_settings:
+        with patch("reasoner.infrastructure.search.discovery.settings") as mock_settings:
             mock_settings.OPENROUTER_API_KEY = "sk-or-test"
             mock_settings.PERPLEXITY_API_KEY = ""
-            with patch("reasoner.core.search.PerplexitySearchClient") as mock_pplx:
+            with patch("reasoner.infrastructure.search.discovery.PerplexitySearchClient") as mock_pplx:
                 mock_instance = Mock()
                 mock_pplx.return_value = mock_instance
                 client, _ = await get_search_client()
@@ -74,11 +74,18 @@ class TestSearchClientFactory:
                 assert client is mock_instance
 
     @pytest.mark.asyncio
-    async def test_factory_returns_discovery_when_openrouter_key_missing(self):
-        with patch("reasoner.core.search.settings") as mock_settings:
+    async def test_factory_falls_back_when_openrouter_key_missing(self):
+        """With no backend keys, factory falls back to PerplexitySearchClient (strategy 4)."""
+        with patch("reasoner.infrastructure.search.discovery.settings") as mock_settings:
             mock_settings.OPENROUTER_API_KEY = ""
             mock_settings.PERPLEXITY_API_KEY = ""
-            with patch("reasoner.core.search.get_discovery_client") as mock_disc:
-                mock_disc.return_value = (AsyncMock(), None)
+            mock_settings.TAVILY_API_KEY = ""
+            mock_settings.TAVILY_SEARCH_ENABLED = False
+            mock_settings.BRAVE_SEARCH_API_KEY = ""
+            mock_settings.BRAVE_SEARCH_ENABLED = False
+            with patch("reasoner.infrastructure.search.discovery.PerplexitySearchClient") as mock_pplx:
+                mock_instance = MagicMock()
+                mock_pplx.return_value = mock_instance
                 client, _ = await get_search_client()
-                mock_disc.assert_awaited_once()
+                mock_pplx.assert_called_once()
+                assert client is mock_instance
