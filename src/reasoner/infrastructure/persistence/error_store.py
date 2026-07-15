@@ -145,6 +145,23 @@ class ErrorStore:
         """)
         conn.commit()
 
+    @staticmethod
+    def _safe_int(value: Any, floor: int = 1, ceiling: int = 3650) -> int:
+        """Coerce a numeric param to a bounded int before it reaches SQL.
+
+        Several stats/query helpers interpolate day/hour windows directly into
+        SQL via str.format(); parameter binding is not usable for the SQLite
+        datetime modifier string. int() rejects non-numeric input (e.g. an
+        injection payload like "7; DROP TABLE errors" raises ValueError), and
+        the result is clamped to [floor, ceiling].
+        """
+        n = int(value)  # raises ValueError/TypeError on non-numeric input
+        if n < floor:
+            return floor
+        if n > ceiling:
+            return ceiling
+        return n
+
     def _prune_old(self) -> None:
         """Remove errors older than retention period."""
         try:
@@ -153,7 +170,7 @@ class ErrorStore:
             # SQLite datetime math
             conn.execute(
                 "DELETE FROM errors WHERE datetime(timestamp) < datetime('now', '-{} days')".format(
-                    self.retention_days
+                    self._safe_int(self.retention_days)
                 )
             )
             conn.commit()
@@ -219,7 +236,7 @@ class ErrorStore:
             conditions.append("user_id = ?")
             params.append(user_id)
         if hours:
-            conditions.append("datetime(timestamp) > datetime('now', '-{} hours')".format(hours))
+            conditions.append("datetime(timestamp) > datetime('now', '-{} hours')".format(self._safe_int(hours)))
 
         where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
 
@@ -251,6 +268,7 @@ class ErrorStore:
 
     def _stats_sync(self, days: int = 7) -> ErrorStats:
         """Synchronous stats aggregation."""
+        days = self._safe_int(days)
         conn = self._get_connection()
 
         total = conn.execute(
