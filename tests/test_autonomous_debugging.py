@@ -182,7 +182,7 @@ class TestStopPipelineScope:
 class TestRateLimiterSlidingWindow:
     def test_reset_snaps_to_exact_boundary(self, monkeypatch):
         """
-        Verify that _reset_windows_if_needed snaps window start to the
+        Verify that _in_memory_reset_windows_if_needed snaps window start to the
         exact boundary (+= N * period) rather than resetting to 'now'.
         """
         from reasoner.rate_limiter import RateLimiter, RateLimitConfig, ClientBucket
@@ -198,7 +198,7 @@ class TestRateLimiterSlidingWindow:
 
         # Advance time by 125 seconds (2 full minute windows + 5s remainder)
         monkeypatch.setattr(time, "monotonic", lambda: base_time + 125.0)
-        rl._reset_windows_if_needed(bucket)
+        rl._in_memory_reset_windows_if_needed(bucket)
 
         # Should snap to base_time + 2*60 = 1120.0 (not reset to 1125.0)
         assert bucket.minute_window_start == base_time + 120.0
@@ -217,7 +217,7 @@ class TestRateLimiterSlidingWindow:
 
         # Advance by 2 hours + 5 minutes
         monkeypatch.setattr(time, "monotonic", lambda: base_time + 7500.0)
-        rl._reset_windows_if_needed(bucket)
+        rl._in_memory_reset_windows_if_needed(bucket)
 
         # Should snap to base_time + 2*3600 = 8200.0 (not reset to 8500.0)
         assert bucket.hour_window_start == base_time + 7200.0
@@ -238,7 +238,7 @@ class TestRateLimiterSlidingWindow:
 
         # Advance by only 30 seconds
         monkeypatch.setattr(time, "monotonic", lambda: base_time + 30.0)
-        rl._reset_windows_if_needed(bucket)
+        rl._in_memory_reset_windows_if_needed(bucket)
 
         # Nothing should change
         assert bucket.minute_window_start == base_time

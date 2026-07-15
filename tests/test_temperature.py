@@ -7,31 +7,33 @@ from reasoner.llm import OpenAICompatibleProvider
 class TestTemperatureHandling:
     """BUG-001 regression tests: Temperature parameter must be handled correctly per model."""
 
+    @staticmethod
+    def _supports(model_name: str) -> bool:
+        """Build a provider for model_name and report its temperature support."""
+        provider = OpenAICompatibleProvider(
+            model=model_name, api_key="test-key", base_url="https://test.api"
+        )
+        return provider._supports_temperature()
+
     def test_openai_models_never_accept_temperature(self):
         """OpenAI models (gpt-*, o1, o3) do NOT accept temperature - they use fixed 1.0."""
-        # Verify OpenAI models are NOT in the supported list
-        supported = OpenAICompatibleProvider._TEMPERATURE_SUPPORTED_MODELS
-        assert not any('gpt-' in m for m in supported)
-        assert not any('o1' in m for m in supported)
-        assert not any('o3' in m for m in supported)
+        assert not self._supports("gpt-4-turbo")
+        assert not self._supports("gpt-4o")
+        assert not self._supports("o1-preview")
+        assert not self._supports("o3-mini")
 
     def test_temperature_supported_models_registry(self):
-        """Verify temperature supported models registry is properly populated."""
-        supported = OpenAICompatibleProvider._TEMPERATURE_SUPPORTED_MODELS
-        
-        # Check major model families are included (NOT OpenAI)
-        assert any('deepseek' in m for m in supported)
-        assert any('qwen' in m for m in supported)
-        assert any('kimi' in m for m in supported)
-        assert any('glm' in m for m in supported)
-        assert any('mistral' in m for m in supported)
-        assert any('gemini' in m for m in supported)
-        assert any('grok' in m for m in supported)
-        assert any('sonar' in m for m in supported)
+        """Verify major non-OpenAI model families accept a custom temperature."""
+        for model in (
+            "deepseek-v3", "qwen3-max", "kimi-k2-6", "glm-4-plus",
+            "mistral-large-latest", "gemini-2.0-pro-exp", "grok-3", "sonar-pro",
+        ):
+            assert self._supports(model), f"{model} should accept temperature"
 
     def test_model_name_matching_logic(self):
-        """Test that model name matching works correctly."""
-        # Test the matching logic used in complete()
+        """Test that _supports_temperature gates models correctly."""
+        # NOTE: gating inverted in the refactor — unknown models now default to
+        # accepting temperature (allowlist -> fixed-temperature denylist).
         test_cases = [
             ("deepseek-v3", True),
             ("deepseek-r1", True),
@@ -42,17 +44,17 @@ class TestTemperatureHandling:
             ("gemini-2.0-pro-exp", True),
             ("grok-3", True),
             ("sonar-pro", True),
-            ("gpt-4-turbo", False),  # OpenAI - NEVER accepts temperature
-            ("gpt-4o", False),  # OpenAI - NEVER accepts temperature
-            ("o1-preview", False),  # OpenAI O1 - NEVER accepts temperature
-            ("o3-mini", False),  # OpenAI O3 - NEVER accepts temperature
-            ("claude-sonnet", False),  # Handled separately (Anthropic)
-            ("unknown-model", False),
+            ("claude-sonnet", True),   # Anthropic accepts temperature
+            ("unknown-model", True),   # default: new models get temperature
+            ("gpt-4-turbo", False),    # OpenAI - fixed temperature
+            ("gpt-4o", False),         # OpenAI - fixed temperature
+            ("o1-preview", False),     # OpenAI O1 - fixed temperature
+            ("o3-mini", False),        # OpenAI O3 - fixed temperature
         ]
-        
         for model_name, should_match in test_cases:
-            matches = any(supported in model_name.lower() for supported in OpenAICompatibleProvider._TEMPERATURE_SUPPORTED_MODELS)
-            assert matches == should_match, f"Model {model_name} matching failed"
+            assert self._supports(model_name) == should_match, (
+                f"Model {model_name} matching failed"
+            )
 
     def test_temperature_default_omitted(self):
         """Verify temperature=1.0 (default) is omitted to reduce token usage."""
