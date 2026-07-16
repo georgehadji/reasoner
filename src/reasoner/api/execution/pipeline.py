@@ -9,6 +9,7 @@ from typing import Callable, Awaitable, Any
 
 from reasoner.application.commands import RunPipelineCommand
 from reasoner.domain.pipeline_state import PipelineState
+from reasoner.domain.models import TaskType
 from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.application.services.preset_service import PresetService
 from reasoner.application.services.pipeline_service import PipelineService
