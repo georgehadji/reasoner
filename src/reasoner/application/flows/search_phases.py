@@ -415,7 +415,6 @@ async def run_deep_read_phase(state: PipelineState, services: WorkflowServices, 
         return
 
     services.log("DEEP_READ", f"Deep reading {len(sources_to_scrape)} sources...", state)
-    from reasoner.core.settings import settings
     use_llm_extraction = settings.REASONER_DEEP_READ_LLM
 
     async def _process_scraped(scraped: dict, matching_result: dict) -> None:

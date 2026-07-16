@@ -227,6 +227,60 @@ class ReasonerPipeline:
             + "\n=== END OF ATTACHED FILES ==="
         )
 
+    def _workflow_services(self) -> Any:
+        """Build a WorkflowServices bound to this pipeline for phase delegation."""
+        from reasoner.application.flows.services import PipelineWorkflowServices
+        return PipelineWorkflowServices(self)
+
+    # ── Backward-compatible phase delegators ──────────────────────────────
+    # The mixin-cleanup refactor (c7f3104) moved phase logic to standalone
+    # `(state, services)` flow functions but left production callers (api/routes/
+    # context.py) and the phase behavior tests referencing the old bound methods.
+    # These thin delegators restore that contract without duplicating logic.
+
+    async def _phase_2_perspectives(self, state: PipelineState) -> None:
+        from reasoner.application.flows.perspective_phases import run_perspectives_phase
+        await run_perspectives_phase(state, self._workflow_services())
+
+    async def _phase_3_critique(self, state: PipelineState) -> None:
+        from reasoner.application.flows.perspective_phases import run_critique_phase
+        await run_critique_phase(state, self._workflow_services())
+
+    async def _phase_4_stress_test(self, state: PipelineState) -> None:
+        from reasoner.application.flows.perspective_phases import run_stress_test_phase
+        await run_stress_test_phase(state, self._workflow_services())
+
+    async def _phase_synthesis(self, state: PipelineState) -> None:
+        from reasoner.application.flows.synthesis_phase import run_synthesis_phase
+        await run_synthesis_phase(state, self._workflow_services())
+
+    async def _phase_deep_read(self, state: PipelineState) -> None:
+        from reasoner.application.flows.search_phases import run_deep_read_phase
+        await run_deep_read_phase(state, self._workflow_services(), domain=self.domain)
+
+    def _validate_evidence_coverage(self, state: PipelineState) -> None:
+        from reasoner.application.flows.search_phases import validate_evidence_coverage
+        validate_evidence_coverage(state, self._workflow_services())
+
+    @staticmethod
+    def _enrich_query(query: str, problem: str) -> str:
+        from reasoner.application.flows.search_phases import _enrich_query
+        return _enrich_query(query, problem)
+
+    async def _phase_jury_generate(self, state: PipelineState) -> None:
+        from reasoner.application.flows.jury_phases import run_jury_generate_phase
+        await run_jury_generate_phase(state, self._workflow_services())
+
+    async def _phase_jury_critique(self, state: PipelineState) -> None:
+        from reasoner.application.flows.jury_phases import run_jury_critique_phase
+        await run_jury_critique_phase(
+            state, self._workflow_services(), batch_critique=self.batch_critique_jury
+        )
+
+    async def _phase_jury_verify_and_meta_eval(self, state: PipelineState) -> None:
+        from reasoner.application.flows.jury_phases import run_jury_verify_and_meta_eval_phase
+        await run_jury_verify_and_meta_eval_phase(state, self._workflow_services())
+
     async def _call_llm_cached(
         self,
         role: str,
