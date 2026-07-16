@@ -32,23 +32,25 @@ class TestEventBusIsolation:
         bus = get_event_bus()
         assert bus.total_subscribers == 0
 
-    def test_init_default_subscribers_registers_handlers(self):
+    @pytest.mark.asyncio
+    async def test_init_default_subscribers_registers_handlers(self):
         bus = get_event_bus()
         assert bus.total_subscribers == 0
 
-        init_default_subscribers(bus)
+        await init_default_subscribers(bus)
         assert bus.total_subscribers > 0
 
-    def test_duplicate_init_is_detectable(self):
+    @pytest.mark.asyncio
+    async def test_duplicate_init_is_detectable(self):
         """
         init_default_subscribers() appends handlers without deduplication.
         This documents the current behavior; future work could add idempotency.
         """
         bus = get_event_bus()
-        init_default_subscribers(bus)
+        await init_default_subscribers(bus)
         first_count = bus.total_subscribers
 
-        init_default_subscribers(bus)
+        await init_default_subscribers(bus)
         second_count = bus.total_subscribers
 
         assert second_count > first_count
@@ -56,7 +58,7 @@ class TestEventBusIsolation:
     @pytest.mark.asyncio
     async def test_reset_event_bus_clears_handlers(self):
         bus = get_event_bus()
-        init_default_subscribers(bus)
+        await init_default_subscribers(bus)
         assert bus.total_subscribers > 0
 
         reset_event_bus()
@@ -74,7 +76,7 @@ class TestEventBusIsolation:
             received.append(event)
 
         bus.subscribe(EventType.PIPELINE_STARTED, handler)
-        init_default_subscribers(bus)
+        await init_default_subscribers(bus)
 
         event = make_event(
             EventType.PIPELINE_STARTED,
