@@ -281,6 +281,104 @@ class ReasonerPipeline:
         from reasoner.application.flows.jury_phases import run_jury_verify_and_meta_eval_phase
         await run_jury_verify_and_meta_eval_phase(state, self._workflow_services())
 
+    async def _phase_jury_weighted_ranking(self, state: PipelineState) -> None:
+        from reasoner.application.flows.jury_phases import run_jury_weighted_ranking_phase
+        await run_jury_weighted_ranking_phase(state, self._workflow_services())
+
+    # CoVe
+    async def _phase_cove_draft(self, state: PipelineState) -> None:
+        from reasoner.application.flows.cognitive_phases import run_cove_draft_phase
+        await run_cove_draft_phase(state, self._workflow_services())
+
+    async def _phase_cove_verify(self, state: PipelineState) -> None:
+        from reasoner.application.flows.cognitive_phases import run_cove_verify_phase
+        await run_cove_verify_phase(state, self._workflow_services())
+
+    async def _phase_cove_answer(self, state: PipelineState) -> None:
+        from reasoner.application.flows.cognitive_phases import run_cove_answer_phase
+        await run_cove_answer_phase(state, self._workflow_services())
+
+    async def _phase_cove_revise(self, state: PipelineState) -> None:
+        from reasoner.application.flows.cognitive_phases import run_cove_revise_phase
+        await run_cove_revise_phase(state, self._workflow_services())
+
+    # SoT
+    async def _phase_sot_skeleton(self, state: PipelineState) -> None:
+        from reasoner.application.flows.cognitive_phases import run_sot_skeleton_phase
+        await run_sot_skeleton_phase(state, self._workflow_services())
+
+    async def _phase_sot_solve(self, state: PipelineState) -> None:
+        from reasoner.application.flows.cognitive_phases import run_sot_solve_phase
+        await run_sot_solve_phase(state, self._workflow_services())
+
+    async def _phase_sot_assemble(self, state: PipelineState) -> None:
+        from reasoner.application.flows.cognitive_phases import run_sot_assemble_phase
+        await run_sot_assemble_phase(state, self._workflow_services())
+
+    # ToT
+    async def _phase_tot_decompose(self, state: PipelineState) -> None:
+        from reasoner.application.flows.cognitive_phases import run_tot_decompose_phase
+        await run_tot_decompose_phase(state, self._workflow_services())
+
+    async def _phase_tot_generate(self, state: PipelineState) -> None:
+        from reasoner.application.flows.cognitive_phases import run_tot_generate_phase
+        await run_tot_generate_phase(state, self._workflow_services())
+
+    async def _phase_tot_evaluate(self, state: PipelineState) -> None:
+        from reasoner.application.flows.cognitive_phases import run_tot_evaluate_phase
+        await run_tot_evaluate_phase(state, self._workflow_services())
+
+    async def _phase_tot_backtrack(self, state: PipelineState) -> None:
+        from reasoner.application.flows.cognitive_phases import run_tot_backtrack_phase
+        await run_tot_backtrack_phase(state, self._workflow_services())
+
+    # PoT
+    async def _phase_pot_generate(self, state: PipelineState) -> None:
+        from reasoner.application.flows.cognitive_phases import run_pot_generate_phase
+        await run_pot_generate_phase(state, self._workflow_services())
+
+    async def _phase_pot_execute(self, state: PipelineState) -> None:
+        from reasoner.application.flows.cognitive_phases import run_pot_execute_phase
+        await run_pot_execute_phase(state, self._workflow_services())
+
+    async def _phase_pot_interpret(self, state: PipelineState) -> None:
+        from reasoner.application.flows.cognitive_phases import run_pot_interpret_phase
+        await run_pot_interpret_phase(state, self._workflow_services())
+
+    # Self-Discover
+    async def _phase_sd_select(self, state: PipelineState) -> None:
+        from reasoner.application.flows.cognitive_phases import run_sd_select_phase
+        await run_sd_select_phase(state, self._workflow_services())
+
+    async def _phase_sd_adapt(self, state: PipelineState) -> None:
+        from reasoner.application.flows.cognitive_phases import run_sd_adapt_phase
+        await run_sd_adapt_phase(state, self._workflow_services())
+
+    async def _phase_sd_implement(self, state: PipelineState) -> None:
+        from reasoner.application.flows.cognitive_phases import run_sd_implement_phase
+        await run_sd_implement_phase(state, self._workflow_services())
+
+    # Delphi
+    async def _phase_delphi_round1(self, state: PipelineState) -> None:
+        from reasoner.application.flows.delphi_phases import run_delphi_round1_phase
+        await run_delphi_round1_phase(state, self._workflow_services())
+
+    async def _phase_delphi_aggregation(self, state: PipelineState) -> None:
+        from reasoner.application.flows.delphi_phases import run_delphi_aggregation_phase
+        await run_delphi_aggregation_phase(state, self._workflow_services())
+
+    async def _phase_delphi_round2(self, state: PipelineState) -> None:
+        from reasoner.application.flows.delphi_phases import run_delphi_round2_phase
+        await run_delphi_round2_phase(state, self._workflow_services())
+
+    async def _phase_delphi_convergence(self, state: PipelineState) -> None:
+        from reasoner.application.flows.delphi_phases import run_delphi_convergence_phase
+        await run_delphi_convergence_phase(state, self._workflow_services())
+
+    async def _phase_delphi_dissent(self, state: PipelineState) -> None:
+        from reasoner.application.flows.delphi_phases import run_delphi_dissent_phase
+        await run_delphi_dissent_phase(state, self._workflow_services())
+
     async def _call_llm_cached(
         self,
         role: str,

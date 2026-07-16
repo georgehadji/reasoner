@@ -25,6 +25,7 @@ import platform
 import sys
 import tempfile
 import textwrap
+import time
 from pathlib import Path
 from typing import Optional
 
