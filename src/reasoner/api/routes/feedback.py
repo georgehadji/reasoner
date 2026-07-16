@@ -51,6 +51,7 @@ async def submit_feedback(
 @router.get("/api/admin/feedback-stats", dependencies=[Depends(check_rate_limit)])
 async def feedback_stats(
     request: Request,
+    days: int = 30,
     admin_key: str | None = Header(default=None, alias="X-Admin-Key"),
     user: User = Depends(get_current_user),
 ):
@@ -64,13 +65,14 @@ async def feedback_stats(
     if not admin_key or not secrets.compare_digest(admin_key, settings.ADMIN_API_KEY):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    stats = await _feedback_store.get_stats(days=30)
+    stats = await _feedback_store.get_stats(days=days)
 
     return {
-        "total": stats.total,
-        "average_score": round(stats.average_score, 2) if stats.average_score else 0,
-        "by_score": stats.by_score,
-        "by_method": stats.by_method,
-        "by_preset": stats.by_preset,
-        "recent_7d": stats.recent_count_7d,
+        "total_entries": stats.total_entries,
+        "upvotes": stats.upvotes,
+        "downvotes": stats.downvotes,
+        "downvote_reasons": stats.downvote_reasons,
+        "avg_comment_length": round(stats.avg_comment_length, 2),
+        "entries_with_context": stats.entries_with_context,
+        "period_days": stats.period_days,
     }
