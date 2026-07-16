@@ -296,6 +296,9 @@ class PipelineExecutionService:
                 phase_errored = False
                 phase_fatal = False
                 phase_start = time.monotonic()
+                # state.errors is cumulative across the run; remember the mark so
+                # phase_complete can report only what *this* phase appended.
+                errors_before_phase = len(state.errors)
 
                 for retry_attempt in range(max_retries + 1):
                     try:
@@ -463,6 +466,13 @@ class PipelineExecutionService:
                 if isinstance(data, dict):
                     data["tokens"] = state.phase_tokens.get(phase_key, {"input": 0, "output": 0})
                     data["duration"] = duration
+                    # Surface what this phase recorded. Without this, a phase whose
+                    # work all failed still serializes to an empty payload and the
+                    # UI can only say "No content for this phase" — the failure is
+                    # invisible to the user and to us.
+                    phase_errors = state.errors[errors_before_phase:]
+                    if phase_errors:
+                        data["errors"] = phase_errors
                     phase_models = state.cost_state._phase_models_by_key.get(phase_key, [])
                     if phase_models:
                         data["models"] = phase_models

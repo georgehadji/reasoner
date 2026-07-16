@@ -323,4 +323,24 @@ describe('Markdown builder — phase state types', () => {
     expect(md).toContain('No content');
     expect(md).not.toContain('undefined');
   });
+
+  it('surfaces phase errors instead of claiming there is no content', () => {
+    // A phase whose work all failed used to serialize to an empty payload and
+    // render as "No content for this phase", hiding the real cause.
+    const md = buildMarkdownFromPhase(0, 2, 'Perspectives', {
+      errors: [
+        "Perspective 'constructive' failed: ParseError: no JSON found",
+        "Perspective 'systemic' returned empty content — skipping",
+      ],
+    });
+    expect(md).toContain('Phase errors (2)');
+    expect(md).toContain("Perspective 'constructive' failed");
+    expect(md).toContain('returned empty content');
+    expect(md).not.toContain('No content for this phase');
+  });
+
+  it('still reports no content when a phase is genuinely empty', () => {
+    const md = buildMarkdownFromPhase(0, 2, 'Perspectives', { errors: [] });
+    expect(md).toContain('No content for this phase');
+  });
 });
