@@ -12,12 +12,21 @@ def test_server_port_default_matches_api_port():
     server_port_default = None
     for node in ast.walk(settings_tree):
         if isinstance(node, ast.Call) and getattr(node.func, "attr", None) == "getenv":
-            args = [ast.literal_eval(a) for a in node.args]
+            # Some getenv defaults are computed expressions (e.g. a ternary for
+            # EVENT_STORE_BACKEND); skip any call whose args aren't all literals.
+            try:
+                args = [ast.literal_eval(a) for a in node.args]
+            except (ValueError, SyntaxError):
+                continue
             if args and args[0] == "SERVER_PORT" and len(args) >= 2:
                 server_port_default = args[1]
 
-    # Extract DEFAULT_API_PORT from constants.py
-    constants_src = (core_dir / "constants.py").read_text(encoding="utf-8")
+    # Extract DEFAULT_API_PORT. constants.py now re-exports it from
+    # constants_limits.py, where the literal assignment actually lives.
+    constants_path = core_dir / "constants_limits.py"
+    if not constants_path.exists():
+        constants_path = core_dir / "constants.py"
+    constants_src = constants_path.read_text(encoding="utf-8")
     constants_tree = ast.parse(constants_src)
     api_port = None
     for node in ast.walk(constants_tree):
