@@ -93,6 +93,35 @@ class EventStoreConnection:
                 run_id TEXT NOT NULL,
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
+
+            -- Aggregates table (current state snapshot). The refactor that split
+            -- connection handling into this module dropped it; prune_events_before,
+            -- aggregate persistence, stats and listing all query it.
+            CREATE TABLE IF NOT EXISTS aggregates (
+                aggregate_id TEXT PRIMARY KEY,
+                aggregate_type TEXT NOT NULL,
+                current_version INTEGER NOT NULL DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'pending',
+                problem TEXT,
+                preset TEXT,
+                method TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_aggregates_status
+                ON aggregates(status);
+            CREATE INDEX IF NOT EXISTS idx_aggregates_created
+                ON aggregates(created_at);
+
+            -- Dead-letter queue for un-persistable events (DM8)
+            CREATE TABLE IF NOT EXISTS dead_letter_queue (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_id TEXT,
+                event_type TEXT NOT NULL,
+                raw_payload TEXT NOT NULL,
+                error TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
         """)
         conn.commit()
 
