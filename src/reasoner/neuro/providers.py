@@ -318,7 +318,10 @@ class OpenAIReasoning(ReasoningProvider):
                                                    "max_tokens": max_tokens,
                                                    "temperature": NON_PHASE_TEMPERATURES["neuro_memory"]})
         resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"]
+        choices = resp.json().get("choices") or []
+        if not choices:
+            return ""
+        return choices[0].get("message", {}).get("content", "") or ""
 
     async def health_check(self) -> bool:
         try:
@@ -338,7 +341,10 @@ class OpenAIEmbedding(EmbeddingProvider):
         resp = await self._get_client().post(f"{self._url()}/embeddings", headers=headers,
                                              json={"model": self.config.model, "input": text})
         resp.raise_for_status()
-        return resp.json()["data"][0]["embedding"]
+        items = resp.json().get("data") or []
+        if not items:
+            return []
+        return items[0].get("embedding", []) or []
 
     async def health_check(self) -> bool:
         try:
@@ -386,7 +392,10 @@ class OpenRouterReasoning(ReasoningProvider):
                                                    "max_tokens": max_tokens,
                                                    "temperature": NON_PHASE_TEMPERATURES["neuro_memory"]})
         resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"]
+        choices = resp.json().get("choices") or []
+        if not choices:
+            return ""
+        return choices[0].get("message", {}).get("content", "") or ""
 
     async def health_check(self) -> bool:
         return bool(self.config.api_key)
@@ -399,7 +408,10 @@ class OpenRouterEmbedding(EmbeddingProvider):
         resp = await self._get_client().post(f"{base}/embeddings", headers=headers,
                                              json={"model": self.config.model, "input": text})
         resp.raise_for_status()
-        return resp.json()["data"][0]["embedding"]
+        items = resp.json().get("data") or []
+        if not items:
+            return []
+        return items[0].get("embedding", []) or []
 
     async def health_check(self) -> bool:
         return bool(self.config.api_key)
@@ -423,7 +435,10 @@ class PerplexityEmbedding(EmbeddingProvider):
             json={"model": self.config.model, "input": text},
         )
         resp.raise_for_status()
-        return resp.json()["data"][0]["embedding"]
+        items = resp.json().get("data") or []
+        if not items:
+            return []
+        return items[0].get("embedding", []) or []
 
     async def health_check(self) -> bool:
         return bool(self.config.api_key)
@@ -465,13 +480,16 @@ class HuggingFaceEmbedding(EmbeddingProvider):
         if self.config.api_base:
             resp = await self._get_client().post(f"{self.config.api_base}/embed", json={"inputs": text})
             resp.raise_for_status()
-            return resp.json()[0]
+            data = resp.json()
+            return data[0] if data else []
         else:
             headers = {"Authorization": f"Bearer {self.config.api_key}"}
             url = f"{HUGGINGFACE_API_BASE}/pipeline/feature-extraction/{self.config.model}"
             resp = await self._get_client().post(url, json={"inputs": text}, headers=headers)
             resp.raise_for_status()
             data = resp.json()
+            if not data:
+                return []
             return data[0] if isinstance(data[0], list) else data
 
     async def health_check(self) -> bool:
