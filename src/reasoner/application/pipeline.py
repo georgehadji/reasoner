@@ -154,6 +154,79 @@ class ReasonerPipeline:
         if self.verbose: logger.info(f"[{phase}] {message}")
         state.log(phase, message)
 
+    async def _build_attachment_context(
+        self,
+        attachments: list[dict[str, Any]],
+        query: str | None = None,
+    ) -> str:
+        """Build a context string from extracted attachment texts.
+
+        When DOCUMENT_SEMANTIC_RETRIEVAL_ENABLED is true and a query is provided,
+        retrieves only the most relevant chunks via semantic search instead of
+        injecting the full document text.
+
+        Format is designed to be unambiguous to LLMs: the injected text IS the
+        actual file content. We use explicit markers so the model cannot mistake
+        this for metadata or instructions.
+        """
+        from reasoner.core.settings import settings
+
+        # ── Semantic retrieval path (opt-in) ──
+        if (
+            settings.DOCUMENT_SEMANTIC_RETRIEVAL_ENABLED
+            and query
+            and attachments
+        ):
+            try:
+                from reasoner.documents.vector_store import DocumentVectorStore
+
+                store = DocumentVectorStore()
+                file_ids = [att.get("file_id", "") for att in attachments if att.get("file_id")]
+                chunks = await store.retrieve(query, file_ids, top_k=5)
+                if chunks:
+                    parts: list[str] = []
+                    for i, chunk_text in enumerate(chunks, 1):
+                        parts.append(
+                            f"=== EXCERPT {i} (most relevant passage) ===\n"
+                            f"[CONTENT START]\n"
+                            f"{chunk_text}\n"
+                            f"[CONTENT END]"
+                        )
+                    return (
+                        "=== ATTACHED FILES (semantic excerpts) ===\n"
+                        "The user has uploaded file(s). Below are the most relevant "
+                        "passages retrieved from those files based on the query.\n\n"
+                        + "\n\n".join(parts)
+                        + "\n=== END OF ATTACHED FILES ==="
+                    )
+            except Exception as exc:
+                logger.warning(
+                    "Semantic attachment retrieval failed, falling back to full text: %s", exc
+                )
+
+        # ── Fallback: verbatim full-text injection ──
+        parts: list[str] = []
+        for att in attachments:
+            filename = att.get("filename", "unknown")
+            extracted = att.get("extracted_text", "").strip()
+            if extracted:
+                parts.append(
+                    f"=== FILE: {filename} ===\n"
+                    f"[CONTENT START]\n"
+                    f"{extracted}\n"
+                    f"[CONTENT END]"
+                )
+        if not parts:
+            return ""
+        return (
+            "=== ATTACHED FILES (full content provided below) ===\n"
+            "The user has uploaded the following file(s). "
+            "Treat the content between [CONTENT START] and [CONTENT END] "
+            "as the actual file contents.\n\n"
+            + "\n\n".join(parts)
+            + "\n=== END OF ATTACHED FILES ==="
+        )
+
     async def _call_llm_cached(
         self,
         role: str,
