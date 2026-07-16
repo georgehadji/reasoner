@@ -169,28 +169,32 @@ class PipelineOrchestrator:
         # Store the buffer on the router so callers can extract it
         router._fallback_buffer = _fallback_buffer
 
-        # ── Neuro Recall + HyperGate (composite block with 5s timeout) ──
-        # Both are LLM calls that can stall. When they exceed 5s combined,
-        # we fall back to a default pipeline decision so the client gets
-        # an event promptly rather than an empty spinner.
+        # ── Neuro Recall + HyperGate (independent budgets, run concurrently) ──
+        # Recall is enrichment; the gate decides whether we spend money at all.
+        # They must not share a budget: recall is an HTTP self-call, so when it
+        # stalls it used to eat the whole window, leave gate_decision_fb None and
+        # silently fall back to the *most expensive* path (a full pipeline) — even
+        # for a prompt the gate would have answered directly in microseconds.
         recalled_chunks: list[dict[str, Any]] = []
         gate_decision_fb: Any | None = None  # fallback capture
 
-        async def _preflight_checks():
-            nonlocal recalled_chunks, gate_decision_fb
-            # Neuro recall
-            if not getattr(req, "no_cache", False):
-                conversation_id = (
-                    getattr(initial_state, "conversation_id", None)
-                    if initial_state else None
+        async def _run_neuro_recall():
+            nonlocal recalled_chunks
+            if getattr(req, "no_cache", False):
+                return
+            conversation_id = (
+                getattr(initial_state, "conversation_id", None)
+                if initial_state else None
+            )
+            try:
+                recalled_chunks = await self._recall_neuro_context(
+                    req.problem, agent_id=conversation_id
                 )
-                try:
-                    recalled_chunks = await self._recall_neuro_context(
-                        req.problem, agent_id=conversation_id
-                    )
-                except Exception as exc:
-                    logger.debug("Neuro recall failed: %s", exc)
-            # HyperGate
+            except Exception as exc:
+                logger.debug("Neuro recall failed: %s", exc)
+
+        async def _run_hypergate():
+            nonlocal gate_decision_fb
             if not getattr(req, "force_pipeline", False):
                 # Override HyperGate router: grok-4.5 for primary, gemini-flash-lite for sub-agents
                 from reasoner.infrastructure.llm.registry import build_provider
@@ -212,15 +216,30 @@ class PipelineOrchestrator:
 
         _preflight_timeout = max(GATE_TIMEOUT_SECONDS * 2, 5.0)
 
-        try:
-            await asyncio.wait_for(_preflight_checks(), timeout=_preflight_timeout)
-        except asyncio.TimeoutError:
-            logger.warning(
-                "Preflight checks (neuro + HyperGate) exceeded %.0fs. "
-                "Falling back to default pipeline.",
-                _preflight_timeout,
-            )
-            gate_decision_fb = None  # force pipeline fallback
+        async def _guard(coro, label: str) -> None:
+            """Run one preflight task under its own budget; never raise."""
+            try:
+                await asyncio.wait_for(coro, timeout=_preflight_timeout)
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "Preflight %s exceeded %.0fs; continuing without it.",
+                    label,
+                    _preflight_timeout,
+                )
+            except Exception as exc:
+                logger.warning("Preflight %s failed: %s", label, exc)
+
+        # gather() so total preflight is max(recall, gate), not their sum. A
+        # stalled recall can no longer cost the gate its budget.
+        await asyncio.gather(
+            _guard(_run_neuro_recall(), "neuro recall"),
+            _guard(_run_hypergate(), "HyperGate"),
+        )
+
+        if gate_decision_fb is None and not getattr(req, "force_pipeline", False):
+            # Gate produced nothing (stalled or errored) — keep the existing
+            # conservative behaviour and run the full pipeline.
+            logger.warning("HyperGate produced no decision. Falling back to default pipeline.")
 
         decision = PreflightDecision(
             action="pipeline",
