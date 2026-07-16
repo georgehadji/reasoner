@@ -42,28 +42,37 @@ def get_cache_stats() -> dict[str, int | float]:
     }
 
 
+def _prune_memory_cache_locked() -> None:
+    """FIFO eviction for the in-memory cache.
+
+    Caller MUST already hold _memory_cache_lock. The lock is a non-reentrant
+    threading.Lock, so re-acquiring it here would self-deadlock the caller.
+    """
+    global _cache_evictions
+    # Back-compat: allow monkey-patching from importing modules (e.g. tests)
+    max_size = _MEMORY_CACHE_MAX_SIZE
+    try:
+        import reasoner.api as _api
+        max_size = getattr(_api, '_MEMORY_CACHE_MAX_SIZE', max_size)
+    except Exception:
+        pass
+    excess = len(_MEMORY_CACHE) - max_size
+    if excess > 0:
+        for _ in range(excess):
+            _MEMORY_CACHE.pop(next(iter(_MEMORY_CACHE)), None)
+        _cache_evictions += excess
+        if _METRICS_AVAILABLE:
+            try:
+                from reasoner.metrics import REASONER_CACHE_EVICTIONS
+                REASONER_CACHE_EVICTIONS.set(_cache_evictions)
+            except Exception:
+                pass
+
+
 def _prune_memory_cache() -> None:
     """Simple FIFO eviction for the in-memory cache (thread-safe)."""
-    global _cache_evictions
     with _memory_cache_lock:
-        # Back-compat: allow monkey-patching from importing modules (e.g. tests)
-        max_size = _MEMORY_CACHE_MAX_SIZE
-        try:
-            import reasoner.api as _api
-            max_size = getattr(_api, '_MEMORY_CACHE_MAX_SIZE', max_size)
-        except Exception:
-            pass
-        excess = len(_MEMORY_CACHE) - max_size
-        if excess > 0:
-            for _ in range(excess):
-                _MEMORY_CACHE.pop(next(iter(_MEMORY_CACHE)), None)
-            _cache_evictions += excess
-            if _METRICS_AVAILABLE:
-                try:
-                    from reasoner.metrics import REASONER_CACHE_EVICTIONS
-                    REASONER_CACHE_EVICTIONS.set(_cache_evictions)
-                except Exception:
-                    pass
+        _prune_memory_cache_locked()
 
 
 def clear_memory_cache() -> None:
@@ -130,7 +139,7 @@ async def _load_cache(key: str) -> list[dict] | None:
             data = json.loads(await asyncio.to_thread(path.read_text, encoding="utf-8"))
             with _memory_cache_lock:
                 _MEMORY_CACHE[key] = data
-                _prune_memory_cache()
+                _prune_memory_cache_locked()
             return data
         except (json.JSONDecodeError, OSError):
             # Treat a corrupt or unreadable cache file as a cache miss and
@@ -166,7 +175,7 @@ async def _save_cache(key: str, events: list[dict]) -> None:
     # Update in-memory hot cache immediately (under lock)
     with _memory_cache_lock:
         _MEMORY_CACHE[key] = events.copy()
-        _prune_memory_cache()
+        _prune_memory_cache_locked()
 
     # Write to a sibling temp file then rename so that a crash during the
     # write never leaves a corrupt (partial) JSON file at the target path.
