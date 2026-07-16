@@ -57,6 +57,12 @@ jobs:
           # Dummy placeholder (NOT a real credential): LocalAuthAdapter validates
           # JWT_SECRET_KEY length on instantiation during SaaS/auth test collection.
           JWT_SECRET_KEY: 'ci-test-secret-key-not-for-production-use-only'
+          # CI has no Redis. The limiter defaults to redis + fail_closed, which
+          # denies every request (429) when Redis is unreachable — tripping ~40
+          # endpoint tests that expect 200/401. fail_open degrades gracefully to
+          # the in-memory limiter, which still enforces limits for the dedicated
+          # rate-limiter tests while letting normal requests through.
+          RATE_LIMITER_REDIS_FAILURE_MODE: 'fail_open'
 
   tsc:
     name: TypeScript type check
