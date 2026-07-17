@@ -34,9 +34,13 @@ async def test_dynamic_subscribe_ownership_enforced():
     ws = FakeWebSocket()
     await manager.connect(ws, "conn-1", metadata={"user_id": "user-b"})
 
-    # Claim that pipeline-123 is owned by user-a
+    # Claim that pipeline-123 is owned by user-a.
+    # handle_websocket_message does `from reasoner.pipeline_owner import
+    # _get_pipeline_owner` inline at call time, so the patch target must be
+    # the attribute on that module (not reasoner.api.history, which manager.py
+    # never imports from).
     with patch(
-        "reasoner.api.history._get_pipeline_owner",
+        "reasoner.pipeline_owner._get_pipeline_owner",
         return_value="user-a",
     ):
         await handle_websocket_message(
@@ -62,7 +66,7 @@ async def test_dynamic_subscribe_same_user_allowed():
     await manager.connect(ws, "conn-2", metadata={"user_id": "user-a"})
 
     with patch(
-        "reasoner.api.history._get_pipeline_owner",
+        "reasoner.pipeline_owner._get_pipeline_owner",
         return_value="user-a",
     ):
         await handle_websocket_message(
