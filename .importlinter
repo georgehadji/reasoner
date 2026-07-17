@@ -56,6 +56,8 @@ ignore_imports=
     reasoner.infrastructure.websocket.manager -> reasoner.application.services.auth_service
     reasoner.infrastructure.server_check -> reasoner.application.handlers
     reasoner.infrastructure.billing.webhooks -> reasoner.application.services.billing_service
+    reasoner.infrastructure.billing.webhooks -> reasoner.application.event_bus.bus
+    reasoner.infrastructure.persistence.billing_deadletter_repo -> reasoner.application.ports.billing_deadletter_port
     # ── application → api (handler renders via api serializer) ──
     reasoner.application.handlers.handlers -> reasoner.api
     reasoner.application.services.data_eraser -> reasoner.api.cache
