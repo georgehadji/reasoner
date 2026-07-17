@@ -33,6 +33,7 @@ ignore_imports=
     reasoner.infrastructure.persistence.cached_quota_repo -> reasoner.application.ports.quota_repository
     reasoner.infrastructure.persistence.postgres_store -> reasoner.application.event_bus.bus
     reasoner.infrastructure.persistence.quota_repo_postgres -> reasoner.application.ports.quota_repository
+    reasoner.infrastructure.persistence.pipeline_ownership_repo -> reasoner.application.ports.pipeline_ownership_port
     reasoner.infrastructure.websocket.manager -> reasoner.application.ports.auth_port
     reasoner.application.event_bus.bus -> reasoner.infrastructure.persistence.event_store
     reasoner.application.handlers.handlers -> reasoner.infrastructure.llm.router
@@ -56,6 +57,8 @@ ignore_imports=
     reasoner.infrastructure.websocket.manager -> reasoner.application.services.auth_service
     reasoner.infrastructure.server_check -> reasoner.application.handlers
     reasoner.infrastructure.billing.webhooks -> reasoner.application.services.billing_service
+    reasoner.infrastructure.billing.webhooks -> reasoner.application.event_bus.bus
+    reasoner.infrastructure.persistence.billing_deadletter_repo -> reasoner.application.ports.billing_deadletter_port
     # ── application → api (handler renders via api serializer) ──
     reasoner.application.handlers.handlers -> reasoner.api
     reasoner.application.services.data_eraser -> reasoner.api.cache

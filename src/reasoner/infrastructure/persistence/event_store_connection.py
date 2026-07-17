@@ -89,7 +89,7 @@ class EventStoreConnection:
 
             CREATE TABLE IF NOT EXISTS pipeline_owners (
                 pipeline_id TEXT PRIMARY KEY,
-                user_id TEXT NOT NULL,
+                user_id TEXT,
                 run_id TEXT NOT NULL,
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
@@ -122,6 +122,34 @@ class EventStoreConnection:
                 error TEXT NOT NULL,
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
+        """)
+        conn.commit()
+        self._migrate_pipeline_owners_nullable(conn)
+
+    def _migrate_pipeline_owners_nullable(self, conn: sqlite3.Connection) -> None:
+        """Relax pipeline_owners.user_id to nullable (anonymous ownership).
+
+        The table originally had ``user_id TEXT NOT NULL``. SQLite has no
+        ALTER COLUMN, and CREATE TABLE IF NOT EXISTS is a no-op on a table
+        that already exists with the old constraint — so any DB created
+        before this change needs an explicit rebuild. Idempotent: no-op once
+        migrated, and a no-op on brand-new DBs where the table above was
+        already created nullable.
+        """
+        cols = conn.execute("PRAGMA table_info(pipeline_owners)").fetchall()
+        user_id_col = next((c for c in cols if c["name"] == "user_id"), None)
+        if user_id_col is None or user_id_col["notnull"] == 0:
+            return
+        conn.executescript("""
+            ALTER TABLE pipeline_owners RENAME TO pipeline_owners_old;
+            CREATE TABLE pipeline_owners (
+                pipeline_id TEXT PRIMARY KEY,
+                user_id TEXT,
+                run_id TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            INSERT INTO pipeline_owners SELECT * FROM pipeline_owners_old;
+            DROP TABLE pipeline_owners_old;
         """)
         conn.commit()
 
