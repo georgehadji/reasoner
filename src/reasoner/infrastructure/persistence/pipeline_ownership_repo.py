@@ -24,6 +24,15 @@ from reasoner.infrastructure.persistence.event_store_connection import EventStor
 
 logger = logging.getLogger(__name__)
 
+# Default location of the retired JSON ownership store (formerly
+# domain/pipeline_owner.py, deleted in Phase 3 of
+# docs/plans/pipeline-ownership-authz-hardening.md). Kept only as a path
+# constant so backfill_from_json() can still find pre-migration data on a
+# deployment that has not yet had a process start since the cutover.
+_LEGACY_PIPELINE_OWNERS_PATH = (
+    Path(__file__).parent.parent.parent / "domain" / "history" / "pipeline_owners.json"
+)
+
 
 class PipelineOwnershipRepository:
     """SQLite-backed pipeline ownership store, sharing the event store DB."""
@@ -91,8 +100,7 @@ class PipelineOwnershipRepository:
         or empty).
         """
         if json_path is None:
-            from reasoner.domain.pipeline_owner import _PIPELINE_OWNERS_PATH
-            json_path = _PIPELINE_OWNERS_PATH
+            json_path = _LEGACY_PIPELINE_OWNERS_PATH
 
         if not json_path.exists():
             return 0
