@@ -154,10 +154,20 @@ class EventStoreConnection:
         conn.commit()
 
     def close(self) -> None:
-        """Close the database connection."""
+        """Close the database connection and shut down the thread pool.
+
+        Previously only closed the sqlite3 connection; the executor was
+        never shut down here, so every close() leaked its worker thread.
+        EventStore.close() called this only by accident of never actually
+        running (see EventStore.close()'s own history) -- the leak was
+        masked by that bug rather than fixed by it.
+        """
         if self._connection is not None:
             try:
                 self._connection.close()
             except Exception:
                 pass
             self._connection = None
+        if self._executor is not None:
+            self._executor.shutdown(wait=True)
+            self._executor = None

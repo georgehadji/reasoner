@@ -10,6 +10,21 @@ import asyncio
 import pytest
 
 from reasoner.core.events.domain_events import EventType, make_event
+from reasoner.infrastructure.persistence.event_store import EventStore
+
+
+@pytest.fixture
+def temp_event_store(tmp_path):
+    """An EventStore on an isolated temp SQLite file, closed after the test.
+
+    Was referenced by every test in this class but never defined anywhere
+    in the repo -- those tests errored on collection regardless of any
+    other change (pre-existing, unrelated to the connection/close() fixes
+    in this file's git history).
+    """
+    store = EventStore(db_path=tmp_path / "concurrency_test.db")
+    yield store
+    store.close()
 
 
 class TestEventStoreConcurrency:
@@ -118,5 +133,8 @@ class TestEventStoreConcurrency:
         await store.save_events([event])
         store.close()
 
-        # After close, the executor should be shut down.
-        assert store._executor is None or store._executor._shutdown
+        # After close, the executor should be shut down. The executor lives
+        # on store.conn (EventStoreConnection), not on store itself -- see
+        # EventStore.close()'s docstring for why this used to be checked in
+        # the wrong place too.
+        assert store.conn._executor is None or store.conn._executor._shutdown

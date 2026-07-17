@@ -802,13 +802,17 @@ class EventStore:
         return await self._run_in_executor(_count_sync)
 
     def close(self) -> None:
-        """Close database connection and thread pool."""
-        if self._connection:
-            self._connection.close()
-            self._connection = None
-        if self._executor:
-            self._executor.shutdown(wait=True)
-            self._executor = None
+        """Close database connection and thread pool.
+
+        Delegates to the connection module (self.conn), matching
+        _get_connection/_run_in_executor above. This method previously
+        referenced self._connection/self._executor directly, but EventStore
+        never sets those attributes -- they live on self.conn since the
+        connection-lifecycle extraction (see EventStoreConnection's own
+        docstring) -- so every call raised AttributeError instead of closing
+        anything.
+        """
+        self.conn.close()
 
 
 # ─────────────────────────────────────────────────────────────────────
