@@ -135,9 +135,11 @@ MODEL_QWEN3_CODER_FLASH: str = "qwen3-coder-flash"
 MODEL_QWEN3_CODER_30B_A3B: str = "qwen3-coder-30b-a3b"
 
 # Kimi (MoonshotAI)
+MODEL_KIMI_K2: str = "kimi-k2"
 MODEL_KIMI_K2_5: str = "kimi-k2-5"
 MODEL_KIMI_K2_6: str = "kimi-k2-6"
 MODEL_KIMI_K2_7_CODE: str = "kimi-k2-7-code"
+MODEL_KIMI_K3: str = "kimi-k3"
 
 # Tencent
 MODEL_HY3: str = "hy3"

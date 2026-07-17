@@ -184,11 +184,13 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "kimi-k2-5":        {"model": "moonshotai/kimi-k2.5"},
     "kimi-k2-6":        {"model": "moonshotai/kimi-k2.6"},
     "kimi-k2-7-code":   {"model": "moonshotai/kimi-k2.7-code"},
+    "kimi-k3":          {"model": "moonshotai/kimi-k3"},           # 1M ctx, advanced agentic reasoning
     # ═══════════════════════════════════════════════════════════════
     # Meta LLaMA
     # ═══════════════════════════════════════════════════════════════
     "llama-4-scout":    {"model": "meta-llama/llama-4-scout"},     # $0.10/$0.30 per M, 10M ctx — best long-context VFM
     "llama-4-maverick": {"model": "meta-llama/llama-4-maverick"},  # $0.15/$0.60 per M, 1M ctx
+    "muse-spark-1.1":   {"model": "meta/muse-spark-1.1"},          # small multimodal/general model
     # ═══════════════════════════════════════════════════════════════
     # Laguna (Poolside)
     # ═══════════════════════════════════════════════════════════════
@@ -434,7 +436,7 @@ def list_models() -> dict[str, list[str]]:
 _VENDOR_BLOC: dict[str, str] = {
     # United States / Western
     "anthropic": "US", "openai": "US", "google": "US", "x-ai": "US",
-    "perplexity": "US", "meta-llama": "US", "poolside": "US", "arcee-ai": "US",
+    "perplexity": "US", "meta-llama": "US", "meta": "US", "poolside": "US", "arcee-ai": "US",
     "nvidia": "US", "nousresearch": "US", "morph": "US",
     # China
     "deepseek": "CN", "qwen": "CN", "moonshotai": "CN", "z-ai": "CN",
