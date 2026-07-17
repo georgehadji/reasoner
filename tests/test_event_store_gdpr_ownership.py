@@ -67,7 +67,8 @@ async def test_data_eraser_logs_failure_instead_of_reporting_success(
     store: EventStore,
 ):
     """Integration check against the actual GDPR erasure caller: a lookup
-    failure must NOT produce a receipt claiming deleted_aggregates worked."""
+    failure must NOT produce a receipt claiming deleted_aggregates worked,
+    and status must say so explicitly."""
     from reasoner.application.services.data_eraser import UserDataEraser
 
     with patch.object(
@@ -82,3 +83,51 @@ async def test_data_eraser_logs_failure_instead_of_reporting_success(
     # deleted_aggregates must be 0, not silently reported as if the (empty)
     # list from a swallowed error meant "nothing to delete".
     assert receipt["deleted_aggregates"] == 0
+    assert receipt["status"] == "failed"
+    assert "db is on fire" in receipt["error"]
+
+
+@pytest.mark.asyncio
+async def test_receipt_not_falsely_completed_via_cache_eviction_alone(
+    store: EventStore,
+):
+    """The actual bug this fix targets: status was `"completed" if
+    deleted_aggregates > 0 or cache_evicted else "partial"` -- a successful
+    cache eviction alone could mark the whole erasure "completed" even
+    though the event-store deletion (the user's actual pipeline data) had
+    just failed. Status must reflect the aggregate-deletion outcome, not be
+    rescued by an unrelated successful side-effect."""
+    from reasoner.application.services.data_eraser import UserDataEraser
+
+    with patch.object(
+        store,
+        "list_aggregate_ids_for_user",
+        new_callable=AsyncMock,
+        side_effect=RuntimeError("db is on fire"),
+    ):
+        eraser = UserDataEraser(event_store=store, clear_cache_fn=lambda: None)
+        receipt = await eraser.erase("user-a")
+
+    assert receipt["cache_evicted"] is True  # the side-effect DID succeed
+    assert receipt["deleted_aggregates"] == 0
+    assert receipt["status"] == "failed"  # must not be "completed"
+
+
+@pytest.mark.asyncio
+async def test_receipt_status_completed_on_genuine_success(store: EventStore):
+    """Regression guard for the happy path: real deletions still report
+    status="completed" with no error field."""
+    from reasoner.application.services.data_eraser import UserDataEraser
+    from reasoner.infrastructure.persistence.pipeline_ownership_repo import (
+        PipelineOwnershipRepository,
+    )
+
+    repo = PipelineOwnershipRepository(db_path=store.db_path)
+    await repo.set_owner("p1", "user-a", "p1")
+
+    eraser = UserDataEraser(event_store=store)
+    receipt = await eraser.erase("user-a")
+
+    assert receipt["deleted_aggregates"] == 1
+    assert receipt["status"] == "completed"
+    assert "error" not in receipt

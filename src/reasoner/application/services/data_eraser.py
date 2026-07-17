@@ -41,6 +41,7 @@ class UserDataEraser:
         """
         deleted_aggregates = 0
         deleted_pipelines = 0
+        aggregates_error: str | None = None
 
         # 1. Delete event store aggregates
         try:
@@ -50,6 +51,7 @@ class UserDataEraser:
             deleted_aggregates = len(aggregate_ids)
             logger.info("GDPR erasure: deleted %d aggregates for user %s", deleted_aggregates, user_id)
         except Exception as exc:
+            aggregates_error = str(exc)
             logger.error("GDPR erasure: failed to delete aggregates for user %s: %s", user_id, exc)
 
         # 2. Evict cache entries for this user
@@ -71,12 +73,27 @@ class UserDataEraser:
         except Exception:
             pass
 
+        # Status reflects whether the event-store deletion step itself
+        # succeeded, not whether *some* step (e.g. cache eviction, which is
+        # a performance side-effect, not the data being erased) succeeded.
+        # Previously "completed" could be true purely from cache_evicted
+        # while aggregates_error was set -- the receipt could claim success
+        # while a user's actual pipeline data was never deleted.
+        if aggregates_error:
+            status = "failed"
+        elif deleted_aggregates > 0 or cache_evicted:
+            status = "completed"
+        else:
+            status = "partial"
+
         receipt = {
             "deleted_aggregates": deleted_aggregates,
             "deleted_pipelines": deleted_pipelines,
             "cache_evicted": cache_evicted,
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "status": "completed" if deleted_aggregates > 0 or cache_evicted else "partial",
+            "status": status,
         }
+        if aggregates_error:
+            receipt["error"] = f"Event store aggregate deletion failed: {aggregates_error}"
         logger.info("GDPR erasure receipt for user %s: %s", user_id, receipt)
         return receipt
