@@ -87,6 +87,10 @@ reasonix.toml
 src/reasoner/infrastructure/uploads/
 src/reasoner/infrastructure/.upload_hash_index.json
 
+# Pipeline ownership map — runtime state written on every run by
+# _save_pipeline_owner(). Recreated on demand; a missing file reads as None.
+src/reasoner/domain/history/pipeline_owners.json
+
 # Self-healing generated tests — regenerable output of
 # healing/test_generation_engine.py. Not collected by pytest (testpaths=tests)
 # and already omitted from coverage.
