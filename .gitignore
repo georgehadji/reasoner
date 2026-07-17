@@ -82,4 +82,16 @@ tmp_req.json
 # Reasonix agent artifacts (should not be tracked)
 .reasonix/
 reasonix.toml
+
+# Runtime upload artifacts (created by the file-upload endpoint at runtime)
+src/reasoner/infrastructure/uploads/
+src/reasoner/infrastructure/.upload_hash_index.json
+
+# Self-healing generated tests — regenerable output of
+# healing/test_generation_engine.py. Not collected by pytest (testpaths=tests)
+# and already omitted from coverage.
+src/reasoner/healing/generated_tests/
+
+# Scratch dir for manual/ad-hoc test scripts
+.tmp_manual_temp/
 =0.9.32
