@@ -12,10 +12,11 @@ Supports:
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, List, Optional
 from dataclasses import asdict
 
 from tenacity import retry, stop_after_attempt, wait_exponential # New import
@@ -249,10 +250,15 @@ class PostgreSQLEventStore:
         import logging
         logger = logging.getLogger(__name__)
         
-        # If circuit breaker is enabled, wrap the operation with it
+        # If circuit breaker is enabled, wrap the operation with it.
+        # aiocircuitbreaker.CircuitBreaker is NOT an async context manager
+        # (it has only sync __enter__/__exit__); use .call(coro_fn, *args),
+        # which applies the breaker's sync `with self:` around an awaited
+        # call. `async with self._circuit_breaker` raised TypeError on every
+        # invocation -- previously never reached because the breaker failed
+        # to construct at all (fixed in the prior commit), now it would.
         if self._circuit_breaker:
-            async with self._circuit_breaker:
-                await self._save_events_internal(events)
+            await self._circuit_breaker.call(self._save_events_internal, events)
         else:
             await self._save_events_internal(events)
 
@@ -627,10 +633,12 @@ class PostgreSQLEventStore:
         import logging
         logger = logging.getLogger(__name__)
         
-        # If circuit breaker is enabled, wrap the operation with it
+        # If circuit breaker is enabled, wrap the operation with it.
+        # See save_events for why this is .call(...) and not `async with`.
         if self._circuit_breaker:
-            async with self._circuit_breaker:
-                await self._save_snapshot_internal(aggregate_id, version, state, snapshot_type)
+            await self._circuit_breaker.call(
+                self._save_snapshot_internal, aggregate_id, version, state, snapshot_type
+            )
         else:
             await self._save_snapshot_internal(aggregate_id, version, state, snapshot_type)
 
