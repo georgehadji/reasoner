@@ -55,3 +55,26 @@ class PipelineOwnershipPort(Protocol):
     async def list_pipeline_ids_for_user(self, user_id: str) -> list[str]:
         """Return every pipeline_id owned by *user_id* (for GDPR erasure)."""
         ...
+
+
+def is_authorized(record: OwnershipRecord | None, user_id: str | None) -> bool:
+    """Fail-closed authorization decision from an ownership lookup.
+
+    - No record at all -> deny. An unknown pipeline is not "unowned"; it
+      might belong to someone, or the ID might be guessed/enumerated. Denying
+      is the safe default a caller can only override via a deliberate
+      backfill (see PipelineOwnershipRepository.backfill_from_json), not by
+      this function inventing an allow.
+    - Record with user_id=None -> allow. This is an explicit prior decision
+      (the run was created without an owner), not a lookup failure.
+    - Otherwise -> allow only for the matching owner.
+
+    This function is pure and cannot see lookup failures — callers must
+    catch exceptions from the port themselves and treat them as deny, not
+    call this with a None standing in for "the store errored".
+    """
+    if record is None:
+        return False
+    if record.user_id is None:
+        return True
+    return record.user_id == user_id

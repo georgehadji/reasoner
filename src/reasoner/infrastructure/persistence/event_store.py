@@ -622,19 +622,28 @@ class EventStore:
     async def list_aggregate_ids_for_user(self, user_id: str) -> list[str]:
         """Return all aggregate IDs for a given user (GDPR erasure support).
 
-        Scans pipeline_owners.json for user -> pipeline_id mapping.
-        Returns an empty list on any error.
+        Reads the pipeline_owners table (via PipelineOwnershipRepository),
+        scoped to this event store's own db_path rather than the global
+        singleton, so tests constructing multiple EventStore instances against
+        different temp DBs each see their own ownership records.
+
+        Unlike the JSON-file version this replaces, a genuine lookup failure
+        RAISES rather than returning []. GDPR erasure (data_eraser.py) already
+        wraps this call in a try/except that logs an error and reports the
+        failure -- silently returning [] here made every failure look like
+        "this user owns nothing", so erasure reported success while deleting
+        nothing. Only a query that ran and genuinely found no owned pipelines
+        returns [].
         """
+        from reasoner.infrastructure.persistence.pipeline_ownership_repo import (
+            PipelineOwnershipRepository,
+        )
+        repo = PipelineOwnershipRepository(db_path=self.db_path)
         try:
-            from reasoner.domain.pipeline_owner import _PIPELINE_OWNERS_PATH
-            if not _PIPELINE_OWNERS_PATH.exists():
-                return []
-            import json
-            mapping = json.loads(_PIPELINE_OWNERS_PATH.read_text(encoding="utf-8"))
-            return [pid for pid, uid in mapping.items() if uid == user_id]
+            await repo.backfill_from_json()
         except Exception as exc:
-            logger.warning("Failed to list aggregates for user %s: %s", user_id, exc)
-            return []
+            logger.warning("Pipeline ownership backfill failed during GDPR lookup: %s", exc)
+        return await repo.list_pipeline_ids_for_user(user_id)
 
     async def delete_aggregate(self, aggregate_id: str) -> None:
         """

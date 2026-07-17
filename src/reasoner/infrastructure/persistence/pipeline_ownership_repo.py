@@ -128,3 +128,66 @@ class PipelineOwnershipRepository:
 
     def close(self) -> None:
         self._conn.close()
+
+
+# ─────────────────────────────────────────────────────────────────────
+# GLOBAL SINGLETON — mirrors event_store.py's get_event_store() pattern.
+# ─────────────────────────────────────────────────────────────────────
+
+_pipeline_ownership_repo: PipelineOwnershipRepository | None = None
+_backfill_done = False
+
+
+def get_pipeline_ownership_repo(
+    db_path: str | Path | None = None,
+) -> PipelineOwnershipRepository:
+    """Get or create the global pipeline ownership repository.
+
+    When db_path is not given, shares the SQLite EventStore's file (so
+    ownership records live alongside the aggregates they describe) if the
+    event store backend is SQLite. Falls back to this repo's own default
+    file when the event store backend is Postgres
+    (EVENT_STORE_BACKEND=postgres) — pipeline ownership does not yet have a
+    Postgres adapter (tracked in
+    docs/plans/pipeline-ownership-authz-hardening.md). In that
+    configuration, ownership lives in a separate SQLite file from the
+    Postgres-backed events — a known limitation, not the final state, but
+    still strictly better than the JSON file it replaces (durable, fails
+    closed on lookup errors instead of silently allowing).
+    """
+    global _pipeline_ownership_repo
+    if _pipeline_ownership_repo is None:
+        if db_path is None:
+            from reasoner.infrastructure.persistence.event_store import get_event_store
+            event_store = get_event_store()
+            db_path = getattr(event_store, "db_path", None)
+        _pipeline_ownership_repo = PipelineOwnershipRepository(db_path=db_path)
+    return _pipeline_ownership_repo
+
+
+async def ensure_pipeline_ownership_backfilled() -> None:
+    """Run the legacy-JSON backfill once per process.
+
+    Idempotent and safe to call on every request: no-ops immediately once
+    the first successful backfill has run. If that attempt fails (e.g. a
+    transient disk error), the next call retries rather than giving up for
+    the rest of the process lifetime.
+    """
+    global _backfill_done
+    if _backfill_done:
+        return
+    try:
+        await get_pipeline_ownership_repo().backfill_from_json()
+        _backfill_done = True
+    except Exception:
+        logger.warning(
+            "Pipeline ownership backfill failed; will retry on next access",
+            exc_info=True,
+        )
+
+
+def reset_pipeline_ownership_repo() -> None:
+    """Reset the global singleton and backfill flag (for testing)."""
+    global _pipeline_ownership_repo, _backfill_done
+    _pipeline_ownership_repo = None
+    _backfill_done = False

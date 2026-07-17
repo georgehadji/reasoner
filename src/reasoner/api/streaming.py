@@ -46,7 +46,7 @@ from reasoner.presets import (
 from reasoner.phases._shared import build_followup_context, _wrap_user_input
 
 from .cache import _cache_key, _load_cache, _save_cache
-from .history import HISTORY_DIR, HistoryEntry, _save_history_entry, _save_pipeline_owner
+from .history import HISTORY_DIR, HistoryEntry, _save_history_entry
 from reasoner.infrastructure.redis.run_state import _run_state_manager as _run_store
 from reasoner.core.events.domain_events import make_event, EventType
 from .schemas import FollowupRequest, RunRequest

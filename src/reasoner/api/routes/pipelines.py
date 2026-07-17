@@ -12,23 +12,43 @@ from reasoner.api.dependencies import get_current_user
 from reasoner.domain.saas import User
 
 from reasoner.application.queries import GetPipelineStatusQuery
-from reasoner.api.history import _get_pipeline_owner
 from reasoner.auth import Scope
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def _check_pipeline_ownership(pipeline_id: str, user: User) -> bool:
-    """Return True if *user* is allowed to access *pipeline_id*."""
+async def _check_pipeline_ownership(pipeline_id: str, user: User) -> bool:
+    """Return True if *user* is allowed to access *pipeline_id*.
+
+    Fails closed: an unknown pipeline (no ownership record) or a lookup
+    error both deny, rather than the old JSON-file behavior where any read
+    failure collapsed to "no owner" and every caller treated that as
+    "world-accessible".
+    """
     # Admins can access any pipeline
     if hasattr(user, "scopes") and Scope.ADMIN.value in user.scopes:
         return True
-    # Legacy pipelines without an owner are world-accessible (for backward compat)
-    owner = _get_pipeline_owner(pipeline_id)
-    if owner is None:
-        return True
-    return str(user.id) == owner
+    # Imported inline (not at module top) so tests can patch
+    # get_pipeline_ownership_repo on the owning module and have it take
+    # effect here -- a top-level `from ... import` binds the function
+    # object once at import time and would not see a later patch.
+    from reasoner.application.ports.pipeline_ownership_port import is_authorized
+    from reasoner.infrastructure.persistence.pipeline_ownership_repo import (
+        ensure_pipeline_ownership_backfilled,
+        get_pipeline_ownership_repo,
+    )
+    try:
+        await ensure_pipeline_ownership_backfilled()
+        record = await get_pipeline_ownership_repo().get_owner(pipeline_id)
+    except Exception:
+        logger.warning(
+            "Pipeline ownership lookup failed for %s; denying access (fail closed)",
+            pipeline_id,
+            exc_info=True,
+        )
+        return False
+    return is_authorized(record, str(user.id))
 
 
 @router.get("/api/events/stats")
@@ -62,13 +82,33 @@ async def list_pipelines(
             offset=offset,
             status=status,
         )
-        # Filter to only pipelines owned by the requesting user (unless admin)
+        # Filter to only pipelines owned by the requesting user (unless admin).
+        # Fails closed per pipeline: a lookup error excludes that pipeline
+        # from the list rather than including it.
         if not (hasattr(user, "scopes") and Scope.ADMIN.value in user.scopes):
+            from reasoner.application.ports.pipeline_ownership_port import is_authorized
+            from reasoner.infrastructure.persistence.pipeline_ownership_repo import (
+                ensure_pipeline_ownership_backfilled,
+                get_pipeline_ownership_repo,
+            )
             user_id_str = str(user.id)
-            pipelines = [
-                p for p in pipelines
-                if _get_pipeline_owner(p.get("aggregate_id", p.get("id", ""))) in (None, user_id_str)
-            ]
+            await ensure_pipeline_ownership_backfilled()
+            repo = get_pipeline_ownership_repo()
+            filtered = []
+            for p in pipelines:
+                pipeline_id = p.get("aggregate_id", p.get("id", ""))
+                try:
+                    record = await repo.get_owner(pipeline_id)
+                except Exception:
+                    logger.warning(
+                        "Pipeline ownership lookup failed for %s during list; excluding (fail closed)",
+                        pipeline_id,
+                        exc_info=True,
+                    )
+                    continue
+                if is_authorized(record, user_id_str):
+                    filtered.append(p)
+            pipelines = filtered
         return {"pipelines": pipelines, "total": len(pipelines)}
     except Exception as e:
         logger.error(f"List pipelines error: {e}")
@@ -81,7 +121,7 @@ async def get_pipeline_status(
     user: User = Depends(get_current_user),
 ):
     """Get pipeline status from event store."""
-    if not _check_pipeline_ownership(pipeline_id, user):
+    if not await _check_pipeline_ownership(pipeline_id, user):
         raise HTTPException(status_code=403, detail="Not authorized to access this pipeline")
     try:
         from reasoner.api import get_architecture_components
@@ -108,7 +148,7 @@ async def resume_pipeline(
     csrf_checked=Depends(require_csrf),
 ):
     """Resume a paused/failed pipeline from event history."""
-    if not _check_pipeline_ownership(pipeline_id, user):
+    if not await _check_pipeline_ownership(pipeline_id, user):
         raise HTTPException(status_code=403, detail="Not authorized to access this pipeline")
     try:
         from reasoner.api import get_architecture_components
@@ -135,7 +175,7 @@ async def resume_pipeline_stream(
     user: User = Depends(get_current_user),
     csrf_checked=Depends(require_csrf),
 ):
-    if not _check_pipeline_ownership(pipeline_id, user):
+    if not await _check_pipeline_ownership(pipeline_id, user):
         raise HTTPException(status_code=403, detail="Not authorized to access this pipeline")
     """Resume a pipeline by reconstructing its context and starting a fresh stream.
 
@@ -208,7 +248,7 @@ async def delete_pipeline(
     csrf_checked=Depends(require_csrf),
 ):
     """Delete pipeline and all events (GDPR compliance)."""
-    if not _check_pipeline_ownership(pipeline_id, user):
+    if not await _check_pipeline_ownership(pipeline_id, user):
         raise HTTPException(status_code=403, detail="Not authorized to access this pipeline")
     try:
         from reasoner.api import get_architecture_components

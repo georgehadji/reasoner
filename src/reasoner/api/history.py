@@ -8,7 +8,6 @@ from pydantic import BaseModel
 HISTORY_DIR = Path(__file__).parent.parent / "history"
 HISTORY_DIR.mkdir(exist_ok=True)
 
-from reasoner.pipeline_owner import _get_pipeline_owner, _save_pipeline_owner
 
 class HistoryEntry(BaseModel):
     id: str
