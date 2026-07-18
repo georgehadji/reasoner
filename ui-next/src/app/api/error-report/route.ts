@@ -6,7 +6,6 @@ import {
   sanitizeResponseHeaders,
   readJsonBody,
   rateLimit,
-  requireCsrfToken,
   ValidationError,
 } from '@/lib/security-server';
 import { API } from '@/lib/config';
@@ -21,7 +20,12 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    await requireCsrfToken(req);
+    // Deliberately CSRF-exempt. This is a diagnostics beacon, not a privileged
+    // state change: reportError() is called from error boundaries with a plain
+    // fetch and cannot attach a token without fetching /api/csrf from inside a
+    // failing page — which breaks precisely during the outages we need reports
+    // for, and risks reporting recursion. Forging a report only writes log noise;
+    // the rate limit above is the abuse control that actually matters here.
     const apiBase = validateUpstreamUrl(getApiBaseUrl());
     const body = await readJsonBody(req);
 

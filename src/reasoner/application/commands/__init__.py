@@ -39,6 +39,10 @@ class RunPipelineCommand(Command):
     domain: str | None = None
     parallel: bool = True
     no_cache: bool = False
+    # Authenticated caller, carried so the executor can record pipeline
+    # ownership. Must reach the ownership write or the run is stored unowned,
+    # which is_authorized() treats as world-readable.
+    user_id: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
