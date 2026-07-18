@@ -303,24 +303,27 @@ class TestPresetValidation:
     """Test that preset validation catches errors."""
 
     def test_invalid_or_model_in_routing_raises(self):
-        """Preset with invalid OR model should raise ValueError."""
-        from reasoner.presets import PipelinePreset
-        
-        with pytest.raises(ValueError, match="unknown model"):
-            PipelinePreset(
-                name="Test",
-                description="Test",
-                primary_id="claude-sonnet",
-                routing={"classification": "invalid-model"},
-                required_env_vars=["OPENROUTER_API_KEY"],
+        """Routing that references an unknown model must be rejected.
+
+        Model-ID validation moved out of the PipelinePreset domain object (to keep
+        the domain free of registry imports) and now lives in PresetService.
+        """
+        from reasoner.application.services.preset_service import PresetService
+
+        with pytest.raises(ValueError, match="Unknown model ID"):
+            PresetService().build_router(
+                "multi-perspective-budget",
+                custom_routing={"classification": "invalid-model"},
             )
 
     def test_invalid_role_in_routing_raises(self):
         """Preset with invalid role should raise ValueError."""
         from reasoner.presets import PipelinePreset
-        
+
         with pytest.raises(ValueError, match="unknown routing keys"):
             PipelinePreset(
+                id="test-preset",
+                method="multi_perspective",
                 name="Test",
                 description="Test",
                 primary_id="claude-sonnet",

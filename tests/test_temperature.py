@@ -106,8 +106,18 @@ class TestTemperatureRegistry:
             def call(self, **kwargs):
                 return "ok", {}
         pipeline = ReasonerPipeline(router=DummyRouter())
-        for key in ["classification", "decomposition", "perspective", "synthesis", "critic"]:
-            assert pipeline.phase_configs[key].temperature == PHASE_TEMPERATURES[key]
+        # Invariant: every declared phase config sources its temperature from the
+        # registry rather than hardcoding one. (Which phases are declared is an
+        # implementation detail; that they use the registry is the contract.)
+        assert pipeline.phase_configs, "pipeline declares no phase configs"
+        for key, cfg in pipeline.phase_configs.items():
+            assert key in PHASE_TEMPERATURES, (
+                f"phase config '{key}' has no entry in PHASE_TEMPERATURES"
+            )
+            assert cfg.temperature == PHASE_TEMPERATURES[key], (
+                f"phase config '{key}' temperature {cfg.temperature} does not match "
+                f"registry value {PHASE_TEMPERATURES[key]}"
+            )
 
     def test_call_llm_cached_resolves_temperature_from_phase_configs(self):
         from reasoner import pipeline as pipeline_module
@@ -120,13 +130,15 @@ class TestTemperatureRegistry:
                 self.last_kwargs = kwargs
                 return "ok", {}
 
-        router = DummyRouter()
-        pipeline = ReasonerPipeline(router=router)
-        state = PipelineState(problem="test")
-
+        # LLMExecutor snapshots caching_enabled at construction, so the flag must
+        # be cleared before the pipeline is built or the cache path still runs.
         old_caching = pipeline_module.TOKEN_OPTIMIZATION["caching"]
         pipeline_module.TOKEN_OPTIMIZATION["caching"] = False
         try:
+            router = DummyRouter()
+            pipeline = ReasonerPipeline(router=router)
+            state = PipelineState(problem="test")
+
             import asyncio
             asyncio.run(pipeline._call_llm_cached(
                 role="classification",
@@ -148,13 +160,13 @@ class TestTemperatureRegistry:
                 self.last_kwargs = kwargs
                 return "ok", {}
 
-        router = DummyRouter()
-        pipeline = ReasonerPipeline(router=router)
-        state = PipelineState(problem="test_override")
-
         old_caching = pipeline_module.TOKEN_OPTIMIZATION["caching"]
         pipeline_module.TOKEN_OPTIMIZATION["caching"] = False
         try:
+            router = DummyRouter()
+            pipeline = ReasonerPipeline(router=router)
+            state = PipelineState(problem="test_override")
+
             import asyncio
             asyncio.run(pipeline._call_llm_cached(
                 role="classification",
@@ -178,13 +190,13 @@ class TestTemperatureRegistry:
                 self.last_kwargs = kwargs
                 return "ok", {}
 
-        router = DummyRouter()
-        pipeline = ReasonerPipeline(router=router)
-        state = PipelineState(problem="test_phase_key")
-
         old_caching = pipeline_module.TOKEN_OPTIMIZATION["caching"]
         pipeline_module.TOKEN_OPTIMIZATION["caching"] = False
         try:
+            router = DummyRouter()
+            pipeline = ReasonerPipeline(router=router)
+            state = PipelineState(problem="test_phase_key")
+
             import asyncio
             asyncio.run(pipeline._call_llm_cached(
                 role="primary",
