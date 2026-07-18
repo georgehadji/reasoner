@@ -168,9 +168,121 @@ def claim_support_ratio(ledger: tuple[Claim, ...]) -> float:
     return score / len(factual)
 
 
-# ═════════════════════════════════════════════════════════════════════
-# Versioned document (§4.1 — fixes G1/G2)
-# ═════════════════════════════════════════════════════════════════════
+def _normalize_claim_text(text: str) -> str:
+    """Normalize claim text for hash-based matching.
+
+    Strips whitespace, lowercases, removes punctuation for fuzzy matching.
+    """
+    import re
+    normalized = text.strip().lower()
+    normalized = re.sub(r'[^\w\s]', '', normalized)
+    normalized = re.sub(r'\s+', ' ', normalized).strip()
+    return normalized
+
+
+def reconcile(
+    prev_ledger: tuple[Claim, ...],
+    new_doc: Document,
+) -> tuple[tuple[Claim, ...], tuple[dict, ...]]:
+    """Reconcile the claim ledger against a new document revision.
+
+    The core of G1: after developmental/style edits modify the article text,
+    this function determines which claims survive, which are dropped, and
+    which new text segments need fresh verification.
+
+    Pure function — no I/O.  The caller is responsible for invoking LLM
+    verification on the returned `deltas_to_verify`.
+
+    Returns:
+        (carried_ledger, deltas_to_verify)
+        - carried_ledger: claims whose text is still present (re-anchored)
+        - deltas_to_verify: new text segments that need verification
+    """
+    # Build normalized-text index for the new document
+    doc_text = new_doc.markdown
+    doc_lower = doc_text.lower()
+
+    # Build sentence-level index for delta detection
+    import re
+    doc_sentences = re.split(r'(?<=[.!?])\s+', doc_text)
+    doc_sentence_hashes = {
+        _normalize_claim_text(s): s for s in doc_sentences if len(s.strip()) > 10
+    }
+
+    carried: list[Claim] = []
+    deltas: list[dict] = []
+
+    for claim in prev_ledger:
+        norm = _normalize_claim_text(claim.text)
+
+        if not norm:
+            continue
+
+        # Check if claim text (or close variant) exists in new doc
+        if norm in doc_lower:
+            # Exact match — carry forward, re-anchor
+            offset = doc_lower.index(norm)
+            carried.append(Claim(
+                id=claim.id,
+                text=claim.text,
+                span=(offset, offset + len(norm)),
+                sources=claim.sources,
+                verdict=claim.verdict,
+                confidence=claim.confidence,
+                method=claim.method,
+                verified_against_version=new_doc.version,
+                human=claim.human,
+                needs_review=claim.needs_review,
+            ))
+        else:
+            # No exact match — try fuzzy: check if any sentence hash matches
+            fuzzy_match = None
+            for s_hash, s_text in doc_sentence_hashes.items():
+                # Check if claim norm is a substring of the sentence hash
+                if len(norm) > 10 and (norm in s_hash or s_hash in norm):
+                    fuzzy_match = s_text
+                    break
+                # Check word overlap for short claims
+                claim_words = set(norm.split())
+                sentence_words = set(s_hash.split())
+                if len(claim_words) > 2:
+                    overlap = len(claim_words & sentence_words)
+                    if overlap / len(claim_words) >= 0.7:
+                        fuzzy_match = s_text
+                        break
+
+            if fuzzy_match:
+                offset = doc_lower.index(_normalize_claim_text(fuzzy_match))
+                carried.append(Claim(
+                    id=claim.id,
+                    text=claim.text,
+                    span=(offset, offset + len(_normalize_claim_text(fuzzy_match))),
+                    sources=claim.sources,
+                    verdict=claim.verdict,
+                    confidence=claim.confidence * 0.9,  # slight discount on fuzzy
+                    method=claim.method,
+                    verified_against_version=new_doc.version,
+                    human=claim.human,
+                    needs_review=True,  # fuzzy match flagged for review
+                ))
+            else:
+                # Claim text vanished — dropped from ledger
+                pass  # dropped silently (could log via events in caller)
+
+    # Detect new sentences not covered by any carried claim
+    carried_texts = {_normalize_claim_text(c.text) for c in carried}
+    for s_hash, s_text in doc_sentence_hashes.items():
+        if s_hash not in carried_texts:
+            # This sentence may be new (not in any carried claim)
+            # Only flag if it looks like a factual claim (not a header or transition)
+            if len(s_text) > 30 and not s_text.startswith('#'):
+                deltas.append({
+                    "text": s_text,
+                    "span": (doc_text.index(s_text), doc_text.index(s_text) + len(s_text)),
+                    "reason": "new_or_unverified",
+                })
+
+    return tuple(carried), tuple(deltas)
 
 @dataclass(frozen=True)
 class Document:

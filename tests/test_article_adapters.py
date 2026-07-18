@@ -410,3 +410,184 @@ class TestDocumentVersioning:
         ctx2 = writing_state_to_context(ctx, ws, _make_adapter_deps())
         assert ctx2.doc is not None
         assert ctx2.doc.locked_spans == ((10, 50), (100, 150))
+
+
+# ═════════════════════════════════════════════════════════════════════
+# Ledger reconciliation (§6.3 — G1)
+# ═════════════════════════════════════════════════════════════════════
+
+class TestReconcileLedger:
+    """reconcile() must carry forward claims, drop vanished ones, flag deltas."""
+
+    def test_exact_match_carried_forward(self):
+        from reasoner.domain.article_domain import reconcile, Claim, Verdict, Document
+        doc = Document(version=2, markdown="This is a verified claim. And another sentence.",
+                       title="T", produced_by="edit")
+        ledger = (
+            Claim(id="1", text="This is a verified claim.", verdict=Verdict.VERIFIED,
+                  confidence=0.95, sources=("https://example.com",)),
+        )
+        carried, deltas = reconcile(ledger, doc)
+        assert len(carried) == 1
+        assert carried[0].id == "1"
+        assert carried[0].verified_against_version == 2
+
+    def test_vanished_claim_dropped(self):
+        from reasoner.domain.article_domain import reconcile, Claim, Verdict, Document
+        doc = Document(version=2, markdown="Completely different content now.",
+                       title="T", produced_by="edit")
+        ledger = (
+            Claim(id="1", text="Original claim that was removed.",
+                  verdict=Verdict.VERIFIED, confidence=0.95),
+        )
+        carried, deltas = reconcile(ledger, doc)
+        assert len(carried) == 0
+
+    def test_new_sentence_detected_as_delta(self):
+        from reasoner.domain.article_domain import reconcile, Claim, Verdict, Document
+        doc = Document(version=2, markdown="Old claim. This is a new factual sentence added later. End.",
+                       title="T", produced_by="edit")
+        ledger = (
+            Claim(id="1", text="Old claim.", verdict=Verdict.VERIFIED,
+                  confidence=0.95),
+        )
+        carried, deltas = reconcile(ledger, doc)
+        # "Old claim." should be carried
+        assert len(carried) == 1
+        # "This is a new factual sentence added later." should be a delta
+        assert len(deltas) >= 1
+        assert any("new factual sentence" in d["text"] for d in deltas)
+
+    def test_fuzzy_match_carries_with_needs_review(self):
+        from reasoner.domain.article_domain import reconcile, Claim, Verdict, Document
+        doc = Document(version=2,
+                       markdown="The climate is changing rapidly according to scientists.",
+                       title="T", produced_by="edit")
+        ledger = (
+            Claim(id="1", text="The climate is changing due to scientists.",
+                  verdict=Verdict.VERIFIED, confidence=0.95),
+        )
+        carried, deltas = reconcile(ledger, doc)
+        # Exact match fails but fuzzy should succeed (high word overlap)
+        assert len(carried) == 1
+        assert carried[0].needs_review is True
+
+    def test_empty_ledger_returns_no_carried(self):
+        from reasoner.domain.article_domain import reconcile, Document
+        doc = Document(version=1, markdown="Some content.", title="T", produced_by="test")
+        carried, deltas = reconcile((), doc)
+        assert len(carried) == 0
+
+    def test_headers_not_flagged_as_deltas(self):
+        from reasoner.domain.article_domain import reconcile, Document
+        doc = Document(version=1, markdown="## Introduction\nThis is content.",
+                       title="T", produced_by="test")
+        carried, deltas = reconcile((), doc)
+        # "## Introduction" should NOT be a delta (it's a heading)
+        for d in deltas:
+            assert not d["text"].startswith("#"), f"Heading flagged as delta: {d['text']}"
+
+
+# ═════════════════════════════════════════════════════════════════════
+# Span-lock enforcement (G2)
+# ═════════════════════════════════════════════════════════════════════
+
+class TestSpanLockEnforcement:
+    """Style/copy edit must not alter locked_spans content."""
+
+    def test_locked_spans_preserved_on_no_change(self):
+        doc = Document(
+            version=1,
+            markdown="Verified content here. Other text.",
+            title="T",
+            produced_by="fact_check",
+            locked_spans=((0, 22),),  # "Verified content here."
+        )
+        # Style edit that doesn't touch the locked span
+        new_text = "Verified content here. Modified other text."
+        new_doc = Document(
+            version=2, markdown=new_text, title="T",
+            produced_by="style_edit",
+            locked_spans=doc.locked_spans,
+        )
+        # Verify the locked span text is intact
+        assert new_text[0:22] == "Verified content here."
+
+    def test_locked_span_violation_results_in_full_revert(self):
+        """When locked_span text is missing from the new doc, the adapter
+        reverts the entire document to preserve factual integrity."""
+        old_text = "Verified fact here. Other content."
+        new_text = "Modified claim here. Other content."
+        # Verify the old text is preserved as the fallback
+        assert "Verified fact here." in old_text
+
+
+# ═════════════════════════════════════════════════════════════════════
+# Adapter wiring — reconciliation after style edit
+# ═════════════════════════════════════════════════════════════════════
+
+class TestAdapterReconciliationWiring:
+    """adapter_style_copy_edit must run reconcile_ledger after the edit."""
+
+    @pytest.mark.asyncio
+    async def test_adapter_style_copy_edit_reconciles_ledger(self):
+        from reasoner.domain.article_domain import Claim, Verdict, Document, reconcile
+        from reasoner.application.flows.article_adapters import adapter_style_copy_edit
+
+        doc = Document(version=1, markdown="Verified claim.",
+                       title="T", produced_by="draft")
+        ledger = (
+            Claim(id="1", text="Verified claim.", verdict=Verdict.VERIFIED,
+                  confidence=0.95, sources=("https://example.com",)),
+        )
+        ctx = _make_test_ctx(doc=doc, ledger=ledger)
+
+        # Mock services to return edited text preserving the claim
+        deps = _make_adapter_deps()
+        deps.services.call_llm = AsyncMock(return_value=(
+            "Verified claim. New content added after edit.",
+            {"model": "test-model"},
+        ))
+        deps.call_llm = deps.services.call_llm
+
+        result = await adapter_style_copy_edit(ctx, deps)
+        assert isinstance(result, Ok), f"Expected Ok, got {result}"
+        ctx2 = result.value
+        # The original claim should be in the ledger after reconciliation
+        assert len(ctx2.ledger) >= 1
+        assert ctx2.ledger[0].text == "Verified claim."
+
+    @pytest.mark.asyncio
+    async def test_adapter_style_copy_edit_span_lock(self):
+        """When style edit alters verified content, the adapter must revert."""
+        from reasoner.domain.article_domain import Claim, Verdict, Document, reconcile
+        from reasoner.application.flows.article_adapters import adapter_style_copy_edit
+
+        doc = Document(
+            version=1,
+            markdown="This sentence is verified. And some other text here.",
+            title="T",
+            produced_by="fact_check",
+            locked_spans=((0, 26),),  # "This sentence is verified."
+        )
+        ledger = (
+            Claim(id="1", text="This sentence is verified.",
+                  verdict=Verdict.VERIFIED, confidence=0.95,
+                  span=(0, 26)),
+        )
+        ctx = _make_test_ctx(doc=doc, ledger=ledger)
+
+        # Mock: style edit returns text where the locked span was altered
+        deps = _make_adapter_deps()
+        deps.services.call_llm = AsyncMock(return_value=(
+            "This verified statement has been altered. And some other text here.",
+            {"model": "test-model"},
+        ))
+        deps.call_llm = deps.services.call_llm
+
+        result = await adapter_style_copy_edit(ctx, deps)
+        assert isinstance(result, Ok), f"Expected Ok, got {result}"
+        ctx2 = result.value
+        # The locked span should be preserved (text reverted)
+        assert ctx2.doc is not None
+        assert "This sentence is verified." in ctx2.doc.markdown

@@ -311,9 +311,27 @@ async def adapter_draft(
 async def adapter_fact_check(
     ctx: Context, deps: AdapterDeps
 ) -> Result[Context, PhaseError]:
-    return await _run_phase_adapter(
+    """Fact-check phase with span-lock recording (G2).
+
+    After verification, records char spans of VERIFIED/SUPPORTED claims
+    into Document.locked_spans so downstream edits preserve them.
+    """
+    result = await _run_phase_adapter(
         ctx, deps, run_article_adversarial_verify_phase, "fact_check"
     )
+    if isinstance(result, Ok):
+        ctx = result.value
+        # Record locked_spans from VERIFIED/SUPPORTED claims
+        if ctx.doc is not None and ctx.ledger:
+            locked = []
+            for c in ctx.ledger:
+                if c.verdict in (Verdict.VERIFIED, Verdict.SUPPORTED) and c.span is not None:
+                    locked.append(c.span)
+            if locked:
+                from dataclasses import replace
+                ctx = replace(ctx, doc=replace(ctx.doc, locked_spans=tuple(locked)))
+                result = Ok(ctx)
+    return result
 
 
 async def adapter_structural_review(
@@ -335,9 +353,103 @@ async def adapter_developmental_edit(
 async def adapter_style_copy_edit(
     ctx: Context, deps: AdapterDeps
 ) -> Result[Context, PhaseError]:
-    return await _run_phase_adapter(
+    """Style + copy edit with span-lock enforcement and reconciliation.
+
+    1. Runs the existing style + copy edit phase.
+    2. Enforces locked_spans: rejects changes that touch verified content.
+    3. Runs reconcile_ledger to refresh the claim ledger against the new doc.
+    """
+    from reasoner.domain.article_domain import reconcile
+
+    result = await _run_phase_adapter(
         ctx, deps, run_article_style_copy_edit_phase, "style_copy_edit"
     )
+    if not isinstance(result, Ok):
+        return result
+
+    ctx_after_edit = result.value
+
+    # ── Span-lock enforcement ──
+    if ctx_after_edit.doc is not None and ctx.doc is not None and ctx.doc.locked_spans:
+        old_text = ctx.doc.markdown
+        new_text = ctx_after_edit.doc.markdown
+        if old_text != new_text:
+            # Check if any locked span changed
+            violations = []
+            for start, end in ctx.doc.locked_spans:
+                old_segment = old_text[start:end]
+                # Find where that segment is in the new text
+                if old_segment and old_segment not in new_text:
+                    violations.append({"span": (start, end), "text": old_segment})
+
+            if violations:
+                logger.warning(
+                    "Span-lock violation: %d verified claim span(s) were modified "
+                    "by style/copy edit — reverting to preserve factual content",
+                    len(violations),
+                )
+                # Full revert: restore old text to preserve verified content
+                ctx_after_edit = replace(
+                    ctx_after_edit,
+                    doc=replace(
+                        ctx_after_edit.doc,
+                        markdown=old_text,
+                    ),
+                )
+
+    # ── Ledger reconciliation ──
+    if ctx_after_edit.doc is not None and ctx.ledger:
+        carried, deltas = reconcile(ctx.ledger, ctx_after_edit.doc)
+        events = list(ctx_after_edit.events)
+        if deltas:
+            events.append({
+                "type": "reconciliation",
+                "version": ctx_after_edit.doc.version,
+                "carried_count": len(carried),
+                "deltas_count": len(deltas),
+            })
+            logger.info(
+                "Ledger reconciliation: %d claims carried, %d deltas need verification",
+                len(carried), len(deltas),
+            )
+        ctx_after_edit = replace(
+            ctx_after_edit,
+            ledger=carried,
+            events=tuple(events),
+        )
+        result = Ok(ctx_after_edit)
+
+    return result
+
+
+def _revert_spans(new_text: str, old_text: str, locked_spans: tuple[tuple[int, int], ...]) -> str:
+    """Revert changes to specific locked spans while preserving edits elsewhere.
+
+    For each locked span, tries exact match first, then word-level fuzzy
+    match within a search window around the expected position.
+    """
+    result = new_text
+    # Process right-to-left so earlier fixes don't shift later positions
+    for start, end in reversed(sorted(locked_spans)):
+        original = old_text[start:end]
+        pos = result.find(original)
+        if pos >= 0:
+            # Exact match found — no violation
+            continue
+        # Locked span was altered — try word-level recovery within the region
+        words = [w for w in original.split() if len(w) > 3]
+        if words:
+            # Try to find the anchored word in the expected region
+            search_start = max(0, start - 20)
+            search_end = min(len(result), end + 20)
+            region = result[search_start:search_end]
+            # Check if any key words survive
+            surviving = [w for w in words if w in region]
+            if len(surviving) >= len(words) * 0.5:
+                continue  # enough words survive — skip revert
+        # Revert the entire locked span
+        result = result[:start] + original + result[min(end, len(result)):]
+    return result
 
 
 async def adapter_final_audit(
