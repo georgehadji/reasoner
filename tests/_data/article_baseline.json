@@ -1,0 +1,415 @@
+{
+  "meta": {
+    "description": "Article pipeline golden set baseline (Phase 0)",
+    "count": 21,
+    "format_version": 1,
+    "captured_at": "2026-07-18T19:23:37.879316+00:00",
+    "preset_count": 2,
+    "pricing_db_entries": 1
+  },
+  "entries": {
+    "blog_climate": {
+      "problem": "Write a blog post about the economic impact of climate change on coastal communities in Southeast As",
+      "content_class": "blog",
+      "language": "English",
+      "expected_language": "English",
+      "expect_deep_question": false,
+      "has_style_brief": false,
+      "prompt_lengths": {
+        "retrieval_plan": 479,
+        "draft": 1741,
+        "outline": 1810,
+        "verify": 1381,
+        "critic": 1623,
+        "dev_edit": 901,
+        "style_edit": 357,
+        "copy_edit": 341,
+        "final_audit": 1026
+      }
+    },
+    "blog_remote_work": {
+      "problem": "Draft a blog post about the future of remote work and its effect on urban development",
+      "content_class": "blog",
+      "language": "English",
+      "expected_language": "English",
+      "expect_deep_question": false,
+      "has_style_brief": false,
+      "prompt_lengths": {
+        "retrieval_plan": 462,
+        "draft": 1724,
+        "outline": 1793,
+        "verify": 1381,
+        "critic": 1623,
+        "dev_edit": 901,
+        "style_edit": 357,
+        "copy_edit": 341,
+        "final_audit": 1026
+      }
+    },
+    "explainer_quantum": {
+      "problem": "Write an explainer about quantum computing for a general audience",
+      "content_class": "explainer",
+      "language": "English",
+      "expected_language": "English",
+      "expect_deep_question": false,
+      "has_style_brief": false,
+      "prompt_lengths": {
+        "retrieval_plan": 442,
+        "draft": 1704,
+        "outline": 1773,
+        "verify": 1381,
+        "critic": 1623,
+        "dev_edit": 901,
+        "style_edit": 357,
+        "copy_edit": 341,
+        "final_audit": 1026
+      }
+    },
+    "explainer_immunity": {
+      "problem": "Draft an explainer article about how mRNA vaccines work, covering the mechanism of action and safety",
+      "content_class": "explainer",
+      "language": "English",
+      "expected_language": "English",
+      "expect_deep_question": false,
+      "has_style_brief": false,
+      "prompt_lengths": {
+        "retrieval_plan": 485,
+        "draft": 1747,
+        "outline": 1816,
+        "verify": 1381,
+        "critic": 1623,
+        "dev_edit": 901,
+        "style_edit": 357,
+        "copy_edit": 341,
+        "final_audit": 1026
+      }
+    },
+    "oped_ai_regulation": {
+      "problem": "Write an opinion piece arguing that AI regulation should focus on capability audits rather than use-",
+      "content_class": "op_ed",
+      "language": "English",
+      "expected_language": "English",
+      "expect_deep_question": false,
+      "has_style_brief": false,
+      "prompt_lengths": {
+        "retrieval_plan": 486,
+        "draft": 1748,
+        "outline": 1817,
+        "verify": 1381,
+        "critic": 1623,
+        "dev_edit": 901,
+        "style_edit": 357,
+        "copy_edit": 341,
+        "final_audit": 1026
+      }
+    },
+    "oped_education": {
+      "problem": "Draft an op-ed about why classical education still matters in the age of AI",
+      "content_class": "op_ed",
+      "language": "English",
+      "expected_language": "English",
+      "expect_deep_question": false,
+      "has_style_brief": false,
+      "prompt_lengths": {
+        "retrieval_plan": 452,
+        "draft": 1714,
+        "outline": 1783,
+        "verify": 1381,
+        "critic": 1623,
+        "dev_edit": 901,
+        "style_edit": 357,
+        "copy_edit": 341,
+        "final_audit": 1026
+      }
+    },
+    "policy_eu_data": {
+      "problem": "Draft a policy brief analyzing the European Union's approach to cross-border data flows under the Da",
+      "content_class": "policy_brief",
+      "language": "English",
+      "expected_language": "English",
+      "expect_deep_question": false,
+      "has_style_brief": false,
+      "prompt_lengths": {
+        "retrieval_plan": 483,
+        "draft": 1745,
+        "outline": 1814,
+        "verify": 1381,
+        "critic": 1623,
+        "dev_edit": 901,
+        "style_edit": 357,
+        "copy_edit": 341,
+        "final_audit": 1026
+      }
+    },
+    "policy_energy": {
+      "problem": "Write a policy analysis article comparing carbon pricing mechanisms across North America, Europe, an",
+      "content_class": "policy_brief",
+      "language": "English",
+      "expected_language": "English",
+      "expect_deep_question": false,
+      "has_style_brief": false,
+      "prompt_lengths": {
+        "retrieval_plan": 491,
+        "draft": 1753,
+        "outline": 1822,
+        "verify": 1381,
+        "critic": 1623,
+        "dev_edit": 901,
+        "style_edit": 357,
+        "copy_edit": 341,
+        "final_audit": 1026
+      }
+    },
+    "news_semiconductor": {
+      "problem": "Write a news analysis article about the global semiconductor supply chain realignment following rece",
+      "content_class": "news_analysis",
+      "language": "English",
+      "expected_language": "English",
+      "expect_deep_question": false,
+      "has_style_brief": false,
+      "prompt_lengths": {
+        "retrieval_plan": 495,
+        "draft": 1757,
+        "outline": 1826,
+        "verify": 1381,
+        "critic": 1623,
+        "dev_edit": 901,
+        "style_edit": 357,
+        "copy_edit": 341,
+        "final_audit": 1026
+      }
+    },
+    "news_cyber": {
+      "problem": "Compose a news analysis article examining the shift in cybersecurity threats from nation-state actor",
+      "content_class": "news_analysis",
+      "language": "English",
+      "expected_language": "English",
+      "expect_deep_question": false,
+      "has_style_brief": false,
+      "prompt_lengths": {
+        "retrieval_plan": 502,
+        "draft": 1764,
+        "outline": 1833,
+        "verify": 1381,
+        "critic": 1623,
+        "dev_edit": 901,
+        "style_edit": 357,
+        "copy_edit": 341,
+        "final_audit": 1026
+      }
+    },
+    "technical_llm": {
+      "problem": "Write a technical article explaining the architecture and trade-offs of mixture-of-experts transform",
+      "content_class": "technical",
+      "language": "English",
+      "expected_language": "English",
+      "expect_deep_question": false,
+      "has_style_brief": false,
+      "prompt_lengths": {
+        "retrieval_plan": 486,
+        "draft": 1748,
+        "outline": 1817,
+        "verify": 1381,
+        "critic": 1623,
+        "dev_edit": 901,
+        "style_edit": 357,
+        "copy_edit": 341,
+        "final_audit": 1026
+      }
+    },
+    "technical_rust": {
+      "problem": "Draft a technical article about memory safety patterns in Rust compared to garbage-collected languag",
+      "content_class": "technical",
+      "language": "English",
+      "expected_language": "English",
+      "expect_deep_question": false,
+      "has_style_brief": false,
+      "prompt_lengths": {
+        "retrieval_plan": 479,
+        "draft": 1741,
+        "outline": 1810,
+        "verify": 1381,
+        "critic": 1623,
+        "dev_edit": 901,
+        "style_edit": 357,
+        "copy_edit": 341,
+        "final_audit": 1026
+      }
+    },
+    "greek_geopolitics": {
+      "problem": "Γράψτε ένα άρθρο ανάλυσης για τις γεωπολιτικές επιπτώσεις της ενεργειακής μετάβασης στην Ανατολική Μ",
+      "content_class": "greek_briefing",
+      "language": "Greek",
+      "expected_language": "Greek",
+      "expect_deep_question": false,
+      "has_style_brief": false,
+      "prompt_lengths": {
+        "retrieval_plan": 487,
+        "draft": 1749,
+        "outline": 1818,
+        "verify": 1384,
+        "critic": 1626,
+        "dev_edit": 904,
+        "style_edit": 360,
+        "copy_edit": 344,
+        "final_audit": 1029
+      }
+    },
+    "greek_technology": {
+      "problem": "Συντάξτε ένα άρθρο για την επίδραση της τεχνητής νοημοσύνης στην ελληνική αγορά εργασίας",
+      "content_class": "greek_briefing",
+      "language": "Greek",
+      "expected_language": "Greek",
+      "expect_deep_question": false,
+      "has_style_brief": false,
+      "prompt_lengths": {
+        "retrieval_plan": 468,
+        "draft": 1730,
+        "outline": 1799,
+        "verify": 1384,
+        "critic": 1626,
+        "dev_edit": 904,
+        "style_edit": 360,
+        "copy_edit": 344,
+        "final_audit": 1029
+      }
+    },
+    "styled_newyorker": {
+      "problem": "Write an article about the decline of local news in rural America",
+      "content_class": "blog",
+      "language": "English",
+      "expected_language": "English",
+      "expect_deep_question": false,
+      "has_style_brief": true,
+      "prompt_lengths": {
+        "retrieval_plan": 442,
+        "draft": 1939,
+        "outline": 1809,
+        "verify": 1381,
+        "critic": 1623,
+        "dev_edit": 901,
+        "style_edit": 492,
+        "copy_edit": 341,
+        "final_audit": 1026
+      }
+    },
+    "styled_financial": {
+      "problem": "Draft an article analyzing the investment implications of deglobalization for emerging markets",
+      "content_class": "policy_brief",
+      "language": "English",
+      "expected_language": "English",
+      "expect_deep_question": false,
+      "has_style_brief": true,
+      "prompt_lengths": {
+        "retrieval_plan": 471,
+        "draft": 1943,
+        "outline": 1839,
+        "verify": 1381,
+        "critic": 1623,
+        "dev_edit": 901,
+        "style_edit": 493,
+        "copy_edit": 341,
+        "final_audit": 1026
+      }
+    },
+    "deep_consciousness": {
+      "problem": "Write an article exploring the philosophical and scientific debate about the nature of consciousness",
+      "content_class": "explainer",
+      "language": "English",
+      "expected_language": "English",
+      "expect_deep_question": true,
+      "has_style_brief": false,
+      "prompt_lengths": {
+        "retrieval_plan": 477,
+        "draft": 1739,
+        "outline": 1808,
+        "verify": 1381,
+        "critic": 1623,
+        "dev_edit": 901,
+        "style_edit": 357,
+        "copy_edit": 341,
+        "final_audit": 1026
+      }
+    },
+    "deep_free_will": {
+      "problem": "Draft an article examining whether free will is compatible with modern neuroscience",
+      "content_class": "explainer",
+      "language": "English",
+      "expected_language": "English",
+      "expect_deep_question": true,
+      "has_style_brief": false,
+      "prompt_lengths": {
+        "retrieval_plan": 460,
+        "draft": 1722,
+        "outline": 1791,
+        "verify": 1381,
+        "critic": 1623,
+        "dev_edit": 901,
+        "style_edit": 357,
+        "copy_edit": 341,
+        "final_audit": 1026
+      }
+    },
+    "deep_greek_techne": {
+      "problem": "Γράψτε ένα άρθρο για την έννοια της τέχνης στην αρχαία ελληνική φιλοσοφία και τη σχέση της με τη σύγ",
+      "content_class": "greek_briefing",
+      "language": "Greek",
+      "expected_language": "Greek",
+      "expect_deep_question": true,
+      "has_style_brief": false,
+      "prompt_lengths": {
+        "retrieval_plan": 496,
+        "draft": 1758,
+        "outline": 1827,
+        "verify": 1384,
+        "critic": 1626,
+        "dev_edit": 904,
+        "style_edit": 360,
+        "copy_edit": 344,
+        "final_audit": 1029
+      }
+    },
+    "short_book_review": {
+      "problem": "Write a short article reviewing Yuval Noah Harari's Nexus, focusing on its thesis about information ",
+      "content_class": "blog",
+      "language": "English",
+      "expected_language": "English",
+      "expect_deep_question": false,
+      "has_style_brief": false,
+      "prompt_lengths": {
+        "retrieval_plan": 485,
+        "draft": 1747,
+        "outline": 1816,
+        "verify": 1381,
+        "critic": 1623,
+        "dev_edit": 901,
+        "style_edit": 357,
+        "copy_edit": 341,
+        "final_audit": 1026
+      }
+    },
+    "factual_space": {
+      "problem": "Write an article about the Artemis program and its implications for international collaboration in s",
+      "content_class": "news_analysis",
+      "language": "English",
+      "expected_language": "English",
+      "expect_deep_question": false,
+      "has_style_brief": false,
+      "prompt_lengths": {
+        "retrieval_plan": 493,
+        "draft": 1755,
+        "outline": 1824,
+        "verify": 1381,
+        "critic": 1623,
+        "dev_edit": 901,
+        "style_edit": 357,
+        "copy_edit": 341,
+        "final_audit": 1026
+      }
+    }
+  },
+  "cost_baseline": {
+    "article-budget": 0.106,
+    "article-premium": 0.106
+  }
+}

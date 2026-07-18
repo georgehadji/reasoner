@@ -211,8 +211,12 @@ QUALITY STANDARD:
 
 
 _WRITING_INDICATORS = [
-    r"\b(write|draft|compose|author|create)\b.*\b(article|essay|blog|report|paper|explainer)\b",
+    r"\b(write|draft|compose|author|create)\b.*\b(article|essay|blog|report|paper|explainer|brief|briefing|piece|analysis)\b",
+    r"\b(opinion|policy)\b.*\b(piece|brief|analysis)\b",
+    r"\bop[.\-]ed\b",
     r"\barticle\b.*\b(about|on)\b",
+    # Greek patterns
+    r"\b(γράψτε|συντάξτε|γράψε|σύνταξε)\b.*\b(άρθρο|ανάλυση|έκθεση|μελέτη)\b",
 ]
 
 _REFERENTIAL_SIGNALS = ["continue", "expand", "revise that", "elaborate", "add more"]
