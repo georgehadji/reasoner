@@ -395,6 +395,9 @@ PHASE_TIMEOUTS: dict[str, float] = {
     "Journal Review": 90.0,
     "Final Assembly": 120.0,
     "Humanize": 90.0,
+    # Article flow — combined style + copy edit runs two sequential LLM calls across the full article
+    "Style + Copy Edit": 180.0,
+    "Style + Copy Edit (retry)": 180.0,
     # Brainstorming (Verbalized Sampling) — sequential multi-round LLM calls need headroom
     "VS Idea Generation": 300.0,   # 5 rounds × ~45s each worst-case
     "Cluster & Score": 120.0,

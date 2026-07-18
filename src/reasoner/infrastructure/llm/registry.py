@@ -134,10 +134,10 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
         "env": "DEEPSEEK_API_KEY",
         "extra_body": {"reasoning": {"effort": "high"}},
     },
-    # V3.2: DeepSeek's VFM-tier model, strong reasoning at lower cost than V4
+    # Re-pointed to v4-flash: v3.2 deprecated, DeepSeek API no longer accepts it.
     "deepseek-v3": {
         "cls": "compat",
-        "model": "deepseek/deepseek-v3.2",            # $0.12/$0.50, 1M ctx — budget VFM
+        "model": "deepseek/deepseek-v4-flash",        # was v3.2 ($0.12/$0.50) — re-pointed Jun 2026
         "base": "https://api.deepseek.com/v1",
         "env": "DEEPSEEK_API_KEY",
     },

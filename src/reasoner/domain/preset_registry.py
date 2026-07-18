@@ -27,7 +27,7 @@ _REGISTRY: dict[str, dict] = {
             "perspective_analysis": "qwen3.6-flash",   # was qwen3-turbo (DEAD) → stronger reasoning
             "synthesis": "gpt-4o-mini",                # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
             # ── Per-perspective echo-chamber-resistant diversity (4 labs, 3 blocs: 2🇨🇳 + 1🇺🇸 + 1🇫🇷) ──
-            "constructive":  "deepseek-v3",           # 🇨🇳 DeepSeek V3.2 — $0.12/$0.50 (was v4-flash, 4-lab diversity)
+            "constructive":  "deepseek-v3",           # 🇨🇳 DeepSeek — v3 alias now routes to v4-flash (API deprecated v3.2)
             "destructive":   "hermes-4-70b",      # 🇺🇸 Nous Research — critic-specialized ($0.13/$0.40) (was ring-2.6-1t 🇨🇳, cross-bloc echo resistance)
             "systemic":      "hy3",     # 🇨🇳 Tencent — 295B MoE, anti-hallucination, configurable CoT, $0.20/$0.80 (was qwen3.7-plus)
             "minimalist":    "ministral-8b",     # 🇫🇷 Mistral — $0.075/$0.20

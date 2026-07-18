@@ -74,21 +74,34 @@ class ArticleFlow(WorkflowStrategy):
                 audit = state.writing_state.get("editorial_audit", {})
                 # Default to False if audit data is empty (parse failure = failed audit)
                 if not audit.get("passes_audit", False):
-                    services.log("WRITING", "Audit failed — retrying developmental edit and re-audit...", state)
-                    audit_retried = True
-                    # Re-run developmental edit
-                    await services.run_phase(
-                        PhaseStep(5.1, "Developmental Edit (retry)", run_article_developmental_edit_phase, _ser_4),
-                        state,
+                    # Check for prior timeouts to avoid cascading retry failures
+                    timed_out = any(
+                        "Style + Copy Edit" in e.get("message", "")
+                        for e in getattr(state, "pending_events", [])
+                        if isinstance(e, dict)
                     )
-                    # Re-run style + copy edit
-                    await services.run_phase(
-                        PhaseStep(5.2, "Style + Copy Edit (retry)", run_article_style_copy_edit_phase, _ser_5),
-                        state,
-                    )
-                    # Re-run audit
-                    await services.run_phase(
-                        PhaseStep(5.3, "Final Audit (retry)", run_article_final_audit_phase, _ser_5),
-                        state,
-                    )
+                    if timed_out:
+                        services.log(
+                            "WRITING",
+                            "Skipping retry — Style + Copy Edit already timed out on primary pass",
+                            state,
+                        )
+                    else:
+                        services.log("WRITING", "Audit failed — retrying developmental edit and re-audit...", state)
+                        audit_retried = True
+                        # Re-run developmental edit
+                        await services.run_phase(
+                            PhaseStep(5.1, "Developmental Edit (retry)", run_article_developmental_edit_phase, _ser_4),
+                            state,
+                        )
+                        # Re-run style + copy edit
+                        await services.run_phase(
+                            PhaseStep(5.2, "Style + Copy Edit (retry)", run_article_style_copy_edit_phase, _ser_5),
+                            state,
+                        )
+                        # Re-run audit
+                        await services.run_phase(
+                            PhaseStep(5.3, "Final Audit (retry)", run_article_final_audit_phase, _ser_5),
+                            state,
+                        )
         return state

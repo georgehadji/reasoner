@@ -28,13 +28,20 @@ class PresetService:
 
     def filter_routing(self, routing: dict[str, str], primary_id: str) -> dict[str, str]:
         filtered: dict[str, str] = {}
+        downgraded: list[str] = []
         for role, model_id in routing.items():
             entry = _REGISTRY.get(model_id, {})
             env = entry.get("env")
             if env and not os.environ.get(env):
                 filtered[role] = primary_id
+                downgraded.append(f"{role}: {model_id} -> {primary_id} (missing {env})")
             else:
                 filtered[role] = model_id
+        if downgraded:
+            logger.warning(
+                "Model downgrades due to missing API keys: %s",
+                "; ".join(downgraded),
+            )
         return filtered
 
     def build_router(
