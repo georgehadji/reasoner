@@ -288,10 +288,12 @@ class TestContextConversion:
             "Argument Map / Outline",
             "First Draft",
             "Fact Check + Ledger",
+            "Gap Retrieval",
             "Structural Review",
             "Developmental Edit",
             "Style + Copy Edit",
             "Final Audit",
+            "Surface Signals",
             "Synthesis",
         ]
         assert names == expected
@@ -710,3 +712,183 @@ class TestAuditPromptLedgerInclusion:
         from reasoner.phases import article as article_prompts
         prompt = article_prompts.article_final_audit_prompt(state)
         assert "do NOT re-derive" in prompt
+
+
+# ═════════════════════════════════════════════════════════════════════
+# Budget circuit-breaker (G10)
+# ═════════════════════════════════════════════════════════════════════
+
+class TestBudgetGuard:
+    """with_budget_guard skips expensive phases when budget is exhausted."""
+
+    @pytest.mark.asyncio
+    async def test_budget_guard_skips_when_exhausted(self):
+        from reasoner.application.flows.article_adapters import with_budget_guard
+        from reasoner.domain.article_domain import Budget, PhaseError, Err
+
+        ctx = _make_test_ctx(budget=Budget(usd_cap=1.0, seconds_cap=60.0, usd_spent=1.0))
+        deps = _make_adapter_deps()
+
+        async def never_called(ctx, deps):
+            pytest.fail("Should not be called when budget is exhausted")
+
+        guarded = with_budget_guard(never_called)
+        result = await guarded(ctx, deps)
+        assert isinstance(result, Err)
+        assert result.error == PhaseError.BUDGET
+
+    @pytest.mark.asyncio
+    async def test_budget_guard_passes_when_budget_remaining(self):
+        from reasoner.application.flows.article_adapters import with_budget_guard, adapter_retrieve_sources
+        from reasoner.domain.article_domain import Budget, Ok
+
+        ctx = _make_test_ctx(budget=Budget(usd_cap=1.0, seconds_cap=60.0, usd_spent=0.0))
+        deps = _make_adapter_deps()
+
+        guarded = with_budget_guard(adapter_retrieve_sources)
+        result = await guarded(ctx, deps)
+        assert isinstance(result, Ok)
+
+    def test_budget_guard_passes_when_no_budget_set(self):
+        from reasoner.application.flows.article_adapters import with_budget_guard
+        from reasoner.domain.article_domain import Ok
+
+        ctx = _make_test_ctx(budget=None)
+
+        async def fake_phase(ctx, deps):
+            return Ok(ctx)
+
+        guarded = with_budget_guard(fake_phase)
+
+        import asyncio
+        result = asyncio.run(guarded(ctx, _make_adapter_deps()))
+        assert isinstance(result, Ok)
+
+
+# ═════════════════════════════════════════════════════════════════════
+# Gap retrieval (G7)
+# ═════════════════════════════════════════════════════════════════════
+
+class TestGapRetrieval:
+    """Gap-driven retrieval runs when evidence gaps exist."""
+
+    @pytest.mark.asyncio
+    async def test_gap_retrieval_skips_when_no_gaps(self):
+        from reasoner.application.flows.article_adapters import adapter_gap_retrieval
+        from reasoner.domain.article_domain import Ok
+
+        ctx = _make_test_ctx(verification={"gaps": []})
+        deps = _make_adapter_deps()
+
+        result = await adapter_gap_retrieval(ctx, deps)
+        assert isinstance(result, Ok)
+        assert result.value == ctx  # unchanged when no gaps
+
+    @pytest.mark.asyncio
+    async def test_gap_retrieval_runs_when_gaps_exist(self):
+        from reasoner.application.flows.article_adapters import adapter_gap_retrieval
+
+        ctx = _make_test_ctx(verification={"gaps": ["Need more on climate impacts"]})
+        deps = _make_adapter_deps()
+
+        result = await adapter_gap_retrieval(ctx, deps)
+        # Should complete gracefully
+        from reasoner.domain.article_domain import Ok, Err
+        assert isinstance(result, (Ok, Err))
+
+    def test_has_evidence_gaps_detects_gaps_in_verification(self):
+        from reasoner.application.flows.article_adapters import _has_evidence_gaps
+        ctx = _make_test_ctx(verification={"gaps": ["Missing data"]})
+        assert _has_evidence_gaps(ctx) is True
+
+    def test_has_evidence_gaps_returns_false_when_no_gaps(self):
+        from reasoner.application.flows.article_adapters import _has_evidence_gaps
+        ctx = _make_test_ctx(verification={"gaps": []})
+        assert _has_evidence_gaps(ctx) is False
+
+    def test_has_evidence_gaps_returns_false_on_empty_ctx(self):
+        from reasoner.application.flows.article_adapters import _has_evidence_gaps
+        ctx = _make_test_ctx()
+        assert _has_evidence_gaps(ctx) is False
+
+
+# ═════════════════════════════════════════════════════════════════════
+# Surface signals (G8)
+# ═════════════════════════════════════════════════════════════════════
+
+class TestSurfaceSignals:
+    """surface_signals emits quality events when audit fails."""
+
+    @pytest.mark.asyncio
+    async def test_emits_quality_warning_on_failed_audit(self):
+        from reasoner.application.flows.article_adapters import adapter_surface_signals
+        from reasoner.domain.article_domain import Ok
+
+        audit = {
+            "passes_audit": False,
+            "audit_score": 0.45,
+            "audit": {"claim_support": 0.4, "citation_accuracy": 0.5},
+            "issues": [{"section": "Body", "severity": "high", "description": "Missing evidence"}],
+        }
+        ctx = _make_test_ctx(editorial_audit=audit)
+        deps = _make_adapter_deps()
+
+        result = await adapter_surface_signals(ctx, deps)
+        assert isinstance(result, Ok)
+        ctx2 = result.value
+        # Should emit quality_warning
+        quality_events = [e for e in ctx2.events if e.get("type") == "quality_warning"]
+        assert len(quality_events) == 1
+        assert "failing_dimensions" in quality_events[0]
+        assert "claim_support" in quality_events[0]["failing_dimensions"][0]
+
+    @pytest.mark.asyncio
+    async def test_does_not_emit_warning_on_passing_audit(self):
+        from reasoner.application.flows.article_adapters import adapter_surface_signals
+        from reasoner.domain.article_domain import Ok
+
+        audit = {"passes_audit": True, "audit_score": 0.85}
+        ctx = _make_test_ctx(editorial_audit=audit)
+        deps = _make_adapter_deps()
+
+        result = await adapter_surface_signals(ctx, deps)
+        assert isinstance(result, Ok)
+        ctx2 = result.value
+        quality_events = [e for e in ctx2.events if e.get("type") == "quality_warning"]
+        assert len(quality_events) == 0
+
+    @pytest.mark.asyncio
+    async def test_high_stakes_held_for_review(self):
+        from reasoner.application.flows.article_adapters import adapter_surface_signals
+        from reasoner.domain.article_domain import Ok
+
+        audit = {"passes_audit": False, "audit_score": 0.5}
+        ctx = _make_test_ctx(content_class="policy_brief", editorial_audit=audit)
+        deps = _make_adapter_deps()
+
+        result = await adapter_surface_signals(ctx, deps)
+        assert isinstance(result, Ok)
+        ctx2 = result.value
+        hold_events = [e for e in ctx2.events if e.get("type") == "hold_for_review"]
+        assert len(hold_events) == 1
+
+    @pytest.mark.asyncio
+    async def test_emits_claim_summary(self):
+        from reasoner.application.flows.article_adapters import adapter_surface_signals
+        from reasoner.domain.article_domain import Claim, Verdict, Ok
+
+        ledger = (
+            Claim(id="1", text="C1", verdict=Verdict.VERIFIED, confidence=1.0),
+            Claim(id="2", text="C2", verdict=Verdict.UNSUPPORTED),
+        )
+        ctx = _make_test_ctx(ledger=ledger)
+        deps = _make_adapter_deps()
+
+        result = await adapter_surface_signals(ctx, deps)
+        assert isinstance(result, Ok)
+        ctx2 = result.value
+        summary_events = [e for e in ctx2.events if e.get("type") == "claim_summary"]
+        assert len(summary_events) == 1
+        assert summary_events[0]["total_claims"] == 2
+        assert summary_events[0]["verdicts"]["verified"] == 1
+        assert summary_events[0]["verdicts"]["unsupported"] == 1

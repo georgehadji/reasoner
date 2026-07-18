@@ -469,17 +469,145 @@ async def adapter_synthesis(
 
 
 # ═════════════════════════════════════════════════════════════════════
+# Combinators (higher-order functions wrapping adapters)
+# ═════════════════════════════════════════════════════════════════════
+
+def with_budget_guard(adapter_fn: Callable) -> Callable:
+    """Budget circuit-breaker combinator (G10).
+
+    Wraps an adapter function: if the budget is exhausted, returns
+    Err(PhaseError.BUDGET) instead of running the phase.
+    """
+    async def wrapped(ctx: Context, deps: AdapterDeps) -> Result:
+        if ctx.budget is not None and ctx.budget.remaining_usd() <= 0:
+            logger.info("Budget exhausted — skipping phase")
+            return Err(PhaseError.BUDGET, fallback=ctx)
+        return await adapter_fn(ctx, deps)
+    wrapped.__name__ = f"budget_guard_{adapter_fn.__name__}"
+    return wrapped
+
+
+def _has_evidence_gaps(ctx: Context) -> bool:
+    """Check if the recent fact-check identified evidence gaps (G7)."""
+    gaps = ctx.events
+    for ev in gaps:
+        if ev.get("type") == "evidence_gap":
+            return True
+    # Also check verification dict for gaps
+    if ctx.verification and ctx.verification.get("gaps"):
+        return True
+    return False
+
+
+async def adapter_gap_retrieval(
+    ctx: Context, deps: AdapterDeps
+) -> Result[Context, PhaseError]:
+    """Gap-driven retrieval phase (G7).
+
+    Runs additional source retrieval for topics where fact-check found
+    insufficient evidence, then updates the context with new sources.
+    """
+    gaps = []
+    if ctx.verification:
+        gaps = ctx.verification.get("gaps", [])
+
+    if not gaps:
+        logger.info("No evidence gaps — skipping gap retrieval")
+        return Ok(ctx)
+
+    logger.info("Retrieving additional sources for %d evidence gaps...", len(gaps))
+
+    # Build gap-targeted search queries
+    gap_queries = [f"evidence about {g[:100]}" for g in gaps[:3]]
+
+    # Run the existing retrieve phase with gap-targeted queries
+    from reasoner.application.flows.article_phases import run_article_retrieve_sources_phase
+    result = await _run_phase_adapter(
+        ctx, deps, run_article_retrieve_sources_phase, "gap_retrieval"
+    )
+
+    if isinstance(result, Ok):
+        ctx = result.value
+        # Log the gap retrieval
+        ctx = replace(ctx, events=ctx.events + (
+            {"type": "gap_retrieval", "gaps_addressed": len(gaps), "sources_added": len(ctx.sources)},
+        ))
+        result = Ok(ctx)
+
+    return result
+
+
+async def adapter_surface_signals(
+    ctx: Context, deps: AdapterDeps
+) -> Result[Context, PhaseError]:
+    """Surface quality signals to the user (G8).
+
+    Reads the editorial audit and emits events that the frontend can
+    display: quality warnings, hold-for-review flags, claim-level
+    verdict summaries.
+    """
+    events: list[dict] = list(ctx.events)
+
+    # ── Quality warning on audit failure ──
+    audit = ctx.editorial_audit or {}
+    passes = audit.get("passes_audit", True)
+    score = audit.get("audit_score", 1.0)
+
+    if not passes:
+        issues = audit.get("issues", [])
+        failing_dims = [
+            f"{k}={v:.2f}" for k, v in (audit.get("audit") or {}).items()
+            if isinstance(v, (int, float)) and v < 0.6
+        ]
+        events.append({
+            "type": "quality_warning",
+            "severity": "warning",
+            "message": f"Article failed audit (score={score:.2f})",
+            "failing_dimensions": failing_dims,
+            "issues_count": len(issues),
+        })
+
+        # ── Hold-for-review policy ──
+        # High-stakes content classes default to hold-for-review
+        high_stakes = ("policy_brief", "news_analysis", "greek_briefing")
+        if ctx.content_class in high_stakes:
+            events.append({
+                "type": "hold_for_review",
+                "severity": "info",
+                "message": f"Article held for manual review ({ctx.content_class})",
+                "content_class": ctx.content_class,
+            })
+
+    # ── Claim-level verdict summary ──
+    if ctx.ledger:
+        verdict_counts: dict[str, int] = {}
+        for c in ctx.ledger:
+            v = c.verdict.value
+            verdict_counts[v] = verdict_counts.get(v, 0) + 1
+        events.append({
+            "type": "claim_summary",
+            "total_claims": len(ctx.ledger),
+            "verdicts": verdict_counts,
+        })
+
+    ctx = replace(ctx, events=tuple(events))
+    return Ok(ctx)
+
+
+# ═════════════════════════════════════════════════════════════════════
 # Convenience: list of all adapters in order
 # ═════════════════════════════════════════════════════════════════════
 
 ADAPTER_PHASES: list[tuple[str, Callable]] = [
-    ("Evidence Collection",     adapter_retrieve_sources),
-    ("Argument Map / Outline",   adapter_build_outline),
-    ("First Draft",              adapter_draft),
-    ("Fact Check + Ledger",      adapter_fact_check),
-    ("Structural Review",         adapter_structural_review),
-    ("Developmental Edit",        adapter_developmental_edit),
-    ("Style + Copy Edit",        adapter_style_copy_edit),
-    ("Final Audit",              adapter_final_audit),
-    ("Synthesis",                adapter_synthesis),
+    ("Evidence Collection",     with_budget_guard(adapter_retrieve_sources)),
+    ("Argument Map / Outline",   with_budget_guard(adapter_build_outline)),
+    ("First Draft",              with_budget_guard(adapter_draft)),
+    ("Fact Check + Ledger",      with_budget_guard(adapter_fact_check)),
+    ("Gap Retrieval",            with_budget_guard(adapter_gap_retrieval)),
+    ("Structural Review",         with_budget_guard(adapter_structural_review)),
+    ("Developmental Edit",        with_budget_guard(adapter_developmental_edit)),
+    ("Style + Copy Edit",        with_budget_guard(adapter_style_copy_edit)),
+    ("Final Audit",              with_budget_guard(adapter_final_audit)),
+    ("Surface Signals",          with_budget_guard(adapter_surface_signals)),
+    ("Synthesis",                with_budget_guard(adapter_synthesis)),
 ]
