@@ -143,7 +143,8 @@ class RunPipelineCommandHandler:
             if sse_emit:
                 if self._pipeline_executor:
                     state = await self._pipeline_executor.execute_run(
-                        command, router, sse_emit
+                        command, router, sse_emit,
+                        user_id=getattr(command, "user_id", None),
                     )
                 else:
                     raise RuntimeError(

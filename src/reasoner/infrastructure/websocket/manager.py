@@ -357,6 +357,33 @@ def get_websocket_manager() -> WebSocketManager:
     return _ws_manager
 
 
+async def _authorized_for_pipeline(pipeline_id: str, user_id: str | None) -> bool:
+    """Fail-closed ownership check shared by the initial connect and the
+    dynamic 'subscribe' message path.
+
+    A lookup failure (DB error) denies, same as an unknown pipeline (no
+    record) — this function must never let a storage error read as
+    "unowned, so allow". See application/ports/pipeline_ownership_port.py.
+    """
+    from reasoner.application.ports.pipeline_ownership_port import is_authorized
+    from reasoner.infrastructure.persistence.pipeline_ownership_repo import (
+        ensure_pipeline_ownership_backfilled,
+        get_pipeline_ownership_repo,
+    )
+
+    try:
+        await ensure_pipeline_ownership_backfilled()
+        record = await get_pipeline_ownership_repo().get_owner(pipeline_id)
+    except Exception:
+        logger.warning(
+            "Pipeline ownership lookup failed for %s; denying access (fail closed)",
+            pipeline_id,
+            exc_info=True,
+        )
+        return False
+    return is_authorized(record, user_id)
+
+
 # ─────────────────────────────────────────────────────────────────────
 # FASTAPI WEBSOCKET ENDPOINT
 # ─────────────────────────────────────────────────────────────────────
@@ -428,10 +455,7 @@ async def websocket_endpoint(
 
     # Subscribe to pipeline if provided
     if pipeline_id:
-        # Ownership check
-        from reasoner.pipeline_owner import _get_pipeline_owner
-        owner = _get_pipeline_owner(pipeline_id)
-        if owner is not None and owner != user_id:
+        if not await _authorized_for_pipeline(pipeline_id, user_id):
             await manager.send_to_connection(
                 connection_id,
                 WebSocketMessage(
@@ -483,9 +507,7 @@ async def handle_websocket_message(
             # Enforce pipeline ownership on dynamic subscribe
             metadata = manager.connection_metadata.get(connection_id, {})
             user_id = metadata.get('user_id')
-            from reasoner.pipeline_owner import _get_pipeline_owner
-            owner = _get_pipeline_owner(pipeline_id)
-            if owner is not None and owner != user_id:
+            if not await _authorized_for_pipeline(pipeline_id, user_id):
                 await manager.send_to_connection(
                     connection_id,
                     WebSocketMessage(

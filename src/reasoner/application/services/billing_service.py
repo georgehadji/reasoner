@@ -35,6 +35,9 @@ class BillingService:
 
         # Persist to database
         from reasoner.infrastructure.persistence.subscription_repo import PostgresSubscriptionRepository
+        from reasoner.infrastructure.persistence.cached_subscription_repo import (
+            invalidate_subscription,
+        )
         from reasoner.core.settings import settings
 
         repo = PostgresSubscriptionRepository(
@@ -47,6 +50,15 @@ class BillingService:
         if not event_type:
             event_type = event.get("event_type", "")
 
+        try:
+            await self._apply_webhook(event_type, sub, repo)
+        finally:
+            # Invalidate even on failure: a partial write may have landed, so
+            # the cached subscription can no longer be trusted.
+            await invalidate_subscription(str(sub.user_id))
+
+    async def _apply_webhook(self, event_type: str, sub, repo) -> None:
+        """Route a webhook event to the matching persistence action."""
         # --- PayPal events ---
         if event_type.startswith("BILLING.SUBSCRIPTION."):
             if event_type == "BILLING.SUBSCRIPTION.CANCELLED":

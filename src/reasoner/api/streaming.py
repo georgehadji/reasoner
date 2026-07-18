@@ -46,7 +46,7 @@ from reasoner.presets import (
 from reasoner.phases._shared import build_followup_context, _wrap_user_input
 
 from .cache import _cache_key, _load_cache, _save_cache
-from .history import HISTORY_DIR, HistoryEntry, _save_history_entry, _save_pipeline_owner
+from .history import HISTORY_DIR, HistoryEntry, _save_history_entry
 from reasoner.infrastructure.redis.run_state import _run_state_manager as _run_store
 from reasoner.core.events.domain_events import make_event, EventType
 from .schemas import FollowupRequest, RunRequest
@@ -120,7 +120,8 @@ async def run_stream(
         top_k=getattr(req, "top_k", 2),
         source_type=getattr(req, "source_type", "general"),
         domain=getattr(req, "domain", None),
-        parallel=not getattr(req, "sequential", False)
+        parallel=not getattr(req, "sequential", False),
+        user_id=user_id,
     )
     
     queue = asyncio.Queue(maxsize=256)
@@ -289,9 +290,13 @@ async def run_stream_cached(
         cached = await _load_cache(key)
         if cached:
             has_fatal_error = any(ev.get("type") == "done" and ev.get("errors") for ev in cached)
-            # Also skip cache replay if any phase had errors — code may have been fixed
+            # Also skip cache replay if any phase had errors — code may have been fixed.
+            # Phase serialization records failures under the plural "errors" key
+            # (singular "error" is kept for older cached payloads); missing it would
+            # make a transient model failure sticky, replayed forever from cache.
             has_phase_error = any(
-                ev.get("type") == "phase_complete" and ev.get("data", {}).get("error")
+                ev.get("type") == "phase_complete"
+                and (ev.get("data", {}).get("error") or ev.get("data", {}).get("errors"))
                 for ev in cached
             )
             if not has_fatal_error and not has_phase_error:

@@ -9,14 +9,17 @@ and search flow phases.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import re
+import time
 from typing import Any, Optional, Protocol
 
 logger = logging.getLogger(__name__)
 
 from reasoner.core.ports.search_port import SearchServicePort, SourceType
-from reasoner.core.constants import DEFAULT_SEARCH_RESULTS, TIMEOUTS, MODEL_QWEN35_9B, MODEL_QWEN35_FLASH, MODEL_GEMINI_FLASH, TRUNCATION
+from reasoner.core.constants import DEFAULT_SEARCH_RESULTS, TIMEOUTS, MODEL_QWEN35_9B, MODEL_QWEN35_FLASH, MODEL_GEMINI_FLASH, TRUNCATION, DEFAULT_MAX_DECOMPOSED_QUERIES
+from reasoner.core.temperatures import NON_PHASE_TEMPERATURES
 from reasoner.core.settings import settings
 
 
@@ -228,6 +231,13 @@ async def smart_search(
 
     Falls back to a single keyword-extracted search on decomposition failure.
     """
+    # Imported inside the function: reasoner.core.search imports this module at
+    # module level, so a top-level import here would be circular. These names
+    # were referenced without any import at all -> NameError once this function
+    # got past decomposition.
+    from reasoner.core.search import _bm25_score, _normalize_url
+    from reasoner.core.rerank import rerank_documents
+
     client, _ = await get_search_client(source_type=source_type)
 
     sub_queries: list[str] = []

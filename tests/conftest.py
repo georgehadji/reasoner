@@ -1,5 +1,20 @@
 import os
 
+# Mirror the env the CI test job sets (.github/workflows/test.yml) so a local
+# `pytest tests/` behaves the same as CI. Without JWT_SECRET_KEY in particular,
+# ~9 test modules fail at COLLECTION -- LocalAuthAdapter validates the key's
+# length when it is constructed at module import time (e.g. test_ocr.py), so
+# the error happens before any test runs and takes the whole file with it.
+#
+# setdefault, not assignment: a value already exported by CI or by a developer
+# with real credentials always wins. These are placeholders, never credentials,
+# and they are confined to the test process -- production still requires the
+# real values via settings.
+os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-not-for-production-use-only")
+os.environ.setdefault("CSRF_ENFORCE_BACKEND", "false")
+os.environ.setdefault("OPENROUTER_API_KEY", "test-dummy-openrouter-key-placeholder")
+os.environ.setdefault("RATE_LIMITER_REDIS_FAILURE_MODE", "fail_open")
+
 import httpx
 import pytest
 import asyncio

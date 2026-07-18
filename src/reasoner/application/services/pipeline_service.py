@@ -264,6 +264,7 @@ from reasoner.domain.core_types import (
 )
 from reasoner.domain.models import TaskType, ClaimLabel, PerspectiveType, PerspectiveRegistry
 from reasoner.domain.core_types import ScenarioType
+from reasoner.core.constants import TRUNCATION
 
 class PipelineSerializationService:
     @staticmethod

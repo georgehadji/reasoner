@@ -358,6 +358,8 @@ const RATE_LIMITS: Record<string, { limit: number; windowMs: number }> = {
   search: { limit: 20, windowMs: SECURITY_CONSTANTS.rateLimitWindowMs },
   'generate-image': { limit: 10, windowMs: SECURITY_CONSTANTS.rateLimitWindowMs },
   estimate: { limit: 30, windowMs: SECURITY_CONSTANTS.rateLimitWindowMs },
+  gate: { limit: 30, windowMs: SECURITY_CONSTANTS.rateLimitWindowMs },
+  'error-report': { limit: 10, windowMs: SECURITY_CONSTANTS.rateLimitWindowMs },
   'account-delete': { limit: 3, windowMs: SECURITY_CONSTANTS.rateLimitWindowMs },
   default: { limit: 30, windowMs: SECURITY_CONSTANTS.rateLimitWindowMs },
 };

@@ -7,6 +7,7 @@ import logging
 from typing import Any
 
 from reasoner.core.constants import TRUNCATION, get_token_budget, DEFAULT_MAX_TOKENS
+from reasoner.infrastructure.search.discovery import get_search_client_for_method
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.domain.core_types import (
     SolutionCandidate,
@@ -164,7 +165,11 @@ async def run_perspectives_phase(
         return p.name if hasattr(p, 'name') else str(p)
 
     from reasoner.domain.pipeline_state import PhaseOutput
-    output = PhaseOutput(candidates=[], errors=[], mutated_in_place=False)
+    # mutated_in_place=True: every executor (SSE path, runner, services fallback)
+    # calls the phase function and drops its return, so the delta has to be
+    # written to `state` here or the candidates are lost and Phase 3 skips.
+    # apply_to() no-ops on this flag, so the DAG runner cannot double-apply.
+    output = PhaseOutput(candidates=[], errors=[], mutated_in_place=True)
 
     if parallel:
         tasks = [_get_perspective(_perspective_name(p)) for p in perspectives]
@@ -187,9 +192,13 @@ async def run_perspectives_phase(
                         if replacement.content and replacement.content.strip():
                             output.candidates.append(replacement)
                         else:
-                            services.log("PHASE-2", f"Regeneration for '{p_name}' also empty — skipping", state)
+                            msg = f"Regeneration for '{p_name}' also empty — skipping"
+                            services.log("PHASE-2", msg, state)
+                            output.errors.append(msg)
                     except Exception as exc:
-                        services.log("PHASE-2", f"Regeneration failed for '{p_name}': {exc}", state)
+                        msg = f"Regeneration failed for '{p_name}': {exc}"
+                        services.log("PHASE-2", msg, state)
+                        output.errors.append(msg)
                 else:
                     output.candidates.append(r)
     else:
@@ -213,6 +222,8 @@ async def run_perspectives_phase(
                 services.log("PHASE-2", msg, state)
                 output.errors.append(msg)
 
+    state.candidates.extend(output.candidates)
+    state.errors.extend(output.errors)
     return output
 
 async def run_critique_phase(state: PipelineState, services: WorkflowServices) -> None:

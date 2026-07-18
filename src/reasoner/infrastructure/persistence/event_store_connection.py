@@ -89,7 +89,7 @@ class EventStoreConnection:
 
             CREATE TABLE IF NOT EXISTS pipeline_owners (
                 pipeline_id TEXT PRIMARY KEY,
-                user_id TEXT NOT NULL,
+                user_id TEXT,
                 run_id TEXT NOT NULL,
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
@@ -124,12 +124,50 @@ class EventStoreConnection:
             );
         """)
         conn.commit()
+        self._migrate_pipeline_owners_nullable(conn)
+
+    def _migrate_pipeline_owners_nullable(self, conn: sqlite3.Connection) -> None:
+        """Relax pipeline_owners.user_id to nullable (anonymous ownership).
+
+        The table originally had ``user_id TEXT NOT NULL``. SQLite has no
+        ALTER COLUMN, and CREATE TABLE IF NOT EXISTS is a no-op on a table
+        that already exists with the old constraint — so any DB created
+        before this change needs an explicit rebuild. Idempotent: no-op once
+        migrated, and a no-op on brand-new DBs where the table above was
+        already created nullable.
+        """
+        cols = conn.execute("PRAGMA table_info(pipeline_owners)").fetchall()
+        user_id_col = next((c for c in cols if c["name"] == "user_id"), None)
+        if user_id_col is None or user_id_col["notnull"] == 0:
+            return
+        conn.executescript("""
+            ALTER TABLE pipeline_owners RENAME TO pipeline_owners_old;
+            CREATE TABLE pipeline_owners (
+                pipeline_id TEXT PRIMARY KEY,
+                user_id TEXT,
+                run_id TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            INSERT INTO pipeline_owners SELECT * FROM pipeline_owners_old;
+            DROP TABLE pipeline_owners_old;
+        """)
+        conn.commit()
 
     def close(self) -> None:
-        """Close the database connection."""
+        """Close the database connection and shut down the thread pool.
+
+        Previously only closed the sqlite3 connection; the executor was
+        never shut down here, so every close() leaked its worker thread.
+        EventStore.close() called this only by accident of never actually
+        running (see EventStore.close()'s own history) -- the leak was
+        masked by that bug rather than fixed by it.
+        """
         if self._connection is not None:
             try:
                 self._connection.close()
             except Exception:
                 pass
             self._connection = None
+        if self._executor is not None:
+            self._executor.shutdown(wait=True)
+            self._executor = None

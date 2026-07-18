@@ -12,10 +12,11 @@ Supports:
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, List, Optional
 from dataclasses import asdict
 
 from tenacity import retry, stop_after_attempt, wait_exponential # New import
@@ -87,8 +88,17 @@ class PostgreSQLEventStore:
         self._read_pool = None
         self._encryption = get_encryption_service()
         
-        # Initialize circuit breaker
-        self._circuit_breaker = CircuitBreaker(fail_max=5, reset_timeout=30) if circuit_breaker_enabled else None
+        # Initialize circuit breaker.
+        # aiocircuitbreaker.CircuitBreaker's constructor is
+        # (failure_threshold, recovery_timeout, ...) -- this previously
+        # passed fail_max/reset_timeout (pybreaker's kwarg names, not this
+        # library's), which raised TypeError on every construction, making
+        # PostgreSQLEventStore entirely unconstructable.
+        self._circuit_breaker = (
+            CircuitBreaker(failure_threshold=5, recovery_timeout=30)
+            if circuit_breaker_enabled
+            else None
+        )
 
     async def initialize(self) -> None:
         """Initialize connection pools."""
@@ -240,10 +250,15 @@ class PostgreSQLEventStore:
         import logging
         logger = logging.getLogger(__name__)
         
-        # If circuit breaker is enabled, wrap the operation with it
+        # If circuit breaker is enabled, wrap the operation with it.
+        # aiocircuitbreaker.CircuitBreaker is NOT an async context manager
+        # (it has only sync __enter__/__exit__); use .call(coro_fn, *args),
+        # which applies the breaker's sync `with self:` around an awaited
+        # call. `async with self._circuit_breaker` raised TypeError on every
+        # invocation -- previously never reached because the breaker failed
+        # to construct at all (fixed in the prior commit), now it would.
         if self._circuit_breaker:
-            async with self._circuit_breaker:
-                await self._save_events_internal(events)
+            await self._circuit_breaker.call(self._save_events_internal, events)
         else:
             await self._save_events_internal(events)
 
@@ -618,10 +633,12 @@ class PostgreSQLEventStore:
         import logging
         logger = logging.getLogger(__name__)
         
-        # If circuit breaker is enabled, wrap the operation with it
+        # If circuit breaker is enabled, wrap the operation with it.
+        # See save_events for why this is .call(...) and not `async with`.
         if self._circuit_breaker:
-            async with self._circuit_breaker:
-                await self._save_snapshot_internal(aggregate_id, version, state, snapshot_type)
+            await self._circuit_breaker.call(
+                self._save_snapshot_internal, aggregate_id, version, state, snapshot_type
+            )
         else:
             await self._save_snapshot_internal(aggregate_id, version, state, snapshot_type)
 
@@ -873,7 +890,34 @@ class PostgreSQLEventStore:
         except Exception as e:
             logger.error(f"Unexpected error deleting aggregate {aggregate_id}: {e}")
             raise
-    
+
+    async def list_aggregate_ids_for_user(self, user_id: str) -> list[str]:
+        """Return all aggregate IDs for a given user (GDPR erasure support).
+
+        This method was previously entirely absent from PostgreSQLEventStore
+        (only EventStore, the SQLite backend, had it), so data_eraser.py's
+        call to it raised AttributeError on any deployment running
+        EVENT_STORE_BACKEND=postgres -- caught by the caller's broad except,
+        but combined with a separate receipt-construction bug meant the
+        erasure receipt could still claim "completed" via cache eviction
+        alone, while the user's actual pipeline data was never touched.
+
+        The aggregates table here has no user_id column -- ownership was
+        never tracked in either event-store backend's own schema, only in
+        the separate ownership store (formerly a JSON file, now
+        PipelineOwnershipRepository). That store is backend-agnostic by
+        design, so this delegates to the same global singleton EventStore's
+        own list_aggregate_ids_for_user uses, rather than needing a
+        Postgres-native ownership table.
+        """
+        from reasoner.infrastructure.persistence.pipeline_ownership_repo import (
+            ensure_pipeline_ownership_backfilled,
+            get_pipeline_ownership_repo,
+        )
+        await ensure_pipeline_ownership_backfilled()
+        repo = get_pipeline_ownership_repo()
+        return await repo.list_pipeline_ids_for_user(user_id)
+
     async def prune_events_before(
         self,
         cutoff: datetime,

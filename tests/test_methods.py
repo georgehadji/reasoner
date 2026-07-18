@@ -51,7 +51,25 @@ FULL_RUN_METHODS = {
     "jury", "socratic", "brainstorming", "pre_mortem",
 }
 
-_HAS_API_KEY = bool(settings.OPENROUTER_API_KEY)
+def _is_usable_api_key(key: str | None) -> bool:
+    """True only for a key that can actually reach the API.
+
+    CI deliberately exports a non-empty placeholder OPENROUTER_API_KEY (see
+    .github/workflows/test.yml) so provider/router construction succeeds
+    offline for the mocked tests. A plain `bool(key)` check read that
+    placeholder as a real credential, so the skipif below did not skip and
+    the tests in this file went on to make live LLM calls, which failed with
+    401 "Missing Authentication header" on every CI run. Treat known
+    placeholder markers as "no key" so these live tests skip instead.
+    """
+    if not key:
+        return False
+    lowered = key.lower()
+    markers = ("dummy", "placeholder", "not-for-production", "ci-test", "test-")
+    return not any(marker in lowered for marker in markers)
+
+
+_HAS_API_KEY = _is_usable_api_key(settings.OPENROUTER_API_KEY)
 
 
 # ── Helper ───────────────────────────────────────────────────────────

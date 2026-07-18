@@ -1160,6 +1160,14 @@ export function buildMarkdownFromPhase(
     append('\n');
   }
 
+  // A phase that recorded errors produced no content *because it failed*. Say so
+  // rather than rendering an indistinguishable "No content for this phase."
+  if (Array.isArray(d.errors) && d.errors.length) {
+    append(`### Phase errors (${(d.errors as string[]).length})\n`);
+    (d.errors as string[]).forEach((e) => append(`- ${e}\n`));
+    append('\n');
+  }
+
   if (!rendered) {
     md += '*No content for this phase.*\n\n';
   }

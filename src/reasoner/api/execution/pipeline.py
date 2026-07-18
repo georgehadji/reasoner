@@ -9,6 +9,7 @@ from typing import Callable, Awaitable, Any
 
 from reasoner.application.commands import RunPipelineCommand
 from reasoner.domain.pipeline_state import PipelineState
+from reasoner.domain.models import TaskType
 from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.application.services.preset_service import PresetService
 from reasoner.application.services.pipeline_service import PipelineService
@@ -19,7 +20,8 @@ from reasoner.api.streaming import _get_phase_subagents
 from reasoner.api.execution.direct import _stream_direct_answer
 from reasoner.api.execution.web_search import _stream_web_search_results
 from reasoner.api.execution.cancel import StreamingConnectionContext
-from reasoner.api.history import HistoryEntry, _save_history_entry, _save_pipeline_owner, HISTORY_DIR
+from reasoner.api.history import HistoryEntry, _save_history_entry, HISTORY_DIR
+from reasoner.infrastructure.persistence.pipeline_ownership_repo import get_pipeline_ownership_repo
 from reasoner.infrastructure.redis.run_state import _run_state_manager as _run_store
 from reasoner.core.events.domain_events import make_event, EventType
 from reasoner.api.sse_utils import _event, _broadcast_ws, _persist_event
@@ -64,7 +66,18 @@ class PipelineExecutionService:
         event_version = 1
         state: PipelineState | None = None
         cancel_event = await _run_store.add(run_id, user_id=user_id)
-        _save_pipeline_owner(run_id, user_id)
+        try:
+            await get_pipeline_ownership_repo().set_owner(run_id, user_id, run_id)
+        except Exception:
+            # An ownership-write failure must not abort the run itself, but it
+            # does mean the pipeline stays inaccessible (fail closed) until a
+            # human intervenes -- log loudly rather than silently swallow it.
+            logger.error(
+                "Failed to record pipeline ownership for %s; pipeline will be "
+                "inaccessible via ownership checks until this is fixed",
+                run_id,
+                exc_info=True,
+            )
 
         # Track per-run WS broadcast tasks so they can be cancelled on disconnect (B-13)
         conn_context = StreamingConnectionContext(run_id)
@@ -296,6 +309,9 @@ class PipelineExecutionService:
                 phase_errored = False
                 phase_fatal = False
                 phase_start = time.monotonic()
+                # state.errors is cumulative across the run; remember the mark so
+                # phase_complete can report only what *this* phase appended.
+                errors_before_phase = len(state.errors)
 
                 for retry_attempt in range(max_retries + 1):
                     try:
@@ -463,6 +479,13 @@ class PipelineExecutionService:
                 if isinstance(data, dict):
                     data["tokens"] = state.phase_tokens.get(phase_key, {"input": 0, "output": 0})
                     data["duration"] = duration
+                    # Surface what this phase recorded. Without this, a phase whose
+                    # work all failed still serializes to an empty payload and the
+                    # UI can only say "No content for this phase" — the failure is
+                    # invisible to the user and to us.
+                    phase_errors = state.errors[errors_before_phase:]
+                    if phase_errors:
+                        data["errors"] = phase_errors
                     phase_models = state.cost_state._phase_models_by_key.get(phase_key, [])
                     if phase_models:
                         data["models"] = phase_models
