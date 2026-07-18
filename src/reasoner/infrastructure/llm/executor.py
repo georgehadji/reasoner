@@ -680,8 +680,13 @@ class LLMExecutor:
 
                 if tracking_key not in state.cost_state._phase_models_by_key:
                     state.cost_state._phase_models_by_key[tracking_key] = []
-                if model not in state.cost_state._phase_models_by_key[tracking_key]:
-                    state.cost_state._phase_models_by_key[tracking_key].append(model)
+                # Normalize model names: use the last segment after '/' as canonical
+                # form (e.g. both 'qwen3.5-flash-02-23' and 'qwen/qwen3.5-flash-02-23'
+                # represent the same model). Prevents display concatenation (P4).
+                model_canonical = model.split("/")[-1]
+                existing = state.cost_state._phase_models_by_key[tracking_key]
+                if not any(model_canonical == e.split("/")[-1] for e in existing):
+                    existing.append(model)
 
     # Map common markdown language tags to file extensions
     _LANG_TO_EXT: ClassVar[dict[str, str]] = {
