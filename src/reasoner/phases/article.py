@@ -502,6 +502,7 @@ ARTICLE_FINAL_AUDIT_SYSTEM = (
 def article_final_audit_prompt(state: PipelineState) -> str:
     draft = state.writing_state.get("final_article", "")
     argument_map = state.writing_state.get("argument_map", {})
+    claim_ledger = state.writing_state.get("claim_ledger", [])
 
     map_block = (
         f"Expected thesis (from argument blueprint):\n"
@@ -509,10 +510,23 @@ def article_final_audit_prompt(state: PipelineState) -> str:
         if argument_map else ""
     )
 
+    # Include reconciled claim ledger so the audit reads facts, not re-derives them
+    ledger_block = ""
+    if claim_ledger:
+        total = len(claim_ledger)
+        supported = sum(1 for c in claim_ledger if c.get("status") in ("verified", "supported"))
+        ledger_block = (
+            f"\nClaim Ledger ({total} total, {supported} supported):\n"
+            f"{json.dumps(claim_ledger[:20], indent=2, ensure_ascii=False)[:2000]}\n\n"
+            f"Use this ledger to inform claim_support and citation_accuracy scores — "
+            f"do NOT re-derive claim support impressionistically.\n"
+        )
+
     return (
         f"{get_language_instruction(state)}\n\n"
         f"Final Article:\n{_wrap_external_content(draft)}\n\n"
         f"{map_block}"
+        f"{ledger_block}"
         f"Audit this article for publication readiness.\n\n"
         f'Output JSON: {{\n'
         f'  "audit": {{'

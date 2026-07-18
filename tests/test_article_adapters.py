@@ -591,3 +591,122 @@ class TestAdapterReconciliationWiring:
         # The locked span should be preserved (text reverted)
         assert ctx2.doc is not None
         assert "This sentence is verified." in ctx2.doc.markdown
+
+
+# ═════════════════════════════════════════════════════════════════════
+# Quality gates via Specification (G6)
+# ═════════════════════════════════════════════════════════════════════
+
+class TestGatePolicy:
+    """GatePolicy evaluation with weighted thresholds."""
+
+    def test_all_dimensions_pass(self):
+        from reasoner.domain.article_domain import GatePolicy, Threshold
+        policy = GatePolicy(thresholds=(
+            Threshold("claim_support", 0.6, 2.0),
+            Threshold("citation_accuracy", 0.6, 2.0),
+        ))
+        scores = {"claim_support": 0.8, "citation_accuracy": 0.9}
+        passed, details = policy.evaluate(scores)
+        assert passed is True
+        assert details["hard_ok"] is True
+
+    def test_fails_when_below_minimum(self):
+        from reasoner.domain.article_domain import GatePolicy, Threshold
+        policy = GatePolicy(thresholds=(
+            Threshold("claim_support", 0.7, 2.0),
+            Threshold("citation_accuracy", 0.6, 2.0),
+        ))
+        scores = {"claim_support": 0.5, "citation_accuracy": 0.9}
+        passed, details = policy.evaluate(scores)
+        assert passed is False
+        assert "claim_support" in details["failures"][0]
+
+    def test_fails_on_low_weighted_score(self):
+        from reasoner.domain.article_domain import GatePolicy, Threshold
+        policy = GatePolicy(thresholds=(
+            Threshold("claim_support", 0.0, 1.0),
+            Threshold("citation_accuracy", 0.0, 1.0),
+        ))
+        scores = {"claim_support": 0.3, "citation_accuracy": 0.4}
+        passed, details = policy.evaluate(scores)
+        assert passed is False
+        assert details["score"] < 0.6
+
+    def test_empty_thresholds_always_pass(self):
+        from reasoner.domain.article_domain import GatePolicy
+        policy = GatePolicy()
+        passed, details = policy.evaluate({})
+        assert passed is True
+
+    def test_weighted_average_correct(self):
+        from reasoner.domain.article_domain import GatePolicy, Threshold
+        policy = GatePolicy(thresholds=(
+            Threshold("claim_support", 0.0, 3.0),   # weight 3
+            Threshold("prose", 0.0, 1.0),            # weight 1
+        ))
+        scores = {"claim_support": 1.0, "prose": 0.0}
+        passed, details = policy.evaluate(scores)
+        # (1.0*3 + 0.0*1) / 4 = 0.75
+        assert details["score"] == 0.75
+
+    def test_per_content_class_policies_exist(self):
+        from reasoner.domain.article_domain import get_gate_policy
+        for cls in ("blog", "explainer", "op_ed", "policy_brief", "news_analysis", "technical", "greek_briefing"):
+            policy = get_gate_policy(cls)
+            assert len(policy.thresholds) > 0, f"{cls}: no thresholds"
+            assert policy.name == cls
+
+    def test_unknown_class_returns_default(self):
+        from reasoner.domain.article_domain import get_gate_policy
+        policy = get_gate_policy("unknown_class")
+        assert policy.name == "default"
+        assert len(policy.thresholds) >= 1
+
+    def test_policy_brief_strictest(self):
+        from reasoner.domain.article_domain import get_gate_policy
+        policy = get_gate_policy("policy_brief")
+        thresholds = {t.dimension: t for t in policy.thresholds}
+        assert thresholds["claim_support"].min_value >= 0.75
+        assert thresholds["citation_accuracy"].min_value >= 0.80
+        assert thresholds["policy_compliance"].min_value >= 0.85
+
+
+class TestAuditPromptLedgerInclusion:
+    """Audit prompt must include the claim ledger (G5)."""
+
+    @pytest.mark.parametrize("tc_name", [
+        "blog_climate", "policy_eu_data", "explainer_quantum",
+        "greek_geopolitics",
+    ])
+    def test_audit_prompt_contains_ledger_when_available(self, tc_name):
+        from tests.test_article_golden_set import GOLDEN_SET, _build_state
+        tc = next(t for t in GOLDEN_SET if t.id == tc_name)
+        state = _build_state(tc)
+        state.writing_state["claim_ledger"] = [
+            {"claim": "Claim A", "source": "https://example.com", "status": "verified"},
+            {"claim": "Claim B", "source": None, "status": "speculative"},
+        ]
+        from reasoner.phases import article as article_prompts
+        prompt = article_prompts.article_final_audit_prompt(state)
+        assert "Claim Ledger" in prompt, f"{tc_name}: audit prompt missing Claim Ledger"
+        assert "Claim A" in prompt
+
+    def test_audit_prompt_works_without_ledger(self):
+        """Audit prompt must not crash when ledger is empty."""
+        from reasoner.domain.pipeline_state import PipelineState
+        state = PipelineState(problem="Test article")
+        from reasoner.phases import article as article_prompts
+        prompt = article_prompts.article_final_audit_prompt(state)
+        assert isinstance(prompt, str) and len(prompt) > 20
+
+    def test_audit_prompt_instructs_not_to_rederive(self):
+        from reasoner.domain.pipeline_state import PipelineState
+        state = PipelineState(problem="Test article")
+        state.writing_state["claim_ledger"] = [
+            {"claim": "C1", "source": "https://example.com", "status": "verified"},
+        ]
+        state.writing_state["final_article"] = "Test body."
+        from reasoner.phases import article as article_prompts
+        prompt = article_prompts.article_final_audit_prompt(state)
+        assert "do NOT re-derive" in prompt

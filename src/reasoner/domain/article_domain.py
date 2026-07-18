@@ -168,6 +168,167 @@ def claim_support_ratio(ledger: tuple[Claim, ...]) -> float:
     return score / len(factual)
 
 
+# ═════════════════════════════════════════════════════════════════════
+# Quality gates via Specification (§7.2 — G6)
+# ═════════════════════════════════════════════════════════════════════
+
+@dataclass(frozen=True)
+class Threshold:
+    """A single quality dimension with minimum value and weight."""
+    dimension: str
+    min_value: float
+    weight: float
+
+
+@dataclass(frozen=True)
+class GatePolicy:
+    """Specification pattern: weighted thresholds that define a quality bar.
+
+    A GatePolicy passes when:
+      1. ALL hard minimums are met (hard_ok)
+      2. The weighted average score >= 0.6
+    """
+    thresholds: tuple[Threshold, ...] = ()
+    name: str = "default"
+
+    def evaluate(self, audit_scores: dict[str, float]) -> tuple[bool, dict]:
+        """Evaluate audit scores against this policy.
+
+        Args:
+            audit_scores: dict of dimension -> score (0.0-1.0), e.g.
+                          {"claim_support": 0.8, "citation_accuracy": 0.9, ...}
+
+        Returns:
+            (passed, details) where details contains score, hard_ok, per-dim results.
+        """
+        if not self.thresholds:
+            return True, {"score": 1.0, "hard_ok": True, "reason": "no thresholds"}
+
+        details: dict = {}
+        weighted_sum = 0.0
+        total_weight = 0.0
+        hard_ok = True
+        failures: list[str] = []
+
+        for t in self.thresholds:
+            score = audit_scores.get(t.dimension, 0.0)
+            weighted_sum += score * t.weight
+            total_weight += t.weight
+            dim_ok = score >= t.min_value
+            if not dim_ok:
+                hard_ok = False
+                failures.append(f"{t.dimension}={score:.2f} < min={t.min_value:.2f}")
+            details[t.dimension] = {
+                "score": score,
+                "min": t.min_value,
+                "weight": t.weight,
+                "pass": dim_ok,
+            }
+
+        score = weighted_sum / total_weight if total_weight > 0 else 0.0
+        passed = hard_ok and score >= 0.6
+
+        return passed, {
+            "score": score,
+            "hard_ok": hard_ok,
+            "failures": failures,
+            "weighted_count": len(self.thresholds),
+        }
+
+
+# ── Per-content-class gate policies ──────────────────────────────
+# Trust dimensions weigh more and floor higher than prose dimensions.
+
+def get_gate_policy(content_class: str) -> GatePolicy:
+    """Return the appropriate GatePolicy for a content class.
+
+    Low-stakes content (blog, explainer) has lower bars.
+    High-stakes content (policy_brief, news_analysis) has stricter bars.
+    """
+    policies: dict[str, GatePolicy] = {
+        "blog": GatePolicy(
+            name="blog",
+            thresholds=(
+                Threshold("claim_support", 0.60, 2.0),
+                Threshold("citation_accuracy", 0.60, 2.0),
+                Threshold("internal_consistency", 0.55, 2.0),
+                Threshold("thesis_advancement", 0.50, 1.0),
+                Threshold("transition_quality", 0.50, 1.0),
+            ),
+        ),
+        "explainer": GatePolicy(
+            name="explainer",
+            thresholds=(
+                Threshold("claim_support", 0.65, 3.0),
+                Threshold("citation_accuracy", 0.65, 3.0),
+                Threshold("internal_consistency", 0.60, 2.0),
+                Threshold("thesis_advancement", 0.55, 1.0),
+            ),
+        ),
+        "op_ed": GatePolicy(
+            name="op_ed",
+            thresholds=(
+                Threshold("claim_support", 0.55, 2.0),
+                Threshold("citation_accuracy", 0.55, 2.0),
+                Threshold("internal_consistency", 0.60, 2.0),
+                Threshold("thesis_advancement", 0.70, 3.0),
+                Threshold("transition_quality", 0.60, 1.0),
+            ),
+        ),
+        "policy_brief": GatePolicy(
+            name="policy_brief",
+            thresholds=(
+                Threshold("claim_support", 0.80, 3.0),
+                Threshold("citation_accuracy", 0.85, 3.0),
+                Threshold("internal_consistency", 0.70, 2.0),
+                Threshold("thesis_advancement", 0.65, 2.0),
+                Threshold("redundancy_removed", 0.60, 1.0),
+                Threshold("policy_compliance", 0.90, 2.0),
+            ),
+        ),
+        "news_analysis": GatePolicy(
+            name="news_analysis",
+            thresholds=(
+                Threshold("claim_support", 0.75, 3.0),
+                Threshold("citation_accuracy", 0.80, 3.0),
+                Threshold("internal_consistency", 0.65, 2.0),
+                Threshold("thesis_advancement", 0.60, 1.0),
+                Threshold("policy_compliance", 0.80, 1.0),
+            ),
+        ),
+        "technical": GatePolicy(
+            name="technical",
+            thresholds=(
+                Threshold("claim_support", 0.75, 3.0),
+                Threshold("citation_accuracy", 0.80, 3.0),
+                Threshold("internal_consistency", 0.70, 2.0),
+                Threshold("thesis_advancement", 0.60, 1.0),
+                Threshold("redundancy_removed", 0.60, 1.0),
+            ),
+        ),
+        "greek_briefing": GatePolicy(
+            name="greek_briefing",
+            thresholds=(
+                Threshold("claim_support", 0.75, 3.0),
+                Threshold("citation_accuracy", 0.80, 3.0),
+                Threshold("internal_consistency", 0.65, 2.0),
+                Threshold("thesis_advancement", 0.60, 2.0),
+                Threshold("policy_compliance", 0.85, 2.0),
+            ),
+        ),
+    }
+    return policies.get(content_class, GatePolicy(name="default", thresholds=(
+        Threshold("claim_support", 0.60, 2.0),
+        Threshold("citation_accuracy", 0.60, 2.0),
+        Threshold("internal_consistency", 0.55, 1.0),
+    )))
+
+
+# ═════════════════════════════════════════════════════════════════════
+# Utility — text normalization for reconciliation
+# ═════════════════════════════════════════════════════════════════════
+
+
 def _normalize_claim_text(text: str) -> str:
     """Normalize claim text for hash-based matching.
 
