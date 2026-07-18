@@ -20,6 +20,7 @@ import httpx
 import openai
 
 from reasoner.core.constants import (
+    IMAGE_GEN_BUDGET_PRESET,
     IMAGE_GEN_COMPLETION_TIMEOUT_SECONDS,
     IMAGE_GEN_DEFAULT_ASPECT_RATIO,
     IMAGE_GEN_DEFAULT_HEIGHT,

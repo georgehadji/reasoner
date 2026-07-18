@@ -587,6 +587,12 @@ class LLMExecutor:
         NOTE: Caching, token accumulation, and cascading are not yet fully
         implemented for streaming.
         """
+        # Imported here (matching the local-import pattern used by the other
+        # methods in this class) so the degraded-response branches below can
+        # construct/isinstance-check it. Without this the name is undefined in
+        # this function's scope -> NameError whenever a stream degrades.
+        from reasoner.infrastructure.llm.ports import DegradedLLMResponse
+
         if "max_tokens" not in kwargs:
             kwargs["max_tokens"] = PHASE_TOKEN_BUDGETS.get(role, DEFAULT_MAX_TOKENS)
 

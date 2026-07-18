@@ -7,6 +7,7 @@ import logging
 from typing import Any
 
 from reasoner.core.constants import TRUNCATION, get_token_budget, DEFAULT_MAX_TOKENS
+from reasoner.infrastructure.search.discovery import get_search_client_for_method
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.domain.core_types import (
     SolutionCandidate,

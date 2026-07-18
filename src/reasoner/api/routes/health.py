@@ -108,7 +108,7 @@ async def health_check(request: Request):
             import asyncio
             from reasoner.infrastructure.redis.client import get_redis
             redis = get_redis()
-            await _aio_redis.wait_for(redis.ping(), timeout=5.0)
+            await asyncio.wait_for(redis.ping(), timeout=5.0)
             health["checks"]["redis"] = {"status": "ok"}
             from reasoner.metrics import REASONER_REDIS_POOL_SIZE
             pool_info = redis.connection_pool.max_connections

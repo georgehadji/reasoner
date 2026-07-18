@@ -10,7 +10,7 @@ import re
 from typing import Any
 
 from reasoner.infrastructure.widgets.protocol import BaseWidget, WidgetResult, WidgetType
-from reasoner.core.constants import OPENMETEO_GEOCODING_URL, OPENMETEO_FORECAST_URL
+from reasoner.core.constants import OPENMETEO_GEOCODING_URL, OPENMETEO_FORECAST_URL, TIMEOUTS
 
 
 class WeatherWidget(BaseWidget):
