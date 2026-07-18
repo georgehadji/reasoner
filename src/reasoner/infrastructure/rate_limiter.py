@@ -271,6 +271,8 @@ class RateLimiter:
                     "reason": "rate_limiter_unavailable",
                 }
             logger.warning("Redis unavailable, falling back to in-memory rate limiter for is_allowed.")
+            from reasoner.infrastructure.metrics import REASONER_VALKEY_FALLBACK_TOTAL
+            REASONER_VALKEY_FALLBACK_TOTAL.labels(subsystem="rate_limiter").inc()
             return await self._in_memory_is_allowed_for_user(client_id, 1.0, 1)
 
     async def is_allowed_for_user(
@@ -321,6 +323,8 @@ class RateLimiter:
                 "Redis unavailable, falling back to in-memory rate limiter for user %s (tier: %s).",
                 client_id, tier,
             )
+            from reasoner.infrastructure.metrics import REASONER_VALKEY_FALLBACK_TOTAL
+            REASONER_VALKEY_FALLBACK_TOTAL.labels(subsystem="rate_limiter").inc()
             return await self._in_memory_is_allowed_for_user(client_id, multiplier, 1)
 
     async def record_request(self, client_id: str) -> None:

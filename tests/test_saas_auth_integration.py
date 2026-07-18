@@ -24,6 +24,7 @@ from reasoner.infrastructure.auth import set_auth_adapter, get_auth_adapter
 from reasoner.api import app
 from reasoner.api.dependencies import _reset_quota_service
 from reasoner.application.services.quota_service import QuotaService
+from reasoner.core.settings import settings
 
 
 class _FakeQuotaRepository:
@@ -126,7 +127,7 @@ def test_run_pipeline_without_auth_still_works_in_legacy_mode(client):
 
 def test_run_pipeline_without_auth_rejected_when_legacy_disabled(client, monkeypatch):
     """SEC-005: Anonymous requests to /api/run are rejected when legacy API keys are disabled."""
-    monkeypatch.setenv("ENABLE_LEGACY_API_KEY", "false")
+    monkeypatch.setattr(settings, "ENABLE_LEGACY_API_KEY", False)
     response = client.post(
         "/api/run",
         json={"problem": "What is 2+2?", "preset": "multi-perspective-budget"},

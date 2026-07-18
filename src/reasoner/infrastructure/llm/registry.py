@@ -261,6 +261,10 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "hermes-4-405b":     {"model": "nousresearch/hermes-4-405b"},   # $1.00/$3.00 per M, 131K ctx — powerful critic
     "hermes-4-70b":      {"model": "nousresearch/hermes-4-70b"},    # $0.13/$0.40 per M, 131K ctx
     # ═══════════════════════════════════════════════════════════════
+    # Thinking Machines
+    # ═══════════════════════════════════════════════════════════════
+    "inkling":          {"model": "thinkingmachines/inkling"},      # $1/$4.05 per M, 1M ctx, 41B active/975B MoE
+    # ═══════════════════════════════════════════════════════════════
     # Morph — coding specialists
     # ═══════════════════════════════════════════════════════════════
     "morph-v3-large":    {"model": "morph/morph-v3-large"},         # $0.90/$1.90 per M, 262K ctx
@@ -437,7 +441,7 @@ _VENDOR_BLOC: dict[str, str] = {
     # United States / Western
     "anthropic": "US", "openai": "US", "google": "US", "x-ai": "US",
     "perplexity": "US", "meta-llama": "US", "meta": "US", "poolside": "US", "arcee-ai": "US",
-    "nvidia": "US", "nousresearch": "US", "morph": "US",
+    "nvidia": "US", "nousresearch": "US", "thinkingmachines": "US", "morph": "US",
     # China
     "deepseek": "CN", "qwen": "CN", "moonshotai": "CN", "z-ai": "CN",
     "xiaomi": "CN", "tencent": "CN", "bytedance-seed": "CN", "inclusionai": "CN",

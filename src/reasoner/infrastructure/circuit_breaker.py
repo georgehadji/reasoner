@@ -347,14 +347,14 @@ class RedisCircuitBreaker:
 
     async def _get_script(self):
         if self._script is None:
-            from reasoner.infrastructure.redis.client import get_redis
+            from reasoner.infrastructure.valkey.client import get_valkey_pool
             from pathlib import Path
 
-            redis = get_redis()
+            valkey = get_valkey_pool()
             script_path = (
-                Path(__file__).parent / "redis" / "scripts" / "circuit_breaker.lua"
+                Path(__file__).parent / "valkey" / "scripts" / "circuit_breaker.lua"
             )
-            self._script = redis.register_script(script_path.read_text())
+            self._script = valkey.register_script(script_path.read_text())
         return self._script
 
     @property
@@ -453,10 +453,10 @@ class RedisCircuitBreaker:
         """Manually reset circuit to closed state."""
         self._stats = CircuitBreakerStats()
         try:
-            from reasoner.infrastructure.redis.client import get_redis
+            from reasoner.infrastructure.valkey.client import get_valkey_pool
 
-            redis = get_redis()
-            await redis.delete(f"cb:{self.name}")
+            valkey = get_valkey_pool()
+            await valkey.delete(f"cb:{self.name}")
         except Exception:
             pass
 
@@ -511,9 +511,13 @@ def get_circuit_breaker(name: str) -> CircuitBreaker | RedisCircuitBreaker:
     from reasoner.core.settings import settings
 
     mode = settings.CIRCUIT_BREAKER_MODE.lower()
-    if mode == "redis":
+    if mode in ("redis", "valkey"):
         return _get_redis_circuit_breaker(name)
     return _get_memory_circuit_breaker(name)
+
+
+# Deprecated alias — use ValkeyCircuitBreaker (same implementation, renamed)
+ValkeyCircuitBreaker = RedisCircuitBreaker
 
 
 def get_all_circuit_breakers() -> dict[str, dict[str, Any]]:

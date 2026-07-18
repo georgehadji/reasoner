@@ -1,189 +1,138 @@
-# ACR Implementation Audit Report — Final
+# Implementation Audit Report
 
-**Audit Date:** 2026-07-09
-**Audit Scope:** Phases 1–7 + Integration Round
-**Commits:** `91086d5` through `3dca7fb`
-**Files:** 55+ new, 8 modified — ~6,200 LOC
-**Tests:** 138 test methods across 9 test files
-**Auditor:** Reasonix
+**Date:** 2026-07-18  
+**Scope:** Redis→Valkey migration, non-critical fixes, model registry additions  
+**Reviewer:** Reasonix (automated review subagent + manual inspection)
 
 ---
 
 ## 1. Executive Summary
 
-All 7 ACR phases plus the integration round have been delivered and audited. The system wires the full closed-loop adaptive pipeline: telemetry → registry → scorer → constraints → router → learning → benchmarks. Six bugs were found during audit and all have been fixed. The orchestrator now passes telemetry and run IDs through the router construction chain, ACR admin endpoints are live, the sliding window decay design gap is closed.
+The implementation covers **8 phases** across **19 modified files** and **8 new files**. Five blocking `NameError` bugs (import/function-call mismatch) were discovered during review and **fixed immediately**. The P1 dual-connection-pool issue in `api/__init__.py` was also fixed. After all fixes: **APPROVED** — all blocking/P1 issues resolved, only cosmetic P2 items remain.
 
-**Final Verdict: APPROVED WITH CHANGES** — all 40 plan deliverables implemented, 6 bugs fixed.
-
-### Key Metrics
-
-| Metric | Value |
-|--------|-------|
-| Plan deliverables implemented | 40/40 |
-| Bugs found in audit | 6 (all fixed) |
-| Tests passing | 138/138 |
-| Architecture violations | 0 |
-| Deferred items | 1 (wire main SSE entry point) |
+**Final severity summary:**
+| Severity | Count | Status |
+|----------|-------|--------|
+| P0 (blocking) | 5 | ✅ Fixed |
+| P1 (should-fix) | 2 | ✅ Fixed |
+| P2 (improvement) | 2 | 📝 Noted |
 
 ---
 
 ## 2. Plan Compliance Matrix
 
-### Phase 1: Call-Level Telemetry
-
-| Plan Item | Status |
-|-----------|--------|
-| `domain/telemetry.py` | ✅ Complete |
-| `core/ports/telemetry_port.py` — `CallTelemetryPort` | ✅ Complete |
-| `infrastructure/telemetry/call_telemetry_store.py` | ✅ Complete |
-| `migrations/006_call_telemetry.sql` | ✅ Complete |
-| `router.py` instrumented with telemetry | ✅ Complete |
-| `metrics.py` Prometheus metrics | ✅ Complete |
-
-### Phase 2: Capability Registry
-
-| Plan Item | Status |
-|-----------|--------|
-| `domain/model_capabilities.py` | ✅ Complete |
-| `core/ports/capability_registry_port.py` | ✅ Complete |
-| `infrastructure/llm/capability_registry.py` | ✅ Complete |
-
-### Phase 3: Task Requirements & Utility Scorer
-
-| Plan Item | Status |
-|-----------|--------|
-| `domain/task_requirements.py` | ✅ Complete |
-| `domain/scoring_weights.py` | ✅ Complete |
-| `application/services/role_requirements.py` (28 roles) | ⚠️ 28/30+ |
-| `application/services/utility_scorer.py` (weighted dot product) | ✅ Complete |
-
-### Phase 4: Constraint Checker
-
-| Plan Item | Status |
-|-----------|--------|
-| `core/ports/routing_constraint_port.py` | ✅ Complete |
-| 5 constraint implementations | ✅ Complete |
-| `application/services/constraint_resolver.py` | ✅ Complete |
-
-### Phase 5: Adaptive Router Service
-
-| Plan Item | Status |
-|-----------|--------|
-| `application/services/adaptive_routing.py` | ✅ Complete |
-| `core/settings.py` — ACR config | ✅ Complete |
-| Orchestrator integration hook | ✅ Complete |
-| ACR admin endpoints | ✅ Complete |
-
-### Phase 6: Online Learning Engine
-
-| Plan Item | Status |
-|-----------|--------|
-| `thompson_sampler.py` + `BetaPosterior.decay()` | ✅ Complete |
-| `quality_signals.py` (30/15/35/20 weights) | ✅ Complete |
-| `exploration.py` (15/10/5% rates) | ✅ Complete |
-| `online_learner.py` (batch processing) | ✅ Complete |
-| `ACR_LEARNING_ENABLED` setting | ✅ Complete |
-
-### Phase 7: Benchmark Engine
-
-| Plan Item | Status |
-|-----------|--------|
-| 8 benchmark suites | ✅ Complete |
-| `runner.py` (semaphore + cost caps) | ✅ Complete |
-| `engine.py` (registry export) | ✅ Complete |
-| `--benchmark` CLI | ✅ Complete |
-| `--benchmark-all` CLI | ✅ Complete |
-| `ACR_BENCHMARKS_ENABLED` setting | ✅ Complete |
+| Plan Item | Status | Evidence | Notes |
+|-----------|--------|----------|-------|
+| **Phase 1** — Port definitions | ✅ Complete | `core/ports/shared_cache_port.py`, `core/ports/distributed_state_port.py` | Follows existing `@runtime_checkable` + `Protocol` pattern |
+| **Phase 2** — Adapter implementations | ✅ Complete | `infrastructure/valkey/` (8 files) | 4 adapters, client, scripts. Port conformance verified |
+| **Phase 3** — Consumer migration | ✅ Complete | 14 of 15 locations updated | 1 remaining (`rate_limiter.py:86`) works through old module |
+| **Phase 4** — Renames | ✅ Complete | Settings, Docker, circuit breaker, health, UI | Backward compat preserved |
+| **Phase 5#4** — Billing consolidation | ✅ Complete | `app-store.ts`, `useSubscription.ts` | 4→1 shared fetch |
+| **Phase 5#5** — SSE worker warning | ✅ Complete | `api/__init__.py` | Warns single-worker in non-dev |
+| **Phase 5#6** — Valkey fallback metrics | ✅ Complete | `metrics.py`, `rate_limiter.py` | Counter + gauge |
+| **Phase 5#7** — Neuro recall timeout | ✅ Complete | `settings.py`, `orchestrator.py` | Separate budget from HyperGate |
+| **Phase 5#8** — Duplicate PipelineCompleted | ✅ Complete | `api/execution/pipeline.py` | Handler is single source per CQRS |
+| **Bugfix** — streaming disconnect | ✅ Complete | `streaming.py:204` | `await request.is_disconnected()` |
+| **Bugfix** — total_tokens type | ✅ Complete | `handlers.py:164`, `bus.py:420` | `int`→`dict` + defensive guard |
+| **Model** — inkling | ✅ Complete | `registry.py`, `constants_models.py`, `harness_guard.py` | US bloc |
 
 ---
 
-## 3. Architecture Compliance
+## 3. Architecture Compliance Assessment
 
-All 7 hexagonal DDD checks pass:
-- Domain layer pure (zero infra imports)
-- Core ports abstract
-- Infrastructure adapters implement ports
-- `infrastructure/learning/` → no application/api imports
-- `infrastructure/benchmarks/` → no application/api imports
-- Thompson Sampling uses stdlib only (`math`, `random`)
-- Benchmark runner uses `asyncio.Semaphore`
+### Hexagonal Ports & Adapters ✅
 
-### Design Decisions Verified
+The new `SharedCachePort` and `DistributedStatePort` follow the established pattern:
+- `@runtime_checkable` + `Protocol` (no ABC, duck-typed)
+- Methods use `...` body convention
+- Docstrings name concrete implementors
+- Port→adapter conformance verified at import time
 
-| Decision | Plan | Actual |
-|----------|------|--------|
-| Capability matching | Weighted dot product (not cosine) | ✅ Correct |
-| Constraints before ranking | Filter → Rank | ✅ Correct |
-| Progressive adoption | Shadow → Advisory → Adaptive | ✅ Correct |
-| Reward weights | 30/15/35/20% | ✅ Exact match |
-| Exploration rates | Budget 15%, Premium 5% | ✅ Budget 15%, Balanced 10%, Premium 5% |
-| Benchmark budget | $2.00 per model | ✅ Exact match |
+### Dependency Rule ✅
+
+Ports in `core/ports/` import nothing from `infrastructure/`. Adapters in `infrastructure/valkey/` import from `core/ports/` (correct hexagonal direction).
+
+### Pre-existing Violations (Not Introduced)
+
+- `infrastructure/valkey/client.py` uses module-level global `_pool` (service locator) — inherited from original `redis/client.py`
+- `infrastructure/rate_limiter.py:28,86` — one remaining old-module import
 
 ---
 
 ## 4. Code Quality Findings
 
 ### Strengths
-- Zero new external dependencies across all phases
-- Defensive error handling — telemetry failures never affect LLM calls
-- Lazy imports avoid circular dependencies
-- Configuration over hardcoding — exploration rates, budgets, batch sizes all configurable
-- Frozen dataclasses throughout for immutability
+- **Backward compatibility**: `get_redis()`, `REDIS_URL`, `RedisCircuitBreaker` all preserved as deprecated aliases
+- **Fail-safe design**: All Valkey consumers fall back to in-memory; `REASONER_VALKEY_FALLBACK_TOTAL` makes this observable
+- **Deduplication**: `fetchSubscription` guards against concurrent fetches
+- **Timeout isolation**: Neuro recall and HyperGate have independent budgets
+- **Event sourcing preserved**: `_persist_event` kept; only bus duplicate removed
+- **Lua scripts**: Copied (not moved) — old path still works during transition
 
-### Issues Found & Fixed
-- 3 unused imports removed (Phase 4 constraints)
-- `sample_count` type mismatch fixed (engine.py)
-- `asyncio.run()` nested in running loop fixed (main.py)
-- Admin error swallowing → HTTP 500 with logging (admin.py)
-- Telemetry lost on auto-method path fixed (orchestrator.py)
-- ACR fallback/cascading dropped during rebuild fixed (orchestrator.py)
+### Issues Found (All Fixed)
+
+| # | File | Issue | Fix |
+|---|------|-------|-----|
+| 1 | `run_state.py:60` | Imported `get_valkey_pool`, called `get_redis()` | Changed to `get_valkey_pool()` |
+| 2 | `cached_quota_repo.py:28` | Same pattern | Changed to `get_valkey_pool()` |
+| 3 | `cached_subscription_repo.py:81,101` | Same pattern (2 sites) | Changed to `get_valkey_pool()` |
+| 4 | `saas_router.py:284` | Same pattern | Changed to `get_valkey_pool()` |
+| 5 | `webhooks.py:264,293` | PayPal handler: `redis = get_redis()` + `valkey` undefined | Changed to `valkey = get_valkey_pool()` |
+| 6 | `api/__init__.py:108-121` | Dual connection pool (old module import) | Changed to `valkey.client` |
+| 7 | `api/__init__.py:157-169` | Second probe + wrong indentation | Fixed import + indentation |
+| 8 | `api/__init__.py:256-258` | Shutdown `close_redis` from old module | Changed to `close_valkey_pool` |
+
+### Minor Observations
+- **`self._redis` variable names** retained — cosmetic; rename in follow-on
+- **Log messages** still say "Redis" in some files — non-blocking
 
 ---
 
 ## 5. Testing & Coverage Assessment
 
-| Test File | Tests | Phase |
-|-----------|-------|-------|
-| `test_call_telemetry.py` | 7 | P1 |
-| `test_call_telemetry_store.py` | 6 | P1 |
-| `test_capability_registry.py` | 16 | P2 |
-| `test_utility_scorer.py` | 18 | P3 |
-| `test_constraints.py` | 16 | P4 |
-| `test_adaptive_routing.py` | 8 | P5 |
-| `test_online_learning.py` | 35 | P6 |
-| `test_benchmarks.py` | 16 | P7 |
-| **Total** | **138** | **All** |
+| Area | Status | Notes |
+|------|--------|-------|
+| Event bus tests | ✅ 13/13 pass | `tests/test_event_bus.py` |
+| TypeScript | ✅ 0 errors | `npx tsc --noEmit` |
+| Port protocol conformance | ✅ Verified | `isinstance(ValkeyCacheAdapter(), SharedCachePort)` |
+| Import integrity | ✅ All modules import | 8 new + all fixed files |
+| Rate limiter fallback metrics | ⚠️ No test | Prometheus counter untested |
+| Neuro recall timeout | ⚠️ No test | Integration test gap |
+| Billing consolidation | ⚠️ No test | No Zustand store tests |
+| Valkey adapters | ⚠️ No test | Infrastructure adapters untested |
 
 ---
 
 ## 6. Risk & Regression Analysis
 
-| Risk | Severity | Status |
-|------|----------|--------|
-| Main SSE path doesn't wire telemetry/ACR | **High** | Deferred — `pipeline.py:80` needs wiring |
-| Run ID mismatch preflight vs postflight | **Medium** | Deferred — two separate UUIDs generated |
-| Streaming not instrumented | **Medium** | Deferred — only non-streaming path emits telemetry |
-| No telemetry retention policy | **Low** | Deferred — plan recommends 30-day vacuum |
+### Backward Compatibility ✅
+- `REDIS_URL` falls back from `VALKEY_URL`
+- `get_redis()` deprecated alias → `get_valkey_pool()`
+- `RedisCircuitBreaker` = `ValkeyCircuitBreaker` alias
+- Docker: both `REDIS_URL` and `VALKEY_URL` set
+- `CIRCUIT_BREAKER_MODE` accepts both `"redis"` and `"valkey"`
 
-All changes are opt-in, backward compatible, and zero-impact when disabled (default state).
+### Remaining P2 Items
+| Risk | File | Notes |
+|------|------|-------|
+| Old module import | `rate_limiter.py:28,86` | Works through old `redis/client.py`; not a crash risk |
+| Cosmetic naming | Various files | `self._redis` attributes; log messages |
 
 ---
 
 ## 7. Required Corrections
 
-| # | Severity | File | Issue | Status |
-|---|----------|------|-------|--------|
-| C1 | Critical | `main.py:140,161` | `asyncio.run()` nested in running loop | ✅ Fixed |
-| C2 | High | `orchestrator.py:234` | Telemetry lost on auto-method path | ✅ Fixed |
-| C3 | High | `orchestrator.py:121` | ACR rebuild drops fallback/cascading | ✅ Fixed |
-| C4 | Medium | `admin.py:162,197` | Error swallowing as HTTP 200 | ✅ Fixed |
-| C5 | Medium | `thompson_sampler.py` | Missing sliding window decay | ✅ Fixed |
-| C6 | Low | `engine.py:99` | `sample_count` type mismatch | ✅ Fixed |
+*All P0 and P1 items have been fixed during this review.*
+
+| Severity | File | Issue | Status |
+|----------|------|-------|--------|
+| P2 | `rate_limiter.py:28,86` | Old module import | Deferred |
+| P2 | Various | `self._redis` attribute names | Deferred |
 
 ---
 
 ## 8. Final Verdict
 
-### **APPROVED WITH CHANGES**
+### APPROVED
 
-All 40 plan deliverables implemented across 7 phases. Six bugs found during audit — all fixed. One item deferred for next sprint: wiring the main SSE entry point (`pipeline.py:80`) to construct `PipelineOrchestrator` with `telemetry_store` and `adaptive_routing` so ACR activates in production.
+All 5 blocking `NameError` bugs and both P1 dual-pool issues have been fixed. The architecture follows the established hexagonal pattern. Backward compatibility is comprehensively preserved. The remaining P2 items are cosmetic and pose no runtime risk.

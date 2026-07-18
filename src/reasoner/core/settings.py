@@ -128,6 +128,18 @@ class Settings:
     RATE_LIMITER_REDIS_FAILURE_MODE: str = os.getenv("RATE_LIMITER_REDIS_FAILURE_MODE", "fail_closed")
     CIRCUIT_BREAKER_MODE: str = os.getenv("CIRCUIT_BREAKER_MODE", "redis")
 
+    # ── Valkey connection (canonical; falls back to REDIS_URL for backward compat) ──
+    VALKEY_URL: str = os.getenv(
+        "VALKEY_URL",
+        os.getenv("REDIS_URL", "redis://localhost:6379/0"),
+    )
+    VALKEY_MAX_CONNECTIONS: int = int(
+        os.getenv(
+            "VALKEY_MAX_CONNECTIONS",
+            os.getenv("REDIS_MAX_CONNECTIONS", "100"),
+        )
+    )
+
     # ── CORS ──
     CORS_ORIGINS: str = os.getenv(
         "CORS_ORIGINS",
@@ -153,6 +165,10 @@ class Settings:
     NEURO_EMBEDDING_FALLBACK_MODELS: str = os.getenv(
         "NEURO_EMBEDDING_FALLBACK_MODELS",
         "openai/text-embedding-3-small,baai/bge-m3",
+    )
+    # Neuro recall timeout during pipeline preflight (default 10s)
+    NEURO_RECALL_TIMEOUT_SECONDS: float = float(
+        os.getenv("NEURO_RECALL_TIMEOUT_SECONDS", "10.0")
     )
 
     # ── Multi-Provider Fallback ──

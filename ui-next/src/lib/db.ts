@@ -95,9 +95,13 @@ export async function loadConversationsPage(
   const results: Conversation[] = [];
   let lastCursor: IDBValidKey | undefined;
 
-  let cursorResult = await (cursor
-    ? index.openCursor(cursor as string | IDBKeyRange, direction)
-    : index.openCursor(null, direction));
+  const range = cursor === undefined
+    ? null
+    : direction === 'prev'
+      ? IDBKeyRange.upperBound(cursor, true)
+      : IDBKeyRange.lowerBound(cursor, true);
+
+  let cursorResult = await index.openCursor(range, direction);
 
   while (cursorResult && results.length < PAGE_SIZE) {
     results.push(cursorResult.value as Conversation);

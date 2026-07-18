@@ -415,9 +415,14 @@ async def track_pipeline_metrics(event: DomainEvent) -> None:
     )
     
     if isinstance(event, PipelineCompleted):
+        token_info = event.total_tokens
+        if isinstance(token_info, dict):
+            token_str = f"{token_info.get('total', 0)} tokens"
+        else:
+            token_str = f"{token_info} tokens"
         logger.info(
             f"Pipeline completed: {event.total_duration_seconds:.2f}s, "
-            f"{event.total_tokens.get('total', 0)} tokens"
+            f"{token_str}"
         )
     elif isinstance(event, PipelineFailed):
         logger.warning(f"Pipeline failed: {event.error}")

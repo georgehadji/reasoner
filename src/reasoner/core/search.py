@@ -6,6 +6,7 @@ Provides internal web search capabilities for context enrichment.
 from __future__ import annotations
 
 import asyncio
+import importlib
 import json
 import logging
 import os
@@ -58,13 +59,23 @@ def set_searxng_cb(cb) -> None:
 
 # Re-export discovery client helpers so tests can import them from core.search.
 # Lazy to avoid circular imports at module load time.
+_DISCOVERY_MODULE = None
+
+
+def _get_discovery_module():
+    global _DISCOVERY_MODULE
+    if _DISCOVERY_MODULE is None:
+        _DISCOVERY_MODULE = importlib.import_module(
+            "reasoner.infrastructure.search.discovery"
+        )
+    return _DISCOVERY_MODULE
+
+
 def get_discovery_client(*args, **kwargs):
-    from reasoner.infrastructure.search.discovery import get_discovery_client as _f
-    return _f(*args, **kwargs)
+    return _get_discovery_module().get_discovery_client(*args, **kwargs)
 
 def reset_discovery_client(*args, **kwargs):
-    from reasoner.infrastructure.search.discovery import reset_discovery_client as _f
-    return _f(*args, **kwargs)
+    return _get_discovery_module().reset_discovery_client(*args, **kwargs)
 
 logger = logging.getLogger(__name__)
 
@@ -300,17 +311,22 @@ def _should_include_result(result: dict[str, Any]) -> bool:
 
 from reasoner.core.ports.search_port import SearchServicePort
 
-# ── Backward-compat re-exports ──
-# These moved to reasoner.infrastructure.search.discovery during the search
-# refactor; re-export from the legacy path for existing importers.
-from reasoner.infrastructure.search.discovery import (  # noqa: E402,F401
-    PerplexitySearchClient,
-    DiscoveryClient,
-    get_search_client,
-    _decompose_query,
-    _extract_search_keywords,
-    _DECOMPOSITION_CACHE,
-    _DECOMPOSITION_TTL_SECONDS,
-)
+_DISCOVERY_EXPORTS = {
+    "PerplexitySearchClient",
+    "DiscoveryClient",
+    "get_search_client",
+    "_decompose_query",
+    "_extract_search_keywords",
+    "_DECOMPOSITION_CACHE",
+    "_DECOMPOSITION_TTL_SECONDS",
+}
+
+
+def __getattr__(name: str):
+    if name in _DISCOVERY_EXPORTS:
+        value = getattr(_get_discovery_module(), name)
+        globals()[name] = value
+        return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 

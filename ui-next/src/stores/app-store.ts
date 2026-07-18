@@ -4,6 +4,8 @@ import type { User as SupabaseUser } from '@supabase/supabase-js';
 import { Conversation } from '@/lib/types';
 import { STORAGE_KEYS, LIMITS } from '@/lib/config';
 import { shallow } from 'zustand/shallow';
+import type { SubscriptionStatus } from '@/hooks/useSubscription';
+import { apiFetch } from '@/lib/api-client';
 
 export interface ComposerAttachment {
   id: string;
@@ -68,6 +70,12 @@ interface AppState {
   setUser: (user: SupabaseUser | null) => void;
   setAuthLoading: (loading: boolean) => void;
   logout: () => void;
+
+  // Subscription (shared cache — single fetch across all components)
+  subscription: SubscriptionStatus | null;
+  subscriptionLoading: boolean;
+  subscriptionError: string | null;
+  fetchSubscription: () => Promise<void>;
 }
 
 export const useAppStore = create<AppState>()(
@@ -90,6 +98,11 @@ export const useAppStore = create<AppState>()(
       user: null,
       isAuthenticated: false,
       isAuthLoading: true,
+
+      // Subscription (shared — single fetch, not persisted)
+      subscription: null,
+      subscriptionLoading: false,
+      subscriptionError: null,
 
       setRunning: (running) => set({ running }),
 
@@ -167,6 +180,28 @@ export const useAppStore = create<AppState>()(
 
       /** Returns the preset string to send to the API: "auto-budget" or "auto-premium". */
       getAutoPreset: () => `auto-${get().tier}`,
+
+      // ── Subscription (shared cache — single fetch across all components) ──
+
+      fetchSubscription: async () => {
+        if (get().subscriptionLoading) return; // deduplicate concurrent fetches
+        set({ subscriptionLoading: true, subscriptionError: null });
+        try {
+          const res = await apiFetch('/api/billing/subscription');
+          if (res.ok) {
+            const data: SubscriptionStatus = await res.json();
+            set({ subscription: data, subscriptionLoading: false });
+          } else {
+            set({ subscription: null, subscriptionLoading: false });
+          }
+        } catch (err) {
+          set({
+            subscription: null,
+            subscriptionLoading: false,
+            subscriptionError: err instanceof Error ? err.message : 'Failed to fetch subscription',
+          });
+        }
+      },
     }),
     {
       name: STORAGE_KEYS.appStore,

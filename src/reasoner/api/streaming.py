@@ -201,7 +201,7 @@ async def run_stream(
         _disconnect_check_counter += 1
         if _disconnect_check_counter % 10 == 0 and request is not None:
             try:
-                if request.is_disconnected():
+                if await request.is_disconnected():
                     logger.info("SSE client disconnected — cancelling pipeline run %s", run_id)
                     task.cancel()
                     break

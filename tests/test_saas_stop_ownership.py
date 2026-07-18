@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from reasoner.api.run_state import RunStateStore
+from reasoner.infrastructure.auth import set_auth_adapter
 from reasoner.infrastructure.auth.local_adapter import LocalAuthAdapter
 
 
@@ -21,6 +22,8 @@ def run_store():
 def stop_client(monkeypatch):
     """Build a TestClient with the stop endpoint mounted."""
     monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key-for-local-auth-adapter-only")
+    adapter = LocalAuthAdapter(secret="test-secret-key-for-local-auth-adapter-only")
+    set_auth_adapter(adapter)
 
     # Use a fresh RunStateManager with its own fallback store
     from reasoner.infrastructure.redis.run_state import RunStateManager
@@ -45,18 +48,19 @@ def stop_client(monkeypatch):
     from reasoner.api.csrf import sign_csrf_token
 
     client = TestClient(app)
-    return client, fresh_manager, sign_csrf_token
+    yield client, fresh_manager, sign_csrf_token
+    set_auth_adapter(None)
 
 
 @pytest.fixture
 def user_a_token():
-    adapter = LocalAuthAdapter()
+    adapter = LocalAuthAdapter(secret="test-secret-key-for-local-auth-adapter-only")
     return adapter.create_token("11111111-1111-1111-1111-111111111111", "user-a@example.com")
 
 
 @pytest.fixture
 def user_b_token():
-    adapter = LocalAuthAdapter()
+    adapter = LocalAuthAdapter(secret="test-secret-key-for-local-auth-adapter-only")
     return adapter.create_token("22222222-2222-2222-2222-222222222222", "user-b@example.com")
 
 

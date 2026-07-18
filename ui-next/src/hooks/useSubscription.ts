@@ -1,5 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
-import { apiFetch } from '@/lib/api-client';
+'use client';
+
+import { useEffect } from 'react';
+import { useAppStore } from '@/stores/app-store';
+import { shallow } from 'zustand/shallow';
 
 export interface SubscriptionStatus {
   tier: string;
@@ -8,38 +11,24 @@ export interface SubscriptionStatus {
   cancel_at_period_end?: boolean;
 }
 
+/**
+ * Shared subscription hook — reads from the Zustand app store.
+ * A single fetch is shared across all components (Dashboard, Settings,
+ * Composer, UserMenu) to eliminate duplicate API calls.
+ */
 export function useSubscription() {
-  const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const refresh = useCallback(async (signal?: AbortSignal) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await apiFetch('/api/billing/subscription');
-      if (signal?.aborted) return;
-      if (res.ok) {
-        const data = await res.json();
-        setSubscription(data);
-      } else {
-        setSubscription(null);
-      }
-    } catch (err) {
-      if (signal?.aborted) return;
-      setError(err instanceof Error ? err.message : 'Failed to fetch subscription');
-    } finally {
-      if (!signal?.aborted) {
-        setLoading(false);
-      }
-    }
-  }, []);
+  const subscription = useAppStore((s) => s.subscription);
+  const loading = useAppStore((s) => s.subscriptionLoading);
+  const error = useAppStore((s) => s.subscriptionError);
+  const fetchSubscription = useAppStore((s) => s.fetchSubscription);
 
   useEffect(() => {
-    const controller = new AbortController();
-    refresh(controller.signal);
-    return () => controller.abort();
-  }, [refresh]);
+    // Fetch on first mount if never fetched; subsequent mounts are no-ops
+    // because fetchSubscription deduplicates concurrent calls.
+    fetchSubscription();
+  }, [fetchSubscription]);
+
+  const refresh = () => fetchSubscription();
 
   return { subscription, loading, error, refresh };
 }

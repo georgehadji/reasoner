@@ -167,11 +167,11 @@ class HyperGateAgent:
         self._tiebreaker = TieBreakerSubAgent()
 
     async def _get_l2_cache(self, problem_hash: str) -> GateDecision | None:
-        """Fetch from shared Redis L2 cache if available."""
-        from reasoner.infrastructure.redis.client import get_redis
+        """Fetch from shared Valkey L2 cache if available."""
+        from reasoner.infrastructure.valkey.client import get_valkey_pool
         import json
         try:
-            r = get_redis()
+            r = get_valkey_pool()
             val = await r.get(f"hypergate:{problem_hash}")
             if val:
                 data = json.loads(val)
@@ -189,11 +189,11 @@ class HyperGateAgent:
         return None
 
     async def _set_l2_cache(self, problem_hash: str, decision: GateDecision) -> None:
-        """Save to shared Redis L2 cache with short TTL."""
-        from reasoner.infrastructure.redis.client import get_redis
+        """Save to shared Valkey L2 cache with short TTL."""
+        from reasoner.infrastructure.valkey.client import get_valkey_pool
         import json
         try:
-            r = get_redis()
+            r = get_valkey_pool()
             data = {
                 "action": decision.action,
                 "method": decision.method,

@@ -92,6 +92,21 @@ REASONER_REDIS_POOL_SIZE = Gauge(
     "Current Redis connection pool size",
 )
 
+# ═══════════════════════════════════════════════════════════════
+# Valkey metrics (successor to Redis metrics — keep both during migration)
+# ═══════════════════════════════════════════════════════════════
+
+REASONER_VALKEY_POOL_SIZE = Gauge(
+    "reasoner_valkey_pool_size",
+    "Current Valkey connection pool size",
+)
+
+REASONER_VALKEY_FALLBACK_TOTAL = Counter(
+    "reasoner_valkey_fallback_total",
+    "Number of times Valkey was unavailable and an in-memory fallback was used",
+    ["subsystem"],  # "rate_limiter" | "circuit_breaker" | "run_state" | "cache" | "hypergate"
+)
+
 # Cache metrics
 REASONER_CACHE_HIT_RATE = Gauge(
     "reasoner_cache_hit_rate",

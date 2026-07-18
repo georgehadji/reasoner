@@ -98,23 +98,23 @@ async def health_check(request: Request):
             health["checks"]["postgres"] = {"status": "error", "reason": str(e)}
             _health_postgres_pool = None
 
-    # Redis check
+    # Valkey check (canonical; falls back to REDIS_URL for backward compat)
     import os
-    _redis_url = os.environ.get("REDIS_URL", "")
-    if not _redis_url:
-        health["checks"]["redis"] = {"status": "ok", "reason": "not configured"}
+    _valkey_url = os.environ.get("VALKEY_URL") or os.environ.get("REDIS_URL", "")
+    if not _valkey_url:
+        health["checks"]["valkey"] = {"status": "ok", "reason": "not configured"}
     else:
         try:
             import asyncio
-            from reasoner.infrastructure.redis.client import get_redis
-            redis = get_redis()
-            await asyncio.wait_for(redis.ping(), timeout=5.0)
-            health["checks"]["redis"] = {"status": "ok"}
-            from reasoner.metrics import REASONER_REDIS_POOL_SIZE
-            pool_info = redis.connection_pool.max_connections
-            REASONER_REDIS_POOL_SIZE.set(pool_info or 0)
+            from reasoner.infrastructure.valkey.client import get_valkey_pool
+            valkey_client = get_valkey_pool()
+            await asyncio.wait_for(valkey_client.ping(), timeout=5.0)
+            health["checks"]["valkey"] = {"status": "ok"}
+            from reasoner.infrastructure.metrics import REASONER_VALKEY_POOL_SIZE
+            pool_info = valkey_client.connection_pool.max_connections
+            REASONER_VALKEY_POOL_SIZE.set(pool_info or 0)
         except Exception as e:
-            health["checks"]["redis"] = {"status": "error", "reason": str(e)}
+            health["checks"]["valkey"] = {"status": "error", "reason": str(e)}
 
     # Stripe check
     try:

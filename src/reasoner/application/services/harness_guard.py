@@ -63,6 +63,8 @@ _MODEL_LABS: dict[str, str] = {
     "nvidia-nemotron-super": "nvidia",
     # NousResearch
     "hermes-4-70b": "nousresearch",
+    # Thinking Machines
+    "inkling": "thinkingmachines",
     # Poolside
     "laguna-xs-2.1": "poolside",
     # Sourceful

@@ -193,3 +193,6 @@ MODEL_RIVERFLOW_V2_MAX_PREVIEW: str = "riverflow-v2-max-preview"
 MODEL_RIVERFLOW_V2_STANDARD_PREVIEW: str = "riverflow-v2-standard-preview"
 MODEL_RIVERFLOW_V2_FAST_PREVIEW: str = "riverflow-v2-fast-preview"
 
+# Thinking Machines
+MODEL_INKLING: str = "inkling"
+

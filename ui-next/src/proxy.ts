@@ -2,50 +2,17 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { CSRF_COOKIE, CSRF_HEADER } from '@/lib/security-constants';
 import { generateSignedCsrfToken, verifyCsrfToken } from '@/lib/security-server';
-
-import { REASONER_WS_PORTS, REASONER_WS_HOSTS } from '@/lib/server-config';
+import { buildContentSecurityPolicy } from '@/lib/security-csp';
 import { TIMING } from '@/lib/config';
 
 const HSTS_VALUE = 'max-age=31536000; includeSubDomains; preload';
 
-function buildConnectSrc(): string {
-  const wsOrigins = new Set<string>();
-  for (const port of REASONER_WS_PORTS) {
-    for (const host of REASONER_WS_HOSTS) {
-      wsOrigins.add(`ws://${host}:${port}`);
-    }
-  }
-  const wsUrl = process.env.NEXT_PUBLIC_WS_URL || '';
-  if (wsUrl) {
-    try {
-      const u = new URL(wsUrl);
-      const port = u.port || REASONER_WS_PORTS[0];
-      wsOrigins.add(`ws://${u.hostname}:${port}`);
-      if (!REASONER_WS_HOSTS.includes(u.hostname)) {
-        wsOrigins.add(`wss://${u.hostname}:${port}`);
-      }
-    } catch { /* fall back to dev defaults */ }
-  }
-  return `connect-src 'self' ${[...wsOrigins].join(' ')}`;
-}
-
 export async function proxy(request: NextRequest) {
   const response = NextResponse.next();
 
-  const scriptSrc = process.env.NODE_ENV === 'production'
-    ? "script-src 'self'"
-    : "script-src 'self' 'unsafe-inline' 'unsafe-eval'";
-  const csp = [
-    "default-src 'self'",
-    scriptSrc,
-    "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data:",
-    "font-src 'self'",
-    buildConnectSrc(),
-    "frame-ancestors 'none'",
-    "base-uri 'self'",
-    "form-action 'self'",
-  ].join('; ');
+  const csp = buildContentSecurityPolicy({
+    allowUnsafeScripts: process.env.NODE_ENV !== 'production',
+  });
 
   response.headers.set('Content-Security-Policy', csp);
   response.headers.set('X-Frame-Options', 'DENY');

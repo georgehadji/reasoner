@@ -19,7 +19,7 @@ from datetime import datetime
 from uuid import UUID
 
 from reasoner.domain.saas import Subscription, SubscriptionStatus, SubscriptionTier
-from reasoner.infrastructure.redis.client import get_redis
+from reasoner.infrastructure.valkey.client import get_valkey_pool
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +78,7 @@ async def invalidate_subscription(user_id: str) -> None:
     of immediately, which must never fail the webhook.
     """
     try:
-        await get_redis().delete(_cache_key(user_id))
+        await get_valkey_pool().delete(_cache_key(user_id))
     except Exception as exc:
         logger.warning(
             "Redis subscription cache invalidate failed for %s "
@@ -98,7 +98,7 @@ class CachedSubscriptionRepository:
 
     def __init__(self, underlying):
         self._underlying = underlying
-        self._redis = get_redis()
+        self._redis = get_valkey_pool()
 
     async def get_subscription_by_user(self, user_id: str) -> Subscription | None:
         cache_key = _cache_key(user_id)

@@ -43,7 +43,7 @@ export function useWebSocketPipeline() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 3000);
     try {
-      const healthResp = await fetchWithCsrf('/api/neuro/health', { signal: controller.signal });
+      const healthResp = await fetchWithCsrf('/api/health', { signal: controller.signal });
       if (!healthResp.ok) {
         const msg = `Backend returned ${healthResp.status} — cannot establish WebSocket`;
         setLastError(msg);
@@ -81,7 +81,6 @@ export function useWebSocketPipeline() {
     ws.onopen = () => {
       reconnectCountRef.current = 0;
       setStatus('connected');
-      // eslint-disable-next-line no-console
       console.debug('[WebSocket] connected for pipeline:', pipelineId);
     };
 
@@ -96,11 +95,10 @@ export function useWebSocketPipeline() {
       }
     };
 
-    ws.onerror = (_err: Event) => {
+    ws.onerror = () => {
       // Browser WebSocket error events are intentionally opaque (no detail exposed for security).
       // Diagnose the likely cause by checking backend health.
       const msg = lastErrorRef.current || 'WebSocket connection failed';
-      // eslint-disable-next-line no-console
       console.error('[WebSocket] error:', msg);
     };
 
@@ -113,7 +111,6 @@ export function useWebSocketPipeline() {
         reconnectCountRef.current += 1;
         const delay = WS.baseReconnectDelayMs * Math.pow(2, reconnectCountRef.current - 1);
         setStatus('reconnecting');
-        // eslint-disable-next-line no-console
         console.debug(`[WebSocket] reconnecting in ${delay}ms (attempt ${reconnectCountRef.current})`);
         reconnectTimerRef.current = setTimeout(() => {
           if (onEventRef.current) doConnectRef.current?.(pipelineId, onEventRef.current);

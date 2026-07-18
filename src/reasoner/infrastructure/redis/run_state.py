@@ -56,8 +56,8 @@ class RunStateManager:
     def _get_redis(self) -> Any:
         """Lazy-load Redis client."""
         if self._redis is None:
-            from reasoner.infrastructure.redis.client import get_redis
-            self._redis = get_redis()
+            from reasoner.infrastructure.valkey.client import get_valkey_pool
+            self._redis = get_valkey_pool()
         return self._redis
 
     async def _ensure_lua(self) -> None:

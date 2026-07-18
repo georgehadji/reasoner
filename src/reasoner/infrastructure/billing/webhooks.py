@@ -12,7 +12,7 @@ from fastapi import Request
 
 from reasoner.infrastructure.billing.stripe_adapter import StripeBillingAdapter
 from reasoner.infrastructure.billing.paypal_adapter import PayPalBillingAdapter
-from reasoner.infrastructure.redis.client import get_redis
+from reasoner.infrastructure.valkey.client import get_valkey_pool
 
 logger = logging.getLogger(__name__)
 
@@ -183,20 +183,20 @@ async def handle_stripe_webhook(request: Request) -> dict:
 
     # Two-phase deduplication (Critical Enhancement 4.9 + Audit Fix B.4)
     # Uses atomic SET NX to eliminate the TOCTOU race between GET and SETEX.
-    redis = get_redis()
+    valkey = get_valkey_pool()
     completed_key = f"stripe_webhook:{event_id}:completed"
     processing_key = f"stripe_webhook:{event_id}:processing"
     try:
-        if await redis.get(completed_key):
+        if await valkey.get(completed_key):
             logger.info("Stripe webhook deduplicated (already completed): %s", event_id)
             return {"status": "ok"}
         # Atomic claim: only one worker succeeds; others see None and bail.
-        claimed = await redis.set(processing_key, "1", nx=True, ex=300)
+        claimed = await valkey.set(processing_key, "1", nx=True, ex=300)
         if not claimed:
             logger.info("Stripe webhook already in progress: %s", event_id)
             return {"status": "ok"}
     except Exception as exc:
-        logger.warning("Redis dedup check failed (proceeding anyway): %s", exc)
+        logger.warning("Valkey dedup check failed (proceeding anyway): %s", exc)
 
     # Process the event
     success = False
@@ -215,15 +215,15 @@ async def handle_stripe_webhook(request: Request) -> dict:
     # Mark completed ONLY after successful DB commit
     if success:
         try:
-            await redis.setex(completed_key, WEBHOOK_DEDUP_TTL_SECONDS, "1")
-            await redis.delete(processing_key)
+            await valkey.setex(completed_key, WEBHOOK_DEDUP_TTL_SECONDS, "1")
+            await valkey.delete(processing_key)
         except Exception as exc:
-            logger.warning("Redis completed-key set failed: %s", exc)
+            logger.warning("Valkey completed-key set failed: %s", exc)
     else:
         try:
-            await redis.delete(processing_key)
+            await valkey.delete(processing_key)
         except Exception as exc:
-            logger.warning("Redis processing-key delete failed: %s", exc)
+            logger.warning("Valkey processing-key delete failed: %s", exc)
 
     return {"status": "ok"}
 
@@ -261,20 +261,20 @@ async def handle_paypal_webhook(request: Request) -> dict:
         return {"status": "ok"}
 
     # Deduplication
-    redis = get_redis()
+    valkey = get_valkey_pool()
     completed_key = f"paypal_webhook:{event_id}:completed"
     processing_key = f"paypal_webhook:{event_id}:processing"
     try:
-        if await redis.get(completed_key):
+        if await valkey.get(completed_key):
             logger.info("PayPal webhook deduplicated (already completed): %s", event_id)
             return {"status": "ok"}
         # Atomic claim: only one worker succeeds; others see None and bail.
-        claimed = await redis.set(processing_key, "1", nx=True, ex=300)
+        claimed = await valkey.set(processing_key, "1", nx=True, ex=300)
         if not claimed:
             logger.info("PayPal webhook already in progress: %s", event_id)
             return {"status": "ok"}
     except Exception as exc:
-        logger.warning("Redis dedup check failed (proceeding anyway): %s", exc)
+        logger.warning("Valkey dedup check failed (proceeding anyway): %s", exc)
 
     # Process the event
     success = False
@@ -290,14 +290,14 @@ async def handle_paypal_webhook(request: Request) -> dict:
 
     if success:
         try:
-            await redis.setex(completed_key, WEBHOOK_DEDUP_TTL_SECONDS, "1")
-            await redis.delete(processing_key)
+            await valkey.setex(completed_key, WEBHOOK_DEDUP_TTL_SECONDS, "1")
+            await valkey.delete(processing_key)
         except Exception as exc:
-            logger.warning("Redis completed-key set failed: %s", exc)
+            logger.warning("Valkey completed-key set failed: %s", exc)
     else:
         try:
-            await redis.delete(processing_key)
+            await valkey.delete(processing_key)
         except Exception as exc:
-            logger.warning("Redis processing-key delete failed: %s", exc)
+            logger.warning("Valkey processing-key delete failed: %s", exc)
 
     return {"status": "ok"}

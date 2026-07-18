@@ -15,6 +15,7 @@ records duration, tokens, cost, model, and handles error capture.
 from __future__ import annotations
 
 import contextlib
+import importlib
 import logging
 import time
 from typing import Any
@@ -51,10 +52,11 @@ async def PhaseSpan(
     t0 = time.monotonic()
 
     try:
-        from reasoner.infrastructure.observability.langfuse_subscriber import (
-            _langfuse_client as _lf_client,
-            _is_langfuse_enabled as _lf_enabled,
+        langfuse_subscriber = importlib.import_module(
+            "reasoner.infrastructure.observability.langfuse_subscriber"
         )
+        _lf_client = getattr(langfuse_subscriber, "_langfuse_client", None)
+        _lf_enabled = getattr(langfuse_subscriber, "_is_langfuse_enabled", False)
         if _lf_client and _lf_enabled:
             _langfuse = _lf_client
     except Exception:

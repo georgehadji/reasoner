@@ -280,8 +280,8 @@ async def delete_account(
 
     # Redis cache keys (best-effort)
     try:
-        from reasoner.infrastructure.redis.client import get_redis
-        redis = get_redis()
+        from reasoner.infrastructure.valkey.client import get_valkey_pool
+        redis = get_valkey_pool()
         pattern = f"user:{user.id}:*"
         keys = await redis.keys(pattern)
         if keys:

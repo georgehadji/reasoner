@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import asyncio
+import importlib
 from typing import Any
 
 from reasoner.application.commands import (
@@ -160,7 +161,7 @@ class RunPipelineCommandHandler:
                 aggregate_id=command.command_id,
                 version=aggregate.version + 1,
                 solution={"core_solution": getattr(state.core, "final_solution", "") if hasattr(state, "core") else ""},
-                total_tokens=getattr(state.meta, "total_tokens", 0) if hasattr(state, "meta") else 0,
+                total_tokens={"total": getattr(state.meta, "total_tokens", 0)} if hasattr(state, "meta") else {},
                 total_duration_seconds=getattr(state.meta, "total_duration", 0) if hasattr(state, "meta") else 0,
                 phases_completed=len(getattr(state.meta, "phase_results", []) if hasattr(state, "meta") else []),
             )
@@ -542,7 +543,7 @@ def get_handler_registry(
 
             llm_router = ProviderRouter(primary=_DummyProvider())
         if pipeline_executor is None:
-            from reasoner.api.execution.pipeline import PipelineExecutionService
-            pipeline_executor = PipelineExecutionService()
+            pipeline_module = importlib.import_module("reasoner.api.execution.pipeline")
+            pipeline_executor = pipeline_module.PipelineExecutionService()
         _handler_registry = HandlerRegistry(llm_router, event_store, pipeline_executor)
     return _handler_registry

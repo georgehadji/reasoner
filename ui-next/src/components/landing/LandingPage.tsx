@@ -305,7 +305,7 @@ export default function LandingPage() {
               </div>
               <div>
                 <h3 className="mb-2 text-lg font-medium text-[var(--text)]">Self-Hostable</h3>
-                <p className="text-[var(--text-muted)]">Full Docker stack with your own Postgres, Redis, and SearXNG.</p>
+                <p className="text-[var(--text-muted)]">Full Docker stack with your own Postgres, Valkey, and SearXNG.</p>
               </div>
               <div>
                 <h3 className="mb-2 text-lg font-medium text-[var(--text)]">Open Source</h3>

@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from reasoner.core.constants import DEFAULT_CLI_PRESET, GATE_TIMEOUT_SECONDS
+from reasoner.core.settings import settings
 from reasoner.application.ports.service_protocols import (
     NeuroClientProtocol,
     PipelineServiceProtocol,
@@ -214,17 +215,18 @@ class PipelineOrchestrator:
                 gate = HyperGateAgent(hypergate_router)
                 gate_decision_fb = await gate.decide(req.problem)
 
-        _preflight_timeout = max(GATE_TIMEOUT_SECONDS * 2, 5.0)
+        _gate_timeout = max(GATE_TIMEOUT_SECONDS * 2, 5.0)
+        _neuro_recall_timeout = settings.NEURO_RECALL_TIMEOUT_SECONDS
 
-        async def _guard(coro, label: str) -> None:
+        async def _guard(coro, label: str, timeout: float) -> None:
             """Run one preflight task under its own budget; never raise."""
             try:
-                await asyncio.wait_for(coro, timeout=_preflight_timeout)
+                await asyncio.wait_for(coro, timeout=timeout)
             except asyncio.TimeoutError:
                 logger.warning(
                     "Preflight %s exceeded %.0fs; continuing without it.",
                     label,
-                    _preflight_timeout,
+                    timeout,
                 )
             except Exception as exc:
                 logger.warning("Preflight %s failed: %s", label, exc)
@@ -232,8 +234,8 @@ class PipelineOrchestrator:
         # gather() so total preflight is max(recall, gate), not their sum. A
         # stalled recall can no longer cost the gate its budget.
         await asyncio.gather(
-            _guard(_run_neuro_recall(), "neuro recall"),
-            _guard(_run_hypergate(), "HyperGate"),
+            _guard(_run_neuro_recall(), "neuro recall", _neuro_recall_timeout),
+            _guard(_run_hypergate(), "HyperGate", _gate_timeout),
         )
 
         if gate_decision_fb is None and not getattr(req, "force_pipeline", False):

@@ -8,7 +8,7 @@ services:
                openssl genrsa -out /certs/ca.key 4096 &&
                openssl req -x509 -new -nodes -key /certs/ca.key -sha256 -days 3650 -out /certs/ca.crt -subj '/CN=Internal CA'
              fi &&
-             for service in backend frontend postgres redis; do
+             for service in backend frontend postgres valkey; do
                openssl genrsa -out /certs/$service.key 2048 &&
                openssl req -new -key /certs/$service.key -out /certs/$service.csr -subj \"/CN=$service\" &&
                openssl x509 -req -in /certs/$service.csr -CA /certs/ca.crt -CAkey /certs/ca.key -CAcreateserial -out /certs/$service.crt -days 365 -sha256 -extfile /certs/extfile.cnf || 
@@ -56,7 +56,9 @@ services:
     build: .
     environment:
       - DATABASE_URL=postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@postgres:5432/reasoner?sslmode=require
-      - REDIS_URL=rediss://redis:6379/0
+      - VALKEY_URL=rediss://valkey:6379/0
+      # Deprecated: REDIS_URL still supported for backward compat
+      - REDIS_URL=rediss://valkey:6379/0
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
@@ -74,7 +76,7 @@ services:
         condition: service_completed_successfully
       postgres:
         condition: service_healthy
-      redis:
+      valkey:
         condition: service_healthy
     volumes:
       - ./cache:/app/cache
@@ -162,20 +164,20 @@ services:
         max-size: "100m"
         max-file: "3"
 
-  redis:
+  valkey:
     image: valkey/valkey:8.1.8
     volumes:
-      - redis_data:/data
+      - valkey_data:/data
       - internal_certs:/certs:ro
     command: >
       valkey-server
       --port 0
       --tls-port 6379
-      --tls-cert-file /certs/redis.crt
-      --tls-key-file /certs/redis.key
+      --tls-cert-file /certs/valkey.crt
+      --tls-key-file /certs/valkey.key
       --tls-ca-cert-file /certs/ca.crt
     healthcheck:
-      test: ["CMD", "valkey-cli", "--tls", "--cert", "/certs/redis.crt", "--key", "/certs/redis.key", "--cacert", "/certs/ca.crt", "ping"]
+      test: ["CMD", "valkey-cli", "--tls", "--cert", "/certs/valkey.crt", "--key", "/certs/valkey.key", "--cacert", "/certs/ca.crt", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -196,7 +198,7 @@ services:
 
 volumes:
   postgres_data:
-  redis_data:
+  valkey_data:
   caddy_data:
   caddy_config:
   internal_certs:

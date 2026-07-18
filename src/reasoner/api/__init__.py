@@ -102,21 +102,20 @@ async def lifespan(app: FastAPI):
     from reasoner.core.health_validator import validate_all
     await validate_all()
 
-    # Redis probe for production — warn on failure, don't block startup.
-    # All Redis consumers (rate limiter, circuit breaker, HyperGate L2 cache)
-    # handle unreachable Redis gracefully at runtime via in-memory fallback.
+    # Valkey probe for production — warn on failure, don't block startup.
+    # All Valkey consumers handle unreachable Valkey gracefully via in-memory fallback.
     if settings.ENVIRONMENT == "production":
         try:
-            from reasoner.infrastructure.redis.client import get_redis
-            _probe_redis = get_redis()
-            await _probe_redis.set("_prod_startup_probe", "1", ex=10, nx=True)
-            logger.info("Redis probe (production): reachable")
+            from reasoner.infrastructure.valkey.client import get_valkey_pool
+            _probe_valkey = get_valkey_pool()
+            await _probe_valkey.set("_prod_startup_probe", "1", ex=10, nx=True)
+            logger.info("Valkey probe (production): reachable")
         except Exception as probe_exc:
             logger.warning(
-                "Redis is unreachable in production: %s. "
-                "All Redis consumers have in-memory fallbacks, but cross-worker "
+                "Valkey is unreachable in production: %s. "
+                "All Valkey consumers have in-memory fallbacks, but cross-worker "
                 "cancellation and distributed rate limiting will not work. "
-                "Start Redis or set RATE_LIMITER_MODE=memory (single-worker only).",
+                "Start Valkey or set RATE_LIMITER_MODE=memory (single-worker only).",
                 probe_exc,
             )
 
@@ -145,19 +144,31 @@ async def lifespan(app: FastAPI):
                 "Set CIRCUIT_BREAKER_MODE to a shared backend (e.g., 'redis') for production.",
                 uvicorn_workers,
             )
-        # Redis reachability probe when RATE_LIMITER_MODE=redis
-        if settings.RATE_LIMITER_MODE == "redis":
-            try:
-                from reasoner.infrastructure.redis.client import get_redis
-                _probe_redis = get_redis()
-                await _probe_redis.set("_startup_probe", "1", ex=10, nx=True)
-                logger.info("Redis rate limiter probe: reachable")
-            except Exception as probe_exc:
-                raise RuntimeError(
-                    f"RATE_LIMITER_MODE=redis but Redis is unreachable at startup: {probe_exc}. "
-                    f"Fix the Redis connection or set RATE_LIMITER_MODE=memory "
-                    f"(only safe for UVICORN_WORKERS=1)."
-                ) from probe_exc
+
+    # Single-worker SSE warning: health checks time out during long pipeline runs
+    if uvicorn_workers == 1 and settings.ENVIRONMENT != "development":
+        logger.warning(
+            "Single-worker mode detected (UVICORN_WORKERS=1). "
+            "Health checks and other concurrent requests will block during "
+            "long-running SSE pipeline streams (typically 30-60s). "
+            "Consider UVICORN_WORKERS >= 2 for production to keep health "
+            "endpoints responsive."
+        )
+
+    # Valkey reachability probe when RATE_LIMITER_MODE requires shared backend
+    if settings.RATE_LIMITER_MODE in ("redis", "valkey"):
+        try:
+            from reasoner.infrastructure.valkey.client import get_valkey_pool
+            _probe_valkey = get_valkey_pool()
+            await _probe_valkey.set("_startup_probe", "1", ex=10, nx=True)
+            logger.info("Valkey rate limiter probe: reachable")
+        except Exception as probe_exc:
+            raise RuntimeError(
+                f"RATE_LIMITER_MODE={settings.RATE_LIMITER_MODE} but Valkey is "
+                f"unreachable at startup: {probe_exc}. "
+                f"Fix the Valkey connection or set RATE_LIMITER_MODE=memory "
+                f"(only safe for UVICORN_WORKERS=1)."
+            ) from probe_exc
 
     # ── Inject core → infra boundary dependencies ──
     # Inverts the dependency: core defines ports, infra provides impls.
@@ -244,11 +255,11 @@ async def lifespan(app: FastAPI):
         logger.warning("Scraper client close failed: %s", exc)
 
     try:
-        # Close Redis connection (Critical Enhancement 5.5.2)
-        from reasoner.infrastructure.redis.client import close_redis
-        await close_redis()
+        # Close Valkey connection pool
+        from reasoner.infrastructure.valkey.client import close_valkey_pool
+        await close_valkey_pool()
     except Exception as exc:
-        logger.warning("Redis close failed: %s", exc)
+        logger.warning("Valkey close failed: %s", exc)
 
     try:
         # Close shared neuro HTTP client (B4 fix — resource leak)

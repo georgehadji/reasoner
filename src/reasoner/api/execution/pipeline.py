@@ -594,9 +594,6 @@ class PipelineExecutionService:
             )
             await _persist_event(done_evt)
 
-            # Emit domain event for pipeline completion
-            emitter.emit("PIPELINE_COMPLETED", phases_completed=len(state.phase_durations))
-
             # ── Postflight: neuro persist ──
             await orchestrator.postflight(state, req, user_id=user_id, run_id=run_id)
 
