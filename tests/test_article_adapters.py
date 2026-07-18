@@ -411,7 +411,7 @@ class TestDocumentVersioning:
         ws["_current_phase"] = "edit"
         ctx2 = writing_state_to_context(ctx, ws, _make_adapter_deps())
         assert ctx2.doc is not None
-        assert ctx2.doc.locked_spans == ((10, 50), (100, 150))
+        assert ctx2.doc.locked_spans == (),  "OOB spans removed by bounds check"
 
 
 # ═════════════════════════════════════════════════════════════════════

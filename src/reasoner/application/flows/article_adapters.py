@@ -30,6 +30,7 @@ from reasoner.domain.article_domain import (
     Ok,
     Err,
     Result,
+    map_verdict,
 )
 from reasoner.application.flows.base import WorkflowServices
 from reasoner.application.flows.article_phases import (
@@ -220,6 +221,46 @@ def writing_state_to_context(ctx: Context, ws: dict[str, Any], deps: AdapterDeps
     # Audit
     audit = ws.get("audit", ctx.audit)
 
+    # Claim ledger — materialize raw dict list into typed Claim tuple (G1 fix)
+    ledger = ctx.ledger
+    raw_ledger = ws.get("claim_ledger", None)
+    if raw_ledger is not None and isinstance(raw_ledger, (list, tuple)):
+        try:
+            typed_claims = []
+            for i, entry in enumerate(raw_ledger):
+                if not isinstance(entry, dict):
+                    continue
+                raw_status = str(entry.get("status", "unsupported")).lower()
+                text = str(entry.get("claim", ""))
+                if not text:
+                    continue
+                source_url = entry.get("source")
+                typed_claims.append(Claim(
+                    id=f"fc_{i}",
+                    text=text,
+                    sources=(source_url,) if source_url else (),
+                    verdict=map_verdict(raw_status),
+                    confidence=0.8 if raw_status in ("verified", "supported") else 0.3,
+                ))
+            if typed_claims:
+                ledger = tuple(typed_claims)
+        except Exception:
+            logger.warning("Failed to convert claim_ledger to typed Claim objects", exc_info=True)
+
+    # Validate locked_spans bounds (D3 fix)
+    if doc is not None and doc.locked_spans:
+        max_len = len(doc.markdown)
+        valid_spans = tuple(
+            (s, e) for s, e in doc.locked_spans
+            if 0 <= s < e <= max_len
+        )
+        if len(valid_spans) != len(doc.locked_spans):
+            logger.warning(
+                "Removed %d out-of-bounds locked_spans",
+                len(doc.locked_spans) - len(valid_spans),
+            )
+            doc = replace(doc, locked_spans=valid_spans)
+
     # Errors
     errors = list(ctx.errors)
     # Check the live PipelineState for new errors (if available)
@@ -233,6 +274,7 @@ def writing_state_to_context(ctx: Context, ws: dict[str, Any], deps: AdapterDeps
         doc=doc,
         sources=sources,
         outline=outline,
+        ledger=ledger,
         verification=verification,
         editorial_audit=editorial_audit,
         metrics=metrics,
