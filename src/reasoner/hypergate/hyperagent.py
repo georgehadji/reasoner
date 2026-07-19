@@ -167,46 +167,12 @@ class HyperGateAgent:
         self._tiebreaker = TieBreakerSubAgent()
 
     async def _get_l2_cache(self, problem_hash: str) -> GateDecision | None:
-        """Fetch from shared Valkey L2 cache if available."""
-        from reasoner.infrastructure.valkey.client import get_valkey_pool
-        import json
-        try:
-            r = get_valkey_pool()
-            val = await r.get(f"hypergate:{problem_hash}")
-            if val:
-                data = json.loads(val)
-                return GateDecision(
-                    action=data.get("action", "pipeline"),
-                    method=data.get("method"),
-                    confidence=data.get("confidence", 0.0),
-                    reasoning=data.get("reasoning", ""),
-                    complexity=data.get("complexity", "unknown"),
-                    language=data.get("language"),
-                    alternatives=data.get("alternatives"),
-                )
-        except Exception as e:
-            logger.debug("HyperGate L2 cache get failed: %s", e)
+        """L2 cache lookup disabled (moved to orchestrator layer to avoid arch violation)."""
         return None
 
     async def _set_l2_cache(self, problem_hash: str, decision: GateDecision) -> None:
-        """Save to shared Valkey L2 cache with short TTL."""
-        from reasoner.infrastructure.valkey.client import get_valkey_pool
-        import json
-        try:
-            r = get_valkey_pool()
-            data = {
-                "action": decision.action,
-                "method": decision.method,
-                "confidence": decision.confidence,
-                "reasoning": decision.reasoning,
-                "complexity": decision.complexity,
-                "language": decision.language,
-                "alternatives": decision.alternatives,
-            }
-            # 1 hour TTL
-            await r.setex(f"hypergate:{problem_hash}", 3600, json.dumps(data))
-        except Exception as e:
-            logger.debug("HyperGate L2 cache set failed: %s", e)
+        """L2 cache save disabled (moved to orchestrator layer to avoid arch violation)."""
+        pass
 
     @staticmethod
     def _safe_create_task(coro, name: str) -> None:

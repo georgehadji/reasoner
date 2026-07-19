@@ -1,4 +1,4 @@
-<!-- AGENTS.md -- Reasoner (Reasoner Pipeline v2.2) -->
+<!-- AGENTS.md -- Reasoner v2.1.0 -->
 
 > This file is written for AI coding agents. It assumes you know nothing about this project.
 > Read this first before making any changes.
@@ -9,7 +9,7 @@
 
 **Reasoner** is a production-grade AI reasoning orchestrator written in Python with a Next.js frontend. It decomposes complex problems into structured multi-phase pipelines, leverages multiple LLMs from diverse training ecosystems in parallel, applies independent critique, stress-tests solutions, and synthesizes actionable recommendations with epistemic labeling.
 
-- **Version:** 2.1.0 (Python package), v2.2 (project)
+- **Version:** 2.1.0 (single source of truth: `__version__` in `src/reasoner/__init__.py`)
 - **Python:** 3.12+
 - **License:** MIT
 
@@ -102,7 +102,7 @@ Reasoner/
 |-- kill_servers.bat        # Windows batch equivalent
 |-- push_to_github.py       # Git push helper
 |-- push_to_github.bat      # Windows batch equivalent
-|-- tests/                  # 197 pytest files
+|-- tests/                  # 244 pytest files (2,100+ test functions)
 |-- src/reasoner/           # Main Python package
 |-- ui-next/                # Next.js frontend
 |-- cache/                  # Run-related cache
@@ -146,15 +146,14 @@ src/reasoner/
 |       |-- __init__.py
 |-- domain/                        # Domain logic
 |   |-- preset_core.py             # Preset data structures
-|   |-- preset_registry.py         # Preset definitions and resolution (24+ presets)
+|   |-- preset_registry.py         # Preset definitions and resolution (50 presets)
 |   |-- saas.py                    # SaaS domain models (User, QuotaResult, tiers)
 |   |-- __init__.py
 |-- application/                   # Application layer (CQRS + Event Bus + Mixins)
 |   |-- commands/                  # Command handlers (placeholder structure)
 |   |-- event_bus/                 # In-memory event bus with backpressure handling
-|   |-- flows/                     # Pipeline flows
 |   |-- handlers/                  # Event handlers
-|   |-- flows/                     # WorkflowStrategy composition (20 strategies)
+|   |-- flows/                     # Pipeline flows -- WorkflowStrategy composition (20 strategies)
 |   |   |-- base.py                # WorkflowStrategy, WorkflowServices protocols
 |   |   |-- factory.py             # WorkflowFactory (20 registered methods)
 |   |   |-- runner.py              # WorkflowRunner (phase lifecycle, retry, quality)
@@ -181,7 +180,7 @@ src/reasoner/
 |       |-- preset_service.py
 |       |-- quota_service.py
 |       |-- search_service.py
-|-- phases/                        # Reasoning method implementations (31 modules)
+|-- phases/                        # Reasoning method implementations (34 modules)
 |   |-- multi_perspective.py
 |   |-- debate.py
 |   |-- jury.py
@@ -199,8 +198,10 @@ src/reasoner/
 |   |-- pot.py
 |   |-- self_discover.py
 |   |-- writing.py
+|   |-- article.py
 |   |-- brainstorming.py
 |   |-- coding.py
+|   |-- iterative_critique.py
 |   |-- vs_behavioral_audit.py
 |   |-- vs_calibration.py
 |   |-- vs_claim_extraction.py
@@ -210,8 +211,10 @@ src/reasoner/
 |   |-- vs_generation.py
 |   |-- vs_probe_generation.py
 |   |-- vs_verification_routing.py
+|   |-- _prism.py
 |   |-- _shared.py
 |   |-- _universal.py
+|   |-- _vs_shared.py
 |-- infrastructure/                # Infrastructure layer
 |   |-- llm/                       # LLM abstraction
 |   |   |-- base.py
@@ -435,7 +438,7 @@ python -m pytest -m searxng             # SearXNG integration tests (requires li
 # With coverage
 python -m pytest tests/ --cov=src/reasoner --cov-report=html
 
-# Python linting (no formal config file -- manual consistency)
+# Python linting & formatting (Ruff config lives in pyproject.toml)
 ruff check src/reasoner/
 ruff format src/reasoner/
 
@@ -508,7 +511,7 @@ docker compose -f docker-compose.searxng.yml up -d
 ### Backend
 - **Framework:** pytest with pytest-asyncio, pytest-timeout, pytest-xdist
 - **Location:** `tests/` directory at repo root
-- **Count:** 197 test files
+- **Count:** 244 test files (2,100+ test functions)
 - **Naming:** `test_*.py` files, `Test...` classes
 - **Configuration:** `pytest.ini` sets `testpaths = tests` and `pythonpath = src`
 - **Parallel execution:** `pytest.ini` enables `-n auto --dist loadscope` by default (requires `pytest-xdist`)
@@ -714,8 +717,12 @@ The pipeline supports multiple reasoning methodologies. Each method has its own 
 15. **PoT** -- Program-of-Thoughts
 16. **Self-Discover** -- Dynamic reasoning module composition
 17. **Writing** -- Creative writing with hallucination guards
-18. **Brainstorming** -- Divergent idea generation
-19. **Coding** -- Code generation with verification
+18. **Article** -- Augmented long-form pipeline with parallel pre-research
+19. **Brainstorming** -- Divergent idea generation
+20. **Coding** -- Code generation with verification
+21. **Iterative Critique** -- Generator-critic refinement loops with convergence guards
+
+Cross-language presets (`cross-language-budget` / `cross-language-premium`) run the language-probe flow (`application/flows/language_probe_phase.py`) rather than a dedicated `phases/` module.
 
 **Vertical Solution (VS) Phases**
 - `vs_behavioral_audit.py`, `vs_calibration.py`, `vs_claim_extraction.py`, `vs_conflict_surfacing.py`, `vs_coverage_audit.py`, `vs_decomposition.py`, `vs_generation.py`, `vs_probe_generation.py`, `vs_verification_routing.py`
@@ -724,10 +731,9 @@ The pipeline supports multiple reasoning methodologies. Each method has its own 
 
 ## 12. Presets & Model Routing
 
-Presets define which models are used for each phase role. The UI orders methods (and their Budget -- Balanced -- Premium presets) from most cost-effective to least and defaults to the first method/preset.
+The registry defines 50 presets across 24 methods: a Budget and a Premium tier per method, plus experimental variants (`multi-perspective-ultra-budget`, `nvidia-nemotron-test`). Presets define which models are used for each phase role. The UI orders methods and their presets from most cost-effective to least and defaults to the first method/preset.
 
 - **Budget** -- Cheapest models, fastest
-- **Balanced** -- Mid-tier quality/cost tradeoff
 - **Premium** -- Best available models
 
 Key commands:
@@ -764,7 +770,7 @@ python main.py --list-models       # Show all model IDs grouped by ecosystem
 
 ## 15. Workflow Orchestration (Agent Guidelines)
 
-### Plan Node Default
+### Plan Mode Default
 - Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions)
 - If something goes sideways, STOP and re-plan immediately
 - Use plan mode for verification steps, not just building

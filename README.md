@@ -1,48 +1,39 @@
-<div id="top" align="center">
+# Reasoner
 
-<!-- ASCII Banner -->
-<pre>
- █████╗ ██████╗  █████╗         ██████╗ ██╗██████╗ ███████╗██╗     ██╗███╗   ██╗███████╗
-██╔══██╗██╔══██╗██╔══██╗        ██╔══██╗██║██╔══██╗██╔════╝██║     ██║████╗  ██║██╔════╝
-███████║██████╔╝███████║        ██████╔╝██║██████╔╝█████╗  ██║     ██║██╔██╗ ██║█████╗  
-██╔══██║██╔══██╗██╔══██║        ██╔═══╝ ██║██╔══██╗██╔══╝  ██║     ██║██║╚██╗██║██╔══╝  
-██║  ██║██║  ██║██║  ██║        ██║     ██║██║  ██║███████╗███████╗██║██║ ╚████║██╔════╗
-╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝        ╚═╝     ╚═╝╚═╝  ╚═╝╚══════╝╚══════╝╚═╝╚═╝  ╚═══╝╚══════╝
-v2.3 — Reasoner — Augmented Reasoning Engine
-</pre>
+**A production-grade, multi-agent reasoning orchestrator that decomposes complex problems into structured multi-phase pipelines, executes them across diverse LLM ecosystems in parallel, and synthesizes verified answers with epistemic confidence labels.**
 
-<!-- Badges -->
-[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg?style=flat-square&logo=python&logoColor=white)](https://www.python.org/downloads/)
-[![Harness Enhanced](https://img.shields.io/badge/harness-E1%E2%80%93E5%20enhanced-brightgreen)]
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg?style=flat-square&logo=python&logoColor=white)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688.svg?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![Next.js](https://img.shields.io/badge/Next.js_16-000000.svg?style=flat-square&logo=next.js&logoColor=white)](https://nextjs.org/)
+[![Next.js 16](https://img.shields.io/badge/Next.js_16-000000.svg?style=flat-square&logo=next.js&logoColor=white)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6.svg?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-06B6D4.svg?style=flat-square&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
-<br>
-[![Tests](https://img.shields.io/badge/tests-800%2B%20passing-brightgreen.svg?style=flat-square&logo=pytest&logoColor=white)](./tests)
-[![Coverage](https://img.shields.io/badge/coverage-~70%25-yellow.svg?style=flat-square)](.)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE)
-[![GitHub stars](https://img.shields.io/github/stars/tesse/Reasoner?style=flat-square&logo=github)](https://github.com/tesse/Reasoner)
+[![Tests](https://img.shields.io/badge/tests-2%2C100%2B-brightgreen.svg?style=flat-square)](./tests)
+[![Coverage](https://img.shields.io/badge/coverage-%7E70%25-yellow.svg?style=flat-square)](.)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE)
 
-### A production-grade multi-agent reasoning orchestrator that coordinates 20 reasoning methodologies and 48 presets with automatic method selection, cross-lab model diversity, self-healing telemetry, and real-time streaming.
-
-[🚀 Quick Start](#-quick-start) · [🧠 Core Architecture](#-core-architecture) · [🎛️ Preset Matrix](#%EF%B8%8F-presets-master-matrix) · [📊 Telemetry & Healing](#-telemetry--self-healing) · [🔒 Security](#-security--encryption) · [🤖 Agent API](#-agent-api) · [💻 Development](#-development)
-
-</div>
+[Quick Start](#quick-start) · [Architecture](#architecture) · [Reasoning Methods & Presets](#reasoning-methods--presets) · [Programmatic Usage](#programmatic-usage) · [Security](#security--encryption) · [Configuration](#configuration-reference) · [Development](#development)
 
 ---
 
-## 🎯 Project Overview
+## Overview
 
-**Reasoner** is a sophisticated, highly modular multi-agent reasoning system designed to decompose complex questions, strategic decisions, and deep research tasks into structured, phase-by-phase execution pipelines. Instead of relying on one-shot language model outputs, Reasoner orchestrates parallel model ensembles across different model-provider ecosystems (Anthropic, OpenAI, Google, DeepSeek, Mistral, and more). It critiques competing perspectives, performs recursive web-grounded RAG, stress-tests candidate answers under adversarial conditions, and synthesizes final solutions marked with precise epistemic confidence labels.
+Reasoner treats reasoning as a first-class engineering problem rather than a one-shot LLM call. Given a question, strategic decision, or research task, it:
 
-It is designed for enterprise environments, featuring real-time Server-Sent Events (SSE) streaming, sub-cent pricing telemetry, a self-healing loop utilizing runtime execution context, zero-trust container security, application-layer envelope encryption (AES-256-GCM), and native programmatic endpoints optimized for integration with AI agents.
+1. **Classifies and routes** the request to one of 24 reasoning methodologies via the HyperGate pre-router (6 parallel sub-agents).
+2. **Decomposes** the problem into atomic sub-questions and assumptions.
+3. **Vets context** through iterative, web-grounded retrieval (SearXNG / Perplexity Sonar) with token-aware compression.
+4. **Generates competing answers** from cross-lab model ensembles (Anthropic, OpenAI, Google, DeepSeek, Mistral, xAI, and more) to reduce single-vendor bias.
+5. **Critiques and stress-tests** candidates with independent LLM judges under adversarial conditions.
+6. **Synthesizes** a final, evidence-grounded answer labeled `VERIFIED`, `HYPOTHESIS`, or `UNRESOLVED`, with citations.
+
+The system is built for production deployment: real-time Server-Sent Events (SSE) streaming, per-phase cost telemetry, a self-healing CI loop, internal TLS with an auto-provisioned PKI, application-layer envelope encryption, and Bearer-token endpoints designed for autonomous AI agents.
+
+**Version:** 2.1.0 (single source of truth: `src/reasoner/__init__.py`) · **License:** MIT · **Python:** 3.12+
 
 ---
 
-## 🧠 Core Architecture
+## Architecture
 
-Reasoner executes structured reasoning using an **8-Phase Pipeline** managed by the `ReasonerPipeline` engine. The entire flow is modeled asynchronously, allowing for massive parallel generation, context vetting, and synthesis:
+Reasoner executes structured reasoning through an **8-phase pipeline** managed by the `ReasonerPipeline` engine. The flow is fully asynchronous, enabling parallel generation, context vetting, and synthesis:
 
 ```
                   ┌─────────────────────────────────────┐
@@ -53,13 +44,13 @@ Reasoner executes structured reasoning using an **8-Phase Pipeline** managed by 
                                      │
                        [ Phase 2: Decomposition ]
                                      │
-                       [ Phase 3: Context Vetting ] <── (Iterative RAG Loop, Max 3)
+                       [ Phase 3: Context Vetting ] <── (Iterative RAG loop, max 3)
                                      │
                        [ Phase 4: Deep Source Reading ]
                                      │
                         [ Phase 5: Generation ] ───────┐
-                                     │                 │ (Cross-Lab
-                       [ Phase 6: Critique & Scoring ] │  Perspective Ensembles)
+                                     │                 │ (Cross-lab
+                       [ Phase 6: Critique & Scoring ] │  perspective ensembles)
                                      │                 │
                       [ Phase 7: Stress Testing ] <────┘
                                      │
@@ -70,248 +61,151 @@ Reasoner executes structured reasoning using an **8-Phase Pipeline** managed by 
                   └─────────────────────────────────────┘
 ```
 
-1. **Classification (Phase 1):** Identifies task type (e.g., math, research, creative, coding) and primary language, enabling optimal routing.
-2. **Decomposition (Phase 2):** Breaks down complex problems into atomic sub-questions and key underlying assumptions.
-3. **Context Vetting (Phase 3):** Performs universal context vetting via iterative RAG. Includes smart token compression at Phase 2 ➔ 3 handoff.
-4. **Deep Reading (Phase 4):** Parses the full contents of critical sources when web-retrieved snippets are insufficient.
-5. **Generation (Phase 5):** Leverages cross-lab model ensembles to produce multiple competing answers and perspectives.
-6. **Critique & Scoring (Phase 6):** Independent LLM judges critique the generated answers against standard quality dimensions.
-7. **Stress Testing (Phase 7):** Subject survivors to adversarial stress testing to surface hidden logical flaws or factual errors.
-8. **Synthesis (Phase 8):** Consolidates verified perspectives into an evidence-grounded final response, complete with epistemic confidence labeling (`VERIFIED`, `HYPOTHESIS`, or `UNRESOLVED`) and citation references.
+| Phase | Responsibility |
+| :--- | :--- |
+| 1. Classification | Identifies task type (math, research, creative, coding, ...) and primary language for optimal routing. |
+| 2. Decomposition | Breaks the problem into atomic sub-questions and key assumptions. |
+| 3. Context Vetting | Iterative RAG with smart token compression at the Phase 2 → 3 handoff. |
+| 4. Deep Reading | Parses full source contents when retrieved snippets are insufficient. |
+| 5. Generation | Cross-lab model ensembles produce competing answers and perspectives. |
+| 6. Critique & Scoring | Independent LLM judges score answers against standard quality dimensions. |
+| 7. Stress Testing | Adversarial probing of surviving candidates to surface hidden flaws. |
+| 8. Synthesis | Consolidates verified perspectives with epistemic labels and citations. |
+
+Internally, the codebase follows **hexagonal architecture** (domain logic depends on ports, not providers), **WorkflowStrategy composition** (20 strategy implementations under `application/flows/`), and a **provider router with automatic fallback** across model ecosystems. See `AGENTS.md` for the full architectural map.
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
-* **Python 3.12+**
-* **Node.js 20+** (for frontend web UI)
-* **OpenRouter API Key** (recommended — single billing interface for 350+ models)
-* **SearXNG** (optional — local search provider; defaults to free mock search if unavailable)
-* **Redis** (optional — recommended in production for distributed rate limiting)
+- **Python 3.12+**
+- **Node.js 20+** (frontend web UI)
+- **OpenRouter API key** (recommended — one billing interface for 350+ models)
+- **SearXNG** (optional — local search; the pipeline degrades gracefully without it)
+- **Redis** (optional — recommended in production for distributed rate limiting)
 
-### 1. Installation & Environment Setup
+### 1. Installation
 
 ```bash
-# Clone the repository
-git clone https://github.com/tesse/Reasoner.git
-cd Reasoner
+git clone https://github.com/georgehadji/Reaseoner.git
+cd Reaseoner
 
-# Set up Python virtual environment and install dependencies
 python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
-# Configure environment variables
-cp .env.example .env
-# Edit .env and insert your API credentials (e.g., OPENROUTER_API_KEY="sk-or-v1-...")
+cp .env.example .env             # then edit .env — at minimum set OPENROUTER_API_KEY
 ```
 
-### 2. Launch Services
+### 2. Launch
 
-Start the FastAPI backend, the Next.js frontend, and the local SearXNG search engine with a single orchestration command:
+Start the FastAPI backend, the Next.js frontend, and the local SearXNG search engine with one command:
 
 ```bash
 python start_all.py
 ```
 
-* **FastAPI Backend:** `http://localhost:8003` (Port configurable via `SERVER_PORT`)
-* **Next.js Frontend:** `http://localhost:3000`
-* **SearXNG Instance:** `http://localhost:8888`
+| Service | Address | Configurable via |
+| :--- | :--- | :--- |
+| FastAPI backend | `http://localhost:8003` | `SERVER_PORT` |
+| Next.js frontend | `http://localhost:3000` | — |
+| SearXNG | `http://localhost:8888` | `SEARXNG_URL` |
 
-### 3. Command-Line Interface (CLI) Examples
-
-Perform deep, multi-agent reasoning directly from your terminal:
+For the full containerized production stack (Caddy reverse proxy with automatic HTTPS, backend, frontend, PostgreSQL, Redis, SearXNG):
 
 ```bash
-# Run with the default balanced reasoning preset
+docker compose up -d
+```
+
+### 3. CLI Examples
+
+```bash
+# Default preset (multi-perspective-budget)
 python main.py --problem "How should we prioritize our Q3 engineering roadmap?"
 
-# Run with a highly optimized budget preset (~$0.02 cost)
+# Budget preset — low-cost run
 python main.py --problem "Explain the long-term impact of quantum cryptography." --preset debate-budget
 
-# Run a premium multi-perspective analysis using top-tier models (~$0.20 cost)
+# Premium multi-perspective analysis with top-tier models
 python main.py --problem "Evaluate microservices vs monolithic architecture for a startup." --preset multi-perspective-premium
 
-# Stream the reasoning steps sequentially to prevent rate limits
+# Sequential generation for rate-limited providers
 python main.py --problem "Analyze the Fermat's Last Theorem proof." --preset scientific-premium --sequential
+
+# Discovery
+python main.py --list-presets      # All presets with API-key status
+python main.py --list-models       # All model IDs grouped by ecosystem
 ```
+
+Useful flags: `--top-k N`, `--source-type {general,academic,social,news,code}`, `--domain DOMAIN`, `--enhance-prompt`, `--force-pipeline`, `--output PATH`, `--save-state PATH` / `--resume PATH`, `--quiet`. Full reference: `python main.py --help`.
 
 ---
 
-## 🎛️ Presets Master Matrix
+## Reasoning Methods & Presets
 
-Reasoner ships with **48 presets** across **20 methodologies**. Each method contains highly optimized model combinations divided into cost-efficient **Budget** and quality-focused **Premium** tiers. 
+Reasoner ships with **50 presets across 24 methodologies**. Each method ships a cost-efficient **Budget** preset and a quality-focused **Premium** preset; the UI orders methods from most to least cost-effective.
 
-| Methodology | Budget Preset (`-budget`) | Premium Preset (`-premium`) | Core Model Strategy & Diversity | Recommended Use Case |
+| Methodology | Budget | Premium | Strategy | Recommended Use Case |
 | :--- | :--- | :--- | :--- | :--- |
-| **Multi-Perspective** | `multi-perspective-budget` | `multi-perspective-premium` | Cross-lab synthesis (Google + Mistral + Zhipu + DeepSeek) | General complex reasoning |
-| **Debate** | `debate-budget` | `debate-premium` | Generator A vs Generator B, adjudicated by a third independent model | Deciding between binary options |
-| **Jury / Orchestrated** | `jury-budget` | `jury-premium` | Large expert panel (4-6 models) scored by an autonomous judge | High-stakes strategic decisions |
-| **Research** | `research-budget` | `research-premium` | Iterative SearXNG queries, context-vetting, and Sonar Pro fact-checking | Evidence-heavy, real-world search |
-| **Scientific** | `scientific-budget` | `scientific-premium` | Hypothesis generation, falsification checks, and empirical scoring | Technical, medical, & scientific questions |
-| **Socratic** | `socratic-budget` | `socratic-premium` | Recursive question-and-answer loops designed to expose bias | Uncovering hidden assumptions |
-| **Pre-Mortem** | `pre-mortem-budget` | `pre-mortem-premium` | Gary Klein's prospective failure analysis and safety back-testing | Project planning and risk assessment |
-| **Bayesian** | `bayesian-budget` | `bayesian-premium` | Prior probability generation, likelihood updating, and sensitivity tests | Probabilistic forecasting |
-| **Dialectical** | `dialectical-budget` | `dialectical-premium` | Hegelian thesis-antithesis-synthesis progression | Philosophical & conceptual queries |
-| **Analogical** | `analogical-budget` | `analogical-premium` | Cross-domain structure-mapping and conceptual transfer | Creative problem solving |
-| **Delphi** | `delphi-budget` | `delphi-premium` | Structured multi-round expert consensus with convergence tracking | Estimations and future forecasting |
-| **Chain-of-Verification**| `cove-budget` | `cove-premium` | Draft ➔ verify queries ➔ answer queries ➔ final revision loop | Detailed fact-checking |
-| **Skeleton-of-Thought** | `sot-budget` | `sot-premium` | Skeleton outline extraction with parallel chunk generation | Low-latency long-form generation |
-| **Tree-of-Thoughts** | `tot-budget` | `tot-premium` | Depth-first/Breadth-first search with heuristic evaluations | Planning and multi-step math |
-| **Program-of-Thought** | `pot-budget` | `pot-premium` | Generating and executing python code to compute the exact answer | Quantitative, statistical analysis |
-| **Self-Discover** | `self-discover-budget` | `self-discover-premium` | Selects, adapts, and implements reasoning styles on-the-fly | Novel, unstructured problems |
-| **Writing / Article** | `writing-budget` | `writing-premium` | CoVE + SoT + Pre-Mortem pipeline with concept augmentation | Professional documentation & publishing |
-| **Brainstorming** | `brainstorming-budget` | `brainstorming-premium` | Verbalized Sampling (VS-CoT/Standard) with clustering | Idea generation & divergent thinking |
-| **Coding** | `coding-budget` | `coding-premium` | Spec ➔ parallel generation ➔ adversarial review ➔ test writing | Production code & test coverage |
-| **Iterative Critique** | `iterative-critique-budget`| `iterative-critique-premium`| Prompt generator-critic debate loops with convergence guards | Polishing creative/technical copy |
+| **Multi-Perspective** | `multi-perspective-budget` | `multi-perspective-premium` | Parallel constructive / destructive / systemic / minimalist analysis | General complex reasoning |
+| **Debate** | `debate-budget` | `debate-premium` | Two generators argue opposing sides; a third independent model adjudicates | Binary decisions |
+| **Jury** | `jury-budget` | `jury-premium` | Large expert panel (4–6 models) scored by an autonomous judge | High-stakes strategic decisions |
+| **Research** | `research-budget` | `research-premium` | Iterative SearXNG queries, context vetting, Sonar fact-checking | Evidence-heavy, real-world search |
+| **Scientific** | `scientific-budget` | `scientific-premium` | Hypothesis generation, falsification checks, empirical scoring | Technical and scientific questions |
+| **Socratic** | `socratic-budget` | `socratic-premium` | Recursive question-and-answer loops exposing bias | Uncovering hidden assumptions |
+| **Pre-Mortem** | `pre-mortem-budget` | `pre-mortem-premium` | Prospective failure analysis (Gary Klein) with safety back-testing | Project planning, risk assessment |
+| **Bayesian** | `bayesian-budget` | `bayesian-premium` | Prior generation, likelihood updating, sensitivity tests | Probabilistic forecasting |
+| **Dialectical** | `dialectical-budget` | `dialectical-premium` | Thesis–antithesis–synthesis progression | Philosophical and conceptual queries |
+| **Analogical** | `analogical-budget` | `analogical-premium` | Cross-domain structure mapping and conceptual transfer | Creative problem solving |
+| **Delphi** | `delphi-budget` | `delphi-premium` | Structured multi-round expert consensus with convergence tracking | Estimation and forecasting |
+| **Chain-of-Verification** | `cove-budget` | `cove-premium` | Draft → verification queries → answers → revision | Detailed fact-checking |
+| **Skeleton-of-Thought** | `sot-budget` | `sot-premium` | Skeleton outline with parallel chunk generation | Low-latency long-form generation |
+| **Tree-of-Thoughts** | `tot-budget` | `tot-premium` | DFS/BFS search with heuristic evaluation | Planning and multi-step math |
+| **Program-of-Thoughts** | `pot-budget` | `pot-premium` | Generates and executes Python to compute exact answers | Quantitative analysis |
+| **Self-Discover** | `self-discover-budget` | `self-discover-premium` | Selects, adapts, and composes reasoning modules on the fly | Novel, unstructured problems |
+| **Writing** | `writing-budget` | `writing-premium` | Long-form generation with hallucination guards | Professional documentation |
+| **Article** | `article-budget` | `article-premium` | Augmented pre-research (debate/jury/socratic) before drafting | Publication-grade articles |
+| **Brainstorming** | `brainstorming-budget` | `brainstorming-premium` | Verbalized sampling with clustering | Divergent ideation |
+| **Coding** | `coding-budget` | `coding-premium` | Spec → parallel generation → adversarial review → tests | Production code and coverage |
+| **Iterative Critique** | `iterative-critique-budget` | `iterative-critique-premium` | Generator–critic loops with convergence guards | Polishing creative/technical copy |
+| **Cross-Language** | `cross-language-budget` | `cross-language-premium` | Cross-lingual probe reasoning to detect language-driven divergence | Sensitive geopolitical/historical topics |
 
-### 🌟 Special & Experimental Presets
+### Special & Experimental Presets
 
-* **`multi-perspective-ultra-budget`** (<$0.01): Leverages ultra-light models (Ministral-3B + Gemini Flash Lite) in a streamlined 5-phase execution pipeline.
-* **`subagent-budget` / `subagent-premium`**: Routes every individual pipeline sub-task (e.g., classification, scoring, synthesis) to specialized models.
-* **`image-gen-budget` / `image-gen-premium`**: Orchestrates text-to-image and image-to-image workflows across Midjourney, Flux 2 Pro, and Stable Diffusion architectures.
-* **`nvidia-nemotron-test`**: Experimental preset utilizing high-parameter NVIDIA Nemotron models through official NIM API keys.
-
----
-
-## 📊 Telemetry & Self-Healing
-
-Reasoner incorporates a production-grade runtime telemetry system inspired by the *Code as Agent Harness* framework (arXiv:2605.18747). This pipeline gathers execution metadata to optimize pricing, route around model failures, and feed context into automated self-healing loops.
-
-### Key Telemetry Pillars
-
-| Pillar | Feature Name | Core Mechanism |
-| :--- | :--- | :--- |
-| **E1** | **Quality-Rich Memory** | Sends `method`, `total_cost_usd`, `phase_durations`, `quality_history`, and `fallback_events` to the central Neuro memory for historical analysis. |
-| **E2** | **Phase Telemetry Store** | App-level `TelemetryStore` running on SQLite/PostgreSQL. Records exact model behavior, cost, and duration per phase. |
-| **E3** | **Context Compression** | Automatically applies context compression algorithms (`smart_compress`) at the handoff between Decomposition and Critique to minimize token cost. |
-| **E4** | **Fallback Surfacing** | Detects model failures in `ProviderRouter` and immediately triggers `on_fallback()` callbacks to route around dead endpoints. |
-| **E5** | **Healing Exporter** | Connects `healing/telemetry_exporter.py` to static codebase analysis tools. Generates runtime context data to help heal pipeline code. |
-
-### Accessing Telemetry Programmatically
-
-You can query the telemetry database using python or SQL:
-
-```python
-import asyncio
-from reasoner.infrastructure.persistence.telemetry_store import get_telemetry_store
-
-async def view_stats():
-    store = get_telemetry_store()
-    stats = await store.get_preset_stats("multi-perspective-premium")
-    print(f"Average Cost: ${stats['avg_cost_usd']:.4f}")
-    print(f"Success Rate: {stats['success_rate'] * 100}%")
-
-asyncio.run(view_stats())
-```
+- **`multi-perspective-ultra-budget`** — Ultra-light models (Ministral-3B, Gemini Flash Lite) in a streamlined 5-phase pipeline; sub-cent runs.
+- **`subagent-budget` / `subagent-premium`** — Routes every pipeline sub-task (classification, scoring, synthesis, ...) to specialized models.
+- **`image-gen-budget` / `image-gen-premium`** — Orchestrates text-to-image and image-to-image workflows.
+- **`nvidia-nemotron-test`** — Experimental preset using NVIDIA Nemotron models via the NIM API.
 
 ---
 
-## 🌐 Language-Bias Mitigation
+## Programmatic Usage
 
-Language choice significantly influences model outputs and ideological leans (Buyl et al., *npj AI* 2026). Reasoner implements a robust, two-part system to neutralize linguistic bias:
+Reasoner is designed to be called by autonomous AI agents (Cursor, LangChain, CrewAI, custom tools) as well as humans. There are three integration surfaces.
 
-### 1. The English Pivot (Always On)
-No matter what language a user questions in, Reasoner internally translates the query to **English**, executes the entire deep reasoning pipeline, and translates the finalized synthesis back to the user's native tongue.
-* **Fallback Chain:** Leverages DeepL first. If no API key is set, falls back to lightweight translation LLMs, and finally to local identity matching.
-* **Preservation Exceptions:** Creative writing, creative brainstorming, and specific article generation models bypass the pivot to maintain stylistic fidelity.
+### Option 1 — Agent API (HTTP, Bearer auth)
 
-### 2. The Cross-Lingual Probe (Canary)
-For highly sensitive geopolitical, historical, or religious topics, the Cross-Lingual Probe evaluates the divergence between English reasoning and native-language reasoning.
-* **Sensitivity Classifier:** Automatically flags queries covering 5 critical domains: geopolitics, governance, history, religion, and politics.
-* **Divergence Metric:** If semantic cosine distance exceeds threshold `0.15`, the system automatically downgrades the solution confidence rating (e.g., `VERIFIED ➔ HYPOTHESIS`) and appends an epistemic linguistic warning.
-
----
-
-## 🧪 Augmented Article Pipeline
-
-For abstract or philosophical inquiries, Reasoner dynamically triggers pre-processing augmentation before launching the primary long-form writing pipeline:
-
-```
-[ Philosophical / Abstract Query ]
-               │
-               ▼
-[ HyperGate Deep Concept Guard ]
-               │
-               ▼  (Triggers parallel preprocessing)
- ┌─────────────┼─────────────┬──────────────────────┐
- │             │             │                      │
- ▼             ▼             ▼                      ▼
-[ Debate ]  [ Jury ]  [ Socratic ]  [ Iterative Critique ]
- └─────────────┼─────────────┴──────────────────────┘
-               │
-               ▼
-  [ Consolidated Pre-Research Context ]
-               │
-               ├─► Retrievals (Refined search keywords)
-               ├─► Outlines (Enriched argumentative maps)
-               └─► Drafting (Integrated synthesis)
-```
-
-### Configuration Variables
-
-```bash
-AUGMENTATION_ENABLED=true             # Toggle the pre-processing pipeline
-AUGMENTATION_CACHE_ENABLED=true       # Cache results to prevent redundant LLM calls
-AUGMENTATION_CACHE_TTL_SECONDS=86400  # Cache lifetime (Default: 24 hours)
-AUGMENTATION_AB_TEST=false            # Enables 50/50 split testing of augmented vs baseline outputs
-```
-
----
-
-## 🔒 Security & Encryption
-
-Reasoner features an enterprise-grade security layer guarding data in transit and at rest.
-
-* **Mutual TLS (mTLS):** All internal microservices (Redis, DB, Web UI, API) communicate strictly over secure TLS 1.3/1.2 tunnels. Reasoner automatically provisions unique, ephemeral cryptographic certificates for internal containers on startup.
-* **At-Rest AES-256-GCM Envelope Encryption:** Sensitive tables — such as API keys, user data, and long-term execution traces — are encrypted at the application layer.
-* **Blind Indexing:** Search queries on encrypted fields utilize one-way HMAC-SHA256 blind indexing to allow searching without revealing plaintext to the database.
-
-### Encryption Migration Script
-
-To safely migrate legacy plain or older format databases to Reasoner v2.3's blind index format:
-
-```bash
-python scripts/migrate_encryption_v2.py \
-  --connection-string "postgresql://user:pass@host:port/dbname" \
-  --encryption-key "your_base64_fernet_key" \
-  --blind-index-key "your_hmac_sha256_key" \
-  --batch-size 1000 \
-  --delay-seconds 0.05
-```
-
----
-
-## 🤖 Agent API
-
-Reasoner was built native for **Autonomous AI Agents** (Cursor, custom LLM tools, LangChain, CrewAI). It exposes endpoints that utilize Bearer token authentication, avoiding CSRF restrictions.
-
-### How an agent should call Reasoner
-
-1. Fetch the tool contract from `GET /api/agent/tools` or the full OpenAPI schema from `GET /openapi.json`.
-2. Send every agent request with `Authorization: Bearer <API_KEY>`.
-3. Prefer `POST /api/agent/run/sync` for autonomous agents because it returns one JSON response.
-4. Use `POST /api/agent/run` only if your agent can consume SSE streams.
-5. Put the task in `problem`, and set `preset` explicitly when you want a specific cost/quality tradeoff.
-6. Read `synthesis` as the final answer, then inspect `citations`, `errors`, and `models_used`.
-
-### Primary Endpoints
+Agent endpoints authenticate with `Authorization: Bearer <API_KEY>` and are exempt from CSRF requirements.
 
 | Endpoint | Method | Format | Description |
 | :--- | :--- | :--- | :--- |
-| `/api/agent/run/sync` | `POST` | `application/json` | Block and return full compiled pipeline output. |
-| `/api/agent/run` | `POST` | `text/event-stream`| Stream pipeline progress and text chunks in real-time. |
-| `/api/agent/tools` | `GET` | `application/json` | Retrieve standard OpenAPI-spec schemas for agent tools. |
+| `/api/agent/run/sync` | `POST` | `application/json` | Block and return the full compiled pipeline output. |
+| `/api/agent/run` | `POST` | `text/event-stream` | Stream pipeline progress and chunks in real time (SSE). |
+| `/api/agent/tools` | `POST` | `application/json` | Compact function-calling schema describing the endpoints. |
+| `/api/health` | `GET` | `application/json` | Liveness/readiness probe. |
 
-### 1. Synchronous Integration Example
+Recommended flow for an agent:
 
-Use `/api/agent/run/sync` to gather all reasoning steps, citations, and models used into a structured JSON payload:
+1. Fetch the tool contract from `POST /api/agent/tools` (or the full OpenAPI schema at `GET /openapi.json`).
+2. Prefer `POST /api/agent/run/sync` unless the agent can consume SSE streams.
+3. Put the task in `problem`; set `preset` explicitly to control the cost/quality trade-off.
+4. Read `synthesis` as the final answer, then inspect `citations`, `errors`, and `models_used`.
 
 ```bash
 curl -X POST http://localhost:8003/api/agent/run/sync \
-  -H "Authorization: Bearer YOUR_ADMIN_API_KEY" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "problem": "Verify whether the prime number spiral has a mathematical pattern.",
@@ -319,37 +213,8 @@ curl -X POST http://localhost:8003/api/agent/run/sync \
   }'
 ```
 
-### 2. Minimal JSON Payload
+The response conforms to the `RunResult` schema (`src/reasoner/api/schemas.py`):
 
-```json
-{
-  "problem": "Evaluate whether we should migrate to a monorepo.",
-  "preset": "research-premium",
-  "top_k": 2,
-  "sequential": false,
-  "no_cache": false,
-  "force_pipeline": false,
-  "enhance_prompt": false,
-  "expert": false,
-  "web_search": false,
-  "smart_search": true,
-  "source_type": "general",
-  "domain": null,
-  "attachments": [],
-  "file_ids": [],
-  "client_run_id": "optional-idempotency-key"
-}
-```
-
-### 3. Response Handling
-
-- `synthesis` is the final answer.
-- `citations` contains source references when available.
-- `errors` lists pipeline failures or provider issues.
-- `models_used` shows which models participated in the run.
-- If `synthesis` is empty, retry with a different `preset` or set `web_search=true`.
-
-**JSON Output Schema:**
 ```json
 {
   "preset": "scientific-premium",
@@ -357,12 +222,8 @@ curl -X POST http://localhost:8003/api/agent/run/sync \
   "total_tokens": { "input": 4821, "output": 7412, "total": 12233 },
   "duration_seconds": 38.4,
   "synthesis": "### Prime Number Spiral Analysis\nThe Ulam spiral exhibits...",
-  "critical_insights": [
-    "Ulam spiral generates diagonal patterns based on quadratic polynomials."
-  ],
-  "open_questions": [
-    "Are there asymptotic limits to prime density along specific diagonals?"
-  ],
+  "critical_insights": ["Ulam spiral generates diagonal patterns based on quadratic polynomials."],
+  "open_questions": ["Are there asymptotic limits to prime density along specific diagonals?"],
   "citations": [
     {
       "url": "https://mathworld.wolfram.com/UlamSpiral.html",
@@ -375,9 +236,7 @@ curl -X POST http://localhost:8003/api/agent/run/sync \
 }
 ```
 
-### 4. LangChain Integration Script
-
-Easily embed the multi-model Reasoner pipeline as a structured tool inside standard AI Agent libraries:
+LangChain tool example:
 
 ```python
 import httpx
@@ -407,131 +266,271 @@ tool = StructuredTool.from_function(
 )
 ```
 
----
+### Option 2 — Headless in-process Python (no server)
 
-## 🔌 Headless Usage (No Server Required)
-
-The **Agent API** section above requires `python start_all.py` (or `uvicorn asgi:app`) running. If you don't want to run a server at all — a CI job, a one-off script, another agent shelling out — Reasoner's CLI (`main.py`) runs the full pipeline standalone with no FastAPI/uvicorn/SearXNG process needed.
-
-### Option A — CLI subprocess (any language)
-
-Stable contract: parse the `--output` JSON file, not stdout (stdout is progress logging, format not guaranteed).
-
-```bash
-python main.py --problem "your question" --preset debate-budget --output result.json --quiet
-```
+For CI jobs, one-off scripts, or embedding in another Python process, use the dedicated `reasoner.headless` module — no FastAPI/uvicorn/SearXNG process required:
 
 ```python
-import subprocess, json
+import sys
+sys.path.insert(0, "/path/to/Reasoner/src")   # or: pip install -e .
+
+from reasoner import headless
+
+result = await headless.ask("Is X better than Y?", preset="research-budget")
+
+if result.action == "pipeline":
+    print(result.state.final_synthesis)
+elif result.action == "direct":
+    print(result.answer)
+else:  # "web_search"
+    print(result.search_results)
+
+# Once, at the host application's own shutdown (not per call):
+await headless.shutdown()
+```
+
+Notes:
+
+- `ask()` accepts the same options as the CLI (`top_k=3`, `sequential=True`, `source_type="academic"`, `domain="github.com"`, `enhance_prompt=True`, ...); it routes through the real argparse parser so defaults and validation stay authoritative in one place.
+- Shared httpx connection pools are process-wide singletons. Call `headless.shutdown()` once at host shutdown — never per `ask()` call, or concurrent callers will tear down each other's pools.
+- `.env` must be loadable before the first import; `reasoner.core.settings` reads it at import time.
+
+### Option 3 — CLI subprocess (any language)
+
+Stable contract: parse the `--output` JSON file, not stdout (stdout is progress logging; its format is not guaranteed).
+
+```python
+import json
+import subprocess
 
 subprocess.run(
     ["python", "main.py", "--problem", problem, "--preset", "debate-budget",
      "--output", "result.json", "--quiet"],
     check=True, cwd="/path/to/Reasoner",
 )
-result = json.load(open("result.json"))
+with open("result.json") as f:
+    result = json.load(f)
 ```
-
-Other useful flags: `--list-presets`, `--list-models`, `--sequential` (rate-limited providers), `--save-state` / `--resume` (session continuity), `--top-k`.
-
-### Option B — In-process Python import (same runtime, lowest latency)
-
-No dedicated wrapper module ships yet — assemble it from the same building blocks `main.py` uses (`src/reasoner/main.py`, `async def main`, lines ~220–318):
-
-1. Build `argv` and call `reasoner.main.parse_args()` — don't hand-roll an args namespace; argparse owns defaults/validation (preset choices, mutually-exclusive `--preset`/`--routing`).
-2. Call `PipelineOrchestrator(PresetService(), None, None).preflight(args, initial_state=None)` for HyperGate routing/preset resolution.
-3. Branch on `preflight.action`: `"direct"` (short-circuit via `preflight.router.call(...)`), `"web_search"`, or fall through to the pipeline.
-4. Construct `ReasonerPipeline(router=preflight.router, preset_name=preflight.effective_preset_name, ...)` and `await pipeline.run(problem)` → returns `PipelineState`.
-5. **Always** close resources in `finally`: `close_scraper_client()` and `OpenAICompatibleProvider.close_shared_pool()` — skipping this leaks httpx connections across repeated calls in a long-lived host process.
-
-Preconditions:
-- `.env` (provider API keys) must load before first import — `reasoner.core.settings` loads it at import time.
-- `sys.path.insert(0, "<repo>/src")` is required unless the package is `pip install -e`'d (no installable-package config ships today — treat that as a prerequisite if you need real packaging).
-- Verify no shared mutable state (`token_cache`, provider connection pools) breaks under concurrent calls in the same process before relying on it under load — the API server already does concurrent per-request calls this way, but a bespoke headless wrapper should confirm it independently.
 
 ---
 
-## ⚙️ Configuration Reference
+## Telemetry & Self-Healing
 
-Configure your Reasoner instance using environment variables inside your `.env` file:
+Reasoner records structured runtime telemetry to optimize pricing, route around failing models, and feed an automated self-healing CI loop.
 
-### API Keys & Providers
-* `OPENROUTER_API_KEY`: Key for OpenRouter integration (Unified Model Access).
-* `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`: Direct provider access keys.
-* `DEEPSEEK_API_KEY`, `MISTRAL_API_KEY`, `XAI_API_KEY`: Optional direct provider keys.
-* `DEEPL_API_KEY`: Key for premium translations in the Language Pivot.
+| Pillar | Feature | Mechanism |
+| :--- | :--- | :--- |
+| E1 | Quality-rich memory | Sends `method`, `total_cost_usd`, `phase_durations`, `quality_history`, and `fallback_events` to the Neuro long-term memory for historical analysis. |
+| E2 | Phase telemetry store | App-level `TelemetryStore` (SQLite/PostgreSQL) recording model, cost, and duration per phase. |
+| E3 | Context compression | `smart_compress` applied at pipeline handoffs to minimize token cost. |
+| E4 | Fallback surfacing | `ProviderRouter` detects model failures and fires `on_fallback()` callbacks to route around dead endpoints. |
+| E5 | Healing exporter | `healing/telemetry_exporter.py` connects runtime context to static analysis tooling in CI. |
 
-### Application Infrastructure
-* `SERVER_PORT` (Default: `8003`): Port for the FastAPI backend.
-* `ADMIN_API_KEY`: Admin authentication token for accessing cache and managing encryption keys.
-* `RATE_LIMITER_MODE` (Default: `memory`): Mode for rate limits. Set to `redis` in production.
-* `REDIS_URL` (Default: `redis://localhost:6379/0`): URL of your Redis cache and rate limiter.
-* `DATABASE_URL` (Default: `sqlite:///./reasoner.db`): SQLAlchemy database path (PostgreSQL recommended in production).
-* `SEARXNG_URL` (Default: `http://localhost:8888`): Direct address to local Search Engine.
+Querying telemetry programmatically:
+
+```python
+import asyncio
+from reasoner.infrastructure.persistence.telemetry_store import get_telemetry_store
+
+async def view_stats():
+    store = get_telemetry_store()
+    stats = await store.get_preset_stats("multi-perspective-premium")
+    print(f"Runs:            {stats['run_count']}")
+    print(f"Average cost:    ${stats['avg_cost']:.4f}")
+    print(f"Total fallbacks: {stats['total_fallbacks']}")
+    for phase in stats["phases"]:
+        print(phase["phase"], f"avg ${phase['avg_cost']:.5f}")
+
+asyncio.run(view_stats())
+```
+
+The CI pipeline (`.github/workflows/self-healing-ci.yml`) adds three healing loops on top: static introspection and test generation, runtime circuit-breaker/health checks, and evolutionary failure-pattern analysis, with coverage gates at 60% (fail) and 80% (warn).
 
 ---
 
-## 💻 Development
+## Language-Bias Mitigation
 
-Reasoner enforces strict type compliance, automated linting, and comprehensive unit coverage.
+Language choice measurably influences model outputs and ideological stance (Buyl et al., *"Large Language Models Reflect the Ideology of Their Creators"*, npj Artificial Intelligence, 2026; [arXiv:2410.18417](https://arxiv.org/abs/2410.18417)). Reasoner mitigates this with two mechanisms:
 
-### Project Structure Overview
+**1. The English Pivot (always on).** Regardless of input language, the query is translated to English, the full reasoning pipeline executes in English, and the final synthesis is translated back to the user's language. Translation uses DeepL when `DEEPL_API_KEY` is set, falls back to lightweight translation LLMs, and finally to identity pass-through. Creative writing, brainstorming, and article presets bypass the pivot to preserve stylistic fidelity.
+
+**2. The Cross-Lingual Probe (canary).** For sensitive topics (geopolitics, governance, religion, and related domains flagged by the sensitivity classifier), the probe compares English reasoning against native-language reasoning. If the semantic cosine distance exceeds the configured threshold (`LANGUAGE_DIVERGENCE_COSINE = 0.15`, `src/reasoner/core/constants_limits.py`), the system downgrades the epistemic confidence label (e.g., `VERIFIED` → `HYPOTHESIS`) and appends a linguistic-variance warning.
+
+---
+
+## Augmented Article Pipeline
+
+For abstract or philosophical inquiries, Reasoner can trigger pre-processing augmentation before the primary long-form writing pipeline:
 
 ```
-E:/Documents/Vibe-Coding/Reasoner/
-├── main.py                     # CLI Entry Point
-├── asgi.py                     # FastAPI ASGI Server Entry Point
-├── src/
-│   └── reasoner/
-│       ├── api/                # API controllers & route mappings
-│       ├── application/        # Application services and logic
-│       ├── core/               # Main orchestration models
-│       ├── domain/             # Entities, value objects & models
-│       ├── infrastructure/     # Database persistence, telemetry & cache stores
-│       ├── phases/             # Phase-specific execution schemas and prompts
-│       ├── security/           # Application-layer encryption & PKI setup
-│       └── utils/              # Token, logging & scraper utilities
-├── tests/                      # Unit, integration & behavioral tests
-├── ui-next/                    # Next.js Web UI
-└── scripts/                    # Database, encryption & build scripts
+[ Philosophical / Abstract Query ]
+               │
+               ▼
+[ HyperGate Deep Concept Guard ]
+               │
+               ▼  (Triggers parallel preprocessing)
+ ┌─────────────┼─────────────┬──────────────────────┐
+ ▼             ▼             ▼                      ▼
+[ Debate ]  [ Jury ]  [ Socratic ]  [ Iterative Critique ]
+ └─────────────┼─────────────┴──────────────────────┘
+               │
+               ▼
+  [ Consolidated Pre-Research Context ]
+               │
+               ├─► Retrievals (refined search keywords)
+               ├─► Outlines (enriched argumentative maps)
+               └─► Drafting (integrated synthesis)
 ```
 
-### Running the Test Suite
-
-We use `pytest` for executing and asserting our test suites:
+Configuration (defaults shown; see `src/reasoner/core/settings.py`):
 
 ```bash
-# Execute the entire test suite
-python -m pytest tests/ -v
+AUGMENTATION_ENABLED=true             # Toggle the pre-processing pipeline
+AUGMENTATION_CACHE_ENABLED=true       # Cache results to prevent redundant LLM calls
+AUGMENTATION_CACHE_TTL_SECONDS=86400  # Cache lifetime (default: 24 hours)
+AUGMENTATION_CACHE_MAX_ENTRIES=128    # Max cached augmentation results
+AUGMENTATION_LLM_CONFIRM=false        # Extra LLM confirmation step before augmenting
+AUGMENTATION_AB_TEST=false            # 50/50 split test: augmented vs baseline
+```
 
-# Run lightweight tests only (excluding slow integration tests)
-python -m pytest tests/ -v -m "not slow and not integration"
+---
 
-# Run with test coverage calculations
+## Security & Encryption
+
+Reasoner implements a zero-trust security architecture covering data in transit and at rest. The authoritative reference is [`ENCRYPTION.md`](ENCRYPTION.md).
+
+**Data in transit**
+
+- External traffic is served over TLS 1.3/1.2 by the Caddy reverse proxy with automatic Let's Encrypt certificates and HSTS.
+- The Docker Compose stack includes a `cert-generator` init container that creates a local root CA and per-service certificates on first boot; PostgreSQL requires SSL, Redis runs TLS-only, and the backend serves TLS natively via Gunicorn/Uvicorn.
+
+**Data at rest**
+
+- Sensitive fields (API keys, user data, execution traces) are encrypted at the application layer using authenticated symmetric encryption (Fernet) with seamless key rotation via `MultiFernet`.
+- Searchable encrypted fields use one-way HMAC-SHA256 **blind indexes**, allowing equality lookups without exposing plaintext to the database.
+
+**Application security**
+
+- Input sanitization and prompt-injection filtering on all user input before it reaches LLM prompts.
+- Token-bucket rate limiting per client IP (Redis-backed mode available for multi-worker deployments), circuit breakers with provider fallback, scoped Bearer-token auth, CSRF protection (HMAC-SHA256), hardened security headers, and strict CORS.
+- Admin endpoints require both a JWT with `admin` scope and a separate `X-Admin-Key` header (constant-time comparison).
+
+To migrate legacy plaintext data to the encrypted, blind-indexed format:
+
+```bash
+python scripts/migrate_encryption_v2.py \
+  --connection-string "postgresql://user:pass@host:port/dbname" \
+  --encryption-key "your_base64_fernet_key" \
+  --blind-index-key "your_hmac_sha256_key" \
+  --batch-size 1000 \
+  --delay-seconds 0.05
+```
+
+---
+
+## Configuration Reference
+
+All configuration is environment-driven via `.env` (copy `.env.example`; `src/reasoner/core/settings.py` is the only env reader). Highlights:
+
+### API Keys & Providers
+
+| Variable | Purpose |
+| :--- | :--- |
+| `OPENROUTER_API_KEY` | Unified access to 350+ models (recommended). |
+| `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY` | Direct provider access (optional). |
+| `DEEPSEEK_API_KEY`, `MISTRAL_API_KEY`, `XAI_API_KEY`, `PERPLEXITY_API_KEY` | Additional direct providers (optional). |
+| `DEEPL_API_KEY` | Premium translation for the English Pivot (optional). |
+
+### Application Infrastructure
+
+| Variable | Default | Purpose |
+| :--- | :--- | :--- |
+| `SERVER_PORT` | `8003` | FastAPI bind port. |
+| `ADMIN_API_KEY` | — | Admin token for cache/admin endpoints. Generate with `secrets.token_urlsafe(32)`. |
+| `DATABASE_URL` | `postgresql+asyncpg://postgres:postgres@localhost:5432/reasoner` | SQLAlchemy/asyncpg database DSN. |
+| `REDIS_URL` | `redis://localhost:6379/0` | Redis cache / rate-limiter backend. |
+| `RATE_LIMITER_MODE` | `memory` | Set to `redis` for multi-worker production deployments. |
+| `CIRCUIT_BREAKER_MODE` | `memory` | Set to `redis` for multi-worker production deployments. |
+| `SEARXNG_URL` | `http://localhost:8888` | Local search engine address. |
+
+The full variable reference (auth, billing, telemetry, feature flags) lives in `.env.example` and [`docs/ENVIRONMENT.md`](docs/ENVIRONMENT.md). **Never commit `.env` with real values.**
+
+---
+
+## Development
+
+### Project Structure
+
+```
+Reasoner/
+├── main.py                     # CLI entry point
+├── asgi.py                     # ASGI entry point (uvicorn asgi:app --port 8003)
+├── src/
+│   └── reasoner/
+│       ├── api/                # FastAPI app, routes, middleware, schemas
+│       ├── application/        # CQRS, event bus, workflow strategies, services
+│       ├── core/               # Protocols, ports, constants, settings
+│       ├── domain/             # Entities, preset registry, SaaS models
+│       ├── infrastructure/     # LLM router, persistence, Redis, billing, websocket
+│       ├── phases/             # Reasoning-method phase implementations
+│       ├── security/           # Application-layer encryption & blind indexing
+│       └── utils/              # Shared utilities
+├── tests/                      # pytest suite (unit, integration, architecture)
+├── ui-next/                    # Next.js 16 web UI (React 19, TypeScript, Tailwind v4)
+├── scripts/                    # Maintenance, migration & smoke-test scripts
+└── migrations/                 # SQL migrations and Alembic versions
+```
+
+See `AGENTS.md` for the exhaustive directory map and contributor conventions.
+
+### Tests
+
+```bash
+# Full suite (parallel by default via pytest-xdist)
+python -m pytest -v
+
+# Fast subset — skip slow and integration tests
+python -m pytest -m "not slow and not integration"
+
+# Include slow tests
+python -m pytest --run-slow
+
+# Coverage report
 python -m pytest tests/ --cov=src/reasoner --cov-report=html
 ```
 
-### Linting & Formatting Standards
+The suite contains 2,100+ tests across 244 files, including architecture fitness functions (`tests/architecture/test_layer_boundaries.py`) that enforce layer dependency rules. Frontend unit tests use Vitest (`cd ui-next && npm run test`); E2E tests use Playwright (`npm run test:e2e`).
 
-Before staging or committing any code changes, run the automated linting checks:
+### Linting & Formatting
+
+Configuration for Ruff and mypy lives in `pyproject.toml`; there are no separate config files.
 
 ```bash
-# Lint the Python codebase
-ruff check src/reasoner/
-
-# Format Python files automatically
-ruff format src/reasoner/
-
-# Lint the Frontend React codebase
-cd ui-next && npm run lint
+ruff check src/reasoner/          # Lint
+ruff format src/reasoner/         # Format
+cd ui-next && npm run lint        # Frontend ESLint (flat config)
 ```
 
 ---
 
-<div align="center">
+## Documentation
 
-**[⬆ Back to Top](#top)**
+| Document | Contents |
+| :--- | :--- |
+| [`AGENTS.md`](AGENTS.md) | Exhaustive architecture map, conventions, and agent-contributor guide. |
+| [`ENCRYPTION.md`](ENCRYPTION.md) | Zero-trust encryption architecture (transit + at-rest). |
+| [`DEPLOY.md`](DEPLOY.md) | Deployment guide. |
+| [`SAAS.md`](SAAS.md) | Multi-tenant SaaS design (auth, billing, quotas). |
+| [`CHANGELOG.md`](CHANGELOG.md) | Release history. |
+| [`docs/ENVIRONMENT.md`](docs/ENVIRONMENT.md) | Full environment-variable reference. |
+| [`docs/`](docs/) | Architecture plans, audits, ADRs, and research notes. |
 
-Built with precision and robust engineering standards.
+---
 
-</div>
+## Contributing
+
+Contributions are welcome. Please read [`CONTRIBUTING.md`](CONTRIBUTING.md) before opening a pull request, keep changes minimal and covered by tests, and follow the conventional-commit style (`feat:`, `fix:`, `docs:`, ...).
+
+## License
+
+[MIT](LICENSE) © 2026 Georgios-Chrysovalantis Chatzivantsidis.
