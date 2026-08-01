@@ -120,6 +120,7 @@ MODEL_DEEPSEEK_V4_PRO: str = "deepseek-v4-pro"
 # Qwen
 MODEL_QWEN37_MAX: str = "qwen3.7-max"
 MODEL_QWEN37_PLUS: str = "qwen3.7-plus"
+MODEL_QWEN37_FLASH: str = "qwen3.7-flash"
 MODEL_QWEN3_MAX_THINKING: str = "qwen3-max-thinking"
 MODEL_QWEN36_FLASH: str = "qwen3.6-flash"
 MODEL_QWEN36_35B_A3B: str = "qwen3.6-35b-a3b"

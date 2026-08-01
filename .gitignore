@@ -4,6 +4,11 @@
 .env.production
 .env.*.local
 
+# Runtime upload state — leaks into src/ due to a known Path(__file__) bug
+# (see plans/PRODUCTION_READINESS_PLAN.md F-02). Never commit user file content.
+src/reasoner/infrastructure/uploads/
+src/reasoner/infrastructure/.upload_hash_index.json
+
 # Python
 __pycache__/
 *.py[cod]

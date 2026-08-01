@@ -15,23 +15,46 @@ import uuid
 from pathlib import Path
 from typing import Any, Optional
 
-# Content-hash deduplication index: {sha256: file_id}
-_HASH_INDEX_PATH = Path(__file__).parent / ".upload_hash_index.json"
+# Upload storage — configurable from composition root
+_UPLOAD_DIR: Path | None = None
+_HASH_INDEX_PATH: Path | None = None
+
+
+def configure_upload_dir(path: str | Path) -> None:
+    """Set upload directory.  Called once at startup."""
+    global _UPLOAD_DIR, _HASH_INDEX_PATH
+    _UPLOAD_DIR = Path(path).resolve()
+    _UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    _HASH_INDEX_PATH = _get_upload_dir() / ".upload_hash_index.json"
+
+
+def _get_upload_dir() -> Path:
+    if _UPLOAD_DIR is not None:
+        return _UPLOAD_DIR
+    d = Path(__file__).resolve().parent / "uploads"
+    d.mkdir(exist_ok=True)
+    return d
+
+
+def _get_hash_index_path() -> Path:
+    if _HASH_INDEX_PATH is not None:
+        return _HASH_INDEX_PATH
+    return _get_upload_dir() / ".upload_hash_index.json"
 
 # Retained references to background indexing tasks to prevent premature GC.
 _BACKGROUND_TASKS: set[asyncio.Task] = set()
 
 def _load_hash_index() -> dict[str, str]:
-    if _HASH_INDEX_PATH.exists():
+    if _get_hash_index_path().exists():
         try:
-            return json.loads(_HASH_INDEX_PATH.read_text(encoding="utf-8"))
+            return json.loads(_get_hash_index_path().read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             pass
     return {}
 
 def _save_hash_index(index: dict[str, str]) -> None:
     try:
-        _HASH_INDEX_PATH.write_text(json.dumps(index), encoding="utf-8")
+        _get_hash_index_path().write_text(json.dumps(index), encoding="utf-8")
     except OSError:
         pass
 
@@ -53,9 +76,6 @@ except ImportError:
     logger.warning("python-docx not available - DOCX extraction disabled")
 
 # Upload storage directory
-UPLOAD_DIR = Path(__file__).parent / "uploads"
-UPLOAD_DIR.mkdir(exist_ok=True)
-
 # Maximum file size (50MB)
 MAX_FILE_SIZE = 50 * 1024 * 1024
 
@@ -284,7 +304,7 @@ async def save_uploaded_file(
     hash_index = _load_hash_index()
     existing_id = hash_index.get(content_hash)
     if existing_id:
-        existing_path = UPLOAD_DIR / f"{existing_id}.meta.json"
+        existing_path = _get_upload_dir() / f"{existing_id}.meta.json"
         if existing_path.exists():
             logger.info("Deduplicating upload: hash %s matches existing file %s", content_hash[:16], existing_id)
             try:
@@ -300,7 +320,7 @@ async def save_uploaded_file(
                 "size": len(content),
                 "mime_type": meta.get("mime_type", "application/octet-stream"),
                 "text": text_content,
-                "path": str(UPLOAD_DIR / f"{existing_id}{_get_file_extension(filename)}"),
+                "path": str(_get_upload_dir() / f"{existing_id}{_get_file_extension(filename)}"),
                 "user_id": user_id,
                 "deduplicated": True,
             }
@@ -343,12 +363,12 @@ async def save_uploaded_file(
     
     # Safe filename: only UUID + validated extension
     safe_filename = f"{file_id}{ext}"
-    file_path = UPLOAD_DIR / safe_filename
+    file_path = _get_upload_dir() / safe_filename
     
     # CRITICAL: Verify the resolved path is within UPLOAD_DIR (defense in depth)
     try:
         resolved_path = file_path.resolve()
-        resolved_upload_dir = UPLOAD_DIR.resolve()
+        resolved_upload_dir = _get_upload_dir().resolve()
         if not str(resolved_path).startswith(str(resolved_upload_dir)):
             logger.error(f"Path traversal attempt detected: {filename} -> {file_path}")
             return {
@@ -403,7 +423,7 @@ async def save_uploaded_file(
         }.get(ext, "application/octet-stream")
 
         # Persist ownership metadata
-        meta_path = UPLOAD_DIR / f"{file_id}.meta.json"
+        meta_path = _get_upload_dir() / f"{file_id}.meta.json"
         meta_path.write_text(
             json.dumps({"user_id": user_id, "filename": filename, "mime_type": mime_type, "created_at": str(uuid.uuid4())}),
             encoding="utf-8",
@@ -434,7 +454,7 @@ async def save_uploaded_file(
 
 def _get_upload_meta(file_id: str) -> dict | None:
     """Read upload metadata if it exists."""
-    meta_path = UPLOAD_DIR / f"{file_id}.meta.json"
+    meta_path = _get_upload_dir() / f"{file_id}.meta.json"
     if meta_path.exists():
         import json
         try:
@@ -467,7 +487,7 @@ async def get_file_text(file_id: str, user_id: str | None = None) -> Optional[st
     
     # Look for exact file by known extensions instead of globbing
     for ext in SUPPORTED_EXTENSIONS:
-        f = UPLOAD_DIR / f"{file_id}{ext}"
+        f = _get_upload_dir() / f"{file_id}{ext}"
         if f.exists():
             try:
                 content = f.read_bytes()
@@ -502,7 +522,7 @@ def delete_file(file_id: str, user_id: str | None = None) -> bool:
     deleted = False
     # Look for exact file by known extensions instead of globbing
     for ext in SUPPORTED_EXTENSIONS:
-        f = UPLOAD_DIR / f"{file_id}{ext}"
+        f = _get_upload_dir() / f"{file_id}{ext}"
         if f.exists():
             try:
                 f.unlink()
@@ -511,7 +531,7 @@ def delete_file(file_id: str, user_id: str | None = None) -> bool:
                 logger.error(f"Failed to delete file {file_id}: {e}")
 
     # Clean up metadata sidecar
-    meta_path = UPLOAD_DIR / f"{file_id}.meta.json"
+    meta_path = _get_upload_dir() / f"{file_id}.meta.json"
     if meta_path.exists():
         try:
             meta_path.unlink()
@@ -541,7 +561,7 @@ def list_uploads(user_id: str | None = None) -> list[dict[str, Any]]:
         List of file info dictionaries
     """
     files = []
-    for f in UPLOAD_DIR.iterdir():
+    for f in _get_upload_dir().iterdir():
         if not f.is_file() or f.suffix == ".json":
             continue
         file_id = f.stem[:12]

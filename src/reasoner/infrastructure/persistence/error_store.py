@@ -71,7 +71,7 @@ class ErrorStore:
         retention_days: int = 30,
     ):
         if db_path is None:
-            db_path = Path(__file__).parent.parent.parent / "errors.db"
+            db_path = None  # Set by composition root via DataPaths
 
         self.db_path = Path(db_path)
         self.retention_days = retention_days

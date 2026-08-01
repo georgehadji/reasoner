@@ -31,13 +31,7 @@ from reasoner.core.constants import MAX_RATE_LIMIT_BUCKETS # Imported MAX_RATE_L
 from reasoner.core.settings import settings
 _REDIS_RATE_LIMITER_ENABLED = settings.RATE_LIMITER_MODE.lower() == "redis"
 
-# Temporarily disable metrics import
-_METRICS_AVAILABLE = False
-# try:
-#     from reasoner.metrics import REASONER_RATE_LIMIT_REJECTED
-#     _METRICS_AVAILABLE = True
-# except Exception:
-#     _METRICS_AVAILABLE = False
+from reasoner.infrastructure.metrics import REASONER_RATE_LIMIT_REJECTED
 
 
 @dataclass
@@ -215,15 +209,13 @@ class RateLimiter:
             if bucket.requests_minute >= rpm:
                 info["retry_after"] = 60 - (time.monotonic() - bucket.minute_window_start)
                 info["reason"] = "per_minute_limit_fallback"
-                if _METRICS_AVAILABLE:
-                    REASONER_RATE_LIMIT_REJECTED.labels(tier="fallback").inc()
+                REASONER_RATE_LIMIT_REJECTED.labels(tier="fallback").inc()
                 return False, info
 
             if bucket.requests_hour >= rph:
                 info["retry_after"] = 3600 - (time.monotonic() - bucket.hour_window_start)
                 info["reason"] = "per_hour_limit_fallback"
-                if _METRICS_AVAILABLE:
-                    REASONER_RATE_LIMIT_REJECTED.labels(tier="fallback").inc()
+                REASONER_RATE_LIMIT_REJECTED.labels(tier="fallback").inc()
                 return False, info
 
             if bucket.tokens < requested_tokens:
@@ -237,8 +229,7 @@ class RateLimiter:
                 info["remaining_minute"] = int(bucket.tokens)
                 info["remaining_hour"] = int(bucket.tokens)
                 info["reason"] = "burst_limit_fallback"
-                if _METRICS_AVAILABLE:
-                    REASONER_RATE_LIMIT_REJECTED.labels(tier="fallback").inc()
+                REASONER_RATE_LIMIT_REJECTED.labels(tier="fallback").inc()
                 return False, info
 
             bucket.tokens -= requested_tokens

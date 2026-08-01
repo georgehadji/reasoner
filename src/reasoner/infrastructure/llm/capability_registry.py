@@ -50,6 +50,7 @@ _MODEL_CONSTRAINT_HINTS: dict[str, dict[str, Any]] = {
     # Qwen
     "qwen3.7-max":      {"max_context": 1_000_000, "cost_in": 1.25, "cost_out": 3.75, "tools": True, "vision": True, "json": True, "temp": True},
     "qwen3.7-plus":     {"max_context": 1_000_000, "cost_in": 0.32, "cost_out": 1.28, "tools": True, "vision": True, "json": True, "temp": True},
+    "qwen3.7-flash":    {"max_context": 1_000_000, "cost_in": 0.03, "cost_out": 0.13, "tools": True, "vision": True, "json": True, "temp": True},
     "qwen3.5-flash":    {"max_context": 1_000_000, "cost_in": 0.065, "cost_out": 0.26, "tools": True, "vision": False, "json": True, "temp": True},
     # Mistral
     "mistral-large-3":    {"max_context": 262_000, "cost_in": 2.0, "cost_out": 8.0, "tools": True, "vision": True, "json": True, "temp": True},

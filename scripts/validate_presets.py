@@ -19,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from reasoner.domain.preset_registry import list_presets, _REGISTRY as PRESETS
 from reasoner.domain.preset_core import _KNOWN_ROUTING_ROLES
+from reasoner.domain.methods import ReasoningMethod
 from reasoner.infrastructure.llm.registry import _REGISTRY as MODELS, bloc_of
 
 # ── Lab taxonomy for cross-lab diversity check ──
@@ -51,13 +52,7 @@ def main() -> int:
     if not quiet:
         print(f"Validating {len(presets)} presets...")
 
-    valid_methods = {
-        "multi-perspective", "debate", "jury", "research", "scientific",
-        "socratic", "pre-mortem", "bayesian", "dialectical", "analogical",
-        "delphi", "cove", "sot", "tot", "pot", "self-discover",
-        "writing", "article", "coding", "brainstorming", "subagent",
-        "cross-language", "iterative-critique", "image-gen",
-    }
+    valid_methods = ReasoningMethod.valid_methods()
 
     for preset in presets:
         name = preset.id

@@ -35,7 +35,7 @@ class EventStore:
 
     def __init__(self, db_path: str | Path | None = None):
         if db_path is None:
-            db_path = Path(__file__).parent.parent / "events.db"
+            db_path = None  # Set by composition root via DataPaths
 
         self.db_path = Path(db_path)
         # Delegate connection lifecycle to dedicated module
@@ -814,7 +814,7 @@ def get_event_store(db_path: str | Path | None = None) -> Any:
     global _event_store
     if _event_store is None:
         from reasoner.core.settings import settings
-        if settings.EVENT_STORE_BACKEND == "postgres" and settings.DATABASE_URL:
+        if settings.resolved_event_store_backend == "postgres" and settings.DATABASE_URL:
             from reasoner.infrastructure.persistence.postgres_store import PostgreSQLEventStore
             _event_store = PostgreSQLEventStore(settings.DATABASE_URL)
         else:

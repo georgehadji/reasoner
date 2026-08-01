@@ -63,32 +63,43 @@ class ArticleFlow(WorkflowStrategy):
         # ── Pre-processing: run augmentation if depth-detected ──
         await run_augmentation(state, services.call_llm, services.log)
 
-        phases = self.get_phases(state)
-        audit_retried = False
-        
-        for step in phases:
-            await services.run_phase(step, state)
-            
-            # E2: If final audit fails, retry developmental edit + re-audit once
-            if not audit_retried and step.fn is run_article_final_audit_phase:
-                audit = state.writing_state.get("editorial_audit", {})
-                # Default to False if audit data is empty (parse failure = failed audit)
-                if not audit.get("passes_audit", False):
-                    services.log("WRITING", "Audit failed — retrying developmental edit and re-audit...", state)
-                    audit_retried = True
-                    # Re-run developmental edit
-                    await services.run_phase(
-                        PhaseStep(5.1, "Developmental Edit (retry)", run_article_developmental_edit_phase, _ser_4),
-                        state,
-                    )
-                    # Re-run style + copy edit
-                    await services.run_phase(
-                        PhaseStep(5.2, "Style + Copy Edit (retry)", run_article_style_copy_edit_phase, _ser_5),
-                        state,
-                    )
-                    # Re-run audit
-                    await services.run_phase(
-                        PhaseStep(5.3, "Final Audit (retry)", run_article_final_audit_phase, _ser_5),
-                        state,
-                    )
+        # ── Adapter-based pipeline (Phase 1) ──
+        # Build initial ArticleContext from current state
+        from reasoner.domain.core_types import ArticleContext, Ok, Err
+        from reasoner.application.flows.article_adapters import (
+            article_pipeline, _compute_surface_signals,
+        )
+
+        ws = state.writing_state
+
+        ctx = ArticleContext(
+            problem=state.problem,
+            language=getattr(state, "language", "English"),
+            preset_name=getattr(state, "preset_name", "article-budget"),
+            content_class="blog",
+            sources=tuple(ws.get("retrieved_sources") or ()),
+            source_metadata=tuple(ws.get("source_metadata") or ()),
+            pre_research_summary=ws.get("pre_research_summary", ""),
+            gaps_noted=list(ws.get("gaps_noted") or []),
+            style_brief=ws.get("style_brief"),
+        )
+        # Note: PipelineState stores style_brief via writing_state dict, not as an attr.
+        # The ws.get() on line 87 already captures it correctly.
+
+        # Run the adapter pipeline — with_retry handles re-running on audit failure
+        result = await article_pipeline(ctx, services)
+
+        if isinstance(result, Ok):
+            ctx = result.value
+            # Compute surface signals for the frontend
+            from reasoner.application.flows.article_adapters import _compute_surface_signals
+            signals = _compute_surface_signals(ctx)
+            if signals:
+                ctx = ctx.replace(surface_signals=signals)
+        elif isinstance(result, Err) and result.fallback is not None:
+            ctx = result.fallback
+            services.log("WRITING", f"Phase degraded: {result.error}", state)
+
+        # Sync back into PipelineState for serializers
+        ctx.sync_to(state)
         return state

@@ -39,7 +39,7 @@ _MODEL_LABS: dict[str, str] = {
     # DeepSeek
     "deepseek-v3": "deepseek", "deepseek-v4-pro": "deepseek", "deepseek-v4-flash": "deepseek",
     # Qwen (Alibaba)
-    "qwen3-max": "qwen", "qwen3.7-max": "qwen", "qwen3.7-plus": "qwen", "qwen3.5-flash": "qwen",
+    "qwen3-max": "qwen", "qwen3.7-max": "qwen", "qwen3.7-plus": "qwen", "qwen3.7-flash": "qwen", "qwen3.5-flash": "qwen",
     "qwen3-max-thinking": "qwen", "qwen3.6-flash": "qwen", "qwen3.6-plus-real": "qwen",
     "qwen3-coder-flash": "qwen", "qwen3-coder-30b-a3b": "qwen",
     # GLM (Zhipu)

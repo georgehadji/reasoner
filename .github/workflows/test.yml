@@ -27,18 +27,22 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt pytest-asyncio pytest-cov bandit mypy
 
-      - name: Lint (ruff — B-rules + undefined names)
+      - name: Lint (ruff — basic rules)
         run: |
           pip install ruff
-          ruff check src/ --select B,F821 --ignore B008 --exit-zero
+          ruff check src/ --select E,F,I,N,W,UP,B --output-format=concise
+
+      - name: Check quality baseline
+        run: |
+          python scripts/quality_gate.py
 
       - name: Security scan (bandit)
         run: |
-          bandit -r src/ -t B307,B308,B102 -f txt --exit-zero
+          bandit -r src/ -t B307,B308,B102 -f txt
 
-      - name: Type check auth_legacy (mypy)
+      - name: Type check (mypy)
         run: |
-          mypy --strict src/reasoner/infrastructure/auth_legacy.py --ignore-missing-imports || true
+          mypy --strict src/reasoner/infrastructure/auth_legacy.py --ignore-missing-imports
 
       - name: Run tests
         run: |

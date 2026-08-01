@@ -1,0 +1,59 @@
+name: Nightly Analysis
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.12'
+  PYTHONPATH: src
+
+jobs:
+  introspection:
+    name: Run introspection engine
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run introspection engine
+        run: |
+          python src/reasoner/healing/introspection_engine.py
+        continue-on-error: true
+
+      - name: Upload introspection report
+        uses: actions/upload-artifact@v4
+        with:
+          name: introspection-report
+          path: healing/introspection_report.*
+          retention-days: 30
+
+  alembic-check:
+    name: Verify Alembic migrations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Check Alembic
+        run: |
+          alembic check

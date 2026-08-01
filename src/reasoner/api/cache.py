@@ -14,8 +14,26 @@ try:
 except Exception:
     _METRICS_AVAILABLE = False
 
-CACHE_DIR = Path(__file__).parent.parent / "cache"
-CACHE_DIR.mkdir(exist_ok=True)
+# Module-level singleton cache directory.  Set via configure_cache_dir()
+# from the composition root.  Defaults to the old Path(__file__) derivation
+# for backward compatibility during the transition window.
+_CACHE_DIR: Path | None = None
+
+
+def configure_cache_dir(path: str | Path) -> None:
+    """Set the cache directory.  Called once at startup."""
+    global _CACHE_DIR
+    _CACHE_DIR = Path(path).resolve()
+    _CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _get_cache_dir() -> Path:
+    if _CACHE_DIR is not None:
+        return _CACHE_DIR
+    # Fallback — legacy path derivation for backward compatibility.
+    d = Path(__file__).resolve().parent.parent / "cache"
+    d.mkdir(exist_ok=True)
+    return d
 
 # In-memory hot-cache layer to avoid disk I/O on repeated identical requests.
 # NOTE: This is a per-process cache. For horizontal scaling, use Redis or
@@ -124,7 +142,7 @@ async def _load_cache(key: str) -> list[dict] | None:
             return _MEMORY_CACHE[key]
 
     # 2. Fall back to disk
-    path = CACHE_DIR / f"{key}.json"
+    path = _get_cache_dir() / f"{key}.json"
     if path.exists():
         try:
             data = json.loads(await asyncio.to_thread(path.read_text, encoding="utf-8"))
@@ -153,7 +171,7 @@ _MAX_CACHE_FILES: int = 1000
 
 def _prune_disk_cache() -> None:
     """Remove oldest cache files if the directory exceeds the max size."""
-    files = sorted(CACHE_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime)
+    files = sorted(_get_cache_dir().glob("*.json"), key=lambda p: p.stat().st_mtime)
     excess = len(files) - _MAX_CACHE_FILES
     for f in files[:excess]:
         try:
@@ -172,9 +190,9 @@ async def _save_cache(key: str, events: list[dict]) -> None:
     # write never leaves a corrupt (partial) JSON file at the target path.
     # FIX BUG-007: Use unique temp filename per writer to prevent race conditions
     # on Windows where os.replace() is not atomic. Include PID and timestamp for uniqueness.
-    path = CACHE_DIR / f"{key}.json"
+    path = _get_cache_dir() / f"{key}.json"
     # Unique temp file: key.{pid}.{timestamp}.tmp
-    tmp = CACHE_DIR / f"{key}.{os.getpid()}.{int(time.time() * 1000)}.tmp"
+    tmp = _get_cache_dir() / f"{key}.{os.getpid()}.{int(time.time() * 1000)}.tmp"
     try:
         await asyncio.to_thread(tmp.write_text, json.dumps(events), encoding="utf-8")
         # On Windows, os.replace() may not be atomic, but with unique temp filenames
@@ -189,7 +207,7 @@ async def _save_cache(key: str, events: list[dict]) -> None:
         return
     finally:
         # Clean up old temp files (crashed writers) regardless of success
-        for old_tmp in CACHE_DIR.glob(f"{key}.*.tmp"):
+        for old_tmp in _get_cache_dir().glob(f"{key}.*.tmp"):
             try:
                 old_tmp.unlink(missing_ok=True)
             except OSError:

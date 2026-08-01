@@ -15,9 +15,9 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install pip-audit bandit
-      - run: pip-audit --requirement requirements.txt || true
-      - run: bandit -r src/ -f json -o bandit-report.json || true
-      - run: bandit -r src/ || true
+      - run: pip-audit --requirement requirements.txt
+      - run: bandit -r src/ -f json -o bandit-report.json
+      - run: bandit -r src/
       - run: python scripts/scan-secrets.py
 
   frontend:
@@ -27,4 +27,4 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: cd ui-next && npm audit --audit-level high || true
+      - run: cd ui-next && npm audit --audit-level high

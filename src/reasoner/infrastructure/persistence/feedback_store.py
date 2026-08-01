@@ -61,9 +61,9 @@ class FeedbackStore:
         jsonl_path: str | Path | None = None,
     ):
         if db_path is None:
-            db_path = Path(__file__).parent.parent.parent / "feedback.db"
+            db_path = None  # Set by composition root via DataPaths
         if jsonl_path is None:
-            jsonl_path = Path(__file__).parent.parent.parent.parent / "feedback" / "feedback.jsonl"
+            jsonl_path = None  # Legacy — migrated by composition root
 
         self.db_path = Path(db_path)
         self.jsonl_path = Path(jsonl_path)

@@ -24,7 +24,7 @@ _REGISTRY: dict[str, dict] = {
         "primary_id": "grok-4.3",
         "routing": {
             "perspective_cot": "mimo-v2.5",           # Xiaomi 🇨🇳 — $0.14/$0.28, cheapest 1M ctx omnimodal
-            "perspective_analysis": "qwen3.6-flash",   # was qwen3-turbo (DEAD) → stronger reasoning
+            "perspective_analysis": "qwen3.7-flash",   # was qwen3-turbo (DEAD) → 3.7-flash (cheapest Qwen, vision)
             "synthesis": "gpt-4o-mini",                # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
             # ── Per-perspective echo-chamber-resistant diversity (4 labs, 3 blocs: 2🇨🇳 + 1🇺🇸 + 1🇫🇷) ──
             "constructive":  "deepseek-v3",           # 🇨🇳 DeepSeek V3.2 — $0.12/$0.50 (was v4-flash, 4-lab diversity)
@@ -33,10 +33,10 @@ _REGISTRY: dict[str, dict] = {
             "minimalist":    "ministral-8b",     # 🇫🇷 Mistral — $0.075/$0.20
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "deepseek-v4-flash",
-        "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
+        "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
         "scoring":        "hy3",              # 🇨🇳 Tencent — anti-hallucination scoring, configurable CoT, $0.20/$0.80 (was gpt-4o-mini)
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "verifier":       "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable
         "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "balanced"],
@@ -45,8 +45,8 @@ _REGISTRY: dict[str, dict] = {
         "method": "multi-perspective",
         "primary_id": "gemini-flash-lite",
         "routing": {
-            "perspective_cot": "qwen3.5-flash",       # was qwen3.5-9b → 1M ctx (vs 262K), multimodal
-            "perspective_analysis": "qwen3.6-flash",   # was qwen3.5-9b → stronger reasoning, 1M ctx
+            "perspective_cot": "qwen3.7-flash",       # was qwen3.5-9b → 1M ctx (vs 262K), multimodal
+            "perspective_analysis": "qwen3.7-flash",   # was qwen3.5-9b → stronger reasoning, 1M ctx
             "synthesis": "gpt-4o-mini",        # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
             # ── Per-perspective cross-bloc diversity (2🇨🇳 + 1🇺🇸 + 1🇫🇷, ultra-cheap) ──
             "constructive":  "stepfun-3.7-flash",    # 🇨🇳 StepFun — $0.20/$1.15
@@ -55,10 +55,10 @@ _REGISTRY: dict[str, dict] = {
             "minimalist":    "ministral-8b",         # 🇫🇷 Mistral — $0.075/$0.20
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "deepseek-v4-flash",
-        "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
+        "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "verifier":       "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable
         "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "creative", "fast"],
@@ -97,10 +97,10 @@ _REGISTRY: dict[str, dict] = {
             "synthesis": "gpt-4o-mini",  # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "deepseek-v4-flash",
-        "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
+        "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "verifier":       "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable
         "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "argumentative", "robust"],
@@ -132,10 +132,10 @@ _REGISTRY: dict[str, dict] = {
             "synthesis": "gpt-4o-mini",  # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "deepseek-v4-flash",
-        "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
+        "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "verifier":       "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable
         "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "governance", "decision-making"],
@@ -164,10 +164,10 @@ _REGISTRY: dict[str, dict] = {
         # ── Reasoning model assignments (budget, v3.4) ──
         "deep_read":      "sonar-pro-search",    # Perplexity 🇺🇸 — higher search context, $1/$1 per M
         "fusion":         "deepseek-v4-flash",
-        "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
+        "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "verifier":       "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable
         "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "research", "web-search"],
@@ -198,10 +198,10 @@ _REGISTRY: dict[str, dict] = {
             "synthesis": "gpt-4o-mini",  # 🇺🇸 OpenAI — cross-bloc final voice
         # ── Reasoning model assignments (budget, v3.5, cross-lab falsification) ──
         "fusion":         "deepseek-v4-flash",
-        "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
-        "scoring":        "qwen3.6-flash",           # Qwen 🇨🇳 — cross-lab falsification (≠ Anthropic primary)
+        "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable
+        "scoring":        "qwen3.7-flash",           # Qwen 🇨🇳 — cross-lab falsification (≠ Anthropic primary)
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "verifier":       "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable
         "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "scientific", "structured"],
@@ -229,10 +229,10 @@ _REGISTRY: dict[str, dict] = {
             "synthesis": "gpt-4o-mini",  # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "deepseek-v4-flash",
-        "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
+        "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "verifier":       "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable
         "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "educational", "inquisitive"],
@@ -254,22 +254,22 @@ _REGISTRY: dict[str, dict] = {
         "tags": ["premium", "educational", "inquisitive"],
     },
     "pre-mortem-budget": {
-        "method": "pre_mortem",
+        "method": "pre-mortem",
         "primary_id": "gemini-flash-lite",
         "routing": {
             "synthesis": "gpt-4o-mini",  # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "deepseek-v4-flash",
-        "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
+        "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "verifier":       "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable
         "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "risk-assessment", "strategic"],
     },
     "pre-mortem-premium": {
-        "method": "pre_mortem",
+        "method": "pre-mortem",
         "primary_id": "gemini-pro",
         "routing": {
             "synthesis": "gpt-4o-mini",  # 🇺🇸 OpenAI — cross-bloc final voice
@@ -291,10 +291,10 @@ _REGISTRY: dict[str, dict] = {
             "synthesis": "gpt-4o-mini",  # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "deepseek-v4-flash",
-        "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
+        "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "verifier":       "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable
         "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "analytical", "probabilistic"],
@@ -322,10 +322,10 @@ _REGISTRY: dict[str, dict] = {
             "synthesis": "gpt-4o-mini",  # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "deepseek-v4-flash",
-        "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
+        "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "verifier":       "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable
         "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "argumentative", "philosophical"],
@@ -353,10 +353,10 @@ _REGISTRY: dict[str, dict] = {
             "synthesis": "gpt-4o-mini",  # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "deepseek-v4-flash",
-        "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
+        "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "verifier":       "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable
         "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "creative", "reasoning"],
@@ -384,10 +384,10 @@ _REGISTRY: dict[str, dict] = {
             "synthesis": "gpt-4o-mini",  # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "deepseek-v4-flash",
-        "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
+        "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "verifier":       "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable
         "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "collaborative", "forecasting"],
@@ -418,10 +418,10 @@ _REGISTRY: dict[str, dict] = {
         "cove_revise":    "deepseek-v4-flash",
         "cove_verify":    "deepseek-v4-flash",
         "fusion":         "deepseek-v4-flash",
-        "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
+        "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "verifier":       "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable
         "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "verification", "fact-checking"],
@@ -452,10 +452,10 @@ _REGISTRY: dict[str, dict] = {
             "synthesis": "gpt-4o-mini",  # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "deepseek-v4-flash",
-        "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
+        "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "verifier":       "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable
         "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "structured-thinking", "outlining"],
@@ -483,13 +483,13 @@ _REGISTRY: dict[str, dict] = {
             "synthesis": "gpt-4o-mini",  # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "deepseek-v4-flash",
-        "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
+        "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
         "tot_backtrack":  "deepseek-v4-flash",
         "tot_decompose":  "deepseek-v4-flash",
         "tot_evaluate":   "deepseek-v4-flash",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "verifier":       "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable
         "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "problem-solving", "exploration"],
@@ -520,10 +520,10 @@ _REGISTRY: dict[str, dict] = {
             "synthesis": "gpt-4o-mini",  # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "deepseek-v4-flash",
-        "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
+        "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "verifier":       "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable
         "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "programming", "code-generation"],
@@ -545,25 +545,25 @@ _REGISTRY: dict[str, dict] = {
         "tags": ["premium", "programming", "code-generation"],
     },
     "self-discover-budget": {
-        "method": "self_discover",
+        "method": "self-discover",
         "primary_id": "gemini-flash-lite",
         "routing": {
             "synthesis": "gpt-4o-mini",  # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "deepseek-v4-flash",
-        "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
+        "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "sd_adapt":       "deepseek-v4-flash",
         "sd_implement":   "deepseek-v4-flash",
         "sd_select":      "deepseek-v4-flash",
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "verifier":       "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable
         "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "reasoning", "self-improvement"],
     },
     "self-discover-premium": {
-        "method": "self_discover",
+        "method": "self-discover",
         "primary_id": "gemini-pro",
         "routing": {
             "synthesis": "gpt-4o-mini",  # 🇺🇸 OpenAI — cross-bloc final voice
@@ -770,10 +770,10 @@ _REGISTRY: dict[str, dict] = {
             "synthesis": "gpt-4o-mini",  # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "deepseek-v4-flash",
-        "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
+        "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "verifier":       "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable
         "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["budget", "translation", "multilingual"],
@@ -817,10 +817,10 @@ _REGISTRY: dict[str, dict] = {
             "synthesis": "gpt-4o-mini",  # 🇺🇸 OpenAI — cross-bloc final voice vs CN scoring
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "deepseek-v4-flash",
-        "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
+        "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "verifier":       "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable
         "post_synthesis_verify": "sonar",  # added v3.5
         },
         "fallback_routing": {
@@ -853,10 +853,10 @@ _REGISTRY: dict[str, dict] = {
             "image_generate": "gemini-3.1-flash-lite-image",
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "deepseek-v4-flash",
-        "meta_evaluator": "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
+        "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable (nemotron FREE too slow for budget)
         "scoring":        "deepseek-v4-flash",
         "stress_testing": "ring-2.6-1t",
-        "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
+        "verifier":       "qwen3.7-flash",           # Qwen 🇨🇳 — fast & reliable
         "post_synthesis_verify": "sonar",  # added v3.5
         },
         "tags": ["image-generation", "creative", "budget"],
@@ -885,7 +885,7 @@ _REGISTRY: dict[str, dict] = {
         # ── Reasoning model assignments (budget, v3.6, 7-lab diversity) ──
         "fusion":         "deepseek-v4-flash",     # DeepSeek 🇨🇳 — fast, cheap analytical integration
         "meta_evaluator": "mistral-small-2603",    # Mistral 🇫🇷 — meta-level debate structure critique
-        "scoring":        "qwen3.6-flash",         # Qwen 🇨🇳 — structured numerical evaluation
+        "scoring":        "qwen3.7-flash",         # Qwen 🇨🇳 — structured numerical evaluation
         "stress_testing": "ring-2.6-1t",           # InclusionAI 🇺🇸 — τ²-Bench proven adversarial testing
         "verifier":       "gemini-flash-lite-real", # Google 🇺🇸 — Gemini 3.1 Flash Lite, structured fact-checking
         "post_synthesis_verify": "sonar",  # added v3.5

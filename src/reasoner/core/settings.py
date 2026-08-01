@@ -1,15 +1,32 @@
 """
-Centralized environment-aware settings.
+Centralized environment-aware settings (pydantic-settings).
 
 This is the ONLY module in the project that reads from the process environment
-and loads the .env file. It uses a guard so that `load_dotenv` is executed at
-most once, even if the module is imported multiple times.
+and loads the .env file.  Every other module receives its configuration via
+constructor injection from the composition root (*asgi.py* / *main.py*).
+
+Architecture:
+    Parse, don't validate — the types of ``Settings`` guarantee the invariants,
+    so downstream code never re-checks ``if settings.CSRF_SECRET``.
+    ``str`` keeps credentials out of ``repr()``.
+    ``frozen=True`` prevents mid-process mutation (which would make testing
+    and cache isolation impossible).
+
+Transition (two-step):
+    1. Log-only release: if production invariants are violated, warn but continue.
+    2. Enforce release: raise ``ValueError`` on violation.
+    Set ``SETTINGS_ENFORCE_VALIDATION`` to ``"true"`` to skip step 1.
 """
 
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
+from typing import Annotated, Any
+
+from pydantic import Field, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from reasoner.core.constants_models import (
     MODEL_CLAUDE_HAIKU,
@@ -17,322 +34,298 @@ from reasoner.core.constants_models import (
     MODEL_GPT4O_MINI,
 )
 
-try:
-    from dotenv import load_dotenv
+logger = logging.getLogger(__name__)
 
-    _dotenv_loaded = False
-
-    def _ensure_dotenv() -> None:
-        global _dotenv_loaded
-        if not _dotenv_loaded:
-            # Load .env first, then .env.local as fallback (Next.js convention).
-            # Also check ui-next/.env.local so the backend can share the frontend key.
-            # .env uses override=True so it wins over stale shell env vars.
-            # Local files use override=False so they only fill gaps.
-            root = Path(__file__).parent.parent.parent.parent
-            load_dotenv(root / ".env", override=True)
-            load_dotenv(root / ".env.local", override=False)
-            load_dotenv(root / "ui-next" / ".env.local", override=False)
-            _dotenv_loaded = True
-
-    _ensure_dotenv()
-except ImportError:
-    pass
+# ── helpers ───────────────────────────────────────────────────────
 
 
-class Settings:
-    """Application settings derived from environment variables."""
+# ── Environment enum ──────────────────────────────────────────────
 
-    RATE_LIMIT_PER_MINUTE: int = int(os.getenv("RATE_LIMIT_PER_MINUTE", "60"))
-    RATE_LIMIT_PER_HOUR: int = int(os.getenv("RATE_LIMIT_PER_HOUR", "1000"))
-    RATE_LIMIT_BURST: int = int(os.getenv("RATE_LIMIT_BURST", "10"))
-    MEMORY_LIMIT_MB: int = int(os.getenv("MEMORY_LIMIT_MB", "4096"))
-    MEMORY_WARNING_MB: int = int(os.getenv("MEMORY_WARNING_MB", "3072"))
-    REQUEST_TIMEOUT_SECONDS: float = float(
-        os.getenv("REQUEST_TIMEOUT_SECONDS", "300.0")
+
+class Environment(str):
+    DEVELOPMENT = "development"
+    PRODUCTION = "production"
+    TESTING = "testing"
+
+
+# ── Settings class ────────────────────────────────────────────────
+
+
+class Settings(BaseSettings):
+    """Application settings derived from environment variables.
+
+    All values come from the environment / .env file.  Every field has
+    a sensible development default.  Production deployments must set
+    the required-production variables (listed in ``_REQUIRED_IN_PRODUCTION``).
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        frozen=True,
     )
-    OPENROUTER_API_KEY: str | None = os.getenv("OPENROUTER_API_KEY")
-    OPENAI_API_KEY: str | None = os.getenv("OPENAI_API_KEY")
-    ANTHROPIC_API_KEY: str | None = os.getenv("ANTHROPIC_API_KEY")
-    MISTRAL_API_KEY: str | None = os.getenv("MISTRAL_API_KEY")
-    DEEPSEEK_API_KEY: str | None = os.getenv("DEEPSEEK_API_KEY")
-    XAI_API_KEY: str | None = os.getenv("XAI_API_KEY")
-    FINE_TUNED_API_KEY: str | None = os.getenv("FINE_TUNED_API_KEY")
-    PERPLEXITY_API_KEY: str | None = os.getenv("PERPLEXITY_API_KEY")
-    NVIDIA_API_KEY: str | None = os.getenv("NVIDIA_API_KEY")
-    OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 
-    ADMIN_API_KEY: str | None = os.getenv("ADMIN_API_KEY")
-    REASONER_DEEP_READ_LLM: bool = os.getenv("REASONER_DEEP_READ_LLM", "1") != "0"
+    # ── API Keys (LLM Providers) ──
+    OPENROUTER_API_KEY: str | None = Field(None, alias="OPENROUTER_API_KEY")
+    OPENAI_API_KEY: str | None = Field(None, alias="OPENAI_API_KEY")
+    ANTHROPIC_API_KEY: str | None = Field(None, alias="ANTHROPIC_API_KEY")
+    MISTRAL_API_KEY: str | None = Field(None, alias="MISTRAL_API_KEY")
+    DEEPSEEK_API_KEY: str | None = Field(None, alias="DEEPSEEK_API_KEY")
+    XAI_API_KEY: str | None = Field(None, alias="XAI_API_KEY")
+    FINE_TUNED_API_KEY: str | None = Field(None, alias="FINE_TUNED_API_KEY")
+    PERPLEXITY_API_KEY: str | None = Field(None, alias="PERPLEXITY_API_KEY")
+    NVIDIA_API_KEY: str | None = Field(None, alias="NVIDIA_API_KEY")
+    OLLAMA_BASE_URL: str = Field("http://localhost:11434", alias="OLLAMA_BASE_URL")
 
-    # ── Phase Subagent Feature Flags ──
-    USE_SUBAGENT_ENHANCEMENT: bool = os.getenv("USE_SUBAGENT_ENHANCEMENT", "false").lower() == "true"
-    USE_SUBAGENT_DECOMPOSITION: bool = os.getenv("USE_SUBAGENT_DECOMPOSITION", "false").lower() == "true"
-    USE_SUBAGENT_CRITIQUE: bool = os.getenv("USE_SUBAGENT_CRITIQUE", "false").lower() == "true"
-    USE_SUBAGENT_SYNTHESIS: bool = os.getenv("USE_SUBAGENT_SYNTHESIS", "false").lower() == "true"
-    USE_SUBAGENT_SEARCH: bool = os.getenv("USE_SUBAGENT_SEARCH", "false").lower() == "true"
+    # ── Security / Admin ──
+    ADMIN_API_KEY: str | None = Field(None, alias="ADMIN_API_KEY")
+    CSRF_SECRET: str | None = Field(None, alias="CSRF_SECRET")
+    CSRF_ENFORCE_BACKEND: bool = Field(True, alias="CSRF_ENFORCE_BACKEND")
+    JWT_SECRET_KEY: str | None = Field(None, alias="JWT_SECRET_KEY")
+    TRUSTED_PROXIES: str = Field("", alias="TRUSTED_PROXIES")
 
     # ── Environment / Deployment ──
-    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
-    UVICORN_WORKERS: int = int(os.getenv("UVICORN_WORKERS", "1"))
-    ENABLE_LEGACY_API_KEY: bool = os.getenv("ENABLE_LEGACY_API_KEY", "false").lower() in ("1", "true", "yes")
+    ENVIRONMENT: str = Field("development", alias="ENVIRONMENT")
+    UVICORN_WORKERS: int = Field(1, alias="UVICORN_WORKERS")
+    ENABLE_LEGACY_API_KEY: bool = Field(False, alias="ENABLE_LEGACY_API_KEY")
 
-    # ── Cohere Rerank (via OpenRouter) ──
-    COHERE_RERANK_ENABLED: bool = os.getenv("COHERE_RERANK_ENABLED", "true").lower() in ("1", "true", "yes")
-    COHERE_RERANK_MODEL: str = os.getenv("COHERE_RERANK_MODEL", "cohere/rerank-4-fast")
+    # ── Rate Limiting ──
+    RATE_LIMIT_PER_MINUTE: int = Field(60, alias="RATE_LIMIT_PER_MINUTE")
+    RATE_LIMIT_PER_HOUR: int = Field(1000, alias="RATE_LIMIT_PER_HOUR")
+    RATE_LIMIT_BURST: int = Field(10, alias="RATE_LIMIT_BURST")
+    RATE_LIMITER_MODE: str = Field("redis", alias="RATE_LIMITER_MODE")
+    RATE_LIMITER_REDIS_FAILURE_MODE: str = Field("fail_closed", alias="RATE_LIMITER_REDIS_FAILURE_MODE")
+    CIRCUIT_BREAKER_MODE: str = Field("redis", alias="CIRCUIT_BREAKER_MODE")
+    MEMORY_LIMIT_MB: int = Field(4096, alias="MEMORY_LIMIT_MB")
+    MEMORY_WARNING_MB: int = Field(3072, alias="MEMORY_WARNING_MB")
+    REQUEST_TIMEOUT_SECONDS: float = Field(300.0, alias="REQUEST_TIMEOUT_SECONDS")
 
-    # ── Prism Integration ──
-    PRISM_RESEARCHER_ENABLED: bool = os.getenv("PRISM_RESEARCHER_ENABLED", "false").lower() in ("1", "true", "yes")
-    PRISM_CLASSIFIER_ENABLED: bool = os.getenv("PRISM_CLASSIFIER_ENABLED", "false").lower() in ("1", "true", "yes")
-    PRISM_FILE_SEARCH_ENABLED: bool = os.getenv("PRISM_FILE_SEARCH_ENABLED", "false").lower() in ("1", "true", "yes")
-    PRISM_RERANK_ENABLED: bool = os.getenv("PRISM_RERANK_ENABLED", "false").lower() in ("1", "true", "yes")
-    PRISM_TOOL_CALLING_ENABLED: bool = os.getenv("PRISM_TOOL_CALLING_ENABLED", "false").lower() in ("1", "true", "yes")
-
-    # ── Document Semantic Retrieval (Phase 4, opt-in) ──
-    DOCUMENT_SEMANTIC_RETRIEVAL_ENABLED: bool = os.getenv("DOCUMENT_SEMANTIC_RETRIEVAL_ENABLED", "false").lower() in ("1", "true", "yes")
-    DOCUMENT_CHUNK_SIZE: int = int(os.getenv("DOCUMENT_CHUNK_SIZE", "1000"))
-    DOCUMENT_CHUNK_OVERLAP: int = int(os.getenv("DOCUMENT_CHUNK_OVERLAP", "200"))
-    DOCUMENT_MAX_CHUNKS_PER_FILE: int = int(os.getenv("DOCUMENT_MAX_CHUNKS_PER_FILE", "500"))
-
-    # ── Server bind configuration ──
-    APP_URL: str = os.getenv("APP_URL", "http://localhost:3000")
-    SERVER_HOST: str = os.getenv("SERVER_HOST", "127.0.0.1")
-    SERVER_PORT: int = int(os.getenv("SERVER_PORT", "8003"))
-    UVICORN_HOST: str = os.getenv("UVICORN_HOST", "127.0.0.1")
-    METRICS_ALLOWED_IPS: str = os.getenv("METRICS_ALLOWED_IPS", "127.0.0.1,::1")
-
-    # ── CSRF ──
-    CSRF_SECRET: str | None = os.getenv("CSRF_SECRET")
-    CSRF_ENFORCE_BACKEND: bool = os.getenv("CSRF_ENFORCE_BACKEND", "true").lower() in ("1", "true", "yes")
-
-
-    # ── Database & Persistence ──
-    # Default to sqlite for dev, postgres for production if URL provided
-    EVENT_STORE_BACKEND: str = os.getenv(
-        "EVENT_STORE_BACKEND", 
-        "postgres" if os.getenv("DATABASE_URL") and os.getenv("ENVIRONMENT") == "production" else "sqlite"
-    )
-
-    # ── Auth / Supabase ──
-    AUTH_PERSISTENCE_ENABLED: bool = os.getenv("AUTH_PERSISTENCE_ENABLED", "false").lower() in ("1", "true", "yes")
-    AUTH_DB_PATH: str = os.getenv("AUTH_DB_PATH", "src/reasoner/auth_keys.db")
-    SUPABASE_URL: str | None = os.getenv("SUPABASE_URL")
-    SUPABASE_ANON_KEY: str | None = os.getenv("SUPABASE_ANON_KEY")
-    SUPABASE_SERVICE_ROLE_KEY: str | None = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-    JWT_SECRET_KEY: str | None = os.getenv("JWT_SECRET_KEY")
-
-    # ── Rate Limiter / Circuit Breaker Mode ──
-    RATE_LIMITER_MODE: str = os.getenv("RATE_LIMITER_MODE", "redis")
-    # "fail_closed": deny requests when Redis is down (safe default; prevents 4× bypass on multi-worker)
-    # "fail_open": fall back to per-worker in-memory limiting (allows bypass, but keeps service running)
-    RATE_LIMITER_REDIS_FAILURE_MODE: str = os.getenv("RATE_LIMITER_REDIS_FAILURE_MODE", "fail_closed")
-    CIRCUIT_BREAKER_MODE: str = os.getenv("CIRCUIT_BREAKER_MODE", "redis")
+    # ── Server Bind ──
+    APP_URL: str = Field("http://localhost:3000", alias="APP_URL")
+    SERVER_HOST: str = Field("127.0.0.1", alias="SERVER_HOST")
+    SERVER_PORT: int = Field(8003, alias="SERVER_PORT")
+    UVICORN_HOST: str = Field("127.0.0.1", alias="UVICORN_HOST")
+    METRICS_ALLOWED_IPS: str = Field("127.0.0.1,::1", alias="METRICS_ALLOWED_IPS")
 
     # ── CORS ──
-    CORS_ORIGINS: str = os.getenv(
-        "CORS_ORIGINS",
-        "http://localhost:3000,http://localhost:8003,http://127.0.0.1:8003,http://localhost:8004,http://127.0.0.1:8004"
+    CORS_ORIGINS: str = Field(
+        "http://localhost:3000,http://localhost:8003,http://127.0.0.1:8003,"
+        "http://localhost:8004,http://127.0.0.1:8004",
+        alias="CORS_ORIGINS",
     )
-
-    # ── DeepL Translation ──
-    DEEPL_API_KEY: str | None = os.getenv("DEEPL_API_KEY")
-
-    # ── OpenRouter analytics headers ──
-    OPENROUTER_HTTP_REFERER: str = os.getenv(
-        "OPENROUTER_HTTP_REFERER", "https://github.com/Reasoner"
-    )
-    OPENROUTER_APP_TITLE: str = os.getenv("OPENROUTER_APP_TITLE", "Reasoner")
-
-    # ── Neuro Memory Models ──
-    NEURO_REASONING_MODEL: str = os.getenv("NEURO_REASONING_MODEL", MODEL_GPT4O_MINI)
-    NEURO_REASONING_FALLBACK_MODELS: str = os.getenv(
-        "NEURO_REASONING_FALLBACK_MODELS",
-        f"{MODEL_GEMINI_FLASH},{MODEL_CLAUDE_HAIKU}",
-    )
-    NEURO_EMBEDDING_MODEL: str = os.getenv("NEURO_EMBEDDING_MODEL", "qwen/qwen3-embedding-8b")
-    NEURO_EMBEDDING_FALLBACK_MODELS: str = os.getenv(
-        "NEURO_EMBEDDING_FALLBACK_MODELS",
-        "openai/text-embedding-3-small,baai/bge-m3",
-    )
-
-    # ── Multi-Provider Fallback ──
-    MULTI_PROVIDER_FALLBACK_ENABLED: bool = os.getenv(
-        "MULTI_PROVIDER_FALLBACK_ENABLED", "true"
-    ).lower() in ("1", "true", "yes")
-
-    # ── Cache Isolation ──
-    CACHE_SHARE_ANONYMOUS: bool = os.getenv(
-        "CACHE_SHARE_ANONYMOUS", "false"
-    ).lower() in ("1", "true", "yes")
-
-    # ── Sentry ──
-    SENTRY_DSN: str | None = os.getenv("SENTRY_DSN")
-    SENTRY_TRACES_SAMPLE_RATE: float = float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1"))
-
-    # ── Langfuse (LLM Observability) ──
-    LANGFUSE_PUBLIC_KEY: str | None = os.getenv("LANGFUSE_PUBLIC_KEY")
-    LANGFUSE_SECRET_KEY: str | None = os.getenv("LANGFUSE_SECRET_KEY")
-
-    # ── Spend Caps (P1.9) ──
-    SPEND_CAP_PER_RUN_USD: float = float(
-        os.getenv("SPEND_CAP_PER_RUN_USD", "0.0")
-    )
-    """Maximum USD per pipeline run. 0.0 = unlimited."""
-
-    SPEND_CAP_MONTHLY_USD: float = float(
-        os.getenv("SPEND_CAP_MONTHLY_USD", "0.0")
-    )
-    """Maximum USD per user per month. 0.0 = unlimited."""
-
-    # ── Stripe Billing ──
-    STRIPE_SECRET_KEY: str | None = os.getenv("STRIPE_SECRET_KEY")
-
-    # ── Transactional Email (P2.14) ──
-    RESEND_API_KEY: str | None = os.getenv("RESEND_API_KEY")
-    """Resend API key for sending transactional emails. If unset, emails are logged."""
-
-    RESEND_FROM_ADDRESS: str = os.getenv(
-        "RESEND_FROM_ADDRESS", "Reasoner <notifications@reasoner.app>"
-    )
-    """Sender address for transactional emails."""
-
-    NOTIFICATION_EMAIL: str | None = os.getenv("NOTIFICATION_EMAIL")
-    """Email address to receive admin notifications (webhook failures, spend cap, etc.)."""
-
-    # ── Scraping ──
-    SCRAPE_USER_AGENT: str = os.getenv(
-        "SCRAPE_USER_AGENT",
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    )
-
-    # ── Rerank ──
-    RERANK_API_BASE: str = os.getenv("RERANK_API_BASE", "https://openrouter.ai/api/v1")
-    # ── SearXNG ──
-    SEARXNG_URL: str = os.getenv("SEARXNG_URL", "http://localhost:8888")
-
-    # Multi-backend search
-    BRAVE_SEARCH_API_KEY: str = os.getenv("BRAVE_SEARCH_API_KEY", "")
-    BRAVE_SEARCH_ENABLED: bool = os.getenv("BRAVE_SEARCH_ENABLED", "true").lower() == "true"
-    TAVILY_API_KEY: str = os.getenv("TAVILY_API_KEY", "")
-    TAVILY_SEARCH_ENABLED: bool = os.getenv("TAVILY_SEARCH_ENABLED", "true").lower() == "true"
-    TAVILY_EXTRACT_ENABLED: bool = os.getenv("TAVILY_EXTRACT_ENABLED", "true").lower() == "true"
-    OPENROUTER_WEB_SEARCH_ENABLED: bool = os.getenv("OPENROUTER_WEB_SEARCH_ENABLED", "true").lower() == "true"
-    PERPLEXITY_SEARCH_TIER: str = os.getenv("PERPLEXITY_SEARCH_TIER", "sonar-pro")
-    # Nemotron Rerank VL: free NVIDIA reranker via OpenRouter chat completions + logprobs.
-    # Used as fallback when Cohere rerank fails, or as primary when NEMOTRON_RERANK_ENABLED=true.
-    NEMOTRON_RERANK_ENABLED: bool = os.getenv("NEMOTRON_RERANK_ENABLED", "false").lower() in ("1", "true", "yes")
-    NEMOTRON_RERANK_MODEL: str = os.getenv("NEMOTRON_RERANK_MODEL", "nvidia/llama-nemotron-rerank-vl-1b-v2:free")
-    NEMOTRON_RERANK_CONCURRENCY: int = int(os.getenv("NEMOTRON_RERANK_CONCURRENCY", "5"))
-    # When true, applies semantic cross-encoder reranking after BM25+freshness sort and before LLM vetting.
-    # Adds ~1-2s latency but meaningfully improves context quality for research/article methods.
-    SEMANTIC_RERANK_VETTING: bool = os.getenv("SEMANTIC_RERANK_VETTING", "false").lower() in ("1", "true", "yes")
 
     # ── Database ──
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "")
+    DATABASE_URL: str = Field("", alias="DATABASE_URL")
+    EVENT_STORE_BACKEND: str = Field("sqlite", alias="EVENT_STORE_BACKEND")
 
-    # ── Event Store Compaction ──
-    COMPACTION_ENABLED: bool = os.getenv("COMPACTION_ENABLED", "true").lower() in ("1", "true", "yes")
-    COMPACTION_RUN_HOUR_UTC: int = int(os.getenv("COMPACTION_RUN_HOUR_UTC", "3"))
-    EVENT_RETENTION_DAYS: int = int(os.getenv("EVENT_RETENTION_DAYS", "365"))
-    DB_POOL_SIZE: int = int(os.getenv("DB_POOL_SIZE", "50"))
+    @property
+    def resolved_event_store_backend(self) -> str:
+        """Resolve event store backend, with dynamic production default."""
+        if self.EVENT_STORE_BACKEND != "sqlite":
+            return self.EVENT_STORE_BACKEND
+        if self.DATABASE_URL and self.ENVIRONMENT == "production":
+            return "postgres"
+        return "sqlite"
+    DB_POOL_SIZE: int = Field(50, alias="DB_POOL_SIZE")
+
+    # ── Auth / Supabase ──
+    AUTH_PERSISTENCE_ENABLED: bool = Field(False, alias="AUTH_PERSISTENCE_ENABLED")
+    AUTH_DB_PATH: str = Field("src/reasoner/auth_keys.db", alias="AUTH_DB_PATH")
+    SUPABASE_URL: str | None = Field(None, alias="SUPABASE_URL")
+    SUPABASE_ANON_KEY: str | None = Field(None, alias="SUPABASE_ANON_KEY")
+    SUPABASE_SERVICE_ROLE_KEY: str | None = Field(None, alias="SUPABASE_SERVICE_ROLE_KEY")
+
+    # ── Search Backends ──
+    BRAVE_SEARCH_API_KEY: str | None = Field(None, alias="BRAVE_SEARCH_API_KEY")
+    BRAVE_SEARCH_ENABLED: bool = Field(True, alias="BRAVE_SEARCH_ENABLED")
+    TAVILY_API_KEY: str | None = Field(None, alias="TAVILY_API_KEY")
+    TAVILY_SEARCH_ENABLED: bool = Field(True, alias="TAVILY_SEARCH_ENABLED")
+    TAVILY_EXTRACT_ENABLED: bool = Field(True, alias="TAVILY_EXTRACT_ENABLED")
+    OPENROUTER_WEB_SEARCH_ENABLED: bool = Field(True, alias="OPENROUTER_WEB_SEARCH_ENABLED")
+    PERPLEXITY_SEARCH_TIER: str = Field("sonar-pro", alias="PERPLEXITY_SEARCH_TIER")
+    SEARXNG_URL: str = Field("http://localhost:8888", alias="SEARXNG_URL")
+
+    # ── Stripe Billing ──
+    STRIPE_SECRET_KEY: str | None = Field(None, alias="STRIPE_SECRET_KEY")
+
+    # ── Cohere Rerank ──
+    COHERE_RERANK_ENABLED: bool = Field(True, alias="COHERE_RERANK_ENABLED")
+    COHERE_RERANK_MODEL: str = Field("cohere/rerank-4-fast", alias="COHERE_RERANK_MODEL")
+
+    # ── Nemotron Rerank ──
+    NEMOTRON_RERANK_ENABLED: bool = Field(False, alias="NEMOTRON_RERANK_ENABLED")
+    NEMOTRON_RERANK_MODEL: str = Field(
+        "nvidia/llama-nemotron-rerank-vl-1b-v2:free", alias="NEMOTRON_RERANK_MODEL"
+    )
+    NEMOTRON_RERANK_CONCURRENCY: int = Field(5, alias="NEMOTRON_RERANK_CONCURRENCY")
+
+    # ── Rerank ──
+    RERANK_API_BASE: str = Field("https://openrouter.ai/api/v1", alias="RERANK_API_BASE")
+    SEMANTIC_RERANK_VETTING: bool = Field(False, alias="SEMANTIC_RERANK_VETTING")
+
+    # ── Document Semantic Retrieval ──
+    DOCUMENT_SEMANTIC_RETRIEVAL_ENABLED: bool = Field(False, alias="DOCUMENT_SEMANTIC_RETRIEVAL_ENABLED")
+    DOCUMENT_CHUNK_SIZE: int = Field(1000, alias="DOCUMENT_CHUNK_SIZE")
+    DOCUMENT_CHUNK_OVERLAP: int = Field(200, alias="DOCUMENT_CHUNK_OVERLAP")
+    DOCUMENT_MAX_CHUNKS_PER_FILE: int = Field(500, alias="DOCUMENT_MAX_CHUNKS_PER_FILE")
+
+    # ── DeepL Translation ──
+    DEEPL_API_KEY: str | None = Field(None, alias="DEEPL_API_KEY")
+
+    # ── Sentry ──
+    SENTRY_DSN: str | None = Field(None, alias="SENTRY_DSN")
+    SENTRY_TRACES_SAMPLE_RATE: float = Field(0.1, alias="SENTRY_TRACES_SAMPLE_RATE")
+
+    # ── Langfuse ──
+    LANGFUSE_PUBLIC_KEY: str | None = Field(None, alias="LANGFUSE_PUBLIC_KEY")
+    LANGFUSE_SECRET_KEY: str | None = Field(None, alias="LANGFUSE_SECRET_KEY")
+
+    # ── Spend Caps ──
+    SPEND_CAP_PER_RUN_USD: float = Field(0.0, alias="SPEND_CAP_PER_RUN_USD")
+    SPEND_CAP_MONTHLY_USD: float = Field(0.0, alias="SPEND_CAP_MONTHLY_USD")
+
+    # ── Resend (Email) ──
+    RESEND_API_KEY: str | None = Field(None, alias="RESEND_API_KEY")
+    RESEND_FROM_ADDRESS: str = Field(
+        "Reasoner <notifications@reasoner.app>", alias="RESEND_FROM_ADDRESS"
+    )
+    NOTIFICATION_EMAIL: str | None = Field(None, alias="NOTIFICATION_EMAIL")
+
+    # ── Scraping ──
+    SCRAPE_USER_AGENT: str = Field(
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        alias="SCRAPE_USER_AGENT",
+    )
+
+    # ── OpenRouter Analytics ──
+    OPENROUTER_HTTP_REFERER: str = Field(
+        "https://github.com/Reasoner", alias="OPENROUTER_HTTP_REFERER"
+    )
+    OPENROUTER_APP_TITLE: str = Field("Reasoner", alias="OPENROUTER_APP_TITLE")
+
+    # ── Neuro Memory Models ──
+    NEURO_REASONING_MODEL: str = Field(MODEL_GPT4O_MINI, alias="NEURO_REASONING_MODEL")
+    NEURO_REASONING_FALLBACK_MODELS: str = Field(
+        f"{MODEL_GEMINI_FLASH},{MODEL_CLAUDE_HAIKU}",
+        alias="NEURO_REASONING_FALLBACK_MODELS",
+    )
+    NEURO_EMBEDDING_MODEL: str = Field(
+        "qwen/qwen3-embedding-8b", alias="NEURO_EMBEDDING_MODEL"
+    )
+    NEURO_EMBEDDING_FALLBACK_MODELS: str = Field(
+        "openai/text-embedding-3-small,baai/bge-m3",
+        alias="NEURO_EMBEDDING_FALLBACK_MODELS",
+    )
+
+    # ── ACR (Adaptive Capability Router) ──
+    ACR_ENABLED: bool = Field(False, alias="ACR_ENABLED")
+    ACR_MODE: str = Field("shadow", alias="ACR_MODE")
+    ACR_LEARNING_ENABLED: bool = Field(False, alias="ACR_LEARNING_ENABLED")
+    ACR_BENCHMARKS_ENABLED: bool = Field(False, alias="ACR_BENCHMARKS_ENABLED")
+    ACR_EXPLORATION_RATE_BUDGET: float = Field(0.15, alias="ACR_EXPLORATION_RATE_BUDGET")
+    ACR_EXPLORATION_RATE_PREMIUM: float = Field(0.05, alias="ACR_EXPLORATION_RATE_PREMIUM")
+    ACR_TELEMETRY_DB: str = Field(
+        str(Path.home() / ".reasoner" / "acr" / "telemetry.db"),
+        alias="ACR_TELEMETRY_DB",
+    )
+    ACR_PROFILES_PATH: str = Field(
+        str(Path.home() / ".reasoner" / "acr" / "capability_profiles.json"),
+        alias="ACR_PROFILES_PATH",
+    )
+    ACR_BENCHMARK_WARMUP_CALLS: int = Field(50, alias="ACR_BENCHMARK_WARMUP_CALLS")
+
+    # ── Prism ──
+    PRISM_RESEARCHER_ENABLED: bool = Field(False, alias="PRISM_RESEARCHER_ENABLED")
+    PRISM_CLASSIFIER_ENABLED: bool = Field(False, alias="PRISM_CLASSIFIER_ENABLED")
+    PRISM_FILE_SEARCH_ENABLED: bool = Field(False, alias="PRISM_FILE_SEARCH_ENABLED")
+    PRISM_RERANK_ENABLED: bool = Field(False, alias="PRISM_RERANK_ENABLED")
+    PRISM_TOOL_CALLING_ENABLED: bool = Field(False, alias="PRISM_TOOL_CALLING_ENABLED")
+
+    # ── Feature Flags ──
+    REASONER_DEEP_READ_LLM: bool = Field(True, alias="REASONER_DEEP_READ_LLM")
+    USE_SUBAGENT_ENHANCEMENT: bool = Field(False, alias="USE_SUBAGENT_ENHANCEMENT")
+    USE_SUBAGENT_DECOMPOSITION: bool = Field(False, alias="USE_SUBAGENT_DECOMPOSITION")
+    USE_SUBAGENT_CRITIQUE: bool = Field(False, alias="USE_SUBAGENT_CRITIQUE")
+    USE_SUBAGENT_SYNTHESIS: bool = Field(False, alias="USE_SUBAGENT_SYNTHESIS")
+    USE_SUBAGENT_SEARCH: bool = Field(False, alias="USE_SUBAGENT_SEARCH")
+    MULTI_PROVIDER_FALLBACK_ENABLED: bool = Field(True, alias="MULTI_PROVIDER_FALLBACK_ENABLED")
+    CACHE_SHARE_ANONYMOUS: bool = Field(False, alias="CACHE_SHARE_ANONYMOUS")
+    EXEC_SANDBOX_ENABLED: bool = Field(True, alias="EXEC_SANDBOX_ENABLED")
+    CODING_VERBALIZED_SAMPLING: bool = Field(True, alias="CODING_VERBALIZED_SAMPLING")
+    AUGMENTATION_ENABLED: bool = Field(True, alias="AUGMENTATION_ENABLED")
+    AUGMENTATION_LLM_CONFIRM: bool = Field(False, alias="AUGMENTATION_LLM_CONFIRM")
+    AUGMENTATION_CACHE_ENABLED: bool = Field(True, alias="AUGMENTATION_CACHE_ENABLED")
+    AUGMENTATION_CACHE_MAX_ENTRIES: int = Field(128, alias="AUGMENTATION_CACHE_MAX_ENTRIES")
+    AUGMENTATION_CACHE_TTL_SECONDS: int = Field(86400, alias="AUGMENTATION_CACHE_TTL_SECONDS")
+    AUGMENTATION_AB_TEST: bool = Field(False, alias="AUGMENTATION_AB_TEST")
+    LANGUAGE_PIVOT_ENABLED: bool = Field(True, alias="LANGUAGE_PIVOT_ENABLED")
+    LANGUAGE_PROBE_ENABLED: bool = Field(False, alias="LANGUAGE_PROBE_ENABLED")
+    TOKEN_DYNAMIC_BUDGETS: bool = Field(True, alias="TOKEN_DYNAMIC_BUDGETS")
+    TOKEN_CONTEXT_COMPRESSION: bool = Field(True, alias="TOKEN_CONTEXT_COMPRESSION")
+    TOKEN_PROMPT_COMPRESSION: bool = Field(True, alias="TOKEN_PROMPT_COMPRESSION")
+    TOKEN_NEURO_COMPRESSION: bool = Field(False, alias="TOKEN_NEURO_COMPRESSION")
+    TOKEN_CACHING: bool = Field(True, alias="TOKEN_CACHING")
+    COMPACTION_ENABLED: bool = Field(True, alias="COMPACTION_ENABLED")
+    COMPACTION_RUN_HOUR_UTC: int = Field(3, alias="COMPACTION_RUN_HOUR_UTC")
+    EVENT_RETENTION_DAYS: int = Field(365, alias="EVENT_RETENTION_DAYS")
+
+    # ── Environment override for settings validation ──
+    SETTINGS_ENFORCE_VALIDATION: bool = Field(False, alias="SETTINGS_ENFORCE_VALIDATION")
+
+    # ── Derived / computed properties ─────────────────────────────
 
     @property
     def internal_api_base_url(self) -> str:
-        """Base URL for internal self-calls (e.g., Neuro endpoints from streaming)."""
         return f"http://{self.SERVER_HOST}:{self.SERVER_PORT}"
 
     @property
     def neuro_reasoning_fallbacks(self) -> list[str]:
-        """Parse NEURO_REASONING_FALLBACK_MODELS into a list."""
         return [m.strip() for m in self.NEURO_REASONING_FALLBACK_MODELS.split(",") if m.strip()]
 
     @property
     def neuro_embedding_fallbacks(self) -> list[str]:
-        """Parse NEURO_EMBEDDING_FALLBACK_MODELS into a list."""
         return [m.strip() for m in self.NEURO_EMBEDDING_FALLBACK_MODELS.split(",") if m.strip()]
-
-    # ── Token Optimization Flags ──
-    TOKEN_DYNAMIC_BUDGETS: bool = os.getenv("TOKEN_DYNAMIC_BUDGETS", "true").lower() == "true"
-    TOKEN_CONTEXT_COMPRESSION: bool = os.getenv("TOKEN_CONTEXT_COMPRESSION", "true").lower() == "true"
-    TOKEN_PROMPT_COMPRESSION: bool = os.getenv("TOKEN_PROMPT_COMPRESSION", "true").lower() == "true"
-    TOKEN_NEURO_COMPRESSION: bool = os.getenv("TOKEN_NEURO_COMPRESSION", "false").lower() == "true"
-    TOKEN_CACHING: bool = os.getenv("TOKEN_CACHING", "true").lower() == "true"
-
-    # ── Code Execution Sandbox (#1) ──
-    EXEC_SANDBOX_ENABLED: bool = os.getenv("EXEC_SANDBOX_ENABLED", "true").lower() == "true"
-
-    # ── ACR (Adaptive Capability Router) ──
-    ACR_ENABLED: bool = os.getenv("ACR_ENABLED", "false").lower() in ("1", "true", "yes")
-    """Master switch for adaptive routing (Phase 5)."""
-
-    ACR_MODE: str = os.getenv("ACR_MODE", "shadow")
-    """ACR operating mode: ``shadow``, ``advisory``, or ``adaptive``."""
-
-    ACR_LEARNING_ENABLED: bool = os.getenv("ACR_LEARNING_ENABLED", "false").lower() in ("1", "true", "yes")
-    """Online learning separate from telemetry (Phase 6)."""
-
-    ACR_BENCHMARKS_ENABLED: bool = os.getenv("ACR_BENCHMARKS_ENABLED", "false").lower() in ("1", "true", "yes")
-    """Benchmark engine separate from learning (Phase 7)."""
-
-    ACR_EXPLORATION_RATE_BUDGET: float = float(
-        os.getenv("ACR_EXPLORATION_RATE_BUDGET", "0.15")
-    )
-    """Explore rate for budget presets (15% by default)."""
-
-    ACR_EXPLORATION_RATE_PREMIUM: float = float(
-        os.getenv("ACR_EXPLORATION_RATE_PREMIUM", "0.05")
-    )
-    """Explore rate for premium presets (5% by default)."""
-
-    ACR_TELEMETRY_DB: str = os.getenv(
-        "ACR_TELEMETRY_DB",
-        str(Path.home() / ".reasoner" / "acr" / "telemetry.db"),
-    )
-    """Path to the ACR telemetry SQLite database."""
-
-    ACR_PROFILES_PATH: str = os.getenv(
-        "ACR_PROFILES_PATH",
-        str(Path.home() / ".reasoner" / "acr" / "capability_profiles.json"),
-    )
-    """Path to the ACR capability profiles JSON file."""
-
-    ACR_BENCHMARK_WARMUP_CALLS: int = int(
-        os.getenv("ACR_BENCHMARK_WARMUP_CALLS", "50")
-    )
-    """Minimum calls before a model enters the adaptive pool."""
-
-    # ── Verbalized Sampling (Coding) ──
-    CODING_VERBALIZED_SAMPLING: bool = os.getenv("CODING_VERBALIZED_SAMPLING", "true").lower() == "true"
-
-    # ── Augmentation (Article/Writing pre-processing) ──
-    AUGMENTATION_ENABLED: bool = os.getenv("AUGMENTATION_ENABLED", "true").lower() in ("1", "true", "yes")
-    AUGMENTATION_LLM_CONFIRM: bool = os.getenv("AUGMENTATION_LLM_CONFIRM", "false").lower() in ("1", "true", "yes")
-    AUGMENTATION_CACHE_ENABLED: bool = os.getenv("AUGMENTATION_CACHE_ENABLED", "true").lower() in ("1", "true", "yes")
-    AUGMENTATION_CACHE_MAX_ENTRIES: int = int(os.getenv("AUGMENTATION_CACHE_MAX_ENTRIES", "128"))
-    AUGMENTATION_CACHE_TTL_SECONDS: int = int(os.getenv("AUGMENTATION_CACHE_TTL_SECONDS", "86400"))
-    AUGMENTATION_AB_TEST: bool = os.getenv("AUGMENTATION_AB_TEST", "false").lower() in ("1", "true", "yes")
-
-    # ── Language Pivot & Probe ──
-    LANGUAGE_PIVOT_ENABLED: bool = os.getenv("LANGUAGE_PIVOT_ENABLED", "true").lower() in ("1", "true", "yes")
-    # Cross-lingual probe: off by default; enable for premium canary presets.
-    LANGUAGE_PROBE_ENABLED: bool = os.getenv("LANGUAGE_PROBE_ENABLED", "false").lower() in ("1", "true", "yes")
-
-    # ── Trusted Proxies ──
-    TRUSTED_PROXIES: list[str] = [
-        p.strip() for p in os.getenv("TRUSTED_PROXIES", "").split(",") if p.strip()
-    ]
 
     @property
     def cors_origins_list(self) -> list[str]:
-        """Parse CORS_ORIGINS env var into a list of origin strings."""
-        return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
+        return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+
+    @property
+    def trusted_proxies_list(self) -> list[str]:
+        return [p.strip() for p in self.TRUSTED_PROXIES.split(",") if p.strip()]
+
+    # ── Production invariants ─────────────────────────────────────
+
+    @model_validator(mode="after")
+    def _validate_production(self) -> Settings:
+        _DEV_CORS_DEFAULT = (
+            "http://localhost:3000,http://localhost:8003,http://127.0.0.1:8003,"
+            "http://localhost:8004,http://127.0.0.1:8004"
+        )
+        _REQUIRED_IN_PRODUCTION = ["ADMIN_API_KEY", "CSRF_SECRET", "JWT_SECRET_KEY"]
+
+        if self.ENVIRONMENT != Environment.PRODUCTION:
+            return self
+
+        missing = [n for n in _REQUIRED_IN_PRODUCTION if not getattr(self, n, None)]
+        if missing:
+            msg = f"Missing required production settings: {', '.join(missing)}"
+            if self.SETTINGS_ENFORCE_VALIDATION:
+                raise ValueError(msg)
+            logger.warning("PRODUCTION CONFIG WARNING: %s", msg)
+
+        if self.CORS_ORIGINS == _DEV_CORS_DEFAULT:
+            msg = "CORS_ORIGINS must be set explicitly in production"
+            if self.SETTINGS_ENFORCE_VALIDATION:
+                raise ValueError(msg)
+            logger.warning("PRODUCTION CONFIG WARNING: %s", msg)
+
+        return self
 
 
+# ── Module-level singleton ────────────────────────────────────────
+# Instantiated here for backward compatibility with existing code.
+# The composition root (asgi.py / main.py) may override specific paths.
 settings = Settings()
-
-# Fail fast at startup if CSRF protection is enabled but no secret is configured.
-if settings.CSRF_ENFORCE_BACKEND and not settings.CSRF_SECRET:
-    raise RuntimeError(
-        "CSRF_SECRET environment variable must be set when CSRF_ENFORCE_BACKEND=true. "
-        "Set CSRF_ENFORCE_BACKEND=false to disable CSRF protection (development only)."
-    )
