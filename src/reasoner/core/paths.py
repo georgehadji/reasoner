@@ -25,10 +25,17 @@ every consumer via constructor injection.
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import dataclass, field
+from functools import lru_cache
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+#: Env var controlling the data root.  Read directly rather than through
+#: ``core.settings`` so this module keeps zero outer dependencies.
+DATA_DIR_ENV = "DATA_DIR"
+DEFAULT_DATA_DIR = "./data"
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,6 +83,13 @@ class DataPaths:
         # Touch DB parent directories (files are created on first use)
         for p in [self.events_db, self.errors_db, self.feedback_db, self.auth_db]:
             p.parent.mkdir(parents=True, exist_ok=True)
+
+    # ── process-wide default ───────────────────────────────────────
+
+    @staticmethod
+    def reset_default() -> None:
+        """Clear the cached default.  For tests that change ``DATA_DIR``."""
+        default_data_paths.cache_clear()
 
     # ── legacy migration helpers ───────────────────────────────────
 
@@ -132,3 +146,24 @@ class DataPaths:
                 new_path.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(old_path, new_path)
                 logger.warning("Copied legacy file %s → %s", old_path, new_path)
+
+
+@lru_cache(maxsize=1)
+def default_data_paths() -> DataPaths:
+    """Return the process-wide ``DataPaths``, derived from ``$DATA_DIR``.
+
+    The composition root (``asgi.py`` / ``main.py``) builds its own
+    instance explicitly and injects it; this function is the fallback for
+    the many stores that are still constructed without arguments — from
+    the CLI, from tests, and from direct imports.
+
+    It exists so that a default-constructed store lands in ``$DATA_DIR``
+    rather than inside the installed package.  It is deliberately *not* a
+    substitute for constructor injection: an explicit ``db_path`` always
+    wins.  Cached so every caller agrees on one root within a process;
+    call ``DataPaths.reset_default()`` in tests that repoint ``DATA_DIR``.
+    """
+    root = os.environ.get(DATA_DIR_ENV) or DEFAULT_DATA_DIR
+    paths = DataPaths.from_root(root)
+    paths.ensure()
+    return paths

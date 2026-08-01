@@ -102,11 +102,11 @@ async def test_clear_cache_clears_memory_and_disk(seeded_memory_cache, tmp_path,
     Regression: DELETE /api/cache must clear both disk files AND the
     in-memory _MEMORY_CACHE dict.
     """
-    from reasoner.api.cache import _MEMORY_CACHE, CACHE_DIR
+    from reasoner.api.cache import _MEMORY_CACHE, get_cache_dir
     from reasoner.api import clear_cache
 
     # Write a disk file so we can verify disk clearing too
-    test_file = CACHE_DIR / "regression-test-disk.json"
+    test_file = get_cache_dir() / "regression-test-disk.json"
     test_file.write_text("[]", encoding="utf-8")
 
     # Verify preconditions

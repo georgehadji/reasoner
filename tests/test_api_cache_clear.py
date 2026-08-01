@@ -4,7 +4,7 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from reasoner.api import _MEMORY_CACHE, _save_cache, CACHE_DIR, app
+from reasoner.api import _MEMORY_CACHE, _save_cache, get_cache_dir, app
 
 
 client = TestClient(app)
@@ -12,7 +12,7 @@ client = TestClient(app)
 
 def clear_memory_and_disk():
     _MEMORY_CACHE.clear()
-    for f in CACHE_DIR.glob("*.json"):
+    for f in get_cache_dir().glob("*.json"):
         try:
             f.unlink()
         except OSError:
@@ -39,7 +39,7 @@ class TestClearCacheEndpoint:
     def test_clear_cache_deletes_disk_files(self):
         # Seed disk with a synthetic cache file
         key = "test-clear-001"
-        path = CACHE_DIR / f"{key}.json"
+        path = get_cache_dir() / f"{key}.json"
         path.write_text(json.dumps([{"type": "done"}]), encoding="utf-8")
 
         response = client.delete("/api/cache")

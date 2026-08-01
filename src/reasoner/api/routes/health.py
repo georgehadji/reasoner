@@ -66,8 +66,8 @@ async def health_check(request: Request):
     }
 
     # Cache status
-    from reasoner.api.cache import CACHE_DIR
-    cache_files = list(CACHE_DIR.glob("*.json"))
+    from reasoner.api.cache import get_cache_dir
+    cache_files = list(get_cache_dir().glob("*.json"))
     health["checks"]["cache"] = {
         "status": "ok",
         **({"files": len(cache_files)} if is_admin else {}),

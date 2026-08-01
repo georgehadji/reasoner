@@ -12,9 +12,8 @@ class TestCacheRaceConditionPrevention:
 
     def test_unique_temp_filename_per_write(self):
         """Test that each cache write uses a unique temp filename."""
-        from reasoner.api import CACHE_DIR
         import time
-        
+
         # Simulate two writes in quick succession
         key = "test_key"
         
@@ -30,11 +29,12 @@ class TestCacheRaceConditionPrevention:
 
     def test_temp_file_cleanup(self):
         """Test that old temp files are cleaned up."""
-        from reasoner.api import CACHE_DIR
-        
+        from reasoner.api import get_cache_dir
+
         # Create fake old temp files
-        old_tmp1 = CACHE_DIR / "test_cleanup.12345.1000.tmp"
-        old_tmp2 = CACHE_DIR / "test_cleanup.12345.1001.tmp"
+        cache_dir = get_cache_dir()
+        old_tmp1 = cache_dir / "test_cleanup.12345.1000.tmp"
+        old_tmp2 = cache_dir / "test_cleanup.12345.1001.tmp"
         old_tmp1.touch(exist_ok=True)
         old_tmp2.touch(exist_ok=True)
         
@@ -44,7 +44,7 @@ class TestCacheRaceConditionPrevention:
             assert old_tmp2.exists()
             
             # Cleanup (simulating what _save_cache does)
-            for old_tmp in CACHE_DIR.glob("test_cleanup.*.tmp"):
+            for old_tmp in cache_dir.glob("test_cleanup.*.tmp"):
                 old_tmp.unlink(missing_ok=True)
             
             # Verify they're deleted
@@ -212,48 +212,60 @@ class TestHistoryDeleteErrorHandling:
 class TestUploaderGlobInjection:
     """BUG-010 regression tests: uploader must not be vulnerable to glob injection."""
 
+    @pytest.fixture(autouse=True)
+    def _upload_dir(self, tmp_path, monkeypatch):
+        """Point the uploader at tmp_path.
+
+        Patches the private ``_UPLOAD_DIR`` in the real module rather than
+        the old ``UPLOAD_DIR`` constant: the directory is resolved lazily
+        through ``get_upload_dir()``, so a shim-level attribute would not
+        be consulted and these tests would silently exercise the real
+        upload directory.
+        """
+        from reasoner.infrastructure import uploader as infra_uploader
+
+        monkeypatch.setattr(infra_uploader, "_UPLOAD_DIR", tmp_path)
+        monkeypatch.setattr(
+            infra_uploader, "_HASH_INDEX_PATH", tmp_path / ".upload_hash_index.json"
+        )
+        return tmp_path
+
     @pytest.mark.anyio
-    async def test_get_file_text_rejects_empty_file_id(self, tmp_path, monkeypatch):
+    async def test_get_file_text_rejects_empty_file_id(self, tmp_path):
         from reasoner import uploader
-        monkeypatch.setattr(uploader, 'UPLOAD_DIR', tmp_path)
         (tmp_path / "secret.txt").write_text("sensitive")
         assert await uploader.get_file_text("") is None
 
     @pytest.mark.anyio
-    async def test_get_file_text_rejects_wildcard_file_id(self, tmp_path, monkeypatch):
+    async def test_get_file_text_rejects_wildcard_file_id(self, tmp_path):
         from reasoner import uploader
-        monkeypatch.setattr(uploader, 'UPLOAD_DIR', tmp_path)
         (tmp_path / "secret.txt").write_text("sensitive")
         assert await uploader.get_file_text("*") is None
 
     @pytest.mark.anyio
-    async def test_get_file_text_rejects_dotdot_file_id(self, tmp_path, monkeypatch):
+    async def test_get_file_text_rejects_dotdot_file_id(self, tmp_path):
         from reasoner import uploader
-        monkeypatch.setattr(uploader, 'UPLOAD_DIR', tmp_path)
         (tmp_path / "secret.txt").write_text("sensitive")
         assert await uploader.get_file_text("..") is None
 
     @pytest.mark.anyio
-    async def test_get_file_text_reads_exact_match(self, tmp_path, monkeypatch):
+    async def test_get_file_text_reads_exact_match(self, tmp_path):
         from reasoner import uploader
-        monkeypatch.setattr(uploader, 'UPLOAD_DIR', tmp_path)
         file_id = "abc123def456"
         (tmp_path / f"{file_id}.txt").write_text("hello world")
         result = await uploader.get_file_text(file_id)
         assert result == "hello world"
 
-    def test_delete_file_rejects_injection_attempts(self, tmp_path, monkeypatch):
+    def test_delete_file_rejects_injection_attempts(self, tmp_path):
         from reasoner import uploader
-        monkeypatch.setattr(uploader, 'UPLOAD_DIR', tmp_path)
         (tmp_path / "secret.txt").write_text("sensitive")
         assert uploader.delete_file("") is False
         assert uploader.delete_file("*") is False
         assert uploader.delete_file("..") is False
         assert (tmp_path / "secret.txt").exists()
 
-    def test_delete_file_deletes_exact_match(self, tmp_path, monkeypatch):
+    def test_delete_file_deletes_exact_match(self, tmp_path):
         from reasoner import uploader
-        monkeypatch.setattr(uploader, 'UPLOAD_DIR', tmp_path)
         file_id = "abc123def456"
         (tmp_path / f"{file_id}.txt").write_text("hello world")
         assert uploader.delete_file(file_id) is True

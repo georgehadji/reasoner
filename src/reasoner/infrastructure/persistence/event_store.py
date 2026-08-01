@@ -35,7 +35,9 @@ class EventStore:
 
     def __init__(self, db_path: str | Path | None = None):
         if db_path is None:
-            db_path = None  # Set by composition root via DataPaths
+            from reasoner.core.paths import default_data_paths
+
+            db_path = default_data_paths().events_db
 
         self.db_path = Path(db_path)
         # Delegate connection lifecycle to dedicated module

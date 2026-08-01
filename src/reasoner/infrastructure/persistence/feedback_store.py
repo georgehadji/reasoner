@@ -60,10 +60,13 @@ class FeedbackStore:
         db_path: str | Path | None = None,
         jsonl_path: str | Path | None = None,
     ):
+        from reasoner.core.paths import default_data_paths
+
         if db_path is None:
-            db_path = None  # Set by composition root via DataPaths
+            db_path = default_data_paths().feedback_db
         if jsonl_path is None:
-            jsonl_path = None  # Legacy — migrated by composition root
+            # Legacy JSONL sink lives alongside the DB under the data root.
+            jsonl_path = default_data_paths().root / "feedback" / "feedback.jsonl"
 
         self.db_path = Path(db_path)
         self.jsonl_path = Path(jsonl_path)

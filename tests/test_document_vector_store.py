@@ -13,7 +13,7 @@ from reasoner.documents.vector_store import (
     _cosine_similarity,
 )
 from reasoner.core.settings import settings
-from reasoner.uploader import UPLOAD_DIR
+from reasoner.uploader import get_upload_dir
 
 
 class TestChunkText:
@@ -56,12 +56,12 @@ class TestDocumentVectorStore:
     def setup_method(self):
         self.store = DocumentVectorStore()
         # Clean up any leftover sidecars
-        for f in UPLOAD_DIR.glob("*.vectors.json"):
+        for f in get_upload_dir().glob("*.vectors.json"):
             if f.name.startswith("test-"):
                 f.unlink(missing_ok=True)
 
     def teardown_method(self):
-        for f in UPLOAD_DIR.glob("*.vectors.json"):
+        for f in get_upload_dir().glob("*.vectors.json"):
             if f.name.startswith("test-"):
                 f.unlink(missing_ok=True)
 
@@ -76,7 +76,7 @@ class TestDocumentVectorStore:
         count = await store.index_file(file_id, text, chunk_size=50, chunk_overlap=10)
 
         assert count > 0
-        sidecar_path = UPLOAD_DIR / f"{file_id}.vectors.json"
+        sidecar_path = get_upload_dir() / f"{file_id}.vectors.json"
         assert sidecar_path.exists()
 
         data = json.loads(sidecar_path.read_text())
@@ -112,7 +112,7 @@ class TestDocumentVectorStore:
                 {"text": "somewhat related content", "embedding": [0.5, 0.5, 0.0]},
             ],
         }
-        (UPLOAD_DIR / f"{file_id}.vectors.json").write_text(json.dumps(sidecar))
+        (get_upload_dir() / f"{file_id}.vectors.json").write_text(json.dumps(sidecar))
 
         results = await store.retrieve("test query", [file_id], top_k=2)
         assert len(results) == 2
@@ -136,7 +136,7 @@ class TestDocumentVectorStore:
 
     def test_delete_index_removes_sidecar(self):
         file_id = "test-delete-001"
-        sidecar_path = UPLOAD_DIR / f"{file_id}.vectors.json"
+        sidecar_path = get_upload_dir() / f"{file_id}.vectors.json"
         sidecar_path.write_text('{"file_id": "test-delete-001"}')
 
         assert sidecar_path.exists()

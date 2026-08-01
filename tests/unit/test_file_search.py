@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock
 
 from reasoner.infrastructure.prism.file_search import PrismFileSearch
-from reasoner.infrastructure.uploader import UPLOAD_DIR
+from reasoner.infrastructure.uploader import get_upload_dir
 
 
 @pytest.fixture
@@ -21,7 +21,7 @@ def mock_embedder():
 @pytest.fixture(autouse=True)
 def cleanup_sidecars():
     yield
-    for f in UPLOAD_DIR.glob("*.vectors.json"):
+    for f in get_upload_dir().glob("*.vectors.json"):
         if f.name.startswith("test-"):
             f.unlink(missing_ok=True)
 
@@ -37,7 +37,7 @@ async def test_search_chunks_loads_sidecar(mock_embedder):
             {"text": "chunk two", "embedding": [0.0, 1.0, 0.0]},
         ],
     }
-    path = UPLOAD_DIR / f"{file_id}.vectors.json"
+    path = get_upload_dir() / f"{file_id}.vectors.json"
     path.write_text(json.dumps(sidecar), encoding="utf-8")
 
     fs = PrismFileSearch(embedder=mock_embedder)
@@ -71,7 +71,7 @@ async def test_search_chunks_top_k(mock_embedder):
             {"text": "c", "embedding": [0.2, 0.0, 0.0]},
         ],
     }
-    path = UPLOAD_DIR / f"{file_id}.vectors.json"
+    path = get_upload_dir() / f"{file_id}.vectors.json"
     path.write_text(json.dumps(sidecar), encoding="utf-8")
 
     fs = PrismFileSearch(embedder=mock_embedder)

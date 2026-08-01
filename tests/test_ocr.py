@@ -196,7 +196,7 @@ class TestSaveUploadedFileOCR:
     @pytest.mark.asyncio
     async def test_save_uploaded_file_passes_force_ocr(self, tmp_path):
         """force_ocr should be forwarded to extract_text."""
-        with patch("reasoner.uploader.UPLOAD_DIR", tmp_path), \
+        with patch("reasoner.infrastructure.uploader._UPLOAD_DIR", tmp_path), \
              patch("reasoner.infrastructure.uploader._MAGIC_AVAILABLE", False), \
              patch("reasoner.uploader.extract_text", new_callable=AsyncMock) as mock_extract:
             mock_extract.return_value = "OCR result"
@@ -209,7 +209,7 @@ class TestSaveUploadedFileOCR:
     @pytest.mark.asyncio
     async def test_save_uploaded_files_passes_force_ocr(self, tmp_path):
         """force_ocr should be forwarded for batched uploads."""
-        with patch("reasoner.uploader.UPLOAD_DIR", tmp_path), \
+        with patch("reasoner.infrastructure.uploader._UPLOAD_DIR", tmp_path), \
              patch("reasoner.infrastructure.uploader._MAGIC_AVAILABLE", False), \
              patch("reasoner.uploader.extract_text", new_callable=AsyncMock) as mock_extract:
             mock_extract.return_value = "OCR result"

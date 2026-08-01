@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from reasoner.core.settings import settings
-from reasoner.uploader import UPLOAD_DIR
+from reasoner.uploader import get_upload_dir
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +91,7 @@ class DocumentVectorStore:
         return self._embedder
 
     def _sidecar_path(self, file_id: str) -> Path:
-        return UPLOAD_DIR / f"{file_id}.vectors.json"
+        return get_upload_dir() / f"{file_id}.vectors.json"
 
     async def index_file(
         self,

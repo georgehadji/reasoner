@@ -15,8 +15,8 @@ except Exception:
     _METRICS_AVAILABLE = False
 
 # Module-level singleton cache directory.  Set via configure_cache_dir()
-# from the composition root.  Defaults to the old Path(__file__) derivation
-# for backward compatibility during the transition window.
+# from the composition root; falls back to $DATA_DIR when unset (CLI,
+# tests, direct imports).
 _CACHE_DIR: Path | None = None
 
 
@@ -27,20 +27,34 @@ def configure_cache_dir(path: str | Path) -> None:
     _CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def _get_cache_dir() -> Path:
+def get_cache_dir() -> Path:
+    """Return the active cache directory.
+
+    Public because the path is resolved lazily — it is only known after
+    ``configure_cache_dir()`` runs at the composition root, so callers
+    cannot hold a module-level constant.  Replaces the old ``CACHE_DIR``
+    module attribute.
+    """
     if _CACHE_DIR is not None:
         return _CACHE_DIR
-    # Fallback — legacy path derivation for backward compatibility.
-    d = Path(__file__).resolve().parent.parent / "cache"
-    d.mkdir(exist_ok=True)
-    return d
+    from reasoner.core.paths import default_data_paths
+
+    return default_data_paths().cache
+
+
+#: Internal alias retained for the call sites already in this module.
+_get_cache_dir = get_cache_dir
 
 # In-memory hot-cache layer to avoid disk I/O on repeated identical requests.
 # NOTE: This is a per-process cache. For horizontal scaling, use Redis or
 # a shared external cache.
 _MEMORY_CACHE: dict[str, list[dict]] = {}
 _MEMORY_CACHE_MAX_SIZE = 256
-_memory_cache_lock = threading.Lock()
+# RLock, not Lock: `_prune_memory_cache()` acquires this lock and is called
+# from inside the locked sections of `_load_cache()` and `_save_cache()`.
+# With a plain Lock that re-entry is a self-deadlock — every cache write
+# hangs the calling thread forever.
+_memory_cache_lock = threading.RLock()
 _cache_hits: int = 0
 _cache_misses: int = 0
 _cache_evictions: int = 0  # Track evictions for metric

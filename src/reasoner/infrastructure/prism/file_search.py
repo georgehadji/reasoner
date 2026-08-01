@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from reasoner.core.ports.file_search_port import FileSearchPort, FileChunk
-from reasoner.infrastructure.uploader import UPLOAD_DIR
+from reasoner.infrastructure.uploader import get_upload_dir
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ class PrismFileSearch(FileSearchPort):
         return self._embedder
 
     def _sidecar_path(self, file_id: str) -> Path:
-        return UPLOAD_DIR / f"{file_id}.vectors.json"
+        return get_upload_dir() / f"{file_id}.vectors.json"
 
     async def search_chunks(
         self,

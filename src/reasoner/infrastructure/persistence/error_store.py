@@ -71,7 +71,9 @@ class ErrorStore:
         retention_days: int = 30,
     ):
         if db_path is None:
-            db_path = None  # Set by composition root via DataPaths
+            from reasoner.core.paths import default_data_paths
+
+            db_path = default_data_paths().errors_db
 
         self.db_path = Path(db_path)
         self.retention_days = retention_days

@@ -28,12 +28,25 @@ def configure_upload_dir(path: str | Path) -> None:
     _HASH_INDEX_PATH = _get_upload_dir() / ".upload_hash_index.json"
 
 
-def _get_upload_dir() -> Path:
+def get_upload_dir() -> Path:
+    """Return the active upload directory.
+
+    Public because the path is resolved lazily — it is only known after
+    ``configure_upload_dir()`` runs at the composition root, so callers
+    cannot hold a module-level constant.  Replaces the old ``UPLOAD_DIR``
+    module attribute.
+    """
     if _UPLOAD_DIR is not None:
         return _UPLOAD_DIR
-    d = Path(__file__).resolve().parent / "uploads"
-    d.mkdir(exist_ok=True)
-    return d
+    # Fall back to $DATA_DIR rather than the package tree — writing user
+    # uploads next to the source is how they ended up tracked by git.
+    from reasoner.core.paths import default_data_paths
+
+    return default_data_paths().uploads
+
+
+#: Internal alias retained for the many call sites already in this module.
+_get_upload_dir = get_upload_dir
 
 
 def _get_hash_index_path() -> Path:

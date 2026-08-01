@@ -102,7 +102,7 @@ class AuthManager:
         self._store: Optional["AuthStore"] = None
         if settings.AUTH_PERSISTENCE_ENABLED:
             from reasoner.infrastructure.persistence.auth_store import AuthStore
-            self._store = AuthStore(Path(settings.AUTH_DB_PATH))
+            self._store = AuthStore(Path(settings.resolved_auth_db_path))
 
         # Local LRU cache for hot-path reads (avoids DB round-trips)
         self._cache: Dict[str, APIKey] = {}

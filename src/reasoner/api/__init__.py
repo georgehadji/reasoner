@@ -401,7 +401,7 @@ from reasoner.infrastructure.redis.run_state import _run_state_manager as _run_s
 # ─────────────────────────────────────────────────────────────────────
 
 from .cache import (
-    CACHE_DIR,
+    get_cache_dir,
     _MEMORY_CACHE,
     _cache_key,
     clear_memory_cache,
@@ -799,7 +799,7 @@ async def clear_cache(
     csrf_checked = Depends(require_csrf),
 ):
     cleared = 0
-    for f in CACHE_DIR.glob("*.json"):
+    for f in get_cache_dir().glob("*.json"):
         try:
             f.unlink(missing_ok=True)
             cleared += 1

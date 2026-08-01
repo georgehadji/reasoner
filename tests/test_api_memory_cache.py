@@ -2,12 +2,12 @@
 
 import json
 import pytest
-from reasoner.api import _load_cache, _save_cache, _MEMORY_CACHE, CACHE_DIR
+from reasoner.api import _load_cache, _save_cache, _MEMORY_CACHE, get_cache_dir
 
 
 def clear_memory_and_disk():
     _MEMORY_CACHE.clear()
-    for f in CACHE_DIR.glob("test-mem-*.json"):
+    for f in get_cache_dir().glob("test-mem-*.json"):
         try:
             f.unlink()
         except OSError:
@@ -42,7 +42,7 @@ async def test_save_cache_populates_memory():
 
     assert _MEMORY_CACHE.get(key) == events
     # Disk should also have it
-    path = CACHE_DIR / f"{key}.json"
+    path = get_cache_dir() / f"{key}.json"
     assert path.exists()
     assert json.loads(path.read_text(encoding="utf-8")) == events
 

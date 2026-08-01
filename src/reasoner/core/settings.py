@@ -63,7 +63,13 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
-        frozen=True,
+        # NOT frozen.  Freezing is the desired end state (see F-13 in
+        # plans/PRODUCTION_READINESS_PLAN.md) but pydantic raises
+        # ValidationError on assignment to a frozen model, which breaks the
+        # 38 `patch.object(settings, ...)` call sites across 7 test modules
+        # — including the security regression suite.  Reinstate `frozen=True`
+        # only together with a fixture that builds a fresh Settings instance
+        # instead of patching the shared one.
     )
 
     # ── API Keys (LLM Providers) ──
@@ -131,7 +137,16 @@ class Settings(BaseSettings):
 
     # ── Auth / Supabase ──
     AUTH_PERSISTENCE_ENABLED: bool = Field(False, alias="AUTH_PERSISTENCE_ENABLED")
-    AUTH_DB_PATH: str = Field("src/reasoner/auth_keys.db", alias="AUTH_DB_PATH")
+    AUTH_DB_PATH: str = Field("", alias="AUTH_DB_PATH")
+
+    @property
+    def resolved_auth_db_path(self) -> str:
+        """Auth DB path, defaulting under ``DATA_DIR`` rather than ``src/``."""
+        if self.AUTH_DB_PATH:
+            return self.AUTH_DB_PATH
+        from reasoner.core.paths import default_data_paths
+
+        return str(default_data_paths().auth_db)
     SUPABASE_URL: str | None = Field(None, alias="SUPABASE_URL")
     SUPABASE_ANON_KEY: str | None = Field(None, alias="SUPABASE_ANON_KEY")
     SUPABASE_SERVICE_ROLE_KEY: str | None = Field(None, alias="SUPABASE_SERVICE_ROLE_KEY")
