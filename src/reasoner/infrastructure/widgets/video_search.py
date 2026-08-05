@@ -72,30 +72,20 @@ class VideoSearchWidget(BaseWidget):
         }
     
     async def _search_videos(self, query: str, limit: int) -> list[dict[str, Any]]:
-        """Search videos using SearXNG via the shared URL helper."""
-        import httpx
-        import reasoner.infrastructure.search.discovery as _disc
-        urls = _disc.get_searxng_urls()
-        for url in urls:
-            try:
-                async with httpx.AsyncClient(timeout=10.0) as client:
-                    resp = await client.get(
-                        url,
-                        params={"q": query, "format": "json", "categories": "videos"},
-                    )
-                    if resp.status_code == 200:
-                        results = resp.json().get("results", [])
-                        return [
-                            {
-                                'title': r.get('title', ''),
-                                'url': r.get('url', ''),
-                                'thumbnail': r.get('thumbnail', ''),
-                                'source': r.get('source', ''),
-                                'duration': r.get('duration', ''),
-                                'published': r.get('publishedDate', r.get('published_date', '')),
-                            }
-                            for r in results[:limit]
-                        ]
-            except Exception:
-                continue
-        return []
+        """Search videos via the Brave Search API.
+
+        Returns [] when BRAVE_SEARCH_API_KEY is unset or the call fails, so the
+        widget degrades to an empty result set rather than erroring.
+        """
+        from reasoner.core.settings import settings
+
+        if not (settings.BRAVE_SEARCH_API_KEY and settings.BRAVE_SEARCH_ENABLED):
+            return []
+
+        from reasoner.infrastructure.search.brave_adapter import BraveSearchAdapter
+
+        adapter = BraveSearchAdapter()
+        try:
+            return await adapter.search_videos(query, num_results=limit)
+        finally:
+            await adapter.close()

@@ -20,7 +20,7 @@ Reasoner treats reasoning as a first-class engineering problem rather than a one
 
 1. **Classifies and routes** the request to one of 24 reasoning methodologies via the HyperGate pre-router (6 parallel sub-agents).
 2. **Decomposes** the problem into atomic sub-questions and assumptions.
-3. **Vets context** through iterative, web-grounded retrieval (SearXNG / Perplexity Sonar) with token-aware compression.
+3. **Vets context** through iterative, web-grounded retrieval (Perplexity Sonar / Brave / Tavily) with token-aware compression.
 4. **Generates competing answers** from cross-lab model ensembles (Anthropic, OpenAI, Google, DeepSeek, Mistral, xAI, and more) to reduce single-vendor bias.
 5. **Critiques and stress-tests** candidates with independent LLM judges under adversarial conditions.
 6. **Synthesizes** a final, evidence-grounded answer labeled `VERIFIED`, `HYPOTHESIS`, or `UNRESOLVED`, with citations.
@@ -83,7 +83,6 @@ Internally, the codebase follows **hexagonal architecture** (domain logic depend
 - **Python 3.12+**
 - **Node.js 20+** (frontend web UI)
 - **OpenRouter API key** (recommended — one billing interface for 350+ models)
-- **SearXNG** (optional — local search; the pipeline degrades gracefully without it)
 - **Redis** (optional — recommended in production for distributed rate limiting)
 
 ### 1. Installation
@@ -101,7 +100,7 @@ cp .env.example .env             # then edit .env — at minimum set OPENROUTER_
 
 ### 2. Launch
 
-Start the FastAPI backend, the Next.js frontend, and the local SearXNG search engine with one command:
+Start the FastAPI backend and the Next.js frontend with one command:
 
 ```bash
 python start_all.py
@@ -111,9 +110,8 @@ python start_all.py
 | :--- | :--- | :--- |
 | FastAPI backend | `http://localhost:8003` | `SERVER_PORT` |
 | Next.js frontend | `http://localhost:3000` | — |
-| SearXNG | `http://localhost:8888` | `SEARXNG_URL` |
 
-For the full containerized production stack (Caddy reverse proxy with automatic HTTPS, backend, frontend, PostgreSQL, Redis, SearXNG):
+For the full containerized production stack (Caddy reverse proxy with automatic HTTPS, backend, frontend, PostgreSQL, Redis):
 
 ```bash
 docker compose up -d
@@ -152,7 +150,7 @@ Reasoner ships with **50 presets across 24 methodologies**. Each method ships a 
 | **Multi-Perspective** | `multi-perspective-budget` | `multi-perspective-premium` | Parallel constructive / destructive / systemic / minimalist analysis | General complex reasoning |
 | **Debate** | `debate-budget` | `debate-premium` | Two generators argue opposing sides; a third independent model adjudicates | Binary decisions |
 | **Jury** | `jury-budget` | `jury-premium` | Large expert panel (4–6 models) scored by an autonomous judge | High-stakes strategic decisions |
-| **Research** | `research-budget` | `research-premium` | Iterative SearXNG queries, context vetting, Sonar fact-checking | Evidence-heavy, real-world search |
+| **Research** | `research-budget` | `research-premium` | Iterative web queries, context vetting, Sonar fact-checking | Evidence-heavy, real-world search |
 | **Scientific** | `scientific-budget` | `scientific-premium` | Hypothesis generation, falsification checks, empirical scoring | Technical and scientific questions |
 | **Socratic** | `socratic-budget` | `socratic-premium` | Recursive question-and-answer loops exposing bias | Uncovering hidden assumptions |
 | **Pre-Mortem** | `pre-mortem-budget` | `pre-mortem-premium` | Prospective failure analysis (Gary Klein) with safety back-testing | Project planning, risk assessment |
@@ -268,7 +266,7 @@ tool = StructuredTool.from_function(
 
 ### Option 2 — Headless in-process Python (no server)
 
-For CI jobs, one-off scripts, or embedding in another Python process, use the dedicated `reasoner.headless` module — no FastAPI/uvicorn/SearXNG process required:
+For CI jobs, one-off scripts, or embedding in another Python process, use the dedicated `reasoner.headless` module — no FastAPI/uvicorn process required:
 
 ```python
 import sys
@@ -451,7 +449,6 @@ All configuration is environment-driven via `.env` (copy `.env.example`; `src/re
 | `REDIS_URL` | `redis://localhost:6379/0` | Redis cache / rate-limiter backend. |
 | `RATE_LIMITER_MODE` | `memory` | Set to `redis` for multi-worker production deployments. |
 | `CIRCUIT_BREAKER_MODE` | `memory` | Set to `redis` for multi-worker production deployments. |
-| `SEARXNG_URL` | `http://localhost:8888` | Local search engine address. |
 
 The full variable reference (auth, billing, telemetry, feature flags) lives in `.env.example` and [`docs/ENVIRONMENT.md`](docs/ENVIRONMENT.md). **Never commit `.env` with real values.**
 

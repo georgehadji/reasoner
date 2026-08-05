@@ -97,8 +97,8 @@ class TestQualityJudgeConfig:
 class TestBaseUrls:
     """Verify base URLs are well-formed."""
 
-    def test_searxng_url_is_http(self):
-        assert const.DEFAULT_SEARXNG_URL.startswith("http")
+    def test_neuro_url_is_http(self):
+        assert const.DEFAULT_NEURO_URL.startswith("http")
 
     def test_openrouter_url_is_https(self):
         assert const.OPENROUTER_BASE_URL.startswith("https")

@@ -29,7 +29,7 @@ jobs:
           # Honest baseline of real layering debt (the gate was crash-red on every
           # PR until the hyper_agent.py IndentationError was fixed, which had
           # masked the full violation set). Ratchet DOWN as debt is paid via DI
-          # (mirror set_build_provider / set_searxng_circuit_breaker). Do not
+          # (mirror set_build_provider). Do not
           # raise without a tracking issue.
           MAX=65
           if [ "$COUNT" -gt "$MAX" ]; then

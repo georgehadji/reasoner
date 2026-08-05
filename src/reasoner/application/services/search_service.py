@@ -169,7 +169,10 @@ class SearchService:
         })
 
     async def close(self) -> None:
-        """Close discovery client."""
-        from reasoner.infrastructure.search.discovery import reset_discovery_client
+        """No-op — kept for interface compatibility.
 
-        reset_discovery_client()
+        Previously reset a cached search-client singleton.
+        `get_search_client()` builds a fresh client per call, so there is
+        nothing to tear down here.
+        """
+        return None

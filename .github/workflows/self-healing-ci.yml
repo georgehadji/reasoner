@@ -457,69 +457,12 @@ jobs:
           retention-days: 30
 
   # ─────────────────────────────────────────────────────────────────────
-  # PHASE 3.5 — SearXNG Integration Verification
-  # ─────────────────────────────────────────────────────────────────────
-  searxng-integration:
-    name: SearXNG Integration Tests
-    runs-on: ubuntu-latest
-    needs: healing-profile
-    
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
-      
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-      
-      - name: Start SearXNG
-        run: |
-          docker compose -f docker-compose.searxng.yml up -d
-          # Poll for readiness (the container's healthcheck may take 30-60s)
-          for i in {1..30}; do
-            if curl -sf http://localhost:8888/ > /dev/null 2>&1; then
-              echo "[OK] SearXNG is ready"
-              break
-            fi
-            echo "Waiting for SearXNG... ($i/30)"
-            sleep 2
-          done
-          # Verify it's responding
-          curl -sf http://localhost:8888/ || echo "WARNING: SearXNG not responding, tests may fail"
-      
-      - name: Run SearXNG Integration Tests
-        env:
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-        run: |
-          # Scope collection to the dedicated SearXNG suites so unrelated stale
-          # test modules (importing refactored-away internals) can't fail this job.
-          pytest -m searxng -v --timeout=120 \
-            tests/test_searxng_integration.py \
-            tests/test_searxng_pipeline.py \
-            tests/test_searxng_widgets.py
-          EC=$?
-          # Exit code 5 = no tests collected (acceptable: SearXNG tests skipped gracefully)
-          if [ $EC -eq 5 ]; then echo "No SearXNG tests collected — skipping gracefully"; exit 0; fi
-          exit $EC
-      
-      - name: Stop SearXNG
-        if: always()
-        run: |
-          docker compose -f docker-compose.searxng.yml down
-
-  # ─────────────────────────────────────────────────────────────────────
   # PHASE 4 — HEALING VERIFICATION
   # ─────────────────────────────────────────────────────────────────────
   healing-verification:
     name: Phase 4 - Healing Verification
     runs-on: ubuntu-latest
-    needs: [loop1-static-healing, loop2-runtime-healing, loop3-evolutionary-healing, searxng-integration]
+    needs: [loop1-static-healing, loop2-runtime-healing, loop3-evolutionary-healing]
     if: always()
     
     steps:

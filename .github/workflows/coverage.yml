@@ -28,7 +28,7 @@ jobs:
       - name: Run tests with coverage
         run: |
           pytest tests/ \
-            -m "not slow and not integration and not searxng" \
+            -m "not slow and not integration" \
             --cov=src/reasoner \
             --cov-report=xml \
             --cov-report=term-missing \
@@ -49,7 +49,7 @@ jobs:
           ")
           echo "Coverage: ${COVERAGE}%"
           # Hard floor reflects real unit-only coverage (job excludes
-          # integration/slow/searxng). Acts as a regression ratchet — raise it
+          # integration/slow). Acts as a regression ratchet — raise it
           # as coverage improves toward the 80% WARN target.
           python -c "
           cov = float('${COVERAGE}')

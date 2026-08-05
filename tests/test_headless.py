@@ -63,7 +63,7 @@ async def test_ask_web_search_action_returns_results():
     with patch.object(
         headless.PipelineOrchestrator, "preflight", new=AsyncMock(return_value=decision)
     ), patch(
-        "reasoner.infrastructure.search.discovery.get_discovery_client",
+        "reasoner.infrastructure.search.discovery.get_search_client",
         new=AsyncMock(return_value=(fake_client, None)),
     ):
         result = await headless.ask("latest news on X")

@@ -43,7 +43,7 @@ jobs:
       - name: Run tests
         run: |
           pytest tests/ -v \
-            -m "not slow and not integration and not searxng" \
+            -m "not slow and not integration" \
             --tb=short \
             --timeout=60 \
             -q

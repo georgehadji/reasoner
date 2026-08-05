@@ -439,25 +439,6 @@ DISCOVER_TOPICS = {
 }
 
 
-async def search_searxng(query: str, params: dict | None = None) -> list[dict[str, Any]]:
-    """Search using SearXNG via the shared URL helper from discovery."""
-    import httpx
-    import reasoner.infrastructure.search.discovery as _disc
-    urls = _disc.get_searxng_urls()
-    for url in urls:
-        try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.get(
-                    url,
-                    params={"q": query, "format": "json", **(params or {})},
-                )
-                if resp.status_code == 200:
-                    return resp.json().get("results", [])
-        except Exception:
-            continue
-    return []
-
-
 async def search_web(query: str, engines: list[str] = None) -> list[dict[str, Any]]:
     """Search using multi-backend search client."""
     from reasoner.infrastructure.search.discovery import get_search_client

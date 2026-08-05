@@ -404,14 +404,21 @@ class TestAPIDiscoverWidget:
 
     @pytest.mark.asyncio
     async def test_api_discover_returns_results(self, api_client, monkeypatch):
-        import reasoner.widgets as _widgets
+        import reasoner.infrastructure.search.discovery as _discovery
 
-        async def fake_search_searxng(query, engines=None):
-            return [
-                {"title": f"{query} result", "url": "https://example.com", "content": "Content", "source": "test", "publishedDate": ""}
-            ]
+        class FakeSearchClient:
+            async def search(self, query, num_results=10, **kwargs):
+                return [
+                    {"title": f"{query} result", "url": "https://example.com", "content": "Content", "source": "test", "publishedDate": ""}
+                ]
 
-        monkeypatch.setattr(_widgets, "search_searxng", fake_search_searxng)
+            async def close(self):
+                return None
+
+        async def fake_get_search_client(source_type=None):
+            return FakeSearchClient(), source_type
+
+        monkeypatch.setattr(_discovery, "get_search_client", fake_get_search_client)
 
         response = await api_client.get("/api/discover?topic=tech&mode=normal")
         assert response.status_code == 200

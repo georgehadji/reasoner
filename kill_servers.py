@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Kill all Reasoner-related servers and the SearXNG container.
+Kill all Reasoner-related servers.
 
 Usage:
   python kill_servers.py
@@ -21,7 +21,6 @@ from pathlib import Path
 # ─────────────────────────────────────────────────────────────────────
 
 REPO_ROOT = Path(__file__).parent.resolve()
-SEARXNG_COMPOSE_FILE = REPO_ROOT / "docker-compose.searxng.yml"
 
 TARGET_KEYWORDS = [
     "uvicorn",
@@ -35,30 +34,6 @@ FRONTEND_DIR_NAME = "ui-next"
 
 # Known ports to force-free (handles Windows zombie sockets)
 TARGET_PORTS = [8003, 8002, 3000, 50001]
-
-
-def _stop_searxng() -> None:
-    """Stop the SearXNG container via docker compose."""
-    if not SEARXNG_COMPOSE_FILE.exists():
-        print("[SKIP] SearXNG compose file not found.")
-        return
-
-    print("[STOP] SearXNG (docker compose down)")
-    result = subprocess.run(
-        ["docker", "compose", "-f", str(SEARXNG_COMPOSE_FILE), "down"],
-        cwd=str(REPO_ROOT),
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode == 0:
-        print("[OK]   SearXNG stopped.")
-    else:
-        # Already down or docker not running — not a fatal error
-        err = (result.stderr or result.stdout or "").strip()
-        if err:
-            print(f"[WARN] docker compose down: {err}")
-        else:
-            print("[WARN] docker compose down returned non-zero.")
 
 
 def _kill_processes(force: bool = False) -> int:
@@ -253,9 +228,6 @@ def main() -> int:
     print("=" * 64)
     print("  Reasoner - Server Killer")
     print("=" * 64)
-    print()
-
-    _stop_searxng()
     print()
 
     killed = _kill_processes(force=args.force)

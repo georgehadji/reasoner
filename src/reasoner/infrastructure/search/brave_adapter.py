@@ -24,6 +24,12 @@ logger = logging.getLogger(__name__)
 
 _BRAVE_BASE = "https://api.search.brave.com/res/v1/web/search"
 _BRAVE_LLM_BASE = "https://api.search.brave.com/res/v1/web/llm_context"
+_BRAVE_IMAGES_BASE = "https://api.search.brave.com/res/v1/images/search"
+_BRAVE_VIDEOS_BASE = "https://api.search.brave.com/res/v1/videos/search"
+
+# Brave caps `count` per endpoint. Requesting more is a 422, so clamp.
+_BRAVE_MAX_IMAGE_RESULTS = 100
+_BRAVE_MAX_VIDEO_RESULTS = 50
 
 
 class BraveSearchAdapter:
@@ -161,6 +167,113 @@ class BraveSearchAdapter:
 
         except Exception as exc:
             logger.warning("Brave LLM Context failed: %s", exc)
+            return []
+
+    async def search_images(
+        self,
+        query: str,
+        num_results: int = 20,
+    ) -> list[dict[str, Any]]:
+        """Search images via Brave's images endpoint.
+
+        Returns the shape the image-search widget emits: title, url, img_src,
+        thumbnail, source. Degrades to [] with no API key, matching `search()`.
+        """
+        if not self._api_key:
+            logger.debug("Brave image search skipped: no API key configured")
+            return []
+
+        try:
+            client = await self._get_client()
+            resp = await client.get(
+                _BRAVE_IMAGES_BASE,
+                params={
+                    "q": query,
+                    "count": min(num_results, _BRAVE_MAX_IMAGE_RESULTS),
+                    "safesearch": "strict",
+                },
+                headers={
+                    "X-Subscription-Token": self._api_key,
+                    "Accept": "application/json",
+                },
+            )
+            resp.raise_for_status()
+
+            results: list[dict[str, Any]] = []
+            for item in resp.json().get("results", [])[:num_results]:
+                # `properties.url` is the full-resolution image; the thumbnail
+                # is Brave's 500px proxied preview. Fall back to the page URL.
+                properties = item.get("properties") or {}
+                page_url = item.get("url", "")
+                # Brave returns thumbnail as {"src": ...}; tolerate a bare string.
+                raw_thumb = item.get("thumbnail") or ""
+                thumbnail = raw_thumb.get("src", "") if isinstance(raw_thumb, dict) else raw_thumb
+                results.append({
+                    "title": item.get("title", ""),
+                    "url": page_url,
+                    "img_src": properties.get("url") or page_url,
+                    "thumbnail": thumbnail,
+                    "source": item.get("source", ""),
+                })
+            return results
+
+        except httpx.HTTPStatusError as exc:
+            logger.warning("Brave image search API error: %s", exc)
+            return []
+        except Exception as exc:
+            logger.warning("Brave image search failed: %s", exc)
+            return []
+
+    async def search_videos(
+        self,
+        query: str,
+        num_results: int = 20,
+    ) -> list[dict[str, Any]]:
+        """Search videos via Brave's videos endpoint.
+
+        Returns the shape the video-search widget emits: title, url, thumbnail,
+        source, duration, published. Degrades to [] with no API key.
+        """
+        if not self._api_key:
+            logger.debug("Brave video search skipped: no API key configured")
+            return []
+
+        try:
+            client = await self._get_client()
+            resp = await client.get(
+                _BRAVE_VIDEOS_BASE,
+                params={
+                    "q": query,
+                    "count": min(num_results, _BRAVE_MAX_VIDEO_RESULTS),
+                    "safesearch": "strict",
+                },
+                headers={
+                    "X-Subscription-Token": self._api_key,
+                    "Accept": "application/json",
+                },
+            )
+            resp.raise_for_status()
+
+            results: list[dict[str, Any]] = []
+            for item in resp.json().get("results", [])[:num_results]:
+                video = item.get("video") or {}
+                thumbnail = item.get("thumbnail") or {}
+                meta_url = item.get("meta_url") or {}
+                results.append({
+                    "title": item.get("title", ""),
+                    "url": item.get("url", ""),
+                    "thumbnail": thumbnail.get("src", ""),
+                    "source": video.get("publisher") or meta_url.get("netloc", ""),
+                    "duration": video.get("duration", ""),
+                    "published": item.get("age", ""),
+                })
+            return results
+
+        except httpx.HTTPStatusError as exc:
+            logger.warning("Brave video search API error: %s", exc)
+            return []
+        except Exception as exc:
+            logger.warning("Brave video search failed: %s", exc)
             return []
 
     async def close(self) -> None:

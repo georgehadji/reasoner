@@ -24,26 +24,6 @@ from reasoner.infrastructure.observability.langfuse_subscriber import reset_lang
 from reasoner.token_cache import reset_token_cache
 
 
-@pytest.fixture(scope="session")
-def searxng_container() -> str:
-    """Return the SearXNG base URL and skip if the instance is unreachable."""
-    url = os.environ.get("SEARXNG_URL", "http://localhost:8888").rstrip("/")
-    try:
-        resp = httpx.get(url, timeout=5)
-        if resp.status_code >= 500:
-            pytest.skip(f"SearXNG at {url} returned {resp.status_code} — skipping integration tests")
-    except httpx.TransportError:
-        pytest.skip(f"SearXNG not reachable at {url} — skipping integration tests")
-    return url
-
-
-@pytest.fixture(scope="session")
-def searxng_client(searxng_container: str):
-    """Return a DiscoveryClient pointed at the live SearXNG instance."""
-    from reasoner.infrastructure.search.discovery import DiscoveryClient
-    return DiscoveryClient(base_url=searxng_container)
-
-
 @pytest.fixture(autouse=True)
 async def auto_clean_state():
     """Fixture to reset all global state between tests."""
