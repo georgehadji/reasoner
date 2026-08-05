@@ -160,9 +160,11 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
         "env": "DEEPSEEK_API_KEY",
     },
     # ═══════════════════════════════════════════════════════════════
-    # Qwen (Alibaba) — 3.5 -> 3.7 series
+    # Qwen (Alibaba) — 3.5 -> 3.8 series
     # ═══════════════════════════════════════════════════════════════
-    # ── 3.7 (latest, Jun 2026) ──
+    # ── 3.8 (latest) ──
+    "qwen3.8-max":         {"model": "qwen/qwen3.8-max"},        # newest flagship
+    # ── 3.7 (Jun 2026) ──
     "qwen3.7-max":         {"model": "qwen/qwen3.7-max"},        # flagship agent — $1.25/$3.75 per M, 1M ctx
     "qwen3.7-plus":        {"model": "qwen/qwen3.7-plus"},       # best VFM — $0.32/$1.28 per M, 1M ctx
     "qwen3.7-flash":       {"model": "qwen/qwen3.7-flash"},      # cheapest Qwen — $0.03/$0.13 per M, 1M ctx, vision
@@ -330,6 +332,8 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "gpt-5-image":                    {"model": "openai/gpt-5-image",       "extra_body": {"include_images": True}},
     "gpt-5-image-mini":               {"model": "openai/gpt-5-image-mini",  "extra_body": {"include_images": True}},
     "gpt-5.4-image-2":                {"model": "openai/gpt-5.4-image-2",   "extra_body": {"include_images": True}},
+    "qwen-image-3":                   {"model": "qwen/qwen-image-3",        "extra_body": {"include_images": True}},
+    "qwen-image-3-pro":               {"model": "qwen/qwen-image-3-pro",    "extra_body": {"include_images": True}},
     # ═══════════════════════════════════════════════════════════════
     # Ollama (local)
     # ═══════════════════════════════════════════════════════════════
