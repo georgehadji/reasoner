@@ -129,8 +129,7 @@ async def test_article_full_success():
     pipeline = MockPipeline()
     state = MockState("Global Warming Trends")
     from unittest.mock import patch
-    with patch("reasoner.core.search.get_search_client", return_value=(MockSearchClient(), None)), \
-         patch("reasoner.core.search.get_discovery_client", return_value=(MockSearchClient(), None)):
+    with patch("reasoner.core.search.get_search_client", return_value=(MockSearchClient(), None)):
         await pipeline._phase_article_decompose(state)
         await pipeline._phase_article_retrieve(state)
         await pipeline._phase_article_extract_claims(state)
@@ -149,8 +148,7 @@ async def test_article_low_score_gate():
     state = MockState("Critical Topic")
     pipeline.mock_llm_responses["critic_score_override"] = 1.0
     from unittest.mock import patch
-    with patch("reasoner.core.search.get_search_client", return_value=(MockSearchClient(), None)), \
-         patch("reasoner.core.search.get_discovery_client", return_value=(MockSearchClient(), None)):
+    with patch("reasoner.core.search.get_search_client", return_value=(MockSearchClient(), None)):
         await pipeline._phase_article_decompose(state)
         await pipeline._phase_article_retrieve(state)
         await pipeline._phase_article_extract_claims(state)
@@ -170,8 +168,7 @@ async def test_article_bare_list_fallback():
         {"id": "C1", "text": "Bare list claim", "source_url": "http://test"}
     ])
     from unittest.mock import patch
-    with patch("reasoner.core.search.get_search_client", return_value=(MockSearchClient(), None)), \
-         patch("reasoner.core.search.get_discovery_client", return_value=(MockSearchClient(), None)):
+    with patch("reasoner.core.search.get_search_client", return_value=(MockSearchClient(), None)):
         await pipeline._phase_article_decompose(state)
         await pipeline._phase_article_retrieve(state)
         await pipeline._phase_article_extract_claims(state)
@@ -188,8 +185,7 @@ async def test_article_re_retrieval():
         "claims": [{"claim_id": "C1", "status": "UNKNOWN", "supporting_sources": []}]
     })
     from unittest.mock import patch
-    with patch("reasoner.core.search.get_search_client", return_value=(MockSearchClient(), None)), \
-         patch("reasoner.core.search.get_discovery_client", return_value=(MockSearchClient(), None)):
+    with patch("reasoner.core.search.get_search_client", return_value=(MockSearchClient(), None)):
         await pipeline._phase_article_decompose(state)
         await pipeline._phase_article_retrieve(state)
         await pipeline._phase_article_extract_claims(state)
@@ -204,8 +200,7 @@ async def test_article_evidence_gate():
     class EmptySearchClient:
         async def search(self, *args, **kwargs): return []
     from unittest.mock import patch
-    with patch("reasoner.core.search.get_search_client", return_value=(EmptySearchClient(), None)), \
-         patch("reasoner.core.search.get_discovery_client", return_value=(EmptySearchClient(), None)):
+    with patch("reasoner.core.search.get_search_client", return_value=(EmptySearchClient(), None)):
         await pipeline._phase_article_decompose(state)
         await pipeline._phase_article_retrieve(state)
         await pipeline._phase_article_extract_claims(state)

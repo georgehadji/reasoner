@@ -14,7 +14,6 @@ from reasoner.core.constants import (
     PHASE_TOKEN_BUDGETS,
     TIMEOUTS,
     TRUNCATION,
-    DEFAULT_SEARXNG_URL,
     DEFAULT_NEURO_URL,
     DEFAULT_OLLAMA_URL,
     OPENROUTER_BASE_URL,
@@ -62,7 +61,6 @@ class TestConstants:
 
     def test_base_urls_are_valid_strings(self):
         urls = [
-            DEFAULT_SEARXNG_URL,
             DEFAULT_NEURO_URL,
             DEFAULT_OLLAMA_URL,
             OPENROUTER_BASE_URL,

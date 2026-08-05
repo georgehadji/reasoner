@@ -48,16 +48,7 @@ def _get_build_provider():
     global _BUILD_PROVIDER
     return _BUILD_PROVIDER
 
-# SearXNG circuit breaker — injected by api/__init__.py at startup.
-# Tests patch this directly: `search_module._SEARXNG_CB = test_cb`
-_SEARXNG_CB = None
-
-def set_searxng_cb(cb) -> None:
-    """Inject SearXNG circuit breaker (called from api/__init__.py)."""
-    global _SEARXNG_CB
-    _SEARXNG_CB = cb
-
-# Re-export discovery client helpers so tests can import them from core.search.
+# Re-export search client helpers so tests can import them from core.search.
 # Lazy to avoid circular imports at module load time.
 _DISCOVERY_MODULE = None
 
@@ -71,22 +62,7 @@ def _get_discovery_module():
     return _DISCOVERY_MODULE
 
 
-def get_discovery_client(*args, **kwargs):
-    return _get_discovery_module().get_discovery_client(*args, **kwargs)
-
-def reset_discovery_client(*args, **kwargs):
-    return _get_discovery_module().reset_discovery_client(*args, **kwargs)
-
 logger = logging.getLogger(__name__)
-
-# Source type categories for specialized searches
-SOURCE_TYPE_ENGINES: dict[str, list[str]] = {
-    "general": [],  # Use default engines
-    "academic": ["arxiv", "google_scholar", "crossref", "semantic_scholar", "pubmed"],
-    "social": ["reddit", "twitter", "hackernews", "mastodon", "wikipedia"],
-    "news": ["google_news", "bing_news", "newsapi", "ddg_news"],
-    "code": ["github", "gitlab", "stackoverflow", "npm"],
-}
 
 SourceType = Literal["general", "academic", "social", "news", "code"]
 
@@ -313,7 +289,6 @@ from reasoner.core.ports.search_port import SearchServicePort
 
 _DISCOVERY_EXPORTS = {
     "PerplexitySearchClient",
-    "DiscoveryClient",
     "get_search_client",
     "_decompose_query",
     "_extract_search_keywords",

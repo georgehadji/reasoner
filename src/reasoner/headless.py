@@ -160,10 +160,10 @@ async def ask(
         )
 
     if preflight.action == "web_search":
-        from reasoner.infrastructure.search.discovery import get_discovery_client
+        from reasoner.infrastructure.search.discovery import get_search_client
 
         try:
-            client, _ = await get_discovery_client(source_type="general")
+            client, _ = await get_search_client(source_type="general")
             results = await client.search(sanitized_problem, num_results=10, source_type="general")
         except Exception:
             logger.warning("headless.web_search_failed", exc_info=True)

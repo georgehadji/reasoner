@@ -35,35 +35,11 @@ MAIN_SERVER_CMD = [sys.executable, "-m", "uvicorn", "asgi:app", "--host", settin
 NEURO_SERVER_CMD = [sys.executable, "-m", "reasoner.neuro.cli", "start"]
 FRONTEND_DIR = REPO_ROOT / "ui-next"
 FRONTEND_CMD = ["npm", "run", "dev"]
-SEARXNG_COMPOSE_FILE = REPO_ROOT / "docker-compose.searxng.yml"
 
 
 # ─────────────────────────────────────────────────────────────────────
 # Helpers
 # ─────────────────────────────────────────────────────────────────────
-
-def _searxng_is_healthy() -> bool:
-    """Return True if SearXNG is responding on port 8888."""
-    import urllib.request
-    try:
-        with urllib.request.urlopen("http://127.0.0.1:8888/", timeout=3) as resp:
-            return 200 <= resp.status < 500
-    except Exception:
-        return False
-
-
-def _docker_available() -> bool:
-    """Return True if the docker CLI is available on PATH."""
-    return shutil.which("docker") is not None
-
-
-def _stop_searxng() -> None:
-    """Stop the SearXNG Docker container."""
-    subprocess.run(
-        ["docker", "compose", "-f", str(SEARXNG_COMPOSE_FILE), "down"],
-        capture_output=True,
-    )
-
 
 def print_banner():
     print("=" * 64)

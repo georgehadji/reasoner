@@ -244,9 +244,9 @@ async def main(args: argparse.Namespace) -> None:
 
         if preflight.action == "web_search":
             print("  [Gate] Web search selected.\n")
-            from reasoner.infrastructure.search.discovery import get_discovery_client
+            from reasoner.infrastructure.search.discovery import get_search_client
             try:
-                client, _ = await get_discovery_client(source_type="general")
+                client, _ = await get_search_client(source_type="general")
                 if settings.PRISM_RESEARCHER_ENABLED:
                     from reasoner.application.flows.prism_research import run_prism_standalone
                     print("  [Prism] Iterative research mode active.\n")

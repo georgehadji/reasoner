@@ -18,7 +18,6 @@ from reasoner.core.search import (
     _extract_search_keywords,
     _DECOMPOSITION_CACHE,
     _DECOMPOSITION_TTL_SECONDS,
-    DiscoveryClient,
 )
 
 
@@ -96,54 +95,6 @@ class TestShouldIncludeResult:
 
     def test_rejects_empty_url(self):
         assert _should_include_result({"title": "x", "url": "", "content": "y" * 30}) is False
-
-
-# ═════════════════════════════════════════════════════════════════════
-# DiscoveryClient.search fallback behavior
-# ═════════════════════════════════════════════════════════════════════
-
-class TestDiscoveryClientSearch:
-    @pytest.mark.asyncio
-    async def test_returns_empty_when_all_results_filtered(self, monkeypatch):
-        """
-        If every raw result fails _should_include_result, the client must
-        return [] instead of falling back to unfiltered raw results.
-        """
-        client = DiscoveryClient(base_url="http://localhost:8888")
-
-        # Mock the HTTP call to return results that will all be filtered out
-        class FakeResponse:
-            status_code = 200
-
-            def json(self):
-                return {
-                    "results": [
-                        {
-                            "title": "Top 10 Things",
-                            "url": "https://example.com/top-10",
-                            "content": "Some content here that is long enough to pass length checks.",
-                            "engine": "google",
-                        },
-                        {
-                            "title": "Data file",
-                            "url": "https://example.com/data.json",
-                            "content": "Some content here that is long enough to pass length checks.",
-                            "engine": "google",
-                        },
-                    ]
-                }
-
-            def raise_for_status(self):
-                pass
-
-        async def fake_get(*args, **kwargs):
-            return FakeResponse()
-
-        monkeypatch.setattr(client.client, "get", fake_get)
-
-        results = await client.search("anything", num_results=10)
-        # When all results are filtered, _fetch_page falls back to raw results
-        assert len(results) > 0
 
 
 # ═════════════════════════════════════════════════════════════════════

@@ -32,7 +32,6 @@ Be respectful, be constructive, assume good intent. Harassment of any kind is no
 - **Node.js 20+** (required for the `ui-next/` frontend)
 - **Git**
 - An **OpenRouter API key** (recommended — one key, 350+ models) *or* individual provider keys (OpenAI, Anthropic, Google, DeepSeek, Mistral, xAI, Perplexity, Ollama)
-- Optional: **Docker** (for the SearXNG search backend)
 
 ---
 
@@ -107,7 +106,6 @@ This launches:
 |--------------|---------------------------|---------------------------------------|
 | FastAPI API  | `http://localhost:8003`   | Configurable via `SERVER_PORT`        |
 | Next.js UI   | `http://localhost:3000`   | From `ui-next/`                       |
-| SearXNG      | `http://localhost:8888`   | Dockerized web search backend         |
 
 ### Run services individually
 

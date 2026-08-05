@@ -12,7 +12,6 @@ Internet
     |
 [Postgres :5432]  ← Database (persistent volume)
 [Redis :6379]     ← Cache / sessions (persistent volume)
-[SearXNG :8080]   ← Search engine (no external port)
 ```
 
 | Service | External Port | Internal Port | Purpose |
@@ -22,7 +21,6 @@ Internet
 | Frontend | — | 3000 | Next.js SSR |
 | Postgres | — | 5432 | PostgreSQL database |
 | Redis | — | 6379 | Redis cache |
-| SearXNG | — | 8080 | Web search (proxied via backend) |
 
 All inter-service communication uses **mTLS** (auto-generated internal certificates).
 
@@ -74,8 +72,8 @@ STRIPE_PRO_PRICE_ID=...
 STRIPE_ENTERPRISE_PRICE_ID=...
 
 # ── Search ──
-SEARXNG_URL=http://searxng:8080   # Internal Docker hostname
-SEARXNG_SECRET_KEY=               # Random secret
+BRAVE_SEARCH_API_KEY=             # Brave Search API key (web/image/video)
+TAVILY_API_KEY=                   # Optional secondary search backend
 
 # ── Optional: Monitoring ──
 SENTRY_DSN=...
@@ -222,7 +220,7 @@ Only these ports need to be open to the internet:
 | 80 | TCP | HTTP → auto-redirects to HTTPS |
 | 443 | TCP | HTTPS (Caddy) |
 
-**Do NOT expose**: 8000 (backend), 3000 (frontend), 5432 (postgres), 6379 (redis), 8888 (searxng).
+**Do NOT expose**: 8000 (backend), 3000 (frontend), 5432 (postgres), 6379 (redis).
 
 ---
 
@@ -246,10 +244,11 @@ Check `.env` has `POSTGRES_PASSWORD` set. The Docker Compose sets:
 DATABASE_URL=postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@postgres:5432/reasoner?sslmode=require
 ```
 
-### SearXNG not responding
-SearXNG takes ~30 seconds to start. Check:
+### Web search returns no results
+Search requires at least one backend key. Verify `BRAVE_SEARCH_API_KEY`,
+`TAVILY_API_KEY` or `OPENROUTER_API_KEY` (Perplexity Sonar) is set:
 ```bash
-docker compose logs searxng --tail 20
+docker compose exec backend env | grep -E 'BRAVE|TAVILY|OPENROUTER'
 ```
 
 ---

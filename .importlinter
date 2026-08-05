@@ -94,4 +94,4 @@ ignore_imports=
     reasoner.domain.pipeline_state -> reasoner.core.protocol
     # ── domain → application (deprecated lazy compat delegations) ──
     reasoner.domain.pipeline_state -> reasoner.application.services.pipeline_service
-    # core→infra imports eliminated via DI (set_build_provider, set_searxng_circuit_breaker)
+    # core→infra imports eliminated via DI (set_build_provider)

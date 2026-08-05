@@ -28,7 +28,7 @@ Hexagonal DDD + CQRS + Event Sourcing + Mixin Composition. `PipelineState` (~60 
 |-------|------------|
 | Runtime | Python 3.12+, FastAPI 0.109+, uvicorn, Pydantic v2, httpx |
 | LLM Routing | OpenRouter (primary, 350+ models); 12 direct adapters (Anthropic, OpenAI, Google, Perplexity, DeepSeek, Mistral, xAI, Qwen, Kimi, GLM, MiniMax, Ollama) |
-| Search | SearXNG (Docker), Perplexity Sonar |
+| Search | Perplexity Sonar, Brave Search API, Tavily |
 | Database | SQLite (event store), PostgreSQL (asyncpg), aiosqlite |
 | Memory | Neuro L1/L2/L3 tiered cache with embedding search |
 | Security | Auth, rate limiter, circuit breaker, sanitization, prompt-injection defense, CSRF |
@@ -105,10 +105,9 @@ scripts/
 ### Development
 
 ```bash
-python start_all.py                                          # backend + frontend + SearXNG
+python start_all.py                                          # backend + frontend
 uvicorn asgi:app --reload --host 0.0.0.0 --port 8003        # backend only
 cd ui-next && npm run dev                                    # frontend only
-docker-compose -f docker-compose.searxng.yml up -d          # SearXNG
 pip install -r requirements.txt                             # install deps
 ```
 
@@ -119,7 +118,6 @@ python -m pytest tests/ -v                                  # all tests
 python -m pytest tests/ -v -m "not slow and not integration"
 pytest tests/ --cov=src/reasoner --cov-report=html
 pytest -n auto                                              # parallel
-python -m pytest -m searxng                                 # requires live SearXNG
 ```
 
 ### CLI
@@ -235,7 +233,7 @@ Cross-lab diversity prevents echo chambers:
 
 ### Self-Healing CI/CD
 
-`.github/workflows/self-healing-ci.yml` — healing-profile → loop1-static → loop2-runtime → loop3-evolutionary → searxng-integration → healing-verification. Coverage gates: 60% fail, 80% warn.
+`.github/workflows/self-healing-ci.yml` — healing-profile → loop1-static → loop2-runtime → loop3-evolutionary → healing-verification. Coverage gates: 60% fail, 80% warn.
 
 ---
 

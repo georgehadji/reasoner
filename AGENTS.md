@@ -29,7 +29,7 @@ It is not a chatbot. It is a **reasoning orchestrator** that treats reasoning as
 | Data Validation | Pydantic v2 |
 | HTTP Client | httpx |
 | LLM Routing | OpenRouter (primary); direct adapters for Anthropic, OpenAI, Google, Perplexity, DeepSeek, Mistral, xAI, Qwen, Kimi, GLM, MiniMax, Ollama |
-| Search | SearXNG (self-hosted via Docker Compose), Perplexity Sonar |
+| Search | Perplexity Sonar, Brave Search API, Tavily |
 | Database | PostgreSQL (asyncpg), SQLite (aiosqlite), SQLAlchemy 2 async ORM, Alembic migrations |
 | Cache / Sessions | Redis (quota caching, rate limiting, session store) |
 | Auth | Supabase JWT + local JWT fallback, token-based scoped auth |
@@ -74,7 +74,7 @@ It is not a chatbot. It is a **reasoning orchestrator** that treats reasoning as
 Reasoner/
 |-- main.py                 # CLI entry-point shim -> reasoner.main
 |-- asgi.py                 # ASGI entry point: uvicorn asgi:app --reload --port 8003
-|-- start_all.py            # Orchestrator shim (starts backend + frontend + SearXNG)
+|-- start_all.py            # Orchestrator shim (starts backend + frontend)
 |-- start_all.bat           # Windows batch equivalent of start_all.py
 |-- api.py                  # Backward-compat API shim
 |-- pipeline.py             # Backward-compat pipeline shim
@@ -93,8 +93,7 @@ Reasoner/
 |-- pytest.ini              # Test configuration
 |-- alembic.ini             # Alembic migration configuration
 |-- .env / .env.example     # Environment variables (NEVER commit .env)
-|-- docker-compose.yml      # Full production stack (Caddy, backend, frontend, Postgres, Redis, SearXNG)
-|-- docker-compose.searxng.yml   # SearXNG-only container setup
+|-- docker-compose.yml      # Full production stack (Caddy, backend, frontend, Postgres, Redis)
 |-- Caddyfile               # Caddy reverse proxy configuration
 |-- Caddyfile.prod          # Production Caddyfile with auto HTTPS
 |-- nginx.conf              # Nginx reverse proxy configuration (alternative to Caddy)
@@ -433,7 +432,6 @@ uvicorn asgi:app --reload --port 8003
 python -m pytest -v
 python -m pytest -m "not slow"          # Skip slow tests
 python -m pytest --run-slow             # Include slow tests
-python -m pytest -m searxng             # SearXNG integration tests (requires live instance)
 
 # With coverage
 python -m pytest tests/ --cov=src/reasoner --cov-report=html
@@ -463,23 +461,17 @@ npm run test:e2e:ui  # Playwright E2E tests with UI
 
 ### Full Stack (Local)
 ```bash
-# One-command start (backend + frontend + SearXNG)
+# One-command start (backend + frontend)
 python start_all.py
 
 # Or individually:
 uvicorn asgi:app --reload --port 8003
-docker compose -f docker-compose.searxng.yml up -d
 cd ui-next && npm run dev
 
-# Full production stack (Caddy, backend, frontend, Postgres, Redis, SearXNG)
+# Full production stack (Caddy, backend, frontend, Postgres, Redis)
 docker compose up -d
 ```
 
-### SearXNG (Search)
-```bash
-docker compose -f docker-compose.searxng.yml up -d
-# Available at http://localhost:8888
-```
 
 ---
 
@@ -519,12 +511,10 @@ docker compose -f docker-compose.searxng.yml up -d
   - `slow` -- deselect with `-m "not slow"`; include with `--run-slow`
   - `integration` -- integration tests
   - `timeout` -- tests with timeout threshold (requires pytest-timeout)
-  - `searxng` -- tests requiring a live SearXNG instance
 - **Async config:** `asyncio_mode = auto` and `asyncio_default_fixture_loop_scope = session` in `pytest.ini`. All async fixtures share a single event loop for the entire test session because the project uses in-memory singletons (rate limiter, circuit breaker, auth store) that persist across tests.
 - **Fixtures:** Defined in `tests/conftest.py`:
   - `sample_pipeline_state`, `sample_llm_messages`, `sample_llm_config`, `mock_llm_response`
   - `sample_widget_params`, `sample_domain_events`
-  - `searxng_container` (session-scoped Docker compose fixture), `searxng_client`
   - `run_state_store`
   - `event_loop_policy` (Windows-compatible selector event loop)
   - `writable_temp_dirs` (session-scoped autouse)
@@ -600,8 +590,8 @@ Copy `.env.example` to `.env` and fill in:
 **Search & Documents**
 | Variable | Purpose |
 |----------|---------|
-| `SEARXNG_URL` | SearXNG instance URL (default: http://localhost:8888) |
-| `SEARXNG_SECRET_KEY` | SearXNG secret key (optional) |
+| `BRAVE_SEARCH_API_KEY` | Brave Search API key (web, image and video search) |
+| `TAVILY_API_KEY` | Tavily search API key (optional) |
 | `COHERE_RERANK_ENABLED` | Enable Cohere reranking via OpenRouter |
 | `COHERE_RERANK_MODEL` | Rerank model ID (default: cohere/rerank-4-fast) |
 | `DOCUMENT_SEMANTIC_RETRIEVAL_ENABLED` | Opt-in semantic chunking for uploaded files |
@@ -753,8 +743,7 @@ python main.py --list-models       # Show all model IDs grouped by ecosystem
   - `loop1-static-healing` -- introspection engine + test generation + coverage gating (60% fail, 80% warn)
   - `loop2-runtime-healing` -- circuit breaker + health checks + smoke tests
   - `loop3-evolutionary-healing` -- failure patterns, spec drift, optimization proposals
-  - `searxng-integration` -- SearXNG integration tests (starts SearXNG container, runs `-m searxng`)
-  - `healing-verification` -- artifact verification, healing summary generation
+    - `healing-verification` -- artifact verification, healing summary generation
 - **Artifacts:** introspection reports, generated tests, coverage reports, evolutionary reports, healing summaries (retention 7--90 days)
 
 ---
