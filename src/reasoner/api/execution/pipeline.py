@@ -637,8 +637,3 @@ class PipelineExecutionService:
                 await close_neuro_client()
             except Exception:
                 pass
-
-
-
-        
-            return state
