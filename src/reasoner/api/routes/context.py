@@ -87,7 +87,7 @@ async def run_with_context(
         # Validate URLs inside context items before injection
         from reasoner.security.url_validator import is_safe_url
         for item in req.context:
-            for key, value in item.items():
+            for _key, value in item.items():
                 if isinstance(value, str) and value.startswith(("http://", "https://")):
                     if not is_safe_url(value):
                         raise HTTPException(

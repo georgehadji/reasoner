@@ -90,7 +90,7 @@ async def delete_history_entry(
         raise
     except OSError as e:
         logger.error(f"Failed to delete history entry {entry_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to delete entry")
+        raise HTTPException(status_code=500, detail="Failed to delete entry") from e
 
 
 @router.delete("/api/history")

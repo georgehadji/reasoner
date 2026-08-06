@@ -25,6 +25,9 @@ from reasoner.core.events.domain_events import (
     CandidateScored,
     StressTestCompleted,
     EventType,
+    WidgetDetected,
+    WidgetExecuted,
+    WidgetFailed,
 )
 
 

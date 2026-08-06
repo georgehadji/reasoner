@@ -62,7 +62,7 @@ async def get_event_stats(user: User = Depends(get_current_user)):
         return stats
     except Exception as e:
         logger.error(f"Event stats error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise HTTPException(status_code=500, detail="Internal server error") from e
 
 
 @router.get("/api/pipelines")

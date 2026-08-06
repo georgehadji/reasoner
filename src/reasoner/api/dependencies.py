@@ -163,7 +163,7 @@ async def _resolve_auth_token(token: str) -> User:
                 display_name=api_key.name,
             )
         except LegacyAuthError as exc:
-            raise HTTPException(status_code=exc.status_code, detail=exc.message)
+            raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
 
     raise HTTPException(
         status_code=401,
@@ -197,7 +197,7 @@ async def get_current_user(
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=401, detail=f"Authentication failed: {exc}")
+        raise HTTPException(status_code=401, detail=f"Authentication failed: {exc}") from exc
 
 
 async def get_optional_user(

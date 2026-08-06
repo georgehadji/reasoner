@@ -705,7 +705,7 @@ async def run_pipeline(
                 status_code=503,
                 detail="Idempotency check failed due to temporary storage issue. Please try again.",
                 headers={"Retry-After": "5"},
-            )
+            ) from exc
     # TODO(#502): use actual user tier from subscription DB
     return StreamingResponse(
         _run_stream_with_metrics(req, request, user, preset_service, pipeline_service),
@@ -754,7 +754,7 @@ async def run_followup_pipeline(
                 status_code=503,
                 detail="Idempotency check failed due to temporary storage issue. Please try again.",
                 headers={"Retry-After": "5"},
-            )
+            ) from exc
     return StreamingResponse(
         run_followup_stream(req, request=request, user_id=str(user.id) if user else None),
         media_type="text/event-stream",
@@ -803,7 +803,7 @@ async def search_web(
         }
     except Exception as exc:
         logger.warning(f"Web search failed: {exc}")
-        raise HTTPException(status_code=503, detail=f"Search unavailable: {str(exc)}")
+        raise HTTPException(status_code=503, detail=f"Search unavailable: {str(exc)}") from exc
 
 
 @app.delete("/api/cache")

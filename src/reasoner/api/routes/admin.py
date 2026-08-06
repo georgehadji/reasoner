@@ -161,7 +161,7 @@ async def acr_leaderboard(
         }
     except Exception as exc:
         logger.exception("ACR leaderboard query failed for role '%s'", role)
-        raise HTTPException(status_code=500, detail=f"Leaderboard query failed: {exc}")
+        raise HTTPException(status_code=500, detail=f"Leaderboard query failed: {exc}") from exc
 
 
 @router.get("/acr/profile/{model_id}")
@@ -196,7 +196,7 @@ async def acr_profile(request: Request, model_id: str):
         }
     except Exception as exc:
         logger.exception("ACR profile query failed for model '%s'", model_id)
-        raise HTTPException(status_code=500, detail=f"Profile query failed: {exc}")
+        raise HTTPException(status_code=500, detail=f"Profile query failed: {exc}") from exc
 
 
 @router.post("/acr/mode")

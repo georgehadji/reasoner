@@ -130,7 +130,7 @@ async def require_api_key(
         api_key = await auth_manager.authenticate(credentials.credentials)
         return api_key
     except AuthenticationError as e:
-        raise _auth_failure("Invalid API key")
+        raise _auth_failure("Invalid API key") from e
 
 
 async def require_auth(
@@ -149,7 +149,7 @@ async def require_auth(
         return api_key
     except AuthenticationError as e:
         # Return generic error to prevent information leakage (timing attack defense)
-        raise _auth_failure("Authentication failed")
+        raise _auth_failure("Authentication failed") from e
 
 
 async def optional_auth(
@@ -196,7 +196,7 @@ async def require_csrf(request: Request):
         raise HTTPException(
             status_code=500,
             detail="CSRF protection misconfigured on server.",
-        )
+        ) from e
 
     if not valid:
         raise HTTPException(

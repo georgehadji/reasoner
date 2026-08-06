@@ -36,8 +36,8 @@ async def create_checkout(
     """
     try:
         tier_enum = SubscriptionTier(tier.lower())
-    except ValueError:
-        raise HTTPException(status_code=400, detail=f"Invalid tier: {tier}. Must be one of: free, pro, enterprise.")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid tier: {tier}. Must be one of: free, pro, enterprise.") from exc
 
     app_url = settings.APP_URL
     success_url = f"{app_url}/dashboard?checkout=success&provider={provider}"
@@ -56,9 +56,9 @@ async def create_checkout(
             cancel_url=cancel_url,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Checkout creation failed: {exc}")
+        raise HTTPException(status_code=500, detail=f"Checkout creation failed: {exc}") from exc
 
     return {"checkout_url": url, "provider": provider}
 

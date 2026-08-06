@@ -110,7 +110,7 @@ async def run_delphi_round2_phase(state: PipelineState, services: WorkflowServic
     ]
     results = await asyncio.gather(*tasks, return_exceptions=True)
     revised = []
-    for eid, result in zip(expert_ids, results):
+    for eid, result in zip(expert_ids, results, strict=True):
         if isinstance(result, Exception):
             state.errors.append(f"Delphi: {eid} Round 2 failed: {result}")
             continue

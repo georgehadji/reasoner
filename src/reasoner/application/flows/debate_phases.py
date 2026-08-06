@@ -42,7 +42,7 @@ async def run_debate_opening_phase(state: PipelineState, services: WorkflowServi
     
     results = await asyncio.gather(_get_opening("A", stance_a), _get_opening("B", stance_b), return_exceptions=True)
     statements = []
-    for side, r in zip(["A", "B"], results):
+    for side, r in zip(["A", "B"], results, strict=True):
         if isinstance(r, Exception):
             msg = f"Debate opening '{side}' failed: {r}"
             services.log("DEBATE", msg, state)
@@ -87,7 +87,7 @@ async def run_debate_rebuttal_phase(state: PipelineState, services: WorkflowServ
     
     results = await asyncio.gather(_get_rebuttal("A", statement_b), _get_rebuttal("B", statement_a), return_exceptions=True)
     rebuttals = []
-    for side, r in zip(["A", "B"], results):
+    for side, r in zip(["A", "B"], results, strict=True):
         if isinstance(r, Exception):
             msg = f"Debate rebuttal '{side}' failed: {r}"
             services.log("DEBATE", msg, state)

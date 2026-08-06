@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
-from typing import Callable, Protocol
+from typing import Any, Callable, Protocol
 
 from reasoner.domain.pipeline_state import PipelineState
 

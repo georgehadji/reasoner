@@ -32,4 +32,4 @@ async def get_scorecard(
         raise HTTPException(
             status_code=503,
             detail=f"Scorecard unavailable: {exc}",
-        )
+        ) from exc

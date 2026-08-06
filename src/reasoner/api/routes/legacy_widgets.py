@@ -25,7 +25,7 @@ async def get_weather(location: str = ""):
         return weather_data
     except Exception as e:
         logger.error(f"Weather error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise HTTPException(status_code=500, detail="Internal server error") from e
 
 
 @router.get("/api/stocks")
