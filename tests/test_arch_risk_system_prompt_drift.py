@@ -18,28 +18,31 @@ def test_analytical_system_prompt_consistency() -> None:
     assert len(ANALYTICAL_SYSTEM_PROMPT) > 20
 
 
-def test_creative_system_prompts_match() -> None:
-    """core/constants.py CREATIVE_SYSTEM_PROMPT matches streaming.py
-    _CREATIVE_SYSTEM_PROMPT. If these drift, one will be updated and the other
-    will carry stale text, causing different behavior between CLI and API paths."""
+def test_creative_system_prompt_has_single_definition() -> None:
+    """CREATIVE_SYSTEM_PROMPT must exist in exactly one place.
+
+    api/streaming.py used to keep a private _CREATIVE_SYSTEM_PROMPT copy, and this
+    test compared the two for drift. The duplicate was removed, so the check is now
+    that no second definition has reappeared — drift is impossible with one source.
+    """
+    import re
+    from pathlib import Path
+
     from reasoner.core.constants import CREATIVE_SYSTEM_PROMPT
-    from reasoner.api.streaming import _CREATIVE_SYSTEM_PROMPT
 
-    # Both must exist
     assert CREATIVE_SYSTEM_PROMPT
-    assert _CREATIVE_SYSTEM_PROMPT
+    assert "creative" in CREATIVE_SYSTEM_PROMPT.lower()
 
-    # Compare canonicalized: strip whitespace-only differences
-    core_normalized = " ".join(CREATIVE_SYSTEM_PROMPT.split())
-    streaming_normalized = " ".join(_CREATIVE_SYSTEM_PROMPT.split())
-
-    assert core_normalized == streaming_normalized, (
-        "CREATIVE_SYSTEM_PROMPT in core/constants.py drift from _CREATIVE_SYSTEM_PROMPT "
-        "in api/streaming.py. Update BOTH when changing creative prompts.\n\n"
-        f"core/constants.py (first 80 chars): {core_normalized[:80]}\n"
-        f"api/streaming.py (first 80 chars): {streaming_normalized[:80]}"
+    src_root = Path(__file__).resolve().parents[1] / "src" / "reasoner"
+    definitions = [
+        path
+        for path in src_root.rglob("*.py")
+        if re.search(r"^_?CREATIVE_SYSTEM_PROMPT\s*[:=]", path.read_text(encoding="utf-8"), re.M)
+    ]
+    assert len(definitions) == 1, (
+        "CREATIVE_SYSTEM_PROMPT must be defined once; found: "
+        f"{[str(p) for p in definitions]}"
     )
-
 
 def test_gate_system_prompt_exists() -> None:
     """GATE_SYSTEM_PROMPT is defined and has expected categories."""

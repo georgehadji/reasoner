@@ -11,7 +11,8 @@ from reasoner.core.settings import Settings
 class TestDBPoolSize:
     def test_default_pool_size(self) -> None:
         settings = Settings()
-        assert settings.DB_POOL_SIZE == 10
+        # Raised from 10 to 50 for multi-worker deployments.
+        assert settings.DB_POOL_SIZE == 50
 
     def test_pool_size_is_int(self) -> None:
         settings = Settings()
