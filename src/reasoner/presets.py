@@ -7,7 +7,10 @@ preset data moved to reasoner.domain.preset_registry.
 from reasoner.domain.preset_core import (
     _KNOWN_ROUTING_ROLES,
     PipelinePreset,
-    get_method_from_preset,
+    # NOTE: preset_core.get_method_from_preset is the legacy name-pattern matcher and
+    # is deliberately NOT imported here — it ignores a preset's explicit `method`
+    # field, so it maps coding/image-gen/subagent presets to "multi-perspective".
+    # The registry-aware definition below is the one every caller must use.
     get_preset_tier,
     get_preset_price_tier,
     build_auto_preset,

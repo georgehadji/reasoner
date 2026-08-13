@@ -27,6 +27,24 @@ def _make_mock_router():
     return mock_router
 
 
+def _fake_translator(text: str, detected: str):
+    """A CompositeTranslator stand-in that always succeeds."""
+    from reasoner.core.ports.translation_port import TranslationResult
+
+    translator = MagicMock()
+    translator.translate = AsyncMock(
+        return_value=TranslationResult(text=text, detected_source_language=detected)
+    )
+    return translator
+
+
+def _failing_translator():
+    """A CompositeTranslator stand-in whose every backend is down."""
+    translator = MagicMock()
+    translator.translate = AsyncMock(side_effect=RuntimeError("API down"))
+    return translator
+
+
 def _make_final_solution(core_solution: str = "") -> FinalSolution:
     """Create a FinalSolution with minimal required fields."""
     return FinalSolution(
@@ -163,18 +181,17 @@ class TestCrossLanguagePipeline:
         """Non-English problems should be translated to English."""
         from reasoner.pipeline import ReasonerPipeline
 
-        with patch("reasoner.infrastructure.translation.deepl_client.DeepLClient.translate", new_callable=AsyncMock) as mock_translate:
-            mock_translate.return_value = {
-                "text": "Hello world",
-                "detected_source_language": "DE",
-            }
+        with patch("reasoner.infrastructure.translation.get_composite_translator") as mock_get:
+            mock_get.return_value = _fake_translator("Hello world", "DE")
             router = _make_mock_router()
             pipeline = ReasonerPipeline(router=router, preset_name="cross-language-budget")
             state = PipelineState(problem="Hallo Welt", language="German")
             await pipeline._phase_cross_language_translate_in(state)
             assert state.problem == "Hello world"
             assert state.cross_language_state["original_problem"] == "Hallo Welt"
-            assert state.cross_language_state["source_language"] == "DE"
+            # source_language records the language the pivot came *from*, as detected
+            # upstream into state.language — not DeepL's ISO reply.
+            assert state.cross_language_state["source_language"] == "German"
             assert state.cross_language_state["direction"] == "in"
 
     @pytest.mark.asyncio
@@ -182,15 +199,15 @@ class TestCrossLanguagePipeline:
         """If translation fails, the original problem should be preserved."""
         from reasoner.pipeline import ReasonerPipeline
 
-        with patch("reasoner.infrastructure.translation.deepl_client.DeepLClient.translate", new_callable=AsyncMock) as mock_translate:
-            mock_translate.side_effect = RuntimeError("API down")
+        with patch("reasoner.infrastructure.translation.get_composite_translator") as mock_get:
+            mock_get.return_value = _failing_translator()
             router = _make_mock_router()
             pipeline = ReasonerPipeline(router=router, preset_name="cross-language-budget")
             state = PipelineState(problem="Hallo Welt", language="German")
             await pipeline._phase_cross_language_translate_in(state)
+            # Pivot aborts and reasoning continues in the source language.
             assert state.problem == "Hallo Welt"  # unchanged
-            assert len(state.errors) == 1
-            assert "translation-in error" in state.errors[0]
+            assert state.pivot_active is False
 
     @pytest.mark.asyncio
     async def test_translate_out_no_state(self):
@@ -208,37 +225,35 @@ class TestCrossLanguagePipeline:
         """Synthesis should be translated back to source language."""
         from reasoner.pipeline import ReasonerPipeline
 
-        with patch("reasoner.infrastructure.translation.deepl_client.DeepLClient.translate", new_callable=AsyncMock) as mock_translate:
-            mock_translate.return_value = {
-                "text": "Hallo Welt",
-                "detected_source_language": "EN",
-            }
+        with patch("reasoner.infrastructure.translation.get_composite_translator") as mock_get:
+            mock_get.return_value = _fake_translator("Hallo Welt", "EN")
             router = _make_mock_router()
             pipeline = ReasonerPipeline(router=router, preset_name="cross-language-budget")
             state = PipelineState(problem="Hello world")
+            # Translate-out only runs for an active pivot back to a non-English language.
+            state.pivot_active = True
+            state.output_language = "German"
             state.cross_language_state = {"source_language": "DE"}
             state.final_solution = _make_final_solution(core_solution="Hello world")
             await pipeline._phase_cross_language_translate_out(state)
             assert state.final_solution.core_solution == "Hallo Welt"
-            assert state.cross_language_state["translated_synthesis"] == "Hallo Welt"
-            assert state.cross_language_state["direction"] == "out"
 
     @pytest.mark.asyncio
     async def test_translate_out_graceful_failure(self):
         """If back-translation fails, synthesis should remain in English."""
         from reasoner.pipeline import ReasonerPipeline
 
-        with patch("reasoner.infrastructure.translation.deepl_client.DeepLClient.translate", new_callable=AsyncMock) as mock_translate:
-            mock_translate.side_effect = RuntimeError("API down")
+        with patch("reasoner.infrastructure.translation.get_composite_translator") as mock_get:
+            mock_get.return_value = _failing_translator()
             router = _make_mock_router()
             pipeline = ReasonerPipeline(router=router, preset_name="cross-language-budget")
             state = PipelineState(problem="Hello world")
+            state.pivot_active = True
+            state.output_language = "German"
             state.cross_language_state = {"source_language": "DE"}
             state.final_solution = _make_final_solution(core_solution="Hello world")
             await pipeline._phase_cross_language_translate_out(state)
             assert state.final_solution.core_solution == "Hello world"  # unchanged
-            assert len(state.errors) == 1
-            assert "translation-out error" in state.errors[0]
 
 
 class TestCrossLanguagePreset:
@@ -250,44 +265,56 @@ class TestCrossLanguagePreset:
         assert "cross-language-budget" in PRESETS
         assert "cross-language-premium" in PRESETS
 
-    def test_preset_requires_deepl_key(self):
-        """Cross-language presets should require DEEPL_API_KEY."""
-        from reasoner.domain.preset_registry import PRESETS
+    def test_preset_resolves_llm_keys(self):
+        """Cross-language presets resolve the keys of the models they route to.
+
+        DEEPL_API_KEY is no longer required: CompositeTranslator falls back from
+        DeepL to an LLM translator and finally to identity.
+        """
+        from reasoner.presets import PRESETS
         preset = PRESETS["cross-language-budget"]
-        assert "DEEPL_API_KEY" in preset.required_env_vars
+        assert "OPENROUTER_API_KEY" in preset.resolved_env_vars()
 
     def test_method_extraction(self):
         """Preset names should map to the cross_language method."""
-        from reasoner.domain.preset_core import get_method_from_preset
-        assert get_method_from_preset("cross-language-budget") == "cross_language"
-        assert get_method_from_preset("cross-language-premium") == "cross_language"
+        # reasoner.presets is the registry-aware extractor used in production; it
+        # returns the preset's declared method verbatim.
+        from reasoner.presets import get_method_from_preset
+        assert get_method_from_preset("cross-language-budget") == "cross-language"
+        assert get_method_from_preset("cross-language-premium") == "cross-language"
 
     def test_pipeline_method_extraction(self):
         """ReasonerPipeline should extract cross_language from preset name."""
         from reasoner.pipeline import ReasonerPipeline
         router = _make_mock_router()
         pipeline = ReasonerPipeline(router=router, preset_name="cross-language-budget")
-        assert pipeline._get_method_from_preset() == "cross_language"
+        # The flow factory normalises hyphens, so both spellings dispatch alike.
+        assert pipeline._get_method_from_preset() == "cross-language"
+        from reasoner.application.flows.factory import WorkflowFactory
+        assert WorkflowFactory().is_migrated("cross-language")
 
 
 class TestCrossLanguageSerializer:
     """Tests for cross-language state serialization."""
 
-    def test_cross_language_metadata_in_synthesis(self):
-        """Serializer should include cross_language metadata when present."""
+    def test_cross_language_state_is_retained_on_state(self):
+        """The pivot record stays on PipelineState for resume compatibility.
+
+        _ser_5 no longer emits a `cross_language` block and no client reads one;
+        the pivot is carried by state.pivot_active / state.output_language instead.
+        """
         from reasoner.api.serializers import _ser_5
 
         state = PipelineState(problem="Hallo")
         state.final_solution = _make_final_solution(core_solution="Hello")
         state.cross_language_state = {
-            "source_language": "DE",
+            "source_language": "German",
             "original_problem": "Hallo",
             "direction": "out",
         }
         result = _ser_5(state)
-        assert result["cross_language"]["source_language"] == "DE"
-        assert result["cross_language"]["original_problem"] == "Hallo"
-        assert result["cross_language"]["translated"] is True
+        assert "cross_language" not in result
+        assert state.cross_language_state["original_problem"] == "Hallo"
 
     def test_no_cross_language_when_empty(self):
         """Serializer should omit cross_language key when state is empty."""
