@@ -920,7 +920,15 @@ def get_preset(preset_id: str) -> PipelinePreset:
         raise ValueError(f"Unknown preset '{preset_id}'")
     # Return a copy to prevent mutation of the registry
     config = _REGISTRY[preset_id]
-    return PipelinePreset(**config, id=preset_id)
+    preset = PipelinePreset(**config, id=preset_id)
+    if "required_tier" not in config:
+        # Keep the dataclass field in agreement with get_preset_tier(), which
+        # derives the tier from the id suffix. Left unset, every premium preset
+        # reported required_tier=FREE while get_preset_tier() said PRO.
+        from reasoner.domain.preset_core import get_preset_tier
+
+        preset.required_tier = get_preset_tier(preset_id)
+    return preset
 
 # Cached after first load — presets are immutable at runtime (v3.4)
 _preset_cache: list[PipelinePreset] | None = None

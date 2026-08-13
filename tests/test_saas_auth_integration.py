@@ -16,6 +16,16 @@ from fastapi.testclient import TestClient
 
 # Ensure legacy API keys are enabled for compat tests
 os.environ.setdefault("ENABLE_LEGACY_API_KEY", "true")
+
+
+@pytest.fixture(autouse=True)
+def _enable_legacy_api_key(monkeypatch):
+    """settings is built at first import, so the env var above only takes effect
+    when this module happens to be imported first. Patch the attribute the request
+    path reads so anonymous access is allowed regardless of test ordering."""
+    from reasoner.core.settings import settings
+
+    monkeypatch.setattr(settings, "ENABLE_LEGACY_API_KEY", True)
 os.environ.setdefault("ENVIRONMENT", "testing")
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-do-not-use-in-production")
 
