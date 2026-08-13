@@ -14,6 +14,9 @@ MODEL_GEMINI_31_FLASH_LITE_IMAGE: str = "gemini-3.1-flash-lite-image"
 MODEL_GPT5_IMAGE: str = "gpt-5-image"
 MODEL_GPT5_IMAGE_MINI: str = "gpt-5-image-mini"
 MODEL_GPT54_IMAGE_2: str = "gpt-5.4-image-2"
+# Qwen (Alibaba)
+MODEL_QWEN_IMAGE_3: str = "qwen-image-3"
+MODEL_QWEN_IMAGE_3_PRO: str = "qwen-image-3-pro"
 MODEL_FLUX_2_PRO: str = "flux.2-pro"
 MODEL_FLUX_2_FLEX: str = "flux.2-flex"
 # Recraft (vector illustration, icons, design)

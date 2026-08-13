@@ -21,6 +21,7 @@ from reasoner.infrastructure.llm.image_generation import (
     ImageGenerationError,
 )
 from reasoner.domain.preset_registry import PRESETS
+from reasoner.core.constants_limits import IMAGE_GEN_PRESETS, IMAGE_GEN_FALLBACKS
 
 
 class TestResolveModelConfig:
@@ -415,7 +416,7 @@ class TestGenerateImages:
             def _side_effect(prompt, alias, *args, **kwargs):
                 nonlocal call_count
                 call_count += 1
-                if alias == "seedream-4.5":
+                if alias == "qwen-image-3":
                     raise ImageGenerationError("Secondary failed")
                 return {"success": True, "image_data": f"data:image/png;base64,ok{call_count}", "model_used": alias}
             mock_gen.side_effect = _side_effect
@@ -423,8 +424,8 @@ class TestGenerateImages:
 
         assert result["success"] is True
         assert len(result["images"]) == 3
-        # primary ordering: riverflow-v2-fast-preview, riverflow-v2-standard-preview
-        assert result["images"][0]["model_used"] == "riverflow-v2-fast-preview"
+        # primary ordering: gemini-flash-image, qwen-image-3
+        assert result["images"][0]["model_used"] == "gemini-flash-image"
         assert mock_gen.call_count == 4
 
     @pytest.mark.asyncio
@@ -446,7 +447,7 @@ class TestGenerateImages:
             new_callable=AsyncMock,
         ) as mock_gen:
             def _side_effect(prompt, alias, *args, **kwargs):
-                if alias == "flux.2-pro":
+                if alias == "gemini-3.1-flash-lite-image":  # first budget fallback
                     return {"success": True, "image_data": "data:image/png;base64,fallback", "model_used": alias}
                 raise ImageGenerationError(f"{alias} failed")
             mock_gen.side_effect = _side_effect
@@ -463,7 +464,7 @@ class TestGenerateImages:
             new_callable=AsyncMock,
         ) as mock_gen:
             def _side_effect(prompt, alias, *args, **kwargs):
-                if alias == "riverflow-v2-fast-preview":
+                if alias == "gemini-flash-image":
                     return {"success": True, "image_data": "data:image/png;base64,ok", "model_used": alias}
                 raise ImageGenerationError(f"{alias} failed")
             mock_gen.side_effect = _side_effect
@@ -581,10 +582,30 @@ class TestGenerateImages:
 class TestImageGenPresets:
     def test_budget_preset_exists(self):
         assert "image-gen-budget" in PRESETS
-        p = PRESETS["image-gen-budget"]
-        assert p.primary_id == "riverflow-v2-fast-preview"
+        assert IMAGE_GEN_PRESETS["image-gen-budget"][0] == "gemini-flash-image"
 
     def test_premium_preset_exists(self):
         assert "image-gen-premium" in PRESETS
-        p = PRESETS["image-gen-premium"]
-        assert p.primary_id == "gemini-pro-image"
+        assert IMAGE_GEN_PRESETS["image-gen-premium"][0] == "gpt-5.4-image-2"
+
+    def test_all_configured_image_models_exist_in_registry(self):
+        """Every image-gen alias must be buildable.
+
+        Regression: IMAGE_GEN_PRESETS/IMAGE_GEN_FALLBACKS kept referencing Flux,
+        Riverflow, Seedream, Recraft, MAI-Image and Grok-Imagine after those
+        providers were dropped from the registry, leaving the budget tier with one
+        working primary and zero working fallbacks.
+        """
+        from reasoner.infrastructure.llm.registry import _REGISTRY
+
+        missing = [
+            (name, tier, alias)
+            for name, table in (
+                ("IMAGE_GEN_PRESETS", IMAGE_GEN_PRESETS),
+                ("IMAGE_GEN_FALLBACKS", IMAGE_GEN_FALLBACKS),
+            )
+            for tier, aliases in table.items()
+            for alias in aliases
+            if alias not in _REGISTRY
+        ]
+        assert not missing, f"Image-gen aliases missing from registry: {missing}"
