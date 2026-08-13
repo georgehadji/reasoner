@@ -153,7 +153,11 @@ async def test_deep_read_legacy_mode_without_llm(pipeline):
 
     with patch("reasoner.scraper.scrape_urls", new_callable=AsyncMock) as mock_scrape:
         mock_scrape.return_value = scraped
-        with patch.dict(os.environ, {"REASONER_DEEP_READ_LLM": "0"}):
+        # The flag is read from settings, which is built at import; patching the
+        # environment alone has no effect.
+        from reasoner.core.settings import settings
+
+        with patch.object(settings, "REASONER_DEEP_READ_LLM", False):
             await pipeline._phase_deep_read(state)
 
     result = state.vetted_context[0]

@@ -464,10 +464,17 @@ async def run_deep_read_phase(state: PipelineState, services: WorkflowServices, 
                     matching_result["summary"] = fallback.get("summary", "").strip()
                     matching_result["key_facts"] = safe_list(fallback.get("key_facts"))
                     matching_result["relevant_quotes"] = safe_list(fallback.get("relevant_quotes"))
+                    # Shallow read works from the search snippet, not the page, so
+                    # this is not a successful extraction. Every other branch sets
+                    # the key; leaving it unset here made the field absent rather
+                    # than False for exactly the sources that were least reliable.
+                    matching_result["extraction_success"] = False
                 except Exception:
                     matching_result["summary"] = f"(Scrape failed: {scraped.get('error')})"
+                    matching_result["extraction_success"] = False
             else:
                 matching_result["summary"] = f"(Scrape failed: {scraped.get('error')})"
+                matching_result["extraction_success"] = False
 
     try:
         scraped_results = await scrape_urls(sources_to_scrape)
