@@ -80,7 +80,11 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # gemini-pro -> claude-sonnet (premium primary, not Google — changed v3.4)
     # gemini-flash-lite -> qwen3.5-flash (budget primary, not Google — changed v3.4)
     MODEL_GEMINI_PRO:   {"model": "anthropic/claude-sonnet-5"},     # premium primary (Anthropic, not Google)
-    MODEL_GEMINI_FLASH: {"model": "google/gemini-3.5-flash"},       # budget primary — $1.50/$9 per M, AI^2 Intel 50.2, 1M ctx
+    # NOTE: MODEL_GEMINI_FLASH is "grok-4.3" (swapped to xAI for the budget tier in
+    # v3.6), so it is defined by the literal "grok-4.3" entry in the xAI section below.
+    # Do not re-add a MODEL_GEMINI_FLASH key here — it collides with that entry, and
+    # whichever is declared last silently wins.
+    "gemini-3.5-flash": {"model": "google/gemini-3.5-flash"},       # $1.50/$9 per M, AI^2 Intel 50.2, 1M ctx
     "gemini-flash-lite": {"model": "qwen/qwen3.5-flash-02-23"},     # budget primary — $0.065/$0.26, fast & reliable
     # ── Real Google models (not aliased to other labs) ──
     "gemini-pro-real":         {"model": "google/gemini-3.1-pro-preview"},     # true Google Pro — $2/$12 per M, 1M ctx
@@ -354,6 +358,18 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "ollama-phi3":      {"cls": "compat", "model": "phi3",      "base": f"{DEFAULT_OLLAMA_URL}/v1", "env": "OLLAMA_API_KEY", "is_local": True},
 }
 
+# Guard against a key being declared twice in the literal above. Some keys are
+# module constants (e.g. MODEL_GEMINI_FLASH == "grok-4.3") whose value can collide
+# with a literal key elsewhere in the dict; Python keeps only the last one, so the
+# earlier entry disappears silently and its model becomes unreachable.
+_ALIAS_CONSTANTS = {
+    "MODEL_GEMINI_PRO": MODEL_GEMINI_PRO,
+    "MODEL_GEMINI_FLASH": MODEL_GEMINI_FLASH,
+}
+for _name, _alias in _ALIAS_CONSTANTS.items():
+    if _MODEL_WHITELIST.get(_alias, {}).get("model") is None:
+        raise RuntimeError(f"{_name} ('{_alias}') is not present in _MODEL_WHITELIST")
+
 # Build _REGISTRY from whitelist so every non-local model routes through OpenRouter.
 _REGISTRY: dict[str, dict[str, Any]] = {}
 for _mid, _cfg in _MODEL_WHITELIST.items():
@@ -362,6 +378,28 @@ for _mid, _cfg in _MODEL_WHITELIST.items():
         _entry.setdefault("cls", "openrouter")
         _entry.setdefault("env", "OPENROUTER_API_KEY")
     _REGISTRY[_mid] = _entry
+
+
+def is_model_available(model_id: str) -> bool:
+    """Whether build_provider(model_id) can succeed with the current environment.
+
+    Callers that pre-filter routing tables must use this rather than checking
+    ``_REGISTRY[model_id]["env"]`` directly: some entries declare a direct-API env
+    var but are still serviceable over OpenRouter, so an env-only check downgrades
+    models that would in fact have worked.
+    """
+    cfg = _REGISTRY.get(model_id)
+    if cfg is None:
+        return False
+    if cfg.get("is_local"):
+        return True
+    if os.environ.get(cfg.get("env", "")):
+        return True
+    is_deepseek = model_id.startswith("deepseek-") or _vendor_of(model_id) == "deepseek"
+    is_xai = model_id.startswith("grok-") or _vendor_of(model_id) == "x-ai"
+    if (is_deepseek or is_xai) and os.environ.get("OPENROUTER_API_KEY"):
+        return True
+    return False
 
 
 def build_provider(model_id: str, api_key: str | None = None) -> "BaseLLMProvider":
@@ -400,6 +438,19 @@ Available models:
             
     if not key:
         key = os.environ.get(cfg["env"], "")
+
+    # DeepSeek entries are direct-API ("compat") but their model paths are already
+    # OpenRouter-shaped ("deepseek/..."), so serve them over OpenRouter when only
+    # OPENROUTER_API_KEY is configured. Without this, every preset routing to a
+    # DeepSeek model fails on a deployment following the documented single-key setup.
+    if is_deepseek and not key and not using_deepseek_direct:
+        or_key = os.environ.get("OPENROUTER_API_KEY", "")
+        if or_key:
+            return OpenRouterProvider(
+                model=cfg["model"].lstrip("~"),
+                api_key=or_key,
+                extra_body=cfg.get("extra_body"),
+            )
 
     if not key and not cfg.get("is_local"):
         raise ValueError(

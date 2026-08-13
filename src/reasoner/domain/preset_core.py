@@ -281,9 +281,30 @@ class PipelinePreset:
                 f"Valid roles: {sorted(_KNOWN_ROUTING_ROLES)}"
             )
 
+    def resolved_env_vars(self) -> list[str]:
+        """Env vars this preset actually needs to run.
+
+        Prefers the explicit ``required_env_vars`` list, falling back to the env
+        vars of every model the preset routes to. Without the fallback the list is
+        empty for presets that never declared one, and ``check_keys()`` reports
+        "all set" no matter which credentials are missing.
+        """
+        if self.required_env_vars:
+            return list(self.required_env_vars)
+
+        from reasoner.infrastructure.llm.registry import _REGISTRY
+
+        model_ids = {self.primary_id, *self.routing.values(), *self.fallback_routing.values()}
+        env_vars = {
+            _REGISTRY[mid]["env"]
+            for mid in model_ids
+            if mid and mid in _REGISTRY and _REGISTRY[mid].get("env")
+        }
+        return sorted(env_vars)
+
     def check_keys(self) -> dict[str, bool]:
         """Return {env_var: is_set} for all required API keys."""
-        return {k: bool(os.environ.get(k)) for k in self.required_env_vars}
+        return {k: bool(os.environ.get(k)) for k in self.resolved_env_vars()}
 
     def missing_keys(self) -> list[str]:
         return [k for k, present in self.check_keys().items() if not present]

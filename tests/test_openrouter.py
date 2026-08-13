@@ -83,12 +83,12 @@ class TestOpenRouterRegistry:
             "claude-opus",
             "claude-sonnet",
             "gpt-5",
-            "gemini-flash",
+            "gemini-flash-latest",
             "deepseek-v3",
             "qwen3-max",
             "kimi-k2-5",
-            "glm-5",
-            "grok-4",
+            "glm-5.2",
+            "grok-4.3",
             "sonar-pro",
         ]
         for model_id in expected_models:
@@ -108,9 +108,9 @@ class TestOpenRouterProvider:
     )
     def test_build_or_provider_success(self):
         """Should build provider successfully with valid key."""
-        provider = build_provider("deepseek-v3")
+        provider = build_provider("qwen3-max")
         assert isinstance(provider, OpenRouterProvider)
-        assert provider.model == "deepseek/deepseek-v3.2"
+        assert provider.model == "qwen/qwen3.7-plus"
 
     def test_build_or_provider_fails_without_key(self):
         """Should raise ValueError when OPENROUTER_API_KEY not set."""
@@ -123,7 +123,7 @@ class TestOpenRouterProvider:
         
         try:
             with pytest.raises(ValueError, match="OPENROUTER_API_KEY"):
-                build_provider("deepseek-v3")
+                build_provider("qwen3-max")
         finally:
             # Restore original key
             if original_key:
@@ -135,7 +135,7 @@ class TestOpenRouterProvider:
     )
     def test_multiple_or_providers_build(self):
         """Should be able to build multiple different OR providers."""
-        models_to_test = ["claude-sonnet", "gpt-5", "glm-5"]
+        models_to_test = ["claude-sonnet", "gpt-5", "glm-5.2"]
         
         for model_id in models_to_test:
             provider = build_provider(model_id)
@@ -154,8 +154,11 @@ class TestOpenRouterPresets:
         """All presets should require at least one valid API key."""
         valid_keys = {"OPENROUTER_API_KEY", "NVIDIA_API_KEY", "OLLAMA_API_KEY"}
         for preset_name, preset in PRESETS.items():
-            assert any(k in valid_keys for k in preset.required_env_vars), (
-                f"{preset_name} has no recognized API key in required_env_vars: {preset.required_env_vars}"
+            # required_env_vars is optional per-preset; resolved_env_vars() derives the
+            # real set from the models the preset routes to.
+            env_vars = preset.resolved_env_vars()
+            assert any(k in valid_keys for k in env_vars), (
+                f"{preset_name} has no recognized API key in resolved_env_vars: {env_vars}"
             )
 
     def test_method_presets_exist(self):
@@ -182,8 +185,10 @@ class TestOpenRouterPresets:
     )
     def test_research_budget_can_build_router(self):
         """Research budget preset should build router successfully."""
-        preset = PRESETS["research-budget"]
-        router = preset.build_router()
+        from reasoner.application.services.preset_service import PresetService
+
+        # Router construction moved from PipelinePreset to PresetService.
+        _, router = PresetService().build_router("research-budget")
         assert router is not None
 
 
@@ -236,13 +241,13 @@ class TestProviderRouter:
         router = ProviderRouter.from_model_ids(
             primary_id="claude-sonnet",
             routing={
-                "classification": "gemini-flash",
+                "classification": "gemini-flash-latest",
                 "constructive": "deepseek-v3",
-                "synthesis": "glm-5",
+                "synthesis": "glm-5.2",
             }
         )
         assert router is not None
-        assert "claude-sonnet-4.6" in router.primary.model or "anthropic/claude-sonnet-4.6" in router.primary.model
+        assert "claude-sonnet-5" in router.primary.model
 
     @pytest.mark.skipif(
         not os.environ.get("OPENROUTER_API_KEY"),
@@ -257,8 +262,8 @@ class TestProviderRouter:
             }
         )
         desc = router.describe()
-        assert "deepseek/deepseek-v3.2" in desc["[primary]"]
-        assert "qwen/qwen3.6-plus" in desc["scoring"]
+        assert "deepseek/deepseek-v4-flash" in desc["[primary]"]
+        assert "qwen/qwen3.7-plus" in desc["scoring"]
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -271,8 +276,8 @@ class TestBackwardCompatibility:
     def test_direct_api_models_still_exist(self):
         """Direct API models should still be in registry."""
         direct_models = [
-            "claude-opus", "gpt-5", "gemini-flash",
-            "deepseek-v3", "qwen3-max", "glm-5",
+            "claude-opus", "gpt-5", "gemini-flash-latest",
+            "deepseek-v3", "qwen3-max", "glm-5.2",
         ]
         for model_id in direct_models:
             assert model_id in _REGISTRY, (

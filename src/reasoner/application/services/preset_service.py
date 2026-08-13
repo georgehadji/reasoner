@@ -7,7 +7,7 @@ import os
 from typing import Any
 
 from reasoner.infrastructure.llm.router import ProviderRouter
-from reasoner.infrastructure.llm.registry import _REGISTRY
+from reasoner.infrastructure.llm.registry import _REGISTRY, is_model_available
 from reasoner.presets import build_auto_preset, build_custom_router, get_preset
 
 logger = logging.getLogger(__name__)
@@ -32,7 +32,7 @@ class PresetService:
         for role, model_id in routing.items():
             entry = _REGISTRY.get(model_id, {})
             env = entry.get("env")
-            if env and not os.environ.get(env):
+            if entry and not is_model_available(model_id):
                 filtered[role] = primary_id
                 downgraded.append(f"{role}: {model_id} -> {primary_id} (missing {env})")
             else:
