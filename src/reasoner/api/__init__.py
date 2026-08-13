@@ -174,9 +174,11 @@ async def lifespan(app: FastAPI):
     # Inverts the dependency: core defines ports, infra provides impls.
     try:
         from reasoner.core.search import set_build_provider
-        from reasoner.infrastructure.llm.registry import build_provider
+        from reasoner.infrastructure.llm.registry import build_provider, RegistryAdapter
+        from reasoner.core.ports.model_registry_port import set_model_registry_port
         set_build_provider(build_provider)
-        logger.info("Core→infra dependencies injected: build_provider")
+        set_model_registry_port(RegistryAdapter())
+        logger.info("Core→infra dependencies injected: build_provider, model_registry_port")
     except Exception as exc:
         logger.warning("Failed to inject core→infra deps: %s", exc)
 

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 from dataclasses import asdict
 from typing import Any
@@ -56,8 +55,8 @@ def _create_generation_candidate(data: dict[str, Any] | str | list[Any], generat
         # If it's a string that contains JSON, try parsing it
         if isinstance(data, str):
             try:
-                data = json.loads(data)
-            except json.JSONDecodeError:
+                data = extract_json(data)
+            except Exception:
                 data = {}
         else:
             data = {}

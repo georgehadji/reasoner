@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from types import MappingProxyType
 from typing import Any
 
 from reasoner.core.constants import (
@@ -353,13 +354,18 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
 }
 
 # Build _REGISTRY from whitelist so every non-local model routes through OpenRouter.
-_REGISTRY: dict[str, dict[str, Any]] = {}
+_REGISTRY_MUTABLE: dict[str, dict[str, Any]] = {}
 for _mid, _cfg in _MODEL_WHITELIST.items():
     _entry: dict[str, Any] = dict(_cfg)
     if not _entry.get("is_local"):
         _entry.setdefault("cls", "openrouter")
         _entry.setdefault("env", "OPENROUTER_API_KEY")
-    _REGISTRY[_mid] = _entry
+    _REGISTRY_MUTABLE[_mid] = _entry
+
+# Frozen after init — built once at import time, read from ~15+ call sites
+# concurrently (see ARCH-AUDIT-V2 Phase 3 fan-in finding). MappingProxyType
+# makes accidental post-init mutation a TypeError instead of a silent data race.
+_REGISTRY: MappingProxyType[str, dict[str, Any]] = MappingProxyType(_REGISTRY_MUTABLE)
 
 
 def build_provider(model_id: str, api_key: str | None = None) -> "BaseLLMProvider":
@@ -518,3 +524,24 @@ def resolved_model_of(model_id: str) -> str:
     """
     cfg = _REGISTRY.get(model_id) or _MODEL_WHITELIST.get(model_id) or {}
     return str(cfg.get("model", model_id)).lstrip("~")
+
+
+class RegistryAdapter:
+    """Infrastructure adapter implementing :class:`ModelRegistryPort`.
+
+    Pure interface extraction — same behavior as calling ``build_provider`` /
+    ``_REGISTRY`` directly, but presented behind the port so application and
+    domain layers never import this module.
+    """
+
+    def get_provider(self, model_id: str, api_key: str | None = None):
+        """Build a provider instance from a model ID (allowlist-enforced)."""
+        return build_provider(model_id, api_key=api_key)
+
+    def contains(self, model_id: str) -> bool:
+        """Return True if *model_id* is a known registry entry."""
+        return model_id in _REGISTRY
+
+    def entry(self, model_id: str) -> dict[str, Any] | None:
+        """Return the registry config entry for *model_id*, or None."""
+        return _REGISTRY.get(model_id)

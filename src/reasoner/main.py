@@ -221,6 +221,12 @@ async def main(args: argparse.Namespace) -> None:
         from reasoner.sanitization import sanitize_for_prompt
         problem, _ = sanitize_for_prompt(problem)
 
+        # Inject core → infra DI hooks (mirrors api/__init__.py lifespan wiring;
+        # the CLI entry point has no lifespan, so it must wire this itself).
+        from reasoner.core.ports.model_registry_port import set_model_registry_port
+        from reasoner.infrastructure.llm.registry import RegistryAdapter
+        set_model_registry_port(RegistryAdapter())
+
         # ?? Orchestrator Preflight: preset resolution, HyperGate, neuro recall ??
         preset_service = PresetService()
         orchestrator = PipelineOrchestrator(preset_service, None, None)

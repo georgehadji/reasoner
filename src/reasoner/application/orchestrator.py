@@ -26,7 +26,7 @@ from reasoner.application.ports.service_protocols import (
 from reasoner.core.events.domain_events import make_event, EventType
 from reasoner.hypergate import HyperGateAgent
 from reasoner.infrastructure.llm.router import ProviderRouter
-from reasoner.infrastructure.llm.registry import _REGISTRY
+from reasoner.core.ports.model_registry_port import get_model_registry_port
 from reasoner.infrastructure.persistence.event_store import get_event_store
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.models import TaskType
@@ -121,7 +121,7 @@ class PipelineOrchestrator:
                     p = router.get(r)
                     static[r] = p.model if hasattr(p, "model") else ""
                 acr_routing = await self._adaptive_routing.select_routing_table(roles, static)
-                reroute = {r: m for r, m in acr_routing.items() if m and m in _REGISTRY}
+                reroute = {r: m for r, m in acr_routing.items() if m and get_model_registry_port().contains(m)}
                 if reroute:
                     router = ProviderRouter.from_model_ids(
                         primary_id=router.primary.model if hasattr(router.primary, "model") else "claude-sonnet",
@@ -198,12 +198,12 @@ class PipelineOrchestrator:
             nonlocal gate_decision_fb
             if not getattr(req, "force_pipeline", False):
                 # Override HyperGate router: grok-4.5 for primary, gemini-flash-lite for sub-agents
-                from reasoner.infrastructure.llm.registry import build_provider
                 from reasoner.infrastructure.llm.router import ProviderRouter
+                registry = get_model_registry_port()
                 hypergate_routing = dict(router.routing_table)
-                hypergate_routing["hypergate_subagent"] = build_provider("gemini-flash-lite")
+                hypergate_routing["hypergate_subagent"] = registry.get_provider("gemini-flash-lite")
                 hypergate_router = ProviderRouter(
-                    primary=build_provider("grok-4.5"),
+                    primary=registry.get_provider("grok-4.5"),
                     routing_table=hypergate_routing,
                     fallback_table=router.fallback_table,
                     cascading_routing=router.cascading_routing,

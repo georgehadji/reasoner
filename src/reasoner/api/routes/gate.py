@@ -15,8 +15,8 @@ from reasoner.api.schemas import RunRequest
 from reasoner.application.services.preset_service import PresetService
 from reasoner.core.constants import HYPERGATE_METHOD_THRESHOLD
 from reasoner.domain.preset_core import build_auto_preset
+from reasoner.core.ports.model_registry_port import get_model_registry_port
 from reasoner.hypergate import HyperGateAgent
-from reasoner.infrastructure.llm.registry import build_provider
 from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.presets import get_preset_price_tier
 
@@ -42,10 +42,11 @@ async def gate_decision(
     _effective_preset_name, router_instance = preset_service.build_router(gate_preset_name)
 
     # Override HyperGate router: grok-4.5 for primary, gemini-flash-lite for sub-agents
+    registry = get_model_registry_port()
     hypergate_routing = dict(router_instance.routing_table)
-    hypergate_routing["hypergate_subagent"] = build_provider("gemini-flash-lite")
+    hypergate_routing["hypergate_subagent"] = registry.get_provider("gemini-flash-lite")
     hypergate_router = ProviderRouter(
-        primary=build_provider("grok-4.5"),
+        primary=registry.get_provider("grok-4.5"),
         routing_table=hypergate_routing,
         fallback_table=router_instance.fallback_table,
         cascading_routing=router_instance.cascading_routing,

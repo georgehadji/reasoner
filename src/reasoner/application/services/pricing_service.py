@@ -24,9 +24,10 @@ def get_pricing(model_id: str) -> ModelPricing:
 
     # Try registry resolution for shorthand IDs
     try:
-        from reasoner.infrastructure.llm.registry import _REGISTRY
-        if model_id in _REGISTRY:
-            or_model = _REGISTRY[model_id]["model"]
+        from reasoner.core.ports.model_registry_port import get_model_registry_port
+        entry = get_model_registry_port().entry(model_id)
+        if entry:
+            or_model = entry["model"]
             if or_model in PRICING_DB:
                 return PRICING_DB[or_model]
     except Exception:

@@ -14,11 +14,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Architecture Style
 
-Hexagonal DDD + CQRS + Event Sourcing + Mixin Composition. `PipelineState` (~60 fields, `domain/pipeline_state.py`) is the primary state model. `PipelineAggregate` provides event-sourced replay.
+Hexagonal DDD + CQRS + Event Sourcing + WorkflowStrategy composition (`application/pipeline.py`'s `ReasonerPipeline` composes via a `flow_factory`/`LLMExecutor`, not mixins). `PipelineState` (~60 fields, `domain/pipeline_state.py`) is the primary state model. `PipelineAggregate` provides event-sourced replay (verified working: snapshot + full-history replay both exercised, `infrastructure/persistence/snapshots.py`).
 
 **Dependency Rule:** Domain has no outer dependencies → Application depends on Domain/Core only → Infrastructure implements Core ports → API/Interface depends on Application.
 
-**Known violations:** `domain/preset_core.py` imports from `infrastructure.llm.registry`. `api/streaming.py` directly instantiates the pipeline rather than routing through CQRS handlers. `application/flows/__init__.py` imports from `api.serializers`.
+**Known violations (last verified 2026-08):** none currently open. Prior violations closed: `domain/preset_core.py`'s infra import (fixed pre-2026-08); `application/orchestrator.py`, `application/services/preset_service.py`, `application/services/pricing_service.py` importing `infrastructure.llm.registry` directly (fixed 2026-08 — now consume `core/ports/model_registry_port.py`, injected via `set_model_registry_port()` at `api/__init__.py`/`main.py`/`headless.py`). `application/flows/__init__.py` importing `api.serializers` — never existed, was a doc error. `api/streaming.py` bypassing CQRS — inaccurate as stated: it does route through `RunPipelineCommandHandler`; the handler's legacy non-streaming branch (`sse_emit=None`) is a separate, rarely-used code path, not a bypass.
 
 ---
 

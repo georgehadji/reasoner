@@ -7,7 +7,7 @@ import os
 from typing import Any
 
 from reasoner.infrastructure.llm.router import ProviderRouter
-from reasoner.infrastructure.llm.registry import _REGISTRY
+from reasoner.core.ports.model_registry_port import get_model_registry_port
 from reasoner.presets import build_auto_preset, build_custom_router, get_preset
 
 logger = logging.getLogger(__name__)
@@ -27,10 +27,11 @@ class PresetService:
         return gate_preset_name, is_auto, auto_tier
 
     def filter_routing(self, routing: dict[str, str], primary_id: str) -> dict[str, str]:
+        registry = get_model_registry_port()
         filtered: dict[str, str] = {}
         downgraded: list[str] = []
         for role, model_id in routing.items():
-            entry = _REGISTRY.get(model_id, {})
+            entry = registry.entry(model_id) or {}
             env = entry.get("env")
             if env and not os.environ.get(env):
                 filtered[role] = primary_id
@@ -54,26 +55,27 @@ class PresetService:
         preset_method: str = "",
     ) -> tuple[str, ProviderRouter]:
         """Build a ProviderRouter from a preset or custom routing."""
+        registry = get_model_registry_port()
         if custom_routing:
             for model_id in custom_routing.values():
-                if model_id not in _REGISTRY:
+                if not registry.contains(model_id):
                     raise ValueError(f"Unknown model ID: {model_id}")
             filtered = self.filter_routing(custom_routing, "claude-sonnet")
             router = build_custom_router(filtered)
             return preset_name, router
 
         preset = get_preset(preset_name)
-        if preset.primary_id not in _REGISTRY:
+        if not registry.contains(preset.primary_id):
             raise ValueError(f"Preset primary model '{preset.primary_id}' not in registry.")
         for role, mid in preset.routing.items():
-            if mid not in _REGISTRY:
+            if not registry.contains(mid):
                 raise ValueError(f"Preset '{preset_name}' role '{role}' uses unknown model '{mid}'")
         for role, mid in preset.fallback_routing.items():
-            if mid not in _REGISTRY:
+            if not registry.contains(mid):
                 raise ValueError(f"Preset '{preset_name}' role '{role}' fallback uses unknown model '{mid}'")
         for role, model_ids in preset.cascading_routing.items():
             for mid in model_ids:
-                if mid not in _REGISTRY:
+                if not registry.contains(mid):
                     raise ValueError(f"Preset '{preset_name}' role '{role}' cascade uses unknown model '{mid}'")
 
         filtered_routing = self.filter_routing(preset.routing, preset.primary_id)

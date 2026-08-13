@@ -130,7 +130,10 @@ async def ask(
     sanitized_problem, _ = sanitize_for_prompt(problem)
 
     from reasoner.application.services.preset_service import PresetService
+    from reasoner.core.ports.model_registry_port import set_model_registry_port
+    from reasoner.infrastructure.llm.registry import RegistryAdapter
 
+    set_model_registry_port(RegistryAdapter())
     preset_service = PresetService()
     orchestrator = PipelineOrchestrator(preset_service, None, None)
     preflight = await orchestrator.preflight(args, initial_state=None)

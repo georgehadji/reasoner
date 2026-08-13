@@ -124,19 +124,10 @@ class RunPipelineCommandHandler:
         await self.event_bus.publish(start_event)
         
         # Execute pipeline phases
-        from reasoner.pipeline import ReasonerPipeline
         from reasoner.infrastructure.llm.router import ProviderRouter
-        
+
         router = ProviderRouter(primary=self.llm_router)
-        pipeline = ReasonerPipeline(
-            router=router,
-            preset_name=command.preset,
-            top_k=command.top_k,
-            source_type=command.source_type,
-            domain=command.domain,
-            parallel_perspectives=command.parallel,
-        )
-        
+
         try:
             from reasoner.application.services.pipeline_service import PipelineService
             from reasoner.application.orchestrator import PipelineOrchestrator
@@ -152,7 +143,16 @@ class RunPipelineCommandHandler:
                         "SSE streaming requested but no PipelineExecutionPort injected"
                     )
             else:
-                # Old behavior
+                # Legacy non-streaming path (sse_emit=None): construct + run pipeline directly.
+                from reasoner.pipeline import ReasonerPipeline
+                pipeline = ReasonerPipeline(
+                    router=router,
+                    preset_name=command.preset,
+                    top_k=command.top_k,
+                    source_type=command.source_type,
+                    domain=command.domain,
+                    parallel_perspectives=command.parallel,
+                )
                 state = await pipeline.run(problem=command.problem)
             
             # Record completion event

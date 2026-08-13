@@ -1,5 +1,6 @@
 [importlinter]
 root_package = reasoner
+exclude_type_checking_imports = True
 
 [importlinter:contract:1]
 name = Layered Architecture
@@ -42,12 +43,10 @@ ignore_imports=
     reasoner.application.orchestrator -> reasoner.infrastructure.llm.router
     reasoner.application.orchestrator -> reasoner.infrastructure.persistence.event_store
     reasoner.application.services.pipeline_service -> reasoner.infrastructure.llm.router
-    reasoner.application.services.preset_service -> reasoner.infrastructure.llm.registry
     reasoner.application.services.preset_service -> reasoner.infrastructure.llm.router
     reasoner.application.services.scorecard_service -> reasoner.infrastructure.persistence.telemetry_store
     reasoner.application.services.data_eraser -> reasoner.infrastructure.persistence.event_store
     reasoner.application.services.billing_service -> reasoner.infrastructure.persistence.subscription_repo
-    reasoner.application.services.pricing_service -> reasoner.infrastructure.llm.registry
     reasoner.application.flows.services -> reasoner.infrastructure.execution.noop_executor
     reasoner.application.flows.services -> reasoner.infrastructure.execution.subprocess_executor
     reasoner.application.flows.research_phases -> reasoner.infrastructure.prism.file_search

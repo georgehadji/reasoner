@@ -22,6 +22,12 @@ jobs:
           pip install 'import-linter==2.12' 'grimp==3.14'
       - name: Run import-linter
         run: PYTHONPATH=src lint-imports --no-cache
+      - name: Check no direct application→registry import
+        # AST-based, direct-imports-only guard. import-linter's `forbidden`
+        # contract type checks the full transitive graph, which false-positives
+        # here since infrastructure.llm.router (a legitimate app dependency)
+        # itself imports registry internally. This script sidesteps that.
+        run: python scripts/check_no_registry_bypass.py
       - name: Check exception count
         run: |
           COUNT=$(grep -c '\->' .importlinter)
