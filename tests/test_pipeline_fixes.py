@@ -295,11 +295,12 @@ async def test_decomposition_prompt_demands_rationale_and_critical_sources():
 
 
 @pytest.mark.asyncio
-async def test_phase_1_decompose_parses_new_assumption_fields():
-    """_phase_1_decompose should preserve rationale, source_hint, and critical_sources in the decomposition dict."""
+async def test_fusion_parses_new_assumption_fields():
+    """Fusion must preserve rationale, source_hint, and critical_sources in the decomposition dict."""
+    # Classification and decomposition are one "fusion" call now.
     router = FakeRouter({
-        "classification": json.dumps({"task_type": "predictive"}),
-        "decomposition": json.dumps({
+        "fusion": json.dumps({
+            "task_type": "predictive",
             "causal_chain": [{"step": 1, "action": "Gather expert surveys", "produces": ["timeline estimates"]}],
             "assumptions": [
                 {

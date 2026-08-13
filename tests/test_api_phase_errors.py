@@ -58,8 +58,10 @@ async def test_critical_phase_error_halts_pipeline():
     fake_router = FakeRouter()
 
     with patch("reasoner.llm.ProviderRouter.from_model_ids", return_value=fake_router):
+        # Phases are PhaseStep entries on a WorkflowStrategy now; "Critique & Pruning"
+        # is the critical step in MultiPerspectiveFlow.
         with patch(
-            "reasoner.pipeline.ReasonerPipeline._phase_1_decompose",
+            "reasoner.application.flows.multi_perspective.run_critique_phase",
             side_effect=ValueError("simulated decomposition failure"),
         ):
             events = []
@@ -94,20 +96,19 @@ async def test_non_critical_phase_error_continues_pipeline():
         # Patch Deep Read to blow up, but leave everything else intact.
         # We also short-circuit Synthesis so it doesn't need real LLM data.
         # Short-circuit network-dependent helpers so the test finishes quickly.
+        # "Evidence Search" is the non-critical PhaseStep that opens
+        # MultiPerspectiveFlow; deep read is no longer a step in this flow.
         with patch(
-            "reasoner.pipeline.ReasonerPipeline._phase_deep_read",
+            "reasoner.application.flows.multi_perspective.run_multi_perspective_research_phase",
             side_effect=RuntimeError("simulated deep read failure"),
         ):
             with patch(
                 "reasoner.pipeline.ReasonerPipeline._phase_synthesis",
                 return_value=None,
             ):
-                with patch(
-                    "reasoner.pipeline.ReasonerPipeline._phase_context_vetting",
-                    return_value=None,
-                ):
+                    # Neuro recall moved to the orchestrator.
                     with patch(
-                        "reasoner.api.streaming._recall_neuro_context",
+                        "reasoner.application.orchestrator.PipelineOrchestrator._recall_neuro_context",
                         return_value=[],
                     ):
                         events = []
