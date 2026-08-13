@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import secrets
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+from typing import Literal
+
 from pydantic import BaseModel
 
 from reasoner.api.auth_deps import require_csrf
@@ -21,12 +23,18 @@ _feedback_store = FeedbackStore()
 
 
 class FeedbackRequest(BaseModel):
+    """Mirrors submitFeedback() in ui-next/src/lib/api-client.ts and FeedbackEntry.
+
+    This previously declared run_id/score/method/preset, which matched neither the
+    client payload nor FeedbackEntry — so every submission raised TypeError and
+    returned 500.
+    """
     conversation_id: str
-    run_id: str
-    score: int  # 1–5
+    message_id: str
+    rating: Literal["up", "down"]
+    reason: str | None = None
     comment: str = ""
-    method: str = ""
-    preset: str = ""
+    context: dict | None = None
 
 
 @router.post("/api/feedback")
@@ -38,11 +46,11 @@ async def submit_feedback(
     """Submit feedback for a pipeline run."""
     entry = FeedbackEntry(
         conversation_id=req.conversation_id,
-        run_id=req.run_id,
-        score=req.score,
+        message_id=req.message_id,
+        rating=req.rating,
+        reason=req.reason,
         comment=req.comment,
-        method=req.method,
-        preset=req.preset,
+        context=req.context,
     )
     row_id = await _feedback_store.insert(entry)
     return {"status": "received", "id": row_id}
