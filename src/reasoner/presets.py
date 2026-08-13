@@ -4,6 +4,7 @@ Backward-compatible shim.  Core logic moved to reasoner.domain.preset_core;
 preset data moved to reasoner.domain.preset_registry.
 """
 
+from reasoner.domain import preset_core as _preset_core
 from reasoner.domain.preset_core import (
     _KNOWN_ROUTING_ROLES,
     PipelinePreset,
@@ -44,6 +45,19 @@ def resolve_preset_name(name: str) -> str:
         available = ", ".join(sorted(PRESETS.keys()))
         raise ValueError(f"Unknown preset: {name!r}. Available: {available}")
     return name
+
+
+def _model_env_var(model_id: str) -> str | None:
+    """Env var a model needs, or None if the model is unknown/local."""
+    from reasoner.infrastructure.llm.registry import _REGISTRY
+
+    cfg = _REGISTRY.get(model_id) or {}
+    return cfg.get("env")
+
+
+# Wire the resolver so PipelinePreset.check_keys() can report real missing keys
+# without the domain layer importing infrastructure.
+_preset_core.set_model_env_resolver(_model_env_var)
 
 
 def get_method_from_preset(preset: str) -> str:

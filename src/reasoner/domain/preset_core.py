@@ -15,6 +15,22 @@ if TYPE_CHECKING:
     from reasoner.core.protocol import PhaseConfig
 
 
+# Maps a model id to the env var that model needs, injected from the infrastructure
+# layer (see reasoner/presets.py). Domain code must not import the model registry
+# directly — see tests/architecture/test_layer_boundaries.py.
+_MODEL_ENV_RESOLVER = None
+
+
+def set_model_env_resolver(fn) -> None:
+    """Inject a callable mapping model_id -> env var name (or None)."""
+    global _MODEL_ENV_RESOLVER  # noqa: PLW0603
+    _MODEL_ENV_RESOLVER = fn
+
+
+def _get_model_env_resolver():
+    return _MODEL_ENV_RESOLVER
+
+
 # Single source of truth for valid routing role keys.
 # When adding a new perspective, add its routing_key here.
 _KNOWN_ROUTING_ROLES: frozenset[str] = frozenset({
@@ -292,15 +308,13 @@ class PipelinePreset:
         if self.required_env_vars:
             return list(self.required_env_vars)
 
-        from reasoner.infrastructure.llm.registry import _REGISTRY
+        resolver = _get_model_env_resolver()
+        if resolver is None:
+            return []
 
         model_ids = {self.primary_id, *self.routing.values(), *self.fallback_routing.values()}
-        env_vars = {
-            _REGISTRY[mid]["env"]
-            for mid in model_ids
-            if mid and mid in _REGISTRY and _REGISTRY[mid].get("env")
-        }
-        return sorted(env_vars)
+        env_vars = {resolver(mid) for mid in model_ids if mid}
+        return sorted(v for v in env_vars if v)
 
     def check_keys(self) -> dict[str, bool]:
         """Return {env_var: is_set} for all required API keys."""
