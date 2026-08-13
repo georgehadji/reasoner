@@ -113,7 +113,10 @@ class TestRerankDocuments:
             with patch("reasoner.core.rerank.rerank_via_nemotron", AsyncMock(return_value=nemotron_result)):
                 with patch.object(settings, "OPENROUTER_API_KEY", "test-key"):
                     with patch.object(settings, "COHERE_RERANK_ENABLED", True):
-                        result = await rerank_documents("query", docs)
+                        # The secondary reranker only runs when explicitly enabled;
+                        # otherwise a Cohere failure degrades to unranked documents.
+                        with patch.object(settings, "NEMOTRON_RERANK_ENABLED", True):
+                            result = await rerank_documents("query", docs)
 
         assert result == nemotron_result
 

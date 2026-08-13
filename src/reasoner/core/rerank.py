@@ -156,18 +156,14 @@ async def rerank_documents(
     except Exception as exc:
         await _record_failure()
         logger.warning("Cohere rerank failed (%s); falling back to Nemotron reranker.", exc)
-        return await rerank_via_nemotron(
-            query, documents, top_n=top_n, api_key=api_key, api_base=api_base
-        )
+        return await _rerank_fallback(query, documents, top_n, api_key, api_base)
 
     # ── Reorder documents by rerank results ──
     results = data.get("results", [])
     if not results:
         await _record_failure()
         logger.warning("Cohere rerank returned empty results; falling back to Nemotron reranker.")
-        return await rerank_via_nemotron(
-            query, documents, top_n=top_n, api_key=api_key, api_base=api_base
-        )
+        return await _rerank_fallback(query, documents, top_n, api_key, api_base)
 
     indexed = {i: doc for i, doc in enumerate(documents)}
     reranked: list[dict[str, Any]] = []
@@ -181,6 +177,30 @@ async def rerank_documents(
     await _record_success()
     logger.debug("Reranked %d documents, returned top %d", len(documents), len(reranked))
     return reranked
+
+
+async def _rerank_fallback(
+    query: str,
+    documents: list[dict[str, Any]],
+    top_n: int,
+    api_key: str | None,
+    api_base: str | None,
+) -> list[dict[str, Any]]:
+    """Secondary reranker, used only when explicitly enabled.
+
+    The Nemotron path scores each document with its own chat request. Its default
+    model is a removed endpoint, so running it unconditionally after a Cohere
+    failure spent one request per document on a dead URL, waited out the timeout on
+    each, and then stamped every document with the neutral 0.5 error score — worse
+    than not reranking at all. Reranking is an optional precision boost, so the
+    correct degraded behaviour is to return the documents untouched.
+    """
+    if not settings.NEMOTRON_RERANK_ENABLED:
+        logger.info("Rerank unavailable; returning documents unranked.")
+        return documents
+    return await rerank_via_nemotron(
+        query, documents, top_n=top_n, api_key=api_key, api_base=api_base
+    )
 
 
 async def _score_document_nemotron(
