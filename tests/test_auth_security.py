@@ -149,14 +149,19 @@ class TestAdminKey:
 
     async def test_admin_key_from_env(self):
         """Admin key set via env should authenticate."""
-        import os
-        os.environ["ADMIN_API_KEY"] = "test-admin-secret-12345"
-        mgr = AuthManager()
-        api_key = await mgr.authenticate("test-admin-secret-12345")
+        # AuthManager reads settings.ADMIN_API_KEY, which is populated once at
+        # import — setting the env var alone has no effect.
+        from unittest.mock import patch
+
+        from reasoner.core.settings import settings
+
+        with patch.object(settings, "ADMIN_API_KEY", "test-admin-secret-12345"):
+            mgr = AuthManager()
+            api_key = await mgr.authenticate("test-admin-secret-12345")
+
         assert api_key is not None
         assert api_key.name == "admin"
         assert "admin" in api_key.scopes
-        del os.environ["ADMIN_API_KEY"]
 
     async def test_admin_key_wrong_rejected(self):
         import os
