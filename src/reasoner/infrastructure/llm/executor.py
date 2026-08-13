@@ -137,6 +137,21 @@ class LLMExecutor:
                     existing = kwargs.get("extra_body") or {}
                     if "reasoning" not in existing:
                         kwargs["extra_body"] = {**existing, "reasoning": {"effort": effort}}
+            else:
+                # No PhaseConfig for this phase/role. Most tuned temperatures live
+                # only in the temperature tables (scoring, stress_testing, verifier,
+                # context_vetting, deep_read, …), so without this the call silently
+                # used the provider default instead of the value chosen for it.
+                from reasoner.core.temperatures import (
+                    NON_PHASE_TEMPERATURES,
+                    PHASE_TEMPERATURES,
+                )
+
+                fallback_temp = PHASE_TEMPERATURES.get(lookup)
+                if fallback_temp is None:
+                    fallback_temp = NON_PHASE_TEMPERATURES.get(lookup)
+                if fallback_temp is not None:
+                    kwargs["temperature"] = fallback_temp
 
         # ── Cache lookup ──────────────────────────────────────────────────
         # Caching for streaming is complex. For now, disable caching for streaming calls.
