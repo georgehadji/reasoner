@@ -124,9 +124,15 @@ class TestRunStateManager:
             run_state_manager._redis = original_redis
             run_state_manager._redis_ok = True
 
+    @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_cross_process_cancel_via_redis(self, run_state_manager):
-        """Two managers sharing Redis should see each other's cancels."""
+        """Two managers sharing Redis should see each other's cancels.
+
+        Requires a live Redis/Valkey: the in-memory fallback is per-instance (and
+        refuses to run in production precisely because it cannot be shared), so
+        without a real server the two managers cannot observe each other by design.
+        """
         from reasoner.infrastructure.redis.run_state import RunStateManager
 
         manager_a = RunStateManager()

@@ -116,6 +116,25 @@ class TestPromptDelimiters:
 class TestPipelineExternalContentSanitization:
     """Layer 3: Scraped web content and search snippets are sanitized before prompt injection."""
 
+    @pytest.fixture(autouse=True)
+    def _disable_token_cache(self):
+        """Keep these runs off the shared token cache.
+
+        These tests assert on the prompts the deep/shallow read phases build. A
+        cached result from an earlier test skips the LLM call entirely, so the
+        assertions see no prompts at all and fail depending on test order.
+        """
+        from reasoner.pipeline import TOKEN_OPTIMIZATION
+        import reasoner.pipeline as _pm
+
+        original = TOKEN_OPTIMIZATION["caching"]
+        old_cache = _pm.token_cache
+        TOKEN_OPTIMIZATION["caching"] = False
+        _pm.token_cache = None
+        yield
+        TOKEN_OPTIMIZATION["caching"] = original
+        _pm.token_cache = old_cache
+
     @pytest.mark.asyncio
     async def test_deep_read_sanitizes_scraped_content(self):
         from reasoner.pipeline import ReasonerPipeline
