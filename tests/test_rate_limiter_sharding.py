@@ -9,16 +9,16 @@ from reasoner.rate_limiter import RateLimiter, RateLimitConfig
 
 
 @pytest.mark.asyncio
-async def test_sharded_locks_allow_concurrent_access():
+async def test_concurrent_access_across_clients_is_allowed():
     """
-    With sharded locks enabled, concurrent checks for different client_ids
-    should not block each other.
-    """
-    import os
-    os.environ["ENABLE_SHARDED_LOCKS"] = "true"
+    Concurrent checks for distinct client_ids must not starve each other.
 
+    Lock sharding was removed when the limiter moved to Redis (which serialises
+    per-client state server-side) with a single in-memory fallback lock. The
+    behaviour under test is unchanged: distinct clients each get their own bucket,
+    so a burst of concurrent first-requests is allowed regardless of backend.
+    """
     rl = RateLimiter(RateLimitConfig(requests_per_minute=100, burst_size=10))
-    assert rl._sharded is True
 
     async def check(client_id: str):
         return await rl.is_allowed(client_id)
@@ -28,5 +28,3 @@ async def test_sharded_locks_allow_concurrent_access():
     results = await asyncio.gather(*tasks)
 
     assert all(allowed for allowed, _ in results)
-
-    del os.environ["ENABLE_SHARDED_LOCKS"]

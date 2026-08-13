@@ -87,6 +87,8 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "gemini-flash-lite-real":  {"model": "google/gemini-3.1-flash-lite"},      # true Google Flash Lite — $0.25/$1.50, 1M ctx
     "gemini-2.5-flash-lite":   {"model": "google/gemini-2.5-flash-lite"},      # cheapest Google — $0.10/$0.40, 1M ctx
     "gemini-2.5-flash":        {"model": "google/gemini-2.5-flash"},           # $0.30/$2.50 per M, 1M ctx
+    "gemini-3.7-flash":        {"model": "google/gemini-3.7-flash"},           # newest Google Flash
+    "gemini-3.7-flash-batch":  {"model": "google/gemini-3.7-flash:batch"},      # batch tier of 3.7-flash — cheaper, higher latency; not for interactive phases
     "gemini-3.6-flash":        {"model": "google/gemini-3.6-flash"},           # newer than budget primary — $1.50/$7.50 per M, 1M ctx
     "gemini-3.5-flash-lite":   {"model": "google/gemini-3.5-flash-lite"},      # $0.30/$2.50 per M, 1M ctx
     # ── Auto-updating (always latest) ──

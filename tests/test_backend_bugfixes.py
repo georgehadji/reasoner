@@ -52,7 +52,7 @@ class TestRateLimiterAnonymous:
         # Third call should be rejected (burst exhausted)
         allowed, info = await limiter.is_allowed("anon:1234")
         assert allowed is False
-        assert info["reason"] == "burst_limit"
+        assert info["reason"].startswith("burst_limit")  # "_fallback" suffix when served in-memory
 
 
 class TestWebSocketCancelPropagation:
@@ -89,13 +89,17 @@ class TestHealthCheckPoolReset:
 
     @pytest.mark.asyncio
     async def test_health_check_resets_pool_on_failure(self):
-        from reasoner.api import health_check, _health_postgres_pool
-        from reasoner.core import settings
+        from reasoner.api.routes.health import health_check
 
         # Ensure pool starts clean
-        import reasoner.api as api_mod
+        import reasoner.api.routes.health as api_mod
         original_pool = api_mod._health_postgres_pool
         api_mod._health_postgres_pool = None
+
+        # The postgres branch is skipped entirely when DATABASE_URL is unset
+        # (as in CI), so pin one for the duration of this test.
+        original_dsn = api_mod.settings.DATABASE_URL
+        api_mod.settings.DATABASE_URL = "postgresql+asyncpg://u:p@localhost:5432/test"
 
         request = MagicMock()
         request.headers = {}
@@ -116,6 +120,7 @@ class TestHealthCheckPoolReset:
 
         # Restore
         api_mod._health_postgres_pool = original_pool
+        api_mod.settings.DATABASE_URL = original_dsn
 
 
 class TestStripeAdapterRobustness:

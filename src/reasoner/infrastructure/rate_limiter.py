@@ -333,21 +333,26 @@ class RateLimiter:
         # adjust it if specific logging/metrics are needed outside of the main check.
         pass
 
+    async def _in_memory_get_client_stats(self, client_id: str) -> dict:
+        async with self._fallback_lock:
+            # Use _in_memory_get_bucket so unseen clients report a full burst
+            # allowance; self._buckets[client_id] would create one with tokens=0.0.
+            bucket = self._in_memory_get_bucket(client_id)
+            self._in_memory_refill_tokens(bucket, 1.0) # Ensure current state
+            self._in_memory_reset_windows_if_needed(bucket)
+            return {
+                "tokens": bucket.tokens,
+                "requests_minute": bucket.requests_minute,
+                "requests_hour": bucket.requests_hour,
+                "limit_minute": self.config.requests_per_minute,
+                "limit_hour": self.config.requests_per_hour,
+            }
+
     async def get_client_stats(self, client_id: str) -> dict:
         if not self._redis_available or self._redis_client is None:
             # Fallback for stats if Redis is not available
-            async with self._fallback_lock:
-                bucket = self._buckets[client_id]
-                self._in_memory_refill_tokens(bucket, 1.0) # Ensure current state
-                self._in_memory_reset_windows_if_needed(bucket)
-                return {
-                    "tokens": bucket.tokens,
-                    "requests_minute": bucket.requests_minute,
-                    "requests_hour": bucket.requests_hour,
-                    "limit_minute": self.config.requests_per_minute,
-                    "limit_hour": self.config.requests_per_hour,
-                }
-        
+            return await self._in_memory_get_client_stats(client_id)
+
         token_bucket_key = f"rate_limit:{client_id}:tokens"
         minute_window_key = f"rate_limit:{client_id}:minute"
         hour_window_key = f"rate_limit:{client_id}:hour"
@@ -380,12 +385,13 @@ class RateLimiter:
                 "limit_hour": self.config.requests_per_hour,
             }
         except Exception as e:
-            print(f"[ERROR] Failed to get Redis client stats: {e}")
-            return {
-                "tokens": 0, "requests_minute": 0, "requests_hour": 0,
-                "limit_minute": self.config.requests_per_minute, "limit_hour": self.config.requests_per_hour,
-                "error": str(e)
-            }
+            # Degrade to the in-memory bucket rather than reporting zeros, which would
+            # misreport a healthy client as having no quota consumed during a Redis blip.
+            logger.warning("Redis unavailable, falling back to in-memory rate limiter for get_client_stats: %s", e)
+            self._redis_available = False
+            stats = await self._in_memory_get_client_stats(client_id)
+            stats["degraded"] = True
+            return stats
 
     async def reset_client(self, client_id: str) -> None:
         if not self._redis_available or self._redis_client is None:

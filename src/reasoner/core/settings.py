@@ -77,7 +77,10 @@ class Settings:
     UVICORN_WORKERS: int = int(os.getenv("UVICORN_WORKERS", "1"))
     ENABLE_LEGACY_API_KEY: bool = os.getenv("ENABLE_LEGACY_API_KEY", "false").lower() in ("1", "true", "yes")
 
-    # ── Cohere Rerank (via OpenRouter) ──
+    # ── Rerank API models (via OpenRouter /rerank) ──
+    # Any model served on the /rerank endpoint works here. Known-good values:
+    #   cohere/rerank-4-fast   — default, lowest latency
+    #   qwen/qwen3-reranker-8b — open-weight cross-encoder, stronger on long documents
     COHERE_RERANK_ENABLED: bool = os.getenv("COHERE_RERANK_ENABLED", "true").lower() in ("1", "true", "yes")
     COHERE_RERANK_MODEL: str = os.getenv("COHERE_RERANK_MODEL", "cohere/rerank-4-fast")
 
