@@ -21,6 +21,7 @@ from reasoner.infrastructure.llm.providers.openai_compat import (
     OpenAICompatibleProvider,
     OpenRouterProvider,
 )
+from reasoner.domain import preset_core as _preset_core
 
 
 # Whitelist of supported models.  Everything except Ollama routes through OpenRouter.
@@ -378,6 +379,19 @@ for _mid, _cfg in _MODEL_WHITELIST.items():
         _entry.setdefault("cls", "openrouter")
         _entry.setdefault("env", "OPENROUTER_API_KEY")
     _REGISTRY[_mid] = _entry
+
+
+def _model_env_var(model_id: str) -> str | None:
+    """Env var a model needs, or None if the model is unknown or local-only."""
+    cfg = _REGISTRY.get(model_id) or {}
+    return cfg.get("env")
+
+
+# Infrastructure supplies the implementation the domain declared a hook for, so
+# PipelinePreset.check_keys() can report genuinely missing credentials without
+# domain code importing this module (see the Layered Architecture contract in
+# .importlinter). Registered on import, which covers both the API and the CLI.
+_preset_core.set_model_env_resolver(_model_env_var)
 
 
 def is_model_available(model_id: str) -> bool:
