@@ -103,15 +103,39 @@ class TestExecutePhasesDag:
             await execute_phases_dag(phases, state, run_phase_fn)
 
     @pytest.mark.asyncio
-    async def test_exception_propagates(self, state, run_phase_fn):
+    async def test_phase_exception_is_recorded_not_propagated(self, state, run_phase_fn):
+        """A failing phase is captured on state.errors rather than aborting the run.
+
+        The DAG gathers with return_exceptions=True so one broken non-critical phase
+        cannot take down the whole pipeline; only a critical phase stops execution.
+        """
         async def phase_a(st):
             raise ValueError("boom")
 
         phases = [
             PhaseStep(0, "A", phase_a, lambda s: {}),
         ]
-        with pytest.raises(ValueError, match="boom"):
-            await execute_phases_dag(phases, state, run_phase_fn)
+        await execute_phases_dag(phases, state, run_phase_fn)
+
+        assert any("boom" in err for err in state.errors)
+
+    @pytest.mark.asyncio
+    async def test_critical_phase_failure_halts_dag(self, state, run_phase_fn):
+        ran = []
+
+        async def phase_a(st):
+            raise ValueError("boom")
+
+        async def phase_b(st):
+            ran.append("B")
+
+        phases = [
+            PhaseStep(0, "A", phase_a, lambda s: {}, critical=True),
+            PhaseStep(1, "B", phase_b, lambda s: {}, depends_on=["A"]),
+        ]
+        await execute_phases_dag(phases, state, run_phase_fn)
+
+        assert ran == []
 
     @pytest.mark.asyncio
     async def test_empty_phases(self, state, run_phase_fn):

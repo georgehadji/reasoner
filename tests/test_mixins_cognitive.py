@@ -131,7 +131,9 @@ async def test_pot_execute_populates_output(pipeline, state):
     ))
     state.pot_state["code"] = "print(42)"
     await pipeline._phase_pot_execute(state)
-    assert state.pot_state["execution_output"] == "42"
+    # The phase runs the code for real now, so the value is raw stdout (with its
+    # trailing newline) rather than an LLM-reported string.
+    assert state.pot_state["execution_output"].strip() == "42"
 
 
 @pytest.mark.asyncio

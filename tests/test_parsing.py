@@ -98,12 +98,16 @@ class TestExtractJson:
         or quoted strings like `"hello"`.  extract_json used to return these
         directly, causing downstream `.get()` to raise AttributeError on str/list.
         """
-        with pytest.raises(ParseError):
-            extract_json('["item1", "item2"]')
+        # A bare array is wrapped rather than rejected — callers still get a dict,
+        # which is what this regression is really about.
+        assert extract_json('["item1", "item2"]') == {"results": ["item1", "item2"]}
+        assert extract_json('```json\n["a", "b"]\n```') == {"results": ["a", "b"]}
+
+        # Anything that is neither object nor array still raises.
         with pytest.raises(ParseError):
             extract_json('"hello world"')
         with pytest.raises(ParseError):
-            extract_json('```json\n["a", "b"]\n```')
+            extract_json('42')
 
     def test_nested_object_inside_array_is_extracted(self):
         """If the text contains both an array and an object, the object wins."""
