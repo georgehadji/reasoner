@@ -81,7 +81,10 @@ class TokenAwareCache:
         # Store in cache
         await cache.set(problem, phase, model_id, prompt, response, tokens_used)
     """
-    
+
+    # How many times a failing disk load is retried before giving up for good.
+    _MAX_LOAD_ATTEMPTS = 3
+
     def __init__(
         self,
         max_tokens: int = 1_000_000,  # 1M token budget
@@ -103,23 +106,35 @@ class TokenAwareCache:
         self._lock = asyncio.Lock()
         self._problem_index: dict[str, list[str]] = {}
         self._loaded = False
+        self._load_failures = 0
 
         # Defer disk loading — call _ensure_loaded() before first use
         if cache_dir:
             cache_dir.mkdir(parents=True, exist_ok=True)
 
     async def _ensure_loaded(self) -> None:
-        """Lazy-init: load cache entries from disk on first use."""
+        """Lazy-init: load cache entries from disk on first use.
+
+        A failed load must not be fatal (a corrupt cache file should never take
+        down a request) but must also not mark the cache loaded — that strands the
+        process on an empty in-memory cache for its whole lifetime, silently turning
+        every warm-cache hit into a paid LLM call. Retries are capped so a
+        permanently unreadable cache does not retry on every single call.
+        """
         if self._loaded or not self.cache_dir:
+            return
+        if self._load_failures >= self._MAX_LOAD_ATTEMPTS:
             return
         try:
             await self._load_from_disk()
         except Exception as exc:
+            self._load_failures += 1
             logger.warning(
-                "Token cache disk load failed, operating with empty cache: %s", exc
+                "Token cache disk load failed (attempt %d/%d), operating with empty cache: %s",
+                self._load_failures, self._MAX_LOAD_ATTEMPTS, exc,
             )
-        finally:
-            self._loaded = True
+            return
+        self._loaded = True
     
     def _compute_key(self, problem: str, phase: str, model_id: str, prompt: str, agent_id: str = "") -> str:
         """Compute cache key. agent_id scopes the cache to a user/session."""

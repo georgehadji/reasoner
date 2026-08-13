@@ -26,13 +26,24 @@ _CSRF_TOKEN_MAX_AGE = 86400
 # causing token mismatch when CSRF_SECRET was set and RuntimeError when it was not.
 
 
+_DEV_FALLBACK_SECRET: bytes | None = None
+
+
 def _get_csrf_secret() -> bytes:
-    """Get the CSRF signing secret. CSRF_SECRET must be set independently of ADMIN_API_KEY."""
+    """Get the CSRF signing secret. CSRF_SECRET must be set independently of ADMIN_API_KEY.
+
+    The dev/CI fallback is generated once per process and cached. Returning a fresh
+    random value per call makes signing and verification use different secrets, so
+    every token fails verification whenever CSRF_SECRET is unset.
+    """
     raw = settings.CSRF_SECRET or ""
     if not raw:
         if not settings.CSRF_ENFORCE_BACKEND:
-            # Dev/CI: generate a random in-process secret (tokens won't survive restarts)
-            return secrets.token_bytes(32)
+            # Dev/CI: random in-process secret (tokens won't survive restarts)
+            global _DEV_FALLBACK_SECRET  # noqa: PLW0603
+            if _DEV_FALLBACK_SECRET is None:
+                _DEV_FALLBACK_SECRET = secrets.token_bytes(32)
+            return _DEV_FALLBACK_SECRET
         raise RuntimeError(
             "CSRF_SECRET must be set for CSRF protection. "
             "Set CSRF_SECRET in your .env file (do not reuse ADMIN_API_KEY)."

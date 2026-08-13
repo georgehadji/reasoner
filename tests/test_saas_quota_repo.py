@@ -18,9 +18,14 @@ def mock_pool():
 
 @pytest.fixture
 def repo(mock_pool):
-    r = PostgresQuotaRepository("postgresql://test")
-    r._pool = mock_pool
-    return r
+    # _pool is a class-level singleton shared by all instances, so setting it on
+    # the instance leaves _get_pool() trying to open a real connection.
+    original = PostgresQuotaRepository._pool
+    PostgresQuotaRepository._pool = mock_pool
+    try:
+        yield PostgresQuotaRepository("postgresql://test")
+    finally:
+        PostgresQuotaRepository._pool = original
 
 
 @pytest.mark.asyncio
