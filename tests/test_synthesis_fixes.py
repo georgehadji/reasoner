@@ -33,6 +33,11 @@ class FakeRouter:
         self.responses = responses
         self.calls: list[tuple[str, str, str]] = []
         self._primary = FakeProvider()
+        # ProviderRouter surface the perspective phase reads for its
+        # lab-diversity check.
+        self.primary = self._primary
+        self.routing_table = {}
+        self.fallback_table = {}
 
     def get(self, role: str):
         return self._primary

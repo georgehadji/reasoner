@@ -75,7 +75,7 @@ async def run_perspectives_phase(
     
     if perspectives is None:
         from reasoner.core import DEFAULT_PERSPECTIVES
-        perspectives = list(DEFAULT_PERSPECTIVES)
+        perspectives = services.perspectives or list(DEFAULT_PERSPECTIVES)
 
     # Warn on diversity collapse: all perspectives resolve to the same model, or
     # all to a single geopolitical bloc. Cross-bloc spread (not just cross-company)
@@ -280,6 +280,29 @@ async def run_critique_phase(state: PipelineState, services: WorkflowServices) -
         state.errors.append(f"Scoring failed: {e}")
         state.top_candidates = state.candidates[:2]
 
+# Failure modes describing the model's own generation limits rather than a
+# real-world risk. STRESS_SYSTEM already tells the model to avoid these, but a
+# prompt is not a guarantee, and letting them through puts "the answer got cut
+# off" in front of users as if it were a finding about their problem.
+_SELF_REFERENTIAL_FAILURE_MARKERS = (
+    "truncat",
+    "length limit",
+    "token limit",
+    "max_tokens",
+    "output was cut",
+    "incomplete response",
+    "malformed json",
+    "parsing error",
+    "off-topic response",
+    "formatting issue",
+)
+
+
+def _is_self_referential_failure(failure_mode: str) -> bool:
+    lowered = (failure_mode or "").lower()
+    return any(marker in lowered for marker in _SELF_REFERENTIAL_FAILURE_MARKERS)
+
+
 async def run_stress_test_phase(state: PipelineState, services: WorkflowServices) -> None:
     services.log("PHASE-4", "Running scenario-based stress testing...", state)
     if not state.top_candidates:
@@ -302,6 +325,7 @@ async def run_stress_test_phase(state: PipelineState, services: WorkflowServices
                 recovery_path=st.get("recovery_path", ""),
             )
             for st in data.get("stress_tests", [])
+            if not _is_self_referential_failure(st.get("failure_mode", ""))
         ]
     except Exception as e:
         services.log("PHASE-4", f"Stress test failed: {e}", state)

@@ -33,6 +33,15 @@ class PipelineWorkflowServices(WorkflowServices):
             from reasoner.infrastructure.execution.noop_executor import NoopExecutor
             self.code_executor = NoopExecutor()
         
+    @property
+    def perspectives(self) -> list:
+        """Perspective set configured on the pipeline (see ReasonerPipeline.__init__).
+
+        Phase 2 defaulted straight to DEFAULT_PERSPECTIVES, which left
+        pipeline.perspectives assigned but never read — narrowing it had no effect.
+        """
+        return list(getattr(self._pipeline, "perspectives", None) or [])
+
     def log(self, phase: str, message: str, state: PipelineState) -> None:
         self._pipeline._log(phase, message, state)
         
