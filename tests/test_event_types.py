@@ -42,12 +42,27 @@ def test_backward_compat_value_comparison() -> None:
 
 
 def test_event_classes_populated() -> None:
-    """All 4 registries have correct entries."""
-    assert len(PIPELINE_EVENT_CLASSES) == 14
-    assert len(WIDGET_EVENT_CLASSES) == 3
-    assert len(MEMORY_EVENT_CLASSES) == 2
-    assert len(SAAS_EVENT_CLASSES) == 10
-    assert len(EVENT_CLASSES) == 29
+    """Every declared event type has a class, and the registries partition cleanly.
+
+    Asserted structurally rather than as fixed counts, which went stale on every
+    new event type without indicating anything was actually wrong.
+    """
+    for enum_cls, registry in (
+        (PipelineEventType, PIPELINE_EVENT_CLASSES),
+        (WidgetEventType, WIDGET_EVENT_CLASSES),
+        (MemoryEventType, MEMORY_EVENT_CLASSES),
+        (SaaSEventType, SAAS_EVENT_CLASSES),
+    ):
+        missing = [e for e in enum_cls if e not in registry]
+        assert not missing, f"{enum_cls.__name__} entries without a class: {missing}"
+
+    combined = (
+        len(PIPELINE_EVENT_CLASSES)
+        + len(WIDGET_EVENT_CLASSES)
+        + len(MEMORY_EVENT_CLASSES)
+        + len(SAAS_EVENT_CLASSES)
+    )
+    assert len(EVENT_CLASSES) == combined
 
 
 def test_make_event_with_sub_type() -> None:
@@ -125,7 +140,12 @@ async def test_saas_only_subscription() -> None:
 
 def test_all_event_types_map() -> None:
     """ALL_EVENT_TYPES contains all enum values."""
-    assert len(ALL_EVENT_TYPES) == 29
+    expected = {
+        e.value
+        for enum_cls in (PipelineEventType, WidgetEventType, MemoryEventType, SaaSEventType)
+        for e in enum_cls
+    }
+    assert set(ALL_EVENT_TYPES) == expected
     assert ALL_EVENT_TYPES["pipeline_started"] == PipelineEventType.PIPELINE_STARTED
     assert ALL_EVENT_TYPES["widget_detected"] == WidgetEventType.WIDGET_DETECTED
     assert ALL_EVENT_TYPES["memory_stored"] == MemoryEventType.MEMORY_STORED

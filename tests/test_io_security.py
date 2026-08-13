@@ -216,6 +216,9 @@ class TestUploaderGlobInjection:
     async def test_get_file_text_rejects_empty_file_id(self, tmp_path, monkeypatch):
         from reasoner import uploader
         monkeypatch.setattr(uploader, 'UPLOAD_DIR', tmp_path)
+        # reasoner.uploader is a shim; the functions read the real module's UPLOAD_DIR.
+        import reasoner.infrastructure.uploader as _real_uploader
+        monkeypatch.setattr(_real_uploader, 'UPLOAD_DIR', tmp_path)
         (tmp_path / "secret.txt").write_text("sensitive")
         assert await uploader.get_file_text("") is None
 
@@ -223,6 +226,9 @@ class TestUploaderGlobInjection:
     async def test_get_file_text_rejects_wildcard_file_id(self, tmp_path, monkeypatch):
         from reasoner import uploader
         monkeypatch.setattr(uploader, 'UPLOAD_DIR', tmp_path)
+        # reasoner.uploader is a shim; the functions read the real module's UPLOAD_DIR.
+        import reasoner.infrastructure.uploader as _real_uploader
+        monkeypatch.setattr(_real_uploader, 'UPLOAD_DIR', tmp_path)
         (tmp_path / "secret.txt").write_text("sensitive")
         assert await uploader.get_file_text("*") is None
 
@@ -230,6 +236,9 @@ class TestUploaderGlobInjection:
     async def test_get_file_text_rejects_dotdot_file_id(self, tmp_path, monkeypatch):
         from reasoner import uploader
         monkeypatch.setattr(uploader, 'UPLOAD_DIR', tmp_path)
+        # reasoner.uploader is a shim; the functions read the real module's UPLOAD_DIR.
+        import reasoner.infrastructure.uploader as _real_uploader
+        monkeypatch.setattr(_real_uploader, 'UPLOAD_DIR', tmp_path)
         (tmp_path / "secret.txt").write_text("sensitive")
         assert await uploader.get_file_text("..") is None
 
@@ -237,6 +246,9 @@ class TestUploaderGlobInjection:
     async def test_get_file_text_reads_exact_match(self, tmp_path, monkeypatch):
         from reasoner import uploader
         monkeypatch.setattr(uploader, 'UPLOAD_DIR', tmp_path)
+        # reasoner.uploader is a shim; the functions read the real module's UPLOAD_DIR.
+        import reasoner.infrastructure.uploader as _real_uploader
+        monkeypatch.setattr(_real_uploader, 'UPLOAD_DIR', tmp_path)
         file_id = "abc123def456"
         (tmp_path / f"{file_id}.txt").write_text("hello world")
         result = await uploader.get_file_text(file_id)
@@ -245,6 +257,9 @@ class TestUploaderGlobInjection:
     def test_delete_file_rejects_injection_attempts(self, tmp_path, monkeypatch):
         from reasoner import uploader
         monkeypatch.setattr(uploader, 'UPLOAD_DIR', tmp_path)
+        # reasoner.uploader is a shim; the functions read the real module's UPLOAD_DIR.
+        import reasoner.infrastructure.uploader as _real_uploader
+        monkeypatch.setattr(_real_uploader, 'UPLOAD_DIR', tmp_path)
         (tmp_path / "secret.txt").write_text("sensitive")
         assert uploader.delete_file("") is False
         assert uploader.delete_file("*") is False
@@ -254,6 +269,9 @@ class TestUploaderGlobInjection:
     def test_delete_file_deletes_exact_match(self, tmp_path, monkeypatch):
         from reasoner import uploader
         monkeypatch.setattr(uploader, 'UPLOAD_DIR', tmp_path)
+        # reasoner.uploader is a shim; the functions read the real module's UPLOAD_DIR.
+        import reasoner.infrastructure.uploader as _real_uploader
+        monkeypatch.setattr(_real_uploader, 'UPLOAD_DIR', tmp_path)
         file_id = "abc123def456"
         (tmp_path / f"{file_id}.txt").write_text("hello world")
         assert uploader.delete_file(file_id) is True
