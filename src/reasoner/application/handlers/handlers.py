@@ -88,9 +88,10 @@ class RunPipelineCommandHandler:
         self._pipeline_executor = pipeline_executor
     
     async def handle(
-        self, 
-        command: RunPipelineCommand, 
-        sse_emit: Callable[[dict], Awaitable[None]] | None = None
+        self,
+        command: RunPipelineCommand,
+        sse_emit: Callable[[dict], Awaitable[None]] | None = None,
+        initial_state: Any | None = None,
     ) -> PipelineAggregate:
         """Execute pipeline command, optionally emitting SSE events."""
         # Create aggregate
@@ -146,6 +147,7 @@ class RunPipelineCommandHandler:
                     state = await self._pipeline_executor.execute_run(
                         command, router, sse_emit,
                         user_id=getattr(command, "user_id", None),
+                        initial_state=initial_state,
                     )
                 else:
                     raise RuntimeError(

@@ -43,7 +43,11 @@ class TestRequireTierEnforcement:
         from reasoner.api.dependencies import require_tier
         from reasoner.domain.saas import SubscriptionTier
 
+        # settings is built once at import, so the env var alone has no effect.
+        from reasoner.core.settings import settings
+
         monkeypatch.setenv("ENVIRONMENT", "production")
+        monkeypatch.setattr(settings, "ENVIRONMENT", "production")
 
         checker = require_tier(SubscriptionTier.PRO)
         with pytest.raises(HTTPException) as exc_info:
@@ -173,7 +177,11 @@ class TestCheckPresetAccess:
         """In production, check_preset_access must raise HTTPException(403)."""
         from reasoner.api.dependencies import check_preset_access
 
+        # settings is built once at import, so the env var alone has no effect.
+        from reasoner.core.settings import settings
+
         monkeypatch.setenv("ENVIRONMENT", "production")
+        monkeypatch.setattr(settings, "ENVIRONMENT", "production")
 
         with pytest.raises(HTTPException) as exc_info:
             await check_preset_access(preset="premium-reasoning", user=mock_user)
@@ -207,9 +215,10 @@ class TestRateLimiterResetRaceCondition:
         config = RateLimitConfig(requests_per_minute=60, requests_per_hour=1000, burst_size=10)
         rl = RateLimiter(config)
 
-        # Create a bucket first
-        async with rl._lock_for("client1"):
-            bucket = rl._get_bucket("client1")
+        # Create a bucket first. Lock sharding was removed when the limiter moved
+        # to Redis; the in-memory fallback uses a single _fallback_lock.
+        async with rl._fallback_lock:
+            bucket = rl._in_memory_get_bucket("client1")
             bucket.tokens = 5
 
         # reset_client should be async and work without error
@@ -228,8 +237,8 @@ class TestRateLimiterResetRaceCondition:
 
         # Create multiple buckets
         for i in range(5):
-            async with rl._lock_for(f"client{i}"):
-                rl._get_bucket(f"client{i}")
+            async with rl._fallback_lock:
+                rl._in_memory_get_bucket(f"client{i}")
 
         assert len(rl._buckets) == 5
 

@@ -8,6 +8,8 @@ import pytest
 from unittest.mock import patch
 
 from reasoner.api import run_stream, RunRequest
+from reasoner.api.streaming import run_followup_stream
+from reasoner.api.schemas import FollowupRequest
 from reasoner.models import PipelineState, ConversationState
 
 
@@ -49,24 +51,28 @@ async def test_followup_budget_uses_kimi_for_persona_roles():
     When initial_state.agent_model is 'kimi-k2-5', the router should use it
     for synthesis, classification, and decomposition.
     """
-    req = RunRequest(problem="test followup budget", preset="multi-perspective-budget")
-    state = PipelineState(
-        problem=req.problem,
-        preset_name=req.preset,
-        conversation_state=ConversationState(agent_model="kimi-k2-5"),
+    # Follow-ups run through run_followup_stream, which is where agent_model is
+    # resolved and pushed into the routing table.
+    req = FollowupRequest(
+        question="test followup budget",
+        preset="multi-perspective-budget",
+        conversation_id="conv-1",
+        history=[],
+        previous_synthesis="earlier answer",
+        agent_model="kimi-k2-5",
     )
 
     with patch("reasoner.llm.ProviderRouter.from_model_ids", side_effect=_capture_router_call):
         with patch("reasoner.pipeline.ReasonerPipeline._phase_synthesis", return_value=None):
             events = []
-            async for line in run_stream(req, initial_state=state):
+            async for line in run_followup_stream(req):
                 if line.startswith("data:"):
                     events.append(json.loads(line.removeprefix("data: ").strip()))
 
     routing = _capture_router_call.last_routing
     assert routing.get("synthesis") == "kimi-k2-5"
-    assert routing.get("classification") == "kimi-k2-5"
-    assert routing.get("decomposition") == "kimi-k2-5"
+    # classification+decomposition are one "fusion" phase now
+    assert routing.get("fusion") == "kimi-k2-5"
     # Other roles should remain as defined by the preset
     assert "constructive" in routing
     assert "destructive" in routing
@@ -78,24 +84,25 @@ async def test_followup_premium_uses_grok_for_persona_roles():
     When initial_state.agent_model is 'grok-4.20', the router should use it
     for synthesis, classification, and decomposition.
     """
-    req = RunRequest(problem="test followup premium", preset="multi-perspective-premium")
-    state = PipelineState(
-        problem=req.problem,
-        preset_name=req.preset,
-        conversation_state=ConversationState(agent_model="grok-4.20"),
+    req = FollowupRequest(
+        question="test followup premium",
+        preset="multi-perspective-premium",
+        conversation_id="conv-2",
+        history=[],
+        previous_synthesis="earlier answer",
+        agent_model="grok-4.20",
     )
 
     with patch("reasoner.llm.ProviderRouter.from_model_ids", side_effect=_capture_router_call):
         with patch("reasoner.pipeline.ReasonerPipeline._phase_synthesis", return_value=None):
             events = []
-            async for line in run_stream(req, initial_state=state):
+            async for line in run_followup_stream(req):
                 if line.startswith("data:"):
                     events.append(json.loads(line.removeprefix("data: ").strip()))
 
     routing = _capture_router_call.last_routing
     assert routing.get("synthesis") == "grok-4.20"
-    assert routing.get("classification") == "grok-4.20"
-    assert routing.get("decomposition") == "grok-4.20"
+    assert routing.get("fusion") == "grok-4.20"
 
 
 @pytest.mark.asyncio
@@ -113,7 +120,53 @@ async def test_initial_run_does_not_override_routing():
                     events.append(json.loads(line.removeprefix("data: ").strip()))
 
     routing = _capture_router_call.last_routing
-    # synthesis should remain the preset default (qwen3-max for budget)
-    assert routing.get("synthesis") == "qwen3-max"
-    assert routing.get("classification") == "gpt-4o-mini"
-    assert routing.get("decomposition") == "deepseek-v3"
+    # Roles must remain exactly what the preset declares.
+    from reasoner.presets import get_preset
+
+    preset = get_preset("multi-perspective-budget")
+    assert routing.get("synthesis") == preset.routing["synthesis"]
+    assert routing.get("fusion") == preset.routing["fusion"]
+
+
+@pytest.mark.asyncio
+async def test_followup_initial_state_reaches_pipeline():
+    """Follow-up context must survive run_stream's command construction.
+
+    Regression: run_stream accepted initial_state but never forwarded it to the
+    command handler, and the handler never forwarded it to execute_run. Follow-ups
+    therefore ran as brand-new questions — no conversation history, no previous
+    synthesis, and no agent_model override.
+    """
+    from reasoner.application.orchestrator import PipelineOrchestrator
+
+    seen = {}
+    original = PipelineOrchestrator.preflight
+
+    async def spy(self, req, initial_state=None, *args, **kwargs):
+        seen["history"] = getattr(initial_state, "conversation_history", None)
+        seen["previous_synthesis"] = getattr(initial_state, "previous_synthesis", None)
+        seen["agent_model"] = getattr(initial_state, "agent_model", None)
+        return await original(self, req, initial_state, *args, **kwargs)
+
+    req = FollowupRequest(
+        question="and then?",
+        preset="multi-perspective-budget",
+        conversation_id="conv-regression",
+        history=[
+            {"role": "user", "content": "first question"},
+            {"role": "assistant", "content": "first answer"},
+        ],
+        previous_synthesis="PRIOR SYNTHESIS",
+        agent_model="kimi-k2-5",
+    )
+
+    with patch.object(PipelineOrchestrator, "preflight", spy):
+        async for _ in run_followup_stream(req):
+            pass
+
+    assert seen["history"] == [
+        {"role": "user", "content": "first question"},
+        {"role": "assistant", "content": "first answer"},
+    ]
+    assert seen["previous_synthesis"] == "PRIOR SYNTHESIS"
+    assert seen["agent_model"] == "kimi-k2-5"

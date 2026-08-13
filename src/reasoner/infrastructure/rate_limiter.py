@@ -405,7 +405,13 @@ class RateLimiter:
         try:
             await self._redis_client.delete(token_bucket_key, minute_window_key, hour_window_key)
         except Exception as e:
-            print(f"[ERROR] Failed to reset client {client_id} in Redis: {e}")
+            # Still clear the in-memory bucket: is_allowed() degrades to the
+            # in-memory limiter on Redis failure, so leaving it populated means a
+            # reset silently does nothing for exactly the requests that will use it.
+            logger.warning("Redis unavailable, resetting in-memory bucket for %s instead: %s", client_id, e)
+            self._redis_available = False
+            async with self._fallback_lock:
+                self._buckets.pop(client_id, None)
     
     async def reset_all(self) -> None:
         if not self._redis_available or self._redis_client is None:
@@ -418,7 +424,12 @@ class RateLimiter:
             async for key in self._redis_client.scan_iter("rate_limit:*"):
                 await self._redis_client.delete(key)
         except Exception as e:
-            print(f"[ERROR] Failed to reset all rate limits in Redis: {e}") # Fixed double f-string
+            logger.warning("Redis unavailable, resetting in-memory buckets instead: %s", e)
+            self._redis_available = False
+        # Always clear local state: buckets accumulated while degraded would
+        # otherwise survive a reset and keep rejecting requests.
+        async with self._fallback_lock:
+            self._buckets.clear()
 
     # In-memory helpers for fallback mode
     def _in_memory_get_bucket(self, client_id: str) -> ClientBucket:

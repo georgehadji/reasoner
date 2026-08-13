@@ -47,7 +47,7 @@ class TestFollowupAgentModels:
         assert FOLLOWUP_AGENT_MODELS["budget"] == "kimi-k2-6"
 
     def test_premium_maps_to_grok(self):
-        assert FOLLOWUP_AGENT_MODELS["premium"] == "grok-4.20"
+        assert FOLLOWUP_AGENT_MODELS["premium"] == "grok-4.3"
 
 
 class TestGetMethodFromPreset:

@@ -78,7 +78,10 @@ class PresetService:
 
         filtered_routing = self.filter_routing(preset.routing, preset.primary_id)
         if agent_model:
-            for role in ("synthesis", "classification", "decomposition"):
+            # "fusion" replaced the separate classification/decomposition roles; the
+            # legacy names are kept so a preset still declaring them is covered, but
+            # without fusion the follow-up agent model never reached that phase.
+            for role in ("synthesis", "fusion", "classification", "decomposition"):
                 filtered_routing[role] = agent_model
 
         method = preset_method or (preset_name.rsplit("-", 1)[0] if "-" in preset_name else preset_name)
@@ -108,7 +111,10 @@ class PresetService:
         preset = get_preset(effective_preset_name)
         filtered_routing = self.filter_routing(preset.routing, preset.primary_id)
         if agent_model:
-            for role in ("synthesis", "classification", "decomposition"):
+            # "fusion" replaced the separate classification/decomposition roles; the
+            # legacy names are kept so a preset still declaring them is covered, but
+            # without fusion the follow-up agent model never reached that phase.
+            for role in ("synthesis", "fusion", "classification", "decomposition"):
                 filtered_routing[role] = agent_model
 
         router = ProviderRouter.from_model_ids(
