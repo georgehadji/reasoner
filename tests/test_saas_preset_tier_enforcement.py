@@ -1,7 +1,9 @@
 """Tests for premium preset tier enforcement (SEC-017).
 
-Since premium presets are open to all users, these tests verify that
-check_preset_access never raises regardless of subscription tier.
+Premium presets are open to all users by default, so check_preset_access must
+never raise regardless of subscription tier unless an operator opts in via
+PRESET_TIER_ENFORCEMENT_ENABLED. See TestPresetTierEnforcement in
+test_saas_preset_tiers.py for the enabled behaviour.
 """
 
 from __future__ import annotations

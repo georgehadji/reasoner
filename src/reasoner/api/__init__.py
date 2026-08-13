@@ -462,6 +462,7 @@ from reasoner.api.dependencies import (
     get_current_user, 
     get_optional_user, 
     check_quota_if_authenticated,
+    check_preset_access_if_authenticated,
     get_preset_service,
     get_pipeline_service,
     get_search_service
@@ -682,6 +683,7 @@ async def run_pipeline(
     Authenticated users get higher rate limits and priority processing.
     """
     _require_auth_if_legacy_disabled(user)
+    await check_preset_access_if_authenticated(req.preset, user)
     # Idempotency: atomically register client_run_id (C2)
     if req.client_run_id:
         from reasoner.infrastructure.redis.run_state import _run_state_manager
@@ -731,6 +733,7 @@ async def run_followup_pipeline(
     Run the Reasoner pipeline for a follow-up question with full conversation context.
     """
     _require_auth_if_legacy_disabled(user)
+    await check_preset_access_if_authenticated(req.preset, user)
     # Idempotency: atomically register client_run_id (Phase 2.1)
     if req.client_run_id:
         from reasoner.infrastructure.redis.run_state import _run_state_manager

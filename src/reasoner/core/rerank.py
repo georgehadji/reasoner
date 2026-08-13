@@ -309,6 +309,12 @@ async def rerank_via_nemotron(
         return documents
 
     model_id = model or settings.NEMOTRON_RERANK_MODEL
+    if not model_id:
+        logger.warning(
+            "Secondary reranker requested but NEMOTRON_RERANK_MODEL is unset; "
+            "returning documents unranked. Set it to a live logprobs-capable model."
+        )
+        return documents
     base = api_base or settings.RERANK_API_BASE
     concurrency = settings.NEMOTRON_RERANK_CONCURRENCY
 

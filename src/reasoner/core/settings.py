@@ -76,6 +76,10 @@ class Settings:
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
     UVICORN_WORKERS: int = int(os.getenv("UVICORN_WORKERS", "1"))
     ENABLE_LEGACY_API_KEY: bool = os.getenv("ENABLE_LEGACY_API_KEY", "false").lower() in ("1", "true", "yes")
+    # Gate premium presets on the caller's subscription tier. Off by default:
+    # premium presets have historically been open to all users (SEC-017), so turning
+    # this on is a pricing decision. Turn it on once you charge for the Pro tier.
+    PRESET_TIER_ENFORCEMENT_ENABLED: bool = os.getenv("PRESET_TIER_ENFORCEMENT_ENABLED", "false").lower() in ("1", "true", "yes")
 
     # ── Rerank API models (via OpenRouter /rerank) ──
     # Any model served on the /rerank endpoint works here. Known-good values:
@@ -237,7 +241,11 @@ class Settings:
     # Nemotron Rerank VL: free NVIDIA reranker via OpenRouter chat completions + logprobs.
     # Used as fallback when Cohere rerank fails, or as primary when NEMOTRON_RERANK_ENABLED=true.
     NEMOTRON_RERANK_ENABLED: bool = os.getenv("NEMOTRON_RERANK_ENABLED", "false").lower() in ("1", "true", "yes")
-    NEMOTRON_RERANK_MODEL: str = os.getenv("NEMOTRON_RERANK_MODEL", "nvidia/llama-nemotron-rerank-vl-1b-v2:free")
+    # No default: the previous one (nvidia/llama-nemotron-rerank-vl-1b-v2:free) is a
+    # dead endpoint — see the removal note in infrastructure/llm/registry.py. Enabling
+    # the path without naming a live model would spend one request per document on a
+    # URL that no longer exists, so it now requires an explicit choice.
+    NEMOTRON_RERANK_MODEL: str = os.getenv("NEMOTRON_RERANK_MODEL", "")
     NEMOTRON_RERANK_CONCURRENCY: int = int(os.getenv("NEMOTRON_RERANK_CONCURRENCY", "5"))
     # When true, applies semantic cross-encoder reranking after BM25+freshness sort and before LLM vetting.
     # Adds ~1-2s latency but meaningfully improves context quality for research/article methods.

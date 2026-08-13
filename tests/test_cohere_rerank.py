@@ -229,3 +229,23 @@ class TestRerankMemoryChunks:
             chunks = [ContextChunk("a", "s", 0.5, "L1")]
             result = await rerank_memory_chunks("query", chunks)
             assert result == chunks
+
+
+@pytest.mark.asyncio
+async def test_nemotron_rerank_without_model_returns_documents_unchanged():
+    """An unset NEMOTRON_RERANK_MODEL must not attempt a call.
+
+    The default used to be a removed endpoint, so enabling this path spent one
+    request per document on a dead URL and then stamped every document with the
+    neutral 0.5 error score.
+    """
+    from reasoner.core.rerank import rerank_via_nemotron
+
+    docs = [{"title": "a"}, {"title": "b"}]
+    with patch.object(settings, "OPENROUTER_API_KEY", "test-key"):
+        with patch.object(settings, "NEMOTRON_RERANK_MODEL", ""):
+            with patch("httpx.AsyncClient") as mock_cls:
+                result = await rerank_via_nemotron("query", docs)
+
+    assert result == docs
+    mock_cls.assert_not_called()

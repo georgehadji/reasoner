@@ -228,15 +228,19 @@ def require_tier(min_tier: SubscriptionTier):
     from fastapi import HTTPException
 
     async def checker(user: User = Depends(get_current_user)) -> User:
-        # BUG-FIX: Actually enforce the tier requirement instead of silently bypassing.
-        # Previously this function returned user unconditionally, allowing any tier
-        # to access endpoints protected by require_tier().
-        # TODO(#501): Replace with actual tier lookup from subscription DB.
-        # For now, fail closed in production to prevent unauthorized access.
-        if settings.ENVIRONMENT == "production":
+        # Resolves the caller's entitled tier from their subscription.
+        # _resolve_user_tier() falls back to FREE on every uncertain path, so a
+        # subscription-store outage denies paid access rather than granting it.
+        if not settings.PRESET_TIER_ENFORCEMENT_ENABLED:
+            return user
+        user_tier = await _resolve_user_tier(str(user.id))
+        if not tier_satisfies(user_tier, min_tier):
             raise HTTPException(
                 status_code=403,
-                detail=f"Tier enforcement not yet implemented. Minimum required: {min_tier.name}",
+                detail=(
+                    f"This feature requires the {min_tier.value} plan. "
+                    f"Your current plan is {user_tier.value}."
+                ),
             )
         return user
 
@@ -373,6 +377,23 @@ def _get_subscription_repo():
 # (cancelled, past_due) is treated as FREE.
 _ENTITLED_STATUSES = frozenset({SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIALING})
 
+# Tier ranking for "at least this tier" comparisons. SubscriptionTier is a plain
+# str Enum with no inherent order, so comparisons must go through this map.
+_TIER_RANK: dict[SubscriptionTier, int] = {
+    SubscriptionTier.FREE: 0,
+    SubscriptionTier.PRO: 1,
+    SubscriptionTier.ENTERPRISE: 2,
+}
+
+
+def tier_satisfies(user_tier: SubscriptionTier, required_tier: SubscriptionTier) -> bool:
+    """Whether *user_tier* meets or exceeds *required_tier*.
+
+    Unknown tiers rank 0 (FREE) so an unrecognised value can never satisfy a paid
+    requirement.
+    """
+    return _TIER_RANK.get(user_tier, 0) >= _TIER_RANK.get(required_tier, 0)
+
 
 async def _resolve_user_tier(user_id: str) -> SubscriptionTier:
     """Resolve the tier a user is entitled to from their subscription.
@@ -446,18 +467,45 @@ async def check_preset_access(
     FastAPI dependency: enforce preset tier requirements.
     Raises HTTPException 403 if preset requires higher tier.
     """
-    # BUG-FIX: Actually enforce preset access control instead of unconditionally
-    # bypassing. Previously any authenticated user could use any preset regardless
-    # of their subscription tier.
-    # TODO(#501): Replace with actual preset-to-tier mapping from DB.
-    # For now, fail closed in production to prevent unauthorized access.
     from fastapi import HTTPException
 
-    if settings.ENVIRONMENT == "production":
+    # Off by default — see PRESET_TIER_ENFORCEMENT_ENABLED. Previously this raised
+    # 403 for *every* caller in production (paying users included) and enforced
+    # nothing anywhere else, so neither tier got the intended behaviour.
+    if not settings.PRESET_TIER_ENFORCEMENT_ENABLED:
+        return
+
+    required_tier = get_preset_tier(preset)
+    if required_tier == SubscriptionTier.FREE:
+        return
+
+    user_tier = await _resolve_user_tier(str(user.id))
+    if not tier_satisfies(user_tier, required_tier):
         raise HTTPException(
             status_code=403,
-            detail=f"Preset access enforcement not yet implemented. Preset: {preset}",
+            detail=(
+                f"Preset '{preset}' requires the {required_tier.value} plan. "
+                f"Your current plan is {user_tier.value}."
+            ),
         )
+
+
+async def check_preset_access_if_authenticated(
+    preset: str,
+    user: User | None,
+) -> None:
+    """Enforce preset tier requirements for authenticated callers.
+
+    Called from the route body rather than via Depends: the preset arrives in the
+    request body, and a dependency taking the body model cannot be resolved from a
+    string annotation, so FastAPI would treat it as a query parameter.
+
+    Mirrors check_quota_if_authenticated — anonymous access is governed by
+    ENABLE_LEGACY_API_KEY at the route, so there is no subscription to check.
+    """
+    if user is None:
+        return
+    await check_preset_access(preset, user)
 
 
 async def check_quota_if_authenticated(
