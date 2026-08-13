@@ -782,9 +782,9 @@ async def search_web(
     deduplicated, and grouped.
     """
     try:
-        from reasoner.core.search import smart_search
-
         if req.smart:
+            from reasoner.core.search import smart_search
+
             results = await smart_search(
                 req.query,
                 source_type=req.source_type,

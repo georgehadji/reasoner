@@ -185,7 +185,10 @@ class TestPromptEnhancement:
         pipeline = ReasonerPipeline(router=router, preset_name="multi-perspective-budget", enhance_prompt=False)
         state = await pipeline.run("vague problem")
 
-        assert state.enhanced_problem == "vague problem"
+        # Opting out skips the enhance phase entirely, so enhanced_problem is left
+        # empty; every consumer reads `enhanced_problem or problem`, and the API
+        # path normalises it to the original before streaming.
+        assert (state.enhanced_problem or state.problem) == "vague problem"
         assert "prompt_enhancement" not in [c[0] for c in router.calls]
 
 
@@ -291,8 +294,13 @@ class TestAPILLMErrorGracefulDegradation:
 
 @pytest_asyncio.fixture
 async def api_client(monkeypatch):
-    # Allow anonymous access for e2e tests that predate auth requirements
+    # Allow anonymous access for e2e tests that predate auth requirements.
+    # settings is built once at import, so the env var alone has no effect —
+    # patch the attribute the request path actually reads.
+    from reasoner.core.settings import settings
+
     monkeypatch.setenv("ENABLE_LEGACY_API_KEY", "true")
+    monkeypatch.setattr(settings, "ENABLE_LEGACY_API_KEY", True)
     async with AsyncClient(
         transport=ASGITransport(app=api.app), base_url="http://test"
     ) as c:
@@ -307,7 +315,7 @@ class TestAPIPromptEnhancement:
         def _sse(data):
             return f"data: {json.dumps(data)}\n\n"
 
-        async def fake_run_stream_cached(req, user_id=None):
+        async def fake_run_stream_cached(req, request=None, user_id=None, **kwargs):
             captured["enhance"] = req.enhance_prompt
             yield _sse({"type": "start", "routing": {"[primary]": "fake"}})
             if req.enhance_prompt:
@@ -340,7 +348,7 @@ class TestAPITokenAndModelsInPhaseComplete:
         def _sse(data):
             return f"data: {json.dumps(data)}\n\n"
 
-        async def fake_run_stream_cached(req, user_id=None):
+        async def fake_run_stream_cached(req, request=None, user_id=None, **kwargs):
             yield _sse({"type": "start", "routing": {"[primary]": "fake"}})
             yield _sse({
                 "type": "phase_complete",
@@ -368,25 +376,24 @@ class TestAPITokenAndModelsInPhaseComplete:
 class TestAPISearch:
     @pytest.mark.asyncio
     async def test_api_search_returns_results(self, api_client, monkeypatch):
-        import reasoner.core.search as _search_mod
+        # /api/search resolves its backend through the SearchService dependency,
+        # so override that rather than patching search-module internals.
+        from reasoner.api.dependencies import get_search_service
 
-        async def fake_search(*args, **kwargs):
+        async def fake_search(query, source_type="general", num_results=10):
             return [
                 {"title": "Result 1", "url": "https://example.com/1", "snippet": "Snippet 1"},
                 {"title": "Result 2", "url": "https://example.com/2", "snippet": "Snippet 2"},
             ]
 
-        async def fake_get_discovery_client(**kwargs):
-            return type("Client", (), {"search": fake_search})(), kwargs.get("source_type")
-
-        async def fake_get_search_client(**kwargs):
-            return type("Client", (), {"search": fake_search})(), kwargs.get("source_type")
-
-        monkeypatch.setattr(_search_mod, "get_discovery_client", fake_get_discovery_client)
-        monkeypatch.setattr(_search_mod, "get_search_client", fake_get_search_client)
+        fake_service = type("FakeSearchService", (), {"search": staticmethod(fake_search)})()
+        api.app.dependency_overrides[get_search_service] = lambda: fake_service
 
         payload = {"query": "test query", "source_type": "general", "num_results": 5}
-        response = await api_client.post("/api/search", json=payload)
+        try:
+            response = await api_client.post("/api/search", json=payload)
+        finally:
+            api.app.dependency_overrides.pop(get_search_service, None)
         assert response.status_code == 200
         data = response.json()
         assert data["query"] == "test query"
@@ -440,10 +447,15 @@ class TestAPICriticalPhaseErrorHalt:
             classmethod(lambda cls, **kwargs: fake_router),
         )
 
-        async def fake_decompose(self, state):
+        # Phases are PhaseStep entries on a WorkflowStrategy now; "Critique & Pruning"
+        # is the critical step in MultiPerspectiveFlow, so failing it must halt the run.
+        async def fake_critique(state, services):
             raise ValueError("simulated decomposition failure")
 
-        monkeypatch.setattr("reasoner.pipeline.ReasonerPipeline._phase_1_decompose", fake_decompose)
+        monkeypatch.setattr(
+            "reasoner.application.flows.multi_perspective.run_critique_phase",
+            fake_critique,
+        )
 
         payload = {"problem": "test critical halt", "preset": "multi-perspective-budget", "no_cache": True}
         async with api_client.stream("POST", "/api/run", json=payload, timeout=10) as response:
