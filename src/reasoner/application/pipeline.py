@@ -404,6 +404,10 @@ class ReasonerPipeline:
 
     async def run(self, problem: str, method: str | None = None) -> PipelineState:
         """Execute the reasoning pipeline."""
+        # Fail before the first paid call: an empty problem cannot produce a useful
+        # answer, but every phase would still run and be billed.
+        if self.initial_state is None and (problem is None or not problem.strip()):
+            raise ValueError("Problem cannot be empty")
         start_time = time.monotonic()
         if not method:
             method = self._get_method_from_preset()
@@ -573,6 +577,13 @@ class ReasonerPipeline:
     def _validate_enhancement(self, original: str, enhanced: str) -> bool:
         if not enhanced or len(enhanced) < 10: return False
         if len(enhanced) > len(original) * 5: return False
+        # Reject an enhancement that changed the problem's language. The enhanced
+        # text replaces the original, and _phase_fusion re-detects the language
+        # from it — so a translated enhancement silently switches the entire run
+        # (and the user's answer) to the wrong language.
+        from reasoner.phases._shared import detect_language
+        if detect_language(original) != detect_language(enhanced):
+            return False
         return True
 
     @timed

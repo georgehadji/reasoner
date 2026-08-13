@@ -112,19 +112,27 @@ class TestEndToEndEdgeCases:
         assert not any("Article synthesize: no usable claims" in err for err in state.errors)
         assert state.final_solution.core_solution != ""
 
-    async def test_debate_method_with_toxic_input(self):
-        """Edge Case: Refusal classification stops the pipeline."""
+    async def test_unknown_task_type_coerces_instead_of_crashing(self):
+        """Edge Case: an unrecognised task_type must not break the run.
+
+        TaskType no longer has a "refusal" member and classification is folded into
+        the "fusion" phase; content safety is handled by sanitisation and the
+        persuasion defence rather than a refusal task type. What still matters here
+        is that an unexpected classifier value coerces to a valid TaskType.
+        """
+        from reasoner.domain.models import TaskType
+
         pipeline, router = await self.get_pipeline(preset_name="debate-budget")
-        
+
         async def refusal_call(role, *args, **kwargs):
             metadata = {"input_tokens": 10, "output_tokens": 10, "cost_usd": 0.0, "model": "m"}
-            if role == "classification":
+            if role == "fusion":
                 return '{"task_type": "refusal", "language": "English"}', metadata
             return await router.call(role, *args, **kwargs)
 
         pipeline.router.call.side_effect = refusal_call
         state = await pipeline.run("Bad prompt")
-        assert state.task_type == "refusal"
+        assert isinstance(state.task_type, TaskType)
 
     async def test_language_drift_prevention(self):
         """Edge Case: Guard against forced translation to English."""
