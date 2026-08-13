@@ -289,9 +289,12 @@ class TestSynthesisCircuitBreaker:
         """The synthesis system prompt must contain circuit breaker text."""
         from reasoner.phases import SYNTHESIS_SYSTEM
         
+        # Asserted on the rule rather than one phrasing of it: the wording was
+        # rewritten ("could not find reliable sources" -> "sources are missing or
+        # unreliable") while the instruction itself is unchanged.
         assert "CIRCUIT BREAKER" in SYNTHESIS_SYSTEM
-        assert "could not find reliable sources" in SYNTHESIS_SYSTEM
-        assert "UNVERIFIED" in SYNTHESIS_SYSTEM
+        assert "missing or unreliable" in SYNTHESIS_SYSTEM
+        assert "Do NOT synthesize confident answers from UNVERIFIED data" in SYNTHESIS_SYSTEM
 
     def test_synthesis_prompt_normal_quality(self):
         """Normal quality should still produce a valid prompt."""
