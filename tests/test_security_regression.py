@@ -155,7 +155,11 @@ class TestBug003ErrorMessageSanitization:
     def test_context_error_is_generic(self):
         """Context route errors must not leak internals."""
         secret = "SECRET_CONTEXT_PATH"
-        with patch("reasoner.api.routes.context.ReasonerPipeline") as mock_pipe:
+        # The route builds its pipeline through the orchestrator now; there is no
+        # direct ReasonerPipeline import to patch.
+        with patch(
+            "reasoner.application.orchestrator.PipelineOrchestrator.create_pipeline"
+        ) as mock_pipe:
             mock_pipe.side_effect = RuntimeError(secret)
             response = client.post(
                 "/api/run-with-context",

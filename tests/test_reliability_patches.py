@@ -90,10 +90,30 @@ async def test_cli_cleanup_on_exit():
     args.force_pipeline = True
     args.output = ""
     args.save_state = ""
+    # MagicMock returns a truthy mock for any unset attribute, which would send
+    # main() down the benchmark branch and into a real provider build.
+    args.benchmark = ""
+    args.benchmark_all = False
     
     # Mock the internal logic to prevent real execution
-    with patch("reasoner.main.build_router"), \
-         patch("reasoner.main.ReasonerPipeline") as mock_pipeline, \
+    # main() now routes through the orchestrator's preflight; stub that boundary so
+    # the test stays focused on the finally-block cleanup. ReasonerPipeline is
+    # imported inside the function, so patch it on its defining module.
+    preflight = MagicMock()
+    preflight.action = "pipeline"
+    preflight.effective_preset_name = "multi-perspective-budget"
+    preflight.auto_selected_method = None
+    preflight.conversation_history = None
+    preflight.previous_synthesis = ""
+    preflight.turn_number = 1
+
+    with patch("reasoner.main.PresetService"), \
+         patch(
+             "reasoner.application.orchestrator.PipelineOrchestrator.preflight",
+             new_callable=AsyncMock,
+             return_value=preflight,
+         ), \
+         patch("reasoner.pipeline.ReasonerPipeline") as mock_pipeline, \
          patch("reasoner.main.render_pipeline_result"), \
          patch("reasoner.main.export_to_json"), \
          patch("reasoner.scraper.close_scraper_client", new_callable=AsyncMock) as mock_close_scraper, \
