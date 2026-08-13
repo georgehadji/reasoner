@@ -100,6 +100,26 @@ class FakeProvider:
         return "fake"
 
 
+@pytest.fixture(autouse=True)
+def disable_token_cache():
+    """Disable the global token cache so runs don't reuse each other's results.
+
+    Without this the first pipeline run populates the cache and later runs are
+    served from it, so the tracking router records only a partial set of roles
+    (or none at all) and the role-call assertions fail depending on test order.
+    """
+    from reasoner.pipeline import TOKEN_OPTIMIZATION
+    import reasoner.pipeline as _pm
+
+    original = TOKEN_OPTIMIZATION["caching"]
+    old_cache = _pm.token_cache
+    TOKEN_OPTIMIZATION["caching"] = False
+    _pm.token_cache = None
+    yield
+    TOKEN_OPTIMIZATION["caching"] = original
+    _pm.token_cache = old_cache
+
+
 class TrackingFakeRouter:
     """Fake router that records every call and returns canned responses."""
 
@@ -137,8 +157,10 @@ class TestPresetConfig:
         assert preset.primary_id
 
     def test_required_routing_roles_present(self, preset):
+        # Classification and decomposition were merged into the single "fusion"
+        # phase; roles absent from a preset resolve to primary automatically.
         required = {
-            "classification", "decomposition",
+            "fusion",
             "constructive", "destructive", "systemic", "minimalist",
             "scoring", "stress_testing", "synthesis",
         }
@@ -150,9 +172,15 @@ class TestPresetConfig:
     def test_parallel_perspectives_enabled(self, preset):
         assert preset.parallel_perspectives is True
 
-    def test_fallback_routing_configured(self, preset):
-        assert preset.fallback_routing, "Budget preset should define fallback routing"
-        assert "constructive" in preset.fallback_routing
+    def test_every_routed_role_resolves_a_provider(self, preset):
+        """Explicit fallback_routing is optional — ProviderRouter falls back to
+        primary for any role without one, so what matters is that each role
+        resolves."""
+        from reasoner.application.services.preset_service import PresetService
+
+        _, router = PresetService().build_router(PRESET_ID)
+        for role in preset.routing:
+            assert router.get(role) is not None, f"role {role!r} did not resolve"
 
     def test_required_tier_is_free(self, preset):
         from reasoner.domain.saas import SubscriptionTier
@@ -267,7 +295,7 @@ class TestMockPipelineRun:
     @pytest.mark.asyncio
     async def test_perspectives_generated(self, pipeline):
         state = await pipeline.run("test problem")
-        assert len(state.perspectives) > 0
+        assert len(state.candidates) > 0
 
     @pytest.mark.asyncio
     async def test_final_solution_produced(self, pipeline):
@@ -309,14 +337,16 @@ class TestPhaseRoleCalls:
         return state, router
 
     @pytest.mark.asyncio
-    async def test_classification_role_called(self, state_and_router):
+    async def test_fusion_role_called(self, state_and_router):
+        """Classification + decomposition are one "fusion" call now."""
         _, router = state_and_router
-        assert "classification" in router.called_roles()
+        assert "fusion" in router.called_roles()
 
     @pytest.mark.asyncio
-    async def test_decomposition_role_called(self, state_and_router):
+    async def test_fusion_precedes_perspectives(self, state_and_router):
         _, router = state_and_router
-        assert "decomposition" in router.called_roles()
+        roles = router.called_roles()
+        assert roles.index("fusion") < roles.index("constructive")
 
     @pytest.mark.asyncio
     async def test_phase_2_perspective_roles_called(self, state_and_router):
@@ -338,14 +368,13 @@ class TestPhaseRoleCalls:
         assert "synthesis" in router.called_roles()
 
     @pytest.mark.asyncio
-    async def test_phase_order_classification_before_decomposition(self, state_and_router):
+    async def test_phase_order_fusion_before_scoring(self, state_and_router):
         _, router = state_and_router
         roles = router.called_roles()
-        classification_idx = next((i for i, r in enumerate(roles) if r == "classification"), -1)
-        decomposition_idx = next((i for i, r in enumerate(roles) if r == "decomposition"), -1)
-        assert classification_idx < decomposition_idx, (
-            "classification must be called before decomposition"
-        )
+        fusion_idx = next((i for i, r in enumerate(roles) if r == "fusion"), -1)
+        scoring_idx = next((i for i, r in enumerate(roles) if r == "scoring"), -1)
+        assert fusion_idx != -1 and scoring_idx != -1
+        assert fusion_idx < scoring_idx, "fusion must be called before scoring"
 
     @pytest.mark.asyncio
     async def test_synthesis_called_after_scoring(self, state_and_router):
