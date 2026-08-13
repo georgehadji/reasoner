@@ -16,6 +16,16 @@ from reasoner.infrastructure.telemetry.call_telemetry_store import (
 )
 
 
+def _now_iso() -> str:
+    """Timestamp inside the stores default query window.
+
+    The queries filter on `timestamp >= datetime('now', '-N hours')`, so a
+    hardcoded date silently ages out of every window and all assertions collapse
+    to zero rows.
+    """
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 @pytest.fixture
 def store(tmp_path):
     """Create a telemetry store backed by a temp SQLite database."""
@@ -29,7 +39,7 @@ def sample_event() -> LLMCallTelemetry:
     return LLMCallTelemetry(
         call_id=str(uuid.uuid4()),
         run_id="run-001",
-        timestamp="2026-07-08T12:00:00Z",
+        timestamp=_now_iso(),
         model_id="claude-sonnet",
         role="constructive",
         preset_id="multi-perspective-budget",
@@ -56,7 +66,7 @@ def failed_event() -> LLMCallTelemetry:
     return LLMCallTelemetry(
         call_id=str(uuid.uuid4()),
         run_id="run-001",
-        timestamp="2026-07-08T12:00:00Z",
+        timestamp=_now_iso(),
         model_id="claude-haiku",
         role="constructive",
         preset_id="multi-perspective-budget",
@@ -115,7 +125,7 @@ async def test_aggregate_multiple_calls(store, sample_event, failed_event):
         evt = LLMCallTelemetry(
             call_id=str(uuid.uuid4()),
             run_id="run-001",
-            timestamp="2026-07-08T12:00:00Z",
+            timestamp=_now_iso(),
             model_id="claude-sonnet",
             role="constructive",
             preset_id="multi-perspective-budget",
@@ -135,7 +145,7 @@ async def test_aggregate_multiple_calls(store, sample_event, failed_event):
     fail_evt = LLMCallTelemetry(
         call_id=str(uuid.uuid4()),
         run_id="run-001",
-        timestamp="2026-07-08T12:00:00Z",
+        timestamp=_now_iso(),
         model_id="claude-sonnet",
         role="constructive",
         preset_id="multi-perspective-budget",
@@ -191,7 +201,7 @@ async def test_role_leaderboard(store):
             evt = LLMCallTelemetry(
                 call_id=str(uuid.uuid4()),
                 run_id="run-002",
-                timestamp="2026-07-08T12:00:00Z",
+                timestamp=_now_iso(),
                 model_id=model_id,
                 role="scoring",
                 preset_id="debate-budget",

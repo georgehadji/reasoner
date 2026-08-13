@@ -102,8 +102,10 @@ def test_preset_methods_map_to_flow_strategies() -> None:
     PipelinePreset has no .method field — method is derived from preset name
     via get_method_from_preset()."""
     from reasoner.application.flows.factory import WorkflowFactory
-    from reasoner.domain.preset_registry import PRESETS
-    from reasoner.domain.preset_core import get_method_from_preset
+    # reasoner.presets is the production accessor: PRESETS values are built
+    # PipelinePreset objects and get_method_from_preset honours the declared
+    # method field instead of matching on the preset name.
+    from reasoner.presets import PRESETS, get_method_from_preset
 
     factory = WorkflowFactory()
 
@@ -122,7 +124,7 @@ def test_preset_methods_map_to_flow_strategies() -> None:
 
 def test_preset_models_in_registry() -> None:
     """Every model referenced in presets must exist in the model registry."""
-    from reasoner.domain.preset_registry import PRESETS
+    from reasoner.presets import PRESETS
     from reasoner.infrastructure.llm.registry import _REGISTRY
 
     for preset_id, preset in PRESETS.items():
