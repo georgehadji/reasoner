@@ -17,7 +17,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from reasoner.logging_utils import get_correlation_id
+from reasoner.logging_utils import get_correlation_id, redact_dict
 
 logger = logging.getLogger(__name__)
 
@@ -190,7 +190,13 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
         message=str(exc.detail),
         request=request,
         status_code=exc.status_code,
-        extra={"headers": dict(request.headers) if level == "error" else None},
+        # Headers carry Authorization, X-Admin-Key and session cookies. These are
+        # written to the durable ErrorStore and attached to the Sentry scope, so
+        # storing them raw put live credentials in both. redact_dict() replaces
+        # the values of any credential-shaped key.
+        extra={
+            "headers": redact_dict(dict(request.headers)) if level == "error" else None
+        },
     )
 
     return _safe_json_response(exc.status_code, str(exc.detail), get_correlation_id(), request)

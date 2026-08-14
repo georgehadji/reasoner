@@ -13,7 +13,10 @@ const FEATURES = [
   {
     num: '01',
     title: 'Verified Reasoning',
-    desc: 'Every claim is independently scored, cross-checked across models, and labeled with epistemic confidence before you see it. No hallucinations pass through.',
+    // "No hallucinations pass through" claimed something the system cannot
+    // deliver and directly contradicted the AI disclosure in Terms §3. What the
+    // pipeline actually does is label confidence — say that instead.
+    desc: 'Every claim is independently scored, cross-checked across models, and labeled VERIFIED, HYPOTHESIS or UNKNOWN — so you can see which parts are load-bearing and which still need checking.',
   },
   {
     num: '02',

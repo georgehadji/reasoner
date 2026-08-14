@@ -186,10 +186,16 @@ class ReasonerPipeline:
                 if chunks:
                     parts: list[str] = []
                     for i, chunk_text in enumerate(chunks, 1):
+                        # Uploaded files are untrusted input: a document can
+                        # carry "ignore previous instructions" as easily as a
+                        # web page can. Scraped content is sanitized in
+                        # flows/search_phases.py; this path was not, so a
+                        # crafted upload reached the model unfiltered.
+                        safe_chunk = sanitize_for_prompt(chunk_text)[0]
                         parts.append(
                             f"=== EXCERPT {i} (most relevant passage) ===\n"
                             f"[CONTENT START]\n"
-                            f"{chunk_text}\n"
+                            f"{safe_chunk}\n"
                             f"[CONTENT END]"
                         )
                     return (
@@ -210,10 +216,13 @@ class ReasonerPipeline:
             filename = att.get("filename", "unknown")
             extracted = att.get("extracted_text", "").strip()
             if extracted:
+                # Same reasoning as the semantic branch above — untrusted
+                # document text must not reach a prompt unfiltered.
+                safe_extracted = sanitize_for_prompt(extracted)[0]
                 parts.append(
                     f"=== FILE: {filename} ===\n"
                     f"[CONTENT START]\n"
-                    f"{extracted}\n"
+                    f"{safe_extracted}\n"
                     f"[CONTENT END]"
                 )
         if not parts:

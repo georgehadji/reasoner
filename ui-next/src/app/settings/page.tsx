@@ -5,7 +5,7 @@ import { useAppStore } from '@/stores/app-store';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { deleteAccount } from '@/lib/api-client';
+import { deleteAccount, exportAccountData } from '@/lib/api-client';
 import { User, ShieldAlert, ShieldCheck, Database, History } from 'lucide-react';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
@@ -17,6 +17,7 @@ export default function SettingsPage() {
   const router = useRouter();
   const { subscription } = useSubscription();
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [retention, setRetention] = useState('forever');
   const [zeroRetention, setZeroRetention] = useState(false);
@@ -42,6 +43,30 @@ export default function SettingsPage() {
       setMessage({ type: 'error', text: msg });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleExportData = async () => {
+    setExporting(true);
+    setMessage({ type: '', text: '' });
+    try {
+      const blob = await exportAccountData();
+      // Hand the file straight to the browser rather than rendering it — an
+      // export is something you keep, not something you read on the page.
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `reasoner-data-export-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setMessage({ type: 'success', text: 'Your data export has been downloaded.' });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Could not export your data.';
+      setMessage({ type: 'error', text: msg });
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -177,6 +202,27 @@ export default function SettingsPage() {
               className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-2 text-sm font-medium hover:bg-[var(--surface-3)] transition-colors disabled:opacity-50"
             >
               Reset Password
+            </button>
+          </div>
+        </section>
+
+        {/* Your data — GDPR Article 20 (portability). The endpoint existed but
+            nothing in the UI reached it, so the right was unavailable in practice. */}
+        <section className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6">
+          <h2 className="mb-4 text-xl font-semibold">Your Data</h2>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <p className="font-medium text-[var(--text)]">Export My Data</p>
+              <p className="text-sm text-[var(--text-muted)]">
+                Download everything we hold about your account as a JSON file.
+              </p>
+            </div>
+            <button
+              onClick={handleExportData}
+              disabled={exporting}
+              className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-medium text-[var(--text)] hover:bg-[var(--bg)] transition-colors disabled:opacity-50 whitespace-nowrap"
+            >
+              {exporting ? 'Preparing…' : 'Export My Data'}
             </button>
           </div>
         </section>

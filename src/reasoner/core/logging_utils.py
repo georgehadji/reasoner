@@ -134,7 +134,11 @@ def redact_dict(data: dict[str, Any]) -> dict[str, Any]:
     result = {}
     sensitive_keys = {
         'api_key', 'apikey', 'key', 'secret', 'password', 'token',
-        'credential', 'auth', 'authorization', 'bearer'
+        'credential', 'auth', 'authorization', 'bearer',
+        # Session cookies are bearer credentials too. Without these, redacting a
+        # request-header dict left `cookie` (and any Set-Cookie echo) in plain
+        # text — a session in the error store is as good as the password.
+        'cookie', 'set-cookie', 'session',
     }
     
     for k, v in data.items():

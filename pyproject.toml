@@ -1,13 +1,26 @@
 [build-system]
 requires = ["setuptools>=64.0"]
-build-backend = "setuptools.backends._legacy:_Backend"
+# `setuptools.backends._legacy:_Backend` is not a module that exists in any
+# setuptools release, so `pip install .` and `pip wheel .` both failed with
+# ModuleNotFoundError. The documented backend is setuptools.build_meta.
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "reasoner"
 version = "2.1.0"
 description = "Multi-model reasoning pipeline orchestrator"
 requires-python = ">=3.12"
+# Runtime dependencies are pinned in requirements.txt, which is what the
+# Dockerfile and CI install. Left empty deliberately so the two cannot drift;
+# `pip install .` gives you the package, `pip install -r requirements.txt`
+# gives you what it needs to run.
 dependencies = []
+
+# Without this, setuptools auto-discovery has to guess between src/, tests/ and
+# scripts/ and errors out on the ambiguity.
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["reasoner*"]
 
 [tool.ruff]
 target-version = "py312"

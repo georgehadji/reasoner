@@ -63,15 +63,40 @@ class UserDataEraser:
             except Exception as exc:
                 logger.warning("GDPR erasure: cache eviction failed for user %s: %s", user_id, exc)
 
-        # 3. Neuro memory — best-effort clear
+        # 3. Neuro long-term memory.
+        #
+        # This step used to import SessionManager, never call it, and fall
+        # through — so a user's hot/warm/cold session transcripts (their prompts
+        # and our responses, verbatim) survived an Article 17 erasure while the
+        # receipt still reported "completed". Neuro isolates tenants by agent
+        # directory, so erasure is the removal of that directory.
+        neuro_erased = False
+        neuro_error: str | None = None
         try:
-            from reasoner.neuro.sessions import SessionManager
-            # SessionManager operates on per-user data directories; clearing the
-            # cache ensures no hot-session data remains in memory. Full file-level
-            # deletion would require knowing the neuro data path per user.
-            # For MVP, this is a best-effort cache clear.
-        except Exception:
-            pass
+            import shutil
+
+            from reasoner.neuro.config import get_agent_data_dir, load_config
+
+            agent_dir = get_agent_data_dir(load_config(), agent_id=str(user_id))
+            if agent_dir.exists():
+                # Refuse to remove anything that isn't the per-agent directory —
+                # a misconfigured data_dir must not turn erasure into rm -rf.
+                if agent_dir.name != str(user_id) or agent_dir.parent.name != "agents":
+                    raise RuntimeError(
+                        f"refusing to erase unexpected neuro path: {agent_dir}"
+                    )
+                shutil.rmtree(agent_dir)
+                neuro_erased = True
+                logger.info("GDPR erasure: removed neuro memory for user %s", user_id)
+            else:
+                # Nothing stored for this user is a successful erasure, not a
+                # failure — there is no memory left to remove.
+                neuro_erased = True
+        except Exception as exc:
+            neuro_error = str(exc)
+            logger.warning(
+                "GDPR erasure: neuro memory removal failed for user %s: %s", user_id, exc
+            )
 
         # Status reflects whether the event-store deletion step itself
         # succeeded, not whether *some* step (e.g. cache eviction, which is
@@ -81,6 +106,11 @@ class UserDataEraser:
         # while a user's actual pipeline data was never deleted.
         if aggregates_error:
             status = "failed"
+        elif not neuro_erased:
+            # Long-term memory holds the user's prompts and our responses
+            # verbatim. If it survived, the erasure is not complete, whatever
+            # else succeeded — saying otherwise is a false compliance record.
+            status = "partial"
         elif deleted_aggregates > 0 or cache_evicted:
             status = "completed"
         else:
@@ -90,9 +120,12 @@ class UserDataEraser:
             "deleted_aggregates": deleted_aggregates,
             "deleted_pipelines": deleted_pipelines,
             "cache_evicted": cache_evicted,
+            "neuro_memory_erased": neuro_erased,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "status": status,
         }
+        if neuro_error:
+            receipt["neuro_error"] = neuro_error
         if aggregates_error:
             receipt["error"] = f"Event store aggregate deletion failed: {aggregates_error}"
         logger.info("GDPR erasure receipt for user %s: %s", user_id, receipt)

@@ -223,6 +223,7 @@ export const API = {
   FEEDBACK: '/api/feedback',
   CONTACT: '/api/contact',
   ACCOUNT_DELETE: '/api/account/delete',
+  ACCOUNT_EXPORT: '/api/account/export',
   ERROR_REPORT: '/api/error-report',
   GENERATE_IMAGE: '/api/generate-image',
   NEURO_HEALTH: '/api/neuro/health',

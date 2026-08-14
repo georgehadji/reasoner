@@ -219,6 +219,27 @@ export async function generateImage(
   return data;
 }
 
+/**
+ * Download everything we hold about the account (GDPR Article 20).
+ *
+ * The endpoint existed and was rate-limited, but nothing in the UI called it,
+ * so the right to data portability was effectively unavailable to users.
+ */
+export async function exportAccountData(): Promise<Blob> {
+  const resp = await fetchWithCsrf(API.ACCOUNT_EXPORT, { method: 'GET' });
+  if (!resp.ok) {
+    let detail = `HTTP ${resp.status}`;
+    try {
+      const body = await resp.json();
+      if (typeof body?.detail === 'string') detail = body.detail;
+    } catch {
+      /* keep the status */
+    }
+    throw new Error(detail);
+  }
+  return resp.blob();
+}
+
 export async function deleteAccount(): Promise<{ status: string; user_id?: string; deleted?: Record<string, unknown> }> {
   const resp = await fetchWithCsrf(API.ACCOUNT_DELETE, { method: 'POST' });
   const data = await resp.json();

@@ -67,6 +67,10 @@ settings.json
 cache/
 src/reasoner/cache/
 src/reasoner/history/
+# Pipeline run records. docker-compose.yml mounts ./history as a volume, so this
+# is live user data — problem text, presets, token counts — not fixtures. 76 real
+# records had been committed because only the src/ path was ignored.
+history/
 graphify-out/
 tasks/
 

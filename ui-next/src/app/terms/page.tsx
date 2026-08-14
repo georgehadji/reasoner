@@ -3,7 +3,11 @@ import { SiteFooter } from '@/components/layout/SiteFooter';
 import { Gavel, AlertCircle, FileText, Globe } from 'lucide-react';
 
 export default function TermsPage() {
-  const lastUpdated = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+// A legal document's revision date is a fact about when it was last
+// changed, not about when the page was rendered. new Date() made every
+// policy claim it had been revised today, every day. Update this by hand
+// when you actually change the text.
+  const lastUpdated = 'August 14, 2026';
 
   return (
     <div className="flex min-h-screen flex-col bg-[var(--bg)] text-[var(--text)]">

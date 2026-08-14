@@ -8,7 +8,8 @@ export default function CookiesPage() {
       <main className="mx-auto max-w-3xl px-4 py-16 flex-1 w-full">
       <h1 className="text-4xl font-bold mb-8">Cookie Policy</h1>
       <div className="prose prose-invert max-w-none text-[var(--text-2)]">
-        <p className="mb-4">Last updated: {new Date().toLocaleDateString()}</p>
+        {/* Hardcoded deliberately: see the note in privacy/page.tsx. */}
+        <p className="mb-4">Last updated: August 14, 2026</p>
         
         <h2 className="text-2xl font-semibold mt-8 mb-4 text-[var(--text)]">What Are Cookies</h2>
         <p className="mb-4">Cookies are small text files that are placed on your computer or mobile device when you visit our website. They are widely used to make websites work more efficiently and provide a better user experience.</p>
