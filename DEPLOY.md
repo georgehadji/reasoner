@@ -95,6 +95,17 @@ python scripts/preflight_check.py --generate   # prints all five secrets
 python scripts/preflight_check.py              # exits 1 on any blocking gap
 ```
 
+To confirm the code itself is releasable without waiting on GitHub Actions
+(a private repo out of billed minutes fails every job in ~2s with no runner
+assigned, which is indistinguishable from a real failure), run the same gates
+locally:
+
+```bash
+./scripts/verify_ci.sh              # every gate
+./scripts/verify_ci.sh --backend    # skip the frontend gates
+./scripts/verify_ci.sh --fast       # skip the coverage re-run
+```
+
 The check flags empty values, unedited `.env.example` placeholders, malformed
 Fernet keys, `DEBUG=true`, `RATE_LIMITER_MODE=memory`, and localhost origins
 left in `CORS_ORIGINS`.
