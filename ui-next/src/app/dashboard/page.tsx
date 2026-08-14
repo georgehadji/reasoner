@@ -2,6 +2,8 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { apiFetch } from '@/lib/api-client';
+import Link from 'next/link';
+import { useCredits } from '@/hooks/useCredits';
 import { useQuota } from '@/hooks/useQuota';
 import { useSubscription } from '@/hooks/useSubscription';
 import {
@@ -46,9 +48,22 @@ function ChartSkeleton() {
   );
 }
 
+/** Ledger reasons rendered as prose rather than raw enum values. */
+const LEDGER_LABELS: Record<string, string> = {
+  monthly_grant: 'Monthly allowance',
+  signup_bonus: 'Signup bonus',
+  purchase: 'Credit purchase',
+  admin_adjustment: 'Adjustment',
+  refund: 'Refund',
+  pipeline_run: 'Pipeline run',
+  image_generation: 'Image generation',
+  web_search: 'Web search',
+};
+
 function DashboardContent() {
   const { quota, loading: quotaLoading } = useQuota();
   const { subscription, loading: subLoading } = useSubscription();
+  const { credits, ledger, loading: creditsLoading } = useCredits({ withLedger: true });
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [portalError, setPortalError] = useState('');
@@ -109,7 +124,35 @@ function DashboardContent() {
     <div className="mx-auto max-w-5xl px-4 py-8">
       <h1 className="mb-6 text-2xl font-bold text-[var(--text)]">Dashboard</h1>
 
-      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {creditsLoading ? (
+          <StatCardSkeleton />
+        ) : (
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-6">
+            <p className="text-sm text-[var(--text-muted)]">Credits</p>
+            <p
+              className={`mt-1 text-2xl font-bold ${
+                (credits?.balance ?? 0) <= 0 ? 'text-red-500' : 'text-[var(--text)]'
+              }`}
+            >
+              {credits?.balance?.toLocaleString() ?? '—'}
+            </p>
+            <p className="mt-1 text-xs text-[var(--text-muted)]">
+              {credits
+                ? `≈ $${credits.balance_usd.toFixed(2)} · ${credits.monthly_allowance.toLocaleString()}/mo`
+                : 'Balance unavailable'}
+            </p>
+            {credits && credits.balance <= 0 && (
+              <Link
+                href="/pricing"
+                className="mt-2 inline-flex text-sm font-medium text-[var(--accent)] hover:underline"
+              >
+                Top up
+              </Link>
+            )}
+          </div>
+        )}
+
         {quotaLoading ? (
           <StatCardSkeleton />
         ) : (
@@ -187,6 +230,44 @@ function DashboardContent() {
         <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-6 text-center text-[var(--text-muted)]">
           No activity yet. Start a conversation to see your usage.
         </div>
+      )}
+
+      {ledger.length > 0 && (
+        <section className="mt-8 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-6">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="font-semibold text-[var(--text)]">Credit activity</h2>
+            <Link href="/docs/credits" className="text-sm text-[var(--accent)] hover:underline">
+              How credits work
+            </Link>
+          </div>
+          <ul className="divide-y divide-[var(--border)]">
+            {ledger.map((entry) => (
+              <li key={entry.id} className="flex items-center justify-between gap-4 py-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm text-[var(--text)]">
+                    {entry.description || LEDGER_LABELS[entry.reason] || entry.reason}
+                  </p>
+                  <p className="text-xs text-[var(--text-muted)]">
+                    {new Date(entry.created_at).toLocaleString()}
+                  </p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p
+                    className={`text-sm font-medium ${
+                      entry.delta > 0 ? 'text-green-500' : 'text-[var(--text)]'
+                    }`}
+                  >
+                    {entry.delta > 0 ? '+' : ''}
+                    {entry.delta.toLocaleString()}
+                  </p>
+                  <p className="text-xs text-[var(--text-muted)]">
+                    {entry.balance_after.toLocaleString()} left
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </div>
   );

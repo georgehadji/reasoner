@@ -12,8 +12,12 @@ import hashlib
 import logging
 import os
 import re
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 from uuid import UUID
+
+if TYPE_CHECKING:
+    from reasoner.application.services.api_key_service import ApiKeyService
+    from reasoner.application.services.credit_service import CreditService
 
 import asyncio
 from fastapi import Depends, HTTPException, Request
@@ -22,6 +26,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 logger = logging.getLogger(__name__)
 
 from reasoner.api.client_ip import get_client_ip
+from reasoner.domain.api_keys import looks_like_api_key
 from reasoner.domain.saas import User, SubscriptionTier, SubscriptionStatus, QuotaResult
 from reasoner.application.ports.auth_port import AuthPort
 from reasoner.application.services.auth_service import AuthService
@@ -129,15 +134,77 @@ def _looks_like_jwt(token: str) -> bool:
     return True
 
 
+async def _load_user_by_id(user_id: UUID) -> User | None:
+    """Load a canonical User from the local users table.
+
+    Used by the API-key path, which authenticates against a stored key hash and
+    therefore has no identity provider payload to build a User from.
+    """
+    try:
+        pool = await _get_provision_pool()
+        row = await pool.fetchrow(
+            "SELECT id, email, display_name, auth_provider, avatar_url, created_at "
+            "FROM users WHERE id = $1",
+            user_id,
+        )
+    except Exception as exc:
+        logger.warning("User lookup failed for %s: %s", user_id, exc)
+        return None
+
+    if row is None:
+        return None
+    return User(
+        id=row["id"] if isinstance(row["id"], UUID) else UUID(str(row["id"])),
+        email=row["email"],
+        display_name=row["display_name"],
+        auth_provider=row["auth_provider"],
+        avatar_url=row["avatar_url"],
+    )
+
+
+async def _resolve_api_key(token: str) -> User:
+    """Resolve a Reasoner API key (rsn_*) to its owning user.
+
+    The key's scopes are attached to the returned User, so a key can never act
+    beyond the permissions it was granted.
+    """
+    service = _get_api_key_service()
+    record = await service.authenticate(token)
+    if record is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or revoked API key",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    owner = await _load_user_by_id(record.user_id)
+    if owner is None:
+        # The key outlived its owner (deleted account) — treat as revoked.
+        raise HTTPException(status_code=401, detail="Invalid or revoked API key")
+
+    return User(
+        id=owner.id,
+        email=owner.email,
+        display_name=owner.display_name,
+        scopes=set(record.scopes),
+        auth_provider="api_key",
+        avatar_url=owner.avatar_url,
+    )
+
+
 async def _resolve_auth_token(token: str) -> User:
     """
     Unified token resolution.
 
     Strategy:
-    1. If token looks like JWT → route to AuthPort (Supabase/Local)
-    2. Else if ENABLE_LEGACY_API_KEY=true → route to legacy AuthManager
-    3. Else → reject
+    1. If token is a Reasoner API key (rsn_*) → route to ApiKeyService
+    2. Else if token looks like JWT → route to AuthPort (Supabase/Local)
+    3. Else if ENABLE_LEGACY_API_KEY=true → route to legacy AuthManager
+    4. Else → reject
     """
+    if looks_like_api_key(token):
+        return await _resolve_api_key(token)
+
     if _looks_like_jwt(token):
         adapter: AuthPort = get_auth_adapter()
         service = AuthService(adapter)
@@ -189,10 +256,15 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    is_api_key = looks_like_api_key(credentials.credentials)
     try:
         user = await _resolve_auth_token(credentials.credentials)
-        await _ensure_user_in_db(user)
+        # API keys resolve from an existing users row, so re-provisioning would
+        # only risk overwriting the real profile with key-derived placeholders.
+        if not is_api_key:
+            await _ensure_user_in_db(user)
         request.state.user = user
+        request.state.auth_method = "api_key" if is_api_key else "bearer"
         return user
     except HTTPException:
         raise
@@ -207,10 +279,13 @@ async def get_optional_user(
     """Optional authentication — returns None if no valid credentials."""
     if not credentials:
         return None
+    is_api_key = looks_like_api_key(credentials.credentials)
     try:
         user = await _resolve_auth_token(credentials.credentials)
-        await _ensure_user_in_db(user)
+        if not is_api_key:
+            await _ensure_user_in_db(user)
         request.state.user = user
+        request.state.auth_method = "api_key" if is_api_key else "bearer"
         return user
     except Exception:
         return None
@@ -313,6 +388,126 @@ def _get_quota_service() -> QuotaService:
         cached_repo = CachedQuotaRepository(pg_repo)
         _quota_service = QuotaService(cached_repo)
     return _quota_service
+
+# ── Credit & API Key Service Singletons ──
+_credit_service: "CreditService | None" = None
+_api_key_service: "ApiKeyService | None" = None
+
+
+def _persistence_is_configured() -> bool:
+    """Whether a real Postgres DSN is available for SaaS persistence."""
+    return bool(settings.DATABASE_URL and "postgres" in settings.DATABASE_URL)
+
+
+def _require_persistence(feature: str) -> None:
+    """Fail closed in production when SaaS persistence is unavailable.
+
+    Falling back to in-memory storage in production would hand out free usage
+    and lose keys on restart, so it is only allowed outside production.
+    """
+    if not _persistence_is_configured() and settings.ENVIRONMENT == "production":
+        raise HTTPException(
+            status_code=503,
+            detail=f"{feature} is unavailable: database not configured.",
+        )
+
+
+def _get_credit_service() -> "CreditService":
+    """Factory for CreditService, backed by Postgres when configured."""
+    global _credit_service
+    if _credit_service is None:
+        from reasoner.application.services.credit_service import CreditService
+
+        if _persistence_is_configured():
+            from reasoner.infrastructure.persistence.credit_repo_postgres import (
+                PostgresCreditRepository,
+            )
+            dsn = settings.DATABASE_URL.replace("+asyncpg", "")
+            repo = PostgresCreditRepository(dsn, pool_size=settings.DB_POOL_SIZE)
+        else:
+            from reasoner.infrastructure.persistence.credit_repo_memory import (
+                InMemoryCreditRepository,
+            )
+            logger.warning(
+                "DATABASE_URL not configured — credits are using in-process storage "
+                "and will not survive a restart."
+            )
+            repo = InMemoryCreditRepository()
+        _credit_service = CreditService(repo)
+    return _credit_service
+
+
+def _get_api_key_service() -> "ApiKeyService":
+    """Factory for ApiKeyService, backed by Postgres when configured."""
+    global _api_key_service
+    if _api_key_service is None:
+        from reasoner.application.services.api_key_service import ApiKeyService
+
+        if _persistence_is_configured():
+            from reasoner.infrastructure.persistence.api_key_repo_postgres import (
+                PostgresApiKeyRepository,
+            )
+            dsn = settings.DATABASE_URL.replace("+asyncpg", "")
+            repo = PostgresApiKeyRepository(dsn, pool_size=settings.DB_POOL_SIZE)
+        else:
+            from reasoner.infrastructure.persistence.api_key_repo_memory import (
+                InMemoryApiKeyRepository,
+            )
+            logger.warning(
+                "DATABASE_URL not configured — API keys are using in-process storage "
+                "and will not survive a restart."
+            )
+            repo = InMemoryApiKeyRepository()
+        _api_key_service = ApiKeyService(repo)
+    return _api_key_service
+
+
+def _reset_credit_services() -> None:
+    """Reset credit/API-key singletons (useful for tests)."""
+    global _credit_service, _api_key_service
+    _credit_service = None
+    _api_key_service = None
+
+
+async def require_credits(user: User = Depends(get_current_user)) -> User:
+    """FastAPI dependency: refuse work when the account has no credits left.
+
+    Runs are settled after completion from actual model spend, so this is a
+    balance gate rather than a reservation: any positive balance may start one
+    run, and the settlement that follows can leave the balance at or below zero.
+    """
+    _require_persistence("Credits")
+    service = _get_credit_service()
+    try:
+        balance = await service.get_balance(str(user.id))
+    except Exception:
+        # A ledger outage must not take the product down; log and let the run
+        # through. The run still settles later if the ledger recovers.
+        logger.warning("Credit balance lookup failed; allowing run", exc_info=True)
+        return user
+
+    if balance.is_exhausted:
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "error": "Insufficient credits",
+                "message": "Your credit balance is exhausted.",
+                "balance": balance.balance,
+                "upgrade_url": "/pricing",
+            },
+        )
+    return user
+
+
+async def require_credits_if_authenticated(
+    user: User | None = Depends(get_optional_user),
+) -> None:
+    """Credit gate that only applies to authenticated callers."""
+    if user is None:
+        return None
+    await require_credits(user)
+    return None
+
 
 # ── Pipeline & Preset Services ──
 

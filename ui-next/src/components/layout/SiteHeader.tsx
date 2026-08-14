@@ -45,7 +45,7 @@ export function SiteHeader() {
           {[
             { label: 'About', href: '/about' },
             { label: 'Pricing', href: '/pricing' },
-            { label: 'Docs', href: '/help' },
+            { label: 'Docs', href: '/docs' },
           ].map(({ label, href }) => (
             <Link
               key={href}

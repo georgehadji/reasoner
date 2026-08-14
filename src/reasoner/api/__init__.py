@@ -11,6 +11,7 @@ from contextlib import asynccontextmanager
 
 import asyncio
 import json
+import uuid
 from fastapi import FastAPI, Request, Depends, HTTPException, Query, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -464,6 +465,7 @@ from reasoner.api.dependencies import (
     get_current_user, 
     get_optional_user, 
     check_quota_if_authenticated,
+    require_credits_if_authenticated,
     get_preset_service,
     get_pipeline_service,
     get_search_service
@@ -482,6 +484,51 @@ async def get_csrf_token():
     """Generate a signed CSRF token for frontend use."""
     from reasoner.api.csrf import generate_signed_csrf_token
     return {"token": generate_signed_csrf_token()}
+
+
+def _extract_run_cost(chunk: str) -> float | None:
+    """Pull ``total_cost_usd`` out of a terminal ``done`` SSE frame.
+
+    Returns None for every other frame. Malformed frames are ignored rather
+    than raised: a parsing problem must never break the stream the user is
+    reading.
+    """
+    try:
+        event = json.loads(chunk[6:])
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(event, dict) or event.get("type") != "done":
+        return None
+    cost = event.get("total_cost_usd")
+    return float(cost) if isinstance(cost, (int, float)) and cost > 0 else None
+
+
+async def _settle_run_credits(
+    user_id: str,
+    cost_usd: float,
+    reference_id: str,
+    preset: str,
+) -> None:
+    """Charge a completed run's actual model spend against the user's credits.
+
+    Post-paid on purpose: a run that fails before spending anything costs
+    nothing. Settlement never raises — the work is already delivered, so a
+    ledger outage is logged and reconciled later rather than surfaced as a
+    stream error.
+    """
+    try:
+        from reasoner.api.dependencies import _get_credit_service
+        await _get_credit_service().charge_usd(
+            user_id,
+            cost_usd=cost_usd,
+            reference_id=reference_id,
+            description=f"Pipeline run ({preset})",
+        )
+    except Exception as exc:
+        logger.warning(
+            "Credit settlement failed for user %s run %s ($%.6f): %s",
+            user_id, reference_id, cost_usd, exc,
+        )
 
 
 async def _run_stream_with_metrics(
@@ -509,6 +556,7 @@ async def _run_stream_with_metrics(
         pass
 
     has_error = False
+    settled_cost_usd = 0.0
     try:
         async for chunk in run_stream_cached(
             req,
@@ -517,11 +565,20 @@ async def _run_stream_with_metrics(
             preset_service=preset_service,
             pipeline_service=pipeline_service,
         ):
+            if user is not None and chunk.startswith("data: "):
+                settled_cost_usd = _extract_run_cost(chunk) or settled_cost_usd
             yield chunk
     except Exception:
         has_error = True
         raise
     finally:
+        if user is not None and settled_cost_usd > 0:
+            await _settle_run_credits(
+                user_id=str(user.id),
+                cost_usd=settled_cost_usd,
+                reference_id=req.client_run_id or f"run:{uuid.uuid4()}",
+                preset=preset,
+            )
         if timer is not None:
             timer.observe()
         try:
@@ -674,6 +731,7 @@ async def run_pipeline(
     authenticated = Depends(optional_auth),
     rate_limit_checked = Depends(check_rate_limit),
     quota: QuotaResult | None = Depends(check_quota_if_authenticated),
+    credits_checked = Depends(require_credits_if_authenticated),
     csrf_checked = Depends(require_csrf),
     preset_service: PresetService = Depends(get_preset_service),
     pipeline_service: PipelineService = Depends(get_pipeline_service),
@@ -929,6 +987,11 @@ app.include_router(websocket_router)
 
 from reasoner.api.routes.keys import router as keys_router
 app.include_router(keys_router)
+
+from reasoner.api.routes.credits import router as credits_router
+from reasoner.api.routes.account_keys import router as account_keys_router
+app.include_router(credits_router)
+app.include_router(account_keys_router)
 
 from reasoner.api.routes.feedback import router as feedback_router
 from reasoner.api.routes.estimate import router as estimate_router

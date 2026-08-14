@@ -6,7 +6,8 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { deleteAccount } from '@/lib/api-client';
-import { User, ShieldAlert, ShieldCheck, Database, History } from 'lucide-react';
+import Link from 'next/link';
+import { User, ShieldAlert, ShieldCheck, Database, Key } from 'lucide-react';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
 import { cn } from '@/lib/utils';
@@ -160,6 +161,27 @@ export default function SettingsPage() {
                 </p>
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* Developer Access */}
+        <section className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6">
+          <h2 className="mb-4 flex items-center gap-2 text-xl font-semibold">
+            <Key className="h-5 w-5 text-[var(--accent)]" /> Developer access
+          </h2>
+          <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+            <div>
+              <p className="font-medium text-[var(--text)]">API keys</p>
+              <p className="text-sm text-[var(--text-muted)]">
+                Call Reasoner from your own code with scoped, revocable keys.
+              </p>
+            </div>
+            <Link
+              href="/settings/api-keys"
+              className="whitespace-nowrap rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-2 text-sm font-medium transition-colors hover:bg-[var(--surface-3)]"
+            >
+              Manage keys
+            </Link>
           </div>
         </section>
 

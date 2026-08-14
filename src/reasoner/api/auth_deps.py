@@ -14,6 +14,7 @@ from reasoner.auth import AuthenticationError, get_auth_manager
 from reasoner.infrastructure.auth_legacy import AuthManager
 from reasoner.api.client_ip import get_client_ip
 from reasoner.api.csrf import verify_csrf_token
+from reasoner.domain.api_keys import looks_like_api_key
 
 logger = logging.getLogger(__name__)
 from reasoner.core.settings import settings
@@ -48,6 +49,36 @@ def _get_auth_manager_instance_auth_deps() -> AuthManager:
         _auth_manager_instance_auth_deps = get_auth_manager()
     return _auth_manager_instance_auth_deps
 
+
+
+async def _is_authenticated_api_key_request(request: Request) -> bool:
+    """Whether this request presents a valid Reasoner API key.
+
+    Used to exempt programmatic callers from CSRF. CSRF defends against a
+    browser replaying ambient credentials from an attacker's page; a page
+    cannot attach a victim's secret API key to an Authorization header, so the
+    threat CSRF addresses does not exist on this path. The key must actually
+    authenticate — an unverified `rsn_`-shaped string is not enough, or the
+    exemption itself would become the bypass.
+    """
+    header = request.headers.get("Authorization", "")
+    if not header.lower().startswith("bearer "):
+        return False
+
+    token = header[7:].strip()
+    if not looks_like_api_key(token):
+        return False
+
+    # Already resolved by an auth dependency earlier in the chain.
+    if getattr(request.state, "auth_method", None) == "api_key":
+        return True
+
+    try:
+        from reasoner.api.dependencies import _get_api_key_service
+        return await _get_api_key_service().authenticate(token) is not None
+    except Exception as exc:
+        logger.warning("API key CSRF exemption check failed: %s", exc)
+        return False
 
 
 async def get_client_id(request: Request) -> str:
@@ -180,6 +211,9 @@ async def require_csrf(request: Request):
     Can be disabled globally via CSRF_ENFORCE_BACKEND=false.
     """
     if not settings.CSRF_ENFORCE_BACKEND:
+        return True
+
+    if await _is_authenticated_api_key_request(request):
         return True
 
     token = request.headers.get("X-CSRF-Token")
