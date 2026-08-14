@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import sqlite3
 import asyncio
 import threading
@@ -61,7 +62,13 @@ class FeedbackStore:
         jsonl_path: str | Path | None = None,
     ):
         if db_path is None:
-            db_path = Path(__file__).parent.parent.parent / "feedback.db"
+            # The default sits inside the source tree, which Docker copies into
+            # the image but never mounts — every redeploy silently discarded all
+            # collected feedback. FEEDBACK_DB_PATH points it at a persisted
+            # volume in production; the default keeps local runs unchanged.
+            db_path = os.environ.get("FEEDBACK_DB_PATH") or (
+                Path(__file__).parent.parent.parent / "feedback.db"
+            )
         if jsonl_path is None:
             jsonl_path = Path(__file__).parent.parent.parent.parent / "feedback" / "feedback.jsonl"
 

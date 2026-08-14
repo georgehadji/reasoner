@@ -500,7 +500,17 @@ async def _run_stream_with_metrics(
     """Wrap run_stream_cached with Prometheus metrics."""
     from reasoner.logging_utils import set_log_context
 
-    tier = "anonymous" if user is None else "free"
+    # Labels the Prometheus query counter and the log context. Hardcoding "free"
+    # for every authenticated user made per-tier cost and usage breakdowns
+    # impossible — every paid run was reported as free.
+    # Imported here rather than at module scope so tests patching
+    # reasoner.api.dependencies._resolve_user_tier still take effect.
+    if user is None:
+        tier = "anonymous"
+    else:
+        from reasoner.api.dependencies import _resolve_user_tier
+
+        tier = (await _resolve_user_tier(str(user.id))).value
     preset = req.preset or "auto-budget"
     set_log_context(user_id=str(user.id) if user else None, tier=tier, preset=preset)
 
@@ -715,7 +725,6 @@ async def run_pipeline(
                 detail="Idempotency check failed due to temporary storage issue. Please try again.",
                 headers={"Retry-After": "5"},
             ) from exc
-    # TODO(#502): use actual user tier from subscription DB
     return StreamingResponse(
         _run_stream_with_metrics(req, request, user, preset_service, pipeline_service),
         media_type="text/event-stream",

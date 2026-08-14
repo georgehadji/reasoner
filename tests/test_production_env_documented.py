@@ -75,6 +75,49 @@ def test_secret_generation_is_documented_in_deploy_guide(var):
     assert var in deploy_md, f"{var} is required in production but absent from DEPLOY.md"
 
 
+def _preflight():
+    """Load scripts/preflight_check.py, which is outside the importable package."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "preflight_check", REPO_ROOT / "scripts" / "preflight_check.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_preflight_blocks_the_unedited_template():
+    """`cp .env.example .env` then deploying must fail loudly, not at runtime."""
+    preflight = _preflight()
+    env = preflight.parse_env_file(REPO_ROOT / ".env.example")
+    errors, _ = preflight.check(env)
+
+    blocked = " ".join(errors)
+    for var in ("CSRF_SECRET", "ENCRYPTION_KEY", "BLIND_INDEX_KEY", "SUPABASE_URL"):
+        assert var in blocked, f"preflight let the {var} placeholder through"
+
+
+def test_preflight_rejects_malformed_fernet_keys():
+    preflight = _preflight()
+
+    assert not preflight.is_fernet_key("not-base64-at-all")
+    assert not preflight.is_fernet_key("c2hvcnQ=")  # valid base64, wrong length
+
+    from cryptography.fernet import Fernet
+
+    assert preflight.is_fernet_key(Fernet.generate_key().decode())
+
+
+def test_preflight_covers_every_blocking_production_var():
+    """The guard list and the script must not drift apart."""
+    preflight = _preflight()
+    checked = {name for name, _ in preflight.BLOCKING}
+
+    for var in PRODUCTION_REQUIRED_VARS:
+        assert var in checked, f"preflight_check.py does not validate {var}"
+
+
 def test_env_example_ships_no_real_secrets(env_example_keys):
     """The template must stay a template."""
     for raw in (REPO_ROOT / ".env.example").read_text(encoding="utf-8").splitlines():

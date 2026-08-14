@@ -65,6 +65,9 @@ services:
       - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
       - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
       - ENVIRONMENT=production
+      # Keep the feedback DB on a mounted volume — the default path is inside
+      # src/, which lives in the image and is wiped on every redeploy.
+      - FEEDBACK_DB_PATH=/app/history/feedback.db
       - ENABLE_LEGACY_API_KEY=false
       - UVICORN_WORKERS=8
       - SSL_CERTFILE=/certs/backend.crt

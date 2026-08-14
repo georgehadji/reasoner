@@ -87,6 +87,18 @@ LANGFUSE_SECRET_KEY=
 
 **Never commit `.env`.** It is already in `.gitignore`.
 
+Generate every secret at once, then validate the result before bringing the
+stack up — a missing variable otherwise surfaces as a crash-looping container:
+
+```bash
+python scripts/preflight_check.py --generate   # prints all five secrets
+python scripts/preflight_check.py              # exits 1 on any blocking gap
+```
+
+The check flags empty values, unedited `.env.example` placeholders, malformed
+Fernet keys, `DEBUG=true`, `RATE_LIMITER_MODE=memory`, and localhost origins
+left in `CORS_ORIGINS`.
+
 > **Observability gate.** `docker-compose.yml` sets `ENVIRONMENT=production`, and
 > in production the app refuses to start with no observability backend at all.
 > `prometheus-client` is a hard dependency in `requirements.txt`, so `/api/metrics`

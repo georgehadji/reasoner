@@ -16,7 +16,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Request, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
 
-from reasoner.domain.saas import User, SubscriptionTier
+from reasoner.domain.saas import User
 from reasoner.application.services.quota_service import TIER_LIMITS
 from reasoner.api.middleware import _anonymize_ip
 from reasoner.api.dependencies import (
@@ -111,13 +111,19 @@ async def get_me_optional(user: User | None = Depends(get_optional_user)):
 @router.get("/quota")
 async def get_quota_status(user: User = Depends(get_current_user)):
     """Return current usage and remaining quota."""
+    # Reported the FREE allowance to every caller, so a paying subscriber saw
+    # the free quota in the UI and was checked against the free limit.
+    # Imported here rather than at module scope so tests patching
+    # reasoner.api.dependencies._resolve_user_tier still take effect.
+    from reasoner.api.dependencies import _resolve_user_tier
+
+    tier = await _resolve_user_tier(str(user.id))
     service = _get_quota_service()
-    result = await service.check(str(user.id), SubscriptionTier.FREE)
-    # TODO(#502): use actual user tier
-    used = (TIER_LIMITS[SubscriptionTier.FREE] - result.remaining) if result.remaining >= 0 else 0
+    result = await service.check(str(user.id), tier)
+    used = (TIER_LIMITS[tier] - result.remaining) if result.remaining >= 0 else 0
     return {
         "used": used,
-        "max": TIER_LIMITS[SubscriptionTier.FREE],
+        "max": TIER_LIMITS[tier],
         "remaining": result.remaining,
         "reset_date": (datetime.now(timezone.utc).replace(day=1) + timedelta(days=32)).replace(day=1).isoformat(),
     }

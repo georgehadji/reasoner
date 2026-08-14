@@ -258,11 +258,18 @@ async def check_rate_limit(
     rate_limiter = _get_rate_limiter_instance()
 
     if user is not None:
-        # Authenticated user — use user_id as bucket key with tier multiplier
-        # TODO(#501): fetch tier from subscription
+        # Authenticated user — use user_id as bucket key with tier multiplier.
+        # The tier drives is_allowed_for_user()'s multiplier (pro 2x, enterprise
+        # 5x); hardcoding "default" gave paying users the free-tier limit.
+        # _resolve_user_tier() falls back to FREE on every uncertain path, and
+        # the subscription repo is cached with webhook invalidation, so this
+        # does not add a database round-trip per request.
         client_id = f"user:{user.id}"
+        user_tier = await _resolve_user_tier(str(user.id))
         try:
-            allowed, info = await rate_limiter.is_allowed_for_user(client_id, tier="default")
+            allowed, info = await rate_limiter.is_allowed_for_user(
+                client_id, tier=user_tier.value
+            )
         except Exception as exc:
             # BUG-FIX: Fail closed on rate limiter errors instead of fail open.
             # Previously any exception (including programming bugs) allowed the request

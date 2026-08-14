@@ -51,7 +51,11 @@ See `DEPLOY.md` for the mechanical deployment steps; this document is the strate
 **Concrete sequence (one afternoon):**
 
 1. Buy a domain (`reasoner.yourname.dev` or similar) → point A record at the VPS.
-2. `git clone`, `cp .env.example .env`, fill the secrets listed in `DEPLOY.md` Step 1.
+2. `git clone`, `cp .env.example .env`, then
+   `python scripts/preflight_check.py --generate` for the secrets and
+   `python scripts/preflight_check.py` to confirm nothing required is missing.
+   Supabase and the encryption keys are mandatory in production — the backend
+   refuses to start without them.
 3. Swap in `Caddyfile.prod` with your domain (Step 2).
 4. `docker compose up -d --build`, verify `curl https://domain/api/health`.
 5. Add the observability overlay:
