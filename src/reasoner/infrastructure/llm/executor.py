@@ -12,6 +12,12 @@ Responsible for:
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:  # quoted annotations only — no import at runtime
+    from reasoner.infrastructure.llm.ports import DegradedLLMResponse
+
+
 import asyncio
 import logging
 import re

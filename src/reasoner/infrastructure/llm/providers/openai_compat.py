@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:  # quoted annotations only — no import at runtime
+    import httpx
+
+
 import asyncio
 import logging
 import os
 import threading
-from typing import Any
+from typing import Any, AsyncIterator
 
 import openai
 

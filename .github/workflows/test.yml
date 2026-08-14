@@ -27,10 +27,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt pytest-asyncio pytest-cov bandit mypy
 
-      - name: Lint (ruff — B-rules + undefined names)
+      # F821 is blocking. It is not style: it finds names that do not exist at
+      # the point they are used. It had been reporting a real one for a while —
+      # infrastructure/rate_limiter.py referenced REASONER_RATE_LIMIT_REJECTED
+      # with its import commented out — but --exit-zero meant nobody saw it.
+      # The B (bugbear) rules stay advisory; they carry more judgement calls.
+      - name: Lint — undefined names (blocking)
         run: |
           pip install ruff
-          ruff check src/ --select B,F821 --ignore B008 --exit-zero
+          ruff check src/ --select F821
+
+      - name: Lint — bugbear (advisory)
+        run: ruff check src/ --select B --ignore B008 --exit-zero
 
       - name: Security scan (bandit)
         run: |

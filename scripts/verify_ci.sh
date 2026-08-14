@@ -80,8 +80,13 @@ need() {
 
 # ── Test / pr-architecture / security workflows ──────────────────────────────
 
-advisory "ruff (B-rules + undefined names)" \
-  "$PYTHON" -m ruff check src/ --select B,F821 --ignore B008
+# F821 blocks: an undefined name is a NameError waiting for the right code path,
+# not a style opinion. The bugbear rules stay advisory.
+gate "ruff undefined names (F821)" \
+  "$PYTHON" -m ruff check src/ --select F821
+
+advisory "ruff bugbear (B-rules)" \
+  "$PYTHON" -m ruff check src/ --select B --ignore B008
 
 advisory "bandit" \
   "$PYTHON" -m bandit -r src/ -t B307,B308,B102 -f txt

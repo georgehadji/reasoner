@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+from typing import Union
 import re
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.models import PerspectiveType

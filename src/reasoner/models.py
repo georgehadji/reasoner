@@ -9,6 +9,11 @@ New code should import directly from:
 All existing imports continue to work through this shim.
 """
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:  # annotations below are quoted, so this stays import-time free
+    from pathlib import Path
+
 from reasoner.domain.core_types import (
     ScenarioType,
     SubProblem,

@@ -6,7 +6,7 @@ import asyncio
 import logging
 import random
 from abc import ABC, abstractmethod
-from typing import AsyncIterator # Add AsyncIterator import
+from typing import Any, AsyncIterator
 
 from reasoner.exceptions import (
     ReasonerError,

@@ -5,6 +5,13 @@ Robust JSON extraction from LLM responses.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:  # quoted annotations only — no import at runtime
+    from reasoner.domain.core_types import EvidenceBundle
+    from reasoner.domain.core_types import PlanContract
+
+
 import json
 import logging
 import re

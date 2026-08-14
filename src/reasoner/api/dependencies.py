@@ -8,6 +8,13 @@ polluting route handlers with auth logic.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:  # quoted annotations only — no import at runtime
+    from reasoner.infrastructure.rate_limiter import RateLimiter
+    import asyncpg
+
+
 import hashlib
 import logging
 import os

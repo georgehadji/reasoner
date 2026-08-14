@@ -2,6 +2,12 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:  # quoted annotations only — no import at runtime
+    from reasoner.domain.core_types import CriticDimensionScore
+
+
 import logging
 from typing import Any
 
