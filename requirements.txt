@@ -27,7 +27,22 @@ python-dotenv>=1.0.0,<2.0.0
 # File Processing
 pypdf>=4.0.0,<7.0.0
 python-docx>=1.1.0,<2.0.0
-pymupdf>=1.23.0,<2.0.0
+# pymupdf is deliberately NOT installed by default.
+#
+# It is dual-licensed AGPL-3.0 / commercial (Artifex). AGPL section 13 obliges
+# you to offer complete corresponding source to *users interacting over a
+# network* — which is exactly what a hosted SaaS does. Shipping it by default
+# would put that obligation on every deployment of an otherwise MIT-licensed
+# project, and would have to be resolved before selling or licensing Reasoner.
+#
+# It is used for one optional feature: rendering scanned-PDF pages to images for
+# OCR (infrastructure/uploader.py). Regular PDF text extraction uses pypdf
+# (BSD-3-Clause) above and is unaffected; without pymupdf, scanned PDFs return a
+# clear message instead of OCR text.
+#
+# To enable it, accept the licence implications and install explicitly:
+#   pip install "pymupdf>=1.23.0,<2.0.0"
+# or buy a commercial licence from Artifex.
 python-magic>=0.4.27,<0.5.0
 
 # Math & Calculations

@@ -12,8 +12,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Build from the lockfile, not the ranged requirements.txt, so two builds of the
+# same commit install byte-identical dependencies. requirements.lock existed but
+# nothing consumed it, and it had drifted far enough to still pin a version of
+# asteval with a published sandbox-escape advisory. Regenerate after any
+# requirements.txt change:
+#   uv pip compile requirements.txt -o requirements.lock --python-version 3.12
+COPY requirements.txt requirements.lock ./
+RUN pip install --no-cache-dir -r requirements.lock
 
 # ── Runtime stage ──
 FROM python:3.12-slim AS runtime

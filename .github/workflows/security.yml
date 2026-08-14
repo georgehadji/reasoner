@@ -21,9 +21,33 @@ jobs:
           python-version: '3.12'
       - run: pip install pip-audit bandit
 
+      # A lockfile that has drifted from requirements.txt is worse than none:
+      # it silently pins whatever was current when it was last generated. This
+      # one had kept a version of asteval with a published sandbox-escape
+      # advisory long after requirements.txt moved on. The Dockerfile installs
+      # from the lock, so drift ships to production.
+      - name: requirements.lock is current (blocking)
+        run: |
+          pip install uv
+          cp requirements.lock requirements.lock.committed
+          uv pip compile requirements.txt -o requirements.lock --python-version 3.12 --quiet
+          if ! diff -q requirements.lock.committed requirements.lock > /dev/null; then
+            echo "::error::requirements.lock is out of date. Regenerate with:"
+            echo "  uv pip compile requirements.txt -o requirements.lock --python-version 3.12"
+            diff requirements.lock.committed requirements.lock || true
+            exit 1
+          fi
+          echo "requirements.lock matches requirements.txt"
+
       # Blocking, as a ratchet: any NEW advisory fails the build, while the
       # known backlog below is listed explicitly so it stays visible instead of
       # being hidden behind `|| true`.
+      #
+      # Audits the LOCK, not requirements.txt: the lock is what the image
+      # installs, and it pins transitive dependencies that a ranged
+      # requirements.txt audit never sees. Auditing the lock surfaced eight
+      # additional vulnerable transitives, all since resolved by upgrading
+      # within the declared ranges.
       #
       # Each ignored ID needs a major-version bump that deserves its own testing
       # cycle, so they are tracked rather than silently accepted:
@@ -35,7 +59,7 @@ jobs:
       # Delete an ID from this list as soon as its dependency is upgraded.
       - name: pip-audit (blocking, known backlog ignored)
         run: |
-          pip-audit --requirement requirements.txt \
+          pip-audit --requirement requirements.lock \
             --ignore-vuln PYSEC-2026-87 \
             --ignore-vuln PYSEC-2026-1845 \
             --ignore-vuln PYSEC-2026-161 \
@@ -47,7 +71,7 @@ jobs:
 
       # Informational: the full picture including the backlog above.
       - name: pip-audit full report (informational)
-        run: pip-audit --requirement requirements.txt || true
+        run: pip-audit --requirement requirements.lock || true
 
       # Blocking, high-severity only. Bandit's full output is noisy on this
       # codebase; the high-confidence high-severity set is the actionable part.
