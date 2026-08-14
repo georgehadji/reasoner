@@ -467,6 +467,26 @@ class ProviderRouter:
         assigned = self.get(role)
         effective_timeout = self._timeout_for_role(role, timeout_seconds)
 
+        # Context-window pre-flight. max_context was only ever used to choose
+        # between models; nothing compared an assembled prompt against the window
+        # of the model it was about to be sent to. An over-long prompt is rejected
+        # by the provider only after the request is made, so the run pays the
+        # round-trip — and on some providers the input tokens — before failing.
+        #
+        # Warn rather than truncate: silently cutting a prompt changes the
+        # question being asked, and a confidently wrong answer is worse than a
+        # clear error.
+        try:
+            from reasoner.infrastructure.llm.capability_registry import check_context_fit
+
+            fits, why = check_context_fit(
+                assigned.model, len(system_prompt) + len(user_prompt), max_tokens
+            )
+            if not fits:
+                logger.warning("Context budget exceeded for role=%s: %s", role, why)
+        except Exception:  # pragma: no cover - a guard rail must never break a call
+            pass
+
         # Resolve fallback: explicit > primary > none.
         # Skip any fallback that resolves to the same model as the failing provider —
         # retrying an identical endpoint after a timeout is guaranteed to waste time.

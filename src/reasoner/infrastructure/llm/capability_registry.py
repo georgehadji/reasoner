@@ -253,4 +253,51 @@ class CapabilityRegistry:
             json.dump(data, f, indent=2)
 
 
-__all__ = ["CapabilityRegistry"]
+# ── Context-window pre-flight ────────────────────────────────────────────────
+
+# Rough characters-per-token for English prose and code. Deliberately not a real
+# tokenizer: this is a guard rail, and adding tiktoken would pull a dependency
+# and a per-call cost to answer a question we only need approximately. 3.5 is
+# conservative (over-estimates tokens), so it errs toward warning early.
+_CHARS_PER_TOKEN = 3.5
+
+
+def estimate_tokens(text: str) -> int:
+    """Approximate token count for a prompt. Over-estimates rather than under."""
+    return int(len(text) / _CHARS_PER_TOKEN) + 1
+
+
+def context_budget_for(model_id: str) -> int:
+    """The model's advertised context window, or a conservative default."""
+    return _MODEL_CONSTRAINT_HINTS.get(model_id, {}).get("max_context", 4096)
+
+
+def check_context_fit(
+    model_id: str, prompt_chars: int, max_output_tokens: int
+) -> tuple[bool, str]:
+    """Report whether a prompt plus its requested output plausibly fits.
+
+    max_context is used only to *select* models elsewhere; nothing checked an
+    assembled prompt against the window of the model it was about to be sent to.
+    An over-long prompt is rejected by the provider after the request is made, so
+    the run pays latency (and on some providers, tokens) before failing.
+
+    Returns (fits, message). The message is empty when it fits.
+    """
+    budget = context_budget_for(model_id)
+    estimated_input = estimate_tokens("x" * prompt_chars)
+    needed = estimated_input + max_output_tokens
+    if needed <= budget:
+        return True, ""
+    return False, (
+        f"prompt ~{estimated_input:,} tokens + {max_output_tokens:,} output "
+        f"exceeds {model_id}'s ~{budget:,} token window by ~{needed - budget:,}"
+    )
+
+
+__all__ = [
+    "CapabilityRegistry",
+    "check_context_fit",
+    "context_budget_for",
+    "estimate_tokens",
+]
