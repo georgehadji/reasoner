@@ -105,6 +105,46 @@ class TestAlertRules:
             "no alert watches LLM spend — a runaway is invisible until the bill"
         )
 
+    def test_alerted_metrics_are_actually_incremented(self, rules):
+        """A metric that is defined but never written is a permanently silent alert.
+
+        reasoner_quota_exceeded_total was defined, alerted on as the abuse
+        tripwire, and incremented nowhere; reasoner_rate_limit_rejected_total had
+        its import commented out behind "temporarily disable metrics import", so
+        a rate-limit flood also produced no alert.
+        """
+        import re
+        import subprocess
+
+        import reasoner.infrastructure.metrics as metrics_mod
+
+        identifier_for = {}
+        for attr in dir(metrics_mod):
+            metric = getattr(metrics_mod, attr)
+            name = getattr(metric, "_name", None)
+            if name:
+                identifier_for[name] = attr
+
+        exprs = " ".join(r["expr"] for r in rules)
+        referenced = set(
+            re.findall(r"\b(reasoner_[a-z_]+?)(?:_total|_bucket|_sum|_count)?\b", exprs)
+        )
+
+        dead = []
+        for metric_name in sorted(referenced):
+            identifier = identifier_for.get(metric_name)
+            if not identifier:
+                continue
+            hits = subprocess.run(
+                ["grep", "-rl", identifier, "src/reasoner", "--include=*.py"],
+                capture_output=True, text=True, cwd=REPO_ROOT,
+            ).stdout.split()
+            writers = [h for h in hits if not h.endswith("infrastructure/metrics.py")]
+            if not writers:
+                dead.append(metric_name)
+
+        assert not dead, f"alerted on but never recorded: {dead}"
+
     def test_every_rule_has_severity_and_summary(self, rules):
         for rule in rules:
             assert rule.get("labels", {}).get("severity") in {"warning", "critical"}, rule["alert"]

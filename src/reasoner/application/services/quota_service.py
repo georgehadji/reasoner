@@ -58,6 +58,16 @@ class QuotaService:
 
         remaining = max(0, quota.max_queries - quota.used_queries)
         if remaining <= 0:
+            # REASONER_QUOTA_EXCEEDED_TOTAL was defined and incremented nowhere,
+            # so QuotaExceededSpike — the abuse tripwire in
+            # docs/monitoring/alerts.yml — could never fire. A flood of quota
+            # rejections looked exactly like an idle system.
+            try:
+                from reasoner.metrics import REASONER_QUOTA_EXCEEDED_TOTAL
+
+                REASONER_QUOTA_EXCEEDED_TOTAL.labels(tier=tier.value).inc()
+            except Exception:  # pragma: no cover - metrics must never break quota
+                pass
             return QuotaResult(
                 allowed=False,
                 remaining=0,

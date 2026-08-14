@@ -31,13 +31,17 @@ from reasoner.core.constants import MAX_RATE_LIMIT_BUCKETS # Imported MAX_RATE_L
 from reasoner.core.settings import settings
 _REDIS_RATE_LIMITER_ENABLED = settings.RATE_LIMITER_MODE.lower() == "redis"
 
-# Temporarily disable metrics import
-_METRICS_AVAILABLE = False
-# try:
-#     from reasoner.metrics import REASONER_RATE_LIMIT_REJECTED
-#     _METRICS_AVAILABLE = True
-# except Exception:
-#     _METRICS_AVAILABLE = False
+# This import was commented out behind "temporarily disable metrics import",
+# with _METRICS_AVAILABLE hardcoded False. Two consequences: the counter was
+# never incremented, so the RateLimitRejectionSpike alert in
+# docs/monitoring/alerts.yml could never fire — a rate-limit flood looked
+# identical to silence — and the three call sites referenced an undefined name,
+# so flipping the flag back on would have raised NameError at the first
+# rejection. reasoner.metrics degrades to no-op counters when prometheus-client
+# is missing, so the guard is not needed to import safely.
+from reasoner.metrics import REASONER_RATE_LIMIT_REJECTED
+
+_METRICS_AVAILABLE = True
 
 
 @dataclass
