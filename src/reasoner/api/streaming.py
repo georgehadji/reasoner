@@ -44,6 +44,8 @@ from reasoner.presets import (
     get_preset_price_tier,
 )
 from reasoner.phases._shared import build_followup_context, _wrap_user_input
+from reasoner.core.logging_utils import get_correlation_id
+from reasoner.core.settings import settings
 
 from .cache import _cache_key, _load_cache, _save_cache
 from .history import HISTORY_DIR, HistoryEntry, _save_history_entry
@@ -151,13 +153,32 @@ async def run_stream(
                 "code": "PIPELINE_TIMEOUT",
             })
         except Exception as e:
-            import traceback
-            traceback.print_exc()
-            await sse_emit({
+            # FastAPI's exception handlers do not cover exceptions raised inside a
+            # streaming generator, so this is the only place that sees them — and
+            # it used to send raw str(e) to the client and dump a traceback to
+            # stdout, bypassing both the production gate in api/error_handler.py
+            # and the redaction installed on the logging record factory.
+            #
+            # Log through the logger (redacted, correlated) and give the client a
+            # correlation ID instead of the exception text, matching what the
+            # global handler returns for non-streaming routes.
+            correlation_id = get_correlation_id()
+            logger.exception(
+                "Unhandled error in pipeline stream (correlation_id=%s)", correlation_id
+            )
+            payload: dict[str, Any] = {
                 "type": "error",
-                "error": str(e),
                 "code": "INTERNAL_ERROR",
-            })
+                "correlation_id": correlation_id,
+            }
+            if settings.ENVIRONMENT != "production":
+                payload["error"] = str(e)
+            else:
+                payload["error"] = (
+                    "The pipeline hit an internal error. Quote the correlation ID "
+                    "if you report this."
+                )
+            await sse_emit(payload)
         finally:
             await queue.put(None)
             

@@ -291,12 +291,82 @@ docker compose exec backend env | grep -E 'BRAVE|TAVILY|OPENROUTER'
 ## Updating to a New Version
 
 ```bash
-git pull
-docker compose down
-docker compose up -d --build
+./scripts/deploy.sh
 ```
 
-Persistent data (Postgres, Redis, Caddy certs) is stored in Docker volumes and survives rebuilds.
+This validates `.env`, builds the new images **while the current stack keeps
+serving**, tags them with the commit, restarts, and waits for the backend to
+report healthy. It records the commit it replaced so you can undo it.
+
+> Do **not** use `docker compose down && docker compose up -d --build`. That
+> stops production *before* building its replacement, so a build failure leaves
+> you with nothing running and no previous image to fall back to.
+
+Persistent data (Postgres, Valkey, Caddy certs, uploads, history) lives in
+Docker volumes and survives rebuilds.
+
+### Rolling back
+
+```bash
+./scripts/rollback.sh              # back to the previous deploy
+./scripts/rollback.sh <commit>     # back to a specific commit
+```
+
+Rollback covers **code only**. If the deploy you are undoing applied a
+migration, decide about it deliberately — `alembic downgrade -1`, or restore a
+dump. Old code against a newer schema is usually fine, but confirm rather than
+assume.
+
+---
+
+## Backups
+
+Nothing is scheduled by default. Set this up before you have data worth losing.
+
+```bash
+./scripts/backup_db.sh                              # dump to ./backups, verify, prune
+BACKUP_REMOTE="s3://your-bucket/reasoner" ./scripts/backup_db.sh
+```
+
+Install it as a nightly host cron:
+
+```cron
+30 3 * * * cd /srv/reasoner && ./scripts/backup_db.sh >> /var/log/reasoner-backup.log 2>&1
+```
+
+**A backup you have never restored is not a backup.** Prove it works — the drill
+restores into a scratch database and drops it, so it is safe to run against a
+live host:
+
+```bash
+./scripts/restore_db.sh --drill backups/reasoner-<timestamp>.dump
+```
+
+To restore for real (destructive, requires typed confirmation):
+
+```bash
+./scripts/restore_db.sh --force backups/reasoner-<timestamp>.dump
+```
+
+A dump kept only on the same machine does not survive losing that machine — set
+`BACKUP_REMOTE`.
+
+---
+
+## Staging
+
+Rehearse deploys against a separate stack before touching production:
+
+```bash
+cp .env .env.staging      # point at test Stripe keys and a staging Supabase project
+docker compose -f docker-compose.yml -f docker-compose.staging.yml \
+  --env-file .env.staging -p reasoner-staging up -d --build
+```
+
+It listens on `:8080`/`:8443`, uses its own volumes and database via the
+separate project name, and caps spend at $0.10/run and $10/month so a looping
+test cannot run up a bill. It deliberately runs with `ENVIRONMENT=production`:
+staging that runs in development mode rehearses nothing.
 
 ---
 

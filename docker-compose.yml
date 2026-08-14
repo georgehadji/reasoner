@@ -36,7 +36,11 @@ services:
       frontend:
         condition: service_started
       backend:
-        condition: service_started
+        # service_started meant Caddy began proxying while the backend was still
+        # running migrations and importing, so every deploy served 502s until it
+        # caught up. The image healthcheck is meaningful now that it speaks TLS,
+        # so wait for it.
+        condition: service_healthy
     restart: unless-stopped
     deploy:
       resources:

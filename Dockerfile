@@ -62,7 +62,10 @@ EXPOSE 8000
 # succeed there, leaving the container permanently unhealthy and defeating the
 # health-gated depends_on. Pick the scheme from the same variable, and skip
 # verification because these are the internal self-signed certs.
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+# start-period covers `alembic upgrade head` plus app import (~110 MB of modules
+# per worker), which takes well over the old 5s. Too short a grace period marks
+# a healthy container unhealthy during a normal cold start.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
     CMD python -c "import os,ssl,urllib.request; \
 s='https' if os.environ.get('SSL_CERTFILE') and os.environ.get('SSL_KEYFILE') else 'http'; \
 c=ssl._create_unverified_context() if s=='https' else None; \

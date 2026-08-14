@@ -56,6 +56,11 @@ services:
       - "9093:9093"
     volumes:
       - ./docs/monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      # Alertmanager does not expand environment variables, so receiver secrets
+      # (Slack webhook URL, PagerDuty routing key) are read from files here.
+      # Create ./secrets locally; it is gitignored. Optional — Alertmanager
+      # starts fine without it while every receiver stays commented out.
+      - ./secrets:/etc/alertmanager/secrets:ro
       - alertmanager_data:/alertmanager
     restart: unless-stopped
     deploy:

@@ -1,0 +1,62 @@
+# Staging overlay — a rehearsal tier between your laptop and production.
+#
+# There was no staging at all: schema changes, TLS config and dependency bumps
+# went straight from a working tree to production with nothing in between. This
+# runs the same images and the same production code paths, but on its own ports,
+# its own volumes, and its own database, so you can rehearse a deploy (including
+# `alembic upgrade head`) without touching real data.
+#
+# Usage:
+#   cp .env .env.staging     # then point it at staging Supabase/Stripe test keys
+#   docker compose -f docker-compose.yml -f docker-compose.staging.yml \
+#     --env-file .env.staging -p reasoner-staging up -d --build
+#
+# The -p flag matters: it gives staging its own project namespace so its volumes
+# and containers never collide with production's.
+#
+# Deliberately kept identical to production: ENVIRONMENT=production. Staging that
+# runs in development mode rehearses nothing — the production guards (Redis-only
+# rate limiting, Supabase-only auth, the observability gate) are exactly what you
+# want to catch here rather than in production.
+
+services:
+  caddy:
+    ports:
+      - "8080:80"
+      - "8443:443"
+
+  backend:
+    environment:
+      # Smaller than production: staging carries no real traffic, and this keeps
+      # both stacks comfortable on one host.
+      - UVICORN_WORKERS=2
+      # Hard ceiling on rehearsal spend. Staging should never be able to run up a
+      # bill — if a test loops, it stops at a dollar.
+      - SPEND_CAP_PER_RUN_USD=0.10
+      - SPEND_CAP_MONTHLY_USD=10.0
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 768M
+
+  frontend:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 384M
+
+  postgres:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+
+  valkey:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M

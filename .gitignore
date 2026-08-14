@@ -99,3 +99,7 @@ src/reasoner/healing/generated_tests/
 # Scratch dir for manual/ad-hoc test scripts
 .tmp_manual_temp/
 =0.9.32
+
+# Alertmanager receiver secrets (Slack webhook URL, PagerDuty routing key).
+# Alertmanager performs no env-var expansion, so these are mounted as files.
+secrets/

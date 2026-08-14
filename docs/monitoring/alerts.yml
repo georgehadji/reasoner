@@ -154,3 +154,57 @@ groups:
         annotations:
           summary: "Rate limit rejection spike"
           description: "{{ $value | printf \"%.2f\" }} requests/sec being rate-limited — possible DoS or misconfigured client"
+
+      # ── Liveness ─────────────────────────────────────────────────────────────
+      # Nothing here referenced the scrape target's own health, so a backend that
+      # died produced silence: Prometheus simply stopped receiving samples and no
+      # rule noticed. These two are the difference between "no alerts because
+      # everything is fine" and "no alerts because nothing is running".
+      - alert: BackendDown
+        expr: up{job="reasoner-backend"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Reasoner backend is not responding to scrapes"
+          description: "Prometheus cannot reach the backend /api/metrics endpoint. Check `docker compose ps` and `docker compose logs backend`."
+
+      - alert: BackendMetricsAbsent
+        expr: absent(up{job="reasoner-backend"})
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Reasoner backend target has disappeared from Prometheus"
+          description: "The scrape target is gone entirely, not just failing. Check prometheus.yml and that the backend container exists."
+
+      # ── Cost ─────────────────────────────────────────────────────────────────
+      # Cost was measured but never alerted on, so a runaway was invisible until
+      # the provider bill arrived. Thresholds are deliberately conservative —
+      # tune them to your own spend once you have a baseline.
+      - alert: LLMSpendRateHigh
+        expr: rate(reasoner_llm_call_cost_usd_total[1h]) * 3600 > 5
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "LLM spend exceeding $5/hour"
+          description: "Burning {{ $value | printf \"%.2f\" }} USD/hour over the last hour. Check for a runaway loop or abuse, and confirm SPEND_CAP_* are set."
+
+      - alert: LLMSpendRateCritical
+        expr: rate(reasoner_llm_call_cost_usd_total[1h]) * 3600 > 25
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "LLM spend exceeding $25/hour"
+          description: "Burning {{ $value | printf \"%.2f\" }} USD/hour. Consider stopping the backend and lowering the provider-side cap."
+
+      - alert: SpendCapHitRepeatedly
+        expr: increase(reasoner_spend_cap_exceeded_total[1h]) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Spend caps tripping repeatedly ({{ $labels.cap_type }})"
+          description: "Runs are being truncated by the {{ $labels.cap_type }} cap more than 5 times an hour — either the cap is too low for real usage, or something is looping."

@@ -90,10 +90,19 @@ async def health_check(request: Request):
             await _health_postgres_pool.fetchval("SELECT 1")
             health["checks"]["postgres"] = {"status": "ok"}
             from reasoner.metrics import REASONER_POSTGRES_POOL_SIZE, REASONER_POSTGRES_POOL_FREE
+            # asyncpg: get_size() is the total number of connections in the pool,
+            # get_idle_size() is how many of them are free. "Free" was being set
+            # to size - idle, which is the number of BUSY connections — so the
+            # critical PostgresPoolExhaustion alert (pool_free == 0) fired when
+            # the pool was completely idle and stayed silent when it was actually
+            # exhausted. Exactly inverted.
+            #
+            # These gauges are refreshed here rather than on the /metrics scrape
+            # so a scrape never opens database connections; the container
+            # HEALTHCHECK polls this endpoint every 30s, matching the scrape
+            # interval. If you stop polling /api/health, these go stale.
             REASONER_POSTGRES_POOL_SIZE.set(_health_postgres_pool.get_size())
-            REASONER_POSTGRES_POOL_FREE.set(
-                _health_postgres_pool.get_size() - _health_postgres_pool.get_idle_size()
-            )
+            REASONER_POSTGRES_POOL_FREE.set(_health_postgres_pool.get_idle_size())
         except Exception as e:
             health["checks"]["postgres"] = {"status": "error", "reason": str(e)}
             _health_postgres_pool = None
