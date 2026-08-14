@@ -6,11 +6,11 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688.svg?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Next.js 16](https://img.shields.io/badge/Next.js_16-000000.svg?style=flat-square&logo=next.js&logoColor=white)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6.svg?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Tests](https://img.shields.io/badge/tests-2%2C100%2B-brightgreen.svg?style=flat-square)](./tests)
-[![Coverage](https://img.shields.io/badge/coverage-%7E70%25-yellow.svg?style=flat-square)](.)
+[![Tests](https://img.shields.io/badge/tests-2%2C700%2B_passing-brightgreen.svg?style=flat-square)](./tests)
+[![Coverage](https://img.shields.io/badge/coverage-~64%25-yellow.svg?style=flat-square)](.)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE)
 
-[Quick Start](#quick-start) · [Architecture](#architecture) · [Reasoning Methods & Presets](#reasoning-methods--presets) · [Programmatic Usage](#programmatic-usage) · [Security](#security--encryption) · [Configuration](#configuration-reference) · [Development](#development)
+[Quick Start](#quick-start) · [Architecture](#architecture) · [Reasoning Methods & Presets](#reasoning-methods--presets) · [Programmatic Usage](#programmatic-usage) · [Security](#security--encryption) · [Configuration](#configuration-reference) · [Development](#development) · [Deployment](#deployment)
 
 ---
 
@@ -18,14 +18,14 @@
 
 Reasoner treats reasoning as a first-class engineering problem rather than a one-shot LLM call. Given a question, strategic decision, or research task, it:
 
-1. **Classifies and routes** the request to one of 24 reasoning methodologies via the HyperGate pre-router (6 parallel sub-agents).
-2. **Decomposes** the problem into atomic sub-questions and assumptions.
+1. **Classifies and routes** the request to one of 24 reasoning methodologies via the HyperGate pre-router — 5 parallel sub-agents plus a tie-breaker, deciding between an instant direct answer, a real-time web search, or the full pipeline.
+2. **Decomposes** the problem into atomic sub-questions and key assumptions in the same call that classifies it.
 3. **Vets context** through iterative, web-grounded retrieval (Perplexity Sonar / Brave / Tavily) with token-aware compression.
-4. **Generates competing answers** from cross-lab model ensembles (Anthropic, OpenAI, Google, DeepSeek, Mistral, xAI, and more) to reduce single-vendor bias.
+4. **Generates competing answers** from cross-lab, cross-bloc model ensembles (172 registered models across 28 vendors — Anthropic, OpenAI, Google, DeepSeek, Mistral, xAI, Qwen, and more — plus 350+ additional models reachable through OpenRouter) to reduce single-vendor and single-geopolitical-bloc bias.
 5. **Critiques and stress-tests** candidates with independent LLM judges under adversarial conditions.
-6. **Synthesizes** a final, evidence-grounded answer labeled `VERIFIED`, `HYPOTHESIS`, or `UNRESOLVED`, with citations.
+6. **Synthesizes** a final, evidence-grounded answer labeled `VERIFIED`, `HYPOTHESIS`, or `UNKNOWN`, with citations.
 
-The system is built for production deployment: real-time Server-Sent Events (SSE) streaming, per-phase cost telemetry, a self-healing CI loop, internal TLS with an auto-provisioned PKI, application-layer envelope encryption, and Bearer-token endpoints designed for autonomous AI agents.
+The system is built for production deployment: real-time Server-Sent Events (SSE) streaming, per-phase cost telemetry, a self-healing CI loop, internal TLS with an auto-provisioned PKI, application-layer envelope encryption, per-user quotas and Stripe/PayPal billing, and Bearer-token endpoints designed for autonomous AI agents.
 
 **Version:** 2.1.0 (single source of truth: `src/reasoner/__init__.py`) · **License:** MIT · **Python:** 3.12+
 
@@ -33,46 +33,52 @@ The system is built for production deployment: real-time Server-Sent Events (SSE
 
 ## Architecture
 
-Reasoner executes structured reasoning through an **8-phase pipeline** managed by the `ReasonerPipeline` engine. The flow is fully asynchronous, enabling parallel generation, context vetting, and synthesis:
+Every request passes through the **HyperGate pre-router** before any pipeline work begins, then — for requests that warrant it — through the **default multi-perspective pipeline**, managed by the `ReasonerPipeline` engine and expressed as a `WorkflowStrategy` (22 implementations under `application/flows/`). The flow is fully asynchronous:
 
 ```
                   ┌─────────────────────────────────────┐
                   │      User Question / Problem        │
                   └──────────────────┬──────────────────┘
                                      │
-                        [ Phase 1: Classification ]
-                                     │
-                       [ Phase 2: Decomposition ]
-                                     │
-                       [ Phase 3: Context Vetting ] <── (Iterative RAG loop, max 3)
-                                     │
-                       [ Phase 4: Deep Source Reading ]
-                                     │
-                        [ Phase 5: Generation ] ───────┐
-                                     │                 │ (Cross-lab
-                       [ Phase 6: Critique & Scoring ] │  perspective ensembles)
-                                     │                 │
-                      [ Phase 7: Stress Testing ] <────┘
-                                     │
-                        [ Phase 8: Synthesis ]
-                                     │
-                  ┌──────────────────▼──────────────────┐
-                  │    Verified Solution with Citations │
-                  └─────────────────────────────────────┘
+     ┌──────────────────── HyperGate Pre-Router ────────────────────┐
+     │  5 parallel sub-agents (language, complexity, direct,        │
+     │  web-search, method) → TieBreaker                            │
+     └──────┬─────────────────────┬─────────────────────┬───────────┘
+            │                     │                     │
+       DIRECT answer        WEB_SEARCH            PIPELINE (method
+       (instant)            (real-time)            auto-selected)
+                                                          │
+                                          [ Phase 0/1: Fusion — classification
+                                            + decomposition, merged ]
+                                                          │
+                                          [ Phase 1.5: Evidence Search ] <── (iterative
+                                                          │                    RAG, method-gated)
+                                          [ Phase 2: Perspectives ] ──────┐
+                                                          │              │ (cross-lab, cross-bloc
+                                          [ Phase 3: Critique & Pruning ]│  generation ensembles)
+                                                          │              │
+                                          [ Phase 4: Stress Testing ] <──┘  (skipped when
+                                                          │                  complexity = simple)
+                                          [ Phase 5: Synthesis ]
+                                                          │
+                  ┌───────────────────────────────────────▼──────────────────┐
+                  │  Synthesis: VERIFIED / HYPOTHESIS / UNKNOWN + citations  │
+                  └────────────────────────────────────────────────────────┘
 ```
 
 | Phase | Responsibility |
 | :--- | :--- |
-| 1. Classification | Identifies task type (math, research, creative, coding, ...) and primary language for optimal routing. |
-| 2. Decomposition | Breaks the problem into atomic sub-questions and key assumptions. |
-| 3. Context Vetting | Iterative RAG with smart token compression at the Phase 2 → 3 handoff. |
-| 4. Deep Reading | Parses full source contents when retrieved snippets are insufficient. |
-| 5. Generation | Cross-lab model ensembles produce competing answers and perspectives. |
-| 6. Critique & Scoring | Independent LLM judges score answers against standard quality dimensions. |
-| 7. Stress Testing | Adversarial probing of surviving candidates to surface hidden flaws. |
-| 8. Synthesis | Consolidates verified perspectives with epistemic labels and citations. |
+| HyperGate | Routes to DIRECT / WEB_SEARCH / PIPELINE; real method names are never exposed to the classifying LLMs, only opaque letters. |
+| 0/1. Fusion | Combines task classification (math, research, creative, coding, ...) and problem decomposition into atomic sub-questions in a single call. |
+| 1.5. Evidence Search | Iterative, web-grounded retrieval with smart token compression at the phase handoff; gated per method. |
+| 2. Perspectives | Cross-lab, cross-bloc model ensembles produce competing answers (constructive / destructive / systemic / minimalist). |
+| 3. Critique & Pruning | Independent LLM judges score candidates 0–10 and retain the top-k; this gate is critical — a failure here halts the run. |
+| 4. Stress Testing | Adversarial probing of surviving candidates (optimal / constraint-violation / adversarial conditions); skipped for simple-complexity requests. |
+| 5. Synthesis | Consolidates verified perspectives into one answer with epistemic labels and citations. |
 
-Internally, the codebase follows **hexagonal architecture** (domain logic depends on ports, not providers), **WorkflowStrategy composition** (20 strategy implementations under `application/flows/`), and a **provider router with automatic fallback** across model ecosystems. See `AGENTS.md` for the full architectural map.
+Other methods (Debate, Jury, Research, Scientific, ToT, Coding, ...) compose their own `WorkflowStrategy` with a different phase sequence — see the [Reasoning Methods & Presets](#reasoning-methods--presets) table below.
+
+Internally, the codebase follows **hexagonal DDD** (domain logic depends on ports, not providers) with **CQRS + event sourcing** (`PipelineAggregate` replay) and a **provider router with automatic cross-lab fallback**. See `AGENTS.md` for the full architectural map, including the small set of documented, intentional layer-boundary exceptions.
 
 ---
 
@@ -83,7 +89,7 @@ Internally, the codebase follows **hexagonal architecture** (domain logic depend
 - **Python 3.12+**
 - **Node.js 20+** (frontend web UI)
 - **OpenRouter API key** (recommended — one billing interface for 350+ models)
-- **Redis** (optional — recommended in production for distributed rate limiting)
+- **Redis** (optional for local development; required in production — the rate limiter and circuit breaker refuse to start in-memory when `ENVIRONMENT=production`)
 
 ### 1. Installation
 
@@ -496,7 +502,15 @@ python -m pytest --run-slow
 python -m pytest tests/ --cov=src/reasoner --cov-report=html
 ```
 
-The suite contains 2,100+ tests across 244 files, including architecture fitness functions (`tests/architecture/test_layer_boundaries.py`) that enforce layer dependency rules. Frontend unit tests use Vitest (`cd ui-next && npm run test`); E2E tests use Playwright (`npm run test:e2e`).
+The suite contains 2,700+ tests across 250+ files, including architecture fitness functions (`tests/architecture/test_layer_boundaries.py`) that enforce layer dependency rules. Frontend unit tests use Vitest (`cd ui-next && npm run test`); E2E tests use Playwright (`npm run test:e2e`).
+
+To run every CI gate locally in one command — useful when GitHub Actions runners aren't available, or before opening a PR:
+
+```bash
+./scripts/verify_ci.sh              # every gate: pytest, coverage, import-linter, tsc, eslint, build, secret scan
+./scripts/verify_ci.sh --backend    # skip the frontend gates (no Node required)
+./scripts/verify_ci.sh --fast       # skip the coverage re-run (the slowest gate)
+```
 
 ### Linting & Formatting
 
@@ -510,13 +524,33 @@ cd ui-next && npm run lint        # Frontend ESLint (flat config)
 
 ---
 
+## Deployment
+
+Reasoner ships as a self-contained Docker Compose stack (Caddy reverse proxy with automatic HTTPS, FastAPI backend, Next.js frontend, PostgreSQL, Redis, internal mTLS) — no Kubernetes or serverless platform required; the pipeline holds long-lived SSE streams for minutes per run, which fights typical serverless timeouts.
+
+```bash
+python scripts/preflight_check.py --generate   # prints ADMIN_API_KEY, CSRF_SECRET,
+                                                 # ENCRYPTION_KEY, BLIND_INDEX_KEY, POSTGRES_PASSWORD
+python scripts/preflight_check.py               # validates .env before you bring the stack up —
+                                                 # catches empty values, unedited placeholders,
+                                                 # malformed keys, and unsafe production settings
+
+docker compose up -d --build
+curl https://your-domain/api/health
+```
+
+`ENVIRONMENT=production` is hardcoded in `docker-compose.yml`; in that mode the app refuses to boot without an encryption key pair, a CSRF secret, a Supabase auth configuration, and at least one observability backend (Prometheus is a hard dependency, so `/api/metrics` satisfies this on a default install). Full walkthrough, secret generation commands, and the observability/backup checklist: [`DEPLOY.md`](DEPLOY.md). Strategy-level guidance — spend caps, a four-dashboard measurement plan, and portfolio/sale packaging — is in [`docs/GO_LIVE_PLAYBOOK.md`](docs/GO_LIVE_PLAYBOOK.md).
+
+---
+
 ## Documentation
 
 | Document | Contents |
 | :--- | :--- |
 | [`AGENTS.md`](AGENTS.md) | Exhaustive architecture map, conventions, and agent-contributor guide. |
 | [`ENCRYPTION.md`](ENCRYPTION.md) | Zero-trust encryption architecture (transit + at-rest). |
-| [`DEPLOY.md`](DEPLOY.md) | Deployment guide. |
+| [`DEPLOY.md`](DEPLOY.md) | Deployment guide — secrets, Docker Compose, TLS, observability, backups. |
+| [`docs/GO_LIVE_PLAYBOOK.md`](docs/GO_LIVE_PLAYBOOK.md) | Deployment strategy, spend protection, measurement plan, portfolio/sale packaging. |
 | [`SAAS.md`](SAAS.md) | Multi-tenant SaaS design (auth, billing, quotas). |
 | [`CHANGELOG.md`](CHANGELOG.md) | Release history. |
 | [`docs/ENVIRONMENT.md`](docs/ENVIRONMENT.md) | Full environment-variable reference. |
