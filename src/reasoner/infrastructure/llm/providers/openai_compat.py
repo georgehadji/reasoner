@@ -284,17 +284,43 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         tool_calls_out = []
         if message.tool_calls:
             for tc in message.tool_calls:
-                args = {}
-                try:
-                    if tc.function.arguments:
-                        args = json.loads(tc.function.arguments)
-                except Exception:
-                    pass
-                tool_calls_out.append({
+                # A bare `except: pass` used to turn unparseable arguments into
+                # {}, which is indistinguishable from "the model called this tool
+                # with no arguments". Nothing executes tool calls today, but the
+                # first caller that does would have invoked the tool with its
+                # defaults instead of rejecting a malformed call. Surface the
+                # failure instead of silently normalising it away.
+                args: dict[str, Any] = {}
+                parse_error: str | None = None
+                raw_arguments = tc.function.arguments or ""
+                if raw_arguments:
+                    try:
+                        parsed = json.loads(raw_arguments)
+                        if isinstance(parsed, dict):
+                            args = parsed
+                        else:
+                            parse_error = (
+                                f"tool arguments must be a JSON object, got {type(parsed).__name__}"
+                            )
+                    except json.JSONDecodeError as exc:
+                        parse_error = f"invalid JSON in tool arguments: {exc}"
+
+                if parse_error:
+                    logger.warning(
+                        "Tool call %s (%s) has unusable arguments — %s",
+                        tc.id, tc.function.name, parse_error,
+                    )
+
+                call: dict[str, Any] = {
                     "id": tc.id,
                     "name": tc.function.name,
                     "arguments": args,
-                })
+                }
+                if parse_error:
+                    # Callers MUST check this before executing the tool.
+                    call["parse_error"] = parse_error
+                    call["raw_arguments"] = raw_arguments
+                tool_calls_out.append(call)
 
         return content, tool_calls_out
 

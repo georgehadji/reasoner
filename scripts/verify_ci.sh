@@ -121,8 +121,8 @@ print(f\"{float(ET.parse('coverage.xml').getroot().attrib.get('line-rate', 0)) *
   echo "Coverage: ${cov}%"
   "$PYTHON" -c "
 cov = float('${cov}')
-if cov < 30:
-    print(f'FAIL: Coverage {cov:.1f}% is below the 30% hard floor'); exit(1)
+if cov < 60:
+    print(f'FAIL: Coverage {cov:.1f}% is below the 60% hard floor'); exit(1)
 elif cov < 80:
     print(f'WARN: Coverage {cov:.1f}% is below the 80% target')
 else:
