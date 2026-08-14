@@ -254,6 +254,23 @@ class Settings:
     # ── Database ──
     DATABASE_URL: str = os.getenv("DATABASE_URL", "")
 
+    @property
+    def ASYNCPG_DSN(self) -> str:
+        """DATABASE_URL with the SQLAlchemy driver suffix stripped, for asyncpg.
+
+        DATABASE_URL carries SQLAlchemy's `postgresql+asyncpg://` form (that is
+        what docker-compose.yml sets), but asyncpg parses the DSN itself and
+        rejects the `+asyncpg` scheme outright:
+
+            ClientConfigurationError: invalid DSN: scheme is expected to be
+            either "postgresql" or "postgres", got 'postgresql+asyncpg'
+
+        Every asyncpg call site used to strip it inline, and three of them
+        forgot — including the event-store pool opened during app startup,
+        which crashed the container on boot. Normalize in one place instead.
+        """
+        return self.DATABASE_URL.replace("+asyncpg", "")
+
     # ── Event Store Compaction ──
     COMPACTION_ENABLED: bool = os.getenv("COMPACTION_ENABLED", "true").lower() in ("1", "true", "yes")
     COMPACTION_RUN_HOUR_UTC: int = int(os.getenv("COMPACTION_RUN_HOUR_UTC", "3"))

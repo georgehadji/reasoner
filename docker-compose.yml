@@ -9,11 +9,11 @@ services:
                openssl req -x509 -new -nodes -key /certs/ca.key -sha256 -days 3650 -out /certs/ca.crt -subj '/CN=Internal CA'
              fi &&
              for service in backend frontend postgres valkey; do
-               openssl genrsa -out /certs/$service.key 2048 &&
-               openssl req -new -key /certs/$service.key -out /certs/$service.csr -subj \"/CN=$service\" &&
-               openssl x509 -req -in /certs/$service.csr -CA /certs/ca.crt -CAkey /certs/ca.key -CAcreateserial -out /certs/$service.crt -days 365 -sha256 -extfile /certs/extfile.cnf || 
-               (echo \"subjectAltName = DNS:$service, DNS:localhost\" > /certs/extfile.cnf &&
-                openssl x509 -req -in /certs/$service.csr -CA /certs/ca.crt -CAkey /certs/ca.key -CAcreateserial -out /certs/$service.crt -days 365 -sha256 -extfile /certs/extfile.cnf)
+               openssl genrsa -out /certs/$$service.key 2048 &&
+               openssl req -new -key /certs/$$service.key -out /certs/$$service.csr -subj \"/CN=$$service\" &&
+               openssl x509 -req -in /certs/$$service.csr -CA /certs/ca.crt -CAkey /certs/ca.key -CAcreateserial -out /certs/$$service.crt -days 365 -sha256 -extfile /certs/extfile.cnf || 
+               (echo \"subjectAltName = DNS:$$service, DNS:localhost\" > /certs/extfile.cnf &&
+                openssl x509 -req -in /certs/$$service.csr -CA /certs/ca.crt -CAkey /certs/ca.key -CAcreateserial -out /certs/$$service.crt -days 365 -sha256 -extfile /certs/extfile.cnf)
              done &&
              chmod -R 644 /certs/*.crt &&
              chmod -R 600 /certs/*.key"

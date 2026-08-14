@@ -104,6 +104,8 @@ async def test_clear_cache_clears_memory_and_disk(seeded_memory_cache, tmp_path,
     """
     from reasoner.api.cache import _MEMORY_CACHE, CACHE_DIR
     from reasoner.api import clear_cache
+    from reasoner.core.settings import Settings
+    from starlette.requests import Request
 
     # Write a disk file so we can verify disk clearing too
     test_file = CACHE_DIR / "regression-test-disk.json"
@@ -113,7 +115,18 @@ async def test_clear_cache_clears_memory_and_disk(seeded_memory_cache, tmp_path,
     assert "regression-test-key" in _MEMORY_CACHE
     assert test_file.exists()
 
-    result = await clear_cache()
+    # The endpoint is admin-gated: CSRF alone left it open to any caller.
+    admin_key = "test-admin-key-for-regression"
+    # Patch the class: patching the instance leaves a shadowing attribute behind.
+    monkeypatch.setattr(Settings, "ADMIN_API_KEY", admin_key)
+    request = Request({
+        "type": "http",
+        "method": "DELETE",
+        "path": "/api/cache",
+        "headers": [(b"x-admin-key", admin_key.encode())],
+    })
+
+    result = await clear_cache(request)
 
     # Postconditions: both memory and disk must be empty
     assert "regression-test-key" not in _MEMORY_CACHE

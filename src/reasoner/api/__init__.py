@@ -206,7 +206,7 @@ async def lifespan(app: FastAPI):
     from reasoner.application.services.compaction_service import run_nightly_compaction_loop
     if settings.DATABASE_URL:
         from reasoner.infrastructure.persistence.postgres_store import PostgreSQLEventStore
-        _compaction_store = PostgreSQLEventStore(settings.DATABASE_URL)
+        _compaction_store = PostgreSQLEventStore(settings.ASYNCPG_DSN)
         await _compaction_store.initialize()
     else:
         from reasoner.infrastructure.persistence.event_store import get_event_store
@@ -827,8 +827,16 @@ async def search_web(
 
 @app.delete("/api/cache")
 async def clear_cache(
+    request: Request,
     csrf_checked = Depends(require_csrf),
 ):
+    # Admin-only. This previously gated on CSRF alone, but a CSRF token is
+    # freely mintable at POST /api/csrf, so any anonymous caller could wipe
+    # every cached response — a cheap DoS and a way to force paid LLM
+    # re-computation of work that was already bought.
+    from reasoner.api.routes.admin import _require_admin
+    _require_admin(request)
+
     cleared = 0
     for f in CACHE_DIR.glob("*.json"):
         try:
