@@ -12,6 +12,10 @@ const LINKS = {
     { label: 'Privacy', href: '/privacy' },
     { label: 'Security', href: '/security' },
     { label: 'Terms', href: '/terms' },
+    // The cookie policy existed but nothing linked to it, and the refund policy
+    // is required by the guarantee advertised on the pricing page.
+    { label: 'Cookies', href: '/cookies' },
+    { label: 'Refunds', href: '/refunds' },
     { label: 'Contact', href: '/contact' },
   ],
 };

@@ -286,6 +286,28 @@ class PipelineExecutionService:
                 # (client disconnect), aclose() propagates GeneratorExit into
                 # run_stream(), triggering the existing finally block.
 
+                # P1.9: stop spending once a cap has been hit.
+                #
+                # executor.py sets state._spend_cap_exceeded when SPEND_CAP_PER_RUN_USD
+                # or SPEND_CAP_MONTHLY_USD is crossed, but only the CLI WorkflowStrategy
+                # runner honoured it — this loop, which serves every HTTP request, ran
+                # the remaining phases anyway and kept billing. Skip them and tell the
+                # client, so the run ends with whatever was produced before the cap.
+                if getattr(state, "_spend_cap_exceeded", False):
+                    logger.info("Spend cap exceeded — skipping phase %s: %s", num, name)
+                    state.phase_tokens[f"Phase {num}: {name}"] = {"input": 0, "output": 0}
+                    if not getattr(state, "_spend_cap_notified", False):
+                        state._spend_cap_notified = True
+                        await sse_emit({
+                            "type": "spend_cap_exceeded",
+                            "message": (
+                                "Spend limit reached for this run — remaining phases were "
+                                "skipped. The results below are what completed first."
+                            ),
+                            "cost_usd": round(getattr(state, "total_cost_usd", 0.0), 4),
+                        })
+                    continue
+
                 # Silent no-ops (e.g. writing pipeline skips generic decomposition/vetting)
                 if getattr(fn, "_is_silent_noop", False):  # v3.1: relaxed from identity check
                     await fn(state)

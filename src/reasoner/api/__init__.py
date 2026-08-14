@@ -958,9 +958,11 @@ app.include_router(keys_router)
 from reasoner.api.routes.feedback import router as feedback_router
 from reasoner.api.routes.estimate import router as estimate_router
 from reasoner.api.routes.gate import router as gate_router
+from reasoner.api.routes.contact import router as contact_router
 app.include_router(feedback_router)
 app.include_router(estimate_router)
 app.include_router(gate_router)
+app.include_router(contact_router)
 
 from reasoner.api.routes.gdpr import router as gdpr_router
 app.include_router(gdpr_router)

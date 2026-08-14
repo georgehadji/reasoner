@@ -113,7 +113,11 @@ def _try_free_port(port: int, pid: int | None) -> bool:
         if sys.platform == "win32" and npx_path.endswith(".ps1"):
             cmd = ["powershell.exe", "-ExecutionPolicy", "Bypass", "-File", npx_path, "kill-port", str(port)]
         try:
-            result = subprocess.run(
+            # nosec B602 — shell=True only on Windows, and only to invoke a .cmd
+            # shim, which cannot be executed directly. `cmd` is a fixed argument
+            # list built above from a resolved executable path and an integer
+            # port; no part of it comes from user input.
+            result = subprocess.run(  # nosec B602
                 cmd,
                 capture_output=True,
                 text=True,

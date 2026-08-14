@@ -254,7 +254,9 @@ export default function PricingPage() {
           </div>
           <div className="flex items-center gap-1.5">
             <Clock className="h-4 w-4" />
-            <span>14-day money-back guarantee</span>
+            <a href="/refunds" className="underline decoration-dotted underline-offset-2 hover:text-[var(--text)]">
+              14-day money-back guarantee
+            </a>
           </div>
         </div>
       </main>

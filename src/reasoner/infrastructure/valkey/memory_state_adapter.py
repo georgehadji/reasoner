@@ -77,8 +77,13 @@ class InMemoryStateAdapter:
         )
 
     async def register_script(self, script_text: str) -> str:
-        """Lua scripts are not supported by the in-memory adapter."""
-        sha = hashlib.sha1(script_text.encode()).hexdigest()
+        """Lua scripts are not supported by the in-memory adapter.
+
+        SHA-1 is not a choice here: Redis/Valkey SCRIPT LOAD returns a SHA-1
+        digest by protocol, so the stand-in has to produce the same shape. It
+        identifies a script, it does not authenticate one.
+        """
+        sha = hashlib.sha1(script_text.encode(), usedforsecurity=False).hexdigest()
         return sha
 
 

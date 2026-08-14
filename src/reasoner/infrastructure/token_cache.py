@@ -142,8 +142,13 @@ class TokenAwareCache:
         return hashlib.sha256(content.encode()).hexdigest()[:32]
     
     def _compute_prompt_hash(self, prompt: str) -> str:
-        """Compute prompt hash for exact matching."""
-        return hashlib.md5(prompt.encode()).hexdigest()[:16]
+        """Compute prompt hash for exact matching.
+
+        A cache-bucket key, not a security primitive — collisions cost a cache
+        miss, nothing more. Marked accordingly so it is not flagged as weak
+        crypto and does not fail on FIPS-enabled hosts.
+        """
+        return hashlib.md5(prompt.encode(), usedforsecurity=False).hexdigest()[:16]
     
     def _compute_problem_hash(self, problem: str) -> str:
         """Compute problem hash for grouping."""

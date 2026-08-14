@@ -229,6 +229,33 @@ export async function deleteAccount(): Promise<{ status: string; user_id?: strin
   return data;
 }
 
+/** Send a support request. Throws with the server's reason when it can't be delivered. */
+export async function submitContact(payload: {
+  name: string;
+  email: string;
+  topic: string;
+  message: string;
+}) {
+  const resp = await fetchWithCsrf(API.CONTACT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!resp.ok) {
+    // Surface the server's own explanation — it names a real fallback when
+    // support email isn't configured, rather than pretending the message sent.
+    let detail = 'Something went wrong sending your message. Please try again.';
+    try {
+      const body = await resp.json();
+      if (typeof body?.detail === 'string') detail = body.detail;
+    } catch {
+      /* keep the default */
+    }
+    throw new Error(detail);
+  }
+  return resp.json() as Promise<{ status: string }>;
+}
+
 export async function submitFeedback(payload: {
   conversation_id: string;
   message_id: string;

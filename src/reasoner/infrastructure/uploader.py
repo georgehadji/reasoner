@@ -52,9 +52,15 @@ except ImportError:
     DOCX_AVAILABLE = False
     logger.warning("python-docx not available - DOCX extraction disabled")
 
-# Upload storage directory
-UPLOAD_DIR = Path(__file__).parent / "uploads"
-UPLOAD_DIR.mkdir(exist_ok=True)
+# Upload storage directory.
+#
+# This defaulted to `<package>/uploads`, i.e. a path inside the installed source
+# tree — which in the container is inside the image. docker-compose.yml mounts a
+# volume at /app/uploads, so every uploaded file was written to the image layer
+# instead and destroyed on the next `docker compose up --build`. Default to the
+# mounted directory and keep it overridable.
+UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR") or (Path.cwd() / "uploads"))
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 # Maximum file size (50MB)
 MAX_FILE_SIZE = 50 * 1024 * 1024

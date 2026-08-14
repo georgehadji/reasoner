@@ -39,7 +39,20 @@ class PipelineOwnershipRepository:
 
     def __init__(self, db_path: str | Path | None = None) -> None:
         if db_path is None:
-            db_path = Path(__file__).parent.parent.parent / "events.db"
+            # Defaulted to `<package>/events.db` — inside the image in a
+            # container, so every redeploy wiped it. This store decides who owns
+            # which pipeline, so losing it drops authorization records, not just
+            # cache. EVENT_STORE_PATH lets deployments point it at a mounted
+            # volume; the historical location stays the fallback for local runs.
+            import os
+
+            env_path = os.environ.get("EVENT_STORE_PATH")
+            db_path = (
+                Path(env_path)
+                if env_path
+                else Path(__file__).parent.parent.parent / "events.db"
+            )
+            Path(db_path).parent.mkdir(parents=True, exist_ok=True)
         self._conn = EventStoreConnection(Path(db_path))
         self._conn.init_db()
 

@@ -42,10 +42,55 @@ def _get_event_bus() -> EventPublisher:
 # Regex for fenced code blocks inside prompts
 _CODE_FENCE_RE = re.compile(r"```(\w+)?\n(.*?)\n```", re.DOTALL)
 
-# P1.9: In-process monthly spend tracker (volatile — resets on restart).
-# Used when SPEND_CAP_MONTHLY_USD > 0. Keyed by conversation_id.
-# For persistent multi-worker enforcement, this should be backed by Redis.
+# P1.9: monthly spend tracker, in-process fallback only.
+#
+# This dict used to BE the monthly cap, which made the cap unenforceable in
+# production three ways over: it was keyed by conversation_id (so starting a new
+# conversation handed the caller a fresh budget), it lived in the worker process
+# (so 8 gunicorn workers each allowed a full cap, and a restart cleared them
+# all), and it was never reset on a month boundary (so "monthly" really meant
+# "since this process started"). accrue_monthly_spend() below uses Redis, which
+# is already a hard production dependency, and falls back here only for local
+# development where no Redis is running.
 _MONTHLY_SPEND: dict[str, float] = {}
+
+# Keep the fallback from growing without bound in long-lived dev processes.
+_MONTHLY_SPEND_MAX_KEYS = 10_000
+
+
+def _monthly_spend_key(subject: str) -> str:
+    """Redis key for one subject's spend in the current calendar month (UTC)."""
+    from datetime import datetime, timezone
+
+    period = datetime.now(timezone.utc).strftime("%Y-%m")
+    return f"spend:monthly:{period}:{subject}"
+
+
+async def accrue_monthly_spend(subject: str, cost_usd: float) -> float:
+    """Add cost to this subject's month-to-date spend and return the new total.
+
+    Shared across workers and durable across restarts via Redis; the key expires
+    on its own well after the month ends, so nothing needs to sweep it. Falls
+    back to the in-process dict when Redis is unavailable, which is the correct
+    behaviour for local development and degrades to the old per-worker semantics
+    rather than failing a user's request.
+    """
+    key = _monthly_spend_key(subject)
+    try:
+        from reasoner.infrastructure.redis.client import get_redis
+
+        redis = get_redis()
+        total = await redis.incrbyfloat(key, cost_usd)
+        # 62 days: comfortably past the end of any month, so a key set on the
+        # 1st is still alive on the 31st and disappears shortly after.
+        await redis.expire(key, 62 * 24 * 3600)
+        return float(total)
+    except Exception as exc:
+        logger.debug("Monthly spend tracking fell back to memory: %s", exc)
+        if len(_MONTHLY_SPEND) >= _MONTHLY_SPEND_MAX_KEYS:
+            _MONTHLY_SPEND.clear()
+        _MONTHLY_SPEND[key] = _MONTHLY_SPEND.get(key, 0.0) + cost_usd
+        return _MONTHLY_SPEND[key]
 
 
 class LLMExecutor:
@@ -508,20 +553,26 @@ class LLMExecutor:
                 except Exception:
                     pass
 
-            # P1.9b: Monthly spend cap check (in-process, volatile)
+            # P1.9b: Monthly spend cap check (Redis-backed, shared across workers)
             if cost_usd > 0 and not getattr(state, "_spend_cap_exceeded", False):
                 try:
                     from reasoner.core.settings import settings
                     mcap = settings.SPEND_CAP_MONTHLY_USD
                     if mcap > 0:
-                        cid = state.conversation_id or "anonymous"
-                        prev = _MONTHLY_SPEND.get(cid, 0.0)
-                        _MONTHLY_SPEND[cid] = prev + cost_usd
-                        if _MONTHLY_SPEND[cid] > mcap:
+                        # Key on the user, not the conversation. Keying on
+                        # conversation_id meant every new chat started the month's
+                        # budget over, so the cap could never actually bind.
+                        cid = (
+                            getattr(state, "user_id", None)
+                            or state.conversation_id
+                            or "anonymous"
+                        )
+                        month_total = await accrue_monthly_spend(cid, cost_usd)
+                        if month_total > mcap:
                             state._spend_cap_exceeded = True
                             logger.warning(
                                 "Monthly spend cap of $%.2f exceeded for %s (%.2f). Halting.",
-                                mcap, cid, _MONTHLY_SPEND[cid],
+                                mcap, cid, month_total,
                             )
                             try:
                                 from reasoner.core.events.domain_events import SaaSEventType
@@ -533,7 +584,7 @@ class LLMExecutor:
                                     metadata={
                                         "cap_type": "monthly",
                                         "cap_amount": mcap,
-                                        "total_cost": _MONTHLY_SPEND[cid],
+                                        "total_cost": month_total,
                                     },
                                 )
                                 await get_event_bus().publish(evt)

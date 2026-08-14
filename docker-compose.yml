@@ -68,8 +68,18 @@ services:
       # Keep the feedback DB on a mounted volume — the default path is inside
       # src/, which lives in the image and is wiped on every redeploy.
       - FEEDBACK_DB_PATH=/app/history/feedback.db
+      # Both of these default to paths inside the image, which the volumes below
+      # do not cover — uploads and pipeline-ownership records were destroyed on
+      # every redeploy.
+      - UPLOAD_DIR=/app/uploads
+      - EVENT_STORE_PATH=/app/history/events.db
       - ENABLE_LEGACY_API_KEY=false
-      - UVICORN_WORKERS=8
+      # 3, not 8. Each worker is a full process: measured 110 MB RSS at import
+      # before serving anything, so 8 workers need ~880 MB of the 1 G limit below
+      # and the OOM killer arrives under load. The app is I/O-bound on LLM calls,
+      # so concurrency comes from async, not from worker count. Raise this only
+      # together with the memory limit.
+      - UVICORN_WORKERS=3
       - SSL_CERTFILE=/certs/backend.crt
       - SSL_KEYFILE=/certs/backend.key
     env_file:

@@ -1,5 +1,10 @@
 name: Security Scan
 
+# Every scan in this workflow used to end in `|| true`, so a vulnerability could
+# never fail a build — only the secret scan could. High-severity npm advisories
+# had been passing green for that reason. The scans below now block; the noisier
+# informational ones stay non-blocking and are clearly marked as such.
+
 on:
   push:
     branches: [main, develop]
@@ -15,10 +20,52 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install pip-audit bandit
-      - run: pip-audit --requirement requirements.txt || true
-      - run: bandit -r src/ -f json -o bandit-report.json || true
-      - run: bandit -r src/ || true
-      - run: python scripts/scan-secrets.py
+
+      # Blocking, as a ratchet: any NEW advisory fails the build, while the
+      # known backlog below is listed explicitly so it stays visible instead of
+      # being hidden behind `|| true`.
+      #
+      # Each ignored ID needs a major-version bump that deserves its own testing
+      # cycle, so they are tracked rather than silently accepted:
+      #   PYSEC-2026-87                       lxml     5.x → 6.1.0
+      #   PYSEC-2026-1845                     pytest   8.x → 9.0.3 (test-only)
+      #   PYSEC-2026-161/248/249/1942/2281/2280
+      #                                       starlette 0.48 → 1.x, which is a
+      #                                       FastAPI framework upgrade
+      # Delete an ID from this list as soon as its dependency is upgraded.
+      - name: pip-audit (blocking, known backlog ignored)
+        run: |
+          pip-audit --requirement requirements.txt \
+            --ignore-vuln PYSEC-2026-87 \
+            --ignore-vuln PYSEC-2026-1845 \
+            --ignore-vuln PYSEC-2026-161 \
+            --ignore-vuln PYSEC-2026-248 \
+            --ignore-vuln PYSEC-2026-249 \
+            --ignore-vuln PYSEC-2026-1942 \
+            --ignore-vuln PYSEC-2026-2281 \
+            --ignore-vuln PYSEC-2026-2280
+
+      # Informational: the full picture including the backlog above.
+      - name: pip-audit full report (informational)
+        run: pip-audit --requirement requirements.txt || true
+
+      # Blocking, high-severity only. Bandit's full output is noisy on this
+      # codebase; the high-confidence high-severity set is the actionable part.
+      - name: bandit high severity (blocking)
+        run: bandit -r src/ -lll -iii
+
+      # Informational: full report, uploaded for inspection, never blocking.
+      - name: bandit full report (informational)
+        run: bandit -r src/ -f json -o bandit-report.json || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bandit-report
+          path: bandit-report.json
+          if-no-files-found: ignore
+
+      - name: Secret scan (blocking)
+        run: python scripts/scan-secrets.py
 
   frontend:
     runs-on: ubuntu-latest
@@ -27,4 +74,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: cd ui-next && npm audit --audit-level high || true
+      - run: cd ui-next && npm ci
+      - name: npm audit high severity (blocking)
+        run: cd ui-next && npm audit --audit-level=high

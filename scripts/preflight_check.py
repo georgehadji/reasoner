@@ -141,6 +141,36 @@ def check(env: dict[str, str]) -> tuple[list[str], list[str]]:
     if env.get("ENABLE_LEGACY_API_KEY", "").lower() in ("1", "true", "yes"):
         warnings.append("ENABLE_LEGACY_API_KEY=true bypasses the modern auth path")
 
+    # Billing that silently stays in test mode takes no money and looks fine.
+    if env.get("PAYPAL_CLIENT_ID") and env.get("PAYPAL_ENV", "sandbox") != "live":
+        errors.append(
+            "PAYPAL_ENV is not 'live' but PayPal credentials are set — checkout will "
+            "run against the sandbox and never charge anyone"
+        )
+    if env.get("STRIPE_SECRET_KEY", "").startswith("sk_test_"):
+        errors.append(
+            "STRIPE_SECRET_KEY is a test key (sk_test_…) — payments will not be real"
+        )
+
+    # Spend caps are the only thing standing between a public URL and an
+    # unbounded provider bill.
+    for cap in ("SPEND_CAP_PER_RUN_USD", "SPEND_CAP_MONTHLY_USD"):
+        raw = env.get(cap, "0")
+        try:
+            if float(raw or 0) <= 0:
+                warnings.append(
+                    f"{cap} is unset or 0 (unlimited) — a public deployment can run up "
+                    "an unbounded LLM bill. Also set a hard cap on the provider dashboard."
+                )
+        except ValueError:
+            errors.append(f"{cap} is not a number: {raw!r}")
+
+    if not env.get("APP_URL") or "localhost" in env.get("APP_URL", ""):
+        warnings.append(
+            "APP_URL is unset or still localhost — checkout redirects and emailed "
+            "links will point at the wrong host"
+        )
+
     for name, reason in WARNING:
         if not env.get(name):
             warnings.append(f"{name} is empty — {reason}")
