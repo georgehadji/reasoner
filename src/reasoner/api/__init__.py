@@ -36,23 +36,30 @@ init_sentry()
 
 # --- Action 1.2: Observability Strictness & Metrics --- START
 if settings.ENVIRONMENT == "production":
-    if not settings.LANGFUSE_PUBLIC_KEY or not settings.LANGFUSE_SECRET_KEY:
-        raise RuntimeError("CRITICAL: Langfuse keys (LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY) are missing in production environment. Observability is mandatory in production.")
-    # Lightweight Langfuse connectivity probe: verify the SDK is reachable
-    # by attempting a simple public-key check.  Connection errors are logged
-    # but non-fatal — the app can run without observability in degraded mode.
-    try:
-        from langfuse import Langfuse
-        _langfuse = Langfuse(
-            public_key=settings.LANGFUSE_PUBLIC_KEY,
-            secret_key=settings.LANGFUSE_SECRET_KEY,
-        )
-        _langfuse.auth_check()
-        logger.info("Langfuse connectivity probe: OK")
-    except Exception as probe_exc:
-        logger.warning(
-            "Langfuse connectivity check failed (non-fatal): %s", probe_exc
-        )
+    # Any one configured backend satisfies the gate — see api/observability.py
+    # for why this is no longer Langfuse-specific.
+    from reasoner.api.observability import require_observability_backend
+
+    logger.info(
+        "Observability backends active: %s", ", ".join(require_observability_backend())
+    )
+
+    if settings.LANGFUSE_PUBLIC_KEY and settings.LANGFUSE_SECRET_KEY:
+        # Lightweight Langfuse connectivity probe: verify the SDK is reachable
+        # by attempting a simple public-key check.  Connection errors are logged
+        # but non-fatal — the app can run without observability in degraded mode.
+        try:
+            from langfuse import Langfuse
+            _langfuse = Langfuse(
+                public_key=settings.LANGFUSE_PUBLIC_KEY,
+                secret_key=settings.LANGFUSE_SECRET_KEY,
+            )
+            _langfuse.auth_check()
+            logger.info("Langfuse connectivity probe: OK")
+        except Exception as probe_exc:
+            logger.warning(
+                "Langfuse connectivity check failed (non-fatal): %s", probe_exc
+            )
 # --- Action 1.2: Observability Strictness & Metrics --- END
 
 # Register global exception handlers (Critical Enhancement 7.7)

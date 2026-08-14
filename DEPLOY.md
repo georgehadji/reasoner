@@ -50,6 +50,8 @@ cp .env.example .env
 # ── Critical Security ──
 ADMIN_API_KEY=              # Generate: python -c "import secrets; print(secrets.token_urlsafe(32))"
 CSRF_SECRET=                # Generate: python -c "import secrets; print(secrets.token_urlsafe(32))"
+ENCRYPTION_KEY=             # Generate: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+BLIND_INDEX_KEY=            # Generate the same way as ENCRYPTION_KEY
 ENVIRONMENT=production
 DEBUG=false
 
@@ -60,7 +62,9 @@ POSTGRES_PASSWORD=          # Strong random password
 OPENROUTER_API_KEY=sk-or-v1-...   # Recommended: single key for 346+ models
 # OR individual provider keys...
 
-# ── SaaS Auth (optional but recommended) ──
+# ── SaaS Auth (REQUIRED in production) ──
+# Without these the app falls back to LocalAuthAdapter (HS256), which
+# infrastructure/auth/__init__.py refuses to use when ENVIRONMENT=production.
 SUPABASE_URL=https://...
 SUPABASE_ANON_KEY=...
 SUPABASE_SERVICE_ROLE_KEY=...
@@ -77,9 +81,17 @@ TAVILY_API_KEY=                   # Optional secondary search backend
 
 # ── Optional: Monitoring ──
 SENTRY_DSN=...
+LANGFUSE_PUBLIC_KEY=              # LLM tracing; needs: pip install "langfuse>=1.14.0,<2.0.0"
+LANGFUSE_SECRET_KEY=
 ```
 
 **Never commit `.env`.** It is already in `.gitignore`.
+
+> **Observability gate.** `docker-compose.yml` sets `ENVIRONMENT=production`, and
+> in production the app refuses to start with no observability backend at all.
+> `prometheus-client` is a hard dependency in `requirements.txt`, so `/api/metrics`
+> satisfies the gate on a default install and neither Sentry nor Langfuse is
+> required to boot. Both are recommended additions, not prerequisites.
 
 ---
 

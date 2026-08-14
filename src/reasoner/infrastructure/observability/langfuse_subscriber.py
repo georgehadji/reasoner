@@ -11,7 +11,11 @@ import logging
 import asyncio
 from typing import Any, Dict, Optional
 
-# Lazy imports to handle missing/version-mismatched langfuse gracefully
+# Lazy imports to handle missing/version-mismatched langfuse gracefully.
+# NOTE: langfuse.model stopped exporting CreateTrace/CreateGeneration in 2.x, so
+# this subscriber only activates against the 1.x SDK — install
+# "langfuse>=1.14.0,<2.0.0". With any newer major this import fails and tracing
+# silently stays off; adopting 2.x+ means porting to the span/generation API.
 try:
     from langfuse import Langfuse as _Langfuse
     from langfuse.model import (
