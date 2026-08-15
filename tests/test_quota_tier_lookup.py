@@ -56,14 +56,17 @@ def captured_tier(monkeypatch):
 
 
 def _stub_repo(monkeypatch, *, returns=None, raises=None):
-    from reasoner.api import dependencies
+    # Tier entitlement lives in the application layer — the pipeline executor
+    # resolves it too, not just HTTP dependencies — and api.dependencies
+    # re-exports it. Stubbing at the source covers both callers.
+    from reasoner.application.services import spend_limit_service
 
     repo = MagicMock()
     if raises is not None:
         repo.get_subscription_by_user = AsyncMock(side_effect=raises)
     else:
         repo.get_subscription_by_user = AsyncMock(return_value=returns)
-    monkeypatch.setattr(dependencies, "_get_subscription_repo", lambda: repo)
+    monkeypatch.setattr(spend_limit_service, "_get_subscription_repo", lambda: repo)
     return repo
 
 

@@ -22,7 +22,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 logger = logging.getLogger(__name__)
 
 from reasoner.api.client_ip import get_client_ip
-from reasoner.domain.saas import User, SubscriptionTier, SubscriptionStatus, QuotaResult
+from reasoner.domain.saas import User, SubscriptionTier, QuotaResult
 from reasoner.application.ports.auth_port import AuthPort
 from reasoner.application.services.auth_service import AuthService
 from reasoner.application.services.quota_service import QuotaService, TIER_LIMITS
@@ -345,59 +345,21 @@ def get_event_store(request: Request):
     return get_event_store()
 
 
-# ── Subscription Repository Singleton ──
-_subscription_repo = None
-
-
-def _get_subscription_repo():
-    """Factory for the subscription repository used to resolve tier entitlement.
-
-    Cached: tier is resolved on every quota-checked request, but subscriptions
-    only change via billing webhooks, which invalidate the entry directly.
-    """
-    global _subscription_repo
-    if _subscription_repo is None:
-        from reasoner.infrastructure.persistence.subscription_repo import (
-            PostgresSubscriptionRepository,
-        )
-        from reasoner.infrastructure.persistence.cached_subscription_repo import (
-            CachedSubscriptionRepository,
-        )
-        dsn = settings.DATABASE_URL.replace("+asyncpg", "")
-        pg_repo = PostgresSubscriptionRepository(dsn, pool_size=settings.DB_POOL_SIZE)
-        _subscription_repo = CachedSubscriptionRepository(pg_repo)
-    return _subscription_repo
-
-
-# Statuses that entitle a user to their subscription's tier. Anything else
-# (cancelled, past_due) is treated as FREE.
-_ENTITLED_STATUSES = frozenset({SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIALING})
-
-
-async def _resolve_user_tier(user_id: str) -> SubscriptionTier:
-    """Resolve the tier a user is entitled to from their subscription.
-
-    Falls back to FREE on every uncertain path — no subscription, a status that
-    does not entitle, or a lookup failure — so an outage can never hand out a
-    paid tier. get_subscription_by_user() returns the newest row without
-    filtering on status, so the status check must happen here.
-    """
-    try:
-        subscription = await _get_subscription_repo().get_subscription_by_user(user_id)
-    except Exception:
-        logger.warning("Subscription lookup failed; defaulting to FREE tier", exc_info=True)
-        return SubscriptionTier.FREE
-
-    if subscription is None or subscription.status not in _ENTITLED_STATUSES:
-        return SubscriptionTier.FREE
-    return subscription.tier
+# ── Tier Entitlement ──
+# Tier resolution lives in the application layer because the pipeline
+# executor needs it too, not just HTTP dependencies. This is a re-export so
+# both paths share one definition of what entitles a user to a tier.
+from reasoner.application.services.spend_limit_service import (  # noqa: E402
+    _reset_subscription_repo,
+    resolve_user_tier as _resolve_user_tier,
+)
 
 
 def _reset_quota_service() -> None:
     """Reset quota service singleton (useful for tests)."""
-    global _quota_service, _subscription_repo
+    global _quota_service
     _quota_service = None
-    _subscription_repo = None
+    _reset_subscription_repo()
 
 
 async def check_quota(
