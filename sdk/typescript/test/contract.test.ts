@@ -31,7 +31,7 @@ function fixtureClient(stride = 13): ReasonerClient {
   const bytes = new TextEncoder().encode(body);
 
   return new ReasonerClient({
-    apiKey: 'rsn_live_contract',
+    apiKey: 'k',
     baseUrl: 'https://example.test',
     fetch: async () =>
       new Response(
