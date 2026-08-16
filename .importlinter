@@ -21,6 +21,7 @@ layers =
     reasoner.quality
     reasoner.token_cache
     reasoner.core
+    reasoner.security
     reasoner.domain
 ignore_imports=
     reasoner.infrastructure.renderer -> reasoner.application.services.renderers
@@ -90,6 +91,11 @@ ignore_imports=
     # ── domain → core (TYPE_CHECKING + preset/model constants) ──
     reasoner.domain.preset_core -> reasoner.core.constants_models
     reasoner.domain.preset_core -> reasoner.core.protocol
+    # domain → core: preset key-preflight derivation. PRESETS is built at
+    # module import (presets.py:25), so DI cannot reach it — a resolver hook
+    # would always be unset at call time. Retire this by making preset
+    # construction lazy, then injecting.
+    reasoner.domain.preset_core -> reasoner.core.ports.model_registry_port
     reasoner.domain.pipeline_state -> reasoner.core.protocol
     # ── domain → application (deprecated lazy compat delegations) ──
     reasoner.domain.pipeline_state -> reasoner.application.services.pipeline_service

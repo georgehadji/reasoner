@@ -6,8 +6,9 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
-from reasoner.api.auth_deps import check_rate_limit, require_csrf
-from reasoner.api.dependencies import get_current_user
+from reasoner.api.auth_deps import require_csrf
+from reasoner.api.dependencies import check_rate_limit, get_current_user
+from reasoner.core.settings import settings
 from reasoner.domain.saas import User
 from reasoner.uploader import delete_file, get_file_text, list_uploads, save_uploaded_file, save_uploaded_files, MAX_FILE_SIZE
 
@@ -25,6 +26,18 @@ async def upload_file(
 ):
     """Upload one or more files and extract their text content."""
     try:
+        # Reject oversized multipart bodies before Starlette parses them into
+        # memory/tempfiles.  Per-file streaming checks below remain required
+        # because Content-Length may be absent or intentionally misleading.
+        content_length = request.headers.get("content-length")
+        if content_length:
+            try:
+                request_limit = (MAX_FILE_SIZE * settings.UPLOAD_MAX_FILES) + (1024 * 1024)
+                if int(content_length) > request_limit:
+                    raise HTTPException(status_code=413, detail="Upload request is too large")
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid Content-Length header")
+
         form = await request.form()
         files = []
 
@@ -38,6 +51,12 @@ async def upload_file(
 
         if not raw_files:
             return {"success": False, "error": "No file provided"}
+
+        if len(raw_files) > settings.UPLOAD_MAX_FILES:
+            raise HTTPException(
+                status_code=413,
+                detail=f"Too many files. Maximum: {settings.UPLOAD_MAX_FILES}",
+            )
 
         # Normalize to list of (bytes, filename) tuples — stream read with size guard
         for item in raw_files:

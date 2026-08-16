@@ -237,7 +237,10 @@ class TestBug003ErrorMessageSanitization:
 
     def test_upload_error_is_generic(self, monkeypatch):
         """Upload route errors must not leak internals."""
-        from reasoner.api.auth_deps import check_rate_limit
+        # uploads.py now depends on dependencies.check_rate_limit directly
+        # (docs/plans/pre-existing-fixes.md #3, strangler commit 2) — the
+        # override must key on that object, not the retired auth_deps shim.
+        from reasoner.api.dependencies import check_rate_limit
 
         secret = "UPLOAD_SECRET_PATH"
 

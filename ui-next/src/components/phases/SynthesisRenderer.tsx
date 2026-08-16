@@ -48,9 +48,9 @@ export const SynthesisRenderer = memo(function SynthesisRenderer({
 
       {footnotes.length > 0 && (
         <section className="mt-8 border-t border-[var(--border)] pt-4">
-          <h4 className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">
+          <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">
             References
-          </h4>
+          </h3>
           <ol className="space-y-2 text-sm text-[var(--text)]">
             {footnotes.map((c) => (
               <li key={c.index} id={`ref-${c.index}`} className="flex gap-2">

@@ -25,6 +25,8 @@ class CompositeTranslator:
         target_lang: str,
         source_lang: str | None = None,
     ) -> TranslationResult:
+        reasons: list[str] = []
+
         if self._deepl is not None:
             try:
                 raw = await self._deepl.translate(text, target_lang=target_lang, source_lang=source_lang)
@@ -34,15 +36,26 @@ class CompositeTranslator:
                 )
             except Exception as exc:
                 logger.warning("DeepL translation failed, trying LLM fallback: %s", exc)
+                reasons.append(f"deepl: {exc}")
+        else:
+            reasons.append("deepl: not configured")
 
         if self._llm is not None:
             try:
                 return await self._llm.translate(text, target_lang=target_lang, source_lang=source_lang)
             except Exception as exc:
                 logger.warning("LLM translation failed, using identity fallback: %s", exc)
+                reasons.append(f"llm: {exc}")
+        else:
+            reasons.append("llm: not configured")
 
         logger.warning("All translators failed; returning original text (pivot degraded to identity)")
-        return TranslationResult(text=text, detected_source_language=source_lang or "unknown")
+        return TranslationResult(
+            text=text,
+            detected_source_language=source_lang or "unknown",
+            degraded=True,
+            degraded_reason="; ".join(reasons),
+        )
 
 
 def get_composite_translator(router: Any | None = None) -> CompositeTranslator:

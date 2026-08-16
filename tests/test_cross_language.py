@@ -132,9 +132,12 @@ class TestDeepLClient:
     @pytest.mark.asyncio
     async def test_health_check_no_key(self):
         """Health check without key should return False."""
-        with patch("os.getenv", return_value=None):
-            client = DeepLClient(api_key=None)
-            assert await client.health_check() is False
+        # api_key=None falls back to settings.DEEPL_API_KEY, not os.getenv, so
+        # patching os.getenv left a real key in place on any machine that has
+        # one configured. Clear the resolved key to test the no-key branch.
+        client = DeepLClient(api_key=None)
+        client.api_key = ""
+        assert await client.health_check() is False
 
 
 class TestCrossLanguagePipeline:
@@ -216,6 +219,11 @@ class TestCrossLanguagePipeline:
             router = _make_mock_router()
             pipeline = ReasonerPipeline(router=router, preset_name="cross-language-budget")
             state = PipelineState(problem="Hello world")
+            # translate_out gates on pivot_active/output_language now;
+            # cross_language_state alone is legacy resume data and makes the
+            # phase a no-op, so these tests silently asserted nothing.
+            state.pivot_active = True
+            state.output_language = "German"
             state.cross_language_state = {"source_language": "DE"}
             state.final_solution = _make_final_solution(core_solution="Hello world")
             await pipeline._phase_cross_language_translate_out(state)
@@ -233,6 +241,8 @@ class TestCrossLanguagePipeline:
             router = _make_mock_router()
             pipeline = ReasonerPipeline(router=router, preset_name="cross-language-budget")
             state = PipelineState(problem="Hello world")
+            state.pivot_active = True
+            state.output_language = "German"
             state.cross_language_state = {"source_language": "DE"}
             state.final_solution = _make_final_solution(core_solution="Hello world")
             await pipeline._phase_cross_language_translate_out(state)
@@ -253,7 +263,9 @@ class TestCrossLanguagePreset:
     def test_preset_requires_deepl_key(self):
         """Cross-language presets should require DEEPL_API_KEY."""
         from reasoner.domain.preset_registry import PRESETS
-        preset = PRESETS["cross-language-budget"]
+        from reasoner.domain.preset_registry import get_preset
+        # PRESETS holds raw config dicts; get_preset() builds the PipelinePreset.
+        preset = get_preset("cross-language-budget")
         assert "DEEPL_API_KEY" in preset.required_env_vars
 
     def test_method_extraction(self):

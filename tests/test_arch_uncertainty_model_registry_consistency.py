@@ -107,7 +107,7 @@ def test_preset_methods_map_to_flow_strategies() -> None:
 
     factory = WorkflowFactory()
 
-    for preset_id, preset in PRESETS.items():
+    for preset_id, _preset in PRESETS.items():
         method = get_method_from_preset(preset_id)
         norm_method = method.replace("-", "_")
         # Known: cross_language has no flow strategy — it uses multi_perspective fallback.
@@ -126,21 +126,24 @@ def test_preset_models_in_registry() -> None:
     from reasoner.infrastructure.llm.registry import _REGISTRY
 
     for preset_id, preset in PRESETS.items():
+        # PRESETS values are plain dicts, not PipelinePreset objects.
+        primary_id = preset["primary_id"]
+
         # Check primary model
-        assert preset.primary_id in _REGISTRY, (
-            f"Preset '{preset_id}' primary model '{preset.primary_id}' "
+        assert primary_id in _REGISTRY, (
+            f"Preset '{preset_id}' primary model '{primary_id}' "
             "not found in model registry."
         )
 
         # Check routing models
-        for role, model_id in preset.routing.items():
+        for role, model_id in preset["routing"].items():
             assert model_id in _REGISTRY, (
                 f"Preset '{preset_id}' routing role '{role}' uses model "
                 f"'{model_id}' which is not in the registry."
             )
 
-        # Check fallback models
-        for role, model_id in preset.fallback_routing.items():
+        # Check fallback models. Not every preset declares fallbacks.
+        for role, model_id in preset.get("fallback_routing", {}).items():
             assert model_id in _REGISTRY, (
                 f"Preset '{preset_id}' fallback role '{role}' uses model "
                 f"'{model_id}' which is not in the registry."

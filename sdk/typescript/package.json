@@ -1,0 +1,52 @@
+{
+  "name": "@reasoner/sdk",
+  "version": "0.2.0",
+  "description": "TypeScript client for the Reasoner API — multi-model reasoning pipelines, streamed over SSE or collapsed server-side with runSync.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/georgehadji/Reaseoner.git",
+    "directory": "sdk/typescript"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "reasoner",
+    "llm",
+    "reasoning",
+    "sse",
+    "agents",
+    "mcp"
+  ],
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}

@@ -575,7 +575,7 @@ async def _run_generation_attempts(
 
     images: list[dict[str, str]] = []
     errors: list[str] = []
-    for alias, result in zip(model_aliases, results):
+    for alias, result in zip(model_aliases, results, strict=False):
         if isinstance(result, Exception):
             msg = str(result)
             logger.warning("Image generation failed with %s: %s", alias, msg)

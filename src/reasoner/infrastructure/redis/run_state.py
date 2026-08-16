@@ -91,7 +91,7 @@ class RunStateManager:
             self._redis_ok = False
             self._redis_last_fail = time.monotonic()
             logger.warning("Redis run-state failed (%s), falling back to memory", exc)
-            raise _RedisUnavailable(str(exc))
+            raise _RedisUnavailable(str(exc)) from exc
 
     def _get_fallback(self) -> "RunStateStore":
         """Lazy-create the in-memory fallback store.

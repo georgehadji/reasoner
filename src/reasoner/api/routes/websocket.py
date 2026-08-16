@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, WebSocket
+import secrets
+
+from fastapi import APIRouter, HTTPException, Request, WebSocket
+
+from reasoner.core.settings import settings
 
 from reasoner.infrastructure.websocket import (
     get_websocket_manager,
@@ -59,12 +63,13 @@ async def websocket_connect(
     WebSocket endpoint for real-time pipeline updates.
     """
     token = _extract_bearer_token(websocket)
-    user_id = None
-    if token:
-        user_id = await _authenticate_ws_token(token)
-        if not user_id:
-            await websocket.close(code=1008, reason="Invalid token")
-            return
+    if not token:
+        await websocket.close(code=1008, reason="Authentication required")
+        return
+    user_id = await _authenticate_ws_token(token)
+    if not user_id:
+        await websocket.close(code=1008, reason="Invalid token")
+        return
     await websocket_endpoint(websocket, pipeline_id)
 
 
@@ -77,18 +82,23 @@ async def pipeline_websocket(
     WebSocket endpoint for specific pipeline.
     """
     token = _extract_bearer_token(websocket)
-    user_id = None
-    if token:
-        user_id = await _authenticate_ws_token(token)
-        if not user_id:
-            await websocket.close(code=1008, reason="Invalid token")
-            return
+    if not token:
+        await websocket.close(code=1008, reason="Authentication required")
+        return
+    user_id = await _authenticate_ws_token(token)
+    if not user_id:
+        await websocket.close(code=1008, reason="Invalid token")
+        return
     await websocket_endpoint(websocket, pipeline_id)
 
 
 @router.get("/api/websocket/stats")
-async def get_websocket_stats():
-    """Get WebSocket connection statistics."""
+async def get_websocket_stats(request: Request):
+    """Get WebSocket statistics (admin-only; contains pipeline identifiers)."""
+    admin_key = settings.ADMIN_API_KEY or ""
+    provided = request.headers.get("X-Admin-Key", "")
+    if not admin_key or not secrets.compare_digest(provided, admin_key):
+        raise HTTPException(status_code=403, detail="Admin access required")
     manager = get_websocket_manager()
     return {
         "active_connections": manager.get_connection_count(),

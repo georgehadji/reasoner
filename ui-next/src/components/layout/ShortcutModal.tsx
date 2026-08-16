@@ -25,7 +25,7 @@ export function ShortcutModal({ isOpen, onClose }: ShortcutModalProps) {
     <div
       className={cn(
         'fixed inset-0 z-[300] flex items-center justify-center p-4 transition-all duration-300',
-        isOpen ? 'bg-black/60 opacity-100' : 'bg-black/0 opacity-0 pointer-events-none',
+        isOpen ? 'bg-[var(--scrim)] opacity-100' : 'bg-transparent opacity-0 pointer-events-none',
       )}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
@@ -33,7 +33,7 @@ export function ShortcutModal({ isOpen, onClose }: ShortcutModalProps) {
     >
       <div
         className={cn(
-          'w-full max-w-md rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[var(--shadow-lg)] transition-all duration-300',
+          'w-full max-w-[var(--width-form)] rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[var(--shadow-lg)] transition-all duration-300',
           isOpen ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-4 opacity-0 scale-95',
         )}
       >

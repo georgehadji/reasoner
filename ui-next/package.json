@@ -13,14 +13,10 @@
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
-    "@react-three/drei": "^10.7.7",
-    "@react-three/fiber": "^9.6.1",
-    "@react-three/postprocessing": "^3.0.4",
     "@sentry/nextjs": "^10.50.0",
     "@stripe/react-stripe-js": "^6.2.0",
     "@stripe/stripe-js": "^9.3.1",
     "@supabase/supabase-js": "^2.49.0",
-    "@types/three": "^0.184.0",
     "clsx": "^2.1.1",
     "framer-motion": "^12.38.0",
     "idb": "^8.0.3",
@@ -36,7 +32,6 @@
     "remark-gfm": "^4.0.1",
     "swr": "^2.4.1",
     "tailwind-merge": "^3.5.0",
-    "three": "^0.184.0",
     "zustand": "^5.0.12"
   },
   "devDependencies": {

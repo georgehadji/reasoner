@@ -1,94 +1,295 @@
 @import "tailwindcss";
 
+/* ============================================================
+   Tailwind v4 — bind the `dark:` variant to the next-themes class.
+
+   Without this line Tailwind v4 resolves `dark:` against the
+   `prefers-color-scheme` media query, so every `dark:` utility follows
+   the operating system and silently ignores the in-app theme toggle.
+   ============================================================ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ============================================================
+   Tailwind v4 theme keys.
+
+   This project has no `@config` directive, so `tailwind.config.js` was
+   never loaded and its `fontFamily` block did nothing — `font-mono` and
+   `font-sans` silently fell back to Tailwind's generic stacks. Declaring
+   the families here is what actually wires them up.
+
+   `@theme` also emits each value to `:root`, so `var(--font-sans)` keeps
+   working in plain CSS below.
+
+   The font SIZE scale is deliberately not declared here. It lives in the
+   `:root` block further down as plain custom properties, which is where
+   it already was; promoting it to a theme key would silently resize every
+   existing `text-lg`/`text-xl`/`text-2xl` in the app and drop Tailwind's
+   paired line-heights.
+   ============================================================ */
+@theme {
+  --font-sans:  var(--font-instrument-sans), -apple-system,
+                BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-serif: var(--font-source-serif), Charter, 'Bitstream Charter',
+                Cambria, Georgia, serif;
+  --font-mono:  var(--font-jetbrains-mono), ui-monospace, SFMono-Regular,
+                Menlo, Consolas, monospace;
+}
+
 @layer base {
+  /* ==========================================================
+     Reasoner Design System
+
+     Palette: warm low-chroma neutrals + indigo accent.
+     The neutrals carry a ~40deg hue bias at very low chroma; pure
+     achromatic greys read as a monitoring dashboard, warm ones read
+     as a product.
+
+     LIGHT IS THE BASE. An unclassed render — server output before the
+     next-themes script runs, print, an embed — must be light, not dark.
+     Dark is applied by `.dark` (explicit choice) and by the media query
+     (system preference, unless `.light` overrides it).
+
+     The dark block is written twice on purpose: a media query and a
+     class selector cannot share a declaration list. Edit both.
+     (A future simplification is CSS `light-dark()`, which collapses
+     these into one declaration per token once the browser floor allows.)
+     ========================================================== */
+
   :root {
-    /* === Reasoner Design System — Dark (Security Edition) === */
-    /* Palette: Deep Carbon + Security Blue + Slate */
-    /* Conveys: trust, professionalism, enterprise-grade security */
+    color-scheme: light;
 
-    /* Background layers — deeper, more neutral darks */
-    --bg:          #141414;
-    --surface:     #1F1F1F;
-    --surface-2:   #292929;
-    --surface-3:   #333333;
-    --surface-hover: #242424;
+    /* Background layers — ivory ground, cards lift toward white */
+    --bg:            #FAF9F5;
+    --surface:       #FFFFFF;
+    --surface-2:     #F1EFE7;
+    --surface-3:     #E6E3D8;
+    --surface-hover: #F5F3EC;
 
-    /* Text hierarchy — high contrast against dark bg */
-    --text:         #E8E8E8;
-    --text-2:       #C0C0C0;
-    --text-muted:   #A0A0A0;
-    --text-subtle:  #808080;
-    --text-small:   #A0A0A0;
+    /* Sidebar is its own ground, not a --surface card: it needs to read as
+       a recessed rail beside the conversation, and its hover/active fills
+       have to move in the SAME direction in both themes (toward contrast).
+       Reusing --surface-hover would darken in light and lighten in dark. */
+    --sidebar-bg:     #F0EEE6;
+    --sidebar-hover:  #E8E5DA;
+    --sidebar-active: #DFDBCC;
+    /* The search field cannot sit on --sidebar-hover: a --text-muted
+       placeholder measures 4.32:1 there. An inset white field on the tan rail
+       clears 5.5:1 and is what the eye expects from a recessed input anyway. */
+    --sidebar-field:  #FFFFFF;
 
-    /* Borders — cool blue-tinted for security feel */
-    --border:        rgba(128, 128, 128, 0.15);
-    --border-strong: rgba(128, 128, 128, 0.30);
+    /* Text hierarchy — every step clears WCAG AA on --bg */
+    --text:        #191817;  /* 16.8:1 */
+    --text-2:      #46433D;  /*  9.4:1 */
+    --text-muted:  #6E6960;  /*  5.2:1 */
+    --text-subtle: #756F65;  /*  4.7:1 */
+    --text-small:  #6E6960;
 
-    /* Primary accent — Muted Steel Blue (trustworthy, visible) */
-    --accent:       #5B8DB8;
-    --accent-hover: #7BA3C8;
-    --accent-text:  #FFFFFF;
-    --accent-dim:   rgba(91, 141, 184, 0.15);
-    --accent-glow:  0 0 40px rgba(91, 141, 184, 0.20);
+    /* Borders — alpha of the opposite ground, never a grey token.
+       The old rgba(160,160,160,0.10) resolved to 1.08:1 on --surface,
+       i.e. invisible; WCAG 1.4.11 wants 3:1 on meaningful boundaries. */
+    --border:        rgb(19 18 17 / 0.12);
+    --border-strong: rgb(19 18 17 / 0.26);
 
-    /* Secondary accent — Cyan (tech, precision) */
-    --accent-2:     #909090; /* Light Medium Gray */
-    --accent-2-dim: rgba(144, 144, 144, 0.12);
+    /* Primary accent — Anthropic coral, darkened for AA on ivory.
+       Brand orange #D97757 itself only clears 2.96:1 here — a fill colour,
+       not a text colour. This is the darkest step of that hue that still
+       reads unmistakably warm/coral rather than brown. */
+    --accent:       #96401F;  /* 6.5:1 on --bg */
+    --accent-hover: #7E3519;
+    --accent-text:  #FFFFFF;  /* 6.9:1 on --accent */
+    --accent-dim:   rgb(150 64 31 / 0.09);
+    --accent-glow:  0 0 24px rgb(150 64 31 / 0.18);
 
-    /* Shadows — deeper for premium feel */
-    --shadow:    0 2px 8px rgba(0, 0, 0, 0.60);
-    --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.80), 0 0 0 1px rgba(128, 128, 128, 0.08);
+    /* Secondary accent — warm neutral */
+    --accent-2:     #8A857A;
+    --accent-2-dim: rgb(138 133 122 / 0.12);
 
-    /* Error — visible red for alerts */
-    --red:        #EF4444;
-    --red-bg:     rgba(239, 68, 68, 0.10);
-    --red-border: rgba(239, 68, 68, 0.25);
+    /* Epistemic labels — VERIFIED / HYPOTHESIS / UNKNOWN.
+       Reasoner's central claim; these tokens do nothing else.
+       --warn shifted yellower than before: against the old indigo accent an
+       amber warn read as clearly distinct, but against the new coral accent
+       the two sit in the same hue family and would be told apart by
+       lightness alone. */
+    --ok:      #2F6E4F;  /* 5.8:1 */
+    --warn:    #7A6012;  /* 5.7:1 */
+    --unknown: #6E6960;  /* 5.2:1 */
 
-    /* Radius */
-    --radius: 0.75rem;
+    /* Error */
+    --red:        #A9302B;
+    --red-bg:     rgb(169 48 43 / 0.08);
+    --red-border: rgb(169 48 43 / 0.22);
 
-    /* Easing curves */
-    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
-    --ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
-    --ease-in-out-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+    /* Shadows */
+    --shadow:    0 1px 2px rgb(19 18 17 / 0.05), 0 8px 24px -12px rgb(19 18 17 / 0.18);
+    --shadow-lg: 0 2px 4px rgb(19 18 17 / 0.04), 0 24px 56px -20px rgb(19 18 17 / 0.22);
+
+    /* Translucent chrome (glass) — derived, never hardcoded */
+    --glass-bg:      rgb(255 255 255 / 0.80);
+    --glass-bg-soft: rgb(255 255 255 / 0.66);
+
+    /* Modal scrim / image lightbox. A scrim must darken in BOTH themes, so it
+       is deliberately not derived from --text or --bg (either would invert).
+       It exists as a token so it responds to prefers-contrast below, which a
+       hardcoded bg-black/60 never did. */
+    --scrim: rgb(19 18 17 / 0.55);
+    --overlay: rgb(19 18 17 / 0.72);
 
     /* Legacy aliases */
     --background: var(--bg);
     --foreground: var(--text);
   }
 
-  .light {
-    /* === Reasoner Design System — Light (Professional Edition) === */
-    --bg:          #F0F0F0;
-    --surface:     #F8F8F8;
-    --surface-2:   #E8E8E8;
-    --surface-3:   #D0D0D0;
-    --surface-hover: #E0E0E0;
+  /* System preference — an explicit `.light` choice must win over it. */
+  @media (prefers-color-scheme: dark) {
+    :root:not(.light) {
+      color-scheme: dark;
 
-    --text:        #1F1F1F;
-    --text-2:      #404040;
-    --text-muted:  #606060;
-    --text-subtle: #707070;
-    --text-small:  #606060;
+      --bg:            #131211;
+      --surface:       #1C1A18;
+      --surface-2:     #252220;
+      --surface-3:     #302D29;
+      --surface-hover: #201E1B;
 
-    --border:        rgba(160, 160, 160, 0.10);
-    --border-strong: rgba(160, 160, 160, 0.25);
+      --sidebar-bg:     #1A1817;
+      --sidebar-hover:  #232120;
+      --sidebar-active: #2E2B28;
+      --sidebar-field:  #232120;
 
-    --accent:       #2563EB;
-    --accent-hover: #3B82F6;
-    --accent-text:  #FFFFFF;
-    --accent-dim:   rgba(37, 99, 235, 0.10);
-    --accent-glow:  0 0 24px rgba(37, 99, 235, 0.15);
+      --text:        #FAF9F5;  /* 17.8:1 */
+      --text-2:      #CFCABE;  /* 11.4:1 */
+      --text-muted:  #A29C90;  /*  6.9:1 */
+      --text-subtle: #857F74;  /*  4.7:1 */
+      --text-small:  #A29C90;
 
-    --accent-2:     #909090; /* Light Medium Gray */
-    --accent-2-dim: rgba(144, 144, 144, 0.10);
+      --border:        rgb(250 249 245 / 0.11);
+      --border-strong: rgb(250 249 245 / 0.24);
 
-    --shadow:    0 2px 8px rgba(0, 0, 0, 0.10);
-    --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.10), 0 0 0 1px rgba(128, 128, 128, 0.06);
+      --accent:       #E39B80;  /* 8.3:1 on --bg */
+      --accent-hover: #EDB79F;
+      --accent-text:  #2A1610;  /* 7.6:1 on --accent */
+      --accent-dim:   rgb(227 155 128 / 0.13);
+      --accent-glow:  0 0 40px rgb(227 155 128 / 0.22);
 
-    --red:        #DC2626;
-    --red-bg:     rgba(220, 38, 38, 0.07);
-    --red-border: rgba(220, 38, 38, 0.20);
+      --accent-2:     #A29C90;
+      --accent-2-dim: rgb(162 156 144 / 0.12);
+
+      --ok:      #7BC79B;  /* 9.3:1 */
+      --warn:    #E8C878;  /* 11.6:1 */
+      --unknown: #A29C90;  /* 6.9:1 */
+
+      --red:        #EF8A82;
+      --red-bg:     rgb(239 138 130 / 0.10);
+      --red-border: rgb(239 138 130 / 0.26);
+
+      --shadow:    0 1px 2px rgb(0 0 0 / 0.40), 0 8px 24px -12px rgb(0 0 0 / 0.70);
+      --shadow-lg: 0 2px 4px rgb(0 0 0 / 0.45), 0 24px 56px -20px rgb(0 0 0 / 0.80);
+
+      --glass-bg:      rgb(28 26 24 / 0.78);
+      --glass-bg-soft: rgb(28 26 24 / 0.62);
+
+    --scrim: rgb(0 0 0 / 0.68);
+    --overlay: rgb(0 0 0 / 0.80);
+    }
+  }
+
+  /* Explicit dark choice — must mirror the media query block above. */
+  :root.dark {
+    color-scheme: dark;
+
+    --bg:            #131211;
+    --surface:       #1C1A18;
+    --surface-2:     #252220;
+    --surface-3:     #302D29;
+    --surface-hover: #201E1B;
+
+    --sidebar-bg:     #1A1817;
+    --sidebar-hover:  #232120;
+    --sidebar-active: #2E2B28;
+    --sidebar-field:  #232120;
+
+    --text:        #FAF9F5;
+    --text-2:      #CFCABE;
+    --text-muted:  #A29C90;
+    --text-subtle: #857F74;
+    --text-small:  #A29C90;
+
+    --border:        rgb(250 249 245 / 0.11);
+    --border-strong: rgb(250 249 245 / 0.24);
+
+    --accent:       #E39B80;
+    --accent-hover: #EDB79F;
+    --accent-text:  #2A1610;
+    --accent-dim:   rgb(227 155 128 / 0.13);
+    --accent-glow:  0 0 40px rgb(227 155 128 / 0.22);
+
+    --accent-2:     #A29C90;
+    --accent-2-dim: rgb(162 156 144 / 0.12);
+
+    --ok:      #7BC79B;
+    --warn:    #E8C878;
+    --unknown: #A29C90;
+
+    --red:        #EF8A82;
+    --red-bg:     rgb(239 138 130 / 0.10);
+    --red-border: rgb(239 138 130 / 0.26);
+
+    --shadow:    0 1px 2px rgb(0 0 0 / 0.40), 0 8px 24px -12px rgb(0 0 0 / 0.70);
+    --shadow-lg: 0 2px 4px rgb(0 0 0 / 0.45), 0 24px 56px -20px rgb(0 0 0 / 0.80);
+
+    --glass-bg:      rgb(28 26 24 / 0.78);
+    --glass-bg-soft: rgb(28 26 24 / 0.62);
+
+    --scrim: rgb(0 0 0 / 0.68);
+    --overlay: rgb(0 0 0 / 0.80);
+  }
+
+  /* ==========================================================
+     Shape, motion, and type plumbing — theme-independent
+     ========================================================== */
+  :root {
+    /* Radius scale. A single 12px radius looked bloated on a 24px chip
+       and timid on a full-width panel. */
+    --radius-sm:   4px;
+    --radius:      8px;
+    --radius-lg:   16px;
+    --radius-xl:   24px;   /* composer shell — the one element that is a slab */
+    --radius-pill: 999px;
+
+    /* ========================================================
+       MOTION SYSTEM
+
+       Durations were previously improvised per utility (0.08s, 0.15s,
+       0.2s, 0.25s, 0.3s, 0.35s, 0.5s) which is seven speeds for four
+       kinds of event. Four bands, named by what is moving, not by how
+       long it takes — a hover and a route change are different events,
+       a hover and a border-colour fade are the same one.
+
+       Motion continuity: entrance and exit of the SAME element share a
+       duration token and mirror their easing (entrance decelerates in,
+       exit accelerates out). Where a utility has one transition serving
+       both directions, the base rule carries the exit curve and the
+       :hover rule carries the entrance curve — that is what makes a
+       wipe feel like it retracts rather than replays backwards.
+       ======================================================== */
+    --dur-micro:     120ms;  /* hover, press, colour — 100–200ms */
+    --dur-state:     220ms;  /* UI state change      — 150–300ms */
+    --dur-component: 340ms;  /* component enter/exit — 250–450ms */
+    --dur-scene:     600ms;  /* route / large transition — 400–800ms */
+
+    /* Stagger unit. Six children × 40ms lands the last one at 200ms,
+       still inside the "instant" perceptual window. */
+    --stagger-step: 40ms;
+
+    /* Easing curves — four roles, then the original three names kept
+       as aliases (identical values) so existing consumers don't break. */
+    --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);      /* symmetric, in-place change */
+    --ease-entrance: cubic-bezier(0.16, 1, 0.3, 1);     /* decelerate — arrives */
+    --ease-exit:     cubic-bezier(0.4, 0, 1, 1);        /* accelerate — leaves */
+    --ease-spring:   cubic-bezier(0.34, 1.56, 0.64, 1); /* overshoot — physical */
+
+    --ease-out-expo:      var(--ease-entrance);
+    --ease-out-back:      var(--ease-spring);
+    --ease-in-out-smooth: var(--ease-standard);
   }
 
   * { box-sizing: border-box; }
@@ -99,10 +300,41 @@
     background-color: var(--bg);
     color: var(--text);
     min-height: 100vh;
-    font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+
+    /* Source Serif 4 is a variable font with an `opsz` axis. Without
+       this line the browser renders every size at the default optical
+       size, so 61px display type gets the thick stems and open
+       counters drawn for 16px body text. This one declaration is the
+       difference between "a serif" and "a serif that was set". */
+    font-optical-sizing: auto;
+    font-variation-settings: normal;
   }
+
+  /* Running prose opts into the serif. Anthropic's warmth comes at least
+     as much from serif body copy as from the ivory ground. */
+  .prose-serif,
+  article.prose-serif,
+  .synthesis-body {
+    font-family: var(--font-serif);
+    font-size: var(--text-md);
+    line-height: var(--lh-body);
+    letter-spacing: 0;
+
+    /* Widows and orphans are the loudest amateur tell in long-form
+       copy; `pretty` costs nothing and fixes most of them. */
+    text-wrap: pretty;
+
+    /* Opening quotes and hyphens hang into the margin, so the optical
+       left edge stays straight. Ignored where unsupported. */
+    hanging-punctuation: first last;
+
+    font-variant-ligatures: common-ligatures contextual;
+  }
+
+  code, kbd, samp, pre { font-family: var(--font-mono); }
 
   /* Smooth transitions for all interactive elements */
   button, a, input, textarea, select, [role="button"] {
@@ -131,13 +363,14 @@
     outline-offset: 2px;
   }
 
-  /* Buttons and links get an enhanced glow */
+  /* Buttons and links get an enhanced glow. The halo is the accent at
+     low alpha, not a neutral grey — the ring and its halo are one object. */
   button:focus-visible,
   a:focus-visible,
   [role="button"]:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
-    box-shadow: 0 0 0 4px rgba(128, 128, 128, 0.25);
+    box-shadow: 0 0 0 4px var(--accent-dim);
   }
 
   /* Form fields get an inset ring so they don't overflow containers */
@@ -152,6 +385,16 @@
   /* Remove default browser outline ONLY when our custom one is active */
   *:focus:not(:focus-visible) {
     outline: none;
+  }
+
+  /* showModal() promotes the dialog to the top layer and makes the rest of the
+     page inert, but it does NOT stop the document scrolling — a wheel or touch
+     drag over the scrim still scrolls the article behind the open menu, and on
+     iOS the page is left somewhere else when the dialog closes. One rule covers
+     every modal dialog in the app; nothing here calls the non-modal show(), so
+     `[open]` and "is modal" mean the same thing. */
+  html:has(dialog[open]) {
+    overflow: hidden;
   }
 }
 
@@ -171,30 +414,55 @@
 
 /* ============================================================
    Typography system — Major Third (1.25×) modular scale, 16px base
+
+   Body sizes stay fixed; fluid body text hurts more than it helps.
+   Display sizes (xl and up) are clamped — 61px is 61px on a 360px
+   phone otherwise.
    ============================================================ */
 
 @layer base {
   :root {
     /* Font size tokens */
-    --text-2xs: 10px;   /* fine print, badges */
+    --text-2xs: 11px;   /* fine print, badges — 10px was below the readable floor */
     --text-xs:  13px;   /* captions, labels, tooltips */
     --text-sm:  14px;   /* nav, secondary UI */
     --text-base: 16px;  /* body */
     --text-md:  18px;   /* lead paragraph */
     --text-lg:  20px;   /* h6, card titles */
-    --text-xl:  25px;   /* h5, section labels */
-    --text-2xl: 31px;   /* h4, feature titles */
-    --text-3xl: 39px;   /* h3, page sections */
-    --text-4xl: 49px;   /* h2, major headings */
-    --text-5xl: 61px;   /* h1, hero display */
-    --text-6xl: 76px;   /* display hero */
+    --text-xl:  clamp(22px, 1.4vw + 16px, 25px);   /* h5, section labels */
+    --text-2xl: clamp(26px, 2.2vw + 17px, 31px);   /* h4, feature titles */
+    --text-3xl: clamp(30px, 3.0vw + 18px, 39px);   /* h3, page sections */
+    --text-4xl: clamp(35px, 4.4vw + 17px, 49px);   /* h2, major headings */
+    --text-5xl: clamp(40px, 6.0vw + 16px, 61px);   /* h1, hero display */
+    --text-6xl: clamp(46px, 7.6vw + 16px, 76px);   /* display hero */
 
-    /* Line height tokens */
+    /* Line height tokens — absolute scale, chosen by hand */
     --leading-tight:  1.25;
     --leading-snug:   1.375;
     --leading-normal: 1.5;
     --leading-relaxed: 1.625;
     --leading-loose:  1.75;
+
+    /* Line height tokens — by ROLE. The scale above answers "how loose?",
+       which forces every component to decide for itself; these answer
+       "what is this text for?", which is a question with one right
+       answer. A 61px hero and a 16px paragraph do not want the same
+       leading: display type at 1.5 floats apart, body at 1.05 is a
+       brick. Leading is a function of size, so name the size band. */
+    --lh-display: 1.05;  /* 40px+  — hero, statement */
+    --lh-heading: 1.15;  /* 26–39px */
+    --lh-subhead: 1.3;   /* 20–25px */
+    --lh-body:    1.6;   /* running prose — the reading measure */
+    --lh-ui:      1.4;   /* buttons, labels, table cells */
+    --lh-tight:   1.2;   /* stacked single lines, badges */
+
+    /* Letter spacing — tightens as size grows (optical correction).
+       Previously absent entirely, so every component improvised. */
+    --tracking-label:  0.1em;      /* uppercase micro-labels */
+    --tracking-normal: 0;
+    --tracking-base:  -0.008em;    /* body */
+    --tracking-snug:  -0.014em;    /* 22–39px */
+    --tracking-tight: -0.022em;    /* 40px and up */
 
     /* Font weight tokens */
     --font-normal:   400;
@@ -202,6 +470,173 @@
     --font-semibold: 600;
     --font-bold:     700;
   }
+}
+
+/* ============================================================
+   SPATIAL SYSTEM
+
+   The file had a radius scale, a type scale and a colour scale, and
+   then every gap, pad and max-width in the app was a judgement call
+   made once, in one component, by whoever was there. That is why two
+   cards that should look like siblings sit 18px and 20px apart.
+
+   One base unit (4px), one derived scale, and — more important — the
+   content widths as tokens, so "how wide is a column of text" has a
+   single answer instead of one per page.
+   ============================================================ */
+
+@layer base {
+  :root {
+    /* Base unit. Every step below is calc()'d from it: change this one
+       value and the whole app re-spaces, which is the entire point of
+       having a scale rather than a list of numbers. */
+    --space-unit: 4px;
+
+    --space-1:  calc(var(--space-unit) *  1);  /*   4px — icon nudge, hairline gap */
+    --space-2:  calc(var(--space-unit) *  2);  /*   8px — inside a chip */
+    --space-3:  calc(var(--space-unit) *  3);  /*  12px — label ↔ field */
+    --space-4:  calc(var(--space-unit) *  4);  /*  16px — default gap */
+    --space-5:  calc(var(--space-unit) *  5);  /*  20px */
+    --space-6:  calc(var(--space-unit) *  6);  /*  24px — card padding */
+    --space-8:  calc(var(--space-unit) *  8);  /*  32px — between cards */
+    --space-10: calc(var(--space-unit) * 10);  /*  40px */
+    --space-12: calc(var(--space-unit) * 12);  /*  48px — block separation */
+    --space-16: calc(var(--space-unit) * 16);  /*  64px — sub-section */
+    --space-20: calc(var(--space-unit) * 20);  /*  80px */
+    --space-24: calc(var(--space-unit) * 24);  /*  96px — section */
+    --space-32: calc(var(--space-unit) * 32);  /* 128px — page-level break */
+
+    /* Fluid section rhythm. Fixed section padding is the reason mobile
+       pages feel cramped and 4K pages feel empty: 96px is a third of a
+       phone viewport and a rounding error on a desktop. The clamp bands
+       let vertical rhythm scale with the viewport while the component
+       scale above stays fixed — spacing INSIDE a card should not change
+       with window width, spacing BETWEEN sections should. */
+    --section-y:    clamp(3rem,   8vw,  8rem);   /*  48 → 128px */
+    --section-y-lg: clamp(4.5rem, 12vw, 12rem);  /*  72 → 192px */
+    --gutter:       clamp(1.25rem, 4vw, 2.5rem); /*  20 →  40px */
+
+    /* Content widths. --measure is the important one: line length, not
+       font size, is what makes long text tiring, and 66–75 characters
+       is where the eye stops losing its place on the return sweep. */
+    --measure:       68ch;   /* running prose */
+    --measure-tight: 54ch;   /* lead paragraphs, captions, pull quotes */
+    --width-content: 46rem;  /* article column */
+    --width-chat:    48rem;  /* conversation column — wider than prose so a
+                                phase card's metrics row still fits on one line */
+    --width-form:    28rem;  /* auth cards, modals — a single column of fields
+                                and nothing else, so it stays narrow */
+    --width-card-min:18rem;  /* smallest a card may get before an auto-fit grid
+                                drops it to the next row */
+    --width-wide:    72rem;  /* app shell / grid */
+    --width-full:    90rem;  /* outer bound — beyond this, nothing */
+
+    /* Default vertical rhythm for .flow (see utilities). `em` on
+       purpose: the gap tracks the font size of the block it separates,
+       so a heading stack and a caption stack both look right without
+       either being told a pixel value. Override --flow-space on any
+       .flow container (or an ancestor) to re-rhythm that subtree. */
+    --flow-space: 1em;
+  }
+}
+
+/* ============================================================
+   MICRO-TYPOGRAPHY
+
+   Everything here is invisible until it is missing. A 52px heading and
+   16px body text sharing one letter-spacing value is the single most
+   common reason an otherwise careful interface reads as "made with a
+   framework": tracking is an optical correction, and the correction a
+   glyph needs shrinks as the glyph grows. Same for leading, ligatures
+   and numerals — the defaults are tuned for a generic document, and
+   this is not one.
+   ============================================================ */
+
+@layer base {
+  /* Headings: leading and tracking by size band, never one value for
+     all six. Tags carry the DEFAULT — Tailwind's `text-*`/`leading-*`
+     utilities live in a later layer and still win wherever a component
+     has already made an explicit choice. */
+  h1, h2, h3, h4, h5, h6 {
+    /* Ragged-right is fine; a two-word second line is not. */
+    text-wrap: balance;
+  }
+
+  h1 { line-height: var(--lh-display); letter-spacing: var(--tracking-tight); }
+  h2 { line-height: var(--lh-heading); letter-spacing: var(--tracking-tight); }
+  h3 { line-height: var(--lh-heading); letter-spacing: var(--tracking-snug); }
+  h4 { line-height: var(--lh-subhead); letter-spacing: var(--tracking-snug); }
+  h5 { line-height: var(--lh-subhead); letter-spacing: var(--tracking-snug); }
+  h6 { line-height: var(--lh-ui);      letter-spacing: var(--tracking-normal); }
+
+  p {
+    line-height: var(--lh-body);
+    /* Widow/orphan control. `balance` is wrong here — it is capped at a
+       few lines and squares off paragraphs; `pretty` only fixes the
+       last line, which is the actual defect. */
+    text-wrap: pretty;
+  }
+
+  /* Ligatures are a feature in prose and a bug in identifiers: `fi` in
+     "classification" is correct, and a JetBrains Mono `!=` fused into
+     one glyph inside a model ID is a rendering lie about the string. */
+  code, kbd, samp, pre, .font-mono {
+    font-variant-ligatures: none;
+  }
+
+  /* Numerals that have to line up vertically, or be compared, get
+     tabular figures — a timestamp that reflows its own width every
+     second is a jitter bug nobody files. */
+  time,
+  th, td {
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+
+  th, td {
+    line-height: var(--lh-ui);
+  }
+}
+
+@layer utilities {
+  /* ---- Layout: the flow utility --------------------------------
+     `.flow` replaces per-element margins with one rule: every child
+     except the first gets top margin. Owl selector, so it cannot leak
+     a trailing margin out of the container, and margin-block-start
+     rather than margin-top so it survives vertical writing modes.
+     This is the highest-leverage rule in the file — most "spacing is
+     inconsistent" bugs are a component that set mb-4 on some children
+     and forgot on others. */
+  .flow > * + * {
+    margin-block-start: var(--flow-space, 1em);
+  }
+
+  /* ---- Layout: measure ------------------------------------------ */
+  .prose-measure {
+    max-width: var(--measure);
+  }
+
+  /* ---- Numerals and font features -------------------------------
+     Real classes, because `font-variant-numeric` is a property no
+     component should be inlining by hand. */
+
+  /* Columns, tables, timers, prices, token counts, latencies: digits
+     get equal advance widths so they align down a column. */
+  .nums-tabular { font-variant-numeric: tabular-nums lining-nums; }
+
+  /* Running prose: proportional oldstyle figures sit on the x-height
+     with descenders, so a year inside a sentence stops shouting. */
+  .nums-prop    { font-variant-numeric: proportional-nums oldstyle-nums; }
+
+  /* True small caps from the font's own designs, not scaled-down
+     capitals. The extra tracking compensates for the wider fit small
+     caps want. */
+  .smallcaps {
+    font-variant-caps: all-small-caps;
+    letter-spacing: 0.06em;
+  }
+
+  /* Escape hatch for IDs, hashes, and anything the user may retype. */
+  .ligatures-off { font-variant-ligatures: none; }
 }
 
 /* ============================================================
@@ -227,83 +662,7 @@
 }
 
 .text-glow {
-  text-shadow: 0 0 40px rgba(59, 130, 246, 0.45), 0 0 100px rgba(6, 182, 212, 0.25);
-}
-
-/* ── Blob drift animations (calm) ──────────────────────── */
-
-@keyframes blob-drift-1 {
-  0%, 100%   { transform: translate(0, 0) rotate(0deg); }
-  33%         { transform: translate(30px, -20px) rotate(3deg); }
-  66%         { transform: translate(-15px, 15px) rotate(-2deg); }
-}
-
-@keyframes blob-drift-2 {
-  0%, 100%   { transform: translate(0, 0) rotate(0deg); }
-  33%         { transform: translate(-25px, 20px) rotate(-4deg); }
-  66%         { transform: translate(20px, -15px) rotate(2deg); }
-}
-
-@keyframes blob-drift-3 {
-  0%, 100%   { transform: translate(0, 0) rotate(0deg); }
-  33%         { transform: translate(15px, 25px) rotate(2deg); }
-  66%         { transform: translate(-20px, -10px) rotate(-3deg); }
-}
-
-.blob-1 {
-  animation: blob-drift-1 20s ease-in-out infinite;
-}
-
-.blob-2 {
-  animation: blob-drift-2 25s ease-in-out infinite;
-}
-
-.blob-3 {
-  animation: blob-drift-3 18s ease-in-out infinite;
-}
-
-/* ── Blob drift animations (intense / pipeline active) ─── */
-
-@keyframes blob-intense-1 {
-  0%, 100%   { transform: translate(0, 0) rotate(0deg) scale(1.05); }
-  25%         { transform: translate(60px, -40px) rotate(8deg) scale(1.12); }
-  50%         { transform: translate(-30px, 30px) rotate(-5deg) scale(1.08); }
-  75%         { transform: translate(40px, 20px) rotate(4deg) scale(1.15); }
-}
-
-@keyframes blob-intense-2 {
-  0%, 100%   { transform: translate(0, 0) rotate(0deg) scale(1.05); }
-  25%         { transform: translate(-50px, 40px) rotate(-10deg) scale(1.12); }
-  50%         { transform: translate(40px, -30px) rotate(6deg) scale(1.08); }
-  75%         { transform: translate(-20px, -25px) rotate(-4deg) scale(1.14); }
-}
-
-@keyframes blob-intense-3 {
-  0%, 100%   { transform: translate(0, 0) rotate(0deg) scale(1.05); }
-  25%         { transform: translate(30px, 50px) rotate(6deg) scale(1.1); }
-  50%         { transform: translate(-40px, -20px) rotate(-8deg) scale(1.14); }
-  75%         { transform: translate(25px, -35px) rotate(5deg) scale(1.08); }
-}
-
-@keyframes blob-pulse {
-  0%, 100%   { opacity: 0.4; transform: scale(0.95); }
-  50%         { opacity: 0.9; transform: scale(1.15); }
-}
-
-.blob-intense-1 {
-  animation: blob-intense-1 10s ease-in-out infinite;
-}
-
-.blob-intense-2 {
-  animation: blob-intense-2 12s ease-in-out infinite;
-}
-
-.blob-intense-3 {
-  animation: blob-intense-3 9s ease-in-out infinite;
-}
-
-.blob-pulse {
-  animation: blob-pulse 4s ease-in-out infinite;
+  text-shadow: var(--accent-glow);
 }
 
 /* ── Phase timeline ping ───────────────────────────────── */
@@ -322,7 +681,11 @@
 }
 
 .animate-phase-reveal {
-  animation: phase-reveal 0.4s var(--ease-out-expo) forwards;
+  /* `both`, not `forwards`: these are staggered with an animation-delay, and
+     `forwards` leaves the element at its natural opacity during the delay —
+     so each phase painted fully, snapped to opacity 0 when its turn came, then
+     faded in. `both` applies the from-state through the delay. */
+  animation: phase-reveal 0.4s var(--ease-out-expo) both;
 }
 
 /* ── Streaming cursor — smooth blink ───────────────────── */
@@ -354,15 +717,26 @@
 
 /* ============================================================
    Micro-interaction utilities
+
+   Every duration and curve below now comes from the motion tokens in
+   the plumbing block. The literals they replaced (0.08s / 0.1s / 0.15s
+   / 0.2s / 0.25s / 0.3s / 0.35s / 0.5s and three inline cubic-beziers)
+   were eight speeds describing four events; a hover that lasts 200ms
+   in one component and 300ms in the next reads as lag, not as design.
+
+   None of these use !important, so the prefers-reduced-motion block at
+   the bottom of the file still overrides all of them: an !important
+   declaration always beats a normal one regardless of layer.
    ============================================================ */
 @layer utilities {
 
-  /* Button lift — smoother, more responsive */
+  /* Button lift — spring on the transform, standard on everything
+     that is only changing colour. */
   .btn-lift {
-    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
-                box-shadow 0.25s ease,
-                background-color 0.2s ease,
-                border-color 0.2s ease;
+    transition: transform var(--dur-state) var(--ease-spring),
+                box-shadow var(--dur-state) var(--ease-standard),
+                background-color var(--dur-state) var(--ease-standard),
+                border-color var(--dur-state) var(--ease-standard);
     will-change: transform;
   }
   .btn-lift:hover:not(:disabled) {
@@ -370,15 +744,16 @@
   }
   .btn-lift:active:not(:disabled) {
     transform: translateY(0px) scale(0.98);
-    transition-duration: 0.08s;
+    /* Press must beat the eye — the finger is already down. */
+    transition-duration: var(--dur-micro);
   }
 
-  /* Card lift — refined hover with scale */
+  /* Card lift — a bigger object moving further, so the component band. */
   .card-hover {
-    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
-                box-shadow 0.3s ease,
-                border-color 0.25s ease,
-                background-color 0.25s ease;
+    transition: transform var(--dur-component) var(--ease-spring),
+                box-shadow var(--dur-component) var(--ease-standard),
+                border-color var(--dur-state) var(--ease-standard),
+                background-color var(--dur-state) var(--ease-standard);
     will-change: transform;
   }
   .card-hover:hover {
@@ -386,18 +761,22 @@
   }
   .card-hover:active {
     transform: translateY(-1px) scale(0.995);
-    transition-duration: 0.1s;
+    transition-duration: var(--dur-micro);
   }
 
   /* Icon bounce */
   .icon-bounce {
-    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: transform var(--dur-state) var(--ease-spring);
   }
   .icon-bounce:hover {
     transform: scale(1.15);
   }
 
-  /* Underline slide — smoother */
+  /* Underline slide — the clearest case for mirrored easing. The base
+     rule owns the exit (accelerate: the rule retracts and is gone),
+     the :hover rule owns the entrance (decelerate: it arrives and
+     settles). Same duration token in both directions, so in and out
+     feel like one gesture reversed rather than two animations. */
   .underline-slide {
     position: relative;
   }
@@ -409,16 +788,17 @@
     width: 0;
     height: 1.5px;
     background: var(--accent);
-    transition: width 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: width var(--dur-component) var(--ease-exit);
   }
   .underline-slide:hover::after {
     width: 100%;
+    transition-timing-function: var(--ease-entrance);
   }
 
   /* Press effect for any interactive element */
   .press-effect {
-    transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1),
-                box-shadow 0.2s ease;
+    transition: transform var(--dur-micro) var(--ease-spring),
+                box-shadow var(--dur-micro) var(--ease-standard);
   }
   .press-effect:active {
     transform: scale(0.97);
@@ -426,43 +806,48 @@
 
   /* Glow on hover for cards/containers */
   .glow-hover {
-    transition: box-shadow 0.3s ease, border-color 0.3s ease;
+    transition: box-shadow var(--dur-state) var(--ease-standard),
+                border-color var(--dur-state) var(--ease-standard);
   }
   .glow-hover:hover {
-    box-shadow: 0 0 30px rgba(128, 128, 128, 0.08);
+    box-shadow: var(--accent-glow);
   }
 
   /* Smooth background color transition */
   .bg-transition {
-    transition: background-color 0.25s ease, border-color 0.25s ease;
+    transition: background-color var(--dur-state) var(--ease-standard),
+                border-color var(--dur-state) var(--ease-standard);
   }
 
   /* Input focus micro-interaction */
   .input-smooth {
-    transition: border-color 0.2s ease,
-                box-shadow 0.2s ease,
-                background-color 0.2s ease;
+    transition: border-color var(--dur-state) var(--ease-standard),
+                box-shadow var(--dur-state) var(--ease-standard),
+                background-color var(--dur-state) var(--ease-standard);
   }
   .input-smooth:focus {
-    box-shadow: 0 0 0 3px rgba(128, 128, 128, 0.15);
+    box-shadow: 0 0 0 3px var(--accent-dim);
   }
 
-  /* Link opacity transition */
+  /* Link opacity transition — pure colour, so the micro band. */
   .link-smooth {
-    transition: opacity 0.2s ease, color 0.2s ease;
+    transition: opacity var(--dur-micro) var(--ease-standard),
+                color var(--dur-micro) var(--ease-standard);
   }
 
-  /* Stagger children fade-in */
+  /* Stagger children fade-in. Delays derive from --stagger-step, so
+     the cadence is one number instead of six magic ones that drift
+     apart the moment somebody edits the middle of the list. */
   .stagger-children > * {
     opacity: 0;
-    animation: fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation: fade-up var(--dur-component) var(--ease-entrance) forwards;
   }
-  .stagger-children > *:nth-child(1) { animation-delay: 0ms; }
-  .stagger-children > *:nth-child(2) { animation-delay: 60ms; }
-  .stagger-children > *:nth-child(3) { animation-delay: 120ms; }
-  .stagger-children > *:nth-child(4) { animation-delay: 180ms; }
-  .stagger-children > *:nth-child(5) { animation-delay: 240ms; }
-  .stagger-children > *:nth-child(6) { animation-delay: 300ms; }
+  .stagger-children > *:nth-child(1) { animation-delay: calc(var(--stagger-step) * 0); }
+  .stagger-children > *:nth-child(2) { animation-delay: calc(var(--stagger-step) * 1); }
+  .stagger-children > *:nth-child(3) { animation-delay: calc(var(--stagger-step) * 2); }
+  .stagger-children > *:nth-child(4) { animation-delay: calc(var(--stagger-step) * 3); }
+  .stagger-children > *:nth-child(5) { animation-delay: calc(var(--stagger-step) * 4); }
+  .stagger-children > *:nth-child(6) { animation-delay: calc(var(--stagger-step) * 5); }
 
   /* Loading spinner for buttons */
   @keyframes btn-loading {
@@ -475,49 +860,36 @@
     animation: btn-loading 1.5s ease infinite;
   }
 
-  /* Glass */
+  /* Glass — derived from --surface so it tracks the theme.
+     Previously hardcoded rgba(10,15,22,.70), a colour from the retired
+     blue-black palette that no longer matched any surface token. */
   .glass {
-    background: rgba(10, 15, 22, 0.70);
-    backdrop-filter: blur(20px) saturate(1.3);
-    -webkit-backdrop-filter: blur(20px) saturate(1.3);
-    border: 1px solid rgba(128, 128, 128, 0.11);
-  }
-
-  .light .glass {
-    background: rgba(255, 255, 255, 0.80);
-    backdrop-filter: blur(20px) saturate(1.5);
-    -webkit-backdrop-filter: blur(20px) saturate(1.5);
-    border: 1px solid rgba(128, 128, 128, 0.12);
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px) saturate(1.4);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
+    border: 1px solid var(--border);
   }
 
   .glass-card {
-    background: rgba(10, 15, 22, 0.60);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(128, 128, 128, 0.09);
-  }
-
-  .light .glass-card {
-    background: rgba(255, 255, 255, 0.82);
-    border: 1px solid rgba(128, 128, 128, 0.10);
+    background: var(--glass-bg-soft);
+    backdrop-filter: blur(12px) saturate(1.2);
+    -webkit-backdrop-filter: blur(12px) saturate(1.2);
+    border: 1px solid var(--border);
   }
 
   /* Dot-grid background pattern */
   .dot-grid {
-    background-image: radial-gradient(rgba(128, 128, 128, 0.12) 1px, transparent 1px);
+    background-image: radial-gradient(var(--border-strong) 1px, transparent 1px);
     background-size: 32px 32px;
   }
 
-  .light .dot-grid {
-    background-image: radial-gradient(rgba(128, 128, 128, 0.10) 1px, transparent 1px);
-  }
-
-  /* Gradient text — Blue → Cyan (subtle, static) */
+  /* Gradient text — accent-derived, tracks the theme */
   .gradient-text {
-    background: linear-gradient(135deg, #A0A0A0 0%, #707070 50%, #505050 100%);
+    background: linear-gradient(135deg, var(--text) 0%, var(--accent) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+    color: var(--text); /* fallback before clip applies */
   }
 
   /* Accent button glow */
@@ -528,7 +900,7 @@
   /* Scrollbar styling */
   .scrollbar-thin {
     scrollbar-width: thin;
-    scrollbar-color: rgba(128, 128, 128, 0.18) transparent;
+    scrollbar-color: var(--border-strong) transparent;
   }
 
   .scrollbar-thin::-webkit-scrollbar {
@@ -541,18 +913,18 @@
   }
 
   .scrollbar-thin::-webkit-scrollbar-thumb {
-    background: rgba(128, 128, 128, 0.22);
-    border-radius: 4px;
+    background: var(--border-strong);
+    border-radius: var(--radius-sm);
   }
 
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background: rgba(128, 128, 128, 0.40);
+    background: var(--text-subtle);
   }
 
-  /* Thicker gray scrollbar for chat and main content areas */
+  /* Thicker scrollbar for chat and main content areas */
   .scrollbar-gray {
     scrollbar-width: auto;
-    scrollbar-color: rgba(128, 128, 128, 0.35) transparent;
+    scrollbar-color: var(--border-strong) transparent;
   }
 
   .scrollbar-gray::-webkit-scrollbar {
@@ -565,12 +937,12 @@
   }
 
   .scrollbar-gray::-webkit-scrollbar-thumb {
-    background: rgba(128, 128, 128, 0.35);
-    border-radius: 4px;
+    background: var(--border-strong);
+    border-radius: var(--radius-sm);
   }
 
   .scrollbar-gray::-webkit-scrollbar-thumb:hover {
-    background: rgba(128, 128, 128, 0.55);
+    background: var(--text-subtle);
   }
 
   /* Accessibility */
@@ -591,7 +963,7 @@
     height: auto;
     width: auto;
     padding: 0.75rem 1.25rem;
-    border-radius: 0.5rem;
+    border-radius: var(--radius);
     background: var(--accent);
     color: var(--accent-text);
     font-weight: 600;
@@ -600,7 +972,23 @@
 
   /* Decorative hero heading glow — scoped to landing page only */
   .hero-heading {
-    text-shadow: 0 0 40px rgba(224, 224, 224, 0.35), 0 0 100px rgba(160, 160, 160, 0.18);
+    text-shadow: var(--accent-glow);
+  }
+
+  /* Epistemic label utilities — fill and rule style carry the same
+     information as hue, so the labels survive monochrome printing
+     and every form of colour blindness. */
+  .epistemic-verified {
+    color: var(--ok);
+    border-left: 3px solid var(--ok);
+  }
+  .epistemic-hypothesis {
+    color: var(--warn);
+    border-left: 3px dashed var(--warn);
+  }
+  .epistemic-unknown {
+    color: var(--unknown);
+    border-left: 3px dotted var(--unknown);
   }
 }
 
@@ -623,6 +1011,45 @@
   .preserve-transition::before,
   .preserve-transition::after {
     transition-duration: 150ms !important;
+  }
+}
+
+/* ============================================================
+   Accessibility — Increased contrast preference
+
+   The sibling of prefers-reduced-motion, previously unhandled: users
+   who ask for more contrast got the same 12%-alpha borders as everyone.
+   ============================================================ */
+
+@media (prefers-contrast: more) {
+  :root {
+    --border:        rgb(19 18 17 / 0.42);
+    --border-strong: rgb(19 18 17 / 0.62);
+    --text-muted:    var(--text-2);
+    --text-subtle:   var(--text-2);
+    --text-small:    var(--text-2);
+  }
+
+  :root.dark {
+    --border:        rgb(250 249 245 / 0.42);
+    --border-strong: rgb(250 249 245 / 0.62);
+    --text-muted:    var(--text-2);
+    --text-subtle:   var(--text-2);
+    --text-small:    var(--text-2);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not(.light) {
+      --border:        rgb(250 249 245 / 0.42);
+      --border-strong: rgb(250 249 245 / 0.62);
+      --text-muted:    var(--text-2);
+      --text-subtle:   var(--text-2);
+      --text-small:    var(--text-2);
+    }
+  }
+
+  :focus-visible {
+    outline-width: 3px;
   }
 }
 

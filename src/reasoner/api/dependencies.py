@@ -16,8 +16,11 @@ from typing import TYPE_CHECKING, Optional
 from uuid import UUID
 
 if TYPE_CHECKING:
+    import asyncpg
+
     from reasoner.application.services.api_key_service import ApiKeyService
     from reasoner.application.services.credit_service import CreditService
+    from reasoner.rate_limiter import RateLimiter
 
 import asyncio
 from fastapi import Depends, HTTPException, Request
@@ -289,6 +292,27 @@ async def get_optional_user(
         return user
     except Exception:
         return None
+
+
+async def require_auth_if_legacy_disabled(
+    user: User | None = Depends(get_optional_user),
+) -> User | None:
+    """Require a principal for metered routes unless legacy access is enabled.
+
+    This is the dependency form of the compatibility gate used by the legacy
+    pipeline endpoint.  Keeping it in the shared dependency module prevents
+    chargeable routes from accidentally implementing different auth semantics.
+    """
+    if user is None and not settings.ENABLE_LEGACY_API_KEY:
+        raise HTTPException(
+            status_code=401,
+            detail=(
+                "Authentication required. Set ENABLE_LEGACY_API_KEY=true "
+                "for v1 backward compatibility."
+            ),
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return user
 
 
 def require_tier(min_tier: SubscriptionTier):

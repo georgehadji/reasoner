@@ -113,7 +113,13 @@ async def test_clear_cache_clears_memory_and_disk(seeded_memory_cache, tmp_path,
     assert "regression-test-key" in _MEMORY_CACHE
     assert test_file.exists()
 
-    result = await clear_cache()
+    from unittest.mock import MagicMock
+
+    # request is required (Request | None = None
+    # broke FastAPI's special-cased Request injection at route
+    # registration — docs/plans/pre-existing-fixes.md). Outside production
+    # it's unused, so a MagicMock stub is enough for this direct call.
+    result = await clear_cache(request=MagicMock())
 
     # Postconditions: both memory and disk must be empty
     assert "regression-test-key" not in _MEMORY_CACHE

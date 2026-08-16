@@ -27,6 +27,7 @@ class PipelineService:
         batch_critique_jury: bool = False,
         initial_state: PipelineState | None = None,
         augmentation_methods: list[str] | None = None,
+        user_id: str | None = None,
     ) -> ReasonerPipeline:
         """Create a configured ReasonerPipeline instance."""
         return ReasonerPipeline(
@@ -42,6 +43,7 @@ class PipelineService:
             complexity=complexity,
             batch_critique_jury=batch_critique_jury,
             augmentation_methods=augmentation_methods,
+            user_id=user_id,
         )
 
     # ── Context Serialization ────────────────────────────────────────

@@ -20,13 +20,14 @@ from reasoner.infrastructure.llm.image_generation import (
     generate_image_with_model,
     ImageGenerationError,
 )
-from reasoner.domain.preset_registry import PRESETS
+from reasoner.core.constants_limits import IMAGE_GEN_FALLBACKS, IMAGE_GEN_PRESETS
+from reasoner.domain.preset_registry import PRESETS, get_preset
 
 
 class TestResolveModelConfig:
     def test_resolves_known_aliases(self):
         assert "google/gemini-2.5-flash-image" == _resolve_model_config("gemini-flash-image")["model"]
-        assert "google/gemini-3-pro-image-preview" == _resolve_model_config("gemini-pro-image")["model"]
+        assert "google/gemini-3-pro-image" == _resolve_model_config("gemini-pro-image")["model"]
         assert "openai/gpt-5-image" == _resolve_model_config("gpt-5-image")["model"]
         assert "openai/gpt-5-image-mini" == _resolve_model_config("gpt-5-image-mini")["model"]
 
@@ -423,9 +424,11 @@ class TestGenerateImages:
 
         assert result["success"] is True
         assert len(result["images"]) == 3
-        # primary ordering: riverflow-v2-fast-preview, riverflow-v2-standard-preview
-        assert result["images"][0]["model_used"] == "riverflow-v2-fast-preview"
-        assert mock_gen.call_count == 4
+        # Derived from the constant rather than pinned: the budget primary list
+        # has been re-ordered and resized twice since these numbers were written.
+        # seedream-4.5 is a fallback, so the three primaries alone satisfy num_images=3.
+        assert result["images"][0]["model_used"] == IMAGE_GEN_PRESETS["budget"][0]
+        assert mock_gen.call_count == len(IMAGE_GEN_PRESETS["budget"])
 
     @pytest.mark.asyncio
     async def test_all_models_fail(self):
@@ -454,7 +457,10 @@ class TestGenerateImages:
 
         assert result["success"] is False
         assert "Generated only 1 of 4 required images" in result["error"]
-        assert mock_gen.call_count == 4
+        # Every primary and every fallback is attempted before giving up.
+        assert mock_gen.call_count == len(IMAGE_GEN_PRESETS["budget"]) + len(
+            IMAGE_GEN_FALLBACKS["budget"]
+        )
 
     @pytest.mark.asyncio
     async def test_partial_success_after_all_fallbacks_is_failure(self):
@@ -471,7 +477,10 @@ class TestGenerateImages:
 
         assert result["success"] is False
         assert "Generated only 1 of 4 required images" in result["error"]
-        assert mock_gen.call_count == 4
+        # Every primary and every fallback is attempted before giving up.
+        assert mock_gen.call_count == len(IMAGE_GEN_PRESETS["budget"]) + len(
+            IMAGE_GEN_FALLBACKS["budget"]
+        )
 
     @pytest.mark.asyncio
     async def test_policy_safe_prompt_retry_recovers_after_moderation_failures(self):
@@ -579,12 +588,16 @@ class TestGenerateImages:
 
 
 class TestImageGenPresets:
+    # Two drifts fixed here. PRESETS maps id -> raw config dict, so the typed
+    # attribute reads need get_preset(). And primary_id on an image-gen preset
+    # is the *reasoning* model that enhances the prompt -- the image model
+    # lives under routing["image_generate"], which is what these tests meant.
     def test_budget_preset_exists(self):
         assert "image-gen-budget" in PRESETS
-        p = PRESETS["image-gen-budget"]
-        assert p.primary_id == "riverflow-v2-fast-preview"
+        p = get_preset("image-gen-budget")
+        assert p.routing["image_generate"] == "gemini-3.1-flash-lite-image"
 
     def test_premium_preset_exists(self):
         assert "image-gen-premium" in PRESETS
-        p = PRESETS["image-gen-premium"]
-        assert p.primary_id == "gemini-pro-image"
+        p = get_preset("image-gen-premium")
+        assert p.routing["image_generate"] == "gemini-pro-image"

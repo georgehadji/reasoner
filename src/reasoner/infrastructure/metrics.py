@@ -42,7 +42,7 @@ except Exception:  # pragma: no cover
 REASONER_QUERIES_TOTAL = Counter(
     "reasoner_queries_total",
     "Total queries executed",
-    ["tier", "preset", "status"],
+    ["tier", "preset", "status", "interface"],
 )
 
 REASONER_QUOTA_EXCEEDED_TOTAL = Counter(

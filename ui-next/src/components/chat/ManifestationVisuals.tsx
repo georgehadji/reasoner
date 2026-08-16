@@ -1,16 +1,63 @@
 'use client';
 
-import React from 'react';
-import { motion } from 'framer-motion';
+import React, { useSyncExternalStore } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
+
+/**
+ * `false` while server-rendering and through hydration, `true` afterwards.
+ * Lets the component branch on browser-only state without handing React
+ * different markup on the server and the hydrating client.
+ */
+const subscribeToNothing = () => () => {};
+const getHydratedSnapshot = () => true;
+const getServerSnapshot = () => false;
 
 interface ManifestationVisualsProps {
   progress: number; // 0 to 1
 }
 
+const RING_BORDER = '1px solid color-mix(in oklab, var(--accent) 35%, transparent)';
+
+/**
+ * Expanding rings. `delay` drives the animated version; `staticSize` /
+ * `staticOpacity` are the frozen concentric snapshot rendered instead when the
+ * user has asked for reduced motion.
+ */
+const RINGS = [
+  { delay: 0, staticSize: 20, staticOpacity: 0.45 },
+  { delay: 0.6, staticSize: 36, staticOpacity: 0.28 },
+  { delay: 1.2, staticSize: 52, staticOpacity: 0.14 },
+] as const;
+
+/**
+ * Decorative scanner panel shown while an image is being generated.
+ *
+ * Purely ornamental: it never intercepts pointer events, it is hidden from
+ * assistive tech, and `contain: layout paint` keeps the scan line's per-frame
+ * invalidation inside this box instead of the whole page.
+ *
+ * Under `prefers-reduced-motion` none of the ambient loops run — the panel
+ * renders as a static composition. The progress fill still tracks `progress`,
+ * because that is data, not ambience; it just snaps instead of easing.
+ */
 export function ManifestationVisuals({ progress }: ManifestationVisualsProps) {
+  // `useReducedMotion()` reads matchMedia during render: `null` on the server,
+  // the real value on the client. Branching on it directly would produce a
+  // hydration mismatch, so the switch waits until hydration has landed.
+  // Reduced-motion users see at most a single animated frame before the static
+  // composition takes over.
+  const shouldReduceMotion = useReducedMotion();
+  const isHydrated = useSyncExternalStore(
+    subscribeToNothing,
+    getHydratedSnapshot,
+    getServerSnapshot,
+  );
+  const prefersReducedMotion = isHydrated && shouldReduceMotion === true;
+
   return (
     <div
-      className="relative h-52 w-full overflow-hidden rounded-lg"
+      className="contain-layout-paint pointer-events-none relative h-52 w-full overflow-hidden rounded-lg"
+      aria-hidden="true"
       style={{
         background: 'var(--surface-3)',
         border: '1px solid var(--border-strong)',
@@ -21,7 +68,7 @@ export function ManifestationVisuals({ progress }: ManifestationVisualsProps) {
         className="absolute inset-0"
         style={{
           backgroundImage:
-            'radial-gradient(circle, rgba(0,201,177,0.12) 1px, transparent 1px)',
+            'radial-gradient(circle, color-mix(in oklab, var(--accent) 12%, transparent) 1px, transparent 1px)',
           backgroundSize: '24px 24px',
           opacity: 0.6,
         }}
@@ -32,23 +79,35 @@ export function ManifestationVisuals({ progress }: ManifestationVisualsProps) {
         className="absolute bottom-0 left-0 right-0"
         style={{
           background:
-            'linear-gradient(to top, rgba(0,201,177,0.07) 0%, transparent 100%)',
+            'linear-gradient(to top, color-mix(in oklab, var(--accent) 7%, transparent) 0%, transparent 100%)',
         }}
         animate={{ height: `${progress * 100}%` }}
-        transition={{ duration: 0.4, ease: 'linear' }}
+        transition={{ duration: prefersReducedMotion ? 0 : 0.4, ease: 'linear' }}
       />
 
-      {/* Scan line */}
-      <motion.div
-        className="absolute left-0 right-0 h-px"
-        style={{
-          background:
-            'linear-gradient(90deg, transparent 0%, rgba(0,201,177,0.6) 20%, var(--accent) 50%, rgba(0,201,177,0.6) 80%, transparent 100%)',
-          boxShadow: '0 0 8px 1px rgba(0,201,177,0.3)',
-        }}
-        animate={{ top: ['0%', '100%'] }}
-        transition={{ duration: 2.8, repeat: Infinity, ease: 'linear' }}
-      />
+      {/* Scan line — sweeps top to bottom, parked at the top when reduced */}
+      {prefersReducedMotion ? (
+        <div
+          className="absolute left-0 right-0 h-px"
+          style={{
+            top: 0,
+            background:
+              'linear-gradient(90deg, transparent 0%, color-mix(in oklab, var(--accent) 60%, transparent) 20%, var(--accent) 50%, color-mix(in oklab, var(--accent) 60%, transparent) 80%, transparent 100%)',
+            boxShadow: '0 0 8px 1px color-mix(in oklab, var(--accent) 30%, transparent)',
+          }}
+        />
+      ) : (
+        <motion.div
+          className="absolute left-0 right-0 h-px"
+          style={{
+            background:
+              'linear-gradient(90deg, transparent 0%, color-mix(in oklab, var(--accent) 60%, transparent) 20%, var(--accent) 50%, color-mix(in oklab, var(--accent) 60%, transparent) 80%, transparent 100%)',
+            boxShadow: '0 0 8px 1px color-mix(in oklab, var(--accent) 30%, transparent)',
+          }}
+          animate={{ top: ['0%', '100%'] }}
+          transition={{ duration: 2.8, repeat: Infinity, ease: 'linear' }}
+        />
+      )}
 
       {/* Corner markers */}
       {[
@@ -81,29 +140,49 @@ export function ManifestationVisuals({ progress }: ManifestationVisualsProps) {
       <div className="absolute inset-0 flex items-center justify-center">
         <div className="relative flex items-center justify-center">
           {/* Rings */}
-          {[0, 0.6, 1.2].map((delay, i) => (
-            <motion.div
-              key={i}
-              className="absolute rounded-full"
-              style={{ border: '1px solid rgba(0,201,177,0.35)' }}
-              initial={{ width: 12, height: 12, opacity: 0.5 }}
-              animate={{ width: 56, height: 56, opacity: 0 }}
-              transition={{
-                duration: 2.4,
-                repeat: Infinity,
-                delay,
-                ease: 'easeOut',
-              }}
-            />
-          ))}
+          {RINGS.map(({ delay, staticSize, staticOpacity }, i) =>
+            prefersReducedMotion ? (
+              <div
+                key={i}
+                className="absolute rounded-full"
+                style={{
+                  border: RING_BORDER,
+                  width: staticSize,
+                  height: staticSize,
+                  opacity: staticOpacity,
+                }}
+              />
+            ) : (
+              <motion.div
+                key={i}
+                className="absolute rounded-full"
+                style={{ border: RING_BORDER }}
+                initial={{ width: 12, height: 12, opacity: 0.5 }}
+                animate={{ width: 56, height: 56, opacity: 0 }}
+                transition={{
+                  duration: 2.4,
+                  repeat: Infinity,
+                  delay,
+                  ease: 'easeOut',
+                }}
+              />
+            ),
+          )}
 
           {/* Core dot */}
-          <motion.div
-            className="relative z-10 h-2 w-2 rounded-full"
-            style={{ background: 'var(--accent)' }}
-            animate={{ opacity: [0.6, 1, 0.6] }}
-            transition={{ duration: 1.8, repeat: Infinity }}
-          />
+          {prefersReducedMotion ? (
+            <div
+              className="relative z-10 h-2 w-2 rounded-full"
+              style={{ background: 'var(--accent)' }}
+            />
+          ) : (
+            <motion.div
+              className="relative z-10 h-2 w-2 rounded-full"
+              style={{ background: 'var(--accent)' }}
+              animate={{ opacity: [0.6, 1, 0.6] }}
+              transition={{ duration: 1.8, repeat: Infinity }}
+            />
+          )}
         </div>
       </div>
     </div>

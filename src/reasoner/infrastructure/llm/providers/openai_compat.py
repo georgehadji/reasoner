@@ -19,6 +19,7 @@ from reasoner.core.constants import (
     TIMEOUTS,
 )
 from reasoner.infrastructure.llm.base import BaseLLMProvider
+from reasoner.infrastructure.llm.caching import build_messages, extract_cache_usage
 from reasoner.infrastructure.llm.utils import _perplexity_response_format
 
 logger = logging.getLogger(__name__)
@@ -68,6 +69,14 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         super().__init__(model, max_retries)
         self.extra_body = extra_body or {}
 
+        # Prompt-cache breakpoints are opt-out; providers that cache
+        # automatically are unaffected either way.
+        from reasoner.core.settings import settings
+        self.prompt_cache_enabled: bool = settings.PROMPT_CACHE_ENABLED
+        # Populated from the response when the provider reports cache usage.
+        self.last_cache_read_tokens: int = 0
+        self.last_cache_write_tokens: int = 0
+
         # If a pre-configured OpenAI client is provided, use it directly
         if http_client is not None:
             self.client = http_client
@@ -116,16 +125,28 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         # Simple stream implementation wrapping the underlying client
         kwargs: dict[str, Any] = {
             "model": self.model,
-            "max_tokens": max_tokens,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user",   "content": user_prompt},
-            ],
+            "messages": build_messages(
+                system_prompt, user_prompt, self.model,
+                enabled=self.prompt_cache_enabled,
+            ),
             "stream": True,
         }
-        if temperature != 1.0:
+        # Mirror complete(): direct OpenAI endpoints need max_completion_tokens.
+        if self._uses_completion_tokens():
+            kwargs["max_completion_tokens"] = max_tokens
+        else:
+            kwargs["max_tokens"] = max_tokens
+        # Honour the fixed-temperature denylist here too — streaming previously
+        # sent temperature unconditionally, which 400s on those models.
+        if self._supports_temperature() and temperature != 1.0:
             kwargs["temperature"] = temperature
-        
+        # extra_body carries the per-phase reasoning effort injected by
+        # LLMExecutor and OpenRouter usage accounting. Dropping it here made
+        # every streaming call fall back to the model's default effort —
+        # silently spending more tokens than the phase config asked for.
+        if self.extra_body:
+            kwargs["extra_body"] = self.extra_body
+
         async with self.client.chat.completions.create(**kwargs) as response:
             async for chunk in response:
                 if chunk.choices and chunk.choices[0].delta.content:
@@ -156,6 +177,31 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             return False
         return not any(marker in m for marker in self._FIXED_TEMPERATURE_MARKERS)
 
+    def _record_usage(self, usage: Any) -> None:
+        """Record token, cache and cost counters from an API response's usage object."""
+        if usage is None:
+            return
+        if hasattr(self, "last_input_tokens"):
+            self.last_input_tokens = getattr(usage, "prompt_tokens", 0) or 0
+        if hasattr(self, "last_output_tokens"):
+            self.last_output_tokens = getattr(usage, "completion_tokens", 0) or 0
+
+        cache = extract_cache_usage(usage)
+        self.last_cache_read_tokens = cache["cache_read_tokens"]
+        self.last_cache_write_tokens = cache["cache_write_tokens"]
+        if cache["cache_read_tokens"]:
+            logger.debug(
+                "[CACHE] %s served %d prompt tokens from provider cache",
+                self.model, cache["cache_read_tokens"],
+            )
+
+        # OpenRouter reports the real charge when usage accounting is enabled.
+        # Without it, last_cost_usd is left alone so callers fall back to the
+        # pricing.py estimate.
+        cost = getattr(usage, "cost", None)
+        if cost is not None and hasattr(self, "last_cost_usd"):
+            self.last_cost_usd = float(cost)
+
     def _uses_completion_tokens(self) -> bool:
         """True for direct OpenAI endpoints that require ``max_completion_tokens``."""
         return self.model.lower().startswith(("gpt-", "o1", "o3", "o4"))
@@ -169,10 +215,10 @@ class OpenAICompatibleProvider(BaseLLMProvider):
     ) -> str:
         kwargs: dict[str, Any] = {
             "model": self.model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user",   "content": user_prompt},
-            ],
+            "messages": build_messages(
+                system_prompt, user_prompt, self.model,
+                enabled=self.prompt_cache_enabled,
+            ),
         }
         # Direct OpenAI endpoints use max_completion_tokens; everything else
         # (including OpenRouter-routed OpenAI models) accepts max_tokens.
@@ -217,15 +263,8 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             raise ProviderUnavailableError(
                 f"Provider returned empty choices (model={self.model}; possible content filtering)"
             )
-        # Track token usage when available (OpenRouter, OpenAI, etc.)
-        usage = getattr(response, "usage", None)
-        if usage is not None:
-            if hasattr(self, "last_input_tokens"):
-                self.last_input_tokens = getattr(usage, "prompt_tokens", 0) or 0
-            if hasattr(self, "last_output_tokens"):
-                self.last_output_tokens = getattr(usage, "completion_tokens", 0) or 0
-            # Cost is not consistently available in the SDK response object;
-            # leave last_cost_usd untouched so callers can estimate via pricing.py.
+        # Track token, cache and cost usage when available (OpenRouter, OpenAI, etc.)
+        self._record_usage(getattr(response, "usage", None))
         return response.choices[0].message.content or ""
 
     def supports_tools(self) -> bool:
@@ -242,10 +281,10 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         import json
         kwargs: dict[str, Any] = {
             "model": self.model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user",   "content": user_prompt},
-            ],
+            "messages": build_messages(
+                system_prompt, user_prompt, self.model,
+                enabled=self.prompt_cache_enabled,
+            ),
             "tools": tools,
         }
         if self._uses_completion_tokens():
@@ -265,13 +304,8 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                 f"Provider returned empty choices (model={self.model}; possible content filtering)"
             )
 
-        # Track token usage when available
-        usage = getattr(response, "usage", None)
-        if usage is not None:
-            if hasattr(self, "last_input_tokens"):
-                self.last_input_tokens = getattr(usage, "prompt_tokens", 0) or 0
-            if hasattr(self, "last_output_tokens"):
-                self.last_output_tokens = getattr(usage, "completion_tokens", 0) or 0
+        # Track token, cache and cost usage when available
+        self._record_usage(getattr(response, "usage", None))
 
         message = response.choices[0].message
         content = message.content or ""
@@ -321,12 +355,17 @@ class OpenRouterProvider(OpenAICompatibleProvider):
         if settings.OPENROUTER_APP_TITLE:
             default_headers["X-Title"] = settings.OPENROUTER_APP_TITLE
 
+        # Usage accounting returns the real charge plus prompt_tokens_details
+        # (cached_tokens / cache_write_tokens), which is how provider-side cache
+        # hits become visible. Without it OpenRouter omits both.
+        merged_extra_body: dict[str, Any] = {"usage": {"include": True}, **(extra_body or {})}
+
         super().__init__(
             model=model,
             api_key=api_key or os.environ.get("OPENROUTER_API_KEY", ""),
             base_url=self.OPENROUTER_BASE_URL,
             max_retries=max_retries,
-            extra_body=extra_body,
+            extra_body=merged_extra_body,
             default_headers=default_headers,
         )
         # Cost tracking

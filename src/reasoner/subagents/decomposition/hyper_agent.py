@@ -83,7 +83,7 @@ class DecompositionHyperAgent:
         sub_problems: list[SubProblem] = []
         what_items = decomposition.get("what", [])
         how_items = decomposition.get("how", [])
-        for i, (what, how) in enumerate(zip(what_items, how_items)):
+        for i, (what, how) in enumerate(zip(what_items, how_items, strict=False)):
             sub_problems.append(SubProblem(
                 id=f"SP{i+1}",
                 description=f"{what}. Approach: {how}",

@@ -145,6 +145,7 @@ class PipelineExecutionService:
                 complexity=getattr(req, "complexity", None),
                 batch_critique_jury=getattr(req, "batch_critique_jury", False),
                 initial_state=initial_state,
+                user_id=user_id,
             )
             state = initial_state or PipelineState(problem=req.problem, preset_name=effective_preset_name)
             if recalled_chunks:

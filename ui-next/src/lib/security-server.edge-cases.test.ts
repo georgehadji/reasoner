@@ -67,13 +67,17 @@ describe('validateRunRequest — edge cases', () => {
     expect(() => validateRunRequest([])).toThrow(ValidationError);
   });
 
+  // These assert the specific message, not a generic 'Invalid problem'. The
+  // validator distinguishes empty from over-length from wrong-type, and that
+  // distinction is the whole value of the message — collapsing it back to one
+  // string would let a regression swap them silently.
   it('rejects empty problem string', () => {
-    expect(() => validateRunRequest({ ...valid, problem: '' })).toThrow('Invalid problem');
+    expect(() => validateRunRequest({ ...valid, problem: '' })).toThrow('Problem cannot be empty');
   });
 
   it('rejects problem exceeding max length', () => {
     const long = 'x'.repeat(VALIDATION_LIMITS.problemMaxLength + 1);
-    expect(() => validateRunRequest({ ...valid, problem: long })).toThrow('Invalid problem');
+    expect(() => validateRunRequest({ ...valid, problem: long })).toThrow('Problem exceeds 10,000 characters');
   });
 
   it('rejects invalid preset patterns', () => {
@@ -126,7 +130,7 @@ describe('validateRunFollowupRequest — edge cases', () => {
   };
 
   it('rejects empty question', () => {
-    expect(() => validateRunFollowupRequest({ ...valid, question: '' })).toThrow('Invalid question');
+    expect(() => validateRunFollowupRequest({ ...valid, question: '' })).toThrow('Question cannot be empty');
   });
 
   it('rejects invalid history format', () => {
@@ -239,6 +243,15 @@ describe('validateUpstreamUrl — edge cases', () => {
   it('accepts valid http/https', () => {
     expect(validateUpstreamUrl('http://localhost:8003')).toBe('http://localhost:8003');
     expect(validateUpstreamUrl('https://example.com')).toBe('https://example.com');
+  });
+
+  it('rejects metadata, link-local, and private IPv6 targets in production', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    expect(() => validateUpstreamUrl('http://169.254.169.254:8003')).toThrow();
+    expect(() => validateUpstreamUrl('http://metadata.google.internal:8003')).toThrow();
+    expect(() => validateUpstreamUrl('http://[fd00::1]:8003')).toThrow();
+    expect(() => validateUpstreamUrl('http://[fe80::1]:8003')).toThrow();
+    vi.unstubAllEnvs();
   });
 });
 

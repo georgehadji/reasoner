@@ -20,8 +20,18 @@ import pytest
 import asyncio
 
 from reasoner.application.event_bus.bus import reset_event_bus
+from reasoner.core.ports.model_registry_port import set_model_registry_port
+from reasoner.infrastructure.llm.registry import RegistryAdapter
 from reasoner.infrastructure.observability.langfuse_subscriber import reset_langfuse
 from reasoner.token_cache import reset_token_cache
+
+# The port is a process-global injected by each composition root (api/__init__.py,
+# main.py, headless.py). Tests have no composition root, so anything reaching
+# get_model_registry_port() raised "ModelRegistryPort not injected" unless some
+# earlier test happened to import the app first — making failures depend on
+# collection order and on how xdist sharded the run. Done at import time rather
+# than in a fixture so it is in place before collection, and once per worker.
+set_model_registry_port(RegistryAdapter())
 
 
 @pytest.fixture(autouse=True)

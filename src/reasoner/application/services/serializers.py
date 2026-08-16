@@ -952,7 +952,33 @@ def _ser_5(state: PipelineState) -> dict:
     citations = _ser_citations(state)
     if citations:
         base["citations"] = citations
+    cross_lang = _ser_cross_language(state)
+    if cross_lang:
+        base["cross_language"] = cross_lang
     return base
+
+
+def _ser_cross_language(state: PipelineState) -> dict:
+    """Serialize the cross-language pivot metadata, or {} when no pivot ran.
+
+    Keys mirror what _phase_cross_language_translate_in/out actually write to
+    cross_language_state. The previous inline version in _ser_synthesis asked
+    for target_language/back_translated, which the pipeline never sets, so it
+    emitted two constant-empty fields and dropped original_problem -- leaving
+    the client unable to show what the user originally typed.
+    """
+    cross_lang = _get_v(state, "cross_language_state", {})
+    if not cross_lang or not cross_lang.get("source_language"):
+        return {}
+    return {
+        "source_language": cross_lang["source_language"],
+        "original_problem": cross_lang.get("original_problem", ""),
+        "direction": cross_lang.get("direction", ""),
+        "translated": bool(
+            cross_lang.get("translated_problem") or cross_lang.get("translated_synthesis")
+        )
+        or cross_lang.get("direction") == "out",
+    }
 
 
 def _ser_synthesis(state: PipelineState) -> dict:
@@ -1042,13 +1068,9 @@ def _ser_synthesis(state: PipelineState) -> dict:
         }
 
         # Cross-language metadata
-        cross_lang = _get_v(state, "cross_language_state", {})
-        if cross_lang and cross_lang.get("source_language"):
-            result["cross_language"] = {
-                "source_language": cross_lang["source_language"],
-                "target_language": cross_lang.get("target_language", ""),
-                "back_translated": cross_lang.get("back_translated", False),
-            }
+        cross_lang = _ser_cross_language(state)
+        if cross_lang:
+            result["cross_language"] = cross_lang
 
         return result
 

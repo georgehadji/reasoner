@@ -139,11 +139,17 @@ async def lifespan(app: FastAPI):
                 )
             logger.warning(message)
         if settings.CIRCUIT_BREAKER_MODE == "memory":
-            logger.warning(
+            message = (
                 "Circuit breaker is in 'memory' mode but UVICORN_WORKERS=%d. "
                 "Circuit state is not shared across workers. "
-                "Set CIRCUIT_BREAKER_MODE to a shared backend (e.g., 'redis') for production.",
-                uvicorn_workers,
+                "Set CIRCUIT_BREAKER_MODE to a shared backend (e.g., 'redis') for production."
+            )
+            if settings.ENVIRONMENT != "development":
+                raise RuntimeError(message % uvicorn_workers)
+            logger.warning(message, uvicorn_workers)
+        if settings.ENVIRONMENT == "production" and not settings.AUTH_PERSISTENCE_ENABLED:
+            raise RuntimeError(
+                "AUTH_PERSISTENCE_ENABLED must be true for multi-worker production deployments."
             )
 
     # Single-worker SSE warning: health checks time out during long pipeline runs
@@ -427,7 +433,6 @@ from .cache import (
 
 from reasoner.api.schemas import (
     FollowupRequest,
-    RunResult,
     RunRequest,
     SearchRequest,
 )
@@ -459,7 +464,7 @@ from reasoner.api.streaming import (
     run_stream_cached,
 )
 
-from reasoner.api.auth_deps import optional_auth, require_api_key, require_csrf
+from reasoner.api.auth_deps import optional_auth, require_csrf
 from reasoner.api.dependencies import (
     check_rate_limit, 
     get_current_user, 
@@ -493,42 +498,9 @@ def _extract_run_cost(chunk: str) -> float | None:
     than raised: a parsing problem must never break the stream the user is
     reading.
     """
-    try:
-        event = json.loads(chunk[6:])
-    except (ValueError, TypeError):
-        return None
-    if not isinstance(event, dict) or event.get("type") != "done":
-        return None
-    cost = event.get("total_cost_usd")
-    return float(cost) if isinstance(cost, (int, float)) and cost > 0 else None
+    from reasoner.application.services.run_metering import extract_run_cost
 
-
-async def _settle_run_credits(
-    user_id: str,
-    cost_usd: float,
-    reference_id: str,
-    preset: str,
-) -> None:
-    """Charge a completed run's actual model spend against the user's credits.
-
-    Post-paid on purpose: a run that fails before spending anything costs
-    nothing. Settlement never raises — the work is already delivered, so a
-    ledger outage is logged and reconciled later rather than surfaced as a
-    stream error.
-    """
-    try:
-        from reasoner.api.dependencies import _get_credit_service
-        await _get_credit_service().charge_usd(
-            user_id,
-            cost_usd=cost_usd,
-            reference_id=reference_id,
-            description=f"Pipeline run ({preset})",
-        )
-    except Exception as exc:
-        logger.warning(
-            "Credit settlement failed for user %s run %s ($%.6f): %s",
-            user_id, reference_id, cost_usd, exc,
-        )
+    return extract_run_cost(chunk)
 
 
 async def _run_stream_with_metrics(
@@ -538,7 +510,12 @@ async def _run_stream_with_metrics(
     preset_service: PresetService,
     pipeline_service: PipelineService,
 ):
-    """Wrap run_stream_cached with Prometheus metrics."""
+    """Stream a run through the shared metering wrapper.
+
+    Settlement, disconnect handling, and metrics all live in
+    ``application/services/run_metering.py`` so the sync endpoint and the MCP
+    adapter bill a run exactly the way this one does.
+    """
     from reasoner.logging_utils import set_log_context
 
     tier = "anonymous" if user is None else "free"
@@ -548,47 +525,37 @@ async def _run_stream_with_metrics(
     # Metrics are optional — degrade gracefully if QueryTimer is missing
     timer = None
     try:
-        from reasoner.metrics import REASONER_QUERIES_TOTAL
         from reasoner.api.metrics import QueryTimer
         timer = QueryTimer(preset=preset)
         timer.start()
     except (ImportError, AttributeError):
         pass
 
-    has_error = False
-    settled_cost_usd = 0.0
-    try:
-        async for chunk in run_stream_cached(
-            req,
-            request=request,
-            user_id=str(user.id) if user else None,
-            preset_service=preset_service,
-            pipeline_service=pipeline_service,
-        ):
-            if user is not None and chunk.startswith("data: "):
-                settled_cost_usd = _extract_run_cost(chunk) or settled_cost_usd
-            yield chunk
-    except Exception:
-        has_error = True
-        raise
-    finally:
-        if user is not None and settled_cost_usd > 0:
-            await _settle_run_credits(
-                user_id=str(user.id),
-                cost_usd=settled_cost_usd,
-                reference_id=req.client_run_id or f"run:{uuid.uuid4()}",
-                preset=preset,
-            )
-        if timer is not None:
-            timer.observe()
-        try:
-            REASONER_QUERIES_TOTAL.labels(
-                tier=tier,
-                preset=preset,
-                status="error" if has_error else "success",
-            ).inc()
-        except Exception as exc:
-            logger.warning("Failed to record prometheus query metrics: %s", exc)
+    from reasoner.api.run_observability import CreditSink, PrometheusObserver
+    from reasoner.application.services.run_metering import RunContext, metered
+
+    user_id = str(user.id) if user else None
+    ctx = RunContext(
+        preset=preset,
+        reference_id=req.client_run_id or f"run:{uuid.uuid4()}",
+        user_id=user_id,
+        tier=tier,
+        interface="web",
+    )
+    stream = run_stream_cached(
+        req,
+        request=request,
+        user_id=user_id,
+        preset_service=preset_service,
+        pipeline_service=pipeline_service,
+    )
+    async for chunk in metered(
+        stream,
+        ctx,
+        CreditSink(),
+        PrometheusObserver(tier=tier, preset=preset, interface="web", timer=timer),
+    ):
+        yield chunk
 
 
 def _require_auth_if_legacy_disabled(user: User | None) -> None:
@@ -601,123 +568,13 @@ def _require_auth_if_legacy_disabled(user: User | None) -> None:
 
 
 # ── Agent-Facing Endpoints ──────────────────────────────────────
-# These use Authorization: Bearer <key> instead of CSRF tokens,
-# making them callable by AI agents (Claude, LangChain, curl, etc.).
+# Moved to reasoner.api.routes.agent: bearer-key auth (account keys or JWT,
+# via get_current_user), idempotency-guarded, and metered identically to a
+# web run. See that module's docstring for why this replaced the previous
+# require_api_key-authenticated, unmetered handlers.
 
-
-@app.post("/api/agent/tools", include_in_schema=False)
-async def agent_tools():
-    """Return compact function-calling schema for agent consumption."""
-    return [
-        {
-            "name": "reasoner_run",
-            "description": "Run a multi-model reasoning pipeline on a problem. Returns SSE stream of events.",
-            "endpoint": "POST /api/agent/run",
-            "parameters": {
-                "problem": {"type": "string", "required": True, "description": "The question or problem to reason about"},
-                "preset": {"type": "string", "required": False, "default": "scientific-budget", "description": "Pipeline preset name"},
-                "top_k": {"type": "integer", "required": False, "default": 2},
-                "source_type": {"type": "string", "required": False, "enum": ["general", "academic", "news"]},
-            },
-            "auth": "Bearer API key in Authorization header",
-        },
-        {
-            "name": "reasoner_run_sync",
-            "description": "Run pipeline and return aggregated JSON result. Best for agents that want a single response.",
-            "endpoint": "POST /api/agent/run/sync",
-            "parameters": {
-                "problem": {"type": "string", "required": True, "description": "The question or problem to reason about"},
-                "preset": {"type": "string", "required": False, "default": "scientific-budget"},
-                "top_k": {"type": "integer", "required": False, "default": 2},
-            },
-            "auth": "Bearer API key in Authorization header",
-        },
-        {
-            "name": "reasoner_health",
-            "description": "Check if Reasoner is running and healthy.",
-            "endpoint": "GET /api/health",
-            "parameters": {},
-            "auth": "None",
-        },
-    ]
-
-
-@app.post("/api/agent/run")
-async def agent_run_pipeline(
-    request: Request,
-    req: RunRequest,
-    api_key = Depends(require_api_key),
-    rate_limit_checked = Depends(check_rate_limit),
-):
-    """Run pipeline with API key auth. No CSRF token needed — designed for agents.
-
-    Returns SSE stream identical to /api/run.
-    """
-    from reasoner.api.streaming import run_stream_cached
-    return StreamingResponse(
-        run_stream_cached(req, request=request, user_id=api_key.name),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",
-        },
-    )
-
-
-@app.post("/api/agent/run/sync", response_model=RunResult)
-async def agent_run_sync(
-    request: Request,
-    req: RunRequest,
-    api_key = Depends(require_api_key),
-    rate_limit_checked = Depends(check_rate_limit),
-):
-    """Run pipeline synchronously and return aggregated JSON result.
-
-    Best for agents that want a single response without parsing SSE.
-    """
-    from reasoner.api.streaming import run_stream_cached
-    events: list[dict] = []
-    errors: list[str] = []
-
-    async for sse_line in run_stream_cached(req, request=request, user_id=api_key.name):
-        if sse_line.startswith("data: "):
-            try:
-                ev = json.loads(sse_line[6:])
-                events.append(ev)
-                if ev.get("type") == "error":
-                    errors.append(str(ev.get("error", "")))
-            except json.JSONDecodeError:
-                pass
-
-    # Extract synthesis from the last phase_complete with core_solution (reverse search)
-    synthesis = ""
-    for ev in reversed(events):
-        if ev.get("type") == "phase_complete":
-            data = ev.get("data", {})
-            core = data.get("core_solution", "") or data.get("core_solution", "")
-            if isinstance(core, dict):
-                core = core.get("core_solution", "") or core.get("synthesis", "")
-            if core and isinstance(core, str):
-                synthesis = core
-                break
-
-    done = next((e for e in events if e.get("type") in ("done", "end")), {})
-    models_used = list(dict.fromkeys(
-        m for e in events if e.get("type") == "phase_complete"
-        for m in (e.get("data", {}).get("models", []) if isinstance(e.get("data"), dict) else [])
-    ))
-
-    return RunResult(
-        preset=req.preset,
-        errors=errors,
-        total_tokens=done.get("total_tokens", {"input": 0, "output": 0, "total": 0}),
-        duration_seconds=done.get("duration", 0.0),
-        synthesis=synthesis,
-        critical_insights=done.get("critical_insights", []),
-        open_questions=done.get("open_questions", []),
-        citations=done.get("citations", []),
-        models_used=models_used,
-    )
+from reasoner.api.routes.agent import router as agent_router
+app.include_router(agent_router)
 
 
 # ── Main pipeline endpoint ───────────────────────────────────────
@@ -742,30 +599,9 @@ async def run_pipeline(
     Authenticated users get higher rate limits and priority processing.
     """
     _require_auth_if_legacy_disabled(user)
-    # Idempotency: atomically register client_run_id (C2)
-    if req.client_run_id:
-        from reasoner.infrastructure.redis.run_state import _run_state_manager
-        try:
-            if not await _run_state_manager.is_authoritative():
-                raise HTTPException(
-                    status_code=503,
-                    detail="Run state store unavailable. Retry after Redis recovers.",
-                    headers={"Retry-After": "10"},
-                )
-            if not await _run_state_manager.try_register(req.client_run_id):
-                raise HTTPException(
-                    status_code=409,
-                    detail=f"Run {req.client_run_id} is already in progress",
-                )
-        except HTTPException:
-            raise
-        except Exception as exc:
-            logger.warning("Idempotency check failed due to run-state store error: %s", exc)
-            raise HTTPException(
-                status_code=503,
-                detail="Idempotency check failed due to temporary storage issue. Please try again.",
-                headers={"Retry-After": "5"},
-            ) from exc
+    from reasoner.api.idempotency_http import register_run_or_error
+
+    await register_run_or_error(req.client_run_id)
     # TODO(#502): use actual user tier from subscription DB
     return StreamingResponse(
         _run_stream_with_metrics(req, request, user, preset_service, pipeline_service),
@@ -791,30 +627,9 @@ async def run_followup_pipeline(
     Run the Reasoner pipeline for a follow-up question with full conversation context.
     """
     _require_auth_if_legacy_disabled(user)
-    # Idempotency: atomically register client_run_id (Phase 2.1)
-    if req.client_run_id:
-        from reasoner.infrastructure.redis.run_state import _run_state_manager
-        try:
-            if not await _run_state_manager.is_authoritative():
-                raise HTTPException(
-                    status_code=503,
-                    detail="Run state store unavailable. Retry after Redis recovers.",
-                    headers={"Retry-After": "10"},
-                )
-            if not await _run_state_manager.try_register(req.client_run_id):
-                raise HTTPException(
-                    status_code=409,
-                    detail=f"Run {req.client_run_id} is already in progress",
-                )
-        except HTTPException:
-            raise
-        except Exception as exc:
-            logger.warning("Idempotency check failed for followup: %s", exc)
-            raise HTTPException(
-                status_code=503,
-                detail="Idempotency check failed due to temporary storage issue. Please try again.",
-                headers={"Retry-After": "5"},
-            ) from exc
+    from reasoner.api.idempotency_http import register_run_or_error
+
+    await register_run_or_error(req.client_run_id)
     return StreamingResponse(
         run_followup_stream(req, request=request, user_id=str(user.id) if user else None),
         media_type="text/event-stream",
@@ -868,8 +683,23 @@ async def search_web(
 
 @app.delete("/api/cache")
 async def clear_cache(
+    request: Request,
     csrf_checked = Depends(require_csrf),
 ):
+    # Cache deletion is destructive and global.  Keep direct test/CLI calls
+    # compatible outside production, but require the constant-time admin key
+    # in deployed environments.
+    #
+    # `request: Request` must stay a required, non-Optional param — FastAPI
+    # injects it via special-casing on the bare type; `Request | None = None`
+    # breaks that special-casing and raises FastAPIError at route
+    # registration (Request is not a valid Pydantic field type), which took
+    # the whole app down at import time.
+    if settings.ENVIRONMENT == "production":
+        provided = request.headers.get("X-Admin-Key", "")
+        admin_key = settings.ADMIN_API_KEY or ""
+        if not admin_key or not secrets.compare_digest(provided, admin_key):
+            raise HTTPException(status_code=403, detail="Admin access required")
     cleared = 0
     for f in CACHE_DIR.glob("*.json"):
         try:
@@ -1022,6 +852,17 @@ app.include_router(saas_router.router)
 from reasoner.api import billing_router
 app.include_router(billing_router.router)
 
+# Optional MCP Streamable-HTTP transport, off by default. Most installs use
+# the stdio transport (mcp_server.py) instead; this is for hosted deployments
+# that want an MCP endpoint without a second process. A missing 'mcp' extra
+# must not take the whole app down -- log and continue without it.
+if settings.ENABLE_MCP_HTTP:
+    try:
+        from reasoner.api.mcp import build_mcp_server
+        app.mount("/mcp", build_mcp_server().streamable_http_app())
+    except ImportError as exc:
+        logger.warning("ENABLE_MCP_HTTP is set but could not be mounted: %s", exc)
+
 # Mount Metrics endpoint (Critical Enhancement 6.1: restrict by IP)
 from reasoner.api.metrics import metrics_endpoint
 
@@ -1029,9 +870,9 @@ from reasoner.api.client_ip import get_client_ip
 
 
 async def _metrics_ip_restricted(request: Request):
-    allowed = settings.METRICS_ALLOWED_IPS.split(",")
+    allowed = {item.strip() for item in settings.METRICS_ALLOWED_IPS.split(",") if item.strip()}
     client_ip = get_client_ip(request)
-    if client_ip not in allowed:
+    if not allowed or client_ip not in allowed:
         raise HTTPException(status_code=403, detail="Metrics access denied")
 
 app.add_api_route("/api/metrics", metrics_endpoint, methods=["GET"], dependencies=[Depends(_metrics_ip_restricted)])

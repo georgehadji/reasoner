@@ -124,6 +124,10 @@ class TestRunStateManager:
             run_state_manager._redis = original_redis
             run_state_manager._redis_ok = True
 
+    # Asserts cancellation propagating through a real Redis. Without one the
+    # manager falls back to in-memory state and the assertion tests nothing,
+    # so this belongs outside the default lane rather than failing in it.
+    @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_cross_process_cancel_via_redis(self, run_state_manager):
         """Two managers sharing Redis should see each other's cancels."""

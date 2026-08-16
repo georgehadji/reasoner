@@ -124,8 +124,8 @@ export function CommandPalette({
       className={cn(
         'fixed inset-0 z-[400] flex items-start justify-center p-4 pt-[20vh] transition-all duration-200',
         isOpen
-          ? 'bg-black/60 opacity-100'
-          : 'bg-black/0 opacity-0 pointer-events-none',
+          ? 'bg-[var(--scrim)] opacity-100'
+          : 'bg-transparent opacity-0 pointer-events-none',
       )}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();

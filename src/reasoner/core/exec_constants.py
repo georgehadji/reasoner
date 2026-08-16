@@ -21,10 +21,10 @@ EXEC_IMPORT_ALLOWLIST: frozenset[str] = frozenset({
     "json", "base64", "binascii", "hashlib", "uuid",
     # Iteration / functional
     "itertools", "functools", "operator",
-    # File I/O — read-only allowed
-    "pathlib", "io", "os.path",
-    # Copy / pickle (limited)
-    "copy", "pickle",
+    # Copy only.  Filesystem and pickle are intentionally unavailable: the
+    # executor is not a security boundary and must never deserialize or access
+    # host data.  A future isolated runner may define its own allowlist.
+    "copy",
     # Warnings / errors
     "warnings", "contextlib",
     # Type checking (runtime)

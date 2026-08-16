@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-from typing import Optional
 
 import logging
 
@@ -19,7 +18,6 @@ from reasoner.domain.api_keys import looks_like_api_key
 logger = logging.getLogger(__name__)
 from reasoner.core.settings import settings
 from reasoner.rate_limiter import RateLimitConfig, RateLimiter, get_rate_limiter
-from reasoner.exceptions import RateLimitError
 
 # ── Rate Limiter Singleton (for auth_deps) ──
 _rate_limiter_instance_auth_deps: RateLimiter | None = None
@@ -87,50 +85,6 @@ async def get_client_id(request: Request) -> str:
     user_agent = request.headers.get("User-Agent", "")
     # SHA-256 with 16 hex chars (64-bit) to make collision-based bypass impractical
     return f"{ip}:{hashlib.sha256(user_agent.encode()).hexdigest()[:16]}"
-
-
-async def check_rate_limit(
-    request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-):
-    """
-    Check rate limit for request.
-    Raises HTTPException if rate limit exceeded.
-    """
-    rate_limiter = _get_rate_limiter_instance_auth_deps()
-    client_id = await get_client_id(request)
-    try:
-        allowed, info = await rate_limiter.is_allowed(client_id)
-    except RateLimitError:
-        allowed = False
-        info = {"limit_minute": 60, "remaining_minute": 0, "retry_after": 60}
-    except Exception as exc:
-        logger.exception("Rate limiter infrastructure failure")
-        raise HTTPException(
-            status_code=503,
-            detail="Rate limiting unavailable",
-        ) from exc
-
-    # Add rate limit headers to response
-    request.state.rate_limit_info = info
-
-    if not allowed:
-        raise HTTPException(
-            status_code=429,
-            detail={
-                "error": "Rate limit exceeded",
-                "retry_after": int(info.get("retry_after") or 60),
-                "limit_minute": info.get("limit_minute"),
-                "remaining_minute": info.get("remaining_minute", 0),
-            },
-            headers={
-                "Retry-After": str(int(info.get("retry_after") or 60)),
-                "X-RateLimit-Limit": str(info.get("limit_minute")),
-                "X-RateLimit-Remaining": str(info.get("remaining_minute", 0)),
-            },
-        )
-
-    return True
 
 
 def _auth_failure(detail: str = "Authentication required") -> HTTPException:

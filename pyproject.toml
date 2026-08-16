@@ -9,6 +9,9 @@ description = "Multi-model reasoning pipeline orchestrator"
 requires-python = ">=3.12"
 dependencies = []
 
+[project.optional-dependencies]
+mcp = ["mcp>=1.2,<2"]
+
 [tool.ruff]
 target-version = "py312"
 line-length = 100

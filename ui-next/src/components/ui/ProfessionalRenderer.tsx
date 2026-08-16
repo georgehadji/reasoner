@@ -23,7 +23,7 @@ interface ProfessionalRendererProps {
 export const ProfessionalRenderer: FC<ProfessionalRendererProps> = ({ content, className, layoutHints }) => {
   const validThemeColor = layoutHints?.primary_theme_color && isHexColor(layoutHints.primary_theme_color)
     ? layoutHints.primary_theme_color
-    : '#3b82f6';
+    : 'var(--accent)';
 
   const components = useMemo<Components>(() => ({
     h1: ({ ...props }) => <h1 className="mb-4 mt-2 border-b-2 pb-2 text-3xl font-bold" style={{ borderColor: validThemeColor }} {...props} />,
@@ -41,7 +41,7 @@ export const ProfessionalRenderer: FC<ProfessionalRendererProps> = ({ content, c
           {String(children).replace(/\n$/, '')}
         </SyntaxHighlighter>
       ) : (
-        <code className="rounded bg-gray-200 px-1 py-0.5 font-mono text-sm text-gray-800">
+        <code className="rounded bg-[var(--surface-2)] px-1 py-0.5 font-mono text-sm text-[var(--text)]">
           {children}
         </code>
       );

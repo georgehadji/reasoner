@@ -8,8 +8,8 @@ import os
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from reasoner.api.auth_deps import check_rate_limit, optional_auth, require_auth, require_csrf
-from reasoner.api.dependencies import get_current_user
+from reasoner.api.auth_deps import optional_auth, require_auth, require_csrf
+from reasoner.api.dependencies import check_rate_limit, get_current_user
 from reasoner.domain.saas import User
 from reasoner.auth import Scope
 from reasoner.core.constants import TIMEOUTS, VALIDATION_TEST_MAX_TOKENS

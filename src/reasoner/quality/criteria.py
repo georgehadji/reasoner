@@ -358,8 +358,8 @@ def _pop_writing(key: str):
 
 
 def _reset_vetted_context(state: PipelineState) -> None:
-    setattr(state, "vetted_context", [])
-    setattr(state, "context_quality", "unknown")
+    state.vetted_context = []
+    state.context_quality = "unknown"
 
 
 _RESET: dict[str, Callable[[PipelineState], None]] = {

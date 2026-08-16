@@ -80,10 +80,10 @@ class LocalAuthAdapter(AuthPort):
                 display_name=payload.get("name"),
                 scopes=set(payload.get("scopes", [])),
             )
-        except jwt.ExpiredSignatureError:
-            raise AuthenticationError("Token has expired", status_code=401)
+        except jwt.ExpiredSignatureError as exc:
+            raise AuthenticationError("Token has expired", status_code=401) from exc
         except jwt.InvalidTokenError as exc:
-            raise AuthenticationError(f"Invalid token: {exc}", status_code=401)
+            raise AuthenticationError(f"Invalid token: {exc}", status_code=401) from exc
 
     async def refresh_session(self, token: str) -> str:
         raise NotImplementedError("Local adapter does not support refresh")

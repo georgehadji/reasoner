@@ -18,9 +18,17 @@ def mock_pool():
 
 @pytest.fixture
 def repo(mock_pool):
-    r = PostgresQuotaRepository("postgresql://test")
-    r._pool = mock_pool
-    return r
+    # _pool is a CLASS attribute and _get_pool() reads it off the class, so an
+    # instance-level `r._pool = mock_pool` no longer shadows it -- _get_pool()
+    # saw None and called asyncpg.create_pool() against postgresql://test,
+    # which is why these "mocked pool" tests died on socket.gaierror. Patch the
+    # class attribute and restore it so the process-wide pool stays clean.
+    original = PostgresQuotaRepository._pool
+    PostgresQuotaRepository._pool = mock_pool
+    try:
+        yield PostgresQuotaRepository("postgresql://test")
+    finally:
+        PostgresQuotaRepository._pool = original
 
 
 @pytest.mark.asyncio

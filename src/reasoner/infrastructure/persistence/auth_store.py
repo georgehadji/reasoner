@@ -16,6 +16,7 @@ from typing import Optional
 
 import aiosqlite
 
+from reasoner.core.ports.crypto_port import EncryptionPort
 from reasoner.security.encryption import get_encryption_service
 
 logger = logging.getLogger(__name__)
@@ -50,7 +51,7 @@ class AuthStore:
         self._db_path = db_path
         self._lock = asyncio.Lock()
         self._initialized = False
-        self._encryption = get_encryption_service()
+        self._encryption: EncryptionPort = get_encryption_service()
 
     async def _ensure_schema(self, conn: aiosqlite.Connection) -> None:
         """Create tables if they don't exist."""
@@ -64,6 +65,9 @@ class AuthStore:
     async def _get_conn(self) -> aiosqlite.Connection:
         """Return a connection with schema guaranteed."""
         conn = await aiosqlite.connect(self._db_path)
+        # Without this, rows come back as plain tuples and _row_to_dict's
+        # dict(row) raises ValueError on every read.
+        conn.row_factory = aiosqlite.Row
         if not self._initialized:
             async with self._lock:
                 if not self._initialized:
@@ -176,14 +180,13 @@ class AuthStore:
     def _row_to_dict(self, row: aiosqlite.Row) -> dict:
         """Convert a database row to a dict. Decrypts metadata (Phase 3: E2EE)."""
         d = dict(row)
-        
-        # Decrypt sensitive metadata (Phase 3: E2EE)
-        try:
-            d["name"] = self._encryption.decrypt(d["name"])
-            scopes_raw = self._encryption.decrypt(d.pop("scopes", ""))
-        except Exception:
-            # Fallback for old plaintext data
-            scopes_raw = d.pop("scopes", "[]")
+
+        # Decrypt sensitive metadata (Phase 3: E2EE). Each field is handled
+        # independently: decrypt_optional passes legacy plaintext through but
+        # raises on a real key mismatch, so a rotated-away key surfaces as an
+        # error instead of silently yielding a key with zero scopes.
+        d["name"] = self._encryption.decrypt_optional(d.get("name"))
+        scopes_raw = self._encryption.decrypt_optional(d.pop("scopes", None)) or "[]"
 
         # JSON-decode scopes
         d["scopes"] = set(json.loads(scopes_raw))

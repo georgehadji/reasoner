@@ -100,7 +100,7 @@ class ConstraintResolver:
             assignment[role] = ranked[0][0] if ranked else ""
 
         # 2. Iteratively fix violations
-        for iteration in range(self.max_iterations):
+        for _iteration in range(self.max_iterations):
             violations = self._check_all(assignment, preset_id)
             hard_violations = [v for v in violations if v.severity == "hard"]
 

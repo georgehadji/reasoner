@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { isEnabled } from '@/hooks/useFeatureFlags';
-import { ChevronDown, Sparkles, Bot, Cpu, Timer, Boxes, ListChecks, ExternalLink } from 'lucide-react';
+import { ChevronDown, Sparkles, ListChecks, ExternalLink, CornerDownRight } from 'lucide-react';
 import { SourceCard } from './SourceCard';
 import { Tooltip } from '@/components/ui/Tooltip';
-import { TEXT_SIZES, TIMING } from '@/lib/config';
+import { CHIP, ICON_SM, MICRO_LABEL, PhaseMetaStrip, SubagentStrip } from './PhaseCard';
 
 interface SubagentInfo {
   name: string;
@@ -51,49 +51,55 @@ interface SynthesisCardProps {
   } | null;
 }
 
-function formatModelLabel(model: string) {
-  return model.split('/').pop() || model;
-}
-
-function formatDurationMs(ms: number) {
-  if (ms < TIMING.durationFormatMsThreshold) return `${ms.toFixed(0)}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
-}
-
 function SourcesPanel({ sources }: { sources: SourceItem[] }) {
   if (!sources.length) return null;
   return (
-    <div className="mb-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
-      <p className="mb-2 text-xs font-medium text-[var(--text-muted)]">Sources</p>
-      <div className="flex gap-2 overflow-x-auto pb-1">
+    /* `id` is what the "Jump to → sources" chip targets. It used to aim at the
+       `### Sources` heading the markdown renderer slugifies, but the synthesis
+       path omits that section, so the chip pointed at nothing. */
+    <section
+      id="sources"
+      className="scroll-mt-24 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--chip-bg,var(--surface-2))] p-[var(--space-3)]"
+    >
+      <h3 className={cn(MICRO_LABEL, 'mb-[var(--space-2)]')}>Sources</h3>
+      <div className="flex gap-[var(--space-2)] overflow-x-auto pb-[var(--space-1)]">
         {sources.map((source, i) => (
           <Tooltip key={i} text={source.snippet || source.title || ''}>
             <a
               href={source.url || '#'}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex shrink-0 items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-xs transition-colors hover:bg-[var(--surface-3)]"
+              className="flex min-h-[var(--space-10)] shrink-0 items-center gap-[var(--space-2)] rounded-[var(--radius)] border border-[var(--border)] bg-[var(--chip-bg-2,var(--surface))] px-[var(--space-3)] py-[var(--space-2)] text-[length:var(--text-xs)] leading-[var(--lh-ui)] transition-colors duration-[var(--dur-micro)] ease-[var(--ease-standard)] hover:bg-[var(--surface-3)]"
             >
-            <span className={`flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent)] ${TEXT_SIZES.tiny} font-bold text-[var(--accent-text)]`}>
-              {i + 1}
-            </span>
-            <div className="flex flex-col">
-              <span className="max-w-[180px] truncate font-medium text-[var(--text)]">
-                {source.title || 'Source'}
+              <span className="nums-tabular flex h-[var(--space-5)] w-[var(--space-5)] shrink-0 items-center justify-center rounded-[var(--radius-pill)] bg-[var(--accent)] text-[length:var(--text-2xs)] font-bold text-[var(--accent-text)]">
+                {i + 1}
               </span>
-              {source.domain && (
-                <span className={`flex items-center gap-0.5 ${TEXT_SIZES.tiny} text-[var(--text-subtle)]`}>
-                  {source.domain} <ExternalLink className="h-2.5 w-2.5" />
+              <span className="flex flex-col">
+                <span className="max-w-[22ch] truncate font-medium text-[var(--text)]">
+                  {source.title || 'Source'}
                 </span>
-              )}
-            </div>
-          </a>
+                {source.domain && (
+                  <span className="flex items-center gap-[var(--space-1)] text-[length:var(--text-2xs)] text-[var(--text-subtle)]">
+                    <span className="ligatures-off">{source.domain}</span>
+                    <ExternalLink aria-hidden="true" className={ICON_SM} />
+                    <span className="sr-only">(opens in a new tab)</span>
+                  </span>
+                )}
+              </span>
+            </a>
           </Tooltip>
         ))}
       </div>
-    </div>
+    </section>
   );
 }
+
+const HIGHLIGHT_ANCHORS: Record<string, string> = {
+  insights: 'critical-insights',
+  actions: 'action-blueprint',
+  questions: 'open-questions',
+  sources: 'sources',
+};
 
 export function SynthesisCard({
   index,
@@ -112,156 +118,129 @@ export function SynthesisCard({
 }: SynthesisCardProps) {
   const [open, setOpen] = useState(defaultOpen);
 
-  const subagentTooltip = subagents
-    ? subagents
-        .map(
-          (s) =>
-            `${s.name} → ${formatModelLabel(s.model)}${s.error ? ' [error]' : ''}`
-        )
-        .join('\n')
-    : '';
+  const uid = useId();
+  const triggerId = `${uid}-trigger`;
+  const panelId = `${uid}-panel`;
+  const sourcesPanelShown = isEnabled('sources-panel') && !!sources && sources.length > 0;
 
   return (
-    <div className="mb-6 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-2)]">
+    <section
+      className="mb-[var(--space-6)] overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface-2)] [--chip-bg:var(--surface)] [--chip-bg-2:var(--surface-2)]"
+    >
       <div className="border-l-4 border-[var(--accent)]">
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-[var(--surface-3)]"
-        >
-          <div className="flex min-w-0 flex-1 flex-col gap-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="flex items-center gap-1.5 rounded-md bg-[var(--accent)] px-2 py-0.5 text-xs font-medium text-[var(--accent-text)]">
-                <Sparkles className="h-3 w-3" />
+        <h2 className="m-0">
+          <button
+            type="button"
+            id={triggerId}
+            aria-expanded={open}
+            aria-controls={panelId}
+            onClick={() => setOpen((v) => !v)}
+            className="flex min-h-[var(--space-10)] w-full items-center justify-between gap-[var(--space-3)] px-[var(--space-4)] pb-[var(--space-2)] pt-[var(--space-3)] text-left transition-colors duration-[var(--dur-micro)] ease-[var(--ease-standard)] hover:bg-[var(--surface-3)]"
+          >
+            <span className="flex min-w-0 flex-1 items-center gap-[var(--space-2)]">
+              <span
+                className={cn(
+                  MICRO_LABEL,
+                  'nums-tabular inline-flex shrink-0 items-center gap-[var(--space-1)] rounded-[var(--radius-sm)] bg-[var(--accent)] px-[var(--space-2)] py-[var(--space-1)] text-[var(--accent-text)]'
+                )}
+              >
+                <Sparkles aria-hidden="true" className={ICON_SM} />
                 Phase {index + 1}
               </span>
-              <span className="text-sm font-semibold text-[var(--text)]">{name}</span>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-subtle)]">
-              <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface)] px-2 py-1">
-                <Boxes className="h-3 w-3" />
-                {(tokens?.input ?? 0).toLocaleString()} in · {(tokens?.output ?? 0).toLocaleString()} out
+              <span className="truncate text-[length:var(--text-lg)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-snug)] text-[var(--text)]">
+                {name}
               </span>
-              {duration !== undefined && duration > 0 ? (
-                <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface)] px-2 py-1">
-                  <Timer className="h-3 w-3" />
-                  {duration.toFixed(1)}s
-                </span>
-              ) : null}
-              {models && models.length > 0
-                ? models.map((model) => (
-                    <Tooltip key={model} text={model}>
-                      <span
-                        className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface)] px-2 py-1"
+            </span>
+            <ChevronDown
+              aria-hidden="true"
+              className={cn(
+                'h-[var(--space-4)] w-[var(--space-4)] shrink-0 text-[var(--text-muted)]',
+                'transition-transform duration-[var(--dur-state)] ease-[var(--ease-standard)]',
+                !open && '-rotate-90'
+              )}
+            />
+          </button>
+        </h2>
+
+        <PhaseMetaStrip
+          tokens={tokens}
+          models={models}
+          subagents={subagents}
+          duration={duration}
+          className="px-[var(--space-4)] pb-[var(--space-3)]"
+        />
+
+        <div
+          id={panelId}
+          style={{ gridTemplateRows: open ? '1fr' : '0fr' }}
+          className="grid transition-[grid-template-rows] duration-[var(--dur-component)] ease-[var(--ease-standard)]"
+        >
+          <div className={cn('min-h-0', !open && 'overflow-hidden')} inert={!open}>
+            <div className="flow [--flow-space:var(--space-3)] px-[var(--space-4)] pb-[var(--space-4)] pt-[var(--space-1)]">
+              {highlights && highlights.length > 0 && (
+                <section className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--chip-bg,var(--surface-2))] p-[var(--space-3)]">
+                  <h3 className={cn(MICRO_LABEL, 'mb-[var(--space-2)]')}>Synthesis Highlights</h3>
+                  <div className="flex flex-wrap gap-[var(--space-2)]">
+                    {highlights.map((highlight) => (
+                      <div
+                        key={highlight.label}
+                        className={cn(
+                          CHIP,
+                          // --chip-bg-2, not --chip-bg: CHIP already resolves to
+                          // the panel's own tone, so a chip left on it vanished
+                          // into the panel it sits in.
+                          'gap-[var(--space-2)] bg-[var(--chip-bg-2,var(--surface))] text-[length:var(--text-xs)] leading-[var(--lh-ui)] text-[var(--text)]'
+                        )}
                       >
-                        <Cpu className="h-3 w-3" />
-                        {formatModelLabel(model)}
-                      </span>
-                    </Tooltip>
-                  ))
-                : null}
-              {subagents && subagents.length > 0 ? (
-                <Tooltip text={subagentTooltip}>
-                  <span
-                    className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface)] px-2 py-1"
-                  >
-                    <Bot className="h-3 w-3" />
-                    {subagents.length} subagent{subagents.length > 1 ? 's' : ''}
-                  </span>
-                </Tooltip>
-              ) : null}
-            </div>
-          </div>
-          <ChevronDown
-            className={cn(
-              'h-4 w-4 text-[var(--text-muted)] transition-transform',
-              !open && '-rotate-90'
-            )}
-          />
-        </button>
-        <div className="px-4 pb-4 pt-1" style={{ display: open ? 'block' : 'none' }}>
-          {highlights && highlights.length > 0 && (
-            <div className="mb-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
-              <p className="mb-2 text-xs font-medium text-[var(--text-muted)]">Synthesis Highlights</p>
-              <div className="flex flex-wrap gap-2">
-                {highlights.map((highlight) => (
-                  <div
-                    key={highlight.label}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2.5 py-1 text-xs text-[var(--text)]"
-                  >
-                    <ListChecks className="h-3 w-3 text-[var(--accent)]" />
-                    {highlight.value} {highlight.label}
+                        <ListChecks aria-hidden="true" className={cn(ICON_SM, 'text-[var(--accent)]')} />
+                        <span className="nums-tabular font-semibold">{highlight.value}</span>
+                        <span className="text-[var(--text-2)]">{highlight.label}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </section>
+              )}
+
+              {highlights && highlights.length > 0 && (
+                <nav
+                  aria-label="Jump to synthesis section"
+                  className="flex flex-wrap items-center gap-[var(--space-2)]"
+                >
+                  <span className={MICRO_LABEL}>Jump to</span>
+                  {highlights.map((highlight) => {
+                    const anchor = HIGHLIGHT_ANCHORS[highlight.label];
+                    if (!anchor) return null;
+                    // The `sources` highlight counts `data.sources`, but the only
+                    // element carrying id="sources" is the panel below — which is
+                    // behind a flag. Without this the chip is a link to nowhere
+                    // every time the flag is off.
+                    if (anchor === 'sources' && !sourcesPanelShown) return null;
+                    return (
+                      <a
+                        key={highlight.label}
+                        href={`#${anchor}`}
+                        className={cn(
+                          CHIP,
+                          'min-h-[var(--space-8)] gap-[var(--space-1)] bg-[var(--chip-bg-2,var(--surface))] text-[length:var(--text-xs)] font-medium leading-[var(--lh-ui)] text-[var(--text)] transition-colors duration-[var(--dur-micro)] ease-[var(--ease-standard)] hover:bg-[var(--surface-2)]'
+                        )}
+                      >
+                        <CornerDownRight aria-hidden="true" className={ICON_SM} />
+                        {highlight.label}
+                      </a>
+                    );
+                  })}
+                </nav>
+              )}
+
+              {sourcesPanelShown && <SourcesPanel sources={sources!} />}
+              {citations && citations.length > 0 && <SourceCard citations={citations} />}
+              {subagents && subagents.length > 0 && <SubagentStrip subagents={subagents} />}
+
+              <div className="text-[var(--text)]">{children}</div>
             </div>
-          )}
-          {highlights && highlights.length > 0 && (
-            <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-[var(--text-subtle)]">
-              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-[var(--text-muted)]">Jump to</span>
-              {highlights.map((highlight) => {
-                const anchor =
-                  highlight.label === 'insights'
-                    ? 'critical-insights'
-                    : highlight.label === 'actions'
-                    ? 'action-blueprint'
-                    : highlight.label === 'questions'
-                    ? 'open-questions'
-                    : highlight.label === 'sources'
-                    ? 'sources'
-                    : '';
-                if (!anchor) return null;
-                return (
-                  <a
-                    key={highlight.label}
-                    href={`#${anchor}`}
-                    className={`rounded-full border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 ${TEXT_SIZES.tiny} font-medium text-[var(--text)] transition-colors hover:bg-[var(--surface-2)]`}
-                  >
-                    {highlight.label}
-                  </a>
-                );
-              })}
-            </div>
-          )}
-          {isEnabled('sources-panel') && sources && sources.length > 0 && <SourcesPanel sources={sources} />}
-          {citations && citations.length > 0 && <SourceCard citations={citations} />}
-          {subagents && subagents.length > 0 && (
-            <div className="mb-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
-              <p className="mb-2 text-xs font-medium text-[var(--text-muted)]">Subagents</p>
-              <div className="flex flex-wrap gap-2">
-                {subagents.map((s) => {
-                  const el = (
-                    <div
-                      key={s.name}
-                      className={cn(
-                        'flex items-center gap-2 rounded-md px-2 py-1 text-xs',
-                        s.error
-                          ? 'bg-red-500/10 text-red-400'
-                          : 'bg-[var(--surface-2)] text-[var(--text-subtle)]'
-                      )}
-                    >
-                      <Bot className="h-3 w-3 shrink-0" />
-                      <span className="font-medium">{s.name}</span>
-                      <span className="text-[var(--text-muted)]">→</span>
-                      <span>{formatModelLabel(s.model)}</span>
-                      <span className="text-[var(--text-muted)]">
-                        {s.tokens_in ?? 0}+{s.tokens_out ?? 0} tok
-                      </span>
-                      <span className="text-[var(--text-muted)]">
-                        · {formatDurationMs(s.duration_ms ?? 0)}
-                      </span>
-                    </div>
-                  );
-                  return s.error ? <Tooltip key={s.name} text={s.error}>{el}</Tooltip> : el;
-                })}
-              </div>
-            </div>
-          )}
-          <div className="text-[var(--text)]">
-            {children}
           </div>
         </div>
       </div>
-    </div>
+    </section>
   );
 }

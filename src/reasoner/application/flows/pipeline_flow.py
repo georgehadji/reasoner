@@ -91,7 +91,7 @@ async def execute_phases_dag(
         results = await asyncio.gather(
             *[_run_step(s) for s in ready], return_exceptions=True
         )
-        for step, result_tuple in zip(ready, results):
+        for step, result_tuple in zip(ready, results, strict=False):
             if isinstance(result_tuple, BaseException):
                 import logging
                 logging.getLogger(__name__).error("Phase %s failed: %s", step.name, result_tuple)

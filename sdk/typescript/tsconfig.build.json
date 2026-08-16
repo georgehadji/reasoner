@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    // No ambient @types in the shipped build. If src ever reaches for a Node
+    // global, this fails here rather than in a browser consumer's bundle.
+    "types": []
+  },
+  "include": ["src/**/*.ts"]
+}

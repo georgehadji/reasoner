@@ -38,7 +38,9 @@ except ImportError:
 
 from reasoner.core.events.domain_events import DomainEvent, PipelineEventType, WidgetEventType, MemoryEventType, SaaSEventType, ALL_EVENT_TYPES
 from reasoner.core.constants import DEFAULT_DB_COMMAND_TIMEOUT
+from reasoner.core.ports.crypto_port import EncryptionPort
 from reasoner.security.encryption import get_encryption_service
+from cryptography.fernet import InvalidToken
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +88,7 @@ class PostgreSQLEventStore:
         
         self._pool = None
         self._read_pool = None
-        self._encryption = get_encryption_service()
+        self._encryption: EncryptionPort = get_encryption_service()
         
         # Initialize circuit breaker.
         # aiocircuitbreaker.CircuitBreaker's constructor is
@@ -477,6 +479,16 @@ class PostgreSQLEventStore:
             object.__setattr__(event, 'timestamp', row["timestamp"])
 
             return event
+        except InvalidToken as exc:
+            # Deliberately NOT downgraded to "skip this event": silently
+            # dropping an undecryptable event truncates aggregate history and
+            # replay would rebuild a wrong-but-plausible state.
+            raise RuntimeError(
+                f"Cannot decrypt event {row.get('event_id')} "
+                f"(aggregate {row.get('aggregate_id')} v{row.get('version')}): "
+                f"ENCRYPTION_KEY does not match the key this event was written with. "
+                f"Append the original key to the ENCRYPTION_KEY list to decrypt it."
+            ) from exc
         except json.JSONDecodeError as exc:
             logger.error(
                 "Data integrity failure (JSONDecodeError): event %s (aggregate %s v%s): %s",
@@ -549,15 +561,10 @@ class PostgreSQLEventStore:
             
             results = []
             for row in rows:
-                problem = row["problem"]
-                if problem:
-                    try:
-                        # Attempt decryption (Phase 3: E2EE)
-                        problem = self._encryption.decrypt(problem)
-                    except Exception:
-                        # Fallback for old plaintext data
-                        pass
-                
+                # Passes legacy plaintext through, but raises on a key
+                # mismatch rather than returning ciphertext to the caller.
+                problem = self._encryption.decrypt_optional(row["problem"])
+
                 results.append({
                     "aggregate_id": row["aggregate_id"],
                     "status": row["status"],
@@ -602,7 +609,9 @@ class PostgreSQLEventStore:
                     "event_id": row["event_id"],
                     "event_type": row["event_type"],
                     "aggregate_id": row["aggregate_id"],
-                    "problem": row["problem"],
+                    # aggregates.problem is encrypted at write time; without
+                    # this the raw ciphertext leaks into API responses.
+                    "problem": self._encryption.decrypt_optional(row["problem"]),
                     "status": row["status"],
                     "timestamp": row["timestamp"],
                 }
@@ -653,9 +662,10 @@ class PostgreSQLEventStore:
         Internal method for saving snapshots, allowing external decorators to wrap it.
         """
         try:
-            # Encrypt snapshot state (Phase 3: E2EE)
+            # Encrypt snapshot state (Phase 3: E2EE). Snapshots are large,
+            # repetitive JSON, so compress before encrypting.
             state_json = json.dumps(state)
-            encrypted_state = self._encryption.encrypt(state_json)
+            encrypted_state = self._encryption.encrypt(state_json, compress=True)
             final_state = {"_e": encrypted_state}
 
             async with self._pool.acquire(timeout=10.0) as conn:
@@ -733,9 +743,11 @@ class PostgreSQLEventStore:
         logger = logging.getLogger(__name__)
         
         try:
-            # Encrypt read model data (Phase 3: E2EE)
+            # Encrypt read model data (Phase 3: E2EE). Compress first — read
+            # models are denormalized JSON with the same redundancy profile
+            # as snapshots.
             data_json = json.dumps(data)
-            encrypted_data = self._encryption.encrypt(data_json)
+            encrypted_data = self._encryption.encrypt(data_json, compress=True)
             final_data = {"_e": encrypted_data}
 
             async with self._pool.acquire(timeout=10.0) as conn:

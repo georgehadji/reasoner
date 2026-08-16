@@ -63,7 +63,7 @@ class PerspectiveRegistry:
     def coerce(cls, value: str) -> "PerspectiveType | str":
         try:
             return PerspectiveType(value)
-        except ValueError:
+        except ValueError as exc:
             if cls.validate(value):
                 return value.lower()
-            raise ValueError(f"Unknown perspective: {value}")
+            raise ValueError(f"Unknown perspective: {value}") from exc

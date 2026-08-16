@@ -299,14 +299,23 @@ class CalculationRequest(BaseModel):
 
 
 class RunResult(BaseModel):
-    """Aggregated pipeline result for agent consumption (non-streaming)."""
+    """Aggregated pipeline result for agent consumption (non-streaming).
+
+    A projection of ``application.services.agent_results.RunSummary``. Field
+    names match the TypeScript SDK's ``expected_summary`` in
+    ``sdk/contract/events.json`` so both clients read the same run the same way.
+    """
     preset: str
+    method: str | None = None
     errors: list[str] = []
     total_tokens: dict[str, int] = {"input": 0, "output": 0, "total": 0}
+    total_cost_usd: float = 0.0
     duration_seconds: float = 0.0
     synthesis: str = ""
     critical_insights: list[str] = []
     open_questions: list[str] = []
+    claim_labels: dict[str, str] = {}
+    action_blueprint: list[dict] = []
     citations: list[dict] = []
     models_used: list[str] = []
 

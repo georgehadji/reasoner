@@ -59,11 +59,15 @@ class TestDocumentVectorStore:
         for f in UPLOAD_DIR.glob("*.vectors.json"):
             if f.name.startswith("test-"):
                 f.unlink(missing_ok=True)
+        for f in UPLOAD_DIR.glob("test-*.meta.json"):
+            f.unlink(missing_ok=True)
 
     def teardown_method(self):
         for f in UPLOAD_DIR.glob("*.vectors.json"):
             if f.name.startswith("test-"):
                 f.unlink(missing_ok=True)
+        for f in UPLOAD_DIR.glob("test-*.meta.json"):
+            f.unlink(missing_ok=True)
 
     @pytest.mark.asyncio
     async def test_index_file_creates_sidecar(self):
@@ -102,6 +106,9 @@ class TestDocumentVectorStore:
         store = DocumentVectorStore(embedder=mock_embedder)
 
         file_id = "test-retrieve-001"
+        (UPLOAD_DIR / f"{file_id}.meta.json").write_text(
+            json.dumps({"user_id": "user-1"})
+        )
         # Pre-create sidecar manually
         sidecar = {
             "file_id": file_id,
@@ -114,10 +121,26 @@ class TestDocumentVectorStore:
         }
         (UPLOAD_DIR / f"{file_id}.vectors.json").write_text(json.dumps(sidecar))
 
-        results = await store.retrieve("test query", [file_id], top_k=2)
+        results = await store.retrieve("test query", [file_id], top_k=2, user_id="user-1")
         assert len(results) == 2
         assert "relevant content" in results[0]
         assert "somewhat related" in results[1]
+
+    @pytest.mark.asyncio
+    async def test_retrieve_refuses_unscoped_or_foreign_files(self):
+        file_id = "test-private-001"
+        (UPLOAD_DIR / f"{file_id}.meta.json").write_text(
+            json.dumps({"user_id": "owner-1"})
+        )
+        (UPLOAD_DIR / f"{file_id}.vectors.json").write_text(
+            json.dumps({"file_id": file_id, "chunks": [{"text": "secret", "embedding": [1.0]}]})
+        )
+        embedder = MagicMock()
+        embedder.embed = AsyncMock(return_value=[1.0])
+        store = DocumentVectorStore(embedder=embedder)
+
+        assert await store.retrieve("q", [file_id]) == []
+        assert await store.retrieve("q", [file_id], user_id="other-user") == []
 
     @pytest.mark.asyncio
     async def test_retrieve_returns_empty_for_missing_sidecar(self):

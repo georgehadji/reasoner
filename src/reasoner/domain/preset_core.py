@@ -121,8 +121,12 @@ def get_method_from_preset(preset: str) -> str:
     """Extract method name from preset string."""
     if "debate" in preset:
         return "debate"
+    # Must precede any bare "iterative" check: the only presets containing
+    # "iterative" are iterative-critique-{budget,premium}, and the flow is
+    # registered as `iterative_critique`. Returning "iterative" here yielded a
+    # method with no WorkflowFactory strategy behind it.
     if "iterative" in preset:
-        return "iterative"
+        return "iterative_critique"
     if "jury" in preset or "orchestrated" in preset:
         return "jury"
     if "research" in preset:
@@ -280,6 +284,41 @@ class PipelinePreset:
                 f"Preset '{self.name}' has unknown fallback routing keys: {sorted(unknown_fb_roles)}. "
                 f"Valid roles: {sorted(_KNOWN_ROUTING_ROLES)}"
             )
+
+        for env_var in self._derived_env_vars():
+            if env_var not in self.required_env_vars:
+                self.required_env_vars.append(env_var)
+
+    def _derived_env_vars(self) -> list[str]:
+        """Env vars implied by the models this preset routes to.
+
+        No preset config declares required_env_vars, so the field was always
+        empty and check_keys()/missing_keys() reported "nothing missing" for
+        every preset — the key preflight in presets.py was a no-op. Derive the
+        list from the registry entries instead, keeping any explicitly declared
+        vars (DEEPL_API_KEY for cross-language, which no model implies).
+
+        Goes through ModelRegistryPort rather than importing
+        infrastructure.llm.registry: domain must not depend on infrastructure.
+        Returns [] when no adapter is injected (CLI/test paths that construct a
+        preset before startup wiring) — preflight degrades to silence rather
+        than making preset construction fail.
+        """
+        from reasoner.core.ports.model_registry_port import get_model_registry_port
+
+        try:
+            registry = get_model_registry_port()
+        except RuntimeError:
+            return []
+
+        found: list[str] = []
+        model_ids = [self.primary_id, *self.routing.values(), *self.fallback_routing.values()]
+        for model_id in model_ids:
+            entry = registry.entry(model_id) or {}
+            env_var = entry.get("env")
+            if env_var and env_var not in found:
+                found.append(env_var)
+        return found
 
     def check_keys(self) -> dict[str, bool]:
         """Return {env_var: is_set} for all required API keys."""

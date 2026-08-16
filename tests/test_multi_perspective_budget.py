@@ -176,7 +176,7 @@ class TestPresetConfig:
 
         assert len(labs) >= 3, (
             f"Phase 2 needs ≥3 labs for diversity, got {len(labs)}: {labs}. "
-            f"Model IDs: {dict(zip(phase_2_roles, model_ids))}"
+            f"Model IDs: {dict(zip(phase_2_roles, model_ids, strict=False))}"
         )
 
     def test_scorer_is_independent_lab(self, preset):

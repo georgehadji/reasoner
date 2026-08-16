@@ -171,7 +171,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
     scientificState &&
     (Array.isArray(scientificState.hypotheses) || Array.isArray(scientificState.test_results))
   ) {
-    const md = buildMarkdownFromPhase(index, phaseNum, name, data, { omitSections: ['vetted_context'] });
+    const md = buildMarkdownFromPhase(index, phaseNum, name, data, { omitSections: ['vetted_context'], omitHeading: true });
     return (
       <PhaseCard index={index} phase={phaseNum} name={name} tokens={tokens} models={models} subagents={subagents} duration={duration} defaultOpen={defaultOpen} forceOpen={forceOpen} compact={isCompact} status={errorPhases.includes(phaseNum) ? 'error' : 'completed'} quality={quality}>
         {vettedContext.length > 0 && <VettedContextBlock items={vettedContext} />}
@@ -187,7 +187,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
     socraticState &&
     (Array.isArray(socraticState.questions) || Array.isArray(socraticState.answers))
   ) {
-    const md = buildMarkdownFromPhase(index, phaseNum, name, data, { omitSections: ['vetted_context'] });
+    const md = buildMarkdownFromPhase(index, phaseNum, name, data, { omitSections: ['vetted_context'], omitHeading: true });
     return (
       <PhaseCard index={index} phase={phaseNum} name={name} tokens={tokens} models={models} subagents={subagents} duration={duration} defaultOpen={defaultOpen} forceOpen={forceOpen} compact={isCompact} status={errorPhases.includes(phaseNum) ? 'error' : 'completed'} quality={quality}>
         {vettedContext.length > 0 && <VettedContextBlock items={vettedContext} />}
@@ -302,7 +302,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
      Array.isArray(writingState.factcheck_reviews) ||
      typeof writingState.final_article === 'string')
   ) {
-    const md = buildMarkdownFromPhase(index, phaseNum, name, data, { omitSections: ['vetted_context'] });
+    const md = buildMarkdownFromPhase(index, phaseNum, name, data, { omitSections: ['vetted_context'], omitHeading: true });
     return (
       <PhaseCard index={index} phase={phaseNum} name={name} tokens={tokens} models={models} subagents={subagents} duration={duration} defaultOpen={defaultOpen} forceOpen={forceOpen} compact={isCompact} status={errorPhases.includes(phaseNum) ? 'error' : 'completed'} quality={quality}>
         {vettedContext.length > 0 && <VettedContextBlock items={vettedContext} />}
@@ -321,6 +321,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
   ) {
     const md = buildMarkdownFromPhase(index, phaseNum, name, data, {
       omitSections: ['critical_insights', 'action_blueprint', 'open_questions', 'sources', 'vetted_context'],
+      omitHeading: true,
     });
     const citations = data && typeof data === 'object' ? (data as Record<string, unknown>).citations as Array<{ url: string; title: string; snippet: string; source_type: string }> | undefined : undefined;
     return (
@@ -328,7 +329,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
         {synthesisSections && (
           <div className="mb-4 grid gap-4">
             {synthesisSections.criticalInsights.length > 0 && (
-              <section id="critical-insights" className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
+              <section id="critical-insights" className="scroll-mt-24 rounded-xl border border-[var(--border)] bg-[var(--chip-bg,var(--surface-2))] p-4">
                 <h3 className="mb-2 text-sm font-semibold text-[var(--text)]">Critical Insights</h3>
                 <ol className="list-decimal space-y-1 pl-5 text-[15px] text-[var(--text)]">
                   {synthesisSections.criticalInsights.map((item, i) => (
@@ -338,7 +339,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
               </section>
             )}
             {synthesisSections.actionBlueprint.length > 0 && (
-              <section id="action-blueprint" className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
+              <section id="action-blueprint" className="scroll-mt-24 rounded-xl border border-[var(--border)] bg-[var(--chip-bg,var(--surface-2))] p-4">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <h3 className="text-sm font-semibold text-[var(--text)]">Action Blueprint</h3>
                   <button
@@ -352,7 +353,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
                       });
                       copyToClipboard(lines.join('\n'));
                     }}
-                    className={`rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2.5 py-1 ${TEXT_SIZES.tiny} font-medium text-[var(--text)] transition-colors hover:bg-[var(--surface-3)]`}
+                    className={`rounded-full border border-[var(--border)] bg-[var(--chip-bg-2,var(--surface))] px-2.5 py-1 ${TEXT_SIZES.tiny} font-medium text-[var(--text)] transition-colors hover:bg-[var(--surface-3)]`}
                   >
                     Copy actions
                   </button>
@@ -374,7 +375,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
               </section>
             )}
             {synthesisSections.openQuestions.length > 0 && (
-              <section id="open-questions" className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
+              <section id="open-questions" className="scroll-mt-24 rounded-xl border border-[var(--border)] bg-[var(--chip-bg,var(--surface-2))] p-4">
                 <h3 className="mb-2 text-sm font-semibold text-[var(--text)]">Open Questions</h3>
                 <ul className="space-y-1 text-[15px] text-[var(--text)]">
                   {synthesisSections.openQuestions.map((item, i) => (
@@ -398,6 +399,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
       ...(isSynthesisPhase(name) ? ['critical_insights', 'action_blueprint', 'open_questions', 'sources'] as const : []),
       'vetted_context' as const
     ],
+    omitHeading: true,
   });
   return (
       <PhaseCard index={index} phase={phaseNum} name={name} tokens={tokens} models={models} subagents={subagents} duration={duration} defaultOpen={defaultOpen} forceOpen={forceOpen} compact={isCompact} status={errorPhases.includes(phaseNum) ? 'error' : 'completed'} quality={quality}>
@@ -414,9 +416,9 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
 
 function VettedContextBlock({ items }: { items: Array<Record<string, unknown>> }) {
   return (
-    <div className="mb-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
+    <div className="mb-4 rounded-xl border border-[var(--border)] bg-[var(--chip-bg,var(--surface-2))] p-4">
       <div className="mb-2 flex items-center justify-between">
-        <h4 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">Vetted Context</h4>
+        <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">Vetted Context</h3>
         <span className={`${TEXT_SIZES.tiny} text-[var(--text-subtle)]`}>{items.length} source{items.length === 1 ? '' : 's'}</span>
       </div>
       <div className="space-y-3">

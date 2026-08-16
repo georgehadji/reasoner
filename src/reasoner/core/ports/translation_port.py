@@ -10,6 +10,12 @@ from typing import Protocol, runtime_checkable
 class TranslationResult:
     text: str
     detected_source_language: str
+    # True when no translator succeeded and *text* is the untranslated input.
+    # Without this the identity fallback is indistinguishable from a real
+    # translation, so callers silently shipped source-language text as if it
+    # had been translated.
+    degraded: bool = False
+    degraded_reason: str = ""
 
 
 @runtime_checkable

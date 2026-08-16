@@ -16,13 +16,22 @@ export function ClassificationCard({ data }: ClassificationCardProps) {
   const language = typeof d.language === 'string' ? d.language : null;
   const tokens = d.tokens as { input?: number; output?: number } | undefined;
 
+  // Each task type gets a distinct, theme-safe treatment: text at the full
+  // semantic token, background at a ~10% wash of it. Within a shared hue the
+  // second type adds an inset ring so the pair stays distinguishable.
   const badgeColor: Record<string, string> = {
-    analytical: 'bg-[#808080]/10 text-[#A0A0A0]',
-    strategic: 'bg-[#808080]/10 text-[#A0A0A0]',
-    creative: 'bg-[#808080]/10 text-[#A0A0A0]',
-    technical: 'bg-[#808080]/10 text-[#A0A0A0]',
-    hybrid: 'bg-[#808080]/10 text-[#A0A0A0]',
-    predictive: 'bg-[#808080]/10 text-[#A0A0A0]',
+    analytical:
+      'bg-[color-mix(in_oklab,var(--accent)_10%,transparent)] text-[var(--accent)]',
+    technical:
+      'bg-[color-mix(in_oklab,var(--accent)_10%,transparent)] text-[var(--accent)] ring-1 ring-inset ring-[color-mix(in_oklab,var(--accent)_35%,transparent)]',
+    strategic:
+      'bg-[color-mix(in_oklab,var(--warn)_10%,transparent)] text-[var(--warn)]',
+    predictive:
+      'bg-[color-mix(in_oklab,var(--warn)_10%,transparent)] text-[var(--warn)] ring-1 ring-inset ring-[color-mix(in_oklab,var(--warn)_35%,transparent)]',
+    creative:
+      'bg-[color-mix(in_oklab,var(--ok)_10%,transparent)] text-[var(--ok)]',
+    hybrid:
+      'bg-[color-mix(in_oklab,var(--unknown)_10%,transparent)] text-[var(--unknown)]',
   };
 
   return (

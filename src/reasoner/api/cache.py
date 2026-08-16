@@ -7,6 +7,10 @@ import os
 import threading
 import time
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from reasoner.api.schemas import RunRequest
 
 try:
     from reasoner.metrics import REASONER_CACHE_HIT_RATE, REASONER_CACHE_ENTRIES

@@ -84,7 +84,7 @@ class SupabaseAuthAdapter(AuthPort):
             raise
         except Exception as exc:
             logger.warning("Supabase auth validation failed: %s", exc)
-            raise AuthenticationError(f"Auth validation failed: {exc}", status_code=401)
+            raise AuthenticationError(f"Auth validation failed: {exc}", status_code=401) from exc
 
     async def refresh_session(self, token: str) -> str:
         """Not implemented for server-side validation."""

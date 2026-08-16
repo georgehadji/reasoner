@@ -21,11 +21,18 @@ export interface DocPage {
   body: string;
 }
 
-export type DocSection = 'Getting started' | 'Reasoning' | 'Billing' | 'Developers' | 'Operations';
+export type DocSection =
+  | 'Getting started'
+  | 'Reasoning'
+  | 'Generation'
+  | 'Billing'
+  | 'Developers'
+  | 'Operations';
 
 export const DOC_SECTIONS: DocSection[] = [
   'Getting started',
   'Reasoning',
+  'Generation',
   'Billing',
   'Developers',
   'Operations',
@@ -86,6 +93,9 @@ Treating "we don't know" as a first-class output is the point. A confident answe
 
 - [Reasoning methods](/docs/reasoning-methods) — what each of the 19 methods is good at.
 - [Presets and models](/docs/presets-and-models) — controlling cost and depth.
+- [Article generation](/docs/article-generation) — sourced, fact-checked long-form writing.
+- [Code generation](/docs/code-generation) — spec, generate, security-review, test.
+- [Image generation](/docs/image-generation) — prompts to pictures, outside the pipeline.
 - [Credits](/docs/credits) — how usage is metered.
 `,
   },
@@ -218,6 +228,242 @@ Circuit breakers are per-provider. A provider that keeps failing is skipped enti
 ## Estimating cost before you run
 
 \`POST /api/estimate\` returns a projected token and cost range for a given problem and preset. The composer calls it as you type, which is where the cost figure next to the run button comes from.
+`,
+  },
+  {
+    slug: 'image-generation',
+    title: 'Image generation',
+    description:
+      'Generate images from a prompt: automatic prompt enhancement, several models in parallel across vendors, reference images, and policy-safe retries.',
+    section: 'Generation',
+    minutes: 5,
+    keywords: ['image', 'image generation', 'prompt enhancement', 'reference images', 'flux', 'gemini'],
+    body: `
+Image generation runs outside the reasoning pipeline. No phases, no critique, no epistemic labels — a prompt goes in and pictures come back.
+
+## Generating an image
+
+In the [app](/chat), press the image toggle in the composer, describe what you want, and press **Enter**. The placeholder changes to *"Describe the image you want to generate…"* when the mode is live.
+
+Two calls happen, in order:
+
+1. **Enhancement.** A fast text model expands your description into a full generation prompt — subject, style, composition, lighting, colour palette, and texture. The expanded prompt is shown in the chat *before* anything is drawn, so you always see what was actually sent.
+2. **Generation.** Several image models run in parallel on that prompt. You get every image that came back, each labelled with the model that produced it.
+
+Enhancement is on by default because short prompts underspecify everything except the subject, and image models fill those gaps with their own house style. Send \`enhance: false\` when you have already written a full prompt and want it used verbatim.
+
+## Which models run
+
+Model choice follows the tier, and always spans more than one vendor:
+
+| Tier | Runs in parallel | Falls back to |
+| --- | --- | --- |
+| **Budget** | grok-imagine, riverflow-v2-fast-preview, gemini-flash-image | seedream-4.5, flux.2-pro, recraft-v4.1-utility |
+| **Premium** | gpt-5.4-image-2, recraft-v4.1-pro | gpt-5-image, gemini-3.1-flash-image-preview, mai-image-2.5, recraft-v4-pro |
+
+The primaries fire concurrently. If fewer images come back than you asked for, fallbacks are tried one at a time until the count is met or the list runs out. A model that fails does not fail the request — you get what the survivors produced.
+
+The app asks for four images on Budget and two on Premium.
+
+## Policy rewrites
+
+Image providers moderate aggressively, and a moderated request usually arrives as prose rather than as an error you can act on.
+
+So when the models return text instead of an image, or refuse outright, Reasoner rewrites the prompt and retries: named franchises, studios, and mascot characters are replaced with original descriptions that preserve the scene, medium, mood, composition, and palette. If the rewriting model is itself unavailable, a local pattern-based rewrite is the last resort.
+
+When this happens the response carries a \`rewritten_prompt\`. That field is the honest answer to *"why does this not look like what I asked for"* — the prompt changed, and this is exactly how.
+
+## Reference images
+
+Attach up to **four** images to steer style, character, or composition.
+
+Attaching any switches routing to models that accept image input — the Gemini and GPT image models. Flux, Riverflow, and Recraft are text-to-image only and are skipped for those requests, so a reference-image run draws from a smaller pool than the table above.
+
+Reference images must be \`data:image/...\` URLs. A link to a file on the internet is rejected.
+
+## What you get back
+
+Images are returned as base64 data URLs, never as links to a provider's CDN. When a model responds with a remote URL, the server downloads it — through the same validator that blocks private-network addresses — and inlines the bytes before replying.
+
+That costs a round trip, and it is worth it: provider image URLs expire, often within the hour, and a history entry that renders a broken image a week later is worse than no history at all.
+
+## API
+
+\`\`\`bash
+curl -X POST https://reasoner.app/api/generate-image \\
+  -H "Authorization: Bearer $REASONER_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "prompt": "a lighthouse in a winter storm",
+    "preset": "image-gen-budget",
+    "aspect_ratio": "16:9",
+    "num_images": 2
+  }'
+\`\`\`
+
+| Field | Default | Notes |
+| --- | --- | --- |
+| \`prompt\` | — | Required. Over 4,000 characters is truncated, not rejected |
+| \`preset\` | \`image-gen-budget\` | Or \`image-gen-premium\` |
+| \`aspect_ratio\` | \`1:1\` | \`1:1\`, \`16:9\`, \`9:16\`, \`4:3\`, \`3:4\` |
+| \`resolution\` | \`1024x1024\` | Clamped per model where the provider requires it |
+| \`enhance\` | \`true\` | Set false to send the prompt verbatim |
+| \`preview_only\` | \`false\` | Returns the enhanced prompt without generating |
+| \`reference_images\` | \`[]\` | Up to 4 image data URLs |
+| \`num_images\` | \`2\` | How many images must succeed |
+
+\`preview_only\` is what the app uses to show you the enhanced prompt while the images are still rendering — it is a cheap text call, not a generation.
+
+The response is \`{ success, images: [{ image_data, model_used }], enhanced_prompt, rewritten_prompt }\`. On total failure, \`success\` is false and \`error\` names each model that failed and why.
+
+## Limits
+
+| Limit | Value |
+| --- | --- |
+| Prompt length | 4,000 characters |
+| Reference images | 4 |
+| Per-model timeout | 90 seconds |
+| Remote image fetch | 20 seconds |
+
+Requests are rate-limited per account — per IP and user-agent when signed out — and count against your plan quota. Browser calls need a CSRF token; API-key calls do not.
+`,
+  },
+  {
+    slug: 'article-generation',
+    title: 'Article generation',
+    description:
+      'The research-backed editorial pipeline: sourcing, argument map, draft, fact-check with a claim ledger, adversarial review, editing, and a pre-publication audit.',
+    section: 'Generation',
+    minutes: 7,
+    keywords: ['article', 'essay', 'writing', 'long-form', 'fact check', 'claim ledger', 'editorial'],
+    body: `
+Asking a model to "write an article about X" gets you an article-shaped object: confident, fluent, and quietly full of invented citations. Reasoner treats long-form writing as an editorial process instead — sources first, claims tracked individually, and a review pass that can send the draft back.
+
+## Two methods
+
+| Method | Presets | Shape |
+| --- | --- | --- |
+| **Writing** | \`writing-budget\`, \`writing-premium\` | 6 phases — sourcing, outline, draft, fact-check, assembly, synthesis |
+| **Article** | \`article-budget\`, \`article-premium\` | 9 phases — adds an argument map, adversarial structural review, developmental and style editing, and a pre-publication audit |
+
+Writing is the lighter path for a well-scoped piece. Article is the publication-grade one, and costs proportionally more.
+
+## How a request gets here
+
+HyperGate matches writing intent before anything else runs, so *"write an article about the latest EU battery regulations"* routes to the writing pipeline rather than to a plain web search.
+
+Pure creative requests — a poem, a story, a joke, a letter — deliberately do **not** come here. They take the direct fast path, because retrieval and fact-checking add latency and nothing else to a limerick. Ask for sources, research, or citations and the same request becomes research-backed again.
+
+## The article pipeline
+
+| Phase | What it does |
+| --- | --- |
+| **2 — Evidence collection** | Plans up to five queries, searches, dedupes by URL, and keeps structured metadata (author, date, publisher) per source |
+| **2.5 — Argument map / outline** | Builds the structural blueprint: claim hierarchy, section outline, target word count, working title |
+| **3 — First draft** | Writes the full piece against the outline and the retrieved sources |
+| **4 — Fact check + claim ledger** | Extracts each factual claim and checks it against the sources, recording a verdict per claim |
+| **4.5 — Structural review** | A devil's-advocate pass on logic, hidden assumptions, and ignored counterarguments — not facts, not grammar |
+| **5 — Developmental edit** | Rewrites argument, evidence, and narrative flow in response to that critique |
+| **6 — Style + copy edit** | Two sequential passes: voice and rhythm, then line-level correctness |
+| **7 — Final audit** | A structured pre-publication checklist producing a pass/fail and a score |
+| **8 — Synthesis** | Assembles the final output with epistemic labels |
+
+Separating the structural review from the fact check is the load-bearing decision. A model asked to check "everything at once" reliably fixes commas and misses that the second section assumes the conclusion. Give one pass only the claims and another only the argument, and both get harder to fake.
+
+## When the audit fails
+
+If the final audit does not pass, the pipeline runs the developmental edit, the style and copy edit, and the audit again — **once**. One retry, not a loop: a piece that fails twice has a problem editing cannot fix, and burning ten passes on it would cost real money to arrive at the same place.
+
+The retry is skipped when the style edit already timed out on the first pass, since re-running a phase that just failed on latency only stacks up more failures.
+
+## Evidence and claim rules
+
+- Target source count is **8–16**, with roughly six results per query.
+- When retrieval returns nothing, an **insufficient-evidence** gate is raised rather than letting the draft proceed unsourced.
+- The fact-check phase emits a **claim ledger**: every claim, its verdict, and its supporting source.
+- If fewer than **50%** of claims are supported, the gaps are recorded explicitly and carried forward rather than silently smoothed over.
+
+## Model routing
+
+Retrieval and fact-checking route to Perplexity Sonar models, which search the live web natively and return real citations — when Sonar answers, the inline \`[title](url)\` citations are parsed straight out of the response instead of being re-derived.
+
+Drafting routes to long-context prose models, the critic routes to a *different* geopolitical bloc than the drafter, and synthesis routes to a million-token-context model so the whole article fits in one pass rather than being summarised into itself.
+
+## What you get
+
+Markdown, plus the working artefacts: the claim ledger, the structural critique with its rigour score, the editorial audit with its score and pass/fail, and the source list with metadata.
+
+## Experimental: adapter pipeline
+
+Setting \`ARTICLE_USE_ADAPTERS=1\` swaps in an 11-phase variant that adds **Gap Retrieval** (a second search targeted at the claims the fact-check could not support) and **Surface Signals**, with explicit budget guards per phase. It is off by default and is a self-hosting option, not a user-facing setting.
+`,
+  },
+  {
+    slug: 'code-generation',
+    title: 'Code generation',
+    description:
+      'The coding pipeline: library research, spec, parallel file generation, CVE-informed security review, test generation, and assembly into a runnable project.',
+    section: 'Generation',
+    minutes: 6,
+    keywords: ['code', 'coding', 'code generation', 'security review', 'tests', 'cve', 'spec'],
+    body: `
+The coding pipeline produces a project, not a snippet: a spec, one file per unit of work, a security review informed by real vulnerability data, a test suite, and a README of what it does and where it falls short.
+
+Presets are \`coding-budget\` and \`coding-premium\`. HyperGate routes here when the request is to build software — as opposed to *compute* something, which routes to Program-of-Thoughts instead.
+
+## The phases
+
+| Phase | What it does |
+| --- | --- |
+| **1.5 — Library research** | Searches code-oriented sources for library docs and API references for the stack in question |
+| **2 — Spec analysis** | Produces the spec: language, framework, the list of files to generate, and optionally a plan contract with validation commands |
+| **3 — Code generation** | One model call per file, in parallel |
+| **3.4 — CVE search** | Looks up known vulnerabilities, OWASP guidance, and secure-coding rules for the spec's language and framework |
+| **3.5 — Security review** | Adversarial review of the generated code against those findings — **critical**: if it fails, the run stops |
+| **4 — Test generation** | Writes a test suite against the generated files |
+| **5 — Final assembly** | Consolidates files, applies fixes, and writes the README and known limitations |
+
+Doing the library and CVE searches *before* review, rather than trusting the model's memory of which versions are vulnerable, is the whole point of those two phases. Training data ages; CVE feeds do not.
+
+## Generation is per-file and capped
+
+Each file in the spec gets its own model call, so a ten-file project is ten focused prompts rather than one prompt asked to hold the entire codebase in its head.
+
+Concurrency is capped at **four** simultaneous calls. Fourteen parallel calls to a frontier model reliably trips rate limits, and a 429 halfway through generation is more expensive than running slightly slower.
+
+Three guardrails apply to every generated file:
+
+- **The path is enforced by the spec.** A model cannot rename or relocate its own file.
+- **Parse failures degrade, they do not delete.** If a model returns raw code where JSON was requested, the raw output becomes the file content rather than being discarded.
+- **Reasoning tags are stripped** so no \`<think>\` block ever lands in shipped source.
+
+If the spec produces no files at all, a single-file fallback spec is synthesised so the request still returns working code.
+
+## Contract validation
+
+When the spec emits a plan contract with validation commands and a code executor is available, those commands are actually run and the exit code is attached to the result as execution evidence.
+
+This is the difference between "the model believes this compiles" and "this compiled". Where the environment supports it, take the evidence over the belief.
+
+## Why there is no synthesis phase
+
+Every other method ends with a synthesis pass. Coding ends at assembly, deliberately.
+
+A synthesis prompt would have to include the full content of every generated file — roughly 100k tokens for a typical project — which overflows the context window of all but a handful of models, to produce a paragraph describing files you already have. Assembly *is* the synthesis here, and the final result is populated directly from it.
+
+For the same reason, the final output carries the README plus a file **index** with line counts, not the file bodies inline. The code itself lives in the run's file list, where it can be read or downloaded without being duplicated through the context window twice.
+
+## Model routing
+
+Budget routes generation to a dedicated coding model rather than a general-purpose cheap model — code-specialised models at that price are meaningfully better at code and fast enough for the phase budget. Premium routes the spec and generation to a frontier model, with review, tests, and assembly on cross-lab models so the reviewer is never marking its own homework.
+
+Reasoning models that emit output on a separate channel are deliberately excluded from coding roles: they leave the content field empty, which reads downstream as a file that generated nothing.
+
+## What you get
+
+The generated files, a test suite, a README, the list of fixes applied during assembly, and an explicit **known limitations** list.
+
+Read the limitations list. Nothing here is executed beyond the contract validation commands, so the code is reviewed and tested-on-paper rather than proven to run. Treat it as a strong first draft from someone who read the CVE feed — not as merge-ready output.
 `,
   },
   {
@@ -436,6 +682,16 @@ Returns HyperGate's decision — route, method, and confidence — without execu
 | \`GET /api/credits/pricing\` | Credit conversion rate and tier allowances |
 | \`GET /api/health\` | Liveness and dependency status |
 
+## Agent endpoints
+
+Bearer-only variants of the run endpoints, built for programmatic callers. See [Agent integration](/docs/agent-integration) for the full guide.
+
+| Endpoint | Returns |
+| --- | --- |
+| \`POST /api/agent/run/sync\` | One JSON \`RunResult\` once the pipeline finishes |
+| \`POST /api/agent/run\` | Same SSE stream as \`/api/run\` |
+| \`GET /api/agent/tools\` | Tool definitions (\`?format=anthropic\|openai\`) |
+
 ## Credits
 
 | Endpoint | Purpose |
@@ -464,6 +720,244 @@ Returns HyperGate's decision — route, method, and confidence — without execu
 | 503 | Dependency unavailable | Retry with backoff |
 
 Rate limit headroom is returned on every response as \`X-RateLimit-Limit\` and \`X-RateLimit-Remaining\`.
+`,
+  },
+  {
+    slug: 'agent-integration',
+    title: 'Agent integration',
+    description:
+      'Call Reasoner from an autonomous agent: tool definitions, streaming, preset choice, retries, and what to do with labelled claims.',
+    section: 'Developers',
+    minutes: 8,
+    keywords: [
+      'agent',
+      'tool use',
+      'function calling',
+      'langchain',
+      'claude',
+      'openai',
+      'autonomous',
+      'sdk',
+    ],
+    body: `
+Reasoner is meant to be called by software as readily as by a person. An agent sends one authenticated POST, reads a stream, and gets back a synthesis in which every claim is labelled **VERIFIED**, **HYPOTHESIS**, or **UNKNOWN** — which is what makes the output safe to hand to another model.
+
+## When to delegate to Reasoner
+
+A Reasoner run costs more and takes longer than a single model call. It earns that on questions where one model's confident answer is itself the risk.
+
+| Worth a run | Not worth a run |
+| --- | --- |
+| "Should we migrate off the monolith this quarter?" | "What is the syntax for a Postgres upsert?" |
+| "Which of these three vendors survives our compliance review?" | "Summarise this file." |
+| "What breaks if we ship this pricing change?" | Anything the calling model already answers reliably |
+
+If the question has one determinate answer, HyperGate will route it to a Direct reply anyway — you are not billed for reasoning you did not need — but the round trip is still wasted. Filter before you call.
+
+## Authenticate
+
+Use a key from [Settings → API keys](/settings/api-keys) as a bearer token. Key-authenticated requests are exempt from CSRF, so no token-fetch round trip is needed:
+
+\`\`\`http
+POST /api/run
+Authorization: Bearer rsn_live_...
+Content-Type: application/json
+\`\`\`
+
+A default read-only key (\`read\`, \`preset:read\`, \`history:read\`) is enough to run pipelines. Give agents nothing more. See [API keys](/docs/api-keys).
+
+## Run it — sync or streamed
+
+Two endpoints, same pipeline, same event contract underneath. Pick whichever matches what your agent can consume.
+
+| Endpoint | Shape | Use when |
+| --- | --- | --- |
+| \`POST /api/agent/run/sync\` | One JSON \`RunResult\` | Your agent makes one call and reads one response — no SSE parser needed |
+| \`POST /api/agent/run\` (or \`/api/run\`) | \`text/event-stream\` | You want per-phase progress, or you are already set up to read SSE |
+
+Both are Bearer-authenticated, both are idempotent on \`client_run_id\`, both settle credits identically — \`/run/sync\` is not a lesser path, it is the streaming pipeline with the collapsing done for you server-side.
+
+\`\`\`bash
+curl -s https://reasoner.app/api/agent/run/sync \\
+  -H "Authorization: Bearer $REASONER_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"problem": "Should we migrate off our monolith?", "preset": "auto-budget"}'
+\`\`\`
+
+\`\`\`json
+{
+  "preset": "auto-budget",
+  "method": "multi-perspective",
+  "synthesis": "Migrate incrementally, starting with billing.",
+  "critical_insights": ["The monolith is not the bottleneck; the deploy pipeline is."],
+  "claim_labels": { "The deploy pipeline is the bottleneck": "VERIFIED" },
+  "action_blueprint": [{ "step": "1", "action": "Extract billing", "go_criteria": "Deploys independently twice a week" }],
+  "citations": [],
+  "total_cost_usd": 0.0191,
+  "models_used": ["claude-sonnet", "deepseek-v3"],
+  "errors": []
+}
+\`\`\`
+
+### If you stream instead
+
+\`/api/agent/run\` and \`/api/run\` return the identical Server-Sent Events; keep the two frames that matter:
+
+- The **last \`phase_complete\` frame carrying \`data.core_solution\`** — this is the answer, and \`critical_insights\`, \`open_questions\`, \`claim_labels\`, and \`action_blueprint\` sit beside it in the same \`data\` object.
+- The terminal **\`done\` frame** — \`total_cost_usd\`, \`total_tokens\`, \`duration\`, \`errors\`.
+
+Citations, when a web-grounded method ran, arrive on their own \`phase_complete\` frame under \`data.citations\`. Ignore event types you do not recognise; new ones are added without a version bump.
+
+\`\`\`python
+import json, uuid, httpx
+
+def ask_reasoner(problem: str, api_key: str, preset: str = "auto-budget") -> dict:
+    """Run one pipeline and collapse the stream into a result dict.
+
+    Equivalent to calling /api/agent/run/sync — written out so you can see
+    what that endpoint does for you, or adapt it if you want progress events
+    along the way.
+    """
+    result = {"synthesis": "", "insights": [], "labels": {}, "cost_usd": 0.0, "errors": []}
+    body = {"problem": problem, "preset": preset, "client_run_id": str(uuid.uuid4())}
+
+    with httpx.stream(
+        "POST",
+        "https://reasoner.app/api/agent/run",
+        json=body,
+        headers={"Authorization": "Bearer " + api_key},
+        timeout=httpx.Timeout(620.0, connect=10.0),
+    ) as response:
+        response.raise_for_status()
+        for line in response.iter_lines():
+            if not line.startswith("data: "):
+                continue
+            event = json.loads(line[6:])
+            if event.get("type") == "phase_complete":
+                data = event.get("data") or {}
+                if data.get("core_solution"):
+                    result["synthesis"] = data["core_solution"]
+                    result["insights"] = data.get("critical_insights", [])
+                    result["labels"] = data.get("claim_labels", {})
+            elif event.get("type") == "done":
+                result["cost_usd"] = event.get("total_cost_usd", 0.0)
+                result["errors"] = event.get("errors", [])
+    return result
+\`\`\`
+
+Everything below is about calling either endpoint well.
+
+## Register it as a tool
+
+Fetch the live definition rather than hand-copying one — it is generated from the same request schema the API validates against, so it cannot drift out from under you:
+
+\`\`\`bash
+curl -s https://reasoner.app/api/agent/tools
+curl -s https://reasoner.app/api/agent/tools?format=openai
+\`\`\`
+
+\`format=anthropic\` (the default) returns \`{name, description, input_schema}\` entries ready for Claude's tool-use API; \`format=openai\` returns the same tools wrapped in OpenAI's function-calling shape. The response is cacheable — fetch it once per agent session, not per call. Shape:
+
+\`\`\`json
+{
+  "name": "reasoner_run_sync",
+  "description": "Delegate a judgement call to a panel of models from different labs. They generate competing answers, critique and score each other, stress-test the survivors, and return one synthesis in which every claim is labelled VERIFIED, HYPOTHESIS, or UNKNOWN. Blocking: takes 20-90 seconds and costs real money. Use for decisions with more than one defensible answer; do not use for lookups, syntax, or summarisation.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "problem": { "type": "string", "description": "The decision or question, with the constraints that matter." },
+      "preset": { "type": "string", "description": "Preset id from reasoner_presets. Omit for auto-budget." }
+    },
+    "required": ["problem"],
+    "additionalProperties": false
+  }
+}
+\`\`\`
+
+The same call also returns \`reasoner_run\`, \`reasoner_gate\`, \`reasoner_estimate\`, \`reasoner_presets\`, and \`reasoner_health\` — register the whole array, not just the run tool; the read-only ones are what let an agent check cost and routing before committing to a paid call.
+
+TypeScript callers can skip the plumbing entirely: the \`@reasoner/sdk\` client exposes \`runToCompletion()\`, which returns \`{ synthesis, criticalInsights, claimLabels, costUsd, modelsUsed }\` already parsed.
+
+## Or skip the HTTP layer: MCP
+
+If your agent host speaks [MCP](https://modelcontextprotocol.io) — Claude Desktop, Claude Code, most current agent frameworks — none of the above is necessary. Reasoner ships an MCP server exposing \`reasoner_run\`, \`reasoner_gate\`, \`reasoner_estimate\`, \`reasoner_presets\`, \`reasoner_health\`, and \`reasoner_followup\` directly as tools, with per-phase progress notifications instead of a stream you parse yourself:
+
+\`\`\`json
+{
+  "mcpServers": {
+    "reasoner": {
+      "command": "python",
+      "args": ["mcp_server.py"],
+      "env": { "REASONER_API_KEY": "rsn_live_..." }
+    }
+  }
+}
+\`\`\`
+
+A run started this way is billed and idempotency-guarded identically to \`/api/agent/run/sync\` — MCP is a different door onto the same pipeline, not a different product. Full setup and the complete tool reference live in \`docs/MCP.md\` in the repository.
+
+## Choose the preset deliberately
+
+Leaving \`preset\` unset means \`auto-budget\`: HyperGate picks the method and the Budget tier. That is the right default for an agent. Override it when the caller knows something the router cannot infer — that the question needs live sources (\`research-*\`), adversarial pressure (\`debate-*\`, \`pre-mortem-*\`), or explicit belief updating (\`bayesian-*\`).
+
+Two endpoints let an agent look before it leaps, both taking the same body as \`/api/run\`:
+
+| Endpoint | Returns | Use it to |
+| --- | --- | --- |
+| \`POST /api/gate\` | \`action\`, \`method\`, \`preset\`, \`confidence\`, \`needs_confirmation\` | See which method would run, without running it |
+| \`POST /api/estimate\` | \`estimated_cost_usd\`, token counts, \`estimated_duration_seconds\` | Abort before spending on an over-budget run |
+
+\`/api/gate\` shares HyperGate's cache, so a following \`/api/run\` on the same problem does not re-pay the routing cost. When it returns \`needs_confirmation: true\`, the router is unsure — a good moment for an agent to ask its own caller rather than commit.
+
+\`GET /api/presets\` returns all 48 presets with method, tier, and cost band. Fetch it once and cache it; an agent that hardcodes preset names will break when the catalogue moves.
+
+## Long runs, timeouts, and retries
+
+- A pipeline is capped at **600 seconds**. Set the client timeout above that — 620s is a sane figure — or you will abandon runs you have already paid for.
+- Always send a \`client_run_id\`. It is both the duplicate-run guard and the credit idempotency key: re-sending the same id returns **409** instead of running twice.
+- If the stream drops mid-run, reconnect with the **same** \`client_run_id\`. Never retry with a fresh one — that is how an agent bills two runs for one question.
+- Runs settle **after** completion, from the actual \`total_cost_usd\` on the \`done\` frame. Failed runs cost nothing.
+
+| Status | Agent behaviour |
+| --- | --- |
+| 402 | Stop. Credits are exhausted; retrying cannot succeed. |
+| 409 | Reuse the original run's result. Do not re-run. |
+| 429 | Back off for \`Retry-After\` seconds. Watch \`X-RateLimit-Remaining\` and throttle before you hit the wall. |
+| 503 | Retry with exponential backoff. |
+
+An \`errors\` array on the \`done\` frame that is non-empty alongside a populated \`core_solution\` means a phase degraded but the run still produced an answer. Treat it as a partial result, not a failure.
+
+## What to do with the answer
+
+The labels are the product. An agent that flattens them back into undifferentiated prose has thrown away the reason it called Reasoner.
+
+- Pass \`claim_labels\` through to whatever consumes the output. A **HYPOTHESIS** presented as fact is worse than no answer.
+- \`open_questions\` are the model telling you what it could not settle — good candidates for a follow-up run or a question back to the user.
+- \`action_blueprint\` entries are normalised to \`step\`, \`action\`, \`time_horizon\`, \`go_criteria\`, \`fallback\`. The \`go_criteria\` field is what makes a step checkable later.
+- To continue the thread, \`POST /api/run-followup\` with the \`conversation_id\`, the prior \`previous_synthesis\`, and the new \`question\`. It streams the same event shape.
+
+## Discovery
+
+An agent that has never seen this API can bootstrap from:
+
+| Resource | Contents |
+| --- | --- |
+| \`GET /api/agent/tools\` | Tool definitions for the agent-facing endpoints, cacheable |
+| \`GET /openapi.json\` | Full OpenAPI schema for every endpoint |
+| [\`/llms.txt\`](/llms.txt) | Machine-readable index of this documentation |
+| [\`/llms-full.txt\`](/llms-full.txt) | The entire documentation corpus in one file |
+| \`GET /api/presets\`, \`GET /api/models\` | Live preset and model catalogues |
+| \`GET /api/health\` | Liveness and dependency status |
+
+## Safety notes for agent operators
+
+- Keep the key out of the prompt. An agent that can read its own key can leak it into a transcript.
+- Everything sent in \`problem\` is sanitised before it reaches any model, but sanitisation is not authorisation — if your agent forwards untrusted text, it is still forwarding untrusted text.
+- Give each agent its own key. Revoking one then costs you one agent, not the fleet, and the ledger attributes spend per key.
+
+## Self-hosted deployments
+
+The endpoints above work identically on a self-hosted instance – same paths, same \`rsn_live_\` account keys, same metering. One addition: with \`ENABLE_LEGACY_API_KEY=true\`, a legacy admin key also authenticates on these paths, for instances mid-migration off the pre-account-key auth system. New deployments should leave that flag off and mint account keys instead.
 `,
   },
   {

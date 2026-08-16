@@ -234,6 +234,8 @@ export const API = {
   NEURO_RECALL: '/api/neuro/recall',
   NEURO_LEARN: '/api/neuro/learn',
   PIPELINE_RESUME: (id: string) => `/api/pipelines/${encodeURIComponent(id)}/resume-stream`,
+  AGENT_RUN: '/api/agent/run',
+  AGENT_RUN_SYNC: '/api/agent/run/sync',
 };
 
 export const DEFAULTS = {
@@ -300,6 +302,10 @@ export const TIMING = {
   neuroLearnStatusClearMs: 3000,
   imageGenProgressDurationMs: 25000,
   imageGenProgressIntervalMs: 100,
+  /** How long to wait for an OAuth redirect before assuming it never happened
+   *  and handing the sign-in form back. On success the page is gone long
+   *  before this; it only ever fires when the navigation was dropped. */
+  oauthRedirectTimeoutMs: 15000,
   csrfMaxAgeSeconds: 60 * 60 * 24,
   jsonBodyMaxBytes: 1024 * 1024,
 };

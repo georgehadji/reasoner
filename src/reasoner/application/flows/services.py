@@ -22,9 +22,16 @@ class PipelineWorkflowServices(WorkflowServices):
         self._init_executor()
 
     def _init_executor(self) -> None:
-        """Lazy-init the code executor if EXEC_SANDBOX_ENABLED is true."""
+        """Install the configured executor, failing closed when disabled.
+
+        ``NoopExecutor`` is deliberately used instead of ``None`` so phases do
+        not fall back to simulating execution with an LLM.  A simulated result
+        is not execution evidence and could be mistaken for verified output.
+        """
         from reasoner.core.settings import settings
         if not settings.EXEC_SANDBOX_ENABLED:
+            from reasoner.infrastructure.execution.noop_executor import NoopExecutor
+            self.code_executor = NoopExecutor()
             return
         try:
             from reasoner.infrastructure.execution.subprocess_executor import SubprocessExecutor

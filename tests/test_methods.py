@@ -135,6 +135,11 @@ def test_strategy_has_phases(method: str, preset_name: str) -> None:
 
 # ── Full pipeline smoke tests (API calls, subset only) ───────────────
 
+# Drives real providers over the network. The skipif is not enough on its own:
+# CI sets a dummy OPENROUTER_API_KEY so build_provider() succeeds, which makes
+# _HAS_API_KEY true and lets these run against live endpoints. `integration`
+# keeps them out of the default lane, where the marker is what CI filters on.
+@pytest.mark.integration
 @pytest.mark.skipif(not _HAS_API_KEY, reason="OPENROUTER_API_KEY not set")
 @pytest.mark.parametrize("method,preset_name", [
     (m, p) for m, p in sorted(METHOD_PRESETS.items()) if m in FULL_RUN_METHODS

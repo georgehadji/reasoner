@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import os
 import logging
-from typing import List
+from typing import TYPE_CHECKING, List
+
+if TYPE_CHECKING:
+    from reasoner.domain.article_domain import Context
 
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.application.flows.base import WorkflowStrategy, WorkflowServices, PhaseStep

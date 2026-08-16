@@ -3,10 +3,10 @@
 import { useState, useMemo } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus, vs } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { useTheme } from 'next-themes';
 import { Check, Copy } from 'lucide-react';
 import { TIMING } from '@/lib/config';
 import { copyToClipboard } from '@/lib/utils';
+import { useIsDark } from '@/hooks/useIsDark';
 
 /**
  * Heavily-lazy loaded syntax-highlighted code block.
@@ -21,8 +21,10 @@ export function CodeBlock({
   language: string;
 }) {
   const [copied, setCopied] = useState(false);
-  const { theme } = useTheme();
-  const isDark = theme === 'dark';
+  // Was `theme === 'dark'`, which is false for every system-dark visitor —
+  // `theme` stays the literal "system" until someone picks explicitly, so
+  // code blocks rendered the light palette on a dark page.
+  const { isDark } = useIsDark();
   const codeStyle = useMemo(() => (isDark ? vscDarkPlus : vs), [isDark]);
   const customStyle = useMemo(() => ({ margin: 0, padding: '1em', background: 'transparent', fontSize: '0.85em' }), []);
 

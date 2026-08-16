@@ -121,6 +121,7 @@ class ReasonerPipeline:
         batch_critique_jury: bool = False,
         phase_configs: dict[str, PhaseConfig] | None = None,
         augmentation_methods: list[str] | None = None,
+        user_id: str | None = None,
     ) -> None:
         self.router = router
         self.initial_state = initial_state
@@ -134,6 +135,7 @@ class ReasonerPipeline:
         self.complexity = complexity
         self.batch_critique_jury = batch_critique_jury
         self.augmentation_methods = augmentation_methods
+        self.user_id = user_id
         self.phase_configs = phase_configs or self._PHASE_CONFIGS
         
         from reasoner.application.flows.factory import WorkflowFactory
@@ -182,7 +184,7 @@ class ReasonerPipeline:
 
                 store = DocumentVectorStore()
                 file_ids = [att.get("file_id", "") for att in attachments if att.get("file_id")]
-                chunks = await store.retrieve(query, file_ids, top_k=5)
+                chunks = await store.retrieve(query, file_ids, top_k=5, user_id=self.user_id)
                 if chunks:
                     parts: list[str] = []
                     for i, chunk_text in enumerate(chunks, 1):
@@ -639,6 +641,13 @@ class ReasonerPipeline:
         try:
             translator = get_composite_translator(router=self.router)
             result = await translator.translate(original_problem, target_lang="EN", source_lang=source_lang)
+            if result.degraded:
+                # The composite never raises -- it falls back to identity. Without
+                # this branch a failed pivot looked identical to a successful one:
+                # state.problem kept its source-language text, pivot_active was set,
+                # and every downstream phase reasoned in the wrong language with
+                # nothing in state.errors to show for it.
+                raise RuntimeError(result.degraded_reason or "all translators failed")
             translated = result.text or original_problem
             state.problem = translated
             if original_enhanced and original_enhanced != original_problem:
@@ -654,12 +663,15 @@ class ReasonerPipeline:
             state.cross_language_state = {
                 "original_problem": original_problem,
                 "original_enhanced": original_enhanced,
-                "source_language": source_lang,
+                # The translator's detected code (e.g. "DE") is more precise than
+                # the pipeline's own language guess (e.g. "German").
+                "source_language": result.detected_source_language or source_lang,
                 "translated_problem": translated,
                 "direction": "in",
             }
         except Exception as e:
             self._log("CROSS-LANG", f"Translate-in failed ({e}); pivot aborted — reasoning in {source_lang}.", state)
+            state.errors.append(f"translation-in error: {e}")
 
     async def _phase_cross_language_translate_out(self, state: PipelineState) -> None:
         from reasoner.infrastructure.translation import get_composite_translator
@@ -680,6 +692,10 @@ class ReasonerPipeline:
                 if not text or not text.strip():
                     return text
                 res = await translator.translate(text, target_lang=target_lang_iso, source_lang="EN")
+                if res.degraded:
+                    # Fail the whole translate-out rather than emitting a solution
+                    # half in English and half in the target language.
+                    raise RuntimeError(res.degraded_reason or "all translators failed")
                 return res.text or text
 
             fs.core_solution = await _t(fs.core_solution)
@@ -717,5 +733,10 @@ class ReasonerPipeline:
 
             if state.cross_language_state:
                 state.cross_language_state["direction"] = "out"
+                # Record the back-translated synthesis: the SSE payload and any
+                # --resume of this state need to know the output was translated,
+                # and "direction" alone does not say it succeeded.
+                state.cross_language_state["translated_synthesis"] = fs.core_solution
         except Exception as e:
             self._log("CROSS-LANG", f"Translate-out failed ({e}); output stays in English.", state)
+            state.errors.append(f"translation-out error: {e}")

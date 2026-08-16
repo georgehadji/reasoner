@@ -240,7 +240,7 @@ class TestSampleFromVS:
         empirical = [counts["a"] / n, counts["b"] / n, counts["c"] / n]
 
         kl = 0.0
-        for p, q in zip(theoretical, empirical):
+        for p, q in zip(theoretical, empirical, strict=False):
             if p > 0 and q > 0:
                 kl += p * math.log(p / q)
         assert kl < 0.05, f"KL divergence {kl} too high"

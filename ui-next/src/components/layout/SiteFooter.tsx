@@ -38,12 +38,16 @@ export function SiteFooter() {
               <div className="mb-4 text-xs font-semibold uppercase tracking-widest text-[var(--text)]">
                 {group}
               </div>
-              <ul className="flex flex-col gap-2.5">
+              <ul className="flex flex-col">
                 {items.map(({ label, href }) => (
                   <li key={href}>
+                    {/* 40px hit area (WCAG 2.5.5) built from padding, not a
+                        visible box, so the column still reads as a tight list.
+                        The old rule set hover to the same value as rest, so
+                        there was no hover feedback at all. */}
                     <Link
                       href={href}
-                      className="text-sm text-[var(--text)] transition-colors duration-200 hover:text-[var(--text)]"
+                      className="inline-flex min-h-[var(--space-10)] items-center text-[length:var(--text-sm)] leading-[var(--lh-ui)] text-[var(--text-muted)] transition-colors duration-[var(--dur-micro)] hover:text-[var(--accent)]"
                     >
                       {label}
                     </Link>

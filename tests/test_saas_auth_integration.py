@@ -52,6 +52,19 @@ def mock_quota_service(monkeypatch):
     _reset_quota_service()
 
 
+@pytest.fixture(autouse=True)
+def bypass_credit_gate():
+    """This file tests auth, not billing. Without it, an authenticated caller
+    hits require_credits_if_authenticated -> a fresh in-memory ledger with a
+    zero balance -> 402, which has nothing to do with what these tests check
+    (docs/plans/pre-existing-fixes.md #4)."""
+    from reasoner.api.dependencies import require_credits_if_authenticated
+
+    app.dependency_overrides[require_credits_if_authenticated] = lambda: None
+    yield
+    app.dependency_overrides.pop(require_credits_if_authenticated, None)
+
+
 @pytest.fixture
 def client():
     return TestClient(app)

@@ -148,7 +148,7 @@ class SnapshotStrategy:
             while True:
                 await asyncio.sleep(self.time_interval_seconds)
                 
-                for aggregate_id, aggregate in list(aggregates.items()):
+                for _aggregate_id, aggregate in list(aggregates.items()):
                     if aggregate.is_running:
                         await self.create_snapshot(aggregate, event_store)
         

@@ -9,7 +9,6 @@ from typing import Any
 from reasoner.core.constants import (
     DEFAULT_OLLAMA_URL,
     MODEL_CLAUDE_SONNET,
-    MODEL_GEMINI_FLASH,
     MODEL_GEMINI_PRO,
     MODEL_GPT4O_MINI,
     MODEL_LAGUNA_XS_FREE,
@@ -34,6 +33,9 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "claude-opus-4.8":   {"model": "anthropic/claude-opus-4.8"},     # legacy pin, kept for reproducibility — $5/$25 per M, 1M ctx
     MODEL_CLAUDE_SONNET: {"model": "anthropic/claude-sonnet-5"},     # v3.6: current as of Jun 2026 — $2/$10 per M, 1M ctx
     "claude-haiku":      {"model": "anthropic/claude-haiku-4.5"},    # $1/$5 per M, 200K ctx
+    # ── Auto-updating (always latest) ──
+    "claude-opus-latest":   {"model": "~anthropic/claude-opus-latest"},    # always -> latest Opus ($5/$25, 1M ctx today)
+    "claude-sonnet-latest": {"model": "~anthropic/claude-sonnet-latest"},  # always -> latest Sonnet ($2/$10, 1M ctx today)
     # ═══════════════════════════════════════════════════════════════
     # OpenAI — GPT series
     # ═══════════════════════════════════════════════════════════════
@@ -49,6 +51,11 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "gpt-5.6-sol":      {"model": "openai/gpt-5.6-sol"},         # flagship — $5/$30 per M, 1.05M ctx
     "gpt-5.6-terra":    {"model": "openai/gpt-5.6-terra"},       # balanced mid-tier — $1/$6 per M, 1.05M ctx
     "gpt-5.6-luna":     {"model": "openai/gpt-5.6-luna"},        # fast/cheap — $0.10/$0.60 per M, 1.05M ctx
+    # -pro siblings are priced identically to the base tiers on OpenRouter, so they
+    # are a free capability upgrade wherever the base tier is already being used.
+    "gpt-5.6-sol-pro":   {"model": "openai/gpt-5.6-sol-pro"},    # $5/$30 per M, 1.05M ctx
+    "gpt-5.6-terra-pro": {"model": "openai/gpt-5.6-terra-pro"},  # $1/$6 per M, 1.05M ctx
+    "gpt-5.6-luna-pro":  {"model": "openai/gpt-5.6-luna-pro"},   # $0.10/$0.60 per M, 1.05M ctx
     # ── Previous (5.4, Mar 2026) ──
     "gpt-5.4":          {"model": "openai/gpt-5.4"},             # $2.50/$15 per M, AI^2 Intel 51.4
     "gpt-5.4-pro":      {"model": "openai/gpt-5.4-pro"},         # max reasoning — $30/$180 per M, 1.05M ctx
@@ -81,14 +88,21 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # gemini-pro -> claude-sonnet (premium primary, not Google — changed v3.4)
     # gemini-flash-lite -> qwen3.5-flash (budget primary, not Google — changed v3.4)
     MODEL_GEMINI_PRO:   {"model": "anthropic/claude-sonnet-5"},     # premium primary (Anthropic, not Google)
-    MODEL_GEMINI_FLASH: {"model": "google/gemini-3.5-flash"},       # budget primary — $1.50/$9 per M, AI^2 Intel 50.2, 1M ctx
+    # No MODEL_GEMINI_FLASH entry here: v3.6 swapped that alias's *value* to
+    # "grok-4.3" without renaming it, so an entry keyed on the constant was a
+    # duplicate of the literal "grok-4.3" key in the xAI block below. The later
+    # key won, this one's google/gemini-3.5-flash value was silently discarded,
+    # and the dict quietly had one fewer model than it appeared to. The xAI
+    # block is the single definition; a real Google flash lives under
+    # gemini-3.6-flash / gemini-2.5-flash.
     "gemini-flash-lite": {"model": "qwen/qwen3.5-flash-02-23"},     # budget primary — $0.065/$0.26, fast & reliable
     # ── Real Google models (not aliased to other labs) ──
     "gemini-pro-real":         {"model": "google/gemini-3.1-pro-preview"},     # true Google Pro — $2/$12 per M, 1M ctx
     "gemini-flash-lite-real":  {"model": "google/gemini-3.1-flash-lite"},      # true Google Flash Lite — $0.25/$1.50, 1M ctx
     "gemini-2.5-flash-lite":   {"model": "google/gemini-2.5-flash-lite"},      # cheapest Google — $0.10/$0.40, 1M ctx
     "gemini-2.5-flash":        {"model": "google/gemini-2.5-flash"},           # $0.30/$2.50 per M, 1M ctx
-    "gemini-3.6-flash":        {"model": "google/gemini-3.6-flash"},           # newer than budget primary — $1.50/$7.50 per M, 1M ctx
+    "gemini-3.7-flash":        {"model": "google/gemini-3.7-flash"},           # newest Google flash — $0.375/$1.875 per M, 1M ctx (half the price of 3.6-flash)
+    "gemini-3.6-flash":        {"model": "google/gemini-3.6-flash"},           # $0.75/$3.75 per M, 1M ctx (repriced down from $1.50/$7.50)
     "gemini-3.5-flash-lite":   {"model": "google/gemini-3.5-flash-lite"},      # $0.30/$2.50 per M, 1M ctx
     # ── Auto-updating (always latest) ──
     "gemini-pro-latest":       {"model": "~google/gemini-pro-latest"},         # always -> latest Gemini Pro
@@ -101,9 +115,13 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ═══════════════════════════════════════════════════════════════
     # xAI — Grok series
     # ═══════════════════════════════════════════════════════════════
+    "grok-4.6":               {"model": "x-ai/grok-4.6"},               # newest Grok — 500K ctx, $2/$6 per M (same price as 4.5, strict upgrade)
     "grok-4.5":               {"model": "x-ai/grok-4.5"},               # 500K ctx, $2/$6 per M, frontier reasoning, structured outputs (updated Jul 2026)
+    "grok-4.20":              {"model": "x-ai/grok-4.20"},              # 2M ctx, $1.25/$2.50 — same price as 4.3 with double the context
+    "grok-4.20-multi-agent":  {"model": "x-ai/grok-4.20-multi-agent"},  # 2M ctx, $1.25/$2.50 — multi-agent variant, useful for adversarial stress-testing
     "grok-4.3":               {"model": "x-ai/grok-4.3"},               # 1M ctx, $1.25/$2.50, τ²-Bench 97.7%, configurable reasoning effort
     "grok-build-0.1":         {"model": "x-ai/grok-build-0.1"},         # fast agentic coding, 256K ctx, $1.00/$2.00
+    "grok-latest":            {"model": "~x-ai/grok-latest"},           # always -> latest Grok ($2/$6, 500K ctx today)
     # ═══════════════════════════════════════════════════════════════
     # Perplexity
     # ═══════════════════════════════════════════════════════════════
@@ -115,7 +133,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ═══════════════════════════════════════════════════════════════
     # Mistral
     # ═══════════════════════════════════════════════════════════════
-    "mistral-large-3":    {"model": "mistralai/mistral-large-2512"},
+    "mistral-large-3":    {"model": "mistralai/mistral-large-2512"},  # $0.50/$1.50 per M, 262K ctx — cheapest EU-bloc frontier anchor
     "mistral-medium":     {"model": "mistralai/mistral-medium-3.1"},
     "mistral-medium-3-5": {"model": "mistralai/mistral-medium-3-5"},    # $1.50/$7.50 per M, 262K ctx — newer mid tier
     "mistral-small":      {"model": "mistralai/mistral-small-2603"},    # v3.3: $0.15/$0.60 per M, 262K ctx
@@ -129,9 +147,11 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ═══════════════════════════════════════════════════════════════
     # DeepSeek — V3.2 + V4 family
     # ═══════════════════════════════════════════════════════════════
-    # V4 family: 1M ctx, MoE
-    #   Pro:   1.6T total / 49B active — $0.435/$0.87  per M
-    #   Flash: 284B total / 13B active — $0.09/$0.18   per M — PRIMARY budget choice
+    # V4 family: 1M ctx, MoE.  Prices below are the OpenRouter list prices (the
+    # fallback lane when DEEPSEEK_API_KEY is unset); DeepSeek's own API is cheaper.
+    #   Pro:   1.6T total / 49B active — $1.168/$2.336  per M  (was $0.435/$0.87;
+    #          that older price now only survives on the deepseek-v4-pro-0813 pin)
+    #   Flash: 284B total / 13B active — $0.0615/$0.1229 per M — PRIMARY budget choice
     "deepseek-v4-pro": {
         "cls": "compat",
         "model": "deepseek/deepseek-v4-pro",
@@ -141,7 +161,9 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     },
     "deepseek-v4-flash": {
         "cls": "compat",
-        "model": "deepseek/deepseek-v4-flash-0731",   # was undated pin -> 0731 re-post-trained revision, same $0.14/$0.28, 1M ctx
+        # The 0731 dated pin was retired upstream: api.deepseek.com now accepts
+        # only deepseek-v4-pro / deepseek-v4-flash and 400s on any dated suffix.
+        "model": "deepseek/deepseek-v4-flash",        # $0.0615/$0.1229, 1M ctx
         "base": "https://api.deepseek.com/v1",
         "env": "DEEPSEEK_API_KEY",
         "extra_body": {"reasoning": {"effort": "high"}},
@@ -166,7 +188,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ── 3.8 (latest) ──
     "qwen3.8-max":         {"model": "qwen/qwen3.8-max"},        # newest flagship
     # ── 3.7 (Jun 2026) ──
-    "qwen3.7-max":         {"model": "qwen/qwen3.7-max"},        # flagship agent — $1.25/$3.75 per M, 1M ctx
+    "qwen3.7-max":         {"model": "qwen/qwen3.7-max"},        # flagship agent — $1.475/$4.425 per M, 1M ctx
     "qwen3.7-plus":        {"model": "qwen/qwen3.7-plus"},       # best VFM — $0.32/$1.28 per M, 1M ctx
     "qwen3.7-flash":       {"model": "qwen/qwen3.7-flash"},      # cheapest Qwen — $0.03/$0.13 per M, 1M ctx, vision
     # ── 3.7 value aliases (intentionally route to 3.7-plus for cost) ──
@@ -207,7 +229,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "kimi-k2-5":        {"model": "moonshotai/kimi-k2.5"},
     "kimi-k2-6":        {"model": "moonshotai/kimi-k2.6"},
     "kimi-k2-7-code":   {"model": "moonshotai/kimi-k2.7-code"},
-    "kimi-k3":          {"model": "moonshotai/kimi-k3"},           # 1M ctx, advanced agentic reasoning
+    "kimi-k3":          {"model": "moonshotai/kimi-k3"},           # 1M ctx, advanced agentic reasoning — $3/$15 per M, priciest CN model on OpenRouter
     "kimi-k2-thinking":  {"model": "moonshotai/kimi-k2-thinking"},    # Nov 2025, older than k2.5+ but the only dedicated reasoning-mode Kimi — $0.60/$2.50 per M, 262K ctx
     # ═══════════════════════════════════════════════════════════════
     # Meta LLaMA
@@ -226,7 +248,9 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ═══════════════════════════════════════════════════════════════
     # GLM (Zhipu AI / z-ai)
     # ═══════════════════════════════════════════════════════════════
-    "glm-5.2":          {"model": "z-ai/glm-5.2"},                # $0.95/$3.00 per M, 1M ctx
+    "glm-5.2":          {"model": "z-ai/glm-5.2"},                # $0.308/$0.968 per M, 1M ctx — repriced 3× down; now one of the cheapest frontier-class CN models
+    # NB: z-ai/glm-5.2:batch is *more* expensive ($0.70/$2.20) and caps at 512K ctx.
+    # Do not add it as a "cheaper batch tier" — for this model the batch lane is a trap.
     # ═══════════════════════════════════════════════════════════════
     # OpenRouter native
     # ═══════════════════════════════════════════════════════════════
@@ -265,7 +289,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ═══════════════════════════════════════════════════════════════
     # Tencent
     # ═══════════════════════════════════════════════════════════════
-    "hy3":               {"model": "tencent/hy3"},               # 295B MoE (21B active, 192 experts, top-8), 262K ctx, $0.20/$0.80 per M, configurable reasoning effort (none/low/high CoT), anti-hallucination — answers grounded, flags missing evidence
+    "hy3":               {"model": "tencent/hy3"},               # 295B MoE (21B active, 192 experts, top-8), 262K ctx, $0.132/$0.528 per M, configurable reasoning effort (none/low/high CoT), anti-hallucination — answers grounded, flags missing evidence
     "hy3-preview":      {"model": "tencent/hy3-preview"},
     # ═══════════════════════════════════════════════════════════════
     # ByteDance Seed
@@ -276,7 +300,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # inclusionAI (Ant Group)
     # ═══════════════════════════════════════════════════════════════
     "ling-2.6-flash-free": {"model": "inclusionai/ling-2.6-flash"},  # v3.5: :free tier dead -> paid non-free model
-    "ling-3.0-flash-free": {"model": "inclusionai/ling-3.0-flash:free"},  # FREE — newest gen; :free tiers on this vendor have died before, watch for drift
+    "ling-3.0-flash-free": {"model": "inclusionai/ling-3.0-flash"},  # v3.8: :free tier died (as predicted) -> paid, $0.021/$0.063 per M, 262K ctx
     "ring-2.6-1t":         {"model": "inclusionai/ring-2.6-1t"},     # $0.075/$0.625 per M, 63B active/1T total, thinking model
     "ling-2.6-1t":         {"model": "inclusionai/ling-2.6-1t"},     # $0.075/$0.625 per M, general-purpose counterpart to ring-2.6-1t (non-reasoning)
     # ═══════════════════════════════════════════════════════════════
@@ -332,14 +356,16 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # Removed: microsoft/mai-image-2.5 — not on OpenRouter
     # Removed: recraft/recraft-v4* (all 8 models) — provider gone from OpenRouter
     "gemini-flash-image":             {"model": "google/gemini-2.5-flash-image",      "extra_body": {"include_images": True}},
-    "gemini-pro-image":               {"model": "google/gemini-3-pro-image-preview",  "extra_body": {"include_images": True}},
-    "gemini-3.1-flash-image-preview": {"model": "google/gemini-3.1-flash-image-preview", "extra_body": {"include_images": True}},
+    # v3.8: -preview pins promoted to the GA ids, which OpenRouter now serves at the
+    # same price with a larger context (65K -> 131K) than the preview endpoints.
+    "gemini-pro-image":               {"model": "google/gemini-3-pro-image",          "extra_body": {"include_images": True}},  # $2/$12 per M, 131K ctx
+    "gemini-3.1-flash-image-preview": {"model": "google/gemini-3.1-flash-image",      "extra_body": {"include_images": True}},  # $0.50/$3 per M, 131K ctx
     MODEL_GEMINI_31_FLASH_LITE_IMAGE: {"model": "google/gemini-3.1-flash-lite-image", "extra_body": {"include_images": True}},
     "gpt-5-image":                    {"model": "openai/gpt-5-image",       "extra_body": {"include_images": True}},
     "gpt-5-image-mini":               {"model": "openai/gpt-5-image-mini",  "extra_body": {"include_images": True}},
     "gpt-5.4-image-2":                {"model": "openai/gpt-5.4-image-2",   "extra_body": {"include_images": True}},
-    "qwen-image-3":                   {"model": "qwen/qwen-image-3",        "extra_body": {"include_images": True}},
-    "qwen-image-3-pro":               {"model": "qwen/qwen-image-3-pro",    "extra_body": {"include_images": True}},
+    # Removed: qwen/qwen-image-3, qwen/qwen-image-3-pro — Qwen has no image-output
+    # model on OpenRouter any more; the only image outputs left are Google + OpenAI.
     # ═══════════════════════════════════════════════════════════════
     # Ollama (local)
     # ═══════════════════════════════════════════════════════════════

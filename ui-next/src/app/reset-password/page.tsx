@@ -2,90 +2,174 @@
 
 import { useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
+import { AlertCircle, Check, Info } from 'lucide-react';
+import { Button } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 import type { AuthError } from '@/lib/auth';
 
+/* Field chrome — identical to /login, /signup and /forgot-password. Focus is
+   louder than hover: hover firms the border, focus firms it AND adds the accent
+   ring `.input-smooth` supplies. 16px is the iOS zoom floor, not a preference. */
+const FIELD =
+  'w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--bg)] input-smooth ' +
+  'px-[var(--space-4)] py-[var(--space-3)] ' +
+  'text-[length:var(--text-base)] leading-[var(--lh-ui)] text-[var(--text)] ' +
+  'placeholder:text-[var(--text-subtle)] ' +
+  'hover:border-[var(--border-strong)] focus:border-[var(--accent)] ' +
+  'aria-[invalid=true]:border-[var(--red)] ' +
+  'disabled:cursor-not-allowed disabled:opacity-60';
+
+const LABEL =
+  'mb-[var(--space-2)] block text-[length:var(--text-sm)] font-medium ' +
+  'leading-[var(--lh-ui)] text-[var(--text-2)]';
+
+const HINT =
+  'mt-[var(--space-2)] flex items-start gap-[var(--space-2)] ' +
+  'text-[length:var(--text-xs)] leading-[var(--lh-ui)] text-[var(--text-muted)]';
+
+/* The icon is not decoration: red text alone fails for ~8% of men, and prints
+   as grey. */
+const FIELD_ERROR =
+  'mt-[var(--space-2)] flex items-start gap-[var(--space-2)] ' +
+  'text-[length:var(--text-xs)] leading-[var(--lh-ui)] text-[var(--red)]';
+
+const MIN_PASSWORD = 6;
+
+type Status = 'idle' | 'submitting' | 'success';
+
 function ResetPasswordForm() {
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState('');
+  const [fieldError, setFieldError] = useState('');
   const router = useRouter();
+
+  const busy = status !== 'idle';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+    /* Validate late (on submit), re-validate early (on change) — telling
+       someone their password is too short while they are still typing it is
+       noise, not help. */
+    if (password.length < MIN_PASSWORD) {
+      setFieldError(`Use at least ${MIN_PASSWORD} characters — ${password.length} so far.`);
       return;
     }
+    setFieldError('');
 
     if (!supabase) {
       setError('Authentication is not configured');
       return;
     }
 
-    setLoading(true);
+    setStatus('submitting');
     try {
       const { error: supaError } = await supabase.auth.updateUser({
         password: password,
       });
       if (supaError) throw supaError;
-      
-      // Password updated successfully, redirect to login
+
+      // Password updated successfully, redirect to login. Stay in `success`
+      // through the redirect — dropping back to idle would flash an enabled
+      // form and read as "nothing happened".
+      setStatus('success');
       router.push('/login?message=password-updated');
     } catch (err) {
       const authErr = err as AuthError;
       setError(authErr.message || 'Failed to update password');
-    } finally {
-      setLoading(false);
+      setStatus('idle');
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-[var(--space-4)]" noValidate>
       {error && (
-        <div className="rounded-lg bg-red-500/10 p-3 text-sm text-red-400" role="alert" aria-live="assertive">
-          {error}
-        </div>
+        <p
+          id="reset-error"
+          role="alert"
+          className="flex items-start gap-[var(--space-2)] rounded-[var(--radius)] border border-[var(--red-border)] bg-[var(--red-bg)] px-[var(--space-3)] py-[var(--space-3)] text-[length:var(--text-sm)] leading-[var(--lh-ui)] text-[var(--red)]"
+        >
+          <AlertCircle aria-hidden="true" className="mt-px size-[var(--space-4)] shrink-0" />
+          <span>{error}</span>
+        </p>
       )}
+
+      {status === 'success' && (
+        <p
+          role="status"
+          className="flex items-start gap-[var(--space-2)] rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-2)] px-[var(--space-3)] py-[var(--space-3)] text-[length:var(--text-sm)] leading-[var(--lh-ui)] text-[var(--text-2)]"
+        >
+          <Check aria-hidden="true" className="mt-px size-[var(--space-4)] shrink-0 text-[var(--ok)]" />
+          <span>Password updated. Taking you to sign in…</span>
+        </p>
+      )}
+
       <div>
-        <label htmlFor="password" className="mb-1 block text-sm font-medium text-[var(--text-2)]">
+        <label htmlFor="password" className={LABEL}>
           New Password
         </label>
         <input
           id="password"
           type="password"
+          autoComplete="new-password"
+          minLength={MIN_PASSWORD}
           placeholder="••••••••"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] p-2.5 text-[var(--text)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:outline-none"
+          onChange={(e) => {
+            setPassword(e.target.value);
+            if (fieldError) setFieldError('');
+          }}
+          className={FIELD}
           required
-          disabled={loading}
-          aria-describedby="password-hint"
+          disabled={busy}
+          aria-invalid={!!fieldError}
+          /* Points at the error when there is one, at the rule when there is
+             not — never at both, so the field is never read twice. */
+          aria-describedby={fieldError ? 'password-error' : 'password-hint'}
         />
-        <p id="password-hint" className="mt-1 text-xs text-[var(--text-muted)]">
-          Must be at least 6 characters
-        </p>
+        {fieldError ? (
+          <p id="password-error" role="alert" className={FIELD_ERROR}>
+            <AlertCircle aria-hidden="true" className="mt-px size-[var(--space-4)] shrink-0" />
+            <span>{fieldError}</span>
+          </p>
+        ) : (
+          <p id="password-hint" className={HINT}>
+            <Info aria-hidden="true" className="mt-px size-[var(--space-4)] shrink-0" />
+            <span>Must be at least {MIN_PASSWORD} characters</span>
+          </p>
+        )}
       </div>
-      <button
+
+      <Button
         type="submit"
-        disabled={loading || !password}
-        className="w-full rounded-lg bg-[var(--accent)] p-2.5 text-[var(--accent-text)] font-medium transition-opacity hover:opacity-90 disabled:opacity-40"
-        aria-busy={loading}
+        size="lg"
+        className="w-full rounded-[var(--radius)] gap-[var(--space-2)]"
+        disabled={busy || !password}
+        loading={status === 'submitting'}
+        aria-busy={status === 'submitting'}
       >
-        {loading ? 'Updating…' : 'Update Password'}
-      </button>
+        {status === 'success' ? 'Password updated' : status === 'submitting' ? 'Updating…' : 'Update Password'}
+      </Button>
     </form>
   );
 }
 
 export default function ResetPasswordPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="w-full max-w-md p-8 space-y-4 rounded-xl border border-[var(--border)] bg-[var(--surface)]">
-        <h1 className="text-2xl font-bold text-[var(--text)]">Update Password</h1>
-        <Suspense fallback={<div className="animate-pulse h-32 bg-[var(--surface-2)] rounded-lg"></div>}>
+    <div className="flex min-h-dvh items-center justify-center px-[var(--gutter)] py-[var(--space-12)]">
+      <div className="flex w-full max-w-[var(--width-form)] flex-col gap-[var(--space-5)] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-[var(--space-8)] shadow-[var(--shadow)]">
+        <h1 className="text-[length:var(--text-2xl)] font-bold text-[var(--text)]">Update Password</h1>
+        <Suspense
+          fallback={
+            <div
+              role="status"
+              aria-label="Loading the password form"
+              className="h-[var(--space-32)] animate-pulse rounded-[var(--radius)] bg-[var(--surface-2)]"
+            />
+          }
+        >
           <ResetPasswordForm />
         </Suspense>
       </div>

@@ -23,6 +23,7 @@ from reasoner.core.constants import (
     PHASE_TOKEN_BUDGETS,
     TRUNCATION,
 )
+from reasoner.infrastructure.llm.caching import user_cache_prefix
 from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.domain.pipeline_state import PipelineState
 
@@ -144,23 +145,28 @@ class LLMExecutor:
         if stream and self._caching_enabled:
             logger.warning("Caching is currently not supported for streaming LLM calls.")
 
+        # Cache key body for this call. Computed unconditionally so the cascading
+        # store path below can reference it even when the lookup was skipped
+        # (e.g. streaming), which previously raised NameError.
+        #
+        # Coding roles: each file has a unique prompt body after the shared
+        # problem prefix, so truncating to PROBLEM chars would produce identical
+        # cache keys for all parallel generate calls and serve the first file's
+        # response for every subsequent file.
+        cache_prompt = (
+            user_prompt
+            if role in (
+                "synthesis", "context_vetting", "primary",
+                "coding_generate", "coding_spec", "coding_review",
+                "coding_tests", "coding_assemble",
+            )
+            else user_prompt[: TRUNCATION.PROBLEM]
+        )
+
         if self._token_cache and self._caching_enabled and not stream:
             # For caching, we need a specific model_id. If cascading, we'll cache against the first model.
             # This is a simplification; a more robust cache would handle model cascades explicitly.
             model_id_for_cache = self.cascading_routing.get(role, [self.router.get(role).model])[0]
-            cache_prompt = (
-                user_prompt
-                if role in (
-                    "synthesis", "context_vetting", "primary",
-                    # Coding roles: each file has a unique prompt body after the
-                    # shared problem prefix, so truncating to PROBLEM chars would
-                    # produce identical cache keys for all parallel generate calls
-                    # and serve the first file's response for every subsequent file.
-                    "coding_generate", "coding_spec", "coding_review",
-                    "coding_tests", "coding_assemble",
-                )
-                else user_prompt[: TRUNCATION.PROBLEM]
-            )
             cached_response = await self._token_cache.get(
                 problem=state.problem,
                 phase=role,
@@ -257,8 +263,10 @@ class LLMExecutor:
                         try:
                             import json
                             json.loads(raw)
-                        except json.JSONDecodeError:
-                            raise RuntimeError(f"Malformed JSON from {model_id} for role={role}")
+                        except json.JSONDecodeError as exc:
+                            raise RuntimeError(
+                                f"Malformed JSON from {model_id} for role={role}"
+                            ) from exc
 
                     # ── Quality gate (fail-fast heuristics) ─────────────────────
                     if self.cascading_quality_check:
@@ -368,12 +376,17 @@ class LLMExecutor:
 
         else: # No cascading routing, use standard routing
             logger.info(f"[CACHE] MISS for {role}")
-            raw, metadata = await self.router.call(
-                role=role,
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                **kwargs,
-            )
+            # Publish the conversation-history block as the user prompt's stable
+            # head. Prompt builders place it ahead of the per-turn question, so
+            # providers that honour explicit breakpoints can cache it across
+            # turns of the same conversation.
+            with user_cache_prefix(getattr(state, "_followup_cache", "") or ""):
+                raw, metadata = await self.router.call(
+                    role=role,
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    **kwargs,
+                )
             llm_call_end_time = time.monotonic() # Capture end time for LLM call
             duration_seconds = llm_call_end_time - llm_call_start_time
 

@@ -1,15 +1,32 @@
 'use client';
 
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Lock, ShieldCheck, Database, Server, Users, History, Globe, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function SecurityModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-  return (
+  // Unmount when closed. `opacity-0 + pointer-events-none` hides it from sight
+  // only: the subtree stayed in the accessibility tree, so its 13 headings ran
+  // ahead of the page's own <h1> in the outline, and its close button was still
+  // tabbable — keyboard users landed inside an invisible dialog. SiteHeader and
+  // SiteFooter each render one, so both effects happened twice per page.
+  if (!isOpen) return null;
+  // Never reached during SSR while `isOpen` starts false, but the guard keeps
+  // that an implementation detail rather than a load-bearing assumption.
+  if (typeof document === 'undefined') return null;
+
+  // Portalled to <body>. `position: fixed` resolves against the nearest ancestor
+  // carrying a filter, backdrop-filter or transform — not the viewport — and
+  // this renders inside SiteHeader, which is `backdrop-blur-xl`. The overlay was
+  // laid out against the 64px header bar: measured 1265×64 on a 1280×800
+  // viewport. Inside the mobile drawer it was worse, clipped to that panel's
+  // 319px column by the panel's reveal transform.
+  return createPortal(
     <div
       className={cn(
         'fixed inset-0 z-[300] flex items-center justify-center p-4 transition-all duration-300',
-        isOpen ? 'bg-black/60 opacity-100' : 'bg-black/0 opacity-0 pointer-events-none',
+        isOpen ? 'bg-[var(--scrim)] opacity-100' : 'bg-transparent opacity-0 pointer-events-none',
       )}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
@@ -17,13 +34,13 @@ export function SecurityModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
     >
       <div
         className={cn(
-          'w-full max-w-2xl rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-8 shadow-[var(--shadow-xl)] transition-all duration-300',
+          'w-full max-w-[var(--width-content)] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-8 shadow-[var(--shadow-lg)] transition-all duration-300',
           isOpen ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-4 opacity-0 scale-95',
         )}
       >
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-500/10 text-green-500">
+            <div className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-lg)] bg-[color-mix(in_oklab,var(--ok)_10%,transparent)] text-[var(--ok)]">
               <ShieldCheck className="h-6 w-6" />
             </div>
             <div>
@@ -32,10 +49,12 @@ export function SecurityModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="rounded-lg p-2 text-[var(--text-2)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
+            aria-label="Close security details"
+            className="min-touch rounded-[var(--radius)] p-2 text-[var(--text-2)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
           >
-            <X className="h-5 w-5" />
+            <X className="h-5 w-5" aria-hidden="true" />
           </button>
         </div>
 
@@ -43,20 +62,20 @@ export function SecurityModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
           {/* Column 1 */}
           <div className="space-y-6">
             <section className="flex gap-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-2)] text-[var(--text-2)]">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius)] bg-[var(--surface-2)] text-[var(--text-2)]">
                 <Lock className="h-5 w-5" />
               </div>
               <div>
-                <h4 className="font-semibold text-[var(--text-2)] mb-1 uppercase tracking-wider text-[10px]">Compliance</h4>
+                <h4 className="font-semibold text-[var(--text-2)] mb-1 uppercase tracking-wider text-[length:var(--text-2xs)]">Compliance</h4>
                 <h5 className="font-bold text-[var(--text)] text-sm mb-1">Certified SOC 2 Type II Ready</h5>
-                <p className="text-[12px] text-[var(--text-2)] leading-relaxed">
+                <p className="text-[length:var(--text-xs)] text-[var(--text-2)] leading-relaxed">
                   Independently audited privacy and security standards. Designed for full compliance to protect enterprise-grade workloads.
                 </p>
               </div>
             </section>
 
             <section className="flex gap-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-2)] text-[var(--text-2)]">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius)] bg-[var(--surface-2)] text-[var(--text-2)]">
                 <Database className="h-5 w-5" />
               </div>
               <div>
@@ -71,7 +90,7 @@ export function SecurityModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
             </section>
 
             <section className="flex gap-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-2)] text-[var(--text-2)]">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius)] bg-[var(--surface-2)] text-[var(--text-2)]">
                 <Server className="h-5 w-5" />
               </div>
               <div>
@@ -89,7 +108,7 @@ export function SecurityModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
           {/* Column 2 */}
           <div className="space-y-6">
             <section className="flex gap-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-2)] text-[var(--text-2)]">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius)] bg-[var(--surface-2)] text-[var(--text-2)]">
                 <Users className="h-5 w-5" />
               </div>
               <div>
@@ -102,7 +121,7 @@ export function SecurityModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
             </section>
 
             <section className="flex gap-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-2)] text-[var(--text-2)]">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius)] bg-[var(--surface-2)] text-[var(--text-2)]">
                 <History className="h-5 w-5" />
               </div>
               <div>
@@ -115,7 +134,7 @@ export function SecurityModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
             </section>
 
             <section className="flex gap-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-2)] text-[var(--text-2)]">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius)] bg-[var(--surface-2)] text-[var(--text-2)]">
                 <Globe className="h-5 w-5" />
               </div>
               <div>
@@ -131,11 +150,12 @@ export function SecurityModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
 
         <button
           onClick={onClose}
-          className="mt-8 w-full rounded-xl bg-[var(--accent)] py-3 text-sm font-semibold text-[var(--accent-text)] transition-all hover:opacity-90 active:scale-[0.98]"
+          className="mt-8 w-full rounded-[var(--radius-lg)] bg-[var(--accent)] py-3 text-sm font-semibold text-[var(--accent-text)] transition-all hover:opacity-90 active:scale-[0.98]"
         >
           Got it
         </button>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

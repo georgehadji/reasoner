@@ -10,7 +10,7 @@ def test_all_preset_models_have_lab_entries():
     from reasoner.application.services.harness_guard import _MODEL_LABS
 
     used_models: set[str] = set()
-    for name, cfg in PRESETS.items():
+    for _name, cfg in PRESETS.items():
         if cfg.get("primary_id"):
             used_models.add(cfg["primary_id"])
         for m in cfg.get("routing", {}).values():

@@ -152,6 +152,7 @@ class RunPipelineCommandHandler:
                     source_type=command.source_type,
                     domain=command.domain,
                     parallel_perspectives=command.parallel,
+                    user_id=getattr(command, "user_id", None),
                 )
                 state = await pipeline.run(problem=command.problem)
             

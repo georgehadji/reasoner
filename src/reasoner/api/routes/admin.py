@@ -4,13 +4,18 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from reasoner.core.settings import settings
+from reasoner.api.dependencies import get_current_user
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/admin")
+# Resolve a canonical principal for every admin route.  In production the
+# principal must also carry the explicit admin scope; the header remains a
+# second factor for scheduler/operational access.  Tests/development retain
+# key-only compatibility while deployments migrate callers to scoped JWTs.
+router = APIRouter(prefix="/api/admin", dependencies=[Depends(get_current_user)])
 
 
 def _require_admin(request: Request) -> None:
@@ -22,6 +27,10 @@ def _require_admin(request: Request) -> None:
     provided = request.headers.get("X-Admin-Key", "")
     if not secrets.compare_digest(provided, admin_key):
         raise HTTPException(status_code=403, detail="Invalid admin key")
+    if settings.ENVIRONMENT == "production":
+        user = getattr(request.state, "user", None)
+        if user is None or "admin" not in getattr(user, "scopes", set()):
+            raise HTTPException(status_code=403, detail="Admin scope required")
 
 
 @router.post("/compaction/run")

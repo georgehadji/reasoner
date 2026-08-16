@@ -12,8 +12,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from reasoner.api.auth_deps import check_rate_limit, require_csrf
-from reasoner.api.dependencies import _get_api_key_service, get_current_user
+from reasoner.api.auth_deps import require_csrf
+from reasoner.api.dependencies import _get_api_key_service, check_rate_limit, get_current_user
 from reasoner.application.services.api_key_service import ApiKeyLimitError, MAX_EXPIRY_DAYS
 from reasoner.domain.api_keys import (
     ASSIGNABLE_SCOPES,

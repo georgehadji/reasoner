@@ -776,6 +776,9 @@ _REGISTRY: dict[str, dict] = {
         "verifier":       "qwen3.5-flash",           # Qwen 🇨🇳 — fast & reliable
         "post_synthesis_verify": "sonar",  # added v3.5
         },
+        # Not implied by any model entry: translation goes through DeepL, not
+        # an LLM provider, so the preflight cannot derive this one.
+        "required_env_vars": ["DEEPL_API_KEY"],
         "tags": ["budget", "translation", "multilingual"],
     },
     "cross-language-premium": {
@@ -792,6 +795,7 @@ _REGISTRY: dict[str, dict] = {
         "verifier":       "glm-5.2",             # Zhipu 🇨🇳 — distinct training signal for multilingual verification
         "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
+        "required_env_vars": ["DEEPL_API_KEY"],
         "tags": ["premium", "translation", "multilingual"],
     },
     # ----------------------------------------------------------------------------------

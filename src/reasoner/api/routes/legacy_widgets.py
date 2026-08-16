@@ -40,7 +40,7 @@ async def get_stock(symbol: str = ""):
         return stock_data
     except Exception as e:
         logger.error(f"Stock error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise HTTPException(status_code=500, detail="Internal server error") from e
 
 
 @router.post("/api/calculate")

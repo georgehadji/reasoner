@@ -10,7 +10,7 @@ from reasoner.api.auth_deps import require_csrf
 from reasoner.api.dependencies import (
     check_quota_if_authenticated,
     check_rate_limit,
-    get_optional_user,
+    require_auth_if_legacy_disabled,
 )
 from reasoner.api.schemas import GenerateImageRequest
 from reasoner.domain.saas import User
@@ -24,7 +24,7 @@ router = APIRouter()
 async def generate_image_endpoint(
     request: Request,
     body: GenerateImageRequest,
-    user: User | None = Depends(get_optional_user),
+    user: User | None = Depends(require_auth_if_legacy_disabled),
     rate_limit_checked=Depends(check_rate_limit),
     csrf_checked=Depends(require_csrf),
     quota=Depends(check_quota_if_authenticated),

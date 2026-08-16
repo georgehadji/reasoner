@@ -108,6 +108,16 @@ def _check_node(node: ast.AST) -> str:
             logger.debug("Blocked from-import: %s", module)
             return SAFETY_BLOCKED
 
+    # ── BLOCKED: deserialization and file-like access by attribute ──
+    # This is defense in depth only.  The real security boundary must be an
+    # isolated execution service, not this AST inspection.
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+        if node.func.attr in {
+            "loads", "load", "read_text", "read_bytes", "write_text",
+            "write_bytes", "open", "unlink", "rename", "replace",
+        }:
+            return SAFETY_BLOCKED
+
     # ── SUSPICIOUS: eval/exec via attribute access ──
     if isinstance(node, ast.Call):
         if isinstance(node.func, ast.Attribute):

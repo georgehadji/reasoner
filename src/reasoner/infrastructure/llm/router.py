@@ -371,6 +371,12 @@ class ProviderRouter:
             metadata["output_tokens"] = provider.last_output_tokens
         if hasattr(provider, "last_cost_usd"):
             metadata["cost_usd"] = provider.last_cost_usd
+        # Provider-side prompt cache accounting (OpenRouter usage.include).
+        # Absent for providers that do not report it.
+        if hasattr(provider, "last_cache_read_tokens"):
+            metadata["cache_read_tokens"] = provider.last_cache_read_tokens
+        if hasattr(provider, "last_cache_write_tokens"):
+            metadata["cache_write_tokens"] = provider.last_cache_write_tokens
         return metadata
 
     async def _emit_telemetry(

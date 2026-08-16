@@ -35,7 +35,7 @@ export function MethodChoicePrompt({
 
   return (
     <div className="flex w-full justify-center px-4">
-      <div className="w-full max-w-3xl rounded-[10px] border border-mds-color-cool-gray/[0.4] bg-[var(--surface-2)] p-4">
+      <div className="w-full max-w-3xl rounded-[10px] border border-[var(--border)] bg-[var(--surface-2)] p-4">
         <div className="mb-3 flex items-center justify-between">
           <div className="text-sm font-medium text-[var(--text)]">
             Not sure which reasoning method fits best — pick one:
@@ -56,16 +56,16 @@ export function MethodChoicePrompt({
               key={c.method}
               type="button"
               onClick={() => onChoose(c.preset!)}
-              className="group flex w-full items-start gap-3 rounded-[8px] border border-mds-color-cool-gray/[0.3] bg-[var(--surface-1)] px-3 py-2.5 text-left transition-colors hover:border-[var(--accent)] hover:bg-[var(--surface-3)]"
+              className="group flex w-full items-start gap-3 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-left transition-colors hover:border-[var(--accent)] hover:bg-[var(--surface-3)]"
             >
-              <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-mds-color-cool-gray/[0.4] text-[10px] text-[var(--text-muted)] group-hover:border-[var(--accent)]">
+              <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[var(--border)] text-[10px] text-[var(--text-muted)] group-hover:border-[var(--accent)]">
                 {i === 0 ? <Check className="h-3 w-3" /> : i + 1}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-[var(--text)]">{prettyMethod(c.method)}</span>
                   {i === 0 && (
-                    <span className="rounded-full bg-[var(--accent)]/15 px-2 py-0.5 text-[10px] font-medium text-[var(--accent)]">
+                    <span className="rounded-full bg-[color-mix(in_oklab,var(--accent)_15%,transparent)] px-2 py-0.5 text-[10px] font-medium text-[var(--accent)]">
                       Suggested
                     </span>
                   )}
@@ -84,7 +84,7 @@ export function MethodChoicePrompt({
             type="checkbox"
             checked={alwaysAuto}
             onChange={onToggleAlwaysAuto}
-            className="h-3.5 w-3.5 cursor-pointer rounded border-mds-color-cool-gray/[0.4]"
+            className="h-3.5 w-3.5 cursor-pointer rounded border-[var(--border)]"
           />
           Always pick automatically — don&apos;t ask again
         </label>
@@ -96,7 +96,7 @@ export function MethodChoicePrompt({
 export function MethodChoiceLoading() {
   return (
     <div className="flex w-full justify-center px-4">
-      <div className="flex items-center gap-2 rounded-full border border-mds-color-cool-gray/[0.4] bg-[var(--surface-2)] px-4 py-2 text-sm text-[var(--text-muted)]">
+      <div className="flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-4 py-2 text-sm text-[var(--text-muted)]">
         <Loader2 className="h-3.5 w-3.5 animate-spin" />
         Checking best reasoning method…
       </div>

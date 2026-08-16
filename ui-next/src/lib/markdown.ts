@@ -5,13 +5,23 @@ export function buildMarkdownFromPhase(
   phaseNum: number,
   name: string,
   data: unknown,
-  options?: { omitSections?: Array<'critical_insights' | 'action_blueprint' | 'open_questions' | 'sources' | 'vetted_context'> }
+  options?: {
+    omitSections?: Array<'critical_insights' | 'action_blueprint' | 'open_questions' | 'sources' | 'vetted_context'>;
+    /** Drop the `### Phase N · name` heading and its rule. Set when the output
+     *  is rendered inside a phase card, whose own <h2> already carries both —
+     *  otherwise every phase is announced twice and the card contributes an
+     *  h3 that outranks nothing. Left off for exports, where the heading is
+     *  the only thing separating one phase from the next. */
+    omitHeading?: boolean;
+  }
 ): string {
   let md = '';
-  if (index > 0) {
-    md += '---\n\n';
+  if (!options?.omitHeading) {
+    if (index > 0) {
+      md += '---\n\n';
+    }
+    md += `### Phase ${index + 1} · ${name}\n\n`;
   }
-  md += `### Phase ${index + 1} · ${name}\n\n`;
   if (!data || typeof data !== 'object') {
     md += String(data) + '\n\n';
     return md;

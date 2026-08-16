@@ -18,11 +18,18 @@ from contextvars import ContextVar
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any
+from types import MappingProxyType
+from typing import Any, Mapping
 
 # Context variables for log context across async calls
 _correlation_id: ContextVar[str] = ContextVar("correlation_id", default="")
-_log_context: ContextVar[dict[str, Any]] = ContextVar("log_context", default={})
+# Immutable default: a bare {} here is one dict shared by every context that
+# never called set_log_context(), so an in-place update in any request would
+# leak into all of them. set_log_context() replaces the value wholesale, so
+# nothing needs to mutate this -- and now nothing can.
+_log_context: ContextVar[Mapping[str, Any]] = ContextVar(
+    "log_context", default=MappingProxyType({})
+)
 
 
 # ── Queue-based async logging (Phase 1.4: replaces blocking print()) ──────────

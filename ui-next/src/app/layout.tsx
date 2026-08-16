@@ -1,16 +1,10 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
 import './globals.css';
+import { fontVariables } from './fonts';
 import { Providers } from './providers';
 import { JsonLd } from '@/components/seo/JsonLd';
 import { organizationSchema, softwareApplicationSchema, websiteSchema } from '@/lib/schema';
 import { SITE, SITE_URL } from '@/lib/site';
-
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-inter',
-  display: 'swap',
-});
 
 export const metadata: Metadata = {
   // Without metadataBase, relative OpenGraph and canonical URLs resolve against
@@ -80,7 +74,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} antialiased`} suppressHydrationWarning>
+    // `suppressHydrationWarning` is required, not cosmetic: next-themes writes the
+    // resolved theme class onto <html> from a blocking inline script before React
+    // hydrates, so the server markup and the client DOM intentionally disagree on
+    // this one element. Without it React logs a hydration mismatch on every load.
+    <html lang="en" className={`${fontVariables} antialiased`} suppressHydrationWarning>
       <body className="min-h-screen bg-[var(--bg)] text-[var(--text)] flex flex-col">
         <JsonLd data={[organizationSchema(), websiteSchema(), softwareApplicationSchema()]} />
         <a href="#main-content" className="skip-link">

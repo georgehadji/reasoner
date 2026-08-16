@@ -8,11 +8,11 @@ from fastapi import HTTPException
 from reasoner.api.auth_deps import (
     _get_auth_manager_instance_auth_deps,
     _get_rate_limiter_instance_auth_deps,
-    check_rate_limit,
     require_auth,
     optional_auth,
     require_csrf,
 )
+from reasoner.api.dependencies import check_rate_limit
 
 
 class TestAuthManagerInstance:
@@ -96,26 +96,62 @@ class TestRequireCSRF:
 
 
 class TestCheckRateLimit:
-    """Test rate limiting dependency."""
+    """Test rate limiting dependency.
+
+    Lives in dependencies.py, not auth_deps (docs/plans/pre-existing-fixes.md
+    #3) — every route, including the auth_deps-guarded ones, now shares this
+    module's rate-limiter singleton and user/credentials-aware signature.
+    """
 
     @pytest.mark.asyncio
-    async def test_rate_limit_blocks_after_threshold(self):
-        from unittest.mock import MagicMock, AsyncMock
+    async def test_rate_limit_blocks_after_threshold(self, monkeypatch):
+        from unittest.mock import MagicMock
+
+        from reasoner.api import dependencies as deps_module
+
         request = MagicMock()
         request.headers = {"User-Agent": "test"}
         request.client.host = "127.0.0.1"
 
-        rate_limiter = _get_rate_limiter_instance_auth_deps()
-        original = rate_limiter.is_allowed
-
         async def reject(*args, **kwargs):
             return False, {"retry_after": 60, "limit_minute": 60, "remaining_minute": 0}
 
-        rate_limiter.is_allowed = reject
-        try:
-            with pytest.raises(HTTPException) as exc_info:
-                await check_rate_limit(request, None)
-            assert exc_info.value.status_code == 429
-            assert "Rate limit" in str(exc_info.value.detail)
-        finally:
-            rate_limiter.is_allowed = original
+        mock_limiter = MagicMock()
+        mock_limiter.is_allowed = reject
+        monkeypatch.setattr(deps_module, "_rate_limiter_instance", mock_limiter)
+
+        with pytest.raises(HTTPException) as exc_info:
+            await check_rate_limit(request=request, user=None, credentials=None)
+        assert exc_info.value.status_code == 429
+        assert "Rate limit" in str(exc_info.value.detail)
+
+    @pytest.mark.asyncio
+    async def test_authenticated_caller_bucketed_by_user_id(self, monkeypatch):
+        """Converged behaviour: an authenticated caller on an auth_deps-guarded
+        route is bucketed by user id, not IP — closing the fairness gap where
+        uploads/keys/credits used to bucket authenticated users by IP while
+        /api/run bucketed them by account."""
+        from unittest.mock import AsyncMock, MagicMock
+        from uuid import uuid4
+
+        from reasoner.api import dependencies as deps_module
+        from reasoner.domain.saas import User
+
+        user = User(id=uuid4(), email="test@example.com", display_name="Test", scopes=["read"])
+
+        request = MagicMock()
+        request.headers = {"User-Agent": "test"}
+        request.client.host = "127.0.0.1"
+        request.state = MagicMock()
+
+        mock_limiter = MagicMock()
+        mock_limiter.is_allowed_for_user = AsyncMock(
+            return_value=(True, {"limit_minute": 60, "remaining_minute": 59})
+        )
+        mock_limiter.is_allowed = AsyncMock(side_effect=AssertionError("should not bucket by IP"))
+        monkeypatch.setattr(deps_module, "_rate_limiter_instance", mock_limiter)
+
+        result = await check_rate_limit(request=request, user=user, credentials=None)
+
+        assert result is True
+        mock_limiter.is_allowed_for_user.assert_awaited_once_with(f"user:{user.id}", tier="default")

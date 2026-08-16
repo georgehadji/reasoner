@@ -18,7 +18,7 @@ Hexagonal DDD + CQRS + Event Sourcing + WorkflowStrategy composition (`applicati
 
 **Dependency Rule:** Domain has no outer dependencies → Application depends on Domain/Core only → Infrastructure implements Core ports → API/Interface depends on Application.
 
-**Known violations (last verified 2026-08):** none currently open. Prior violations closed: `domain/preset_core.py`'s infra import (fixed pre-2026-08); `application/orchestrator.py`, `application/services/preset_service.py`, `application/services/pricing_service.py` importing `infrastructure.llm.registry` directly (fixed 2026-08 — now consume `core/ports/model_registry_port.py`, injected via `set_model_registry_port()` at `api/__init__.py`/`main.py`/`headless.py`). `application/flows/__init__.py` importing `api.serializers` — never existed, was a doc error. `api/streaming.py` bypassing CQRS — inaccurate as stated: it does route through `RunPipelineCommandHandler`; the handler's legacy non-streaming branch (`sse_emit=None`) is a separate, rarely-used code path, not a bypass.
+**Known violations (last verified 2026-08):** one accepted exception — `domain/preset_core.py` imports `core/ports/model_registry_port.py` for preset key-preflight derivation (`.importlinter` `ignore_imports`, documented). `PRESETS` builds at module import (`presets.py:25`), so DI can't reach it there; retire by making preset construction lazy, then injecting. Prior violations closed: `domain/preset_core.py`'s infra import (fixed pre-2026-08); `application/orchestrator.py`, `application/services/preset_service.py`, `application/services/pricing_service.py` importing `infrastructure.llm.registry` directly (fixed 2026-08 — now consume `core/ports/model_registry_port.py`, injected via `set_model_registry_port()` at `api/__init__.py`/`main.py`/`headless.py`). `application/flows/__init__.py` importing `api.serializers` — never existed, was a doc error. `api/streaming.py` bypassing CQRS — inaccurate as stated: it does route through `RunPipelineCommandHandler`; the handler's legacy non-streaming branch (`sse_emit=None`) is a separate, rarely-used code path, not a bypass.
 
 ---
 
@@ -49,7 +49,9 @@ src/reasoner/
 │   ├── schemas.py          # Pydantic request/response models
 │   ├── middleware.py       # Security headers, memory limits, timeouts
 │   ├── auth_deps.py        # Auth dependencies with scoped permissions
-│   └── routes/             # Modular route handlers
+│   ├── run_observability.py # CreditSink/PrometheusObserver bindings for run_metering.metered()
+│   ├── mcp/                # MCP server (driving adapter, optional 'mcp' extra) — see docs/MCP.md
+│   └── routes/             # Modular route handlers (includes routes/agent.py — bearer-key agent endpoints)
 ├── application/            # CQRS commands, queries, event bus, flows, mixins
 │   ├── pipeline.py         # ReasonerPipeline orchestrator (real impl — pipeline.py root is a shim)
 │   ├── orchestrator.py     # PipelineOrchestrator + preflight (HyperGate, preset resolution)

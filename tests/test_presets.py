@@ -10,6 +10,7 @@ from reasoner.presets import (
     get_preset_price_tier,
     FOLLOWUP_AGENT_MODELS,
 )
+from reasoner.core.constants_models import MODEL_GROK_43
 from reasoner.domain.saas import SubscriptionTier
 
 class TestGetPresetPriceTier:
@@ -47,7 +48,11 @@ class TestFollowupAgentModels:
         assert FOLLOWUP_AGENT_MODELS["budget"] == "kimi-k2-6"
 
     def test_premium_maps_to_grok(self):
-        assert FOLLOWUP_AGENT_MODELS["premium"] == "grok-4.20"
+        # Assert against the alias constant, not a hardcoded ID. The literal
+        # "grok-4.20" here outlived the model it named; pinning the constant
+        # keeps this test meaningful (premium routes to the Grok alias) across
+        # the version bumps that happen every few weeks.
+        assert FOLLOWUP_AGENT_MODELS["premium"] == MODEL_GROK_43
 
 
 class TestGetMethodFromPreset:

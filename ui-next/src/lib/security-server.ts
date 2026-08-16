@@ -93,11 +93,31 @@ export async function generateSignedCsrfToken(): Promise<string> {
   return signCsrfToken(generateCsrfToken());
 }
 
+/**
+ * Extract a bearer token from the Authorization header, or null.
+ *
+ * Agent routes are bearer-only — no CSRF token, no session cookie. Without
+ * this check a proxy route would forward a CSRF-free, credential-free
+ * request straight to a metered backend endpoint that requires one of the
+ * two; failing here, in the proxy, is cheaper than round-tripping to find
+ * out the same thing from a 401.
+ */
+export function extractBearerToken(req: NextRequest): string | null {
+  const header = req.headers.get('authorization') ?? '';
+  return header.toLowerCase().startsWith('bearer ') ? header.slice(7).trim() || null : null;
+}
+
 export function getApiBaseUrl(): string {
   if (process.env.API_BASE_URL) return process.env.API_BASE_URL;
   if (process.env.NEXT_PUBLIC_API_BASE_URL) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('API_BASE_URL must be configured server-side in production');
+    }
     console.warn('SECURITY: Using NEXT_PUBLIC_API_BASE_URL. Prefer API_BASE_URL (server-only).');
     return process.env.NEXT_PUBLIC_API_BASE_URL;
+  }
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('API_BASE_URL must be configured in production');
   }
   return REASONER_API_BASE;
 }
@@ -124,9 +144,17 @@ export function validateUpstreamUrl(url: string): string {
     if (
       hostname === 'localhost' ||
       hostname === '127.0.0.1' ||
+      hostname === '::1' ||
+      hostname === '0.0.0.0' ||
+      hostname === '::' ||
+      hostname === '169.254.169.254' ||
+      hostname === 'metadata.google.internal' ||
       hostname.startsWith('192.168.') ||
       hostname.startsWith('10.') ||
-      /^172\.(1[6-9]|2\d|3[01])\./.test(hostname)
+      hostname.startsWith('169.254.') ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) ||
+      /^fc[0-9a-f]{2}:/i.test(hostname) ||
+      /^fe[89ab][0-9a-f]:/i.test(hostname)
     ) {
       throw new Error('Upstream URL points to a private network in production');
     }
@@ -210,7 +238,10 @@ export function validateRunRequest(body: unknown): RunRequest {
     throw new ValidationError('Problem cannot be empty');
   }
   if (b.problem.length > VALIDATION_LIMITS.problemMaxLength) {
-    throw new ValidationError(`Problem exceeds ${VALIDATION_LIMITS.problemMaxLength.toLocaleString()} characters`);
+    // Pinned locale: bare toLocaleString() follows the *server's* locale, so a
+    // host running de-DE rendered the limit as "10.000 characters" to an English
+    // user, who reads that as ten. The copy around it is English either way.
+    throw new ValidationError(`Problem exceeds ${VALIDATION_LIMITS.problemMaxLength.toLocaleString('en-US')} characters`);
   }
   if (typeof b.preset !== 'string' || !VALID_PRESET_PATTERN.test(b.preset)) {
     throw new ValidationError('Invalid preset');
@@ -255,7 +286,7 @@ export function validateRunFollowupRequest(body: unknown): import('./types').Run
     throw new ValidationError('Question cannot be empty');
   }
   if (b.question.length > VALIDATION_LIMITS.questionMaxLength) {
-    throw new ValidationError(`Question exceeds ${VALIDATION_LIMITS.questionMaxLength.toLocaleString()} characters`);
+    throw new ValidationError(`Question exceeds ${VALIDATION_LIMITS.questionMaxLength.toLocaleString('en-US')} characters`);
   }
   if (typeof b.preset !== 'string' || !VALID_PRESET_PATTERN.test(b.preset)) {
     throw new ValidationError('Invalid preset');
@@ -352,6 +383,11 @@ export function validateSearchRequest(body: unknown): { query: string; source_ty
 // Rate limiting
 const RATE_LIMITS: Record<string, { limit: number; windowMs: number }> = {
   run: { limit: 10, windowMs: SECURITY_CONSTANTS.rateLimitWindowMs },
+  // Agent callers are servers, not browser tabs, and often share an egress
+  // IP (NAT, a datacenter range). This is a coarse outer guard only — the
+  // authoritative, per-account limit is enforced by the backend's
+  // check_rate_limit, which buckets by user id once the bearer key resolves.
+  'agent-run': { limit: 30, windowMs: SECURITY_CONSTANTS.rateLimitWindowMs },
   calculate: { limit: 20, windowMs: SECURITY_CONSTANTS.rateLimitWindowMs },
   stop: { limit: 30, windowMs: SECURITY_CONSTANTS.rateLimitWindowMs },
   cache: { limit: 30, windowMs: SECURITY_CONSTANTS.rateLimitWindowMs },

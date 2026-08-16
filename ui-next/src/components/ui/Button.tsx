@@ -91,8 +91,12 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           // Transition
           'transition-all duration-200 ease-out',
           'active:scale-[0.97] active:duration-100',
-          // Focus
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]',
+          // Focus is not styled here. globals.css already gives every button an
+          // accent outline with a transparent 2px offset, which reads correctly
+          // on --bg, --surface and --surface-2 alike, and thickens to 3px under
+          // prefers-contrast: more. The ring this used to draw hardcoded a --bg
+          // offset — a page-coloured gap painted over every card — and its
+          // outline-none opted out of the contrast bump entirely.
           // Disabled / Loading
           isDisabled && 'cursor-not-allowed opacity-60',
           // Size

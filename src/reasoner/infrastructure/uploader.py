@@ -196,7 +196,7 @@ async def _ocr_scanned_pdf(content: bytes, max_pages: int = 3) -> str:
         return f"[Scanned PDF OCR failed: {e}]"
 
 
-async def extract_text(content: bytes, filename: str, *, force_ocr: bool = False) -> str:
+async def _extract_text_unbounded(content: bytes, filename: str, *, force_ocr: bool = False) -> str:
     """
     Extract text content from a file based on its extension.
 
@@ -228,6 +228,19 @@ async def extract_text(content: bytes, filename: str, *, force_ocr: bool = False
             return await _extract_image(content, filename)
         case _:
             return f"[Unsupported file type: {ext}]"
+
+
+async def extract_text(content: bytes, filename: str, *, force_ocr: bool = False) -> str:
+    """Extract content with a hard per-file parser/OCR timeout."""
+    timeout = max(1, settings.DOCUMENT_EXTRACTION_TIMEOUT_SECONDS)
+    try:
+        return await asyncio.wait_for(
+            _extract_text_unbounded(content, filename, force_ocr=force_ocr),
+            timeout=timeout,
+        )
+    except asyncio.TimeoutError:
+        logger.warning("Document extraction timed out for %s after %ss", filename, timeout)
+        return "[Document extraction timed out]"
 
 
 async def save_uploaded_files(

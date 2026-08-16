@@ -1,0 +1,25 @@
+# Normalise line endings in the repo to LF. Without this, editing on Windows
+# rewrites whole files to CRLF and every diff becomes unreviewable.
+* text=auto eol=lf
+
+# Windows-only scripts must keep CRLF to run.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Never touch binaries.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.pdf binary
+*.zip binary
+*.db binary
+*.sqlite binary
+*.sqlite3 binary

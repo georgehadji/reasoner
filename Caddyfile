@@ -6,7 +6,7 @@
     handle /api/health {
         reverse_proxy https://backend:8000 {
             transport http {
-                tls_insecure_skip_verify
+                tls_trust_pool file /certs/ca.crt
             }
         }
     }
@@ -15,7 +15,7 @@
     handle /api/* {
         reverse_proxy https://backend:8000 {
             transport http {
-                tls_insecure_skip_verify
+                tls_trust_pool file /certs/ca.crt
             }
         }
     }
@@ -24,7 +24,7 @@
     handle /ws/* {
         reverse_proxy https://backend:8000 {
             transport http {
-                tls_insecure_skip_verify
+                tls_trust_pool file /certs/ca.crt
             }
         }
     }
@@ -33,7 +33,7 @@
     handle {
         reverse_proxy https://frontend:3000 {
             transport http {
-                tls_insecure_skip_verify
+                tls_trust_pool file /certs/ca.crt
             }
         }
     }

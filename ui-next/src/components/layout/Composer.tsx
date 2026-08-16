@@ -28,6 +28,18 @@ const ALLOWED_TYPES = [
   'image/webp',
 ];
 
+/* Pill toggles in the toolbar. 40px tall — the WCAG 2.5.5 floor — and the
+   active state is a shape (the leading dot), not only a hue, so it survives
+   monochrome and colour blindness. `aria-pressed` carries it to AT. */
+const TOGGLE_BASE =
+  'flex h-[var(--space-10)] cursor-pointer items-center gap-[var(--space-2)] rounded-[var(--radius-pill)] px-[var(--space-3)] text-[length:var(--text-xs)] font-medium leading-[var(--lh-ui)] transition-colors duration-[var(--dur-micro)]';
+const TOGGLE_ON = 'bg-[var(--accent-dim)] text-[var(--accent)]';
+const TOGGLE_OFF = 'text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]';
+
+function ActiveDot() {
+  return <span aria-hidden="true" className="h-1.5 w-1.5 rounded-[var(--radius-pill)] bg-[var(--accent)]" />;
+}
+
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes}B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
@@ -42,21 +54,23 @@ interface AttachmentChipProps {
 function AttachmentChip({ att, onRemove }: AttachmentChipProps) {
   const isImage = att.type.startsWith('image/');
   return (
-    <div className="group inline-flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5 text-xs text-[var(--text-muted)] transition-colors hover:border-[var(--border-strong)]">
+    <div className="group inline-flex items-center gap-[var(--space-2)] rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-2)] px-[var(--space-3)] py-[var(--space-1)] text-[length:var(--text-xs)] leading-[var(--lh-ui)] text-[var(--text-muted)] transition-colors duration-[var(--dur-micro)] hover:border-[var(--border-strong)]">
       {isImage && att.previewUrl ? (
-        <img src={att.previewUrl} alt={att.name} className="h-5 w-5 rounded object-cover" />
+        <img src={att.previewUrl} alt="" className="h-5 w-5 rounded-[var(--radius-sm)] object-cover" />
       ) : (
-        <FileText className="h-4 w-4 shrink-0" />
+        <FileText className="h-4 w-4 shrink-0" aria-hidden="true" />
       )}
-      <span className="max-w-[120px] truncate">{att.name}</span>
-      <span className="text-[10px] text-[var(--text-subtle)]">{formatFileSize(att.size)}</span>
+      <span className="max-w-[18ch] truncate">{att.name}</span>
+      <span className="nums-tabular font-mono text-[length:var(--text-2xs)] text-[var(--text-subtle)]">
+        {formatFileSize(att.size)}
+      </span>
       <button
         type="button"
         onClick={() => onRemove(att.id)}
-        className="ml-1 cursor-pointer rounded-full p-1 text-[var(--text-subtle)] transition-colors hover:bg-red-500/15 hover:text-red-400 min-touch focus-visible:outline-2 focus-visible:outline-[var(--accent)] focus-visible:outline-offset-2"
+        className="min-touch cursor-pointer rounded-[var(--radius-pill)] text-[var(--text-subtle)] transition-colors duration-[var(--dur-micro)] hover:bg-[var(--red-bg)] hover:text-[var(--red)]"
         aria-label={`Remove ${att.name}`}
       >
-        <X className="h-3.5 w-3.5" />
+        <X className="h-3.5 w-3.5" aria-hidden="true" />
       </button>
     </div>
   );
@@ -77,6 +91,20 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
   const isImageMode = useAppStore((s) => s.isImageMode);
   const toggleImageMode = useAppStore((s) => s.toggleImageMode);
   const hasContent = composerText.trim().length > 0 || attachments.length > 0;
+
+  const user = useAppStore((s) => s.user);
+
+  /* Set after mount, never during render: `new Date()` on the server and on
+     the client land in different hours often enough, and Next would flag the
+     mismatch and re-render the whole subtree. The neutral default is what
+     ships in the HTML. */
+  const [greeting, setGreeting] = useState('Ready when you are');
+  useEffect(() => {
+    const hour = new Date().getHours();
+    const part = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+    const name = user?.email?.split('@')[0];
+    setGreeting(name ? `${part}, ${name}` : part);
+  }, [user]);
 
   const [estimate, setEstimate] = useState<{ tokens: number; cost: string; duration: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -195,21 +223,22 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
 
   /* ── Toolbar buttons ──────────────────────────────────── */
   function AttachButton() {
+    const disabled = attachments.length >= LIMITS.maxAttachments || running;
     return (
       <Tooltip text="Attach files (PDF, TXT, MD, images)">
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          disabled={attachments.length >= 5 || running}
+          disabled={disabled}
           className={cn(
-            'flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl border text-[var(--text-muted)] transition-all',
-            attachments.length >= 5 || running
-              ? 'cursor-not-allowed border-[var(--border)] opacity-40'
-              : 'border-[var(--border)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]',
+            'min-touch cursor-pointer rounded-[var(--radius-pill)] text-[var(--text-muted)] transition-colors duration-[var(--dur-micro)]',
+            disabled
+              ? 'cursor-not-allowed opacity-40'
+              : 'hover:bg-[var(--surface-2)] hover:text-[var(--text)]',
           )}
           aria-label="Attach files"
         >
-          <Plus className="h-4 w-4" />
+          <Plus className="h-5 w-5" aria-hidden="true" />
         </button>
       </Tooltip>
     );
@@ -236,16 +265,21 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
           onClick={() => { if (!isLocked) toggleTier(); }}
           disabled={isLocked && !isPremium}
           className={cn(
-            'flex h-10 cursor-pointer items-center gap-1.5 rounded-xl border px-3 text-xs font-medium transition-all',
+            TOGGLE_BASE,
             isPremium
-              ? 'border-[var(--surface-2)] bg-[var(--surface)] text-[var(--text)]'
+              ? TOGGLE_ON
               : isLocked
                 ? 'cursor-not-allowed border-[var(--border)] text-[var(--text-subtle)] opacity-50'
-                : 'border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]',
+                : TOGGLE_OFF,
           )}
+          aria-pressed={isPremium}
           aria-disabled={isLocked && !isPremium}
         >
-          {isLocked && !isPremium ? <Lock className="h-3 w-3" /> : <Sparkles className="h-3 w-3" />}
+          {/* The glyph identifies the control and must persist; the dot is
+              additive state. Swapping the icon out meant turning Premium on
+              deleted the only thing that said "Premium". */}
+          {isPremium && <ActiveDot />}
+          {isLocked && !isPremium ? <Lock className="h-3 w-3" aria-hidden="true" /> : <Sparkles className="h-3 w-3" aria-hidden="true" />}
           Premium
         </button>
       </Tooltip>
@@ -258,14 +292,11 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
         <button
           type="button"
           onClick={toggleImageMode}
-          className={cn(
-            'flex h-10 cursor-pointer items-center gap-1.5 rounded-xl border px-3 text-xs font-medium transition-all',
-            isImageMode
-              ? 'border-[var(--surface-2)] bg-[var(--surface)] text-[var(--text)]'
-              : 'border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]',
-          )}
+          className={cn(TOGGLE_BASE, isImageMode ? TOGGLE_ON : TOGGLE_OFF)}
+          aria-pressed={isImageMode}
         >
-          <ImageIcon className="h-3 w-3" />
+          {isImageMode && <ActiveDot />}
+          <ImageIcon className="h-3 w-3" aria-hidden="true" />
           Image
         </button>
       </Tooltip>
@@ -279,10 +310,10 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
         <button
           type="button"
           onClick={onStop}
-          className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl bg-[#606060]/15 text-[#A0A0A0] transition-colors hover:bg-[#606060]/25"
-          aria-label="Stop"
+          className="min-touch cursor-pointer rounded-[var(--radius-pill)] bg-[var(--accent-2-dim)] text-[var(--text-2)] transition-colors duration-[var(--dur-micro)] hover:bg-[color-mix(in_oklab,var(--accent-2)_24%,transparent)]"
+          aria-label="Stop generating"
         >
-          <Square className="h-3.5 w-3.5 fill-current" />
+          <Square className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
         </button>
       );
     }
@@ -292,28 +323,41 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
         onClick={onSubmit}
         disabled={!hasContent}
         className={cn(
-          'flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl font-semibold text-white transition-all',
+          'min-touch rounded-[var(--radius-pill)] font-semibold transition-colors duration-[var(--dur-micro)]',
           hasContent
-            ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] hover:shadow-[var(--accent-glow)]'
-            : 'bg-[var(--surface-3)] text-[var(--text-subtle)] cursor-not-allowed',
+            ? 'cursor-pointer bg-[var(--accent)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)] hover:shadow-[var(--accent-glow)]'
+            : 'cursor-not-allowed bg-[var(--surface-3)] text-[var(--text-subtle)]',
         )}
-        aria-label="Send"
+        aria-label={isImageMode ? 'Generate image' : 'Send message'}
       >
-        <ArrowUp className="h-4.5 w-4.5" />
+        <ArrowUp className="h-4 w-4" aria-hidden="true" />
       </button>
     );
   }
 
   /* ── Input box ────────────────────────────────────────── */
-  const inputBox = (minH: number) => (
+  /* State ladder, weakest to strongest: rest → hover (border only) →
+     focus-within (accent border + 3px accent ring + lifted shadow). Focus
+     must never be quieter than hover, or keyboard users lose the caret. */
+  const inputBox = (minH: number, placeholder: string) => (
     <div
+      aria-busy={running}
       className={cn(
-        'relative rounded-2xl border bg-[var(--surface)] transition-all duration-300 ease-out',
+        'relative rounded-[var(--radius-xl)] border bg-[var(--surface)] shadow-[var(--shadow)] transition-[border-color,box-shadow,background-color] duration-[var(--dur-state)] ease-[var(--ease-standard)]',
         isDragging
           ? 'border-[var(--accent)] shadow-[var(--accent-glow)]'
           : running
-            ? 'border-[var(--accent)]/40 shadow-[0_0_20px_rgba(59,130,246,0.10)]'
-            : 'border-[var(--border)] focus-within:border-[var(--border-strong)] focus-within:shadow-[var(--shadow-lg)] focus-within:bg-[var(--surface-2)]',
+            // Busy is --accent-2, not --accent: the focus ring below is
+            // --accent, and when both used it the two states were
+            // indistinguishable.
+            ? 'border-[var(--accent-2)] shadow-[0_0_0_3px_var(--accent-2-dim)]'
+            : 'border-[var(--border)] hover:border-[var(--border-strong)]',
+        // Outside the ternary on purpose. The `running` branch previously
+        // carried no focus-within rule at all, so focusing the textarea during
+        // a run produced zero visual change (WCAG 2.4.7) — the textarea also
+        // sets focus:outline-none, so nothing else drew a ring.
+        !isDragging &&
+          'focus-within:border-[var(--accent)] focus-within:shadow-[0_0_0_3px_var(--accent-dim),var(--shadow-lg)]',
       )}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -321,16 +365,19 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
       onPaste={handlePaste}
     >
       {isDragging && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl border-2 border-dashed border-[var(--accent)] bg-[var(--accent-dim)]">
-          <div className="flex items-center gap-2 text-sm font-medium text-[var(--accent)]">
-            <Upload className="h-5 w-5" />
+        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-[var(--radius-xl)] border-2 border-dashed border-[var(--accent)] bg-[var(--accent-dim)]">
+          <div className="flex items-center gap-[var(--space-2)] text-[length:var(--text-sm)] font-medium text-[var(--accent)]">
+            <Upload className="h-5 w-5" aria-hidden="true" />
             Drop files here
           </div>
         </div>
       )}
 
       {fileError && (
-        <div className="mx-3 mt-2 rounded-lg border border-[var(--red-border)] bg-[var(--red-bg)] px-3 py-2 text-sm text-[var(--red)]">
+        <div
+          role="alert"
+          className="mx-[var(--space-3)] mt-[var(--space-2)] rounded-[var(--radius)] border border-[var(--red-border)] bg-[var(--red-bg)] px-[var(--space-3)] py-[var(--space-2)] text-[length:var(--text-sm)] leading-[var(--lh-ui)] text-[var(--red)]"
+        >
           {fileError}
         </div>
       )}
@@ -339,46 +386,80 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
         value={composerText}
         onChange={(e) => { setComposerText(e.target.value); autoResize(); clearFileError(); }}
         onKeyDown={handleKeyDown}
-        placeholder={isImageMode ? 'Describe the image you want to generate…' : 'Ask anything…'}
+        placeholder={placeholder}
         rows={1}
-        className="w-full resize-none bg-transparent px-4 py-3.5 text-[16px] leading-relaxed text-[var(--text)] placeholder:text-[var(--text-muted)] placeholder:transition-colors placeholder:duration-200 focus:outline-none transition-[height] duration-150 ease-out"
+        aria-label={isImageMode ? 'Describe the image to generate' : 'Ask anything'}
+        className="w-full resize-none bg-transparent px-[var(--space-5)] pt-[var(--space-4)] text-[length:var(--text-base)] leading-[var(--lh-body)] text-[var(--text)] transition-[height] duration-[var(--dur-micro)] ease-[var(--ease-standard)] placeholder:text-[var(--text-muted)] placeholder:transition-colors placeholder:duration-[var(--dur-micro)] focus:outline-none"
         style={{ minHeight: minH }}
       />
 
       {attachments.length > 0 && (
-        <div className="flex flex-wrap gap-2 px-4 pb-2">
+        <div className="flex flex-wrap gap-[var(--space-2)] px-[var(--space-5)] pb-[var(--space-2)] pt-[var(--space-2)]">
           {attachments.map((att) => (
             <AttachmentChip key={att.id} att={att} onRemove={removeAttachment} />
           ))}
         </div>
       )}
 
-      <div className="flex items-center justify-between px-3 pb-3">
-        <div className="flex items-center gap-1.5">
+      {/* Toolbar sits inside the slab, on its floor — not a bordered tray.
+          Left is "what goes in", right is "how it runs" then send. */}
+      <div className="flex flex-wrap items-center justify-between gap-[var(--space-2)] px-[var(--space-3)] pb-[var(--space-3)] pt-[var(--space-2)]">
+        <div className="flex items-center gap-[var(--space-1)]">
           <AttachButton />
-          <div className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface-2)]/50 p-0.5">
-            <TierToggle />
-            <div className="h-4 w-[1px] bg-[var(--border)] mx-0.5" />
-            <ImageModeToggle />
-          </div>
         </div>
-        <ActionButton />
+        <div className="flex items-center gap-[var(--space-1)]">
+          <TierToggle />
+          <ImageModeToggle />
+          <ActionButton />
+        </div>
       </div>
+
+      {/* Lives in the shell, not the bottom-bar branch: the centered layout
+          returned before ever rendering it, so on the empty state the attach
+          button opened nothing at all. */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf,.txt,.md,.png,.jpg,.jpeg,.webp"
+        multiple
+        className="hidden"
+        onChange={handleFileSelect}
+      />
     </div>
   );
 
   /* ── Centered (empty state) layout ───────────────────── */
   if (centered) {
     return (
-      <div className="flex h-full w-full flex-col items-center justify-center px-4">
-        <div className="w-full max-w-3xl">
-          <h1 className="mb-6 text-center text-2xl font-semibold tracking-tight text-[var(--text)] sm:text-3xl">
-            Brainstorm ideas
+      <div className="flex h-full w-full flex-col items-center justify-center px-[var(--gutter)] py-[var(--space-8)]">
+        <div className="w-full max-w-[var(--width-chat)]">
+          {/* Serif, and the only display-scale type in the app shell. The
+              greeting is the one moment the product speaks before it works. */}
+          <h1 className="mb-[var(--space-8)] text-center font-serif text-[length:var(--text-4xl)] font-normal leading-[var(--lh-display)] tracking-[var(--tracking-tight)] text-[var(--text)]">
+            {isImageMode ? 'What should we picture?' : greeting}
           </h1>
 
-          {inputBox(120)}
+          {inputBox(96, isImageMode ? 'Describe the image you want to generate…' : 'How can I help you today?')}
 
-          <div className="mt-3 text-center text-xs text-[var(--text-subtle)]">
+          {!isImageMode && (
+            <div className="mt-[var(--space-6)] flex flex-wrap justify-center gap-[var(--space-2)]">
+              {EXAMPLE_PROMPTS.slice(0, 4).map((prompt) => (
+                <button
+                  key={prompt}
+                  type="button"
+                  onClick={() => {
+                    setComposerText(prompt);
+                    textareaRef.current?.focus();
+                  }}
+                  className="flex h-10 max-w-full cursor-pointer items-center rounded-[var(--radius-pill)] border border-[var(--border)] px-[var(--space-4)] text-[length:var(--text-sm)] leading-[var(--lh-ui)] text-[var(--text-2)] transition-colors duration-[var(--dur-micro)] hover:border-[var(--border-strong)] hover:bg-[var(--surface)] hover:text-[var(--text)]"
+                >
+                  <span className="truncate">{prompt}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-[var(--space-6)] text-center text-[length:var(--text-xs)] leading-[var(--lh-ui)] text-[var(--text-subtle)]">
             {isImageMode
               ? 'Enter to generate · Shift+Enter for newline'
               : `Enter to send · Shift+Enter for newline · Esc to stop`}
@@ -390,40 +471,32 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
 
   /* ── Bottom-bar layout ───────────────────────────────── */
   return (
-    <div className="w-full px-4 pb-6 pt-2">
-      <div className="mx-auto max-w-3xl">
+    <div className="w-full px-[var(--gutter)] pb-[var(--space-4)] pt-[var(--space-2)]">
+      <div className="mx-auto max-w-[var(--width-chat)]">
         {isFollowup && (
-          <div className="mb-2 flex items-center gap-2 px-1">
-            <span className="rounded-full border border-[#808080]/30 bg-[#808080]/10 px-2.5 py-0.5 text-xs font-medium text-[#A0A0A0]">
+          <div className="mb-[var(--space-2)] flex items-center gap-[var(--space-2)] px-[var(--space-1)]">
+            <span className="rounded-[var(--radius-pill)] bg-[var(--accent-2-dim)] px-[var(--space-3)] py-[var(--space-1)] text-[length:var(--text-xs)] font-medium leading-[var(--lh-ui)] text-[var(--text-2)]">
               Follow-up
             </span>
-            <span className="text-xs text-[var(--text-subtle)]">Continuing conversation</span>
+            <span className="text-[length:var(--text-xs)] text-[var(--text-subtle)]">Continuing conversation</span>
           </div>
         )}
 
-        {inputBox(28)}
+        {inputBox(28, isImageMode ? 'Describe the image you want to generate…' : 'Reply to Reasoner…')}
 
-        <div className="mt-2 text-center text-[11px] text-[var(--text-subtle)]">
-          {isImageMode
-            ? 'Enter to generate · Shift+Enter for newline'
-            : `Enter to send · Shift+Enter for newline · Esc to stop`}
+        <div className="mt-[var(--space-2)] flex flex-wrap items-center justify-center gap-x-[var(--space-2)] text-center text-[length:var(--text-2xs)] leading-[var(--lh-ui)] text-[var(--text-subtle)]">
+          <span>
+            {isImageMode
+              ? 'Enter to generate · Shift+Enter for newline'
+              : `Enter to send · Shift+Enter for newline · Esc to stop`}
+          </span>
+          {isEnabled('cost-transparency') && estimate && (
+            <span className="nums-tabular font-mono">
+              · ~{estimate.tokens.toLocaleString()} tokens · ~${estimate.cost} · ~{estimate.duration}s
+            </span>
+          )}
         </div>
-
-        {isEnabled('cost-transparency') && estimate && (
-          <div className="mt-1 text-center text-[10px] text-[var(--text-subtle)]">
-            ~{estimate.tokens.toLocaleString()} tokens · ~${estimate.cost} · ~{estimate.duration}s
-          </div>
-        )}
       </div>
-
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".pdf,.txt,.md,.png,.jpg,.jpeg,.webp"
-        multiple
-        className="hidden"
-        onChange={handleFileSelect}
-      />
     </div>
   );
 }

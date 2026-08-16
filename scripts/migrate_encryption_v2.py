@@ -8,7 +8,10 @@ import time
 import asyncpg
 from asyncpg.exceptions import PostgresError
 
-from reasoner.security.encryption import get_encryption_service, EncryptionService
+from cryptography.fernet import InvalidToken
+
+from reasoner.core.ports.crypto_port import EncryptionPort
+from reasoner.security.encryption import get_encryption_service
 from reasoner.infrastructure.persistence.postgres_store import PostgreSQLEventStore, get_postgres_store
 from reasoner.core.constants import DEFAULT_DB_COMMAND_TIMEOUT
 from reasoner.core.events.domain_events import PipelineEventType, make_event
@@ -43,7 +46,7 @@ async def _fetch_legacy_snapshots(conn: asyncpg.Connection, batch_size: int, off
     return await conn.fetch(query, batch_size, offset)
 
 
-async def migrate_events(store: PostgreSQLEventStore, encryption_service: EncryptionService, batch_size: int, delay_seconds: float) -> int:
+async def migrate_events(store: PostgreSQLEventStore, encryption_service: EncryptionPort, batch_size: int, delay_seconds: float) -> int:
     """Migrates legacy events to the new envelope encryption format with blind indexing."""
     migrated_count = 0
     offset = 0
@@ -143,7 +146,100 @@ async def migrate_events(store: PostgreSQLEventStore, encryption_service: Encryp
     return migrated_count
 
 
-async def migrate_snapshots(store: PostgreSQLEventStore, encryption_service: EncryptionService, batch_size: int, delay_seconds: float) -> int:
+async def _fetch_events_for_blind_reindex(conn: asyncpg.Connection, batch_size: int, offset: int) -> list[asyncpg.Record]:
+    """
+    Fetches a batch of already-encrypted events for blind-index regeneration.
+
+    Deliberately NOT scoped to "missing _blind_index": every row already has
+    that key (even if its value is a stale or empty []), so that condition
+    matches nothing once initial migration has run once. Reindexing is a
+    distinct operation from migration — every encrypted row is a candidate,
+    every time the tokenizer or index parameters change.
+    """
+    query = """
+        SELECT id, event_id, aggregate_id, payload, version
+        FROM events
+        WHERE payload ? '_e'
+        ORDER BY id ASC
+        LIMIT $1 OFFSET $2
+    """
+    return await conn.fetch(query, batch_size, offset)
+
+
+async def reindex_blind_indexes(store: PostgreSQLEventStore, encryption_service: EncryptionPort, batch_size: int, delay_seconds: float) -> int:
+    """
+    Regenerates _blind_index for every already-encrypted event using the
+    CURRENT tokenizer and digest length.
+
+    Run this after any change to blind-index generation (tokenizer rules,
+    _BLIND_INDEX_BYTES) — e.g. the fix that made non-Latin text indexable.
+    Decrypts to get the plaintext to re-tokenize, then updates only the
+    _blind_index key via jsonb_set: _e is untouched, so this never
+    re-encrypts data that doesn't need it.
+    """
+    reindexed_count = 0
+    offset = 0
+    bus = get_event_bus()
+
+    while True:
+        async with store._pool.acquire() as conn:
+            batch = await _fetch_events_for_blind_reindex(conn, batch_size, offset)
+            if not batch:
+                break
+
+            logger.info(f"Reindexing {len(batch)} events from offset {offset}...")
+
+            for record in batch:
+                event_id = record["event_id"]
+                aggregate_id = record["aggregate_id"]
+                version = record["version"]
+                payload = record["payload"]
+
+                try:
+                    decrypted_json = encryption_service.decrypt(payload["_e"])
+                    raw_payload = json.loads(decrypted_json)
+
+                    blind_indexes: list[str] = []
+                    if isinstance(raw_payload, dict):
+                        text_to_index = [
+                            raw_payload[key]
+                            for key in ('problem', 'content', 'rationale', 'summary', 'message')
+                            if key in raw_payload and isinstance(raw_payload[key], str)
+                        ]
+                        if text_to_index:
+                            blind_indexes = encryption_service.generate_blind_index(" ".join(text_to_index))
+
+                    await conn.execute("""
+                        UPDATE events
+                        SET payload = jsonb_set(payload, '{_blind_index}', $1::jsonb)
+                        WHERE event_id = $2
+                    """, json.dumps(blind_indexes), event_id)
+                    reindexed_count += 1
+
+                except (PostgresError, json.JSONDecodeError, InvalidToken) as e:
+                    logger.error(f"Error reindexing event {event_id} (aggregate {aggregate_id}): {e}")
+                    asyncio.create_task(bus.publish(make_event(
+                        PipelineEventType.ERROR_OCCURRED, aggregate_id, version,
+                        message=f"Error reindexing event {event_id}: {e}",
+                        details={"event_id": str(event_id), "error_type": e.__class__.__name__}
+                    )))
+                except Exception as e:
+                    logger.error(f"Unexpected error reindexing event {event_id} (aggregate {aggregate_id}): {e}", exc_info=True)
+                    asyncio.create_task(bus.publish(make_event(
+                        PipelineEventType.ERROR_OCCURRED, aggregate_id, version,
+                        message=f"Unexpected error reindexing event {event_id}: {e}",
+                        details={"event_id": str(event_id), "error_type": e.__class__.__name__}
+                    )))
+
+            offset += len(batch)
+            if len(batch) < batch_size:
+                break
+            await asyncio.sleep(delay_seconds)
+
+    return reindexed_count
+
+
+async def migrate_snapshots(store: PostgreSQLEventStore, encryption_service: EncryptionPort, batch_size: int, delay_seconds: float) -> int:
     """Migrates legacy snapshots to the new envelope encryption format."""
     migrated_count = 0
     offset = 0
@@ -235,7 +331,11 @@ async def main():
                         help="Base64 encoded Fernet encryption key. Defaults to ENCRYPTION_KEY environment variable.")
     parser.add_argument("--blind-index-key", type=str, default=os.environ.get("BLIND_INDEX_KEY"),
                         help="Key for HMAC blind indexing. Defaults to BLIND_INDEX_KEY environment variable.")
-    
+    parser.add_argument("--reindex-blind-index", action="store_true",
+                        help="Regenerate _blind_index on every already-encrypted event using the "
+                             "current tokenizer/digest length, instead of running the legacy-format "
+                             "migration. Run this after a blind-index generation change.")
+
     args = parser.parse_args()
 
     if not args.connection_string:
@@ -265,13 +365,18 @@ async def main():
     store = PostgreSQLEventStore(connection_string=args.connection_string)
     await store.initialize() # This will also run schema init
 
-    logger.info("Starting legacy data migration...")
+    if args.reindex_blind_index:
+        logger.info("Starting blind-index reindex...")
+        reindexed = await reindex_blind_indexes(store, encryption_service, args.batch_size, args.delay_seconds)
+        logger.info(f"Completed blind-index reindex. Total events reindexed: {reindexed}")
+    else:
+        logger.info("Starting legacy data migration...")
 
-    events_migrated = await migrate_events(store, encryption_service, args.batch_size, args.delay_seconds)
-    logger.info(f"Completed event migration. Total events migrated: {events_migrated}")
+        events_migrated = await migrate_events(store, encryption_service, args.batch_size, args.delay_seconds)
+        logger.info(f"Completed event migration. Total events migrated: {events_migrated}")
 
-    snapshots_migrated = await migrate_snapshots(store, encryption_service, args.batch_size, args.delay_seconds)
-    logger.info(f"Completed snapshot migration. Total snapshots migrated: {snapshots_migrated}")
+        snapshots_migrated = await migrate_snapshots(store, encryption_service, args.batch_size, args.delay_seconds)
+        logger.info(f"Completed snapshot migration. Total snapshots migrated: {snapshots_migrated}")
 
     await store.close()
     await event_bus.stop()

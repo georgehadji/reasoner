@@ -55,7 +55,7 @@ def _chunk_text(text: str, size: int, overlap: int) -> list[str]:
 
 def _cosine_similarity(a: list[float], b: list[float]) -> float:
     """Compute cosine similarity between two vectors."""
-    dot = sum(x * y for x, y in zip(a, b))
+    dot = sum(x * y for x, y in zip(a, b, strict=False))
     norm_a = math.sqrt(sum(x * x for x in a))
     norm_b = math.sqrt(sum(x * x for x in b))
     if norm_a == 0.0 or norm_b == 0.0:
@@ -135,7 +135,7 @@ class DocumentVectorStore:
                     *[embedder.embed(chunk) for chunk in batch],
                     return_exceptions=True
                 )
-                for chunk, res in zip(batch, batch_embeddings_raw):
+                for chunk, res in zip(batch, batch_embeddings_raw, strict=False):
                     if isinstance(res, BaseException):
                         logger.warning("Embedding chunk failed for %s: %s", file_id, res)
                     else:
@@ -154,7 +154,7 @@ class DocumentVectorStore:
             "chunk_overlap": overlap,
             "chunks": [
                 {"text": chunk, "embedding": emb}
-                for chunk, emb in zip(chunks, embeddings)
+                for chunk, emb in zip(chunks, embeddings, strict=False)
             ],
         }
 
@@ -174,6 +174,7 @@ class DocumentVectorStore:
         query: str,
         file_ids: list[str],
         top_k: int = 5,
+        user_id: str | None = None,
     ) -> list[str]:
         """Retrieve the top-k most relevant chunks for a query.
 
@@ -185,6 +186,23 @@ class DocumentVectorStore:
         Returns:
             List of chunk texts, ordered by relevance.
         """
+        # Sidecars contain extracted user content.  Never retrieve them for an
+        # unscoped request; callers without an authenticated owner can still
+        # use the pipeline's explicit attachment fallback path.
+        if not user_id:
+            logger.warning("Refusing unscoped document-vector retrieval")
+            return []
+
+        from reasoner.infrastructure.uploader import _get_upload_meta
+
+        authorized_file_ids = [
+            fid for fid in file_ids
+            if isinstance(fid, str)
+            and (_get_upload_meta(fid) or {}).get("user_id") == user_id
+        ]
+        if not authorized_file_ids:
+            return []
+
         embedder = self._get_embedder()
         if embedder is None:
             logger.warning("No embedder available; cannot retrieve document chunks.")
@@ -192,7 +210,7 @@ class DocumentVectorStore:
 
         # Load sidecars
         all_chunks: list[dict[str, Any]] = []
-        for fid in file_ids:
+        for fid in authorized_file_ids:
             path = self._sidecar_path(fid)
             if not path.exists():
                 logger.debug("No vector sidecar for %s", fid)

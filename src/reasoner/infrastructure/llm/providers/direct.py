@@ -33,17 +33,32 @@ class AnthropicDirectProvider(BaseLLMProvider):
     ) -> str:
         try:
             from anthropic import AsyncAnthropic
+
+            from reasoner.core.settings import settings
+            from reasoner.infrastructure.llm.caching import breakpoint_marker, is_cacheable
+
+            # Anthropic only caches behind an explicit breakpoint. Below the
+            # minimum cacheable prefix the marker is a documented no-op, so it
+            # is only worth the structured-block payload for large prompts.
+            system: Any = system_prompt
+            if settings.PROMPT_CACHE_ENABLED and is_cacheable(system_prompt):
+                system = [{
+                    "type": "text",
+                    "text": system_prompt,
+                    "cache_control": breakpoint_marker(self.model),
+                }]
+
             client = AsyncAnthropic(api_key=self._api_key, timeout=TIMEOUTS.LLM_CALL)
             response = await client.messages.create(
                 model=self.model,
                 max_tokens=max_tokens,
                 temperature=temperature,
-                system=system_prompt,
+                system=system,
                 messages=[{"role": "user", "content": user_prompt}],
             )
             return response.content[0].text
-        except ImportError:
-            raise LLMError("anthropic SDK not installed. pip install anthropic")
+        except ImportError as exc:
+            raise LLMError("anthropic SDK not installed. pip install anthropic") from exc
         except Exception as e:
             raise LLMError(f"Anthropic direct API failed: {e}") from e
 
@@ -120,8 +135,8 @@ class GoogleDirectProvider(BaseLLMProvider):
                 config={"max_output_tokens": max_tokens, "temperature": temperature},
             )
             return response.text or ""
-        except ImportError:
-            raise LLMError("google-genai SDK not installed. pip install google-genai")
+        except ImportError as exc:
+            raise LLMError("google-genai SDK not installed. pip install google-genai") from exc
         except Exception as e:
             raise LLMError(f"Google direct API failed: {e}") from e
 

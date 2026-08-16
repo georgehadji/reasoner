@@ -387,7 +387,7 @@ class CodebaseIntrospector:
     def _map_test_coverage(self) -> None:
         """Map test coverage to functions."""
         # Simple heuristic: check if test file exists for module
-        for module_name, module_info in self.modules.items():
+        for _module_name, module_info in self.modules.items():
             # Check if corresponding test file exists
             test_file_name = f"test_{module_info.file_path.replace(os.sep, '_').replace('.py', '')}.py"
             test_file = self.project_root / test_file_name
@@ -485,7 +485,7 @@ class CodebaseIntrospector:
                 ))
         
         # Check for unused imports
-        for module_name, module_info in self.modules.items():
+        for _module_name, module_info in self.modules.items():
             for imp in module_info.imports_external:
                 # Simple check: if import name not used in any function
                 if imp not in called_functions:

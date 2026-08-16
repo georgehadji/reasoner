@@ -40,7 +40,7 @@ def classification_prompt(problem: str, language: str, state: PipelineState | No
     lang_instruction = get_language_instruction(language)
     followup = _followup_context(state) if state else ""
     return (
-        f'{lang_instruction}\n\nProblem:\n{_wrap_user_input(problem)}{followup}\n\n'
+        f'{lang_instruction}\n{followup}\nProblem:\n{_wrap_user_input(problem)}\n\n'
         f'Choose exactly ONE task type from: analytical, strategic, creative, technical, predictive, hybrid. '
         f'JSON: {{"task_type": "analytical", "rationale": "<why>", "language": "{language}"}}'
     )
@@ -54,7 +54,8 @@ def decomposition_prompt(state: PipelineState) -> str:
     
     return f'''{get_language_instruction(state)}
 
-Problem: {_wrap_user_input(state.problem)}{web_context}{followup}
+{followup}
+Problem: {_wrap_user_input(state.problem)}{web_context}
 Decompose.{jury_instr}
 
 JSON: {{"causal_chain": [{{"step": 1, "action": "<action>", "produces": ["<output>"]}}], "assumptions": [{{"text": "<assumption>", "label": "VERIFIED|HYPOTHESIS|UNKNOWN", "rationale": "<why this label>", "source_hint": "<source name or URL if VERIFIED>"}}], "failure_modes": ["<failure>"], "critical_sources": [{{"url": "<URL>", "reason": "<why it matters>"}}]}}
@@ -72,7 +73,7 @@ def fusion_prompt(state: PipelineState, language: str) -> str:
 
     problem = state.enhanced_problem or state.problem
     return (
-        f'{lang_instruction}\n\nProblem: {_wrap_user_input(problem)}{web_context}{followup}\n\n'
+        f'{lang_instruction}\n{followup}\nProblem: {_wrap_user_input(problem)}{web_context}\n\n'
         f'First, choose exactly ONE task type from: analytical, strategic, creative, technical, predictive, hybrid.\n'
         f'\n'
         f'DISAMBIGUATION (apply strictly):\n'
@@ -182,7 +183,7 @@ def synthesis_prompt(state: PipelineState) -> str:
     followup = _followup_context(state)
     quality_note = f"\nCONTEXT QUALITY: {state.context_quality}\n" if state.context_quality and state.context_quality != "unknown" else ""
 
-    return f'{get_language_instruction(state)}\n\nFinal Context:\n{_wrap_external_content(json.dumps(final_context, indent=2))}\n{_wrap_external_content(sources_info)}{followup}{quality_note}\n\n{method_hint}\n\nUse this exact format: [SOLUTION]...prose with structured headings and citations...[/SOLUTION] ```json...``` with fields: critical_insights, action_blueprint, open_questions, claim_labels, meta_audit, sources, layout_hints, evidence.'
+    return f'{get_language_instruction(state)}\n{followup}\nFinal Context:\n{_wrap_external_content(json.dumps(final_context, indent=2))}\n{_wrap_external_content(sources_info)}{quality_note}\n\n{method_hint}\n\nUse this exact format: [SOLUTION]...prose with structured headings and citations...[/SOLUTION] ```json...``` with fields: critical_insights, action_blueprint, open_questions, claim_labels, meta_audit, sources, layout_hints, evidence.'
 
 COT_DETECTION_SYSTEM = """You are a meticulous, skeptical, and ruthless analytical assistant. Your primary function is to shield the reasoning pipeline from low-quality, irrelevant, or misleading information. Review retrieved text for factual errors, unsubstantiated claims, obvious speculation, or low relevance to the user's core problem. Output ONLY valid JSON.
 

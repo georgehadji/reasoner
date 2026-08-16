@@ -185,18 +185,18 @@ Reasoner is designed to be called by autonomous AI agents (Cursor, LangChain, Cr
 
 ### Option 1 — Agent API (HTTP, Bearer auth)
 
-Agent endpoints authenticate with `Authorization: Bearer <API_KEY>` and are exempt from CSRF requirements.
+Agent endpoints authenticate with `Authorization: Bearer <API_KEY>` and are exempt from CSRF requirements — a Reasoner account key (`rsn_live_...`), a JWT, or (self-hosted, `ENABLE_LEGACY_API_KEY=true`) a legacy admin key all resolve to the same authenticated caller. Every run is idempotency-guarded and metered identically to a web run: same credit ledger, same ownership record. This is true both self-hosted and on the SaaS deployment — there is no separate unmetered surface. The full agent guide — tool definitions, retry semantics, preset selection — lives at `/docs/agent-integration` (source: `ui-next/src/lib/docs.ts`).
 
 | Endpoint | Method | Format | Description |
 | :--- | :--- | :--- | :--- |
 | `/api/agent/run/sync` | `POST` | `application/json` | Block and return the full compiled pipeline output. |
 | `/api/agent/run` | `POST` | `text/event-stream` | Stream pipeline progress and chunks in real time (SSE). |
-| `/api/agent/tools` | `POST` | `application/json` | Compact function-calling schema describing the endpoints. |
+| `/api/agent/tools` | `GET` | `application/json` | Function-calling schema (`?format=anthropic\|openai`) for the endpoints above. |
 | `/api/health` | `GET` | `application/json` | Liveness/readiness probe. |
 
 Recommended flow for an agent:
 
-1. Fetch the tool contract from `POST /api/agent/tools` (or the full OpenAPI schema at `GET /openapi.json`).
+1. Fetch the tool contract from `GET /api/agent/tools` (or the full OpenAPI schema at `GET /openapi.json`).
 2. Prefer `POST /api/agent/run/sync` unless the agent can consume SSE streams.
 3. Put the task in `problem`; set `preset` explicitly to control the cost/quality trade-off.
 4. Read `synthesis` as the final answer, then inspect `citations`, `errors`, and `models_used`.
@@ -237,11 +237,13 @@ The response conforms to the `RunResult` schema (`src/reasoner/api/schemas.py`):
 LangChain tool example:
 
 ```python
+import os
+
 import httpx
 from langchain.tools import StructuredTool
 from pydantic import BaseModel, Field
 
-REASONER_API_KEY = "sk-your-reasoner-key"
+REASONER_API_KEY = os.environ["REASONER_API_KEY"]
 
 class ReasonerInput(BaseModel):
     problem: str = Field(description="The problem to reason about")

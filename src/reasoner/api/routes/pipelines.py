@@ -112,7 +112,7 @@ async def list_pipelines(
         return {"pipelines": pipelines, "total": len(pipelines)}
     except Exception as e:
         logger.error(f"List pipelines error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise HTTPException(status_code=500, detail="Internal server error") from e
 
 
 @router.get("/api/pipelines/{pipeline_id}")
@@ -138,7 +138,7 @@ async def get_pipeline_status(
         return result
     except Exception as e:
         logger.error(f"Get pipeline error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise HTTPException(status_code=500, detail="Internal server error") from e
 
 
 @router.post("/api/pipelines/{pipeline_id}/resume")
@@ -166,7 +166,7 @@ async def resume_pipeline(
         return {"error": str(e), "can_resume": False}
     except Exception as e:
         logger.error(f"Resume pipeline error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise HTTPException(status_code=500, detail="Internal server error") from e
 
 
 @router.post("/api/pipelines/{pipeline_id}/resume-stream")
@@ -204,7 +204,7 @@ async def resume_pipeline_stream(
         return {"error": str(e), "can_resume": False}
     except Exception as e:
         logger.error(f"Resume stream error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise HTTPException(status_code=500, detail="Internal server error") from e
 
     problem = result.get("problem", "")
     preset = result.get("preset", "auto-budget")
@@ -258,4 +258,4 @@ async def delete_pipeline(
         return {"status": "deleted", "pipeline_id": pipeline_id}
     except Exception as e:
         logger.error(f"Delete pipeline error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise HTTPException(status_code=500, detail="Internal server error") from e

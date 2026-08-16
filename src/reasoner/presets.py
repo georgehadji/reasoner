@@ -46,15 +46,32 @@ def resolve_preset_name(name: str) -> str:
 def get_method_from_preset(preset: str) -> str:
     """Extract method name from preset string.
 
-    First checks the preset registry for an explicit method field.
-    Falls back to name-based pattern matching for backward compatibility.
+    Name-based pattern matching wins; the registry's declared ``method`` field
+    is only consulted when the patterns fall through to the default.
+
+    That precedence is deliberate. The registry declares methods in display
+    form ("cross-language"), while flows, serializers and _METHOD_TO_SLUG use
+    the canonical form ("cross_language"). Preferring the declared field meant
+    cross-language presets resolved to a method name nothing was registered
+    under. The patterns produce canonical names, so they lead; the declared
+    field still covers presets whose method cannot be read off the name
+    (image-gen, for one).
     """
-    # Check the registry for an explicit method field
+    derived = _derive_method_from_preset_name(preset)
+    if derived != _DEFAULT_METHOD:
+        return derived
+
     if preset in PRESETS:
         explicit = getattr(PRESETS[preset], "method", None)
         if explicit:
             return explicit
+    return derived
 
+
+_DEFAULT_METHOD = "multi-perspective"
+
+
+def _derive_method_from_preset_name(preset: str) -> str:
     if "debate" in preset:
         return "debate"
     if "iterative" in preset:
@@ -97,7 +114,7 @@ def get_method_from_preset(preset: str) -> str:
         return "pot"
     if "cross-language" in preset or "cross_language" in preset:
         return "cross_language"
-    return "multi-perspective"
+    return _DEFAULT_METHOD
 
 def build_custom_router(routing_dict: dict[str, str]) -> ProviderRouter:
     """

@@ -2,8 +2,8 @@
 
 import { useState, useRef, useCallback, useReducer, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTheme } from 'next-themes';
 import { useAppStore } from '@/stores/app-store';
-import { BlobBackground } from '@/components/layout/BlobBackground';
 
 import { usePipelineStream } from '@/hooks/usePipelineStream';
 import { useWebSocketPipeline } from '@/hooks/useWebSocketPipeline';
@@ -216,6 +216,7 @@ export default function ChatPage() {
   const { startRun, startFollowup, stopRun } = usePipelineStream();
   const { connect: wsConnect, disconnect: wsDisconnect, sendStop: wsSendStop, status: wsStatus, lastError: wsLastError } = useWebSocketPipeline();
   const serverOnline = useServerStatus();
+  const { resolvedTheme, setTheme } = useTheme();
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -1098,7 +1099,6 @@ export default function ChatPage() {
 
   return (
     <div className="flex h-[100dvh] w-full bg-[var(--bg)] text-[var(--text)] overflow-hidden">
-      <BlobBackground active={running} />
       <Sidebar
         conversations={history}
         onLoad={handleLoad}
@@ -1112,16 +1112,18 @@ export default function ChatPage() {
       />
 
       <div className="relative flex flex-1 flex-col sm:ml-0 overflow-hidden">
-        <header className={`flex h-14 shrink-0 items-center justify-between border-b border-[var(--border)] px-4 ${collapsed ? 'sm:ml-14' : ''}`}>
+        {/* Borderless: the sidebar's own ground already separates rail from
+            conversation, so a rule here just boxes the column in. */}
+        <header className={`flex h-14 shrink-0 items-center justify-between px-4 ${collapsed ? 'sm:ml-14' : ''}`}>
           <div className="flex items-center gap-3">
             <Tooltip text={serverOnline === true ? 'Online' : serverOnline === false ? 'Offline' : 'Checking…'}>
               <div
                 className={`h-2 w-2 rounded-full ${
                   serverOnline === true
-                    ? 'bg-[#22C55E]'
+                    ? 'bg-[var(--ok)]'
                     : serverOnline === false
-                    ? 'bg-[#606060]'
-                    : 'bg-[#A0A0A0]'
+                    ? 'bg-[var(--red)]'
+                    : 'bg-[var(--unknown)]'
                 }`}
               />
             </Tooltip>
@@ -1131,12 +1133,12 @@ export default function ChatPage() {
                   <div
                     className={`h-2 w-2 rounded-full ${
                       wsStatus === 'connected'
-                        ? 'bg-[#22C55E]'
+                        ? 'bg-[var(--ok)]'
                         : wsStatus === 'reconnecting'
-                        ? 'bg-[#A0A0A0] animate-pulse'
+                        ? 'bg-[var(--accent)] animate-pulse'
                         : wsStatus === 'error'
-                        ? 'bg-[#EF4444]'
-                        : 'bg-gray-400'
+                        ? 'bg-[var(--red)]'
+                        : 'bg-[var(--unknown)]'
                     }`}
                     aria-label={`WebSocket ${wsStatus}`}
                   />
@@ -1208,7 +1210,7 @@ export default function ChatPage() {
         >
           {hasMessages ? (
             <>
-              <ChatErrorBoundary fallback={<div className="p-4 text-red-500">Display error. Please refresh.</div>}>
+              <ChatErrorBoundary fallback={<div className="p-4 text-[var(--red)]">Display error. Please refresh.</div>}>
                 <>
                   {activeAssistantMsg && activeAssistantMsg.phases?.length === 0 && activeAssistantMsg.isStreaming && (
                     <PipelineSkeleton method={autoSelectedMethod} />
@@ -1277,7 +1279,10 @@ export default function ChatPage() {
         onClose={() => setCommandPaletteOpen(false)}
         onNew={handleNew}
         onClearComposer={() => setComposerText('')}
-        onToggleTheme={() => document.documentElement.classList.toggle('dark')}
+        // Toggling the class directly added `.dark` while next-themes' own
+        // `.light` stayed put, so nothing changed and the stored preference
+        // desynchronised. Go through next-themes.
+        onToggleTheme={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
         onToggleSidebar={toggleSidebar}
         onToggleNeuro={toggleNeuroPanel}
         onToggleTier={toggleTier}

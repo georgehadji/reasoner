@@ -221,7 +221,7 @@ class TestTokenAndModelTracking:
         assert state.detailed_token_usage
         assert "fusion" in state.detailed_token_usage
         assert "synthesis" in state.detailed_token_usage
-        for role, tokens in state.detailed_token_usage.items():
+        for _role, tokens in state.detailed_token_usage.items():
             assert tokens.get("input", 0) >= 0
             assert tokens.get("output", 0) >= 0
 

@@ -43,6 +43,11 @@ Key facts:
   Perplexity, and local Ollama.
 - Cross-lab diversity is enforced: Phase 2 uses at least 3 labs (4 on Premium),
   and the critique model must come from a different ecosystem than the generators.
+- Long-form writing and software generation are first-class pipelines: articles
+  are sourced, fact-checked against a claim ledger, and audited before release;
+  code is specced, generated per-file, and security-reviewed against CVE data.
+- Image generation runs outside the reasoning pipeline: a prompt-enhancement
+  pass, then several image models in parallel across different vendors.
 - Usage is metered in credits: 1,000 credits = $1.00 of model spend, charged
   after a run completes from its actual cost. Failed runs cost nothing.
 - Programmatic access uses scoped API keys (rsn_live_*) over a streaming REST API.

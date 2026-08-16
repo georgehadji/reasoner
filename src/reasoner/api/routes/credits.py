@@ -7,10 +7,11 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from reasoner.api.auth_deps import check_rate_limit, require_csrf
+from reasoner.api.auth_deps import require_csrf
 from reasoner.api.dependencies import (
     _get_credit_service,
     _resolve_user_tier,
+    check_rate_limit,
     get_current_user,
 )
 from reasoner.auth import Scope

@@ -36,7 +36,7 @@ class NoRepeatLabConstraint:
 
         # Count roles per vendor
         vendor_counts: Counter[str] = Counter()
-        for role, model_id in proposed.items():
+        for _role, model_id in proposed.items():
             vendor = _vendor_of(model_id)
             vendor_counts[vendor] += 1
 

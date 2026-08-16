@@ -22,7 +22,7 @@ class TestPresetsEndpoint:
     def test_presets_have_required_keys(self):
         response = client.get("/api/presets")
         data = response.json()
-        for preset_id, meta in data["presets"].items():
+        for _preset_id, meta in data["presets"].items():
             assert "name" in meta
             assert "description" in meta
             assert "primary_id" in meta
@@ -54,7 +54,7 @@ class TestModelsEndpoint:
     def test_models_are_strings(self):
         response = client.get("/api/models")
         data = response.json()
-        for group, models in data.items():
+        for _group, models in data.items():
             for model_id in models:
                 assert isinstance(model_id, str)
                 assert len(model_id) > 0

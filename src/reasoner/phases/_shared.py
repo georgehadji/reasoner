@@ -94,7 +94,12 @@ def build_followup_context(
     if not rendered_turns and not previous_synthesis:
         return ""
 
-    ctx = f"\n---\nCONVERSATION HISTORY (Turn {turn_number}):\n"
+    # No turn counter anywhere in this block. It is the largest repeated prefix
+    # in the system and serves as a prompt-cache breakpoint: any per-turn value
+    # inside it changes the cached bytes every turn and invalidates the whole
+    # prefix. The model can count the USER TURN entries; callers that need the
+    # number have state.turn_number.
+    ctx = "\n---\nCONVERSATION HISTORY:\n"
     if rendered_turns:
         ctx += "\n".join(rendered_turns) + "\n"
     if previous_synthesis:

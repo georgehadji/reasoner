@@ -76,6 +76,9 @@ class Settings:
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
     UVICORN_WORKERS: int = int(os.getenv("UVICORN_WORKERS", "1"))
     ENABLE_LEGACY_API_KEY: bool = os.getenv("ENABLE_LEGACY_API_KEY", "false").lower() in ("1", "true", "yes")
+    # Mounts the MCP Streamable-HTTP transport at /mcp. Off by default: most
+    # installs use stdio (mcp_server.py) instead. Requires the mcp extra.
+    ENABLE_MCP_HTTP: bool = os.getenv("ENABLE_MCP_HTTP", "false").lower() in ("1", "true", "yes")
 
     # ── Cohere Rerank (via OpenRouter) ──
     COHERE_RERANK_ENABLED: bool = os.getenv("COHERE_RERANK_ENABLED", "true").lower() in ("1", "true", "yes")
@@ -93,6 +96,13 @@ class Settings:
     DOCUMENT_CHUNK_SIZE: int = int(os.getenv("DOCUMENT_CHUNK_SIZE", "1000"))
     DOCUMENT_CHUNK_OVERLAP: int = int(os.getenv("DOCUMENT_CHUNK_OVERLAP", "200"))
     DOCUMENT_MAX_CHUNKS_PER_FILE: int = int(os.getenv("DOCUMENT_MAX_CHUNKS_PER_FILE", "500"))
+    # Multipart upload bounds are enforced before parsing where possible and
+    # again while streaming each part.  This prevents request-body and file
+    # count exhaustion from reaching the document parsers.
+    UPLOAD_MAX_FILES: int = int(os.getenv("UPLOAD_MAX_FILES", "10"))
+    DOCUMENT_EXTRACTION_TIMEOUT_SECONDS: int = int(
+        os.getenv("DOCUMENT_EXTRACTION_TIMEOUT_SECONDS", "60")
+    )
 
     # ── Server bind configuration ──
     APP_URL: str = os.getenv("APP_URL", "http://localhost:3000")
@@ -270,9 +280,21 @@ class Settings:
     TOKEN_PROMPT_COMPRESSION: bool = os.getenv("TOKEN_PROMPT_COMPRESSION", "true").lower() == "true"
     TOKEN_NEURO_COMPRESSION: bool = os.getenv("TOKEN_NEURO_COMPRESSION", "false").lower() == "true"
     TOKEN_CACHING: bool = os.getenv("TOKEN_CACHING", "true").lower() == "true"
+    # Provider-side prompt caching (cache_control breakpoints on the system
+    # prompt for Anthropic/Gemini/Qwen). Distinct from TOKEN_CACHING, which is
+    # the in-process response cache.
+    PROMPT_CACHE_ENABLED: bool = os.getenv("PROMPT_CACHE_ENABLED", "true").lower() == "true"
+    # "5m" or "1h". Default 1h: reuse comes from follow-up turns, which usually
+    # arrive more than five minutes apart, so a 5m entry would expire unread.
+    # Costs 2x to write instead of 1.25x, so it needs a 3rd read to break even.
+    # Anthropic only — other providers get a bare ephemeral marker.
+    PROMPT_CACHE_TTL: str = os.getenv("PROMPT_CACHE_TTL", "1h")
 
     # ── Code Execution Sandbox (#1) ──
-    EXEC_SANDBOX_ENABLED: bool = os.getenv("EXEC_SANDBOX_ENABLED", "true").lower() == "true"
+    # Host-side execution is disabled by default.  The current executor is an
+    # AST-filtered subprocess, not a security boundary; production must not
+    # enable it until an isolated ExecutionSandboxPort adapter is deployed.
+    EXEC_SANDBOX_ENABLED: bool = os.getenv("EXEC_SANDBOX_ENABLED", "false").lower() in ("1", "true", "yes")
 
     # ── ACR (Adaptive Capability Router) ──
     ACR_ENABLED: bool = os.getenv("ACR_ENABLED", "false").lower() in ("1", "true", "yes")
@@ -343,9 +365,28 @@ class Settings:
 
 settings = Settings()
 
+# A denylist/AST guard cannot safely contain LLM-generated code on the API host.
+# Fail closed rather than allowing a deployment to opt into the legacy executor
+# accidentally through a copied environment file.
+if settings.ENVIRONMENT == "production" and settings.EXEC_SANDBOX_ENABLED:
+    raise RuntimeError(
+        "EXEC_SANDBOX_ENABLED=true is not permitted in production. "
+        "Deploy an isolated execution sandbox adapter before enabling code execution."
+    )
+
 # Fail fast at startup if CSRF protection is enabled but no secret is configured.
 if settings.CSRF_ENFORCE_BACKEND and not settings.CSRF_SECRET:
     raise RuntimeError(
         "CSRF_SECRET environment variable must be set when CSRF_ENFORCE_BACKEND=true. "
         "Set CSRF_ENFORCE_BACKEND=false to disable CSRF protection (development only)."
     )
+
+if settings.ENVIRONMENT == "production":
+    for secret_name in ("CSRF_SECRET", "ADMIN_API_KEY"):
+        secret_value = getattr(settings, secret_name) or ""
+        if len(secret_value) < 32:
+            raise RuntimeError(
+                f"{secret_name} must be configured with at least 32 characters in production."
+            )
+    if settings.JWT_SECRET_KEY and len(settings.JWT_SECRET_KEY) < 32:
+        raise RuntimeError("JWT_SECRET_KEY must be at least 32 characters in production.")

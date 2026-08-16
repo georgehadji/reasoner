@@ -1,0 +1,128 @@
+{
+  "$comment": [
+    "The SSE event contract between the Reasoner backend and its client SDKs.",
+    "",
+    "OpenAPI cannot describe an SSE stream, so this file stands in for it. Both",
+    "sides test against it: tests/test_sdk_contract.py asserts the backend still",
+    "produces these keys, and sdk/typescript/test/contract.test.ts asserts the",
+    "SDK still consumes them. A backend change that drops a key fails the Python",
+    "test; an SDK change that stops reading one fails the TypeScript test.",
+    "",
+    "Only keys an SDK actually depends on belong here. This is a floor, not an",
+    "inventory: the backend may emit more, and new event types are added without",
+    "a version bump, so clients must ignore what they do not recognise."
+  ],
+  "version": 1,
+  "required_frames": {
+    "done": {
+      "description": "Terminal frame of every run. Carries cost, tokens, and timing.",
+      "source": "src/reasoner/api/execution/pipeline.py :: done_payload",
+      "required_keys": [
+        "type",
+        "errors",
+        "total_tokens",
+        "duration",
+        "total_cost_usd",
+        "phase_costs"
+      ],
+      "notes": [
+        "total_cost_usd is the figure charged against credits — the backend's own",
+        "_extract_run_cost reads it off this frame to settle the run.",
+        "A crashed pipeline emits a reduced done frame carrying only type and errors,",
+        "so consumers must treat every key but type as optional at read time."
+      ]
+    },
+    "phase_complete.synthesis": {
+      "description": "Payload of the synthesis phase, nested under the event's `data` key.",
+      "source": "src/reasoner/application/services/serializers.py :: _ser_synthesis",
+      "container": "data",
+      "required_keys": [
+        "core_solution",
+        "critical_insights",
+        "action_blueprint",
+        "open_questions",
+        "claim_labels",
+        "evidence",
+        "meta_audit",
+        "layout_hints",
+        "tokens"
+      ],
+      "key_types": {
+        "core_solution": "string",
+        "critical_insights": "array<string>",
+        "action_blueprint": "array<object>",
+        "open_questions": "array<string>",
+        "claim_labels": "object",
+        "tokens": "object"
+      },
+      "notes": [
+        "claim_labels is a claim -> label mapping, NOT an array. Labels are",
+        "VERIFIED, HYPOTHESIS, or UNKNOWN.",
+        "action_blueprint entries are normalised to five string fields:",
+        "step, action, time_horizon, go_criteria, fallback.",
+        "This payload — not the done frame — is where critical_insights and",
+        "open_questions live."
+      ]
+    }
+  },
+  "action_step_keys": ["step", "action", "time_horizon", "go_criteria", "fallback"],
+  "sample_stream": [
+    { "type": "start", "preset": "debate-premium" },
+    { "type": "method_selected", "action": "pipeline", "method": "debate", "confidence": 0.82 },
+    { "type": "phase_start", "phase": 2, "name": "Opening" },
+    { "type": "phase_complete", "phase": 2, "name": "Opening", "models": ["claude-sonnet", "deepseek-v3"] },
+    { "type": "an_event_added_after_this_contract_was_written", "payload": "must be ignored, not fatal" },
+    {
+      "type": "phase_complete",
+      "phase": 5,
+      "name": "Synthesis",
+      "models": ["deepseek-v3", "grok-4.5"],
+      "data": {
+        "core_solution": "Migrate incrementally, starting with billing.",
+        "critical_insights": ["The monolith is not the bottleneck; the deploy pipeline is."],
+        "action_blueprint": [
+          {
+            "step": "1",
+            "action": "Extract billing into its own service",
+            "time_horizon": "Q1",
+            "go_criteria": "Billing deploys independently twice a week",
+            "fallback": "Keep billing in-process behind a module boundary"
+          }
+        ],
+        "open_questions": ["What is the current deploy cadence?"],
+        "claim_labels": {
+          "The deploy pipeline is the bottleneck": "VERIFIED",
+          "Extraction takes one quarter": "HYPOTHESIS"
+        },
+        "evidence": {},
+        "meta_audit": {},
+        "layout_hints": {},
+        "tokens": { "input": 5100, "output": 2400 }
+      }
+    },
+    {
+      "type": "done",
+      "errors": [],
+      "total_tokens": { "input": 8213, "output": 3944, "total": 12157 },
+      "duration": 41.2,
+      "total_cost_usd": 0.0191,
+      "phase_costs": { "2": 0.0071, "5": 0.012 }
+    }
+  ],
+  "expected_summary": {
+    "synthesis": "Migrate incrementally, starting with billing.",
+    "criticalInsights": ["The monolith is not the bottleneck; the deploy pipeline is."],
+    "openQuestions": ["What is the current deploy cadence?"],
+    "claimLabels": {
+      "The deploy pipeline is the bottleneck": "VERIFIED",
+      "Extraction takes one quarter": "HYPOTHESIS"
+    },
+    "costUsd": 0.0191,
+    "tokens": { "input": 8213, "output": 3944, "total": 12157 },
+    "durationSeconds": 41.2,
+    "modelsUsed": ["claude-sonnet", "deepseek-v3", "grok-4.5"],
+    "preset": "debate-premium",
+    "method": "debate",
+    "errors": []
+  }
+}
