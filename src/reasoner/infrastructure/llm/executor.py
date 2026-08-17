@@ -16,7 +16,10 @@ import asyncio
 import logging
 import re
 import time # Ensure time is imported once
-from typing import Any, AsyncIterator, ClassVar # Add ClassVar for _LANG_TO_EXT
+from typing import TYPE_CHECKING, Any, AsyncIterator, ClassVar # Add ClassVar for _LANG_TO_EXT
+
+if TYPE_CHECKING:
+    from reasoner.infrastructure.llm.ports import DegradedLLMResponse
 
 from reasoner.core.constants import (
     DEFAULT_MAX_TOKENS,
@@ -30,6 +33,7 @@ from reasoner.domain.pipeline_state import PipelineState
 # New imports for event emission
 from reasoner.core.events.domain_events import LLMGenerationCompleted, PipelineEventType, make_event
 from reasoner.core.events.ports import EventPublisher
+from reasoner.core.temperatures import PHASE_TEMPERATURES
 # get_event_bus imported lazily inside methods to avoid circular import with api/__init__.py
 
 logger = logging.getLogger(__name__)
@@ -109,7 +113,13 @@ class LLMExecutor:
                         cfg = c
                         break
 
-            if cfg:
+            if cfg is None and lookup in PHASE_TEMPERATURES:
+                # No declared PhaseConfig for this phase_key/role (e.g. research,
+                # deep_read) — fall back to the flat temperature registry so the
+                # tuned value is still used instead of silently omitting the
+                # kwarg and falling through to the provider's own default.
+                kwargs["temperature"] = PHASE_TEMPERATURES[lookup]
+            elif cfg:
                 base_temp = cfg.temperature
                 strategy = getattr(cfg, "temperature_strategy", None)
                 attempt = kwargs.get("_retry_attempt", 0)

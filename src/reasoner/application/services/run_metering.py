@@ -28,7 +28,34 @@ SSE_DATA_PREFIX = "data: "
 
 
 class SettlementSink(Protocol):
-    """Charges a completed run's actual model spend."""
+    """Reserves a run's estimated cost up front, then charges what it
+    actually spent."""
+
+    async def reserve(
+        self,
+        *,
+        user_id: str,
+        estimated_cost_usd: float,
+        reference_id: str,
+        preset: str,
+    ) -> int:
+        """Hold estimated credits against the balance before a run starts.
+
+        Returns the number of credits reserved (0 for a free/zero estimate).
+        Raises InsufficientCreditsError -- callers must fail closed, not
+        start the run.
+        """
+        ...
+
+    async def release(
+        self,
+        *,
+        user_id: str,
+        credits: int,
+        reference_id: str,
+    ) -> None:
+        """Return credits from a reservation that won't be (fully) used."""
+        ...
 
     async def settle(
         self,
@@ -52,6 +79,10 @@ class RunContext:
 
     ``user_id`` is None for anonymous and legacy-key callers: there is no
     account to charge, so settlement is skipped rather than guessed at.
+
+    ``reserved_credits`` is set by :func:`reserve_run_budget` before the run
+    starts. When it's non-zero, settlement is a true-up against the held
+    reservation instead of a fresh charge.
     """
 
     preset: str
@@ -59,6 +90,7 @@ class RunContext:
     user_id: str | None = None
     tier: str = "anonymous"
     interface: str = "web"
+    reserved_credits: int = 0
 
 
 def extract_run_cost(frame: str) -> float | None:
@@ -105,13 +137,40 @@ async def metered(
         has_error = True
         raise
     finally:
-        if ctx.user_id and cost_usd > 0:
+        if ctx.user_id and ctx.reserved_credits > 0:
+            await _true_up(sink, ctx, cost_usd)
+        elif ctx.user_id and cost_usd > 0:
+            # Defensive fallback for a caller that never reserved. Every
+            # production call site reserves via reserve_run_budget(); this
+            # keeps older/uninstrumented callers billed rather than free.
             await _settle(sink, ctx, cost_usd)
         if observer is not None:
             try:
                 observer.observe(status="error" if has_error else "success")
             except Exception as exc:
                 logger.warning("Run observer failed for %s: %s", ctx.reference_id, exc)
+
+
+async def _true_up(sink: SettlementSink, ctx: RunContext, cost_usd: float) -> None:
+    """Release the held reservation, then charge the actual cost.
+
+    Two ledger entries through the existing composable primitives rather
+    than new delta arithmetic -- release is exempt from the same fail-soft
+    handling as settle so one failure doesn't block the other.
+    """
+    try:
+        await sink.release(
+            user_id=ctx.user_id or "",
+            credits=ctx.reserved_credits,
+            reference_id=f"{ctx.reference_id}:release",
+        )
+    except Exception as exc:
+        logger.warning(
+            "Reservation release failed for user %s run %s (%d credits): %s",
+            ctx.user_id, ctx.reference_id, ctx.reserved_credits, exc,
+        )
+    if cost_usd > 0:
+        await _settle(sink, ctx, cost_usd)
 
 
 async def _settle(sink: SettlementSink, ctx: RunContext, cost_usd: float) -> None:
@@ -132,10 +191,39 @@ async def _settle(sink: SettlementSink, ctx: RunContext, cost_usd: float) -> Non
         )
 
 
+async def reserve_run_budget(
+    *,
+    user_id: str | None,
+    preset: str,
+    problem: str,
+    reference_id: str,
+    sink: SettlementSink,
+) -> int:
+    """Reserve estimated credits for a run before it starts.
+
+    Returns 0 for anonymous callers (nothing to reserve against -- capped
+    separately by AnonymousTrialPolicy) or a free estimate. Raises
+    InsufficientCreditsError to fail closed: the caller must not start the
+    run, and should translate this into a 402 response.
+    """
+    if not user_id:
+        return 0
+    from reasoner.application.services.estimate_service import estimate_cost
+
+    estimate = await estimate_cost(problem, preset)
+    return await sink.reserve(
+        user_id=user_id,
+        estimated_cost_usd=estimate["estimated_cost_usd"],
+        reference_id=f"{reference_id}:reserve",
+        preset=preset,
+    )
+
+
 __all__ = [
     "RunContext",
     "RunObserver",
     "SettlementSink",
     "extract_run_cost",
     "metered",
+    "reserve_run_budget",
 ]

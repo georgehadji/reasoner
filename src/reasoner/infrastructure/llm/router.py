@@ -7,7 +7,10 @@ import logging
 import os
 import time
 import uuid
-from typing import Any, AsyncIterator
+from typing import TYPE_CHECKING, Any, AsyncIterator
+
+if TYPE_CHECKING:
+    from reasoner.domain.telemetry import LLMCallTelemetry
 
 from reasoner.core.constants import (
     DEFAULT_MAX_TOKENS,

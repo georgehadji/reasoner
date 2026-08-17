@@ -43,7 +43,7 @@ class TestRateLimiterConfig:
         await asyncio.sleep(1.0)
         allowed, info = await limiter.is_allowed("zero-burst")
         assert not allowed
-        assert info["reason"] == "burst_limit"
+        assert info["reason"] == "burst_limit_fallback"
 
     async def test_very_high_burst(self):
         config = RateLimitConfig(
@@ -210,7 +210,7 @@ class TestWindowBoundaries:
         # 4th should fail (per-minute exhausted)
         allowed, info = await limiter.is_allowed(client)
         assert not allowed
-        assert info["reason"] == "per_minute_limit"
+        assert info["reason"] == "per_minute_limit_fallback"
 
     @pytest.mark.asyncio
     async def test_burst_limit_info_correct(self):

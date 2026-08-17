@@ -20,7 +20,11 @@ from reasoner.infrastructure.llm.image_generation import (
     generate_image_with_model,
     ImageGenerationError,
 )
-from reasoner.core.constants_limits import IMAGE_GEN_FALLBACKS, IMAGE_GEN_PRESETS
+from reasoner.core.constants_limits import (
+    IMAGE_GEN_FALLBACKS,
+    IMAGE_GEN_IMAGE_COUNT,
+    IMAGE_GEN_PRESETS,
+)
 from reasoner.domain.preset_registry import PRESETS, get_preset
 
 
@@ -28,6 +32,7 @@ class TestResolveModelConfig:
     def test_resolves_known_aliases(self):
         assert "google/gemini-2.5-flash-image" == _resolve_model_config("gemini-flash-image")["model"]
         assert "google/gemini-3-pro-image" == _resolve_model_config("gemini-pro-image")["model"]
+        assert "qwen/qwen-image-3" == _resolve_model_config("qwen-image-3")["model"]
         assert "openai/gpt-5-image" == _resolve_model_config("gpt-5-image")["model"]
         assert "openai/gpt-5-image-mini" == _resolve_model_config("gpt-5-image-mini")["model"]
 
@@ -583,8 +588,10 @@ class TestGenerateImages:
             result = await generate_images("a cat", preset="premium", enhance=False)
 
         assert result["success"] is True
-        assert len(result["images"]) == 2
-        assert mock_gen.call_count == 2  # Two models in parallel
+        # Both tiers ship IMAGE_GEN_IMAGE_COUNT primaries and must return that
+        # many images; premium was a 2-model pair before the 4-model rework.
+        assert len(result["images"]) == IMAGE_GEN_IMAGE_COUNT
+        assert mock_gen.call_count == IMAGE_GEN_IMAGE_COUNT  # all primaries in parallel
 
 
 class TestImageGenPresets:

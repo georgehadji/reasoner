@@ -125,10 +125,17 @@ async def test_pot_generate_populates_code(pipeline, state):
 
 
 @pytest.mark.asyncio
-async def test_pot_execute_populates_output(pipeline, state):
-    pipeline._call_llm_cached = AsyncMock(return_value=(
-        json.dumps({"output": "42", "success": True}), {}
+async def test_pot_execute_populates_output(pipeline, state, monkeypatch):
+    from reasoner.core.ports.code_executor import ExecutionResult
+
+    fake_executor = AsyncMock()
+    fake_executor.execute = AsyncMock(return_value=ExecutionResult(
+        success=True, stdout="42", exit_code=0,
     ))
+    monkeypatch.setattr(
+        "reasoner.application.flows.services.PipelineWorkflowServices._init_executor",
+        lambda self: setattr(self, "code_executor", fake_executor),
+    )
     state.pot_state["code"] = "print(42)"
     await pipeline._phase_pot_execute(state)
     assert state.pot_state["execution_output"] == "42"

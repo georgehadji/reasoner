@@ -1,16 +1,8 @@
 'use client';
 
-import React, { useSyncExternalStore } from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
-
-/**
- * `false` while server-rendering and through hydration, `true` afterwards.
- * Lets the component branch on browser-only state without handing React
- * different markup on the server and the hydrating client.
- */
-const subscribeToNothing = () => () => {};
-const getHydratedSnapshot = () => true;
-const getServerSnapshot = () => false;
+import React from 'react';
+import { motion } from 'framer-motion';
+import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 
 interface ManifestationVisualsProps {
   progress: number; // 0 to 1
@@ -41,18 +33,9 @@ const RINGS = [
  * because that is data, not ambience; it just snaps instead of easing.
  */
 export function ManifestationVisuals({ progress }: ManifestationVisualsProps) {
-  // `useReducedMotion()` reads matchMedia during render: `null` on the server,
-  // the real value on the client. Branching on it directly would produce a
-  // hydration mismatch, so the switch waits until hydration has landed.
-  // Reduced-motion users see at most a single animated frame before the static
-  // composition takes over.
-  const shouldReduceMotion = useReducedMotion();
-  const isHydrated = useSyncExternalStore(
-    subscribeToNothing,
-    getHydratedSnapshot,
-    getServerSnapshot,
-  );
-  const prefersReducedMotion = isHydrated && shouldReduceMotion === true;
+  // Reduced-motion users see at most a single animated frame before the
+  // static composition below takes over.
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   return (
     <div

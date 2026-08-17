@@ -18,27 +18,18 @@ def test_analytical_system_prompt_consistency() -> None:
     assert len(ANALYTICAL_SYSTEM_PROMPT) > 20
 
 
-def test_creative_system_prompts_match() -> None:
-    """core/constants.py CREATIVE_SYSTEM_PROMPT matches streaming.py
-    _CREATIVE_SYSTEM_PROMPT. If these drift, one will be updated and the other
-    will carry stale text, causing different behavior between CLI and API paths."""
+def test_creative_system_prompt_single_source() -> None:
+    """CREATIVE_SYSTEM_PROMPT lives only in core/constants_prompts.py now.
+
+    streaming.py no longer keeps its own _CREATIVE_SYSTEM_PROMPT copy (the
+    duplication this test class was written to guard against was since
+    removed) — assert the duplicate stays gone and the canonical copy exists.
+    """
     from reasoner.core.constants import CREATIVE_SYSTEM_PROMPT
-    from reasoner.api.streaming import _CREATIVE_SYSTEM_PROMPT
+    import reasoner.api.streaming as streaming
 
-    # Both must exist
     assert CREATIVE_SYSTEM_PROMPT
-    assert _CREATIVE_SYSTEM_PROMPT
-
-    # Compare canonicalized: strip whitespace-only differences
-    core_normalized = " ".join(CREATIVE_SYSTEM_PROMPT.split())
-    streaming_normalized = " ".join(_CREATIVE_SYSTEM_PROMPT.split())
-
-    assert core_normalized == streaming_normalized, (
-        "CREATIVE_SYSTEM_PROMPT in core/constants.py drift from _CREATIVE_SYSTEM_PROMPT "
-        "in api/streaming.py. Update BOTH when changing creative prompts.\n\n"
-        f"core/constants.py (first 80 chars): {core_normalized[:80]}\n"
-        f"api/streaming.py (first 80 chars): {streaming_normalized[:80]}"
-    )
+    assert not hasattr(streaming, "_CREATIVE_SYSTEM_PROMPT")
 
 
 def test_gate_system_prompt_exists() -> None:

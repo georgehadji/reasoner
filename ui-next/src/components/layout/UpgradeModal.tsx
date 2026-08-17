@@ -71,7 +71,7 @@ export function UpgradeModal({ open, onClose }: UpgradeModalProps) {
     >
       <div
         className={cn(
-          'w-full max-w-[var(--width-form)] rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[var(--shadow-lg)] transition-all duration-300',
+          'w-full max-w-[var(--width-form)] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[var(--shadow-lg)] transition-all duration-300',
           open ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-4 opacity-0 scale-95',
         )}
       >
@@ -82,7 +82,7 @@ export function UpgradeModal({ open, onClose }: UpgradeModalProps) {
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
+            className="rounded-[var(--radius)] p-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
             aria-label="Close upgrade modal"
           >
             <X className="h-5 w-5" />
@@ -94,12 +94,12 @@ export function UpgradeModal({ open, onClose }: UpgradeModalProps) {
         </p>
 
         {error && (
-          <div className="mb-4 rounded-lg bg-red-500/10 p-3 text-sm text-red-600" role="alert">
+          <div className="mb-4 rounded-[var(--radius)] bg-[var(--red-bg)] p-3 text-sm text-[var(--red)]" role="alert">
             {error}
           </div>
         )}
 
-        <div className="mb-6 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-4">
+        <div className="mb-6 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-2)] p-4">
           <div className="flex items-center gap-2 text-sm font-medium text-[var(--text)]">
             <Lock className="h-4 w-4 text-[var(--accent)]" />
             Pro Plan — $12/month
@@ -116,7 +116,7 @@ export function UpgradeModal({ open, onClose }: UpgradeModalProps) {
             type="button"
             onClick={handleUpgrade}
             disabled={loading}
-            className="flex-1 rounded-lg bg-[var(--accent)] py-2.5 text-[var(--accent-text)] font-medium transition-opacity hover:opacity-90 disabled:opacity-40"
+            className="flex-1 rounded-[var(--radius)] bg-[var(--accent)] py-2.5 text-[var(--accent-text)] font-medium transition-opacity hover:opacity-90 disabled:opacity-40"
             aria-busy={loading}
           >
             {loading ? 'Loading…' : 'Upgrade Now'}
@@ -124,7 +124,7 @@ export function UpgradeModal({ open, onClose }: UpgradeModalProps) {
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] py-2.5 text-[var(--text)] font-medium transition-colors hover:bg-[var(--surface-3)]"
+            className="flex-1 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-2)] py-2.5 text-[var(--text)] font-medium transition-colors hover:bg-[var(--surface-3)]"
           >
             Maybe Later
           </button>

@@ -69,7 +69,7 @@ def attach_execution_evidence(
 
     Args:
         bundles: Existing evidence bundles (may be empty before synthesis).
-        execution_evidence_id: Evidence id from #1's CodeExecuted event.
+        execution_evidence_id: Evidence id from the CodeExecutionCompleted event.
         claim_match_fn: Optional function (claim_text: str) -> bool to
                         select which claims get the evidence link. If None,
                         links to the first claim or creates a generic entry.

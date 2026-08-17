@@ -27,11 +27,11 @@
    paired line-heights.
    ============================================================ */
 @theme {
-  --font-sans:  var(--font-instrument-sans), -apple-system,
+  --font-sans:  var(--font-dm-sans), -apple-system,
                 BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  --font-serif: var(--font-source-serif), Charter, 'Bitstream Charter',
+  --font-serif: var(--font-newsreader), Charter, 'Bitstream Charter',
                 Cambria, Georgia, serif;
-  --font-mono:  var(--font-jetbrains-mono), ui-monospace, SFMono-Regular,
+  --font-mono:  var(--font-inconsolata), ui-monospace, SFMono-Regular,
                 Menlo, Consolas, monospace;
 }
 

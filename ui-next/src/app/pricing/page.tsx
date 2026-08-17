@@ -116,7 +116,7 @@ export default function PricingPage() {
         </div>
 
         {error && (
-          <div className="mx-auto mb-6 max-w-lg rounded-lg bg-red-500/10 p-3 text-sm text-red-400" role="alert">
+          <div className="mx-auto mb-6 max-w-lg rounded-[var(--radius)] bg-[var(--red-bg)] p-3 text-sm text-[var(--red)]" role="alert">
             <div className="flex items-center gap-2">
               <X className="h-4 w-4 shrink-0" />
               {error}
@@ -128,9 +128,9 @@ export default function PricingPage() {
           {plans.map((plan) => (
             <div
               key={plan.name}
-              className={`relative flex flex-col rounded-2xl border bg-[var(--surface)] p-6 transition-all ${
+              className={`relative flex flex-col rounded-[var(--radius-lg)] border bg-[var(--surface)] p-6 transition-all ${
                 plan.highlighted
-                  ? 'border-[var(--border-strong)] shadow-[var(--shadow-lg)] ring-1 ring-blue-500/20'
+                  ? 'border-[var(--border-strong)] shadow-[var(--shadow-lg)] ring-1 ring-[color-mix(in_oklab,var(--accent)_20%,transparent)]'
                   : 'border-[var(--border)] hover:shadow-[var(--shadow-lg)]'
               }`}
             >
@@ -152,7 +152,7 @@ export default function PricingPage() {
               <ul className="mb-4 flex-1 space-y-2.5 text-left text-sm text-[var(--text-2)]">
                 {plan.features.map((f) => (
                   <li key={f} className="flex items-start gap-2.5">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-blue-400" />
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent)]" />
                     <span>{f}</span>
                   </li>
                 ))}
@@ -171,7 +171,7 @@ export default function PricingPage() {
                       <button
                         onClick={() => handleUpgrade(plan.tier, 'stripe')}
                         disabled={!!loadingTier}
-                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent)] py-2.5 font-medium text-[var(--accent-text)] transition-all hover:opacity-90 disabled:opacity-40"
+                        className="flex w-full items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-[var(--accent)] py-2.5 font-medium text-[var(--accent-text)] transition-all hover:opacity-90 disabled:opacity-40"
                         aria-busy={isLoading(plan.tier, 'stripe')}
                       >
                         {isLoading(plan.tier, 'stripe') ? (
@@ -184,7 +184,7 @@ export default function PricingPage() {
                         )}
                       </button>
                       {/* Payment method badges */}
-                      <div className="flex items-center justify-center gap-2 text-[10px] text-[var(--text-subtle)]">
+                      <div className="flex items-center justify-center gap-2 text-[length:var(--text-2xs)] text-[var(--text-subtle)]">
                         <span className="rounded border border-[var(--border)] px-1.5 py-0.5">Visa</span>
                         <span className="rounded border border-[var(--border)] px-1.5 py-0.5">Mastercard</span>
                         <span className="rounded border border-[var(--border)] px-1.5 py-0.5">Apple Pay</span>
@@ -193,7 +193,7 @@ export default function PricingPage() {
                       <button
                         onClick={() => handleUpgrade(plan.tier, 'paypal')}
                         disabled={!!loadingTier}
-                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] py-2.5 font-medium text-[var(--text)] transition-all hover:bg-[var(--surface-3)] disabled:opacity-40"
+                        className="flex w-full items-center justify-center gap-2 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface-2)] py-2.5 font-medium text-[var(--text)] transition-all hover:bg-[var(--surface-3)] disabled:opacity-40"
                         aria-busy={isLoading(plan.tier, 'paypal')}
                       >
                         {isLoading(plan.tier, 'paypal') ? (
@@ -219,7 +219,7 @@ export default function PricingPage() {
                     <button
                       onClick={() => setSelectedTier(plan.tier)}
                       disabled={!!loadingTier}
-                      className={`w-full rounded-xl py-2.5 font-medium transition-all disabled:opacity-40 ${
+                      className={`w-full rounded-[var(--radius-lg)] py-2.5 font-medium transition-all disabled:opacity-40 ${
                         plan.highlighted
                           ? 'bg-[var(--accent)] text-[var(--accent-text)] hover:opacity-90'
                           : 'border border-[var(--border)] bg-[var(--surface-2)] text-[var(--text)] hover:bg-[var(--surface-3)]'
@@ -233,7 +233,7 @@ export default function PricingPage() {
               {plan.tier === 'free' && (
                 <button
                   disabled
-                  className="w-full cursor-default rounded-xl border border-[var(--border)] bg-[var(--surface-2)] py-2.5 font-medium text-[var(--text-muted)]"
+                  className="w-full cursor-default rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface-2)] py-2.5 font-medium text-[var(--text-muted)]"
                 >
                   Current Plan
                 </button>

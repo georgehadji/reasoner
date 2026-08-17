@@ -14,8 +14,14 @@ MODEL_GEMINI_31_FLASH_LITE_IMAGE: str = "gemini-3.1-flash-lite-image"
 MODEL_GPT5_IMAGE: str = "gpt-5-image"
 MODEL_GPT5_IMAGE_MINI: str = "gpt-5-image-mini"
 MODEL_GPT54_IMAGE_2: str = "gpt-5.4-image-2"
+MODEL_GPT_IMAGE_2: str = "gpt-image-2"
+MODEL_GEMINI_31_FLASH_IMAGE: str = "gemini-3.1-flash-image-preview"  # alias routes to the GA id
 MODEL_FLUX_2_PRO: str = "flux.2-pro"
 MODEL_FLUX_2_FLEX: str = "flux.2-flex"
+# Krea
+MODEL_KREA_2_LARGE: str = "krea-2-large"
+MODEL_KREA_2_MEDIUM: str = "krea-2-medium"
+MODEL_KREA_2_MEDIUM_TURBO: str = "krea-2-medium-turbo"
 # Recraft (vector illustration, icons, design)
 MODEL_RECRAFT_V4: str = "recraft-v4"
 MODEL_RECRAFT_V4_PRO: str = "recraft-v4-pro"
@@ -27,6 +33,7 @@ MODEL_RECRAFT_V41_UTILITY_PRO: str = "recraft-v4.1-utility-pro"
 MODEL_GROK_IMAGINE: str = "grok-imagine"
 # Microsoft
 MODEL_MAI_IMAGE_25: str = "mai-image-2.5"
+MODEL_MAI_IMAGE_25_PRO: str = "mai-image-2.5-pro"
 
 # Qwen (temperature-supporting, non-OpenAI)
 MODEL_QWEN35_FLASH: str = "qwen3.5-flash"
@@ -158,6 +165,8 @@ MODEL_SONAR_DEEP_RESEARCH: str = "sonar-deep-research"
 # ByteDance
 MODEL_SEED_20_MINI: str = "seed-2.0-mini"
 MODEL_SEEDREAM_45: str = "seedream-4.5"
+MODEL_SEEDREAM_5_PRO: str = "seedream-5-pro"
+MODEL_SEEDREAM_5_LITE: str = "seedream-5-lite"
 
 # Baidu
 MODEL_QIANFAN_OCR_FAST: str = "qianfan-ocr-fast"
@@ -187,6 +196,8 @@ MODEL_FLUX_2_MAX: str = "flux.2-max"
 MODEL_FLUX_2_KLEIN_4B: str = "flux.2-klein-4b"
 
 # Sourceful
+MODEL_RIVERFLOW_V25_FAST: str = "riverflow-v2.5-fast"
+MODEL_RIVERFLOW_V25_PRO: str = "riverflow-v2.5-pro"
 MODEL_RIVERFLOW_V2_PRO: str = "riverflow-v2-pro"
 MODEL_RIVERFLOW_V2_FAST: str = "riverflow-v2-fast"
 MODEL_RIVERFLOW_V2_MAX_PREVIEW: str = "riverflow-v2-max-preview"

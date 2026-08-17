@@ -16,48 +16,38 @@
  * down the page, so preloading it would contend with the two families
  * that actually block first meaningful paint.
  */
-import { Instrument_Sans, Source_Serif_4, JetBrains_Mono } from 'next/font/google';
+import { DM_Sans, Newsreader, Inconsolata } from 'next/font/google';
 
-/** UI chrome. Tighter than Inter by default, which is what keeps a dense
- *  reasoning UI compact at 11–13px. Above the fold everywhere. */
-export const instrumentSans = Instrument_Sans({
+/** UI chrome. DM Sans provides excellent UI clarity at dense sizing (11–13px).
+ *  Above the fold everywhere. */
+export const dmSans = DM_Sans({
   subsets: ['latin'],
-  variable: '--font-instrument-sans',
+  variable: '--font-dm-sans',
   display: 'swap',
   preload: true,
 });
 
-/** Running prose. The `opsz` axis lets one family cover 15px paragraphs
- *  and 60px headings without a second download. Above the fold everywhere. */
-export const sourceSerif = Source_Serif_4({
+/** Running prose. Newsreader is a contemporary serif optimized for screen reading.
+ *  Above the fold everywhere. */
+export const newsreader = Newsreader({
   subsets: ['latin'],
-  variable: '--font-source-serif',
+  variable: '--font-newsreader',
   display: 'swap',
   preload: true,
 });
 
-/** Code, model IDs, token values, and anything tabular. Below the fold —
- *  deliberately not preloaded so it does not compete with sans/serif for
- *  the first connections. */
-export const jetbrainsMono = JetBrains_Mono({
+/** Code, model IDs, token values, and anything tabular. Inconsolata is a
+ *  humanist monospace. Below the fold — deliberately not preloaded. */
+export const inconsolata = Inconsolata({
   subsets: ['latin'],
-  variable: '--font-jetbrains-mono',
+  variable: '--font-inconsolata',
   display: 'swap',
   preload: false,
 });
 
 /** Space-joined className carrying the three webfont CSS variables. */
 export const fontVariables = [
-  instrumentSans.variable,
-  sourceSerif.variable,
-  jetbrainsMono.variable,
+  dmSans.variable,
+  newsreader.variable,
+  inconsolata.variable,
 ].join(' ');
-
-/*
- * Inter used to be loaded purely to fill the second slot of the `--font-sans`
- * chain. That slot was unreachable: next/font emits
- * `--font-instrument-sans: 'Instrument Sans', 'Instrument Sans Fallback'`, and
- * the size-adjusted local fallback already covers both the swap window and a
- * failed download. The payload never rendered a pixel, so both the import and
- * the `var(--font-inter)` reference in globals.css are gone.
- */

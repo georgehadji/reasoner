@@ -6,11 +6,15 @@ const LINKS = {
   Product: [
     { label: 'About', href: '/about' },
     { label: 'Pricing', href: '/pricing' },
-    { label: 'Docs', href: '/help' },
+    { label: 'Docs', href: '/docs' },
+    { label: 'FAQ', href: '/faq' },
+    { label: 'Changelog', href: '/changelog' },
+    { label: 'Status', href: '/status' },
   ],
   Legal: [
     { label: 'Privacy', href: '/privacy' },
     { label: 'Security', href: '/security' },
+    { label: 'Sub-processors', href: '/subprocessors' },
     { label: 'Terms', href: '/terms' },
     { label: 'Contact', href: '/contact' },
   ],
@@ -59,7 +63,7 @@ export function SiteFooter() {
         </div>
 
         <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-[var(--border)] pt-8 text-xs text-[var(--text-2)] sm:flex-row">
-          <p>© {new Date().getFullYear()} Reasoner. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Reasoner, operated by Georgios-Chrysovalantis Chatzivantsidis.</p>
           <p>Built for critical decisions.</p>
         </div>
       </div>

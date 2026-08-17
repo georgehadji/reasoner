@@ -147,24 +147,28 @@ class TestScopeAuthorization:
 
 class TestAdminKey:
 
-    async def test_admin_key_from_env(self):
-        """Admin key set via env should authenticate."""
-        import os
-        os.environ["ADMIN_API_KEY"] = "test-admin-secret-12345"
+    async def test_admin_key_from_env(self, monkeypatch):
+        """Admin key set via env should authenticate.
+
+        AuthManager reads settings.ADMIN_API_KEY (the frozen pydantic-settings
+        singleton, loaded once at process startup) rather than a live
+        os.getenv() call, so mutating os.environ after import has no effect —
+        monkeypatch the singleton attribute directly instead.
+        """
+        from reasoner.core.settings import settings
+        monkeypatch.setattr(settings, "ADMIN_API_KEY", "test-admin-secret-12345")
         mgr = AuthManager()
         api_key = await mgr.authenticate("test-admin-secret-12345")
         assert api_key is not None
         assert api_key.name == "admin"
         assert "admin" in api_key.scopes
-        del os.environ["ADMIN_API_KEY"]
 
-    async def test_admin_key_wrong_rejected(self):
-        import os
-        os.environ["ADMIN_API_KEY"] = "correct-admin-key"
+    async def test_admin_key_wrong_rejected(self, monkeypatch):
+        from reasoner.core.settings import settings
+        monkeypatch.setattr(settings, "ADMIN_API_KEY", "correct-admin-key")
         mgr = AuthManager()
         with pytest.raises(AuthenticationError, match="Invalid"):
             await mgr.authenticate("wrong-admin-key")
-        del os.environ["ADMIN_API_KEY"]
 
 
 class TestKeyRevocation:

@@ -8,9 +8,18 @@ import pytest
 
 
 @pytest.mark.asyncio
-async def test_direct_fallback_disabled_by_default():
-    """When MULTI_PROVIDER_FALLBACK_ENABLED is false, _try_direct_fallback returns None."""
+async def test_direct_fallback_disabled_when_setting_off(monkeypatch):
+    """When MULTI_PROVIDER_FALLBACK_ENABLED is false, _try_direct_fallback returns None.
+
+    Default flipped true->false->true in commit de76b6d ("REAPER V7 — OpenRouter
+    SPOF fallback") — direct-provider fallback is now enabled by default so a full
+    OpenRouter outage doesn't take the whole app down. This test now forces the
+    setting off to exercise the disabled branch instead of asserting on the default.
+    """
+    from reasoner.core.settings import settings
     from reasoner.infrastructure.llm.router import _try_direct_fallback
+
+    monkeypatch.setattr(settings, "MULTI_PROVIDER_FALLBACK_ENABLED", False)
 
     result = await _try_direct_fallback(
         role="primary", system_prompt="test", user_prompt="test",

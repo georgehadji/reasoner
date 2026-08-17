@@ -12,10 +12,14 @@ from fastapi.testclient import TestClient
 from reasoner.api import app
 from reasoner.auth import AuthManager
 from reasoner.infrastructure.auth.local_adapter import LocalAuthAdapter
+from reasoner.infrastructure.auth import set_auth_adapter
 
 import os
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-for-local-auth-adapter-only")
 _adapter = LocalAuthAdapter()
+# Force LocalAuthAdapter regardless of ambient SUPABASE_URL/ENVIRONMENT config —
+# get_auth_adapter() otherwise picks SupabaseAuthAdapter outside ENVIRONMENT=testing.
+set_auth_adapter(_adapter)
 _test_token = _adapter.create_token("11111111-1111-1111-1111-111111111111", "test@example.com")
 _admin_token = _adapter.create_token(
     "11111111-1111-1111-1111-111111111111",
@@ -155,11 +159,15 @@ class TestBug003ErrorMessageSanitization:
     def test_context_error_is_generic(self):
         """Context route errors must not leak internals."""
         secret = "SECRET_CONTEXT_PATH"
-        with patch("reasoner.api.routes.context.ReasonerPipeline") as mock_pipe:
-            mock_pipe.side_effect = RuntimeError(secret)
+        # context.py builds the pipeline via PipelineOrchestrator.create_pipeline()
+        # now (direct ReasonerPipeline import was removed), so inject the error there.
+        with patch(
+            "reasoner.application.orchestrator.PipelineOrchestrator.create_pipeline",
+            side_effect=RuntimeError(secret),
+        ):
             response = client.post(
                 "/api/run-with-context",
-                json={"problem": "x", "preset": "auto-budget", "context": []},
+                json={"problem": "x", "preset": "multi-perspective-budget", "context": []},
             )
         assert response.status_code == 200
         data = response.json()

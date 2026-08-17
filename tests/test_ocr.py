@@ -8,7 +8,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi.testclient import TestClient
 
 from reasoner.api import app
+from reasoner.core.settings import settings
 from reasoner.infrastructure.auth.local_adapter import LocalAuthAdapter
+from reasoner.infrastructure.auth import set_auth_adapter
 from reasoner.uploader import (
     extract_text,
     save_uploaded_file,
@@ -20,6 +22,9 @@ from reasoner.uploader import (
 import os
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-for-local-auth-adapter-only")
 _adapter = LocalAuthAdapter()
+# Force LocalAuthAdapter regardless of ambient SUPABASE_URL/ENVIRONMENT config —
+# get_auth_adapter() otherwise picks SupabaseAuthAdapter outside ENVIRONMENT=testing.
+set_auth_adapter(_adapter)
 _test_token = _adapter.create_token("11111111-1111-1111-1111-111111111111", "test@example.com")
 client = TestClient(app, headers={"Authorization": f"Bearer {_test_token}"})
 
@@ -37,7 +42,7 @@ class TestExtractTextOCR:
     @pytest.mark.asyncio
     async def test_image_uses_describe_by_default(self):
         """Images without force_ocr should use describe_image."""
-        with patch("reasoner.uploader._extract_image", new_callable=AsyncMock) as mock_describe:
+        with patch("reasoner.infrastructure.uploader._extract_image", new_callable=AsyncMock) as mock_describe:
             mock_describe.return_value = "A photo of a cat"
             result = await extract_text(b"fake-img", "test.png")
             mock_describe.assert_awaited_once_with(b"fake-img", "test.png")
@@ -55,7 +60,7 @@ class TestExtractTextOCR:
     @pytest.mark.asyncio
     async def test_pdf_uses_ocr_when_forced(self):
         """PDFs with force_ocr=True should always route to OCR."""
-        with patch("reasoner.uploader._extract_pdf") as mock_pdf, \
+        with patch("reasoner.infrastructure.uploader._extract_pdf") as mock_pdf, \
              patch("reasoner.infrastructure.uploader._ocr_scanned_pdf", new_callable=AsyncMock) as mock_ocr:
             mock_pdf.return_value = "Plenty of text here that would normally skip OCR"
             mock_ocr.return_value = "OCR text"
@@ -67,7 +72,7 @@ class TestExtractTextOCR:
     async def test_pdf_skips_ocr_when_text_is_long(self):
         """PDFs with extracted text >= 50 chars should skip OCR."""
         long_text = "x" * 50
-        with patch("reasoner.uploader._extract_pdf") as mock_pdf, \
+        with patch("reasoner.infrastructure.uploader._extract_pdf") as mock_pdf, \
              patch("reasoner.infrastructure.uploader._ocr_scanned_pdf", new_callable=AsyncMock) as mock_ocr:
             mock_pdf.return_value = long_text
             result = await extract_text(b"fake-pdf", "test.pdf")
@@ -77,7 +82,7 @@ class TestExtractTextOCR:
     @pytest.mark.asyncio
     async def test_pdf_fallback_to_ocr_when_text_is_short(self):
         """PDFs with extracted text < 50 chars should trigger OCR fallback."""
-        with patch("reasoner.uploader._extract_pdf") as mock_pdf, \
+        with patch("reasoner.infrastructure.uploader._extract_pdf") as mock_pdf, \
              patch("reasoner.infrastructure.uploader._ocr_scanned_pdf", new_callable=AsyncMock) as mock_ocr:
             mock_pdf.return_value = "short"
             mock_ocr.return_value = "Scanned page text"
@@ -88,7 +93,7 @@ class TestExtractTextOCR:
     @pytest.mark.asyncio
     async def test_pdf_fallback_whitespace_only_counts_as_short(self):
         """PDFs returning only whitespace should trigger OCR fallback."""
-        with patch("reasoner.uploader._extract_pdf") as mock_pdf, \
+        with patch("reasoner.infrastructure.uploader._extract_pdf") as mock_pdf, \
              patch("reasoner.infrastructure.uploader._ocr_scanned_pdf", new_callable=AsyncMock) as mock_ocr:
             mock_pdf.return_value = "   \n\n   "
             mock_ocr.return_value = "Scanned page text"
@@ -196,9 +201,10 @@ class TestSaveUploadedFileOCR:
     @pytest.mark.asyncio
     async def test_save_uploaded_file_passes_force_ocr(self, tmp_path):
         """force_ocr should be forwarded to extract_text."""
-        with patch("reasoner.uploader.UPLOAD_DIR", tmp_path), \
+        with patch("reasoner.infrastructure.uploader.UPLOAD_DIR", tmp_path), \
              patch("reasoner.infrastructure.uploader._MAGIC_AVAILABLE", False), \
-             patch("reasoner.uploader.extract_text", new_callable=AsyncMock) as mock_extract:
+             patch.object(settings, "UPLOAD_REQUIRE_MIME_VALIDATION", False), \
+             patch("reasoner.infrastructure.uploader.extract_text", new_callable=AsyncMock) as mock_extract:
             mock_extract.return_value = "OCR result"
             result = await save_uploaded_file(b"fake", "img.png", force_ocr=True)
             assert result["text"] == "OCR result"
@@ -209,9 +215,10 @@ class TestSaveUploadedFileOCR:
     @pytest.mark.asyncio
     async def test_save_uploaded_files_passes_force_ocr(self, tmp_path):
         """force_ocr should be forwarded for batched uploads."""
-        with patch("reasoner.uploader.UPLOAD_DIR", tmp_path), \
+        with patch("reasoner.infrastructure.uploader.UPLOAD_DIR", tmp_path), \
              patch("reasoner.infrastructure.uploader._MAGIC_AVAILABLE", False), \
-             patch("reasoner.uploader.extract_text", new_callable=AsyncMock) as mock_extract:
+             patch.object(settings, "UPLOAD_REQUIRE_MIME_VALIDATION", False), \
+             patch("reasoner.infrastructure.uploader.extract_text", new_callable=AsyncMock) as mock_extract:
             mock_extract.return_value = "OCR result"
             results = await save_uploaded_files(
                 [(b"fake1", "a.png"), (b"fake2", "b.png")],

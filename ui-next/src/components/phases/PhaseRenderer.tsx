@@ -208,9 +208,9 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
 
     if (rawIdeas.length > 0 || clusters.length > 0 || developments.length > 0) {
       const tierColor: Record<string, string> = {
-        conventional: 'text-slate-400',
-        lateral: 'text-amber-400',
-        disruptive: 'text-violet-400',
+        conventional: 'text-[var(--text-muted)]',
+        lateral: 'text-[var(--warn)]',
+        disruptive: 'text-[var(--accent)]',
       };
 
       return (
@@ -225,10 +225,10 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
                 const tier = String(idea.creativity_tier ?? 'conventional');
                 const prob = typeof idea.probability === 'number' ? idea.probability : null;
                 return (
-                  <div key={i} className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2">
+                  <div key={i} className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2">
                     <div className="flex items-center gap-2 mb-1">
                       <span className={`text-sm font-semibold ${phaseTextClass}`}>{String(idea.title ?? '')}</span>
-                      <span className={`text-xs font-medium ${tierColor[tier] ?? 'text-slate-400'}`}>{tier}</span>
+                      <span className={`text-xs font-medium ${tierColor[tier] ?? 'text-[var(--text-muted)]'}`}>{tier}</span>
                       {prob !== null && (
                         <span className="ml-auto text-xs opacity-50">p={prob.toFixed(2)}</span>
                       )}
@@ -246,7 +246,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
                 const clusterIdeas = Array.isArray(cluster.ideas) ? cluster.ideas as Record<string, unknown>[] : [];
                 const keptIdeas = clusterIdeas.filter(i => i.keep !== false);
                 return (
-                  <div key={ci} className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2">
+                  <div key={ci} className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2">
                     <p className={`text-xs font-semibold uppercase tracking-wide mb-2 ${phaseTextClass}`}>{String(cluster.theme ?? `Theme ${ci + 1}`)}</p>
                     {keptIdeas.map((idea, ii) => (
                       <div key={ii} className="flex items-center gap-2 py-1 border-t border-[var(--border)]">
@@ -266,7 +266,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
                 const steps = Array.isArray(dev.steps) ? dev.steps as string[] : [];
                 const risks = Array.isArray(dev.risks) ? dev.risks as string[] : [];
                 return (
-                  <div key={di} className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-3 space-y-2">
+                  <div key={di} className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-2)] px-3 py-3 space-y-2">
                     <p className={`text-sm font-semibold ${phaseTextClass}`}>{String(dev.title ?? '')}</p>
                     {!!dev.use_case && <p className={`text-xs opacity-80 ${phaseTextClass}`}>{String(dev.use_case)}</p>}
                     {steps.length > 0 && (
@@ -329,9 +329,9 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
         {synthesisSections && (
           <div className="mb-4 grid gap-4">
             {synthesisSections.criticalInsights.length > 0 && (
-              <section id="critical-insights" className="scroll-mt-24 rounded-xl border border-[var(--border)] bg-[var(--chip-bg,var(--surface-2))] p-4">
+              <section id="critical-insights" className="scroll-mt-24 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--chip-bg,var(--surface-2))] p-4">
                 <h3 className="mb-2 text-sm font-semibold text-[var(--text)]">Critical Insights</h3>
-                <ol className="list-decimal space-y-1 pl-5 text-[15px] text-[var(--text)]">
+                <ol className="list-decimal space-y-1 pl-5 text-[length:var(--text-sm)] text-[var(--text)]">
                   {synthesisSections.criticalInsights.map((item, i) => (
                     <li key={i}>{item}</li>
                   ))}
@@ -339,7 +339,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
               </section>
             )}
             {synthesisSections.actionBlueprint.length > 0 && (
-              <section id="action-blueprint" className="scroll-mt-24 rounded-xl border border-[var(--border)] bg-[var(--chip-bg,var(--surface-2))] p-4">
+              <section id="action-blueprint" className="scroll-mt-24 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--chip-bg,var(--surface-2))] p-4">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <h3 className="text-sm font-semibold text-[var(--text)]">Action Blueprint</h3>
                   <button
@@ -358,7 +358,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
                     Copy actions
                   </button>
                 </div>
-                <ul className="space-y-1 text-[15px] text-[var(--text)]">
+                <ul className="space-y-1 text-[length:var(--text-sm)] text-[var(--text)]">
                   {synthesisSections.actionBlueprint.map((item, i) => {
                     if (typeof item === 'string') {
                       return <li key={i}>• {item}</li>;
@@ -375,9 +375,9 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
               </section>
             )}
             {synthesisSections.openQuestions.length > 0 && (
-              <section id="open-questions" className="scroll-mt-24 rounded-xl border border-[var(--border)] bg-[var(--chip-bg,var(--surface-2))] p-4">
+              <section id="open-questions" className="scroll-mt-24 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--chip-bg,var(--surface-2))] p-4">
                 <h3 className="mb-2 text-sm font-semibold text-[var(--text)]">Open Questions</h3>
-                <ul className="space-y-1 text-[15px] text-[var(--text)]">
+                <ul className="space-y-1 text-[length:var(--text-sm)] text-[var(--text)]">
                   {synthesisSections.openQuestions.map((item, i) => (
                     <li key={i}>• {item}</li>
                   ))}
@@ -416,7 +416,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
 
 function VettedContextBlock({ items }: { items: Array<Record<string, unknown>> }) {
   return (
-    <div className="mb-4 rounded-xl border border-[var(--border)] bg-[var(--chip-bg,var(--surface-2))] p-4">
+    <div className="mb-4 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--chip-bg,var(--surface-2))] p-4">
       <div className="mb-2 flex items-center justify-between">
         <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">Vetted Context</h3>
         <span className={`${TEXT_SIZES.tiny} text-[var(--text-subtle)]`}>{items.length} source{items.length === 1 ? '' : 's'}</span>
@@ -429,7 +429,7 @@ function VettedContextBlock({ items }: { items: Array<Record<string, unknown>> }
           const summary = typeof item.summary === 'string' ? item.summary : typeof item.snippet === 'string' ? item.snippet : '';
           const keyFacts = Array.isArray(item.key_facts) ? item.key_facts : [];
           return (
-            <div key={idx} className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-3 text-sm text-[var(--text)]">
+            <div key={idx} className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-2)] p-3 text-sm text-[var(--text)]">
               <div className="flex flex-wrap items-center gap-2">
                 {url ? (
                   <a href={url} target="_blank" rel="noopener noreferrer" className="font-semibold underline">
@@ -440,7 +440,7 @@ function VettedContextBlock({ items }: { items: Array<Record<string, unknown>> }
                 )}
                 {date ? <span className="text-xs text-[var(--text-subtle)]">{date}</span> : null}
               </div>
-              {summary ? <p className="mt-2 text-[15px] text-[var(--text)]">{summary}</p> : null}
+              {summary ? <p className="mt-2 text-[length:var(--text-sm)] text-[var(--text)]">{summary}</p> : null}
               {keyFacts.length > 0 && (
                 <ul className="mt-2 space-y-1 text-sm text-[var(--text-subtle)]">
                   {keyFacts.slice(0, 4).map((fact, i) => (

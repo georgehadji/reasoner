@@ -50,8 +50,13 @@ def _parse_sse(line: str) -> dict:
 @pytest.mark.asyncio
 async def test_critical_phase_error_halts_pipeline():
     """
-    If a critical phase like Decomposition raises an exception,
+    If a critical phase like Critique & Pruning raises an exception,
     the stream should emit a phase_error event and stop before Synthesis.
+
+    Critique & Pruning is the only critical=True step in MultiPerspectiveFlow
+    (application/flows/multi_perspective.py) — Decomposition is no longer a
+    pipeline phase (classification/decomposition moved into HyperGate
+    preflight), so it can't be used to test critical-phase halting anymore.
     """
     req = RunRequest(problem="test critical error", preset="multi-perspective-budget")
 
@@ -59,8 +64,8 @@ async def test_critical_phase_error_halts_pipeline():
 
     with patch("reasoner.llm.ProviderRouter.from_model_ids", return_value=fake_router):
         with patch(
-            "reasoner.pipeline.ReasonerPipeline._phase_1_decompose",
-            side_effect=ValueError("simulated decomposition failure"),
+            "reasoner.application.flows.multi_perspective.run_critique_phase",
+            side_effect=ValueError("simulated critique failure"),
         ):
             events = []
             async for line in run_stream(req):
@@ -70,7 +75,7 @@ async def test_critical_phase_error_halts_pipeline():
     # Should report the phase error
     phase_errors = [e for e in events if e.get("type") == "phase_error"]
     assert len(phase_errors) == 1
-    assert "ValueError: simulated decomposition failure" in phase_errors[0]["error"]
+    assert "ValueError: simulated critique failure" in phase_errors[0]["error"]
 
     # Synthesis must NOT have been attempted
     synthesis_completes = [
@@ -83,42 +88,46 @@ async def test_critical_phase_error_halts_pipeline():
 @pytest.mark.asyncio
 async def test_non_critical_phase_error_continues_pipeline():
     """
-    If a non-critical phase like Deep Read raises an exception,
+    If a non-critical phase like Stress Testing raises an exception,
     the stream should emit a phase_error event and continue to Synthesis.
+
+    Deep Read isn't part of MultiPerspectiveFlow's phase list (it's a
+    method-specific step, not wired for multi-perspective-budget), and
+    Synthesis/Context Vetting are no longer ReasonerPipeline methods — the
+    strategy calls the standalone run_synthesis_phase/run_context_vetting_phase
+    functions instead. Context Vetting itself is currently dead code in
+    api/execution/pipeline.py (defined but never invoked), so no patch is
+    needed for it.
     """
     req = RunRequest(problem="test non-critical error", preset="multi-perspective-budget")
 
     fake_router = FakeRouter()
 
     with patch("reasoner.llm.ProviderRouter.from_model_ids", return_value=fake_router):
-        # Patch Deep Read to blow up, but leave everything else intact.
+        # Patch Stress Testing to blow up, but leave everything else intact.
         # We also short-circuit Synthesis so it doesn't need real LLM data.
         # Short-circuit network-dependent helpers so the test finishes quickly.
         with patch(
-            "reasoner.pipeline.ReasonerPipeline._phase_deep_read",
-            side_effect=RuntimeError("simulated deep read failure"),
+            "reasoner.application.flows.multi_perspective.run_stress_test_phase",
+            side_effect=RuntimeError("simulated stress test failure"),
         ):
             with patch(
-                "reasoner.pipeline.ReasonerPipeline._phase_synthesis",
+                "reasoner.application.flows.multi_perspective.run_synthesis_phase",
                 return_value=None,
             ):
                 with patch(
-                    "reasoner.pipeline.ReasonerPipeline._phase_context_vetting",
-                    return_value=None,
+                    "reasoner.application.orchestrator.PipelineOrchestrator._recall_neuro_context",
+                    return_value=[],
                 ):
-                    with patch(
-                        "reasoner.api.streaming._recall_neuro_context",
-                        return_value=[],
-                    ):
-                        events = []
-                        async for line in run_stream(req):
-                            if line.startswith("data:"):
-                                events.append(_parse_sse(line))
+                    events = []
+                    async for line in run_stream(req):
+                        if line.startswith("data:"):
+                            events.append(_parse_sse(line))
 
-    # Deep Read phase error should be reported
+    # Stress Testing phase error should be reported
     phase_errors = [e for e in events if e.get("type") == "phase_error"]
     assert len(phase_errors) == 1
-    assert "RuntimeError: simulated deep read failure" in phase_errors[0]["error"]
+    assert "RuntimeError: simulated stress test failure" in phase_errors[0]["error"]
 
     # Synthesis should still complete because Deep Read is non-critical
     synthesis_completes = [

@@ -533,6 +533,63 @@ async def require_credits_if_authenticated(
     return None
 
 
+async def reserve_or_402(
+    *,
+    user_id: str | None,
+    preset: str,
+    problem: str,
+    reference_id: str,
+) -> int:
+    """Reserve a run's estimated cost, translating a shortfall into a 402.
+
+    The single call site every route uses before constructing its streaming
+    response -- reservation has to happen here, not inside the generator
+    body, because a generator that's already started can't turn into a 402:
+    the response has already begun.
+
+    Returns 0 for anonymous callers (nothing to reserve) or when persistence
+    isn't configured outside production (same in-memory fallback every other
+    credit operation uses).
+    """
+    if user_id is None:
+        return 0
+    if not _persistence_is_configured() and settings.ENVIRONMENT != "production":
+        return 0
+    _require_persistence("Credits")
+
+    from reasoner.api.run_observability import CreditSink
+    from reasoner.application.services.run_metering import reserve_run_budget
+    from reasoner.domain.credits import InsufficientCreditsError
+
+    try:
+        return await reserve_run_budget(
+            user_id=user_id,
+            preset=preset,
+            problem=problem,
+            reference_id=reference_id,
+            sink=CreditSink(),
+        )
+    except InsufficientCreditsError as exc:
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "error": "Insufficient credits",
+                "message": "Your credit balance can't cover this run's estimated cost.",
+                "required": exc.required,
+                "available": exc.available,
+                "upgrade_url": "/pricing",
+            },
+        ) from exc
+    except HTTPException:
+        raise
+    except Exception:
+        # A ledger outage must not take the product down -- same posture as
+        # require_credits: log and let the run through unreserved. metered()
+        # still settles from actual spend once the ledger recovers.
+        logger.warning("Credit reservation failed; allowing run unreserved", exc_info=True)
+        return 0
+
+
 # ── Pipeline & Preset Services ──
 
 def get_preset_service() -> PresetService:

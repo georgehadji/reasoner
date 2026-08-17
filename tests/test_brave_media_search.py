@@ -88,8 +88,12 @@ class TestBraveImageSearch:
         assert results[0]["img_src"] == "https://e.com/page"
 
     async def test_returns_empty_without_api_key(self):
-        adapter = BraveSearchAdapter(api_key="")
-        assert await adapter.search_images("q") == []
+        # BraveSearchAdapter.__init__ does `api_key or settings.BRAVE_SEARCH_API_KEY`,
+        # so passing "" alone falls back to a real configured key in this dev
+        # environment and makes a live API call — patch the settings key too.
+        with patch("reasoner.infrastructure.search.brave_adapter.settings.BRAVE_SEARCH_API_KEY", ""):
+            adapter = BraveSearchAdapter(api_key="")
+            assert await adapter.search_images("q") == []
 
     async def test_returns_empty_on_http_failure(self):
         adapter = BraveSearchAdapter(api_key="test-key")
@@ -132,8 +136,9 @@ class TestBraveVideoSearch:
         assert results[0]["source"] == "vimeo.com"
 
     async def test_returns_empty_without_api_key(self):
-        adapter = BraveSearchAdapter(api_key="")
-        assert await adapter.search_videos("q") == []
+        with patch("reasoner.infrastructure.search.brave_adapter.settings.BRAVE_SEARCH_API_KEY", ""):
+            adapter = BraveSearchAdapter(api_key="")
+            assert await adapter.search_videos("q") == []
 
 
 class TestMediaWidgetsUseBrave:

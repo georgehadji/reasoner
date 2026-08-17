@@ -242,7 +242,7 @@ class ReasonerPipeline:
 
     async def _phase_2_perspectives(self, state: PipelineState) -> None:
         from reasoner.application.flows.perspective_phases import run_perspectives_phase
-        await run_perspectives_phase(state, self._workflow_services())
+        await run_perspectives_phase(state, self._workflow_services(), perspectives=self.perspectives)
 
     async def _phase_3_critique(self, state: PipelineState) -> None:
         from reasoner.application.flows.perspective_phases import run_critique_phase
@@ -406,6 +406,8 @@ class ReasonerPipeline:
 
     async def run(self, problem: str, method: str | None = None) -> PipelineState:
         """Execute the reasoning pipeline."""
+        if not problem or not problem.strip():
+            raise ValueError("Problem cannot be empty")
         start_time = time.monotonic()
         if not method:
             method = self._get_method_from_preset()
@@ -460,6 +462,8 @@ class ReasonerPipeline:
         # ── Optional: Prompt Enhancement ──
         if self.enhance_prompt:
             await self._phase_enhance_prompt(state)
+        else:
+            state.enhanced_problem = state.problem
 
         # ── Mandatory: Fusion (Classification + Decomposition) ──
         await self._phase_fusion(state)
@@ -575,6 +579,9 @@ class ReasonerPipeline:
     def _validate_enhancement(self, original: str, enhanced: str) -> bool:
         if not enhanced or len(enhanced) < 10: return False
         if len(enhanced) > len(original) * 5: return False
+        from reasoner.phases._shared import detect_language
+        if detect_language(original) != detect_language(enhanced):
+            return False
         return True
 
     @timed

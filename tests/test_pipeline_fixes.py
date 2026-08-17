@@ -298,8 +298,10 @@ async def test_decomposition_prompt_demands_rationale_and_critical_sources():
 async def test_phase_1_decompose_parses_new_assumption_fields():
     """_phase_1_decompose should preserve rationale, source_hint, and critical_sources in the decomposition dict."""
     router = FakeRouter({
-        "classification": json.dumps({"task_type": "predictive"}),
-        "decomposition": json.dumps({
+        # Classification + decomposition were merged into a single "fusion"
+        # role (application/pipeline.py::_phase_fusion).
+        "fusion": json.dumps({
+            "task_type": "predictive",
             "causal_chain": [{"step": 1, "action": "Gather expert surveys", "produces": ["timeline estimates"]}],
             "assumptions": [
                 {

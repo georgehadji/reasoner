@@ -98,4 +98,6 @@ src/reasoner/healing/generated_tests/
 
 # Scratch dir for manual/ad-hoc test scripts
 .tmp_manual_temp/
-=0.9.32
+
+# Separate embedded repo (own .git) — not part of this project
+deepseek-harness/

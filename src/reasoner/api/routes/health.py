@@ -7,10 +7,9 @@ Full diagnostics available with valid X-Admin-Key header.
 
 from __future__ import annotations
 
-import secrets
-
 from fastapi import APIRouter, Depends, Request
 
+from reasoner.api.admin_auth import verify_admin_key
 from reasoner.api.cache import CACHE_DIR
 from reasoner.api.dependencies import get_optional_user
 from reasoner.application.services.health_service import check_health
@@ -26,9 +25,7 @@ async def health_check(
     user: User | None = Depends(get_optional_user),
 ):
     """Comprehensive health check endpoint."""
-    admin_key = request.headers.get("X-Admin-Key", "")
-    admin_api_key = settings.ADMIN_API_KEY or ""
-    is_admin = bool(admin_api_key and secrets.compare_digest(admin_key, admin_api_key))
+    is_admin = verify_admin_key(request.headers.get("X-Admin-Key"))
     if settings.ENVIRONMENT == "production":
         is_admin = is_admin and user is not None and "admin" in user.scopes
     cache_file_count = len(list(CACHE_DIR.glob("*.json"))) if is_admin else None

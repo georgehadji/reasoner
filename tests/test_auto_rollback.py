@@ -79,7 +79,13 @@ class TestAutoDisableSemanticRetrieval:
 
 class TestAutoFallbackRerank:
     @pytest.mark.asyncio
-    async def test_rerank_returns_docs_unchanged_when_api_fails(self):
+    async def test_rerank_falls_back_to_nemotron_when_cohere_api_fails(self):
+        """When Cohere's rerank call fails, rerank_documents now cascades to
+        the Nemotron reranker instead of just giving up and returning docs
+        unchanged — a real resilience improvement (core/rerank.py's except
+        branch calls rerank_via_nemotron()). Mock that fallback directly
+        rather than simulating Nemotron's own HTTP/logprobs semantics.
+        """
         docs = [{"title": "a"}, {"title": "b"}]
 
         mock_response = MagicMock()
@@ -92,8 +98,14 @@ class TestAutoFallbackRerank:
             mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
             with patch.object(settings, "OPENROUTER_API_KEY", "sk-or-v1-test"):
-                result = await rerank_documents("query", docs)
+                with patch(
+                    "reasoner.core.rerank.rerank_via_nemotron",
+                    new_callable=AsyncMock,
+                    return_value=docs,
+                ) as mock_nemotron:
+                    result = await rerank_documents("query", docs)
 
+        mock_nemotron.assert_awaited_once()
         assert result == docs
 
     @pytest.mark.asyncio

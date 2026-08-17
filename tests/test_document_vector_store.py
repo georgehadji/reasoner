@@ -83,7 +83,14 @@ class TestDocumentVectorStore:
         sidecar_path = UPLOAD_DIR / f"{file_id}.vectors.json"
         assert sidecar_path.exists()
 
-        data = json.loads(sidecar_path.read_text())
+        # Sidecars are encrypted at rest (security-remediation-plan.md
+        # Phase 4 item 5) -- the on-disk envelope is {"encrypted": true,
+        # "payload": <ciphertext>}, not the sidecar shape directly.
+        from reasoner.security.encryption import get_encryption_service
+
+        envelope = json.loads(sidecar_path.read_text())
+        assert envelope["encrypted"] is True
+        data = json.loads(get_encryption_service().decrypt(envelope["payload"]))
         assert data["file_id"] == file_id
         assert data["chunk_count"] == count
         assert len(data["chunks"]) == count
@@ -202,7 +209,7 @@ class TestSemanticAttachmentContext:
         assert "semantic excerpts" in result
         assert "First relevant passage" in result
         assert "Second relevant passage" in result
-        mock_store.retrieve.assert_awaited_once_with("machine learning", ["abc123"], top_k=5)
+        mock_store.retrieve.assert_awaited_once_with("machine learning", ["abc123"], top_k=5, user_id=None)
 
     @pytest.mark.asyncio
     async def test_fallback_to_full_text_when_disabled(self):

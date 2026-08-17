@@ -24,8 +24,9 @@ class ExecutionResult:
     timed_out: bool = False
     duration_ms: int = 0
     truncated: bool = False  # output was clipped to EXEC_MAX_OUTPUT_BYTES
-    blocked: bool = False    # AST guard rejected the code
+    blocked: bool = False    # AST guard rejected the code, or sandbox refused
     blocked_reason: str = ""
+    policy_version: str = ""  # identifies which guard/sandbox config produced this result
 
     @property
     def summary(self) -> str:
@@ -78,5 +79,16 @@ class CodeExecutorPort(Protocol):
             ExecutionResult with stdout, stderr, exit code, and diagnostics.
             The executor MUST NOT raise on execution failure — only on
             infrastructure failure (sandbox init error, disk full, etc.).
+        """
+        ...
+
+    async def health_check(self) -> bool:
+        """Return whether this executor is safe to use right now.
+
+        Callers must fail closed (fall back to a non-executing adapter) when
+        this returns False rather than attempt execution anyway. Adapters
+        that are not an isolation boundary (e.g. the legacy subprocess
+        executor) should always return False so they are never silently
+        treated as the approved isolated path.
         """
         ...

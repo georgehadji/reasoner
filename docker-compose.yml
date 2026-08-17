@@ -70,6 +70,11 @@ services:
       - UVICORN_WORKERS=8
       - SSL_CERTFILE=/certs/backend.crt
       - SSL_KEYFILE=/certs/backend.key
+      # Code execution: backend never touches Docker itself — it only calls
+      # sandbox-worker over the internal network. EXEC_SANDBOX_ENABLED stays
+      # false until an operator opts in; see .env.example.
+      - SANDBOX_WORKER_URL=http://sandbox-worker:8901
+      - SANDBOX_WORKER_TOKEN=${SANDBOX_WORKER_TOKEN:-}
     env_file:
       - .env
     depends_on:
@@ -190,6 +195,68 @@ services:
           memory: 256M
         reservations:
           cpus: '0.125'
+          memory: 128M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+
+  # ── Code execution sandbox (security-remediation-plan.md Phase 1) ──
+  # `backend` never has Docker access. `docker-socket-proxy` exposes only
+  # the container/image verbs sandbox-worker needs — no exec, networks,
+  # volumes, build, swarm, or secrets access to the real Docker socket.
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:0.2.0
+    environment:
+      CONTAINERS: 1   # create/start/wait/logs/remove job containers
+      IMAGES: 1        # inspect the sandbox image for health checks
+      INFO: 1
+      POST: 1          # required alongside CONTAINERS for create/start/remove
+      # Everything else stays default-denied: EXEC, NETWORKS, VOLUMES,
+      # BUILD, COMMIT, SERVICES, SWARM, NODES, SECRETS, CONFIGS, TASKS,
+      # PLUGINS, SESSION, AUTH, DISTRIBUTION.
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # Before enabling EXEC_SANDBOX_ENABLED=true, build the per-job sandbox
+  # image once so it's present on the Docker host sandbox-worker talks to
+  # (docker-socket-proxy intentionally has BUILD disabled, so this can't
+  # happen automatically through the proxy):
+  #   docker build -t reasoner-sandbox-python:latest \
+  #     -f src/reasoner/infrastructure/execution/sandbox_worker/sandbox_image/Dockerfile \
+  #     src/reasoner/infrastructure/execution/sandbox_worker/sandbox_image
+  sandbox-worker:
+    build:
+      context: .
+      dockerfile: src/reasoner/infrastructure/execution/sandbox_worker/Dockerfile
+    environment:
+      - DOCKER_HOST=tcp://docker-socket-proxy:2375
+      - SANDBOX_WORKER_TOKEN=${SANDBOX_WORKER_TOKEN:-}
+    depends_on:
+      docker-socket-proxy:
+        condition: service_started
+    restart: unless-stopped
+    # No published ports — reachable only from `backend`, as
+    # http://sandbox-worker:8901, over the internal Compose network.
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
           memory: 128M
     logging:
       driver: "json-file"

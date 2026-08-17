@@ -27,12 +27,35 @@ class PipelineWorkflowServices(WorkflowServices):
         ``NoopExecutor`` is deliberately used instead of ``None`` so phases do
         not fall back to simulating execution with an LLM.  A simulated result
         is not execution evidence and could be mistaken for verified output.
+
+        This only *selects* an executor — it never performs I/O, so it can
+        stay synchronous. For the container sandbox, the actual "is this
+        adapter healthy enough to trust" gate runs inside
+        ``ContainerExecutionSandbox.execute()`` (TTL-cached health check)
+        rather than here, since a real Docker/network probe needs to be
+        async and this constructor is called from sync contexts.
         """
         from reasoner.core.settings import settings
         if not settings.EXEC_SANDBOX_ENABLED:
             from reasoner.infrastructure.execution.noop_executor import NoopExecutor
             self.code_executor = NoopExecutor()
             return
+
+        if settings.EXEC_SANDBOX_MODE == "container":
+            try:
+                from reasoner.infrastructure.execution.container_sandbox import ContainerExecutionSandbox
+                self.code_executor = ContainerExecutionSandbox(
+                    settings.SANDBOX_WORKER_URL,
+                    settings.SANDBOX_WORKER_TOKEN,
+                )
+            except Exception:
+                from reasoner.infrastructure.execution.noop_executor import NoopExecutor
+                self.code_executor = NoopExecutor()
+            return
+
+        # Legacy/dev-only path. settings.py raises at import time if this
+        # mode is ever combined with EXEC_SANDBOX_ENABLED=true in production,
+        # so reaching here in production is not possible.
         try:
             from reasoner.infrastructure.execution.subprocess_executor import SubprocessExecutor
             self.code_executor = SubprocessExecutor()

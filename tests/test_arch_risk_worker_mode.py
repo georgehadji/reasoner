@@ -45,30 +45,51 @@ async def test_memory_rate_limiter_warns_in_multi_worker() -> None:
 async def test_production_memory_ratelimiter_should_be_redis() -> None:
     """In production, if RATE_LIMITER_MODE=memory with >1 workers, CRITICAL is logged
     and the app should refuse to start. We validate the guard condition exists."""
-    # Verify the environment variable keys exist in Settings
-    from reasoner.core.settings import Settings
+    import importlib
+    
+    # Copy environment and pop the keys to test fallback defaults
+    env_copy = os.environ.copy()
+    env_copy.pop("RATE_LIMITER_MODE", None)
+    env_copy.pop("CIRCUIT_BREAKER_MODE", None)
+    with patch("dotenv.load_dotenv", return_value=True):
+        with patch.dict(os.environ, env_copy, clear=True):
+            import reasoner.core.settings
+            importlib.reload(reasoner.core.settings)
+            s = reasoner.core.settings.Settings()
+            assert hasattr(s, "RATE_LIMITER_MODE")
+            assert hasattr(s, "CIRCUIT_BREAKER_MODE")
+            # Default should be "redis" (as set in settings.py)
+            assert s.RATE_LIMITER_MODE == "redis"
+            assert s.CIRCUIT_BREAKER_MODE == "redis"
 
-    # Settings defines both RATE_LIMITER_MODE and CIRCUIT_BREAKER_MODE
-    s = Settings()
-    assert hasattr(s, "RATE_LIMITER_MODE")
-    assert hasattr(s, "CIRCUIT_BREAKER_MODE")
-    # Default should be "redis" (as set in settings.py)
-    assert s.RATE_LIMITER_MODE == "redis"
-    assert s.CIRCUIT_BREAKER_MODE == "redis"
+    # Restore module state
+    importlib.reload(reasoner.core.settings)
 
 
 def test_settings_default_ratelimiter_mode_is_redis() -> None:
     """Default RATE_LIMITER_MODE should be 'redis' for production safety.
     This guards against accidental regression to 'memory' defaults."""
-    from reasoner.core.settings import settings
+    import importlib
 
-    assert settings.RATE_LIMITER_MODE == "redis", (
-        f"RATE_LIMITER_MODE is '{settings.RATE_LIMITER_MODE}', should be 'redis'. "
-        "A 'memory' default is unsafe for multi-worker deployments."
-    )
-    assert settings.CIRCUIT_BREAKER_MODE == "redis", (
-        f"CIRCUIT_BREAKER_MODE is '{settings.CIRCUIT_BREAKER_MODE}', should be 'redis'."
-    )
+    # Copy environment and pop the keys to test fallback defaults
+    env_copy = os.environ.copy()
+    env_copy.pop("RATE_LIMITER_MODE", None)
+    env_copy.pop("CIRCUIT_BREAKER_MODE", None)
+    with patch("dotenv.load_dotenv", return_value=True):
+        with patch.dict(os.environ, env_copy, clear=True):
+            import reasoner.core.settings
+            importlib.reload(reasoner.core.settings)
+            s = reasoner.core.settings.Settings()
+            assert s.RATE_LIMITER_MODE == "redis", (
+                f"RATE_LIMITER_MODE is '{s.RATE_LIMITER_MODE}', should be 'redis'. "
+                "A 'memory' default is unsafe for multi-worker deployments."
+            )
+            assert s.CIRCUIT_BREAKER_MODE == "redis", (
+                f"CIRCUIT_BREAKER_MODE is '{s.CIRCUIT_BREAKER_MODE}', should be 'redis'."
+            )
+
+    # Restore module state
+    importlib.reload(reasoner.core.settings)
 
 
 # ── Auth persistence mode validation ─────────────────────────────────

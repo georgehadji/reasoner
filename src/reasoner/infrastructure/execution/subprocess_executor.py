@@ -210,3 +210,9 @@ class SubprocessExecutor:
                     shutil.rmtree(tmpdir, ignore_errors=True)
                 except Exception:
                     pass
+
+    async def health_check(self) -> bool:
+        """Always unhealthy — this executor runs code on the API host with
+        no container/network/filesystem isolation. It must never be reported
+        as the approved isolated boundary, even though it can execute code."""
+        return False

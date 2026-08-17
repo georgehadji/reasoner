@@ -236,6 +236,7 @@ export const API = {
   PIPELINE_RESUME: (id: string) => `/api/pipelines/${encodeURIComponent(id)}/resume-stream`,
   AGENT_RUN: '/api/agent/run',
   AGENT_RUN_SYNC: '/api/agent/run/sync',
+  WEBSOCKET_TICKET: '/api/websocket/ticket',
 };
 
 export const DEFAULTS = {

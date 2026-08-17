@@ -17,6 +17,16 @@ export class PipelineError extends Error {
   }
 }
 
+/**
+ * Aborts are user-initiated (Stop button, unmount, a new run superseding the
+ * old one). The browser surfaces them as a DOMException named 'AbortError'
+ * ("signal is aborted without reason"), which must never reach the UI as a
+ * pipeline error.
+ */
+function isAbortError(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && (err as { name?: string }).name === 'AbortError';
+}
+
 function getDevErrorMessage(status: number, text: string): string {
   if (status === 504) {
     return 'Backend unreachable. Run: uvicorn asgi:app --reload';
@@ -31,29 +41,40 @@ export function usePipelineStream() {
 
   const streamEvents = useCallback(
     async (url: string, body: object, onEvent: (ev: PhaseEvent) => void) => {
-      // Abort any in-flight stream before starting a new one.
+      // Abort any in-flight stream before starting a new one. Hold the
+      // controller locally: stopRun() may null the ref while this call is
+      // still awaiting, and a superseding run replaces it outright.
       abortControllerRef.current?.abort();
-      abortControllerRef.current = new AbortController();
-      const resp = await fetchWithCsrf(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        signal: abortControllerRef.current.signal,
-      });
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
 
-      if (!resp.ok) {
-        const text = await resp.text().catch(() => '');
-        const isDev = process.env.NODE_ENV !== 'production';
-        const message = isDev
-          ? getDevErrorMessage(resp.status, text)
-          : `HTTP ${resp.status}: ${text.slice(0, 200)}`;
-        // eslint-disable-next-line no-console
-        console.error('Pipeline HTTP error:', resp.status, text);
-        throw new PipelineError(resp.status, text, message);
+      try {
+        const resp = await fetchWithCsrf(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        });
+
+        if (!resp.ok) {
+          const text = await resp.text().catch(() => '');
+          const isDev = process.env.NODE_ENV !== 'production';
+          const message = isDev
+            ? getDevErrorMessage(resp.status, text)
+            : `HTTP ${resp.status}: ${text.slice(0, 200)}`;
+          // eslint-disable-next-line no-console
+          console.error('Pipeline HTTP error:', resp.status, text);
+          throw new PipelineError(resp.status, text, message);
+        }
+        if (!resp.body) throw new Error('No response body');
+
+        await readSSEStream(resp.body, onEvent, controller.signal);
+      } catch (err) {
+        if (controller.signal.aborted || isAbortError(err)) return;
+        throw err;
+      } finally {
+        if (abortControllerRef.current === controller) abortControllerRef.current = null;
       }
-      if (!resp.body) throw new Error('No response body');
-
-      await readSSEStream(resp.body, onEvent, abortControllerRef.current.signal);
     },
     []
   );

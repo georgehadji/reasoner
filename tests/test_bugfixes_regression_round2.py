@@ -41,9 +41,12 @@ class TestRequireTierEnforcement:
     async def test_require_tier_blocks_in_production(self, mock_user, monkeypatch):
         """In production, require_tier must raise HTTPException(403)."""
         from reasoner.api.dependencies import require_tier
+        from reasoner.core.settings import settings
         from reasoner.domain.saas import SubscriptionTier
 
-        monkeypatch.setenv("ENVIRONMENT", "production")
+        # settings.ENVIRONMENT is a pydantic-settings field cached at construction —
+        # monkeypatch.setenv() alone doesn't reach it, patch the attribute directly.
+        monkeypatch.setattr(settings, "ENVIRONMENT", "production")
 
         checker = require_tier(SubscriptionTier.PRO)
         with pytest.raises(HTTPException) as exc_info:
@@ -56,9 +59,10 @@ class TestRequireTierEnforcement:
     async def test_require_tier_allows_in_development(self, mock_user, monkeypatch):
         """In development, require_tier should allow through (for testing)."""
         from reasoner.api.dependencies import require_tier
+        from reasoner.core.settings import settings
         from reasoner.domain.saas import SubscriptionTier
 
-        monkeypatch.setenv("ENVIRONMENT", "development")
+        monkeypatch.setattr(settings, "ENVIRONMENT", "development")
 
         checker = require_tier(SubscriptionTier.PRO)
         result = await checker(user=mock_user)
@@ -172,8 +176,9 @@ class TestCheckPresetAccess:
     async def test_preset_access_blocks_in_production(self, mock_user, monkeypatch):
         """In production, check_preset_access must raise HTTPException(403)."""
         from reasoner.api.dependencies import check_preset_access
+        from reasoner.core.settings import settings
 
-        monkeypatch.setenv("ENVIRONMENT", "production")
+        monkeypatch.setattr(settings, "ENVIRONMENT", "production")
 
         with pytest.raises(HTTPException) as exc_info:
             await check_preset_access(preset="premium-reasoning", user=mock_user)
@@ -185,8 +190,9 @@ class TestCheckPresetAccess:
     async def test_preset_access_allows_in_development(self, mock_user, monkeypatch):
         """In development, check_preset_access should allow through."""
         from reasoner.api.dependencies import check_preset_access
+        from reasoner.core.settings import settings
 
-        monkeypatch.setenv("ENVIRONMENT", "development")
+        monkeypatch.setattr(settings, "ENVIRONMENT", "development")
 
         # Should not raise
         await check_preset_access(preset="premium-reasoning", user=mock_user)
@@ -208,8 +214,8 @@ class TestRateLimiterResetRaceCondition:
         rl = RateLimiter(config)
 
         # Create a bucket first
-        async with rl._lock_for("client1"):
-            bucket = rl._get_bucket("client1")
+        async with rl._fallback_lock:
+            bucket = rl._in_memory_get_bucket("client1")
             bucket.tokens = 5
 
         # reset_client should be async and work without error
@@ -228,8 +234,8 @@ class TestRateLimiterResetRaceCondition:
 
         # Create multiple buckets
         for i in range(5):
-            async with rl._lock_for(f"client{i}"):
-                rl._get_bucket(f"client{i}")
+            async with rl._fallback_lock:
+                rl._in_memory_get_bucket(f"client{i}")
 
         assert len(rl._buckets) == 5
 

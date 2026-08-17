@@ -14,6 +14,12 @@ async def test_event_bus_drops_events_when_queue_full():
     """
     Publishing events to a bus with a small queue should drop
     events once the queue is full.
+
+    DomainEvent.is_critical now includes PHASE_COMPLETED (business-critical —
+    the SSE stream depends on it), so EventBus.publish() applies blocking
+    backpressure (await put()) for it instead of dropping (put_nowait()).
+    Use a non-critical event type (RESEARCH_STEP_EMITTED) to exercise the
+    drop path this test is actually about.
     """
     bus = EventBus(max_queue_size=5)
     await bus.start()
@@ -24,13 +30,13 @@ async def test_event_bus_drops_events_when_queue_full():
         nonlocal processed
         processed += 1
 
-    bus.subscribe(EventType.PHASE_COMPLETED, fast_handler)
+    bus.subscribe(EventType.RESEARCH_STEP_EMITTED, fast_handler)
 
     # Publish 10 events quickly
     for i in range(10):
         event = DomainEvent(
             event_id=f"evt-{i}",
-            event_type=EventType.PHASE_COMPLETED,
+            event_type=EventType.RESEARCH_STEP_EMITTED,
             aggregate_id=f"pipe-{i}",
             version=1,
             timestamp=1704067200.0,

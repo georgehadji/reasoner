@@ -36,7 +36,7 @@ async def upload_file(
                 if int(content_length) > request_limit:
                     raise HTTPException(status_code=413, detail="Upload request is too large")
             except ValueError:
-                raise HTTPException(status_code=400, detail="Invalid Content-Length header")
+                raise HTTPException(status_code=400, detail="Invalid Content-Length header") from None
 
         form = await request.form()
         files = []

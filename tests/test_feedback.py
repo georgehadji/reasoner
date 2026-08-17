@@ -188,7 +188,11 @@ class TestFeedbackEndpoint:
         monkeypatch.setattr(Settings, "ADMIN_API_KEY", "test-admin-key")
 
         from reasoner.infrastructure.auth.local_adapter import LocalAuthAdapter
+        from reasoner.infrastructure.auth import set_auth_adapter
         adapter = LocalAuthAdapter()
+        # Force LocalAuthAdapter regardless of ambient SUPABASE_URL/ENVIRONMENT config —
+        # get_auth_adapter() otherwise picks SupabaseAuthAdapter outside ENVIRONMENT=testing.
+        set_auth_adapter(adapter)
         admin_token = adapter.create_token(
             "11111111-1111-1111-1111-111111111111",
             "admin@example.com",

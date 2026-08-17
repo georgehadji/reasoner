@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import os
 from types import MappingProxyType
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from reasoner.infrastructure.llm.base import BaseLLMProvider
 
 from reasoner.core.constants import (
     DEFAULT_OLLAMA_URL,
@@ -347,14 +350,36 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
         "env": "NVIDIA_API_KEY",
     },
     # ═══════════════════════════════════════════════════════════════
+    # Sakana AI
+    # ═══════════════════════════════════════════════════════════════
+    "sakana-fugu-ultra": {"model": "sakana/fugu-ultra"},           # 1M ctx multimodal reasoning
+    "sakana-namazu":     {"model": "sakana/sakana-namazu"},         # Japanese earthquake/disaster warning & robust analysis
+    # ═══════════════════════════════════════════════════════════════
+    # KwaiPilot (Kuaishou — coding specialists)
+    # ═══════════════════════════════════════════════════════════════
+    "kat-coder-air-v2.5": {"model": "kwaipilot/kat-coder-air-v2.5"}, # $0.15/$0.60 per M, lightweight fast coder
+    "kat-coder-pro-v2":   {"model": "kwaipilot/kat-coder-pro-v2"},   # $0.30/$1.20 per M, professional-grade coder
+    "kat-coder-pro-v2.5": {"model": "kwaipilot/kat-coder-pro-v2.5"}, # $0.74/$2.96 per M, flagship reasoning & coding
+    # ═══════════════════════════════════════════════════════════════
+    # Cohere
+    # ═══════════════════════════════════════════════════════════════
+    "cohere-command-a":            {"model": "cohere/command-a"},                # Cohere agentic model
+    "cohere-command-r-08-2024":      {"model": "cohere/command-r-08-2024"},        # enterprise command-r
+    "cohere-command-r-plus-08-2024": {"model": "cohere/command-r-plus-08-2024"},   # heavy enterprise command-r-plus
+    "cohere-command-r7b":          {"model": "cohere/command-r7b-12-2024"},      # fast compact r7b
+    "cohere-north-mini-code-free": {"model": "cohere/north-mini-code:free"},     # FREE coding assistant
+    # ═══════════════════════════════════════════════════════════════
     # Image generation models (OpenRouter multimodal image output)
     # ═══════════════════════════════════════════════════════════════
-    # Removed: black-forest-labs/flux.* (all 4 models) — provider gone from OpenRouter
-    # Removed: sourceful/riverflow-v2-* (all 5 models) — provider gone from OpenRouter
-    # Removed: bytedance-seed/seedream-4.5 — not on OpenRouter
-    # Removed: x-ai/grok-imagine-image-quality — not on OpenRouter
-    # Removed: microsoft/mai-image-2.5 — not on OpenRouter
-    # Removed: recraft/recraft-v4* (all 8 models) — provider gone from OpenRouter
+    # ⚠ The "Removed: ... provider gone from OpenRouter" comments that used to live
+    # here were WRONG. flux.*, riverflow, recraft, seedream, grok-imagine and
+    # mai-image-2.5 were never delisted — GET /api/v1/models returns the *text*
+    # lane only, and pure image generators are invisible without
+    # ?output_modalities=image. All of them are live (45 image models as of
+    # 2026-08). Verify against the image lane before deleting anything here;
+    # scripts/update_openrouter_catalogue.py now fetches both.
+    #
+    # ── Hybrid chat+image (token-priced, work through OpenRouterProvider) ──
     "gemini-flash-image":             {"model": "google/gemini-2.5-flash-image",      "extra_body": {"include_images": True}},
     # v3.8: -preview pins promoted to the GA ids, which OpenRouter now serves at the
     # same price with a larger context (65K -> 131K) than the preview endpoints.
@@ -364,8 +389,48 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "gpt-5-image":                    {"model": "openai/gpt-5-image",       "extra_body": {"include_images": True}},
     "gpt-5-image-mini":               {"model": "openai/gpt-5-image-mini",  "extra_body": {"include_images": True}},
     "gpt-5.4-image-2":                {"model": "openai/gpt-5.4-image-2",   "extra_body": {"include_images": True}},
-    # Removed: qwen/qwen-image-3, qwen/qwen-image-3-pro — Qwen has no image-output
-    # model on OpenRouter any more; the only image outputs left are Google + OpenAI.
+    # ── Pure image generators (priced per image, not per token) ──
+    # These have no prompt/completion pricing at all; cost is `image` /
+    # `image_output`. Do not reason about their cost from the per-M columns above.
+    "qwen-image-3":                   {"model": "qwen/qwen-image-3",        "extra_body": {"include_images": True}},  # $0.003/image, 65K ctx
+    "qwen-image-3-pro":               {"model": "qwen/qwen-image-3-pro",    "extra_body": {"include_images": True}},  # $0.003/image, higher per-token image rate
+    "seedream-5-pro":                 {"model": "bytedance-seed/seedream-5-0-pro",  "extra_body": {"include_images": True}},  # 🇨🇳 ByteDance — $0.003/image
+    "seedream-5-lite":                {"model": "bytedance-seed/seedream-5-0-lite", "extra_body": {"include_images": True}},  # 🇨🇳 ByteDance — cheapest Seedream tier
+    "seedream-4.5":                   {"model": "bytedance-seed/seedream-4.5",      "extra_body": {"include_images": True}},  # 🇨🇳 ByteDance — IMAGE_GEN_FALLBACKS budget pin
+    "grok-imagine-image-2":           {"model": "x-ai/grok-imagine-image-2.0",      "extra_body": {"include_images": True}},  # 🇺🇸 xAI — $0.01/image, priciest per image
+    "grok-imagine":                   {"model": "x-ai/grok-imagine-image-quality",  "extra_body": {"include_images": True}},  # 🇺🇸 xAI — quality tier, IMAGE_GEN_PRESETS budget pin
+    "riverflow-v2-fast-preview":      {"model": "sourceful/riverflow-v2-fast",      "extra_body": {"include_images": True}},  # 🇺🇸 Sourceful — preview pin promoted to GA id
+    "flux.2-pro":                     {"model": "black-forest-labs/flux.2-pro",     "extra_body": {"include_images": True}},  # 🇩🇪 Black Forest Labs — IMAGE_GEN_FALLBACKS budget pin
+    "recraft-v4.1-utility":           {"model": "recraft/recraft-v4.1-utility",     "extra_body": {"include_images": True}},  # 🇺🇸 Recraft — IMAGE_GEN_FALLBACKS budget pin
+    "krea-2-large":                   {"model": "krea/krea-2-large",         "extra_body": {"include_images": True}},  # 🇺🇸 Krea — highest-fidelity Krea tier
+    "krea-2-medium":                  {"model": "krea/krea-2-medium",        "extra_body": {"include_images": True}},  # 🇺🇸 Krea — half the image-token rate of large
+    "krea-2-medium-turbo":            {"model": "krea/krea-2-medium-turbo",  "extra_body": {"include_images": True}},  # 🇺🇸 Krea — cheapest of the three, latency-optimised
+    # ── Remaining 2026-08 catalogue image models (previously undeclared) ──
+    "gpt-image-1":                    {"model": "openai/gpt-image-1",              "extra_body": {"include_images": True}},
+    "gpt-image-1-mini":               {"model": "openai/gpt-image-1-mini",         "extra_body": {"include_images": True}},
+    "gpt-image-2":                    {"model": "openai/gpt-image-2",              "extra_body": {"include_images": True}},
+    "mai-image-2.5":                  {"model": "microsoft/mai-image-2.5",         "extra_body": {"include_images": True}},  # 🇺🇸 Microsoft
+    "mai-image-2.5-pro":              {"model": "microsoft/mai-image-2.5-pro",     "extra_body": {"include_images": True}},  # 🇺🇸 Microsoft
+    "gemini-3-pro-image-preview":     {"model": "google/gemini-3-pro-image-preview",     "extra_body": {"include_images": True}},  # legacy preview id, GA is gemini-pro-image
+    "flux.2-flex":                    {"model": "black-forest-labs/flux.2-flex",   "extra_body": {"include_images": True}},  # 🇩🇪 Black Forest Labs
+    "flux.2-max":                     {"model": "black-forest-labs/flux.2-max",    "extra_body": {"include_images": True}},  # 🇩🇪 Black Forest Labs
+    "flux.2-klein-4b":                {"model": "black-forest-labs/flux.2-klein-4b", "extra_body": {"include_images": True}},  # 🇩🇪 Black Forest Labs
+    "recraft-v3":                     {"model": "recraft/recraft-v3",              "extra_body": {"include_images": True}},  # 🇺🇸 Recraft
+    "recraft-v4":                     {"model": "recraft/recraft-v4",              "extra_body": {"include_images": True}},  # 🇺🇸 Recraft
+    "recraft-v4-pro":                 {"model": "recraft/recraft-v4-pro",          "extra_body": {"include_images": True}},  # 🇺🇸 Recraft
+    "recraft-v4-vector":              {"model": "recraft/recraft-v4-vector",       "extra_body": {"include_images": True}},  # 🇺🇸 Recraft — SVG output
+    "recraft-v4-pro-vector":          {"model": "recraft/recraft-v4-pro-vector",   "extra_body": {"include_images": True}},  # 🇺🇸 Recraft — SVG output
+    "recraft-v4.1":                   {"model": "recraft/recraft-v4.1",            "extra_body": {"include_images": True}},  # 🇺🇸 Recraft
+    "recraft-v4.1-pro":               {"model": "recraft/recraft-v4.1-pro",        "extra_body": {"include_images": True}},  # 🇺🇸 Recraft
+    "recraft-v4.1-vector":            {"model": "recraft/recraft-v4.1-vector",     "extra_body": {"include_images": True}},  # 🇺🇸 Recraft — SVG output
+    "recraft-v4.1-pro-vector":        {"model": "recraft/recraft-v4.1-pro-vector", "extra_body": {"include_images": True}},  # 🇺🇸 Recraft — SVG output
+    "recraft-v4.1-utility-pro":       {"model": "recraft/recraft-v4.1-utility-pro", "extra_body": {"include_images": True}},  # 🇺🇸 Recraft
+    "riverflow-v2-pro":               {"model": "sourceful/riverflow-v2-pro",      "extra_body": {"include_images": True}},  # 🇺🇸 Sourceful
+    "riverflow-v2.5-fast":            {"model": "sourceful/riverflow-v2.5-fast",   "extra_body": {"include_images": True}},  # 🇺🇸 Sourceful
+    "riverflow-v2.5-pro":             {"model": "sourceful/riverflow-v2.5-pro",    "extra_body": {"include_images": True}},  # 🇺🇸 Sourceful
+    # google/gemini-3.1-flash-image-preview NOT declared separately — its alias
+    # slot ("gemini-3.1-flash-image-preview") already points at the promoted GA
+    # id (google/gemini-3.1-flash-image) above; adding it here would collide.
     # ═══════════════════════════════════════════════════════════════
     # Ollama (local)
     # ═══════════════════════════════════════════════════════════════
@@ -510,6 +575,7 @@ _VENDOR_BLOC: dict[str, str] = {
     "anthropic": "US", "openai": "US", "google": "US", "x-ai": "US",
     "perplexity": "US", "meta-llama": "US", "meta": "US", "poolside": "US", "arcee-ai": "US",
     "nvidia": "US", "nousresearch": "US", "thinkingmachines": "US", "morph": "US",
+    "krea": "US", "black-forest-labs": "US", "sourceful": "US", "recraft": "US", "microsoft": "US",
     # China
     "deepseek": "CN", "qwen": "CN", "moonshotai": "CN", "z-ai": "CN",
     "xiaomi": "CN", "tencent": "CN", "bytedance-seed": "CN", "inclusionai": "CN",

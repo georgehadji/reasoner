@@ -85,23 +85,36 @@ async def test_cli_cleanup_on_exit():
     args = MagicMock()
     args.list_presets = False
     args.list_models = False
+    args.benchmark = False
+    args.benchmark_all = False
     args.resume = ""
     args.problem = "test"
     args.force_pipeline = True
     args.output = ""
     args.save_state = ""
     
-    # Mock the internal logic to prevent real execution
-    with patch("reasoner.main.build_router"), \
-         patch("reasoner.main.ReasonerPipeline") as mock_pipeline, \
+    from reasoner.application.orchestrator import PreflightDecision
+
+    # Mock the internal logic to prevent real execution. PipelineOrchestrator.preflight
+    # now does real preset/routing resolution against `args` — a bare MagicMock args
+    # object fails deep inside it (e.g. "Custom routing must include a 'primary' key"),
+    # so preflight itself is mocked to hand back a canned "go straight to pipeline" decision.
+    with patch("reasoner.main.PipelineOrchestrator") as mock_orchestrator_cls, \
+         patch("reasoner.pipeline.ReasonerPipeline") as mock_pipeline, \
          patch("reasoner.main.render_pipeline_result"), \
          patch("reasoner.main.export_to_json"), \
          patch("reasoner.scraper.close_scraper_client", new_callable=AsyncMock) as mock_close_scraper, \
          patch("reasoner.infrastructure.llm.providers.openai_compat.OpenAICompatibleProvider.close_shared_pool", new_callable=AsyncMock) as mock_close_llm:
-        
+
+        mock_orchestrator_cls.return_value.preflight = AsyncMock(return_value=PreflightDecision(
+            action="pipeline",
+            router=MagicMock(),
+            effective_preset_name="multi-perspective-budget",
+        ))
+
         # Mock successful pipeline run
         mock_pipeline.return_value.run = AsyncMock(return_value=MagicMock())
-        
+
         await main(args)
         
         # Verify cleanup was called

@@ -81,6 +81,34 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${fontVariables} antialiased`} suppressHydrationWarning>
       <body className="min-h-screen bg-[var(--bg)] text-[var(--text)] flex flex-col">
         <JsonLd data={[organizationSchema(), websiteSchema(), softwareApplicationSchema()]} />
+        {/* Flyweight gooey filter def — mounted once, referenced by every
+            LiquidField via filter: url(#goo). feColorMatrix thresholds alpha
+            only (not feColorMatrix on CSS colour), so it composites over
+            transparent backgrounds and needs no light/dark branch.
+            Invariant: a filter-bearing container must never contain a
+            `position: fixed` descendant — fixed elements resolve against the
+            nearest filter/backdrop-filter/transform ancestor, not the
+            viewport (see SecurityModal's portal-to-body fix). LiquidField is
+            leaf decoration for exactly this reason. */}
+        <svg
+          aria-hidden="true"
+          focusable="false"
+          style={{ position: 'absolute', width: 0, height: 0 }}
+        >
+          <defs>
+            <filter id="goo" colorInterpolationFilters="sRGB">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="12" result="blur" />
+              <feColorMatrix
+                in="blur"
+                type="matrix"
+                values="1 0 0 0 0
+                        0 1 0 0 0
+                        0 0 1 0 0
+                        0 0 0 19 -9"
+              />
+            </filter>
+          </defs>
+        </svg>
         <a href="#main-content" className="skip-link">
           Skip to main content
         </a>

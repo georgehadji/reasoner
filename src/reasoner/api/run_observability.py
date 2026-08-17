@@ -14,7 +14,47 @@ logger = logging.getLogger(__name__)
 
 
 class CreditSink:
-    """Settles a run's cost against the credit service."""
+    """Reserves and settles a run's cost against the credit service."""
+
+    async def reserve(
+        self,
+        *,
+        user_id: str,
+        estimated_cost_usd: float,
+        reference_id: str,
+        preset: str,
+    ) -> int:
+        from reasoner.api.dependencies import _get_credit_service
+        from reasoner.domain.credits import usd_to_credits
+
+        credits = usd_to_credits(estimated_cost_usd)
+        if credits <= 0:
+            return 0
+        await _get_credit_service().charge(
+            user_id,
+            credits,
+            reference_id=reference_id,
+            description=f"Reservation for pending run ({preset})",
+        )
+        return credits
+
+    async def release(
+        self,
+        *,
+        user_id: str,
+        credits: int,
+        reference_id: str,
+    ) -> None:
+        if credits <= 0:
+            return
+        from reasoner.api.dependencies import _get_credit_service
+
+        await _get_credit_service().refund(
+            user_id,
+            credits,
+            reference_id=reference_id,
+            description="Unused reservation released",
+        )
 
     async def settle(
         self,

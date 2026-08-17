@@ -67,9 +67,9 @@ export function SecurityModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
               </div>
               <div>
                 <h4 className="font-semibold text-[var(--text-2)] mb-1 uppercase tracking-wider text-[length:var(--text-2xs)]">Compliance</h4>
-                <h5 className="font-bold text-[var(--text)] text-sm mb-1">Certified SOC 2 Type II Ready</h5>
+                <h5 className="font-bold text-[var(--text)] text-sm mb-1">SOC 2 Type II — Roadmap</h5>
                 <p className="text-[length:var(--text-xs)] text-[var(--text-2)] leading-relaxed">
-                  Independently audited privacy and security standards. Designed for full compliance to protect enterprise-grade workloads.
+                  Not yet certified. See our <a href="/security" className="underline hover:text-[var(--text)]">security page</a> for current controls and audit history.
                 </p>
               </div>
             </section>
@@ -79,12 +79,11 @@ export function SecurityModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
                 <Database className="h-5 w-5" />
               </div>
               <div>
-                <h4 className="font-semibold text-[var(--text-2)] mb-1 uppercase tracking-wider text-[10px]">Data Privacy</h4>
+                <h4 className="font-semibold text-[var(--text-2)] mb-1 uppercase tracking-wider text-[length:var(--text-2xs)]">Data Privacy</h4>
                 <h5 className="font-bold text-[var(--text)] text-sm mb-1">Data Privacy</h5>
-                <p className="text-[12px] text-[var(--text-2)] leading-relaxed">
-                  Zero-Training Guarantee. We never train LLMs on your data. Full GDPR and HIPAA compliance.
-                  <br />
-                  <span className="italic text-[var(--text-muted)] text-[11px]">We never train our LLMs on enterprise data.</span>
+                <p className="text-[length:var(--text-xs)] text-[var(--text-2)] leading-relaxed">
+                  Zero-Training Guarantee. We never train models on your data. GDPR data subject
+                  rights (export, deletion) supported on request.
                 </p>
               </div>
             </section>
@@ -94,12 +93,12 @@ export function SecurityModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
                 <Server className="h-5 w-5" />
               </div>
               <div>
-                <h4 className="font-semibold text-[var(--text-2)] mb-1 uppercase tracking-wider text-[10px]">Encryption</h4>
+                <h4 className="font-semibold text-[var(--text-2)] mb-1 uppercase tracking-wider text-[length:var(--text-2xs)]">Encryption</h4>
                 <h5 className="font-bold text-[var(--text)] text-sm mb-1">Encryption</h5>
-                <p className="text-[12px] text-[var(--text-2)] leading-relaxed">
-                  E2EE in transit and at rest using AES-256-GCM. 
+                <p className="text-[length:var(--text-xs)] text-[var(--text-2)] leading-relaxed">
+                  E2EE in transit and at rest using AES-256-GCM.
                   <br />
-                  <span className="italic text-[var(--text-muted)] text-[11px]">All data is encrypted in transit and at rest.</span>
+                  <span className="italic text-[var(--text-muted)] text-[length:var(--text-2xs)]">All data is encrypted in transit and at rest.</span>
                 </p>
               </div>
             </section>
@@ -112,10 +111,10 @@ export function SecurityModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
                 <Users className="h-5 w-5" />
               </div>
               <div>
-                <h4 className="font-semibold text-[var(--text-2)] mb-1 uppercase tracking-wider text-[10px]">Access Control</h4>
-                <h5 className="font-bold text-[var(--text)] text-sm mb-1">SSO & SAML Support</h5>
-                <p className="text-[12px] text-[var(--text-2)] leading-relaxed">
-                  Integrate with Okta, Azure AD, and Google Workspace. Enforce RBAC (Role-Based Access Control) for your team.
+                <h4 className="font-semibold text-[var(--text-2)] mb-1 uppercase tracking-wider text-[length:var(--text-2xs)]">Access Control</h4>
+                <h5 className="font-bold text-[var(--text)] text-sm mb-1">SSO & SAML — Roadmap</h5>
+                <p className="text-[length:var(--text-xs)] text-[var(--text-2)] leading-relaxed">
+                  Okta, Azure AD, and Google Workspace integration is planned, not yet available.
                 </p>
               </div>
             </section>
@@ -125,9 +124,9 @@ export function SecurityModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
                 <History className="h-5 w-5" />
               </div>
               <div>
-                <h4 className="font-semibold text-[var(--text-2)] mb-1 uppercase tracking-wider text-[10px]">Governance</h4>
+                <h4 className="font-semibold text-[var(--text-2)] mb-1 uppercase tracking-wider text-[length:var(--text-2xs)]">Governance</h4>
                 <h5 className="font-bold text-[var(--text)] text-sm mb-1">Audit Logs & Retention</h5>
-                <p className="text-[12px] text-[var(--text-2)] leading-relaxed">
+                <p className="text-[length:var(--text-xs)] text-[var(--text-2)] leading-relaxed">
                   Comprehensive audit trails for all actions. Configurable data retention policies to meet legal requirements.
                 </p>
               </div>
@@ -138,9 +137,9 @@ export function SecurityModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
                 <Globe className="h-5 w-5" />
               </div>
               <div>
-                <h4 className="font-semibold text-[var(--text-2)] mb-1 uppercase tracking-wider text-[10px]">Network</h4>
+                <h4 className="font-semibold text-[var(--text-2)] mb-1 uppercase tracking-wider text-[length:var(--text-2xs)]">Network</h4>
                 <h5 className="font-bold text-[var(--text)] text-sm mb-1">Zero-Trust Architecture</h5>
-                <p className="text-[12px] text-[var(--text-2)] leading-relaxed">
+                <p className="text-[length:var(--text-xs)] text-[var(--text-2)] leading-relaxed">
                   All inter-component communication is authenticated and encrypted via internal PKI. No plaintext data on the wire.
                 </p>
               </div>

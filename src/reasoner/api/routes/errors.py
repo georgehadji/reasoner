@@ -6,10 +6,11 @@ GET  /api/admin/errors   — admin-only error log viewer
 
 from __future__ import annotations
 
-import secrets
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
+from reasoner.api.admin_auth import verify_admin_key
+from reasoner.api.auth_deps import require_csrf
 from reasoner.api.dependencies import check_rate_limit, get_current_user
 from reasoner.core.settings import settings
 from reasoner.domain.saas import User
@@ -21,15 +22,20 @@ _error_store = ErrorStore()
 
 
 class ClientErrorReport(BaseModel):
-    message: str
-    source: str = "client"
-    stack: str | None = None
-    url: str | None = None
-    user_agent: str | None = None
+    # Bounded (security-remediation-plan.md Phase 5 item 3): this endpoint
+    # is public and unauthenticated, so an unbounded stack trace/URL was a
+    # storage-exhaustion vector.
+    message: str = Field(..., max_length=4_000)
+    source: str = Field("client", max_length=100)
+    stack: str | None = Field(None, max_length=16_000)
+    url: str | None = Field(None, max_length=2_000)
+    user_agent: str | None = Field(None, max_length=500)
 
 
-@router.post("/api/error-report")
-async def report_client_error(req: ClientErrorReport, request: Request):
+@router.post("/api/error-report", dependencies=[Depends(check_rate_limit)])
+async def report_client_error(
+    req: ClientErrorReport, request: Request, csrf_checked=Depends(require_csrf)
+):
     """Accept error reports from the frontend. No auth required."""
     from reasoner.logging_utils import get_correlation_id
 
@@ -64,7 +70,7 @@ async def error_logs(
     user_scopes = getattr(user, "scopes", set())
     if Scope.ADMIN.value not in user_scopes:
         raise HTTPException(status_code=403, detail="Admin scope required")
-    if not admin_key or not secrets.compare_digest(admin_key, settings.ADMIN_API_KEY):
+    if not verify_admin_key(admin_key):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     errors = await _error_store.query(

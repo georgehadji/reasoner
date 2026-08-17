@@ -29,6 +29,7 @@ from reasoner.core.constants import (
     IMAGE_GEN_ENHANCEMENT_MODEL,
     IMAGE_GEN_ENHANCEMENT_SYSTEM_PROMPT,
     IMAGE_GEN_FALLBACKS,
+    IMAGE_GEN_IMAGE_COUNT,
     IMAGE_GEN_POLICY_REWRITE_SYSTEM_PROMPT,
     IMAGE_GEN_PRESETS,
     IMAGE_GEN_PROMPT_MAX_TOKENS,
@@ -405,6 +406,33 @@ def _resolve_model_config(alias: str) -> dict[str, Any]:
     if alias not in _REGISTRY:
         raise ValueError(f"Unknown image generation model alias: {alias}")
     return _REGISTRY[alias]
+
+
+def _registered_aliases(aliases: list[str] | None) -> list[str]:
+    """Keep only aliases that actually exist in the model registry."""
+    from reasoner.infrastructure.llm.registry import _REGISTRY
+
+    return [a for a in (aliases or []) if a in _REGISTRY]
+
+
+def _selection_is_format_locked(aliases: list[str]) -> bool:
+    """True when `aliases` produce an output format the static presets cannot.
+
+    Such a selection is complete even when it is shorter than the requested
+    image count, so it must be honoured rather than replaced. SVG is the only
+    such format today; the predicate lives in the catalogue so the taxonomy is
+    defined in exactly one place. A broken catalogue answers False, which is the
+    pre-existing behaviour (static preset), never an exception.
+    """
+    if not aliases:
+        return False
+    try:
+        from reasoner.infrastructure.llm.image_model_catalogue import emits_svg_only
+
+        return emits_svg_only(aliases)
+    except Exception as exc:  # catalogue unreadable — degrade, don't explode
+        logger.warning("Could not classify injected image models: %s", exc)
+        return False
 
 
 def _get_modalities(model_id: str) -> list[str] | None:
@@ -856,17 +884,25 @@ async def generate_images(
     aspect_ratio: str = IMAGE_GEN_DEFAULT_ASPECT_RATIO,
     resolution: str = IMAGE_GEN_DEFAULT_RESOLUTION,
     reference_images: list[str] | None = None,
-    num_images: int = 2,
+    num_images: int = IMAGE_GEN_IMAGE_COUNT,
+    model_aliases: list[str] | None = None,
+    fallback_aliases: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Generate images in parallel with 2 models + optional prompt enhancement.
+    """Generate images in parallel across the preset's models + optional prompt enhancement.
 
     Args:
         prompt: Text description of the desired image.
-        preset: "budget" or "premium" — determines the 2-model pair.
+        preset: "budget" or "premium" — selects the primary model set.
         api_key: Optional OpenRouter API key.
         enhance: Whether to auto-enhance the prompt before generation.
         aspect_ratio: Requested aspect ratio (e.g. "1:1", "16:9").
         resolution: Requested resolution (e.g. "1024x1024").
+        model_aliases: Optional caller-selected primaries; unknown aliases are
+            dropped and the static preset is used if none survive. A surviving
+            selection whose output format the static preset cannot produce (SVG)
+            is honoured even when it is shorter than `num_images` — the run then
+            returns fewer images rather than raster substitutes.
+        fallback_aliases: Optional caller-selected fallbacks (same validation).
 
     Returns:
         {
@@ -882,15 +918,62 @@ async def generate_images(
     # image input (Flux/Riverflow are text-to-image only).
     if reference_images:
         if tier in ("budget", IMAGE_GEN_BUDGET_PRESET):
-            model_aliases = ["gemini-flash-image", "gpt-5-image-mini"]
-            fallback_aliases = ["gemini-3.1-flash-image-preview", "gemini-pro-image"]
+            static_primaries = [
+                "gemini-flash-image",
+                "gpt-5-image-mini",
+                "gpt-image-1-mini",
+                "gemini-3.1-flash-lite-image",
+            ]
+            static_fallbacks = ["gemini-3.1-flash-image-preview", "gemini-pro-image"]
         else:
-            model_aliases = ["gemini-pro-image", "gpt-5-image"]
-            fallback_aliases = ["gemini-3.1-flash-image-preview", "gemini-flash-image"]
+            static_primaries = [
+                "gemini-pro-image",
+                "gpt-5-image",
+                "gpt-image-2",
+                "gemini-3.1-flash-image-preview",
+            ]
+            static_fallbacks = ["gpt-5.4-image-2", "gemini-flash-image"]
     else:
-        model_aliases = IMAGE_GEN_PRESETS[tier]
-        fallback_aliases = IMAGE_GEN_FALLBACKS.get(tier, [])
+        static_primaries = IMAGE_GEN_PRESETS[tier]
+        static_fallbacks = IMAGE_GEN_FALLBACKS.get(tier, [])
     required_image_count = num_images
+
+    # Caller-injected selection (automatic model selection). Unknown aliases are
+    # dropped silently; if nothing usable survives we fall back to the static
+    # preset, so a bad selection can never raise "Unknown image generation model
+    # alias".
+    #
+    # A short selection has two very different causes and only one of them is a
+    # failure:
+    #   (a) selection broke, or its aliases are not registered → static preset.
+    #   (b) the selection is complete but its family is shallow → honour it and
+    #       generate FEWER images. Today that means SVG: only four vector models
+    #       exist, so any request for more comes back short by construction (see
+    #       the EXEMPTION in image_model_catalogue.select_models). Swapping in
+    #       the raster preset to reach the count would answer an SVG request
+    #       with PNGs — a wrong output format, not a cheaper one.
+    injected = _registered_aliases(model_aliases)
+    injected_fallbacks = _registered_aliases(fallback_aliases)
+    format_locked = _selection_is_format_locked(injected)
+    if injected and (format_locked or len(injected) >= required_image_count):
+        model_aliases = injected
+        if format_locked:
+            # The static fallbacks are raster, so an empty vector fallback list
+            # must stay empty — this is the same leak reached via the retry path.
+            fallback_aliases = injected_fallbacks
+            required_image_count = min(
+                required_image_count, len(model_aliases) + len(fallback_aliases)
+            )
+        else:
+            fallback_aliases = injected_fallbacks or static_fallbacks
+    else:
+        if model_aliases:
+            logger.warning(
+                "Injected image models unusable (%d of %d registered); using static preset.",
+                len(injected), required_image_count,
+            )
+        model_aliases = static_primaries
+        fallback_aliases = static_fallbacks
 
     # 1. Optional prompt enhancement
     final_prompt = prompt

@@ -7,7 +7,7 @@ export function UsageBadge() {
   if (!quota) return null;
 
   const percent = (quota.used / quota.max) * 100;
-  const color = percent >= 90 ? 'text-red-400' : percent >= 70 ? 'text-orange-400' : 'text-blue-400';
+  const color = percent >= 90 ? 'text-[var(--red)]' : percent >= 70 ? 'text-[var(--warn)]' : 'text-[var(--accent)]';
 
   return (
     <div className={`text-xs font-medium ${color}`}>

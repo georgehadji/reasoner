@@ -52,7 +52,7 @@ class TestRateLimiterAnonymous:
         # Third call should be rejected (burst exhausted)
         allowed, info = await limiter.is_allowed("anon:1234")
         assert allowed is False
-        assert info["reason"] == "burst_limit"
+        assert info["reason"] == "burst_limit_fallback"
 
 
 class TestWebSocketCancelPropagation:
@@ -89,13 +89,13 @@ class TestHealthCheckPoolReset:
 
     @pytest.mark.asyncio
     async def test_health_check_resets_pool_on_failure(self):
-        from reasoner.api import health_check, _health_postgres_pool
-        from reasoner.core import settings
+        from reasoner.api.routes.health import health_check
+        from reasoner.application.services import health_service
+        from reasoner.core.settings import settings
 
         # Ensure pool starts clean
-        import reasoner.api as api_mod
-        original_pool = api_mod._health_postgres_pool
-        api_mod._health_postgres_pool = None
+        original_pool = health_service._health_postgres_pool
+        health_service._health_postgres_pool = None
 
         request = MagicMock()
         request.headers = {}
@@ -107,15 +107,18 @@ class TestHealthCheckPoolReset:
             call_count += 1
             raise ConnectionError("DB is down")
 
-        with patch("asyncpg.create_pool", side_effect=fake_create_pool):
-            result = await health_check(request)
+        # Postgres check is skipped entirely unless DATABASE_URL is set — force it
+        # so the test doesn't depend on the local environment's .env.
+        with patch.object(settings, "DATABASE_URL", "postgresql+asyncpg://x:x@localhost:5432/x"), \
+             patch("asyncpg.create_pool", side_effect=fake_create_pool):
+            result = await health_check(request, user=None)
 
         assert result["checks"]["postgres"]["status"] == "error"
         # Pool must be reset to None so next health check retries
-        assert api_mod._health_postgres_pool is None
+        assert health_service._health_postgres_pool is None
 
         # Restore
-        api_mod._health_postgres_pool = original_pool
+        health_service._health_postgres_pool = original_pool
 
 
 class TestStripeAdapterRobustness:

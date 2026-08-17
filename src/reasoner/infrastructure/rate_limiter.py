@@ -335,7 +335,7 @@ class RateLimiter:
         if not self._redis_available or self._redis_client is None:
             # Fallback for stats if Redis is not available
             async with self._fallback_lock:
-                bucket = self._buckets[client_id]
+                bucket = self._in_memory_get_bucket(client_id)
                 self._in_memory_refill_tokens(bucket, 1.0) # Ensure current state
                 self._in_memory_reset_windows_if_needed(bucket)
                 return {

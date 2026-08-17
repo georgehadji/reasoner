@@ -15,6 +15,11 @@ from reasoner.infrastructure.telemetry.call_telemetry_store import (
     SQLiteCallTelemetryStore,
 )
 
+# query_model_role_stats() filters to the last 168 hours by default — a
+# hardcoded past timestamp eventually falls outside that window and the
+# fixture rows silently stop matching. Use "now" instead.
+_NOW = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
 
 @pytest.fixture
 def store(tmp_path):
@@ -29,7 +34,7 @@ def sample_event() -> LLMCallTelemetry:
     return LLMCallTelemetry(
         call_id=str(uuid.uuid4()),
         run_id="run-001",
-        timestamp="2026-07-08T12:00:00Z",
+        timestamp=_NOW,
         model_id="claude-sonnet",
         role="constructive",
         preset_id="multi-perspective-budget",
@@ -56,7 +61,7 @@ def failed_event() -> LLMCallTelemetry:
     return LLMCallTelemetry(
         call_id=str(uuid.uuid4()),
         run_id="run-001",
-        timestamp="2026-07-08T12:00:00Z",
+        timestamp=_NOW,
         model_id="claude-haiku",
         role="constructive",
         preset_id="multi-perspective-budget",
@@ -115,7 +120,7 @@ async def test_aggregate_multiple_calls(store, sample_event, failed_event):
         evt = LLMCallTelemetry(
             call_id=str(uuid.uuid4()),
             run_id="run-001",
-            timestamp="2026-07-08T12:00:00Z",
+            timestamp=_NOW,
             model_id="claude-sonnet",
             role="constructive",
             preset_id="multi-perspective-budget",
@@ -135,7 +140,7 @@ async def test_aggregate_multiple_calls(store, sample_event, failed_event):
     fail_evt = LLMCallTelemetry(
         call_id=str(uuid.uuid4()),
         run_id="run-001",
-        timestamp="2026-07-08T12:00:00Z",
+        timestamp=_NOW,
         model_id="claude-sonnet",
         role="constructive",
         preset_id="multi-perspective-budget",
@@ -191,7 +196,7 @@ async def test_role_leaderboard(store):
             evt = LLMCallTelemetry(
                 call_id=str(uuid.uuid4()),
                 run_id="run-002",
-                timestamp="2026-07-08T12:00:00Z",
+                timestamp=_NOW,
                 model_id=model_id,
                 role="scoring",
                 preset_id="debate-budget",

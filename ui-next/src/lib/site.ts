@@ -7,6 +7,8 @@
  * page.
  */
 
+import { CAPABILITIES } from './capabilities.generated';
+
 function normalizeOrigin(raw: string | undefined, fallback: string): string {
   const value = (raw || '').trim() || fallback;
   const withProtocol = /^https?:\/\//.test(value) ? value : `https://${value}`;
@@ -25,8 +27,9 @@ export const SITE = {
   /** Used as the default meta description and the JSON-LD description. */
   description:
     'Reasoner is a multi-method AI reasoning engine. It decomposes a problem, runs cross-lab models in parallel, critiques and stress-tests the candidates, then synthesises an answer with explicit VERIFIED / HYPOTHESIS / UNKNOWN labels.',
-  /** Short form for OpenGraph cards, where space is tight. */
-  shortDescription: '19 reasoning methods · 350+ models · epistemically labelled answers',
+  /** Short form for OpenGraph cards, where space is tight. Derived from
+   *  capabilities.generated.ts so it can't drift from the live registry. */
+  shortDescription: `${CAPABILITIES.methods} reasoning methods · ${CAPABILITIES.routableModels}+ models · epistemically labelled answers`,
   url: SITE_URL,
   locale: 'en_US',
   twitter: '@reasonerapp',

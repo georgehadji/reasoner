@@ -99,6 +99,8 @@ async def _metered_agent_stream(
     *,
     preset: str,
     interface: str,
+    reference_id: str,
+    reserved_credits: int = 0,
 ) -> AsyncIterator[str]:
     """The one place an agent route turns a request into a billed run.
 
@@ -106,19 +108,21 @@ async def _metered_agent_stream(
     metered through the identical path a streaming caller is -- not a second,
     hand-copied settlement.
 
-    ``run_stream_cached`` is imported here, not at module level, so tests can
-    monkeypatch ``reasoner.api.streaming.run_stream_cached`` and have this
-    call site see it -- a top-level import would bind the name once at import
-    time and never see a later patch.
+    ``reference_id``/``reserved_credits`` come from the caller, which already
+    reserved this run's estimated cost via ``reserve_or_402`` before invoking
+    this generator -- ``agent_run``'s streaming response can't turn a
+    mid-generator exception into a clean 402, so the reservation (and its
+    possible failure) has to happen before the generator starts.
     """
     from reasoner.api.streaming import run_stream_cached
 
     ctx = RunContext(
         preset=preset,
-        reference_id=req.client_run_id or f"run:{uuid.uuid4()}",
+        reference_id=reference_id,
         user_id=str(user.id),
         tier="free",
         interface=interface,
+        reserved_credits=reserved_credits,
     )
     stream = run_stream_cached(
         req,
@@ -148,11 +152,19 @@ async def agent_run(
     pipeline_service: PipelineService = Depends(get_pipeline_service),
 ):
     """Run a pipeline; identical SSE event shape to ``/api/run``."""
+    from reasoner.api.dependencies import reserve_or_402
+
     await register_run_or_error(req.client_run_id)
+    preset = req.preset or "auto-budget"
+    reference_id = req.client_run_id or f"run:{uuid.uuid4()}"
+    reserved_credits = await reserve_or_402(
+        user_id=str(user.id), preset=preset, problem=req.problem, reference_id=reference_id,
+    )
     return StreamingResponse(
         _metered_agent_stream(
             req, request, user, preset_service, pipeline_service,
-            preset=req.preset or "auto-budget", interface="agent_http",
+            preset=preset, interface="agent_http",
+            reference_id=reference_id, reserved_credits=reserved_credits,
         ),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
@@ -176,13 +188,20 @@ async def agent_run_sync(
     (``PIPELINE_ABSOLUTE_TIMEOUT_SECONDS``, currently 600s) -- set the client
     timeout above that rather than below it.
     """
+    from reasoner.api.dependencies import reserve_or_402
+
     await register_run_or_error(req.client_run_id)
     preset = req.preset or "auto-budget"
+    reference_id = req.client_run_id or f"run:{uuid.uuid4()}"
+    reserved_credits = await reserve_or_402(
+        user_id=str(user.id), preset=preset, problem=req.problem, reference_id=reference_id,
+    )
 
     events: list[dict] = []
     async for chunk in _metered_agent_stream(
         req, request, user, preset_service, pipeline_service,
         preset=preset, interface="agent_sync",
+        reference_id=reference_id, reserved_credits=reserved_credits,
     ):
         if chunk.startswith("data: "):
             try:

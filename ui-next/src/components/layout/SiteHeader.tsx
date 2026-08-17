@@ -9,6 +9,7 @@ import { UserMenu } from './UserMenu';
 import { Logo } from '@/components/brand/Logo';
 import { SecurityModal } from './SecurityModal';
 import { Button } from '@/components/ui/Button';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { cn } from '@/lib/utils';
 
 const NAV_LINKS = [
@@ -126,6 +127,7 @@ export function SiteHeader() {
 
         {/* Actions */}
         <div className="flex items-center gap-[var(--space-2)] sm:gap-[var(--space-3)]">
+          <ThemeToggle />
           <Button
             variant="outline"
             size="sm"
@@ -231,6 +233,10 @@ export function SiteHeader() {
                 place left to reach it — so it was reachable nowhere. sm:hidden
                 because from sm up the header shows it and the drawer is still
                 open until md. */}
+            <div className="flex items-center justify-between gap-[var(--space-2)]">
+              <span className="text-[length:var(--text-sm)] text-[var(--text-muted)]">Theme</span>
+              <ThemeToggle />
+            </div>
             <Button
               variant="outline"
               size="sm"

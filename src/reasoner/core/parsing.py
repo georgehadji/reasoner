@@ -8,9 +8,12 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from reasoner.domain.core_types import EvidenceBundle, PlanContract
 
 from reasoner.domain.core_types import CritiqueScore, ReviewHypothesis
 from reasoner.models import PerspectiveRegistry

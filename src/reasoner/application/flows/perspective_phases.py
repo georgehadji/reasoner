@@ -26,6 +26,17 @@ from reasoner.application.services.recovery_service import RecoveryService
 
 logger = logging.getLogger(__name__)
 
+# Shared between perspective and stress-test filtering — text an English-language
+# LLM sometimes leaks when it garbles non-English source material instead of
+# actually reasoning about it.
+_HALLUCINATION_KEYWORDS = {
+    "greek text", "greek characters", "parsing errors", "encoding issues", "unicode problems",
+    # Self-referential — the model describing its own generation process
+    # (truncation, context limits) instead of a real solution risk.
+    "truncated output", "context window exceeded", "token limit reached",
+}
+
+
 async def run_multi_perspective_research_phase(state: PipelineState, services: WorkflowServices) -> None:
     """Search for evidence to ground perspective generation."""
     services.log("PHASE-2", "Gathering evidence for multi-perspective analysis...", state)
@@ -115,13 +126,11 @@ async def run_perspectives_phase(
             "message": "All perspectives resolve to a single geopolitical bloc — creator-ideology bias is not mitigated. Add API keys from a different bloc (🇺🇸/🇨🇳/🇪🇺) for cross-bloc diversity.",
         })
 
-    _PERSPECTIVE_HALLUCINATION_KEYWORDS = {"greek text", "greek characters", "parsing errors", "encoding issues", "unicode problems"}
-
     def _is_perspective_hallucinated(candidate: SolutionCandidate) -> bool:
         if state.language != "English":
             return False
         text = f"{candidate.content} {' '.join(candidate.key_insights)}".lower()
-        return any(kw in text for kw in _PERSPECTIVE_HALLUCINATION_KEYWORDS)
+        return any(kw in text for kw in _HALLUCINATION_KEYWORDS)
 
     async def _get_perspective(p_name: str):
         from reasoner.pipeline import TOKEN_OPTIMIZATION
@@ -294,6 +303,9 @@ async def run_stress_test_phase(state: PipelineState, services: WorkflowServices
     )
     try:
         data = extract_json(raw)
+        # Same garbled-non-English-source hallucination as perspectives (Phase 2) —
+        # only meaningful to filter when the problem itself is actually English.
+        filter_hallucinations = state.language == "English"
         state.stress_results = [
             StressTestResult(
                 scenario=ScenarioType.coerce(st.get("scenario", "optimal")),
@@ -302,6 +314,9 @@ async def run_stress_test_phase(state: PipelineState, services: WorkflowServices
                 recovery_path=st.get("recovery_path", ""),
             )
             for st in data.get("stress_tests", [])
+            if not (filter_hallucinations and any(
+                kw in st.get("failure_mode", "").lower() for kw in _HALLUCINATION_KEYWORDS
+            ))
         ]
     except Exception as e:
         services.log("PHASE-4", f"Stress test failed: {e}", state)

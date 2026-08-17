@@ -62,6 +62,17 @@ export default function AboutPage() {
             Start Reasoning
           </button>
         </div>
+
+        <div className="mt-16 border-t border-[var(--border)] pt-8 text-center text-sm text-[var(--text-subtle)]">
+          <p>Reasoner is operated by Georgios-Chrysovalantis Chatzivantsidis.</p>
+          <p className="mt-1">
+            Questions?{' '}
+            <a href="/contact" className="underline hover:text-[var(--accent)]">
+              Get in touch
+            </a>
+            .
+          </p>
+        </div>
       </main>
       <SiteFooter />
     </div>

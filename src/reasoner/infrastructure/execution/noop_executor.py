@@ -36,3 +36,7 @@ class NoopExecutor:
             blocked=True,
             blocked_reason="execution_disabled",
         )
+
+    async def health_check(self) -> bool:
+        """Never healthy — this adapter intentionally does not execute code."""
+        return False

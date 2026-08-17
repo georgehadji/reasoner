@@ -109,17 +109,23 @@ class TokenAwareCache:
             cache_dir.mkdir(parents=True, exist_ok=True)
 
     async def _ensure_loaded(self) -> None:
-        """Lazy-init: load cache entries from disk on first use."""
+        """Lazy-init: load cache entries from disk on first use.
+
+        BUG-016: _loaded must only be set on a successful load. get()/set()
+        call this unguarded, so a raise here would crash a live cache lookup
+        on a transient disk error — but marking _loaded=True unconditionally
+        (the original bug) permanently disables the cache after that one
+        error, since every later call sees _loaded=True and skips retrying.
+        """
         if self._loaded or not self.cache_dir:
             return
         try:
             await self._load_from_disk()
+            self._loaded = True
         except Exception as exc:
             logger.warning(
                 "Token cache disk load failed, operating with empty cache: %s", exc
             )
-        finally:
-            self._loaded = True
     
     def _compute_key(self, problem: str, phase: str, model_id: str, prompt: str, agent_id: str = "") -> str:
         """Compute cache key. agent_id scopes the cache to a user/session."""

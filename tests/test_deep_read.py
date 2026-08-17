@@ -11,6 +11,19 @@ from unittest.mock import patch, AsyncMock
 from reasoner.pipeline import ReasonerPipeline
 from reasoner.scraper import scrape_urls  # noqa: F401  — ensures module is loadable
 from reasoner.models import PipelineState
+from reasoner.core.settings import settings
+
+
+@pytest.fixture(autouse=True)
+def disable_tavily_extract():
+    """These tests exercise the per-URL scrape_urls + LLM extraction path.
+
+    TAVILY_EXTRACT_ENABLED defaults true and, with a real TAVILY_API_KEY
+    configured, batch-extracts sources_to_scrape before the mocked
+    scrape_urls ever runs — bypassing the code path under test entirely.
+    """
+    with patch.object(settings, "TAVILY_EXTRACT_ENABLED", False):
+        yield
 
 
 class FakeProvider:
@@ -153,7 +166,7 @@ async def test_deep_read_legacy_mode_without_llm(pipeline):
 
     with patch("reasoner.scraper.scrape_urls", new_callable=AsyncMock) as mock_scrape:
         mock_scrape.return_value = scraped
-        with patch.dict(os.environ, {"REASONER_DEEP_READ_LLM": "0"}):
+        with patch.object(settings, "REASONER_DEEP_READ_LLM", False):
             await pipeline._phase_deep_read(state)
 
     result = state.vetted_context[0]

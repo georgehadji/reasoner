@@ -88,6 +88,16 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Design token guard (no raw Tailwind palette colors)
+        run: |
+          # global-error.tsx is exempt: it renders outside the root layout
+          # (no globals.css, var() resolves to nothing there), so it uses
+          # literal hex mirroring the tokens instead.
+          ! grep -rEn --include=*.tsx --include=*.ts \
+            --exclude=global-error.tsx \
+            '(bg|text|border|from|to|via|ring|fill|stroke)-(slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-[0-9]{2,3}' \
+            src
+
   sdk:
     name: TypeScript SDK
     runs-on: ubuntu-latest

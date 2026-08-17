@@ -103,6 +103,16 @@ class Settings:
     DOCUMENT_EXTRACTION_TIMEOUT_SECONDS: int = int(
         os.getenv("DOCUMENT_EXTRACTION_TIMEOUT_SECONDS", "60")
     )
+    # Reject uploads outright when python-magic isn't installed, rather than
+    # silently skipping content-vs-extension validation. An operator who
+    # genuinely can't install it sets this False explicitly, on the record.
+    UPLOAD_REQUIRE_MIME_VALIDATION: bool = os.getenv(
+        "UPLOAD_REQUIRE_MIME_VALIDATION", "true"
+    ).lower() in ("1", "true", "yes")
+    # Bounded background document-indexing queue (infrastructure/documents/
+    # index_queue.py) -- replaces unbounded fire-and-forget indexing tasks.
+    DOCUMENT_INDEX_QUEUE_MAXSIZE: int = int(os.getenv("DOCUMENT_INDEX_QUEUE_MAXSIZE", "200"))
+    DOCUMENT_INDEX_WORKER_COUNT: int = int(os.getenv("DOCUMENT_INDEX_WORKER_COUNT", "2"))
 
     # ── Server bind configuration ──
     APP_URL: str = os.getenv("APP_URL", "http://localhost:3000")
@@ -291,10 +301,35 @@ class Settings:
     PROMPT_CACHE_TTL: str = os.getenv("PROMPT_CACHE_TTL", "1h")
 
     # ── Code Execution Sandbox (#1) ──
-    # Host-side execution is disabled by default.  The current executor is an
-    # AST-filtered subprocess, not a security boundary; production must not
-    # enable it until an isolated ExecutionSandboxPort adapter is deployed.
+    # Host-side execution is disabled by default.
     EXEC_SANDBOX_ENABLED: bool = os.getenv("EXEC_SANDBOX_ENABLED", "false").lower() in ("1", "true", "yes")
+    # "container": ContainerExecutionSandbox — the approved isolated boundary
+    #   (per-job Docker container run by the separate sandbox-worker service).
+    # "subprocess": legacy SubprocessExecutor — runs on the API host with only
+    #   an AST allowlist, not a security boundary. Dev/local use only; the
+    #   production guard below refuses to start with this mode enabled.
+    EXEC_SANDBOX_MODE: str = os.getenv("EXEC_SANDBOX_MODE", "container")
+    # Internal-network URL of the sandbox-worker service (never exposed to
+    # the public internet — see docker-compose.yml's `sandbox-worker`).
+    SANDBOX_WORKER_URL: str = os.getenv("SANDBOX_WORKER_URL", "http://sandbox-worker:8901")
+    SANDBOX_WORKER_TOKEN: str = os.getenv("SANDBOX_WORKER_TOKEN", "")
+
+    # ── Anonymous Trial Spend Cap (Phase 2 metering) ──
+    # Anonymous runs (ENABLE_LEGACY_API_KEY=true, no account) skip the
+    # per-user credit ledger entirely -- there's no account to charge. This
+    # caps estimated daily spend per client IP so anonymous traffic stays
+    # bounded regardless. 50 credits = $0.05/day, enough for a couple of
+    # budget-tier trial runs.
+    ANONYMOUS_DAILY_CREDIT_CAP: int = int(os.getenv("ANONYMOUS_DAILY_CREDIT_CAP", "50"))
+
+    # ── WebSocket Security (Phase 3 metering) ──
+    # Ticket validity window. Short by design: the ticket travels via the
+    # Sec-WebSocket-Protocol header for exactly one connection attempt, not
+    # as a standing credential -- see core/ws_ticket.py.
+    WS_TICKET_TTL_SECONDS: int = int(os.getenv("WS_TICKET_TTL_SECONDS", "30"))
+    WS_CONNECT_RATE_LIMIT_PER_MINUTE: int = int(
+        os.getenv("WS_CONNECT_RATE_LIMIT_PER_MINUTE", "20")
+    )
 
     # ── ACR (Adaptive Capability Router) ──
     ACR_ENABLED: bool = os.getenv("ACR_ENABLED", "false").lower() in ("1", "true", "yes")
@@ -366,13 +401,24 @@ class Settings:
 settings = Settings()
 
 # A denylist/AST guard cannot safely contain LLM-generated code on the API host.
-# Fail closed rather than allowing a deployment to opt into the legacy executor
-# accidentally through a copied environment file.
+# Fail closed rather than allowing a deployment to opt into the legacy
+# subprocess executor accidentally through a copied environment file. The
+# isolated container sandbox (mode="container") is the only path permitted
+# in production; it's still gated separately at runtime by a Docker/image
+# health check (application/flows/services.py:_init_executor) before code
+# execution is actually wired in.
 if settings.ENVIRONMENT == "production" and settings.EXEC_SANDBOX_ENABLED:
-    raise RuntimeError(
-        "EXEC_SANDBOX_ENABLED=true is not permitted in production. "
-        "Deploy an isolated execution sandbox adapter before enabling code execution."
-    )
+    if settings.EXEC_SANDBOX_MODE != "container":
+        raise RuntimeError(
+            f"EXEC_SANDBOX_MODE={settings.EXEC_SANDBOX_MODE!r} is not permitted in "
+            "production with EXEC_SANDBOX_ENABLED=true. Only the isolated "
+            "container sandbox (EXEC_SANDBOX_MODE=container) may run in production."
+        )
+    if not settings.SANDBOX_WORKER_TOKEN:
+        raise RuntimeError(
+            "SANDBOX_WORKER_TOKEN must be set when EXEC_SANDBOX_ENABLED=true "
+            "in production — an unauthenticated sandbox worker cannot be trusted."
+        )
 
 # Fail fast at startup if CSRF protection is enabled but no secret is configured.
 if settings.CSRF_ENFORCE_BACKEND and not settings.CSRF_SECRET:

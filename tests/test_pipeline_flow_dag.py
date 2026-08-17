@@ -103,15 +103,19 @@ class TestExecutePhasesDag:
             await execute_phases_dag(phases, state, run_phase_fn)
 
     @pytest.mark.asyncio
-    async def test_exception_propagates(self, state, run_phase_fn):
+    async def test_exception_recorded_for_non_critical_phase(self, state, run_phase_fn):
+        # execute_phases_dag no longer re-raises phase exceptions — it catches
+        # them (asyncio.gather(..., return_exceptions=True)) and records them
+        # in state.errors, same as the higher-level streaming phase loop.
+        # Only step.critical=True stops the DAG early; nothing ever raises.
         async def phase_a(st):
             raise ValueError("boom")
 
         phases = [
             PhaseStep(0, "A", phase_a, lambda s: {}),
         ]
-        with pytest.raises(ValueError, match="boom"):
-            await execute_phases_dag(phases, state, run_phase_fn)
+        await execute_phases_dag(phases, state, run_phase_fn)
+        assert any("boom" in e for e in state.errors)
 
     @pytest.mark.asyncio
     async def test_empty_phases(self, state, run_phase_fn):

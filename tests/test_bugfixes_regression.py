@@ -99,6 +99,18 @@ class TestCsrfSecretConsistency:
 class TestQuotaRepoPoolRaceCondition:
     """Verify that concurrent calls to _get_pool() create only ONE asyncpg pool."""
 
+    @pytest.fixture(autouse=True)
+    def _reset_pool_singleton(self):
+        """_pool/_pool_lock are class attributes (a deliberate process-wide
+        singleton pool), so they leak across tests in the same process unless
+        reset here."""
+        from reasoner.infrastructure.persistence.quota_repo_postgres import PostgresQuotaRepository
+        PostgresQuotaRepository._pool = None
+        PostgresQuotaRepository._pool_lock = None
+        yield
+        PostgresQuotaRepository._pool = None
+        PostgresQuotaRepository._pool_lock = None
+
     @pytest.mark.asyncio
     async def test_concurrent_get_pool_creates_single_pool(self, monkeypatch):
         """Multiple concurrent _get_pool() calls must result in exactly one create_pool."""
@@ -196,16 +208,17 @@ class TestTokenCacheLoadFailure:
 
         monkeypatch.setattr(cache, "_load_from_disk", failing_load)
 
-        # First call should attempt load and fail
-        with pytest.raises(OSError, match="Simulated disk I/O error"):
-            await cache._ensure_loaded()
+        # _ensure_loaded() is called unguarded by get()/set(), so it must
+        # swallow the disk error (not raise) to avoid crashing a live cache
+        # lookup — but must NOT mark _loaded=True on failure, or the cache
+        # is silently disabled forever instead of retrying next call.
+        await cache._ensure_loaded()
 
         assert cache._loaded is False, "_loaded must remain False after failed load"
         assert load_attempts == 1
 
         # Second call should ALSO attempt load (retry behavior)
-        with pytest.raises(OSError, match="Simulated disk I/O error"):
-            await cache._ensure_loaded()
+        await cache._ensure_loaded()
 
         assert load_attempts == 2, "Second call should retry load, not skip it"
 
@@ -297,9 +310,17 @@ class TestPipelineRoutesReturnProperStatusCodes:
 
     @pytest.mark.asyncio
     async def test_get_pipeline_status_raises_500_on_error(self, mock_user, monkeypatch):
-        """get_pipeline_status must raise HTTPException(500) on internal errors."""
+        """get_pipeline_status must raise HTTPException(500) on internal errors.
+
+        Pipeline routes now fail-closed on ownership (routes/pipelines.py's
+        _check_pipeline_ownership — a real hardening, not a regression): an
+        unknown pipeline_id with no ownership record denies with 403 before
+        ever reaching get_architecture_components(). Bypass ownership here
+        so the test still reaches the internal-error path it's actually
+        about.
+        """
         from fastapi import HTTPException
-        from reasoner.api.routes.pipelines import get_pipeline_status
+        from reasoner.api.routes import pipelines as pipelines_mod
 
         def broken_get_components():
             raise RuntimeError("Simulated internal error")
@@ -308,17 +329,22 @@ class TestPipelineRoutesReturnProperStatusCodes:
             "reasoner.api.get_architecture_components",
             broken_get_components,
         )
+        monkeypatch.setattr(pipelines_mod, "_check_pipeline_ownership", AsyncMock(return_value=True))
 
         with pytest.raises(HTTPException) as exc_info:
-            await get_pipeline_status(pipeline_id="test-pipe", user=mock_user)
+            await pipelines_mod.get_pipeline_status(pipeline_id="test-pipe", user=mock_user)
 
         assert exc_info.value.status_code == 500
 
     @pytest.mark.asyncio
     async def test_delete_pipeline_raises_500_on_error(self, mock_user, monkeypatch):
-        """delete_pipeline must raise HTTPException(500) on internal errors."""
+        """delete_pipeline must raise HTTPException(500) on internal errors.
+
+        Bypass the fail-closed ownership check (see
+        test_get_pipeline_status_raises_500_on_error) to reach it.
+        """
         from fastapi import HTTPException
-        from reasoner.api.routes.pipelines import delete_pipeline
+        from reasoner.api.routes import pipelines as pipelines_mod
 
         def broken_get_components():
             raise RuntimeError("Simulated internal error")
@@ -327,17 +353,22 @@ class TestPipelineRoutesReturnProperStatusCodes:
             "reasoner.api.get_architecture_components",
             broken_get_components,
         )
+        monkeypatch.setattr(pipelines_mod, "_check_pipeline_ownership", AsyncMock(return_value=True))
 
         with pytest.raises(HTTPException) as exc_info:
-            await delete_pipeline(pipeline_id="test-pipe", user=mock_user, csrf_checked=None)
+            await pipelines_mod.delete_pipeline(pipeline_id="test-pipe", user=mock_user, csrf_checked=None)
 
         assert exc_info.value.status_code == 500
 
     @pytest.mark.asyncio
     async def test_resume_pipeline_raises_500_on_error(self, mock_user, monkeypatch):
-        """resume_pipeline must raise HTTPException(500) on internal errors."""
+        """resume_pipeline must raise HTTPException(500) on internal errors.
+
+        Bypass the fail-closed ownership check (see
+        test_get_pipeline_status_raises_500_on_error) to reach it.
+        """
         from fastapi import HTTPException
-        from reasoner.api.routes.pipelines import resume_pipeline
+        from reasoner.api.routes import pipelines as pipelines_mod
 
         def broken_get_components():
             raise RuntimeError("Simulated internal error")
@@ -346,8 +377,9 @@ class TestPipelineRoutesReturnProperStatusCodes:
             "reasoner.api.get_architecture_components",
             broken_get_components,
         )
+        monkeypatch.setattr(pipelines_mod, "_check_pipeline_ownership", AsyncMock(return_value=True))
 
         with pytest.raises(HTTPException) as exc_info:
-            await resume_pipeline(pipeline_id="test-pipe", user=mock_user, csrf_checked=None)
+            await pipelines_mod.resume_pipeline(pipeline_id="test-pipe", user=mock_user, csrf_checked=None)
 
         assert exc_info.value.status_code == 500

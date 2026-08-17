@@ -236,7 +236,10 @@ class TestUploaderGlobInjection:
     @pytest.mark.anyio
     async def test_get_file_text_reads_exact_match(self, tmp_path, monkeypatch):
         from reasoner import uploader
-        monkeypatch.setattr(uploader, 'UPLOAD_DIR', tmp_path)
+        from reasoner.infrastructure import uploader as impl_uploader
+        # get_file_text is defined in infrastructure.uploader and reads its own
+        # module-global UPLOAD_DIR — the shim's copy is a separate binding.
+        monkeypatch.setattr(impl_uploader, 'UPLOAD_DIR', tmp_path)
         file_id = "abc123def456"
         (tmp_path / f"{file_id}.txt").write_text("hello world")
         result = await uploader.get_file_text(file_id)
@@ -253,7 +256,8 @@ class TestUploaderGlobInjection:
 
     def test_delete_file_deletes_exact_match(self, tmp_path, monkeypatch):
         from reasoner import uploader
-        monkeypatch.setattr(uploader, 'UPLOAD_DIR', tmp_path)
+        from reasoner.infrastructure import uploader as impl_uploader
+        monkeypatch.setattr(impl_uploader, 'UPLOAD_DIR', tmp_path)
         file_id = "abc123def456"
         (tmp_path / f"{file_id}.txt").write_text("hello world")
         assert uploader.delete_file(file_id) is True

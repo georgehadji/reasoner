@@ -15,7 +15,7 @@ class FakeWebSocket:
         self.client_state = WebSocketState.CONNECTED
         self.sent = []
 
-    async def accept(self):
+    async def accept(self, subprotocol: str | None = None):
         pass
 
     async def send_text(self, text: str) -> None:

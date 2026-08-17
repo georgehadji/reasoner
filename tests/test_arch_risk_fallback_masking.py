@@ -88,22 +88,32 @@ async def test_degraded_response_carries_metadata() -> None:
 @pytest.mark.asyncio
 async def test_fallback_provides_explicit_model_name() -> None:
     """When primary falls back to an explicit fallback provider,
-    the DegradedLLMResponse should reference the correct model."""
+    the DegradedLLMResponse should reference the correct model.
+
+    MULTI_PROVIDER_FALLBACK_ENABLED defaults true (de76b6d, OpenRouter SPOF
+    fallback), so without disabling it router.call() would try real direct
+    providers after routing_table/fallback_table are exhausted, and could
+    return a real (non-degraded) response instead — see
+    test_provider_router_degradation.py for the same issue observed live.
+    """
+    from reasoner.core.settings import settings
+
     router = ProviderRouter(
         primary=FakeProvider("primary-model"),
         routing_table={"scoring": FakeProvider("scoring-model")},
         fallback_table={"scoring": FakeProvider("fallback-scoring-model")},
     )
 
-    with patch(
-        "reasoner.infrastructure.llm.router._call_with_circuit",
-        side_effect=asyncio.TimeoutError("timed out"),
-    ):
-        result, metadata = await router.call(
-            role="scoring",
-            system_prompt="test",
-            user_prompt="test",
-        )
+    with patch.object(settings, "MULTI_PROVIDER_FALLBACK_ENABLED", False):
+        with patch(
+            "reasoner.infrastructure.llm.router._call_with_circuit",
+            side_effect=asyncio.TimeoutError("timed out"),
+        ):
+            result, metadata = await router.call(
+                role="scoring",
+                system_prompt="test",
+                user_prompt="test",
+            )
 
     assert isinstance(result, DegradedLLMResponse)
     # Should mention the fallback model since it was tried

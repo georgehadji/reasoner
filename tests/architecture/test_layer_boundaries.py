@@ -31,6 +31,9 @@ ALLOWED_LINEAGE: dict[str, list[str]] = {
         "reasoner.api",
     ],
     "core/protocol.py": ["reasoner.infrastructure.llm.router"],
+    # core/ws_ticket.py: lazy inline import of the Valkey pool (Redis->Valkey
+    # migration) inside a function, not module-level.
+    "core/ws_ticket.py": ["reasoner.infrastructure.valkey.client"],
 
     # orchestrator has lazy inline imports of api/clients (neuro fallback)
     # websocket manager imports api/history for run owner tracking

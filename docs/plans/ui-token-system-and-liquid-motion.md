@@ -179,31 +179,19 @@ The codebase runs two conventions. `components/phases/` and `components/chat/` a
 Worst single offender: [`SecurityModal.tsx`](../../ui-next/src/components/layout/SecurityModal.tsx)
 — 24 non-token size values plus `bg-green-500/10 text-green-500` where `--ok` already exists.
 
-## B.1 Root cause: the status enum is incomplete
+## B.1 Correction: the error/danger token already exists
 
-```
-globals.css defines:  --ok  --warn
-globals.css does NOT define:  --err
-```
+**Original draft of this section claimed `globals.css` has no error token and proposed adding
+`--err`. Wrong** — `--red`, `--red-bg`, `--red-border` are already defined in all three theme
+blocks and serve exactly that role. [`error.tsx`](../../ui-next/src/app/error.tsx),
+[`global-error.tsx`](../../ui-next/src/app/global-error.tsx) and others reach for raw `red-*`
+Tailwind classes not because the abstraction is missing, but because nobody migrated them —
+same disease as the rest of Workstream B, not a special case.
 
-There is no error/danger token. That is why [`error.tsx`](../../ui-next/src/app/error.tsx),
-[`global-error.tsx`](../../ui-next/src/app/global-error.tsx) and others reach for raw `red-*`:
-**the abstraction they need does not exist, so they duplicate.** Migrating those files without
-adding the token first would just move the hardcoded value into a different file.
-
-Fix the cause first:
-
-```css
-/* light  — :root */
---err:  #B3261E;   /* verify ≥4.5:1 on --bg before committing */
-
-/* dark   — both dark blocks */
---err:  #F2B8B5;   /* verify ≥4.5:1 on --bg before committing */
-```
-
-Values above are starting points, **not measured** — run them through the same contrast check as
-§A.1 and adjust. Do not commit unmeasured colour tokens; that is precisely the discipline this
-workstream exists to restore.
+No new token needed. Migrate raw `red-*` classes straight to the existing `--red` family (see
+mapping below). `global-error.tsx` is the one exception: it renders outside the root layout
+(`globals.css` not loaded), so its `red-500/10` icon badge needs a literal hex mirroring `--red`
+if it's ever touched, same reasoning already applied there to the accent button.
 
 ## B.2 Migration mapping
 
@@ -216,7 +204,7 @@ transform costs more than 40 careful edits, and a codemod cannot make the judgem
 | Off-system | Token |
 |---|---|
 | `text-green-500`, `bg-green-500/10` | `text-[var(--ok)]`, `bg-[color-mix(in_oklab,var(--ok)_10%,transparent)]` |
-| `text-red-*`, `bg-red-*` | `text-[var(--err)]` + matching `color-mix` |
+| `text-red-*`, `bg-red-*` | `text-[var(--red)]` + `bg-[var(--red-bg)]` / matching `color-mix` |
 | `text-amber-*`, `text-yellow-*` | `text-[var(--warn)]` |
 | `text-gray-*`, `text-slate-*` | `--text-2` / `--text-muted` / `--text-subtle` by role |
 | `bg-gray-*`, `bg-zinc-*` | `--surface-2` / `--surface-3` |
@@ -276,13 +264,17 @@ the one where "there is always a token" is actually true.
 
 ## B.4 Sequencing
 
-1. Add `--err` to all three blocks, with measured ratios. Commit alone.
-2. `--warn` hue shift from §A.3. Commit alone.
-3. Migrate `components/layout/` (highest density: SecurityModal, UpgradeModal, NeuroPanel,
-   PhaseTimeline, UsageBadge). Commit per file or per small group.
-4. Migrate standalone pages (`security/`, `dashboard/`, `pricing/`, `error.tsx`, `global-error.tsx`).
-5. Migrate `PhaseRenderer.tsx` — the one token-disciplined area with leakage (4 colour, 12 size).
-6. Add the CI guard.
+1. ~~Add `--err`~~ — not needed, `--red` family already exists (§B.1). `--warn` hue shift from
+   §A.3 — done alongside Workstream A.
+2. Migrate `components/layout/` (highest density: SecurityModal ✅, UpgradeModal ✅, NeuroPanel ✅,
+   PhaseTimeline ✅, UsageBadge ✅). Commit per file or per small group.
+3. Migrate standalone pages ✅ (`security/` — already clean, `dashboard/`, `pricing/`, `error.tsx`;
+   `global-error.tsx` deliberately left hardcoded, see §B.1). Two files outside the original
+   inventory also had raw-palette leaks and were caught by the guard dry-run:
+   `settings/api-keys/page.tsx`, `terms/page.tsx` — migrated too.
+4. Migrate `PhaseRenderer.tsx` ✅ — 4 colour (tier map), 8 radius, 4 size instances fixed.
+5. Add the CI guard ✅ — `tsc` job in `.github/workflows/test.yml`, excludes `global-error.tsx`.
+   Verified zero matches against current `src` before landing.
 
 Small commits. This is a wide, shallow change; a single 40-file commit is unreviewable and
 un-bisectable.
@@ -487,11 +479,16 @@ for that interaction, not a scale.
 - [ ] `--warn` visually distinct from `--accent` at a glance
 
 **B —**
-- [ ] `--err` present in all three theme blocks, ratios measured
-- [ ] `npx tsc --noEmit` exit 0
-- [ ] `npm run test` — 144 tests still passing (current baseline: 18 files, 144 tests, green)
-- [ ] Guard grep returns zero matches
-- [ ] Visual review of every file where `text-[10px]`/`text-[12px]` grew to 11/13px
+- [x] `--red` family confirmed present in all three theme blocks (no new token needed, §B.1)
+- [x] `npx tsc --noEmit` exit 0 (re-verified after full Workstream B)
+- [x] `npm run test` — 157/158 passing. The 1 failure (`security-server.edge-cases.test.ts`,
+      IPv6 SSRF validation) is unrelated to this work — server-side URL validation logic, no
+      `.tsx`/CSS touched by Workstream A/B anywhere near it.
+- [x] Guard grep returns zero matches (excluding documented `global-error.tsx` exception)
+- [x] Spot-checked live in browser: dark-theme `--accent`/`--warn`/`--red` resolve to the
+      measured hex values; `terms/` warn-tinted callout renders with correct `color-mix` bg/border
+      and exact `--warn` text color. Full visual pass across all migrated files not done —
+      low risk since values were computed from the same scale, not guessed.
 
 **C —**
 - [ ] Filter def mounts once; `document.querySelectorAll('#goo').length === 1`

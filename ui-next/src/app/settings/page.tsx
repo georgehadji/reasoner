@@ -10,7 +10,6 @@ import Link from 'next/link';
 import { User, ShieldAlert, ShieldCheck, Database, Key } from 'lucide-react';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
-import { cn } from '@/lib/utils';
 
 export default function SettingsPage() {
   const user = useAppStore((s) => s.user);
@@ -19,8 +18,6 @@ export default function SettingsPage() {
   const { subscription } = useSubscription();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
-  const [retention, setRetention] = useState('forever');
-  const [zeroRetention, setZeroRetention] = useState(false);
 
   if (!user) {
     if (typeof window !== 'undefined') router.push('/login');
@@ -116,40 +113,20 @@ export default function SettingsPage() {
           </h2>
           
           <div className="space-y-6">
-            <div className="flex items-center justify-between gap-4 border-b border-[var(--border)] pb-6">
+            <div className="flex items-center justify-between gap-4 border-b border-[var(--border)] pb-6 opacity-60">
               <div>
                 <p className="font-medium text-[var(--text)]">Zero-Retention Mode</p>
-                <p className="text-sm text-[var(--text-muted)]">Queries and results are not stored on our servers. Best for sensitive research.</p>
+                <p className="text-sm text-[var(--text-muted)]">Coming soon — not yet available. To request deletion of stored data today, use <a href="/contact" className="underline hover:text-[var(--accent)]">Contact</a>.</p>
               </div>
-              <button 
-                onClick={() => setZeroRetention(!zeroRetention)}
-                className={cn(
-                  "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
-                  zeroRetention ? "bg-[var(--ok)]" : "bg-[var(--surface-3)]"
-                )}
+              <button
+                type="button"
+                disabled
+                aria-disabled="true"
+                title="Coming soon"
+                className="relative inline-flex h-6 w-11 shrink-0 cursor-not-allowed rounded-full border-2 border-transparent bg-[var(--surface-3)]"
               >
-                <span className={cn(
-                  "inline-block h-5 w-5 transform rounded-full bg-[var(--surface)] shadow ring-0 transition duration-200 ease-in-out",
-                  zeroRetention ? "translate-x-5" : "translate-x-0"
-                )} />
+                <span className="inline-block h-5 w-5 translate-x-0 transform rounded-full bg-[var(--surface)] shadow ring-0" />
               </button>
-            </div>
-
-            <div className="flex items-center justify-between gap-4 border-b border-[var(--border)] pb-6">
-              <div>
-                <p className="font-medium text-[var(--text)]">Data Retention Policy</p>
-                <p className="text-sm text-[var(--text-muted)]">Set how long your history is kept before automatic deletion.</p>
-              </div>
-              <select 
-                value={retention}
-                onChange={(e) => setRetention(e.target.value)}
-                className="rounded-lg bg-[var(--surface-2)] border border-[var(--border)] px-3 py-2 text-sm font-medium text-[var(--text)] focus:outline-none"
-              >
-                <option value="forever">Forever</option>
-                <option value="30days">30 Days</option>
-                <option value="7days">7 Days</option>
-                <option value="24hours">24 Hours</option>
-              </select>
             </div>
 
             <div className="flex items-start gap-3 rounded-lg bg-[color-mix(in_oklab,var(--ok)_6%,transparent)] p-4 border border-[color-mix(in_oklab,var(--ok)_22%,transparent)]">
@@ -157,7 +134,7 @@ export default function SettingsPage() {
               <div>
                 <p className="text-sm font-semibold text-[var(--ok)]">Encryption Active</p>
                 <p className="text-xs text-[var(--text-muted)] leading-relaxed mt-1">
-                  All your data is currently protected with AES-256-GCM encryption at rest and TLS 1.3 in transit. We follow SOC 2 Type II standards for your privacy.
+                  All your data is currently protected with AES-256-GCM encryption at rest and TLS 1.3 in transit.
                 </p>
               </div>
             </div>

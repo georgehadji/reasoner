@@ -261,7 +261,7 @@ from dataclasses import asdict, fields as dc_fields
 from pathlib import Path
 from reasoner.domain.core_types import (
     SolutionCandidate, CritiqueScore, ReviewHypothesis, StressTestResult,
-    MetaCognitiveAudit, GenerationCandidate, CriticScore,
+    MetaCognitiveAudit, GenerationCandidate, CriticScore, CriticDimensionScore,
     VerificationResult, MetaEvaluation, Decomposition, FinalSolution, SubProblem, Assumption
 )
 from reasoner.domain.models import TaskType, ClaimLabel, PerspectiveType, PerspectiveRegistry

@@ -38,7 +38,7 @@ class WebSocketMessage:
     type: str  # 'event', 'progress', 'complete', 'error'
     data: dict[str, Any]
     pipeline_id: str | None = None
-    
+
     def to_json(self) -> str:
         """Serialize to JSON."""
         return json.dumps({
@@ -46,6 +46,24 @@ class WebSocketMessage:
             'data': self.data,
             'pipeline_id': self.pipeline_id,
         })
+
+
+@dataclass(frozen=True)
+class WebSocketSession:
+    """Resolved identity of one connection attempt, established before
+    ``accept()`` by ``api/routes/websocket.py`` (ticket redemption + Origin
+    check) and handed to ``websocket_endpoint`` as plain arguments.
+
+    Not stored as the connection_metadata value itself -- that stays a
+    plain dict (existing tests construct it directly, e.g.
+    ``manager.connect(ws, "conn-1", metadata={"user_id": "user-b"})``) --
+    this exists to give the connect-time auth resolution a typed shape
+    instead of an ad-hoc tuple of arguments.
+    """
+    user_id: str | None
+    origin: str | None
+    connection_id: str
+    issued_at: float
 
 
 class WebSocketManager:
@@ -92,8 +110,15 @@ class WebSocketManager:
         websocket: WebSocket,
         connection_id: str,
         metadata: dict[str, Any] | None = None,
+        subprotocol: str | None = None,
     ) -> None:
-        """Accept and register new WebSocket connection."""
+        """Accept and register new WebSocket connection.
+
+        ``subprotocol`` is echoed back on ``accept()`` when the client
+        negotiated one (the WS ticket travels via Sec-WebSocket-Protocol —
+        see api/routes/websocket.py) so the browser's ``WebSocket.protocol``
+        reflects what the server actually honored.
+        """
         async with self._lock:
             if len(self.active_connections) >= self._max_connections:
                 await websocket.close(code=1008, reason="Connection limit reached")
@@ -102,8 +127,8 @@ class WebSocketManager:
             self.connection_metadata[connection_id] = metadata or {}
             if _METRICS_AVAILABLE:
                 REASONER_WEBSOCKET_CONNECTIONS.set(len(self.active_connections))
-        
-        await websocket.accept()
+
+        await websocket.accept(subprotocol=subprotocol)
 
         logger.info(f"WebSocket connected: {connection_id}")
         
@@ -391,67 +416,45 @@ async def _authorized_for_pipeline(pipeline_id: str, user_id: str | None) -> boo
 async def websocket_endpoint(
     websocket: WebSocket,
     pipeline_id: str | None = None,
+    *,
+    user_id: str | None = None,
+    origin: str | None = None,
+    subprotocol: str | None = None,
 ):
     """
     WebSocket endpoint for real-time updates.
 
-    Usage:
-        ws://<host>:<port>/ws?token=xxx
-        ws://<host>:<port>/ws?pipeline_id=xxx&token=xxx
-
-    Authentication:
-        Requires a valid API key/JWT either in the `token` query parameter
-        or in the `Authorization` header.
+    Authentication happens entirely in the caller (``api/routes/websocket.py``)
+    *before* this is invoked: a single-use ticket redeemed via
+    ``core/ws_ticket.py`` and an Origin check via
+    ``infrastructure/websocket/ws_security.py``, both run before
+    ``WebSocket.accept()`` so an unauthenticated/cross-origin socket is
+    never accepted. This function receives the already-resolved identity as
+    a plain argument rather than extracting a token itself -- there is no
+    query-string ``?token=`` path anymore (security-remediation-plan.md
+    Phase 3 item 2).
     """
-    # Authenticate BEFORE accepting the connection
-    token = websocket.query_params.get("token") or ""
-    if not token:
-        auth_header = websocket.headers.get("authorization", "")
-        if auth_header.lower().startswith("bearer "):
-            token = auth_header[7:]
-
-    user_id: str | None = None
-    if token:
-        # Try JWT auth first, then legacy API key
-        try:
-            from reasoner.application.ports.auth_port import AuthPort
-            from reasoner.application.services.auth_service import AuthService
-            from reasoner.infrastructure.auth import get_auth_adapter
-            adapter: AuthPort = get_auth_adapter()
-            service = AuthService(adapter)
-            user = await service.authenticate(token)
-            if user:
-                user_id = str(user.id)
-        except Exception:
-            # Fallback to legacy API key auth
-            try:
-                from reasoner.auth import get_auth_manager
-                auth_mgr = get_auth_manager()
-                api_key = await auth_mgr.authenticate(token)
-                if api_key:
-                    user_id = getattr(api_key, "key_hash", None)
-            except Exception:
-                pass
-        
-        # If token was provided but is invalid, reject the connection
-        if not user_id:
-            await websocket.close(code=1008, reason="Invalid token")
-            return
-
     manager = get_websocket_manager()
 
     # Generate connection ID
+    import time
     import uuid
     connection_id = str(uuid.uuid4())
 
-    # Get metadata from query params
+    session = WebSocketSession(
+        user_id=user_id,
+        origin=origin,
+        connection_id=connection_id,
+        issued_at=time.time(),
+    )
     metadata = {
         'pipeline_id': pipeline_id,
         'user_agent': websocket.headers.get('user-agent', ''),
-        'user_id': user_id,
+        'user_id': session.user_id,
+        'origin': session.origin,
     }
 
-    await manager.connect(websocket, connection_id, metadata)
+    await manager.connect(websocket, connection_id, metadata, subprotocol=subprotocol)
 
     # Subscribe to pipeline if provided
     if pipeline_id:

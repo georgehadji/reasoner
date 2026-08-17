@@ -126,7 +126,7 @@ export function NeuroPanel({ conversationId, lastUserPrompt, lastAssistantRespon
         <button
           type="button"
           onClick={() => setActiveTab('search')}
-          className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
+          className={`flex flex-1 items-center justify-center gap-1.5 rounded-[var(--radius)] px-2 py-1.5 text-xs font-medium transition-colors ${
             activeTab === 'search'
               ? 'bg-[var(--surface-2)] text-[var(--text)]'
               : 'text-[var(--text-muted)] hover:bg-[var(--surface-2)]'
@@ -138,7 +138,7 @@ export function NeuroPanel({ conversationId, lastUserPrompt, lastAssistantRespon
         <button
           type="button"
           onClick={() => setActiveTab('recent')}
-          className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
+          className={`flex flex-1 items-center justify-center gap-1.5 rounded-[var(--radius)] px-2 py-1.5 text-xs font-medium transition-colors ${
             activeTab === 'recent'
               ? 'bg-[var(--surface-2)] text-[var(--text)]'
               : 'text-[var(--text-muted)] hover:bg-[var(--surface-2)]'
@@ -186,14 +186,14 @@ export function NeuroPanel({ conversationId, lastUserPrompt, lastAssistantRespon
               {recallResults.map((chunk, idx) => (
                 <div
                   key={idx}
-                  className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-2.5 text-xs"
+                  className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface-2)] p-2.5 text-xs"
                 >
                   <div className="mb-1 flex items-center gap-2">
-                    <span className="rounded bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--accent-text)]">
+                    <span className="rounded-[var(--radius-sm)] bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-medium text-[var(--accent-text)]">
                       {(chunk.relevance * 100).toFixed(0)}%
                     </span>
                     <Tooltip text={chunk.source}>
-                      <span className="truncate text-[10px] text-[var(--text-muted)]">
+                      <span className="truncate text-[length:var(--text-2xs)] text-[var(--text-muted)]">
                         {chunk.source}
                       </span>
                     </Tooltip>
@@ -226,7 +226,7 @@ export function NeuroPanel({ conversationId, lastUserPrompt, lastAssistantRespon
               {canLearn ? 'Learn this turn' : 'No turn to learn'}
             </button>
             {learnStatus && (
-              <div className="text-xs text-blue-400">{learnStatus}</div>
+              <div className="text-xs text-[var(--accent)]">{learnStatus}</div>
             )}
           </div>
         </>
@@ -246,14 +246,14 @@ export function NeuroPanel({ conversationId, lastUserPrompt, lastAssistantRespon
             {recentEntries.map((entry, idx) => (
               <div
                 key={idx}
-                className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-2.5 text-xs"
+                className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface-2)] p-2.5 text-xs"
               >
                 <button
                   type="button"
                   onClick={() => setExpandedEntry(expandedEntry === idx ? null : idx)}
                   className="flex w-full items-center justify-between text-left"
                 >
-                  <span className="text-[10px] text-[var(--text-muted)]">
+                  <span className="text-[length:var(--text-2xs)] text-[var(--text-muted)]">
                     {entry.timestamp ? new Date(entry.timestamp).toLocaleString() : 'Unknown time'}
                   </span>
                   {expandedEntry === idx ? (
@@ -289,7 +289,7 @@ export function NeuroPanel({ conversationId, lastUserPrompt, lastAssistantRespon
 
       {/* Error */}
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-2.5 py-2 text-xs text-red-700">
+        <div className="rounded-[var(--radius)] border border-[var(--red-border)] bg-[var(--red-bg)] px-2.5 py-2 text-xs text-[var(--red)]">
           {error}
         </div>
       )}

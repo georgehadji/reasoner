@@ -92,18 +92,19 @@ class TestExtractJson:
         assert extract_json("\n\t  \n") == {}
 
     def test_rejects_non_dict_json(self):
-        """JSON arrays or strings must not be returned as dicts — raise ParseError instead.
+        """JSON scalars must not be returned as dicts — raise ParseError instead.
 
-        BUG: LLMs occasionally return bare JSON arrays like `["item1", "item2"]`
-        or quoted strings like `"hello"`.  extract_json used to return these
-        directly, causing downstream `.get()` to raise AttributeError on str/list.
+        Bare JSON arrays are no longer rejected: extract_json now wraps them
+        as {"results": [...]} so downstream `.get()` doesn't raise
+        AttributeError, instead of forcing every caller to handle both dict
+        and list shapes. Only genuinely non-dict/non-list JSON (e.g. a bare
+        quoted string, which extract_json_any doesn't even attempt to parse
+        since it looks for {...}/[...] structures) still raises.
         """
-        with pytest.raises(ParseError):
-            extract_json('["item1", "item2"]')
+        assert extract_json('["item1", "item2"]') == {"results": ["item1", "item2"]}
         with pytest.raises(ParseError):
             extract_json('"hello world"')
-        with pytest.raises(ParseError):
-            extract_json('```json\n["a", "b"]\n```')
+        assert extract_json('```json\n["a", "b"]\n```') == {"results": ["a", "b"]}
 
     def test_nested_object_inside_array_is_extracted(self):
         """If the text contains both an array and an object, the object wins."""

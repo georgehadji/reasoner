@@ -22,6 +22,17 @@ from reasoner.phases import (
     _wrap_external_content,
 )
 from reasoner.sanitization import sanitize_for_prompt
+from reasoner.core.settings import settings
+
+
+@pytest.fixture(autouse=True)
+def disable_tavily_extract():
+    """TAVILY_EXTRACT_ENABLED defaults true and, with a real TAVILY_API_KEY
+    configured, batch-extracts sources_to_scrape before the mocked
+    scrape_urls ever runs — bypassing the code path under test entirely.
+    """
+    with patch.object(settings, "TAVILY_EXTRACT_ENABLED", False):
+        yield
 
 
 class TestSanitizeForPrompt:

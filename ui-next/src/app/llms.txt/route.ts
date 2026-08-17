@@ -1,5 +1,6 @@
 import { DOCS, docsBySection } from '@/lib/docs';
 import { SITE, absoluteUrl } from '@/lib/site';
+import { CAPABILITIES } from '@/lib/capabilities.generated';
 
 /**
  * /llms.txt — a machine-readable index of this site for AI answer engines.
@@ -33,14 +34,14 @@ synthesised. Every claim in the final answer is labelled VERIFIED, HYPOTHESIS,
 or UNKNOWN.
 
 Key facts:
-- 19 reasoning methods (multi-perspective, debate, jury, research, scientific,
+- ${CAPABILITIES.methods} reasoning methods (multi-perspective, debate, jury, research, scientific,
   socratic, pre-mortem, Bayesian, dialectical, analogical, Delphi,
   chain-of-verification, skeleton-of-thought, tree-of-thoughts,
-  program-of-thoughts, self-discover, writing, brainstorming, coding).
-- 48 presets, each method in a Budget (~$0.02/run) and Premium (~$0.15–0.30/run) tier.
-- 28 directly registered models plus 350+ via OpenRouter, spanning Anthropic,
-  OpenAI, Google, DeepSeek, Mistral, xAI, Qwen, Moonshot, Zhipu, MiniMax,
-  Perplexity, and local Ollama.
+  program-of-thoughts, self-discover, writing, brainstorming, coding, and more).
+- ${CAPABILITIES.presets} presets, each method in a Budget (~$0.02/run) and Premium (~$0.15–0.30/run) tier.
+- ${CAPABILITIES.directModels} directly registered reasoning models plus ${CAPABILITIES.routableModels}+ via
+  OpenRouter, spanning ${CAPABILITIES.providerAdapters} model labs including Anthropic,
+  OpenAI, Google, DeepSeek, Mistral, xAI, and Perplexity.
 - Cross-lab diversity is enforced: Phase 2 uses at least 3 labs (4 on Premium),
   and the critique model must come from a different ecosystem than the generators.
 - Long-form writing and software generation are first-class pipelines: articles

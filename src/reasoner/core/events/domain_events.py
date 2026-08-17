@@ -32,7 +32,9 @@ class PipelineEventType(str, Enum):
     LLM_GENERATION_COMPLETED = "llm_generation_completed"
     RESEARCH_STEP_EMITTED = "research_step_emitted"
     RESEARCH_CITATIONS_READY = "research_citations_ready"
-    CODE_EXECUTED = "code_executed"
+    CODE_EXECUTION_REQUESTED = "code_execution_requested"
+    CODE_EXECUTION_COMPLETED = "code_execution_completed"
+    CODE_EXECUTION_REJECTED = "code_execution_rejected"
     HARNESS_MUTATION_PROPOSED = "harness_mutation_proposed"
     HARNESS_MUTATION_EVALUATED = "harness_mutation_evaluated"
     HARNESS_MUTATION_PROMOTED = "harness_mutation_promoted"
@@ -119,6 +121,9 @@ class DomainEvent:
             SaaSEventType.WEBHOOK_PROCESSING_FAILED,
             SaaSEventType.SPEND_CAP_EXCEEDED,
             PipelineEventType.ERROR_OCCURRED,
+            PipelineEventType.CODE_EXECUTION_REQUESTED,
+            PipelineEventType.CODE_EXECUTION_COMPLETED,
+            PipelineEventType.CODE_EXECUTION_REJECTED,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -279,6 +284,35 @@ class StressTestCompleted(DomainEvent):
     failure_mode: str = ""
 
 
+@dataclass(frozen=True)
+class CodeExecutionRequested(DomainEvent):
+    """A code execution attempt was dispatched to the configured executor.
+
+    Emitted before the executor runs so the audit trail records the attempt
+    even if the process hangs or the host is killed before completion."""
+    phase_name: str = ""
+    language: str = "python"
+
+
+@dataclass(frozen=True)
+class CodeExecutionCompleted(DomainEvent):
+    """A code execution ran to completion (success or runtime failure)."""
+    phase_name: str = ""
+    exit_code: int = -1
+    success: bool = False
+    duration_ms: int = 0
+    policy_version: str = ""
+
+
+@dataclass(frozen=True)
+class CodeExecutionRejected(DomainEvent):
+    """A code execution attempt was refused before/without running —
+    AST guard rejection, disabled sandbox, or an unhealthy isolation
+    boundary. Never contains code or output, only the reason."""
+    phase_name: str = ""
+    blocked_reason: str = ""
+
+
 # ─────────────────────────────────────────────────────────────────────
 # WIDGET EVENTS
 # ─────────────────────────────────────────────────────────────────────
@@ -399,7 +433,9 @@ PIPELINE_EVENT_CLASSES: dict[PipelineEventType, type[DomainEvent]] = {
     PipelineEventType.LLM_GENERATION_COMPLETED: LLMGenerationCompleted,
     PipelineEventType.RESEARCH_STEP_EMITTED: ResearchStepEmitted,
     PipelineEventType.RESEARCH_CITATIONS_READY: ResearchCitationsReady,
-    PipelineEventType.CODE_EXECUTED: DomainEvent,
+    PipelineEventType.CODE_EXECUTION_REQUESTED: CodeExecutionRequested,
+    PipelineEventType.CODE_EXECUTION_COMPLETED: CodeExecutionCompleted,
+    PipelineEventType.CODE_EXECUTION_REJECTED: CodeExecutionRejected,
     PipelineEventType.HARNESS_MUTATION_PROPOSED: DomainEvent,
     PipelineEventType.HARNESS_MUTATION_EVALUATED: DomainEvent,
     PipelineEventType.HARNESS_MUTATION_PROMOTED: DomainEvent,

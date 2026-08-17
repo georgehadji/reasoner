@@ -272,6 +272,13 @@ async def run_pot_execute_phase(state: PipelineState, services: WorkflowServices
     # Use real code executor if available, otherwise fall back to LLM simulation
     executor = getattr(services, "code_executor", None)
     if executor is not None:
+        # Audit trail: record the attempt before dispatch, so it's captured
+        # even if the executor hangs or the host is killed mid-run.
+        from reasoner.application.services.event_emission_service import get_event_emitter
+        _emitter = get_event_emitter()
+        if _emitter:
+            _emitter.emit("CODE_EXECUTION_REQUESTED", phase_name="pot_execute", language="python")
+
         result = await executor.execute(code)
         state.pot_state["execution_output"] = result.stdout
         state.pot_state["execution_success"] = result.success
@@ -286,15 +293,21 @@ async def run_pot_execute_phase(state: PipelineState, services: WorkflowServices
         else:
             services.log("PoT", f"Execution OK: {result.summary}", state)
 
-        # Emit CodeExecuted domain event for audit trail
-        from reasoner.application.services.event_emission_service import get_event_emitter
-        _emitter = get_event_emitter()
+        # Audit trail: record the outcome — rejected (AST guard / disabled /
+        # unhealthy sandbox, never contains code or output) vs. completed
+        # (ran, success or runtime failure).
         if _emitter:
-            _emitter.emit("CODE_EXECUTED",
-                          phase_name="pot_execute",
-                          exit_code=result.exit_code,
-                          success=result.success,
-                          duration_ms=result.duration_ms)
+            if result.blocked:
+                _emitter.emit("CODE_EXECUTION_REJECTED",
+                              phase_name="pot_execute",
+                              blocked_reason=result.blocked_reason)
+            else:
+                _emitter.emit("CODE_EXECUTION_COMPLETED",
+                              phase_name="pot_execute",
+                              exit_code=result.exit_code,
+                              success=result.success,
+                              duration_ms=result.duration_ms,
+                              policy_version=result.policy_version)
 
         # Link execution evidence to claims for #3 evidence bundles
         try:

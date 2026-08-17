@@ -8,7 +8,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6.svg?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Tests](https://img.shields.io/badge/tests-2%2C100%2B-brightgreen.svg?style=flat-square)](./tests)
 [![Coverage](https://img.shields.io/badge/coverage-%7E70%25-yellow.svg?style=flat-square)](.)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE)
+[![License: BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-blue.svg?style=flat-square)](LICENSE)
 
 [Quick Start](#quick-start) · [Architecture](#architecture) · [Reasoning Methods & Presets](#reasoning-methods--presets) · [Programmatic Usage](#programmatic-usage) · [Security](#security--encryption) · [Configuration](#configuration-reference) · [Development](#development)
 
@@ -27,7 +27,7 @@ Reasoner treats reasoning as a first-class engineering problem rather than a one
 
 The system is built for production deployment: real-time Server-Sent Events (SSE) streaming, per-phase cost telemetry, a self-healing CI loop, internal TLS with an auto-provisioned PKI, application-layer envelope encryption, and Bearer-token endpoints designed for autonomous AI agents.
 
-**Version:** 2.1.0 (single source of truth: `src/reasoner/__init__.py`) · **License:** MIT · **Python:** 3.12+
+**Version:** 2.1.0 (single source of truth: `src/reasoner/__init__.py`) · **License:** BUSL-1.1 (converts to Apache-2.0 on 2030-08-17) · **Python:** 3.12+
 
 ---
 
@@ -532,4 +532,4 @@ Contributions are welcome. Please read [`CONTRIBUTING.md`](CONTRIBUTING.md) befo
 
 ## License
 
-[MIT](LICENSE) © 2026 Georgios-Chrysovalantis Chatzivantsidis.
+[Business Source License 1.1](LICENSE) © 2026 Georgios-Chrysovalantis Chatzivantsidis. Free for self-hosted internal and personal use; converts to Apache-2.0 on 2030-08-17. See [LICENSE](LICENSE) for the Additional Use Grant.

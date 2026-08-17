@@ -43,6 +43,10 @@ def test_flow_factory_has_all_methods() -> None:
         "pot",
         "self_discover",
         "article",
+        "subagent",
+        "cross_language",
+        "iterative_critique",
+        "image_gen",
     }
 
     for method in expected_methods:

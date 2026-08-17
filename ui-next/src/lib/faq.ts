@@ -5,6 +5,8 @@
  * crawler is given is always byte-identical to the answer a person reads.
  */
 
+import { CAPABILITIES } from './capabilities.generated';
+
 export interface FaqEntry {
   q: string;
   a: string;
@@ -33,7 +35,7 @@ export const FAQS: readonly FaqEntry[] = [
   },
   {
     q: 'Which AI models does Reasoner use?',
-    a: 'Reasoner routes across 28 directly registered models and more than 350 through OpenRouter, including models from Anthropic, OpenAI, Google, DeepSeek, Mistral, xAI, Qwen, Moonshot, Zhipu, MiniMax, and Perplexity, plus locally hosted Ollama models. Routing is by role and preset rather than by a fixed favourite.',
+    a: `Reasoner routes across ${CAPABILITIES.directModels} directly registered reasoning models and more than ${CAPABILITIES.routableModels} through OpenRouter, spanning ${CAPABILITIES.providerAdapters} model labs including Anthropic, OpenAI, Google, DeepSeek, Mistral, xAI, and Perplexity. Routing is by role and preset rather than by a fixed favourite.`,
   },
   {
     q: 'Why does Reasoner use models from different companies?',
@@ -45,7 +47,7 @@ export const FAQS: readonly FaqEntry[] = [
   },
   {
     q: 'Is my data used for training?',
-    a: 'No. Your queries and results are not used to train models. You control retention in Settings — keep forever, 30 days, 7 days, or 24 hours — and zero-retention mode stores nothing at all. Data is encrypted with AES-256-GCM at rest and TLS 1.3 in transit.',
+    a: 'No. Your queries and results are not used to train models. We do not yet publish a fixed retention period or offer self-serve zero-retention mode — both are on our roadmap. Contact us to request export or deletion in the meantime. Data is encrypted with AES-256-GCM at rest and TLS 1.3 in transit.',
   },
   {
     q: 'Can I cancel my subscription?',

@@ -9,6 +9,8 @@ New code should import directly from:
 All existing imports continue to work through this shim.
 """
 
+from pathlib import Path
+
 from reasoner.domain.core_types import (
     ScenarioType,
     SubProblem,

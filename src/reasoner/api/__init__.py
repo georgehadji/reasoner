@@ -129,8 +129,8 @@ async def lifespan(app: FastAPI):
                 "Each worker maintains its own token bucket, allowing rate-limit bypass. "
                 "Set RATE_LIMITER_MODE to a shared backend (e.g., 'redis')."
             )
-            # Raise in any non-development environment, not just production.
-            if settings.ENVIRONMENT != "development":
+            # Raise ONLY in production environment to avoid blocking non-prod.
+            if settings.ENVIRONMENT == "production":
                 logger.critical(message)
                 raise RuntimeError(
                     f"Unsafe rate limiter configuration: RATE_LIMITER_MODE=memory with "
@@ -144,7 +144,8 @@ async def lifespan(app: FastAPI):
                 "Circuit state is not shared across workers. "
                 "Set CIRCUIT_BREAKER_MODE to a shared backend (e.g., 'redis') for production."
             )
-            if settings.ENVIRONMENT != "development":
+            # Raise ONLY in production environment to avoid blocking non-prod.
+            if settings.ENVIRONMENT == "production":
                 raise RuntimeError(message % uvicorn_workers)
             logger.warning(message, uvicorn_workers)
         if settings.ENVIRONMENT == "production" and not settings.AUTH_PERSISTENCE_ENABLED:
@@ -170,12 +171,20 @@ async def lifespan(app: FastAPI):
             await _probe_valkey.set("_startup_probe", "1", ex=10, nx=True)
             logger.info("Valkey rate limiter probe: reachable")
         except Exception as probe_exc:
-            raise RuntimeError(
-                f"RATE_LIMITER_MODE={settings.RATE_LIMITER_MODE} but Valkey is "
-                f"unreachable at startup: {probe_exc}. "
-                f"Fix the Valkey connection or set RATE_LIMITER_MODE=memory "
-                f"(only safe for UVICORN_WORKERS=1)."
-            ) from probe_exc
+            if settings.ENVIRONMENT == "production":
+                raise RuntimeError(
+                    f"RATE_LIMITER_MODE={settings.RATE_LIMITER_MODE} but Valkey is "
+                    f"unreachable at startup: {probe_exc}. "
+                    f"Fix the Valkey connection or set RATE_LIMITER_MODE=memory "
+                    f"(only safe for UVICORN_WORKERS=1)."
+                ) from probe_exc
+            else:
+                logger.warning(
+                    f"RATE_LIMITER_MODE={settings.RATE_LIMITER_MODE} but Valkey is "
+                    f"unreachable at startup: {probe_exc}. "
+                    f"Continuing since ENVIRONMENT={settings.ENVIRONMENT}, but rate limiting "
+                    f"will fall back to in-memory (split-brain if UVICORN_WORKERS > 1)."
+                )
 
     # ── Inject core → infra boundary dependencies ──
     # Inverts the dependency: core defines ports, infra provides impls.
@@ -208,7 +217,7 @@ async def lifespan(app: FastAPI):
     from reasoner.application.services.compaction_service import run_nightly_compaction_loop
     if settings.DATABASE_URL:
         from reasoner.infrastructure.persistence.postgres_store import PostgreSQLEventStore
-        _compaction_store = PostgreSQLEventStore(settings.DATABASE_URL)
+        _compaction_store = PostgreSQLEventStore(settings.DATABASE_URL, pool_size=5)
         await _compaction_store.initialize()
     else:
         from reasoner.infrastructure.persistence.event_store import get_event_store
@@ -509,12 +518,21 @@ async def _run_stream_with_metrics(
     user: User | None,
     preset_service: PresetService,
     pipeline_service: PipelineService,
+    *,
+    reference_id: str,
+    reserved_credits: int = 0,
 ):
     """Stream a run through the shared metering wrapper.
 
     Settlement, disconnect handling, and metrics all live in
     ``application/services/run_metering.py`` so the sync endpoint and the MCP
     adapter bill a run exactly the way this one does.
+
+    ``reference_id``/``reserved_credits`` come from the caller, which already
+    reserved this run's estimated cost (``reserve_run_budget``, called before
+    ``StreamingResponse`` is constructed so an ``InsufficientCreditsError``
+    can still become a clean 402 -- a generator body is too late for that,
+    the response has already started).
     """
     from reasoner.logging_utils import set_log_context
 
@@ -537,10 +555,11 @@ async def _run_stream_with_metrics(
     user_id = str(user.id) if user else None
     ctx = RunContext(
         preset=preset,
-        reference_id=req.client_run_id or f"run:{uuid.uuid4()}",
+        reference_id=reference_id,
         user_id=user_id,
         tier=tier,
         interface="web",
+        reserved_credits=reserved_credits,
     )
     stream = run_stream_cached(
         req,
@@ -602,9 +621,37 @@ async def run_pipeline(
     from reasoner.api.idempotency_http import register_run_or_error
 
     await register_run_or_error(req.client_run_id)
+
+    from reasoner.api.dependencies import reserve_or_402
+
+    reference_id = req.client_run_id or f"run:{uuid.uuid4()}"
+    preset = req.preset or "auto-budget"
+
+    if user is None:
+        # No account to reserve credits against -- capped separately so
+        # anonymous traffic stays bounded regardless (Phase 2 metering).
+        from reasoner.api.client_ip import get_client_ip
+        from reasoner.application.services.anonymous_trial_policy import (
+            enforce_anonymous_trial_cap,
+        )
+        from reasoner.application.services.estimate_service import estimate_cost
+
+        estimate = await estimate_cost(req.problem, preset)
+        await enforce_anonymous_trial_cap(get_client_ip(request), estimate["estimated_cost_usd"])
+
+    reserved_credits = await reserve_or_402(
+        user_id=str(user.id) if user else None,
+        preset=preset,
+        problem=req.problem,
+        reference_id=reference_id,
+    )
+
     # TODO(#502): use actual user tier from subscription DB
     return StreamingResponse(
-        _run_stream_with_metrics(req, request, user, preset_service, pipeline_service),
+        _run_stream_with_metrics(
+            req, request, user, preset_service, pipeline_service,
+            reference_id=reference_id, reserved_credits=reserved_credits,
+        ),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -681,25 +728,27 @@ async def search_web(
         raise HTTPException(status_code=503, detail=f"Search unavailable: {str(exc)}") from exc
 
 
-@app.delete("/api/cache")
+@app.delete("/api/cache", dependencies=[Depends(check_rate_limit)])
 async def clear_cache(
     request: Request,
     csrf_checked = Depends(require_csrf),
 ):
-    # Cache deletion is destructive and global.  Keep direct test/CLI calls
-    # compatible outside production, but require the constant-time admin key
-    # in deployed environments.
+    # Cache deletion is destructive and global -- require the admin key in
+    # every environment, not just production (security-remediation-plan.md
+    # Phase 5 item 2: this used to be wide open outside production). An
+    # operator without ADMIN_API_KEY configured at all (fresh local dev)
+    # keeps today's frictionless behavior; anyone who HAS set the key must
+    # present it, in every environment.
     #
     # `request: Request` must stay a required, non-Optional param — FastAPI
     # injects it via special-casing on the bare type; `Request | None = None`
     # breaks that special-casing and raises FastAPIError at route
     # registration (Request is not a valid Pydantic field type), which took
     # the whole app down at import time.
-    if settings.ENVIRONMENT == "production":
-        provided = request.headers.get("X-Admin-Key", "")
-        admin_key = settings.ADMIN_API_KEY or ""
-        if not admin_key or not secrets.compare_digest(provided, admin_key):
-            raise HTTPException(status_code=403, detail="Admin access required")
+    from reasoner.api.admin_auth import verify_admin_key
+
+    if settings.ADMIN_API_KEY and not verify_admin_key(request.headers.get("X-Admin-Key")):
+        raise HTTPException(status_code=403, detail="Admin access required")
     cleared = 0
     for f in CACHE_DIR.glob("*.json"):
         try:
@@ -708,6 +757,11 @@ async def clear_cache(
         except OSError:
             pass
     clear_memory_cache()
+    logger.warning(
+        "Cache invalidated: %d entries cleared (admin_key_configured=%s)",
+        cleared,
+        bool(settings.ADMIN_API_KEY),
+    )
     return {"cleared": cleared}
 
 

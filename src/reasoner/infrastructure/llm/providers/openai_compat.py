@@ -6,9 +6,12 @@ import asyncio
 import logging
 import os
 import threading
-from typing import Any
+from typing import TYPE_CHECKING, Any, AsyncIterator
 
 import openai
+
+if TYPE_CHECKING:
+    import httpx
 
 from reasoner.exceptions import ProviderUnavailableError
 from reasoner.core.constants import (

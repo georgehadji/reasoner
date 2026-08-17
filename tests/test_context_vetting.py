@@ -288,9 +288,10 @@ class TestSynthesisCircuitBreaker:
     def test_synthesis_prompt_contains_circuit_breaker_instructions(self):
         """The synthesis system prompt must contain circuit breaker text."""
         from reasoner.phases import SYNTHESIS_SYSTEM
-        
+
         assert "CIRCUIT BREAKER" in SYNTHESIS_SYSTEM
-        assert "could not find reliable sources" in SYNTHESIS_SYSTEM
+        # Reworded from "could not find reliable sources" — same concept.
+        assert "missing or unreliable" in SYNTHESIS_SYSTEM
         assert "UNVERIFIED" in SYNTHESIS_SYSTEM
 
     def test_synthesis_prompt_normal_quality(self):

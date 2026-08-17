@@ -1,5 +1,6 @@
 from __future__ import annotations
 import re
+from typing import Union
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.models import PerspectiveType
 from reasoner.core.constants import JSON_ONLY_FOOTER, TRUNCATION, DEFAULT_SEARCH_RESULTS

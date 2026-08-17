@@ -32,6 +32,9 @@ from reasoner.core.settings import settings
 
 REPO_ROOT = Path(__file__).parent.parent.parent.resolve()
 MAIN_SERVER_CMD = [sys.executable, "-m", "uvicorn", "asgi:app", "--host", settings.UVICORN_HOST, "--port", "8003"]
+# Watch only the backend package: the repo root contains ui-next/node_modules,
+# which makes a bare --reload watch thousands of irrelevant files.
+MAIN_SERVER_RELOAD_ARGS = ["--reload", "--reload-dir", "src"]
 NEURO_SERVER_CMD = [sys.executable, "-m", "reasoner.neuro.cli", "start"]
 FRONTEND_DIR = REPO_ROOT / "ui-next"
 FRONTEND_CMD = ["npm", "run", "dev"]
@@ -245,6 +248,7 @@ def main() -> int:
     parser.add_argument("--neuro-port", type=int, default=50001, help="Port for the standalone neuro server")
     parser.add_argument("--frontend-port", type=int, default=3000, help="Port for the Next.js frontend dev server")
     parser.add_argument("--force", action="store_true", help="Auto-kill existing processes / free zombie sockets on conflicting ports")
+    parser.add_argument("--no-reload", action="store_true", help="Disable backend autoreload (the frontend dev server always hot-reloads)")
     args = parser.parse_args()
 
     print_banner()
@@ -323,6 +327,9 @@ def main() -> int:
         main_cmd = MAIN_SERVER_CMD.copy()
         if "--port" in main_cmd:
             main_cmd[main_cmd.index("--port") + 1] = str(args.main_port)
+        if not args.no_reload:
+            main_cmd.extend(MAIN_SERVER_RELOAD_ARGS)
+            print("[INFO]  Backend autoreload enabled (watching src/). Use --no-reload to disable.")
         main_proc = spawn_process("Main API Server", main_cmd)
         processes.append(("Main API Server", main_proc))
 

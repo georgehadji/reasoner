@@ -829,7 +829,10 @@ def get_event_store(db_path: str | Path | None = None) -> Any:
         from reasoner.core.settings import settings
         if settings.EVENT_STORE_BACKEND == "postgres" and settings.DATABASE_URL:
             from reasoner.infrastructure.persistence.postgres_store import PostgreSQLEventStore
-            _event_store = PostgreSQLEventStore(settings.DATABASE_URL)
+            _event_store = PostgreSQLEventStore(
+                connection_string=settings.DATABASE_URL,
+                pool_size=settings.DB_POOL_SIZE,
+            )
         else:
             _event_store = EventStore(db_path)
     return _event_store

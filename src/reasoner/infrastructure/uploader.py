@@ -15,27 +15,63 @@ import uuid
 from pathlib import Path
 from typing import Any, Optional
 
-# Content-hash deduplication index: {sha256: file_id}
+from reasoner.core.settings import settings
+
+# Content-hash deduplication index, scoped per tenant: {user_id: {sha256: file_id}}.
+# Anonymous uploads (user_id is None) are never written here and never
+# deduplicated -- there's no stable identity to scope a match against, and
+# matching them against each other (or against a real tenant) would leak
+# one caller's file_id/existence to another (security-remediation-plan.md
+# Phase 4 item 1: this was previously a single global {sha256: file_id}
+# index shared across every tenant).
 _HASH_INDEX_PATH = Path(__file__).parent / ".upload_hash_index.json"
 
-# Retained references to background indexing tasks to prevent premature GC.
-_BACKGROUND_TASKS: set[asyncio.Task] = set()
-
-def _load_hash_index() -> dict[str, str]:
+def _load_hash_index() -> dict[str, dict[str, str]]:
     if _HASH_INDEX_PATH.exists():
         try:
-            return json.loads(_HASH_INDEX_PATH.read_text(encoding="utf-8"))
+            index = json.loads(_HASH_INDEX_PATH.read_text(encoding="utf-8"))
+            # Migrate a pre-Phase-4 flat {sha256: file_id} index by discarding
+            # it rather than guessing an owner for old entries -- the first
+            # re-upload of each file simply re-indexes itself under the
+            # correct tenant; no data is lost, only a handful of one-time
+            # re-extractions.
+            if index and not all(isinstance(v, dict) for v in index.values()):
+                return {}
+            return index
         except (json.JSONDecodeError, OSError):
             pass
     return {}
 
-def _save_hash_index(index: dict[str, str]) -> None:
+def _save_hash_index(index: dict[str, dict[str, str]]) -> None:
     try:
         _HASH_INDEX_PATH.write_text(json.dumps(index), encoding="utf-8")
     except OSError:
         pass
 
 logger = logging.getLogger(__name__)
+
+
+def _encrypt_bytes(content: bytes) -> bytes:
+    """Encrypt file content for storage, using the same at-rest encryption
+    port already used by ``auth_store.py``/``postgres_store.py``
+    (``core.ports.crypto_port.EncryptionPort``).
+
+    Returns the encrypted token encoded as UTF-8 bytes -- ``encrypt()``
+    returns a text token, and callers here write/read raw bytes either way.
+    """
+    from reasoner.security.encryption import get_encryption_service
+
+    return get_encryption_service().encrypt(content).encode("utf-8")
+
+
+def _decrypt_bytes(data: bytes) -> bytes:
+    """Inverse of ``_encrypt_bytes``. Only called when the file's own
+    ``.meta.json`` says ``encrypted: true`` -- legacy plaintext uploads
+    never reach this function, so no migration of old files is required."""
+    from reasoner.security.encryption import get_encryption_service
+
+    return get_encryption_service().decrypt_bytes(data.decode("utf-8"))
+
 
 # Try to import optional dependencies
 try:
@@ -292,10 +328,13 @@ async def save_uploaded_file(
             "error": f"File too large. Maximum size: {MAX_FILE_SIZE // (1024*1024)}MB",
         }
 
-    # Content-hash deduplication
+    # Content-hash deduplication -- scoped to this tenant only. Anonymous
+    # callers (user_id is None) skip dedup entirely: there's no stable
+    # identity to scope a match against.
     content_hash = hashlib.sha256(content).hexdigest()
     hash_index = _load_hash_index()
-    existing_id = hash_index.get(content_hash)
+    tenant_hashes = hash_index.get(user_id, {}) if user_id else {}
+    existing_id = tenant_hashes.get(content_hash)
     if existing_id:
         existing_path = UPLOAD_DIR / f"{existing_id}.meta.json"
         if existing_path.exists():
@@ -338,8 +377,21 @@ async def save_uploaded_file(
                     f"Detected: {detected_mime}, expected: {ext}"
                 ),
             }
+    elif settings.UPLOAD_REQUIRE_MIME_VALIDATION:
+        logger.error(
+            "Rejecting upload: python-magic is not installed and "
+            "UPLOAD_REQUIRE_MIME_VALIDATION=true, so content-vs-extension "
+            "validation cannot run."
+        )
+        return {
+            "success": False,
+            "error": "Upload validation is unavailable; please try again later.",
+        }
     else:
-        logger.debug("Skipping MIME-type validation (python-magic not installed)")
+        logger.warning(
+            "Skipping MIME-type validation: python-magic not installed and "
+            "UPLOAD_REQUIRE_MIME_VALIDATION=false was set explicitly."
+        )
 
     # Generate unique ID and create safe filename
     # FIX BUG-008: Prevent path traversal by using only the extension, not the full filename
@@ -375,31 +427,24 @@ async def save_uploaded_file(
         }
 
     try:
-        # Save file
-        file_path.write_bytes(content)
+        # Save file, encrypted at rest (security-remediation-plan.md Phase 4
+        # item 5). Extraction below runs on the original plaintext bytes
+        # already in memory, not a decrypt round-trip.
+        file_path.write_bytes(_encrypt_bytes(content))
 
         # Extract text
         text_content = await extract_text(content, filename, force_ocr=force_ocr)
 
-        # Background: index for semantic retrieval if enabled
+        # Background: index for semantic retrieval if enabled. Bounded queue,
+        # not a raw asyncio.create_task() -- an upload burst can no longer
+        # spawn unbounded concurrent indexing tasks (security-remediation-
+        # plan.md Phase 4 item 4). A full queue drops the job and logs; the
+        # upload above has already succeeded either way.
         if file_id and text_content and len(text_content) > 0:
             try:
-                from reasoner.core.settings import settings
                 if settings.DOCUMENT_SEMANTIC_RETRIEVAL_ENABLED:
-                    from reasoner.documents.vector_store import DocumentVectorStore
-                    store = DocumentVectorStore()
-                    task = asyncio.create_task(store.index_file(file_id, text_content))
-                    _BACKGROUND_TASKS.add(task)
-                    task.add_done_callback(_BACKGROUND_TASKS.discard)
-                    task.add_done_callback(
-                        lambda t: logger.warning(
-                            "Background document indexing failed for %s: %s",
-                            file_id,
-                            t.exception(),
-                        )
-                        if not t.cancelled() and t.exception()
-                        else None
-                    )
+                    from reasoner.infrastructure.documents.index_queue import enqueue_index_job
+                    enqueue_index_job(file_id, text_content)
             except Exception as e:
                 logger.warning("Background document indexing setup failed for %s: %s", file_id, e)
 
@@ -415,16 +460,29 @@ async def save_uploaded_file(
             ".webp": "image/webp",
         }.get(ext, "application/octet-stream")
 
-        # Persist ownership metadata
+        # Persist ownership metadata. "encrypted": True marks that the
+        # sibling content file is ciphertext -- read paths branch on this
+        # explicit flag rather than guessing from content shape, so files
+        # written before this flag existed (no key, or False) keep reading
+        # as plaintext with no migration step required.
         meta_path = UPLOAD_DIR / f"{file_id}.meta.json"
         meta_path.write_text(
-            json.dumps({"user_id": user_id, "filename": filename, "mime_type": mime_type, "created_at": str(uuid.uuid4())}),
+            json.dumps({
+                "user_id": user_id,
+                "filename": filename,
+                "mime_type": mime_type,
+                "created_at": str(uuid.uuid4()),
+                "encrypted": True,
+            }),
             encoding="utf-8",
         )
 
-        # Update content-hash index
-        hash_index[content_hash] = file_id
-        _save_hash_index(hash_index)
+        # Update content-hash index -- only for identified tenants; an
+        # anonymous upload is never recorded, so it can never dedupe with
+        # (or be matched by) a later upload from anyone.
+        if user_id:
+            hash_index.setdefault(user_id, {})[content_hash] = file_id
+            _save_hash_index(hash_index)
 
         return {
             "success": True,
@@ -472,18 +530,22 @@ async def get_file_text(file_id: str, user_id: str | None = None) -> Optional[st
     if not file_id or not re.match(r'^[a-f0-9-]+$', file_id):
         return None
     
+    meta = _get_upload_meta(file_id)
+
     # Ownership check
     if user_id is not None:
-        meta = _get_upload_meta(file_id)
         if meta is None or meta.get("user_id") != user_id:
             return None
-    
+
     # Look for exact file by known extensions instead of globbing
     for ext in SUPPORTED_EXTENSIONS:
         f = UPLOAD_DIR / f"{file_id}{ext}"
         if f.exists():
             try:
-                content = f.read_bytes()
+                raw = f.read_bytes()
+                # Legacy plaintext files have no "encrypted" flag (or False)
+                # and are read unchanged -- no migration required.
+                content = _decrypt_bytes(raw) if meta and meta.get("encrypted") else raw
                 return await extract_text(content, f"upload{ext}")
             except Exception as e:
                 logger.error(f"Failed to retrieve file {file_id}: {e}")

@@ -33,7 +33,7 @@ class FakeWebSocket:
         from starlette.websockets import WebSocketState
         self.client_state = WebSocketState.CONNECTED
 
-    async def accept(self):
+    async def accept(self, subprotocol: str | None = None):
         pass
 
     async def send_text(self, text: str) -> None:

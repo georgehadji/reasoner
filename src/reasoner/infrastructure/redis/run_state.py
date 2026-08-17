@@ -17,7 +17,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from reasoner.infrastructure.redis.in_memory import RunStateStore
 
 logger = logging.getLogger(__name__)
 

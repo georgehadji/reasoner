@@ -290,6 +290,7 @@ from reasoner.core.ports.search_port import SearchServicePort
 _DISCOVERY_EXPORTS = {
     "PerplexitySearchClient",
     "get_search_client",
+    "smart_search",
     "_decompose_query",
     "_extract_search_keywords",
     "_DECOMPOSITION_CACHE",

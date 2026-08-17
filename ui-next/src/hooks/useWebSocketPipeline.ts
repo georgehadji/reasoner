@@ -2,9 +2,8 @@
 
 import { useRef, useCallback, useEffect, useState } from 'react';
 import { PhaseEvent } from '@/lib/types';
-import { WS } from '@/lib/config';
+import { API, WS } from '@/lib/config';
 import { REASONER_WS_URL } from '@/lib/server-config';
-import { getAuthToken } from '@/lib/auth';
 import { fetchWithCsrf } from '@/lib/security-client';
 
 export type ConnectionStatus = 'idle' | 'connecting' | 'connected' | 'disconnected' | 'reconnecting' | 'error';
@@ -70,12 +69,33 @@ export function useWebSocketPipeline() {
     }
 
     setStatus('connecting');
-    const token = await getAuthToken();
-    let url = `${REASONER_WS_URL}?pipeline_id=${encodeURIComponent(pipelineId)}`;
-    if (token) {
-      url += `&token=${encodeURIComponent(token)}`;
+
+    // A ticket, not a standing bearer token, travels with the handshake --
+    // never in the query string (server access logs, browser history) and
+    // single-use server-side, so a value visible in devtools network logs
+    // can't be replayed. Fetched fresh on every connect/reconnect since
+    // it's consumed on first use.
+    let ticket: string;
+    try {
+      const ticketResp = await fetchWithCsrf(API.WEBSOCKET_TICKET, { method: 'POST' });
+      if (!ticketResp.ok) {
+        const msg = `Could not obtain a connection ticket (${ticketResp.status})`;
+        setLastError(msg);
+        lastErrorRef.current = msg;
+        setStatus('error');
+        return;
+      }
+      ({ ticket } = await ticketResp.json());
+    } catch {
+      const msg = 'Could not reach the backend to request a connection ticket';
+      setLastError(msg);
+      lastErrorRef.current = msg;
+      setStatus('error');
+      return;
     }
-    const ws = new WebSocket(url);
+
+    const url = `${REASONER_WS_URL}?pipeline_id=${encodeURIComponent(pipelineId)}`;
+    const ws = new WebSocket(url, [ticket]);
     wsRef.current = ws;
 
     ws.onopen = () => {

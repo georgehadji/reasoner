@@ -23,7 +23,18 @@ async def test_all_providers_blocked_returns_degraded_response():
     """
     When both primary and fallback providers time out,
     router.call() should return a DegradedLLMResponse so the pipeline can continue.
+
+    MULTI_PROVIDER_FALLBACK_ENABLED defaults true (de76b6d, OpenRouter SPOF
+    fallback), so router.call() also tries direct-SDK providers (anthropic,
+    openai, google, mistral, ...) after the primary/fallback_table path is
+    exhausted. Without disabling it, this test made a real network call to
+    whichever direct provider had a key configured in the environment
+    (observed: Mistral answered "It looks like you're testing!..." for real)
+    instead of exercising the degraded-response path. Disable it here so the
+    test is isolated and deterministic.
     """
+    from reasoner.core.settings import settings
+
     primary = FakeProvider("primary-model")
     fallback = FakeProvider("fallback-model")
 
@@ -32,15 +43,16 @@ async def test_all_providers_blocked_returns_degraded_response():
         fallback_table={"primary": fallback},
     )
 
-    with patch(
-        "reasoner.infrastructure.llm.router._call_with_circuit",
-        side_effect=asyncio.TimeoutError("timed out"),
-    ):
-        result, _metadata = await router.call(
-            role="primary",
-            system_prompt="test",
-            user_prompt="test",
-        )
+    with patch.object(settings, "MULTI_PROVIDER_FALLBACK_ENABLED", False):
+        with patch(
+            "reasoner.infrastructure.llm.router._call_with_circuit",
+            side_effect=asyncio.TimeoutError("timed out"),
+        ):
+            result, _metadata = await router.call(
+                role="primary",
+                system_prompt="test",
+                user_prompt="test",
+            )
 
     assert isinstance(result, DegradedLLMResponse)
     assert result.degraded is True

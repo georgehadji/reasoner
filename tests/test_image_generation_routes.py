@@ -1,9 +1,23 @@
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
 
 from reasoner.api.routes import images
 from reasoner.api.schemas import GenerateImageRequest
+from reasoner.core.constants import IMAGE_GEN_MAX_IMAGE_COUNT
+
+
+@pytest.mark.parametrize("num_images", [0, -1, IMAGE_GEN_MAX_IMAGE_COUNT + 1])
+def test_num_images_outside_the_allowed_range_is_rejected(num_images):
+    """Each image is a paid provider call fanned out in parallel — bound the fan-out."""
+    with pytest.raises(ValidationError):
+        GenerateImageRequest(prompt="draw a fox", num_images=num_images)
+
+
+@pytest.mark.parametrize("num_images", [1, IMAGE_GEN_MAX_IMAGE_COUNT])
+def test_num_images_range_boundaries_are_accepted(num_images):
+    assert GenerateImageRequest(prompt="draw a fox", num_images=num_images).num_images == num_images
 
 
 @pytest.mark.asyncio

@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from reasoner.core.constants import (
     DEFAULT_PRESET,
@@ -19,6 +19,7 @@ from reasoner.core.constants import (
     IMAGE_GEN_DEFAULT_ASPECT_RATIO,
     IMAGE_GEN_DEFAULT_PRESET,
     IMAGE_GEN_DEFAULT_RESOLUTION,
+    IMAGE_GEN_MAX_IMAGE_COUNT,
     TRUNCATION,
 )
 from reasoner.presets import is_valid_preset_name, resolve_preset_name
@@ -196,7 +197,10 @@ class GenerateImageRequest(BaseModel):
     enhance: bool = True
     preview_only: bool = False
     reference_images: list[str] = []
-    num_images: int = 2
+    # Unbounded here meant one request could fan out across the whole image
+    # catalogue in parallel, each model a paid call. Asking for zero (or fewer)
+    # images silently "succeeded" with no images, so the floor matters too.
+    num_images: int = Field(default=2, ge=1, le=IMAGE_GEN_MAX_IMAGE_COUNT)
 
     @field_validator("prompt")
     @classmethod

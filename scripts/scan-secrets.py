@@ -32,6 +32,7 @@ SKIP_PATHS = {
     ".next", "out", "dist", "build", ".mypy_cache", ".ruff_cache",
     "docs", "tasks", "cache", "history", "uploads",
     "tests",  # test fixtures deliberately contain fake credentials
+    "deepseek-harness",  # separate embedded repo, not part of this project
 }
 
 SKIP_FILES = {

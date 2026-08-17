@@ -7,6 +7,8 @@
  * not execute JavaScript.
  */
 
+import { CAPABILITIES } from './capabilities.generated';
+
 export interface DocPage {
   slug: string;
   title: string;
@@ -195,7 +197,7 @@ This is not vendor neutrality theatre. Models trained on overlapping data with o
     slug: 'presets-and-models',
     title: 'Presets and models',
     description:
-      'How the 48 presets map to reasoning methods, what Budget and Premium change, and how model routing and fallbacks work.',
+      `How the ${CAPABILITIES.presets} presets map to reasoning methods, what Budget and Premium change, and how model routing and fallbacks work.`,
     section: 'Reasoning',
     minutes: 6,
     keywords: ['presets', 'models', 'budget', 'premium', 'routing', 'fallback', 'openrouter'],
@@ -209,13 +211,13 @@ A preset is a method plus its model routing. Every method ships in two tiers:
 | **Budget** | ~$0.02 | Fewer, cheaper models; at least 3 labs in generation |
 | **Premium** | ~$0.15–$0.30 | Frontier models; at least 4 labs; more stress-test scenarios |
 
-There are 48 presets in total. The picker lists them cheapest-first and defaults to the cheapest option, so cost is opt-in rather than opt-out.
+There are ${CAPABILITIES.presets} presets in total. The picker lists them cheapest-first and defaults to the cheapest option, so cost is opt-in rather than opt-out.
 
 Leaving the preset on **Auto** lets HyperGate pick both the method and the tier from the problem itself.
 
 ## Models
 
-Reasoner routes across 28 directly registered models and 350+ more through OpenRouter, spanning Anthropic, OpenAI, Google, DeepSeek, Mistral, xAI, Qwen, Moonshot, Zhipu, MiniMax, Perplexity, and locally hosted Ollama models.
+Reasoner routes across ${CAPABILITIES.directModels} directly registered reasoning models and ${CAPABILITIES.routableModels}+ more through OpenRouter, spanning ${CAPABILITIES.providerAdapters} model labs including Anthropic, OpenAI, Google, DeepSeek, Mistral, xAI, and Perplexity.
 
 Routing is by **role**, not by preference. Each phase requests a role — generator, scorer, synthesiser, searcher — and the router resolves it against the preset's routing table.
 
@@ -310,7 +312,7 @@ curl -X POST https://reasoner.app/api/generate-image \\
 | \`enhance\` | \`true\` | Set false to send the prompt verbatim |
 | \`preview_only\` | \`false\` | Returns the enhanced prompt without generating |
 | \`reference_images\` | \`[]\` | Up to 4 image data URLs |
-| \`num_images\` | \`2\` | How many images must succeed |
+| \`num_images\` | \`2\` | How many images must succeed. 1–8; SVG prompts return fewer, never raster |
 
 \`preview_only\` is what the app uses to show you the enhanced prompt while the images are still rendering — it is a cheap text call, not a generation.
 

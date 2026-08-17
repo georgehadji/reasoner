@@ -130,6 +130,7 @@ def history_client(temp_history_dir, monkeypatch):
 
     from reasoner.api.routes.history import router as history_router
     from reasoner.infrastructure.auth.local_adapter import LocalAuthAdapter
+    from reasoner.infrastructure.auth import set_auth_adapter
 
     # Ensure JWT secret is strong enough
     monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key-for-local-auth-adapter-only")
@@ -139,11 +140,17 @@ def history_client(temp_history_dir, monkeypatch):
 
     # Create a token for a known user
     adapter = LocalAuthAdapter()
-    token = adapter.create_token(str(UUID("11111111-1111-1111-1111-111111111111")), "user-a@example.com")
+    # Force LocalAuthAdapter regardless of ambient SUPABASE_URL/ENVIRONMENT config —
+    # get_auth_adapter() otherwise picks SupabaseAuthAdapter outside ENVIRONMENT=testing.
+    # get_auth_adapter() is a global singleton independent of which FastAPI app
+    # instance the routes are mounted on, so this is required even for this
+    # standalone `app`, not just reasoner.api.app.
+    set_auth_adapter(adapter)
 
     client = TestClient(app)
-    client.headers["Authorization"] = f"Bearer {token}"
-    return client
+    client.headers["Authorization"] = f"Bearer {adapter.create_token(str(UUID('11111111-1111-1111-1111-111111111111')), 'user-a@example.com')}"
+    yield client
+    set_auth_adapter(None)
 
 
 def test_get_history_requires_auth(history_client):

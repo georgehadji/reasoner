@@ -32,7 +32,7 @@ function isValidPortalUrl(url: string): boolean {
 
 function StatCardSkeleton() {
   return (
-    <div className="animate-pulse rounded-lg border border-[var(--border)] bg-[var(--surface)] p-6">
+    <div className="animate-pulse rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-6">
       <div className="mb-2 h-4 w-24 rounded bg-[var(--surface-3)]" />
       <div className="h-8 w-16 rounded bg-[var(--surface-3)]" />
     </div>
@@ -41,7 +41,7 @@ function StatCardSkeleton() {
 
 function ChartSkeleton() {
   return (
-    <div className="animate-pulse rounded-lg border border-[var(--border)] bg-[var(--surface)] p-6">
+    <div className="animate-pulse rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-6">
       <div className="mb-4 h-5 w-32 rounded bg-[var(--surface-3)]" />
       <div className="h-[200px] rounded bg-[var(--surface-3)]" />
     </div>
@@ -118,7 +118,7 @@ function DashboardContent() {
   };
 
   const percent = quota && quota.max > 0 ? Math.min((quota.used / quota.max) * 100, 100) : 0;
-  const barColor = percent >= 90 ? 'bg-red-500' : percent >= 70 ? 'bg-orange-400' : 'bg-[var(--accent)]';
+  const barColor = percent >= 90 ? 'bg-[var(--red)]' : percent >= 70 ? 'bg-[var(--warn)]' : 'bg-[var(--accent)]';
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
@@ -128,11 +128,11 @@ function DashboardContent() {
         {creditsLoading ? (
           <StatCardSkeleton />
         ) : (
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-6">
+          <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-6">
             <p className="text-sm text-[var(--text-muted)]">Credits</p>
             <p
               className={`mt-1 text-2xl font-bold ${
-                (credits?.balance ?? 0) <= 0 ? 'text-red-500' : 'text-[var(--text)]'
+                (credits?.balance ?? 0) <= 0 ? 'text-[var(--red)]' : 'text-[var(--text)]'
               }`}
             >
               {credits?.balance?.toLocaleString() ?? '—'}
@@ -156,7 +156,7 @@ function DashboardContent() {
         {quotaLoading ? (
           <StatCardSkeleton />
         ) : (
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-6">
+          <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-6">
             <p className="text-sm text-[var(--text-muted)]">Queries This Month</p>
             <p className="mt-1 text-2xl font-bold text-[var(--text)]">
               {quota?.used ?? 0} / {quota?.max ?? 20}
@@ -170,7 +170,7 @@ function DashboardContent() {
         {quotaLoading ? (
           <StatCardSkeleton />
         ) : (
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-6">
+          <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-6">
             <p className="text-sm text-[var(--text-muted)]">Remaining</p>
             <p className="mt-1 text-2xl font-bold text-[var(--text)]">{quota?.remaining ?? '-'}</p>
           </div>
@@ -179,7 +179,7 @@ function DashboardContent() {
         {subLoading ? (
           <StatCardSkeleton />
         ) : (
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-6">
+          <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-6">
             <p className="text-sm text-[var(--text-muted)]">Plan</p>
             <p className="mt-1 text-2xl font-bold text-[var(--text)] capitalize">
               {subscription?.tier || 'Free'}
@@ -197,7 +197,7 @@ function DashboardContent() {
       </div>
 
       {portalError && (
-        <div className="mb-4 rounded-lg bg-red-500/10 p-3 text-sm text-red-600" role="alert">
+        <div className="mb-4 rounded-[var(--radius)] bg-[var(--red-bg)] p-3 text-sm text-[var(--red)]" role="alert">
           {portalError}
         </div>
       )}
@@ -205,7 +205,7 @@ function DashboardContent() {
       {historyLoading ? (
         <ChartSkeleton />
       ) : chartData.length > 0 ? (
-        <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-6">
+        <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-6">
           <h2 className="mb-4 font-semibold text-[var(--text)]">Recent Activity</h2>
           <div className="h-[250px]">
             <ResponsiveContainer width="100%" height="100%">
@@ -227,13 +227,13 @@ function DashboardContent() {
           </div>
         </div>
       ) : (
-        <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-6 text-center text-[var(--text-muted)]">
+        <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-6 text-center text-[var(--text-muted)]">
           No activity yet. Start a conversation to see your usage.
         </div>
       )}
 
       {ledger.length > 0 && (
-        <section className="mt-8 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-6">
+        <section className="mt-8 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-6">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="font-semibold text-[var(--text)]">Credit activity</h2>
             <Link href="/docs/credits" className="text-sm text-[var(--accent)] hover:underline">
@@ -254,7 +254,7 @@ function DashboardContent() {
                 <div className="shrink-0 text-right">
                   <p
                     className={`text-sm font-medium ${
-                      entry.delta > 0 ? 'text-green-500' : 'text-[var(--text)]'
+                      entry.delta > 0 ? 'text-[var(--ok)]' : 'text-[var(--text)]'
                     }`}
                   >
                     {entry.delta > 0 ? '+' : ''}

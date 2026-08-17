@@ -13,7 +13,10 @@ import {
 import { useRouter } from 'next/navigation';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
+import { LiquidField } from '@/components/ui/LiquidField';
 import { ArrowRight } from 'lucide-react';
+import { CAPABILITIES as GENERATED_CAPABILITIES, PROVIDERS } from '@/lib/capabilities.generated';
+import { DemoReplay } from './DemoReplay';
 
 /* ============================================================
    Bento geometry
@@ -51,7 +54,7 @@ const FEATURES = [
   {
     num: '01',
     title: 'Verified Reasoning',
-    desc: 'Every claim is independently scored, cross-checked across models, and labeled with epistemic confidence before you see it. No hallucinations pass through.',
+    desc: 'Every claim is independently scored, cross-checked across models, and labeled VERIFIED, HYPOTHESIS, or UNKNOWN before you see it — never presented as fact without that label.',
     featured: true,
     span: SPAN_2,
   },
@@ -78,34 +81,14 @@ const FEATURES = [
   },
 ];
 
+/* Generated from live registry/preset/phase counts by
+   scripts/update_mindmap_meta.py — see capabilities.generated.ts. Never
+   hand-edit a number here; it drifts from the code the moment you do. */
 const CAPABILITIES = [
-  '17 reasoning methods',
-  '90+ AI models',
-  '6 model labs',
-  '100% verified output',
-];
-
-const STEPS = [
-  {
-    step: '01',
-    title: 'Classify',
-    desc: 'Six sub-agents analyze your problem in parallel — language, complexity, domain, and optimal reasoning method — before any computation begins.',
-  },
-  {
-    step: '02',
-    title: 'Decompose',
-    desc: 'The problem is broken into structured sub-tasks. Context is vetted against live sources. Nothing proceeds without verified foundations.',
-  },
-  {
-    step: '03',
-    title: 'Generate & Critique',
-    desc: 'Multiple independent models generate solutions simultaneously. A dedicated critique layer probes each for logical flaws, bias, and weak evidence.',
-  },
-  {
-    step: '04',
-    title: 'Synthesize & Label',
-    desc: 'The strongest elements are synthesized into a final answer. Every claim is labeled VERIFIED, HYPOTHESIS, or UNKNOWN — so you know exactly what to trust.',
-  },
+  `${GENERATED_CAPABILITIES.methods} reasoning methods`,
+  `${GENERATED_CAPABILITIES.routableModels}+ AI models`,
+  `${GENERATED_CAPABILITIES.providerAdapters} model labs`,
+  'Every claim epistemically labeled',
 ];
 
 /* The `tone` class carries a colour AND a border style (solid / dashed
@@ -143,8 +126,8 @@ const TRUST = [
     desc: 'Full Docker stack with your own Postgres and Valkey.',
   },
   {
-    title: 'Open Source',
-    desc: 'MIT licensed. Audit the code, fork it, or deploy it yourself.',
+    title: 'Source-Available',
+    desc: 'Read the code under a Business Source License. Converts to Apache-2.0 in 2030.',
   },
 ];
 
@@ -366,8 +349,11 @@ export default function LandingPage() {
             the stagger delay to zero as well, which CSS cannot do to an
             inline style. */}
         <section className="relative flex min-h-[90svh] flex-col items-center justify-center overflow-hidden px-[var(--gutter)] pb-[var(--section-y)] pt-[var(--space-32)] text-center">
+          <LiquidField />
           {/* Vignette: pulls the hero's outer edges toward --bg so the display
-              type sits on a settled ground rather than a hard flat field. */}
+              type sits on a settled ground rather than a hard flat field. It
+              also fades LiquidField's blobs at the edges rather than letting
+              them hard-clip against overflow-hidden. */}
           <div
             className="pointer-events-none absolute inset-0 z-[1]"
             style={{
@@ -382,7 +368,7 @@ export default function LandingPage() {
               className="animate-fade-up font-sans text-[length:var(--text-sm)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]"
               style={heroEntrance(0, prefersReducedMotion)}
             >
-              Enterprise-Grade Reasoning
+              Cross-Lab Verified Reasoning
             </p>
 
             <h1 className="mt-[var(--space-6)] max-w-[var(--width-wide)] font-serif text-[length:var(--text-6xl)] font-normal leading-[var(--lh-display)] tracking-[var(--tracking-tight)]">
@@ -448,8 +434,48 @@ export default function LandingPage() {
                 </li>
               ))}
             </ul>
+
+            {/* Provider strip — "Routes across", never "Trusted by": this is a
+                factual routing statement, not a borrowed-endorsement claim. */}
+            <div
+              className="animate-fade-up mt-[var(--space-10)] flex flex-col items-center gap-[var(--space-3)]"
+              style={heroEntrance(9, prefersReducedMotion)}
+            >
+              <p className="font-sans text-[length:var(--text-xs)] uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-subtle)]">
+                Routes across
+              </p>
+              <ul
+                role="list"
+                className="flex list-none flex-wrap items-center justify-center gap-x-[var(--space-5)] gap-y-[var(--space-2)]"
+              >
+                {PROVIDERS.map((name) => (
+                  <li
+                    key={name}
+                    className="font-sans text-[length:var(--text-sm)] font-medium leading-[var(--lh-ui)] text-[var(--text-subtle)]"
+                  >
+                    {name}
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </section>
+
+        <Rule />
+
+        {/* ── Demo replay ─────────────────────────────────────
+            A real captured run, not a mockup — see DemoReplay.tsx header. */}
+        <RevealSection className="px-[var(--gutter)] py-[var(--section-y)]">
+          <div className="mx-auto mb-[var(--space-12)] w-full max-w-[var(--width-content)] text-center">
+            <Reveal>
+              <Eyebrow>See It Work</Eyebrow>
+              <h2 className="mt-[var(--space-4)] font-serif text-[length:var(--text-4xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)]">
+                Watch a real run.
+              </h2>
+            </Reveal>
+          </div>
+          <DemoReplay />
+        </RevealSection>
 
         <Rule />
 
@@ -511,47 +537,39 @@ export default function LandingPage() {
 
         <Rule />
 
-        {/* ── How it works ───────────────────────────────────
-            One rendering of the step number, not a desktop copy plus
-            a mobile copy: the row is a flex pair that holds from 390
-            up, so the duplicate markup and its two breakpoints are
-            gone. */}
+        {/* ── For developers ─────────────────────────────────── */}
         <RevealSection className="px-[var(--gutter)] py-[var(--section-y)]">
-          <div className="mx-auto w-full max-w-[var(--width-wide)]">
+          <div className="mx-auto grid w-full max-w-[var(--width-wide)] gap-[var(--space-12)] lg:grid-cols-[1fr_1fr] lg:items-start">
             <Reveal>
-              <Eyebrow>Architecture</Eyebrow>
+              <Eyebrow>For Developers</Eyebrow>
               <h2 className="mt-[var(--space-4)] font-serif text-[length:var(--text-4xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)]">
-                How it works
+                Call it from your own code.
               </h2>
+              <p className="prose-measure mt-[var(--space-6)] font-serif text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
+                A typed SDK, a documented HTTP API, and an MCP server so agents can call Reasoner
+                as a tool. Scoped, revocable API keys — no dashboard click-through required to
+                get started.
+              </p>
+              <div className="mt-[var(--space-8)] flex flex-wrap gap-[var(--space-4)]">
+                <a
+                  href="/docs"
+                  className="link-smooth font-sans text-[length:var(--text-sm)] font-semibold text-[var(--accent)] hover:text-[var(--accent-hover)]"
+                >
+                  Read the docs →
+                </a>
+              </div>
             </Reveal>
 
-            {/* Rhythm: a heading binds tighter to its own content (64px)
-                than one section does to the next (2 × --section-y), and
-                the steps sit closer to each other still (48px). */}
-            <ol role="list" className="mt-[var(--space-16)] grid list-none gap-[var(--space-12)]">
-              {STEPS.map(({ step, title, desc }, i) => (
-                <li key={step}>
-                  <Reveal step={i + 1}>
-                    <div className="group flex gap-[var(--gutter)]">
-                      <span
-                        aria-hidden="true"
-                        className="nums-tabular w-[var(--space-16)] shrink-0 font-mono text-[length:var(--text-3xl)] font-bold leading-[var(--lh-tight)] text-[var(--text-subtle)] transition-colors duration-[var(--dur-state)] ease-[var(--ease-standard)] group-hover:text-[var(--accent)]"
-                      >
-                        {step}
-                      </span>
-                      <div className="flex-1">
-                        <h3 className="font-serif text-[length:var(--text-xl)] font-semibold leading-[var(--lh-subhead)] tracking-[var(--tracking-snug)] text-[var(--text)]">
-                          {title}
-                        </h3>
-                        <p className="prose-measure mt-[var(--space-3)] font-serif text-[length:var(--text-base)] leading-[var(--lh-body)] text-[var(--text-muted)]">
-                          {desc}
-                        </p>
-                      </div>
-                    </div>
-                  </Reveal>
-                </li>
-              ))}
-            </ol>
+            <Reveal step={1}>
+              <pre className="overflow-x-auto rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-[var(--space-6)] font-mono text-[length:var(--text-xs)] leading-[var(--lh-body)] text-[var(--text-muted)]">
+                <code>{`npm i @reasoner/sdk
+
+curl https://reasoner.app/api/agent/run/sync \\
+  -H "Authorization: Bearer $REASONER_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"problem": "..."}'`}</code>
+              </pre>
+            </Reveal>
           </div>
         </RevealSection>
 
@@ -630,6 +648,8 @@ export default function LandingPage() {
             </div>
           </div>
         </RevealSection>
+
+        <Rule />
 
         {/* ── CTA ────────────────────────────────────────────── */}
         <RevealSection className="px-[var(--gutter)] py-[var(--section-y-lg)]">

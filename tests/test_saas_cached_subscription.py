@@ -171,7 +171,7 @@ async def test_db_error_propagates_to_caller(cached_repo, mock_redis, underlying
 async def test_invalidate_deletes_cache_key(monkeypatch):
     redis = AsyncMock()
     monkeypatch.setattr(
-        "reasoner.infrastructure.persistence.cached_subscription_repo.get_redis",
+        "reasoner.infrastructure.persistence.cached_subscription_repo.get_valkey_pool",
         lambda: redis,
     )
 
@@ -186,7 +186,7 @@ async def test_invalidate_never_raises(monkeypatch):
     redis = AsyncMock()
     redis.delete.side_effect = RuntimeError("redis down")
     monkeypatch.setattr(
-        "reasoner.infrastructure.persistence.cached_subscription_repo.get_redis",
+        "reasoner.infrastructure.persistence.cached_subscription_repo.get_valkey_pool",
         lambda: redis,
     )
 

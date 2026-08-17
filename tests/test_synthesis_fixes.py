@@ -33,6 +33,8 @@ class FakeRouter:
         self.responses = responses
         self.calls: list[tuple[str, str, str]] = []
         self._primary = FakeProvider()
+        self.primary = self._primary
+        self.routing_table: dict[str, FakeProvider] = {}
 
     def get(self, role: str):
         return self._primary

@@ -23,8 +23,17 @@ from reasoner.core.constants_models import (
     MODEL_RECRAFT_V4_PRO,
     MODEL_GROK_IMAGINE,
     MODEL_MAI_IMAGE_25,
+    MODEL_MAI_IMAGE_25_PRO,
     MODEL_SEEDREAM_45,
+    MODEL_SEEDREAM_5_PRO,
+    MODEL_SEEDREAM_5_LITE,
     MODEL_RIVERFLOW_V2_FAST_PREVIEW,
+    MODEL_RIVERFLOW_V25_FAST,
+    MODEL_RIVERFLOW_V25_PRO,
+    MODEL_FLUX_2_KLEIN_4B,
+    MODEL_FLUX_2_MAX,
+    MODEL_KREA_2_MEDIUM_TURBO,
+    MODEL_GPT_IMAGE_2,
     MODEL_STEPFUN_37_FLASH,
 )
 from typing import Literal
@@ -87,6 +96,8 @@ HYPERGATE_MAX_TOKENS_DIRECT: int = 100
 HYPERGATE_MAX_TOKENS_WEB: int = 100
 HYPERGATE_MAX_TOKENS_METHOD: int = 128
 HYPERGATE_MAX_TOKENS_TIEBREAK: int = 200
+# On-demand only (image generation), NOT part of the Phase-1 parallel gather.
+HYPERGATE_MAX_TOKENS_IMAGE_MODEL: int = 128
 
 # ═════════════════════════════════════════════════════════════════════
 # LANGUAGE PIVOT
@@ -442,17 +453,62 @@ IMAGE_GEN_COMPLETION_TIMEOUT_SECONDS: float = 90.0
 IMAGE_GEN_PROMPT_MAX_TOKENS: int = 512
 IMAGE_GEN_PROMPT_TEMPERATURE: float = 0.7
 IMAGE_GEN_ENHANCEMENT_MODEL: str = MODEL_GEMINI_FLASH
+# Every tier returns this many images; each preset below carries exactly this
+# many primaries so one model failure degrades into a fallback, not a short run.
+IMAGE_GEN_IMAGE_COUNT: int = 4
+# Hard ceiling on a caller-requested image count. Every image is one paid
+# provider call and they are fanned out in parallel, so an unbounded count lets a
+# single request fan out across the whole 40+ model image catalogue. Twice the
+# designed batch leaves room for a wider spread without turning one request into
+# a cost amplifier.
+IMAGE_GEN_MAX_IMAGE_COUNT: int = IMAGE_GEN_IMAGE_COUNT * 2
+# Both tiers ship exactly IMAGE_GEN_IMAGE_COUNT primaries so a full run needs no
+# fallbacks, and each primary is a different lab — one lab outage or one policy
+# refusal can never zero out a run.
+#
+# Ordering is by measured OpenRouter price (image / image_output columns of
+# domain/openrouter_models.json), not by reputation. Note grok-imagine bills
+# $0.01 *per image* flat — the single most expensive image model in the
+# catalogue — so it is deliberately NOT in the budget tier despite the name.
+IMAGE_GEN_BUDGET_MODELS: list[str] = [
+    MODEL_FLUX_2_KLEIN_4B,      # 🇩🇪 Black Forest Labs — cheapest image_output rate
+    MODEL_KREA_2_MEDIUM_TURBO,  # 🇺🇸 Krea — latency-optimised
+    MODEL_RIVERFLOW_V25_FAST,   # 🇺🇸 Sourceful
+    MODEL_SEEDREAM_5_LITE,      # 🇨🇳 ByteDance — cross-bloc diversity
+]
+IMAGE_GEN_BUDGET_FALLBACK_MODELS: list[str] = [
+    MODEL_GEMINI_FLASH_IMAGE,       # 🇺🇸 Google — token-priced hybrid, very cheap
+    MODEL_RECRAFT_V41_UTILITY,      # 🇺🇸 Recraft
+    MODEL_FLUX_2_PRO,               # 🇩🇪 Black Forest Labs
+    MODEL_RIVERFLOW_V2_FAST_PREVIEW,# 🇺🇸 Sourceful
+    MODEL_SEEDREAM_45,              # 🇨🇳 ByteDance
+]
+IMAGE_GEN_PREMIUM_MODELS: list[str] = [
+    MODEL_GPT_IMAGE_2,      # 🇺🇸 OpenAI — strongest in-image text rendering
+    MODEL_GEMINI_31_FLASH_IMAGE_PREVIEW,  # 🇺🇸 Google (alias routes to the GA id)
+    MODEL_RECRAFT_V41_PRO,  # 🇺🇸 Recraft — design/vector-grade
+    MODEL_SEEDREAM_5_PRO,   # 🇨🇳 ByteDance — cross-bloc diversity
+]
+IMAGE_GEN_PREMIUM_FALLBACK_MODELS: list[str] = [
+    MODEL_GPT54_IMAGE_2,    # 🇺🇸 OpenAI
+    MODEL_MAI_IMAGE_25_PRO, # 🇺🇸 Microsoft
+    MODEL_FLUX_2_MAX,       # 🇩🇪 Black Forest Labs
+    MODEL_RIVERFLOW_V25_PRO,# 🇺🇸 Sourceful
+    MODEL_GPT5_IMAGE,       # 🇺🇸 OpenAI
+    MODEL_MAI_IMAGE_25,     # 🇺🇸 Microsoft
+    MODEL_RECRAFT_V4_PRO,   # 🇺🇸 Recraft
+]
 IMAGE_GEN_PRESETS: dict[str, list[str]] = {
-    "budget": [MODEL_GROK_IMAGINE, MODEL_RIVERFLOW_V2_FAST_PREVIEW, MODEL_GEMINI_FLASH_IMAGE],
-    "premium": [MODEL_GPT54_IMAGE_2, MODEL_RECRAFT_V41_PRO],
-    IMAGE_GEN_BUDGET_PRESET: [MODEL_GROK_IMAGINE, MODEL_RIVERFLOW_V2_FAST_PREVIEW, MODEL_GEMINI_FLASH_IMAGE],
-    IMAGE_GEN_PREMIUM_PRESET: [MODEL_GPT54_IMAGE_2, MODEL_RECRAFT_V41_PRO],
+    "budget": IMAGE_GEN_BUDGET_MODELS,
+    "premium": IMAGE_GEN_PREMIUM_MODELS,
+    IMAGE_GEN_BUDGET_PRESET: IMAGE_GEN_BUDGET_MODELS,
+    IMAGE_GEN_PREMIUM_PRESET: IMAGE_GEN_PREMIUM_MODELS,
 }
 IMAGE_GEN_FALLBACKS: dict[str, list[str]] = {
-    "budget": [MODEL_SEEDREAM_45, MODEL_FLUX_2_PRO, MODEL_RECRAFT_V41_UTILITY],
-    "premium": [MODEL_GPT5_IMAGE, MODEL_GEMINI_31_FLASH_IMAGE_PREVIEW, MODEL_MAI_IMAGE_25, MODEL_RECRAFT_V4_PRO],
-    IMAGE_GEN_BUDGET_PRESET: [MODEL_SEEDREAM_45, MODEL_FLUX_2_PRO, MODEL_RECRAFT_V41_UTILITY],
-    IMAGE_GEN_PREMIUM_PRESET: [MODEL_GPT5_IMAGE, MODEL_GEMINI_31_FLASH_IMAGE_PREVIEW, MODEL_MAI_IMAGE_25, MODEL_RECRAFT_V4_PRO],
+    "budget": IMAGE_GEN_BUDGET_FALLBACK_MODELS,
+    "premium": IMAGE_GEN_PREMIUM_FALLBACK_MODELS,
+    IMAGE_GEN_BUDGET_PRESET: IMAGE_GEN_BUDGET_FALLBACK_MODELS,
+    IMAGE_GEN_PREMIUM_PRESET: IMAGE_GEN_PREMIUM_FALLBACK_MODELS,
 }
 IMAGE_GEN_ENHANCEMENT_SYSTEM_PROMPT: str = ""  # moved to constants_prompts.py
 IMAGE_GEN_POLICY_REWRITE_SYSTEM_PROMPT: str = ""  # moved to constants_prompts.py

@@ -12,7 +12,13 @@ import os
 # real values via settings.
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-not-for-production-use-only")
 os.environ.setdefault("CSRF_ENFORCE_BACKEND", "false")
-os.environ.setdefault("OPENROUTER_API_KEY", "test-dummy-openrouter-key-placeholder")
+# Must look like a real key (sk-/sk-or- prefix): health_validator.validate_all(),
+# triggered by any test that starts the FastAPI app lifespan, treats a
+# malformed key as "missing" and permanently flips settings.COHERE_RERANK_ENABLED /
+# DOCUMENT_SEMANTIC_RETRIEVAL_ENABLED to False via direct attribute assignment on the
+# frozen settings singleton -- no restore, so it silently poisons every later
+# test sharing that xdist worker.
+os.environ.setdefault("OPENROUTER_API_KEY", "sk-or-test-dummy-openrouter-key-placeholder")
 os.environ.setdefault("RATE_LIMITER_REDIS_FAILURE_MODE", "fail_open")
 
 import httpx

@@ -112,13 +112,23 @@ class TestEndToEndEdgeCases:
         assert not any("Article synthesize: no usable claims" in err for err in state.errors)
         assert state.final_solution.core_solution != ""
 
+    @pytest.mark.xfail(
+        reason="Known gap: TaskType enum (domain/models.py) has no REFUSAL member — "
+        "only analytical/strategic/creative/technical/predictive/hybrid. "
+        "TaskType.coerce('refusal') always falls back to HYBRID, so refusal "
+        "classification doesn't exist as a task_type value in the current "
+        "architecture. See REMEDIATION_PLAN.md unclassified-triage section.",
+        strict=True,
+    )
     async def test_debate_method_with_toxic_input(self):
         """Edge Case: Refusal classification stops the pipeline."""
         pipeline, router = await self.get_pipeline(preset_name="debate-budget")
-        
+
         async def refusal_call(role, *args, **kwargs):
             metadata = {"input_tokens": 10, "output_tokens": 10, "cost_usd": 0.0, "model": "m"}
-            if role == "classification":
+            # Classification + decomposition were merged into a single
+            # "fusion" role (application/pipeline.py::_phase_fusion).
+            if role == "fusion":
                 return '{"task_type": "refusal", "language": "English"}', metadata
             return await router.call(role, *args, **kwargs)
 

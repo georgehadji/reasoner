@@ -60,7 +60,7 @@ function PhaseTimelineComponent({
               onClick={() => onPhaseClick?.(p.id)}
               aria-label={`${p.name} \u2014 ${isActive ? 'In progress' : isError ? 'Error' : isCompleted ? 'Completed' : 'Pending'}`}
               className={cn(
-                'flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-3 py-2.5 text-left',
+                'flex shrink-0 cursor-pointer items-center gap-1.5 rounded-[var(--radius)] px-3 py-2.5 text-left',
                 'transition-all duration-300 ease-out',
                 isActive
                   ? 'bg-[var(--accent-dim)] text-[var(--text)]'
@@ -75,7 +75,7 @@ function PhaseTimelineComponent({
                   className={cn(
                     'h-2 w-2 rounded-full transition-all duration-500',
                     isError
-                      ? 'bg-red-400'
+                      ? 'bg-[var(--red)]'
                       : isActive
                         ? 'bg-[var(--accent)] scale-110'
                         : isCompleted
@@ -111,7 +111,7 @@ function PhaseTimelineComponent({
             <button
               type="button"
               onClick={onExpandAll}
-              className="cursor-pointer rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-[11px] font-medium text-[var(--text-muted)] transition-all duration-200 hover:border-[var(--border-strong)] hover:text-[var(--text)]"
+              className="cursor-pointer rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-[length:var(--text-2xs)] font-medium text-[var(--text-muted)] transition-all duration-200 hover:border-[var(--border-strong)] hover:text-[var(--text)]"
             >
               Expand all
             </button>
@@ -120,7 +120,7 @@ function PhaseTimelineComponent({
             <button
               type="button"
               onClick={onCollapseAll}
-              className="cursor-pointer rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-[11px] font-medium text-[var(--text-muted)] transition-all duration-200 hover:border-[var(--border-strong)] hover:text-[var(--text)]"
+              className="cursor-pointer rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-[length:var(--text-2xs)] font-medium text-[var(--text-muted)] transition-all duration-200 hover:border-[var(--border-strong)] hover:text-[var(--text)]"
             >
               Collapse all
             </button>

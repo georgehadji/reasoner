@@ -159,8 +159,12 @@ class DocumentVectorStore:
         }
 
         try:
+            from reasoner.security.encryption import get_encryption_service
+
+            sidecar_json = json.dumps(sidecar, default=str)
+            payload = get_encryption_service().encrypt(sidecar_json)
             self._sidecar_path(file_id).write_text(
-                json.dumps(sidecar, default=str), encoding="utf-8"
+                json.dumps({"encrypted": True, "payload": payload}), encoding="utf-8"
             )
         except Exception as exc:
             logger.error("Failed to write vector sidecar for %s: %s", file_id, exc)
@@ -216,7 +220,15 @@ class DocumentVectorStore:
                 logger.debug("No vector sidecar for %s", fid)
                 continue
             try:
-                sidecar = json.loads(path.read_text(encoding="utf-8"))
+                raw = json.loads(path.read_text(encoding="utf-8"))
+                if raw.get("encrypted"):
+                    from reasoner.security.encryption import get_encryption_service
+
+                    sidecar = json.loads(get_encryption_service().decrypt(raw["payload"]))
+                else:
+                    # Legacy plaintext sidecar (no "encrypted" flag) -- read
+                    # unchanged, no migration required.
+                    sidecar = raw
                 all_chunks.extend(sidecar.get("chunks", []))
             except Exception as exc:
                 logger.warning("Failed to load sidecar for %s: %s", fid, exc)

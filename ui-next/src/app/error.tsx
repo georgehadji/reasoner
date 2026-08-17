@@ -16,7 +16,7 @@ export default function Error({
 
   return (
     <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-[var(--bg)] p-6 text-center">
-      <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-red-500/10 text-red-500">
+      <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-[var(--radius-lg)] bg-[var(--red-bg)] text-[var(--red)]">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="32"
@@ -42,7 +42,7 @@ export default function Error({
       </p>
       <button
         onClick={() => reset()}
-        className="inline-flex items-center justify-center rounded-xl bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-[var(--accent-text)] transition-all hover:opacity-90 active:scale-[0.98]"
+        className="inline-flex items-center justify-center rounded-[var(--radius-lg)] bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-[var(--accent-text)] transition-all hover:opacity-90 active:scale-[0.98]"
       >
         Try again
       </button>

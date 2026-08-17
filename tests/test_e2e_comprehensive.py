@@ -307,7 +307,7 @@ class TestAPIPromptEnhancement:
         def _sse(data):
             return f"data: {json.dumps(data)}\n\n"
 
-        async def fake_run_stream_cached(req, user_id=None):
+        async def fake_run_stream_cached(req, user_id=None, **kwargs):
             captured["enhance"] = req.enhance_prompt
             yield _sse({"type": "start", "routing": {"[primary]": "fake"}})
             if req.enhance_prompt:
@@ -340,7 +340,7 @@ class TestAPITokenAndModelsInPhaseComplete:
         def _sse(data):
             return f"data: {json.dumps(data)}\n\n"
 
-        async def fake_run_stream_cached(req, user_id=None):
+        async def fake_run_stream_cached(req, user_id=None, **kwargs):
             yield _sse({"type": "start", "routing": {"[primary]": "fake"}})
             yield _sse({
                 "type": "phase_complete",
@@ -376,13 +376,12 @@ class TestAPISearch:
                 {"title": "Result 2", "url": "https://example.com/2", "snippet": "Snippet 2"},
             ]
 
-        async def fake_get_discovery_client(**kwargs):
-            return type("Client", (), {"search": fake_search})(), kwargs.get("source_type")
-
         async def fake_get_search_client(**kwargs):
             return type("Client", (), {"search": fake_search})(), kwargs.get("source_type")
 
-        monkeypatch.setattr(_search_mod, "get_discovery_client", fake_get_discovery_client)
+        # get_discovery_client never existed on core.search — its only real
+        # discovery-client export (lazily proxied to
+        # infrastructure.search.discovery) is get_search_client.
         monkeypatch.setattr(_search_mod, "get_search_client", fake_get_search_client)
 
         payload = {"query": "test query", "source_type": "general", "num_results": 5}
@@ -440,10 +439,16 @@ class TestAPICriticalPhaseErrorHalt:
             classmethod(lambda cls, **kwargs: fake_router),
         )
 
-        async def fake_decompose(self, state):
+        # Decomposition is no longer a pipeline phase (classification/decomposition
+        # moved into HyperGate preflight); Critique & Pruning is the only
+        # critical=True step in MultiPerspectiveFlow, so use that to exercise
+        # critical-phase-halts-pipeline behavior instead.
+        async def fake_critique(state, services):
             raise ValueError("simulated decomposition failure")
 
-        monkeypatch.setattr("reasoner.pipeline.ReasonerPipeline._phase_1_decompose", fake_decompose)
+        monkeypatch.setattr(
+            "reasoner.application.flows.multi_perspective.run_critique_phase", fake_critique
+        )
 
         payload = {"problem": "test critical halt", "preset": "multi-perspective-budget", "no_cache": True}
         async with api_client.stream("POST", "/api/run", json=payload, timeout=10) as response:

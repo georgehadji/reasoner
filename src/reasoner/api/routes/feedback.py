@@ -6,10 +6,10 @@ GET  /api/admin/feedback-stats — admin-only feedback statistics
 
 from __future__ import annotations
 
-import secrets
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
+from reasoner.api.admin_auth import verify_admin_key
 from reasoner.api.auth_deps import require_csrf
 from reasoner.api.dependencies import check_rate_limit, get_current_user
 from reasoner.core.settings import settings
@@ -21,12 +21,12 @@ _feedback_store = FeedbackStore()
 
 
 class FeedbackRequest(BaseModel):
-    conversation_id: str
-    run_id: str
-    score: int  # 1–5
-    comment: str = ""
-    method: str = ""
-    preset: str = ""
+    conversation_id: str = Field(..., max_length=200)
+    message_id: str = Field(..., max_length=200)
+    rating: str = Field(..., max_length=10)  # "up" | "down"
+    reason: str | None = Field(None, max_length=500)
+    comment: str | None = Field(None, max_length=4_000)
+    context: dict | None = None
 
 
 @router.post("/api/feedback")
@@ -38,11 +38,11 @@ async def submit_feedback(
     """Submit feedback for a pipeline run."""
     entry = FeedbackEntry(
         conversation_id=req.conversation_id,
-        run_id=req.run_id,
-        score=req.score,
+        message_id=req.message_id,
+        rating=req.rating,
+        reason=req.reason,
         comment=req.comment,
-        method=req.method,
-        preset=req.preset,
+        context=req.context,
     )
     row_id = await _feedback_store.insert(entry)
     return {"status": "received", "id": row_id}
@@ -62,7 +62,7 @@ async def feedback_stats(
     user_scopes = getattr(user, "scopes", set())
     if Scope.ADMIN.value not in user_scopes:
         raise HTTPException(status_code=403, detail="Admin scope required")
-    if not admin_key or not secrets.compare_digest(admin_key, settings.ADMIN_API_KEY):
+    if not verify_admin_key(admin_key):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     stats = await _feedback_store.get_stats(days=days)

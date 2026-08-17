@@ -19,13 +19,11 @@ router = APIRouter(prefix="/api/admin", dependencies=[Depends(get_current_user)]
 
 
 def _require_admin(request: Request) -> None:
-    """Raise 403 unless request carries a valid X-Admin-Key header."""
-    admin_key = settings.ADMIN_API_KEY or ""
-    if not admin_key:
-        raise HTTPException(status_code=403, detail="Admin key not configured")
-    import secrets
-    provided = request.headers.get("X-Admin-Key", "")
-    if not secrets.compare_digest(provided, admin_key):
+    """Raise 403 unless request carries a valid X-Admin-Key header (plus a
+    scoped principal in production)."""
+    from reasoner.api.admin_auth import verify_admin_key
+
+    if not verify_admin_key(request.headers.get("X-Admin-Key")):
         raise HTTPException(status_code=403, detail="Invalid admin key")
     if settings.ENVIRONMENT == "production":
         user = getattr(request.state, "user", None)

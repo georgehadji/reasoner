@@ -18,18 +18,22 @@ from reasoner.core.evolution_constants import (
 _MODEL_LABS: dict[str, str] = {
     # Anthropic
     "claude-sonnet": "anthropic", "claude-haiku": "anthropic",
+    "claude-opus-latest": "anthropic", "claude-sonnet-latest": "anthropic",
     # OpenAI — GPT
     "gpt-5": "openai", "gpt-5.5": "openai", "gpt-5.5-pro": "openai",
     "gpt-5-mini": "openai", "gpt-5.4-mini": "openai", "gpt-5.4-nano": "openai",
     "gpt-latest": "openai", "gpt-mini-latest": "openai",
     "gpt-4o-mini": "openai", "o3": "openai", "o3-mini": "openai",
     "gpt-oss-120b": "openai", "gpt-oss-20b": "openai",
+    "gpt-5.6-sol": "openai", "gpt-5.6-terra": "openai", "gpt-5.6-luna": "openai",
+    "gpt-5.6-sol-pro": "openai", "gpt-5.6-terra-pro": "openai", "gpt-5.6-luna-pro": "openai",
     # Google — Gemini
     "gemini-flash": "google", "gemini-pro-real": "google",
     "gemini-flash-lite-real": "google", "gemini-2.5-flash-lite": "google",
     "gemini-pro-latest": "google", "gemini-flash-latest": "google",
     "gemini-flash-image": "google", "gemini-pro-image": "google",
     "gemini-3.1-flash-image-preview": "google", "gemini-3.1-flash-lite-image": "google",
+    "gemini-3.7-flash": "google", "gemini-3.6-flash": "google",
     # Note: gemini-pro → Anthropic (claude-sonnet), gemini-flash-lite → Qwen (qwen3.5-flash)
     # Meta
     "llama-3.3-70b": "meta",
@@ -42,6 +46,7 @@ _MODEL_LABS: dict[str, str] = {
     "qwen3-max": "qwen", "qwen3.7-max": "qwen", "qwen3.7-plus": "qwen", "qwen3.5-flash": "qwen",
     "qwen3-max-thinking": "qwen", "qwen3.6-flash": "qwen", "qwen3.6-plus-real": "qwen",
     "qwen3-coder-flash": "qwen", "qwen3-coder-30b-a3b": "qwen",
+    "qwen3.7-flash": "qwen",
     # GLM (Zhipu)
     "glm-5.2": "zhipu",
     # Tencent
@@ -54,6 +59,11 @@ _MODEL_LABS: dict[str, str] = {
     "kimi-k3": "moonshot",
     # StepFun
     "stepfun-3.7-flash": "stepfun",
+    # Image generators (pure image output, priced per image)
+    "qwen-image-3": "qwen", "qwen-image-3-pro": "qwen",
+    "seedream-5-pro": "bytedance", "seedream-5-lite": "bytedance",
+    "grok-imagine-image-2": "xai",
+    "krea-2-large": "krea", "krea-2-medium": "krea", "krea-2-medium-turbo": "krea",
     # OpenAI — Codex
     "gpt-5.1-codex-mini": "openai",
     # Google — misc
@@ -76,6 +86,7 @@ _MODEL_LABS: dict[str, str] = {
     "mimo-v2-pro": "xiaomi", "mimo-v2-flash": "xiaomi",
     # xAI — Grok
     "grok-4.3": "xai", "grok-build-0.1": "xai",
+    "grok-4.6": "xai", "grok-4.20": "xai", "grok-4.20-multi-agent": "xai", "grok-latest": "xai",
     # Perplexity
     "sonar-pro": "perplexity", "sonar-pro-search": "perplexity",
     "sonar": "perplexity", "sonar-reasoning-pro": "perplexity", "sonar-deep-research": "perplexity",

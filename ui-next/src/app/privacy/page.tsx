@@ -59,25 +59,31 @@ export default function PrivacyPage() {
               <ul className="list-disc pl-6 space-y-3">
                 <li><strong>Account Information:</strong> Email address and billing details required to manage your subscription.</li>
                 <li><strong>Usage Data:</strong> We collect metadata (timestamp, model used, token count) to provide service reliability and billing accuracy.</li>
-                <li><strong>Reasoning Content:</strong> We store your reasoning pipelines to enable history and collaboration, unless <strong>Zero-Retention Mode</strong> is enabled.</li>
+                <li><strong>Reasoning Content:</strong> We store your reasoning pipelines to enable history and collaboration. A zero-retention mode is on our roadmap but not yet available.</li>
               </ul>
             </section>
 
             <section>
-              <h3 className="text-2xl font-bold mb-6 text-[var(--text)]">4. Zero-Retention Mode</h3>
+              <h3 className="text-2xl font-bold mb-6 text-[var(--text)]">4. Data Retention & Deletion</h3>
               <p>
-                For high-stakes research, we offer a <strong>Zero-Retention Mode</strong>. When active, reasoning 
-                processes are executed in-memory and are never written to our persistent database. Once the 
-                session ends, the data is purged from volatile memory.
+                We do not yet publish a fixed retention period. To request export or deletion of your
+                data, contact us via the{' '}
+                <a href="/contact" className="underline hover:text-[var(--accent)]">
+                  Contact page
+                </a>
+                {' '}and we will act on it. Self-serve deletion is on our roadmap.
               </p>
             </section>
 
             <section>
               <h3 className="text-2xl font-bold mb-6 text-[var(--text)]">5. Third-Party LLM Providers</h3>
               <p>
-                Reasoner routes requests to various providers (OpenAI, Anthropic, Google, etc.). We maintain 
-                Enterprise-grade agreements with these providers ensuring they do not train on data sent through 
-                our API endpoints.
+                Reasoner routes requests to the model providers listed on our{' '}
+                <a href="/subprocessors" className="underline hover:text-[var(--accent)]">
+                  Sub-processors
+                </a>{' '}
+                page. Each provider's own privacy policy, linked from that page, governs how they
+                handle API traffic.
               </p>
             </section>
           </div>
@@ -104,8 +110,8 @@ export default function PrivacyPage() {
                 <div className="flex items-start gap-3">
                   <Scale className="h-5 w-5 text-[var(--accent)] shrink-0" />
                   <div>
-                    <p className="text-sm font-bold text-[var(--text)]">GDPR/HIPAA</p>
-                    <p className="text-xs">Built for global compliance standards.</p>
+                    <p className="text-sm font-bold text-[var(--text)]">GDPR</p>
+                    <p className="text-xs">EU data subject rights — export and deletion on request.</p>
                   </div>
                 </div>
               </div>
