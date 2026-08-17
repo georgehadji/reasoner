@@ -13,6 +13,11 @@ from reasoner.domain.models import TaskType
 from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.application.services.preset_service import PresetService
 from reasoner.application.services.pipeline_service import PipelineService
+from reasoner.application.services.spend_limit_service import (
+    apply_spend_limits,
+    check_run_allowed,
+    resolve_user_tier,
+)
 from reasoner.application.orchestrator import PipelineOrchestrator
 from reasoner.core.logging_utils import set_correlation_id
 from reasoner.api.schemas import RunRequest
@@ -89,6 +94,10 @@ class PipelineExecutionService:
         # while the preflight (HyperGate LLM calls) completes.
         await sse_emit({"type": "connecting", "message": "Running system check…"})
         try:
+            # Resolve the caller's plan up front — the spend ceilings it implies
+            # gate the run below and bound every LLM call inside it.
+            user_tier = await resolve_user_tier(user_id)
+
             # ── Orchestrator Preflight: preset resolution, HyperGate, neuro recall ──
             orchestrator = PipelineOrchestrator(preset_service, pipeline_service)
             preflight = await orchestrator.preflight(req, initial_state)
@@ -134,6 +143,37 @@ class PipelineExecutionService:
             auto_selected_method = preflight.auto_selected_method
             recalled_chunks = preflight.recalled_chunks
 
+            # Refuse a run the caller's plan cannot pay for. Checked against the
+            # preset preflight actually resolved, not the one requested — auto
+            # presets only settle on a tier here.
+            rejection = check_run_allowed(effective_preset_name, user_tier, user_id)
+            if rejection is not None:
+                logger.info(
+                    "Run %s refused: %s cap for tier %s (preset %s)",
+                    run_id, rejection.cap_type, user_tier.value, effective_preset_name,
+                )
+                await sse_emit({
+                    "type": "error",
+                    "error": rejection.reason,
+                    "code": (
+                        "PRESET_TIER_REQUIRED"
+                        if rejection.cap_type == "preset_tier"
+                        else "SPEND_LIMIT_EXCEEDED"
+                    ),
+                    "data": {
+                        "cap_type": rejection.cap_type,
+                        "cap_usd": round(rejection.cap_usd, 4),
+                        "estimated_usd": round(rejection.estimated_usd, 4),
+                        "tier": rejection.tier.value,
+                        "required_tier": (
+                            rejection.required_tier.value
+                            if rejection.required_tier else None
+                        ),
+                        "upgrade_url": "/pricing",
+                    },
+                })
+                return
+
             pipeline = pipeline_service.create_pipeline(
                 router=router,
                 preset_name=effective_preset_name,
@@ -147,6 +187,9 @@ class PipelineExecutionService:
                 initial_state=initial_state,
             )
             state = initial_state or PipelineState(problem=req.problem, preset_name=effective_preset_name)
+            # Carry the ceilings into the run so the executor halts mid-pipeline
+            # if the accumulated cost crosses one.
+            apply_spend_limits(state, user_tier, user_id)
             if recalled_chunks:
                 state.neuro_context = recalled_chunks
 

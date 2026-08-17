@@ -93,6 +93,18 @@ class CostTrackingState:
     phase_costs_by_key: dict[str, float] = field(default_factory=dict)
     _phase_models_by_key: dict[str, list[str]] = field(default_factory=dict)
 
+    # Spend ceilings resolved from the caller's subscription tier, carried on
+    # state so the executor enforces them without a per-call tier lookup.
+    # 0.0 means unlimited; an unresolved caller falls back to global settings.
+    spend_cap_per_run_usd: float = 0.0
+    spend_cap_monthly_usd: float = 0.0
+    # Identity the monthly ceiling aggregates over — the user id, not the
+    # conversation id, or a new chat would reset the month's spend.
+    billing_subject: str = ""
+    subscription_tier: str = ""
+    # Which ceiling stopped the run: "" | "per_run" | "monthly".
+    spend_cap_hit: str = ""
+
 
 @dataclass
 class ConversationState:
@@ -619,6 +631,11 @@ class PipelineState:
     total_cost_usd = PipelineField("cost_state")
     phase_costs = PipelineField("cost_state")
     detailed_token_usage = PipelineField("cost_state")
+    spend_cap_per_run_usd = PipelineField("cost_state")
+    spend_cap_monthly_usd = PipelineField("cost_state")
+    billing_subject = PipelineField("cost_state")
+    subscription_tier = PipelineField("cost_state")
+    spend_cap_hit = PipelineField("cost_state")
     conversation_history = PipelineField("conversation_state")
     conversation_id = PipelineField("conversation_state")
     turn_number = PipelineField("conversation_state")

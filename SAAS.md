@@ -145,11 +145,18 @@ CREATE TABLE query_log (
 
 ### Quota Model
 
-| Tier | Queries/month | Presets available | Priority |
-|------|--------------|-------------------|---------|
-| free | 20 | budget only | low |
-| pro | 500 | all (budget + premium) | high |
-| enterprise | unlimited | all | highest |
+Two self-serve tiers. Enterprise stays a real, billable `SubscriptionTier`
+in the backend (quota, spend ceilings, Stripe/PayPal price IDs all support
+it) — it's just not sold off a fixed price on `/pricing`. Volume and
+custom-deployment terms are negotiated instead: one core plan, one
+higher-touch option, and raise price once the workflow is proven rather
+than listing three fixed tiers before the niche is proven.
+
+| Tier | Queries/month | Presets available | Priority | Sold how |
+|------|--------------|-------------------|---------|---|
+| free | 20 | budget only | low | self-serve |
+| pro | 500 | all (budget + premium) | high | self-serve |
+| enterprise | unlimited | all | highest | contact sales (`/contact?topic=enterprise`) |
 
 ### Implementation
 
@@ -197,7 +204,11 @@ Product: Reasoner Pro
   Price: $12/month (monthly) | $99/year (annual, ~30% discount)
 
 Product: Reasoner Enterprise
-  Price: $49/month | Custom annual
+  No fixed price — quoted per deal from the sales conversation, then a
+  custom Price object is created for that customer's Checkout session.
+  STRIPE_ENTERPRISE_PRICE_ID / PAYPAL_ENTERPRISE_PLAN_ID stay as the env
+  vars `stripe_adapter.py` / `paypal_adapter.py` read once a rep sets a
+  price; there's no catalog price to publish here.
 ```
 
 ### New Backend Files
