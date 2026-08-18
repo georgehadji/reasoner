@@ -161,6 +161,10 @@ class PipelineMeta:
     method: str | None = None
     augmentation_methods: list[str] | None = None
     context_quality: str = "unknown"  # "good" | "partial" | "contaminated" | "missing"
+    # Layer A egress scrub reports, keyed by field name (e.g. "core_solution",
+    # "critical_insights"); dict[str, Any] .get()-accessed per the method-state
+    # convention so --resume stays compatible with older state files.
+    provenance_report: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -248,7 +252,7 @@ class PipelineState:
             'started_at', 'phase_logs', 'phase_tokens', 'phase_durations',
             'phase_models', 'phase_results', 'quality_hints', 'quality_history',
             'preset_name', 'method', 'context_quality',
-            'fallback_events',
+            'fallback_events', 'provenance_report',
         }
         _REMAINDER_FIELDS = {
             'neuro_context', 'reflexion_memory', 'web_discovery_results',

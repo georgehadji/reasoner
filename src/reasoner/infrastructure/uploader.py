@@ -355,6 +355,7 @@ async def save_uploaded_file(
                 "path": str(UPLOAD_DIR / f"{existing_id}{_get_file_extension(filename)}"),
                 "user_id": user_id,
                 "deduplicated": True,
+                "provenance_report": None,  # scrubbed (if applicable) on the original upload
             }
 
     # Extract extension here so it's available for MIME validation below
@@ -426,6 +427,23 @@ async def save_uploaded_file(
             "error": "Invalid filename",
         }
 
+    # Strip C2PA/EXIF/XMP provenance metadata from uploaded images before
+    # persisting -- a genuine privacy feature (EXIF GPS coordinates are a
+    # real leak), on by default. Runs on the plaintext bytes, before
+    # encryption; a scrub failure degrades to the original bytes rather than
+    # blocking the upload (see ImageMarkScrubber.scrub's degraded contract).
+    provenance_report: dict[str, Any] | None = None
+    if ext in IMAGE_EXTENSIONS and settings.WATERMARK_IMAGE_STRIP_UPLOADS:
+        try:
+            from reasoner.infrastructure.watermark.scrubber import ImageMarkScrubber
+
+            outcome = ImageMarkScrubber().scrub(content)
+            if not outcome.degraded:
+                content = outcome.data
+            provenance_report = outcome.to_dict()
+        except Exception as exc:
+            logger.warning("Image provenance scrub failed for %s: %s", filename, exc)
+
     try:
         # Save file, encrypted at rest (security-remediation-plan.md Phase 4
         # item 5). Extraction below runs on the original plaintext bytes
@@ -493,6 +511,7 @@ async def save_uploaded_file(
             "text": text_content,
             "path": str(file_path),
             "user_id": user_id,
+            "provenance_report": provenance_report,
         }
 
     except Exception as e:

@@ -413,6 +413,19 @@ class Settings:
         p.strip() for p in os.getenv("TRUSTED_PROXIES", "").split(",") if p.strip()
     ]
 
+    # ── Watermark / AI-provenance-mark scrubbing ──
+    # See docs/plans/watermark-removal-integration.md Part IX and §10.3.
+    # Layer A egress hygiene is on by default (it is a bug fix + injection
+    # defense, not a watermark-removal feature). Generated-image metadata
+    # stripping is opt-in: Reasoner requesting an image and then removing the
+    # provenance the provider attached is a materially different posture
+    # from a user cleaning their own upload.
+    WATERMARK_EGRESS_LAYER_A: bool = os.getenv("WATERMARK_EGRESS_LAYER_A", "true").lower() in ("1", "true", "yes")
+    WATERMARK_INGRESS_INSPECT: bool = os.getenv("WATERMARK_INGRESS_INSPECT", "true").lower() in ("1", "true", "yes")
+    WATERMARK_IMAGE_STRIP_UPLOADS: bool = os.getenv("WATERMARK_IMAGE_STRIP_UPLOADS", "true").lower() in ("1", "true", "yes")
+    WATERMARK_IMAGE_STRIP_GENERATED: bool = os.getenv("WATERMARK_IMAGE_STRIP_GENERATED", "false").lower() in ("1", "true", "yes")
+    WATERMARK_LAYER_B_ENABLED: bool = os.getenv("WATERMARK_LAYER_B_ENABLED", "false").lower() in ("1", "true", "yes")
+
     @property
     def cors_origins_list(self) -> list[str]:
         """Parse CORS_ORIGINS env var into a list of origin strings."""

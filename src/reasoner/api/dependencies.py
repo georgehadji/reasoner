@@ -42,6 +42,7 @@ from reasoner.presets import get_preset_tier
 from reasoner.application.services.preset_service import PresetService
 from reasoner.application.services.pipeline_service import PipelineService
 from reasoner.application.services.search_service import SearchService
+from reasoner.application.services.watermark_service import WatermarkService
 
 
 # ── Rate Limiter Singleton ──
@@ -606,6 +607,12 @@ def get_search_service() -> SearchService:
     """Dependency provider for SearchService."""
     from reasoner.application.services.search_service import SearchService
     return SearchService()
+
+def get_watermark_service() -> WatermarkService:
+    """Dependency provider for WatermarkService."""
+    from reasoner.infrastructure.watermark.pixel.noop import NoopPixelScrubber
+    from reasoner.infrastructure.watermark.scrubber import ImageMarkScrubber
+    return WatermarkService(image_scrubber=ImageMarkScrubber(), pixel=NoopPixelScrubber())
 
 # ── Event Bus & Event Store Dependency Providers ──
 

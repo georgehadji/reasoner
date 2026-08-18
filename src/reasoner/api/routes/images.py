@@ -83,6 +83,47 @@ async def _release_image_credits(user: User | None, credits: int, reference_id: 
         logger.warning("Image credit release failed for %s: %s", reference_id, exc)
 
 
+def _scrub_generated_images(images: list[dict]) -> list[dict]:
+    """Strip C2PA/AI-provenance metadata from generated images, when opted in.
+
+    Off by default (WATERMARK_IMAGE_STRIP_GENERATED=false): Reasoner
+    requesting an image from a provider and then removing the provenance
+    that provider attached is a materially different posture from a user
+    cleaning their own upload -- see
+    docs/plans/watermark-removal-integration.md Part X.3. A scrub failure on
+    any one image degrades to that image's original data, never blocks the
+    response.
+    """
+    from reasoner.core.settings import settings
+
+    if not settings.WATERMARK_IMAGE_STRIP_GENERATED:
+        return images
+
+    from reasoner.infrastructure.watermark import data_url as data_url_codec
+    from reasoner.infrastructure.watermark.scrubber import ImageMarkScrubber
+
+    scrubber = ImageMarkScrubber()
+    cleaned: list[dict] = []
+    for image in images:
+        raw = image.get("image_data")
+        if not isinstance(raw, str):
+            cleaned.append(image)
+            continue
+        try:
+            mime_type, decoded = data_url_codec.parse_data_url(raw)
+            outcome = scrubber.scrub(decoded)
+            if outcome.degraded:
+                cleaned.append(image)
+                continue
+            cleaned.append(
+                {**image, "image_data": data_url_codec.to_data_url(mime_type, outcome.data)}
+            )
+        except Exception as exc:
+            logger.warning("Generated-image provenance scrub failed: %s", exc)
+            cleaned.append(image)
+    return cleaned
+
+
 async def _auto_select_models(
     body: GenerateImageRequest, num_images: int
 ) -> tuple[list[str] | None, list[str] | None]:
@@ -204,7 +245,7 @@ async def generate_image_endpoint(
             }
         return {
             "success": True,
-            "images": result["images"],
+            "images": _scrub_generated_images(result["images"]),
             "enhanced_prompt": result.get("enhanced_prompt"),
             "rewritten_prompt": result.get("rewritten_prompt"),
         }

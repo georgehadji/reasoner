@@ -17,7 +17,7 @@ from reasoner.models import (
     TaskType,
 )
 from reasoner.parsing import extract_solution_prose, extract_json, strip_json_fences, ParseError, parse_evidence_bundles
-from reasoner.sanitization import clean_llm_artifacts
+from reasoner.sanitization import clean_llm_artifacts_with_report
 import reasoner.phases as phases
 from reasoner.application.flows.base import WorkflowServices
 
@@ -79,7 +79,7 @@ async def run_synthesis_phase(state: PipelineState, services: WorkflowServices) 
     if not core_solution:
         core_solution = strip_json_fences(raw)
 
-    core_solution = clean_llm_artifacts(core_solution)
+    core_solution, core_solution_report = clean_llm_artifacts_with_report(core_solution)
 
     # Citation integrity validator
     allowed_urls = {r.get("url", "").rstrip("/") for r in (state.vetted_context or [])}
@@ -146,11 +146,48 @@ async def run_synthesis_phase(state: PipelineState, services: WorkflowServices) 
         elif step is not None and str(step).strip():
             clean_bp.append({"step": "", "action": str(step).strip(), "time_horizon": "", "go_criteria": "", "fallback": ""})
 
+    # Egress Layer A scrub on the remaining user-facing prose fields --
+    # core_solution was already scrubbed above via clean_llm_artifacts_with_report.
+    def _scrub_strings(items: list) -> tuple[list[str], int]:
+        cleaned: list[str] = []
+        changed = 0
+        for item in items:
+            text, report = clean_llm_artifacts_with_report(str(item))
+            cleaned.append(text)
+            if report is not None:
+                changed += report.suspicious_total
+        return cleaned, changed
+
+    def _scrub_blueprint_steps(items: list[dict]) -> tuple[list[dict], int]:
+        changed = 0
+        cleaned: list[dict] = []
+        for step in items:
+            new_step = dict(step)
+            for key in ("step", "action", "time_horizon", "go_criteria", "fallback"):
+                if key in new_step and new_step[key]:
+                    text, report = clean_llm_artifacts_with_report(str(new_step[key]))
+                    new_step[key] = text
+                    if report is not None:
+                        changed += report.suspicious_total
+            cleaned.append(new_step)
+        return cleaned, changed
+
+    critical_insights, insights_changed = _scrub_strings(json_data.get("critical_insights", []))
+    open_questions, questions_changed = _scrub_strings(json_data.get("open_questions", []))
+    clean_bp, blueprint_changed = _scrub_blueprint_steps(clean_bp)
+
+    state.meta.provenance_report = {
+        "core_solution": core_solution_report.to_dict() if core_solution_report else None,
+        "critical_insights_removed": insights_changed,
+        "action_blueprint_removed": blueprint_changed,
+        "open_questions_removed": questions_changed,
+    }
+
     state.final_solution = FinalSolution(
         core_solution=core_solution,
-        critical_insights=json_data.get("critical_insights", []),
+        critical_insights=critical_insights,
         action_blueprint=clean_bp,
-        open_questions=json_data.get("open_questions", []),
+        open_questions=open_questions,
         claim_labels=clean_labels,
         meta_audit=MetaCognitiveAudit(
             most_dangerous_assumption=meta_audit_data.get("most_dangerous_assumption", ""),

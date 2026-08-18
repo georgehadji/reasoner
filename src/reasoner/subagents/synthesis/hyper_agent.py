@@ -21,6 +21,7 @@ from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.domain.core_types import FinalSolution, MetaCognitiveAudit
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.models import ClaimLabel
+from reasoner.sanitization import clean_llm_artifacts_with_report
 from reasoner.subagents.models import PhaseSubAgentOutput
 from reasoner.subagents.synthesis.consensus_mapper import ConsensusMapperSubAgent
 from reasoner.subagents.synthesis.contradiction_resolver import ContradictionResolverSubAgent
@@ -118,11 +119,55 @@ class SynthesisHyperAgent:
             except ValueError:
                 clean_labels[k] = ClaimLabel.UNKNOWN
 
+        # Egress Layer A scrub -- mirrors application/flows/synthesis_phase.py's
+        # legacy path so both routes to FinalSolution get the same hygiene.
+        core_solution, core_solution_report = clean_llm_artifacts_with_report(
+            result.get("core_solution", "")
+        )
+
+        def _scrub_strings(items: list) -> tuple[list[str], int]:
+            cleaned: list[str] = []
+            changed = 0
+            for item in items:
+                text, report = clean_llm_artifacts_with_report(str(item))
+                cleaned.append(text)
+                if report is not None:
+                    changed += report.suspicious_total
+            return cleaned, changed
+
+        def _scrub_blueprint_steps(items: list) -> tuple[list, int]:
+            changed = 0
+            cleaned: list = []
+            for step in items:
+                if not isinstance(step, dict):
+                    cleaned.append(step)
+                    continue
+                new_step = dict(step)
+                for key in ("step", "action", "time_horizon", "go_criteria", "fallback"):
+                    if key in new_step and new_step[key]:
+                        text, report = clean_llm_artifacts_with_report(str(new_step[key]))
+                        new_step[key] = text
+                        if report is not None:
+                            changed += report.suspicious_total
+                cleaned.append(new_step)
+            return cleaned, changed
+
+        critical_insights, insights_changed = _scrub_strings(result.get("critical_insights", []))
+        open_questions, questions_changed = _scrub_strings(result.get("open_questions", []))
+        action_blueprint, blueprint_changed = _scrub_blueprint_steps(result.get("action_blueprint", []))
+
+        state.meta.provenance_report = {
+            "core_solution": core_solution_report.to_dict() if core_solution_report else None,
+            "critical_insights_removed": insights_changed,
+            "action_blueprint_removed": blueprint_changed,
+            "open_questions_removed": questions_changed,
+        }
+
         return FinalSolution(
-            core_solution=result.get("core_solution", ""),
-            critical_insights=result.get("critical_insights", []),
-            action_blueprint=result.get("action_blueprint", []),
-            open_questions=result.get("open_questions", []),
+            core_solution=core_solution,
+            critical_insights=critical_insights,
+            action_blueprint=action_blueprint,
+            open_questions=open_questions,
             claim_labels=clean_labels,
             meta_audit=meta_audit,
             sources=result.get("sources", []),

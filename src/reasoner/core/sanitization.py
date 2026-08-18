@@ -8,9 +8,12 @@ from __future__ import annotations
 import html
 import re
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from reasoner.core.constants import DEFAULT_SANITIZER_MAX_LENGTH
+
+if TYPE_CHECKING:
+    from reasoner.domain.watermark import TextInspectReport
 
 
 @dataclass
@@ -185,7 +188,22 @@ def sanitize_for_prompt(text: str) -> tuple[str, list[str]]:
 
     Reuses InputSanitizer but preserves <, >, & characters so that
     legitimate math/code questions are not mangled in prompts.
+
+    Also inspects (but does not silently strip) Layer A Unicode carriers --
+    invisible/format codepoints, including the tag-character and
+    private-use-plane smuggling channels -- since these are a
+    prompt-injection vector when they arrive in *user* input, not just an
+    egress hygiene concern. Ingress stripping is intentionally more
+    conservative than egress: it uses domain.watermark's default (safe)
+    options, never the aggressive/strip-everything modes, so legitimate
+    multilingual input is not corrupted on the way in either.
     """
+    from reasoner.domain.watermark import scrub_text
+
+    scrub_result = scrub_text(text)
+    if scrub_result.stats.total_changed:
+        text = scrub_result.text
+
     sanitizer = InputSanitizer(
         max_length=DEFAULT_SANITIZER_MAX_LENGTH,
         allow_html=True,
@@ -196,7 +214,18 @@ def sanitize_for_prompt(text: str) -> tuple[str, list[str]]:
     if result.blocked:
         raise ValueError("Input blocked: potential prompt injection detected")
 
-    return result.sanitized, result.warnings
+    warnings = result.warnings
+    if scrub_result.stats.total_changed:
+        warnings = [
+            *warnings,
+            f"Removed {scrub_result.stats.total_changed} invisible/format Unicode "
+            "character(s) from input",
+        ]
+
+    return result.sanitized, warnings
+
+
+_SENTENCEPIECE_SPACE = chr(0x2581)  # SentencePiece's leading-space marker
 
 
 def clean_llm_artifacts(text: str) -> str:
@@ -204,56 +233,48 @@ def clean_llm_artifacts(text: str) -> str:
     Strip invisible Unicode characters and LLM-specific control tokens from
     output text before it reaches the user.
 
+    Carrier removal (Layer A) delegates to domain.watermark.scrub_text --
+    context-aware, so load-bearing invisibles (emoji ZWJ sequences, RTL
+    isolates, script joiners, flag-emoji tag sequences) survive instead of
+    being corrupted, unlike the unconditional strip this replaced. It also
+    now covers the tag-character (U+E0001-E007F) and private-use-plane
+    smuggling channels the previous implementation missed entirely. See
+    docs/plans/watermark-removal-integration.md Part II for the specific
+    corruption cases this fixes.
+
     Safe to call on any string; returns the input unchanged if nothing matches.
+    Callers that also want the Layer A provenance report (e.g. to surface
+    "N invisible characters removed" to the user) should call
+    clean_llm_artifacts_with_report instead.
+    """
+    text, _report = clean_llm_artifacts_with_report(text)
+    return text
+
+
+def clean_llm_artifacts_with_report(text: str) -> tuple[str, TextInspectReport | None]:
+    """Same cleaning as clean_llm_artifacts, plus the Layer A scrub report.
+
+    The report reflects only the domain.watermark carrier-scrub step, not the
+    LLM-token/decode-artifact cleanup that follows it -- those are out of
+    Layer A's scope (see the inline comments below) and are not
+    watermark-relevant. Returns (text, None) for empty input.
     """
     if not text:
-        return text
+        return text, None
 
-    # ── Invisible / zero-width Unicode characters ─────────────────────────
-    # Strip entirely — these are never meaningful in prose.
-    _STRIP_CODEPOINTS = (
-        "​"  # zero-width space          (injected by AI-bypass tools)
-        "‌"  # zero-width non-joiner
-        "‍"  # zero-width joiner
-        "‎"  # left-to-right mark
-        "‏"  # right-to-left mark
-        "﻿"  # byte order mark / zero-width no-break space
-        "­"  # soft hyphen
-        "͏"  # combining grapheme joiner
-        "؜"  # arabic letter mark
-        "⁠"  # word joiner
-        "⁡"  # invisible function application
-        "⁢"  # invisible times
-        "⁣"  # invisible separator
-        "⁤"  # invisible plus
-        "⁪"  # inhibit symmetric swapping
-        "⁫"  # activate symmetric swapping
-        "⁬"  # inhibit arabic form shaping
-        "⁭"  # activate arabic form shaping
-        "⁮"  # national digit shapes
-        "⁯"  # nominal digit shapes
-        "￹"  # interlinear annotation anchor
-        "￺"  # interlinear annotation separator
-        "￻"  # interlinear annotation terminator
-        "�"  # replacement character (artifact of bad decoding)
-    )
-    _strip_table = str.maketrans("", "", _STRIP_CODEPOINTS)
-    text = text.translate(_strip_table)
+    from reasoner.domain.watermark import scrub_text
 
-    # ── Unicode spaces → regular ASCII space ──────────────────────────────
-    # Covers en-space, em-space, thin-space, hair-space, non-breaking space,
-    # narrow no-break space, ideographic space, etc.
-    _SPACE_CHARS = re.compile(
-        r"[   -   　]"
-    )
-    text = _SPACE_CHARS.sub(" ", text)
+    scrub_result = scrub_text(text)
+    text = scrub_result.text
 
-    # ── Bidi override characters (can hide malicious text visually) ────────
-    _BIDI_STRIP = re.compile(r"[‪-‮⁦-⁩]")
-    text = _BIDI_STRIP.sub("", text)
+    # ── Decode-artifact cleanup (not a Layer A carrier concern) ────────────
+    text = text.replace(chr(0xFFFD), "")  # replacement char from a bad decode upstream
 
-    # ── Line/paragraph separator → newline ────────────────────────────────
-    text = text.replace(" ", "\n").replace(" ", "\n\n")
+    # ── Unicode line/paragraph separators -> plain newlines ────────────────
+    # Visible whitespace, not an invisible/format carrier, so out of Layer
+    # A's scope -- but LLM output sometimes emits them where a plain
+    # newline was intended.
+    text = text.replace(chr(0x2028), "\n").replace(chr(0x2029), "\n\n")
 
     # ── LLM control / chat-template tokens ────────────────────────────────
     # Listed in order of likelihood; use a single compiled pattern for speed.
@@ -265,7 +286,7 @@ def clean_llm_artifacts(text: str) -> str:
         r"|\[/?INST\]"
         r"|<\|pad\|>|<\|unk\|>"
         r"|<pad>|<unk>|<sep>|<cls>|<mask>"
-        r"|▁(?=\s)"   # SentencePiece leading space before whitespace
+        + "|" + re.escape(_SENTENCEPIECE_SPACE) + r"(?=\s)"  # SentencePiece leading space before whitespace
     )
     text = _LLM_TOKENS.sub("", text)
 
@@ -273,7 +294,7 @@ def clean_llm_artifacts(text: str) -> str:
     # Collapse multiple consecutive blank lines (>2) to at most two.
     text = re.sub(r"\n{3,}", "\n\n", text)
 
-    return text
+    return text, scrub_result.report
 
 
 def sanitize_for_logging(text: str, max_length: int = 200) -> str:

@@ -64,8 +64,7 @@ from reasoner.core.constants import (
     DEFAULT_MAX_TOKENS,
     TRUNCATION,
 )
-from reasoner.token_cache import get_token_cache 
-from reasoner.sanitization import sanitize_for_prompt, clean_llm_artifacts
+from reasoner.token_cache import get_token_cache
 import reasoner.phases as phases
 
 logger = logging.getLogger(__name__)
