@@ -162,6 +162,20 @@ export function validateUpstreamUrl(url: string): string {
   return url;
 }
 
+/**
+ * Shared secret for the FastAPI /api/neuro/* gate, forwarded by the neuro
+ * proxy routes. Must match NEURO_INTERNAL_KEY on the API workers.
+ *
+ * Server-only: never read this through NEXT_PUBLIC_, and note it is
+ * deliberately absent from sanitizeRequestHeaders' allowlist below so a
+ * browser cannot supply its own. Empty when unset, which is the local-dev
+ * posture where the backend leaves the endpoints ungated.
+ */
+export function neuroKeyHeader(): Record<string, string> {
+  const key = process.env.NEURO_INTERNAL_KEY?.trim();
+  return key ? { 'X-Neuro-Key': key } : {};
+}
+
 export function sanitizeRequestHeaders(headers: Headers): Record<string, string> {
   const allowed = new Set([
     'authorization',

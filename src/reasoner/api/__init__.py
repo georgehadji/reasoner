@@ -153,6 +153,20 @@ async def lifespan(app: FastAPI):
                 "AUTH_PERSISTENCE_ENABLED must be true for multi-worker production deployments."
             )
 
+    # Neuro's endpoints are mounted on the public app and self-called over
+    # loopback. Without the shared key they are open: /audit is an unmetered
+    # LLM proxy and /learn writes into tenant memory.
+    if not settings.neuro_internal_key:
+        message = (
+            "NEURO_INTERNAL_KEY is unset: /api/neuro/* is unauthenticated. "
+            "Set the same value on every API worker and on the Next server "
+            "(its /api/neuro/* proxy routes forward it upstream)."
+        )
+        if settings.ENVIRONMENT == "production":
+            logger.critical(message)
+            raise RuntimeError(message)
+        logger.warning(message)
+
     # Single-worker SSE warning: health checks time out during long pipeline runs
     if uvicorn_workers == 1 and settings.ENVIRONMENT != "development":
         logger.warning(
@@ -826,6 +840,9 @@ app.include_router(uploads_router)
 
 from reasoner.api.routes.images import router as images_router
 app.include_router(images_router)
+
+from reasoner.api.routes.provenance import router as provenance_router
+app.include_router(provenance_router)
 
 
 # ─────────────────────────────────────────────────────────────────────

@@ -61,7 +61,7 @@ class L1Cache:
         if persona and persona.l1_similarity_override is not None:
             threshold = persona.l1_similarity_override
 
-        now = time.monotonic()
+        now = time.time()
         scored = []
         for bundle in self.bundles:
             age = now - bundle.get("created_at", 0)
@@ -80,7 +80,7 @@ class L1Cache:
     async def add(self, content: str, source: str, embedding: list[float]) -> str:
         bundle_id = hashlib.sha256(content.encode()).hexdigest()[:12]
         bundle = {"id": bundle_id, "content": content, "source": source,
-                  "embedding": embedding, "created_at": time.monotonic()}
+                  "embedding": embedding, "created_at": time.time()}
         self.bundles.append(bundle)
         if len(self.bundles) > self.config.l1_max_bundles:
             self.bundles.sort(key=lambda b: b.get("created_at", 0))
@@ -137,7 +137,7 @@ class L2Index:
         entry_id = hashlib.sha256(content.encode()).hexdigest()[:12]
         self.entries.append({"id": entry_id, "content": content, "source": source,
                             "embedding": embedding, "metadata": metadata or {},
-                            "created_at": time.monotonic()})
+                            "created_at": time.time()})
         # Evict oldest entries if size exceeds limit
         while len(self.entries) > self.config.l2_max_entries:
             self.entries.pop(0)

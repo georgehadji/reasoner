@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getApiBaseUrl, validateUpstreamUrl } from '@/lib/security-server';
+import { getApiBaseUrl, validateUpstreamUrl, neuroKeyHeader } from '@/lib/security-server';
 import { API } from '@/lib/config';
 
 export async function GET(request: Request) {
@@ -14,6 +14,7 @@ export async function GET(request: Request) {
     const resp = await fetch(upstream.toString(), {
       headers: {
         cookie: request.headers.get('cookie') || '',
+        ...neuroKeyHeader(),
       },
     });
 

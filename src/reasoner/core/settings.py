@@ -275,6 +275,27 @@ class Settings:
         return f"http://{self.SERVER_HOST}:{self.SERVER_PORT}"
 
     @property
+    def neuro_internal_key(self) -> str:
+        """Shared secret gating /api/neuro/*.
+
+        Those endpoints are self-called over loopback by the pipeline, but
+        they are mounted on the public app. Ungated, anyone can drive the
+        embedding and reasoning providers (unmetered LLM spend via /audit)
+        and read or poison another tenant's memory.
+
+        Three processes must agree on this value -- every gunicorn worker
+        (self-calls are load balanced across them) and the Next server, whose
+        /api/neuro/* proxy routes forward it upstream. So it is one explicit
+        env var rather than something derived: a value derived from another
+        secret would have to be re-derived identically in TypeScript, and
+        would drift the moment either side changed.
+
+        Empty is allowed for local development; api/__init__.py refuses to
+        start in production without it.
+        """
+        return os.getenv("NEURO_INTERNAL_KEY", "").strip()
+
+    @property
     def neuro_reasoning_fallbacks(self) -> list[str]:
         """Parse NEURO_REASONING_FALLBACK_MODELS into a list."""
         return [m.strip() for m in self.NEURO_REASONING_FALLBACK_MODELS.split(",") if m.strip()]

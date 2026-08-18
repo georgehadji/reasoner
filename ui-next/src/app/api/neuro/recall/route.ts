@@ -8,6 +8,7 @@ import {
   rateLimit,
   requireCsrfToken,
   ValidationError,
+  neuroKeyHeader,
 } from '@/lib/security-server';
 import { API } from '@/lib/config';
 
@@ -27,6 +28,7 @@ export async function POST(req: NextRequest) {
 
     const headers = new Headers(sanitizeRequestHeaders(req.headers));
     headers.set('Content-Type', 'application/json');
+    for (const [k, v] of Object.entries(neuroKeyHeader())) headers.set(k, v);
     const upstream = await fetch(`${apiBase}${API.NEURO_RECALL}`, {
       method: 'POST',
       headers,

@@ -4,6 +4,7 @@ Multi-tenant isolation, provider fallback chains, persona modes.
 """
 
 import os
+import re
 import copy
 import yaml
 from pathlib import Path
@@ -180,7 +181,6 @@ def _build_persona(name: str, data: dict) -> PersonaConfig:
 
 
 def load_config(path: Optional[str] = None) -> NeuroConfig:
-    print("[DEBUG] neuro/config.py: load_config started")
     import logging
     logger = logging.getLogger(__name__)
     
@@ -195,9 +195,7 @@ def load_config(path: Optional[str] = None) -> NeuroConfig:
             if env_path:
                 config_path = Path(env_path)
             else:
-                print("[DEBUG] neuro/config.py: checking default config paths")
                 for candidate in DEFAULT_CONFIG_PATHS:
-                    print(f"[DEBUG] neuro/config.py: checking {candidate}")
                     try:
                         if candidate.exists():
                             config_path = candidate
@@ -206,7 +204,6 @@ def load_config(path: Optional[str] = None) -> NeuroConfig:
                         continue
 
         if not config_path or not config_path.exists():
-            print("[DEBUG] neuro/config.py: no config file found, using defaults")
             return _apply_defaults(NeuroConfig())
 
         logger.info(f"Loading config from {config_path}")
@@ -344,14 +341,31 @@ def _apply_defaults(cfg: NeuroConfig) -> NeuroConfig:
     return cfg
 
 
+_AGENT_ID_RE = re.compile(r"[^A-Za-z0-9_-]")
+
+
+def _safe_agent_id(agent_id: str) -> str:
+    """Reduce an untrusted agent_id to a single safe path segment.
+
+    agent_id reaches this module straight from request bodies
+    (/api/neuro/{recall,learn,audit}) and from PipelineState.conversation_id,
+    and is joined onto the neuro data dir. Without this, an absolute path
+    ("/etc/evil") or traversal ("../../x") escapes the agents directory and
+    turns tenant storage into an arbitrary file write.
+    """
+    return _AGENT_ID_RE.sub("", agent_id)[:128] or "default"
+
+
 def get_agent_data_dir(cfg: NeuroConfig, agent_id: Optional[str] = None) -> Path:
+    # Membership is tested against the raw id so operator-configured agent
+    # names (trusted, from neuro.yaml) keep resolving to their own data_dir.
     if agent_id and agent_id in cfg.agents:
         agent_cfg = cfg.agents[agent_id]
         if agent_cfg.data_dir:
             return Path(agent_cfg.data_dir)
-        return Path(cfg.data_dir) / "agents" / agent_id
+        return Path(cfg.data_dir) / "agents" / _safe_agent_id(agent_id)
     elif agent_id:
-        return Path(cfg.data_dir) / "agents" / agent_id
+        return Path(cfg.data_dir) / "agents" / _safe_agent_id(agent_id)
     return Path(cfg.data_dir) / "agents" / "default"
 
 

@@ -8,11 +8,12 @@ import time
 import hashlib
 import logging
 import asyncio
+import secrets
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from reasoner.neuro.config import (
@@ -170,16 +171,14 @@ class TenantManager:
                 self._evict_lru_locked()
 
             data_dir = get_agent_data_dir(self.config, agent_id)
-            memory_dir = data_dir / "memory"
             l1_dir = data_dir / "cache" / "l1"
             l2_dir = data_dir / "cache" / "l2"
 
-            for d in [memory_dir, l1_dir, l2_dir]:
+            for d in [l1_dir, l2_dir]:
                 d.mkdir(parents=True, exist_ok=True)
 
             tenant = {
                 "data_dir": data_dir,
-                "memory_dir": memory_dir,
                 "l1": L1Cache(l1_dir, self.config.cache),
                 "l2": L2Index(l2_dir, self.config.cache),
                 "sessions": SessionManager(data_dir, SessionConfig()),
@@ -219,11 +218,30 @@ def build_audit_system_prompt(persona: PersonaConfig) -> str:
 #  Router Factory
 # ─────────────────────────────────────────────
 
+def require_neuro_key(request: Request) -> None:
+    """Gate /api/neuro/* to callers holding the shared internal key.
+
+    The pipeline reaches these endpoints over loopback, but they are mounted
+    on the public app: ungated, /audit is a free LLM proxy and /learn lets
+    anyone write into a tenant's memory.
+
+    An unset key is allowed through so local development works with no
+    secrets configured; api/__init__.py refuses to start in production when
+    the key is empty, so this branch is never the production posture.
+    """
+    expected = settings.neuro_internal_key
+    if not expected:
+        return
+    provided = request.headers.get("X-Neuro-Key", "")
+    if not secrets.compare_digest(provided, expected):
+        raise HTTPException(status_code=403, detail="Neuro access required")
+
+
 def create_neuro_router(config: Optional[NeuroConfig] = None) -> APIRouter:
     if config is None:
         config = load_config()
 
-    router = APIRouter(prefix="/api/neuro")
+    router = APIRouter(prefix="/api/neuro", dependencies=[Depends(require_neuro_key)])
     reasoner = create_resilient_reasoning(config.reasoning)
     embedder = create_resilient_embedding(config.embedding)
     tenants = TenantManager(config)
@@ -257,7 +275,6 @@ def create_neuro_router(config: Optional[NeuroConfig] = None) -> APIRouter:
         persona = get_persona(config, req.persona, req.agent_id)
         tenant = await tenants.get(req.agent_id)
         l1, l2 = tenant["l1"], tenant["l2"]
-        memory_dir = tenant["memory_dir"]
         sessions = tenant["sessions"]
 
         all_chunks = []
@@ -280,6 +297,21 @@ def create_neuro_router(config: Optional[NeuroConfig] = None) -> APIRouter:
         remaining = req.max_results - len(all_chunks)
         if remaining > 0:
             all_chunks.extend(l2.search(query_embedding, top_k=remaining, persona=persona))
+
+        # L3: archived session summaries written by archive_hot_sessions().
+        # Embeddings are sidecar-cached by content hash, so a cold scan only
+        # calls the provider for summaries it has not seen before.
+        # ponytail: linear directory scan on the recall path, bounded by
+        # NEURO_RECALL_TIMEOUT_SECONDS. Fine for hundreds of summaries per
+        # tenant; index the warm dir if a tenant ever accumulates thousands.
+        remaining = req.max_results - len(all_chunks)
+        if remaining > 0:
+            try:
+                all_chunks.extend(await l3_scan(
+                    sessions.warm_dir, query_embedding, embedder.embed, top_k=remaining
+                ))
+            except Exception as exc:
+                log.warning("L3 scan failed in recall: %s", exc)
 
         # Optional: cross-encoder rerank for higher precision
         if len(all_chunks) > 1 and settings.COHERE_RERANK_ENABLED:
@@ -341,6 +373,36 @@ def create_neuro_router(config: Optional[NeuroConfig] = None) -> APIRouter:
     async def learn(req: LearnRequest):
         tenant = await tenants.get(req.agent_id)
         result = tenant["sessions"].ingest(req.prompt, req.response, req.metadata)
+
+        # Index the exchange for semantic recall. Without this nothing ever
+        # writes L1/L2, so /recall degrades to HOT substring matching.
+        #
+        # The entry goes into both tiers deliberately: L1 is the hot subset
+        # (24h TTL, 50 bundles, 0.75 threshold) that ages out, L2 the durable
+        # index (500 entries, 0.5 threshold) that keeps it. Recall queries L1
+        # first, so recent context matches at high precision before the wider
+        # L2 scan. Both writes reuse the one embedding -- this costs a file
+        # write, not a second provider call.
+        #
+        # Best-effort: a dead embedding provider must not fail the ingest.
+        # ponytail: last-writer-wins on concurrent same-tenant learns can drop
+        # an entry (L2Index rewrites index.json wholesale); add a per-tenant
+        # lock if that shows up as measurable recall loss.
+        try:
+            content = f"User: {req.prompt}\nAssistant: {req.response}"
+            embedding = await embedder.embed(content)
+            source = f"session:{result['session_id']}"
+            await tenant["l1"].add(content, source=source, embedding=embedding)
+            await tenant["l2"].add(
+                content,
+                source=source,
+                embedding=embedding,
+                metadata=req.metadata or {},
+            )
+        except Exception as exc:
+            log.warning("Memory indexing failed for learn (session %s): %s",
+                        result["session_id"], exc)
+
         return LearnResponse(
             status="learned", session_id=result["session_id"],
             entry_number=result["entry_number"], agent_id=req.agent_id,
