@@ -53,12 +53,12 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ── 5.6 (Jul 2026) — tri-tier Sol/Terra/Luna naming, newest OpenAI gen ──
     "gpt-5.6-sol":      {"model": "openai/gpt-5.6-sol"},         # flagship — $5/$30 per M, 1.05M ctx
     "gpt-5.6-terra":    {"model": "openai/gpt-5.6-terra"},       # balanced mid-tier — $1/$6 per M, 1.05M ctx
-    "gpt-5.6-luna":     {"model": "openai/gpt-5.6-luna"},        # fast/cheap — $0.10/$0.60 per M, 1.05M ctx
+    "gpt-5.6-luna":     {"model": "openai/gpt-5.6-luna"},        # fast/cheap — $0.20/$1.20 per M, 1.05M ctx, AA Intel 51.2 — default synthesis voice
     # -pro siblings are priced identically to the base tiers on OpenRouter, so they
     # are a free capability upgrade wherever the base tier is already being used.
     "gpt-5.6-sol-pro":   {"model": "openai/gpt-5.6-sol-pro"},    # $5/$30 per M, 1.05M ctx
     "gpt-5.6-terra-pro": {"model": "openai/gpt-5.6-terra-pro"},  # $1/$6 per M, 1.05M ctx
-    "gpt-5.6-luna-pro":  {"model": "openai/gpt-5.6-luna-pro"},   # $0.10/$0.60 per M, 1.05M ctx
+    "gpt-5.6-luna-pro":  {"model": "openai/gpt-5.6-luna-pro"},   # $0.20/$1.20 per M, 1.05M ctx
     # ── Previous (5.4, Mar 2026) ──
     "gpt-5.4":          {"model": "openai/gpt-5.4"},             # $2.50/$15 per M, AI^2 Intel 51.4
     "gpt-5.4-pro":      {"model": "openai/gpt-5.4-pro"},         # max reasoning — $30/$180 per M, 1.05M ctx
@@ -152,8 +152,10 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ═══════════════════════════════════════════════════════════════
     # V4 family: 1M ctx, MoE.  Prices below are the OpenRouter list prices (the
     # fallback lane when DEEPSEEK_API_KEY is unset); DeepSeek's own API is cheaper.
-    #   Pro:   1.6T total / 49B active — $1.168/$2.336  per M  (was $0.435/$0.87;
-    #          that older price now only survives on the deepseek-v4-pro-0813 pin)
+    #   Pro:   1.6T total / 49B active — $0.66/$1.98 per M per the bundled catalogue
+    #          (2026-08-16). Earlier comments said $0.435/$0.87 and the Aug catalogue doc
+    #          said $1.168/$2.336 — this model's list price has moved repeatedly, so
+    #          re-check the snapshot before costing the 23 preset slots that use it.
     #   Flash: 284B total / 13B active — $0.0615/$0.1229 per M — PRIMARY budget choice
     "deepseek-v4-pro": {
         "cls": "compat",
@@ -251,7 +253,11 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ═══════════════════════════════════════════════════════════════
     # GLM (Zhipu AI / z-ai)
     # ═══════════════════════════════════════════════════════════════
-    "glm-5.2":          {"model": "z-ai/glm-5.2"},                # $0.308/$0.968 per M, 1M ctx — repriced 3× down; now one of the cheapest frontier-class CN models
+    # Price verified against the live OpenRouter model page 2026-08-17: $0.476/$1.496.
+    # The bundled catalogue snapshot says $1.19/$3.74 and docs/openrouter-catalogue-2026-08.md
+    # says $0.308/$0.968 — three different figures. Re-run scripts/update_openrouter_catalogue.py
+    # before trusting PRICING_DB for this model.
+    "glm-5.2":          {"model": "z-ai/glm-5.2"},                # $0.476/$1.496 per M, 1M ctx — AA Intel 52.6, cheapest frontier-class CN model
     # NB: z-ai/glm-5.2:batch is *more* expensive ($0.70/$2.20) and caps at 512K ctx.
     # Do not add it as a "cheaper batch tier" — for this model the batch lane is a trap.
     # ═══════════════════════════════════════════════════════════════

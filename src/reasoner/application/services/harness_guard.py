@@ -46,7 +46,7 @@ _MODEL_LABS: dict[str, str] = {
     "qwen3-max": "qwen", "qwen3.7-max": "qwen", "qwen3.7-plus": "qwen", "qwen3.5-flash": "qwen",
     "qwen3-max-thinking": "qwen", "qwen3.6-flash": "qwen", "qwen3.6-plus-real": "qwen",
     "qwen3-coder-flash": "qwen", "qwen3-coder-30b-a3b": "qwen",
-    "qwen3.7-flash": "qwen",
+    "qwen3.7-flash": "qwen", "qwen3.8-max": "qwen",
     # GLM (Zhipu)
     "glm-5.2": "zhipu",
     # Tencent
@@ -77,6 +77,9 @@ _MODEL_LABS: dict[str, str] = {
     "inkling": "thinkingmachines",
     # Poolside
     "laguna-xs-2.1": "poolside",
+    # KwaiPilot (Kuaishou) — coding cascade in coding-budget
+    "kat-coder-air-v2.5": "kwaipilot", "kat-coder-pro-v2.5": "kwaipilot",
+    "kat-coder-pro-v2": "kwaipilot",
     # Sourceful
     "riverflow-v2-fast-preview": "sourceful",
     # InclusionAI (Ant Group)
