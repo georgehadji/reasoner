@@ -134,7 +134,6 @@
       "Bash(curl -s http://localhost:3000/api/billing/subscription)",
       "Bash(git stash *)",
       "Bash(git checkout *)",
-      "Bash(gh pr create --repo georgehadji/Reaseoner --base main --head fix/autonomous-bug-fixes-session --title 'fix: autonomous bug-fix session — 12 patches \\(security, concurrency, silent failures, UI\\)' --body ' *)",
       "Bash(bash /tmp/check_files.sh)",
       "Bash(bash /tmp/check_track1.sh)",
       "Bash(pip show *)",
