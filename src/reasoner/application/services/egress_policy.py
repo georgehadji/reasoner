@@ -22,6 +22,7 @@ class EgressPolicy:
     layer_a_options: ScrubOptions
     image_metadata: bool
     layer_b_enabled: bool
+    layer_b_strategy: str
 
 
 def resolve_egress_policy(
@@ -34,7 +35,7 @@ def resolve_egress_policy(
 
     `None` means "no request-level opinion" -> fall back to the deployment
     default in `settings`. Layer B has no per-request opt-in yet (Phase 6);
-    it always follows `settings.WATERMARK_LAYER_B_ENABLED`.
+    it always follows `settings.WATERMARK_LAYER_B_ENABLED`/`_STRATEGY`.
     """
     return EgressPolicy(
         layer_a=settings.WATERMARK_EGRESS_LAYER_A if layer_a is None else layer_a,
@@ -43,6 +44,7 @@ def resolve_egress_policy(
             settings.WATERMARK_IMAGE_STRIP_UPLOADS if image_metadata is None else image_metadata
         ),
         layer_b_enabled=settings.WATERMARK_LAYER_B_ENABLED,
+        layer_b_strategy=settings.WATERMARK_LAYER_B_STRATEGY,
     )
 
 

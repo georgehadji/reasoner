@@ -117,9 +117,12 @@ class WatermarkService:
         """Mirrors the reference repo's `/capabilities` -- what's actually bound.
 
         `layer_b_enabled` is hardcoded False regardless of the
-        `WATERMARK_LAYER_B_ENABLED` setting: no rewriter is bound yet
-        (Phase 6). Reporting the raw setting here would let a deployment
-        advertise a capability that doesn't exist.
+        `WATERMARK_LAYER_B_ENABLED` setting: Phase 6 wired Layer B into the
+        pipeline's own `egress_rewrite` phase (flows/egress_rewrite_phase.py),
+        but this service -- the standalone `/api/provenance/rewrite` HTTP
+        path -- has no rewriter bound. Reporting the raw setting here would
+        let a deployment advertise an ad-hoc rewrite capability that doesn't
+        exist outside a pipeline run.
         """
         from reasoner.infrastructure.watermark.pixel.noop import NoopPixelScrubber
 

@@ -305,6 +305,20 @@ class PipelineExecutionService:
                     
                     phases.append((step.num, step.name, make_wrapper(step.fn), step.serializer))
                     step_metadata[step.name] = {"critical": step.critical}
+
+                # Layer B (optional, off by default): appended once here rather than
+                # in every flow's get_phases() -- this loop is the single real driver
+                # for every method (docs/plans/watermark-removal-integration.md §5.5).
+                from reasoner.application.services.egress_policy import resolve_egress_policy
+                if resolve_egress_policy().layer_b_enabled and phases:
+                    from reasoner.application.flows.base import PhaseStep
+                    from reasoner.application.flows.egress_rewrite_phase import run_egress_rewrite_phase
+                    from reasoner.application.services.serializers import _ser_egress_rewrite
+                    egress_step = PhaseStep(
+                        phases[-1][0] + 0.5, "Egress Rewrite", run_egress_rewrite_phase, _ser_egress_rewrite
+                    )
+                    phases.append((egress_step.num, egress_step.name, make_wrapper(egress_step.fn), egress_step.serializer))
+                    step_metadata[egress_step.name] = {"critical": False}
             else:
                 logger.error(f"No strategy found for method: {method}")
 

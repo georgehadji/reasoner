@@ -95,6 +95,40 @@ export interface Attachment {
   extractedText?: string;
 }
 
+/** One distinct invisible/AI-provenance character carrier found in text. */
+export interface ProvenanceCharHit {
+  codepoint: string;
+  label: string;
+  count: number;
+  kind: string;
+  confidence: string;
+  sample_offsets: number[];
+}
+
+/** Layer A text-scrub findings for one field (`domain.watermark.TextInspectReport`). */
+export interface ProvenanceTextReport {
+  length: number;
+  suspicious_total: number;
+  hits: ProvenanceCharHit[];
+  notes: string[];
+}
+
+/** `state.meta.provenance_report`, set by synthesis_phase.py and carried on the
+ * synthesis SSE payload's `data.provenance_report` field (see _ser_synthesis). */
+export interface SynthesisProvenanceReport {
+  core_solution: ProvenanceTextReport | null;
+  critical_insights_removed: number;
+  action_blueprint_removed: number;
+  open_questions_removed: number;
+}
+
+/** GET /api/provenance/capabilities — what this deployment actually supports. */
+export interface ProvenanceCapabilities {
+  image_formats: string[];
+  pixel_backend_bound: boolean;
+  layer_b_enabled: boolean;
+}
+
 export interface ResearchStepEvent {
   step_type: 'searching' | 'reasoning' | 'reading';
   queries: string[];

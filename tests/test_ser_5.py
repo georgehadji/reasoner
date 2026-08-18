@@ -233,6 +233,49 @@ class TestSer5EdgeCases:
         assert len(result["critical_insights"][0]) == 100000
 
 
+class TestSer5ProvenanceReport:
+    """provenance_report (domain.watermark, written to state.meta by
+    synthesis_phase.py) must reach the SSE payload -- previously it was set
+    but never serialized, so the frontend had no way to see it."""
+
+    def _get_ser_5(self):
+        from reasoner.application.services.serializers import _ser_synthesis
+        return _ser_synthesis
+
+    def test_provenance_report_included_when_present(self):
+        state = MockPipelineState(
+            final_solution={"core_solution": "Clean text"},
+        )
+        state.meta = MagicMock()
+        state.meta.provenance_report = {
+            "core_solution": {"length": 10, "suspicious_total": 2, "hits": [], "notes": []},
+            "critical_insights_removed": 0,
+            "action_blueprint_removed": 0,
+            "open_questions_removed": 0,
+        }
+
+        result = self._get_ser_5()(state)
+
+        assert result["provenance_report"]["core_solution"]["suspicious_total"] == 2
+
+    def test_provenance_report_omitted_when_absent(self):
+        """No meta attribute at all (older/minimal state) must not crash the serializer."""
+        state = MockPipelineState(final_solution={"core_solution": "Clean text"})
+
+        result = self._get_ser_5()(state)
+
+        assert "provenance_report" not in result
+
+    def test_provenance_report_omitted_when_empty(self):
+        state = MockPipelineState(final_solution={"core_solution": "Clean text"})
+        state.meta = MagicMock()
+        state.meta.provenance_report = {}
+
+        result = self._get_ser_5()(state)
+
+        assert "provenance_report" not in result
+
+
 class TestSer5LegacyObjectFormat:
     """Test _ser_5 with legacy FinalSolution object format."""
     

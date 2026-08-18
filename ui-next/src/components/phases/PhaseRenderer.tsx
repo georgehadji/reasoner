@@ -12,6 +12,8 @@ import { CritiqueCard } from './CritiqueCard';
 import { buildMarkdownFromPhase } from '@/lib/markdown';
 import { copyToClipboard } from '@/lib/utils';
 import { isEnabled } from '@/hooks/useFeatureFlags';
+import { getProvenanceReport } from '@/lib/provenance';
+import { ProvenanceBadge } from '@/components/provenance/ProvenanceBadge';
 
 function isSynthesisPhase(name: string): boolean {
   return /synthesis|report|theory|conclusion|verdict|redesign|aufhebung|transfer/i.test(name);
@@ -324,6 +326,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
       omitHeading: true,
     });
     const citations = data && typeof data === 'object' ? (data as Record<string, unknown>).citations as Array<{ url: string; title: string; snippet: string; source_type: string }> | undefined : undefined;
+    const provenanceReport = getProvenanceReport(data);
     return (
       <SynthesisCard index={index} phase={phaseNum} name={name} tokens={tokens} models={models} subagents={subagents} duration={duration} highlights={synthesisHighlights} sources={synthesisSections?.sources} citations={citations} defaultOpen>
         {synthesisSections && (
@@ -385,6 +388,11 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
               </section>
             )}
 
+          </div>
+        )}
+        {provenanceReport && (
+          <div className="mb-4">
+            <ProvenanceBadge report={provenanceReport} />
           </div>
         )}
         <SynthesisRenderer text={md} />

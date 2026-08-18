@@ -958,6 +958,14 @@ def _ser_5(state: PipelineState) -> dict:
     return base
 
 
+def _ser_egress_rewrite(state: PipelineState) -> dict:
+    """Serialize the Layer B rewrite outcome, or {} when the phase didn't run."""
+    provenance = _get_v(_get_v(state, "meta", None), "provenance_report", {})
+    if not isinstance(provenance, dict):
+        return {}
+    return provenance.get("egress_rewrite", {})
+
+
 def _ser_cross_language(state: PipelineState) -> dict:
     """Serialize the cross-language pivot metadata, or {} when no pivot ran.
 
@@ -1071,6 +1079,13 @@ def _ser_synthesis(state: PipelineState) -> dict:
         cross_lang = _ser_cross_language(state)
         if cross_lang:
             result["cross_language"] = cross_lang
+
+        # Provenance/watermark scrub report (domain.watermark, set in synthesis_phase.py) --
+        # written onto state.meta but otherwise never left it; the frontend has
+        # nothing to show a ProvenanceBadge for without this.
+        provenance_report = _get_v(_get_v(state, "meta", None), "provenance_report", {})
+        if provenance_report:
+            result["provenance_report"] = provenance_report
 
         return result
 

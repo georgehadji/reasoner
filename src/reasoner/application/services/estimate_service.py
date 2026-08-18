@@ -37,6 +37,19 @@ async def estimate_cost(problem: str, preset: str) -> dict[str, Any]:
     base_duration = 8 if tier == "budget" else 20
     estimated_duration = base_duration + (len(problem.split()) / 50)
 
+    # Layer B (docs/plans/watermark-removal-integration.md §5.5, integration
+    # point #14): one extra rewrite call, input+output roughly the synthesis
+    # phase's own share -- so a deployment that enables it doesn't surprise-bill.
+    from reasoner.core.settings import settings
+
+    if settings.WATERMARK_LAYER_B_ENABLED:
+        rewrite_input = tokens_per_phase_input
+        rewrite_output = tokens_per_phase_output
+        estimated_input += rewrite_input
+        estimated_output += rewrite_output
+        estimated_cost += calculate_model_cost(primary_id, rewrite_input, rewrite_output)
+        estimated_duration += 5
+
     return {
         "estimated_tokens_input": estimated_input,
         "estimated_tokens_output": estimated_output,

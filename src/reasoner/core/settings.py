@@ -425,6 +425,7 @@ class Settings:
     WATERMARK_IMAGE_STRIP_UPLOADS: bool = os.getenv("WATERMARK_IMAGE_STRIP_UPLOADS", "true").lower() in ("1", "true", "yes")
     WATERMARK_IMAGE_STRIP_GENERATED: bool = os.getenv("WATERMARK_IMAGE_STRIP_GENERATED", "false").lower() in ("1", "true", "yes")
     WATERMARK_LAYER_B_ENABLED: bool = os.getenv("WATERMARK_LAYER_B_ENABLED", "false").lower() in ("1", "true", "yes")
+    WATERMARK_LAYER_B_STRATEGY: str = os.getenv("WATERMARK_LAYER_B_STRATEGY", "paraphrase")
 
     @property
     def cors_origins_list(self) -> list[str]:
