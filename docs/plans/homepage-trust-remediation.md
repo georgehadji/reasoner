@@ -64,10 +64,10 @@ restrictive licence do not get installed; and the self-host/auditability claim i
 security page than the theoretical risk it guards against.
 
 **Verification tasks before choosing:**
-- Confirm `github.com/georgehadji/Reaseoner` was never public under MIT (it currently 404s, so a
-  clean slate is likely). Any prior public commit stays MIT-licensed for that revision, permanently.
+- Confirm `github.com/georgehadji/reasoner` (then misspelled `Reaseoner`, renamed 2026-08-18 —
+  see D-6) was never public under MIT (it currently 404s, so a clean slate is likely). Any prior
+  public commit stays MIT-licensed for that revision, permanently.
 - Confirm `.github/workflows/release-sdk.yml` never published `@reasoner/sdk@0.2.0` to npm under MIT.
-- Note the repo slug is misspelled (`Reaseoner`). Rename before it appears on the site.
 
 ### 0.2 False-claim purge
 
@@ -337,7 +337,7 @@ Phase 0 blocks everything: layering features over false claims multiplies the ev
 | D-3 | Legal entity + registered address to publish | You | 2.5 |
 | D-4 | Actual retention period and deletion SLA | You | 2.1, 2.4 |
 | D-5 | Is HIPAA in scope at all (BAA offered)? If not, delete every mention | You | 0.2 |
-| D-6 | ~~Rename repo `Reaseoner` → `reasoner` before any public link~~ — **done 2026-08-18.** Renamed on GitHub (still private, so nothing public pointed at the old slug); local remote and the three hardcoded references updated in `d1a7653`. GitHub redirects the old path, and a dead command-allowlist entry in `.claude/settings.local.json` was removed. The only surviving mentions of the old slug are the historical notes above, which record the decision and are correct as written | — | 4.3 |
+| D-6 | ~~Rename repo `Reaseoner` → `reasoner` before any public link~~ — **done 2026-08-18.** Renamed on GitHub (still private, so nothing public pointed at the old slug); local remote and the three hardcoded references updated in `d1a7653`. GitHub redirects the old path, and a dead command-allowlist entry in `.claude/settings.local.json` was removed. The remaining mentions of the old slug (§0.1, above) are deliberate — quoted as historical fact, dated to the rename | — | 4.3 |
 
 ## Explicitly out of scope
 
