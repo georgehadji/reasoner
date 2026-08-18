@@ -30,6 +30,11 @@ class FakeRouter:
             "critique", "stress_testing", "synthesis",
         ]}
         self.cascading_routing = {}
+        self.fallback_table = {}
+        self.verbose = False
+        self.run_id = ""
+        self.preset_id = ""
+        self.method = ""
 
     def get(self, role):
         return self._primary
@@ -45,6 +50,28 @@ class FakeRouter:
 def _parse_sse(line: str) -> dict:
     """Strip 'data: ' prefix and parse JSON."""
     return json.loads(line.removeprefix("data: ").strip())
+
+
+@pytest.fixture(autouse=True)
+def _stub_hypergate(monkeypatch):
+    """Keep preflight off the network.
+
+    HyperGate runs before the pipeline and builds its own LLM clients, so
+    patching ProviderRouter.from_model_ids does not reach it. Unstubbed it
+    tried real calls, burned its full 10s budget, and preflight fell back to
+    the default pipeline -- the run never got as far as the phase these tests
+    patch, so they saw zero phase_error events.
+    """
+    import reasoner.application.orchestrator as orch
+
+    class _NoopGate:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def decide(self, *args, **kwargs):
+            return None
+
+    monkeypatch.setattr(orch, "HyperGateAgent", _NoopGate)
 
 
 @pytest.mark.asyncio
