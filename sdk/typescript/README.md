@@ -15,7 +15,7 @@ Zero runtime dependencies. Runs on Node 20+, Bun, Deno, browsers, and edge runti
 | One call, one answer, no SSE parser | `client.runSync(params)` | Hits `POST /api/agent/run/sync`. Simplest option. |
 | The answer, but I already have a stream-friendly client | `client.runToCompletion(params)` | Same result shape as `runSync`, folded client-side; keeps `RunSummary.events`. |
 | Per-phase progress as it happens | `client.run(params)` | Async iterable of `ReasonerEvent`. |
-| A host that speaks [MCP](https://modelcontextprotocol.io) (Claude Desktop, Claude Code) | Skip this package | Reasoner ships an MCP server — see [`docs/MCP.md`](https://github.com/georgehadji/Reaseoner/blob/main/docs/MCP.md) in the main repo. Same pipeline, same billing, no HTTP client code. |
+| A host that speaks [MCP](https://modelcontextprotocol.io) (Claude Desktop, Claude Code) | Skip this package | Reasoner ships an MCP server — see [`docs/MCP.md`](https://github.com/georgehadji/reasoner/blob/main/docs/MCP.md) in the main repo. Same pipeline, same billing, no HTTP client code. |
 
 `runSync` and `runToCompletion` return the identical `RunSummary` shape, so switching between them is a one-line change.
 

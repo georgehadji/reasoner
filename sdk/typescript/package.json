@@ -23,7 +23,7 @@
   "sideEffects": false,
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/georgehadji/Reaseoner.git",
+    "url": "git+https://github.com/georgehadji/reasoner.git",
     "directory": "sdk/typescript"
   },
   "publishConfig": {

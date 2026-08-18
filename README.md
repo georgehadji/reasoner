@@ -88,8 +88,8 @@ Internally, the codebase follows **hexagonal architecture** (domain logic depend
 ### 1. Installation
 
 ```bash
-git clone https://github.com/georgehadji/Reaseoner.git
-cd Reaseoner
+git clone https://github.com/georgehadji/reasoner.git
+cd reasoner
 
 python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
