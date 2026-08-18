@@ -1,11 +1,17 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { apiFetch } from '@/lib/api-client';
-import { Check, X, Shield, CreditCard, Clock } from 'lucide-react';
+import { Check, X, Shield, CreditCard, Clock, Mail } from 'lucide-react';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
 
+// Two self-serve plans. Enterprise stays a real, billable tier in the
+// backend (SubscriptionTier.ENTERPRISE, Stripe/PayPal price IDs, spend
+// ceilings) — it's just not sold off a fixed-price card here. Volume and
+// custom-deployment terms are negotiated, so it's a "contact us" link
+// below the cards instead of a third self-serve plan.
 const plans = [
   {
     name: 'Free',
@@ -19,7 +25,7 @@ const plans = [
       'Community support',
     ],
     notIncluded: [
-      'Premium & Enterprise models',
+      'Premium models',
       'Advanced analytics',
       'Priority support',
     ],
@@ -42,21 +48,6 @@ const plans = [
       'Dedicated infrastructure',
     ],
     highlighted: true,
-  },
-  {
-    name: 'Enterprise',
-    tier: 'enterprise',
-    price: '$49',
-    period: '/ month',
-    queries: 'Unlimited queries',
-    features: [
-      'Everything in Pro',
-      'Custom model integrations',
-      'Self-hosted deployment option',
-      'Audit trails & compliance exports',
-      '99.9% uptime SLA',
-      'Dedicated support channel',
-    ],
   },
 ];
 
@@ -124,7 +115,7 @@ export default function PricingPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div className="mx-auto grid max-w-3xl grid-cols-1 gap-6 sm:grid-cols-2">
           {plans.map((plan) => (
             <div
               key={plan.name}
@@ -225,7 +216,7 @@ export default function PricingPage() {
                           : 'border border-[var(--border)] bg-[var(--surface-2)] text-[var(--text)] hover:bg-[var(--surface-3)]'
                       }`}
                     >
-                      {plan.tier === 'enterprise' ? 'Contact Sales' : 'Upgrade'}
+                      Upgrade
                     </button>
                   )}
                 </div>
@@ -240,6 +231,23 @@ export default function PricingPage() {
               )}
             </div>
           ))}
+        </div>
+
+        {/* Enterprise — custom terms, not a fixed self-serve price */}
+        <div className="mx-auto mt-8 max-w-3xl rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)] px-6 py-4 text-center">
+          <p className="text-sm text-[var(--text)]">
+            <span className="font-semibold">Need more than Pro?</span>{' '}
+            <span className="text-[var(--text-muted)]">
+              Custom model integrations, self-hosted deployment, SLAs, and volume pricing.
+            </span>
+          </p>
+          <Link
+            href="/contact?topic=enterprise"
+            className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--accent)] hover:underline"
+          >
+            <Mail className="h-4 w-4" />
+            Contact us for Enterprise
+          </Link>
         </div>
 
         {/* Trust badges */}

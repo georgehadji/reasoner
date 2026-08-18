@@ -47,10 +47,8 @@ def _get_event_bus() -> EventPublisher:
 # Regex for fenced code blocks inside prompts
 _CODE_FENCE_RE = re.compile(r"```(\w+)?\n(.*?)\n```", re.DOTALL)
 
-# P1.9: In-process monthly spend tracker (volatile — resets on restart).
-# Used when SPEND_CAP_MONTHLY_USD > 0. Keyed by conversation_id.
-# For persistent multi-worker enforcement, this should be backed by Redis.
-_MONTHLY_SPEND: dict[str, float] = {}
+# P1.9: monthly spend totals live in infrastructure.llm.spend_tracker, keyed
+# by billing subject (user id) rather than conversation.
 
 
 class LLMExecutor:
@@ -481,79 +479,9 @@ class LLMExecutor:
             except Exception:
                 pass
 
-            # P1.9: Per-run spend cap check — stop further LLM calls once cap exceeded
+            # P1.9: Spend ceilings — stop further LLM calls once one is crossed
             if cost_usd > 0:
-                try:
-                    from reasoner.core.settings import settings
-                    cap = settings.SPEND_CAP_PER_RUN_USD
-                    if cap > 0 and state.total_cost_usd > cap and not getattr(state, "_spend_cap_exceeded", False):
-                        state._spend_cap_exceeded = True
-                        logger.warning(
-                            "Per-run spend cap of $%.2f exceeded (current: $%.2f). Halting further LLM calls.",
-                            cap, state.total_cost_usd,
-                        )
-                        try:
-                            from reasoner.core.events.domain_events import SaaSEventType
-                            from reasoner.application.event_bus.bus import get_event_bus
-                            evt = make_event(
-                                SaaSEventType.SPEND_CAP_EXCEEDED,
-                                aggregate_id=state.conversation_id or "unknown",
-                                version=1,
-                                metadata={
-                                    "cap_type": "per_run",
-                                    "cap_amount": cap,
-                                    "total_cost": state.total_cost_usd,
-                                },
-                            )
-                            await get_event_bus().publish(evt)
-                        except Exception:
-                            pass
-                        try:
-                            from reasoner.infrastructure.metrics import REASONER_SPEND_CAP_EXCEEDED_TOTAL
-                            REASONER_SPEND_CAP_EXCEEDED_TOTAL.labels(cap_type="per_run").inc()
-                        except Exception:
-                            pass
-                except Exception:
-                    pass
-
-            # P1.9b: Monthly spend cap check (in-process, volatile)
-            if cost_usd > 0 and not getattr(state, "_spend_cap_exceeded", False):
-                try:
-                    from reasoner.core.settings import settings
-                    mcap = settings.SPEND_CAP_MONTHLY_USD
-                    if mcap > 0:
-                        cid = state.conversation_id or "anonymous"
-                        prev = _MONTHLY_SPEND.get(cid, 0.0)
-                        _MONTHLY_SPEND[cid] = prev + cost_usd
-                        if _MONTHLY_SPEND[cid] > mcap:
-                            state._spend_cap_exceeded = True
-                            logger.warning(
-                                "Monthly spend cap of $%.2f exceeded for %s (%.2f). Halting.",
-                                mcap, cid, _MONTHLY_SPEND[cid],
-                            )
-                            try:
-                                from reasoner.core.events.domain_events import SaaSEventType
-                                from reasoner.application.event_bus.bus import get_event_bus
-                                evt = make_event(
-                                    SaaSEventType.SPEND_CAP_EXCEEDED,
-                                    aggregate_id=cid,
-                                    version=1,
-                                    metadata={
-                                        "cap_type": "monthly",
-                                        "cap_amount": mcap,
-                                        "total_cost": _MONTHLY_SPEND[cid],
-                                    },
-                                )
-                                await get_event_bus().publish(evt)
-                            except Exception:
-                                pass
-                            try:
-                                from reasoner.infrastructure.metrics import REASONER_SPEND_CAP_EXCEEDED_TOTAL
-                                REASONER_SPEND_CAP_EXCEEDED_TOTAL.labels(cap_type="monthly").inc()
-                            except Exception:
-                                pass
-                except Exception:
-                    pass
+                await self._enforce_spend_caps(state, cost_usd)
 
             await self._accumulate_tokens(state, role, input_tokens, output_tokens, model)
 
@@ -674,6 +602,96 @@ class LLMExecutor:
                 yield chunk_or_degraded
                 return
             yield chunk_or_degraded
+
+    async def _enforce_spend_caps(self, state: PipelineState, cost_usd: float) -> None:
+        """Halt the run if this call pushed it past a spend ceiling.
+
+        Ceilings come from the caller's subscription tier, stamped onto state
+        during preflight. When state carries none — CLI runs, tests, any path
+        that never resolved a user — the deployment-wide SPEND_CAP_* settings
+        apply instead, preserving the pre-tier behaviour.
+
+        Sets `_spend_cap_exceeded`, which the phase runners check to skip every
+        remaining phase. Never raises: a failure to enforce must not take down
+        a run that is otherwise fine.
+        """
+        if getattr(state, "_spend_cap_exceeded", False):
+            return
+
+        try:
+            from reasoner.core.settings import settings
+
+            per_run = getattr(state, "spend_cap_per_run_usd", 0.0) or settings.SPEND_CAP_PER_RUN_USD
+            monthly = getattr(state, "spend_cap_monthly_usd", 0.0) or settings.SPEND_CAP_MONTHLY_USD
+
+            # Fall back to the conversation when no billing subject was
+            # resolved, so unauthenticated runs stay bounded per conversation
+            # rather than becoming unbounded.
+            subject = getattr(state, "billing_subject", "") or state.conversation_id or "anonymous"
+
+            if per_run > 0 and state.total_cost_usd > per_run:
+                await self._halt_on_cap(state, "per_run", per_run, state.total_cost_usd, subject)
+                return
+
+            if monthly > 0:
+                from reasoner.infrastructure.llm import spend_tracker
+
+                total = spend_tracker.record(subject, cost_usd)
+                if total > monthly:
+                    await self._halt_on_cap(state, "monthly", monthly, total, subject)
+        except Exception:
+            logger.debug("Spend cap enforcement failed", exc_info=True)
+
+    async def _halt_on_cap(
+        self,
+        state: PipelineState,
+        cap_type: str,
+        cap_amount: float,
+        total_cost: float,
+        subject: str,
+    ) -> None:
+        """Mark the run halted, emit the domain event, and bump the metric."""
+        state._spend_cap_exceeded = True
+        try:
+            state.spend_cap_hit = cap_type
+        except Exception:
+            pass
+
+        logger.warning(
+            "%s spend cap of $%.2f exceeded for %s (tier=%s, spent $%.2f). Halting further LLM calls.",
+            cap_type,
+            cap_amount,
+            subject,
+            getattr(state, "subscription_tier", "") or "unknown",
+            total_cost,
+        )
+
+        try:
+            from reasoner.application.event_bus.bus import get_event_bus
+            from reasoner.core.events.domain_events import SaaSEventType
+
+            evt = make_event(
+                SaaSEventType.SPEND_CAP_EXCEEDED,
+                aggregate_id=state.conversation_id or subject or "unknown",
+                version=1,
+                metadata={
+                    "cap_type": cap_type,
+                    "cap_amount": cap_amount,
+                    "total_cost": total_cost,
+                    "tier": getattr(state, "subscription_tier", "") or "unknown",
+                    "billing_subject": subject,
+                },
+            )
+            await get_event_bus().publish(evt)
+        except Exception:
+            pass
+
+        try:
+            from reasoner.infrastructure.metrics import REASONER_SPEND_CAP_EXCEEDED_TOTAL
+
+            REASONER_SPEND_CAP_EXCEEDED_TOTAL.labels(cap_type=cap_type).inc()
+        except Exception:
+            pass
 
     async def _accumulate_tokens(
         self,
