@@ -42,6 +42,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from reasoner.application.orchestrator import PipelineOrchestrator
+from reasoner.application.services.adaptive_routing import build_adaptive_routing_service
 from reasoner.domain.pipeline_state import PipelineState
 
 logger = logging.getLogger(__name__)
@@ -135,7 +136,10 @@ async def ask(
 
     set_model_registry_port(RegistryAdapter())
     preset_service = PresetService()
-    orchestrator = PipelineOrchestrator(preset_service, None, None)
+    orchestrator = PipelineOrchestrator(
+        preset_service, None, None,
+        adaptive_routing=build_adaptive_routing_service(),
+    )
     preflight = await orchestrator.preflight(args, initial_state=None)
 
     if preflight.action == "direct":

@@ -1,12 +1,16 @@
 """In-memory capability registry backed by JSON file for persistence (ACR Phase 2).
 
-Bootstraps from _MODEL_WHITELIST static facts and benchmark results file.
-Dynamic capabilities updated by telemetry and online learning engine.
+Constraints are derived from the OpenRouter catalogue snapshot
+(``domain/openrouter_models.json``) so that any model added to
+``_MODEL_WHITELIST`` becomes an ACR selection candidate with real limits and
+real prices, with no second table to hand-edit. Capability *scores* still come
+from the benchmark engine or telemetry — never from guesses.
 """
 
 from __future__ import annotations
 
 import json
+import logging
 import os
 from pathlib import Path
 from typing import Any
@@ -16,13 +20,24 @@ from reasoner.domain.model_capabilities import (
     ModelConstraints,
     ModelProfile,
 )
+from reasoner.domain.pricing import MODEL_CATALOGUE
 from reasoner.domain.task_requirements import TaskConstraints
-from reasoner.infrastructure.llm.registry import _MODEL_WHITELIST, _REGISTRY, bloc_of
+from reasoner.infrastructure.llm.registry import (
+    _MODEL_WHITELIST,
+    _REGISTRY,
+    bloc_of,
+    resolved_model_of,
+)
+
+logger = logging.getLogger(__name__)
 
 
-# ── Default bootstrap: hard-coded constraint metadata ──
-# Populated from the inline comments in _MODEL_WHITELIST.
-# This maps model_id -> partial ModelConstraints (fields not set are inferred).
+# ── Manual override layer ──
+# Only consulted for models the catalogue snapshot does not cover (local Ollama
+# builds, floating "-latest" aliases, or a provider OpenRouter does not list).
+# The catalogue wins wherever it has an entry, so most of the rows below are
+# inert — they are kept as the documented escape hatch, not as the source of
+# truth. Costs are per million tokens.
 _MODEL_CONSTRAINT_HINTS: dict[str, dict[str, Any]] = {
     # Anthropic
     "claude-fable-5":  {"max_context": 1_000_000, "cost_in": 10.0, "cost_out": 50.0, "tools": True, "vision": True, "json": True, "temp": True},
@@ -78,24 +93,97 @@ def _infer_vendor(model_id: str) -> str:
     return vendor
 
 
-def _build_constraints(model_id: str) -> ModelConstraints:
-    """Build ModelConstraints from the hint table or whitelist fallback."""
-    hint = _MODEL_CONSTRAINT_HINTS.get(model_id, {})
-    vendor = _infer_vendor(model_id)
-    bloc = bloc_of(model_id)
+def _hint_facts(model_id: str) -> dict[str, Any] | None:
+    """Constraint facts from the manual override table, or None."""
+    hint = _MODEL_CONSTRAINT_HINTS.get(model_id)
+    if not hint:
+        return None
+    return {
+        "max_context": int(hint.get("max_context", 0)),
+        # Hints are quoted per million tokens; constraints are per 1K.
+        "cost_in_1k": float(hint.get("cost_in", 0.0)) / 1000.0,
+        "cost_out_1k": float(hint.get("cost_out", 0.0)) / 1000.0,
+        "tools": bool(hint.get("tools", False)),
+        "vision": bool(hint.get("vision", False)),
+        "json": bool(hint.get("json", False)),
+        "temp": bool(hint.get("temp", True)),
+    }
 
-    # Try to find cost info from whitelist comment via basic heuristics
+
+def _catalogue_facts(served_model: str) -> dict[str, Any] | None:
+    """Constraint facts from the OpenRouter catalogue snapshot, or None.
+
+    ``supported_parameters`` is authoritative for temperature and tool support —
+    the same field ``_FIXED_TEMPERATURE_MARKERS`` approximates by substring.
+    """
+    entry = MODEL_CATALOGUE.get(served_model)
+    if not entry:
+        return None
+
+    params = set(entry.get("supported_parameters") or ())
+    modalities = set((entry.get("architecture") or {}).get("input_modalities") or ())
+    pricing = entry.get("pricing") or {}
+
+    def _per_1k(key: str) -> float:
+        try:
+            # Catalogue prices are per single token.
+            return float(pricing.get(key, 0.0)) * 1000.0
+        except (TypeError, ValueError):
+            return 0.0
+
+    return {
+        "max_context": int(entry.get("context_length") or 0),
+        "cost_in_1k": _per_1k("prompt"),
+        "cost_out_1k": _per_1k("completion"),
+        "tools": "tools" in params,
+        "vision": "image" in modalities,
+        "json": bool({"response_format", "structured_outputs"} & params),
+        "temp": "temperature" in params,
+    }
+
+
+def _build_constraints(model_id: str) -> ModelConstraints:
+    """Build ModelConstraints for a registry alias.
+
+    Precedence: OpenRouter catalogue → manual hint → unknown. An "unknown"
+    profile is still created so the model stays visible and starts being
+    selected the moment the catalogue snapshot covers it, but it is excluded
+    from ACR candidate lists (see ``get_models_satisfying``).
+    """
+    served = resolved_model_of(model_id)
+    facts = _catalogue_facts(served)
+    source = "catalogue"
+
+    if facts is None:
+        facts = _hint_facts(model_id)
+        source = "hint"
+
+    if facts is None:
+        logger.debug(
+            "No catalogue or hint entry for '%s' (served as '%s') — "
+            "profiled but not ACR-selectable",
+            model_id, served,
+        )
+        return ModelConstraints(
+            vendor=_infer_vendor(model_id),
+            bloc=bloc_of(model_id),
+            served_model=served,
+            data_source="unknown",
+        )
+
     return ModelConstraints(
-        max_context_tokens=hint.get("max_context", 4096),
-        cost_per_1k_input_usd=hint.get("cost_in", 0.0) / 1000.0,  # Per 1K from per-M
-        cost_per_1k_output_usd=hint.get("cost_out", 0.0) / 1000.0,  # Per 1K from per-M
-        supports_tools=hint.get("tools", False),
-        supports_vision=hint.get("vision", False),
+        max_context_tokens=facts["max_context"],
+        cost_per_1k_input_usd=facts["cost_in_1k"],
+        cost_per_1k_output_usd=facts["cost_out_1k"],
+        supports_tools=facts["tools"],
+        supports_vision=facts["vision"],
         supports_streaming=True,
-        supports_json_mode=hint.get("json", False),
-        supports_temperature=hint.get("temp", True),
-        vendor=vendor,
-        bloc=bloc,
+        supports_json_mode=facts["json"],
+        supports_temperature=facts["temp"],
+        vendor=_infer_vendor(model_id),
+        bloc=bloc_of(model_id),
+        served_model=served,
+        data_source=source,
     )
 
 
@@ -122,15 +210,9 @@ class CapabilityRegistry:
         self._bootstrap()
 
     def _bootstrap(self) -> None:
-        """Bootstrap profiles from the model whitelist and persisted data."""
-        # 1. Build from whitelist
-        for model_id in _MODEL_WHITELIST:
-            if model_id not in self._profiles:
-                constraints = _build_constraints(model_id)
-                self._profiles[model_id] = ModelProfile(
-                    model_id=model_id,
-                    constraints=constraints,
-                )
+        """Bootstrap profiles from the model registry and persisted data."""
+        # 1. Build from every known alias
+        self.refresh()
 
         # 2. Load persisted capabilities (overwrites if present)
         persisted = self._load_persisted()
@@ -149,11 +231,38 @@ class CapabilityRegistry:
                     capabilities=caps_obj,
                 )
 
+    def refresh(self) -> list[str]:
+        """Profile any registry alias not yet seen. Returns the new IDs.
+
+        ``_REGISTRY`` grows at runtime (OpenRouter passthrough registers models
+        on first use), so this runs on every candidate query rather than only
+        at construction — a model added after startup must still be considered.
+        Existing profiles are left alone so measured capabilities survive.
+        """
+        added: list[str] = []
+        for model_id in (*_MODEL_WHITELIST, *_REGISTRY):
+            if model_id not in self._profiles:
+                self._profiles[model_id] = ModelProfile(
+                    model_id=model_id,
+                    constraints=_build_constraints(model_id),
+                )
+                added.append(model_id)
+        if added:
+            logger.info("ACR capability registry: profiled %d new model(s)", len(added))
+        return added
+
     def get_profile(self, model_id: str) -> ModelProfile | None:
         return self._profiles.get(model_id)
 
     def get_all_profiles(self) -> dict[str, ModelProfile]:
         return dict(self._profiles)
+
+    def unresolved_models(self) -> list[str]:
+        """Model IDs with no catalogue or hint data — never ACR-selectable."""
+        return sorted(
+            mid for mid, p in self._profiles.items()
+            if p.constraints.data_source == "unknown"
+        )
 
     def update_capabilities(
         self,
@@ -190,10 +299,19 @@ class CapabilityRegistry:
         self,
         constraints: TaskConstraints,
     ) -> list[ModelProfile]:
-        """Filter models by hard constraints."""
+        """Filter models by hard constraints.
+
+        Picks up newly-registered models first, so an alias added after startup
+        is a candidate on its next selection rather than at next restart.
+        """
+        self.refresh()
+
         results: list[ModelProfile] = []
         for profile in self._profiles.values():
             c = profile.constraints
+            # Unknown limits — refuse to guess (see ModelConstraints.data_source)
+            if c.data_source == "unknown":
+                continue
             # Context window
             if c.max_context_tokens < constraints.min_context_tokens:
                 continue

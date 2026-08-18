@@ -24,6 +24,15 @@ class ModelConstraints:
     supports_temperature: bool = True  # o-series doesn't
     vendor: str = ""
     bloc: str = ""  # "US", "CN", "EU", "OTHER"
+    # Fully-qualified served model string (e.g. "anthropic/claude-sonnet-5").
+    # Two registry aliases can point at the same served model; selection code
+    # compares this — not model_id — to tell a real alternative from a rename.
+    served_model: str = ""
+    # Provenance of the fields above: "catalogue" (OpenRouter snapshot),
+    # "hint" (hand-maintained override), or "unknown" (nothing found).
+    # Selection excludes "unknown" — guessed limits would either bar a good
+    # model from every role or let a bad one through a cost ceiling.
+    data_source: str = "unknown"
 
 
 @dataclass(frozen=True)

@@ -282,6 +282,15 @@ class ProviderRouter:
         # Explicit per-role fallbacks. Roles absent here fall back to primary automatically.
         self.fallback_table: dict[str, BaseLLMProvider] = fallback_table or {}
         self.cascading_routing: dict[str, list[str]] = cascading_routing or {}
+        # Raw model-ID arguments as passed to from_model_ids(). The tables above
+        # hold built providers, so a caller that rebuilds this router (the ACR
+        # reroute in PipelineOrchestrator.preflight) cannot recover the IDs from
+        # them. Without these the rebuild silently drops every preset fallback
+        # and cascade.
+        self.routing_ids: dict[str, str] = {}
+        self.fallback_routing_ids: dict[str, str] = {}
+        self.cascading_routing_ids: dict[str, list[str]] = dict(cascading_routing or {})
+        self.primary_id: str = getattr(primary, "model", "")
         self.verbose = verbose
         self.on_fallback = on_fallback
         # ACR telemetry (Phase 1)
@@ -708,11 +717,17 @@ class ProviderRouter:
         primary = build_provider(primary_id)
         table = {role: build_provider(mid) for role, mid in (routing or {}).items()}
         fallback_table = {role: build_provider(mid) for role, mid in (fallback_routing or {}).items()}
-        return cls(
+        router = cls(
             primary=primary, routing_table=table, fallback_table=fallback_table,
             cascading_routing=cascading_routing, verbose=verbose,
             telemetry=telemetry, run_id=run_id, preset_id=preset_id, method=method,
         )
+        # Preserve the ID-level view for callers that rebuild this router.
+        router.primary_id = primary_id
+        router.routing_ids = dict(routing or {})
+        router.fallback_routing_ids = dict(fallback_routing or {})
+        router.cascading_routing_ids = dict(cascading_routing or {})
+        return router
 
 
 def _build_telemetry_event(

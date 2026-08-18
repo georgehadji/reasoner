@@ -115,26 +115,49 @@ class PipelineOrchestrator:
         _acr_applied = False
         if self._adaptive_routing is not None and self._adaptive_routing.mode != "shadow":
             try:
-                roles = list(dict.fromkeys(list(router.routing_table.keys()) + ["constructive", "scoring"]))
-                static = {}
-                for r in roles:
-                    p = router.get(r)
-                    static[r] = p.model if hasattr(p, "model") else ""
-                acr_routing = await self._adaptive_routing.select_routing_table(roles, static)
-                reroute = {r: m for r, m in acr_routing.items() if m and get_model_registry_port().contains(m)}
+                registry_port = get_model_registry_port()
+                # Registry aliases, not served model strings: ACR returns and
+                # the allowlist checks aliases, and two aliases can share one
+                # served model.
+                static = dict(router.routing_ids)
+                static.setdefault("primary", router.primary_id)
+                roles = list(static)
+
+                plan = await self._adaptive_routing.select_routing_plan(
+                    roles,
+                    static,
+                    static_fallbacks=router.fallback_routing_ids,
+                    preset_id=gate_preset_name,
+                )
+                reroute = {
+                    r: m for r, m in plan.routing.items()
+                    if m and r != "primary" and registry_port.contains(m)
+                }
+                fallbacks = {
+                    r: m for r, m in plan.fallbacks.items()
+                    if m and registry_port.contains(m)
+                }
                 if reroute:
+                    acr_primary = plan.routing.get("primary") or router.primary_id
                     router = ProviderRouter.from_model_ids(
-                        primary_id=router.primary.model if hasattr(router.primary, "model") else "claude-sonnet",
+                        primary_id=(
+                            acr_primary if registry_port.contains(acr_primary)
+                            else router.primary_id
+                        ),
                         routing=reroute,
-                        fallback_routing=getattr(router, "fallback_table_args", None),
-                        cascading_routing=getattr(router, "cascading_routing_args", None),
+                        fallback_routing=fallbacks or None,
+                        cascading_routing=router.cascading_routing_ids or None,
                         telemetry=self._telemetry_store,
                         run_id=run_id,
                         preset_id=gate_preset_name,
                         method=gate_preset_name,
                     )
                     _acr_applied = True
-                    logger.info("ACR %s: applied for '%s' (%d roles)", self._adaptive_routing.mode, gate_preset_name, len(reroute))
+                    logger.info(
+                        "ACR %s: applied for '%s' (%d roles, %d fallbacks)",
+                        self._adaptive_routing.mode, gate_preset_name,
+                        len(reroute), len(fallbacks),
+                    )
             except Exception as exc:
                 logger.warning("ACR routing failed, using preset: %s", exc)
 

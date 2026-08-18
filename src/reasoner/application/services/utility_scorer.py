@@ -20,6 +20,15 @@ from reasoner.domain.scoring_weights import (
 )
 
 
+COLD_START_SCORE = 0.5
+"""Score returned for a model with no measured capabilities.
+
+Callers must treat a score equal to this as "no evidence", not as a passing
+grade — every unbenchmarked model returns exactly this value, so comparing
+against it decides nothing.
+"""
+
+
 class UtilityScorer:
     """Computes utility U(model, task) for model selection.
 
@@ -51,7 +60,7 @@ class UtilityScorer:
         """
         if not model.has_capabilities:
             # Cold start: neutral score — new models get exploration budget
-            return 0.5
+            return COLD_START_SCORE
 
         w = self.weights
         caps = model.capabilities

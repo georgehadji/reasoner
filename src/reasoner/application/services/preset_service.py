@@ -116,6 +116,11 @@ class PresetService:
         router = ProviderRouter.from_model_ids(
             primary_id=preset.primary_id,
             routing=filtered_routing,
+            # Auto-selected presets carry the same fallback and cascade tables as
+            # an explicitly named one; omitting them here left every auto run
+            # with no per-role fallback at all.
+            fallback_routing=preset.fallback_routing or None,
+            cascading_routing=preset.cascading_routing or None,
             telemetry=telemetry,
             run_id=run_id,
             preset_id=effective_preset_name,

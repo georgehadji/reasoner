@@ -212,6 +212,10 @@ _METHOD_TO_SLUG: dict[str, str] = {
     "writing": "writing",
     "brainstorming": "brainstorming",
     "article": "article",
+    # HyperGate's method classifier emits "coding" (taxonomy letter S) and the
+    # tie-breaker accepts it; without this entry every coding classification fell
+    # through to multi-perspective and the coding-* presets were unreachable.
+    "coding": "coding",
 }
 
 

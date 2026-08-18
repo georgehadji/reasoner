@@ -28,29 +28,63 @@ class ModelPricing:
         return (input_tokens * self.input_per_token) + (output_tokens * self.output_per_token)
 
 
-def _load_openrouter_pricing() -> dict[str, ModelPricing]:
-    """Load pricing from openrouter_models.json if available."""
-    db: dict[str, ModelPricing] = {}
+def _load_openrouter_catalogue(what: str = "model catalogue") -> dict[str, dict]:
+    """Load the OpenRouter model catalogue snapshot, keyed by model ID.
+
+    Each entry carries ``context_length``, ``pricing``, ``supported_parameters``
+    and ``architecture`` — the raw facts both the pricing DB and the ACR
+    capability registry derive from. Refresh with
+    ``scripts/update_openrouter_catalogue.py``.
+
+    Args:
+        what: Named in the warning when the file is corrupt or unreadable, so
+            the log says which consumer went without data.
+    """
     json_path = Path(__file__).with_name("openrouter_models.json")
     if not json_path.exists():
-        return db
+        return {}
     try:
         with json_path.open("r", encoding="utf-8") as fh:
             payload = json.load(fh)
-        for entry in payload.get("data", []):
-            model_id = entry.get("id")
-            pricing = entry.get("pricing") or {}
-            prompt = pricing.get("prompt")
-            completion = pricing.get("completion")
-            if model_id and prompt is not None and completion is not None:
-                try:
-                    db[model_id] = ModelPricing(float(prompt), float(completion))
-                except ValueError:
-                    continue
     except Exception as exc:
-        logger.warning("Failed to load pricing from %s: %s", json_path, exc)
-        pass
+        logger.warning("Failed to load %s from %s: %s", what, json_path, exc)
+        return {}
+    return {
+        entry["id"]: entry
+        for entry in payload.get("data", [])
+        if isinstance(entry, dict) and entry.get("id")
+    }
+
+
+def _load_openrouter_pricing(
+    catalogue: dict[str, dict] | None = None,
+) -> dict[str, ModelPricing]:
+    """Extract per-token pricing from the catalogue snapshot.
+
+    Args:
+        catalogue: Pre-loaded catalogue. Omit to read the file directly —
+            corrupt or unreadable files warn and yield an empty dict rather
+            than failing the import (BUG-002).
+    """
+    if catalogue is None:
+        catalogue = _load_openrouter_catalogue("pricing")
+
+    db: dict[str, ModelPricing] = {}
+    for model_id, entry in catalogue.items():
+        pricing = entry.get("pricing") or {}
+        prompt = pricing.get("prompt")
+        completion = pricing.get("completion")
+        if prompt is None or completion is None:
+            continue
+        try:
+            db[model_id] = ModelPricing(float(prompt), float(completion))
+        except (TypeError, ValueError):
+            continue
     return db
+
+
+MODEL_CATALOGUE: dict[str, dict] = _load_openrouter_catalogue()
+"""Raw OpenRouter catalogue snapshot, keyed by served model ID."""
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -58,7 +92,7 @@ def _load_openrouter_pricing() -> dict[str, ModelPricing]:
 # Auto-loaded from openrouter_models.json with manual overrides/fallbacks.
 # ─────────────────────────────────────────────────────────────────────
 
-PRICING_DB: dict[str, ModelPricing] = _load_openrouter_pricing()
+PRICING_DB: dict[str, ModelPricing] = _load_openrouter_pricing(MODEL_CATALOGUE)
 
 # Manual overrides / fallbacks for models that may not be in the JSON
 # or whose JSON prices are unreliable.

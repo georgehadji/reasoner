@@ -19,6 +19,7 @@ from reasoner.application.services.spend_limit_service import (
     resolve_user_tier,
 )
 from reasoner.application.orchestrator import PipelineOrchestrator
+from reasoner.application.services.adaptive_routing import build_adaptive_routing_service
 from reasoner.core.logging_utils import set_correlation_id
 from reasoner.api.schemas import RunRequest
 from reasoner.api.streaming import _get_phase_subagents
@@ -99,7 +100,11 @@ class PipelineExecutionService:
             user_tier = await resolve_user_tier(user_id)
 
             # ── Orchestrator Preflight: preset resolution, HyperGate, neuro recall ──
-            orchestrator = PipelineOrchestrator(preset_service, pipeline_service)
+            orchestrator = PipelineOrchestrator(
+                preset_service,
+                pipeline_service,
+                adaptive_routing=build_adaptive_routing_service(),
+            )
             preflight = await orchestrator.preflight(req, initial_state)
 
             if preflight.gate_reasoning:

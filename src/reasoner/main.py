@@ -55,6 +55,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from reasoner.application.orchestrator import PipelineOrchestrator
+from reasoner.application.services.adaptive_routing import build_adaptive_routing_service
 from reasoner.application.services.preset_service import PresetService
 from reasoner.renderer import export_to_json, render_pipeline_result
 from reasoner.infrastructure.llm.registry import list_models
@@ -229,7 +230,10 @@ async def main(args: argparse.Namespace) -> None:
 
         # ?? Orchestrator Preflight: preset resolution, HyperGate, neuro recall ??
         preset_service = PresetService()
-        orchestrator = PipelineOrchestrator(preset_service, None, None)
+        orchestrator = PipelineOrchestrator(
+            preset_service, None, None,
+            adaptive_routing=build_adaptive_routing_service(),
+        )
         preflight = await orchestrator.preflight(args, initial_state)
 
         if preflight.action == "direct":
