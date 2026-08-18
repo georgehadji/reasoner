@@ -64,20 +64,16 @@ function Section({
   marker,
   name,
   children,
-  first = false,
 }: {
   id?: string;
   marker: string;
   name: string;
   children: ReactNode;
-  first?: boolean;
 }) {
   return (
     <section
       id={id}
-      className={`mx-auto w-full max-w-[var(--width-wide)] scroll-mt-[var(--space-20)] px-[var(--gutter)] py-[var(--section-y)] ${
-        first ? '' : 'border-t border-[var(--border)]'
-      }`}
+      className="mx-auto w-full max-w-[var(--width-wide)] scroll-mt-[var(--space-20)] px-[var(--gutter)] py-[var(--section-y)]"
     >
       <div className="grid gap-[var(--space-6)] lg:grid-cols-[9rem_minmax(0,1fr)] lg:gap-[var(--space-12)]">
         <div className="lg:sticky lg:top-[var(--space-24)] lg:self-start">
@@ -189,7 +185,7 @@ export default function RunRecord() {
             The record's result, presented before its working — the
             order a report is read in, not the order it was produced
             in. The toggle is the product's argument in one control. */}
-        <Section id="synthesis" marker="§5" name="Synthesis" first>
+        <Section id="synthesis" marker="§5" name="Synthesis">
           <h2 className="font-serif text-[length:var(--text-3xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-snug)] text-[var(--text)]">
             The finding, and what stands behind it.
           </h2>
@@ -475,7 +471,7 @@ export default function RunRecord() {
         </Section>
 
         {/* ── Close ─────────────────────────────────────────────── */}
-        <section className="mx-auto w-full max-w-[var(--width-wide)] border-t border-[var(--border)] px-[var(--gutter)] py-[var(--section-y)]">
+        <section className="mx-auto w-full max-w-[var(--width-wide)] px-[var(--gutter)] py-[var(--section-y)]">
           <div className="grid gap-[var(--space-8)] lg:grid-cols-[9rem_minmax(0,1fr)] lg:gap-[var(--space-12)]">
             <div />
             <div>

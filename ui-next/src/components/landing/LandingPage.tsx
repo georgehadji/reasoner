@@ -26,26 +26,28 @@ import { SHOWCASE_IMAGES, SHOWCASE_PROMPT } from '@/lib/image-showcase';
 
 /* ── Section chrome ───────────────────────────────────────────────── */
 
-/** Shares the run record's marginal-label idiom so the two pages read as one document. */
+/**
+ * Shares the run record's marginal-label idiom so the two pages read as one
+ * document. Sections are separated by the §n marker and --section-y
+ * whitespace alone — no rule between them. A line reads as a wall between
+ * unrelated blocks; this page is one argument in seven parts, and the
+ * marker's number is what says "new part," not a border.
+ */
 function Section({
   id,
   marker,
   name,
   children,
-  first = false,
 }: {
   id?: string;
   marker: string;
   name: string;
   children: ReactNode;
-  first?: boolean;
 }) {
   return (
     <section
       id={id}
-      className={`mx-auto w-full max-w-[var(--width-wide)] scroll-mt-[var(--space-20)] px-[var(--gutter)] py-[var(--section-y)] ${
-        first ? '' : 'border-t border-[var(--border)]'
-      }`}
+      className="mx-auto w-full max-w-[var(--width-wide)] scroll-mt-[var(--space-20)] px-[var(--gutter)] py-[var(--section-y)]"
     >
       <div className="grid gap-[var(--space-6)] lg:grid-cols-[9rem_minmax(0,1fr)] lg:gap-[var(--space-12)]">
         <div className="lg:sticky lg:top-[var(--space-24)] lg:self-start">
@@ -249,7 +251,7 @@ export default function LandingPage() {
         {/* ── §1 Hallucination ──────────────────────────────────
             Leads the page because it is the only deterministic
             guarantee on it. */}
-        <Section id="hallucination" marker="§1" name="Hallucination" first>
+        <Section id="hallucination" marker="§1" name="Hallucination">
           <Heading>A model cannot vouch for itself.</Heading>
           <Lede>
             Most products ask a model whether it is confident and print the answer. Reasoner does
@@ -538,7 +540,7 @@ export default function LandingPage() {
         </Section>
 
         {/* ── Close ─────────────────────────────────────────────── */}
-        <section className="mx-auto w-full max-w-[var(--width-wide)] border-t border-[var(--border)] px-[var(--gutter)] py-[var(--section-y)]">
+        <section className="mx-auto w-full max-w-[var(--width-wide)] px-[var(--gutter)] py-[var(--section-y)]">
           <div className="grid gap-[var(--space-6)] lg:grid-cols-[9rem_minmax(0,1fr)] lg:gap-[var(--space-12)]">
             <div aria-hidden="true" />
             <div className="min-w-0">
