@@ -6,7 +6,7 @@ GET  /api/admin/feedback-stats — admin-only feedback statistics
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from reasoner.api.admin_auth import verify_admin_key

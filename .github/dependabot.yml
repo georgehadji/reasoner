@@ -1,0 +1,53 @@
+version: 2
+
+updates:
+  # Backend Python deps
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      python-deps:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 10
+
+  # Frontend Node deps
+  - package-ecosystem: "npm"
+    directory: "/ui-next"
+    schedule:
+      interval: "weekly"
+    groups:
+      npm-deps:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 10
+
+  # Docker base images — root backend image
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  # Docker base images — frontend
+  - package-ecosystem: "docker"
+    directory: "/ui-next"
+    schedule:
+      interval: "weekly"
+
+  # Docker base images — sandbox worker + sandbox job image
+  - package-ecosystem: "docker"
+    directory: "/src/reasoner/infrastructure/execution/sandbox_worker"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "docker"
+    directory: "/src/reasoner/infrastructure/execution/sandbox_worker/sandbox_image"
+    schedule:
+      interval: "weekly"
+
+  # GitHub Actions versions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

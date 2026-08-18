@@ -16,6 +16,9 @@ jobs:
           python-version: '3.12'
       - run: pip install pip-audit bandit
       # Security checks are release gates; failures must not be hidden.
+      # Suppression: a genuine false positive gets `# nosec <rule-id> —
+      # <reason>, expires <date>` inline, reviewed in the PR that adds it.
+      # No blanket / unreviewed suppression.
       - run: pip-audit --requirement requirements.txt
       - run: bandit -r src/ -f json -o bandit-report.json
       - run: bandit -r src/
@@ -29,3 +32,63 @@ jobs:
         with:
           node-version: '22'
       - run: cd ui-next && npm audit --audit-level high
+
+  # SBOM + known-vulnerability scan of the dependency tree and Dockerfiles.
+  # Fails the build on CRITICAL/HIGH findings (security-remediation-plan.md
+  # Phase 6 item 4/5).
+  sbom-and-image-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate SBOM (backend)
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: sbom-backend.cdx.json
+
+      - name: Generate SBOM (frontend)
+        uses: anchore/sbom-action@v0
+        with:
+          path: ./ui-next
+          format: cyclonedx-json
+          output-file: sbom-frontend.cdx.json
+
+      - name: Upload SBOMs
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom-*.cdx.json
+
+      - name: Scan dependency tree for known vulnerabilities
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+          ignore-unfixed: true
+
+      - name: Scan Dockerfiles/compose for misconfiguration
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: config
+          scan-ref: .
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+
+  # Verifies requirements.lock.txt (hash-pinned, `scripts/lock_requirements.sh`)
+  # is present and matches requirements.txt. Fails closed: an unlocked or
+  # stale lockfile blocks the build rather than silently installing
+  # unpinned/unverified transitive dependencies.
+  lockfile-freshness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pip-tools
+      - run: bash scripts/lock_requirements.sh
+      - run: git diff --exit-code requirements.lock.txt
