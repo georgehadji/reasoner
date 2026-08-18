@@ -415,6 +415,9 @@ const RATE_LIMITS: Record<string, { limit: number; windowMs: number }> = {
   // a legitimate client fetches one per connect/reconnect, so this stays
   // tight without blocking normal reconnect-with-backoff behavior.
   'websocket-ticket': { limit: 20, windowMs: SECURITY_CONSTANTS.rateLimitWindowMs },
+  'provenance-inspect': { limit: 30, windowMs: SECURITY_CONSTANTS.rateLimitWindowMs },
+  'provenance-scrub': { limit: 30, windowMs: SECURITY_CONSTANTS.rateLimitWindowMs },
+  'provenance-rewrite': { limit: 30, windowMs: SECURITY_CONSTANTS.rateLimitWindowMs },
   default: { limit: 30, windowMs: SECURITY_CONSTANTS.rateLimitWindowMs },
 };
 

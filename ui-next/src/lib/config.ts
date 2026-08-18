@@ -237,6 +237,10 @@ export const API = {
   AGENT_RUN: '/api/agent/run',
   AGENT_RUN_SYNC: '/api/agent/run/sync',
   WEBSOCKET_TICKET: '/api/websocket/ticket',
+  PROVENANCE_CAPABILITIES: '/api/provenance/capabilities',
+  PROVENANCE_INSPECT: '/api/provenance/inspect',
+  PROVENANCE_SCRUB: '/api/provenance/scrub',
+  PROVENANCE_REWRITE: '/api/provenance/rewrite',
 };
 
 export const DEFAULTS = {
