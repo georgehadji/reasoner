@@ -19,6 +19,7 @@ from reasoner.core.constants import (
     IMAGE_GEN_DEFAULT_ASPECT_RATIO,
     IMAGE_GEN_DEFAULT_PRESET,
     IMAGE_GEN_DEFAULT_RESOLUTION,
+    IMAGE_GEN_IMAGE_COUNT,
     IMAGE_GEN_MAX_IMAGE_COUNT,
     TRUNCATION,
 )
@@ -200,7 +201,14 @@ class GenerateImageRequest(BaseModel):
     # Unbounded here meant one request could fan out across the whole image
     # catalogue in parallel, each model a paid call. Asking for zero (or fewer)
     # images silently "succeeded" with no images, so the floor matters too.
-    num_images: int = Field(default=2, ge=1, le=IMAGE_GEN_MAX_IMAGE_COUNT)
+    #
+    # The default tracks IMAGE_GEN_IMAGE_COUNT rather than restating a number:
+    # both tiers ship exactly that many primaries, one per lab, so a hardcoded
+    # smaller default silently handed API callers a narrower cross-lab spread
+    # than the UI gets and than the product claims.
+    num_images: int = Field(
+        default=IMAGE_GEN_IMAGE_COUNT, ge=1, le=IMAGE_GEN_MAX_IMAGE_COUNT
+    )
 
     @field_validator("prompt")
     @classmethod

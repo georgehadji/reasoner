@@ -1,0 +1,26 @@
+{
+  "prompt": "A single wooden reading chair beside a tall window in an empty gallery, early morning light raking across a bare floor, warm ivory walls, editorial photography, quiet and still",
+  "enhanced_prompt": "A solitary mid-century wooden reading chair with a woven cane back and linen cushion positioned beside a towering arched window in a vast, empty minimalist gallery, early morning sunlight slicing dramatically across the polished oak floor in long golden rays and casting sharp geometric shadows, warm ivory walls with subtle plaster texture, editorial photography style, composed from a low three-quarter angle with shallow depth of field, serene and contemplative atmosphere, soft golden-hour light creating gentle highlights and deep contrasts, muted warm neutral palette of ivory, honeyed wood, and pale stone, intricate details of wood grain, subtle dust motes floating in the light beams, and an airy, hushed stillness throughout the space.",
+  "images": [
+    {
+      "file": "image-1.webp",
+      "model": "flux.2-klein-4b",
+      "bytes": 24858
+    },
+    {
+      "file": "image-2.webp",
+      "model": "riverflow-v2.5-fast",
+      "bytes": 24548
+    },
+    {
+      "file": "image-3.webp",
+      "model": "gemini-flash-image",
+      "bytes": 17908
+    },
+    {
+      "file": "image-4.webp",
+      "model": "recraft-v4.1-utility",
+      "bytes": 43278
+    }
+  ]
+}

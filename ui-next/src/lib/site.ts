@@ -23,7 +23,9 @@ export const SITE_URL = normalizeOrigin(
 export const SITE = {
   name: 'Reasoner',
   legalName: 'Reasoner',
-  tagline: 'Think with Certainty',
+  /** Renders as the browser title on every route, so it has to say what the
+   *  product does rather than how it feels. */
+  tagline: 'Reasoning with the argument attached',
   /** Used as the default meta description and the JSON-LD description. */
   description:
     'Reasoner is a multi-method AI reasoning engine. It decomposes a problem, runs cross-lab models in parallel, critiques and stress-tests the candidates, then synthesises an answer with explicit VERIFIED / HYPOTHESIS / UNKNOWN labels.',
