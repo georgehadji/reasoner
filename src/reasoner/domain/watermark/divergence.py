@@ -22,7 +22,7 @@ def _tokens(text: str) -> list[str]:
 
 
 def _bigrams(tokens: list[str]) -> set[tuple[str, str]]:
-    return set(zip(tokens, tokens[1:]))
+    return set(zip(tokens, tokens[1:], strict=False))
 
 
 def lexical_divergence(original: str, candidate: str) -> float:

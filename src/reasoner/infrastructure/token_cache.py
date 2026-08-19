@@ -134,7 +134,8 @@ class TokenAwareCache:
     
     def _compute_prompt_hash(self, prompt: str) -> str:
         """Compute prompt hash for exact matching."""
-        return hashlib.md5(prompt.encode()).hexdigest()[:16]
+        # Cache-key digest only, never a security boundary.
+        return hashlib.md5(prompt.encode(), usedforsecurity=False).hexdigest()[:16]
     
     def _compute_problem_hash(self, problem: str) -> str:
         """Compute problem hash for grouping."""

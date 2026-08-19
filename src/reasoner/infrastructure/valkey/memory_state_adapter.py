@@ -78,9 +78,11 @@ class InMemoryStateAdapter:
 
     async def register_script(self, script_text: str) -> str:
         """Lua scripts are not supported by the in-memory adapter."""
-        sha = hashlib.sha1(script_text.encode()).hexdigest()
+        # SHA1 is mandated by the Redis/Valkey SCRIPT LOAD protocol, so this
+        # digest must match theirs; it is an identifier, not a security hash.
+        sha = hashlib.sha1(script_text.encode(), usedforsecurity=False).hexdigest()
         return sha
 
 
 # Verify protocol conformance
-_: DistributedStatePort = InMemoryStateAdapter()  # type: ignore[assignment]
+_: DistributedStatePort = InMemoryStateAdapter()

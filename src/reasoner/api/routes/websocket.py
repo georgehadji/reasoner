@@ -2,7 +2,7 @@
 
 Auth flow (security-remediation-plan.md Phase 3):
   1. An authenticated HTTPS caller gets a short-lived, single-use ticket
-     from POST /api/websocket/ticket (core/ws_ticket.py).
+     from POST /api/websocket/ticket (application/services/ws_ticket.py).
   2. The browser opens the WebSocket passing that ticket via the
      Sec-WebSocket-Protocol header -- `new WebSocket(url, [ticket])` --
      never in the query string and never as a first post-connect message.
@@ -21,7 +21,7 @@ from reasoner.api.auth_deps import require_csrf
 from reasoner.api.client_ip import get_client_ip
 from reasoner.api.dependencies import get_current_user
 from reasoner.core.settings import settings
-from reasoner.core.ws_ticket import issue_ticket, redeem_ticket
+from reasoner.application.services.ws_ticket import issue_ticket, redeem_ticket
 from reasoner.domain.saas import User
 from reasoner.infrastructure.websocket import get_websocket_manager, websocket_endpoint
 from reasoner.infrastructure.websocket.ws_security import (

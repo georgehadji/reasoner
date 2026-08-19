@@ -27,6 +27,9 @@ export function useIsDark(): { isDark: boolean; mounted: boolean } {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // next-themes cannot resolve the theme until after hydration; this mount
+    // flag is the documented next-themes pattern, not derivable during render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 

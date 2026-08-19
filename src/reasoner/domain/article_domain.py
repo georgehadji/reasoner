@@ -38,7 +38,7 @@ class Err(Generic[E]):
     fallback: object | None = None  # degraded Context, if any
 
 
-Result = Union[Ok, Err]
+Result = Union[Ok[T], Err[E]]
 
 
 # ═════════════════════════════════════════════════════════════════════
@@ -191,7 +191,7 @@ class GatePolicy:
     thresholds: tuple[Threshold, ...] = ()
     name: str = "default"
 
-    def evaluate(self, audit_scores: dict[str, float]) -> tuple[bool, dict]:
+    def evaluate(self, audit_scores: dict[str, float]) -> tuple[bool, dict[str, Any]]:
         """Evaluate audit scores against this policy.
 
         Args:
@@ -204,7 +204,7 @@ class GatePolicy:
         if not self.thresholds:
             return True, {"score": 1.0, "hard_ok": True, "reason": "no thresholds"}
 
-        details: dict = {}
+        details: dict[str, Any] = {}
         weighted_sum = 0.0
         total_weight = 0.0
         hard_ok = True
@@ -344,7 +344,7 @@ def _normalize_claim_text(text: str) -> str:
 def reconcile(
     prev_ledger: tuple[Claim, ...],
     new_doc: Document,
-) -> tuple[tuple[Claim, ...], tuple[dict, ...]]:
+) -> tuple[tuple[Claim, ...], tuple[dict[str, Any], ...]]:
     """Reconcile the claim ledger against a new document revision.
 
     The core of G1: after developmental/style edits modify the article text,
@@ -371,7 +371,7 @@ def reconcile(
     }
 
     carried: list[Claim] = []
-    deltas: list[dict] = []
+    deltas: list[dict[str, Any]] = []
 
     for claim in prev_ledger:
         norm = _normalize_claim_text(claim.text)
@@ -516,8 +516,8 @@ class Context:
     content_class: str                     # blog, policy_brief, explainer, etc.
 
     # ── Search & outline (populated by early phases) ──
-    sources: tuple[dict, ...] = ()
-    outline: dict | None = None
+    sources: tuple[dict[str, Any], ...] = ()
+    outline: dict[str, Any] | None = None
 
     # ── Document (populated by draft phase, updated by edit phases) ──
     doc: Document | None = None
@@ -526,28 +526,28 @@ class Context:
     ledger: tuple[Claim, ...] = ()
 
     # ── Audit & metrics (populated by final audit) ──
-    audit: dict | None = None
-    metrics: dict | None = None
+    audit: dict[str, Any] | None = None
+    metrics: dict[str, Any] | None = None
 
     # ── Critique (populated by structural review) ──
-    structural_critique: dict | None = None
+    structural_critique: dict[str, Any] | None = None
 
     # ── Budget (tracked across the run) ──
     budget: Budget | None = None
 
     # ── Provenance (append-only event log) ──
-    events: tuple[dict, ...] = ()
+    events: tuple[dict[str, Any], ...] = ()
 
     # ── Augmentation / pre-research insights ──
     pre_research_summary: str = ""
-    pre_research_insights: tuple[dict, ...] = ()
+    pre_research_insights: tuple[dict[str, Any], ...] = ()
 
     # ── Style brief ──
-    style_brief: dict | None = None
+    style_brief: dict[str, Any] | None = None
 
     # ── Verification artifacts ──
-    verification: dict | None = None
-    editorial_audit: dict | None = None
+    verification: dict[str, Any] | None = None
+    editorial_audit: dict[str, Any] | None = None
 
     # ── Pipeline metadata ──
     preset_name: str = ""

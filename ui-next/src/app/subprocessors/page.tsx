@@ -90,7 +90,7 @@ export default function SubprocessorsPage() {
         </div>
 
         <p className="prose-measure mt-[var(--space-8)] text-[length:var(--text-sm)] leading-[var(--lh-body)] text-[var(--text-muted)]">
-          This list reflects the providers configured in the pipeline's direct-adapter registry.
+          This list reflects the providers configured in the pipeline&apos;s direct-adapter registry.
           Additional models are reachable via OpenRouter, which acts as a routing intermediary to
           the underlying provider. See{' '}
           <a href="/security" className="underline hover:text-[var(--accent)]">

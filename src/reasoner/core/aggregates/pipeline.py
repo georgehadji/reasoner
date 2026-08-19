@@ -359,6 +359,9 @@ class WidgetStateData:
     start_time: float = 0.0
     end_time: float = 0.0
     duration_seconds: float = 0.0
+    # Appended to by every _apply_widget_* handler below. Without this field
+    # each of those handlers raised AttributeError on replay.
+    logs: list[str] = field(default_factory=list)
 
 
 class WidgetAggregate(Aggregate):

@@ -8,7 +8,7 @@ from __future__ import annotations
 import os
 import secrets
 import hashlib
-from typing import Optional, Dict, Set, List
+from typing import Any, Optional, Dict, Set, List
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -88,7 +88,7 @@ class AuthManager:
 
     _MAX_KEYS = 10_000
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._keys: OrderedDict[str, APIKey] = OrderedDict()
         self._lock = asyncio.Lock()
         self._admin_keys: Set[str] = set()
@@ -149,16 +149,20 @@ class AuthManager:
         if expires_in_days:
             expires_at = datetime.now(timezone.utc) + timedelta(days=expires_in_days)
 
-        # Use provided scopes or default for role
+        # Use provided scopes or default for role. DEFAULT_SCOPES holds Scope
+        # enum members while the parameter takes plain strings, so normalise
+        # both into one set[str] rather than mixing the two representations.
         if scopes is None:
-            scopes = DEFAULT_SCOPES.get(role, DEFAULT_SCOPES["user"])
+            resolved_scopes = {s.value for s in DEFAULT_SCOPES.get(role, DEFAULT_SCOPES["user"])}
+        else:
+            resolved_scopes = {s.value if isinstance(s, Scope) else s for s in scopes}
 
         api_key = APIKey(
             key_hash=key_hash,
             name=name,
             created_at=datetime.now(timezone.utc),
             expires_at=expires_at,
-            scopes={s.value if isinstance(s, Scope) else s for s in scopes},
+            scopes=resolved_scopes,
             rate_limit_tier=rate_limit_tier,
             created_by=created_by,
         )
@@ -317,7 +321,7 @@ class AuthManager:
             for k in keys_to_remove:
                 self._cache.pop(k, None)
 
-    async def list_keys(self, requester_scopes: Optional[Set[str]] = None) -> list[dict]:
+    async def list_keys(self, requester_scopes: Optional[Set[str]] = None) -> list[dict[str, Any]]:
         """
         List all active keys (without exposing hashes).
 

@@ -38,6 +38,7 @@ Usage:
 from __future__ import annotations
 
 from enum import Enum
+from typing import Any
 
 
 class ErrorCode(str, Enum):
@@ -85,7 +86,7 @@ class ReasonerError(Exception):
     """
     retryable: bool = False
     
-    def __init__(self, message: str, details: dict | None = None):
+    def __init__(self, message: str, details: dict[str, Any] | None = None):
         super().__init__(message)
         self.details = details or {}
 

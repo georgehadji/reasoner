@@ -31,6 +31,9 @@ export function RunIndex() {
 
   useEffect(() => {
     if (reduced || typeof IntersectionObserver === 'undefined') {
+      // The IntersectionObserver capability check needs the DOM, so it cannot
+      // run during render; this is the no-observer fallback path.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setStarted(true);
       return;
     }

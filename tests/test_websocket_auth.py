@@ -105,7 +105,7 @@ async def test_valid_ticket_resolves_the_user_id_and_never_closes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(settings, "CSRF_SECRET", "test-secret-do-not-reuse")
-    from reasoner.core.ws_ticket import issue_ticket
+    from reasoner.application.services.ws_ticket import issue_ticket
 
     ticket = issue_ticket("user-42")
     ws = FakeWebSocket(

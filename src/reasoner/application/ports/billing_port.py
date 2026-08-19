@@ -6,7 +6,7 @@ Stripe is the default adapter, but the domain never imports stripe.
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Any, Protocol
 from reasoner.domain.saas import Subscription, SubscriptionTier
 
 
@@ -27,7 +27,7 @@ class BillingPort(Protocol):
         """Return a billing portal URL for self-service management."""
         ...
 
-    async def sync_subscription(self, provider_event: dict) -> Subscription:
+    async def sync_subscription(self, provider_event: dict[str, Any]) -> Subscription:
         """
         Idempotently sync a subscription from a provider webhook event.
 

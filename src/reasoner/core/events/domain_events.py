@@ -73,7 +73,7 @@ class SaaSEventType(str, Enum):
 _AllEventType = PipelineEventType | WidgetEventType | MemoryEventType | SaaSEventType
 
 # Old import path still resolves
-EventType = PipelineEventType  # type: ignore[misc]
+EventType = PipelineEventType
 
 # For consumers that need to handle all types:
 ALL_EVENT_TYPES: dict[str, _AllEventType] = {
@@ -468,9 +468,16 @@ SAAS_EVENT_CLASSES: dict[SaaSEventType, type[DomainEvent]] = {
 }
 
 # Shorthand backward compat
+# Built by iteration rather than ** unpacking: dict is invariant in its key
+# type, so unpacking dict[PipelineEventType, ...] into a dict keyed by the
+# wider _AllEventType union does not type-check.
 EVENT_CLASSES: dict[_AllEventType, type[DomainEvent]] = {
-    **PIPELINE_EVENT_CLASSES,
-    **WIDGET_EVENT_CLASSES,
-    **MEMORY_EVENT_CLASSES,
-    **SAAS_EVENT_CLASSES,
+    event_type: event_cls
+    for group in (
+        PIPELINE_EVENT_CLASSES,
+        WIDGET_EVENT_CLASSES,
+        MEMORY_EVENT_CLASSES,
+        SAAS_EVENT_CLASSES,
+    )
+    for event_type, event_cls in group.items()
 }

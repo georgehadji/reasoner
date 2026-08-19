@@ -3,7 +3,7 @@ connection rate limiting.
 
 security-remediation-plan.md Phase 3 items 3-4. Both checks run before
 ``WebSocket.accept()`` in ``api/routes/websocket.py``, alongside the ticket
-redemption in ``core/ws_ticket.py`` — a connection is never accepted while
+redemption in ``application/services/ws_ticket.py`` — a connection is never accepted while
 still unverified.
 """
 

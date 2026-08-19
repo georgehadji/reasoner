@@ -17,10 +17,14 @@ ENV NODE_ENV=production
 
 # Copy standalone output (~150MB vs 800MB with full node_modules)
 # Critical Enhancement 5.7
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
-COPY https-server.js ./
+COPY --from=builder --chown=node:node /app/.next/standalone ./
+COPY --from=builder --chown=node:node /app/.next/static ./.next/static
+COPY --from=builder --chown=node:node /app/public ./public
+COPY --chown=node:node https-server.js ./
+
+# Run as the unprivileged `node` user (uid 1000) shipped in the base image.
+# Trivy AVD-DS-0002: a container without a USER directive runs as root.
+USER node
 
 EXPOSE 3000
 

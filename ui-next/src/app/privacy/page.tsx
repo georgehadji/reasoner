@@ -82,7 +82,7 @@ export default function PrivacyPage() {
                 <a href="/subprocessors" className="underline hover:text-[var(--accent)]">
                   Sub-processors
                 </a>{' '}
-                page. Each provider's own privacy policy, linked from that page, governs how they
+                page. Each provider&apos;s own privacy policy, linked from that page, governs how they
                 handle API traffic.
               </p>
             </section>

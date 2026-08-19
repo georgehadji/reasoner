@@ -426,7 +426,7 @@ async def websocket_endpoint(
 
     Authentication happens entirely in the caller (``api/routes/websocket.py``)
     *before* this is invoked: a single-use ticket redeemed via
-    ``core/ws_ticket.py`` and an Origin check via
+    ``application/services/ws_ticket.py`` and an Origin check via
     ``infrastructure/websocket/ws_security.py``, both run before
     ``WebSocket.accept()`` so an unauthenticated/cross-origin socket is
     never accepted. This function receives the already-resolved identity as

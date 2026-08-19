@@ -90,5 +90,16 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install pip-tools
-      - run: bash scripts/lock_requirements.sh
-      - run: git diff --exit-code requirements.lock.txt
+      - name: Verify requirements.lock.txt exists and is current
+        run: |
+          if [ ! -f requirements.lock.txt ]; then
+            echo "::error::requirements.lock.txt is missing. Run 'bash scripts/lock_requirements.sh' locally and commit the result."
+            exit 1
+          fi
+          cp requirements.lock.txt /tmp/requirements.lock.txt.committed
+          bash scripts/lock_requirements.sh
+          if ! diff -q /tmp/requirements.lock.txt.committed requirements.lock.txt > /dev/null; then
+            echo "::error::requirements.lock.txt is stale. Run 'bash scripts/lock_requirements.sh' locally and commit the result."
+            diff /tmp/requirements.lock.txt.committed requirements.lock.txt || true
+            exit 1
+          fi

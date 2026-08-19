@@ -147,7 +147,7 @@ class EvidenceBundle:
     residual_risk: str = ""                        # remaining risk despite checks
     source: str = "model"                          # "model" | "sensor" | "search"
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "label": self.label,
             "checks_run": self.checks_run,
@@ -158,7 +158,7 @@ class EvidenceBundle:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "EvidenceBundle":
+    def from_dict(cls, data: dict[str, Any]) -> "EvidenceBundle":
         return cls(
             label=data.get("label", "UNKNOWN"),
             checks_run=data.get("checks_run") or [],
@@ -183,7 +183,7 @@ class PlanContract:
     read_set: list[str] = field(default_factory=list)
     write_set: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "targets": self.targets,
             "invariants": self.invariants,
@@ -195,7 +195,7 @@ class PlanContract:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "PlanContract":
+    def from_dict(cls, data: dict[str, Any]) -> "PlanContract":
         return cls(
             targets=list(data.get("targets") or []),
             invariants=list(data.get("invariants") or []),

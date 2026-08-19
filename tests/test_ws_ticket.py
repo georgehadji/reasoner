@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from reasoner.core import ws_ticket
+from reasoner.application.services import ws_ticket
 from reasoner.core.settings import settings
 
 pytestmark = pytest.mark.unit

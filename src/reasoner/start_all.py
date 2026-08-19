@@ -115,12 +115,16 @@ def _try_free_port(port: int, pid: int | None) -> bool:
         cmd = [npx_path, "kill-port", str(port)]
         if sys.platform == "win32" and npx_path.endswith(".ps1"):
             cmd = ["powershell.exe", "-ExecutionPolicy", "Bypass", "-File", npx_path, "kill-port", str(port)]
+        elif sys.platform == "win32" and npx_path.endswith(".cmd"):
+            # A .cmd shim needs an interpreter, but invoking it explicitly via
+            # `cmd.exe /c` keeps every argument a separate argv entry. shell=True
+            # would instead hand the whole line to the shell for re-parsing.
+            cmd = ["cmd.exe", "/c", npx_path, "kill-port", str(port)]
         try:
             result = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
-                shell=sys.platform == "win32" and npx_path.endswith(".cmd"),
             )
             if result.returncode == 0:
                 time.sleep(0.5)

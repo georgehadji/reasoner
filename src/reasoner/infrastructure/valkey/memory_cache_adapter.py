@@ -61,4 +61,4 @@ class InMemoryCacheAdapter:
 
 
 # Verify protocol conformance
-_: SharedCachePort = InMemoryCacheAdapter()  # type: ignore[assignment]
+_: SharedCachePort = InMemoryCacheAdapter()

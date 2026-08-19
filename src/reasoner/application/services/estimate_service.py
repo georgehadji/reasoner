@@ -12,7 +12,7 @@ from typing import Any
 async def estimate_cost(problem: str, preset: str) -> dict[str, Any]:
     """Estimate tokens, cost, and duration for a run, without executing it."""
     from reasoner.application.services.preset_service import PresetService
-    from reasoner.infrastructure.llm.registry import _REGISTRY
+    from reasoner.core.ports.model_registry_port import get_model_registry_port
     from reasoner.presets import get_preset_price_tier
     from reasoner.pricing import calculate_model_cost
 
@@ -29,9 +29,8 @@ async def estimate_cost(problem: str, preset: str) -> dict[str, Any]:
     estimated_input = prompt_tokens + (num_phases * tokens_per_phase_input)
     estimated_output = num_phases * tokens_per_phase_output
 
-    primary_id = _REGISTRY.get(gate_preset_name, {}).get(
-        "primary", "openrouter/openai/gpt-4o-mini"
-    )
+    registry_entry = get_model_registry_port().entry(gate_preset_name) or {}
+    primary_id = registry_entry.get("primary", "openrouter/openai/gpt-4o-mini")
     estimated_cost = calculate_model_cost(primary_id, estimated_input, estimated_output)
 
     base_duration = 8 if tier == "budget" else 20
