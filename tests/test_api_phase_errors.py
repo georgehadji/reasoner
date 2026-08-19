@@ -53,16 +53,30 @@ def _parse_sse(line: str) -> dict:
 
 
 @pytest.fixture(autouse=True)
-def _stub_hypergate(monkeypatch):
-    """Keep preflight off the network.
+def _preflight_env(monkeypatch):
+    """Give run_stream the startup wiring it normally gets from the app.
 
-    HyperGate runs before the pipeline and builds its own LLM clients, so
-    patching ProviderRouter.from_model_ids does not reach it. Unstubbed it
-    tried real calls, burned its full 10s budget, and preflight fell back to
-    the default pipeline -- the run never got as far as the phase these tests
-    patch, so they saw zero phase_error events.
+    These tests call run_stream() directly, so no lifespan runs. Without the
+    registry port injected, preflight raised "ModelRegistryPort not injected"
+    and the stream emitted a single generic `error` -- the run never reached
+    the phases these tests patch, which is why they saw zero phase_error
+    events regardless of what was patched.
+
+    HyperGate is stubbed for the same reason it matters here: it builds its
+    own LLM clients, so patching ProviderRouter.from_model_ids never reached
+    it and it spent its full 10s budget on real network calls.
     """
+    import reasoner.api.execution.pipeline as execution
     import reasoner.application.orchestrator as orch
+    from reasoner.core.ports.model_registry_port import set_model_registry_port
+    from reasoner.infrastructure.llm.registry import RegistryAdapter
+
+    set_model_registry_port(RegistryAdapter())
+
+    # Unauthenticated runs resolve to the free tier, whose per-run cost limit
+    # rejects multi-perspective-budget outright. These tests are about phase
+    # error propagation, not billing, so let the run through.
+    monkeypatch.setattr(execution, "check_run_allowed", lambda *a, **k: None)
 
     class _NoopGate:
         def __init__(self, *args, **kwargs):

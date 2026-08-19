@@ -135,6 +135,17 @@ async def ask(
     from reasoner.infrastructure.llm.registry import RegistryAdapter
 
     set_model_registry_port(RegistryAdapter())
+
+    # Headless has no server to call, so before this the pipeline's HTTP
+    # self-call to /api/neuro/recall always failed and memory was inert here.
+    try:
+        from reasoner.core.ports.memory_port import set_memory_port
+        from reasoner.neuro.server import get_neuro_service
+
+        set_memory_port(get_neuro_service())
+    except Exception as exc:
+        logger.warning("Memory port unavailable, neuro recall disabled: %s", exc)
+
     preset_service = PresetService()
     orchestrator = PipelineOrchestrator(
         preset_service, None, None,

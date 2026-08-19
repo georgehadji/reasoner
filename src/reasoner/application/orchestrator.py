@@ -88,6 +88,7 @@ class PipelineOrchestrator:
         self,
         req: Any,
         initial_state: PipelineState | None = None,
+        user_id: str | None = None,
     ) -> PreflightDecision:
         """Resolve preset, build router, run HyperGate, perform neuro recall.
 
@@ -212,7 +213,7 @@ class PipelineOrchestrator:
             )
             try:
                 recalled_chunks = await self._recall_neuro_context(
-                    req.problem, agent_id=conversation_id
+                    req.problem, agent_id=conversation_id, owner=user_id
                 )
             except Exception as exc:
                 logger.debug("Neuro recall failed: %s", exc)
@@ -336,32 +337,18 @@ class PipelineOrchestrator:
         return decision
 
     async def _recall_neuro_context(
-        self, problem: str, agent_id: str | None = None
+        self, problem: str, agent_id: str | None = None, owner: str | None = None
     ) -> list[dict]:
         """Fetch relevant past context from Neuro memory."""
-        try:
-            # Prefer injected client, fall back to lazy api/clients import
-            client = self._neuro_client
-            if client is None:
-                from reasoner.clients import get_neuro_client
-                client = get_neuro_client()
-            from reasoner.core.settings import settings as app_settings
+        from reasoner.core.ports.memory_port import get_memory_port
 
-            resp = await client.post(
-                f"{app_settings.internal_api_base_url}/api/neuro/recall",
-                json={
-                    "prompt": problem,
-                    "agent_id": agent_id,
-                    "max_results": 5,
-                    "compression": "none",
-                },
+        port = get_memory_port()
+        if port is None:
+            return []
+        try:
+            return await port.recall(
+                problem, agent_id=agent_id, max_results=5, owner=owner
             )
-            if resp.status_code == 200:
-                data = resp.json()
-                return [
-                    {"content": c["content"], "source": c["source"], "relevance": c["relevance"]}
-                    for c in data.get("chunks", [])
-                ]
         except Exception as exc:
             logger.debug("Neuro recall failed: %s", exc)
         return []
@@ -414,35 +401,31 @@ class PipelineOrchestrator:
         """Neuro learn and history persistence after pipeline completes."""
         # ── Neuro Persist ──
         try:
-            from reasoner.clients import get_neuro_client
-            from reasoner.core.settings import settings as app_settings
+            from reasoner.core.ports.memory_port import get_memory_port
 
-            client = get_neuro_client()
+            port = get_memory_port()
             synthesis_text = ""
             if state.final_solution:
                 synthesis_text = getattr(state.final_solution, "core_solution", "") or ""
             if not synthesis_text:
                 synthesis_text = getattr(state, "previous_synthesis", "")
 
-            if synthesis_text:
-                await client.post(
-                    f"{app_settings.internal_api_base_url}/api/neuro/learn",
-                    json={
-                        "prompt": getattr(req, "problem", ""),
-                        "response": synthesis_text,
-                        "agent_id": getattr(state, "conversation_id", None),
-                        "metadata": {
-                            "preset": getattr(state, "preset_name", ""),
-                            "type": "pipeline",
-                            "method": getattr(state.meta, "method", None),
-                            "total_cost_usd": round(state.cost_state.total_cost_usd, 6),
-                            "phase_costs": dict(state.cost_state.phase_costs),
-                            "phase_durations": {k: round(v, 2) for k, v in state.meta.phase_durations.items()},
-                            "quality_history": state.meta.quality_history[-10:],
-                            "fallback_events": getattr(state.meta, "fallback_events", []),
-                        },
+            if port is not None and synthesis_text:
+                await port.learn(
+                    prompt=getattr(req, "problem", ""),
+                    response=synthesis_text,
+                    agent_id=getattr(state, "conversation_id", None),
+                    owner=user_id,
+                    metadata={
+                        "preset": getattr(state, "preset_name", ""),
+                        "type": "pipeline",
+                        "method": getattr(state.meta, "method", None),
+                        "total_cost_usd": round(state.cost_state.total_cost_usd, 6),
+                        "phase_costs": dict(state.cost_state.phase_costs),
+                        "phase_durations": {k: round(v, 2) for k, v in state.meta.phase_durations.items()},
+                        "quality_history": state.meta.quality_history[-10:],
+                        "fallback_events": getattr(state.meta, "fallback_events", []),
                     },
-                    timeout=5.0,
                 )
         except Exception as exc:
             logger.debug("Neuro persist failed: %s", exc)

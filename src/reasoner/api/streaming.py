@@ -245,29 +245,26 @@ async def run_followup_stream(
         yield chunk
 
     try:
-        from reasoner.clients import get_neuro_client
-        from reasoner.core.settings import settings
+        from reasoner.core.ports.memory_port import get_memory_port
 
-        client = get_neuro_client()
-        await client.post(
-            f"{settings.internal_api_base_url}/api/neuro/learn",
-            json={
-                "prompt": req.question,
-                "response": (
+        port = get_memory_port()
+        if port is not None:
+            await port.learn(
+                prompt=req.question,
+                response=(
                     state.final_solution.core_solution
                     if state.final_solution
                     else state.previous_synthesis
                 ),
-                "agent_id": req.conversation_id,
-                "metadata": {
+                agent_id=req.conversation_id,
+                owner=user_id,
+                metadata={
                     "turn_number": state.turn_number,
                     "preset": req.preset,
                     "agent_model": state.agent_model,
                     "type": "followup",
                 },
-            },
-            timeout=5.0,
-        )
+            )
     except Exception:
         pass
 

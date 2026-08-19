@@ -212,6 +212,16 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.warning("Failed to inject core→infra deps: %s", exc)
 
+    # Memory is best-effort: a broken neuro config must not stop the app, it
+    # just leaves get_memory_port() returning None and recall returning [].
+    try:
+        from reasoner.core.ports.memory_port import set_memory_port
+        from reasoner.neuro.server import get_neuro_service
+
+        set_memory_port(get_neuro_service())
+    except Exception as exc:
+        logger.warning("Memory port unavailable, neuro recall disabled: %s", exc)
+
     logger.info("Reasoner startup complete")
     logger.info(f"Web UI: http://{settings.SERVER_HOST}:{settings.SERVER_PORT}")
     logger.info(f"API Docs: http://{settings.SERVER_HOST}:{settings.SERVER_PORT}/docs")

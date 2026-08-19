@@ -105,7 +105,7 @@ class PipelineExecutionService:
                 pipeline_service,
                 adaptive_routing=build_adaptive_routing_service(),
             )
-            preflight = await orchestrator.preflight(req, initial_state)
+            preflight = await orchestrator.preflight(req, initial_state, user_id=user_id)
 
             if preflight.gate_reasoning:
                 await sse_emit({

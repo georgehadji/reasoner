@@ -56,6 +56,17 @@ def client(app):
     return TestClient(app, headers={"X-Neuro-Key": NEURO_KEY})
 
 
+@pytest.fixture
+def service(tmp_path, monkeypatch):
+    """The same NeuroService the router wraps, called directly as MemoryPort."""
+    monkeypatch.setattr(ns.settings, "COHERE_RERANK_ENABLED", False, raising=False)
+    monkeypatch.setattr(ns, "create_resilient_embedding", lambda c: _FakeEmbedding())
+    monkeypatch.setattr(ns, "create_resilient_reasoning", lambda c: _FakeReasoning())
+    cfg = _apply_defaults(NeuroConfig())
+    cfg.data_dir = str(tmp_path)
+    return ns.NeuroService(cfg)
+
+
 AGENT = "wiring-test-agent"
 PROMPT = "How does the circuit breaker pick a fallback provider?"
 
@@ -206,27 +217,46 @@ def test_unset_key_leaves_endpoints_open_for_local_dev(tmp_path, monkeypatch):
     assert resp.status_code == 200
 
 
-def test_pipeline_client_carries_a_key_the_gate_accepts(app, monkeypatch):
-    """The orchestrator swallows neuro failures, so a self-call rejected by
-    the gate would make memory silently dead in production rather than loud."""
+def test_service_satisfies_the_memory_port(service):
+    """The pipeline reaches memory through MemoryPort, in-process. If the
+    signatures drift, recall/learn fail at runtime inside an except block that
+    swallows them -- memory would go quietly dead rather than fail loudly."""
+    from reasoner.core.ports.memory_port import MemoryPort
+
+    assert isinstance(service, MemoryPort)
+
+
+def test_port_round_trip_needs_no_http_server(service):
+    """This is the point of the refactor: memory used to be an HTTP self-call
+    to /api/neuro/learn, which always failed in CLI/headless mode because
+    nothing was listening for the app to call itself."""
     import asyncio
 
-    import reasoner.infrastructure.clients as clients
-
-    monkeypatch.setenv("NEURO_INTERNAL_KEY", NEURO_KEY)
-    asyncio.run(clients.close_neuro_client())
-    try:
-        neuro_client = clients.get_neuro_client()
-        assert neuro_client.headers.get("X-Neuro-Key") == NEURO_KEY
-
-        # the gate must accept exactly the headers that client sends
-        resp = TestClient(app, headers=dict(neuro_client.headers)).post(
-            "/api/neuro/learn",
-            json={"prompt": "p", "response": "r", "agent_id": AGENT},
+    async def scenario():
+        await service.learn(
+            prompt=PROMPT,
+            response="It trips after 3 failures and routes to the next chain entry.",
+            agent_id=AGENT,
         )
-        assert resp.status_code == 200
-    finally:
-        asyncio.run(clients.close_neuro_client())
+        return await service.recall(PROMPT, agent_id=AGENT, max_results=5)
+
+    chunks = asyncio.run(scenario())
+    assert chunks, "in-process recall returned nothing"
+    assert {"content", "source", "relevance"} <= set(chunks[0])
+
+
+def test_router_and_port_share_one_service(monkeypatch):
+    """L1 is an in-memory cache backed by disk, so two service instances would
+    hold divergent copies of it."""
+    import reasoner.neuro.server as srv
+
+    monkeypatch.setattr(srv, "_service", None)
+    monkeypatch.setattr(srv, "create_resilient_embedding", lambda c: _FakeEmbedding())
+    monkeypatch.setattr(srv, "create_resilient_reasoning", lambda c: _FakeReasoning())
+
+    first = srv.get_neuro_service()
+    srv.create_neuro_router()
+    assert srv.get_neuro_service() is first
 
 
 def test_hostile_agent_id_creates_no_dirs_outside_agents(client, tmp_path):
@@ -237,3 +267,50 @@ def test_hostile_agent_id_creates_no_dirs_outside_agents(client, tmp_path):
     assert not (tmp_path.parent / "pwned").exists()
     assert all(d.parent == tmp_path / "agents"
                for d in (tmp_path / "agents").iterdir())
+
+
+def test_owner_scoping_isolates_the_same_agent_id(service):
+    """agent_id is a conversation id from the request body. Before owner
+    scoping, anyone who learned another user's conversation id could recall
+    that conversation's memory."""
+    import asyncio
+
+    async def scenario():
+        await service.learn(
+            prompt="alice private planning notes",
+            response="alice secret",
+            agent_id="shared-conversation-id",
+            owner="alice",
+        )
+        victim = await service.recall(
+            "alice private planning notes",
+            agent_id="shared-conversation-id",
+            owner="alice",
+        )
+        # same agent_id, different identity
+        attacker = await service.recall(
+            "alice private planning notes",
+            agent_id="shared-conversation-id",
+            owner="mallory",
+        )
+        # and an unauthenticated caller guessing the raw id
+        anonymous = await service.recall(
+            "alice private planning notes",
+            agent_id="shared-conversation-id",
+        )
+        return victim, attacker, anonymous
+
+    victim, attacker, anonymous = asyncio.run(scenario())
+    assert victim, "owner lost access to their own memory"
+    assert not attacker, f"cross-tenant leak: {attacker}"
+    assert not anonymous, f"anonymous leak: {anonymous}"
+
+
+def test_tenant_key_separates_identities():
+    from reasoner.neuro.server import tenant_key
+
+    assert tenant_key("alice", "conv1") != tenant_key("mallory", "conv1")
+    assert tenant_key(None, "conv1") == "conv1"
+    assert tenant_key("alice", "conv1") == tenant_key("alice", "conv1")
+    # an owner must not be able to forge another's namespace via agent_id
+    assert tenant_key("mallory", "alice~conv1") != tenant_key("alice", "conv1")

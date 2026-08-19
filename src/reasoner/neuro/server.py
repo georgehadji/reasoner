@@ -237,17 +237,79 @@ def require_neuro_key(request: Request) -> None:
         raise HTTPException(status_code=403, detail="Neuro access required")
 
 
-def create_neuro_router(config: Optional[NeuroConfig] = None) -> APIRouter:
-    if config is None:
-        config = load_config()
+def tenant_key(owner: Optional[str], agent_id: Optional[str]) -> Optional[str]:
+    """Scope a caller-supplied agent_id to the identity that owns it.
 
-    router = APIRouter(prefix="/api/neuro", dependencies=[Depends(require_neuro_key)])
-    reasoner = create_resilient_reasoning(config.reasoning)
-    embedder = create_resilient_embedding(config.embedding)
-    tenants = TenantManager(config)
+    agent_id is a conversation id that arrives straight from the request body,
+    and it alone used to select the memory directory -- so anyone who learned
+    another user's conversation id could recall or poison that conversation's
+    memory through the Next proxy.
 
-    @router.get("/health", response_model=NeuroHealthResponse)
-    async def health():
+    Binding the owner into the key closes that by construction rather than by
+    lookup: the same agent_id under two identities resolves to two different
+    tenants, so a guessed id lands the guesser in their own namespace. No
+    ownership table to keep in sync, and nothing to forget to check.
+
+    Anonymous callers (owner=None) keep the bare agent_id namespace. They have
+    no identity to protect, and they cannot reach an owned tenant because they
+    cannot produce its "<owner>~" prefix.
+    """
+    if not owner:
+        return agent_id
+    return f"{owner}~{agent_id or 'default'}"
+
+
+class NeuroService:
+    """Owns the providers, tenants, and memory tiers.
+
+    Reachable two ways, both hitting this same instance: in-process through
+    MemoryPort (the pipeline) and over HTTP through the router below (the
+    Next proxy, on behalf of the browser). One instance matters -- L1 is an
+    in-memory cache backed by disk, so a second service object would hold a
+    divergent copy of it until something forced a reload.
+    """
+
+    def __init__(self, config: Optional[NeuroConfig] = None):
+        self.config = config or load_config()
+        self.reasoner = create_resilient_reasoning(self.config.reasoning)
+        self.embedder = create_resilient_embedding(self.config.embedding)
+        self.tenants = TenantManager(self.config)
+
+    # ── MemoryPort ────────────────────────────────────────────────────────
+    async def recall(
+        self,
+        prompt: str,
+        agent_id: Optional[str] = None,
+        max_results: int = 5,
+        owner: Optional[str] = None,
+    ) -> list[dict]:
+        resp = await self.recall_chunks(RecallRequest(
+            prompt=prompt, agent_id=agent_id,
+            max_results=max_results, compression="none",
+        ), owner=owner)
+        return [
+            {"content": c.content, "source": c.source, "relevance": c.relevance}
+            for c in resp.chunks
+        ]
+
+    async def learn(
+        self,
+        prompt: str,
+        response: str,
+        agent_id: Optional[str] = None,
+        metadata: Optional[dict] = None,
+        owner: Optional[str] = None,
+    ) -> None:
+        await self.ingest(LearnRequest(
+            prompt=prompt, response=response,
+            agent_id=agent_id, metadata=metadata or {},
+        ), owner=owner)
+
+    # ── Full request/response surface (shared with the router) ────────────
+    async def health(self) -> NeuroHealthResponse:
+        config, reasoner, embedder, tenants = (
+            self.config, self.reasoner, self.embedder, self.tenants
+        )
         r_ok = await reasoner.health_check()
         e_ok = await embedder.health_check()
         total_sessions = {"hot": 0, "warm": 0, "cold": 0}
@@ -269,11 +331,13 @@ def create_neuro_router(config: Optional[NeuroConfig] = None) -> APIRouter:
             sessions=total_sessions,
         )
 
-    @router.post("/recall", response_model=RecallResponse)
-    async def recall(req: RecallRequest):
+    async def recall_chunks(
+        self, req: RecallRequest, owner: Optional[str] = None
+    ) -> RecallResponse:
+        config, embedder, tenants = self.config, self.embedder, self.tenants
         start = time.perf_counter()
         persona = get_persona(config, req.persona, req.agent_id)
-        tenant = await tenants.get(req.agent_id)
+        tenant = await tenants.get(tenant_key(owner, req.agent_id))
         l1, l2 = tenant["l1"], tenant["l2"]
         sessions = tenant["sessions"]
 
@@ -341,12 +405,14 @@ def create_neuro_router(config: Optional[NeuroConfig] = None) -> APIRouter:
             provider_used=embedder.active_label,
         )
 
-    @router.post("/audit", response_model=AuditResponse)
-    async def audit(req: AuditRequest):
+    async def audit(
+        self, req: AuditRequest, owner: Optional[str] = None
+    ) -> AuditResponse:
+        config, reasoner, tenants = self.config, self.reasoner, self.tenants
         start = time.perf_counter()
         persona = get_persona(config, req.persona, req.agent_id)
-        tenant = await tenants.get(req.agent_id)
-        
+        tenant = await tenants.get(tenant_key(owner, req.agent_id))
+
         system_prompt = build_audit_system_prompt(persona)
         user_prompt = f"PROMPT:\n{req.prompt}\n\nDRAFT RESPONSE:\n{req.draft_response}"
 
@@ -369,9 +435,11 @@ def create_neuro_router(config: Optional[NeuroConfig] = None) -> APIRouter:
                 persona=persona.name, provider_used=reasoner.active_label,
             )
 
-    @router.post("/learn")
-    async def learn(req: LearnRequest):
-        tenant = await tenants.get(req.agent_id)
+    async def ingest(
+        self, req: LearnRequest, owner: Optional[str] = None
+    ) -> LearnResponse:
+        embedder, tenants = self.embedder, self.tenants
+        tenant = await tenants.get(tenant_key(owner, req.agent_id))
         result = tenant["sessions"].ingest(req.prompt, req.response, req.metadata)
 
         # Index the exchange for semantic recall. Without this nothing ever
@@ -408,15 +476,89 @@ def create_neuro_router(config: Optional[NeuroConfig] = None) -> APIRouter:
             entry_number=result["entry_number"], agent_id=req.agent_id,
         )
 
+    async def list_sessions(
+        self,
+        agent_id: Optional[str] = None,
+        limit: int = 20,
+        offset: int = 0,
+        owner: Optional[str] = None,
+    ) -> dict:
+        """List recent session entries for browsing memory."""
+        tenant = await self.tenants.get(tenant_key(owner, agent_id))
+        entries = tenant["sessions"].list_recent_entries(limit=limit, offset=offset)
+        return {"entries": entries, "total": len(entries)}
+
+
+_service: Optional[NeuroService] = None
+
+
+def get_neuro_service() -> NeuroService:
+    """Return the process-wide NeuroService, building it on first use.
+
+    Injected as the MemoryPort at startup and used by create_neuro_router(),
+    so the pipeline and the HTTP endpoints share one set of tenants and one
+    L1 cache.
+    """
+    global _service
+    if _service is None:
+        _service = NeuroService()
+    return _service
+
+
+def create_neuro_router(config: Optional[NeuroConfig] = None) -> APIRouter:
+    """Mount the HTTP surface over a NeuroService.
+
+    Passing *config* builds an isolated service (tests); the default shares
+    the process-wide one so HTTP and in-process callers see the same state.
+    """
+    service = NeuroService(config) if config is not None else get_neuro_service()
+
+    router = APIRouter(prefix="/api/neuro", dependencies=[Depends(require_neuro_key)])
+
+    # Imported lazily: reasoner.api imports this module, so a module-level
+    # import would close the cycle.
+    from reasoner.api.dependencies import get_optional_user
+
+    async def _owner(user=Depends(get_optional_user)) -> Optional[str]:
+        """Identity that owns the requested agent_id, or None if anonymous.
+
+        Resolved from credentials by FastAPI -- never from the request body,
+        or a caller could just claim someone else's owner and walk straight
+        back into the isolation hole this closes.
+
+        Must stay a real dependency: calling get_optional_user(request) by
+        hand leaves its Depends(security) default unresolved, so every caller
+        would look anonymous and the scoping would be silently inert.
+        """
+        if not user:
+            return None
+        return str(getattr(user, "id", "")) or None
+
+    @router.get("/health", response_model=NeuroHealthResponse)
+    async def health():
+        return await service.health()
+
+    @router.post("/recall", response_model=RecallResponse)
+    async def recall(req: RecallRequest, owner: Optional[str] = Depends(_owner)):
+        return await service.recall_chunks(req, owner=owner)
+
+    @router.post("/audit", response_model=AuditResponse)
+    async def audit(req: AuditRequest, owner: Optional[str] = Depends(_owner)):
+        return await service.audit(req, owner=owner)
+
+    @router.post("/learn")
+    async def learn(req: LearnRequest, owner: Optional[str] = Depends(_owner)):
+        return await service.ingest(req, owner=owner)
+
     @router.get("/sessions")
     async def list_sessions(
         agent_id: Optional[str] = None,
         limit: int = 20,
         offset: int = 0,
+        owner: Optional[str] = Depends(_owner),
     ):
-        """List recent session entries for browsing memory."""
-        tenant = await tenants.get(agent_id)
-        entries = tenant["sessions"].list_recent_entries(limit=limit, offset=offset)
-        return {"entries": entries, "total": len(entries)}
+        return await service.list_sessions(
+            agent_id=agent_id, limit=limit, offset=offset, owner=owner
+        )
 
     return router
