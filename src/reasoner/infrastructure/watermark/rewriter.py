@@ -53,24 +53,40 @@ def build_rewrite_prompt(
     raise ValueError(f"unknown rewrite strategy: {strategy}")
 
 
-def select_rewrite_model(origin_model: str) -> str | None:
-    """Peer-tier, cross-bloc, cross-vendor candidate for rewriting *origin_model*'s output.
+# Curated, ordered general-purpose prose models spanning all three blocs.
+# Explicit rather than derived: scanning the whitelist programmatically picks
+# by alias spelling, not by suitability -- it happily returned `codestral` (a
+# *code* model) to rewrite prose, and could return a local `ollama-*` alias
+# that needs a server nobody is running. Rewrite quality is a judgment call,
+# so the judgment is written down here.
+_REWRITE_CANDIDATES: tuple[str, ...] = (
+    "claude-sonnet",     # US / anthropic
+    "deepseek-v4-pro",   # CN / deepseek
+    "mistral-large-3",   # EU / mistralai
+    "qwen3.8-max",       # CN / qwen
+    "gpt-5.5",           # US / openai
+    "kimi-k2-6",         # CN / moonshotai
+    "gemini-pro",        # US (resolves cross-vendor -- see _vendor_of)
+    "mistral-medium",    # EU / mistralai
+)
 
-    Candidates come from the same whitelist Reasoner already trusts for real
-    routing (`_MODEL_WHITELIST`), not a separate "cheap rewrite model" tier --
-    never a downgrade. Image-only aliases are excluded (a text rewrite through
-    an image model would just fail). Returns None if no cross-bloc,
-    cross-vendor candidate exists; callers must skip the rewrite rather than
-    fall back to a same-bloc model.
+
+def select_rewrite_model(origin_model: str) -> str | None:
+    """Cross-bloc, cross-vendor candidate for rewriting *origin_model*'s output.
+
+    Picks the first candidate whose training bloc AND vendor both differ from
+    the origin -- rewriting a model's output with a sibling from the same lab
+    defeats the point. Returns None when no candidate qualifies; callers must
+    skip the rewrite rather than fall back to a same-bloc model.
     """
-    from reasoner.infrastructure.llm.registry import _MODEL_WHITELIST, bloc_of, resolved_model_of
+    from reasoner.infrastructure.llm.registry import _REGISTRY, bloc_of, resolved_model_of
 
     if not origin_model:
         return None
     origin_bloc = bloc_of(origin_model)
     origin_vendor = resolved_model_of(origin_model).split("/", 1)[0]
-    for alias in sorted(_MODEL_WHITELIST):
-        if "image" in alias:
+    for alias in _REWRITE_CANDIDATES:
+        if alias not in _REGISTRY:
             continue
         if bloc_of(alias) == origin_bloc:
             continue

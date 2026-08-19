@@ -13,7 +13,7 @@ matches the reference tool's own single-blob design.
 
 Guards (plan §5.5, enforced here rather than trusted to the model):
   1. Citation integrity   -- no URL present before is missing after.
-  2. Number/identifier    -- numbers and backtick-identifiers unchanged as a set.
+  2. Number/identifier    -- no invented numbers; backtick identifiers exact.
   3. Length drift          -- output within [0.6x, 1.6x] of input.
   4. Evidence label        -- holds by construction: only core_solution is ever
                               reassigned; claim_labels/evidence are untouched.
@@ -35,6 +35,25 @@ _NUMBER_RE = re.compile(r"\b\d[\d.,]*\b")
 _IDENTIFIER_RE = re.compile(r"`[^`]+`")
 _URL_RE = re.compile(r"https?://[^\s\)\]]+")
 
+# Sentence punctuation that a model routinely leaves glued to a trailing URL
+# ("...see https://example.com/x."). Without stripping it the citation guard
+# rejects the rewrite for "dropping" a URL that is plainly still there --
+# observed on the very first live run against a real model.
+_URL_TRAILING = ".,;:!?'\"" + "/"
+
+# Paraphrasing legitimately spells small numbers out ("3 regions" -> "three
+# regions"); the guard exists to catch a model *changing* 42 into 99, not to
+# forbid English. Only the range that actually shows up spelled in prose.
+_NUMBER_WORDS: dict[str, str] = {
+    "zero": "0", "one": "1", "two": "2", "three": "3", "four": "4", "five": "5",
+    "six": "6", "seven": "7", "eight": "8", "nine": "9", "ten": "10",
+    "eleven": "11", "twelve": "12", "thirteen": "13", "fourteen": "14",
+    "fifteen": "15", "sixteen": "16", "seventeen": "17", "eighteen": "18",
+    "nineteen": "19", "twenty": "20", "thirty": "30", "forty": "40",
+    "fifty": "50", "sixty": "60", "seventy": "70", "eighty": "80", "ninety": "90",
+}
+_WORD_RE = re.compile(r"[a-z]+")
+
 _MIN_LENGTH_RATIO = 0.6
 _MAX_LENGTH_RATIO = 1.6
 
@@ -42,11 +61,20 @@ _REWRITE_SYSTEM_PROMPT = "You rewrite text exactly as instructed. Output only th
 
 
 def _urls(text: str) -> set[str]:
-    return {u.rstrip("/") for u in _URL_RE.findall(text)}
+    return {u.rstrip(_URL_TRAILING) for u in _URL_RE.findall(text)}
 
 
-def _facts(text: str) -> set[str]:
-    return set(_NUMBER_RE.findall(text)) | set(_IDENTIFIER_RE.findall(text))
+def _numbers(text: str) -> set[str]:
+    """Numeric facts, with spelled-out small numbers folded to their digits."""
+    found = {n.rstrip(".,") for n in _NUMBER_RE.findall(text)}
+    for word in _WORD_RE.findall(text.lower()):
+        if word in _NUMBER_WORDS:
+            found.add(_NUMBER_WORDS[word])
+    return found
+
+
+def _identifiers(text: str) -> set[str]:
+    return set(_IDENTIFIER_RE.findall(text))
 
 
 def _record(state: PipelineState, report: dict) -> None:
@@ -74,6 +102,20 @@ async def run_egress_rewrite_phase(state: PipelineState, services: WorkflowServi
         _record(state, {"rewritten": False, "rejected_reason": reason})
         return
 
+    # Bind the chosen model to this phase's role. ProviderRouter.resolve()
+    # falls back to the preset's primary for any role it doesn't know, so
+    # without this the "non-origin model" guarantee is cosmetic: the rewrite
+    # would run on the very model whose output it is meant to launder.
+    try:
+        from reasoner.infrastructure.llm.registry import build_provider
+
+        services.router.routing_table["egress_rewrite"] = build_provider(model)
+    except Exception as exc:
+        reason = f"could not bind rewrite model {model}: {exc}"
+        services.log("EGRESS_REWRITE", f"Skipping rewrite: {reason}", state)
+        _record(state, {"rewritten": False, "rejected_reason": reason})
+        return
+
     strategy = policy.layer_b_strategy
     prompt = build_rewrite_prompt(strategy, original)
     try:
@@ -95,9 +137,24 @@ async def run_egress_rewrite_phase(state: PipelineState, services: WorkflowServi
         _record(state, {"rewritten": False, "rejected_reason": reason})
         return
 
-    if _facts(original) != _facts(rewritten):
-        services.log("EGRESS_REWRITE", "Rewrite rejected: numbers/identifiers changed", state)
-        _record(state, {"rewritten": False, "rejected_reason": "numbers/identifiers changed"})
+    # Numbers: asymmetric. A figure appearing in the rewrite that was never in
+    # the original means the model altered or invented one (42 -> 99), which is
+    # the actual danger. Numbers *missing* from the rewrite are not rejected --
+    # "one"/"two" occur non-numerically in ordinary prose ("one of the
+    # services"), so requiring equality rejected valid paraphrases on live runs.
+    invented = _numbers(rewritten) - _numbers(original)
+    if invented:
+        reason = f"introduced number(s) not in the original: {sorted(invented)}"
+        services.log("EGRESS_REWRITE", f"Rewrite rejected: {reason}", state)
+        _record(state, {"rewritten": False, "rejected_reason": reason})
+        return
+
+    # Identifiers: exact. Backticked names are code, not prose -- there is no
+    # legitimate reason for a rewrite to add, drop, or respell one.
+    if _identifiers(original) != _identifiers(rewritten):
+        reason = "backtick identifiers changed"
+        services.log("EGRESS_REWRITE", f"Rewrite rejected: {reason}", state)
+        _record(state, {"rewritten": False, "rejected_reason": reason})
         return
 
     ratio = len(rewritten) / len(original) if original else 1.0

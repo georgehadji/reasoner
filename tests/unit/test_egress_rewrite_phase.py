@@ -22,11 +22,19 @@ def _final_solution(core_solution: str) -> FinalSolution:
     )
 
 
+class FakeRouter:
+    """Minimal stand-in for ProviderRouter -- only routing_table is used here."""
+
+    def __init__(self):
+        self.routing_table: dict[str, object] = {}
+
+
 class FakeServices:
     def __init__(self, response: str = "", raise_error: bool = False):
         self.response = response
         self.raise_error = raise_error
         self.logs: list[tuple[str, str]] = []
+        self.router = FakeRouter()
 
     def log(self, phase, message, state):
         self.logs.append((phase, message))
@@ -35,6 +43,19 @@ class FakeServices:
         if self.raise_error:
             raise RuntimeError("llm unavailable")
         return self.response, {}
+
+
+@pytest.fixture
+def layer_b_on(monkeypatch):
+    """Enable Layer B and stub out real provider construction."""
+    from reasoner.core.settings import settings
+    import reasoner.infrastructure.llm.registry as registry
+    import reasoner.application.flows.egress_rewrite_phase as mod
+
+    monkeypatch.setattr(settings, "WATERMARK_LAYER_B_ENABLED", True)
+    monkeypatch.setattr(mod, "select_rewrite_model", lambda origin: "claude-sonnet")
+    monkeypatch.setattr(registry, "build_provider", lambda model_id, api_key=None: object())
+    return mod
 
 
 class TestDivergence:
@@ -99,12 +120,8 @@ class TestEgressRewritePhase:
         assert not services.logs
 
     @pytest.mark.asyncio
-    async def test_no_candidate_model_rejects(self, monkeypatch):
-        from reasoner.core.settings import settings
-        import reasoner.application.flows.egress_rewrite_phase as mod
-
-        monkeypatch.setattr(settings, "WATERMARK_LAYER_B_ENABLED", True)
-        monkeypatch.setattr(mod, "select_rewrite_model", lambda origin: None)
+    async def test_no_candidate_model_rejects(self, monkeypatch, layer_b_on):
+        monkeypatch.setattr(layer_b_on, "select_rewrite_model", lambda origin: None)
         state = PipelineState()
         state.final_solution = _final_solution("original text")
         services = FakeServices(response="rewritten text")
@@ -115,12 +132,19 @@ class TestEgressRewritePhase:
         assert state.meta.provenance_report["egress_rewrite"]["rewritten"] is False
 
     @pytest.mark.asyncio
-    async def test_dropped_citation_rejects(self, monkeypatch):
-        from reasoner.core.settings import settings
-        import reasoner.application.flows.egress_rewrite_phase as mod
+    async def test_selected_model_is_bound_to_the_role(self, layer_b_on):
+        """ProviderRouter falls back to the preset primary for unknown roles, so
+        the phase must bind its chosen model or the cross-bloc guarantee is fake."""
+        state = PipelineState()
+        state.final_solution = _final_solution("the result was 42 percent complete")
+        services = FakeServices(response="the outcome reached 42 percent completion")
 
-        monkeypatch.setattr(settings, "WATERMARK_LAYER_B_ENABLED", True)
-        monkeypatch.setattr(mod, "select_rewrite_model", lambda origin: "claude-sonnet")
+        await run_egress_rewrite_phase(state, services)
+
+        assert "egress_rewrite" in services.router.routing_table
+
+    @pytest.mark.asyncio
+    async def test_dropped_citation_rejects(self, layer_b_on):
         state = PipelineState()
         state.final_solution = _final_solution("see https://example.com/source for details")
         services = FakeServices(response="see the source for details, citation removed")
@@ -133,12 +157,19 @@ class TestEgressRewritePhase:
         assert state.final_solution.core_solution == "see https://example.com/source for details"
 
     @pytest.mark.asyncio
-    async def test_number_mismatch_rejects(self, monkeypatch):
-        from reasoner.core.settings import settings
-        import reasoner.application.flows.egress_rewrite_phase as mod
+    async def test_url_with_trailing_period_is_not_a_dropped_citation(self, layer_b_on):
+        """Regression: a live model ended a sentence with the URL, so the match
+        captured 'https://example.com/source.' and the guard falsely rejected."""
+        state = PipelineState()
+        state.final_solution = _final_solution("details live at https://example.com/source for now")
+        services = FakeServices(response="the writeup is at https://example.com/source.")
 
-        monkeypatch.setattr(settings, "WATERMARK_LAYER_B_ENABLED", True)
-        monkeypatch.setattr(mod, "select_rewrite_model", lambda origin: "claude-sonnet")
+        await run_egress_rewrite_phase(state, services)
+
+        assert state.meta.provenance_report["egress_rewrite"]["rewritten"] is True
+
+    @pytest.mark.asyncio
+    async def test_altered_number_rejects(self, layer_b_on):
         state = PipelineState()
         state.final_solution = _final_solution("the result was 42 percent")
         services = FakeServices(response="the result was 99 percent")
@@ -147,18 +178,36 @@ class TestEgressRewritePhase:
 
         report = state.meta.provenance_report["egress_rewrite"]
         assert report["rewritten"] is False
-        assert "numbers" in report["rejected_reason"]
+        assert "number" in report["rejected_reason"]
 
     @pytest.mark.asyncio
-    async def test_length_drift_rejects(self, monkeypatch):
-        from reasoner.core.settings import settings
-        import reasoner.application.flows.egress_rewrite_phase as mod
-
-        monkeypatch.setattr(settings, "WATERMARK_LAYER_B_ENABLED", True)
-        monkeypatch.setattr(mod, "select_rewrite_model", lambda origin: "claude-sonnet")
+    async def test_spelled_out_number_is_not_a_mismatch(self, layer_b_on):
+        """Regression: paraphrasing legitimately turns '3 regions' into 'three
+        regions'; strict set equality rejected valid live rewrites for it."""
         state = PipelineState()
-        original = "short original text here"
-        state.final_solution = _final_solution(original)
+        state.final_solution = _final_solution("the rollout covered 3 regions in total")
+        services = FakeServices(response="in total, the rollout spanned three regions")
+
+        await run_egress_rewrite_phase(state, services)
+
+        assert state.meta.provenance_report["egress_rewrite"]["rewritten"] is True
+
+    @pytest.mark.asyncio
+    async def test_changed_identifier_rejects(self, layer_b_on):
+        state = PipelineState()
+        state.final_solution = _final_solution("the `auth_middleware` module was slow")
+        services = FakeServices(response="the `authMiddleware` module was slow")
+
+        await run_egress_rewrite_phase(state, services)
+
+        report = state.meta.provenance_report["egress_rewrite"]
+        assert report["rewritten"] is False
+        assert "identifier" in report["rejected_reason"]
+
+    @pytest.mark.asyncio
+    async def test_length_drift_rejects(self, layer_b_on):
+        state = PipelineState()
+        state.final_solution = _final_solution("short original text here")
         services = FakeServices(response="way " * 40 + "too long")  # >1.6x
 
         await run_egress_rewrite_phase(state, services)
@@ -168,12 +217,7 @@ class TestEgressRewritePhase:
         assert "length drift" in report["rejected_reason"]
 
     @pytest.mark.asyncio
-    async def test_llm_failure_keeps_original(self, monkeypatch):
-        from reasoner.core.settings import settings
-        import reasoner.application.flows.egress_rewrite_phase as mod
-
-        monkeypatch.setattr(settings, "WATERMARK_LAYER_B_ENABLED", True)
-        monkeypatch.setattr(mod, "select_rewrite_model", lambda origin: "claude-sonnet")
+    async def test_llm_failure_keeps_original(self, layer_b_on):
         state = PipelineState()
         state.final_solution = _final_solution("original text")
         services = FakeServices(raise_error=True)
@@ -184,12 +228,7 @@ class TestEgressRewritePhase:
         assert "failed" in state.meta.provenance_report["egress_rewrite"]["rejected_reason"]
 
     @pytest.mark.asyncio
-    async def test_accepted_rewrite_replaces_core_solution(self, monkeypatch):
-        from reasoner.core.settings import settings
-        import reasoner.application.flows.egress_rewrite_phase as mod
-
-        monkeypatch.setattr(settings, "WATERMARK_LAYER_B_ENABLED", True)
-        monkeypatch.setattr(mod, "select_rewrite_model", lambda origin: "claude-sonnet")
+    async def test_accepted_rewrite_replaces_core_solution(self, layer_b_on):
         state = PipelineState()
         state.final_solution = _final_solution("the result was 42 percent complete")
         services = FakeServices(response="the outcome reached 42 percent completion")
