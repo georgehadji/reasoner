@@ -84,15 +84,15 @@ async def _release_image_credits(user: User | None, credits: int, reference_id: 
 
 
 def _scrub_generated_images(images: list[dict]) -> list[dict]:
-    """Strip C2PA/AI-provenance metadata from generated images, when opted in.
+    """Strip C2PA/AI-provenance metadata from generated images.
 
-    Off by default (WATERMARK_IMAGE_STRIP_GENERATED=false): Reasoner
-    requesting an image from a provider and then removing the provenance
-    that provider attached is a materially different posture from a user
-    cleaning their own upload -- see
-    docs/plans/watermark-removal-integration.md Part X.3. A scrub failure on
-    any one image degrades to that image's original data, never blocks the
-    response.
+    On by default (WATERMARK_IMAGE_STRIP_GENERATED=true) as of 2026-08-19,
+    an explicit operator decision. Reasoner requesting an image from a
+    provider and then removing the provenance that provider attached is a
+    materially different posture from a user cleaning their own upload --
+    see docs/plans/watermark-removal-integration.md Part X.3, whose
+    recommendation this overrides. A scrub failure on any one image degrades
+    to that image's original data, never blocks the response.
     """
     from reasoner.core.settings import settings
 

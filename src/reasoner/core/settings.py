@@ -416,20 +416,27 @@ class Settings:
     # ── Watermark / AI-provenance-mark scrubbing ──
     # See docs/plans/watermark-removal-integration.md Part IX and §10.3.
     # Layer A egress hygiene is on by default (it is a bug fix + injection
-    # defense, not a watermark-removal feature). Generated-image metadata
-    # stripping is opt-in: Reasoner requesting an image and then removing the
-    # provenance the provider attached is a materially different posture
-    # from a user cleaning their own upload.
+    # defense, not a watermark-removal feature).
     #
-    # Layer B defaults ON as of 2026-08-19, an explicit operator decision
-    # overriding the plan's ship-behind-a-flag recommendation (§10.3). Every
-    # run now spends one extra cross-bloc LLM call to rewrite the synthesis
-    # prose, and the pre-run estimate accounts for it. It stays best-effort:
-    # it cannot certify removal against a vendor detector.
+    # As of 2026-08-19 every scrubbing control defaults ON, an explicit
+    # operator decision overriding the plan's §10.3 recommendation to ship
+    # the two removal-flavoured ones behind flags:
+    #
+    #   WATERMARK_LAYER_B_ENABLED       -- one extra cross-bloc LLM call per
+    #     run to rewrite the synthesis prose; the pre-run estimate accounts
+    #     for it. Best-effort: cannot certify removal against a detector.
+    #   WATERMARK_IMAGE_STRIP_GENERATED -- strips the provenance a provider
+    #     (Gemini/OpenAI) attached to an image Reasoner itself requested,
+    #     before delivery. §10.3 calls this the sharpest case, since it makes
+    #     Reasoner the party removing the mark on content it generated.
+    #     Distinct from STRIP_UPLOADS, which cleans the user's own file.
+    #
+    # Deployments in jurisdictions with provider marking duties (EU AI Act
+    # Art. 50, California SB 942) should review these two before shipping.
     WATERMARK_EGRESS_LAYER_A: bool = os.getenv("WATERMARK_EGRESS_LAYER_A", "true").lower() in ("1", "true", "yes")
     WATERMARK_INGRESS_INSPECT: bool = os.getenv("WATERMARK_INGRESS_INSPECT", "true").lower() in ("1", "true", "yes")
     WATERMARK_IMAGE_STRIP_UPLOADS: bool = os.getenv("WATERMARK_IMAGE_STRIP_UPLOADS", "true").lower() in ("1", "true", "yes")
-    WATERMARK_IMAGE_STRIP_GENERATED: bool = os.getenv("WATERMARK_IMAGE_STRIP_GENERATED", "false").lower() in ("1", "true", "yes")
+    WATERMARK_IMAGE_STRIP_GENERATED: bool = os.getenv("WATERMARK_IMAGE_STRIP_GENERATED", "true").lower() in ("1", "true", "yes")
     WATERMARK_LAYER_B_ENABLED: bool = os.getenv("WATERMARK_LAYER_B_ENABLED", "true").lower() in ("1", "true", "yes")
     WATERMARK_LAYER_B_STRATEGY: str = os.getenv("WATERMARK_LAYER_B_STRATEGY", "paraphrase")
 
