@@ -1,9 +1,10 @@
 """Layer B: optional best-effort statistical-rewrite pass on the synthesis output.
 
-Runs only when `EgressPolicy.layer_b_enabled` (WATERMARK_LAYER_B_ENABLED, off
-by default). Never replaces `state.final_solution.core_solution` unless every
-post-condition guard passes; on any rejection the original text is kept and
-the reason is reported on the phase's own SSE payload -- a silent downgrade
+Runs when `EgressPolicy.layer_b_enabled` (WATERMARK_LAYER_B_ENABLED, on by
+default as of 2026-08-19). Never replaces
+`state.final_solution.core_solution` unless every post-condition guard
+passes; on any rejection the original text is kept and the reason is
+reported on the phase's own SSE payload -- a silent downgrade
 is not an option (docs/plans/watermark-removal-integration.md Part X.2,
 "silent no-op mistaken for success").
 
@@ -107,9 +108,10 @@ async def run_egress_rewrite_phase(state: PipelineState, services: WorkflowServi
     # without this the "non-origin model" guarantee is cosmetic: the rewrite
     # would run on the very model whose output it is meant to launder.
     try:
-        from reasoner.infrastructure.llm.registry import build_provider
+        from reasoner.core.ports.model_registry_port import get_model_registry_port
 
-        services.router.routing_table["egress_rewrite"] = build_provider(model)
+        provider = get_model_registry_port().get_provider(model)
+        services.router.routing_table["egress_rewrite"] = provider
     except Exception as exc:
         reason = f"could not bind rewrite model {model}: {exc}"
         services.log("EGRESS_REWRITE", f"Skipping rewrite: {reason}", state)

@@ -571,7 +571,7 @@ Rewire `clean_llm_artifacts` as a delegate; drop the dead import; extend scrubbi
 Badge, report drawer, settings panel; capability-gated. **Exit:** Playwright coverage; copy reviewed against the discipline rules in §5.7.
 
 ### Phase 6 — Layer B (opt-in, feature-flagged) · ~4 days
-`NonOriginModelSelector`, strategies, divergence scorer, `egress_rewrite` phase, post-condition guards, estimate integration, audit logging, `RewriteDiff` UI. **Exit:** rewrite never ships when a post-condition fails; cost appears in the pre-run estimate; every invocation lands in the audit log. Ships behind `WATERMARK_LAYER_B_ENABLED=false`.
+`NonOriginModelSelector`, strategies, divergence scorer, `egress_rewrite` phase, post-condition guards, estimate integration, audit logging, `RewriteDiff` UI. **Exit:** rewrite never ships when a post-condition fails; cost appears in the pre-run estimate; every invocation lands in the audit log. Ships behind `WATERMARK_LAYER_B_ENABLED=false`. **Update 2026-08-19: shipped, then the operator flipped the default to `true` after live verification — see §10.3, whose recommendation this overrides.**
 
 ### Phase 7 (optional, deferred) — Stylometry as a quality metric · ~1 day
 Surface the score as a **writing-quality signal** in the writing/article methods ("your draft reads formulaically: CV 0.22, 6 AI-cadence phrases"), not as a removal tool. This is the honest, defensible use of that scorer and arguably worth more to Reasoner than the removal use.

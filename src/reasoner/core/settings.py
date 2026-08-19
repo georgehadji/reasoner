@@ -346,7 +346,7 @@ class Settings:
     # ── WebSocket Security (Phase 3 metering) ──
     # Ticket validity window. Short by design: the ticket travels via the
     # Sec-WebSocket-Protocol header for exactly one connection attempt, not
-    # as a standing credential -- see core/ws_ticket.py.
+    # as a standing credential -- see application/services/ws_ticket.py.
     WS_TICKET_TTL_SECONDS: int = int(os.getenv("WS_TICKET_TTL_SECONDS", "30"))
     WS_CONNECT_RATE_LIMIT_PER_MINUTE: int = int(
         os.getenv("WS_CONNECT_RATE_LIMIT_PER_MINUTE", "20")
@@ -420,11 +420,17 @@ class Settings:
     # stripping is opt-in: Reasoner requesting an image and then removing the
     # provenance the provider attached is a materially different posture
     # from a user cleaning their own upload.
+    #
+    # Layer B defaults ON as of 2026-08-19, an explicit operator decision
+    # overriding the plan's ship-behind-a-flag recommendation (§10.3). Every
+    # run now spends one extra cross-bloc LLM call to rewrite the synthesis
+    # prose, and the pre-run estimate accounts for it. It stays best-effort:
+    # it cannot certify removal against a vendor detector.
     WATERMARK_EGRESS_LAYER_A: bool = os.getenv("WATERMARK_EGRESS_LAYER_A", "true").lower() in ("1", "true", "yes")
     WATERMARK_INGRESS_INSPECT: bool = os.getenv("WATERMARK_INGRESS_INSPECT", "true").lower() in ("1", "true", "yes")
     WATERMARK_IMAGE_STRIP_UPLOADS: bool = os.getenv("WATERMARK_IMAGE_STRIP_UPLOADS", "true").lower() in ("1", "true", "yes")
     WATERMARK_IMAGE_STRIP_GENERATED: bool = os.getenv("WATERMARK_IMAGE_STRIP_GENERATED", "false").lower() in ("1", "true", "yes")
-    WATERMARK_LAYER_B_ENABLED: bool = os.getenv("WATERMARK_LAYER_B_ENABLED", "false").lower() in ("1", "true", "yes")
+    WATERMARK_LAYER_B_ENABLED: bool = os.getenv("WATERMARK_LAYER_B_ENABLED", "true").lower() in ("1", "true", "yes")
     WATERMARK_LAYER_B_STRATEGY: str = os.getenv("WATERMARK_LAYER_B_STRATEGY", "paraphrase")
 
     @property

@@ -45,16 +45,35 @@ class FakeServices:
         return self.response, {}
 
 
+class _StubRegistryPort:
+    """Stub ModelRegistryPort -- the phase only ever calls get_provider()."""
+
+    def get_provider(self, model_id: str, api_key: str | None = None) -> object:
+        return object()
+
+    def contains(self, model_id: str) -> bool:
+        return True
+
+    def entry(self, model_id: str) -> dict | None:
+        return {}
+
+
 @pytest.fixture
 def layer_b_on(monkeypatch):
-    """Enable Layer B and stub out real provider construction."""
+    """Enable Layer B and stub provider construction at the port boundary.
+
+    Patches the port, not infrastructure.llm.registry: the phase resolves its
+    provider through get_model_registry_port(), which raises unless an adapter
+    was injected at startup. Stubbing it keeps these tests hermetic -- no real
+    provider, no API key, no network -- regardless of injection state.
+    """
     from reasoner.core.settings import settings
-    import reasoner.infrastructure.llm.registry as registry
+    import reasoner.core.ports.model_registry_port as registry_port
     import reasoner.application.flows.egress_rewrite_phase as mod
 
     monkeypatch.setattr(settings, "WATERMARK_LAYER_B_ENABLED", True)
     monkeypatch.setattr(mod, "select_rewrite_model", lambda origin: "claude-sonnet")
-    monkeypatch.setattr(registry, "build_provider", lambda model_id, api_key=None: object())
+    monkeypatch.setattr(registry_port, "get_model_registry_port", lambda: _StubRegistryPort())
     return mod
 
 
