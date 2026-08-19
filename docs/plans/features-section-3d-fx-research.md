@@ -7,11 +7,17 @@
 **Deliverable:** options, costs, and failure modes.
 
 **Two updates since first writing (2026-08-18).**
-1. The section this doc studies **no longer exists in the working tree.** It is still in `HEAD`, but
-   the uncommitted `LandingPage.tsx` rewrite replaced the feature bento with a real-run record, on
-   the stated reasoning that cards *describe* the product where a record *demonstrates* it. Line
-   references above point at `HEAD`. The inverted-band mechanism (§2) and the shared FX layer (§3)
-   transfer to any section; only the per-card mapping in §4 is tied to the cards.
+1. **The section this doc studies no longer exists — it was committed away.** `78ca432 feat:
+   capability-led landing page, run record moves to /how-it-works` replaced the four-card bento;
+   `HEAD` now contains zero occurrences of "Verified Reasoning". Every `LandingPage.tsx` line
+   reference in this doc points at a pre-`78ca432` revision and will not resolve. The page is now
+   seven numbered sections (§1 Hallucination, §2 Bias, §3 Research, §4 Methods, §5 Images,
+   §6 Writing, §7 Ideas & code) plus Terms.
+
+   What survives the deletion: the inverted-band mechanism (§2) and the shared FX layer (§3) apply
+   to any section. What does not: the per-card FX mapping in §4 has no cards left to map onto, and
+   §6's imagery question was answered in the product itself — §5 Images ships four real generated
+   images, one per lab, each attributed with model, origin, and fallback status.
 2. A working lab of every effect here now exists at
    [`ui-next/src/app/fx-lab/`](../../ui-next/src/app/fx-lab/FxLab.tsx) (route `/fx-lab`, noindex,
    no new dependencies, deletable in one `rm -r`). Corrections found while building it are marked

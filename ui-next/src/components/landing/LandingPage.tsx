@@ -410,7 +410,7 @@ export default function LandingPage() {
               className="mt-[var(--space-6)] grid list-none gap-[var(--space-4)] sm:grid-cols-2 lg:grid-cols-4"
             >
               {SHOWCASE_IMAGES.map(({ src, model, lab, origin, fallback }) => (
-                <li key={src}>
+                <li key={src} className="card-hover">
                   <img
                     src={src}
                     alt={`${lab}'s interpretation of the prompt: a wooden reading chair beside a tall gallery window in morning light`}
