@@ -119,9 +119,12 @@ def get_pricing(model_id: str) -> ModelPricing:
     if model_id in PRICING_DB:
         return PRICING_DB[model_id]
     
-    # Fallback to default pricing.
-    # Callers that need to resolve registry shorthand IDs (e.g. "claude-opus")
-    # to their OpenRouter model paths should use pricing_service.get_pricing().
+    # Fallback to default pricing. Returned by identity, so callers can detect
+    # "unpriced" with `is PRICING_DB["_default"]` rather than comparing values.
+    # Callers holding registry shorthand IDs (e.g. "claude-opus") must resolve
+    # them first via infrastructure.llm.pricing_resolver.get_pricing(); domain
+    # cannot reach the alias table, and silently defaulting here is what made
+    # the spend gate price every preset identically.
     return PRICING_DB["_default"]
 
 

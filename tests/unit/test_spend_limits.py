@@ -159,7 +159,7 @@ class TestEstimate:
             svc, "_preset_routing", lambda p: {"a": "m", "b": "m"} if p == "big" else {"a": "m"}
         )
         monkeypatch.setattr(
-            "reasoner.application.services.pricing_service.get_pricing",
+            "reasoner.infrastructure.llm.pricing_resolver.get_pricing",
             lambda _m: ModelPricing(1e-6, 5e-6),
         )
         assert svc.estimate_run_cost("big") > svc.estimate_run_cost("small")

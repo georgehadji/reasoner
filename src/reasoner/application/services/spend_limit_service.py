@@ -145,8 +145,8 @@ def estimate_run_cost(preset_id: str) -> float:
     cost accumulated during the run, which the executor enforces against the
     same ceiling.
     """
-    from reasoner.application.services.pricing_service import get_pricing
     from reasoner.core.constants import DEFAULT_MAX_TOKENS, PHASE_TOKEN_BUDGETS
+    from reasoner.infrastructure.llm.pricing_resolver import get_pricing
 
     routing = _preset_routing(preset_id)
     if not routing:
