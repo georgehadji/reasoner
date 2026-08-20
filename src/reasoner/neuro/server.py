@@ -3,29 +3,31 @@ Neuro API Engine
 Internal endpoints for recall, audit, and learning.
 """
 
-import json
-import time
+import asyncio
 import hashlib
 import logging
-import asyncio
 import secrets
-from pathlib import Path
+import time
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from reasoner.neuro.config import (
-    load_config, NeuroConfig, get_agent_data_dir, get_persona, PersonaConfig,
-)
-from reasoner.neuro.providers import create_resilient_reasoning, create_resilient_embedding
-from reasoner.neuro.cache import L1Cache, L2Index, l3_scan, ContextChunk
-from reasoner.neuro.sessions import SessionManager, SessionConfig
-from reasoner.neuro.compression import smart_compress
 from reasoner.core.rerank import rerank_memory_chunks
 from reasoner.core.settings import settings
-from reasoner.utils.json_safe import safe_json_loads, JSONDepthExceededError
+from reasoner.neuro.cache import ContextChunk, L1Cache, L2Index, l3_scan
+from reasoner.neuro.compression import smart_compress
+from reasoner.neuro.config import (
+    NeuroConfig,
+    PersonaConfig,
+    get_agent_data_dir,
+    get_persona,
+    load_config,
+)
+from reasoner.neuro.providers import create_resilient_embedding, create_resilient_reasoning
+from reasoner.neuro.sessions import SessionConfig, SessionManager
+from reasoner.utils.json_safe import safe_json_loads
 
 log = logging.getLogger("neuro.api")
 
@@ -39,7 +41,7 @@ def _cached_compress(content: str, ext: str, level: str) -> str:
     if key not in _compression_cache:
         if len(_compression_cache) >= _COMPRESSION_CACHE_MAX:
             # Evict oldest quarter by removing arbitrary keys (dict is insertion-ordered)
-            evict = list(_compression_cache)[:_COMPRESSION_CACHE_MAX // 4]
+            evict = list(_compression_cache)[: _COMPRESSION_CACHE_MAX // 4]
             for k in evict:
                 del _compression_cache[k]
         _compression_cache[key] = smart_compress(content, ext=ext, level=level)
@@ -49,6 +51,7 @@ def _cached_compress(content: str, ext: str, level: str) -> str:
 # ─────────────────────────────────────────────
 #  Request/Response Models
 # ─────────────────────────────────────────────
+
 
 class NeuroHealthResponse(BaseModel):
     status: str
@@ -80,7 +83,9 @@ class RecallRequest(BaseModel):
     agent_id: Optional[str] = Field(None, description="Agent ID for tenant isolation")
     persona: Optional[str] = Field(None, description="Persona mode")
     max_results: int = Field(5, ge=1, le=20)
-    compression: str = Field("none", description="Compression level: none | minimal | aggressive")
+    compression: Literal["none", "minimal", "aggressive"] = Field(
+        "none", description="Compression level"
+    )
 
 
 class RecallChunkResponse(BaseModel):
@@ -120,6 +125,7 @@ class AuditResponse(BaseModel):
 # ─────────────────────────────────────────────
 #  Tenant Manager
 # ─────────────────────────────────────────────
+
 
 class TenantManager:
     """Manages per-agent tenant state with LRU eviction to prevent unbounded growth.
@@ -177,11 +183,27 @@ class TenantManager:
             for d in [l1_dir, l2_dir]:
                 d.mkdir(parents=True, exist_ok=True)
 
+            # L1Cache/L2Index.__init__ each do a synchronous glob+read of their
+            # tenant's cache dir (_load()); done inline this blocks the whole
+            # event loop -- not just this coroutine -- for every worker
+            # request, for as long as we hold self._lock above. Offload the
+            # construction to a thread so first-touch of a new tenant never
+            # stalls the process.
+            l1, l2, sessions = await asyncio.to_thread(
+                lambda: (
+                    L1Cache(l1_dir, self.config.cache),
+                    L2Index(l2_dir, self.config.cache),
+                    SessionManager(data_dir, SessionConfig()),
+                )
+            )
             tenant = {
                 "data_dir": data_dir,
-                "l1": L1Cache(l1_dir, self.config.cache),
-                "l2": L2Index(l2_dir, self.config.cache),
-                "sessions": SessionManager(data_dir, SessionConfig()),
+                "l1": l1,
+                "l2": l2,
+                "sessions": sessions,
+                # Serializes L1/L2 indexing per tenant -- see ingest()'s use
+                # of it for why.
+                "index_lock": asyncio.Lock(),
             }
             self._tenants[key] = tenant
             self._last_access[key] = now
@@ -207,6 +229,7 @@ Respond with EXACTLY this JSON format (no markdown):
     "enrichment": "additional context if ENRICH, otherwise null"
 }}"""
 
+
 def build_audit_system_prompt(persona: PersonaConfig) -> str:
     prompt = BASE_AUDIT_PROMPT
     if persona.custom_system_prompt:
@@ -217,6 +240,7 @@ def build_audit_system_prompt(persona: PersonaConfig) -> str:
 # ─────────────────────────────────────────────
 #  Router Factory
 # ─────────────────────────────────────────────
+
 
 def require_neuro_key(request: Request) -> None:
     """Gate /api/neuro/* to callers holding the shared internal key.
@@ -250,13 +274,16 @@ def tenant_key(owner: Optional[str], agent_id: Optional[str]) -> Optional[str]:
     tenants, so a guessed id lands the guesser in their own namespace. No
     ownership table to keep in sync, and nothing to forget to check.
 
-    Anonymous callers (owner=None) keep the bare agent_id namespace. They have
-    no identity to protect, and they cannot reach an owned tenant because they
-    cannot produce its "<owner>~" prefix.
+    Both branches carry a literal prefix ("u-"/"a-") neither caller controls,
+    not just a separator character -- get_agent_data_dir's path sanitizer
+    strips everything outside [A-Za-z0-9_-], including a bare "~", so an
+    anonymous agent_id could otherwise be crafted to reproduce an owned key
+    once the separator was stripped. A fixed prefix survives sanitization and
+    the anonymous branch can never emit "u-...", regardless of agent_id.
     """
     if not owner:
-        return agent_id
-    return f"{owner}~{agent_id or 'default'}"
+        return f"a-{agent_id}" if agent_id else None
+    return f"u-{owner}-{agent_id or 'default'}"
 
 
 class NeuroService:
@@ -283,10 +310,15 @@ class NeuroService:
         max_results: int = 5,
         owner: Optional[str] = None,
     ) -> list[dict]:
-        resp = await self.recall_chunks(RecallRequest(
-            prompt=prompt, agent_id=agent_id,
-            max_results=max_results, compression="none",
-        ), owner=owner)
+        resp = await self.recall_chunks(
+            RecallRequest(
+                prompt=prompt,
+                agent_id=agent_id,
+                max_results=max_results,
+                compression="none",
+            ),
+            owner=owner,
+        )
         return [
             {"content": c.content, "source": c.source, "relevance": c.relevance}
             for c in resp.chunks
@@ -300,22 +332,32 @@ class NeuroService:
         metadata: Optional[dict] = None,
         owner: Optional[str] = None,
     ) -> None:
-        await self.ingest(LearnRequest(
-            prompt=prompt, response=response,
-            agent_id=agent_id, metadata=metadata or {},
-        ), owner=owner)
+        await self.ingest(
+            LearnRequest(
+                prompt=prompt,
+                response=response,
+                agent_id=agent_id,
+                metadata=metadata or {},
+            ),
+            owner=owner,
+        )
 
     # ── Full request/response surface (shared with the router) ────────────
     async def health(self) -> NeuroHealthResponse:
         config, reasoner, embedder, tenants = (
-            self.config, self.reasoner, self.embedder, self.tenants
+            self.config,
+            self.reasoner,
+            self.embedder,
+            self.tenants,
         )
         r_ok = await reasoner.health_check()
         e_ok = await embedder.health_check()
         total_sessions = {"hot": 0, "warm": 0, "cold": 0}
         tenant_snapshot = list(tenants._tenants.values())
         for t in tenant_snapshot:
-            s = t["sessions"].stats
+            # .stats globs + stats every session file on disk -- offload so
+            # health() doesn't block the loop once tenants hold real data.
+            s = await asyncio.to_thread(lambda t=t: t["sessions"].stats)
             total_sessions["hot"] += s["hot_sessions"]
             total_sessions["warm"] += s["warm_sessions"]
             total_sessions["cold"] += s["cold_sessions"]
@@ -345,19 +387,22 @@ class NeuroService:
         # HOT search
         hot_results = sessions.search_hot(req.prompt, max_results=3)
         for hr in hot_results:
-            all_chunks.append(ContextChunk(
-                content=f"[{hr['timestamp'][:16]}] User: {hr['prompt']}\nAgent: {hr['response']}",
-                source=f"recent-session:{hr['session_id']}",
-                relevance=0.95, cache_tier="HOT",
-            ))
+            all_chunks.append(
+                ContextChunk(
+                    content=f"[{hr['timestamp'][:16]}] User: {hr['prompt']}\nAgent: {hr['response']}",
+                    source=f"recent-session:{hr['session_id']}",
+                    relevance=0.95,
+                    cache_tier="HOT",
+                )
+            )
 
         query_embedding = await embedder.embed(req.prompt)
-        
+
         # L1/L2 search
         remaining = req.max_results - len(all_chunks)
         if remaining > 0:
             all_chunks.extend(l1.search(query_embedding, top_k=remaining, persona=persona))
-        
+
         remaining = req.max_results - len(all_chunks)
         if remaining > 0:
             all_chunks.extend(l2.search(query_embedding, top_k=remaining, persona=persona))
@@ -371,9 +416,11 @@ class NeuroService:
         remaining = req.max_results - len(all_chunks)
         if remaining > 0:
             try:
-                all_chunks.extend(await l3_scan(
-                    sessions.warm_dir, query_embedding, embedder.embed, top_k=remaining
-                ))
+                all_chunks.extend(
+                    await l3_scan(
+                        sessions.warm_dir, query_embedding, embedder.embed, top_k=remaining
+                    )
+                )
             except Exception as exc:
                 log.warning("L3 scan failed in recall: %s", exc)
 
@@ -401,13 +448,13 @@ class NeuroService:
             chunks=[RecallChunkResponse(**c.to_dict()) for c in all_chunks],
             total_found=len(all_chunks),
             latency_ms=round(latency, 1),
-            cache_hits={}, agent_id=req.agent_id, persona=persona.name,
+            cache_hits={},
+            agent_id=req.agent_id,
+            persona=persona.name,
             provider_used=embedder.active_label,
         )
 
-    async def audit(
-        self, req: AuditRequest, owner: Optional[str] = None
-    ) -> AuditResponse:
+    async def audit(self, req: AuditRequest, owner: Optional[str] = None) -> AuditResponse:
         config, reasoner, tenants = self.config, self.reasoner, self.tenants
         start = time.perf_counter()
         persona = get_persona(config, req.persona, req.agent_id)
@@ -418,29 +465,38 @@ class NeuroService:
 
         try:
             raw = await reasoner.generate(user_prompt, system=system_prompt)
-            result = safe_json_loads(raw.strip().strip("`").replace("json", "", 1).strip(), max_depth=50)
+            result = safe_json_loads(
+                raw.strip().strip("`").replace("json", "", 1).strip(), max_depth=50
+            )
             return AuditResponse(
                 verdict=result.get("verdict", "PASS"),
                 confidence=result.get("confidence", 0.5),
                 reason=result.get("reason", ""),
                 enrichment=result.get("enrichment"),
                 latency_ms=round((time.perf_counter() - start) * 1000, 1),
-                persona=persona.name, provider_used=reasoner.active_label,
+                persona=persona.name,
+                provider_used=reasoner.active_label,
             )
         except Exception as e:
             log.warning("Audit failed (returning WARN): %s", e)
             return AuditResponse(
-                verdict="WARN", confidence=0.0, reason=f"Audit parse failed: {e}",
+                verdict="WARN",
+                confidence=0.0,
+                reason=f"Audit parse failed: {e}",
                 latency_ms=round((time.perf_counter() - start) * 1000, 1),
-                persona=persona.name, provider_used=reasoner.active_label,
+                persona=persona.name,
+                provider_used=reasoner.active_label,
             )
 
-    async def ingest(
-        self, req: LearnRequest, owner: Optional[str] = None
-    ) -> LearnResponse:
+    async def ingest(self, req: LearnRequest, owner: Optional[str] = None) -> LearnResponse:
         embedder, tenants = self.embedder, self.tenants
         tenant = await tenants.get(tenant_key(owner, req.agent_id))
-        result = tenant["sessions"].ingest(req.prompt, req.response, req.metadata)
+        # ingest_async(), not ingest(): this runs inside an async request
+        # handler, and SessionManager's own docstring says as much -- the
+        # sync ingest() has no await points, so its open()/write()/flush()
+        # blocks the whole event loop, stalling every other concurrent
+        # request on this worker for the write's duration.
+        result = await tenant["sessions"].ingest_async(req.prompt, req.response, req.metadata)
 
         # Index the exchange for semantic recall. Without this nothing ever
         # writes L1/L2, so /recall degrades to HOT substring matching.
@@ -453,27 +509,36 @@ class NeuroService:
         # write, not a second provider call.
         #
         # Best-effort: a dead embedding provider must not fail the ingest.
-        # ponytail: last-writer-wins on concurrent same-tenant learns can drop
-        # an entry (L2Index rewrites index.json wholesale); add a per-tenant
-        # lock if that shows up as measurable recall loss.
+        #
+        # index_lock: L2Index.add() rewrites index.json wholesale from an
+        # in-memory snapshot taken before the write is handed to a thread --
+        # concurrent same-tenant learns raced two such writes with nothing
+        # serializing them, and a slower-finishing thread with an earlier
+        # (smaller) snapshot could clobber a faster one's, silently dropping
+        # entries. Confirmed under real load (20 concurrent learns -> 4
+        # entries lost) rather than fixed speculatively.
         try:
             content = f"User: {req.prompt}\nAssistant: {req.response}"
             embedding = await embedder.embed(content)
             source = f"session:{result['session_id']}"
-            await tenant["l1"].add(content, source=source, embedding=embedding)
-            await tenant["l2"].add(
-                content,
-                source=source,
-                embedding=embedding,
-                metadata=req.metadata or {},
-            )
+            async with tenant["index_lock"]:
+                await tenant["l1"].add(content, source=source, embedding=embedding)
+                await tenant["l2"].add(
+                    content,
+                    source=source,
+                    embedding=embedding,
+                    metadata=req.metadata or {},
+                )
         except Exception as exc:
-            log.warning("Memory indexing failed for learn (session %s): %s",
-                        result["session_id"], exc)
+            log.warning(
+                "Memory indexing failed for learn (session %s): %s", result["session_id"], exc
+            )
 
         return LearnResponse(
-            status="learned", session_id=result["session_id"],
-            entry_number=result["entry_number"], agent_id=req.agent_id,
+            status="learned",
+            session_id=result["session_id"],
+            entry_number=result["entry_number"],
+            agent_id=req.agent_id,
         )
 
     async def list_sessions(
@@ -485,7 +550,9 @@ class NeuroService:
     ) -> dict:
         """List recent session entries for browsing memory."""
         tenant = await self.tenants.get(tenant_key(owner, agent_id))
-        entries = tenant["sessions"].list_recent_entries(limit=limit, offset=offset)
+        # Reads every hot session file on disk -- offload, same reason as
+        # the tenant construction and health() fixes above.
+        entries = await asyncio.to_thread(tenant["sessions"].list_recent_entries, limit, offset)
         return {"entries": entries, "total": len(entries)}
 
 

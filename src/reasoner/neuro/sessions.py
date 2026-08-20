@@ -9,17 +9,17 @@ Lifecycle:
   Cold (day 30+):   Compressed archive, L3 scan only.
 """
 
-import json
-import gzip
 import asyncio
+import gzip
+import hashlib
 import inspect
+import json
 import logging
 import time
-import hashlib
-from pathlib import Path
-from datetime import datetime, timezone, timedelta
-from typing import Optional, Callable
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Callable, Optional
 
 log = logging.getLogger("neuro.sessions")
 
@@ -27,6 +27,7 @@ log = logging.getLogger("neuro.sessions")
 @dataclass
 class SessionEntry:
     """A single prompt/response exchange."""
+
     timestamp: str
     prompt: str
     response: str
@@ -36,11 +37,12 @@ class SessionEntry:
 @dataclass
 class SessionConfig:
     """Session lifecycle configuration."""
-    hot_days: int = 3            # days before archival
-    warm_days: int = 30          # days before cold storage
+
+    hot_days: int = 3  # days before archival
+    warm_days: int = 30  # days before cold storage
     max_session_gap_minutes: int = 60  # new session after this gap
     auto_summarize: bool = True  # summarize on archival
-    max_hot_entries: int = 500   # safety cap per session file
+    max_hot_entries: int = 500  # safety cap per session file
 
 
 class SessionManager:
@@ -166,17 +168,24 @@ class SessionManager:
             log.error(f"Unexpected error ingesting session entry: {e}")
             raise RuntimeError(f"Failed to ingest session: {e}") from e
 
-    async def ingest_async(self, prompt: str, response: str, metadata: Optional[dict] = None) -> dict:
+    async def ingest_async(
+        self, prompt: str, response: str, metadata: Optional[dict] = None
+    ) -> dict:
         """
         Async variant of ingest — acquires a per-file asyncio.Lock before writing
         to prevent interleaved writes under concurrent callers.
+
+        _start_session() is itself a synchronous file write (it writes the
+        session-start header), so it is offloaded via asyncio.to_thread here
+        too -- otherwise every session's first message would still block the
+        event loop despite the exchange write below being async-safe.
         """
         try:
             if self._should_start_new_session():
-                self._start_session()
+                await asyncio.to_thread(self._start_session)
 
             if self._entry_count >= self.config.max_hot_entries:
-                self._start_session()
+                await asyncio.to_thread(self._start_session)
 
             entry = {
                 "_type": "exchange",
@@ -221,14 +230,16 @@ class SessionManager:
         for f in sorted(self.hot_dir.glob("*.jsonl"), reverse=True):
             entries = self._count_entries(f)
             stat = f.stat()
-            sessions.append({
-                "session_id": f.stem,
-                "file": f.name,
-                "entries": entries,
-                "size_kb": round(stat.st_size / 1024, 1),
-                "modified": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
-                "tier": "hot",
-            })
+            sessions.append(
+                {
+                    "session_id": f.stem,
+                    "file": f.name,
+                    "entries": entries,
+                    "size_kb": round(stat.st_size / 1024, 1),
+                    "modified": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
+                    "tier": "hot",
+                }
+            )
         return sessions
 
     def get_warm_sessions(self) -> list[dict]:
@@ -237,12 +248,14 @@ class SessionManager:
         for f in sorted(self.warm_dir.glob("*.json"), reverse=True):
             try:
                 data = json.loads(f.read_text())
-                sessions.append({
-                    "session_id": f.stem,
-                    "summary": data.get("summary", "")[:100],
-                    "key_facts": len(data.get("key_facts", [])),
-                    "tier": "warm",
-                })
+                sessions.append(
+                    {
+                        "session_id": f.stem,
+                        "summary": data.get("summary", "")[:100],
+                        "key_facts": len(data.get("key_facts", [])),
+                        "tier": "warm",
+                    }
+                )
             except Exception:
                 pass
         return sessions
@@ -265,13 +278,15 @@ class SessionManager:
                                 continue
                             text = f"{entry.get('prompt', '')} {entry.get('response', '')}"
                             if query_lower in text.lower():
-                                results.append({
-                                    "session_id": session_file.stem,
-                                    "timestamp": entry.get("timestamp", ""),
-                                    "prompt": entry["prompt"][:200],
-                                    "response": entry["response"][:200],
-                                    "tier": "hot",
-                                })
+                                results.append(
+                                    {
+                                        "session_id": session_file.stem,
+                                        "timestamp": entry.get("timestamp", ""),
+                                        "prompt": entry["prompt"][:200],
+                                        "response": entry["response"][:200],
+                                        "tier": "hot",
+                                    }
+                                )
                                 if len(results) >= max_results:
                                     return results
                         except json.JSONDecodeError:
@@ -358,8 +373,7 @@ class SessionManager:
             if summarize_fn and self.config.auto_summarize:
                 try:
                     transcript = "\n".join(
-                        f"User: {e['prompt']}\nAssistant: {e['response']}"
-                        for e in exchanges[-20:]
+                        f"User: {e['prompt']}\nAssistant: {e['response']}" for e in exchanges[-20:]
                     )
                     if inspect.iscoroutinefunction(summarize_fn):
                         summary_result = await summarize_fn(transcript)
@@ -454,7 +468,7 @@ class SessionManager:
             all_exchanges.extend(exchanges)
 
         all_exchanges.sort(key=lambda e: e.get("timestamp", ""), reverse=True)
-        page = all_exchanges[offset:offset + limit]
+        page = all_exchanges[offset : offset + limit]
         return [
             {
                 "timestamp": e.get("timestamp", ""),
