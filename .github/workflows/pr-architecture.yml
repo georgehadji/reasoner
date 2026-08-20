@@ -30,16 +30,8 @@ jobs:
         run: python scripts/check_no_registry_bypass.py
       - name: Check exception count
         run: |
-          COUNT=$(grep -c '\->' .importlinter)
-          echo "Import-linter exceptions: $COUNT"
-          # Honest baseline of real layering debt (the gate was crash-red on every
-          # PR until the hyper_agent.py IndentationError was fixed, which had
-          # masked the full violation set). Ratchet DOWN as debt is paid via DI
-          # (mirror set_build_provider). Do not
-          # raise without a tracking issue.
-          MAX=65
-          if [ "$COUNT" -gt "$MAX" ]; then
-            echo "FAIL: $COUNT exceptions exceeds maximum of $MAX"
-            exit 1
-          fi
-          echo "PASS: $COUNT exceptions within limit of $MAX"
+          # Semantic count via configparser (scripts/count_importlinter_exceptions.py),
+          # not `grep -c '\->'` — a prose comment containing "->" would inflate a
+          # naive grep count. Two-way ratchet: MAX must move in lockstep with the
+          # real count, in either direction. Do not raise without a tracking issue.
+          PYTHONPATH=src python scripts/count_importlinter_exceptions.py --max 60

@@ -101,3 +101,8 @@ src/reasoner/healing/generated_tests/
 
 # Separate embedded repo (own .git) — not part of this project
 deepseek-harness/
+
+# Coverage run output (coverage.yml / ci-local.sh coverage)
+.coverage
+coverage.xml
+htmlcov/

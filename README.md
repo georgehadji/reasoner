@@ -6,8 +6,8 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688.svg?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Next.js 16](https://img.shields.io/badge/Next.js_16-000000.svg?style=flat-square&logo=next.js&logoColor=white)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6.svg?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Tests](https://img.shields.io/badge/tests-2%2C100%2B-brightgreen.svg?style=flat-square)](./tests)
-[![Coverage](https://img.shields.io/badge/coverage-%7E70%25-yellow.svg?style=flat-square)](.)
+[![Tests](https://img.shields.io/badge/tests-286%20files-brightgreen.svg?style=flat-square)](./tests)
+[![Coverage gate](https://img.shields.io/badge/coverage_gate-30%25_floor-yellow.svg?style=flat-square)](.github/workflows/coverage.yml)
 [![License: BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-blue.svg?style=flat-square)](LICENSE)
 
 [Quick Start](#quick-start) · [Architecture](#architecture) · [Reasoning Methods & Presets](#reasoning-methods--presets) · [Programmatic Usage](#programmatic-usage) · [Security](#security--encryption) · [Configuration](#configuration-reference) · [Development](#development)

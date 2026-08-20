@@ -18,16 +18,13 @@ target-version = "py312"
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "N", "W", "UP"]
-
-[tool.pytest.ini_options]
-asyncio_mode = "auto"
-testpaths = ["tests"]
-timeout = 120
-xfail_strict = true
-filterwarnings = [
-    "ignore::DeprecationWarning:reasoner.*",
-]
+# B (bugbear) + F821 (undefined names) merged in from the old CI-only
+# `--select B,F821` flag, which used to shadow this profile entirely: ruff's
+# CLI --select replaces config select, so the E/I/N/W/UP rules below never
+# executed in CI. CI now runs bare `ruff check src/` so this is authoritative.
+select = ["E", "F", "I", "N", "W", "UP", "B"]
+# B008 (function call in default arg) — deliberate FastAPI pattern (Depends()).
+ignore = ["B008"]
 
 [tool.mypy]
 python_version = "3.12"

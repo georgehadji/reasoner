@@ -6,11 +6,13 @@
 
 name: Self-Healing CI/CD
 
+# push/pull_request triggers were removed (architecture-score-9-remediation-plan.md
+# Phase 0.8): every job below is guarded by an `if:` requiring schedule/dispatch, so
+# on push/pull_request the jobs were silently skipped while the workflow still showed
+# up as "running" — a second, contradictory coverage gate (60%/80%, loop1-static-healing
+# below) that looked PR-enforced but never actually ran on a PR. coverage.yml's 30% gate
+# is now the single PR-enforced number; this workflow is nightly/manual only.
 on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main]
   schedule:
     # Nightly healing loop
     - cron: '0 2 * * *'

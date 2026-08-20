@@ -32,6 +32,14 @@ ALLOWED_LINEAGE: dict[str, list[str]] = {
     ],
     "core/protocol.py": ["reasoner.infrastructure.llm.router"],
 
+    # application/handlers/handlers.py:263 — `import reasoner.api as api`, lazy
+    # inside a function. Tracked upward-dependency debt, mirrored in
+    # .importlinter's ignore_imports (application.handlers.handlers -> api).
+    # Fix is Phase 3.2 of architecture-score-9-remediation-plan.md: invert via
+    # an injected port. Do not add new entries here without a matching Phase 3
+    # tracking item — this dict is a debt ledger, not a blanket exemption.
+    "application/handlers/handlers.py": ["reasoner.api"],
+
     # orchestrator has lazy inline imports of api/clients (neuro fallback)
     # websocket manager imports api/history for run owner tracking
     # application/flows/*.py import from api.serializers shim (content moved to
@@ -58,8 +66,11 @@ FORBIDDEN_IMPORTS: dict[str, list[str]] = {
 
 
 def get_imports(file_path: Path) -> list[str]:
-    """Extract all 'from reasoner.X import' statements from a Python file.
+    """Extract all 'reasoner.X' module references from a Python file's imports.
 
+    Covers both `from reasoner.x import y` (ImportFrom) and plain
+    `import reasoner.x` (Import) — a bare `import reasoner.api` previously
+    defeated this check entirely since only ImportFrom was walked.
     Does NOT skip TYPE_CHECKING imports (they are still real imports at parse time).
     Uses ALLOWED_LINEAGE to exempt known-safe TYPE_CHECKING and port adapter imports.
     """
@@ -71,6 +82,9 @@ def get_imports(file_path: Path) -> list[str]:
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom) and node.module:
             imports.append(node.module)
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                imports.append(alias.name)
     return imports
 
 
@@ -122,31 +136,36 @@ def test_no_circular_imports() -> None:
     )
 
 
-@pytest.mark.xfail(reason="Target: <250 lines. Refactoring in progress (Phase 1.3)")
+# Real ratchet caps, pinned at the line count measured when this cap was
+# introduced (architecture-score-9-remediation-plan.md, Phase 0.5). The
+# xfail versions of these tests never failed AND never passed — xfail_strict
+# was inert (see Phase 0.3), so growth went undetected either way. Aspirational
+# targets (250/300/400 — see Phase 5) stay as comments; ratchet the pinned cap
+# down as god modules in Phase 5 are decomposed. Do not raise a cap without
+# shrinking the corresponding module first.
+
 def test_api_init_size() -> None:
-    """api/__init__.py should be under 250 lines."""
+    """api/__init__.py should not grow past its pinned cap. Target: <250 lines (Phase 5.1)."""
     path = BASE / "api" / "__init__.py"
     if not path.exists():
         pytest.skip("api/__init__.py not found")
     lines = len(path.read_text(encoding="utf-8").splitlines())
-    assert lines < 250, f"api/__init__.py is {lines} lines (limit: 250)"
+    assert lines <= 1008, f"api/__init__.py is {lines} lines (pinned cap: 1008)"
 
 
-@pytest.mark.xfail(reason="Target: <300 lines. models.py now a 49-line shim (Phase 2.1)")
 def test_models_size() -> None:
-    """models.py should be under 300 lines."""
+    """models.py should not grow past its pinned cap. Target: <300 lines."""
     path = BASE / "models.py"
     if not path.exists():
         pytest.skip("models.py not found")
     lines = len(path.read_text(encoding="utf-8").splitlines())
-    assert lines < 300, f"models.py is {lines} lines (limit: 300)"
+    assert lines <= 59, f"models.py is {lines} lines (pinned cap: 59)"
 
 
-@pytest.mark.xfail(reason="Target: <400 lines. Refactoring in progress")
 def test_streaming_size() -> None:
-    """api/streaming.py should be under 400 lines."""
+    """api/streaming.py should not grow past its pinned cap. Target: <400 lines."""
     path = BASE / "api" / "streaming.py"
     if not path.exists():
         pytest.skip("api/streaming.py not found")
     lines = len(path.read_text(encoding="utf-8").splitlines())
-    assert lines < 400, f"api/streaming.py is {lines} lines (limit: 400)"
+    assert lines <= 337, f"api/streaming.py is {lines} lines (pinned cap: 337)"

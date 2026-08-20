@@ -7,8 +7,10 @@ name = Layered Architecture
 type = layers
 # grimp's chain-resolution granularity differs across platforms (Linux CI vs
 # Windows dev) even on the same pinned version, so some ignore_imports edges
-# match on one OS but appear "unused" on the other. Don't fail on unused.
-unmatched_ignore_imports_alerting = none
+# match on one OS but appear "unused" on the other. `warn` (not `error`) so
+# a Windows-only "unused" edge never fails the build — it only surfaces in
+# the log, letting stale exceptions be spotted and cleaned up over time.
+unmatched_ignore_imports_alerting = warn
 layers =
     reasoner.api
     reasoner.application

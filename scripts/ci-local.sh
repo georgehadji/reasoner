@@ -9,8 +9,13 @@
 #   bash scripts/ci-local.sh python     # ruff, bandit, mypy, pytest
 #   bash scripts/ci-local.sh arch       # import-linter + registry guard
 #   bash scripts/ci-local.sh frontend   # tsc, eslint, design tokens
+#   bash scripts/ci-local.sh coverage   # coverage.yml (30% floor + domain/core floors)
 #
-# Kept in sync by hand with .github/workflows/{test,pr-architecture}.yml.
+# "coverage" is not in the default "all" run — it re-runs the full suite with
+# --cov, which takes ~15-20min. Run it explicitly, or let coverage.yml run it
+# in CI once Actions billing (Phase 0.1) is restored.
+#
+# Kept in sync by hand with .github/workflows/{test,pr-architecture,coverage}.yml.
 # If you change a gate there, change it here.
 set -uo pipefail
 cd "$(dirname "$0")/.."
@@ -43,9 +48,10 @@ want() { [ "$FILTER" = "all" ] || [ "$FILTER" = "$1" ]; }
 
 # ── python (test.yml: pytest job) ──────────────────────────────────────
 if want python; then
-    gate "ruff"   ruff check src/ --select B,F821 --ignore B008
+    gate "ruff"   python scripts/ruff_ratchet.py --max 4606
     gate "bandit" bandit -r src/ -t B307,B308,B102 -f txt -q
-    gate "mypy"   mypy --strict src/reasoner/infrastructure/auth_legacy.py --ignore-missing-imports
+    gate "mypy-strict-auth_legacy" mypy --strict src/reasoner/infrastructure/auth_legacy.py --ignore-missing-imports
+    gate "mypy-ratchet" python scripts/mypy_ratchet.py --max 429
     gate "pytest" python -m pytest tests/ -m "not slow and not integration" \
         --tb=short --timeout=60 -q -p no:cacheprovider
 fi
@@ -54,10 +60,7 @@ fi
 if want arch; then
     gate "import-linter"  lint-imports --no-cache
     gate "registry-guard" python scripts/check_no_registry_bypass.py
-    gate "exception-count" bash -c '
-        COUNT=$(grep -c "\->" .importlinter); MAX=65
-        echo "import-linter exceptions: $COUNT (max $MAX)"
-        [ "$COUNT" -le "$MAX" ]'
+    gate "exception-count" python scripts/count_importlinter_exceptions.py --max 60
 fi
 
 # ── frontend (test.yml: tsc job) ───────────────────────────────────────
@@ -69,6 +72,20 @@ if want frontend; then
         --exclude=global-error.tsx \
         "(bg|text|border|from|to|via|ring|fill|stroke)-(slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-[0-9]{2,3}" \
         ui-next/src'
+fi
+
+# ── coverage (coverage.yml) — explicit only, not part of "all" (slow) ──
+if [ "$FILTER" = "coverage" ]; then
+    gate "pytest-cov" python -m pytest tests/ -m "not slow and not integration" \
+        --cov=src/reasoner --cov-report=xml --tb=short -q
+    gate "coverage-floor" python -c "
+import sys, xml.etree.ElementTree as ET
+rate = float(ET.parse('coverage.xml').getroot().attrib.get('line-rate', 0)) * 100
+print(f'Coverage: {rate:.1f}%')
+sys.exit(0 if rate >= 30 else 1)
+"
+    gate "package-coverage-floor" python scripts/package_coverage_gate.py \
+        --xml coverage.xml --package domain:85 --package core:75
 fi
 
 printf '\n════════ SUMMARY ════════\n%d passed, %d failed\n' "$PASS" "$FAIL"

@@ -62,6 +62,16 @@ jobs:
               print(f'OK: Coverage {cov:.1f}% meets target')
           "
 
+      - name: Per-package coverage floor (domain/, core/)
+        run: |
+          # A global percentage lets clean domain/core code hide behind old
+          # covered code elsewhere — floors pinned with headroom below the
+          # measured baseline (domain 92.3%, core 81.9%), not the aspirational
+          # 80% target. See Phase 0.10 in
+          # docs/plans/architecture-score-9-remediation-plan.md.
+          python scripts/package_coverage_gate.py --xml coverage.xml \
+            --package domain:85 --package core:75
+
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
         if: always()
