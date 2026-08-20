@@ -238,7 +238,9 @@ class TestArticlePresetRoutingDiversity:
             "gemini": "google", "deepseek": "deepseek", "qwen": "qwen",
             "grok": "xai", "sonar": "perplexity", "hy": "tencent",
             "kimi": "moonshot", "glm": "zhipuai", "mistral": "mistral",
-            "laguna": "poolside", "llama": "meta",
+            "laguna": "poolside", "llama": "meta", "arcee": "arcee",
+            "hermes": "nousresearch", "seed-": "bytedance", "minimax": "minimax",
+            "ministral": "mistral", "mimo": "xiaomi", "stepfun": "stepfun",
         }
         for prefix, family in known_prefixes.items():
             if model_id.startswith(prefix):

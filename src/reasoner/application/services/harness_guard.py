@@ -27,6 +27,7 @@ _MODEL_LABS: dict[str, str] = {
     "gpt-oss-120b": "openai", "gpt-oss-20b": "openai",
     "gpt-5.6-sol": "openai", "gpt-5.6-terra": "openai", "gpt-5.6-luna": "openai",
     "gpt-5.6-sol-pro": "openai", "gpt-5.6-terra-pro": "openai", "gpt-5.6-luna-pro": "openai",
+    "gpt-5-nano": "openai",
     # Google — Gemini
     "gemini-flash": "google", "gemini-pro-real": "google",
     "gemini-flash-lite-real": "google", "gemini-2.5-flash-lite": "google",
@@ -36,7 +37,7 @@ _MODEL_LABS: dict[str, str] = {
     "gemini-3.7-flash": "google", "gemini-3.6-flash": "google",
     # Note: gemini-pro → Anthropic (claude-sonnet), gemini-flash-lite → Qwen (qwen3.5-flash)
     # Meta
-    "llama-3.3-70b": "meta",
+    "llama-3.3-70b": "meta", "llama-4-maverick": "meta",
     # Mistral
     "mistral-large-3": "mistral", "mistral-small": "mistral", "mistral-small-2603": "mistral",
     "ministral-8b": "mistral", "codestral-2508": "mistral",
@@ -47,10 +48,15 @@ _MODEL_LABS: dict[str, str] = {
     "qwen3-max-thinking": "qwen", "qwen3.6-flash": "qwen", "qwen3.6-plus-real": "qwen",
     "qwen3-coder-flash": "qwen", "qwen3-coder-30b-a3b": "qwen",
     "qwen3.7-flash": "qwen", "qwen3.8-max": "qwen",
+    "qwen3-30b-a3b": "qwen", "qwen3-max-real": "qwen", "qwen3.5-9b": "qwen",
+    "qwen3.6-27b": "qwen", "qwen3.6-35b-a3b": "qwen", "qwen3.6-max-preview": "qwen",
     # GLM (Zhipu)
-    "glm-5.2": "zhipu",
+    "glm-5.2": "zhipu", "glm-5.3": "zhipu",
     # Tencent
     "hy3": "tencent", "hy3-preview": "tencent",
+    "hy-mt2-30b": "tencent", "hy-mt2-1.8b": "tencent",
+    # ByteDance Seed (text tiers; the seedream image models are grouped below)
+    "seed-2.0-mini": "bytedance", "seed-2.0-lite": "bytedance",
     # MiniMax
     "minimax-m3": "minimax", "minimax-m2.7": "minimax", "minimax-m2.5": "minimax",
     "minimax-m2.1": "minimax", "minimax-m2": "minimax", "minimax-m1": "minimax",
@@ -65,14 +71,16 @@ _MODEL_LABS: dict[str, str] = {
     "grok-imagine-image-2": "xai",
     "krea-2-large": "krea", "krea-2-medium": "krea", "krea-2-medium-turbo": "krea",
     # OpenAI — Codex
-    "gpt-5.1-codex-mini": "openai",
+    "gpt-5.1-codex-mini": "openai", "gpt-5.1-codex": "openai",
     # Google — misc
     "google/gemma-2-9b-it": "google", "gemini-flash-lite": "qwen",
     "gemini-pro": "anthropic", "gemini-pro-image": "google",
     # NVIDIA
     "nvidia-nemotron-super": "nvidia",
     # NousResearch
-    "hermes-4-70b": "nousresearch",
+    "hermes-4-70b": "nousresearch", "hermes-4-405b": "nousresearch",
+    # Arcee AI
+    "arcee-trinity-large-thinking": "arcee", "arcee-virtuoso-large": "arcee",
     # Thinking Machines
     "inkling": "thinkingmachines",
     # Poolside
@@ -89,7 +97,7 @@ _MODEL_LABS: dict[str, str] = {
     "mimo-v2-pro": "xiaomi", "mimo-v2-flash": "xiaomi",
     # xAI — Grok
     "grok-4.3": "xai", "grok-build-0.1": "xai",
-    "grok-4.6": "xai", "grok-4.20": "xai", "grok-4.20-multi-agent": "xai", "grok-latest": "xai",
+    "grok-4.6": "xai", "grok-latest": "xai",
     # Perplexity
     "sonar-pro": "perplexity", "sonar-pro-search": "perplexity",
     "sonar": "perplexity", "sonar-reasoning-pro": "perplexity", "sonar-deep-research": "perplexity",

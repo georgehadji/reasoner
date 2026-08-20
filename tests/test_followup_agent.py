@@ -75,14 +75,14 @@ async def test_followup_budget_uses_kimi_for_persona_roles():
 @pytest.mark.asyncio
 async def test_followup_premium_uses_grok_for_persona_roles():
     """
-    When initial_state.agent_model is 'grok-4.20', the router should use it
+    When initial_state.agent_model is 'grok-4.3', the router should use it
     for synthesis, classification, and decomposition.
     """
     req = RunRequest(problem="test followup premium", preset="multi-perspective-premium")
     state = PipelineState(
         problem=req.problem,
         preset_name=req.preset,
-        conversation_state=ConversationState(agent_model="grok-4.20"),
+        conversation_state=ConversationState(agent_model="grok-4.3"),
     )
 
     with patch("reasoner.llm.ProviderRouter.from_model_ids", side_effect=_capture_router_call):
@@ -93,9 +93,9 @@ async def test_followup_premium_uses_grok_for_persona_roles():
                     events.append(json.loads(line.removeprefix("data: ").strip()))
 
     routing = _capture_router_call.last_routing
-    assert routing.get("synthesis") == "grok-4.20"
-    assert routing.get("classification") == "grok-4.20"
-    assert routing.get("decomposition") == "grok-4.20"
+    assert routing.get("synthesis") == "grok-4.3"
+    assert routing.get("classification") == "grok-4.3"
+    assert routing.get("decomposition") == "grok-4.3"
 
 
 @pytest.mark.asyncio

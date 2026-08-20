@@ -1,5 +1,15 @@
 # Preset -> Phase -> Model Matrix
 
+> **STALE as of 2026-08-20 — do not read this as current routing.** Superseded by
+> two changes: `grok-4.20` was retired (its 18 `verifier` slots moved to
+> `grok-4.3`, 1M ctx instead of 2M), and the one-model-per-phase invariant
+> reassigned 103 slots across 37 presets. Every `verifier` row below naming
+> `grok-4.20`, and any row duplicating another model inside the same preset, is
+> now wrong. The registry is the source of truth;
+> `python scripts/validate_presets.py` and
+> `tests/unit/test_preset_model_uniqueness.py` enforce it. Regenerate before
+> relying on this file.
+
 Generated from `domain/preset_registry.py` after the 2026-08-18 routing change.
 `resolved` = the actually-served model (several aliases route cross-vendor, e.g.
 `gemini-pro` -> Anthropic, `gemini-flash-lite` -> Qwen).

@@ -120,8 +120,11 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ═══════════════════════════════════════════════════════════════
     "grok-4.6":               {"model": "x-ai/grok-4.6"},               # newest Grok — 500K ctx, $2/$6 per M (same price as 4.5, strict upgrade)
     "grok-4.5":               {"model": "x-ai/grok-4.5"},               # 500K ctx, $2/$6 per M, frontier reasoning, structured outputs (updated Jul 2026)
-    "grok-4.20":              {"model": "x-ai/grok-4.20"},              # 2M ctx, $1.25/$2.50 — same price as 4.3 with double the context
-    "grok-4.20-multi-agent":  {"model": "x-ai/grok-4.20-multi-agent"},  # 2M ctx, $1.25/$2.50 — multi-agent variant, useful for adversarial stress-testing
+    # grok-4.20 / grok-4.20-multi-agent removed 2026-08-20 (still live upstream,
+    # deliberately not routable here). The 18 verifier slots they held now use
+    # grok-4.3 — same $1.25/$2.50, 1M ctx instead of 2M. Do not re-add from the
+    # catalogue snapshot: openrouter_models.json still lists them because it
+    # mirrors upstream, and that is not a signal to reinstate the alias.
     "grok-4.3":               {"model": "x-ai/grok-4.3"},               # 1M ctx, $1.25/$2.50, τ²-Bench 97.7%, configurable reasoning effort
     "grok-build-0.1":         {"model": "x-ai/grok-build-0.1"},         # fast agentic coding, 256K ctx, $1.00/$2.00
     "grok-latest":            {"model": "~x-ai/grok-latest"},           # always -> latest Grok ($2/$6, 500K ctx today)
@@ -260,6 +263,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "glm-5.2":          {"model": "z-ai/glm-5.2"},                # $0.476/$1.496 per M, 1M ctx — AA Intel 52.6, cheapest frontier-class CN model
     # NB: z-ai/glm-5.2:batch is *more* expensive ($0.70/$2.20) and caps at 512K ctx.
     # Do not add it as a "cheaper batch tier" — for this model the batch lane is a trap.
+    "glm-5.3":          {"model": "z-ai/glm-5.3"},                # $1.40/$4.40 per M, 1M ctx — newest Zhipu gen, ~3x the price of 5.2 (verify against the catalogue before moving budget presets onto it)
     # ═══════════════════════════════════════════════════════════════
     # OpenRouter native
     # ═══════════════════════════════════════════════════════════════
@@ -300,6 +304,15 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ═══════════════════════════════════════════════════════════════
     "hy3":               {"model": "tencent/hy3"},               # 295B MoE (21B active, 192 experts, top-8), 262K ctx, $0.132/$0.528 per M, configurable reasoning effort (none/low/high CoT), anti-hallucination — answers grounded, flags missing evidence
     "hy3-preview":      {"model": "tencent/hy3-preview"},
+    # ── Hunyuan-MT v2: translation specialists, NOT general reasoning models ──
+    # 8K context (vs 262K for hy3) rules them out of every pipeline phase that
+    # carries accumulated state — decomposition, synthesis, stress-testing. The
+    # ACR capability registry derives max_context from the catalogue, so its
+    # min_context_tokens role requirements exclude these automatically; the
+    # constraint is recorded here so nobody hand-pins them into a long-context
+    # role and only discovers the truncation at runtime.
+    "hy-mt2-30b":       {"model": "tencent/hy-mt2-30b-a3b"},     # 30B/3B MoE MT — $0.074/$0.295 per M, 8K ctx
+    "hy-mt2-1.8b":      {"model": "tencent/hy-mt2-1.8b"},        # 1.8B dense MT — $0.044/$0.177 per M, 8K ctx, cheapest translation lane
     # ═══════════════════════════════════════════════════════════════
     # ByteDance Seed
     # ═══════════════════════════════════════════════════════════════

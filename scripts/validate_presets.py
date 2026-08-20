@@ -19,7 +19,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from reasoner.domain.preset_registry import list_presets, _REGISTRY as PRESETS
 from reasoner.domain.preset_core import _KNOWN_ROUTING_ROLES
-from reasoner.infrastructure.llm.registry import _REGISTRY as MODELS, bloc_of
+from reasoner.infrastructure.llm.registry import (
+    _REGISTRY as MODELS,
+    bloc_of,
+    resolved_model_of,
+)
 
 # ── Lab taxonomy for cross-lab diversity check ──
 _LABS: dict[str, str] = {
@@ -31,6 +35,7 @@ _LABS: dict[str, str] = {
     "devstral": "Mistral", "minimax": "MiniMax", "nvidia": "NVIDIA",
     "nemotron": "NVIDIA", "sonar": "Perplexity", "llama": "Meta",
     "mimo": "Xiaomi", "seed-": "ByteDance", "hy3": "Tencent",
+    "hy-mt": "Tencent",
     "qianfan": "Baidu", "nex-": "NexAGI", "arcee": "Arcee",
     "tngtech": "TNG", "flux.": "BFL", "riverflow": "Sourceful",
     "recraft": "Recraft", "mai-": "Microsoft",
@@ -157,6 +162,26 @@ def main() -> int:
                         f"{name}: bloc {b} dominates generation ({', '.join(sorted(rs))}) "
                         f"— max 2 generator roles per bloc"
                     )
+
+        # ── Invariant C: no model serves two phases of the same preset ──
+        # Compared on the RESOLVED model string, not the alias: several aliases
+        # point at the same served model (gemini-pro and claude-sonnet both ->
+        # anthropic/claude-sonnet-5), so alias-level distinctness would pass
+        # while the preset actually ran one model twice — the echo chamber the
+        # cross-bloc invariants above exist to prevent, but cannot see.
+        seen_models: dict[str, list[str]] = {}
+        slots = list(preset.routing.items()) + [("primary_id", preset.primary_id)]
+        for role, model_id in slots:
+            if not model_id:
+                continue
+            seen_models.setdefault(resolved_model_of(model_id), []).append(role)
+        for served, roles in seen_models.items():
+            if len(roles) > 1:
+                errors.append(
+                    f"{name}: {served} serves {len(roles)} roles "
+                    f"({', '.join(sorted(roles))}) — each model may serve at "
+                    f"most one phase per preset"
+                )
 
     if errors:
         print(f"\n❌ {len(errors)} VALIDATION ERRORS:")
