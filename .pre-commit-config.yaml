@@ -1,0 +1,14 @@
+# Tracked pre-commit-framework config (architecture-score-9-remediation-plan.md
+# Phase 0.2). The actually-enforced hooks are wired via `.githooks/` +
+# `core.hooksPath` (zero extra dependency, see .githooks/README.md); this file
+# is the standard entrypoint for anyone using the `pre-commit` tool
+# (https://pre-commit.com) directly, or via an editor/CI integration that
+# looks for it by convention.
+repos:
+  - repo: local
+    hooks:
+      - id: scan-secrets
+        name: Scan staged changes for secrets
+        entry: python scripts/scan-secrets.py .
+        language: system
+        pass_filenames: false

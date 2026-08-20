@@ -1,0 +1,18 @@
+#!/bin/sh
+# Tracked pre-commit hook — survives `git clone` (unlike the old untracked
+# .git/hooks/pre-commit it replaces). Activate once per clone:
+#   git config core.hooksPath .githooks
+# See docs/plans/architecture-score-9-remediation-plan.md Phase 0.2.
+
+SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$SCRIPT_DIR" || exit 1
+
+python scripts/scan-secrets.py .
+RESULT=$?
+if [ $RESULT -ne 0 ]; then
+    echo ""
+    echo "ERROR: Secrets detected in staged changes."
+    echo "Remove them before committing, or use --no-verify to bypass."
+    exit 1
+fi
+exit 0

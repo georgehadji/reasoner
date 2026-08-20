@@ -1,0 +1,12 @@
+#!/bin/sh
+# Tracked pre-push hook — runs the local CI mirror (scripts/ci-local.sh).
+# GitHub Actions billing has lapsed and branch protection is unavailable on a
+# private free-plan repo (Phase 0.1), so no hosted check runs today; this is
+# the real gate until that's resolved — see "Switching triggers" in
+# docs/plans/architecture-score-9-remediation-plan.md.
+# Skip with: git push --no-verify
+
+SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$SCRIPT_DIR" || exit 1
+
+bash scripts/ci-local.sh
