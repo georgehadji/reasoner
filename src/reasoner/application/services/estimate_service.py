@@ -9,12 +9,26 @@ from __future__ import annotations
 from typing import Any
 
 
+def _preset_primary_model(preset_id: str) -> str | None:
+    """The preset's primary model alias, or None when the preset is unknown.
+
+    Mirrors ``spend_limit_service._preset_routing``: an unknown preset yields no
+    estimate rather than a guessed one, so a typo surfaces as $0.00 instead of a
+    confident wrong number.
+    """
+    try:
+        from reasoner.presets import PRESETS
+
+        preset = PRESETS.get(preset_id)
+    except Exception:
+        return None
+    return getattr(preset, "primary_id", None) if preset is not None else None
+
+
 async def estimate_cost(problem: str, preset: str) -> dict[str, Any]:
     """Estimate tokens, cost, and duration for a run, without executing it."""
     from reasoner.application.services.preset_service import PresetService
-    from reasoner.core.ports.model_registry_port import get_model_registry_port
     from reasoner.presets import get_preset_price_tier
-    from reasoner.pricing import calculate_model_cost
 
     preset_service = PresetService()
     raw_preset = preset or "auto-budget"
@@ -29,9 +43,25 @@ async def estimate_cost(problem: str, preset: str) -> dict[str, Any]:
     estimated_input = prompt_tokens + (num_phases * tokens_per_phase_input)
     estimated_output = num_phases * tokens_per_phase_output
 
-    registry_entry = get_model_registry_port().entry(gate_preset_name) or {}
-    primary_id = registry_entry.get("primary", "openrouter/openai/gpt-4o-mini")
-    estimated_cost = calculate_model_cost(primary_id, estimated_input, estimated_output)
+    # Price the preset's actual primary model. This previously passed
+    # gate_preset_name -- a PRESET id -- to entry(), which only ever holds MODEL
+    # ids, so it returned None for all 50 presets; it then read key "primary"
+    # (registry entries use "model"), and fell back to the literal
+    # "openrouter/openai/gpt-4o-mini", which is not a PRICING_DB key (the real
+    # key is "openai/gpt-4o-mini"). Three compounding faults, so every preset --
+    # budget or premium -- returned one identical fabricated figure.
+    #
+    # get_pricing here is the resolver, not domain.pricing.calculate_model_cost:
+    # that one is keyed by served model id and does NOT resolve registry
+    # aliases, so handing it a "grok-4.3" would land on the default price again.
+    from reasoner.infrastructure.llm.pricing_resolver import get_pricing
+
+    primary_id = _preset_primary_model(gate_preset_name)
+    estimated_cost = (
+        get_pricing(primary_id).calculate_cost(estimated_input, estimated_output)
+        if primary_id
+        else 0.0
+    )
 
     base_duration = 8 if tier == "budget" else 20
     estimated_duration = base_duration + (len(problem.split()) / 50)
@@ -46,7 +76,12 @@ async def estimate_cost(problem: str, preset: str) -> dict[str, Any]:
         rewrite_output = tokens_per_phase_output
         estimated_input += rewrite_input
         estimated_output += rewrite_output
-        estimated_cost += calculate_model_cost(primary_id, rewrite_input, rewrite_output)
+        # Same resolver as above — calculate_model_cost() would not resolve the
+        # alias and would price this leg at the default.
+        if primary_id:
+            estimated_cost += get_pricing(primary_id).calculate_cost(
+                rewrite_input, rewrite_output
+            )
         estimated_duration += 5
 
     return {
