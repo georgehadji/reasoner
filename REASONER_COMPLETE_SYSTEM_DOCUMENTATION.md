@@ -909,7 +909,6 @@ class PipelinePreset:
 
 #### Special/Experimental (2)
 
-- `nvidia-nemotron-test`: Experimental Nemotron routing
 - `image-gen-budget` / `image-gen-premium`: Specialized image generation
 
 ### Preset Selection Logic

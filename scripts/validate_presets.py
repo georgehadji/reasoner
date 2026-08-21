@@ -22,8 +22,30 @@ from reasoner.domain.preset_core import _KNOWN_ROUTING_ROLES
 from reasoner.infrastructure.llm.registry import (
     _REGISTRY as MODELS,
     bloc_of,
+    honours_tuned_temperature,
     resolved_model_of,
 )
+from reasoner.core.temperatures import PHASE_TEMPERATURES
+
+# Below this, a model that silently samples at its fixed 1.0 default is far
+# enough from the phase's intent to count as mis-routed. Roles at 0.7/1.0
+# (perspectives, generators) are close enough that a fixed-temp model is fine.
+_TEMP_TOLERANCE_FLOOR = 0.7
+
+# Roles that inherit the "perspective" temperature rather than naming their own.
+_GENERATOR_ROLES = {
+    "constructive", "destructive", "systemic", "minimalist", "perspective",
+    "expert_1", "expert_2", "expert_3", "expert_4",
+}
+
+
+def target_temperature(role: str) -> float | None:
+    """Temperature a role will actually be called with, or None if untuned."""
+    if role in PHASE_TEMPERATURES:
+        return PHASE_TEMPERATURES[role]
+    if role in _GENERATOR_ROLES or role.startswith("perspective_"):
+        return PHASE_TEMPERATURES["perspective"]
+    return None
 
 # ── Lab taxonomy for cross-lab diversity check ──
 _LABS: dict[str, str] = {
@@ -182,6 +204,27 @@ def main() -> int:
                     f"({', '.join(sorted(roles))}) — each model may serve at "
                     f"most one phase per preset"
                 )
+
+        # ── Invariant D: no fixed-temperature model in a low-temperature phase ──
+        # Models that reject a custom temperature (OpenAI gpt-*/o-series,
+        # claude-opus/sonnet/fable) do not error when routed to a tuned phase —
+        # the provider just omits the parameter and the model samples at its
+        # fixed 1.0 default. A synthesis role tuned to 0.5, or a fusion role
+        # tuned to 0.2, silently runs twice to five times more random than
+        # intended, and nothing in the response reveals it.
+        for role, model_id in slots:
+            if not model_id:
+                continue
+            target = target_temperature(role)
+            if target is None or target >= _TEMP_TOLERANCE_FLOOR:
+                continue
+            if honours_tuned_temperature(model_id):
+                continue
+            errors.append(
+                f"{name}: role '{role}' targets temperature {target} but "
+                f"'{model_id}' ({resolved_model_of(model_id)}) ignores it and "
+                f"runs at 1.0 — route a temperature-honouring model here"
+            )
 
     if errors:
         print(f"\n❌ {len(errors)} VALIDATION ERRORS:")

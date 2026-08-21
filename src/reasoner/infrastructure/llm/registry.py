@@ -637,6 +637,44 @@ def resolved_model_of(model_id: str) -> str:
     return str(cfg.get("model", model_id)).lstrip("~")
 
 
+def honours_tuned_temperature(model_id: str) -> bool:
+    """True when routing this model to a phase actually applies that phase's temperature.
+
+    A model fails this on either of two independent grounds, and both matter:
+
+      * the provider refuses to send ``temperature`` at all
+        (``OpenAICompatibleProvider._FIXED_TEMPERATURE_MARKERS``), or
+      * the OpenRouter catalogue reports no ``temperature`` in the model's
+        ``supported_parameters``.
+
+    The two disagree today -- the denylist is hand-maintained from Jun 2026
+    capability data and has drifted from the catalogue in both directions -- so
+    this deliberately fails closed on the union rather than trusting either
+    alone. An unknown model (absent from the catalogue, e.g. an ollama or
+    ``~*-latest`` alias) is assumed to honour temperature, matching the
+    provider's own allowlist-by-default stance.
+
+    Why this matters: a model that ignores temperature does not error, it
+    silently samples at its fixed default (1.0). Routed to a phase tuned for
+    0.2, it is 5x more random than the phase asked for, and nothing surfaces it.
+    """
+    from reasoner.domain.pricing import MODEL_CATALOGUE
+    from reasoner.infrastructure.llm.providers.openai_compat import (
+        OpenAICompatibleProvider,
+    )
+
+    served = resolved_model_of(model_id).lower()
+    if served.startswith(("gpt-", "o1", "o3", "o4")):
+        return False
+    if any(m in served for m in OpenAICompatibleProvider._FIXED_TEMPERATURE_MARKERS):
+        return False
+
+    entry = MODEL_CATALOGUE.get(resolved_model_of(model_id))
+    if not entry:
+        return True
+    return "temperature" in set(entry.get("supported_parameters") or ())
+
+
 class RegistryAdapter:
     """Infrastructure adapter implementing :class:`ModelRegistryPort`.
 

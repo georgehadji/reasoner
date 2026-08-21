@@ -35,12 +35,13 @@ _MODEL_LABS: dict[str, str] = {
     "gemini-flash-image": "google", "gemini-pro-image": "google",
     "gemini-3.1-flash-image-preview": "google", "gemini-3.1-flash-lite-image": "google",
     "gemini-3.7-flash": "google", "gemini-3.6-flash": "google",
+    "gemini-2.5-flash": "google",
     # Note: gemini-pro → Anthropic (claude-sonnet), gemini-flash-lite → Qwen (qwen3.5-flash)
     # Meta
     "llama-3.3-70b": "meta", "llama-4-maverick": "meta",
     # Mistral
     "mistral-large-3": "mistral", "mistral-small": "mistral", "mistral-small-2603": "mistral",
-    "ministral-8b": "mistral", "codestral-2508": "mistral",
+    "ministral-8b": "mistral", "codestral-2508": "mistral", "mistral-medium-3-5": "mistral",
     # DeepSeek
     "deepseek-v3": "deepseek", "deepseek-v4-pro": "deepseek", "deepseek-v4-flash": "deepseek",
     # Qwen (Alibaba)
@@ -68,6 +69,7 @@ _MODEL_LABS: dict[str, str] = {
     # Image generators (pure image output, priced per image)
     "qwen-image-3": "qwen", "qwen-image-3-pro": "qwen",
     "seedream-5-pro": "bytedance", "seedream-5-lite": "bytedance",
+    "seedream-4.5": "bytedance", "gpt-image-2": "openai",
     "grok-imagine-image-2": "xai",
     "krea-2-large": "krea", "krea-2-medium": "krea", "krea-2-medium-turbo": "krea",
     # OpenAI — Codex
@@ -82,7 +84,7 @@ _MODEL_LABS: dict[str, str] = {
     # Arcee AI
     "arcee-trinity-large-thinking": "arcee", "arcee-virtuoso-large": "arcee",
     # Thinking Machines
-    "inkling": "thinkingmachines",
+    "inkling": "thinkingmachines", "inkling-small": "thinkingmachines",
     # Poolside
     "laguna-xs-2.1": "poolside",
     # KwaiPilot (Kuaishou) — coding cascade in coding-budget

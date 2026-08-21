@@ -452,16 +452,6 @@
 | stress_testing | `ring-2.6-1t` | inclusionai/ring-2.6-1t | inclusionai |
 | verifier | `qwen3.5-flash` | qwen/qwen3.5-flash-02-23 | qwen |
 
-#### `nvidia-nemotron-test` — 3 roles (experimental)
-| Role | Key | Model | Lab |
-|------|-----|-------|-----|
-| primary | `nvidia-nemotron-super` | nvidia/nemotron-3-super-120b-a12b | nvidia |
-| perspective_cot | `nvidia-nemotron-super` | nvidia/nemotron-3-super-120b-a12b | nvidia |
-| perspective_analysis | `nvidia-nemotron-super` | nvidia/nemotron-3-super-120b-a12b | nvidia |
-| synthesis | `nvidia-nemotron-super` | nvidia/nemotron-3-super-120b-a12b | nvidia |
-
-### pot
-
 #### `pot-budget` — 6 roles
 | Role | Key | Model | Lab |
 |------|-----|-------|-----|

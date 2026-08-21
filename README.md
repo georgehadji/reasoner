@@ -175,7 +175,6 @@ Reasoner ships with **50 presets across 24 methodologies**. Each method ships a 
 - **`multi-perspective-ultra-budget`** — Ultra-light models (Ministral-3B, Gemini Flash Lite) in a streamlined 5-phase pipeline; sub-cent runs.
 - **`subagent-budget` / `subagent-premium`** — Routes every pipeline sub-task (classification, scoring, synthesis, ...) to specialized models.
 - **`image-gen-budget` / `image-gen-premium`** — Orchestrates text-to-image and image-to-image workflows.
-- **`nvidia-nemotron-test`** — Experimental preset using NVIDIA Nemotron models via the NIM API.
 
 ---
 

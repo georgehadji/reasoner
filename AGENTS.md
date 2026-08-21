@@ -721,7 +721,7 @@ Cross-language presets (`cross-language-budget` / `cross-language-premium`) run 
 
 ## 12. Presets & Model Routing
 
-The registry defines 50 presets across 24 methods: a Budget and a Premium tier per method, plus experimental variants (`multi-perspective-ultra-budget`, `nvidia-nemotron-test`). Presets define which models are used for each phase role. The UI orders methods and their presets from most cost-effective to least and defaults to the first method/preset.
+The registry defines 49 presets across 24 methods: a Budget and a Premium tier per method, plus the experimental `multi-perspective-ultra-budget`. Presets define which models are used for each phase role. The UI orders methods and their presets from most cost-effective to least and defaults to the first method/preset.
 
 - **Budget** -- Cheapest models, fastest
 - **Premium** -- Best available models

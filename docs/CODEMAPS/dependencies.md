@@ -1,4 +1,4 @@
-<!-- Generated: 2026-08-20 | Files scanned: 523 | Token estimate: ~650 -->
+<!-- Generated: 2026-08-21 | Files scanned: 523 | Token estimate: ~650 -->
 
 # Dependencies — Reasoner
 
