@@ -34,8 +34,8 @@ class TestBug001AdminEndpointHardening:
 
     def test_admin_stats_wrong_key_returns_401(self, monkeypatch):
         """Wrong admin key must 401 (existing behavior preserved)."""
-        from reasoner.core.settings import Settings
-        monkeypatch.setattr(Settings, "ADMIN_API_KEY", "real-admin-key")
+        from reasoner.core.settings import settings
+        monkeypatch.setattr(settings, "ADMIN_API_KEY", "real-admin-key")
 
         admin_client = TestClient(app, headers={"Authorization": f"Bearer {_admin_token}"})
         response = admin_client.get(
@@ -46,8 +46,8 @@ class TestBug001AdminEndpointHardening:
 
     def test_admin_stats_no_key_returns_401(self, monkeypatch):
         """Missing admin key must 401."""
-        from reasoner.core.settings import Settings
-        monkeypatch.setattr(Settings, "ADMIN_API_KEY", "real-admin-key")
+        from reasoner.core.settings import settings
+        monkeypatch.setattr(settings, "ADMIN_API_KEY", "real-admin-key")
 
         admin_client = TestClient(app, headers={"Authorization": f"Bearer {_admin_token}"})
         response = admin_client.get("/api/admin/feedback-stats")
@@ -55,8 +55,8 @@ class TestBug001AdminEndpointHardening:
 
     def test_admin_stats_rate_limited(self, monkeypatch):
         """Rapid requests to admin endpoint must be rate limited (429)."""
-        from reasoner.core.settings import Settings
-        monkeypatch.setattr(Settings, "ADMIN_API_KEY", "real-admin-key")
+        from reasoner.core.settings import settings
+        monkeypatch.setattr(settings, "ADMIN_API_KEY", "real-admin-key")
 
         # Monkey-patch rate limiter to reject immediately
         from reasoner.api.dependencies import _get_rate_limiter_instance
@@ -84,8 +84,8 @@ class TestBug001AdminEndpointHardening:
 
     def test_admin_stats_authorized_still_works(self, monkeypatch):
         """Correct admin key must still succeed."""
-        from reasoner.core.settings import Settings
-        monkeypatch.setattr(Settings, "ADMIN_API_KEY", "real-admin-key")
+        from reasoner.core.settings import settings
+        monkeypatch.setattr(settings, "ADMIN_API_KEY", "real-admin-key")
 
         admin_client = TestClient(app, headers={"Authorization": f"Bearer {_admin_token}"})
         response = admin_client.get(
