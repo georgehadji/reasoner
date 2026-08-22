@@ -84,19 +84,19 @@ class DegradedLLMResponse:
     @property
     def tokens_total(self) -> int:
         """Total tokens used."""
-        return self.tokens_prompt + self.tokens_completion
-    
+        return self.metadata.get("input_tokens", 0) + self.metadata.get("output_tokens", 0)
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
-            'content': self.content,
-            'model_used': self.model_used,
+            'content': self.text,
+            'model_used': self.metadata.get("model", "unknown"),
             'tokens': {
-                'prompt': self.tokens_prompt,
-                'completion': self.tokens_completion,
+                'prompt': self.metadata.get("input_tokens", 0),
+                'completion': self.metadata.get("output_tokens", 0),
                 'total': self.tokens_total,
             },
-            'finish_reason': self.finish_reason,
+            'finish_reason': self.metadata.get("finish_reason", "error"),
             'metadata': self.metadata,
         }
 

@@ -204,6 +204,10 @@ async def run_stream(
                 if await request.is_disconnected():
                     logger.info("SSE client disconnected — cancelling pipeline run %s", run_id)
                     task.cancel()
+                    try:
+                        await task
+                    except (asyncio.CancelledError, Exception):
+                        pass
                     break
             except Exception:
                 pass

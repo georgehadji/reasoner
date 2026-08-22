@@ -699,8 +699,16 @@ async def run_followup_pipeline(
     """
     _require_auth_if_legacy_disabled(user)
     from reasoner.api.idempotency_http import register_run_or_error
+    from reasoner.api.dependencies import reserve_or_402
 
     await register_run_or_error(req.client_run_id)
+    reference_id = req.client_run_id or f"followup:{uuid.uuid4()}"
+    await reserve_or_402(
+        user_id=str(user.id) if user else None,
+        preset=req.preset or "auto-budget",
+        problem=req.question,
+        reference_id=reference_id,
+    )
     return StreamingResponse(
         run_followup_stream(req, request=request, user_id=str(user.id) if user else None),
         media_type="text/event-stream",

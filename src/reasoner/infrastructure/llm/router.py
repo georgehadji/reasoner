@@ -312,11 +312,13 @@ class ProviderRouter:
         # But if ProviderRouter is created multiple times per request,
         # self.routing_table contains NEW instances.
         # So we can cache by the provider's model and type.
-        cache_key = f"{type(provider).__name__}::{provider.model}"
-        
+        extra = getattr(provider, "extra_body", None)
+        extra_sig = hash(tuple(sorted(extra.items()))) if extra else 0
+        cache_key = f"{type(provider).__name__}::{provider.model}::{extra_sig}"
+
         if cache_key not in _GLOBAL_RESOLVED_CACHE:
             _GLOBAL_RESOLVED_CACHE[cache_key] = provider
-            
+
         return _GLOBAL_RESOLVED_CACHE[cache_key]
 
     def get(self, role: str) -> BaseLLMProvider:

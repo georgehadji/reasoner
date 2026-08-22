@@ -149,16 +149,17 @@ class BaseLLMProvider(ABC):
     ) -> AsyncIterator[str]:
         last_error: Exception | None = None
         for attempt in range(self.max_retries + 1):
+            yielded_any = False
             try:
                 async for chunk in self.stream_complete(
                     system_prompt, user_prompt, max_tokens, temperature
                 ):
+                    yielded_any = True
                     yield chunk
                 return # Success
             except Exception as exc:
                 last_error = exc
-                # Don't retry non-retryable errors
-                if not is_retryable(exc):
+                if yielded_any or not is_retryable(exc):
                     raise
                 if attempt < self.max_retries:
                     await asyncio.sleep(min(2 ** attempt, 4) + random.uniform(0, 0.5))
