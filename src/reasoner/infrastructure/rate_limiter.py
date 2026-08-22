@@ -378,12 +378,21 @@ class RateLimiter:
                 "limit_hour": self.config.requests_per_hour,
             }
         except Exception as e:
+            # BUG FIX: fall back to the in-memory bucket instead of lying with
+            # hardcoded zeros -- same degrade-on-Redis-failure contract as
+            # is_allowed()/reset_client()/reset_all() above.
             print(f"[ERROR] Failed to get Redis client stats: {e}")
-            return {
-                "tokens": 0, "requests_minute": 0, "requests_hour": 0,
-                "limit_minute": self.config.requests_per_minute, "limit_hour": self.config.requests_per_hour,
-                "error": str(e)
-            }
+            async with self._fallback_lock:
+                bucket = self._in_memory_get_bucket(client_id)
+                self._in_memory_refill_tokens(bucket, 1.0)
+                self._in_memory_reset_windows_if_needed(bucket)
+                return {
+                    "tokens": bucket.tokens,
+                    "requests_minute": bucket.requests_minute,
+                    "requests_hour": bucket.requests_hour,
+                    "limit_minute": self.config.requests_per_minute,
+                    "limit_hour": self.config.requests_per_hour,
+                }
 
     async def reset_client(self, client_id: str) -> None:
         if not self._redis_available or self._redis_client is None:
@@ -397,20 +406,33 @@ class RateLimiter:
         try:
             await self._redis_client.delete(token_bucket_key, minute_window_key, hour_window_key)
         except Exception as e:
+            # BUG FIX: A Redis-configured limiter that can't actually reach Redis
+            # (e.g. no server in this environment) falls back to the in-memory
+            # bucket for is_allowed() -- reset_client() must degrade the same way,
+            # or the in-memory bucket it is silently rate-limiting against can
+            # never be cleared, unlike is_allowed()'s existing ConnectionError
+            # fallback.
             print(f"[ERROR] Failed to reset client {client_id} in Redis: {e}")
-    
+            async with self._fallback_lock:
+                self._buckets.pop(client_id, None)
+
     async def reset_all(self) -> None:
         if not self._redis_available or self._redis_client is None:
             async with self._fallback_lock:
                 self._buckets.clear()
             return
-        
+
         # Danger zone: This will delete ALL keys matching the pattern. Use with caution.
         try:
             async for key in self._redis_client.scan_iter("rate_limit:*"):
                 await self._redis_client.delete(key)
         except Exception as e:
+            # BUG FIX: same in-memory fallback as reset_client() above -- without
+            # it, a Redis outage means _buckets can never be cleared even though
+            # is_allowed() is actively using it for every request.
             print(f"[ERROR] Failed to reset all rate limits in Redis: {e}") # Fixed double f-string
+            async with self._fallback_lock:
+                self._buckets.clear()
 
     # In-memory helpers for fallback mode
     def _in_memory_get_bucket(self, client_id: str) -> ClientBucket:

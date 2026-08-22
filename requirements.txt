@@ -2,7 +2,17 @@
 # Python 3.10+
 
 # Web Framework
-fastapi>=0.109.0,<0.117.0
+fastapi>=0.137.2,<0.145.0
+# starlette is a direct dependency (imported in websocket/manager.py, api/middleware.py,
+# api/error_handler.py), not just fastapi's transitive pin. Pinned explicitly >=1.3.1 because
+# fastapi's own metadata floor (starlette>=0.46.0, no ceiling) is not high enough to force this
+# via `pip install --upgrade fastapi` in an environment that already has an older starlette
+# satisfying that loose bound (pip's default, non-eager upgrade strategy won't cascade the
+# transitive bump) — only a from-scratch install would land on a modern starlette by accident.
+# >=1.3.1 closes 7 pip-audit CVEs (Host-header URL reconstruction injection, unbounded
+# urlencoded form parsing DoS, Windows UNC SSRF via StaticFiles, HTTPEndpoint arbitrary-attribute
+# method dispatch, quadratic-time Range-header DoS in FileResponse).
+starlette>=1.3.1,<2.0.0
 uvicorn[standard]>=0.27.0,<0.35.0
 python-multipart>=0.0.6,<0.1.0
 

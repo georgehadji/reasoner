@@ -19,6 +19,7 @@ import reasoner.core.search  # noqa: F401
 
 from reasoner.presets import get_preset
 from reasoner.pipeline import ReasonerPipeline
+from reasoner.application.pipeline import TOKEN_OPTIMIZATION
 from reasoner.models import PipelineState
 
 PRESET_ID = "multi-perspective-budget"
@@ -307,7 +308,20 @@ class TestPhaseRoleCalls:
     """Verify the correct router roles are invoked for each phase."""
 
     @pytest.fixture
-    async def state_and_router(self):
+    async def state_and_router(self, monkeypatch):
+        # These tests assert which roles the router was called for -- the
+        # process-wide token-response cache (application/pipeline.py's
+        # module-level `token_cache`) can serve a cached response and skip
+        # the router call entirely for an identical (problem, phase, model,
+        # prompt) tuple, which is exactly what every test in this class
+        # would produce since they all drive the same problem string through
+        # TrackingFakeRouter's single fake model. Caching is a real
+        # optimization in production; it's fundamentally at odds with
+        # "was the router called" as a test assertion, so it's disabled for
+        # just this pipeline instance rather than relying on the global
+        # reset_token_cache() autouse fixture to always win a race against
+        # Phase 2's concurrent perspective calls.
+        monkeypatch.setitem(TOKEN_OPTIMIZATION, "caching", False)
         router = TrackingFakeRouter(FAKE_RESPONSES)
         pipeline = ReasonerPipeline(
             router=router,
