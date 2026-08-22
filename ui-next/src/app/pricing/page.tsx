@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { apiFetch } from '@/lib/api-client';
 import { Check, X, Shield, CreditCard, Clock, Mail } from 'lucide-react';
@@ -68,6 +68,16 @@ export default function PricingPage() {
   const [loadingTier, setLoadingTier] = useState<string | null>(null);
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
   const [error, setError] = useState('');
+  // Full-page navigation is a side effect on the browser's own global state,
+  // not something an event handler should perform directly — handleUpgrade
+  // records where to go, and the effect below is what actually navigates.
+  const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (redirectUrl) {
+      window.location.href = redirectUrl;
+    }
+  }, [redirectUrl]);
 
   const handleUpgrade = async (tier: string, provider: 'stripe' | 'paypal') => {
     setError('');
@@ -86,7 +96,7 @@ export default function PricingPage() {
       if (!url || typeof url !== 'string' || !isValidCheckoutUrl(url)) {
         throw new Error('Invalid checkout URL received');
       }
-      window.location.href = url;
+      setRedirectUrl(url);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Checkout failed';
       setError(msg);

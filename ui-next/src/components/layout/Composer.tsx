@@ -94,17 +94,20 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
 
   const user = useAppStore((s) => s.user);
 
-  /* Set after mount, never during render: `new Date()` on the server and on
-     the client land in different hours often enough, and Next would flag the
-     mismatch and re-render the whole subtree. The neutral default is what
-     ships in the HTML. */
-  const [greeting, setGreeting] = useState('Ready when you are');
-  useEffect(() => {
+  /* Computed during render, not synced via effect+state: `new Date()` on the
+     server and on the client land in different hours often enough that the
+     text would legitimately differ between the SSR pass and the first client
+     render. `suppressHydrationWarning` on the element that renders it (below)
+     is React's sanctioned way to allow exactly that one mismatch instead of
+     laundering it through an effect. Server renders fall back to the neutral
+     default via the `typeof window` guard. */
+  const greeting = (() => {
+    if (typeof window === 'undefined') return 'Ready when you are';
     const hour = new Date().getHours();
     const part = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
     const name = user?.email?.split('@')[0];
-    setGreeting(name ? `${part}, ${name}` : part);
-  }, [user]);
+    return name ? `${part}, ${name}` : part;
+  })();
 
   const [estimate, setEstimate] = useState<{ tokens: number; cost: string; duration: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -434,8 +437,14 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
       <div className="flex h-full w-full flex-col items-center justify-center px-[var(--gutter)] py-[var(--space-8)]">
         <div className="w-full max-w-[var(--width-chat)]">
           {/* Serif, and the only display-scale type in the app shell. The
-              greeting is the one moment the product speaks before it works. */}
-          <h1 className="mb-[var(--space-8)] text-center font-serif text-[length:var(--text-4xl)] font-normal leading-[var(--lh-display)] tracking-[var(--tracking-tight)] text-[var(--text)]">
+              greeting is the one moment the product speaks before it works.
+              suppressHydrationWarning: `greeting` is time-of-day dependent and
+              may legitimately differ between the server render and the first
+              client render (see the computation above). */}
+          <h1
+            suppressHydrationWarning
+            className="mb-[var(--space-8)] text-center font-serif text-[length:var(--text-4xl)] font-normal leading-[var(--lh-display)] tracking-[var(--tracking-tight)] text-[var(--text)]"
+          >
             {isImageMode ? 'What should we picture?' : greeting}
           </h1>
 
