@@ -17,7 +17,7 @@ import logging
 import os
 import time
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Dict, Optional, Any
 import asyncio
 import math # Added math for ceil in Lua script error fallback
@@ -331,21 +331,43 @@ class RateLimiter:
         # adjust it if specific logging/metrics are needed outside of the main check.
         pass
 
+    def _in_memory_stats_snapshot(self, client_id: str) -> dict:
+        """Read-only view of a client's in-memory bucket.
+
+        get_client_stats() is observability: it must never mutate the state
+        is_allowed() enforces against. _in_memory_get_bucket() would, twice
+        over -- it *creates* a bucket for an unknown client_id and, once
+        _MAX_BUCKETS is reached, evicts next(iter(self._buckets)) to make
+        room. Polling stats for ids that never sent a request therefore used
+        to fill the table and drop real clients' buckets, handing them back a
+        full burst: a stats endpoint doubling as a rate-limit reset.
+
+        So: look up the bucket, never insert one, and project it onto a
+        detached copy so the shared refill/window helpers can be reused
+        without writing through to the live bucket. An unknown client has no
+        consumption on record, which is what a fresh bucket would report.
+        """
+        bucket = self._buckets.get(client_id)
+        snapshot = replace(bucket) if bucket is not None else ClientBucket(
+            tokens=float(self.config.burst_size)
+        )
+        if bucket is not None:
+            self._in_memory_refill_tokens(snapshot, 1.0)
+            self._in_memory_reset_windows_if_needed(snapshot)
+        return {
+            "tokens": snapshot.tokens,
+            "requests_minute": snapshot.requests_minute,
+            "requests_hour": snapshot.requests_hour,
+            "limit_minute": self.config.requests_per_minute,
+            "limit_hour": self.config.requests_per_hour,
+        }
+
     async def get_client_stats(self, client_id: str) -> dict:
         if not self._redis_available or self._redis_client is None:
-            # Fallback for stats if Redis is not available
-            async with self._fallback_lock:
-                bucket = self._in_memory_get_bucket(client_id)
-                self._in_memory_refill_tokens(bucket, 1.0) # Ensure current state
-                self._in_memory_reset_windows_if_needed(bucket)
-                return {
-                    "tokens": bucket.tokens,
-                    "requests_minute": bucket.requests_minute,
-                    "requests_hour": bucket.requests_hour,
-                    "limit_minute": self.config.requests_per_minute,
-                    "limit_hour": self.config.requests_per_hour,
-                }
-        
+            # Redis is not in play at all: is_allowed() enforces against the
+            # in-memory buckets, so reporting them is an authoritative read.
+            return self._in_memory_stats_snapshot(client_id)
+
         token_bucket_key = f"rate_limit:{client_id}:tokens"
         minute_window_key = f"rate_limit:{client_id}:minute"
         hour_window_key = f"rate_limit:{client_id}:hour"
@@ -378,21 +400,20 @@ class RateLimiter:
                 "limit_hour": self.config.requests_per_hour,
             }
         except Exception as e:
-            # BUG FIX: fall back to the in-memory bucket instead of lying with
-            # hardcoded zeros -- same degrade-on-Redis-failure contract as
-            # is_allowed()/reset_client()/reset_all() above.
+            # Degraded read. Unlike is_allowed(), reaching here does NOT mean
+            # the limiter fell back to memory: _redis_available is still True
+            # (only _execute_redis_script clears it, and only on ConnectionError),
+            # so Redis is still the enforcer and self._buckets holds nothing for
+            # this client. The in-memory numbers below are therefore a guess, not
+            # a reading -- a client sitting at 0 tokens in Redis looks like it has
+            # a full burst. Say so explicitly: "error" (restored) and "degraded"
+            # are the only things separating this from a healthy response, whose
+            # keys are otherwise identical.
             print(f"[ERROR] Failed to get Redis client stats: {e}")
-            async with self._fallback_lock:
-                bucket = self._in_memory_get_bucket(client_id)
-                self._in_memory_refill_tokens(bucket, 1.0)
-                self._in_memory_reset_windows_if_needed(bucket)
-                return {
-                    "tokens": bucket.tokens,
-                    "requests_minute": bucket.requests_minute,
-                    "requests_hour": bucket.requests_hour,
-                    "limit_minute": self.config.requests_per_minute,
-                    "limit_hour": self.config.requests_per_hour,
-                }
+            stats = self._in_memory_stats_snapshot(client_id)
+            stats["degraded"] = True
+            stats["error"] = str(e)
+            return stats
 
     async def reset_client(self, client_id: str) -> None:
         if not self._redis_available or self._redis_client is None:
@@ -433,6 +454,24 @@ class RateLimiter:
             print(f"[ERROR] Failed to reset all rate limits in Redis: {e}") # Fixed double f-string
             async with self._fallback_lock:
                 self._buckets.clear()
+
+    def reset_local_buckets(self) -> None:
+        """Drop this process's in-memory buckets. Never touches Redis.
+
+        reset_all() is the shared-state reset: with Redis reachable it scans
+        and deletes every `rate_limit:*` key, which belongs to every client of
+        that deployment, not just this process. Callers that only want to clear
+        what this process owns -- notably tests, which must not be able to wipe
+        a dev/staging keyspace -- want this instead.
+
+        Deliberately synchronous and lock-free: dict.clear() is atomic under the
+        GIL, and _fallback_lock is an asyncio.Lock on a process-wide singleton.
+        Awaiting it binds the lock to whichever event loop the caller happens to
+        be running in as soon as it is ever contended, after which every acquire
+        from another loop raises RuntimeError. A reset primitive callable from
+        any loop (or none) must not put that lock at risk.
+        """
+        self._buckets.clear()
 
     # In-memory helpers for fallback mode
     def _in_memory_get_bucket(self, client_id: str) -> ClientBucket:
