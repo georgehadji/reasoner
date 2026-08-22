@@ -21,7 +21,11 @@ from reasoner.core.constants import (
     OPENROUTER_BASE_URL as _OPENROUTER_BASE_URL,
     TIMEOUTS,
 )
-from reasoner.infrastructure.llm.base import BaseLLMProvider
+from reasoner.infrastructure.llm.base import (
+    BaseLLMProvider,
+    config_signature,
+    secret_digest,
+)
 from reasoner.infrastructure.llm.caching import build_messages, extract_cache_usage
 from reasoner.infrastructure.llm.utils import _perplexity_response_format
 
@@ -71,6 +75,28 @@ class OpenAICompatibleProvider(BaseLLMProvider):
     ) -> None:
         super().__init__(model, max_retries)
         self.extra_body = extra_body or {}
+
+        # Routing identity, snapshotted here and never recomputed.
+        #
+        #  * ``extra_body`` is captured now, from the *configured* value: the
+        #    router overwrites the live attribute in place for the duration of
+        #    a call (ProviderRouter._call_with_circuit), so deriving the
+        #    identity from it later would observe a transient value.
+        #  * ``base_url``/``api_key`` are captured because they vanish into
+        #    ``self.client`` below and are unrecoverable afterwards. Without
+        #    them two tenants' BYOK providers for the same model share one
+        #    identity and one would be served the other's client.
+        self._routing_identity = "::".join((
+            type(self).__name__,
+            model,
+            base_url or "-",
+            secret_digest(api_key),
+            config_signature(self.extra_body),
+            # A caller-supplied client carries its own credentials and
+            # transport, none of which are inspectable here; keep such
+            # providers distinct rather than risk conflating them.
+            f"client:{id(http_client)}" if http_client is not None else "-",
+        ))
 
         # Prompt-cache breakpoints are opt-out; providers that cache
         # automatically are unaffected either way.
