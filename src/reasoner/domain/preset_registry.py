@@ -656,7 +656,10 @@ _REGISTRY: dict[str, dict] = {
     },
     "article-budget": {
         "method": "article",
-        "primary_id": "deepseek-v4-flash",
+        # Must be a key-safe (env=None) model: filter_routing() downgrades any
+        # role whose key is missing to primary_id, so a gated model here can't
+        # act as its own fallback.
+        "primary_id": "gemini-flash-lite",
         "routing": {
             "synthesis": "qwen3.7-plus",         # 🇨🇳 Qwen — 1M ctx for full article, cross-bloc (was gpt-4o-mini)
         # ── Article-flow roles (budget, v3.5) ──

@@ -136,7 +136,7 @@ async def run_stream(
         try:
             registry = get_handler_registry()
             handler = registry.command_handlers["RunPipelineCommand"]
-            await handler.handle(command, sse_emit=sse_emit)
+            await handler.handle(command, sse_emit=sse_emit, initial_state=initial_state)
         except asyncio.CancelledError:
             # asyncio.wait_for() cancels our task on timeout via CancelledError,
             # NOT TimeoutError. TimeoutError is raised to the _timed_task wrapper.

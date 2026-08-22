@@ -20,10 +20,11 @@ from reasoner.core.settings import settings
 # Token validity window in seconds (24 hours)
 _CSRF_TOKEN_MAX_AGE = 86400
 
-# Per-process CSRF signing secret (rotates on restart — acceptable for stateless tokens)
-# BUG-FIX: Use _get_csrf_secret() consistently so generation and verification use the same secret.
-# Previously _CSRF_SECRET was a process-local random value while verification used the env var,
-# causing token mismatch when CSRF_SECRET was set and RuntimeError when it was not.
+# Per-process CSRF signing secret (rotates on restart — acceptable for stateless tokens).
+# Computed once at import and reused by every sign/verify call below — when
+# CSRF_SECRET is unset, _get_csrf_secret() returns a fresh random value on each
+# call, so calling it again inside sign/verify would sign and verify with
+# different secrets and every token would fail verification.
 
 
 def _get_csrf_secret() -> bytes:
@@ -54,8 +55,7 @@ def generate_csrf_token() -> str:
 
 def sign_csrf_token(token: str) -> str:
     """Sign a token with HMAC-SHA256. Returns 'token.signature_hex'."""
-    secret = _get_csrf_secret()
-    sig = hmac.new(secret, token.encode("utf-8"), hashlib.sha256).hexdigest()
+    sig = hmac.new(_CSRF_SECRET, token.encode("utf-8"), hashlib.sha256).hexdigest()
     return f"{token}.{sig}"
 
 
@@ -68,8 +68,7 @@ def verify_csrf_token(signed: str) -> bool:
     if not token or not provided_sig:
         return False
 
-    secret = _get_csrf_secret()
-    expected_sig = hmac.new(secret, token.encode("utf-8"), hashlib.sha256).hexdigest()
+    expected_sig = hmac.new(_CSRF_SECRET, token.encode("utf-8"), hashlib.sha256).hexdigest()
 
     # Constant-time comparison to prevent timing attacks
     if not hmac.compare_digest(provided_sig, expected_sig):

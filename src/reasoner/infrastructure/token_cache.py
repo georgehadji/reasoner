@@ -452,8 +452,20 @@ def get_token_cache(
 
 
 async def reset_token_cache() -> None:
-    """Resets the global token cache for testing purposes."""
+    """Resets the global token cache for testing purposes.
+
+    Clears the existing instance in place rather than dropping the module
+    singleton (`_cache = None`). Callers that captured a reference to the
+    cache before this runs — e.g. `application/pipeline.py`'s module-level
+    `token_cache = get_token_cache(...)`, bound once at import time — keep
+    using that same object for the life of the process. Nulling `_cache`
+    here only resets *this module's* pointer: the first reset after import
+    empties it as intended, but every reset after that sees `_cache is
+    None` and no-ops, while `pipeline.py` (and anything else holding an
+    earlier reference) goes on serving stale cache hits for the rest of the
+    test session. Clearing in place keeps every held reference — this
+    module's and any captured earlier — pointing at the same emptied cache.
+    """
     global _cache
     if _cache:
         await _cache.clear()
-    _cache = None

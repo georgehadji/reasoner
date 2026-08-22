@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import time
@@ -313,7 +314,11 @@ class ProviderRouter:
         # self.routing_table contains NEW instances.
         # So we can cache by the provider's model and type.
         extra = getattr(provider, "extra_body", None)
-        extra_sig = hash(tuple(sorted(extra.items()))) if extra else 0
+        # extra_body commonly nests dicts/lists (e.g. DeepSeek's
+        # {"reasoning": {"effort": "high"}}, Perplexity's search options),
+        # which aren't hashable — a stable JSON dump is used as the
+        # discriminator instead of hashing the structure directly.
+        extra_sig = json.dumps(extra, sort_keys=True, default=str) if extra else "0"
         cache_key = f"{type(provider).__name__}::{provider.model}::{extra_sig}"
 
         if cache_key not in _GLOBAL_RESOLVED_CACHE:

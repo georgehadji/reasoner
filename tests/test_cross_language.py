@@ -12,6 +12,7 @@ from reasoner.infrastructure.translation.deepl_client import (
     FREE_BASE_URL,
     PAID_BASE_URL,
 )
+from reasoner.infrastructure.translation.composite import reset_composite_translator
 
 
 def _make_mock_router():
@@ -145,9 +146,15 @@ class TestCrossLanguagePipeline:
 
     @pytest.fixture(autouse=True)
     def reset_client(self):
+        # get_composite_translator() caches its own module-level singleton
+        # (independent of the DeepL client singleton reset above) and never
+        # re-evaluates DEEPL_API_KEY once built, so a stale CompositeTranslator
+        # from an earlier test would silently ignore this test's env/mocks.
         reset_deepl_client()
+        reset_composite_translator()
         yield
         reset_deepl_client()
+        reset_composite_translator()
 
     @pytest.mark.asyncio
     async def test_translate_in_skips_english(self):
@@ -162,10 +169,15 @@ class TestCrossLanguagePipeline:
         assert state.cross_language_state == {}
 
     @pytest.mark.asyncio
-    async def test_translate_in_translates_non_english(self):
+    async def test_translate_in_translates_non_english(self, monkeypatch):
         """Non-English problems should be translated to English."""
         from reasoner.pipeline import ReasonerPipeline
 
+        # get_composite_translator() only wires in a DeepL adapter when an API
+        # key is configured (DeepLClient() -> None otherwise); without this the
+        # DeepL branch is skipped entirely and the patched translate() below is
+        # never invoked, silently falling through to the LLM/identity fallback.
+        monkeypatch.setenv("DEEPL_API_KEY", "test-deepl-key-not-real")
         with patch("reasoner.infrastructure.translation.deepl_client.DeepLClient.translate", new_callable=AsyncMock) as mock_translate:
             mock_translate.return_value = {
                 "text": "Hello world",
@@ -207,10 +219,14 @@ class TestCrossLanguagePipeline:
         assert state.cross_language_state == {}
 
     @pytest.mark.asyncio
-    async def test_translate_out_success(self):
+    async def test_translate_out_success(self, monkeypatch):
         """Synthesis should be translated back to source language."""
         from reasoner.pipeline import ReasonerPipeline
 
+        # See test_translate_in_translates_non_english: DeepL must be
+        # "configured" or the composite translator skips straight past the
+        # patched DeepLClient.translate to the LLM/identity fallback.
+        monkeypatch.setenv("DEEPL_API_KEY", "test-deepl-key-not-real")
         with patch("reasoner.infrastructure.translation.deepl_client.DeepLClient.translate", new_callable=AsyncMock) as mock_translate:
             mock_translate.return_value = {
                 "text": "Hallo Welt",
