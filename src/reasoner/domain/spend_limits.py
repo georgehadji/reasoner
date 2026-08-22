@@ -65,16 +65,25 @@ TIER_SPEND_LIMITS: dict[SubscriptionTier, TierSpendLimits] = {
     # Synthesis' output budget was later raised to 32K (constants_limits.py,
     # "leverage qwen3.6-plus's 1M context window"), which lifted every
     # preset's worst-case estimate without a matching update here: the old
-    # 0.05 sat *below* the typical budget preset's own worst-case estimate
-    # (most cluster $0.045-$0.063; e.g. debate-budget ~$0.0615,
-    # multi-perspective-budget ~$0.0616), so it rejected normal free-tier
-    # runs outright rather than only genuine outliers. 0.07 clears that
-    # normal cluster with headroom while still catching real outliers
-    # (article-budget ~$0.11, iterative-critique-budget ~$0.35) — those stay
-    # rejected on the free tier, which is correct, not fixed here.
-    # ~7 budget runs/month at the new ceiling (was ~10 at 0.05). Still
-    # enough to evaluate the product, bounded enough that a few thousand
-    # free accounts stay affordable.
+    # 0.05 sat *below* the typical budget preset's own worst-case estimate,
+    # so it rejected normal free-tier runs outright rather than only genuine
+    # outliers. Measured across all 25 budget presets: 13/25 clear 0.05,
+    # 23/25 clear 0.07. The two that remain rejected (article-budget,
+    # iterative-critique-budget) are real outliers and stay rejected on the
+    # free tier, which is correct and not fixed here.
+    #
+    # MEASURING THIS: estimate_run_cost() resolves per-model pricing through
+    # the model-registry port, which the composition roots inject
+    # (set_model_registry_port at api/__init__.py, main.py, headless.py) and
+    # tests/conftest.py injects at import. A bare `python -c` that skips that
+    # injection falls back to undifferentiated pricing and inflates every
+    # estimate ~4.4x (debate-budget reads $0.273 instead of $0.0615), which
+    # makes it look like no preset can ever pass at any cap. Inject the port
+    # before trusting a number from this estimator.
+    #
+    # ~7 budget runs/month at this ceiling (was ~10 at 0.05). Still enough to
+    # evaluate the product, bounded enough that a few thousand free accounts
+    # stay affordable.
     SubscriptionTier.FREE: TierSpendLimits(per_run_usd=0.07, monthly_usd=0.50),
     # per_run covers the most expensive premium preset; monthly is ~4x the
     # expected average, so it only binds on genuine outliers.
