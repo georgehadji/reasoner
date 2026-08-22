@@ -656,10 +656,25 @@ _REGISTRY: dict[str, dict] = {
     },
     "article-budget": {
         "method": "article",
-        # Must be a key-safe (env=None) model: filter_routing() downgrades any
-        # role whose key is missing to primary_id, so a gated model here can't
-        # act as its own fallback.
-        "primary_id": "gemini-flash-lite",
+        # primary_id is both the catch-all for unrouted roles AND the target
+        # filter_routing() downgrades a role to when its key is missing, so it
+        # must (a) build without a provider-specific key and (b) sit on a
+        # different lab from the routed roles it may replace.
+        #
+        # deepseek-v4-flash satisfies both. It is NOT gated on DEEPSEEK_API_KEY:
+        # the registry entry carries no explicit env, so the _MODEL_WHITELIST ->
+        # _REGISTRY build setdefaults it to OPENROUTER_API_KEY and it resolves
+        # through OpenRouter, while build_provider() still prefers a direct
+        # DeepSeek key when one is present. (An earlier edit here swapped this
+        # to gemini-flash-lite to dodge a DEEPSEEK_API_KEY requirement that the
+        # registry fix had already removed, on the false premise that some
+        # entry has env=None — none does; every non-local entry is
+        # OPENROUTER_API_KEY.) That swap also broke cross-lab diversity:
+        # "gemini-flash-lite" is an alias for qwen/qwen3.5-flash-02-23, the same
+        # lab as this preset's qwen3.7-plus synthesis, so a degraded environment
+        # collapsed the whole preset onto one lab — the opposite of the
+        # "fail to a cross-lab equivalent" rule in CLAUDE.md §5.
+        "primary_id": "deepseek-v4-flash",
         "routing": {
             "synthesis": "qwen3.7-plus",         # 🇨🇳 Qwen — 1M ctx for full article, cross-bloc (was gpt-4o-mini)
         # ── Article-flow roles (budget, v3.5) ──
