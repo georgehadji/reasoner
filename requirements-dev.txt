@@ -1,0 +1,19 @@
+# Reasoner — development / CI-only dependencies
+#
+# Kept out of requirements.txt because that file is what Dockerfile installs
+# into the production image: shipping the test stack there bloats the image and
+# surfaces dev-only CVEs (e.g. pytest's PYSEC-2026-1845, a local
+# /tmp/pytest-of-{user} race) in the production pip-audit gate, where the only
+# available response is to suppress them.
+#
+# Install alongside the runtime deps:
+#   pip install -r requirements.txt -r requirements-dev.txt
+
+-r requirements.txt
+
+# Testing
+pytest>=8.0.0,<9.0.0
+pytest-asyncio>=0.23.0,<0.25.0
+pytest-timeout>=2.0.0,<3.0.0
+pytest-xdist>=3.0.0,<4.0.0
+hypothesis>=6.100.0,<7.0.0

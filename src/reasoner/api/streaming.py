@@ -204,10 +204,17 @@ async def run_stream(
                 if await request.is_disconnected():
                     logger.info("SSE client disconnected — cancelling pipeline run %s", run_id)
                     task.cancel()
-                    try:
-                        await task
-                    except (asyncio.CancelledError, Exception):
-                        pass
+                    # Deliberately do NOT await the task here. run_task's own
+                    # CancelledError handler and its finally both `await
+                    # queue.put(...)`, and this generator is the queue's only
+                    # consumer -- once we stop draining, awaiting the task
+                    # deadlocks against a full queue (maxsize=256), which is
+                    # exactly the backpressure state a disconnect implies.
+                    # Bare `except Exception` would also swallow a
+                    # CancelledError aimed at *this* generator (it is a
+                    # BaseException), suppressing uvicorn's shutdown unwind.
+                    # cancel() is enough: the task drops its queue reference
+                    # and is collected once it unwinds.
                     break
             except Exception:
                 pass

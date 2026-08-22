@@ -19,16 +19,7 @@ jobs:
       # Suppression: a genuine false positive gets `# nosec <rule-id> —
       # <reason>, expires <date>` inline, reviewed in the PR that adds it.
       # No blanket / unreviewed suppression.
-      #
-      # PYSEC-2026-1845 (pytest <=9.0.2, /tmp/pytest-of-{user} naming, local
-      # multi-user race) — reviewed 2026-08-22, expires 2027-02-01. pytest is
-      # dev-only (never ships to prod) and CI runners are single-tenant, so
-      # the local-multi-user precondition doesn't apply here. The fix
-      # (pytest 9.x) needs a pytest-asyncio 0.2x->1.x migration with its own
-      # breaking config changes — tracked separately, not worth forcing into
-      # this gate. Re-review at expiry; drop this ignore once that migration
-      # lands.
-      - run: pip-audit --requirement requirements.txt --ignore-vuln PYSEC-2026-1845
+      - run: pip-audit --requirement requirements.txt
       - run: bandit -r src/ -f json -o bandit-report.json
       - run: bandit -r src/
       - run: python scripts/scan-secrets.py

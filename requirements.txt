@@ -64,12 +64,10 @@ cryptography>=42.0.0
 tenacity>=8.2.3,<9.0.0 # For retries
 aiocircuitbreaker>=2.0.0,<3.0.0 # For circuit breaking
 
-# Testing
-pytest>=8.0.0,<9.0.0
-pytest-asyncio>=0.23.0,<0.25.0
-pytest-timeout>=2.0.0,<3.0.0
-pytest-xdist>=3.0.0,<4.0.0
-hypothesis>=6.100.0,<7.0.0
+# Testing deps live in requirements-dev.txt — this file is what Dockerfile
+# installs into the production image, and shipping the test stack there both
+# bloats the image and puts dev-only CVEs (e.g. pytest's PYSEC-2026-1845) in
+# front of the production pip-audit gate.
 
 # Production WSGI
 gunicorn>=22.0.0,<24.0.0
