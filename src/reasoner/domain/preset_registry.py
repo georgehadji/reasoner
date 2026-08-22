@@ -860,11 +860,15 @@ _REGISTRY: dict[str, dict] = {
         # None of these are fixed-temperature models: fusion/meta_evaluator/
         # scoring/stress_testing/verifier all run below 0.7, and a model that
         # ignores temperature would silently sample at 1.0 there.
-        # NB: the image_generate fallback below is the preset-level chain; the
-        # actual image call also has its own IMAGE_GEN_FALLBACKS ladder in
-        # core/constants_limits.py, which is what image_generation.py consumes.
+        # No image_generate entry here: this preset's actual image call
+        # (api/routes/images.py -> generate_images()) never reads this dict —
+        # it is resolved entirely through IMAGE_GEN_FALLBACKS in
+        # core/constants_limits.py (5 cross-vendor models for budget, 7 for
+        # premium), or by hypergate's auto model selector. A prior version of
+        # this comment claimed both were consulted; that was wrong, and an
+        # image_generate key here would be dead data implying a fallback path
+        # that does not exist.
         "fallback_routing": {
-            "image_generate":  "seedream-4.5",          # 🇨🇳 ByteDance — cross-vendor from Google
             "fusion":          "seed-2.0-mini",         # 🇨🇳 ByteDance — $0.10/$0.40, 262K ctx
             "meta_evaluator":  "mistral-small-2603",    # 🇫🇷 Mistral — EU bloc, accepts temperature
             "scoring":         "hy3",                   # 🇨🇳 Tencent — anti-hallucination scoring
@@ -892,9 +896,11 @@ _REGISTRY: dict[str, dict] = {
         # backs, distinct served model, and no fixed-temperature model in a
         # sub-0.7 phase (deep_read 0.2, fusion 0.2, scoring 0.3, verifier 0.2,
         # stress_testing 0.5) — which rules out the gpt-5.x tiers, claude-opus,
-        # claude-sonnet and claude-fable-5 for all of them.
+        # claude-sonnet and claude-fable-5 for all of them. No image_generate
+        # entry: see image-gen-budget's fallback_routing comment — that role's
+        # fallback lives entirely in core/constants_limits.py's
+        # IMAGE_GEN_FALLBACKS, not in this dict.
         "fallback_routing": {
-            "image_generate":  "gpt-image-2",           # 🇺🇸 OpenAI — cross-vendor from Google
             "deep_read":       "claude-haiku",          # 🇺🇸 Anthropic — accepts temperature, unlike sonnet/opus/fable
             "fusion":          "qwen3-max-real",        # 🇨🇳 Qwen — cross-vendor from DeepSeek
             "meta_evaluator":  "mistral-medium-3-5",    # 🇫🇷 Mistral — EU bloc

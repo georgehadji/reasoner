@@ -40,6 +40,40 @@ Hexagonal DDD + CQRS + Event Sourcing + WorkflowStrategy composition (`applicati
 
 ## 3. Project Structure
 
+### 3.1 Folder → Skill Map (start here)
+
+Every folder has a **map skill** in `.claude/skills/` listing what the folder contains and what each file does. Load the map for the folder you are about to touch instead of searching the tree.
+
+| Task / area | Folder | Load skill |
+|-------------|--------|------------|
+| Endpoints, SSE streaming, auth deps, middleware, CSRF, billing routes, MCP tools | `src/reasoner/api/` | `map-api` |
+| Pipeline behavior, reasoning flows and phase logic, CQRS handlers, event bus, services (routing, billing, metering, serializers, renderers) | `src/reasoner/application/` | `map-application` |
+| Constants, token budgets, settings/env, hexagonal ports, domain events, aggregates, JSON parsing, sanitization | `src/reasoner/core/` | `map-core` |
+| `PipelineState` fields, the 48 presets, pricing, credits, SaaS entities, ACR value objects, watermark domain | `src/reasoner/domain/` | `map-domain` |
+| Adding a model or provider, routing and fallback, event stores and repos, Valkey/Redis, search adapters, code sandbox, widgets, websocket | `src/reasoner/infrastructure/` | `map-infrastructure` |
+| Routing decision (DIRECT / WEB_SEARCH / PIPELINE), method classification, fast-path regexes | `src/reasoner/hypergate/` | `map-hypergate` |
+| Writing or editing any prompt; per-method prompt modules; Verbalized Sampling stages | `src/reasoner/phases/` | `map-phases` |
+| Intra-phase sub-agents (enhancement, decomposition, critique, search, synthesis) | `src/reasoner/subagents/` | `map-subagents` |
+| Long-term memory, L1/L2/L3 cache, compression, self-healing loop | `src/reasoner/neuro/`, `src/reasoner/healing/` | `map-neuro-healing` |
+| Telling a shim from the real module; CLI and headless entry points; security, quality, utils, documents, VS verticals | `src/reasoner/` root + small packages | `map-reasoner-root` |
+| Any UI change, proxy route, SSE hook, IndexedDB, styling | `ui-next/` | `map-ui-next` |
+| Finding existing coverage, fixtures, markers, running subsets | `tests/` | `map-tests` |
+| ADRs, CODEMAPS, environment variables, method and preset references, audits, plans | `docs/` | `map-docs` |
+| CI gates and ratchets, git hooks, DB migrations, TypeScript SDK, benchmarks, deployment, root entry points | `scripts/`, `.github/`, `migrations/`, `sdk/`, repo root | `map-ops` |
+
+**Task skills** (how to make a change, not where things live): `reasoner-pipeline` (add a reasoning method), `reasoner-model-routing` (whitelist, cross-lab rules, fallbacks), `reasoner-testing` (pytest patterns), `ara-add-preset`, `ara-add-provider`, `ara-add-perspective`, `ara-debug` (diagnose a failing phase). A second, repo-level skill directory exists at `skills/`: `llm-routing-optimizer`, `reasoner-preset-manager`, `reasoner-test-generator`.
+
+**Cross-folder work — the folders a change usually touches together:**
+
+- *New reasoning method*: `map-phases` → `map-application` → `map-domain` (presets) → `map-hypergate` (routing letter) → `map-ui-next` (renderer and serializer surface) → `map-tests`.
+- *New model or provider*: `map-infrastructure` (registry, router) → `map-domain` (presets, pricing) → `map-tests`.
+- *New endpoint*: `map-api` → `map-application` (service or handler) → `map-ui-next` (proxy route under `src/app/api/`).
+- *Anything billed*: `map-application` (`run_metering`, credits, spend limits) → `map-domain` (credits, spend ceilings) → `map-api` (`run_observability`).
+
+**Directories with no map — generated or runtime, never edit:** `cache/`, `history/`, `uploads/`, `logs/`, `graphify-out/`, `.reports/`, `.benchmarks/`, `.hypothesis/`, `.ruff_cache/`, `.import_linter_cache/`, `.worktrees/`, `node_modules/`, `ui-next/.next/`, `sdk/typescript/dist/`.
+
+### 3.2 Tree
+
 ```
 src/reasoner/
 ├── api/                    # FastAPI HTTP/SSE (~30 endpoints)
@@ -262,6 +296,7 @@ Cross-lab diversity prevents echo chambers:
 |-----|---------------|
 | `ARCHITECTURE_MINDMAP.md` | `post-commit` hook patches date + counts (models, presets, files) automatically via `scripts/update_mindmap_meta.py` |
 | `graphify-out/` | `post-commit` and `post-checkout` hooks rebuild the knowledge graph automatically |
+| `.claude/skills/map-*/SKILL.md` | `scripts/check_skill_maps.py` (pre-commit warning + `PostToolUse` hook on Write) reports which map a new or deleted file made stale; run `/update-maps` to rewrite the affected map, then `--update` to re-baseline |
 | `AGENTS.md` | Manual — update when adding methods, presets, or major architectural changes |
 
 *For complete architectural analysis see `ARCHITECTURE_MINDMAP.md`. For dependency graph see `graphify-out/GRAPH_REPORT.md`.*

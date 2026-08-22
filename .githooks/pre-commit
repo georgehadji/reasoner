@@ -15,4 +15,8 @@ if [ $RESULT -ne 0 ]; then
     echo "Remove them before committing, or use --no-verify to bypass."
     exit 1
 fi
+
+# Warn (never block) when a folder map in .claude/skills/ no longer matches the tree.
+python scripts/check_skill_maps.py || true
+
 exit 0
