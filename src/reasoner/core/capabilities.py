@@ -54,7 +54,7 @@ CAPABILITY_POLICY: dict[Capability, CapabilityPolicy] = {
         # the per-user credit ledger.
         credit_reason=CreditReason.PIPELINE_RUN,
         rate_limited=True,
-        routes=("/api/run", "/api/agent/run", "/api/agent/run/sync"),
+        routes=("/api/run", "/api/run-followup", "/api/agent/run", "/api/agent/run/sync"),
     ),
     Capability.IMAGE_GENERATE: CapabilityPolicy(
         requires_auth=False,

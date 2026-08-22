@@ -7,6 +7,7 @@ import logging
 import os
 import time
 import uuid
+from collections import OrderedDict
 from typing import TYPE_CHECKING, Any, AsyncIterator
 
 if TYPE_CHECKING:
@@ -210,7 +211,15 @@ async def _call_with_tools_circuit(
                 provider.extra_body = {}
 
 
-_GLOBAL_RESOLVED_CACHE: dict[str, BaseLLMProvider] = {}
+# Process-wide de-duplication of equivalent provider instances (every request
+# builds a fresh ProviderRouter, so without this each run mints a new
+# AsyncOpenAI wrapper per role).  Bounded and LRU-ordered: the key space grows
+# with distinct (class, model, base_url, credential, extra_body) tuples, which
+# is unbounded in a multi-tenant deployment.  Eviction is safe — the entry is
+# only a shortcut, and every router holds its own reference to the providers it
+# was built with.
+_RESOLVED_CACHE_MAX = 512
+_GLOBAL_RESOLVED_CACHE: "OrderedDict[str, BaseLLMProvider]" = OrderedDict()
 _PER_MODEL_SEMAPHORES: dict[str, asyncio.Semaphore] = {}
 _SEMAPHORE_CONFIG: dict[str, int] | None = None
 
@@ -299,28 +308,82 @@ class ProviderRouter:
         self.preset_id = preset_id
         self.method = method
 
+    @staticmethod
+    def _dedupe(provider: BaseLLMProvider) -> BaseLLMProvider:
+        """Collapse behaviourally identical providers onto one shared instance.
+
+        Every request builds a fresh router, so ``routing_table`` holds new
+        instances each time; without this, a long-lived process accumulates a
+        distinct AsyncOpenAI wrapper per role per run.  The identity comes from
+        the provider itself (:meth:`BaseLLMProvider.routing_identity`) so
+        connection settings that are invisible from out here — base URL,
+        credentials — still separate two providers that merely share a model.
+
+        Everything that resolves a provider must go through this, including
+        ``self.primary``: a router's own ``primary`` object is not the instance
+        this returns once another router has warmed the entry, so an ``is``
+        comparison against the raw attribute silently stops matching.
+
+        Providers are duck-typed here -- the router only ever needs ``.model``
+        and the call methods, and objects that never subclass
+        ``BaseLLMProvider`` (test doubles, out-of-tree adapters) are legitimate.
+        One that declares no identity is returned untouched rather than being
+        forced into the cache: de-duplication is an optimisation, so failing to
+        apply it must never be fatal, and an object that cannot state what makes
+        it interchangeable is exactly one that must not be shared process-wide.
+        """
+        identify = getattr(provider, "routing_identity", None)
+        if not callable(identify):
+            return provider
+        key = identify()
+        cached = _GLOBAL_RESOLVED_CACHE.get(key)
+        if cached is not None:
+            _GLOBAL_RESOLVED_CACHE.move_to_end(key)
+            return cached
+        _GLOBAL_RESOLVED_CACHE[key] = provider
+        while len(_GLOBAL_RESOLVED_CACHE) > _RESOLVED_CACHE_MAX:
+            _GLOBAL_RESOLVED_CACHE.popitem(last=False)
+        return provider
+
     def resolve(self, role: str) -> BaseLLMProvider:
         """Return the provider for a role, with global process-level caching."""
-        # Use provider string keys for global cache to avoid collisions between identical roles but different preset configurations
         provider = self.routing_table.get(role)
         if provider is None:
             provider = self.primary
-        
-        # We don't want to re-instantiate identical providers, but we don't have
-        # a unique preset string here. We can just use the memory id of the config or model.
-        # Actually, the routing_table already holds instances.
-        # But if ProviderRouter is created multiple times per request,
-        # self.routing_table contains NEW instances.
-        # So we can cache by the provider's model and type.
-        cache_key = f"{type(provider).__name__}::{provider.model}"
-        
-        if cache_key not in _GLOBAL_RESOLVED_CACHE:
-            _GLOBAL_RESOLVED_CACHE[cache_key] = provider
-            
-        return _GLOBAL_RESOLVED_CACHE[cache_key]
+        return self._dedupe(provider)
+
+    def resolve_primary(self) -> BaseLLMProvider:
+        """Return the primary provider as :meth:`resolve` would hand it back.
+
+        Use this — never the raw ``self.primary`` attribute — whenever the
+        result is compared by identity against something ``resolve()``
+        produced.
+        """
+        return self._dedupe(self.primary)
 
     def get(self, role: str) -> BaseLLMProvider:
         return self.resolve(role)
+
+    def _resolve_fallback(self, role: str, assigned: BaseLLMProvider) -> BaseLLMProvider | None:
+        """Pick the fallback provider for *role*: explicit > primary > none.
+
+        Any candidate resolving to the same model as the failing provider is
+        dropped — re-issuing an identical request against an endpoint that just
+        timed out only burns the remaining budget.
+        """
+        primary = self.resolve_primary()
+        explicit = self.fallback_table.get(role)
+        if explicit is None and assigned is primary:
+            explicit = self.fallback_table.get("primary")
+        if explicit is not None:
+            explicit = self._dedupe(explicit)
+
+        candidates: list[BaseLLMProvider] = []
+        if explicit is not None and explicit is not assigned:
+            candidates.append(explicit)
+        if primary is not assigned and primary not in candidates:
+            candidates.append(primary)
+        return next((p for p in candidates if p.model != assigned.model), None)
 
     def _timeout_for_role(self, role: str, override: float | None) -> float:
         if override is not None:
@@ -478,23 +541,7 @@ class ProviderRouter:
         """
         assigned = self.get(role)
         effective_timeout = self._timeout_for_role(role, timeout_seconds)
-
-        # Resolve fallback: explicit > primary > none.
-        # Skip any fallback that resolves to the same model as the failing provider —
-        # retrying an identical endpoint after a timeout is guaranteed to waste time.
-        explicit = self.fallback_table.get(role)
-        if explicit is None and assigned is self.primary:
-            explicit = self.fallback_table.get("primary")
-
-        candidates: list[BaseLLMProvider] = []
-        if explicit and explicit is not assigned:
-            candidates.append(explicit)
-        if self.primary is not assigned and self.primary not in candidates:
-            candidates.append(self.primary)
-        # Filter out same-model duplicates so we never retry a timed-out endpoint
-        fallback: BaseLLMProvider | None = next(
-            (p for p in candidates if p.model != assigned.model), None
-        )
+        fallback: BaseLLMProvider | None = self._resolve_fallback(role, assigned)
 
         async def _execute_call(provider: BaseLLMProvider, is_fallback: bool = False):
             actual_provider = provider
@@ -576,59 +623,92 @@ class ProviderRouter:
                     metadata={"model": provider.model},
                 )
                 return
+            # Whether the consumer has already received content from THIS
+            # provider. Once it has, switching to a fallback would replay that
+            # provider's full answer on top of the partial one, so the stream
+            # can only be closed out with a degraded frame.
+            delivered = False
+            timed_out = False
+            failure: Exception | None = None
             try:
                 semaphore = _get_llm_semaphore(provider.model)
                 async with semaphore:
                     async for chunk in provider.stream_complete_with_retry(
                         system_prompt, user_prompt, max_tokens, temperature
                     ):
+                        delivered = True
                         yield chunk
                 await circuit.record_success()
             except asyncio.CancelledError:
                 raise
-            except asyncio.TimeoutError:
-                await circuit.record_failure()
-                if is_fallback:
-                    yield DegradedLLMResponse(
-                        text="",
-                        error=f"{provider.model} timed out",
-                        metadata={"model": provider.model},
+            except asyncio.TimeoutError as exc:
+                timed_out = True
+                failure = exc
+            except Exception as exc:
+                # Deliberately broad. A provider is only *contractually* bound
+                # to raise LLMError once its retry budget is exhausted;
+                # stream_complete_with_retry re-raises the raw transport error
+                # (httpx.ReadError, ConnectionError, ...) whenever it declines
+                # to retry — after a partial yield, or for a non-retryable
+                # failure. Catching LLMError alone let those escape the router
+                # entirely: no circuit.record_failure(), so a flapping provider
+                # never tripped the breaker; no fallback; and the consumer got
+                # a raw exception instead of a DegradedLLMResponse frame.
+                failure = exc
+                if not isinstance(exc, LLMError):
+                    logger.error(
+                        "Role '%s' provider '%s' raised %s mid-stream",
+                        role, provider.model, type(exc).__name__, exc_info=True,
                     )
-                    return
-                if fallback:
-                    async for chunk in _execute_stream(fallback, is_fallback=True):
-                        yield chunk
-                else:
-                    yield DegradedLLMResponse(
-                        text="",
-                        error=f"{assigned.model} timed out — no fallback",
-                        metadata={"model": assigned.model},
-                    )
-            except LLMError as exc:
-                await circuit.record_failure()
-                if is_fallback:
+
+            if failure is None:
+                return
+
+            await circuit.record_failure()
+
+            if timed_out:
+                reason = f"{provider.model} timed out"
+                no_fallback_reason = f"{assigned.model} timed out — no fallback"
+            else:
+                reason = str(failure) or type(failure).__name__
+                no_fallback_reason = reason
+
+            if delivered:
+                # Partial content is already in the consumer's hands.
+                yield DegradedLLMResponse(
+                    text="",
+                    error=f"{reason} — stream truncated after partial output",
+                    metadata={"model": provider.model, "partial": True},
+                )
+                return
+
+            if is_fallback:
+                # Timeouts skip the direct-provider chain here, as before: the
+                # role has already spent two full timeout windows.
+                if not timed_out:
                     direct = await _try_direct_fallback(
-                        role, system_prompt, user_prompt, original_error=exc,
+                        role, system_prompt, user_prompt, original_error=failure,
                         max_tokens=max_tokens, temperature=temperature, extra_body=extra_body,
                     )
                     if direct:
                         yield direct
                         return
-                    yield DegradedLLMResponse(
-                        text="",
-                        error=str(exc),
-                        metadata={"model": provider.model},
-                    )
-                    return
-                if fallback:
-                    async for chunk in _execute_stream(fallback, is_fallback=True):
-                        yield chunk
-                else:
-                    yield DegradedLLMResponse(
-                        text="",
-                        error=str(exc),
-                        metadata={"model": assigned.model},
-                    )
+                yield DegradedLLMResponse(
+                    text="",
+                    error=reason,
+                    metadata={"model": provider.model},
+                )
+                return
+
+            if fallback:
+                async for chunk in _execute_stream(fallback, is_fallback=True):
+                    yield chunk
+            else:
+                yield DegradedLLMResponse(
+                    text="",
+                    error=no_fallback_reason,
+                    metadata={"model": assigned.model},
+                )
 
         if stream:
             return _execute_stream(assigned)
@@ -662,20 +742,7 @@ class ProviderRouter:
         """Call a provider with tools using circuit-breaker protection and fallback logic."""
         assigned = self.get(role)
         effective_timeout = self._timeout_for_role(role, timeout_seconds)
-
-        # Fallback resolution logic: explicit > primary > none.
-        explicit = self.fallback_table.get(role)
-        if explicit is None and assigned is self.primary:
-            explicit = self.fallback_table.get("primary")
-
-        candidates: list[BaseLLMProvider] = []
-        if explicit and explicit is not assigned:
-            candidates.append(explicit)
-        if self.primary is not assigned and self.primary not in candidates:
-            candidates.append(self.primary)
-        fallback: BaseLLMProvider | None = next(
-            (p for p in candidates if p.model != assigned.model), None
-        )
+        fallback: BaseLLMProvider | None = self._resolve_fallback(role, assigned)
 
         async def _execute_tool_call(provider: BaseLLMProvider, is_fallback: bool = False):
             try:

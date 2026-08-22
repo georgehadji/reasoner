@@ -44,6 +44,17 @@ const EXPIRY_OPTIONS = [
   { value: '365', label: '1 year' },
 ];
 
+/** Pure network call, no React state — shared by `load` and the mount effect below. */
+async function fetchApiKeysData(): Promise<{ keys: ApiKeyRecord[]; limits: KeyLimits | null }> {
+  const res = await apiFetch(API.API_KEYS);
+  if (!res.ok) throw new Error(`Could not load keys (HTTP ${res.status})`);
+  const data = await res.json();
+  return {
+    keys: Array.isArray(data?.keys) ? data.keys : [],
+    limits: data?.limits ?? null,
+  };
+}
+
 function formatDate(value: string | null): string {
   if (!value) return '—';
   return new Date(value).toLocaleDateString(undefined, {
@@ -71,17 +82,16 @@ export default function ApiKeysPage() {
   const [newKey, setNewKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
+  // Exposed for manual re-fetching (e.g. after creating/revoking a key).
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const res = await apiFetch(API.API_KEYS);
-      if (!res.ok) throw new Error(`Could not load keys (HTTP ${res.status})`);
-      const data = await res.json();
-      setKeys(Array.isArray(data?.keys) ? data.keys : []);
-      setLimits(data?.limits ?? null);
-      if (scopes.length === 0 && Array.isArray(data?.limits?.default_scopes)) {
-        setScopes(data.limits.default_scopes);
+      const { keys, limits } = await fetchApiKeysData();
+      setKeys(keys);
+      setLimits(limits);
+      if (scopes.length === 0 && Array.isArray(limits?.default_scopes)) {
+        setScopes(limits.default_scopes);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load keys');
@@ -93,15 +103,40 @@ export default function ApiKeysPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Mount fetch is intentionally self-contained rather than calling `load`:
+  // an Effect must not synchronously trigger a setState chain, which is what
+  // calling the (also setState-ing) `load` from here would do. See
+  // https://react.dev/learn/you-might-not-need-an-effect#fetching-data.
   useEffect(() => {
     if (!user) {
       router.push('/login');
       return;
     }
-    load().catch(() => {
-      // load records its own failure.
-    });
-  }, [user, router, load]);
+    let ignore = false;
+    async function loadOnMount() {
+      setLoading(true);
+      setError('');
+      try {
+        const { keys, limits } = await fetchApiKeysData();
+        if (ignore) return;
+        setKeys(keys);
+        setLimits(limits);
+        if (scopes.length === 0 && Array.isArray(limits?.default_scopes)) {
+          setScopes(limits.default_scopes);
+        }
+      } catch (err) {
+        if (!ignore) setError(err instanceof Error ? err.message : 'Could not load keys');
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    }
+    loadOnMount();
+    return () => {
+      ignore = true;
+    };
+    // Same rationale as `load` above for omitting `scopes`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, router]);
 
   if (!user) return null;
 

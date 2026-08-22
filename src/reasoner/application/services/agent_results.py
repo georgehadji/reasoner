@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import types
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 
@@ -161,12 +161,14 @@ class RunSummary:
     synthesis: str = ""
     critical_insights: tuple[str, ...] = ()
     open_questions: tuple[str, ...] = ()
-    claim_labels: Mapping[str, str] = types.MappingProxyType({})
+    claim_labels: Mapping[str, str] = field(default_factory=lambda: types.MappingProxyType({}))
     action_blueprint: tuple[Mapping[str, Any], ...] = ()
     citations: tuple[Mapping[str, Any], ...] = ()
     models_used: tuple[str, ...] = ()
-    total_tokens: Mapping[str, int] = types.MappingProxyType(
-        {"input": 0, "output": 0, "total": 0}
+    total_tokens: Mapping[str, int] = field(
+        default_factory=lambda: types.MappingProxyType(
+            {"input": 0, "output": 0, "total": 0}
+        )
     )
     total_cost_usd: float = 0.0
     duration_seconds: float = 0.0

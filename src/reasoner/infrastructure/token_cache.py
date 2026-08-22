@@ -353,13 +353,19 @@ class TokenAwareCache:
         return asyncio.create_task(_loop(), name="token_cache_cleanup")
 
     async def clear(self) -> None:
-        """Clear all cache entries."""
+        """Clear all cache entries and the statistics describing them."""
         async with self._lock:
             self._entries.clear()
             self._problem_index.clear()
             self._current_tokens = 0
-            self._stats.total_size_bytes = 0
-            
+            # Every counter, not just total_size_bytes. hits/misses/evictions/
+            # total_tokens_saved all describe the population just dropped, so
+            # leaving them makes get_stats() report a hit_rate and a savings
+            # figure for a cache that no longer exists -- and, because
+            # tests/conftest.py resets this singleton around every test, lets
+            # one test's tallies show up in another's assertions.
+            self._stats = CacheStats()
+
             # Clear disk cache
             if self.cache_dir:
                 for f in self.cache_dir.glob("*.json"):
@@ -436,24 +442,82 @@ _cache: Optional[TokenAwareCache] = None
 
 
 def get_token_cache(
-    max_tokens: int = 1_000_000,
-    ttl_seconds: int = 3600,
+    max_tokens: Optional[int] = None,
+    ttl_seconds: Optional[int] = None,
     cache_dir: Optional[str] = None,
 ) -> TokenAwareCache:
-    """Get or create global token-aware cache."""
+    """Get or create the global token-aware cache.
+
+    Arguments configure the singleton only on the call that creates it; any
+    later call returns the existing instance untouched, whatever it asks for.
+    That is unavoidable for a process-wide singleton, but it used to be
+    silent: application/pipeline.py builds it at import time with
+    cache_dir="cache/tokens" while api/__init__.py's lifespan asks for one
+    with no arguments, so whichever ran first decided whether disk
+    persistence was on for the process and the loser got no indication. A
+    conflicting request is now logged. Callers that need their own
+    configuration should construct TokenAwareCache() directly instead of
+    reaching for the singleton.
+
+    None means "no opinion, use the instance defaults" for every argument.
+    """
     global _cache
     if _cache is None:
-        _cache = TokenAwareCache(
-            max_tokens=max_tokens,
-            ttl_seconds=ttl_seconds,
-            cache_dir=Path(cache_dir) if cache_dir else None,
+        overrides: dict[str, Any] = {}
+        if max_tokens is not None:
+            overrides["max_tokens"] = max_tokens
+        if ttl_seconds is not None:
+            overrides["ttl_seconds"] = ttl_seconds
+        if cache_dir is not None:
+            overrides["cache_dir"] = Path(cache_dir)
+        _cache = TokenAwareCache(**overrides)
+        return _cache
+
+    conflicts = []
+    if max_tokens is not None and max_tokens != _cache.max_tokens:
+        conflicts.append(f"max_tokens={max_tokens} (live: {_cache.max_tokens})")
+    if ttl_seconds is not None and ttl_seconds != _cache.ttl_seconds:
+        conflicts.append(f"ttl_seconds={ttl_seconds} (live: {_cache.ttl_seconds})")
+    if cache_dir is not None and Path(cache_dir) != _cache.cache_dir:
+        conflicts.append(f"cache_dir={Path(cache_dir)} (live: {_cache.cache_dir})")
+    if conflicts:
+        logger.warning(
+            "get_token_cache() ignored the requested configuration -- the "
+            "process-wide cache was already built by an earlier caller: %s. "
+            "Construct TokenAwareCache() directly for an independently "
+            "configured cache.",
+            "; ".join(conflicts),
         )
     return _cache
 
 
 async def reset_token_cache() -> None:
-    """Resets the global token cache for testing purposes."""
-    global _cache
-    if _cache:
+    """Resets the global token cache for testing purposes.
+
+    Clears the existing instance in place rather than dropping the module
+    singleton (`_cache = None`). Callers that captured a reference to the
+    cache before this runs — e.g. `application/pipeline.py`'s module-level
+    `token_cache = get_token_cache(...)`, bound once at import time — keep
+    using that same object for the life of the process. Nulling `_cache`
+    here only resets *this module's* pointer: the first reset after import
+    empties it as intended, but every reset after that sees `_cache is
+    None` and no-ops, while `pipeline.py` (and anything else holding an
+    earlier reference) goes on serving stale cache hits for the rest of the
+    test session. Clearing in place keeps every held reference — this
+    module's and any captured earlier — pointing at the same emptied cache.
+
+    It also detaches the singleton from disk first. The instance
+    application/pipeline.py builds at import points at the real
+    `cache/tokens/` directory in the working tree; clear() globs and unlinks
+    every *.json in whatever directory it is given, and tests/conftest.py's
+    autouse fixture runs this before *and* after every test. Running the
+    suite therefore deleted a developer's genuine cached responses, ~2x per
+    test, purely as a side effect. Dropping cache_dir takes the test process
+    out of that directory entirely — nothing is read from it, nothing is
+    written to it, nothing is deleted from it — which is also stronger
+    isolation than the wipe was: no entry a test writes can survive on disk
+    to be reloaded by _ensure_loaded() in a later session.
+    """
+    if _cache is not None:
+        _cache.cache_dir = None
         await _cache.clear()
-    _cache = None

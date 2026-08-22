@@ -26,9 +26,10 @@ class TestBug004TruncatedJsonQuote:
         result = _repair_truncated_json(text)
         assert result is not None, "Should produce a repaired string"
         # The result MUST contain a closing double-quote
-        assert result.count('"') == 2, (
+        quote_count = result.count('"')
+        assert quote_count == 2, (
             f"Expected 2 double-quotes (open + close), "
-            f"got {result.count('"')} in {result!r}"
+            f"got {quote_count} in {result!r}"
         )
 
     def test_object_with_truncated_string_value(self):
@@ -61,8 +62,9 @@ class TestBug004TruncatedJsonQuote:
         result = _repair_truncated_json(text)
         assert result is not None
         # All braces and the string must close
-        assert result.count('"') % 2 == 0, (
-            f"Unmatched quotes: {result.count('"')} quotes in {result!r}"
+        quote_count = result.count('"')
+        assert quote_count % 2 == 0, (
+            f"Unmatched quotes: {quote_count} quotes in {result!r}"
         )
         # Validity check: braces should be balanced
         opening_braces = result.count("{")

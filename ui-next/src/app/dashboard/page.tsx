@@ -70,7 +70,9 @@ function DashboardContent() {
 
   useEffect(() => {
     const controller = new AbortController();
-    setHistoryLoading(true);
+    // `historyLoading` already starts `true` (see useState above) and this
+    // effect only ever runs once (empty deps), so setting it again here was
+    // a redundant synchronous setState — dropped rather than deferred.
     apiFetch('/api/history')
       .then((r) => {
         if (controller.signal.aborted) return null;

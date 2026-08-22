@@ -13,7 +13,11 @@ from reasoner.api.dependencies import check_rate_limit, get_current_user
 from reasoner.domain.saas import User
 from reasoner.auth import Scope
 from reasoner.core.constants import TIMEOUTS, VALIDATION_TEST_MAX_TOKENS
-from reasoner.infrastructure.llm.registry import _REGISTRY, build_provider
+from reasoner.infrastructure.llm.registry import (
+    _REGISTRY,
+    build_provider,
+    direct_key_envs,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -47,6 +51,24 @@ async def get_api_keys_status(
             }
 
         env_status[env_var]["models"].append(model_id)
+
+    # Vendor-direct keys (DEEPSEEK_API_KEY, XAI_API_KEY) are deliberately not an
+    # entry's "env" -- that field gates routing, and declaring them there would
+    # make filter_routing() downgrade every DeepSeek/xAI role whenever only
+    # OPENROUTER_API_KEY is set. They are still live credentials that
+    # build_provider() prefers when present, so a status view enumerating "env"
+    # alone silently omitted them.
+    for env_var, models in direct_key_envs().items():
+        if env_var in env_status:
+            continue
+        key_value = os.environ.get(env_var, "")
+        env_status[env_var] = {
+            "is_set": bool(key_value),
+            "key_length": len(key_value) if key_value else 0,
+            "models": list(models),
+            "is_local": False,
+            "optional": True,
+        }
 
     total_providers = len(env_status)
     configured = sum(1 for s in env_status.values() if s["is_set"])
@@ -127,6 +149,41 @@ async def validate_api_keys(
                 "status": "error",
                 "error_type": error_type,
                 "reason": error_msg,
+            }
+
+    # Vendor-direct keys, which carry no entry "env" (see direct_key_envs).
+    # build_provider() silently prefers them over the OpenRouter lane, so a
+    # stale or revoked one 401s every call for that vendor while a preflight
+    # that only walked "env" reported all-green. Unset is not a failure here --
+    # these are an optional upgrade, not a requirement.
+    for env_var, models in direct_key_envs().items():
+        if env_var in tested_envs or not models:
+            continue
+        tested_envs.add(env_var)
+        if not os.environ.get(env_var, ""):
+            continue
+        model_id = models[0]
+        try:
+            provider = build_provider(model_id)
+            await asyncio.wait_for(
+                provider.complete(
+                    system_prompt="Reply with: ok",
+                    user_prompt="test",
+                    max_tokens=VALIDATION_TEST_MAX_TOKENS,
+                ),
+                timeout=TIMEOUTS.MODEL_VALIDATION,
+            )
+            results[env_var] = {"status": "valid", "model_tested": model_id}
+        except asyncio.TimeoutError:
+            results[env_var] = {
+                "status": "timeout",
+                "reason": "Provider did not respond within 10 seconds",
+            }
+        except Exception as e:
+            results[env_var] = {
+                "status": "error",
+                "error_type": type(e).__name__,
+                "reason": str(e)[:200],
             }
 
     valid_count = sum(1 for r in results.values() if r["status"] == "valid")

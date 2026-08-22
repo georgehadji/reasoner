@@ -157,35 +157,37 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     #          said $1.168/$2.336 — this model's list price has moved repeatedly, so
     #          re-check the snapshot before costing the 23 preset slots that use it.
     #   Flash: 284B total / 13B active — $0.0615/$0.1229 per M — PRIMARY budget choice
+    # No "cls"/"base"/"env" override on any of these four: leaving them plain
+    # ("model" [+ "extra_body"] only) lets the _MODEL_WHITELIST -> _REGISTRY
+    # build below setdefault them to cls="openrouter" / env="OPENROUTER_API_KEY",
+    # exactly like every other non-local entry -- OpenRouter is "the fallback
+    # lane when DEEPSEEK_API_KEY is unset" per the price comment above, and
+    # build_provider()'s "DeepSeek direct routing" branch already hardcodes its
+    # own https://api.deepseek.com/v1 base_url and its own DEEPSEEK_API_KEY
+    # lookup, so it needs neither field from here. A prior "cls": "compat" +
+    # explicit "base"/"env": "DEEPSEEK_API_KEY" on these entries pinned every
+    # one of them to direct-DeepSeek-only, so build_provider() raised whenever
+    # only OPENROUTER_API_KEY was configured (the common case in CI/dev) —
+    # e.g. PresetService.filter_routing() had to downgrade these roles to
+    # primary_id to route around it. Restoring the plain shape restores the
+    # documented fallback instead of routing around its absence.
     "deepseek-v4-pro": {
-        "cls": "compat",
         "model": "deepseek/deepseek-v4-pro",
-        "base": "https://api.deepseek.com/v1",
-        "env": "DEEPSEEK_API_KEY",
         "extra_body": {"reasoning": {"effort": "high"}},
     },
     "deepseek-v4-flash": {
-        "cls": "compat",
         # The 0731 dated pin was retired upstream: api.deepseek.com now accepts
         # only deepseek-v4-pro / deepseek-v4-flash and 400s on any dated suffix.
         "model": "deepseek/deepseek-v4-flash",        # $0.0615/$0.1229, 1M ctx
-        "base": "https://api.deepseek.com/v1",
-        "env": "DEEPSEEK_API_KEY",
         "extra_body": {"reasoning": {"effort": "high"}},
     },
     "deepseek-v4-flash-0424": {
-        "cls": "compat",
         "model": "deepseek/deepseek-v4-flash",        # legacy pin, kept for reproducibility — $0.14/$0.28, 1M ctx
-        "base": "https://api.deepseek.com/v1",
-        "env": "DEEPSEEK_API_KEY",
         "extra_body": {"reasoning": {"effort": "high"}},
     },
     # Re-pointed to v4-flash: v3.2 deprecated, DeepSeek API no longer accepts it.
     "deepseek-v3": {
-        "cls": "compat",
         "model": "deepseek/deepseek-v4-flash",        # was v3.2 ($0.12/$0.50) — re-pointed Jun 2026
-        "base": "https://api.deepseek.com/v1",
-        "env": "DEEPSEEK_API_KEY",
     },
     # ═══════════════════════════════════════════════════════════════
     # Qwen (Alibaba) — 3.5 -> 3.8 series
@@ -477,11 +479,11 @@ Available models:
   {available}"""
         )
     cfg = _REGISTRY[model_id]
-    
+
     # xAI direct routing logic
-    is_xai = model_id.startswith("grok-") or _vendor_of(model_id) == "x-ai"
+    is_xai = _prefers_direct_key(model_id) == "XAI_API_KEY"
     using_xai_direct = False
-    
+
     key = api_key
     if is_xai and not key:
         xai_key = os.environ.get("XAI_API_KEY", "")
@@ -490,7 +492,7 @@ Available models:
             using_xai_direct = True
 
     # DeepSeek direct routing logic (try DEEPSEEK_API_KEY first, fall back to OpenRouter)
-    is_deepseek = model_id.startswith("deepseek-") or _vendor_of(model_id) == "deepseek"
+    is_deepseek = _prefers_direct_key(model_id) == "DEEPSEEK_API_KEY"
     using_deepseek_direct = False
 
     if is_deepseek and not key and not using_xai_direct:
@@ -609,6 +611,47 @@ def bloc_of(model_id: str) -> str:
     One of ``"US"``, ``"CN"``, ``"EU"``, or ``"OTHER"`` (unknown/stealth vendors).
     """
     return _VENDOR_BLOC.get(_vendor_of(model_id), "OTHER")
+
+
+# Vendors whose own API this deployment will use in preference to OpenRouter
+# when the corresponding key happens to be set. These are NOT recorded as an
+# entry's "env": that field is the key a role is *gated* on, and
+# PresetService.filter_routing() downgrades any role whose "env" is unset — so
+# declaring DEEPSEEK_API_KEY there would rewrite every DeepSeek role away
+# whenever only OPENROUTER_API_KEY is configured, which is the common case and
+# was a real outage. The direct key is strictly an optional upgrade.
+_DIRECT_KEY_VENDORS: dict[str, str] = {
+    "x-ai": "XAI_API_KEY",
+    "deepseek": "DEEPSEEK_API_KEY",
+}
+
+
+def _prefers_direct_key(model_id: str) -> str | None:
+    """Env var of the vendor-direct key ``build_provider`` prefers, if any."""
+    if model_id.startswith("grok-"):
+        return "XAI_API_KEY"
+    if model_id.startswith("deepseek-"):
+        return "DEEPSEEK_API_KEY"
+    return _DIRECT_KEY_VENDORS.get(_vendor_of(model_id))
+
+
+def direct_key_envs() -> dict[str, list[str]]:
+    """Optional vendor-direct key env vars, mapped to the models that use them.
+
+    ``build_provider`` silently prefers these over the OpenRouter lane, so they
+    are live credentials that can be stale or revoked — but because they are
+    deliberately absent from every entry's ``env`` (see ``_DIRECT_KEY_VENDORS``),
+    anything enumerating providers by that field alone cannot see them. The key
+    status/validation endpoints use this so an operator's preflight actually
+    covers the keys their traffic will use, instead of reporting all-green while
+    every DeepSeek call 401s.
+    """
+    out: dict[str, list[str]] = {}
+    for model_id in _REGISTRY:
+        env = _prefers_direct_key(model_id)
+        if env:
+            out.setdefault(env, []).append(model_id)
+    return out
 
 
 def resolved_model_of(model_id: str) -> str:

@@ -485,7 +485,7 @@ class LLMExecutor:
 
             await self._accumulate_tokens(state, role, input_tokens, output_tokens, model)
 
-            if self._token_cache and self._caching_enabled:
+            if self._token_cache and self._caching_enabled and raw and raw.strip():
                 model_id = self.router.get(role).model if hasattr(self.router, "get") else "unknown"
                 cache_prompt = (
                     user_prompt

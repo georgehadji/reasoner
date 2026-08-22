@@ -27,6 +27,7 @@ import asyncio
 
 from reasoner.application.event_bus.bus import reset_event_bus
 from reasoner.core.ports.model_registry_port import set_model_registry_port
+from reasoner.core.rerank import reset_rerank_circuit
 from reasoner.infrastructure.llm.registry import RegistryAdapter
 from reasoner.infrastructure.observability.langfuse_subscriber import reset_langfuse
 from reasoner.token_cache import reset_token_cache
@@ -43,6 +44,14 @@ set_model_registry_port(RegistryAdapter())
 @pytest.fixture(autouse=True)
 async def auto_clean_state():
     """Fixture to reset all global state between tests."""
+    # core.rerank latches a module-level failure counter open after 3 failures.
+    # test_cohere_rerank.py drives enough failing calls to trip it, and the
+    # circuit then short-circuits rerank_documents() for every later test on the
+    # same xdist worker -- which looked like an unrelated broken fallback in
+    # test_auto_rollback.py. Sync and loop-independent, so it runs outside the
+    # loop branches below.
+    reset_rerank_circuit()
+
     # Ensure event loop is running for async resets
     if asyncio.get_event_loop().is_running():
         reset_event_bus()
