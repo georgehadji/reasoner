@@ -406,7 +406,11 @@ class ReasonerPipeline:
         )
 
         # ── Carry augmentation methods from preflight ──
-        if self.augmentation_methods:
+        # None = caller expressed no preference (tests, direct construction).
+        # []   = caller explicitly requested zero augmentation (budget tier)
+        #        and must survive the handoff — an empty list is a decision,
+        #        not an absence.
+        if self.augmentation_methods is not None:
             state.meta.augmentation_methods = self.augmentation_methods
 
         # ── Publish Pipeline Started Event ──

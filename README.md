@@ -389,7 +389,6 @@ AUGMENTATION_CACHE_ENABLED=true       # Cache results to prevent redundant LLM c
 AUGMENTATION_CACHE_TTL_SECONDS=86400  # Cache lifetime (default: 24 hours)
 AUGMENTATION_CACHE_MAX_ENTRIES=128    # Max cached augmentation results
 AUGMENTATION_LLM_CONFIRM=false        # Extra LLM confirmation step before augmenting
-AUGMENTATION_AB_TEST=false            # 50/50 split test: augmented vs baseline
 ```
 
 ---

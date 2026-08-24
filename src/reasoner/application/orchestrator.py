@@ -323,16 +323,6 @@ class PipelineOrchestrator:
             tier = get_preset_price_tier(decision.effective_preset_name)
             decision.augmentation_methods = get_tier_augmentation_methods(tier)
 
-        # ── A/B test: randomly assign baseline arm → disable augmentation ──
-        import hashlib as _hashlib
-
-        from reasoner.application.services.augmentation_metrics import (
-            should_disable_augmentation_for_ab,
-        )
-        ab_run_id = _hashlib.sha256(req.problem.encode()).hexdigest()[:16]
-        if should_disable_augmentation_for_ab(req.problem, ab_run_id):
-            decision.augmentation_methods = []
-
         return decision
 
     async def _recall_neuro_context(

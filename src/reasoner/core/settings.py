@@ -401,7 +401,6 @@ class Settings:
     AUGMENTATION_CACHE_ENABLED: bool = os.getenv("AUGMENTATION_CACHE_ENABLED", "true").lower() in ("1", "true", "yes")
     AUGMENTATION_CACHE_MAX_ENTRIES: int = int(os.getenv("AUGMENTATION_CACHE_MAX_ENTRIES", "128"))
     AUGMENTATION_CACHE_TTL_SECONDS: int = int(os.getenv("AUGMENTATION_CACHE_TTL_SECONDS", "86400"))
-    AUGMENTATION_AB_TEST: bool = os.getenv("AUGMENTATION_AB_TEST", "false").lower() in ("1", "true", "yes")
 
     # ── Language Pivot & Probe ──
     LANGUAGE_PIVOT_ENABLED: bool = os.getenv("LANGUAGE_PIVOT_ENABLED", "true").lower() in ("1", "true", "yes")

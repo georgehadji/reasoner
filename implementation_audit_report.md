@@ -1,125 +1,165 @@
-# Implementation Audit Report
+# Implementation Audit Report — Augmented Article Pipeline
 
-**Date:** 2026-07-18  
-**Scope:** (1) Augmented Article Pipeline, (2) Article Method Optimization Phase 0, (3) Article Method Optimization Phase 1, (4) Article Method Optimization Phase 2, and (5) Article Method Optimization Phase 3 (Commit `bb21c46`)  
-**Reviewer:** Gemini CLI (expert-grade automated auditor)  
-**Status:** APPROVED  
+**Plan:** [implementation_plan.md](implementation_plan.md) (dated 2026-07-05, status claimed: "✅ Implemented, reviewed, all fixes applied")
+**Code changes reviewed:** commit [`81adfd7`](https://github.com) — *"feat: augmented article pipeline + model cost optimization"* (2026-07-06)
+**Current HEAD:** `799d532` (156 commits ahead of the reviewed commit; verified the code paths below are unchanged since)
+**Auditor:** Claude Code, static + executable verification (no live LLM calls made)
+**Audit date:** 2026-08-24
 
 ---
 
 ## 1. Executive Summary
 
-This audit report evaluates the completion and architectural compliance of five consecutive high-priority milestones in the **Reasoner** article and writing pipeline ecosystem:
-1. **The Augmented Article Pipeline** (specified in `implementation_plan.md` in the root).
-2. **Article Method Optimization — Phase 0: Safety Net** (specified in `docs/plans/ARTICLE_METHOD_OPTIMIZATION_PLAN.md`).
-3. **Article Method Optimization — Phase 1: Immutable Boundary Layer** (specified in `docs/plans/ARTICLE_METHOD_OPTIMIZATION_PLAN.md`).
-4. **Article Method Optimization — Phase 2: Living Claim Ledger** (specified in `docs/plans/ARTICLE_METHOD_OPTIMIZATION_PLAN.md`).
-5. **Article Method Optimization — Phase 3: Quality Gates & Ledger Audit** (specified in `docs/plans/ARTICLE_METHOD_OPTIMIZATION_PLAN.md` and executed in the latest HEAD commit `bb21c46`).
+The feature is **functionally present and mostly matches the plan's plumbing** (T1–T17, T19 all verified in code). Tests exist, pass (62/62), and the architecture stays within the project's hexagonal layering.
 
-### 1.1 Scope of Audited Changes
-- **The Augmented Article Pipeline (Commit `81adfd7`):** Implements automated pre-processing loop (debate + critique).
-- **Article Optimization Phase 0 (Commit `0c39c39`):** Builds regression-testing safety net, golden set, and offline prompt tests.
-- **Article Optimization Phase 1 (Commit `4986cfd`):** Implements a robust "functional core, imperative shell" boundary layer with Strangler Fig adapters.
-- **Article Optimization Phase 2 (Commit `aa50ff7`):** Implements the living claim ledger and G1/G2/G3 fixes.
-  - Resolves G1 (stale ledger) via a pure `reconcile` function using normalized-text hash matching to carry forward/drop claims and detect text deltas across edits.
-  - Resolves G2 (overconfidence/factual altering) via span-lock enforcement during `style_copy_edit`—reverting edits that trample locked verified text, and modifying the edit prompt to remove the overconfidence instruction.
-  - Resolves G3 (taxonomy mismatch) by strictly enforcing the canonical 5-value taxonomy in `ARTICLE_VERIFY_SYSTEM`.
-- **Article Optimization Phase 3 (Commit `bb21c46`):** Implements Specification-based Quality Gates (G6) and integrates the reconciled ledger into the Audit phase (G5).
-  - Resolves G6 (stricter gates) by modeling `Threshold` and `GatePolicy` structures with weighted scoring, hard minimum limits, and 7 tailored per-class policies (e.g. strict rules for `policy_brief`).
-  - Resolves G5 (audit re-derives support) by formatting the living `claim_ledger` directly into `article_final_audit_prompt` and adding explicit instructions commanding the model to read (and not guess) factual scores.
+However, the audit found **one CRITICAL correctness bug** that silently defeats two of the feature's own headline design goals stated in the commit message: *"Budget users pay zero extra cost"* and the A/B test's baseline arm. An empty list (`[]`, meaning "explicitly zero augmentation methods") is treated as falsy in [pipeline.py:409](src/reasoner/application/pipeline.py:409), so it's discarded in favor of the 2-method default. This was reproduced with executable evidence (Section 6). No test exists that would have caught it — the test suite covers regex detection and A/B math in isolation, but never exercises the tier→pipeline→state wiring where the bug lives.
 
-### 1.2 Severity Summary
-| Severity | Count | Status | Notes |
-|----------|-------|--------|-------|
-| **P0 (blocking)** | 0 | ✅ None | No blocking defects found. Code is exceptionally clean and robust. |
-| **P1 (should-fix)**| 0 | ✅ None | No critical or high issues; all invariants and constraints are fully met. |
-| **P2 (improvement)**| 2 | 📝 Noted | Minor observations regarding warnings and distributed caching. |
+The audit also found that **the plan document itself is stale relative to the code it describes**: Appendix B lists per-tier config, env toggles, caching, and A/B testing as "Future Enhancements — not done," yet the very commit that produced this text also implemented all four. The plan was not updated to reflect delivered scope, undermining its value as a compliance record.
+
+**Verdict: APPROVED WITH CHANGES** — the core feature works and is architecturally sound, but the cost-gating bug must be fixed before this can be considered "premium users pay for augmentation, budget users don't" (a stated cost-control invariant), and the plan doc should be reconciled with actual scope.
 
 ---
 
 ## 2. Plan Compliance Matrix
 
-*(Note: Phase 0 and Augmented Pipeline matrices are preserved as 100% complete; only the new Phase 1, 2, and 3 deliverables are detailed below for brevity).*
-
-### 2.1 Article Method Optimization — Phases 1, 2, & 3 (`ARTICLE_METHOD_OPTIMIZATION_PLAN.md`)
-
-| Plan Item / Deliverable | Status | Evidence | Notes |
-|-------------------------|--------|----------|-------|
-| **Immutable Domain Model** | ✅ Complete | `src/reasoner/domain/article_domain.py` | Implements `Document`, `Claim`, `Verdict`, `Budget`, and `Context` as frozen dataclasses. |
-| **Typed Effects (`Result`)** | ✅ Complete | `article_domain.py` (`Ok`/`Err`) | Introduces structured return types at phase boundaries. |
-| **Phase Error Taxonomy** | ✅ Complete | `PhaseError` in `article_domain.py` | Explicitly lists `PARSE`, `TIMEOUT`, `LLM`, `BUDGET`, and `INTERNAL` categories. |
-| **Honest Metric Evaluation** | ✅ Complete | `claim_support_ratio` in `article_domain.py` | Correctly weighs partial claims at `0.5` and ignores opinion/speculative claims. |
-| **Strangler Fig Adapters** | ✅ Complete | `flows/article_adapters.py` | Creates 9 phase-specific adapters mapping Context ↔ PipelineState. |
-| **Bidirectional Conversions** | ✅ Complete | `flows/article_adapters.py` | `context_to_writing_state` and `writing_state_to_context` handle formatting. |
-| **Document Versioning** | ✅ Complete | `writing_state_to_context` | Increments Document version strictly on content change. |
-| **G1: Ledger Reconciliation** | ✅ Complete | `reconcile()` in `article_domain.py` | Carries forward claims, drops vanished claims, and detects deltas using fuzzy matching. |
-| **G2: Span-Lock Enforcement** | ✅ Complete | `adapter_fact_check` / `adapter_style_copy_edit` | Records locked spans and rejects style edits that alter verified factual content. |
-| **G2: Prompt Fix** | ✅ Complete | `ARTICLE_STYLE_EDIT_SYSTEM` | Removed "Replace hedging with confident language" instruction. |
-| **G3: Canonical Taxonomy** | ✅ Complete | `map_verdict` / Prompt updates | Ensures the 5-value `Verdict` enum is strictly mapped and requested from the LLM. |
-| **G5: Audit Reads Ledger** | ✅ Complete | `article_final_audit_prompt` in `phases/article.py` | Embeds the actual ledger and instructs the auditor model not to re-evaluate impressionistically. |
-| **G6: Quality Gates via Specification** | ✅ Complete | `Threshold` / `GatePolicy` in `article_domain.py` | Implements weighted evaluations and hard minimums across 7 content classes. |
-| **Phase 1, 2, & 3 Tests** | ✅ Complete | `tests/test_article_adapters.py` | Expanded with 23 new tests (totaling **54 tests**) for exact/fuzzy reconciliation, span-lock, GatePolicy and ledger audit. |
+| Plan Item | Status | Evidence | Notes |
+|---|---|---|---|
+| T1 Shared augmentation module | ✅ Complete | [augmentation.py](src/reasoner/application/flows/augmentation.py) exists, 301 lines | |
+| T2 Depth detection regex | ✅ Complete | `_DEEP_QUESTION_PATTERNS`, `is_deep_question()` — [augmentation.py:74-158](src/reasoner/application/flows/augmentation.py:74) | 9 patterns, Greek+English |
+| T3 Parallel augmentation execution | ✅ Complete | `asyncio.gather(*tasks)` — [augmentation.py:260](src/reasoner/application/flows/augmentation.py:260) | |
+| T4 Wire ArticleFlow | ✅ Complete | `await run_augmentation(...)` at top of `execute()` — [article.py](src/reasoner/application/flows/article.py) diff | |
+| T5 Wire WritingFlow | ✅ Complete | Same call in [writing.py](src/reasoner/application/flows/writing.py) diff | |
+| T6 Enrich article prompts (retrieval/outline/draft) | ✅ Complete | All 3 prompts inject `pre_research_summary` gated on non-empty — [phases/article.py](src/reasoner/phases/article.py) diff | |
+| T7 Enrich writing prompts (outline/draft) | ✅ Complete | Same pattern in [phases/writing.py](src/reasoner/phases/writing.py) diff | |
+| T8 `augmentation_methods` on `GateDecision` | ✅ Complete | [gate_agent.py](src/reasoner/hypergate/gate_agent.py) diff, field added | |
+| T9 Wire through HyperGate returns | ✅ Complete | All 4 `GateDecision` construction sites updated — [hyperagent.py](src/reasoner/hypergate/hyperagent.py) diff | Field is always `None` from HyperGate now (see §4) |
+| T10 `_DEEP_CONCEPT_PATTERNS` | ✅ Complete | [hyperagent.py](src/reasoner/hypergate/hyperagent.py) diff, 2 patterns (39 EN concepts in one regex, 17 GR) | Plan claims "39 English + 20 Greek" as *concept count*, not pattern count — consistent phrasing, verified by counting alternatives in the compiled regex |
+| T11 Factual fast-path exclusion fix | ✅ Complete | `and not is_deep_concept` guard — [hyperagent.py](src/reasoner/hypergate/hyperagent.py) diff | Covered by `test_deep_concepts_bypass_factual_fastpath` (5 cases, passing) |
+| T12 `augmentation_methods` on `PreflightDecision` | ✅ Complete | [orchestrator.py:44](src/reasoner/application/orchestrator.py:44) | |
+| T13 Propagate through orchestrator | ✅ Complete | [orchestrator.py:275-334](src/reasoner/application/orchestrator.py:275) | Also carries A/B override (out-of-plan, see §4) |
+| T14 `augmentation_methods` on `PipelineMeta` | ✅ Complete | [pipeline_state.py:147](src/reasoner/domain/pipeline_state.py:147) | Proper dataclass field, not a dict — `.get()` invariant doesn't apply here |
+| T15 Thread through `ReasonerPipeline` | ⚠️ **Partial — has a bug** | [pipeline.py:106,120,409](src/reasoner/application/pipeline.py:106) | Constructor param and instance attr wired correctly; the *transfer into state* at line 409 is broken for empty lists — see §6 |
+| T16 Thread through `PipelineService` | ✅ Complete | [pipeline_service.py](src/reasoner/application/services/pipeline_service.py) diff | |
+| T17 Thread through CLI (`main.py`) | ✅ Complete | [main.py:254](src/reasoner/main.py:254) `augmentation_methods=preflight.augmentation_methods` | |
+| T18 Revert preflight timeout | ❓ **Unverifiable (HYPOTHESIS)** | No timeout-related change appears anywhere in commit `81adfd7`'s diff | If a value was bumped and reverted to its original within the same uncommitted working session, the net diff is legitimately empty — can't be disproven from history. Flagged, not scored as a defect. |
+| T19 Delete `depth_detector.py` | ✅ Complete | File absent at HEAD; zero remaining references to `DepthDetector`/`depth_detector` anywhere in `src/` or `tests/` | Clean removal, no dead imports |
+| T20 Unit tests (plan says "16 cases") | ⚠️ **Partial / plan inaccurate** | [test_augmented_article.py](tests/test_augmented_article.py) has 10 test functions / **53** parametrized cases, not 16 — the plan's own §6 breakdown table sums to 53, contradicting its own §1 "16 unit test cases" headline | See §5 for coverage gap analysis |
+| Appendix B "Future": env toggle | ✅ **Already delivered, mislabeled as future** | `AUGMENTATION_ENABLED` etc. — [settings.py](src/reasoner/core/settings.py) diff | |
+| Appendix B "Future": per-tier config | ✅ **Already delivered, mislabeled as future, and buggy** | `get_tier_augmentation_methods()` — [augmentation.py:289-300](src/reasoner/application/flows/augmentation.py:289) | Delivered beyond plan's described "Budget → debate only; Premium → debate+jury" (actual: budget=0, premium=4 methods). See §6 for the bug. |
+| Appendix B "Future": caching | ✅ **Already delivered, mislabeled as future** | L1 LRU+TTL cache — [augmentation.py:22-67](src/reasoner/application/flows/augmentation.py:22) | Untested (no test file covers cache hit/expiry) |
+| Appendix B "Future": A/B metrics | ✅ **Already delivered, mislabeled as future** | [augmentation_metrics.py](src/reasoner/application/services/augmentation_metrics.py), tested in [test_augmentation_metrics.py](tests/test_augmentation_metrics.py) (9 cases, passing) | Baseline arm is silently defeated by the same bug as budget tier — see §6 |
+| Out-of-scope (bundled in same commit) | ℹ️ Present, not in plan | Model routing swaps: `grok-4.20`→`grok-4.3` alias, `gpt-5.5`→`glm-5.2` synthesis role across 19 presets — [preset_registry.py](src/reasoner/domain/preset_registry.py), [registry.py](src/reasoner/infrastructure/llm/registry.py), [constants_models.py](src/reasoner/core/constants_models.py), [harness_guard.py](src/reasoner/application/services/harness_guard.py) diffs | Unrelated to the augmented-article feature; correctly backward-compat aliased. Not a defect, but conflates two unrelated changes in one commit, complicating this very audit. |
 
 ---
 
 ## 3. Architecture Compliance Assessment
 
-### 3.1 Strangler Fig Pattern & Boundary Integrity ✅
-- **Adherence:** Pristine implementation of the Strangler Fig pattern. The pipeline is safely refactored via functional adapter boundaries while retaining the highly mature execution logic in `article_phases.py` and `synthesis_phase.py`.
-- **Functional Core & Imperative Shell:** Fulfills every major goal. Calculation of quality gates (`GatePolicy`), matching logic (`reconcile`), and score adjustments remain as side-effect-free, purely mathematical operations.
+- **Dependency direction:** `augmentation.py` (application layer) imports only `domain.pipeline_state` and, lazily, `core.settings` — no infrastructure imports. `augmentation_metrics.py` (application/services) is dependency-free except `core.settings`. Both respect the Dependency Rule in [CLAUDE.md §1](CLAUDE.md).
+- **`PipelineMeta.augmentation_methods`** is a genuine dataclass field (`list[str] | None`), not a `dict[str, Any]` catch-all — the project's "always `.get()`, never subscript" invariant applies to the dict-typed method-state fields, not to this. No violation.
+- **Design-injected callables:** `run_augmentation(state, call_llm, log)` takes `call_llm`/`log` as parameters instead of requiring a `WorkflowServices` object, exactly as planned in §3.1 — this is a deliberate decoupling so both `ArticleFlow` and `WritingFlow` can share it without a common base beyond `WorkflowStrategy`. Reasonable, matches plan.
+- **HyperGate opacity contract:** `_DEEP_CONCEPT_PATTERNS` and the new fast-path guard live entirely in regex/Python, never exposed to an LLM prompt — consistent with "real method names are never exposed to LLMs."
+- **No import-linter contract changes** were needed or made; nothing in this diff touches the one documented exception (`domain/preset_core.py`).
+- **Deviation from plan's own architecture note:** §3.5 of the plan describes `GateDecision.augmentation_methods` as a real signal path ("HyperGate Fast-Path Fix" implies HyperGate participates in the decision). In the actual code, the local variable `augmentation_methods` in `hyperagent.py` is declared once as `None` and never reassigned before any `GateDecision(...)` construction — it is **always `None`** in practice (confirmed by inspection of every call site in the diff). The comment left in the code — *"Depth detection moved to ArticleFlow (regex-based, no LLM overhead)"* — is accurate and explains why, but the plan's file manifest (§2, "hyperagent.py ← updated: +_DEEP_CONCEPT_PATTERNS, gate fix") undersells that this field is now vestigial plumbing on the HyperGate side; all real selection happens in `orchestrator.py` via tier lookup. Not a defect — just worth noting the field exists on `GateDecision` for a future use case that isn't wired yet (dead-but-harmless optionality, consistent with the plan's own backward-compat philosophy).
 
-### 3.2 Invariants and Domain Consistency ✅
-- **G5 - Information Flow Invariant:** The ledger is successfully established as a first-class value passed forward. The audit prompt builder directly utilizes the populated, reconciled ledger, preventing the LLM auditor from re-evaluating support from scratch and keeping analytical metrics perfectly in sync.
-- **G6 - Specification-Based Quality Gates:** Replaces uniform `0.6` gates with explicit, content-class-tailored policies. Low-stakes content (e.g. blog posts) receives a lighter bar while strict publishing venues (e.g. `policy_brief`) are bound by rigid requirements: `claim_support >= 0.80`, `citation_accuracy >= 0.85`, and `policy_compliance >= 0.90`.
+**Assessment: Compliant.** No layering violations found.
 
 ---
 
-## 4. Code Quality Review
+## 4. Code Quality Findings
 
-### 4.1 SOLID Principles ✅
-- **Specification Pattern (Single Responsibility & Open-Closed):** By abstracting gates into `Threshold` and `GatePolicy` dataclasses, policies can be customized, extended, or replaced without editing pipeline orchestrator code or changing domain entities.
-- **Dry & Kiss:** Avoids monad libraries or nested abstraction webs. Leverages standard Python dataclasses, set intersections, and simple mappings to maintain outstanding readability.
+| Severity | Area | Finding |
+|---|---|---|
+| Medium | `pipeline.py:409` | See §6 — falsy-empty-list bug. Root cause of the critical correctness issue. |
+| Low | `orchestrator.py:326-334` | A/B test wiring does `from ... import should_disable_augmentation_for_ab` and `import hashlib as _hashlib` **inside** the function body rather than at module top. This matches an existing local-import pattern already present in `augmentation.py` (avoiding a settings-import cycle at module load time), so it's consistent with the codebase's established style rather than a one-off smell — but the `_hashlib` alias specifically exists only to dodge a name collision with a module-level `hashlib` import that doesn't actually exist in `orchestrator.py`; the alias is unnecessary and could just be `import hashlib`. Cosmetic only. |
+| Low | `augmentation.py:190-192` | `confirm_depth()` swallows all exceptions and fails **open** (returns `True`, trusting the regex). This matches the plan's stated "graceful degradation" philosophy for augmentation *execution* failures, but here it fails open on the *gate* — worth a one-line comment confirming this is intentional (LLM-confirm being a quality filter, not a safety gate, so failing open is low-risk), since a silent broad `except Exception` next to a security-adjacent gate normally warrants scrutiny per this repo's own security checklist. Not flagged as a defect; flagged for documentation. |
+| Low | `augmentation.py` | Cache (`_aug_cache`) is a bare module-level `OrderedDict`, not protected by a lock. Safe under Python's single-threaded asyncio cooperative model (no `await` between the dict mutations in `_get_cached`/`_set_cache`), but will silently fail to share entries across separate worker processes if the app is ever deployed with multiple uvicorn workers — this is inherent to "L1 in-memory" caches and is explicitly labeled as such in the module's own docstring, so this is a known, accepted limitation rather than an oversight. |
+| Info | `preset_registry.py`, `registry.py`, `constants_models.py`, `harness_guard.py` | Model-routing changes bundled into this commit are clean, backward-compatible alias swaps (old model ID routes to the new model's API endpoint). Correct, but orthogonal to the plan under review — see the "out-of-scope" row in §2. |
+| Info | Prompt injection surface | All `pre_research_summary` injections into `article.py`/`writing.py` prompts go through `_wrap_external_content()` (delimiter-fencing), consistent with the existing pattern used for search-result injection elsewhere in the same files. No new sanitization gap introduced. |
 
-### 4.2 Error Handling & Resiliency ✅
-- **Degraded Fallback Propagation:** If any phase adapter encounters an unexpected failure, it wraps the crash inside `Err(PhaseError.INTERNAL, fallback=ctx)`. This ensures that even in degraded environments, the previous context acts as a robust recovery layer, completely honoring the "no cascading failures" mandate.
+No SOLID/DRY/KISS violations of note — `run_augmentation` is a single well-scoped function, the five augmentation prompts are declared as simple string constants keyed by method name (no premature strategy-pattern abstraction), and the module avoids introducing a class where a function sufficed.
 
 ---
 
 ## 5. Testing & Coverage Assessment
 
-### 5.1 Test Analysis
-All test suites run in parallel and pass completely:
-- **`test_article_adapters.py` (64 cases):** Thoroughly verifies Result types, Verdict mapping, cost tracking, serialization round-trips, exact/fuzzy ledger reconciliation, delta sentences, span-lock reverts, weighted gate policies, per-class policy constraints, and audit prompt ledger formatting.
-- **`test_augmented_article.py` (53 cases):** High-coverage suite for Greek/English deep patterns.
-- **`test_article_golden_set.py` (21 cases × 9 builders = 180 assertions):** Compiles and checks the structured article outlines and drafts offline.
-- **Total:** **449 passing tests** (and 22 expectedly skipped tests) run in **under 73 seconds**, maintaining top-tier CI/CD build performance.
+**Ran:** `pytest tests/test_augmented_article.py tests/test_augmentation_metrics.py -q` → **62 passed, 0 failed** (verified directly, this session).
+
+Covered:
+- Regex depth detection (37 parametrized deep/shallow cases, Greek + English)
+- HyperGate fast-path exclusion (10 cases)
+- Augmentation config completeness (prompts exist for every method, roles are valid strings)
+- A/B arm assignment determinism and metric payload shape (9 cases)
+
+**Not covered — and this is where the bug in §6 lives, undetected:**
+- `get_tier_augmentation_methods()` itself — no test asserts `get_tier_augmentation_methods("budget") == []`, `("premium")` returns the 4-method list, or the default-tier single-method list.
+- `ReasonerPipeline.run()`'s transfer of `self.augmentation_methods` into `state.meta.augmentation_methods` — no test constructs a pipeline with `augmentation_methods=[]` and asserts the state reflects "no augmentation," which is exactly the path that's broken.
+- `run_augmentation()` end-to-end (mocked `call_llm`) — no test verifies that a deep question with `state.meta.augmentation_methods = []` actually skips LLM calls, nor that the cache hit path (`_get_cached`) returns without calling `call_llm`.
+- `confirm_depth()` — no test for the LLM-confirm gate (success or failure path).
+- `should_disable_augmentation_for_ab()`'s actual effect on a run when `AUGMENTATION_AB_TEST=true` — tests only check the arm-assignment math and the off-by-default no-op case, never the on-and-assigned-baseline case feeding back into `decision.augmentation_methods`.
+
+**Regression:** No existing tests appear to have broken (I did not run the full suite due to time cost of ~150+ files at 120s+ per background run at the time of writing; the two directly-relevant files pass cleanly and the diff to shared files — `orchestrator.py`, `pipeline.py`, `hyperagent.py` — is additive except for the one-line factual fast-path condition, which has direct test coverage confirming both directions still work).
+
+**Manual verification step in plan (§6):** unexecuted by this audit — requires live API keys and was explicitly out of scope for a static/offline review. Flagged as HYPOTHESIS: plan claims "Expected log: `[AUGMENT] Running pre-processing: debate, iterative_critique`" — plausible given the code, not independently confirmed against a live run.
 
 ---
 
-## 6. Risk & Regression Analysis
+## 6. Risk & Regression Analysis — Primary Finding
 
-### 6.1 Performance and Latency Invariants ✅
-- Calculating `GatePolicy.evaluate()` consists of simple float multiplication and division over a small set of dimensions (typically 3 to 6). Execution overhead is strictly sub-millisecond, leaving no performance footprints.
+### CRITICAL: Budget-tier and A/B-baseline augmentation is not actually disabled
 
-### 6.2 Backward Compatibility ✅
-- Default fallback structures are defined in `get_gate_policy` if an unknown `content_class` is passed, preventing runtime exceptions. The JSON serialized states are fully backwards compatible.
+**Files:** [pipeline.py:409](src/reasoner/application/pipeline.py:409), [orchestrator.py:322-334](src/reasoner/application/orchestrator.py:322), [augmentation.py:236](src/reasoner/application/flows/augmentation.py:236)
+
+**Mechanism:**
+1. `orchestrator.py:324` computes `decision.augmentation_methods = get_tier_augmentation_methods("budget")` → `[]` (intentional: budget tier should get zero augmentation, per the code's own comment "Budget users pay zero extra cost").
+2. That `[]` is threaded through `PipelineService.create_pipeline(augmentation_methods=[])` → `ReasonerPipeline.__init__(augmentation_methods=[])` → `self.augmentation_methods = []`.
+3. In `ReasonerPipeline.run()`, line 409: `if self.augmentation_methods: state.meta.augmentation_methods = self.augmentation_methods`. Since `[]` is falsy in Python, this branch is skipped, and `state.meta.augmentation_methods` is left at its dataclass default, `None`.
+4. In `run_augmentation()`, line 236: `methods = state.meta.augmentation_methods or DEFAULT_AUGMENTATION_METHODS` → `None or ["debate", "iterative_critique"]` → the 2-method default is used.
+
+**Net effect:** a deep question routed to a **budget** preset still triggers 2 extra LLM calls (debate + iterative_critique) — the exact cost the tiering was built to avoid, per the commit's own stated goal ("Per-tier augmentation: budget=0, standard=1, premium=4 methods" / code comment "Fill in tier-specific defaults so Budget users pay zero extra cost").
+
+The identical bug **also defeats the A/B test's baseline arm**: `orchestrator.py:334` sets `decision.augmentation_methods = []` to force the baseline (unaugmented) condition for a fair comparison — but that `[]` is swallowed by the same falsy-check, so a run assigned to "baseline" for measurement purposes still runs augmentation. This silently invalidates any A/B comparison collected while `AUGMENTATION_AB_TEST=true`, since both arms end up augmented whenever the question is regex-flagged as deep.
+
+**Reproduced with executable evidence** (this session, not simulated in prose):
+
+```
+tier=budget -> []
+state.meta.augmentation_methods after pipeline.run() = None
+methods actually used for a BUDGET-tier deep question = ['debate', 'iterative_critique']
+```
+
+**Root cause, not symptom:** the bug is in the one shared choke point (`pipeline.py:409`) that both the budget-tier path and the A/B-baseline path route through — fixing it there fixes both call sites at once; patching only one caller would leave the other broken.
+
+**Fix:** see [augmentation_remediation_plan.md §3](augmentation_remediation_plan.md).
+
+> **Correction (2026-08-25):** this section originally recommended a single-line `is not None` change at `pipeline.py:409`. That recommendation was **incomplete**. Follow-up verification found the identical falsy bug a second time at [augmentation.py:236](src/reasoner/application/flows/augmentation.py:236) (`state.meta.augmentation_methods or DEFAULT_AUGMENTATION_METHODS` — `[] or X` is `X`), so fixing line 409 alone leaves the defect fully intact. Additionally, the `AUGMENTATION_LLM_CONFIRM` branch issues a billable LLM call *before* methods are resolved, so zero-cost budget runs also require reordering the guards. The complete fix is a small restructure of `run_augmentation()` plus the `pipeline.py` guard, specified in the remediation plan.
+
+**Severity escalation:** augmentation calls route through `services.call_llm` → `_call_llm_cached` → `self._executor.execute()` ([pipeline.py:376](src/reasoner/application/pipeline.py:376)) — the same `LLMExecutor` every billed phase uses. The budget-tier overrun is therefore **real metered spend**, not merely wasted latency.
+
+### Other risks
+
+| Severity | Description |
+|---|---|
+| Low | Plan-vs-code drift (§2, Appendix B rows) means anyone reading `implementation_plan.md` as a spec for "what this system currently does" will underestimate the delivered surface (env toggles, caching, A/B testing, jury/socratic methods) and might duplicate work or miss the extra `AUGMENTATION_*` settings when reasoning about cost/config. |
+| Low | No caching test coverage — a future refactor of `_get_cached`/`_set_cache` (e.g., changing the TTL check or eviction order) has no regression net. |
+| None found | No security issues: no new user-input trust boundary crossed without existing `sanitize_for_prompt()`/`_wrap_external_content()` conventions; no secrets; no SQL/path/command surfaces touched. |
+| None found | No backward-compatibility issues: every new field defaults to `None`/`False` per the plan's stated approach, verified in each diff. |
 
 ---
 
 ## 7. Required Corrections
 
-*No P0 or P1 corrections are required. The changes represent an exemplary, production-grade codebase migration.*
-
-### 7.1 Minor Observations (P2 Improvements)
 | Severity | File | Issue | Recommendation |
-|----------|------|-------|----------------|
-| **P2 (Improvement)** | `tests/test_article_adapters.py` | `RuntimeWarning: coroutine 'AsyncMockMixin._execute_mock_call' was never awaited` is triggered during logging calls. | Inside the mock setup in `test_article_adapters.py`, change `services.log = AsyncMock()` to a synchronous mock (or define as a synchronous lambda) if the log function is called synchronously in `article_phases.py` to eliminate warnings. |
-| **P2 (Improvement)** | `src/reasoner/application/flows/augmentation.py` | L1 Lru Cache is in-memory only. Multiple worker nodes might experience duplicate augmentation runs. | (Future optimization): Extract to standard Redis/Valkey cache adapter to leverage distributed state across workers. |
+|---|---|---|---|
+| **CRITICAL** | [pipeline.py:409](src/reasoner/application/pipeline.py:409) + [augmentation.py:236](src/reasoner/application/flows/augmentation.py:236) | `if self.augmentation_methods:` and `... or DEFAULT_AUGMENTATION_METHODS` each treat an explicit empty list as "no override," silently re-enabling the 2-method default for budget-tier and A/B-baseline runs. Billed via the standard `LLMExecutor`, so this is real metered spend. | Fix **both** sites and move method resolution ahead of the billable `AUGMENTATION_LLM_CONFIRM` call. Full specification in [augmentation_remediation_plan.md §3](augmentation_remediation_plan.md). |
+| **HIGH** | [augmentation_metrics.py](src/reasoner/application/services/augmentation_metrics.py) | `build_ab_metric()` is dead code (only its own tests call it) and its payload does not fit `TelemetryStoreProtocol.save_run()`'s fixed signature — the module docstring's emission claim is false. The A/B experiment assigns arms and measures **nothing**. | Delete the module (recommended — it is listed as an unbuilt "future enhancement" in the plan anyway), or wire emission via the event bus. See [remediation plan §2 and §4](augmentation_remediation_plan.md). |
+| Medium | [tests/test_augmented_article.py](tests/test_augmented_article.py) | No test exercises `get_tier_augmentation_methods()` or the tier→state wiring where the bug above lives — this class of regression will recur silently otherwise. | Add: (a) unit test asserting `get_tier_augmentation_methods("budget") == []`, `"premium"` returns 4 methods, default returns `["debate"]`; (b) a test constructing `ReasonerPipeline(augmentation_methods=[])` and asserting `state.meta.augmentation_methods == []` after `.run()` (not `None`). |
+| Low | [implementation_plan.md](implementation_plan.md) Appendix B / §1 | Plan lists delivered features (env toggles, per-tier config, caching, A/B testing) as "Future Enhancements," and its executive summary claims "16 unit test cases" while its own §6 table sums to 53 (63 including the undocumented A/B metrics test file). | Update the plan doc to reflect actual delivered scope, or mark it explicitly superseded/historical so it isn't mistaken for a current spec. |
+| Low | [src/reasoner/application/flows/augmentation.py](src/reasoner/application/flows/augmentation.py) (cache) | No test coverage for `_get_cached`/`_set_cache` TTL expiry or LRU eviction. | Add a small unit test with a monkeypatched `time.time()` or short TTL to exercise expiry, and one exercising eviction past `AUGMENTATION_CACHE_MAX_ENTRIES`. |
 
 ---
 
 ## 8. Final Verdict
 
-### APPROVED
+## APPROVED WITH CHANGES
 
-Commit `bb21c46` successfully executes Phase 3 of the Article Method Optimization. It perfectly addresses G5 (audit reads living ledger) and G6 (weighted specification quality gates per content class) with elegant, deterministic, and highly maintainable Python patterns. The entire pipeline optimization series has been executed to the highest industry standards with complete regression safety.
+The feature is architecturally sound, its plumbing matches the plan (T1–T17, T19 all verified), and its own tests pass. It must not ship to a cost-sensitive budget tier in its current state: the tier-gating bug in [pipeline.py:409](src/reasoner/application/pipeline.py:409) means "budget users pay zero extra cost" is currently false, and it also invalidates the A/B experiment the same commit introduced. The fix is a one-line, low-risk change with an obvious regression test to pair with it. The plan document should also be reconciled with the actual delivered scope before being treated as a source of truth.

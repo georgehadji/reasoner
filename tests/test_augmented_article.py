@@ -13,14 +13,26 @@ from reasoner.application.flows.augmentation import (
     AUGMENTATION_PROMPTS,
     AUGMENTATION_ROLES,
     DEFAULT_AUGMENTATION_METHODS,
+    _aug_cache,
+    get_tier_augmentation_methods,
     is_deep_question,
+    run_augmentation,
 )
+from reasoner.domain.pipeline_state import PipelineState
 
 # Re-import the HyperGate patterns for direct testing
 from reasoner.hypergate.hyperagent import (
     _DEEP_CONCEPT_PATTERNS,
     _FACTUAL_PATTERNS,
 )
+
+
+@pytest.fixture(autouse=True)
+def _clear_aug_cache():
+    """The module-level augmentation cache leaks across tests otherwise."""
+    _aug_cache.clear()
+    yield
+    _aug_cache.clear()
 
 # ── Depth Detection: should-detect cases ─────────────────────────────
 
@@ -171,3 +183,137 @@ def test_very_long_question():
 def test_english_deep_question_not_detected_by_greek_only():
     """English deep questions must be detected even without any Greek text."""
     assert is_deep_question("What is art?")
+
+
+# ── Tier → method mapping (regression: F-5, tier gating) ──────────────
+
+@pytest.mark.parametrize("tier,expected", [
+    ("budget", []),
+    ("premium", ["debate", "iterative_critique", "jury", "socratic"]),
+    ("unknown", ["debate"]),
+])
+def test_tier_augmentation_methods(tier: str, expected: list[str]):
+    assert get_tier_augmentation_methods(tier) == expected
+
+
+# ── run_augmentation: explicit [] must make zero LLM calls (regression) ─
+# Root cause: `state.meta.augmentation_methods or DEFAULT_AUGMENTATION_METHODS`
+# treated an explicit empty list (budget tier / cost-off) as "no preference"
+# and silently fell back to the 2-method default, billing calls the tier was
+# designed to avoid. See implementation_audit_report.md and
+# augmentation_remediation_plan.md.
+
+async def test_empty_methods_list_makes_zero_llm_calls():
+    """An explicit [] (e.g. budget tier) must skip augmentation entirely."""
+    calls: list[str] = []
+
+    async def fake_call_llm(**kwargs):
+        calls.append(kwargs.get("phase_key"))
+        return "content", {}
+
+    state = PipelineState(problem="Τι είναι τέχνη;")
+    state.meta.augmentation_methods = []
+
+    await run_augmentation(state, fake_call_llm, lambda *a, **k: None)
+
+    assert calls == [], f"budget tier must make zero calls, made: {calls}"
+    assert "pre_research_summary" not in state.writing_state
+
+
+async def test_none_methods_falls_back_to_default_pair():
+    """None (no preference set) must still run the default pair."""
+    calls: list[str] = []
+
+    async def fake_call_llm(**kwargs):
+        calls.append(kwargs.get("phase_key"))
+        return "content", {}
+
+    state = PipelineState(problem="Τι είναι τέχνη;")
+    assert state.meta.augmentation_methods is None
+
+    await run_augmentation(state, fake_call_llm, lambda *a, **k: None)
+
+    assert sorted(calls) == ["augment_debate", "augment_iterative_critique"]
+
+
+async def test_explicit_methods_list_is_honoured():
+    """A non-empty explicit list must run exactly those methods."""
+    calls: list[str] = []
+
+    async def fake_call_llm(**kwargs):
+        calls.append(kwargs.get("phase_key"))
+        return "content", {}
+
+    state = PipelineState(problem="Τι είναι τέχνη;")
+    state.meta.augmentation_methods = ["socratic"]
+
+    await run_augmentation(state, fake_call_llm, lambda *a, **k: None)
+
+    assert calls == ["augment_socratic"]
+
+
+async def test_shallow_question_skips_before_any_method_resolution():
+    """Non-deep questions must return before touching state.meta at all."""
+    async def _boom(**kwargs):
+        raise AssertionError("call_llm must not be invoked for a shallow question")
+
+    state = PipelineState(problem="How to make coffee")
+    await run_augmentation(state, _boom, lambda *a, **k: None)
+
+
+# ── Pipeline handoff: [] must survive into state.meta (regression) ────
+# Mirrors the exact predicate that regressed at
+# application/pipeline.py: `if self.augmentation_methods is not None:`.
+
+@pytest.mark.parametrize("configured,expected", [
+    ([], []),
+    (None, None),
+    (["debate"], ["debate"]),
+])
+def test_augmentation_methods_handoff_predicate(configured, expected):
+    state = PipelineState(problem="Τι είναι τέχνη;")
+    if configured is not None:
+        state.meta.augmentation_methods = configured
+    assert state.meta.augmentation_methods == expected
+
+
+# ── Cache hit/miss behaviour ────────────────────────────────────────────
+
+async def test_cache_hit_skips_llm_calls():
+    calls: list[str] = []
+
+    async def fake_call_llm(**kwargs):
+        calls.append(kwargs.get("phase_key"))
+        return "content", {}
+
+    log = lambda *a, **k: None
+    problem = "Τι είναι τέχνη;"
+
+    s1 = PipelineState(problem=problem)
+    await run_augmentation(s1, fake_call_llm, log)
+    first_count = len(calls)
+    assert first_count > 0
+
+    s2 = PipelineState(problem=problem)
+    await run_augmentation(s2, fake_call_llm, log)
+
+    assert len(calls) == first_count, "second identical question must hit cache, not re-call"
+    assert s2.writing_state["pre_research_summary"] == s1.writing_state["pre_research_summary"]
+
+
+async def test_cache_is_not_consulted_when_methods_are_empty():
+    """A budget-tier ([] methods) run must not even reach the cache lookup —
+    it should short-circuit before the cache is touched at all."""
+    calls: list[str] = []
+
+    async def fake_call_llm(**kwargs):
+        calls.append(kwargs.get("phase_key"))
+        return "content", {}
+
+    state = PipelineState(problem="Τι είναι τέχνη;")
+    state.meta.augmentation_methods = []
+
+    await run_augmentation(state, fake_call_llm, lambda *a, **k: None)
+
+    assert calls == []
+    assert _aug_cache == {}, "budget tier run must not populate the cache"

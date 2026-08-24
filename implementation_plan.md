@@ -2,7 +2,7 @@
 
 **Project:** Reasoner  
 **Feature:** Auto-detected augmentation (debate + iterative critique pre-processing) for deep/philosophical article questions  
-**Status:** ✅ Implemented, reviewed, all fixes applied  
+**Status:** ✅ Implemented 2026-07-05. Audited 2026-08-24 — found a critical cost-gating bug and stale scope in this doc; fixed 2026-08-25. See [implementation_audit_report.md](implementation_audit_report.md) and [augmentation_remediation_plan.md](augmentation_remediation_plan.md) for what actually shipped vs. what's described below.
 **Date:** 2026-07-05  
 
 ---
@@ -16,7 +16,7 @@ The **Augmented Article Pipeline** enriches article and writing workflows by aut
 - **Augmentation:** 2 parallel LLM calls (debate + iterative critique) before main phases
 - **Scope:** Both `ArticleFlow` and `WritingFlow`
 - **Graceful degradation:** Failed augmentation → pipeline continues normally
-- **Tests:** 16 unit test cases covering regex detection, HyperGate fast-path exclusion, and edge cases
+- **Tests:** 53 parametrized unit test cases (10 test functions) covering regex detection, HyperGate fast-path exclusion, and edge cases — the "16" originally stated here didn't match this doc's own §6 breakdown table
 
 ---
 
@@ -270,11 +270,19 @@ DELETED:
   src/reasoner/hypergate/sub_agents/depth_detector.py ← dead code (replaced by regex heuristic)
 ```
 
-## Appendix B: Future Enhancements
+## Appendix B: Future Enhancements (as of 2026-07-05 — see note below)
 
-1. **Environment toggle:** `AUGMENTATION_ENABLED=false` to disable globally
-2. **LLM-based depth confirmation:** Optionally run DepthDetector for higher confidence (the sub-agent class is available for re-creation)
-3. **Per-tier configuration:** Budget → debate only; Premium → debate + jury
-4. **More augmentation methods:** Socratic questioning, dialectical analysis
-5. **Caching augmentation results:** Reuse across similar deep questions
-6. **A/B metrics:** Compare augmented vs. baseline article quality scores
+> **2026-08-25 correction:** items 1, 2 (as `AUGMENTATION_LLM_CONFIRM`), 3, 4, and 5 below were
+> already delivered in the same commit (`81adfd7`) that produced this document — this list was
+> never updated to reflect actual scope. Item 6 (A/B metrics) was also delivered in that commit
+> but never worked (it assigned experiment arms but emitted no metric to anywhere, and a
+> cost-gating bug meant its "baseline" arm silently still ran augmentation); it was deleted
+> during the 2026-08-25 remediation rather than fixed, per YAGNI — nothing depended on its
+> output. Left here for historical record; do not treat this appendix as a current roadmap.
+
+1. ~~**Environment toggle:** `AUGMENTATION_ENABLED=false` to disable globally~~ — delivered
+2. ~~**LLM-based depth confirmation:**~~ — delivered as `AUGMENTATION_LLM_CONFIRM` (a direct YES/NO classifier call, not a re-created `DepthDetector` sub-agent)
+3. ~~**Per-tier configuration:**~~ — delivered as `get_tier_augmentation_methods()`: budget=0, default=1 (debate), premium=4 (debate, iterative_critique, jury, socratic)
+4. ~~**More augmentation methods:**~~ — delivered: `jury` and `socratic` prompts added alongside `debate`/`iterative_critique`/`multi_perspective`
+5. ~~**Caching augmentation results:**~~ — delivered: in-process L1 LRU cache with TTL (`AUGMENTATION_CACHE_*` settings)
+6. ~~**A/B metrics:**~~ — delivered but non-functional (dead-code metric builder, no telemetry sink wired); **removed** 2026-08-25

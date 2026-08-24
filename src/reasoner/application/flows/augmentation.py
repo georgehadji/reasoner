@@ -3,6 +3,10 @@
 When a question is detected as deep/abstract, runs debate + iterative critique
 in parallel before the main pipeline phases, storing enriched context in
 state.writing_state["pre_research_insights"].
+
+The result cache below is L1 (in-process) only: per-worker, not shared across
+uvicorn workers or restarts. That's an accepted limitation of an in-memory
+cache, not an oversight.
 """
 
 from __future__ import annotations
@@ -188,8 +192,11 @@ async def confirm_depth(problem: str, call_llm, log, state: PipelineState) -> bo
         log("AUGMENT", f"LLM depth confirmation: {'YES' if is_confirmed else 'NO'} (raw: {result[:50]})", state)
         return is_confirmed
     except Exception as exc:
+        # Deliberate fail-open: this is a quality filter refining the regex
+        # heuristic, not a safety gate — on failure, trust the regex verdict
+        # rather than silently dropping augmentation for an unrelated error.
         logger.warning("LLM depth confirmation failed: %s. Falling back to regex result.", exc)
-        return True  # On failure, trust the regex heuristic
+        return True
 
 
 async def run_augmentation(
@@ -217,14 +224,20 @@ async def run_augmentation(
         log("AUGMENT", "Augmentation disabled via AUGMENTATION_ENABLED=false", state)
         return
 
-    # ── Optional LLM depth confirmation (premium-tier quality filter) ──
-    if settings.AUGMENTATION_LLM_CONFIRM:
-        if not await confirm_depth(state.problem, call_llm, log, state):
-            log("AUGMENT", "LLM depth confirmation rejected — skipping augmentation", state)
-            return
+    # ── Resolve methods before anything billable ──
+    # None = no preference (tests, direct construction) → default pair.
+    # []   = explicit "no augmentation" (budget tier) → must not fall back,
+    #        that's the entire point of the tier — skip before spending a cent.
+    configured = state.meta.augmentation_methods
+    methods = DEFAULT_AUGMENTATION_METHODS if configured is None else configured
+    if not methods:
+        log("AUGMENT", "No augmentation methods configured for this tier — skipping", state)
+        return
 
     # ── Cache check: skip LLM calls on repeated deep questions ──
     # Only cache first-turn questions; follow-up turns have different context.
+    # Checked before the (billable) LLM depth confirmation below — a cached
+    # entry was already depth-confirmed when it was stored.
     is_first_turn = getattr(state, "turn_number", 1) <= 1
     if is_first_turn and settings.AUGMENTATION_CACHE_ENABLED:
         if cached := _get_cached(state.problem):
@@ -233,7 +246,11 @@ async def run_augmentation(
             log("AUGMENT", "Cache hit — reused prior augmentation results", state)
             return
 
-    methods = state.meta.augmentation_methods or DEFAULT_AUGMENTATION_METHODS
+    # ── Optional LLM depth confirmation (premium-tier quality filter) ──
+    if settings.AUGMENTATION_LLM_CONFIRM:
+        if not await confirm_depth(state.problem, call_llm, log, state):
+            log("AUGMENT", "LLM depth confirmation rejected — skipping augmentation", state)
+            return
 
     log("AUGMENT", f"Running pre-processing: {', '.join(methods)}", state)
 
@@ -290,7 +307,7 @@ def get_tier_augmentation_methods(tier: str) -> list[str]:
     """Return augmentation methods appropriate for a pricing tier.
 
     Budget  → no augmentation (cost-sensitive)
-    Premium → debate + iterative critique + jury + multi-perspective
+    Premium → debate + iterative critique + jury + socratic
     Default → debate only (single extra call)
     """
     if tier == "budget":
