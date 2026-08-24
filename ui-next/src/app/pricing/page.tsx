@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import Link from 'next/link';
 import { apiFetch } from '@/lib/api-client';
 import { Check, X, Shield, CreditCard, Clock, Mail } from 'lucide-react';
@@ -68,6 +68,16 @@ export default function PricingPage() {
   const [loadingTier, setLoadingTier] = useState<string | null>(null);
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
   const [error, setError] = useState('');
+  // Navigate straight from the handler rather than staging the URL in state and
+  // letting an effect perform it. Routing it through state made a repeat click
+  // silently do nothing: setState with an Object.is-equal value bails out, so
+  // returning via bfcache (which restores state and does not re-run effects) and
+  // clicking the same tier again re-set the identical URL, the effect never
+  // re-fired, and the button span forever because setLoadingTier(null) only runs
+  // in the catch. A checkout redirect is a genuine event-handler side effect.
+  const navigateToCheckout = useCallback((url: string) => {
+    window.location.href = url;
+  }, []);
 
   const handleUpgrade = async (tier: string, provider: 'stripe' | 'paypal') => {
     setError('');
@@ -86,7 +96,7 @@ export default function PricingPage() {
       if (!url || typeof url !== 'string' || !isValidCheckoutUrl(url)) {
         throw new Error('Invalid checkout URL received');
       }
-      window.location.href = url;
+      navigateToCheckout(url);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Checkout failed';
       setError(msg);

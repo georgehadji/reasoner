@@ -19,6 +19,7 @@ os.environ.setdefault("ENVIRONMENT", "testing")
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-do-not-use-in-production")
 
 from reasoner.api import app
+from reasoner.core.settings import settings
 from reasoner.infrastructure.auth import set_auth_adapter
 from reasoner.infrastructure.auth.local_adapter import LocalAuthAdapter
 
@@ -93,8 +94,16 @@ def test_run_with_exhausted_quota_returns_429(client, auth_token, monkeypatch):
     assert response.status_code == 429
 
 
-def test_run_without_auth_bypasses_quota_check(client):
-    # Anonymous requests should not trigger quota checks
+def test_run_without_auth_bypasses_quota_check(client, monkeypatch):
+    # Anonymous requests should not trigger quota checks.
+    #
+    # The module-level os.environ.setdefault("ENABLE_LEGACY_API_KEY", "true")
+    # above can't actually reach this: Settings reads os.getenv() once at
+    # class-body-execution time when reasoner.core.settings is first
+    # imported, and conftest.py's own imports already trigger that before
+    # this test module is even collected. monkeypatch.setattr on the
+    # settings singleton is what actually reaches a fresh read.
+    monkeypatch.setattr(settings, "ENABLE_LEGACY_API_KEY", True)
     response = client.post(
         "/api/run",
         json={"problem": "test", "preset": "multi-perspective-budget"},

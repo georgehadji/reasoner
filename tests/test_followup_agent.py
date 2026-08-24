@@ -103,7 +103,21 @@ async def test_followup_premium_uses_grok_for_persona_roles():
 async def test_initial_run_does_not_override_routing():
     """
     When initial_state is None (first turn), the preset routing must remain untouched.
+
+    Expectations are read from the live preset rather than hardcoded model
+    names: the preset's own routing table has been re-tuned repeatedly
+    (synthesis is "gpt-5.6-luna" for cross-bloc diversity as of this
+    writing, not the "qwen3-max"/"gpt-4o-mini"/"deepseek-v3" this test
+    originally hardcoded), and separate "classification"/"decomposition"
+    routing entries no longer exist at all — both were merged into a single
+    "fusion" role (application/pipeline.py::_phase_fusion). Hardcoding a
+    snapshot of preset values here would just go stale again next tune;
+    what this test actually needs to guard is the invariant that a run with
+    no initial_state leaves the preset's routing untouched.
     """
+    from reasoner.presets import get_preset
+
+    preset = get_preset("multi-perspective-budget")
     req = RunRequest(problem="test initial run", preset="multi-perspective-budget")
 
     with patch("reasoner.llm.ProviderRouter.from_model_ids", side_effect=_capture_router_call):
@@ -114,7 +128,11 @@ async def test_initial_run_does_not_override_routing():
                     events.append(json.loads(line.removeprefix("data: ").strip()))
 
     routing = _capture_router_call.last_routing
-    # synthesis should remain the preset default (qwen3-max for budget)
-    assert routing.get("synthesis") == "qwen3-max"
-    assert routing.get("classification") == "gpt-4o-mini"
-    assert routing.get("decomposition") == "deepseek-v3"
+    assert routing.get("synthesis") == preset.routing.get("synthesis")
+    # Not overridden -> not invented: the preset defines no separate
+    # classification/decomposition roles, so an un-overridden run must not
+    # have them either.
+    assert "classification" not in preset.routing
+    assert "decomposition" not in preset.routing
+    assert routing.get("classification") == preset.routing.get("classification")
+    assert routing.get("decomposition") == preset.routing.get("decomposition")

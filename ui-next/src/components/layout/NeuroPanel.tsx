@@ -111,11 +111,36 @@ export function NeuroPanel({ conversationId, lastUserPrompt, lastAssistantRespon
     }
   }, [conversationId]);
 
+  // Self-contained rather than calling `loadRecent(0)`: an Effect must not
+  // synchronously trigger a setState chain, which is what calling the (also
+  // setState-ing) `loadRecent` from here would do. `loadRecent` itself is
+  // unchanged and still backs the "Load more" button below. See
+  // https://react.dev/learn/you-might-not-need-an-effect#fetching-data.
   useEffect(() => {
-    if (activeTab === 'recent') {
-      loadRecent(0);
+    if (activeTab !== 'recent') return;
+    let ignore = false;
+    async function loadInitialPage() {
+      setRecentLoading(true);
+      setError(null);
+      try {
+        const data = await neuroSessions(conversationId || undefined, 10, 0);
+        if (ignore || !isMounted.current) return;
+        const entries = data.entries || [];
+        setRecentEntries(entries);
+        setHasMore(entries.length === 10);
+        setRecentOffset(entries.length);
+      } catch (err) {
+        if (ignore || !isMounted.current) return;
+        setError(err instanceof Error ? err.message : 'Failed to load recent memory');
+      } finally {
+        if (!ignore && isMounted.current) setRecentLoading(false);
+      }
     }
-  }, [activeTab, loadRecent]);
+    loadInitialPage();
+    return () => {
+      ignore = true;
+    };
+  }, [activeTab, conversationId]);
 
   const canLearn = !!lastUserPrompt && !!lastAssistantResponse;
 

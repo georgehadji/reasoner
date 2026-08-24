@@ -90,9 +90,16 @@ class RunPipelineCommandHandler:
     async def handle(
         self,
         command: RunPipelineCommand,
-        sse_emit: Callable[[dict], Awaitable[None]] | None = None
+        sse_emit: Callable[[dict], Awaitable[None]] | None = None,
+        initial_state: PipelineState | None = None,
     ) -> PipelineAggregate:
-        """Execute pipeline command, optionally emitting SSE events."""
+        """Execute pipeline command, optionally emitting SSE events.
+
+        initial_state carries follow-up continuity (conversation history,
+        previous synthesis, turn number, persona agent_model override) —
+        it must reach PipelineExecutionPort.execute_run()/ReasonerPipeline
+        below, both of which already know how to consume it.
+        """
         # Create aggregate
         aggregate = PipelineAggregate(aggregate_id=command.command_id)
 
@@ -136,6 +143,7 @@ class RunPipelineCommandHandler:
                     state = await self._pipeline_executor.execute_run(
                         command, router, sse_emit,
                         user_id=getattr(command, "user_id", None),
+                        initial_state=initial_state,
                     )
                 else:
                     raise RuntimeError(
@@ -156,7 +164,11 @@ class RunPipelineCommandHandler:
                     source_type=command.source_type,
                     domain=command.domain,
                     user_id=getattr(command, "user_id", None),
-                    initial_state=metadata.get("initial_state"),
+                    # initial_state arrives either as an explicit handle() kwarg
+                    # (SSE path, api/streaming.py) or baked into command.metadata
+                    # (CLI/headless path, main.py/headless.py) — honour whichever
+                    # was actually provided.
+                    initial_state=initial_state if initial_state is not None else metadata.get("initial_state"),
                     enhance_prompt=metadata.get("enhance_prompt", False),
                     batch_critique_jury=metadata.get("batch_critique_jury", False),
                     augmentation_methods=metadata.get("augmentation_methods"),

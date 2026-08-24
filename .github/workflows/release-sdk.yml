@@ -37,7 +37,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt pytest-asyncio
+          pip install -r requirements-dev.txt
 
       - name: Assert the backend still emits what this SDK expects
         run: pytest tests/test_sdk_contract.py -v

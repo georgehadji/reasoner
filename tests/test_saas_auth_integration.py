@@ -130,8 +130,19 @@ def test_run_pipeline_with_auth_token(client, auth_token):
     assert response.status_code == 200
 
 
-def test_run_pipeline_without_auth_still_works_in_legacy_mode(client):
-    # When ENABLE_LEGACY_API_KEY=true, anonymous requests are allowed
+def test_run_pipeline_without_auth_still_works_in_legacy_mode(client, monkeypatch):
+    # When ENABLE_LEGACY_API_KEY=true, anonymous requests are allowed.
+    #
+    # The module-level os.environ.setdefault("ENABLE_LEGACY_API_KEY", "true")
+    # above (line 18) can't actually reach this: Settings reads os.getenv()
+    # once at class-body-execution time when reasoner.core.settings is first
+    # imported, and by the time this test module is collected, conftest.py's
+    # own imports have already triggered that (see settings.py's module
+    # docstring -- it is the only module that reads the environment).
+    # monkeypatch.setattr on the settings singleton is the pattern that
+    # actually reaches a fresh read (as test_run_pipeline_without_auth_
+    # rejected_when_legacy_disabled below already does for the False case).
+    monkeypatch.setattr(settings, "ENABLE_LEGACY_API_KEY", True)
     response = client.post(
         "/api/run",
         json={"problem": "What is 2+2?", "preset": "multi-perspective-budget"},
@@ -149,19 +160,28 @@ def test_run_pipeline_without_auth_rejected_when_legacy_disabled(client, monkeyp
     assert response.status_code == 401
 
 
-def test_legacy_api_key_still_works(client):
-    # Set a known admin key for this test
-    original = os.environ.get("ADMIN_API_KEY")
-    os.environ["ADMIN_API_KEY"] = "test-admin-key-12345"
-    try:
-        response = client.post(
-            "/api/run",
-            json={"problem": "What is 2+2?", "preset": "multi-perspective-budget"},
-            headers={"Authorization": "Bearer test-admin-key-12345"},
-        )
-        assert response.status_code == 200
-    finally:
-        if original is None:
-            os.environ.pop("ADMIN_API_KEY", None)
-        else:
-            os.environ["ADMIN_API_KEY"] = original
+def test_legacy_api_key_still_works(client, monkeypatch):
+    # Set a known admin key for this test. A plain os.environ[...] assignment
+    # doesn't reach settings.ADMIN_API_KEY for the same class-body-execution-
+    # time reason as ENABLE_LEGACY_API_KEY above, so use monkeypatch on the
+    # settings singleton instead (matches TestBug001AdminEndpointHardening's
+    # working pattern in test_security_regression.py).
+    monkeypatch.setattr(settings, "ADMIN_API_KEY", "test-admin-key-12345")
+    monkeypatch.setattr(settings, "ENABLE_LEGACY_API_KEY", True)
+
+    # AuthManager (infrastructure/auth_legacy.py) is itself a process-wide
+    # singleton that snapshots settings.ADMIN_API_KEY into self._admin_keys
+    # once, at first construction -- so even with the settings singleton
+    # patched above, a previously-constructed AuthManager (e.g. from an
+    # earlier test) would still be checking against whatever ADMIN_API_KEY
+    # was configured back then. Clearing the cached instance forces
+    # get_auth_manager() to build a fresh one that picks up the patched key.
+    import reasoner.infrastructure.auth_legacy as auth_legacy_module
+    monkeypatch.setattr(auth_legacy_module, "_auth_manager", None)
+
+    response = client.post(
+        "/api/run",
+        json={"problem": "What is 2+2?", "preset": "multi-perspective-budget"},
+        headers={"Authorization": "Bearer test-admin-key-12345"},
+    )
+    assert response.status_code == 200

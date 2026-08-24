@@ -103,12 +103,25 @@ class TestAutoFallbackRerank:
             mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
             with patch.object(settings, "OPENROUTER_API_KEY", "sk-or-v1-test"):
-                with patch(
-                    "reasoner.core.rerank.rerank_via_nemotron",
-                    new_callable=AsyncMock,
-                    return_value=docs,
-                ) as mock_nemotron:
-                    result = await rerank_documents("query", docs)
+                # Pin explicitly rather than relying on the True default: an
+                # earlier test in this xdist worker may have booted the
+                # FastAPI app lifespan with a not-"sk-"-prefixed
+                # OPENROUTER_API_KEY (e.g. CI's placeholder key), and
+                # health_validator.validate_all() auto-corrects by assigning
+                # settings.COHERE_RERANK_ENABLED = False directly on the
+                # shared singleton with no restore (see
+                # TestAutoDisableCohereRerank above, which guards against
+                # exactly this). Without pinning it here, this test's own
+                # rerank_documents() call would short-circuit to "return
+                # documents" before ever reaching Cohere or the Nemotron
+                # fallback under test.
+                with patch.object(settings, "COHERE_RERANK_ENABLED", True):
+                    with patch(
+                        "reasoner.core.rerank.rerank_via_nemotron",
+                        new_callable=AsyncMock,
+                        return_value=docs,
+                    ) as mock_nemotron:
+                        result = await rerank_documents("query", docs)
 
         mock_nemotron.assert_awaited_once()
         assert result == docs

@@ -1,6 +1,6 @@
 services:
   cert-generator:
-    image: alpine:latest
+    image: alpine:3.24.1
     command: >
       sh -c "apk add --no-cache openssl &&
              mkdir -p /certs &&

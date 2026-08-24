@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo, useSyncExternalStore } from 'react';
 import { useAppStore } from '@/stores/app-store';
 import { EXAMPLE_PROMPTS, LIMITS, TIMING, API } from '@/lib/config';
 import { cn } from '@/lib/utils';
@@ -94,17 +94,31 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
 
   const user = useAppStore((s) => s.user);
 
-  /* Set after mount, never during render: `new Date()` on the server and on
-     the client land in different hours often enough, and Next would flag the
-     mismatch and re-render the whole subtree. The neutral default is what
-     ships in the HTML. */
-  const [greeting, setGreeting] = useState('Ready when you are');
-  useEffect(() => {
+  /* The greeting depends on the client's clock, so the server cannot render it.
+     Two wrong ways to handle that, both previously tried here:
+       - compute it during render behind `typeof window` + suppressHydrationWarning
+         -> React then *accepts the server text as correct and never patches it*,
+            so the greeting stays stuck on the fallback for the whole
+            pre-interaction session (nothing else re-renders this component for a
+            logged-out visitor -- `user` is not persisted by the store);
+       - setState inside an effect -> works, but is what react-hooks/set-state-in-effect
+         correctly flags, since an effect is not where derived state belongs.
+     useSyncExternalStore is React's actual primitive for a client-only value:
+     it hands back the server snapshot during SSR and hydration (so the markup
+     matches with nothing suppressed), then re-renders once with the client
+     snapshot. The store never emits, so this subscribes to nothing. */
+  const isClient = useSyncExternalStore(
+    useCallback(() => () => {}, []),
+    () => true,
+    () => false,
+  );
+  const greeting = useMemo(() => {
+    if (!isClient) return 'Ready when you are';
     const hour = new Date().getHours();
     const part = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
     const name = user?.email?.split('@')[0];
-    setGreeting(name ? `${part}, ${name}` : part);
-  }, [user]);
+    return name ? `${part}, ${name}` : part;
+  }, [isClient, user]);
 
   const [estimate, setEstimate] = useState<{ tokens: number; cost: string; duration: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -434,7 +448,11 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
       <div className="flex h-full w-full flex-col items-center justify-center px-[var(--gutter)] py-[var(--space-8)]">
         <div className="w-full max-w-[var(--width-chat)]">
           {/* Serif, and the only display-scale type in the app shell. The
-              greeting is the one moment the product speaks before it works. */}
+              greeting is the one moment the product speaks before it works.
+              No suppressHydrationWarning: `greeting` starts at the neutral
+              server value and is replaced post-mount by the effect above, so
+              there is no mismatch to suppress -- and suppressing one here
+              would silence genuine future mismatches in this element. */}
           <h1 className="mb-[var(--space-8)] text-center font-serif text-[length:var(--text-4xl)] font-normal leading-[var(--lh-display)] tracking-[var(--tracking-tight)] text-[var(--text)]">
             {isImageMode ? 'What should we picture?' : greeting}
           </h1>

@@ -8,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from reasoner.api import app
-from reasoner.core.settings import Settings
+from reasoner.core.settings import settings
 from reasoner.infrastructure.persistence.feedback_store import (
     FeedbackEntry,
     FeedbackStore,
@@ -188,7 +188,12 @@ class TestFeedbackEndpoint:
 
     def test_admin_stats_authorized(self, monkeypatch):
         """GET /api/admin/feedback-stats with correct key should return stats."""
-        monkeypatch.setattr(Settings, "ADMIN_API_KEY", "test-admin-key")
+        # Patch the `settings` singleton, not the `Settings` class: once any
+        # test in this worker does monkeypatch.setattr(settings, ...), undo
+        # restores it with setattr on the *instance*, permanently creating an
+        # instance attribute that shadows the class one — a later class-level
+        # patch then has no effect and the endpoint 503s.
+        monkeypatch.setattr(settings, "ADMIN_API_KEY", "test-admin-key")
 
         from reasoner.infrastructure.auth import set_auth_adapter
         from reasoner.infrastructure.auth.local_adapter import LocalAuthAdapter

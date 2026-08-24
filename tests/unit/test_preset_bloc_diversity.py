@@ -23,6 +23,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "src"))
 
 from reasoner.domain.preset_registry import _REGISTRY as PRESETS  # noqa: E402
+from reasoner.infrastructure.llm.registry import _REGISTRY as _REGISTRY_MODELS  # noqa: E402
 from reasoner.infrastructure.llm.registry import bloc_of  # noqa: E402
 
 # Experimental presets are intentionally single-model / single-bloc.
@@ -78,6 +79,40 @@ def test_generation_spans_multiple_blocs(preset_id):
         f"{preset_id}: bloc(s) dominate generation {dominant}; "
         f"max 2 generator roles per bloc"
     )
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("preset_id", _NON_EXEMPT)
+def test_primary_is_key_safe(preset_id):
+    """primary_id must build without a provider-specific key.
+
+    filter_routing() rewrites any role whose ``env`` is unset in the
+    environment to primary_id, so a primary that is itself gated on a
+    provider-specific key cannot act as its own fallback: the downgrade is a
+    no-op and build_provider() raises, taking the whole preset down. Every
+    non-local registry entry resolves to OPENROUTER_API_KEY, so this asserts
+    the primary is not pinned to some other provider's key.
+    """
+    primary = PRESETS[preset_id].get("primary_id")
+    if not primary:
+        pytest.skip("preset declares no primary_id")
+    entry = _REGISTRY_MODELS.get(primary)
+    assert entry is not None, f"{preset_id}: primary_id '{primary}' is not in the registry"
+    env = entry.get("env")
+    assert env in (None, "OPENROUTER_API_KEY"), (
+        f"{preset_id}: primary_id '{primary}' is gated on {env}. primary_id is "
+        f"the downgrade target for every key-missing role, so it must not need "
+        f"a provider-specific key of its own."
+    )
+
+
+# NOTE: "primary_id must be a different bloc from synthesis" is deliberately
+# NOT asserted here. It sounds like it belongs beside invariants A and B, but
+# 28 of the 48 presets violate it, so it is not a property this registry holds
+# — asserting it would be introducing new routing policy under the guise of a
+# regression test. The cross-bloc rule in CLAUDE.md §5 is about the *routed*
+# roles, which invariants A and B already cover. Left as a judgment call for
+# whoever tunes an individual preset.
 
 
 @pytest.mark.unit

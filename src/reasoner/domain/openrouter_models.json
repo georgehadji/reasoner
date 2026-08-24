@@ -4549,6 +4549,40 @@
    ]
   },
   {
+   "id": "meta/muse-spark-1.2-contributor",
+   "pricing": {
+    "prompt": "0.0000001",
+    "completion": "0.0000002"
+   },
+   "context_length": 1048576,
+   "architecture": {
+    "input_modalities": [
+     "text",
+     "image",
+     "video",
+     "file",
+     "audio"
+    ],
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "repetition_penalty",
+    "response_format",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_k",
+    "top_p"
+   ]
+  },
+  {
    "id": "microsoft/mai-image-2.5",
    "pricing": {
     "prompt": "0.000005",

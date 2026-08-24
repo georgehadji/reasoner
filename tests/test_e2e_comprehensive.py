@@ -21,6 +21,7 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
 import reasoner.api as api
+from reasoner.core.settings import settings
 from reasoner.models import PipelineState
 from reasoner.pipeline import ReasonerPipeline
 from reasoner.presets import get_preset
@@ -290,8 +291,14 @@ class TestAPILLMErrorGracefulDegradation:
 
 @pytest_asyncio.fixture
 async def api_client(monkeypatch):
-    # Allow anonymous access for e2e tests that predate auth requirements
-    monkeypatch.setenv("ENABLE_LEGACY_API_KEY", "true")
+    # Allow anonymous access for e2e tests that predate auth requirements.
+    # `Settings` bakes each field in from the environment once, at module
+    # import time (see core/settings.py) — `import reasoner.api` above has
+    # already triggered that import, so `monkeypatch.setenv(...)` here would
+    # be read too late to change anything. Patch the resolved settings
+    # object directly instead, matching the convention used elsewhere
+    # (e.g. tests/test_metered_auth_policy.py).
+    monkeypatch.setattr(settings, "ENABLE_LEGACY_API_KEY", True)
     async with AsyncClient(
         transport=ASGITransport(app=api.app), base_url="http://test"
     ) as c:

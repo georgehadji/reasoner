@@ -364,7 +364,6 @@ class PipelineOrchestrator:
         **pipeline_kwargs: Any,
     ) -> PipelineState:
         """Run the pipeline with the given decision. Returns final state."""
-        pipeline = self.create_pipeline(decision, initial_state=initial_state, **pipeline_kwargs)
         state = initial_state or PipelineState(
             problem=decision.problem,
             preset_name=decision.effective_preset_name,
@@ -378,6 +377,7 @@ class PipelineOrchestrator:
             state.meta.fallback_events.extend(_fallback_buffer)
             _fallback_buffer.clear()
 
+        pipeline = self.create_pipeline(decision, initial_state=state, **pipeline_kwargs)
         return await pipeline.run(decision.problem)
 
     async def postflight(

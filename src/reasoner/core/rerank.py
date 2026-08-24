@@ -9,6 +9,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
+import os
+import re
+import time
 import unicodedata
 from typing import Any
 
@@ -48,7 +51,7 @@ async def _is_circuit_open() -> bool:
         global _failure_count, _last_failure_time
         if _failure_count < _CIRCUIT_THRESHOLD:
             return False
-        elapsed = asyncio.get_running_loop().time() - _last_failure_time
+        elapsed = time.monotonic() - _last_failure_time
         if elapsed >= _CIRCUIT_COOLDOWN_SECONDS:
             _failure_count = 0
             return False
@@ -59,7 +62,32 @@ async def _record_failure() -> None:
     async with _failure_lock:
         global _failure_count, _last_failure_time
         _failure_count += 1
-        _last_failure_time = asyncio.get_running_loop().time()
+        # time.monotonic(), not loop.time(): the loop clock is per-event-loop
+        # and restarts near zero for each new loop, so a timestamp taken in one
+        # loop and compared in another yields a negative elapsed that never
+        # reaches the cooldown -- the circuit would then stay open for the rest
+        # of the process. Any code path that runs more than one loop (asyncio.run
+        # called repeatedly, a worker that recreates its loop, the test suite)
+        # hits this. time.monotonic() is process-wide and loop-independent.
+        _last_failure_time = time.monotonic()
+
+
+def reset_rerank_circuit() -> None:
+    """Clear the module-level circuit state.
+
+    The counters above are process-global, so a few failing rerank calls leave
+    the circuit latched open for everything that follows in the same process --
+    across unrelated tests sharing an xdist worker, where it made
+    ``rerank_documents`` return early and look like a broken fallback. Exposed
+    as a reset hook rather than reached into directly so the test suite has one
+    supported way to restore the state (see tests/conftest.py's
+    ``auto_clean_state``). Synchronous and lock-free by design: it is called
+    between tests, when nothing is contending, and taking an asyncio.Lock here
+    would bind that lock to whichever loop happened to run the reset.
+    """
+    global _failure_count, _last_failure_time
+    _failure_count = 0
+    _last_failure_time = 0.0
 
 
 async def _record_success() -> None:

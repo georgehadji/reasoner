@@ -595,6 +595,60 @@ async def _run_stream_with_metrics(
         yield chunk
 
 
+async def _run_followup_stream_with_metrics(
+    req: FollowupRequest,
+    request: Request,
+    user: User | None,
+    *,
+    reference_id: str,
+    reserved_credits: int = 0,
+):
+    """Stream a follow-up run through the shared metering wrapper.
+
+    A follow-up costs real LLM spend, and the caller has already *debited* the
+    estimate against the user's balance before this generator starts. Only
+    ``metered()``'s finally -> _true_up -> sink.release gives that hold back and
+    settles the run's actual cost, so streaming the raw generator (as this
+    endpoint did) charged every follow-up turn the full worst-case estimate,
+    permanently, and never billed what the run really used. Mirrors
+    _run_stream_with_metrics above -- the reservation and the settlement must
+    share one reference_id.
+    """
+    from reasoner.logging_utils import set_log_context
+    from reasoner.api.run_observability import CreditSink, PrometheusObserver
+    from reasoner.application.services.run_metering import RunContext, metered
+
+    tier = "anonymous" if user is None else "free"
+    preset = req.preset or "auto-budget"
+    user_id = str(user.id) if user else None
+    set_log_context(user_id=user_id, tier=tier, preset=preset)
+
+    timer = None
+    try:
+        from reasoner.api.metrics import QueryTimer
+        timer = QueryTimer(preset=preset)
+        timer.start()
+    except (ImportError, AttributeError):
+        pass
+
+    ctx = RunContext(
+        preset=preset,
+        reference_id=reference_id,
+        user_id=user_id,
+        tier=tier,
+        interface="web",
+        reserved_credits=reserved_credits,
+    )
+    stream = run_followup_stream(req, request=request, user_id=user_id)
+    async for chunk in metered(
+        stream,
+        ctx,
+        CreditSink(),
+        PrometheusObserver(tier=tier, preset=preset, interface="web", timer=timer),
+    ):
+        yield chunk
+
+
 def _require_auth_if_legacy_disabled(user: User | None) -> None:
     """Backward-compat gate: require auth when legacy API key mode is disabled."""
     if user is None and not settings.ENABLE_LEGACY_API_KEY:
@@ -686,18 +740,48 @@ async def run_followup_pipeline(
     request: Request,
     req: FollowupRequest,
     user: User | None = Depends(get_optional_user),
+    authenticated = Depends(optional_auth),
     rate_limit_checked = Depends(check_rate_limit),
+    quota: QuotaResult | None = Depends(check_quota_if_authenticated),
+    credits_checked = Depends(require_credits_if_authenticated),
     csrf_checked = Depends(require_csrf),
 ):
     """
     Run the Reasoner pipeline for a follow-up question with full conversation context.
+
+    Carries the same gates as ``/api/run``: a follow-up runs the identical
+    pipeline at identical cost, so quota, credits, and the anonymous trial cap
+    all have to apply here too. Without them an anonymous caller could hand-build
+    a conversation payload and run unbounded premium pipelines on the operator's
+    provider keys behind nothing but the per-IP rate limiter.
     """
     _require_auth_if_legacy_disabled(user)
     from reasoner.api.idempotency_http import register_run_or_error
+    from reasoner.api.dependencies import reserve_or_402
+
+    if user is None:
+        from reasoner.api.client_ip import get_client_ip
+        from reasoner.application.services.anonymous_trial_policy import (
+            enforce_anonymous_trial_cap,
+        )
+        from reasoner.application.services.estimate_service import estimate_cost
+
+        estimate = await estimate_cost(req.question, req.preset or "auto-budget")
+        await enforce_anonymous_trial_cap(get_client_ip(request), estimate["estimated_cost_usd"])
 
     await register_run_or_error(req.client_run_id)
+    reference_id = req.client_run_id or f"followup:{uuid.uuid4()}"
+    reserved_credits = await reserve_or_402(
+        user_id=str(user.id) if user else None,
+        preset=req.preset or "auto-budget",
+        problem=req.question,
+        reference_id=reference_id,
+    )
     return StreamingResponse(
-        run_followup_stream(req, request=request, user_id=str(user.id) if user else None),
+        _run_followup_stream_with_metrics(
+            req, request, user,
+            reference_id=reference_id, reserved_credits=reserved_credits,
+        ),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

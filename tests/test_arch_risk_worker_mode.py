@@ -40,45 +40,69 @@ async def test_memory_rate_limiter_warns_in_multi_worker() -> None:
         # The actual warning is in api/__init__.py lifespan — tested there
 
 
+def _load_isolated_settings_module():
+    """Load a private copy of reasoner.core.settings under a throwaway module
+    name, instead of importlib.reload()-ing the canonical one.
+
+    reload() replaces sys.modules["reasoner.core.settings"].Settings/settings
+    in place -- but every module that already did `from reasoner.core.settings
+    import settings` (feedback.py, dependencies.py, auth_deps.py, admin_auth.py,
+    rate_limiter.py, ...) keeps its own reference to the pre-reload objects.
+    That desyncs the process into two permanently disconnected Settings
+    universes: code that reads `settings.X` sees the original singleton
+    forever, while anything that re-imports `Settings`/`settings` after the
+    reload (e.g. a later test's `from reasoner.core.settings import Settings`)
+    gets the replacement -- so monkeypatching one is invisible to the other.
+    That previously made unrelated tests elsewhere in the suite fail (e.g.
+    admin-endpoint tests monkeypatching Settings.ADMIN_API_KEY and getting a
+    503 "Admin endpoint not configured" because feedback.py was still reading
+    the pre-reload settings object) whenever this module ran first on a
+    shared xdist worker. Loading the module under a private name exercises
+    the exact same class-body-default logic without ever touching the
+    shared `reasoner.core.settings` module or any object other code holds a
+    reference to.
+    """
+    import importlib.util
+    import reasoner.core.settings as canonical
+
+    spec = importlib.util.spec_from_file_location(
+        "reasoner_core_settings_isolated_probe", canonical.__file__
+    )
+    isolated = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(isolated)
+    return isolated
+
+
 @pytest.mark.asyncio
 async def test_production_memory_ratelimiter_should_be_redis() -> None:
     """In production, if RATE_LIMITER_MODE=memory with >1 workers, CRITICAL is logged
     and the app should refuse to start. We validate the guard condition exists."""
-    import importlib
-
     # Copy environment and pop the keys to test fallback defaults
     env_copy = os.environ.copy()
     env_copy.pop("RATE_LIMITER_MODE", None)
     env_copy.pop("CIRCUIT_BREAKER_MODE", None)
     with patch("dotenv.load_dotenv", return_value=True):
         with patch.dict(os.environ, env_copy, clear=True):
-            import reasoner.core.settings
-            importlib.reload(reasoner.core.settings)
-            s = reasoner.core.settings.Settings()
+            isolated = _load_isolated_settings_module()
+            s = isolated.Settings()
             assert hasattr(s, "RATE_LIMITER_MODE")
             assert hasattr(s, "CIRCUIT_BREAKER_MODE")
             # Default should be "redis" (as set in settings.py)
             assert s.RATE_LIMITER_MODE == "redis"
             assert s.CIRCUIT_BREAKER_MODE == "redis"
 
-    # Restore module state
-    importlib.reload(reasoner.core.settings)
-
 
 def test_settings_default_ratelimiter_mode_is_redis() -> None:
     """Default RATE_LIMITER_MODE should be 'redis' for production safety.
     This guards against accidental regression to 'memory' defaults."""
-    import importlib
-
     # Copy environment and pop the keys to test fallback defaults
     env_copy = os.environ.copy()
     env_copy.pop("RATE_LIMITER_MODE", None)
     env_copy.pop("CIRCUIT_BREAKER_MODE", None)
     with patch("dotenv.load_dotenv", return_value=True):
         with patch.dict(os.environ, env_copy, clear=True):
-            import reasoner.core.settings
-            importlib.reload(reasoner.core.settings)
-            s = reasoner.core.settings.Settings()
+            isolated = _load_isolated_settings_module()
+            s = isolated.Settings()
             assert s.RATE_LIMITER_MODE == "redis", (
                 f"RATE_LIMITER_MODE is '{s.RATE_LIMITER_MODE}', should be 'redis'. "
                 "A 'memory' default is unsafe for multi-worker deployments."
@@ -86,9 +110,6 @@ def test_settings_default_ratelimiter_mode_is_redis() -> None:
             assert s.CIRCUIT_BREAKER_MODE == "redis", (
                 f"CIRCUIT_BREAKER_MODE is '{s.CIRCUIT_BREAKER_MODE}', should be 'redis'."
             )
-
-    # Restore module state
-    importlib.reload(reasoner.core.settings)
 
 
 # ── Auth persistence mode validation ─────────────────────────────────

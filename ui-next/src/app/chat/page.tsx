@@ -223,7 +223,14 @@ export default function ChatPage() {
   // REFACTOR: Replace useState with useReducer for messages state
   const [messages, dispatchMessages] = useReducer(messagesReducer, []);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  // `conversationIdRef` is the source of truth read from async SSE/event
+  // callbacks (handleFeedback, onEvent, ...): those closures need the latest
+  // value the instant it changes, without waiting for a re-render, so a ref
+  // is correct there. `conversationId` mirrors it purely for render — refs
+  // must never be read during render (`react-hooks/refs`) — and is updated
+  // at every site that writes the ref, right below each write.
   const conversationIdRef = useRef<string | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const clientRunIdRef = useRef<string | null>(null);
 
   // Auto-selected method from HyperGate — populated from the 'start' SSE event.
@@ -875,6 +882,7 @@ export default function ChatPage() {
       } else {
         const newConvId = assistantId;
         conversationIdRef.current = newConvId;
+        setConversationId(newConvId);
         const req = {
           problem,
           preset: opts?.presetOverride || getAutoPreset(),
@@ -970,6 +978,7 @@ export default function ChatPage() {
     setPhaseOpenMode('auto');
     phaseStartTimesRef.current = {};
     conversationIdRef.current = null;
+    setConversationId(null);
   }
 
   async function handleResume(pipelineId: string) {
@@ -1050,6 +1059,7 @@ export default function ChatPage() {
 
   function handleLoad(conv: Conversation) {
     conversationIdRef.current = conv.conversation_id || conv.id;
+    setConversationId(conversationIdRef.current);
     const renderedPhases: RenderedPhase[] = conv.phases.map((p, idx) => ({
       index: idx,
       phase: p.phase,
@@ -1106,7 +1116,7 @@ export default function ChatPage() {
         onClear={handleClearCache}
         onNew={handleNew}
         onResume={handleResume}
-        conversationId={conversationIdRef.current}
+        conversationId={conversationId}
         lastUserPrompt={messages.filter((m) => m.role === 'user').at(-1)?.content}
         lastAssistantResponse={messages.filter((m) => m.role === 'assistant' && !m.isStreaming).at(-1)?.content}
       />
