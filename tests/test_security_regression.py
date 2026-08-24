@@ -5,16 +5,17 @@ Covers BUG-001, BUG-002, BUG-003 fixes.
 
 from __future__ import annotations
 
+import os
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 
 from reasoner.api import app
 from reasoner.auth import AuthManager
-from reasoner.infrastructure.auth.local_adapter import LocalAuthAdapter
 from reasoner.infrastructure.auth import set_auth_adapter
+from reasoner.infrastructure.auth.local_adapter import LocalAuthAdapter
 
-import os
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-for-local-auth-adapter-only")
 _adapter = LocalAuthAdapter()
 # Force LocalAuthAdapter regardless of ambient SUPABASE_URL/ENVIRONMENT config —
@@ -123,6 +124,7 @@ class TestBug002KeyValidationRequiresAuth:
     def test_validate_keys_with_auth_returns_summary(self, monkeypatch):
         """Authenticated request must return summary without burning quota."""
         import asyncio
+
         from reasoner.api.auth_deps import _get_auth_manager_instance_auth_deps
 
         # Use the app's singleton auth manager so the key is recognized

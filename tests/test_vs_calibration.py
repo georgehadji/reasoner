@@ -6,13 +6,13 @@ import math
 import pytest
 
 from reasoner.phases.vs_calibration import (
+    VSCalibrationSignals,
     compute_vs_calibrated_confidence,
     extract_calibration_signals,
-    VSCalibrationSignals,
 )
-from reasoner.phases.vs_generation import VSGenerationResult, GenerationCandidate
+from reasoner.phases.vs_generation import GenerationCandidate, VSGenerationResult
 from reasoner.reasoner_verbalized_sampling import VSCandidate, compute_verbalized_entropy
-from reasoner.reasoner_vs_constants import W_ENTROPY, W_SUPPORT, W_NLI, W_RANK
+from reasoner.reasoner_vs_constants import W_ENTROPY, W_NLI, W_RANK, W_SUPPORT
 from reasoner.vs_config import VSFeatureFlags
 
 

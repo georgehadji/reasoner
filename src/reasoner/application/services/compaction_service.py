@@ -9,11 +9,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from reasoner.core.settings import settings
 from reasoner.core.constants_limits import COMPACTION_BATCH_SIZE
+from reasoner.core.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ class CompactionService:
         self._store = event_store
 
     def _cutoff(self) -> datetime:
-        return datetime.now(tz=timezone.utc) - timedelta(days=settings.EVENT_RETENTION_DAYS)
+        return datetime.now(tz=UTC) - timedelta(days=settings.EVENT_RETENTION_DAYS)
 
     async def run_once(self, dry_run: bool = False) -> dict[str, int]:
         """Run one full compaction pass, looping in batches until no more eligible rows remain.
@@ -95,7 +95,7 @@ async def run_nightly_compaction_loop(event_store: Any) -> None:
     service = CompactionService(event_store)
 
     while True:
-        now = datetime.now(tz=timezone.utc)
+        now = datetime.now(tz=UTC)
         target_hour = settings.COMPACTION_RUN_HOUR_UTC
 
         next_run = now.replace(hour=target_hour, minute=0, second=0, microsecond=0)

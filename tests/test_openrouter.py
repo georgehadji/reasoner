@@ -10,19 +10,20 @@ Tests cover:
 """
 
 import os
+
 import pytest
+
+from reasoner.application.services.preset_service import PresetService
+from reasoner.core.constants_models import MODEL_GEMINI_FLASH
+from reasoner.domain.preset_registry import get_preset
 from reasoner.llm import (
-    build_provider,
     _REGISTRY,
-    list_models,
     OpenRouterProvider,
     ProviderRouter,
+    build_provider,
+    list_models,
 )
-from reasoner.core.constants_models import MODEL_GEMINI_FLASH
-from reasoner.application.services.preset_service import PresetService
-from reasoner.domain.preset_registry import get_preset
 from reasoner.presets import PRESETS
-
 
 # ─────────────────────────────────────────────────────────────────────
 # TEST 1: Registry Validation
@@ -125,11 +126,11 @@ class TestOpenRouterProvider:
         """Should raise ValueError when OPENROUTER_API_KEY not set."""
         # Save original key if exists
         original_key = os.environ.get("OPENROUTER_API_KEY")
-        
+
         # Temporarily remove key
         if "OPENROUTER_API_KEY" in os.environ:
             del os.environ["OPENROUTER_API_KEY"]
-        
+
         try:
             # Must be an OpenRouter-routed alias: compat entries such as
             # deepseek-v3 demand their own vendor key, not OPENROUTER_API_KEY.
@@ -147,7 +148,7 @@ class TestOpenRouterProvider:
     def test_multiple_or_providers_build(self):
         """Should be able to build multiple different OR providers."""
         models_to_test = ["claude-sonnet", "gpt-5", "glm-5.2"]
-        
+
         for model_id in models_to_test:
             provider = build_provider(model_id)
             assert isinstance(provider, OpenRouterProvider)

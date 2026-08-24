@@ -8,8 +8,7 @@ selects this outside production environments.
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from reasoner.core.ports.api_key_repository import ApiKeyRepository
@@ -30,7 +29,7 @@ class InMemoryApiKeyRepository(ApiKeyRepository):
         key_hash: str,
         key_prefix: str,
         scopes: frozenset[str],
-        expires_at: Optional[datetime] = None,
+        expires_at: datetime | None = None,
     ) -> ApiKey:
         record = ApiKey(
             id=uuid4(),
@@ -45,7 +44,7 @@ class InMemoryApiKeyRepository(ApiKeyRepository):
             self._keys[record.id] = record
         return record
 
-    async def get_by_hash(self, key_hash: str) -> Optional[ApiKey]:
+    async def get_by_hash(self, key_hash: str) -> ApiKey | None:
         async with self._lock:
             for record in self._keys.values():
                 if record.key_hash == key_hash:
@@ -82,7 +81,7 @@ class InMemoryApiKeyRepository(ApiKeyRepository):
                 scopes=record.scopes,
                 last_used_at=record.last_used_at,
                 expires_at=record.expires_at,
-                revoked_at=datetime.now(timezone.utc),
+                revoked_at=datetime.now(UTC),
                 created_at=record.created_at,
             )
             return True
@@ -99,13 +98,13 @@ class InMemoryApiKeyRepository(ApiKeyRepository):
                 key_hash=record.key_hash,
                 key_prefix=record.key_prefix,
                 scopes=record.scopes,
-                last_used_at=datetime.now(timezone.utc),
+                last_used_at=datetime.now(UTC),
                 expires_at=record.expires_at,
                 revoked_at=record.revoked_at,
                 created_at=record.created_at,
             )
 
-    async def get_owner(self, key_id: UUID) -> Optional[UUID]:
+    async def get_owner(self, key_id: UUID) -> UUID | None:
         async with self._lock:
             record = self._keys.get(key_id)
         return record.user_id if record else None

@@ -1,17 +1,16 @@
 """Tests for MethodState dict wrapper and backward-compatible aliases."""
 
 from __future__ import annotations
-from reasoner.models import save, load
 
-import json
 import tempfile
 from pathlib import Path
 
 from reasoner.models import (
-    MethodState,
     PipelineCore,
     PipelineState,
     TaskType,
+    load,
+    save,
 )
 
 

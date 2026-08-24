@@ -1,7 +1,9 @@
 from __future__ import annotations
+
 import json
+
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.phases._shared import get_language_instruction, _wrap_user_input
+from reasoner.phases._shared import _wrap_user_input, get_language_instruction
 
 DEBATE_OPENING_SYSTEM = ("You are an expert debater. You MUST produce a valid JSON object ONLY. "
                            "Do not include any introductory text, concluding remarks, or conversational markdown. "

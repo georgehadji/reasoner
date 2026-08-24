@@ -1,7 +1,8 @@
 """Tests for EventEmissionService — contextvar lifecycle, emit, pending events."""
 
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 
 class TestEventEmissionServiceLifecycle:
@@ -9,7 +10,8 @@ class TestEventEmissionServiceLifecycle:
 
     def test_contextvar_set_and_reset(self):
         from reasoner.application.services.event_emission_service import (
-            EventEmissionService, get_event_emitter,
+            EventEmissionService,
+            get_event_emitter,
         )
 
         emitter = EventEmissionService()
@@ -22,7 +24,8 @@ class TestEventEmissionServiceLifecycle:
 
     def test_contextvar_nesting_and_isolation(self):
         from reasoner.application.services.event_emission_service import (
-            EventEmissionService, get_event_emitter,
+            EventEmissionService,
+            get_event_emitter,
         )
 
         emitter_a = EventEmissionService(aggregate_id="run-a")
@@ -57,7 +60,6 @@ class TestEventEmissionServiceEmit:
         wiring is correct by inspecting the created task.
         """
         from reasoner.application.services.event_emission_service import EventEmissionService
-        from reasoner.core.events.domain_events import DomainEvent
 
         captured = []
 
@@ -96,7 +98,6 @@ class TestEventEmissionServiceEmit:
     def test_emit_accepts_string_event_type(self):
         """emit() should coerce string types to PipelineEventType enum."""
         from reasoner.application.services.event_emission_service import EventEmissionService
-        from reasoner.core.events.domain_events import PipelineEventType
 
         mock_bus = MagicMock()
         emitter = EventEmissionService(bus=mock_bus, aggregate_id="run-1")
@@ -163,7 +164,8 @@ class TestGetEventEmitter:
 
     def test_get_event_emitter_returns_active_emitter(self):
         from reasoner.application.services.event_emission_service import (
-            EventEmissionService, get_event_emitter,
+            EventEmissionService,
+            get_event_emitter,
         )
 
         emitter = EventEmissionService()

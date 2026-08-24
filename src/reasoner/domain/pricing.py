@@ -22,7 +22,7 @@ class ModelPricing:
     """Immutable pricing data for a model."""
     input_per_token: float   # Cost per input token
     output_per_token: float  # Cost per output token
-    
+
     def calculate_cost(self, input_tokens: int, output_tokens: int) -> float:
         """Calculate total cost for given token usage."""
         return (input_tokens * self.input_per_token) + (output_tokens * self.output_per_token)
@@ -118,7 +118,7 @@ def get_pricing(model_id: str) -> ModelPricing:
     # Direct match in pricing DB
     if model_id in PRICING_DB:
         return PRICING_DB[model_id]
-    
+
     # Fallback to default pricing. Returned by identity, so callers can detect
     # "unpriced" with `is PRICING_DB["_default"]` rather than comparing values.
     # Callers holding registry shorthand IDs (e.g. "claude-opus") must resolve
@@ -171,11 +171,11 @@ def print_cost_summary(phase_costs: dict[str, float], total_cost: float) -> str:
         "💰 Cost Summary",
         "─" * 60,
     ]
-    
+
     for phase, cost in phase_costs.items():
         lines.append(f"  {phase:30s} {format_cost(cost):>10s}")
-    
+
     lines.append("─" * 60)
     lines.append(f"  {'TOTAL':30s} {format_cost(total_cost):>10s}")
-    
+
     return "\n".join(lines)

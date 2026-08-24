@@ -5,9 +5,8 @@ Reasoner Domain Models - Pure Business Entities
 from __future__ import annotations
 
 from enum import Enum
-from dataclasses import dataclass, field
-from typing import Any
 from functools import lru_cache
+
 
 class TaskType(str, Enum):
     ANALYTICAL = "analytical"
@@ -18,7 +17,7 @@ class TaskType(str, Enum):
     HYBRID = "hybrid"
 
     @classmethod
-    def coerce(cls, value: str | "TaskType") -> "TaskType":
+    def coerce(cls, value: str | TaskType) -> TaskType:
         if isinstance(value, cls):
             return value
         raw = str(value).lower().strip()
@@ -60,7 +59,7 @@ class PerspectiveRegistry:
         return value.lower() in cls._known
 
     @classmethod
-    def coerce(cls, value: str) -> "PerspectiveType | str":
+    def coerce(cls, value: str) -> PerspectiveType | str:
         try:
             return PerspectiveType(value)
         except ValueError as exc:

@@ -8,9 +8,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from reasoner.phases.vs_generation import generate_with_vs, VSGenerationConfig, GenerationStrategy
-from reasoner.vs_config import VSFeatureFlags, VSDeploymentProfile
-
+from reasoner.phases.vs_generation import GenerationStrategy, VSGenerationConfig, generate_with_vs
+from reasoner.vs_config import VSDeploymentProfile, VSFeatureFlags
 
 BENCHMARK_QUERIES = [
     "Explain quantum computing",

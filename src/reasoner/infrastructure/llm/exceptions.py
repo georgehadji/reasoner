@@ -61,7 +61,7 @@ def is_retryable(error: Exception) -> bool:
     """Check if an error is retryable."""
     if isinstance(error, InfrastructureError):
         return error.retryable
-    
+
     # Network errors are generally retryable
     retryable_types = (
         ConnectionError,

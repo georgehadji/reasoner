@@ -4,22 +4,29 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any
 
-from reasoner.core.constants import ARTICLE_MIN_SOURCE_COUNT, ARTICLE_MIN_CLAIM_SUPPORT_RATIO, get_token_budget, DEFAULT_MAX_TOKENS, TRUNCATION
-from reasoner.domain.pipeline_state import PipelineState
+import reasoner.phases as phases
+from reasoner.application.flows.base import WorkflowServices
+from reasoner.core.constants import (
+    DEFAULT_MAX_TOKENS,
+    get_token_budget,
+)
 from reasoner.domain.core_types import (
     FinalSolution,
     MetaCognitiveAudit,
 )
+from reasoner.domain.pipeline_state import PipelineState
 from reasoner.models import (
     ClaimLabel,
-    TaskType,
 )
-from reasoner.parsing import extract_solution_prose, extract_json, strip_json_fences, ParseError, parse_evidence_bundles
+from reasoner.parsing import (
+    ParseError,
+    extract_json,
+    extract_solution_prose,
+    parse_evidence_bundles,
+    strip_json_fences,
+)
 from reasoner.sanitization import clean_llm_artifacts_with_report
-import reasoner.phases as phases
-from reasoner.application.flows.base import WorkflowServices
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +35,7 @@ async def run_synthesis_phase(state: PipelineState, services: WorkflowServices) 
 
     # Simplified synthesis logic extracted from pipeline.py
     from reasoner.pipeline import TOKEN_OPTIMIZATION, USE_PHASE_SUBAGENTS
-    
+
     # ── Subagent path (opt-in via env) ────────────────────────────
     if USE_PHASE_SUBAGENTS["synthesis"]:
         from reasoner.subagents.synthesis.hyper_agent import SynthesisHyperAgent
@@ -49,7 +56,7 @@ async def run_synthesis_phase(state: PipelineState, services: WorkflowServices) 
         state=state,
         max_tokens=get_token_budget("synthesis") if TOKEN_OPTIMIZATION["dynamic_budgets"] else DEFAULT_MAX_TOKENS
     )
-    
+
     try:
         json_data = extract_json(raw) or {}
     except ParseError as exc:

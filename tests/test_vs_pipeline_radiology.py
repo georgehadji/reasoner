@@ -1,19 +1,21 @@
 """E2E test: Radiology pipeline with VS enabled."""
 from __future__ import annotations
-from tests.utils.mocks import MockLLM, MockNLI
 
 import pytest
-from unittest.mock import AsyncMock
 
-from reasoner.phases.vs_probe_generation import generate_probes_with_vs, ProbeGenerationConfig
-from reasoner.phases.vs_decomposition import decompose_with_vs, DecompositionVSConfig
-from reasoner.phases.vs_generation import generate_with_vs, VSGenerationConfig, GenerationStrategy
 from reasoner.phases.vs_calibration import extract_calibration_signals
-from reasoner.phases.vs_claim_extraction import extract_claims_from_vs_candidates, ClaimExtractionMode, VSClaimExtractionConfig
-from reasoner.phases.vs_verification_routing import route_claim_by_vs_probability, VerificationRoute
+from reasoner.phases.vs_claim_extraction import (
+    ClaimExtractionMode,
+    VSClaimExtractionConfig,
+    extract_claims_from_vs_candidates,
+)
 from reasoner.phases.vs_conflict_surfacing import surface_cross_candidate_conflicts
-from reasoner.vs_config import VSFeatureFlags, VSDeploymentProfile
-
+from reasoner.phases.vs_decomposition import DecompositionVSConfig, decompose_with_vs
+from reasoner.phases.vs_generation import GenerationStrategy, VSGenerationConfig, generate_with_vs
+from reasoner.phases.vs_probe_generation import ProbeGenerationConfig, generate_probes_with_vs
+from reasoner.phases.vs_verification_routing import VerificationRoute, route_claim_by_vs_probability
+from reasoner.vs_config import VSDeploymentProfile, VSFeatureFlags
+from tests.utils.mocks import MockLLM, MockNLI
 
 CANDIDATES_JSON = '{"candidates": [{"text": "Lesion A found in upper lobe", "probability": 0.5}, {"text": "No significant findings", "probability": 0.3}, {"text": "Possible nodule in mediastinum", "probability": 0.2}]}'
 

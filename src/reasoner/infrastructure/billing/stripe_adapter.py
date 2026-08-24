@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 import asyncio
-import os
 import logging
+import os
+from datetime import UTC
 from uuid import UUID, uuid4
 
 import stripe
 
-from reasoner.domain.saas import Subscription, SubscriptionTier, SubscriptionStatus
 from reasoner.application.ports.billing_port import BillingPort
+from reasoner.domain.saas import Subscription, SubscriptionStatus, SubscriptionTier
 
 logger = logging.getLogger(__name__)
 
@@ -194,7 +195,7 @@ class StripeBillingAdapter(BillingPort):
         )
 
     def _timestamp_to_datetime(self, ts: int | None):
-        from datetime import datetime, timezone
+        from datetime import datetime
         if ts is None:
             return None
-        return datetime.fromtimestamp(ts, tz=timezone.utc)
+        return datetime.fromtimestamp(ts, tz=UTC)

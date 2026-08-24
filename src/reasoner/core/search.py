@@ -5,37 +5,17 @@ Provides internal web search capabilities for context enrichment.
 
 from __future__ import annotations
 
-import asyncio
 import importlib
-import json
 import logging
-import os
 import re
-import time
-from datetime import datetime, timezone
-from urllib.parse import urlparse, urlunparse
-from typing import Any, Optional, Literal, Protocol
-
-import httpx
-
-from reasoner.core.temperatures import NON_PHASE_TEMPERATURES
-from reasoner.core.settings import settings
-from reasoner.core.rerank import rerank_documents
-from reasoner.core.constants import (
-    TIMEOUTS,
-    DEFAULT_MAX_DECOMPOSED_QUERIES,
-    DEFAULT_SEARCH_RESULTS,
-    TRUNCATION,
-    MODEL_GEMINI_FLASH,
-    MODEL_QWEN35_9B,
-    MODEL_QWEN35_FLASH,
-)
 
 # ── Dependency Injection for core → infrastructure boundary ───────
 # These are set by api/__init__.py during bootstrap, inverting the
 # dependency: core defines the port, infrastructure provides the impl.
 # Thread-safe via single assignment (not atomic, but set once at startup).
-import threading
+from datetime import UTC, datetime
+from typing import Any, Literal
+from urllib.parse import urlparse
 
 _BUILD_PROVIDER = None
 
@@ -226,7 +206,7 @@ def _parse_freshness(result: dict) -> float:
         return 0.5
     try:
         pub = datetime.fromisoformat(raw.replace("Z", "+00:00"))
-        days_old = max(0, (datetime.now(timezone.utc) - pub).days)
+        days_old = max(0, (datetime.now(UTC) - pub).days)
         return 1.0 / (1.0 + days_old / 365.0)
     except Exception:
         return 0.5
@@ -285,7 +265,6 @@ def _should_include_result(result: dict[str, Any]) -> bool:
 #  Discovery Client
 # ─────────────────────────────────────────────
 
-from reasoner.core.ports.search_port import SearchServicePort
 
 _DISCOVERY_EXPORTS = {
     "PerplexitySearchClient",

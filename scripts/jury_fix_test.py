@@ -1,9 +1,13 @@
 """Quick jury fix verification."""
-import asyncio, sys, time
+import asyncio
+import sys
+import time
+
 sys.path.insert(0, r'E:\Documents\Vibe-Coding\Reasoner\src')
+from reasoner.application.services.preset_service import PresetService
 from reasoner.core.settings import settings
 from reasoner.pipeline import ReasonerPipeline
-from reasoner.application.services.preset_service import PresetService
+
 
 async def main():
     if not settings.OPENROUTER_API_KEY:

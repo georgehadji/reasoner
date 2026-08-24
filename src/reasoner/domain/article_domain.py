@@ -12,10 +12,9 @@ mutation inside a phase is fine; immutability is enforced only at phase
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Generic, TypeVar, Union
-
 
 # ═════════════════════════════════════════════════════════════════════
 # Typed effects: Result[T, E]
@@ -485,7 +484,7 @@ class Budget:
     def remaining_seconds(self) -> float:
         return max(0.0, self.seconds_cap - self.seconds_spent)
 
-    def spend(self, usd: float = 0.0, seconds: float = 0.0) -> "Budget":
+    def spend(self, usd: float = 0.0, seconds: float = 0.0) -> Budget:
         """Return a new Budget with added spend (immutable)."""
         return Budget(
             usd_cap=self.usd_cap,

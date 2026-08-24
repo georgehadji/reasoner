@@ -5,19 +5,19 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import math
-from dataclasses import dataclass, field
-from typing import Any, Callable, Literal
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any, Literal
 
-from reasoner.core.ports.search_port import SearchServicePort, SourceType
+from reasoner.application.flows.base import WorkflowServices
+from reasoner.core.constants_limits import TRUNCATION
 from reasoner.core.ports.file_search_port import FileSearchPort
 from reasoner.core.ports.llm_port import LLMPort
+from reasoner.core.ports.search_port import SearchServicePort, SourceType
 from reasoner.core.search import _normalize_url
-from reasoner.domain.pipeline_state import PipelineState
-from reasoner.application.flows.base import WorkflowServices
-from reasoner.parsing import extract_json, ParseError
-from reasoner.core.constants_limits import TRUNCATION
 from reasoner.core.settings import settings
+from reasoner.domain.pipeline_state import PipelineState
+from reasoner.parsing import ParseError, extract_json
 from reasoner.phases import prism_research_system
 
 logger = logging.getLogger(__name__)

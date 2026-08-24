@@ -102,6 +102,7 @@ def _log_error(
     # Persist to ErrorStore (fire and forget, don't block response)
     try:
         import asyncio
+
         from reasoner.infrastructure.persistence.error_store import ErrorEntry
 
         store = _get_error_store()

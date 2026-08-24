@@ -9,9 +9,8 @@ asserted. This operationalizes "a label is a claim about evidence, not confidenc
 
 from __future__ import annotations
 
-from reasoner.domain.core_types import EvidenceBundle, FinalSolution
-from reasoner.domain.models import ClaimLabel
 from reasoner.core.constants_limits import EVIDENCE_SENSOR_SOURCES
+from reasoner.domain.core_types import EvidenceBundle
 
 _SENSOR_SOURCES = set(EVIDENCE_SENSOR_SOURCES)
 

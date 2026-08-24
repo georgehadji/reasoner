@@ -1,33 +1,19 @@
 """Global invariant tests for VS integration."""
 from __future__ import annotations
-from tests.utils.mocks import MockLLM, MockNLI
 
-import ast
-import inspect
-import os
 from pathlib import Path
 
 import pytest
 
 from reasoner.phases.vs_generation import _generate_with_vs_inner
 from reasoner.phases.vs_probe_generation import generate_probes_with_vs
-from reasoner.phases.vs_decomposition import decompose_with_vs
-from reasoner.phases.vs_coverage_audit import audit_claim_coverage_vs
-from reasoner.phases.vs_calibration import extract_calibration_signals
-from reasoner.phases.vs_claim_extraction import extract_claims_from_vs_candidates
-from reasoner.phases.vs_verification_routing import route_claim_by_vs_probability
-from reasoner.phases.vs_conflict_surfacing import surface_cross_candidate_conflicts
-from reasoner.phases.vs_behavioral_audit import log_vs_behavioral_audit
 from reasoner.vs_config import VSFeatureFlags
-
-
-
-
+from tests.utils.mocks import MockLLM, MockNLI
 
 
 class TestLLMCallCounter:
     async def test_generation_makes_exactly_one_llm_call(self) -> None:
-        from reasoner.phases.vs_generation import VSGenerationConfig, GenerationStrategy
+        from reasoner.phases.vs_generation import GenerationStrategy, VSGenerationConfig
 
         llm = MockLLM('{"candidates": [{"text": "a", "probability": 1}]}')
         nli = MockNLI()
@@ -51,7 +37,7 @@ class TestLLMCallCounter:
 
 class TestTaintPropagation:
     async def test_generation_has_vs_metadata(self) -> None:
-        from reasoner.phases.vs_generation import VSGenerationConfig, GenerationStrategy
+        from reasoner.phases.vs_generation import GenerationStrategy, VSGenerationConfig
 
         llm = MockLLM('{"candidates": [{"text": "a", "probability": 1}]}')
         nli = MockNLI()

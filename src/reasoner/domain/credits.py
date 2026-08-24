@@ -19,13 +19,11 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Optional
 from uuid import UUID
 
 from reasoner.domain.saas import SubscriptionTier
-
 
 # 1 credit = $0.001 USD of model spend. A budget run (~$0.02) costs ~20 credits,
 # a premium run (~$0.20) costs ~200 credits.
@@ -82,7 +80,7 @@ class CreditBalance:
     balance: int = 0
     lifetime_granted: int = 0
     lifetime_spent: int = 0
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     @property
     def is_exhausted(self) -> bool:
@@ -108,9 +106,9 @@ class CreditLedgerEntry:
     delta: int                       # positive = granted, negative = spent
     balance_after: int
     reason: CreditReason
-    reference_id: Optional[str] = None   # idempotency key, unique per user
-    description: Optional[str] = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    reference_id: str | None = None   # idempotency key, unique per user
+    description: str | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def to_dict(self) -> dict:
         return {

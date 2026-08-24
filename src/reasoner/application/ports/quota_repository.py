@@ -7,7 +7,8 @@ Implementations may use PostgreSQL, Redis, or a hybrid cache-aside strategy.
 from __future__ import annotations
 
 from typing import Protocol
-from reasoner.domain.saas import UsageQuota, QuotaResult
+
+from reasoner.domain.saas import QuotaResult, UsageQuota
 
 
 class QuotaRepository(Protocol):

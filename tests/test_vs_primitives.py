@@ -3,20 +3,19 @@ from __future__ import annotations
 
 import json
 import math
-from typing import Any
 
 import pytest
 
 from reasoner.reasoner_verbalized_sampling import (
-    VSMode,
     VSCandidate,
+    VSMode,
     VSResult,
+    _extract_json_block,
+    _strip_markdown_fences,
     build_vs_prompt,
     parse_vs_response,
     sample_from_vs,
     top_candidate,
-    _strip_markdown_fences,
-    _extract_json_block,
 )
 
 

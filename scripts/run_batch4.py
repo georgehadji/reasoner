@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
-import sys, asyncio, time, logging
+import asyncio
+import logging
+import sys
+import time
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 for n in list(logging.root.manager.loggerDict.keys()):
     logging.getLogger(n).setLevel(logging.ERROR)
 
 from reasoner.application.orchestrator import PipelineOrchestrator
-from reasoner.application.services.preset_service import PresetService
 from reasoner.application.services.pipeline_service import PipelineService
+from reasoner.application.services.preset_service import PresetService
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.pipeline import ReasonerPipeline
 
@@ -65,7 +69,7 @@ async def run_one(method, prompt, name):
         if result.errors: return {"status":"errors","error":"; ".join(result.errors[:3]),"duration":dt}
         if result.final_solution: return {"status":"success","output":result.final_solution.core_solution,"duration":dt}
         return {"status":"no_output","error":"no final_solution","duration":dt}
-    except asyncio.TimeoutError:
+    except TimeoutError:
         return {"status":"timeout","error":"300s timeout","duration":time.monotonic()-t0}
     except Exception as e:
         return {"status":"exception","error":f"{type(e).__name__}: {str(e)[:150]}","duration":time.monotonic()-t0}

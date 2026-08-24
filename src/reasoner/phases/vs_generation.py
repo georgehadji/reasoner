@@ -8,16 +8,16 @@ from typing import Any, Protocol
 
 from pydantic import BaseModel, Field, field_validator
 
+from reasoner.exceptions import ProviderError
+from reasoner.reasoner_verbalized_sampling import VSMode, build_vs_prompt, parse_vs_response
 from reasoner.reasoner_vs_constants import (
-    VS_K_GENERATION,
-    PROFILE_NLI_BUDGET,
-    LOG_VS_STRATEGY,
+    LOG_VS_CANDIDATE_RANK,
     LOG_VS_K,
     LOG_VS_NLI_SCORES,
-    LOG_VS_CANDIDATE_RANK,
+    LOG_VS_STRATEGY,
+    PROFILE_NLI_BUDGET,
+    VS_K_GENERATION,
 )
-from reasoner.reasoner_verbalized_sampling import VSMode, build_vs_prompt, parse_vs_response
-from reasoner.exceptions import ProviderError
 from reasoner.vs_config import VSDeploymentProfile, VSFeatureFlags
 
 logger = logging.getLogger(__name__)

@@ -1,12 +1,19 @@
 from __future__ import annotations
+
 import json
-from reasoner.domain.pipeline_state import PipelineState
+
 from reasoner.core.constants import (
     ARTICLE_MAX_SOURCES_FOR_CLAIM_EXTRACTION,
     ARTICLE_MIN_SOURCE_COUNT,
     JSON_ONLY_FOOTER,
 )
-from reasoner.phases._shared import get_language_instruction, _wrap_user_input, _wrap_external_content, HUMANIZATION_RULES
+from reasoner.domain.pipeline_state import PipelineState
+from reasoner.phases._shared import (
+    HUMANIZATION_RULES,
+    _wrap_external_content,
+    _wrap_user_input,
+    get_language_instruction,
+)
 
 # ── CoVE for Claims ──────────────────────────────────────────────────────────
 

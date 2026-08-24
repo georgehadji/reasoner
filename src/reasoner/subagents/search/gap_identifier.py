@@ -6,9 +6,8 @@ from __future__ import annotations
 from typing import Any
 
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.subagents.base import PhaseSubAgent
 from reasoner.parsing import extract_json
-
+from reasoner.subagents.base import PhaseSubAgent
 
 GAP_SYSTEM = """You are a Gap Identifier. Your ONE JOB is to identify what evidence or information is still MISSING after reviewing search results.
 

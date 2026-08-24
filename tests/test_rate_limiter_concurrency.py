@@ -4,7 +4,7 @@ import asyncio
 
 import pytest
 
-from reasoner.rate_limiter import RateLimiter, RateLimitConfig
+from reasoner.rate_limiter import RateLimitConfig, RateLimiter
 
 
 class TestRateLimiterConcurrency:

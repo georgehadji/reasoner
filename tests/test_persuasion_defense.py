@@ -2,16 +2,12 @@
 Tests for ara_persuasion_defense.py
 """
 
-import asyncio
-import json
 import logging
-import time
 from typing import Any
 
 import pytest
 
 from reasoner.reasoner_persuasion_defense import (
-    ReasonerPersuasionIntegration,
     ActiveFrictionGate,
     BehavioralAuditStage,
     CoverageAuditStage,
@@ -25,12 +21,12 @@ from reasoner.reasoner_persuasion_defense import (
     PersuasionDefensePipeline,
     PersuasionDefenseResult,
     PersuasionTactic,
+    ReasonerPersuasionIntegration,
     RetrievedChunk,
     TacticDetectionStage,
     TacticReport,
     TaintRecord,
 )
-
 
 # =============================================================================
 # Fakes / Mocks

@@ -9,16 +9,15 @@ Pattern: generator produces answer → critic finds flaws → generator revises 
 
 from __future__ import annotations
 
-import json
 import logging
 from dataclasses import dataclass, field
 from typing import Any
 
-from reasoner.domain.pipeline_state import PipelineState
-from reasoner.domain.core_types import CriticDimensionScore
-from reasoner.application.flows.base import WorkflowServices
-from reasoner.parsing import extract_json
 import reasoner.phases.iterative_critique as ic_phases
+from reasoner.application.flows.base import WorkflowServices
+from reasoner.domain.core_types import CriticDimensionScore
+from reasoner.domain.pipeline_state import PipelineState
+from reasoner.parsing import extract_json
 
 logger = logging.getLogger(__name__)
 

@@ -49,7 +49,7 @@ class RunStateManager:
 
     def __init__(self) -> None:
         self._redis: Any | None = None
-        self._fallback: "RunStateStore | None" = None
+        self._fallback: RunStateStore | None = None
         self._redis_ok: bool = True
         self._redis_last_fail: float = 0.0
         self._redis_cooldown_seconds: float = 5.0
@@ -96,14 +96,14 @@ class RunStateManager:
             logger.warning("Redis run-state failed (%s), falling back to memory", exc)
             raise _RedisUnavailable(str(exc)) from exc
 
-    def _get_fallback(self) -> "RunStateStore":
+    def _get_fallback(self) -> RunStateStore:
         """Lazy-create the in-memory fallback store.
         In production, this should not be used for correctness.
         """
         from reasoner.core.settings import settings
         if settings.ENVIRONMENT == "production":
             raise RuntimeError("In-memory fallback for run state is disabled in production (requires Redis).")
-            
+
         if self._fallback is None:
             logger.warning("Using in-memory fallback for run state (safe only for single-worker/dev).")
             from reasoner.infrastructure.redis.in_memory import RunStateStore
@@ -134,7 +134,7 @@ class RunStateManager:
             except Exception:
                 self._redis_ok = False
                 self._redis_last_fail = time.monotonic()
-        
+
         # If in development/non-production, we can proceed with fallback
         from reasoner.core.settings import settings
         if settings.ENVIRONMENT != "production":

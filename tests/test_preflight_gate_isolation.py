@@ -19,8 +19,8 @@ import pytest
 
 def _orchestrator():
     from reasoner.application.orchestrator import PipelineOrchestrator
-    from reasoner.application.services.preset_service import PresetService
     from reasoner.application.services.pipeline_service import PipelineService
+    from reasoner.application.services.preset_service import PresetService
 
     return PipelineOrchestrator(PresetService(), PipelineService())
 

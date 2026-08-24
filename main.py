@@ -1,6 +1,6 @@
 """CLI entry-point shim. Keeps `python main.py` working."""
-import sys
 import asyncio
+import sys
 from pathlib import Path
 
 # Add src to sys.path

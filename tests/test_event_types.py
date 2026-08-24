@@ -4,22 +4,21 @@ from __future__ import annotations
 
 import pytest
 
+from reasoner.application.event_bus.bus import EventBus, reset_event_bus
 from reasoner.core.events.domain_events import (
-    PipelineEventType,
-    WidgetEventType,
-    MemoryEventType,
-    SaaSEventType,
-    EventType,
     ALL_EVENT_TYPES,
-    PIPELINE_EVENT_CLASSES,
-    WIDGET_EVENT_CLASSES,
-    MEMORY_EVENT_CLASSES,
-    SAAS_EVENT_CLASSES,
     EVENT_CLASSES,
+    MEMORY_EVENT_CLASSES,
+    PIPELINE_EVENT_CLASSES,
+    SAAS_EVENT_CLASSES,
+    WIDGET_EVENT_CLASSES,
+    EventType,
+    MemoryEventType,
+    PipelineEventType,
+    SaaSEventType,
+    WidgetEventType,
     make_event,
-    DomainEvent,
 )
-from reasoner.application.event_bus.bus import EventBus, get_event_bus, reset_event_bus
 
 
 @pytest.fixture(autouse=True)

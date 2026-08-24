@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
 
 from reasoner.application.services.api_key_service import (
+    MAX_EXPIRY_DAYS,
     ApiKeyLimitError,
     ApiKeyService,
-    MAX_EXPIRY_DAYS,
 )
 from reasoner.domain.api_keys import (
     ASSIGNABLE_SCOPES,
@@ -133,18 +133,18 @@ def _key(**overrides) -> ApiKey:
 
 @pytest.mark.unit
 def test_a_revoked_key_is_unusable():
-    assert _key(revoked_at=datetime.now(timezone.utc)).is_usable() is False
+    assert _key(revoked_at=datetime.now(UTC)).is_usable() is False
 
 
 @pytest.mark.unit
 def test_an_expired_key_is_unusable():
-    past = datetime.now(timezone.utc) - timedelta(days=1)
+    past = datetime.now(UTC) - timedelta(days=1)
     assert _key(expires_at=past).is_usable() is False
 
 
 @pytest.mark.unit
 def test_a_fresh_key_is_usable():
-    future = datetime.now(timezone.utc) + timedelta(days=1)
+    future = datetime.now(UTC) + timedelta(days=1)
     assert _key(expires_at=future).is_usable() is True
     assert _key().is_usable() is True
 
@@ -209,7 +209,7 @@ async def test_expired_key_stops_authenticating(service: ApiKeyService, user_id:
         key_hash=minted.key_hash,
         key_prefix=minted.key_prefix,
         scopes=frozenset({"read"}),
-        expires_at=datetime.now(timezone.utc) - timedelta(seconds=1),
+        expires_at=datetime.now(UTC) - timedelta(seconds=1),
     )
 
     assert await expiring.authenticate(minted.plaintext) is None

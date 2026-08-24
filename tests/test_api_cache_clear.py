@@ -1,11 +1,11 @@
 """Tests for the DELETE /api/cache endpoint."""
 
 import json
+
 import pytest
 from fastapi.testclient import TestClient
 
-from reasoner.api import _MEMORY_CACHE, _save_cache, CACHE_DIR, app
-
+from reasoner.api import _MEMORY_CACHE, CACHE_DIR, _save_cache, app
 
 client = TestClient(app)
 

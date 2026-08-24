@@ -10,9 +10,8 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import os
 import re
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 if TYPE_CHECKING:
@@ -23,27 +22,26 @@ if TYPE_CHECKING:
     from reasoner.rate_limiter import RateLimiter
 
 import asyncio
+
 from fastapi import Depends, HTTPException, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 logger = logging.getLogger(__name__)
 
 from reasoner.api.client_ip import get_client_ip
-from reasoner.domain.api_keys import looks_like_api_key
-from reasoner.domain.saas import User, SubscriptionTier, QuotaResult
 from reasoner.application.ports.auth_port import AuthPort
 from reasoner.application.services.auth_service import AuthService
-from reasoner.application.services.quota_service import QuotaService, TIER_LIMITS
-from reasoner.infrastructure.auth import get_auth_adapter
-from reasoner.auth import AuthenticationError as LegacyAuthError
-from reasoner.core.settings import settings
-from reasoner.rate_limiter import RateLimitConfig, get_rate_limiter
-from reasoner.presets import get_preset_tier
-from reasoner.application.services.preset_service import PresetService
 from reasoner.application.services.pipeline_service import PipelineService
+from reasoner.application.services.preset_service import PresetService
+from reasoner.application.services.quota_service import QuotaService
 from reasoner.application.services.search_service import SearchService
 from reasoner.application.services.watermark_service import WatermarkService
-
+from reasoner.auth import AuthenticationError as LegacyAuthError
+from reasoner.core.settings import settings
+from reasoner.domain.api_keys import looks_like_api_key
+from reasoner.domain.saas import QuotaResult, SubscriptionTier, User
+from reasoner.infrastructure.auth import get_auth_adapter
+from reasoner.rate_limiter import RateLimitConfig, get_rate_limiter
 
 # ── Rate Limiter Singleton ──
 _rate_limiter_instance: RateLimiter | None = None
@@ -245,7 +243,7 @@ async def _resolve_auth_token(token: str) -> User:
 
 async def get_current_user(
     request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
 ) -> User:
     """
     Require valid authentication (JWT or legacy API key).
@@ -278,8 +276,8 @@ async def get_current_user(
 
 async def get_optional_user(
     request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-) -> Optional[User]:
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+) -> User | None:
     """Optional authentication — returns None if no valid credentials."""
     if not credentials:
         return None
@@ -346,7 +344,7 @@ def require_tier(min_tier: SubscriptionTier):
 async def check_rate_limit(
     request: Request,
     user: User | None = Depends(get_optional_user),
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
 ):
     """
     Check rate limit using user_id if authenticated, otherwise IP.
@@ -406,8 +404,8 @@ def _get_quota_service() -> QuotaService:
     """Factory for QuotaService with cached Postgres repository."""
     global _quota_service
     if _quota_service is None:
-        from reasoner.infrastructure.persistence.quota_repo_postgres import PostgresQuotaRepository
         from reasoner.infrastructure.persistence.cached_quota_repo import CachedQuotaRepository
+        from reasoner.infrastructure.persistence.quota_repo_postgres import PostgresQuotaRepository
         dsn = settings.DATABASE_URL.replace("+asyncpg", "")
         pg_repo = PostgresQuotaRepository(dsn, pool_size=settings.DB_POOL_SIZE)
         cached_repo = CachedQuotaRepository(pg_repo)
@@ -415,8 +413,8 @@ def _get_quota_service() -> QuotaService:
     return _quota_service
 
 # ── Credit & API Key Service Singletons ──
-_credit_service: "CreditService | None" = None
-_api_key_service: "ApiKeyService | None" = None
+_credit_service: CreditService | None = None
+_api_key_service: ApiKeyService | None = None
 
 
 def _persistence_is_configured() -> bool:
@@ -437,7 +435,7 @@ def _require_persistence(feature: str) -> None:
         )
 
 
-def _get_credit_service() -> "CreditService":
+def _get_credit_service() -> CreditService:
     """Factory for CreditService, backed by Postgres when configured."""
     global _credit_service
     if _credit_service is None:
@@ -462,7 +460,7 @@ def _get_credit_service() -> "CreditService":
     return _credit_service
 
 
-def _get_api_key_service() -> "ApiKeyService":
+def _get_api_key_service() -> ApiKeyService:
     """Factory for ApiKeyService, backed by Postgres when configured."""
     global _api_key_service
     if _api_key_service is None:
@@ -634,6 +632,8 @@ def get_event_store(request: Request):
 # both paths share one definition of what entitles a user to a tier.
 from reasoner.application.services.spend_limit_service import (  # noqa: E402
     _reset_subscription_repo,
+)
+from reasoner.application.services.spend_limit_service import (
     resolve_user_tier as _resolve_user_tier,
 )
 

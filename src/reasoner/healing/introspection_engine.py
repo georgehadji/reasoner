@@ -26,11 +26,11 @@ import logging
 import os
 import sys
 from collections import defaultdict
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
-from datetime import datetime, timezone
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -59,9 +59,9 @@ class FunctionInfo:
     module: str
     file_path: str
     line_number: int
-    inputs: List[str] = field(default_factory=list)
-    outputs: List[str] = field(default_factory=list)
-    side_effects: List[str] = field(default_factory=list)
+    inputs: list[str] = field(default_factory=list)
+    outputs: list[str] = field(default_factory=list)
+    side_effects: list[str] = field(default_factory=list)
     has_tests: bool = False
     coverage_percent: float = 0.0
     complexity_score: int = 1
@@ -72,8 +72,8 @@ class FunctionInfo:
     has_error_handling: bool = False
     is_public: bool = True
     is_async: bool = False
-    decorators: List[str] = field(default_factory=list)
-    calls_external: List[str] = field(default_factory=list)
+    decorators: list[str] = field(default_factory=list)
+    calls_external: list[str] = field(default_factory=list)
     bare_except_count: int = 0
 
 
@@ -82,10 +82,10 @@ class ModuleInfo:
     """Information about a module."""
     name: str
     file_path: str
-    functions: List[str] = field(default_factory=list)
-    classes: List[str] = field(default_factory=list)
-    imports_internal: List[str] = field(default_factory=list)
-    imports_external: List[str] = field(default_factory=list)
+    functions: list[str] = field(default_factory=list)
+    classes: list[str] = field(default_factory=list)
+    imports_internal: list[str] = field(default_factory=list)
+    imports_external: list[str] = field(default_factory=list)
     has_tests: bool = False
     is_dead_code: bool = False
 
@@ -117,7 +117,7 @@ class TypeCoverageGap:
     item_type: str
     name: str
     file_path: str
-    missing_annotations: List[str] = field(default_factory=list)
+    missing_annotations: list[str] = field(default_factory=list)
     has_any_type: bool = False
     severity: Severity = Severity.P2
 
@@ -141,16 +141,16 @@ class IntrospectionReport:
     total_modules: int
     total_functions: int
     total_classes: int
-    functions: List[FunctionInfo] = field(default_factory=list)
-    modules: List[ModuleInfo] = field(default_factory=list)
-    dependency_graph: List[DependencyEdge] = field(default_factory=list)
-    dead_code: List[DeadCodeItem] = field(default_factory=list)
-    type_gaps: List[TypeCoverageGap] = field(default_factory=list)
-    error_gaps: List[ErrorHandlingGap] = field(default_factory=list)
-    circular_dependencies: List[List[str]] = field(default_factory=list)
-    complexity_summary: Dict[str, int] = field(default_factory=dict)
-    coverage_summary: Dict[str, Any] = field(default_factory=dict)
-    severity_summary: Dict[str, int] = field(default_factory=dict)
+    functions: list[FunctionInfo] = field(default_factory=list)
+    modules: list[ModuleInfo] = field(default_factory=list)
+    dependency_graph: list[DependencyEdge] = field(default_factory=list)
+    dead_code: list[DeadCodeItem] = field(default_factory=list)
+    type_gaps: list[TypeCoverageGap] = field(default_factory=list)
+    error_gaps: list[ErrorHandlingGap] = field(default_factory=list)
+    circular_dependencies: list[list[str]] = field(default_factory=list)
+    complexity_summary: dict[str, int] = field(default_factory=dict)
+    coverage_summary: dict[str, Any] = field(default_factory=dict)
+    severity_summary: dict[str, int] = field(default_factory=dict)
 
 
 class CodebaseIntrospector:
@@ -159,19 +159,19 @@ class CodebaseIntrospector:
     
     Scans the codebase and generates comprehensive reports.
     """
-    
-    def __init__(self, project_root: str, test_dirs: Optional[List[str]] = None):
+
+    def __init__(self, project_root: str, test_dirs: list[str] | None = None):
         self.project_root = Path(project_root)
         self.test_dirs = test_dirs or ["tests", "test_*"]
-        self.functions: Dict[str, FunctionInfo] = {}
-        self.modules: Dict[str, ModuleInfo] = {}
-        self.imports_internal: Dict[str, Set[str]] = defaultdict(set)
-        self.imports_external: Dict[str, Set[str]] = defaultdict(set)
-        self.test_coverage: Dict[str, float] = {}
-        self.dead_code: List[DeadCodeItem] = []
-        self.type_gaps: List[TypeCoverageGap] = []
-        self.error_gaps: List[ErrorHandlingGap] = []
-        
+        self.functions: dict[str, FunctionInfo] = {}
+        self.modules: dict[str, ModuleInfo] = {}
+        self.imports_internal: dict[str, set[str]] = defaultdict(set)
+        self.imports_external: dict[str, set[str]] = defaultdict(set)
+        self.test_coverage: dict[str, float] = {}
+        self.dead_code: list[DeadCodeItem] = []
+        self.type_gaps: list[TypeCoverageGap] = []
+        self.error_gaps: list[ErrorHandlingGap] = []
+
     def scan(self) -> IntrospectionReport:
         """
         Perform complete codebase scan.
@@ -180,90 +180,90 @@ class CodebaseIntrospector:
             IntrospectionReport with all findings
         """
         logger.info(f"Starting introspection of {self.project_root}")
-        
+
         # Step 1: Discover all Python modules
         logger.info("Step 1: Discovering Python modules...")
         python_files = self._discover_python_files()
         logger.info(f"  Found {len(python_files)} Python files")
-        
+
         # Step 2: Parse each module
         logger.info("Step 2: Parsing modules...")
         for file_path in python_files:
             self._parse_module(file_path)
         logger.info(f"  Parsed {len(self.modules)} modules")
-        
+
         # Step 3: Map test coverage
         logger.info("Step 3: Mapping test coverage...")
         self._map_test_coverage()
-        
+
         # Step 4: Build dependency graph
         logger.info("Step 4: Building dependency graph...")
         dependency_edges = self._build_dependency_graph()
-        
+
         # Step 5: Detect circular dependencies
         logger.info("Step 5: Detecting circular dependencies...")
         circular_deps = self._detect_circular_dependencies()
         if circular_deps:
             logger.warning(f"  Found {len(circular_deps)} circular dependencies")
-        
+
         # Step 6: Identify dead code
         logger.info("Step 6: Identifying dead code...")
         self._identify_dead_code()
-        
+
         # Step 7: Map type coverage gaps
         logger.info("Step 7: Mapping type coverage gaps...")
         self._map_type_gaps()
-        
+
         # Step 8: Map error handling gaps
         logger.info("Step 8: Mapping error handling gaps...")
         self._map_error_gaps()
-        
+
         # Step 9: Calculate complexity scores
         logger.info("Step 9: Calculating complexity scores...")
         self._calculate_complexity()
-        
+
         # Step 10: Generate report
         logger.info("Step 10: Generating report...")
         return self._generate_report(dependency_edges, circular_deps)
-    
-    def _discover_python_files(self) -> List[Path]:
+
+    def _discover_python_files(self) -> list[Path]:
         """Discover all Python files in project."""
         python_files = []
         exclude_dirs = {
-            '__pycache__', '.pytest_cache', '.git', '.venv', 
+            '__pycache__', '.pytest_cache', '.git', '.venv',
             'venv', 'node_modules', '.claude', 'cache', 'uploads',
             '.worktrees'
         }
-        
+
         for root, dirs, files in os.walk(self.project_root):
             # Exclude certain directories
             dirs[:] = [d for d in dirs if d not in exclude_dirs]
-            
+
             for file in files:
                 if file.endswith('.py'):
                     file_path = Path(root) / file
                     # Skip test files for function inventory
                     if not any(part.startswith('test_') for part in file_path.parts):
                         python_files.append(file_path)
-        
+
         return python_files
-    
+
     def _parse_module(self, file_path: Path) -> None:
         """Parse a single Python module."""
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, encoding='utf-8') as f:
                 source = f.read()
-            
+
             tree = ast.parse(source, filename=str(file_path))
             relative_path = file_path.relative_to(self.project_root)
             module_name = str(relative_path.with_suffix('')).replace(os.sep, '.')
-            
+
             # Create module info
             module_info = ModuleInfo(
                 name=module_name,
                 file_path=str(relative_path),
             )
-            
+
             # Extract imports
             for node in ast.walk(tree):
                 if isinstance(node, ast.Import):
@@ -282,14 +282,14 @@ class CodebaseIntrospector:
                         else:
                             module_info.imports_external.append(node.module)
                             self.imports_external[module_name].add(node.module)
-            
+
             # Extract functions and classes
             for node in tree.body:
                 if isinstance(node, ast.FunctionDef) or isinstance(node, ast.AsyncFunctionDef):
                     func_info = self._extract_function_info(node, file_path, module_name)
                     self.functions[func_info.id] = func_info
                     module_info.functions.append(func_info.id)
-                    
+
                 elif isinstance(node, ast.ClassDef):
                     module_info.classes.append(node.name)
                     # Extract methods
@@ -300,49 +300,49 @@ class CodebaseIntrospector:
                             )
                             self.functions[method_info.id] = method_info
                             module_info.functions.append(method_info.id)
-            
+
             self.modules[module_name] = module_info
-            
+
         except Exception as e:
             logger.error(f"Failed to parse {file_path}: {e}")
-    
+
     def _extract_function_info(
-        self, 
-        node: ast.AST, 
-        file_path: Path, 
+        self,
+        node: ast.AST,
+        file_path: Path,
         module_name: str,
-        class_name: Optional[str] = None
+        class_name: str | None = None
     ) -> FunctionInfo:
         """Extract function information from AST node."""
         name = node.name
         func_id = f"{module_name}.{class_name}.{name}" if class_name else f"{module_name}.{name}"
         relative_path = file_path.relative_to(self.project_root)
-        
+
         # Extract inputs (arguments)
         inputs = []
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             for arg in node.args.args:
                 inputs.append(arg.arg)
-        
+
         # Check for docstring
         has_docstring = (
-            isinstance(node.body[0], ast.Expr) and 
-            isinstance(node.body[0].value, ast.Constant) and 
+            isinstance(node.body[0], ast.Expr) and
+            isinstance(node.body[0].value, ast.Constant) and
             isinstance(node.body[0].value.value, str)
         ) if node.body else False
-        
+
         # Check for type annotations
         has_type_annotations = all(
-            arg.annotation is not None 
-            for arg in node.args.args 
+            arg.annotation is not None
+            for arg in node.args.args
             if arg.arg != 'self' and arg.arg != 'cls'
         ) if node.args else True
-        
+
         # Check for error handling
         has_error_handling = False
         bare_except_count = 0
         calls_external = []
-        
+
         for child in ast.walk(node):
             if isinstance(child, ast.Try):
                 has_error_handling = True
@@ -355,10 +355,10 @@ class CodebaseIntrospector:
                     calls_external.append(child.func.attr)
                 elif isinstance(child.func, ast.Name):
                     calls_external.append(child.func.id)
-        
+
         # Determine if public
         is_public = not name.startswith('_')
-        
+
         # Get decorators
         decorators = []
         for decorator in node.decorator_list:
@@ -366,7 +366,7 @@ class CodebaseIntrospector:
                 decorators.append(decorator.id)
             elif isinstance(decorator, ast.Attribute):
                 decorators.append(decorator.attr)
-        
+
         return FunctionInfo(
             id=func_id,
             name=name,
@@ -383,7 +383,7 @@ class CodebaseIntrospector:
             calls_external=list(set(calls_external))[:10],  # Limit to 10
             bare_except_count=bare_except_count,
         )
-    
+
     def _map_test_coverage(self) -> None:
         """Map test coverage to functions."""
         # Simple heuristic: check if test file exists for module
@@ -391,13 +391,13 @@ class CodebaseIntrospector:
             # Check if corresponding test file exists
             test_file_name = f"test_{module_info.file_path.replace(os.sep, '_').replace('.py', '')}.py"
             test_file = self.project_root / test_file_name
-            
+
             # Also check tests/ directory
             test_file_alt = self.project_root / "tests" / f"test_{Path(module_info.file_path).stem}.py"
-            
+
             has_test = test_file.exists() or test_file_alt.exists()
             module_info.has_tests = has_test
-            
+
             # Update functions in this module
             for func_id in module_info.functions:
                 if func_id in self.functions:
@@ -406,11 +406,11 @@ class CodebaseIntrospector:
                     if has_test:
                         self.functions[func_id].coverage_percent = 50.0  # Assume 50% if test exists
                     self.test_coverage[func_id] = self.functions[func_id].coverage_percent
-    
-    def _build_dependency_graph(self) -> List[DependencyEdge]:
+
+    def _build_dependency_graph(self) -> list[DependencyEdge]:
         """Build dependency graph from imports."""
         edges = []
-        
+
         for module_name, imports in self.imports_internal.items():
             for imp in imports:
                 edges.append(DependencyEdge(
@@ -418,7 +418,7 @@ class CodebaseIntrospector:
                     target=imp,
                     dependency_type="internal",
                 ))
-        
+
         for module_name, imports in self.imports_external.items():
             for imp in imports:
                 edges.append(DependencyEdge(
@@ -426,21 +426,21 @@ class CodebaseIntrospector:
                     target=imp,
                     dependency_type="external",
                 ))
-        
+
         return edges
-    
-    def _detect_circular_dependencies(self) -> List[List[str]]:
+
+    def _detect_circular_dependencies(self) -> list[list[str]]:
         """Detect circular dependencies using DFS."""
         circular = []
         visited = set()
         rec_stack = set()
         path = []
-        
+
         def dfs(module_name: str) -> None:
             visited.add(module_name)
             rec_stack.add(module_name)
             path.append(module_name)
-            
+
             for dep in self.imports_internal.get(module_name, set()):
                 if dep not in visited:
                     dfs(dep)
@@ -449,31 +449,31 @@ class CodebaseIntrospector:
                     cycle_start = path.index(dep)
                     cycle = path[cycle_start:] + [dep]
                     circular.append(cycle)
-            
+
             path.pop()
             rec_stack.remove(module_name)
-        
+
         for module_name in self.modules:
             if module_name not in visited:
                 dfs(module_name)
-        
+
         return circular
-    
+
     def _identify_dead_code(self) -> None:
         """Identify potentially dead code."""
         called_functions = set()
-        
+
         # Collect all function calls across codebase
         for func_info in self.functions.values():
             called_functions.update(func_info.calls_external)
-        
+
         # Check for uncalled public functions
         for func_info in self.functions.values():
             if func_info.is_public and func_info.name not in called_functions:
                 # Check if it's an entry point (main, app, etc.)
                 if func_info.name in ['main', 'app', 'create_app', 'run']:
                     continue
-                
+
                 self.dead_code.append(DeadCodeItem(
                     item_type="function",
                     name=func_info.name,
@@ -483,7 +483,7 @@ class CodebaseIntrospector:
                     severity=Severity.P3,
                     auto_fix_available=False,  # Requires human review
                 ))
-        
+
         # Check for unused imports
         for _module_name, module_info in self.modules.items():
             for imp in module_info.imports_external:
@@ -498,7 +498,7 @@ class CodebaseIntrospector:
                         severity=Severity.P3,
                         auto_fix_available=True,
                     ))
-    
+
     def _map_type_gaps(self) -> None:
         """Map type annotation gaps."""
         for func_info in self.functions.values():
@@ -510,7 +510,7 @@ class CodebaseIntrospector:
                     missing_annotations=func_info.inputs,
                     severity=Severity.P2 if func_info.complexity_score > 5 else Severity.P3,
                 ))
-    
+
     def _map_error_gaps(self) -> None:
         """Map error handling gaps."""
         for func_info in self.functions.values():
@@ -524,11 +524,11 @@ class CodebaseIntrospector:
                     severity=Severity.P1,
                     recommendation="Replace bare 'except:' with specific exception types",
                 ))
-            
+
             # Check for I/O operations without error handling
             io_keywords = ['open', 'read', 'write', 'request', 'query', 'execute']
             has_io = any(io in func_info.calls_external for io in io_keywords)
-            
+
             if has_io and not func_info.has_error_handling and func_info.is_public:
                 self.error_gaps.append(ErrorHandlingGap(
                     function_name=func_info.name,
@@ -538,7 +538,7 @@ class CodebaseIntrospector:
                     severity=Severity.P1,
                     recommendation="Add try/except block around I/O operations",
                 ))
-    
+
     def _calculate_complexity(self) -> None:
         """Calculate complexity scores for all functions."""
         for func_info in self.functions.values():
@@ -546,24 +546,24 @@ class CodebaseIntrospector:
             # - Number of lines (estimated)
             # - Number of branches (if/elif/else/for/while)
             # - Number of function calls
-            
+
             # Base complexity
             complexity = 1
-            
+
             # Add for inputs
             complexity += len(func_info.inputs) * 0.5
-            
+
             # Add for external calls
             complexity += len(func_info.calls_external) * 0.3
-            
+
             # Adjust for async (more complex)
             if func_info.is_async:
                 complexity += 1
-            
+
             # Round and cap
             complexity = min(20, int(complexity))
             func_info.complexity_score = complexity
-            
+
             # Determine level
             if complexity <= 5:
                 func_info.complexity_level = ComplexityLevel.LOW
@@ -577,11 +577,11 @@ class CodebaseIntrospector:
             else:
                 func_info.complexity_level = ComplexityLevel.CRITICAL
                 func_info.severity = Severity.P0
-    
+
     def _generate_report(
-        self, 
-        dependency_edges: List[DependencyEdge],
-        circular_deps: List[List[str]]
+        self,
+        dependency_edges: list[DependencyEdge],
+        circular_deps: list[list[str]]
     ) -> IntrospectionReport:
         """Generate final introspection report."""
         # Calculate summaries
@@ -591,22 +591,22 @@ class CodebaseIntrospector:
             "HIGH": sum(1 for f in self.functions.values() if f.complexity_level == ComplexityLevel.HIGH),
             "CRITICAL": sum(1 for f in self.functions.values() if f.complexity_level == ComplexityLevel.CRITICAL),
         }
-        
+
         severity_summary = {
             "P0": sum(1 for f in self.functions.values() if f.severity == Severity.P0),
             "P1": len([g for g in self.error_gaps if g.severity == Severity.P1]),
             "P2": len(self.type_gaps),
             "P3": len(self.dead_code),
         }
-        
+
         coverage_summary = {
             "total_functions": len(self.functions),
             "tested_functions": sum(1 for f in self.functions.values() if f.has_tests),
             "average_coverage": sum(f.coverage_percent for f in self.functions.values()) / max(1, len(self.functions)),
         }
-        
+
         return IntrospectionReport(
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             project_root=str(self.project_root),
             total_modules=len(self.modules),
             total_functions=len(self.functions),
@@ -629,24 +629,24 @@ def generate_markdown_report(report: IntrospectionReport) -> str:
     md = []
     md.append("# Codebase Introspection Report")
     md.append(f"\n**Generated:** {report.timestamp}\n")
-    
+
     md.append("## Summary\n")
     md.append(f"- **Total Modules:** {report.total_modules}")
     md.append(f"- **Total Functions:** {report.total_functions}")
     md.append(f"- **Total Classes:** {report.total_classes}")
     md.append(f"- **Average Coverage:** {report.coverage_summary['average_coverage']:.1f}%\n")
-    
+
     md.append("## Complexity Distribution\n")
     for level, count in report.complexity_summary.items():
         md.append(f"- **{level}:** {count}")
     md.append("")
-    
+
     md.append("## Severity Summary\n")
     for severity, count in report.severity_summary.items():
         if count > 0:
             md.append(f"- **{severity}:** {count}")
     md.append("")
-    
+
     # Critical functions (P0)
     critical_funcs = [f for f in report.functions if f.severity == Severity.P0]
     if critical_funcs:
@@ -656,7 +656,7 @@ def generate_markdown_report(report: IntrospectionReport) -> str:
         for func in critical_funcs[:10]:
             md.append(f"| {func.name} | {func.module} | {func.complexity_score} |")
         md.append("")
-    
+
     # Error handling gaps
     if report.error_gaps:
         md.append("## Error Handling Gaps\n")
@@ -667,7 +667,7 @@ def generate_markdown_report(report: IntrospectionReport) -> str:
         for gap in report.error_gaps[:20]:
             md.append(f"| {gap.function_name} | {gap.file_path} | {gap.gap_type} | {gap.recommendation} |")
         md.append("")
-    
+
     # Type gaps
     if report.type_gaps:
         md.append("## Type Annotation Gaps\n")
@@ -679,7 +679,7 @@ def generate_markdown_report(report: IntrospectionReport) -> str:
             missing = ", ".join(gap.missing_annotations) if gap.missing_annotations else "All"
             md.append(f"| {gap.name} | {gap.file_path} | {missing} |")
         md.append("")
-    
+
     # Dead code
     if report.dead_code:
         md.append("## Dead Code\n")
@@ -690,7 +690,7 @@ def generate_markdown_report(report: IntrospectionReport) -> str:
         for item in report.dead_code[:20]:
             md.append(f"| {item.item_type} | {item.name} | {item.file_path} | {item.reason} |")
         md.append("")
-    
+
     # Circular dependencies
     if report.circular_dependencies:
         md.append("## Circular Dependencies\n")
@@ -698,7 +698,7 @@ def generate_markdown_report(report: IntrospectionReport) -> str:
         for i, cycle in enumerate(report.circular_dependencies, 1):
             md.append(f"{i}. {' → '.join(cycle)}")
         md.append("")
-    
+
     return "\n".join(md)
 
 
@@ -708,18 +708,18 @@ def main():
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
-    
+
     # Determine project root
     project_root = Path(__file__).parent.parent
-    
+
     # Run introspection
     introspector = CodebaseIntrospector(str(project_root))
     report = introspector.scan()
-    
+
     # Save JSON report
     json_path = project_root / "healing" / "introspection_report.json"
     json_path.parent.mkdir(exist_ok=True)
-    
+
     # Convert to dict for JSON serialization
     report_dict = {
         "timestamp": report.timestamp,
@@ -738,18 +738,18 @@ def main():
         "coverage_summary": report.coverage_summary,
         "severity_summary": report.severity_summary,
     }
-    
+
     with open(json_path, 'w', encoding='utf-8') as f:
         json.dump(report_dict, f, indent=2)
     logger.info(f"JSON report saved to {json_path}")
-    
+
     # Save Markdown report
     md_report = generate_markdown_report(report)
     md_path = project_root / "healing" / "introspection_report.md"
     with open(md_path, 'w', encoding='utf-8') as f:
         f.write(md_report)
     logger.info(f"Markdown report saved to {md_path}")
-    
+
     # Print summary
     print("\n" + "="*80)
     print("INTROSPECTION COMPLETE")
@@ -762,7 +762,7 @@ def main():
     print(f"P2 Issues: {report.severity_summary['P2']}")
     print(f"P3 Issues: {report.severity_summary['P3']}")
     print("="*80)
-    
+
     # SELF-VERIFICATION BLOCK
     # This block verifies the introspection engine itself
     print("\nSELF-VERIFICATION:")
@@ -772,22 +772,22 @@ def main():
             source = f.read()
         ast.parse(source)  # Syntax check
         print("[OK] Syntax valid")
-        
+
         # Check all functions are discoverable
         tree = ast.parse(source)
         functions = [n.name for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)]
         assert len(functions) > 0, "No functions found"
         print(f"[OK] {len(functions)} functions discoverable")
-        
+
         # Verify report was generated
         assert json_path.exists(), "JSON report not generated"
         print("[OK] JSON report generated")
-        
+
         assert md_path.exists(), "Markdown report not generated"
         print("[OK] Markdown report generated")
-        
+
         print("\n[PASS] ALL SELF-VERIFICATION CHECKS PASSED")
-        
+
     except Exception as e:
         print(f"\n[FAIL] SELF-VERIFICATION FAILED: {e}")
         sys.exit(1)

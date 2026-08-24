@@ -1,17 +1,16 @@
 """Tests for cross-language reasoning and DeepL translation."""
 
-import json
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from reasoner.models import PipelineState, FinalSolution, MetaCognitiveAudit
+import pytest
+
 from reasoner.infrastructure.translation.deepl_client import (
-    DeepLClient,
-    get_deepl_client,
-    reset_deepl_client,
     FREE_BASE_URL,
     PAID_BASE_URL,
+    DeepLClient,
+    reset_deepl_client,
 )
+from reasoner.models import FinalSolution, MetaCognitiveAudit, PipelineState
 
 
 def _make_mock_router():
@@ -262,7 +261,6 @@ class TestCrossLanguagePreset:
 
     def test_preset_requires_deepl_key(self):
         """Cross-language presets should require DEEPL_API_KEY."""
-        from reasoner.domain.preset_registry import PRESETS
         from reasoner.domain.preset_registry import get_preset
         # PRESETS holds raw config dicts; get_preset() builds the PipelinePreset.
         preset = get_preset("cross-language-budget")

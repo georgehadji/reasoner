@@ -4,25 +4,25 @@ Tests for Domain Events
 Tests the event sourcing foundation of the new architecture.
 """
 
-import pytest
 import time
-from dataclasses import asdict
+
+import pytest
 
 from reasoner.core.events.domain_events import (
-    EventType,
-    WidgetEventType,
-    MemoryEventType,
     DomainEvent,
-    PipelineStarted,
+    EventType,
+    MemoryEventType,
     PhaseCompleted,
     PipelineCompleted,
+    PipelineStarted,
+    WidgetEventType,
     make_event,
 )
 
 
 class TestDomainEvent:
     """Tests for base DomainEvent class."""
-    
+
     def test_event_creation(self):
         """Test basic event creation."""
         event = DomainEvent(
@@ -33,13 +33,13 @@ class TestDomainEvent:
             version=1,
             metadata={"phase": "classification"},
         )
-        
+
         assert event.event_id == "test-123"
         assert event.event_type == EventType.PHASE_STARTED
         assert event.aggregate_id == "agg-456"
         assert event.version == 1
         assert event.metadata["phase"] == "classification"
-    
+
     def test_event_to_dict(self):
         """Test event serialization."""
         event = DomainEvent(
@@ -49,14 +49,14 @@ class TestDomainEvent:
             aggregate_id="agg-456",
             version=1,
         )
-        
+
         data = event.to_dict()
-        
+
         assert data["event_id"] == "test-123"
         assert data["event_type"] == "phase_started"
         assert data["aggregate_id"] == "agg-456"
         assert data["version"] == 1
-    
+
     def test_event_immutability(self):
         """Test that events are frozen (immutable)."""
         event = DomainEvent(
@@ -66,7 +66,7 @@ class TestDomainEvent:
             aggregate_id="agg-456",
             version=1,
         )
-        
+
         # Should raise error when trying to modify
         with pytest.raises(Exception):  # FrozenInstanceError or similar
             event.event_id = "modified"
@@ -74,7 +74,7 @@ class TestDomainEvent:
 
 class TestPipelineEvents:
     """Tests for pipeline-specific events."""
-    
+
     def test_pipeline_started_event(self):
         """Test PipelineStarted event."""
         event = PipelineStarted(
@@ -88,12 +88,12 @@ class TestPipelineEvents:
             method="multi-perspective",
             options={"top_k": 2},
         )
-        
+
         assert event.problem == "What is AI?"
         assert event.preset == "claude-only"
         assert event.method == "multi-perspective"
         assert event.options["top_k"] == 2
-    
+
     def test_phase_completed_event(self):
         """Test PhaseCompleted event."""
         event = PhaseCompleted(
@@ -108,13 +108,13 @@ class TestPipelineEvents:
             model_used="claude-sonnet",
             duration_seconds=1.5,
         )
-        
+
         assert event.phase_name == "classification"
         assert event.result["task_type"] == "analytical"
         assert event.tokens["prompt"] == 100
         assert event.model_used == "claude-sonnet"
         assert event.duration_seconds == 1.5
-    
+
     def test_pipeline_completed_event(self):
         """Test PipelineCompleted event."""
         event = PipelineCompleted(
@@ -128,7 +128,7 @@ class TestPipelineEvents:
             total_duration_seconds=15.5,
             phases_completed=6,
         )
-        
+
         assert event.solution["core_solution"] == "The answer is 42"
         assert event.total_tokens["prompt"] == 1000
         assert event.total_duration_seconds == 15.5
@@ -137,7 +137,7 @@ class TestPipelineEvents:
 
 class TestEventFactory:
     """Tests for event factory function."""
-    
+
     def test_make_event(self):
         """Test event creation via factory."""
         event = make_event(
@@ -146,7 +146,7 @@ class TestEventFactory:
             version=1,
             phase_name="classification",
         )
-        
+
         assert isinstance(event, DomainEvent)
         assert event.event_type == EventType.PHASE_STARTED
         assert event.aggregate_id == "test-agg"
@@ -154,7 +154,7 @@ class TestEventFactory:
         assert event.phase_name == "classification"  # type: ignore
         assert event.event_id  # UUID generated
         assert event.timestamp  # Timestamp set
-    
+
     def test_make_event_pipeline_started(self):
         """Test factory creates correct event type."""
         event = make_event(
@@ -165,14 +165,14 @@ class TestEventFactory:
             preset="test-preset",
             method="multi-perspective",
         )
-        
+
         assert isinstance(event, PipelineStarted)
         assert event.problem == "Test problem"
 
 
 class TestEventType:
     """Tests for EventType enum."""
-    
+
     def test_event_type_values(self):
         """Test all event types are defined."""
         assert EventType.PIPELINE_STARTED.value == "pipeline_started"
@@ -181,7 +181,7 @@ class TestEventType:
         assert EventType.PHASE_FAILED.value == "phase_failed"
         assert EventType.PIPELINE_COMPLETED.value == "pipeline_completed"
         assert EventType.PIPELINE_FAILED.value == "pipeline_failed"
-    
+
     def test_widget_event_types(self):
         """Test widget event types."""
         assert WidgetEventType.WIDGET_DETECTED.value == "widget_detected"

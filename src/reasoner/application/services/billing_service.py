@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import logging
 
-from reasoner.domain.saas import SubscriptionTier
 from reasoner.application.ports.billing_port import BillingPort
+from reasoner.domain.saas import SubscriptionTier
 
 logger = logging.getLogger(__name__)
 
@@ -34,11 +34,13 @@ class BillingService:
         sub = await self._port.sync_subscription(event)
 
         # Persist to database
-        from reasoner.infrastructure.persistence.subscription_repo import PostgresSubscriptionRepository
+        from reasoner.core.settings import settings
         from reasoner.infrastructure.persistence.cached_subscription_repo import (
             invalidate_subscription,
         )
-        from reasoner.core.settings import settings
+        from reasoner.infrastructure.persistence.subscription_repo import (
+            PostgresSubscriptionRepository,
+        )
 
         repo = PostgresSubscriptionRepository(
             settings.DATABASE_URL.replace("+asyncpg", ""),

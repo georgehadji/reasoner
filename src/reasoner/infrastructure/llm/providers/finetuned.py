@@ -29,8 +29,6 @@ import logging
 import os
 from typing import Any
 
-import openai
-
 from reasoner.core.constants import DEFAULT_MAX_RETRIES
 from reasoner.infrastructure.llm.providers.openai_compat import OpenAICompatibleProvider
 
@@ -57,10 +55,10 @@ class FineTunedProvider(OpenAICompatibleProvider):
         from reasoner.core.settings import settings
         # Resolve API key: explicit > settings > env > None (OpenAI client will error clearly)
         resolved_key = (
-            api_key 
-            or settings.OPENAI_API_KEY 
-            or settings.FINE_TUNED_API_KEY 
-            or os.getenv("OPENAI_API_KEY") 
+            api_key
+            or settings.OPENAI_API_KEY
+            or settings.FINE_TUNED_API_KEY
+            or os.getenv("OPENAI_API_KEY")
             or os.getenv("FINE_TUNED_API_KEY")
         )
         super().__init__(

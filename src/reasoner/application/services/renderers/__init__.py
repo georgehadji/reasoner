@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Callable, Protocol
+from collections.abc import Callable
+from typing import Protocol
 
 from reasoner.domain.pipeline_state import PipelineState
 
@@ -36,22 +37,22 @@ class RendererService:
 
 
 # Build and export the default service instance
-from ._render_multi_perspective import _render_multi_perspective
-from ._render_debate import _render_debate
-from ._render_research import _render_research
-from ._render_jury import _render_jury
-from ._render_scientific import _render_scientific
-from ._render_socratic import _render_socratic
-from ._render_pre_mortem import _render_pre_mortem
-from ._render_bayesian import _render_bayesian
-from ._render_dialectical import _render_dialectical
 from ._render_analogical import _render_analogical
-from ._render_delphi import _render_delphi
+from ._render_bayesian import _render_bayesian
 from ._render_cove import _render_cove
+from ._render_debate import _render_debate
+from ._render_delphi import _render_delphi
+from ._render_dialectical import _render_dialectical
+from ._render_jury import _render_jury
+from ._render_multi_perspective import _render_multi_perspective
+from ._render_pot import _render_pot
+from ._render_pre_mortem import _render_pre_mortem
+from ._render_research import _render_research
+from ._render_scientific import _render_scientific
+from ._render_self_discover import _render_self_discover
+from ._render_socratic import _render_socratic
 from ._render_sot import _render_sot
 from ._render_tot import _render_tot
-from ._render_pot import _render_pot
-from ._render_self_discover import _render_self_discover
 
 renderer_service = RendererService()
 renderer_service.register("multi-perspective", _render_multi_perspective)

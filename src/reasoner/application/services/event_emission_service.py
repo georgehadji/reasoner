@@ -19,19 +19,19 @@ import logging
 from contextvars import ContextVar
 from typing import Any
 
-from reasoner.core.events.domain_events import make_event, PipelineEventType
+from reasoner.core.events.domain_events import make_event
 
 logger = logging.getLogger(__name__)
 
 # ── Contextvar for per-run emitter injection ─────────────────────────
 # Phase functions that call emit() (e.g. cognitive_phases.py) retrieve
 # the current emitter via get_event_emitter() — no PipelineState coupling.
-_current_emitter: ContextVar["EventEmissionService | None"] = ContextVar(
+_current_emitter: ContextVar[EventEmissionService | None] = ContextVar(
     "_current_emitter", default=None
 )
 
 
-def get_event_emitter() -> "EventEmissionService | None":
+def get_event_emitter() -> EventEmissionService | None:
     """Get the active EventEmissionService for the current pipeline run.
 
     Returns None outside of an active pipeline execution context
@@ -40,7 +40,7 @@ def get_event_emitter() -> "EventEmissionService | None":
     return _current_emitter.get()
 
 
-def set_event_emitter(emitter: "EventEmissionService | None") -> None:
+def set_event_emitter(emitter: EventEmissionService | None) -> None:
     """Set the active EventEmissionService for the current pipeline run."""
     _current_emitter.set(emitter)
 
@@ -73,7 +73,7 @@ class EventEmissionService:
         # Pending events buffer — flushed by the SSE streaming layer
         self.pending_events: list[dict[str, Any]] = []
 
-    def context(self) -> "_EmitterContext":
+    def context(self) -> _EmitterContext:
         """Return a context manager that sets this emitter as the current one.
 
         Phase functions that call get_event_emitter() will resolve to

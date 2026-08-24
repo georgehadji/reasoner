@@ -8,7 +8,7 @@ import math
 from pathlib import Path
 from typing import Any
 
-from reasoner.core.ports.file_search_port import FileSearchPort, FileChunk
+from reasoner.core.ports.file_search_port import FileChunk, FileSearchPort
 from reasoner.infrastructure.uploader import UPLOAD_DIR
 
 logger = logging.getLogger(__name__)

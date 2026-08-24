@@ -5,17 +5,15 @@ These tests hit the FastAPI /api/run endpoint with live LLM calls.
 Run with: python -m pytest tests/test_e2e_real_api.py -v --run-slow
 """
 
-import os
 import json
+import os
+
+import httpx
 import pytest
 import pytest_asyncio
-import asyncio
-import httpx
-
 from httpx import ASGITransport
 
 import reasoner.api as api
-
 
 pytestmark = [
     pytest.mark.slow,

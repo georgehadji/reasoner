@@ -85,7 +85,7 @@ class ReasonerError(Exception):
         retryable (bool): Whether the error is retryable
     """
     retryable: bool = False
-    
+
     def __init__(self, message: str, details: dict[str, Any] | None = None):
         super().__init__(message)
         self.details = details or {}
@@ -127,7 +127,7 @@ class AuthenticationError(ProviderError):
     The user must update their API key configuration.
     """
     retryable = False
-    
+
     def __init__(self, message: str, provider: str | None = None):
         super().__init__(message, {"provider": provider})
 
@@ -142,7 +142,7 @@ class RateLimitError(ProviderError):
         retry_after (int | None): Seconds to wait before retrying
     """
     retryable = True
-    
+
     def __init__(self, message: str, provider: str | None = None, retry_after: int | None = None):
         super().__init__(message, {"provider": provider, "retry_after": retry_after})
 
@@ -154,7 +154,7 @@ class ModelNotFoundError(ProviderError):
     This error is NOT retryable - the model ID is invalid.
     """
     retryable = False
-    
+
     def __init__(self, message: str, model: str | None = None):
         super().__init__(message, {"model": model})
 

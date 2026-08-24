@@ -25,8 +25,8 @@ def test_creative_system_prompt_single_source() -> None:
     duplication this test class was written to guard against was since
     removed) — assert the duplicate stays gone and the canonical copy exists.
     """
-    from reasoner.core.constants import CREATIVE_SYSTEM_PROMPT
     import reasoner.api.streaming as streaming
+    from reasoner.core.constants import CREATIVE_SYSTEM_PROMPT
 
     assert CREATIVE_SYSTEM_PROMPT
     assert not hasattr(streaming, "_CREATIVE_SYSTEM_PROMPT")
@@ -52,7 +52,7 @@ def test_image_gen_policy_rewrite_prompt_exists() -> None:
 
 def test_direct_answer_temperature_constant() -> None:
     """DIRECT_ANSWER_TEMPERATURE is used in streaming.py; must match expected."""
-    from reasoner.core.constants import DIRECT_ANSWER_TEMPERATURE, CREATIVE_TEMPERATURE
+    from reasoner.core.constants import CREATIVE_TEMPERATURE, DIRECT_ANSWER_TEMPERATURE
 
     assert DIRECT_ANSWER_TEMPERATURE == 0.7
     assert CREATIVE_TEMPERATURE == 0.8

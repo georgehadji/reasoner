@@ -3,12 +3,10 @@ ConsensusMapperSubAgent — ONE JOB: identify which points all perspectives agre
 """
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.subagents.base import PhaseSubAgent
-
 
 CONSENSUS_SYSTEM = """You are a Consensus Mapper. Your ONE JOB is to read all perspective candidates and identify which claims, conclusions, or recommendations appear in ALL of them (or in a strong majority).
 

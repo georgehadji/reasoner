@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from reasoner.core.settings import settings
-from reasoner.domain.saas import User, SubscriptionTier
+
 from reasoner.api.dependencies import get_current_user
-from reasoner.infrastructure.billing.stripe_adapter import StripeBillingAdapter
-from reasoner.infrastructure.billing.paypal_adapter import PayPalBillingAdapter
 from reasoner.application.services.billing_service import BillingService
+from reasoner.core.settings import settings
+from reasoner.domain.saas import SubscriptionTier, User
+from reasoner.infrastructure.billing.paypal_adapter import PayPalBillingAdapter
+from reasoner.infrastructure.billing.stripe_adapter import StripeBillingAdapter
 
 router = APIRouter(prefix="/api/billing", tags=["billing"])
 
@@ -77,8 +78,8 @@ async def create_portal(
 @router.get("/subscription")
 async def get_subscription(user: User = Depends(get_current_user)):
     """Get current subscription status from database."""
-    from reasoner.infrastructure.persistence.subscription_repo import PostgresSubscriptionRepository
     from reasoner.core.settings import settings
+    from reasoner.infrastructure.persistence.subscription_repo import PostgresSubscriptionRepository
 
     repo = PostgresSubscriptionRepository(
         settings.DATABASE_URL.replace("+asyncpg", ""),

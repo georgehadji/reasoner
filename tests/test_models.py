@@ -1,33 +1,29 @@
 """Tests for models module including state persistence."""
 
-from reasoner.models import save, load
-import json
 import tempfile
-from collections import deque
 from pathlib import Path
+
 import pytest
 
 from reasoner.models import (
-    PipelineState,
-    PipelineCore,
-    TaskType,
-    ClaimLabel,
-    PerspectiveType,
-    ScenarioType,
-    SubProblem,
     Assumption,
+    ClaimLabel,
     Decomposition,
+    PerspectiveType,
+    PipelineCore,
+    PipelineState,
+    ScenarioType,
     SolutionCandidate,
-    CritiqueScore,
-    StressTestResult,
-    MetaCognitiveAudit,
-    FinalSolution,
+    SubProblem,
+    TaskType,
+    load,
+    save,
 )
 
 
 class TestPipelineStatePersistence:
     """Test state save/load functionality."""
-    
+
     def test_save_and_load_roundtrip(self):
         """Test that save followed by load preserves state."""
         # Create a state with some data
@@ -39,7 +35,7 @@ class TestPipelineStatePersistence:
                 language="English",
             ),
         )
-        
+
         # Add decomposition
         state.decomposition = Decomposition(
             sub_problems=[
@@ -61,7 +57,7 @@ class TestPipelineStatePersistence:
             failure_modes=["Failure mode 1"],
             raw_response="Raw response",
         )
-        
+
         # Add candidates
         state.candidates = [
             SolutionCandidate(
@@ -71,35 +67,35 @@ class TestPipelineStatePersistence:
                 model_used="claude-sonnet",
             )
         ]
-        
+
         # Save to temp file
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
             temp_path = f.name
-        
+
         try:
             save(state, temp_path)
-            
+
             # Load and verify
             loaded = load(temp_path)
-            
+
             assert loaded.problem == state.problem
             assert loaded.task_type == state.task_type
             assert loaded.task_type_rationale == state.task_type_rationale
             assert loaded.language == state.language
-            
+
             # Verify decomposition
             assert loaded.decomposition is not None
             assert len(loaded.decomposition.sub_problems) == 1
             assert loaded.decomposition.sub_problems[0].id == "SP1"
             assert loaded.decomposition.assumptions[0].label == ClaimLabel.HYPOTHESIS
-            
+
             # Verify candidates
             assert len(loaded.candidates) == 1
             assert loaded.candidates[0].perspective == PerspectiveType.CONSTRUCTIVE
-            
+
         finally:
             Path(temp_path).unlink(missing_ok=True)
-    
+
     def test_to_dict_serializes_enums(self):
         """Test that enums are serialized to strings."""
         state = PipelineState(
@@ -108,11 +104,11 @@ class TestPipelineStatePersistence:
                 task_type=TaskType.STRATEGIC,
             ),
         )
-        
+
         data = state.to_dict()
         assert data["core"]["task_type"] == "strategic"
         assert isinstance(data["core"]["task_type"], str)
-    
+
     def test_load_reconstructs_enums(self):
         """Test that enums are reconstructed from strings."""
         state = PipelineState(
@@ -121,29 +117,29 @@ class TestPipelineStatePersistence:
                 task_type=TaskType.CREATIVE,
             ),
         )
-        
+
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
             temp_path = f.name
-        
+
         try:
             save(state, temp_path)
             loaded = load(temp_path)
-            
+
             assert loaded.task_type == TaskType.CREATIVE
             assert isinstance(loaded.task_type, TaskType)
-            
+
         finally:
             Path(temp_path).unlink(missing_ok=True)
 
 
 class TestPipelineStateContext:
     """Test context dictionary generation."""
-    
+
     def test_to_context_dict_structure(self):
         state = PipelineState(core=PipelineCore(problem="Test problem"))
-        
+
         context = state.to_context_dict()
-        
+
         assert "problem" in context
         assert "task_type" in context
         assert "sub_problems" in context
@@ -200,7 +196,7 @@ class TestStateDeserializationRobustness:
 
             # Corrupt the file by removing fields from sub_problems
             import json
-            with open(temp_path, 'r') as f:
+            with open(temp_path) as f:
                 data = json.load(f)
 
             # Remove required fields from sub_problem
@@ -245,7 +241,7 @@ class TestStateDeserializationRobustness:
 
             # Corrupt: change list fields to strings
             import json
-            with open(temp_path, 'r') as f:
+            with open(temp_path) as f:
                 data = json.load(f)
 
             data['core']['decomposition']['sub_problems'][0]['inputs'] = "not_a_list"
@@ -279,7 +275,7 @@ class TestStateDeserializationRobustness:
 
             # Corrupt: remove decomposition entirely
             import json
-            with open(temp_path, 'r') as f:
+            with open(temp_path) as f:
                 data = json.load(f)
 
             del data['core']['decomposition']
@@ -313,7 +309,7 @@ class TestStateDeserializationRobustness:
 
             # Corrupt: use invalid enum value
             import json
-            with open(temp_path, 'r') as f:
+            with open(temp_path) as f:
                 data = json.load(f)
 
             data['core']['decomposition']['assumptions'][0]['label'] = 'INVALID_LABEL'

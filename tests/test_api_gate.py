@@ -1,10 +1,11 @@
 """API integration tests for the GateAgent in the SSE stream."""
 
 import json
-import pytest
 from unittest.mock import AsyncMock, patch
 
-from reasoner.api import run_stream, RunRequest
+import pytest
+
+from reasoner.api import RunRequest, run_stream
 
 
 class FakeProvider:

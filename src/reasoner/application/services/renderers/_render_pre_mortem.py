@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-from reasoner.application.services.renderers._shared import (
-    console, _get_attr, _duration, _label_color,
-    _render_stress, _render_action_blueprint, _render_errors,
-    render_routing_table, render_perspective_content,
-)
-from reasoner.domain.pipeline_state import PipelineState
-
+from rich import box
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
-from rich import box
+
+from reasoner.application.services.renderers._shared import (
+    _render_errors,
+    console,
+)
+from reasoner.domain.pipeline_state import PipelineState
+
 
 def _render_pre_mortem(state: PipelineState) -> None:
     pm = state.pre_mortem_state
@@ -19,7 +19,7 @@ def _render_pre_mortem(state: PipelineState) -> None:
     fn = pm.get("failure_narrative", {})
     if fn:
         content = Text()
-        content.append(f"Scenario: ", style="bold red")
+        content.append("Scenario: ", style="bold red")
         content.append(f"{fn.get('scenario', 'N/A')}\n\n")
         content.append(fn.get("what_happened", ""))
         triggers = fn.get("immediate_triggers", [])

@@ -2,12 +2,9 @@
 Regression tests for renderer bugs.
 """
 
-import pytest
-from io import StringIO
 
-from reasoner.models import PipelineState, FinalSolution, MetaCognitiveAudit
-from reasoner.renderer import render_pipeline_result, console
-
+from reasoner.models import FinalSolution, MetaCognitiveAudit, PipelineState
+from reasoner.renderer import console, render_pipeline_result
 
 # ─────────────────────────────────────────────────────────────────────
 # Bug 2: action_blueprint shows `?:` for empty dicts / strings

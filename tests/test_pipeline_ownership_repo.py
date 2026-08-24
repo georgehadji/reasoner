@@ -138,6 +138,7 @@ def test_migration_relaxes_preexisting_not_null_constraint(tmp_path: Path):
     """A DB created before this change (user_id NOT NULL) must be rebuilt
     nullable on the next init_db() call, and existing rows must survive."""
     import sqlite3
+
     from reasoner.infrastructure.persistence.event_store_connection import (
         EventStoreConnection,
     )

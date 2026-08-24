@@ -16,10 +16,8 @@ from collections import Counter, defaultdict
 
 from reasoner.core.ports.routing_constraint_port import (
     ConstraintViolation,
-    RoutingConstraintPort,
 )
 from reasoner.infrastructure.llm.registry import bloc_of, resolved_model_of
-
 
 _GENERATOR_ROLES = frozenset({
     "constructive", "destructive", "systemic", "minimalist",

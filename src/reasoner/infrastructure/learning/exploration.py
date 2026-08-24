@@ -12,9 +12,7 @@ This policy provides a hard floor to ensure minimum exploration.
 
 from __future__ import annotations
 
-import math
 import random
-
 
 # Default exploration rates by preset tier
 _EXPLORATION_RATES: dict[str, float] = {

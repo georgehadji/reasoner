@@ -13,7 +13,7 @@ from __future__ import annotations
 import base64
 import json
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from cryptography.fernet import Fernet, InvalidToken
@@ -591,7 +591,7 @@ async def test_auth_store_roundtrips_encrypted_metadata(auth_store):
         scopes={"read", "write"},
         is_active=True,
         rate_limit_tier="high",
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
         expires_at=None,
         created_by="admin",
     )
@@ -617,7 +617,7 @@ async def test_auth_store_persists_ciphertext_not_plaintext(auth_store):
         scopes={"admin"},
         is_active=True,
         rate_limit_tier="default",
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
         expires_at=None,
         created_by=None,
     )
@@ -648,7 +648,7 @@ async def test_auth_store_raises_rather_than_dropping_scopes_on_key_mismatch(
         scopes={"admin", "write"},
         is_active=True,
         rate_limit_tier="default",
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
         expires_at=None,
         created_by=None,
     )
@@ -680,7 +680,7 @@ async def test_auth_store_reads_legacy_plaintext_rows(auth_store):
             "INSERT INTO api_keys (key_hash, name, scopes, is_active, rate_limit_tier,"
             " created_at, usage_count) VALUES (?, ?, ?, 1, 'default', ?, 0)",
             ("legacy-1", "old-plaintext-key", json.dumps(["read"]),
-             datetime.now(timezone.utc).isoformat()),
+             datetime.now(UTC).isoformat()),
         )
         await conn.commit()
 

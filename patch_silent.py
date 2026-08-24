@@ -1,4 +1,4 @@
-with open('src/reasoner/api/streaming.py', 'r', encoding='utf-8') as f:
+with open('src/reasoner/api/streaming.py', encoding='utf-8') as f:
     content = f.read()
 
 old = "            if getattr(fn, \"_is_silent_noop\", False):"

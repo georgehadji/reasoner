@@ -4,30 +4,30 @@ Ensures the CQRS handler and direct pipeline.run() produce the same
 result for the same input.
 """
 
+from datetime import UTC
+from unittest.mock import MagicMock
+
 import pytest
-from unittest.mock import MagicMock, AsyncMock
 
 
 @pytest.mark.asyncio
 async def test_cqrs_vs_direct_parity():
     """Both paths should return PipelineState with matching problem."""
+    from datetime import datetime
     from unittest.mock import patch
-    from reasoner.application.commands import RunPipelineCommand
-    from reasoner.domain.pipeline_state import PipelineState
-    from reasoner.infrastructure.llm.router import ProviderRouter
 
-    from datetime import datetime, timezone
+    from reasoner.application.commands import RunPipelineCommand
     command = RunPipelineCommand(
         command_id="test-parity-001",
         problem="What is 2+2?",
         preset="multi-perspective-budget",
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
     )
 
     # Path 1: Direct pipeline.run()
     from reasoner.application.orchestrator import PipelineOrchestrator
-    from reasoner.application.services.preset_service import PresetService
     from reasoner.application.services.pipeline_service import PipelineService
+    from reasoner.application.services.preset_service import PresetService
 
     preset_service = PresetService()
     pipeline_service = PipelineService()
@@ -56,17 +56,15 @@ async def test_cqrs_handler_produces_state():
     """CQRS handler with injected pipeline_executor should produce PipelineState."""
     from reasoner.application.commands import RunPipelineCommand
     from reasoner.application.handlers.handlers import (
-        HandlerRegistry,
         RunPipelineCommandHandler,
-        PipelineExecutionPort,
     )
-    from reasoner.infrastructure.llm.router import ProviderRouter
-    from reasoner.domain.pipeline_state import PipelineState
 
     # Create a minimal execution port that wraps pipeline
     from reasoner.application.orchestrator import PipelineOrchestrator
-    from reasoner.application.services.preset_service import PresetService
     from reasoner.application.services.pipeline_service import PipelineService
+    from reasoner.application.services.preset_service import PresetService
+    from reasoner.domain.pipeline_state import PipelineState
+    from reasoner.infrastructure.llm.router import ProviderRouter
 
     preset_service = PresetService()
     pipeline_service = PipelineService()
@@ -75,7 +73,6 @@ async def test_cqrs_handler_produces_state():
     class TestExecutor:
         async def execute_run(self, command, router, sse_emit=None, user_id=None, initial_state=None):
             # For the test, just return a minimal state
-            from reasoner.domain.pipeline_state import PipelineState
             return PipelineState(problem=command.problem, preset_name=command.preset or "test")
 
     router = ProviderRouter(primary=MagicMock())
@@ -84,12 +81,12 @@ async def test_cqrs_handler_produces_state():
         pipeline_executor=TestExecutor(),
     )
 
-    from datetime import datetime, timezone
+    from datetime import datetime
     command = RunPipelineCommand(
         command_id="test-handler-001",
         problem="What is the capital of France?",
         preset="direct-budget",
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
     )
 
     captured = []

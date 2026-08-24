@@ -9,17 +9,17 @@ Skip API calls: pytest tests/test_methods.py -v
 
 from __future__ import annotations
 
-import asyncio
 import os
-import pytest
 import sys
+
+import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from reasoner.core.settings import settings
-from reasoner.presets import get_method_from_preset, is_valid_preset_name, resolve_preset_name
-from reasoner.domain.preset_registry import PRESETS as _PRESETS
 from reasoner.application.services.preset_service import PresetService
+from reasoner.core.settings import settings
+from reasoner.domain.preset_registry import PRESETS as _PRESETS
+from reasoner.presets import get_method_from_preset, is_valid_preset_name, resolve_preset_name
 
 # ── Method-to-budget-preset mapping ──────────────────────────────────
 METHOD_PRESETS: dict[str, str] = {
@@ -148,7 +148,7 @@ def test_strategy_has_phases(method: str, preset_name: str) -> None:
 async def test_full_pipeline_run(method: str, preset_name: str) -> None:
     """Run a full pipeline with real LLM calls for core methods."""
     from reasoner.pipeline import ReasonerPipeline
-        
+
     router, effective = _build_router(preset_name)
 
     pipeline = ReasonerPipeline(
@@ -161,14 +161,14 @@ async def test_full_pipeline_run(method: str, preset_name: str) -> None:
     )
 
     problem = "What is 2 + 2? Answer in one sentence."
-    
+
     try:
         state = await pipeline.run(problem)
-        
+
         # Basic assertions
         assert state is not None, f"{method}: Pipeline returned None"
         assert state.problem, f"{method}: State has no problem"
-        
+
         # Check that pipeline actually produced output
         if state.final_solution:
             solution = getattr(state.final_solution, "core_solution", "") or ""
@@ -181,7 +181,7 @@ async def test_full_pipeline_run(method: str, preset_name: str) -> None:
         print(f"[{method}] Tokens: {sum(t.get('total', 0) for t in state.phase_tokens.values())}")
         print(f"[{method}] Phases: {list(state.phase_durations.keys())}")
         print(f"[{method}] Errors: {state.errors}")
-        
+
     except Exception as exc:
         pytest.fail(f"{method} pipeline failed: {exc}")
 
@@ -195,7 +195,7 @@ async def test_pipeline_instantiation(method: str, preset_name: str) -> None:
     from reasoner.pipeline import ReasonerPipeline
 
     router, effective = _build_router(preset_name)
-    
+
     pipeline = ReasonerPipeline(
         router=router,
         top_k=2,
@@ -211,9 +211,10 @@ async def test_pipeline_instantiation(method: str, preset_name: str) -> None:
 # ── Run marker ───────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    import pytest
     import sys
-    
+
+    import pytest
+
     args = ["-v", "--tb=short"]
     if "--run-integration" in sys.argv:
         args.append("-m")
@@ -221,6 +222,6 @@ if __name__ == "__main__":
     else:
         args.append("-m")
         args.append("not integration")
-    
+
     args.append(__file__)
     sys.exit(pytest.main(args))

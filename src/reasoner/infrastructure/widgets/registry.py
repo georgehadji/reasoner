@@ -12,9 +12,9 @@ from typing import Any
 
 from reasoner.infrastructure.widgets.protocol import (
     Widget,
+    WidgetDetectionResult,
     WidgetResult,
     WidgetType,
-    WidgetDetectionResult,
 )
 
 logger = logging.getLogger(__name__)
@@ -30,13 +30,13 @@ class WidgetRegistry:
     - Execution orchestration
     - Health tracking
     """
-    
+
     def __init__(self):
         self._widgets: dict[str, Widget] = {}
         self._widgets_by_type: dict[WidgetType, Widget] = {}
         self._execution_count: dict[str, int] = {}
         self._error_count: dict[str, int] = {}
-    
+
     def register(self, widget: Widget) -> None:
         """
         Register a widget.
@@ -48,9 +48,9 @@ class WidgetRegistry:
         self._widgets_by_type[widget.widget_type] = widget
         self._execution_count[widget.name] = 0
         self._error_count[widget.name] = 0
-        
+
         logger.info(f"Registered widget: {widget.name} ({widget.widget_type.value})")
-    
+
     def unregister(self, widget_name: str) -> None:
         """
         Unregister a widget.
@@ -63,15 +63,15 @@ class WidgetRegistry:
             del self._widgets[widget_name]
             del self._widgets_by_type[widget.widget_type]
             logger.info(f"Unregistered widget: {widget_name}")
-    
+
     def get_widget(self, name: str) -> Widget | None:
         """Get widget by name."""
         return self._widgets.get(name)
-    
+
     def get_widget_by_type(self, widget_type: WidgetType) -> Widget | None:
         """Get widget by type."""
         return self._widgets_by_type.get(widget_type)
-    
+
     async def detect_widgets(self, query: str) -> list[WidgetDetectionResult]:
         """
         Detect all widgets that should activate for a query.
@@ -83,31 +83,31 @@ class WidgetRegistry:
             List of detection results, sorted by confidence
         """
         results = []
-        
+
         for widget in self._widgets.values():
             try:
                 should_activate = await widget.detect(query)
-                
+
                 if should_activate:
                     params = widget.extract_params(query) or {}
-                    
+
                     # Calculate confidence based on pattern match quality
                     confidence = self._calculate_confidence(widget, query, params)
-                    
+
                     results.append(WidgetDetectionResult(
                         widget=widget,
                         confidence=confidence,
                         params=params,
                     ))
-                    
+
             except Exception as e:
                 logger.error(f"Error detecting widget {widget.name}: {e}")
-        
+
         # Sort by confidence (highest first)
         results.sort(key=lambda r: r.confidence, reverse=True)
-        
+
         return results
-    
+
     def _calculate_confidence(
         self,
         widget: Widget,
@@ -123,25 +123,25 @@ class WidgetRegistry:
         - Query length
         """
         confidence = 0.5  # Base confidence
-        
+
         # Boost for each matched pattern
         matched_patterns = sum(
             1 for pattern in widget.trigger_patterns
             if pattern.search(query.lower())
         )
         confidence += min(matched_patterns * 0.15, 0.3)
-        
+
         # Boost for complete parameters
         if params:
             confidence += 0.1
-        
+
         # Boost for specific parameter values
         for value in params.values():
             if value and len(str(value)) > 2:
                 confidence += 0.05
-        
+
         return min(confidence, 1.0)
-    
+
     async def execute_widget(
         self,
         widget_name: str,
@@ -193,7 +193,7 @@ class WidgetRegistry:
                 widget_type=widget.widget_type,
                 error=str(e),
             )
-    
+
     async def auto_execute(
         self,
         query: str,
@@ -210,21 +210,21 @@ class WidgetRegistry:
             List of execution results
         """
         detections = await self.detect_widgets(query)
-        
+
         if not detections:
             return []
-        
+
         results = []
-        
+
         for detection in detections[:max_widgets]:
             result = await self.execute_widget(
                 detection.widget.name,
                 detection.params,
             )
             results.append(result)
-        
+
         return results
-    
+
     def list_widgets(self) -> list[dict[str, Any]]:
         """List all registered widgets with metadata."""
         return [
@@ -238,17 +238,17 @@ class WidgetRegistry:
             }
             for widget in self._widgets.values()
         ]
-    
+
     def _get_success_rate(self, widget_name: str) -> float:
         """Calculate success rate for a widget."""
         executions = self._execution_count.get(widget_name, 0)
         errors = self._error_count.get(widget_name, 0)
-        
+
         if executions == 0:
             return 1.0
-        
+
         return (executions - errors) / executions
-    
+
     def clear_stats(self) -> None:
         """Clear execution statistics."""
         self._execution_count.clear()
@@ -280,13 +280,13 @@ def reset_widget_registry() -> None:
 def _register_default_widgets(registry: WidgetRegistry) -> None:
     """Register default widgets."""
     # Import here to avoid circular dependencies
-    from reasoner.infrastructure.widgets.weather import WeatherWidget
-    from reasoner.infrastructure.widgets.stocks import StockWidget
     from reasoner.infrastructure.widgets.calculator import CalculatorWidget
     from reasoner.infrastructure.widgets.discover import DiscoverWidget
     from reasoner.infrastructure.widgets.image_search import ImageSearchWidget
+    from reasoner.infrastructure.widgets.stocks import StockWidget
     from reasoner.infrastructure.widgets.video_search import VideoSearchWidget
-    
+    from reasoner.infrastructure.widgets.weather import WeatherWidget
+
     registry.register(WeatherWidget())
     registry.register(StockWidget())
     registry.register(CalculatorWidget())

@@ -15,11 +15,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any
 
-from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.domain.core_types import FinalSolution, MetaCognitiveAudit
 from reasoner.domain.pipeline_state import PipelineState
+from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.models import ClaimLabel
 from reasoner.sanitization import clean_llm_artifacts_with_report
 from reasoner.subagents.models import PhaseSubAgentOutput

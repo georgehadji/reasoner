@@ -5,8 +5,9 @@ disconnect, subscribe, and broadcast operations.
 """
 
 import asyncio
+from unittest.mock import AsyncMock
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock
 from starlette.websockets import WebSocketState
 
 from reasoner.infrastructure.websocket.manager import (

@@ -10,7 +10,14 @@ from reasoner.api.auth_deps import require_csrf
 from reasoner.api.dependencies import check_rate_limit, get_current_user
 from reasoner.core.settings import settings
 from reasoner.domain.saas import User
-from reasoner.uploader import delete_file, get_file_text, list_uploads, save_uploaded_file, save_uploaded_files, MAX_FILE_SIZE
+from reasoner.uploader import (
+    MAX_FILE_SIZE,
+    delete_file,
+    get_file_text,
+    list_uploads,
+    save_uploaded_file,
+    save_uploaded_files,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

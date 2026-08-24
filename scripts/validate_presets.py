@@ -17,15 +17,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from reasoner.domain.preset_registry import list_presets, _REGISTRY as PRESETS
-from reasoner.domain.preset_core import _KNOWN_ROUTING_ROLES
+from reasoner.core.temperatures import PHASE_TEMPERATURES
+from reasoner.domain.preset_registry import list_presets
 from reasoner.infrastructure.llm.registry import (
     _REGISTRY as MODELS,
+)
+from reasoner.infrastructure.llm.registry import (
     bloc_of,
     honours_tuned_temperature,
     resolved_model_of,
 )
-from reasoner.core.temperatures import PHASE_TEMPERATURES
 
 # Below this, a model that silently samples at its fixed 1.0 default is far
 # enough from the phase's intent to count as mis-routed. Roles at 0.7/1.0

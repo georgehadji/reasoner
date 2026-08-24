@@ -7,10 +7,6 @@ and the environment-togglable baseline disabling.
 
 from __future__ import annotations
 
-import hashlib
-
-import pytest
-
 from reasoner.application.services.augmentation_metrics import (
     assign_ab_arm,
     build_ab_metric,

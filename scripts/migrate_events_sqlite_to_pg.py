@@ -11,7 +11,6 @@ Usage:
 """
 
 import asyncio
-import os
 import sys
 from pathlib import Path
 
@@ -19,9 +18,10 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).parent.parent.resolve()
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
+from reasoner.core.settings import settings
 from reasoner.infrastructure.persistence.event_store import EventStore
 from reasoner.infrastructure.persistence.postgres_store import PostgreSQLEventStore
-from reasoner.core.settings import settings
+
 
 async def migrate() -> None:
     if not settings.DATABASE_URL:
@@ -37,20 +37,20 @@ async def migrate() -> None:
     if not sqlite_db_path.exists():
         print(f"ERROR: SQLite database not found at {sqlite_db_path}")
         sys.exit(1)
-        
+
     sqlite_store = EventStore(sqlite_db_path)
 
-    # Note: For a robust migration we ideally bypass the DomainEvent abstractions 
+    # Note: For a robust migration we ideally bypass the DomainEvent abstractions
     # and do a direct row-for-row copy between the tables using asyncpg for speed.
-    
+
     print("Fetching SQLite data...")
     conn = sqlite_store._get_connection()
-    
+
     # 1. Migrate Events
     cursor = conn.execute("SELECT * FROM events ORDER BY id ASC")
     events = cursor.fetchall()
     print(f"Found {len(events)} events to migrate.")
-    
+
     if events:
         async with pg_store.pool.acquire() as pg_conn:
             await pg_conn.executemany(
@@ -61,7 +61,7 @@ async def migrate() -> None:
                 ON CONFLICT (event_id) DO NOTHING
                 """,
                 [(
-                    r["event_id"], r["event_type"], r["aggregate_id"], r["aggregate_type"], 
+                    r["event_id"], r["event_type"], r["aggregate_id"], r["aggregate_type"],
                     r["version"], r["timestamp"], r["payload"], r["created_at"]
                 ) for r in events]
             )
@@ -71,7 +71,7 @@ async def migrate() -> None:
     cursor = conn.execute("SELECT * FROM aggregates")
     aggregates = cursor.fetchall()
     print(f"Found {len(aggregates)} aggregates to migrate.")
-    
+
     if aggregates:
         async with pg_store.pool.acquire() as pg_conn:
             await pg_conn.executemany(
@@ -82,7 +82,7 @@ async def migrate() -> None:
                 ON CONFLICT (aggregate_id) DO NOTHING
                 """,
                 [(
-                    r["aggregate_id"], r["aggregate_type"], r["current_version"], r["status"], 
+                    r["aggregate_id"], r["aggregate_type"], r["current_version"], r["status"],
                     r["problem"], r["preset"], r["method"], r["created_at"], r["updated_at"]
                 ) for r in aggregates]
             )
@@ -92,7 +92,7 @@ async def migrate() -> None:
     cursor = conn.execute("SELECT * FROM snapshots")
     snapshots = cursor.fetchall()
     print(f"Found {len(snapshots)} snapshots to migrate.")
-    
+
     if snapshots:
         async with pg_store.pool.acquire() as pg_conn:
             await pg_conn.executemany(
@@ -109,7 +109,7 @@ async def migrate() -> None:
         print("Snapshots migrated successfully.")
 
     print("\nMigration completed successfully.")
-    
+
     # Close connections
     sqlite_store.close()
     await pg_store.close()

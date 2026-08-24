@@ -7,9 +7,10 @@ every route now uses directly, fail-closed to 429 on limiter errors.
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock
+
 import pytest
 from fastapi import HTTPException, Request
-from unittest.mock import AsyncMock
 
 from reasoner.api.dependencies import check_rate_limit
 

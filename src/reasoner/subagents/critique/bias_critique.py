@@ -6,9 +6,8 @@ from __future__ import annotations
 from typing import Any
 
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.subagents.base import PhaseSubAgent
 from reasoner.parsing import extract_json
-
+from reasoner.subagents.base import PhaseSubAgent
 
 BIAS_SYSTEM = """You are a Bias Critique Sub-Agent. Your ONE JOB is to identify cognitive biases, framing effects, and unstated assumptions that may have influenced each candidate solution.
 

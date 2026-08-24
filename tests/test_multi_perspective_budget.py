@@ -11,15 +11,15 @@ Covers:
 from __future__ import annotations
 
 import json
+
 import pytest
 
 # Import core.search before ReasonerPipeline to resolve a circular import
 # between infrastructure/search/discovery.py and core/search.py.
 import reasoner.core.search  # noqa: F401
-
-from reasoner.presets import get_preset
-from reasoner.pipeline import ReasonerPipeline
 from reasoner.models import PipelineState
+from reasoner.pipeline import ReasonerPipeline
+from reasoner.presets import get_preset
 
 PRESET_ID = "multi-perspective-budget"
 

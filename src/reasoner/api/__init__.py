@@ -7,23 +7,24 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from contextlib import asynccontextmanager
-
 import asyncio
 import json
+import logging
 import uuid
-from fastapi import FastAPI, Request, Depends, HTTPException, Query, Header
+from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from reasoner.core.settings import settings
+from fastapi.security import HTTPBearer
+from pydantic import BaseModel
+
 from reasoner.core.constants import (
     CORS_MAX_AGE_SECONDS,
     TRUNCATION,
 )
-from fastapi.security import HTTPBearer
-from pydantic import BaseModel
-from datetime import datetime, timezone
-import logging
+from reasoner.core.settings import settings
 
 # Setup logger
 logger = logging.getLogger(__name__)
@@ -33,6 +34,7 @@ logger = logging.getLogger(__name__)
 
 # Initialize Sentry (Critical Enhancement 7.2)
 from reasoner.api.sentry import init_sentry
+
 init_sentry()
 
 # --- Action 1.2: Observability Strictness & Metrics --- START
@@ -63,10 +65,9 @@ from reasoner.api.error_handler import register_exception_handlers
 security = HTTPBearer(auto_error=False)
 
 # Import rate limiter and auth
-from reasoner.rate_limiter import get_rate_limiter, RateLimitConfig
-from reasoner.auth import get_auth_manager, AuthenticationError
-
 from reasoner.api.middleware import SecurityHeadersMiddleware
+from reasoner.auth import AuthenticationError, get_auth_manager
+from reasoner.rate_limiter import RateLimitConfig, get_rate_limiter
 
 # Module-level singleton for health-check Postgres pool (Critical Enhancement 5.6)
 _health_postgres_pool = None
@@ -92,7 +93,7 @@ async def _update_active_users_loop() -> None:
 async def lifespan(app: FastAPI):
     """Application lifespan: startup and shutdown orchestration."""
     # ── Startup ──
-    from reasoner.application.event_bus.bus import init_default_subscribers, get_event_bus
+    from reasoner.application.event_bus.bus import get_event_bus, init_default_subscribers
     bus = get_event_bus()
     await bus.start()
     await init_default_subscribers(bus)
@@ -203,9 +204,9 @@ async def lifespan(app: FastAPI):
     # ── Inject core → infra boundary dependencies ──
     # Inverts the dependency: core defines ports, infra provides impls.
     try:
-        from reasoner.core.search import set_build_provider
-        from reasoner.infrastructure.llm.registry import build_provider, RegistryAdapter
         from reasoner.core.ports.model_registry_port import set_model_registry_port
+        from reasoner.core.search import set_build_provider
+        from reasoner.infrastructure.llm.registry import RegistryAdapter, build_provider
         set_build_provider(build_provider)
         set_model_registry_port(RegistryAdapter())
         logger.info("Core→infra dependencies injected: build_provider, model_registry_port")
@@ -337,6 +338,7 @@ app.add_middleware(SecurityHeadersMiddleware)
 
 # Add audit middleware (Critical Enhancement 6.3)
 from reasoner.api.middleware import AuditMiddleware
+
 app.add_middleware(AuditMiddleware)
 
 # Add CORS middleware — production-aware (Critical Enhancement 6.1.2)
@@ -381,15 +383,15 @@ from reasoner.infrastructure.llm.registry import _REGISTRY
 
 # Neuro Integration
 from reasoner.neuro.server import create_neuro_router
+
 app.include_router(create_neuro_router())
 
 # New Architecture Integration
-from reasoner.infrastructure.persistence import get_event_store
 from reasoner.application.handlers import get_handler_registry
 from reasoner.application.queries import (
     GetPipelineStatusQuery,
 )
-
+from reasoner.infrastructure.persistence import get_event_store
 
 # Widget Integrations (legacy fallback)
 
@@ -400,15 +402,15 @@ _handler_registry = None
 def get_architecture_components():
     """Lazy initialization of new architecture components."""
     global _event_store, _handler_registry
-    
+
     if _event_store is None:
         _event_store = get_event_store()
-    
+
     if _handler_registry is None:
         # Create a simple router for new architecture components
         # Uses Claude as primary by default, falls back to legacy router for actual LLM calls
-        from reasoner.infrastructure.llm.registry import build_provider, _REGISTRY
-        
+        from reasoner.infrastructure.llm.registry import _REGISTRY, build_provider
+
         # Try to get a primary provider (use first available OpenRouter model)
         primary_provider = None
         for model_id in sorted(_REGISTRY):
@@ -419,18 +421,18 @@ def get_architecture_components():
                 break
             except Exception:
                 continue
-        
+
         # If no provider available, create a dummy one
         if primary_provider is None:
             from reasoner.infrastructure.llm.providers.noop import NoopProvider
             primary_provider = NoopProvider(model="dummy")
-        
+
         from reasoner.api.execution.pipeline import PipelineExecutionService
         _handler_registry = get_handler_registry(
             primary_provider, _event_store,
             pipeline_executor=PipelineExecutionService(),
         )
-    
+
     return _event_store, _handler_registry
 
 
@@ -448,33 +450,48 @@ def _filter_routing(routing: dict[str, str], primary_id: str) -> dict[str, str]:
 # Per-run cancellation tracking.
 # Encapsulated in RunStateManager for testability and safe async locking.
 # Redis-backed with in-memory fallback (Critical Enhancement 9.1–9.3, 9.7).
-from reasoner.infrastructure.redis.run_state import _run_state_manager as _run_store
-
-# ─────────────────────────────────────────────────────────────────────
-# CACHE
-# ─────────────────────────────────────────────────────────────────────
-
-from .cache import (
-    CACHE_DIR,
-    _MEMORY_CACHE,
-    _cache_key,
-    clear_memory_cache,
-    _load_cache,
-    _save_cache,
+from reasoner.api.auth_deps import optional_auth, require_csrf
+from reasoner.api.dependencies import (
+    check_quota_if_authenticated,
+    check_rate_limit,
+    get_current_user,
+    get_optional_user,
+    get_pipeline_service,
+    get_preset_service,
+    get_search_service,
+    require_credits_if_authenticated,
 )
-
-
 from reasoner.api.schemas import (
     FollowupRequest,
     RunRequest,
     SearchRequest,
 )
+from reasoner.api.streaming import (
+    run_followup_stream,
+    run_stream,
+    run_stream_cached,
+)
+from reasoner.application.services.pipeline_service import PipelineService
+from reasoner.application.services.preset_service import PresetService
+from reasoner.application.services.search_service import SearchService
+from reasoner.domain.saas import QuotaResult, User
+from reasoner.infrastructure.redis.run_state import _run_state_manager as _run_store
 
+# ─────────────────────────────────────────────────────────────────────
+# CACHE
+# ─────────────────────────────────────────────────────────────────────
+from .cache import (
+    _MEMORY_CACHE,
+    CACHE_DIR,
+    _cache_key,
+    _load_cache,
+    _save_cache,
+    clear_memory_cache,
+)
 
 # ─────────────────────────────────────────────────────────────────────
 # SERIALIZERS — one per phase
 # ─────────────────────────────────────────────────────────────────────
-
 from .serializers import (
     _event,
     _is_debate,
@@ -489,29 +506,6 @@ from .serializers import (
     _ser_4,
     _ser_5,
 )
-
-
-from reasoner.api.streaming import (
-    run_followup_stream,
-    run_stream,
-    run_stream_cached,
-)
-
-from reasoner.api.auth_deps import optional_auth, require_csrf
-from reasoner.api.dependencies import (
-    check_rate_limit, 
-    get_current_user, 
-    get_optional_user, 
-    check_quota_if_authenticated,
-    require_credits_if_authenticated,
-    get_preset_service,
-    get_pipeline_service,
-    get_search_service
-)
-from reasoner.application.services.preset_service import PresetService
-from reasoner.application.services.pipeline_service import PipelineService
-from reasoner.application.services.search_service import SearchService
-from reasoner.domain.saas import User, QuotaResult
 
 # ─────────────────────────────────────────────────────────────────────
 # API Endpoints
@@ -617,6 +611,7 @@ def _require_auth_if_legacy_disabled(user: User | None) -> None:
 # require_api_key-authenticated, unmetered handlers.
 
 from reasoner.api.routes.agent import router as agent_router
+
 app.include_router(agent_router)
 
 
@@ -846,12 +841,15 @@ async def stop_pipeline(
 # ─────────────────────────────────────────────────────────────────────
 
 from reasoner.api.routes.uploads import router as uploads_router
+
 app.include_router(uploads_router)
 
 from reasoner.api.routes.images import router as images_router
+
 app.include_router(images_router)
 
 from reasoner.api.routes.provenance import router as provenance_router
+
 app.include_router(provenance_router)
 
 
@@ -863,12 +861,15 @@ app.include_router(provenance_router)
 
 
 from reasoner.api.routes.context import router as context_router
+
 app.include_router(context_router)
 
 from reasoner.api.routes.widgets import router as widgets_router
+
 app.include_router(widgets_router)
 
 from reasoner.api.routes.pipelines import router as pipelines_router
+
 app.include_router(pipelines_router)
 
 
@@ -877,6 +878,7 @@ app.include_router(pipelines_router)
 # ─────────────────────────────────────────────────────────────────────
 
 from reasoner.api.routes.legacy_widgets import router as legacy_widgets_router
+
 app.include_router(legacy_widgets_router)
 
 
@@ -885,10 +887,12 @@ app.include_router(legacy_widgets_router)
 # ─────────────────────────────────────────────────────────────────────
 
 from reasoner.api.routes.history import router as history_router
+
 app.include_router(history_router)
 
 
 from reasoner.api.routes.websocket import router as websocket_router
+
 app.include_router(websocket_router)
 
 
@@ -897,40 +901,49 @@ app.include_router(websocket_router)
 # ─────────────────────────────────────────────────────────────────────
 
 from reasoner.api.routes.keys import router as keys_router
+
 app.include_router(keys_router)
 
-from reasoner.api.routes.credits import router as credits_router
 from reasoner.api.routes.account_keys import router as account_keys_router
+from reasoner.api.routes.credits import router as credits_router
+
 app.include_router(credits_router)
 app.include_router(account_keys_router)
 
-from reasoner.api.routes.feedback import router as feedback_router
 from reasoner.api.routes.estimate import router as estimate_router
+from reasoner.api.routes.feedback import router as feedback_router
 from reasoner.api.routes.gate import router as gate_router
+
 app.include_router(feedback_router)
 app.include_router(estimate_router)
 app.include_router(gate_router)
 
 from reasoner.api.routes.gdpr import router as gdpr_router
+
 app.include_router(gdpr_router)
 
 from reasoner.api.routes.errors import router as errors_router
+
 app.include_router(errors_router)
 
 from reasoner.api.routes.health import router as health_router
 from reasoner.api.routes.telemetry import router as telemetry_router
+
 app.include_router(health_router)
 app.include_router(telemetry_router)
 
 from reasoner.api.routes.admin import router as admin_router
+
 app.include_router(admin_router)
 
 # Mount SaaS router
 from reasoner.api import saas_router
+
 app.include_router(saas_router.router)
 
 # Mount Billing router
 from reasoner.api import billing_router
+
 app.include_router(billing_router.router)
 
 # Optional MCP Streamable-HTTP transport, off by default. Most installs use
@@ -945,9 +958,8 @@ if settings.ENABLE_MCP_HTTP:
         logger.warning("ENABLE_MCP_HTTP is set but could not be mounted: %s", exc)
 
 # Mount Metrics endpoint (Critical Enhancement 6.1: restrict by IP)
-from reasoner.api.metrics import metrics_endpoint
-
 from reasoner.api.client_ip import get_client_ip
+from reasoner.api.metrics import metrics_endpoint
 
 
 async def _metrics_ip_restricted(request: Request):

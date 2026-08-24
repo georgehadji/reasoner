@@ -1,8 +1,10 @@
 """Tests for circuit breaker race condition fix (BUG-001 regression)."""
 
-import pytest
 import asyncio
-from reasoner.circuit_breaker import CircuitBreaker, CircuitState, CircuitBreakerConfig
+
+import pytest
+
+from reasoner.circuit_breaker import CircuitBreaker, CircuitBreakerConfig, CircuitState
 
 
 class TestCircuitBreakerConcurrency:

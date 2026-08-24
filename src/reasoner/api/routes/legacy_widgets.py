@@ -7,7 +7,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 
 from reasoner.api.auth_deps import require_csrf
-from reasoner.api.schemas import CalculationRequest, DiscoverRequest, StockRequest, WeatherRequest
+from reasoner.api.schemas import CalculationRequest
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -51,6 +51,7 @@ async def calculate(
     """Evaluate a mathematical expression (legacy endpoint)."""
     try:
         import asyncio
+
         from reasoner.widgets import calculate_expression
 
         result = await asyncio.wait_for(
@@ -58,7 +59,7 @@ async def calculate(
             timeout=1.0,
         )
         return result
-    except asyncio.TimeoutError:
+    except TimeoutError:
         return {"error": "Calculation timed out", "valid": False}
     except HTTPException:
         raise

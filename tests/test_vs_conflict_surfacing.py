@@ -1,18 +1,14 @@
 """Tests for vs_conflict_surfacing stage."""
 from __future__ import annotations
-from tests.utils.mocks import MockLLM, MockNLI
 
 import pytest
-from unittest.mock import AsyncMock
 
 from reasoner.phases.vs_conflict_surfacing import (
     surface_cross_candidate_conflicts,
-    CrossCandidateConflict,
 )
 from reasoner.phases.vs_generation import GenerationCandidate
 from reasoner.vs_config import VSFeatureFlags
-
-
+from tests.utils.mocks import MockNLI
 
 
 @pytest.fixture

@@ -13,22 +13,23 @@ ARCHITECTURAL NOTE:
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import math  # Added math for ceil in Lua script error fallback
 import os
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Dict, Optional, Any
-import asyncio
-import math # Added math for ceil in Lua script error fallback
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 import valkey.asyncio as aioredis
-from reasoner.infrastructure.redis.client import get_redis
-from reasoner.core.constants import MAX_RATE_LIMIT_BUCKETS # Imported MAX_RATE_LIMIT_BUCKETS
 
+from reasoner.core.constants import MAX_RATE_LIMIT_BUCKETS  # Imported MAX_RATE_LIMIT_BUCKETS
 from reasoner.core.settings import settings
+from reasoner.infrastructure.redis.client import get_redis
+
 _REDIS_RATE_LIMITER_ENABLED = settings.RATE_LIMITER_MODE.lower() == "redis"
 
 try:
@@ -67,13 +68,13 @@ class RateLimiter:
     - Per-client tracking
     - Async-safe
     """
-    
+
     # MAX_RATE_LIMIT_BUCKETS is now imported at the top
     _MAX_BUCKETS: int = MAX_RATE_LIMIT_BUCKETS
 
-    def __init__(self, config: Optional[RateLimitConfig] = None):
+    def __init__(self, config: RateLimitConfig | None = None):
         self.config = config or RateLimitConfig()
-        self._redis_client: Optional[aioredis.Redis] = None
+        self._redis_client: aioredis.Redis | None = None
         self._redis_script: Any = None
         self._redis_available: bool = False
 
@@ -89,7 +90,7 @@ class RateLimiter:
                         f"Lua rate-limit script not found at {script_path}. "
                         "Check that src/reasoner/infrastructure/redis/scripts/rate_limit.lua exists."
                     )
-                with open(script_path, "r", encoding="utf-8") as f:
+                with open(script_path, encoding="utf-8") as f:
                     lua_script_content = f.read()
                 self._redis_script = self._redis_client.register_script(lua_script_content)
                 self._redis_available = True
@@ -106,7 +107,7 @@ class RateLimiter:
                 raise RuntimeError("Unsafe rate limiter configuration: RATE_LIMITER_MODE=memory in production.")
 
         # In-memory fallback (always initialized, even if Redis is primary)
-        self._buckets: Dict[str, ClientBucket] = defaultdict(ClientBucket)
+        self._buckets: dict[str, ClientBucket] = defaultdict(ClientBucket)
         self._fallback_lock = asyncio.Lock()
 
     async def _execute_redis_script(
@@ -117,7 +118,7 @@ class RateLimiter:
         requests_per_minute: int,
         requests_per_hour: int,
         requested_tokens: int = 1,
-    ) -> tuple[bool, Dict[str, Any]]:
+    ) -> tuple[bool, dict[str, Any]]:
         if not self._redis_available or self._redis_client is None or self._redis_script is None:
             raise ConnectionError("Redis rate limiter not available.")
 
@@ -170,7 +171,7 @@ class RateLimiter:
         client_id: str,
         multiplier: float = 1.0,
         requested_tokens: int = 1,
-    ) -> tuple[bool, Dict[str, Any]]:
+    ) -> tuple[bool, dict[str, Any]]:
         # This is the original in-memory logic, simplified for the fallback.
         # It needs to be self-contained and not rely on self._lock (which is removed).
         async with self._fallback_lock:
@@ -198,7 +199,7 @@ class RateLimiter:
             if elapsed_hours > 0:
                 bucket.requests_hour = 0
                 bucket.hour_window_start += elapsed_hours * 3600
-            
+
             rpm = int(self.config.requests_per_minute * multiplier)
             rph = int(self.config.requests_per_hour * multiplier)
 
@@ -246,8 +247,8 @@ class RateLimiter:
             info["remaining_minute"] = rpm - bucket.requests_minute
             info["remaining_hour"] = rph - bucket.requests_hour
             return True, info
-    
-    async def is_allowed(self, client_id: str) -> tuple[bool, Dict[str, Any]]:
+
+    async def is_allowed(self, client_id: str) -> tuple[bool, dict[str, Any]]:
         try:
             return await self._execute_redis_script(
                 client_id=client_id,
@@ -277,7 +278,7 @@ class RateLimiter:
         self,
         client_id: str,
         tier: str = "default",
-    ) -> tuple[bool, Dict[str, Any]]:
+    ) -> tuple[bool, dict[str, Any]]:
         tier_multipliers = {
             "default": 1.0,
             "free": 1.0,
@@ -285,7 +286,7 @@ class RateLimiter:
             "enterprise": 5.0,
         }
         multiplier = tier_multipliers.get(tier, 1.0)
-        
+
         # Calculate tier-specific limits
         rpm_limit = int(self.config.requests_per_minute * multiplier)
         rph_limit = int(self.config.requests_per_hour * multiplier)
@@ -345,7 +346,7 @@ class RateLimiter:
                     "limit_minute": self.config.requests_per_minute,
                     "limit_hour": self.config.requests_per_hour,
                 }
-        
+
         token_bucket_key = f"rate_limit:{client_id}:tokens"
         minute_window_key = f"rate_limit:{client_id}:minute"
         hour_window_key = f"rate_limit:{client_id}:hour"
@@ -356,11 +357,11 @@ class RateLimiter:
             bucket_info = await self._redis_client.hmget(token_bucket_key, 'tokens', 'last_refill_time_ms')
             tokens = float(bucket_info[0]) if bucket_info[0] else self.config.burst_size
             last_refill_time_ms = float(bucket_info[1]) if bucket_info[1] else current_time_ms
-            
+
             elapsed_time_ms = current_time_ms - last_refill_time_ms
             refill_rate = (self.config.requests_per_minute) / 60000.0
             refilled_tokens = math.floor(elapsed_time_ms * refill_rate)
-            
+
             current_tokens = min(self.config.burst_size, tokens + refilled_tokens)
 
             # Get counts for windows (no request added)
@@ -398,13 +399,13 @@ class RateLimiter:
             await self._redis_client.delete(token_bucket_key, minute_window_key, hour_window_key)
         except Exception as e:
             print(f"[ERROR] Failed to reset client {client_id} in Redis: {e}")
-    
+
     async def reset_all(self) -> None:
         if not self._redis_available or self._redis_client is None:
             async with self._fallback_lock:
                 self._buckets.clear()
             return
-        
+
         # Danger zone: This will delete ALL keys matching the pattern. Use with caution.
         try:
             async for key in self._redis_client.scan_iter("rate_limit:*"):
@@ -422,7 +423,7 @@ class RateLimiter:
             bucket.tokens = self.config.burst_size # Start with full burst
             self._buckets[client_id] = bucket
         return self._buckets[client_id]
-    
+
     def _in_memory_refill_tokens(self, bucket: ClientBucket, multiplier: float = 1.0) -> None:
         now = time.monotonic()
         elapsed = now - bucket.last_update
@@ -430,14 +431,14 @@ class RateLimiter:
         max_tokens = self.config.burst_size * multiplier
         bucket.tokens = min(max_tokens, bucket.tokens + (elapsed * refill_rate))
         bucket.last_update = now
-    
+
     def _in_memory_reset_windows_if_needed(self, bucket: ClientBucket) -> None:
         now = time.monotonic()
         elapsed_minutes = int((now - bucket.minute_window_start) // 60)
         if elapsed_minutes > 0:
             bucket.requests_minute = 0
             bucket.minute_window_start += elapsed_minutes * 60
-        
+
         elapsed_hours = int((now - bucket.hour_window_start) // 3600)
         if elapsed_hours > 0:
             bucket.requests_hour = 0
@@ -448,10 +449,10 @@ class RateLimiter:
 # (multi-worker/multi-process), each worker maintains its own token bucket.
 # A client can bypass limits by hitting different workers. Replace with a
 # Redis-backed sliding window or external rate-limiting service.
-_rate_limiter: Optional[RateLimiter] = None
+_rate_limiter: RateLimiter | None = None
 
 
-def get_rate_limiter(config: Optional[RateLimitConfig] = None) -> RateLimiter:
+def get_rate_limiter(config: RateLimitConfig | None = None) -> RateLimiter:
     """Get or create global rate limiter."""
     global _rate_limiter
     if _rate_limiter is None: # Removed conditional for _REDIS_RATE_LIMITER_ENABLED as RateLimiter handles it internally

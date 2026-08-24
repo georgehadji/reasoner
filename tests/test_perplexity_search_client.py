@@ -1,7 +1,8 @@
 """Tests for PerplexitySearchClient via OpenRouter."""
 
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
+
 import pytest
-from unittest.mock import AsyncMock, Mock, patch, MagicMock
 
 from reasoner.core.search import PerplexitySearchClient, get_search_client
 

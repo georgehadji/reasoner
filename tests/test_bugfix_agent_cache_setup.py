@@ -1,6 +1,6 @@
-import pytest
-from reasoner.subagents.base import PhaseSubAgent
 from reasoner.hypergate.base_sub_agent import BaseSubAgent
+from reasoner.subagents.base import PhaseSubAgent
+
 
 class DummyPhaseSubAgent(PhaseSubAgent):
     """Dummy PhaseSubAgent for testing initialization."""
@@ -27,7 +27,7 @@ def test_phase_subagent_cache_instantiation():
     agent1 = DummyPhaseSubAgent()
     assert hasattr(agent1, "_cache")
     assert isinstance(agent1._cache, dict)
-    
+
     agent2 = DummyHyperBaseSubAgent()
     assert hasattr(agent2, "_cache")
     assert isinstance(agent2._cache, dict)

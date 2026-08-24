@@ -12,13 +12,11 @@ Bugs covered:
 from __future__ import annotations
 
 import asyncio
-import hashlib
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
 from fastapi import HTTPException
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # BUG-019: require_tier() completely bypasses subscription enforcement
@@ -208,7 +206,7 @@ class TestRateLimiterResetRaceCondition:
     @pytest.mark.asyncio
     async def test_reset_client_is_async_and_acquires_lock(self):
         """reset_client must be async and acquire the shard lock."""
-        from reasoner.rate_limiter import RateLimiter, RateLimitConfig
+        from reasoner.rate_limiter import RateLimitConfig, RateLimiter
 
         config = RateLimitConfig(requests_per_minute=60, requests_per_hour=1000, burst_size=10)
         rl = RateLimiter(config)
@@ -227,7 +225,7 @@ class TestRateLimiterResetRaceCondition:
     @pytest.mark.asyncio
     async def test_reset_all_is_async_and_clears_all(self):
         """reset_all must be async and clear all buckets."""
-        from reasoner.rate_limiter import RateLimiter, RateLimitConfig
+        from reasoner.rate_limiter import RateLimitConfig, RateLimiter
 
         config = RateLimitConfig(requests_per_minute=60, requests_per_hour=1000, burst_size=10)
         rl = RateLimiter(config)
@@ -246,7 +244,7 @@ class TestRateLimiterResetRaceCondition:
     @pytest.mark.asyncio
     async def test_concurrent_reset_and_check_no_crash(self):
         """Concurrent reset_client and is_allowed must not crash."""
-        from reasoner.rate_limiter import RateLimiter, RateLimitConfig
+        from reasoner.rate_limiter import RateLimitConfig, RateLimiter
 
         config = RateLimitConfig(requests_per_minute=60, requests_per_hour=1000, burst_size=10)
         rl = RateLimiter(config)

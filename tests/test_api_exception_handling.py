@@ -6,7 +6,6 @@ from pathlib import Path
 
 import pytest
 
-
 ROUTES_DIR = Path(__file__).parent.parent / "src" / "reasoner" / "api" / "routes"
 
 

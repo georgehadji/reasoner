@@ -8,9 +8,9 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from reasoner.api import history as _history_module
 from reasoner.api.auth_deps import require_csrf
 from reasoner.api.dependencies import get_current_user
-from reasoner.api import history as _history_module
 from reasoner.domain.saas import User
 
 logger = logging.getLogger(__name__)

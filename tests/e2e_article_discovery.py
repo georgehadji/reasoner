@@ -2,13 +2,11 @@
 import asyncio
 import json
 import logging
-from dataclasses import dataclass, field
 from typing import Any
 
-from pydantic import BaseModel
-from reasoner.models import PipelineState, TaskType, PerspectiveType, SolutionCandidate
 from reasoner.application.mixins.article_pipeline import ArticlePipelineMixin
-from reasoner.application.mixins._protocol import PipelineMixinProtocol
+
+from reasoner.models import PipelineState
 
 # Setup minimal logging
 logging.basicConfig(level=logging.INFO)

@@ -1,10 +1,10 @@
 """Tests for I/O and security bug fixes (BUG-007, BUG-008, BUG-009 regression)."""
 
-import pytest
 import os
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+
+import pytest
 
 
 class TestCacheRaceConditionPrevention:
@@ -12,41 +12,40 @@ class TestCacheRaceConditionPrevention:
 
     def test_unique_temp_filename_per_write(self):
         """Test that each cache write uses a unique temp filename."""
-        from reasoner.api import CACHE_DIR
         import time
-        
+
         # Simulate two writes in quick succession
         key = "test_key"
-        
+
         # First write
         tmp1_name = f"{key}.{os.getpid()}.{int(time.time() * 1000)}.tmp"
         time.sleep(0.002)  # 2ms delay
-        
+
         # Second write
         tmp2_name = f"{key}.{os.getpid()}.{int(time.time() * 1000)}.tmp"
-        
+
         # Filenames should be different due to timestamp
         assert tmp1_name != tmp2_name
 
     def test_temp_file_cleanup(self):
         """Test that old temp files are cleaned up."""
         from reasoner.api import CACHE_DIR
-        
+
         # Create fake old temp files
         old_tmp1 = CACHE_DIR / "test_cleanup.12345.1000.tmp"
         old_tmp2 = CACHE_DIR / "test_cleanup.12345.1001.tmp"
         old_tmp1.touch(exist_ok=True)
         old_tmp2.touch(exist_ok=True)
-        
+
         try:
             # Verify they exist
             assert old_tmp1.exists()
             assert old_tmp2.exists()
-            
+
             # Cleanup (simulating what _save_cache does)
             for old_tmp in CACHE_DIR.glob("test_cleanup.*.tmp"):
                 old_tmp.unlink(missing_ok=True)
-            
+
             # Verify they're deleted
             assert not old_tmp1.exists()
             assert not old_tmp2.exists()
@@ -62,7 +61,7 @@ class TestPathTraversalPrevention:
     def test_path_traversal_in_extension_rejected(self):
         """Test that path traversal in extension is rejected."""
         from reasoner.uploader import _get_file_extension
-        
+
         # Malicious filenames
         malicious = [
             "../../../etc/passwd.txt",
@@ -70,7 +69,7 @@ class TestPathTraversalPrevention:
             "test/../../../evil.txt",
             "file.txt/../../../evil.txt",
         ]
-        
+
         for filename in malicious:
             ext = _get_file_extension(filename)
             # Extension should only be the last component
@@ -80,14 +79,14 @@ class TestPathTraversalPrevention:
     def test_extension_validation_regex(self):
         """Test the extension validation regex."""
         import re
-        
+
         pattern = r'^\.[a-zA-Z0-9]+$'
-        
+
         # Valid extensions
         valid = [".txt", ".pdf", ".docx", ".TXT", ".PDF", ".test123"]
         for ext in valid:
             assert re.match(pattern, ext), f"{ext} should be valid"
-        
+
         # Invalid extensions
         invalid = [
             "",  # Empty
@@ -103,18 +102,18 @@ class TestPathTraversalPrevention:
 
     def test_safe_filename_construction(self):
         """Test that safe filename is constructed properly."""
-        import uuid
         import re
-        
+        import uuid
+
         # Simulate the safe filename construction
         file_id = str(uuid.uuid4())[:12]
         ext = ".txt"
         safe_filename = f"{file_id}{ext}"
-        
+
         # Should only contain alphanumeric, dot, hyphen from UUID
         # UUID can contain hyphens, so allow them
         assert re.match(r'^[a-f0-9-]+\.txt$', safe_filename)
-        
+
         # Should not contain path separators
         assert "/" not in safe_filename
         assert "\\" not in safe_filename
@@ -122,14 +121,13 @@ class TestPathTraversalPrevention:
 
     def test_path_resolution_check(self):
         """Test that path resolution check prevents escape."""
-        from pathlib import Path
-        
+
         upload_dir = Path("/safe/uploads")
-        
+
         # Safe path
         safe_file = upload_dir / "abc123.txt"
         assert str(safe_file.resolve()).startswith(str(upload_dir.resolve()))
-        
+
         # Attempted escape (would be caught before this, but testing defense in depth)
         # Note: Path doesn't resolve .. without the file existing, so we test the logic
         escape_attempt = upload_dir / "../../../etc/passwd"
@@ -143,67 +141,64 @@ class TestHistoryDeleteErrorHandling:
     def test_delete_nonexistent_entry(self):
         """Test deleting non-existent entry returns 404."""
         # This simulates the API behavior
-        from pathlib import Path
-        
+
         history_dir = Path(tempfile.mkdtemp())
         path = history_dir / "nonexistent.json"
-        
+
         # Should not raise, should handle gracefully
         if not path.exists():
             result = {"error": "Entry not found"}, 404
             assert result[1] == 404
-        
+
         # Cleanup
         import shutil
         shutil.rmtree(history_dir, ignore_errors=True)
 
     def test_delete_with_missing_ok(self):
         """Test that unlink(missing_ok=True) handles race condition."""
-        from pathlib import Path
         import tempfile
-        
+
         history_dir = Path(tempfile.mkdtemp())
         path = history_dir / "test.json"
-        
+
         # Create file
         path.touch()
         assert path.exists()
-        
+
         # Delete it
         path.unlink(missing_ok=True)
         assert not path.exists()
-        
+
         # Delete again - should not raise
         path.unlink(missing_ok=True)  # No exception
-        
+
         # Cleanup
         import shutil
         shutil.rmtree(history_dir, ignore_errors=True)
 
     def test_clear_history_with_failures(self):
         """Test that clear_history handles individual failures."""
-        from pathlib import Path
         import tempfile
-        
+
         history_dir = Path(tempfile.mkdtemp())
-        
+
         # Create some files
         (history_dir / "file1.json").touch()
         (history_dir / "file2.json").touch()
-        
+
         cleared = 0
         failed = 0
-        
+
         for f in history_dir.glob("*.json"):
             try:
                 f.unlink(missing_ok=True)
                 cleared += 1
             except OSError:
                 failed += 1
-        
+
         assert cleared == 2
         assert failed == 0
-        
+
         # Cleanup
         import shutil
         shutil.rmtree(history_dir, ignore_errors=True)

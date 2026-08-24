@@ -24,24 +24,23 @@ from __future__ import annotations
 
 import json
 import os
-import textwrap
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import pytest
 
-from reasoner.domain.pipeline_state import PipelineState
-from reasoner.phases._shared import is_article_request, detect_language
-from reasoner.phases import article as article_prompts
 from reasoner.core.constants import (
-    ARTICLE_MIN_SOURCE_COUNT,
+    ARTICLE_CRITIC_MAX_WORDS,
     ARTICLE_MAX_SOURCE_COUNT,
-    ARTICLE_SEARCH_RESULTS_PER_QUERY,
     ARTICLE_MAX_SOURCES_FOR_CLAIM_EXTRACTION,
     ARTICLE_MIN_CLAIM_SUPPORT_RATIO,
-    ARTICLE_CRITIC_MAX_WORDS,
+    ARTICLE_MIN_SOURCE_COUNT,
+    ARTICLE_SEARCH_RESULTS_PER_QUERY,
     TRUNCATION,
 )
+from reasoner.domain.pipeline_state import PipelineState
+from reasoner.phases import article as article_prompts
+from reasoner.phases._shared import detect_language, is_article_request
 
 # ═════════════════════════════════════════════════════════════════════
 # Golden set definition
@@ -509,7 +508,7 @@ class TestGoldenSetCostBaseline:
         bp = _get_baseline_path()
         if not os.path.exists(bp):
             return {}
-        with open(bp, "r", encoding="utf-8") as fh:
+        with open(bp, encoding="utf-8") as fh:
             return json.load(fh).get("cost_baseline", {})
 
     def test_cost_baseline_recorded(self):
@@ -539,7 +538,7 @@ class TestGoldenSetBaselineCheck:
         if not os.path.exists(bp):
             pytest.skip(f"Baseline file not found at {bp}")
 
-        with open(bp, "r", encoding="utf-8") as fh:
+        with open(bp, encoding="utf-8") as fh:
             baseline = json.load(fh)
 
         entries = baseline.get("entries", {})
@@ -602,7 +601,7 @@ def capture_baseline() -> dict[str, Any]:
             try:
                 prompt = builder_fn(state)
                 prompt_lengths[prompt_name] = len(prompt)
-            except Exception as exc:
+            except Exception:
                 prompt_lengths[prompt_name] = -1  # error marker
 
         entries[tc.id] = {

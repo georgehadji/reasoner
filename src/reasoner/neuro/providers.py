@@ -3,25 +3,28 @@ Neuro Provider Abstraction Layer
 Pluggable backends with circuit-breaker fallback chains.
 """
 
-import time
 import asyncio
 import logging
+import time
 from abc import ABC, abstractmethod
-from typing import Optional
 
 import httpx
 
-from reasoner.core.temperatures import NON_PHASE_TEMPERATURES
 from reasoner.core.constants import (
-    DEFAULT_MAX_TOKENS,
-    TIMEOUTS,
-    OPENAI_BASE_URL,
     ANTHROPIC_BASE_URL,
-    OPENROUTER_BASE_URL as _OPENROUTER_BASE_URL,
-    GOOGLE_BASE_URL as _GOOGLE_BASE_URL,
-    PERPLEXITY_BASE_URL,
+    DEFAULT_MAX_TOKENS,
     HUGGINGFACE_API_BASE,
+    OPENAI_BASE_URL,
+    PERPLEXITY_BASE_URL,
+    TIMEOUTS,
 )
+from reasoner.core.constants import (
+    GOOGLE_BASE_URL as _GOOGLE_BASE_URL,
+)
+from reasoner.core.constants import (
+    OPENROUTER_BASE_URL as _OPENROUTER_BASE_URL,
+)
+from reasoner.core.temperatures import NON_PHASE_TEMPERATURES
 from reasoner.neuro.config import ProviderConfig, ResilientProviderConfig
 
 log = logging.getLogger("neuro.providers")
@@ -47,7 +50,7 @@ async def close_all_resilient_wrappers() -> None:
 class ReasoningProvider(ABC):
     def __init__(self, config: ProviderConfig):
         self.config = config
-        self._client: Optional[httpx.AsyncClient] = None
+        self._client: httpx.AsyncClient | None = None
 
     def _get_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
@@ -74,7 +77,7 @@ class ReasoningProvider(ABC):
 class EmbeddingProvider(ABC):
     def __init__(self, config: ProviderConfig):
         self.config = config
-        self._client: Optional[httpx.AsyncClient] = None
+        self._client: httpx.AsyncClient | None = None
 
     def _get_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:

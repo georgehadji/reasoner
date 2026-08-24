@@ -9,7 +9,6 @@ import ipaddress
 import socket
 from urllib.parse import urlparse
 
-
 # CIDR blocks that are never safe for server-side fetching
 _BLOCKED_NETWORKS = [
     ipaddress.ip_network("127.0.0.0/8"),      # Loopback

@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from unittest.mock import patch
 
-from reasoner.api.csrf import generate_csrf_token, verify_csrf_token, sign_csrf_token
+from reasoner.api.csrf import generate_csrf_token, sign_csrf_token, verify_csrf_token
 
 
 def test_csrf_token_valid():

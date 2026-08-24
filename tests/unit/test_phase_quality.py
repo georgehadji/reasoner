@@ -6,20 +6,16 @@ from dataclasses import dataclass, field
 from typing import Any
 from unittest.mock import MagicMock
 
-import pytest
-
+from reasoner.core.constants import (
+    QUALITY_JUDGE_MODELS,
+    QUALITY_JUDGE_THRESHOLDS,
+    get_quality_judge_model,
+    get_quality_judge_threshold,
+)
 from reasoner.quality.criteria import (
-    PhaseQualityResult,
     evaluate_rules,
     reset_phase_state,
 )
-from reasoner.core.constants import (
-    get_quality_judge_model,
-    get_quality_judge_threshold,
-    QUALITY_JUDGE_MODELS,
-    QUALITY_JUDGE_THRESHOLDS,
-)
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Minimal PipelineState stub — only the fields criteria.py reads

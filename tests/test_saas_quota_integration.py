@@ -10,6 +10,7 @@ Validates:
 from __future__ import annotations
 
 import os
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -17,9 +18,9 @@ os.environ.setdefault("ENABLE_LEGACY_API_KEY", "true")
 os.environ.setdefault("ENVIRONMENT", "testing")
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-do-not-use-in-production")
 
-from reasoner.infrastructure.auth.local_adapter import LocalAuthAdapter
-from reasoner.infrastructure.auth import set_auth_adapter
 from reasoner.api import app
+from reasoner.infrastructure.auth import set_auth_adapter
+from reasoner.infrastructure.auth.local_adapter import LocalAuthAdapter
 
 
 @pytest.fixture
@@ -62,8 +63,9 @@ def test_quota_endpoint_returns_status(client, auth_token, monkeypatch):
 
 
 def test_run_with_exhausted_quota_returns_429(client, auth_token, monkeypatch):
-    from reasoner.api import dependencies
     from fastapi import HTTPException
+
+    from reasoner.api import dependencies
 
     async def mock_check_quota(*args, **kwargs):
         raise HTTPException(

@@ -39,7 +39,7 @@ class ProvenanceContentRequest(BaseModel):
     model_config = {"extra": "forbid"}
 
     @model_validator(mode="after")
-    def _require_something(self) -> "ProvenanceContentRequest":
+    def _require_something(self) -> ProvenanceContentRequest:
         if self.content is None and self.image is None:
             raise ValueError("At least one of 'content' or 'image' is required.")
         return self

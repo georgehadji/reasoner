@@ -9,11 +9,12 @@ Contains: ScenarioType, SubProblem, Assumption, Decomposition,
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, asdict, fields as dc_fields
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-from reasoner.domain.models import TaskType, ClaimLabel, PerspectiveType, PerspectiveRegistry
+from reasoner.domain.models import ClaimLabel, PerspectiveRegistry, PerspectiveType
+
 
 class ScenarioType(str, Enum):
     OPTIMAL = "optimal"
@@ -21,7 +22,7 @@ class ScenarioType(str, Enum):
     ADVERSARIAL = "adversarial"
 
     @classmethod
-    def coerce(cls, value: str | "ScenarioType") -> "ScenarioType":
+    def coerce(cls, value: str | ScenarioType) -> ScenarioType:
         """Accept enum values, enum names, and common separator variants.
         Unknown scenario names returned by the LLM gracefully fall back to
         ADVERSARIAL so that stress-test results are not silently discarded.
@@ -158,7 +159,7 @@ class EvidenceBundle:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "EvidenceBundle":
+    def from_dict(cls, data: dict[str, Any]) -> EvidenceBundle:
         return cls(
             label=data.get("label", "UNKNOWN"),
             checks_run=data.get("checks_run") or [],
@@ -195,7 +196,7 @@ class PlanContract:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "PlanContract":
+    def from_dict(cls, data: dict[str, Any]) -> PlanContract:
         return cls(
             targets=list(data.get("targets") or []),
             invariants=list(data.get("invariants") or []),

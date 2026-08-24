@@ -4,14 +4,14 @@ Uses mocks — no live scraping or LLM calls required.
 """
 
 import json
-import os
-import pytest
-from unittest.mock import patch, AsyncMock
+from unittest.mock import AsyncMock, patch
 
+import pytest
+
+from reasoner.core.settings import settings
+from reasoner.models import PipelineState
 from reasoner.pipeline import ReasonerPipeline
 from reasoner.scraper import scrape_urls  # noqa: F401  — ensures module is loadable
-from reasoner.models import PipelineState
-from reasoner.core.settings import settings
 
 
 @pytest.fixture(autouse=True)

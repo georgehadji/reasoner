@@ -13,9 +13,8 @@ These entities know nothing about HTTP, databases, or third-party APIs.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Optional
 from uuid import UUID
 
 
@@ -37,11 +36,11 @@ class User:
     """Canonical user entity — auth-provider agnostic."""
     id: UUID
     email: str
-    display_name: Optional[str] = None
+    display_name: str | None = None
     scopes: set[str] = field(default_factory=set)
-    auth_provider: Optional[str] = None
-    avatar_url: Optional[str] = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    auth_provider: str | None = None
+    avatar_url: str | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 @dataclass(frozen=True)
@@ -51,11 +50,11 @@ class Subscription:
     user_id: UUID
     tier: SubscriptionTier
     status: SubscriptionStatus
-    stripe_subscription_id: Optional[str] = None
-    current_period_end: Optional[datetime] = None
-    stripe_customer_id: Optional[str] = None  # NEW: Store Stripe customer ID (Enhancement 4.4)
-    paypal_subscription_id: Optional[str] = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    stripe_subscription_id: str | None = None
+    current_period_end: datetime | None = None
+    stripe_customer_id: str | None = None  # NEW: Store Stripe customer ID (Enhancement 4.4)
+    paypal_subscription_id: str | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 @dataclass(frozen=True)
@@ -66,9 +65,9 @@ class UsageQuota:
     used_queries: int = 0
     max_queries: int = 20          # -1 means unlimited
     period_start: datetime = field(
-        default_factory=lambda: datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        default_factory=lambda: datetime.now(UTC).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     )
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 @dataclass
@@ -81,7 +80,7 @@ class QueryAuditLog:
     tokens_in: int = 0
     tokens_out: int = 0
     cost_usd: float = 0.0
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,5 +88,5 @@ class QuotaResult:
     """Result of a quota check."""
     allowed: bool
     remaining: int
-    retry_after: Optional[int] = None   # seconds until reset (computed from period_start + 1 month)
-    reason: Optional[str] = None
+    retry_after: int | None = None   # seconds until reset (computed from period_start + 1 month)
+    reason: str | None = None

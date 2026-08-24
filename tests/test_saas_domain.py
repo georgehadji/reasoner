@@ -1,13 +1,12 @@
 # tests/test_saas_domain.py
-import pytest
 from uuid import uuid4
+
+import pytest
+
 from reasoner.domain.saas import (
-    SubscriptionTier,
-    SubscriptionStatus,
-    User,
-    Subscription,
-    UsageQuota,
     QuotaResult,
+    SubscriptionTier,
+    User,
 )
 
 

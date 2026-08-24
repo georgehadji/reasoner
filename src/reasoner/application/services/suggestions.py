@@ -6,11 +6,9 @@ Generates intelligent search suggestions based on partial queries.
 from __future__ import annotations
 
 import logging
-from typing import Any
 from dataclasses import dataclass
 
 from reasoner.core.constants import DEFAULT_NUM_SUGGESTIONS
-from reasoner.core.search import SourceType
 
 logger = logging.getLogger(__name__)
 
@@ -66,11 +64,11 @@ SUGGESTION_TEMPLATES = {
 def detect_topic(query: str) -> str:
     """Detect the topic category from the query."""
     query_lower = query.lower()
-    
+
     tech_keywords = ["ai", "machine learning", "python", "javascript", "api", "software", "code", "programming", "llm", "model"]
     science_keywords = ["physics", "biology", "chemistry", "research", "study", "experiment", "scientific"]
     programming_keywords = ["code", "function", "variable", "loop", "array", "debug", "error", "syntax"]
-    
+
     if any(keyword in query_lower for keyword in programming_keywords):
         return "programming"
     elif any(keyword in query_lower for keyword in tech_keywords):
@@ -87,7 +85,7 @@ def extract_topic(query: str) -> str:
     question_words = ["what", "how", "why", "when", "where", "who", "which", "is", "are", "does", "do", "can", "could", "would", "should"]
     words = query.lower().split()
     topic_words = [w for w in words if w not in question_words and len(w) > 2]
-    
+
     if topic_words:
         return " ".join(topic_words[:3])  # Return first 3 meaningful words
     return query
@@ -103,22 +101,22 @@ def generate_suggestions(request: SuggestionRequest) -> SuggestionResponse:
     - Query completion patterns
     """
     query = request.query.strip()
-    
+
     if not query:
         return SuggestionResponse(suggestions=[], query=query)
-    
+
     topic_category = detect_topic(query)
     topic = extract_topic(query)
-    
+
     suggestions = []
-    
+
     # Generate suggestions from templates
     templates = SUGGESTION_TEMPLATES.get(topic_category, SUGGESTION_TEMPLATES["general"])
     for template in templates[:request.max_suggestions]:
         suggestion = template.replace("{topic}", topic)
         if suggestion.lower() != query.lower():
             suggestions.append(suggestion)
-    
+
     # Add query completion patterns
     if len(query.split()) < 4:
         completion_patterns = [
@@ -129,12 +127,12 @@ def generate_suggestions(request: SuggestionRequest) -> SuggestionResponse:
         for pattern in completion_patterns:
             if pattern not in suggestions and len(suggestions) < request.max_suggestions:
                 suggestions.append(pattern)
-    
+
     # Limit to max_suggestions
     suggestions = suggestions[:request.max_suggestions]
-    
+
     logger.info(f"Generated {len(suggestions)} suggestions for query: {query[:50]}...")
-    
+
     return SuggestionResponse(suggestions=suggestions, query=query)
 
 

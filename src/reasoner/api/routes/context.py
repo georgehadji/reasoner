@@ -13,8 +13,8 @@ from reasoner.api.dependencies import (
     require_auth_if_legacy_disabled,
 )
 from reasoner.api.schemas import ContextAnalysisRequest
-from reasoner.domain.saas import User
 from reasoner.domain.pipeline_state import PipelineState
+from reasoner.domain.saas import User
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -51,9 +51,9 @@ async def run_with_context(
         )
 
     try:
-        from reasoner.application.services.preset_service import PresetService
-        from reasoner.application.services.pipeline_service import PipelineService
         from reasoner.application.orchestrator import PipelineOrchestrator
+        from reasoner.application.services.pipeline_service import PipelineService
+        from reasoner.application.services.preset_service import PresetService
 
         _preset_service = PresetService()
         _orchestrator = PipelineOrchestrator(

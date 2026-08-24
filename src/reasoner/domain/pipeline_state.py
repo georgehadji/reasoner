@@ -7,21 +7,25 @@ Contains: MethodState, CostTrackingState, ConversationState,
 
 from __future__ import annotations
 
-import json
-import logging
-from collections import deque
-from dataclasses import dataclass, field, asdict, fields as dc_fields, MISSING as _DC_MISSING
-from enum import Enum
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, TYPE_CHECKING
+from dataclasses import MISSING as _DC_MISSING
+from dataclasses import dataclass, field
+from dataclasses import fields as dc_fields
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 
 from reasoner.domain.core_types import (
-    SolutionCandidate, CritiqueScore, ReviewHypothesis, StressTestResult,
-    MetaCognitiveAudit, GenerationCandidate, CriticScore,
-    VerificationResult, MetaEvaluation, Decomposition, FinalSolution,
+    CriticScore,
+    CritiqueScore,
+    Decomposition,
+    FinalSolution,
+    GenerationCandidate,
+    MetaEvaluation,
+    ReviewHypothesis,
+    SolutionCandidate,
+    StressTestResult,
+    VerificationResult,
 )
-from reasoner.domain.models import TaskType, ClaimLabel, PerspectiveType, PerspectiveRegistry
+from reasoner.domain.models import TaskType
 
 
 class PipelineField:
@@ -139,21 +143,21 @@ class PipelineCore:
     errors: list[str] = field(default_factory=list)
     attachments: list[dict[str, Any]] = field(default_factory=list)
     # ORCHESTRATED method fields (populated only when preset is orchestrated)
-    generation_candidates: list["GenerationCandidate"] = field(default_factory=list)
-    critic_scores: list["CriticScore"] = field(default_factory=list)
-    verification_results: list["VerificationResult"] = field(default_factory=list)
-    meta_evaluation: "MetaEvaluation | None" = None
+    generation_candidates: list[GenerationCandidate] = field(default_factory=list)
+    critic_scores: list[CriticScore] = field(default_factory=list)
+    verification_results: list[VerificationResult] = field(default_factory=list)
+    meta_evaluation: MetaEvaluation | None = None
 
 
 @dataclass
 class PipelineMeta:
     """Fields that are write-only during execution, read-only after."""
-    started_at: "datetime" = field(default_factory=lambda: datetime.now(timezone.utc))
+    started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     phase_logs: list[str] = field(default_factory=list)
     phase_tokens: dict[str, dict[str, int]] = field(default_factory=dict)
     phase_durations: dict[str, float] = field(default_factory=dict)
     phase_models: dict[str, str] = field(default_factory=dict)
-    phase_results: list["PhaseResult"] = field(default_factory=list)
+    phase_results: list[PhaseResult] = field(default_factory=list)
     quality_hints: dict[str, str] = field(default_factory=dict)
     quality_history: list[dict] = field(default_factory=list)
     fallback_events: list[dict] = field(default_factory=list)
@@ -193,10 +197,10 @@ class PhaseOutput:
     stress_results: list[StressTestResult] | None = None
     final_solution: FinalSolution | None = None
     errors: list[str] | None = None
-    generation_candidates: list["GenerationCandidate"] | None = None
-    critic_scores: list["CriticScore"] | None = None
-    verification_results: list["VerificationResult"] | None = None
-    meta_evaluation: "MetaEvaluation | None" = None
+    generation_candidates: list[GenerationCandidate] | None = None
+    critic_scores: list[CriticScore] | None = None
+    verification_results: list[VerificationResult] | None = None
+    meta_evaluation: MetaEvaluation | None = None
     # Flag to indicate short-term sequential mutation (Phase C3)
     mutated_in_place: bool = False
 
@@ -705,7 +709,7 @@ class PipelineState:
         return PipelineSerializationService.to_dict(self)
 
     @classmethod
-    def _from_dict(cls, data: dict[str, Any]) -> "PipelineState":
+    def _from_dict(cls, data: dict[str, Any]) -> PipelineState:
         """Reconstruct PipelineState from a plain dict (delegates to PipelineSerializationService)."""
         from reasoner.application.services.pipeline_service import PipelineSerializationService
         return PipelineSerializationService._from_dict(data)

@@ -4,14 +4,11 @@ Uses fakes — no OPENROUTER_API_KEY required.
 """
 
 import json
+
 import pytest
-import asyncio
-from dataclasses import asdict
 
+from reasoner.models import PipelineState
 from reasoner.pipeline import ReasonerPipeline
-from reasoner.models import PipelineState, SolutionCandidate, PerspectiveType
-from reasoner.llm import ProviderRouter
-
 
 # ─────────────────────────────────────────────────────────────────────
 # Fakes
@@ -166,8 +163,8 @@ async def test_synthesis_coerces_string_sources():
 # Bug 6: Language Detection
 # ─────────────────────────────────────────────────────────────────────
 
-from reasoner.phases import detect_language
 import reasoner.pipeline as _pipeline_module
+from reasoner.phases import detect_language
 
 
 @pytest.fixture(autouse=True)
@@ -329,7 +326,6 @@ async def test_phase_1_decompose_parses_new_assumption_fields():
 # Milestone 4: Off-topic domain / acronym collision gating
 # ─────────────────────────────────────────────────────────────────────
 
-from reasoner.core.search import _should_include_result
 
 
 def test_should_include_result_rejects_tax_agi_article():
@@ -363,7 +359,6 @@ def test_should_include_result_rejects_huggingface_vocab():
 # Milestone 4: Query enrichment
 # ─────────────────────────────────────────────────────────────────────
 
-from reasoner.pipeline import ReasonerPipeline
 
 
 def test_enrich_query_adds_disambiguation_for_agi():

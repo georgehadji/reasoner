@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
-from typing import Any
 
-from reasoner.domain.pipeline_state import PipelineState
-from reasoner.parsing import extract_json
 import reasoner.phases as phases
 from reasoner.application.flows.base import WorkflowServices
-from reasoner.core.constants import ARTICLE_MIN_SOURCE_COUNT, ARTICLE_MIN_CLAIM_SUPPORT_RATIO, TRUNCATION
+from reasoner.core.constants import (
+    ARTICLE_MIN_CLAIM_SUPPORT_RATIO,
+)
+from reasoner.domain.pipeline_state import PipelineState
 from reasoner.infrastructure.search.discovery import get_search_client_for_method
+from reasoner.parsing import extract_json
 
 logger = logging.getLogger(__name__)
 
@@ -175,7 +175,7 @@ async def run_article_adversarial_verify_phase(state: PipelineState, services: W
     state.writing_state["claim_ledger"] = data.get("claim_ledger", [])
     metrics = data.get("metrics", {})
     state.writing_state["metrics"] = metrics
-    
+
     if metrics.get("claim_support_ratio", 1.0) < ARTICLE_MIN_CLAIM_SUPPORT_RATIO:
         services.log("WRITING", "Low claim support ratio. Identifying gaps.", state)
         state.writing_state["gaps_noted"] = data.get("gaps", [])

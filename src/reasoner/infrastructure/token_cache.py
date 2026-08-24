@@ -12,15 +12,15 @@ Features:
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
 import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
 from pathlib import Path
-import asyncio
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ class CacheEntry:
     ttl_seconds: int
     access_count: int = 0
     last_accessed: float = field(default_factory=time.time)
-    semantic_embedding: Optional[List[float]] = None  # For semantic matching
+    semantic_embedding: list[float] | None = None  # For semantic matching
     raw_prompt: str = ""  # Stored for Jaccard semantic matching
 
 
@@ -51,12 +51,12 @@ class CacheStats:
     evictions: int = 0
     total_tokens_saved: int = 0
     total_size_bytes: int = 0
-    
+
     @property
     def hit_rate(self) -> float:
         total = self.hits + self.misses
         return self.hits / total if total > 0 else 0.0
-    
+
     @property
     def estimated_cost_savings(self) -> float:
         # Approximate: $0.000001 per token (average across providers)
@@ -81,12 +81,12 @@ class TokenAwareCache:
         # Store in cache
         await cache.set(problem, phase, model_id, prompt, response, tokens_used)
     """
-    
+
     def __init__(
         self,
         max_tokens: int = 1_000_000,  # 1M token budget
         ttl_seconds: int = 3600,  # 1 hour default TTL
-        cache_dir: Optional[Path] = None,
+        cache_dir: Path | None = None,
         semantic_threshold: float = 0.85,  # 85% similarity for cache hit
         max_entries: int = 1000,
     ):
@@ -95,7 +95,7 @@ class TokenAwareCache:
         self.cache_dir = cache_dir
         self.semantic_threshold = semantic_threshold
         self.max_entries = max_entries
-        
+
         self._entries: OrderedDict[str, CacheEntry] = OrderedDict()
         self._lru_max_entries: int = 512  # LRU cap — oldest evicted on overflow
         self._current_tokens = 0
@@ -126,25 +126,25 @@ class TokenAwareCache:
             logger.warning(
                 "Token cache disk load failed, operating with empty cache: %s", exc
             )
-    
+
     def _compute_key(self, problem: str, phase: str, model_id: str, prompt: str, agent_id: str = "") -> str:
         """Compute cache key. agent_id scopes the cache to a user/session."""
         content = f"{agent_id}:{problem}:{phase}:{model_id}:{prompt}"
         return hashlib.sha256(content.encode()).hexdigest()[:32]
-    
+
     def _compute_prompt_hash(self, prompt: str) -> str:
         """Compute prompt hash for exact matching."""
         # Cache-key digest only, never a security boundary.
         return hashlib.md5(prompt.encode(), usedforsecurity=False).hexdigest()[:16]
-    
+
     def _compute_problem_hash(self, problem: str) -> str:
         """Compute problem hash for grouping."""
         return hashlib.sha256(problem.encode()).hexdigest()[:16]
-    
+
     def _estimate_tokens(self, text: str) -> int:
         """Estimate token count (rough: 1 token ≈ 4 chars)."""
         return len(text) // 4
-    
+
     @staticmethod
     def _jaccard_similarity(text_a: str, text_b: str) -> float:
         """Compute Jaccard similarity between two texts using word sets."""
@@ -164,7 +164,7 @@ class TokenAwareCache:
         prompt: str,
         semantic_threshold: float = 0.85,
         agent_id: str = "",
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         Get cached response.
 
@@ -224,7 +224,7 @@ class TokenAwareCache:
 
             self._stats.misses += 1
             return None
-    
+
     async def set(
         self,
         problem: str,
@@ -233,20 +233,20 @@ class TokenAwareCache:
         prompt: str,
         response: str,
         tokens_used: int,
-        ttl_seconds: Optional[int] = None,
+        ttl_seconds: int | None = None,
         agent_id: str = "",
     ) -> None:
         """Store response in cache."""
         async with self._lock:
             await self._ensure_loaded()
             key = self._compute_key(problem, phase, model_id, prompt, agent_id=agent_id)
-            
+
             # Check if we need to evict — token budget, max entries, or LRU cap
             while (self._current_tokens + tokens_used > self.max_tokens
                    or len(self._entries) >= self.max_entries
                    or len(self._entries) >= self._lru_max_entries):
                 await self._evict_lru()
-            
+
             # Create entry
             entry = CacheEntry(
                 key=key,
@@ -261,7 +261,7 @@ class TokenAwareCache:
                 ttl_seconds=ttl_seconds or self.ttl_seconds,
                 raw_prompt=prompt,
             )
-            
+
             # Subtract old entry's token count on overwrite to prevent counter leak
             if key in self._entries:
                 old_entry = self._entries[key]
@@ -274,16 +274,16 @@ class TokenAwareCache:
                         old_idx.remove(key)
                     except ValueError:
                         pass
-            
+
             self._entries[key] = entry
             self._problem_index.setdefault(entry.problem_hash, []).append(key)
             self._current_tokens += tokens_used
             self._stats.total_size_bytes += len(response.encode())
-            
+
             # Save to disk if cache_dir provided
             if self.cache_dir:
                 await self._save_to_disk(key, entry)
-    
+
     async def _evict(self, key: str) -> None:
         """Evict specific entry."""
         if key in self._entries:
@@ -298,12 +298,12 @@ class TokenAwareCache:
             self._stats.total_size_bytes -= len(entry.response.encode())
             self._stats.evictions += 1
             del self._entries[key]
-    
+
     async def _evict_lru(self) -> None:
         """Evict least recently used entry."""
         if not self._entries:
             return
-        
+
         # Find LRU entry
         lru_key = min(
             self._entries.keys(),
@@ -359,7 +359,7 @@ class TokenAwareCache:
             self._problem_index.clear()
             self._current_tokens = 0
             self._stats.total_size_bytes = 0
-            
+
             # Clear disk cache
             if self.cache_dir:
                 for f in self.cache_dir.glob("*.json"):
@@ -367,7 +367,7 @@ class TokenAwareCache:
                         f.unlink(missing_ok=True)
                     except PermissionError:
                         pass
-    
+
     def get_stats(self) -> dict[str, Any]:
         """Get cache statistics."""
         return {
@@ -382,7 +382,7 @@ class TokenAwareCache:
             "tokens_saved": self._stats.total_tokens_saved,
             "estimated_cost_savings_usd": self._stats.estimated_cost_savings,
         }
-    
+
     async def _load_from_disk(self) -> None:
         """Load cache entries from disk."""
         if not self.cache_dir:
@@ -404,12 +404,12 @@ class TokenAwareCache:
             except (json.JSONDecodeError, KeyError, TypeError):
                 # Corrupted file, remove it
                 f.unlink()
-    
+
     async def _save_to_disk(self, key: str, entry: CacheEntry) -> None:
         """Save entry to disk."""
         if not self.cache_dir:
             return
-        
+
         f = self.cache_dir / f"{key}.json"
         try:
             data = {
@@ -427,18 +427,18 @@ class TokenAwareCache:
                 "raw_prompt": entry.raw_prompt,
             }
             await asyncio.to_thread(f.write_text, json.dumps(data))
-        except (IOError, OSError) as exc:
+        except OSError as exc:
             logger.warning("Failed to persist cache entry %s to disk: %s", key, exc)
 
 
 # Global cache instance
-_cache: Optional[TokenAwareCache] = None
+_cache: TokenAwareCache | None = None
 
 
 def get_token_cache(
     max_tokens: int = 1_000_000,
     ttl_seconds: int = 3600,
-    cache_dir: Optional[str] = None,
+    cache_dir: str | None = None,
 ) -> TokenAwareCache:
     """Get or create global token-aware cache."""
     global _cache

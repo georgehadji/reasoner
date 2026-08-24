@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-import json
-import os
 import asyncio
+import json
 import logging
+import os
 
 import stripe
 from fastapi import Request
 
-from reasoner.infrastructure.billing.stripe_adapter import StripeBillingAdapter
 from reasoner.infrastructure.billing.paypal_adapter import PayPalBillingAdapter
+from reasoner.infrastructure.billing.stripe_adapter import StripeBillingAdapter
 from reasoner.infrastructure.valkey.client import get_valkey_pool
 
 logger = logging.getLogger(__name__)
@@ -103,6 +103,7 @@ async def _get_webhook_pool():
         return _webhook_pool
     try:
         import asyncpg
+
         from reasoner.core.settings import settings
         if not settings.DATABASE_URL:
             return None

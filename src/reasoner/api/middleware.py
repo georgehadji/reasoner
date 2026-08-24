@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -185,7 +184,7 @@ class RequestTimeoutMiddleware(BaseHTTPMiddleware):
                 call_next(request),
                 timeout=self.timeout_seconds,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning(f"Request timeout: {request.url.path}")
             return JSONResponse(
                 {"error": "Request timeout"},

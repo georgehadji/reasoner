@@ -11,40 +11,11 @@ All existing imports continue to work through this shim.
 
 from pathlib import Path
 
-from reasoner.domain.core_types import (
-    ScenarioType,
-    SubProblem,
-    Assumption,
-    Decomposition,
-    SolutionCandidate,
-    CritiqueScore,
-    StressTestResult,
-    MetaCognitiveAudit,
-    GenerationCandidate,
-    CriticDimensionScore,
-    CriticScore,
-    VerificationResult,
-    MetaEvaluation,
-    FinalSolution,
-)
-
+# Re-export domain model types that were historically exposed via models.py
 from reasoner.domain.pipeline_state import (
-    MethodState,
-    CostTrackingState,
-    ConversationState,
-    PipelineCore,
-    PipelineMeta,
-    PipelineRemainder,
     PipelineState,
 )
 
-# Re-export domain model types that were historically exposed via models.py
-from reasoner.domain.models import (
-    TaskType,
-    ClaimLabel,
-    PerspectiveType,
-    PerspectiveRegistry,
-)
 
 # Backward-compat: standalone load/save for auto-generated tests
 # Moved to PipelineSerializationService (C3 refactor — I/O off domain object).

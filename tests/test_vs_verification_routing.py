@@ -1,11 +1,9 @@
 """Tests for vs_verification_routing stage."""
 from __future__ import annotations
 
-import pytest
-
 from reasoner.phases.vs_verification_routing import (
-    route_claim_by_vs_probability,
     VerificationRoute,
+    route_claim_by_vs_probability,
 )
 from reasoner.reasoner_vs_constants import VS_ROUTING_HIGH_PROB, VS_ROUTING_MEDIUM_PROB
 from reasoner.vs_config import VSFeatureFlags

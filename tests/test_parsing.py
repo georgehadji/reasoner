@@ -1,12 +1,18 @@
 """Tests for parsing module."""
 
 import pytest
-from reasoner.parsing import extract_json, strip_perplexity_citations, strip_prose_preamble, ParseError
+
+from reasoner.parsing import (
+    ParseError,
+    extract_json,
+    strip_perplexity_citations,
+    strip_prose_preamble,
+)
 
 
 class TestStripPerplexityCitations:
     """Test Perplexity Sonar citation removal."""
-    
+
     def test_removes_citation_markers(self):
         text = 'This is a response [1] with citations [2] and [3].'
         result = strip_perplexity_citations(text)
@@ -14,14 +20,14 @@ class TestStripPerplexityCitations:
         assert '[2]' not in result
         assert '[3]' not in result
         assert 'This is a response' in result
-    
+
     def test_removes_sources_section(self):
         text = 'Response text.\n\nSources:\n[1] https://example.com\n[2] https://test.com'
         result = strip_perplexity_citations(text)
         assert 'Sources:' not in result
         assert 'example.com' not in result
         assert 'Response text' in result
-    
+
     def test_removes_citations_section(self):
         text = 'Response text.\n\nCitations:\n[1] Source 1\n[2] Source 2'
         result = strip_perplexity_citations(text)
@@ -32,19 +38,19 @@ class TestStripPerplexityCitations:
 
 class TestStripProsePreamble:
     """Test prose preamble removal."""
-    
+
     def test_removes_here_is_json(self):
         text = 'Here is the JSON:\n{"key": "value"}'
         result = strip_prose_preamble(text)
         assert 'Here is the JSON:' not in result
         assert '{"key": "value"}' in result
-    
+
     def test_removes_sure_here_is(self):
         text = 'Sure! Here is the response:\n{"key": "value"}'
         result = strip_prose_preamble(text)
         assert 'Sure!' not in result
         assert '{"key": "value"}' in result
-    
+
     def test_handles_clean_json(self):
         text = '{"key": "value"}'
         result = strip_prose_preamble(text)
@@ -53,38 +59,38 @@ class TestStripProsePreamble:
 
 class TestExtractJson:
     """Test JSON extraction from various formats."""
-    
+
     def test_clean_json(self):
         text = '{"task_type": "analytical", "rationale": "test"}'
         result = extract_json(text)
         assert result["task_type"] == "analytical"
         assert result["rationale"] == "test"
-    
+
     def test_json_with_markdown_fences(self):
         text = '```json\n{"task_type": "analytical"}\n```'
         result = extract_json(text)
         assert result["task_type"] == "analytical"
-    
+
     def test_json_with_preamble(self):
         text = 'Here is the JSON:\n```json\n{"task_type": "analytical"}\n```'
         result = extract_json(text)
         assert result["task_type"] == "analytical"
-    
+
     def test_json_with_perplexity_citations(self):
         text = '{"task_type": "analytical"} [1]\n\nSources:\n[1] https://example.com'
         result = extract_json(text)
         assert result["task_type"] == "analytical"
-    
+
     def test_trailing_commas_removed(self):
         text = '{"items": [1, 2, 3,],}'
         result = extract_json(text)
         assert result["items"] == [1, 2, 3]
-    
+
     def test_invalid_json_raises_error(self):
         text = 'This is not JSON at all'
         with pytest.raises(ParseError):
             extract_json(text)
-    
+
     def test_empty_string_returns_empty_dict(self):
         """Empty LLM responses should gracefully fallback to empty dict."""
         assert extract_json("") == {}

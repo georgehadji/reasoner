@@ -12,12 +12,12 @@ from __future__ import annotations
 
 import logging
 
+from reasoner.application.ports.email_port import EmailMessage
 from reasoner.core.events.domain_events import (
     DomainEvent,
-    SaaSEventType,
     PipelineEventType,
+    SaaSEventType,
 )
-from reasoner.application.ports.email_port import EmailMessage
 
 logger = logging.getLogger(__name__)
 

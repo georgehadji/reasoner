@@ -5,9 +5,7 @@ Tests domain value objects and telemetry store query logic.
 
 from __future__ import annotations
 
-import json
 import uuid
-from datetime import datetime, timezone
 
 import pytest
 

@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from reasoner.api.auth_deps import optional_auth
 from reasoner.application.handlers import (
     GetHarnessScorecardQuery,
     handle_get_harness_scorecard,
 )
-from reasoner.api.auth_deps import optional_auth
 from reasoner.domain.saas import User
 
 router = APIRouter()

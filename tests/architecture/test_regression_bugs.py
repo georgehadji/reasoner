@@ -11,18 +11,17 @@ BUG-006: _get_build_provider race condition
 """
 
 from __future__ import annotations
-from reasoner.models import save, load
-from reasoner.application.services.event_emission_service import EventEmissionService
 
-import asyncio
 import json
 import os
 import tempfile
 import threading
-import pytest
-from unittest.mock import patch, MagicMock
 
+import pytest
+
+from reasoner.application.services.event_emission_service import EventEmissionService
 from reasoner.domain.pipeline_state import PipelineState
+from reasoner.models import load, save
 
 
 class TestBug001LoadLogging:

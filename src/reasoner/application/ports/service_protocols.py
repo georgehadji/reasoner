@@ -7,7 +7,8 @@ composition boundaries without coupling to concrete implementations.
 
 from __future__ import annotations
 
-from typing import Any, AsyncGenerator, Protocol, runtime_checkable
+from collections.abc import AsyncGenerator
+from typing import Any, Protocol, runtime_checkable
 
 
 @runtime_checkable

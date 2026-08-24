@@ -6,8 +6,8 @@ import logging
 import os
 from typing import Any
 
-from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.core.ports.model_registry_port import get_model_registry_port
+from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.presets import build_auto_preset, build_custom_router, get_preset
 
 logger = logging.getLogger(__name__)

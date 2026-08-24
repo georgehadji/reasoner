@@ -12,10 +12,8 @@ import hashlib
 import hmac
 import secrets
 import time
-from typing import Optional
 
 from reasoner.core.settings import settings
-
 
 # Token validity window in seconds (24 hours)
 _CSRF_TOKEN_MAX_AGE = 86400

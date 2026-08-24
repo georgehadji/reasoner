@@ -3,13 +3,13 @@ Neuro Cache Hierarchy
 L1/L2/L3 with persona-aware similarity thresholds.
 """
 
-import json
-import time
-import hashlib
 import asyncio
+import hashlib
+import json
 import logging
+import time
+from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Optional, Callable, Awaitable
 
 import numpy as np
 
@@ -56,7 +56,7 @@ class L1Cache:
         log.info(f"L1 cache: {len(self.bundles)} bundles")
 
     def search(self, query_embedding: list[float], top_k: int = 3,
-               persona: Optional[PersonaConfig] = None) -> list[ContextChunk]:
+               persona: PersonaConfig | None = None) -> list[ContextChunk]:
         threshold = self.config.l1_similarity_threshold
         if persona and persona.l1_similarity_override is not None:
             threshold = persona.l1_similarity_override
@@ -115,7 +115,7 @@ class L2Index:
         await asyncio.to_thread((self.index_dir / "index.json").write_text, json.dumps(self.entries, default=str))
 
     def search(self, query_embedding: list[float], top_k: int = 5,
-               persona: Optional[PersonaConfig] = None) -> list[ContextChunk]:
+               persona: PersonaConfig | None = None) -> list[ContextChunk]:
         threshold = self.config.l2_similarity_threshold
         if persona and persona.l2_similarity_override is not None:
             threshold = persona.l2_similarity_override

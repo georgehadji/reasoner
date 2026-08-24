@@ -129,7 +129,7 @@ class Settings:
     # ── Database & Persistence ──
     # Default to sqlite for dev, postgres for production if URL provided
     EVENT_STORE_BACKEND: str = os.getenv(
-        "EVENT_STORE_BACKEND", 
+        "EVENT_STORE_BACKEND",
         "postgres" if os.getenv("DATABASE_URL") and os.getenv("ENVIRONMENT") == "production" else "sqlite"
     )
 

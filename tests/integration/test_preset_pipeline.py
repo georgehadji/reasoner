@@ -14,7 +14,6 @@ import pytest
 
 from .sse_utils import collect_pipeline_events
 
-
 # ── Parameterized test cases ──────────────────────────────────────────
 # Each tuple: (preset, prompt, expected_phases, min_phases)
 # - prompt: complex enough to trigger full pipeline (not a direct answer)

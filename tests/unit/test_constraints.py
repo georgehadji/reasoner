@@ -7,6 +7,9 @@ from __future__ import annotations
 
 import pytest
 
+from reasoner.application.services.constraint_resolver import (
+    ConstraintResolver,
+)
 from reasoner.infrastructure.llm.constraints.bloc_diversity import (
     BlocDiversityConstraint,
 )
@@ -21,9 +24,6 @@ from reasoner.infrastructure.llm.constraints.concurrency import (
 )
 from reasoner.infrastructure.llm.constraints.no_repeat_lab import (
     NoRepeatLabConstraint,
-)
-from reasoner.application.services.constraint_resolver import (
-    ConstraintResolver,
 )
 
 

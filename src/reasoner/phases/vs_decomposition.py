@@ -5,8 +5,8 @@ from typing import Any, Protocol
 
 from pydantic import BaseModel, Field
 
-from reasoner.reasoner_vs_constants import VS_K_DECOMPOSITION, VS_PARSE_MAX_RETRIES
 from reasoner.reasoner_verbalized_sampling import VSMode, build_vs_prompt, parse_vs_response
+from reasoner.reasoner_vs_constants import VS_K_DECOMPOSITION, VS_PARSE_MAX_RETRIES
 from reasoner.vs_config import VSFeatureFlags
 
 

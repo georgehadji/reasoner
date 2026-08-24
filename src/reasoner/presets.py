@@ -6,16 +6,17 @@ preset data moved to reasoner.domain.preset_registry.
 
 from reasoner.domain.preset_core import (
     _KNOWN_ROUTING_ROLES,
-    PipelinePreset,
-    get_method_from_preset,
-    get_preset_tier,
-    get_preset_price_tier,
-    build_auto_preset,
     FOLLOWUP_AGENT_MODELS,
-    _METHOD_TO_SLUG,
+    PipelinePreset,
+    build_auto_preset,
+    get_method_from_preset,
+    get_preset_price_tier,
+    get_preset_tier,
 )
 from reasoner.domain.preset_registry import (
     get_preset as get_preset_from_registry,
+)
+from reasoner.domain.preset_registry import (
     list_presets as list_presets_from_registry,
 )
 from reasoner.infrastructure.llm.router import ProviderRouter
@@ -139,12 +140,12 @@ def build_custom_router(routing_dict: dict[str, str]) -> ProviderRouter:
 
 def print_presets_summary() -> None:
     """Print a formatted summary of all available presets."""
+    import io
+    import sys
+
+    from rich import box
     from rich.console import Console
     from rich.table import Table
-    from rich import box
-
-    import sys
-    import io
     safe_out = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
     console = Console(file=safe_out)
     table = Table(title="Reasoner v2.0 - Available Pipeline Presets", box=box.ROUNDED)

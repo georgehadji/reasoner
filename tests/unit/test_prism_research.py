@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import json
-import pytest
 from unittest.mock import AsyncMock
 
+import pytest
+
 from reasoner.application.flows.prism_research import run_prism_research_phase
-from reasoner.domain.pipeline_state import PipelineState
 from reasoner.core.ports.search_port import SearchServicePort
+from reasoner.domain.pipeline_state import PipelineState
 
 
 class MockSearchClient(SearchServicePort):
@@ -405,7 +406,7 @@ def test_prism_system_prompts_vary_by_mode():
 def test_research_synthesis_prompt_discipline():
     """Verify that when the preset is 'research', the synthesis prompt enforces report discipline."""
     from reasoner.phases._universal import synthesis_prompt
-    
+
     state_research = PipelineState(problem="test", preset_name="research-budget")
     prompt_research = synthesis_prompt(state_research)
     assert "RESEARCH METHOD CITATION AND REPORT DISCIPLINE" in prompt_research

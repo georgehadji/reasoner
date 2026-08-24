@@ -1,4 +1,5 @@
 import os
+
 shadow_names = {'asyncio', 'selectors', 'concurrent', 'threading', 'time'}
 for root, dirs, files in os.walk('src'):
     for f in files:

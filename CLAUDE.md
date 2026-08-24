@@ -287,6 +287,7 @@ Cross-lab diversity prevents echo chambers:
 - **Simplicity First** — Make every change as simple as possible. Impact minimal code.
 - **Root Causes** — No temporary fixes. Senior developer standards.
 - **Minimal Impact** — Changes should only touch what's necessary.
+- **Architectural & Paradigm Integrity** — Every addition, change, fix, and enhancement suggested and implemented by an agent MUST strictly follow the project's established architecture and use the optimal programming paradigms and design patterns for each specific module.
 
 ---
 
@@ -300,3 +301,7 @@ Cross-lab diversity prevents echo chambers:
 | `AGENTS.md` | Manual — update when adding methods, presets, or major architectural changes |
 
 *For complete architectural analysis see `ARCHITECTURE_MINDMAP.md`. For dependency graph see `graphify-out/GRAPH_REPORT.md`.*
+
+## Workspace CONTEXT.md Map
+
+To easily navigate the codebase, explore directory structures, and understand file roles, please refer to the root [CONTEXT.md](CONTEXT.md) file. This file contains a complete hierarchical map and points to individual `CONTEXT.md` files detailing the contents and functioning of every single folder in the project.

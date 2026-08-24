@@ -4,15 +4,16 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Literal, Optional, List
+from typing import TYPE_CHECKING, Literal
+
+from reasoner.core.constants_models import MODEL_GROK_43, MODEL_KIMI_K2_6
 
 # Removed ProviderRouter and _REGISTRY imports to restore domain purity.
 # Validation logic will be moved to an application service.
 from reasoner.domain.saas import SubscriptionTier
-from reasoner.core.constants_models import MODEL_GROK_43, MODEL_KIMI_K2_6
 
 if TYPE_CHECKING:
-    from reasoner.core.protocol import PhaseConfig
+    pass
 
 
 # Single source of truth for valid routing role keys.
@@ -251,7 +252,7 @@ class PipelinePreset:
     routing: dict[str, str] = field(default_factory=dict)
     notes: list[str] = field(default_factory=list)
     required_env_vars: list[str] = field(default_factory=list)
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
     # Per-role fallback model IDs. If a role's provider fails, this model is tried next.
     # Roles absent here fall back to primary automatically (if they use a non-primary model).
     fallback_routing: dict[str, str] = field(default_factory=dict)

@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from reasoner.core.constants import DEFAULT_PRESET, DEFAULT_TOP_K, DEFAULT_SOURCE_TYPE
+from reasoner.core.constants import DEFAULT_PRESET, DEFAULT_SOURCE_TYPE, DEFAULT_TOP_K
 
 
 @dataclass(frozen=True)

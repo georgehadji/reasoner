@@ -14,9 +14,9 @@ from reasoner.infrastructure.persistence.event_store import (
     reset_event_store,
 )
 from reasoner.infrastructure.persistence.snapshots import (
-    SnapshotStrategy,
-    SnapshotManager,
     ReadModelProjection,
+    SnapshotManager,
+    SnapshotStrategy,
     setup_read_model_projections,
 )
 

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from reasoner.rate_limiter import RateLimiter, RateLimitConfig
+from reasoner.rate_limiter import RateLimitConfig, RateLimiter
 
 
 @pytest.fixture

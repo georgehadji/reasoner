@@ -1,15 +1,15 @@
 """Golden regression — VS code paths behave correctly when all flags disabled."""
 from __future__ import annotations
 
-from reasoner.vs_config import VSFeatureFlags, VSVerticalConfig, VSVerticalRegistry
 from reasoner.reasoner_verbalized_sampling import (
-    build_vs_prompt,
-    VSMode,
     VSCandidate,
+    VSMode,
     VSResult,
+    build_vs_prompt,
     sample_from_vs,
     top_candidate,
 )
+from reasoner.vs_config import VSFeatureFlags, VSVerticalRegistry
 
 
 class TestAllFlagsDisabledRegression:

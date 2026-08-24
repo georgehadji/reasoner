@@ -6,9 +6,8 @@ from __future__ import annotations
 from typing import Any
 
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.subagents.base import PhaseSubAgent
 from reasoner.parsing import extract_json
-
+from reasoner.subagents.base import PhaseSubAgent
 
 EVIDENCE_SYSTEM = """You are an Evidence Critique Sub-Agent. Your ONE JOB is to evaluate the quality, reliability, and sufficiency of evidence supporting each candidate solution.
 

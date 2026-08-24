@@ -1,14 +1,15 @@
 import asyncio
-import sys
-import traceback
-from unittest.mock import MagicMock, patch, AsyncMock
-from pathlib import Path
 
 # Add src to path
 import os
+import sys
+import traceback
+from unittest.mock import AsyncMock, MagicMock, patch
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "src")))
 
 from reasoner.main import main
+
 
 async def test_cli_cleanup_on_exit():
     args = MagicMock()
@@ -33,7 +34,7 @@ async def test_cli_cleanup_on_exit():
             mock_close_llm.assert_called_once()
             with open("test_output.log", "w") as f:
                 f.write("SUCCESS\n")
-        except Exception as e:
+        except Exception:
             with open("test_output.log", "w") as f:
                 f.write(traceback.format_exc())
 

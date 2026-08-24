@@ -12,7 +12,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import Any, AsyncGenerator, Callable
+from collections.abc import AsyncGenerator, Callable
 
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.infrastructure.llm.router import ProviderRouter
@@ -106,7 +106,7 @@ async def run_phase_with_keepalive(
                         await phase_task
                     except (asyncio.CancelledError, Exception):
                         pass
-                raise asyncio.TimeoutError(
+                raise TimeoutError(
                     f"Phase timed out after {timeout_seconds}s"
                 )
             wait = min(keepalive_interval, remaining)

@@ -27,16 +27,14 @@ import tempfile
 import textwrap
 import time
 from pathlib import Path
-from typing import Optional
 
-from reasoner.core.code_safety import check_code_safety, CodeSafetyError
+from reasoner.core.code_safety import CodeSafetyError, check_code_safety
 from reasoner.core.exec_constants import (
     EXEC_DEFAULT_TIMEOUT_MS,
-    EXEC_MEM_LIMIT_MB,
     EXEC_MAX_OUTPUT_BYTES,
+    EXEC_MEM_LIMIT_MB,
 )
 from reasoner.core.ports.code_executor import (
-    CodeExecutorPort,
     ExecutionLimits,
     ExecutionResult,
 )
@@ -148,7 +146,7 @@ class SubprocessExecutor:
                         proc.communicate(input=stdin.encode() if stdin else None),
                         timeout=timeout_sec,
                     )
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     # Kill the hung process
                     try:
                         proc.kill()

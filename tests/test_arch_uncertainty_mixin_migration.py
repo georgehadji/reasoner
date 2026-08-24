@@ -9,9 +9,7 @@ documented reasoning methods.
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
-
 
 # ── Flow factory covers all documented methods ────────────────────────
 
@@ -138,8 +136,8 @@ def test_mixin_files_have_flow_counterparts() -> None:
 
 def test_method_slug_mapping_complete() -> None:
     """Every method slug in _METHOD_TO_SLUG maps to a known flow."""
-    from reasoner.domain.preset_core import _METHOD_TO_SLUG
     from reasoner.application.flows.factory import WorkflowFactory
+    from reasoner.domain.preset_core import _METHOD_TO_SLUG
 
     factory = WorkflowFactory()
 

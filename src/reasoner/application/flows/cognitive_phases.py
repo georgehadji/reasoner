@@ -4,14 +4,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any
 
-from reasoner.domain.pipeline_state import PipelineState
-from reasoner.domain.core_types import SolutionCandidate
-from reasoner.models import PerspectiveType
-from reasoner.parsing import extract_json
 import reasoner.phases as phases
 from reasoner.application.flows.base import WorkflowServices
+from reasoner.domain.core_types import SolutionCandidate
+from reasoner.domain.pipeline_state import PipelineState
+from reasoner.models import PerspectiveType
+from reasoner.parsing import extract_json
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +21,7 @@ async def run_cove_draft_phase(state: PipelineState, services: WorkflowServices)
     raw, _ = await services.call_llm(
         role="cove_draft",
         system_prompt=phases.COVE_DRAFT_SYSTEM,
-        user_prompt=phases.cove_draft_prompt(state), 
+        user_prompt=phases.cove_draft_prompt(state),
         state=state
     )
     data = extract_json(raw)
@@ -34,7 +33,7 @@ async def run_cove_verify_phase(state: PipelineState, services: WorkflowServices
     raw, _ = await services.call_llm(
         role="cove_verify",
         system_prompt=phases.COVE_VERIFY_SYSTEM,
-        user_prompt=phases.cove_verify_prompt(state), 
+        user_prompt=phases.cove_verify_prompt(state),
         state=state
     )
     data = extract_json(raw)
@@ -45,7 +44,7 @@ async def run_cove_answer_phase(state: PipelineState, services: WorkflowServices
     raw, _ = await services.call_llm(
         role="cove_answer",
         system_prompt=phases.COVE_ANSWER_SYSTEM,
-        user_prompt=phases.cove_answer_prompt(state), 
+        user_prompt=phases.cove_answer_prompt(state),
         state=state
     )
     data = extract_json(raw)
@@ -56,7 +55,7 @@ async def run_cove_revise_phase(state: PipelineState, services: WorkflowServices
     raw, _ = await services.call_llm(
         role="cove_revise",
         system_prompt=phases.COVE_REVISE_SYSTEM,
-        user_prompt=phases.cove_revise_prompt(state), 
+        user_prompt=phases.cove_revise_prompt(state),
         state=state
     )
     data = extract_json(raw)
@@ -78,7 +77,7 @@ async def run_sot_skeleton_phase(state: PipelineState, services: WorkflowService
     raw, _ = await services.call_llm(
         role="sot_skeleton",
         system_prompt=phases.SOT_SKELETON_SYSTEM,
-        user_prompt=phases.sot_skeleton_prompt(state), 
+        user_prompt=phases.sot_skeleton_prompt(state),
         state=state
     )
     data = extract_json(raw)
@@ -96,7 +95,7 @@ async def run_sot_solve_phase(state: PipelineState, services: WorkflowServices) 
             raw, _ = await services.call_llm(
                 role="sot_solve",
                 system_prompt=phases.SOT_SOLVE_SYSTEM,
-                user_prompt=phases.sot_solve_prompt(state, sp), 
+                user_prompt=phases.sot_solve_prompt(state, sp),
                 state=state
             )
             data = extract_json(raw)
@@ -121,7 +120,7 @@ async def run_sot_assemble_phase(state: PipelineState, services: WorkflowService
     raw, _ = await services.call_llm(
         role="sot_assemble",
         system_prompt=phases.SOT_ASSEMBLE_SYSTEM,
-        user_prompt=phases.sot_assemble_prompt(state), 
+        user_prompt=phases.sot_assemble_prompt(state),
         state=state
     )
     data = extract_json(raw)
@@ -142,7 +141,7 @@ async def run_tot_decompose_phase(state: PipelineState, services: WorkflowServic
     raw, _ = await services.call_llm(
         role="tot_decompose",
         system_prompt=phases.TOT_DECOMPOSE_SYSTEM,
-        user_prompt=phases.tot_decompose_prompt(state), 
+        user_prompt=phases.tot_decompose_prompt(state),
         state=state
     )
     try:
@@ -169,7 +168,7 @@ async def run_tot_generate_phase(state: PipelineState, services: WorkflowService
     raw, _ = await services.call_llm(
         role="tot_generate",
         system_prompt=phases.TOT_GENERATE_SYSTEM,
-        user_prompt=phases.tot_generate_prompt(state, current_dp), 
+        user_prompt=phases.tot_generate_prompt(state, current_dp),
         state=state
     )
     try:
@@ -194,7 +193,7 @@ async def run_tot_evaluate_phase(state: PipelineState, services: WorkflowService
     raw, _ = await services.call_llm(
         role="tot_evaluate",
         system_prompt=phases.TOT_EVALUATE_SYSTEM,
-        user_prompt=phases.tot_evaluate_prompt(state, candidates), 
+        user_prompt=phases.tot_evaluate_prompt(state, candidates),
         state=state
     )
     try:
@@ -219,7 +218,7 @@ async def run_tot_backtrack_phase(state: PipelineState, services: WorkflowServic
     raw, _ = await services.call_llm(
         role="tot_backtrack",
         system_prompt=phases.TOT_BACKTRACK_SYSTEM,
-        user_prompt=phases.tot_backtrack_prompt(state), 
+        user_prompt=phases.tot_backtrack_prompt(state),
         state=state
     )
     try:
@@ -251,7 +250,7 @@ async def run_pot_generate_phase(state: PipelineState, services: WorkflowService
     raw, _ = await services.call_llm(
         role="pot_generate",
         system_prompt=phases.POT_GENERATE_SYSTEM,
-        user_prompt=phases.pot_generate_prompt(state), 
+        user_prompt=phases.pot_generate_prompt(state),
         state=state
     )
     data = extract_json(raw)
@@ -325,7 +324,7 @@ async def run_pot_execute_phase(state: PipelineState, services: WorkflowServices
         raw, _ = await services.call_llm(
             role="pot_execute",
             system_prompt=phases.POT_EXECUTE_SYSTEM,
-            user_prompt=phases.pot_execute_prompt(state), 
+            user_prompt=phases.pot_execute_prompt(state),
             state=state
         )
         data = extract_json(raw)
@@ -345,7 +344,7 @@ async def run_pot_interpret_phase(state: PipelineState, services: WorkflowServic
     raw, _ = await services.call_llm(
         role="pot_interpret",
         system_prompt=phases.POT_INTERPRET_SYSTEM,
-        user_prompt=phases.pot_interpret_prompt(state), 
+        user_prompt=phases.pot_interpret_prompt(state),
         state=state
     )
     data = extract_json(raw)
@@ -366,7 +365,7 @@ async def run_sd_select_phase(state: PipelineState, services: WorkflowServices) 
     raw, _ = await services.call_llm(
         role="sd_select",
         system_prompt=phases.SD_SELECT_SYSTEM,
-        user_prompt=phases.sd_select_prompt(state), 
+        user_prompt=phases.sd_select_prompt(state),
         state=state
     )
     data = extract_json(raw)
@@ -378,7 +377,7 @@ async def run_sd_adapt_phase(state: PipelineState, services: WorkflowServices) -
     raw, _ = await services.call_llm(
         role="sd_adapt",
         system_prompt=phases.SD_ADAPT_SYSTEM,
-        user_prompt=phases.sd_adapt_prompt(state), 
+        user_prompt=phases.sd_adapt_prompt(state),
         state=state
     )
     data = extract_json(raw)
@@ -389,11 +388,11 @@ async def run_sd_implement_phase(state: PipelineState, services: WorkflowService
     raw, model = await services.call_llm(
         role="sd_implement",
         system_prompt=phases.SD_IMPLEMENT_SYSTEM,
-        user_prompt=phases.sd_implement_prompt(state), 
+        user_prompt=phases.sd_implement_prompt(state),
         state=state
     )
     data = extract_json(raw)
-    
+
     # Rescue loop
     if not data:
         services.log("SELF-DISCOVER", "Implement phase failed JSON extraction, retrying...", state)

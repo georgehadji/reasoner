@@ -1,8 +1,10 @@
 from __future__ import annotations
+
 import json
-from reasoner.domain.pipeline_state import PipelineState
+
 from reasoner.core.constants import JSON_ONLY_FOOTER
-from reasoner.phases._shared import get_language_instruction, _wrap_user_input
+from reasoner.domain.pipeline_state import PipelineState
+from reasoner.phases._shared import _wrap_user_input, get_language_instruction
 
 SD_SELECT_SYSTEM = (
     "You are a meta-reasoning architect. Given a problem, select the reasoning modules "

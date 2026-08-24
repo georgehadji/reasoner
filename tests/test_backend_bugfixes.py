@@ -10,9 +10,7 @@ Bugs covered:
 
 from __future__ import annotations
 
-import asyncio
 import os
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID
 
@@ -24,7 +22,7 @@ class TestRateLimiterAnonymous:
 
     @pytest.mark.asyncio
     async def test_is_allowed_anonymous_no_nameerror(self):
-        from reasoner.rate_limiter import RateLimiter, RateLimitConfig
+        from reasoner.rate_limiter import RateLimitConfig, RateLimiter
 
         limiter = RateLimiter(RateLimitConfig(
             requests_per_minute=10,
@@ -38,7 +36,7 @@ class TestRateLimiterAnonymous:
 
     @pytest.mark.asyncio
     async def test_is_allowed_anonymous_respects_burst_limit(self):
-        from reasoner.rate_limiter import RateLimiter, RateLimitConfig
+        from reasoner.rate_limiter import RateLimitConfig, RateLimiter
 
         limiter = RateLimiter(RateLimitConfig(
             requests_per_minute=10,
@@ -125,16 +123,16 @@ class TestStripeAdapterRobustness:
     """BUG-005 / BUG-006 regression: Stripe adapter handles edge cases gracefully."""
 
     def test_price_id_for_free_tier_returns_empty(self):
-        from reasoner.infrastructure.billing.stripe_adapter import StripeBillingAdapter
         from reasoner.domain.saas import SubscriptionTier
+        from reasoner.infrastructure.billing.stripe_adapter import StripeBillingAdapter
 
         adapter = StripeBillingAdapter(api_key="sk_test_dummy")
         result = adapter._price_id_for_tier(SubscriptionTier.FREE)
         assert result == ""
 
     def test_price_id_for_tier_with_missing_env(self):
-        from reasoner.infrastructure.billing.stripe_adapter import StripeBillingAdapter
         from reasoner.domain.saas import SubscriptionTier
+        from reasoner.infrastructure.billing.stripe_adapter import StripeBillingAdapter
 
         with patch.dict(os.environ, {}, clear=True):
             adapter = StripeBillingAdapter(api_key="sk_test_dummy")
@@ -167,8 +165,8 @@ class TestStripeAdapterRobustness:
 
     @pytest.mark.asyncio
     async def test_handle_subscription_deleted_missing_user_id(self):
+        from reasoner.domain.saas import SubscriptionStatus, SubscriptionTier
         from reasoner.infrastructure.billing.stripe_adapter import StripeBillingAdapter
-        from reasoner.domain.saas import SubscriptionTier, SubscriptionStatus
 
         adapter = StripeBillingAdapter(api_key="sk_test_dummy")
         stripe_sub = {"id": "sub_123", "customer": "cus_123"}

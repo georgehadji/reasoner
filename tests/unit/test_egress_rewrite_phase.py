@@ -67,9 +67,9 @@ def layer_b_on(monkeypatch):
     was injected at startup. Stubbing it keeps these tests hermetic -- no real
     provider, no API key, no network -- regardless of injection state.
     """
-    from reasoner.core.settings import settings
-    import reasoner.core.ports.model_registry_port as registry_port
     import reasoner.application.flows.egress_rewrite_phase as mod
+    import reasoner.core.ports.model_registry_port as registry_port
+    from reasoner.core.settings import settings
 
     monkeypatch.setattr(settings, "WATERMARK_LAYER_B_ENABLED", True)
     monkeypatch.setattr(mod, "select_rewrite_model", lambda origin: "claude-sonnet")

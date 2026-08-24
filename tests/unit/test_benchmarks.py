@@ -6,11 +6,13 @@ Tests benchmark suites, runner, and engine.
 from __future__ import annotations
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock
 
-from reasoner.infrastructure.benchmarks.suites import BenchmarkResult
-from reasoner.infrastructure.benchmarks.runner import BenchmarkRunner, BenchmarkRun, BENCHMARK_BUDGET
 from reasoner.infrastructure.benchmarks.engine import BenchmarkEngine
+from reasoner.infrastructure.benchmarks.runner import (
+    BenchmarkRun,
+    BenchmarkRunner,
+)
+from reasoner.infrastructure.benchmarks.suites import BenchmarkResult
 
 
 class MockProvider:
@@ -103,7 +105,9 @@ class TestSuites:
 
     @pytest.mark.asyncio
     async def test_critical_thinking_suite(self, provider):
-        from reasoner.infrastructure.benchmarks.suites.critical_thinking import CriticalThinkingSuite
+        from reasoner.infrastructure.benchmarks.suites.critical_thinking import (
+            CriticalThinkingSuite,
+        )
         suite = CriticalThinkingSuite()
         assert suite.suite_name == "critical_thinking"
         result = await suite.run(provider, calls_per_suite=2)
@@ -131,8 +135,8 @@ class TestBenchmarkRunner:
 
     @pytest.mark.asyncio
     async def test_run_all_suites(self, runner, provider):
-        from reasoner.infrastructure.benchmarks.suites.reasoning import ReasoningSuite
         from reasoner.infrastructure.benchmarks.suites.coding import CodingSuite
+        from reasoner.infrastructure.benchmarks.suites.reasoning import ReasoningSuite
         suites = [ReasoningSuite(), CodingSuite()]
 
         run = await runner.run_all_suites("test-model", suites, provider)
@@ -144,8 +148,8 @@ class TestBenchmarkRunner:
     @pytest.mark.asyncio
     async def test_budget_ceiling_stops(self, runner, provider):
         """Budget ceiling stops further suite runs."""
-        from reasoner.infrastructure.benchmarks.suites.reasoning import ReasoningSuite
         from reasoner.infrastructure.benchmarks.suites.coding import CodingSuite
+        from reasoner.infrastructure.benchmarks.suites.reasoning import ReasoningSuite
         from reasoner.infrastructure.benchmarks.suites.writing import WritingSuite
 
         runner.budget["per_model_warmup_usd"] = 0.0  # Zero budget
@@ -175,8 +179,8 @@ class TestBenchmarkEngine:
 
     @pytest.mark.asyncio
     async def test_benchmark_model(self, engine, provider):
-        from reasoner.infrastructure.benchmarks.suites.reasoning import ReasoningSuite
         from reasoner.infrastructure.benchmarks.suites.coding import CodingSuite
+        from reasoner.infrastructure.benchmarks.suites.reasoning import ReasoningSuite
         suites = [ReasoningSuite(), CodingSuite()]
 
         result = await engine.benchmark_model("test-model", provider, suites=suites)
@@ -202,7 +206,6 @@ class TestBenchmarkEngine:
     @pytest.mark.asyncio
     async def test_benchmark_multiple(self, engine, provider):
         """Benchmark multiple models."""
-        from reasoner.infrastructure.benchmarks.suites.reasoning import ReasoningSuite
         results = await engine.benchmark_multiple(
             ["model-a", "model-b"],
             provider_factory=lambda m: provider,

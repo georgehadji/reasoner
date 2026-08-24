@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 
 class AuditService:
-    def __init__(self, event_bus: "EventBus"):
+    def __init__(self, event_bus: EventBus):
         self._bus = event_bus
 
     async def log_query(

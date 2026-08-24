@@ -7,7 +7,8 @@ import logging
 import os
 import time
 import uuid
-from typing import TYPE_CHECKING, Any, AsyncIterator
+from collections.abc import AsyncIterator
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from reasoner.domain.telemetry import LLMCallTelemetry
@@ -19,8 +20,8 @@ from reasoner.core.constants import (
     TIMEOUTS,
 )
 from reasoner.infrastructure.llm.base import BaseLLMProvider, LLMError
-from reasoner.infrastructure.llm.registry import build_provider
 from reasoner.infrastructure.llm.ports import DegradedLLMResponse
+from reasoner.infrastructure.llm.registry import build_provider
 
 try:
     from reasoner.core.ports.telemetry_port import CallTelemetryPort
@@ -30,10 +31,10 @@ except Exception:
 
 try:
     from reasoner.infrastructure.metrics import (
-        LLM_CALL_DURATION,
-        LLM_CALL_SUCCESS,
-        LLM_CALL_FAILURE,
         LLM_CALL_COST,
+        LLM_CALL_DURATION,
+        LLM_CALL_FAILURE,
+        LLM_CALL_SUCCESS,
     )
     _HAS_ACR_METRICS = True
 except Exception:
@@ -272,7 +273,7 @@ class ProviderRouter:
     def __init__(
         self, primary: BaseLLMProvider, routing_table: dict[str, BaseLLMProvider] | None = None, fallback_table: dict[str, BaseLLMProvider] | None = None, verbose: bool = False, cascading_routing: dict[str, list[str]] | None = None,
         on_fallback: "None | (str, str, str, str) -> None" = None,
-        telemetry: "CallTelemetryPort | None" = None,
+        telemetry: CallTelemetryPort | None = None,
         run_id: str = "",
         preset_id: str = "",
         method: str = "",
@@ -305,7 +306,7 @@ class ProviderRouter:
         provider = self.routing_table.get(role)
         if provider is None:
             provider = self.primary
-        
+
         # We don't want to re-instantiate identical providers, but we don't have
         # a unique preset string here. We can just use the memory id of the config or model.
         # Actually, the routing_table already holds instances.
@@ -313,10 +314,10 @@ class ProviderRouter:
         # self.routing_table contains NEW instances.
         # So we can cache by the provider's model and type.
         cache_key = f"{type(provider).__name__}::{provider.model}"
-        
+
         if cache_key not in _GLOBAL_RESOLVED_CACHE:
             _GLOBAL_RESOLVED_CACHE[cache_key] = provider
-            
+
         return _GLOBAL_RESOLVED_CACHE[cache_key]
 
     def get(self, role: str) -> BaseLLMProvider:
@@ -405,7 +406,7 @@ class ProviderRouter:
         if not self.telemetry and not _HAS_ACR_METRICS:
             return
 
-        from reasoner.infrastructure.llm.registry import bloc_of, _vendor_of
+        from reasoner.infrastructure.llm.registry import _vendor_of, bloc_of
 
         input_tokens = getattr(provider, "last_input_tokens", 0) or 0
         output_tokens = getattr(provider, "last_output_tokens", 0) or 0
@@ -507,7 +508,7 @@ class ProviderRouter:
                 if not response or not response.strip():
                     raise LLMError(f"Empty response from {provider.model} for role={role}")
                 return response, self._build_metadata(actual_provider, response)
-            except asyncio.TimeoutError as exc:
+            except TimeoutError as exc:
                 if is_fallback:
                     logger.error(
                         "Role '%s' fallback '%s' timed out after %.0fs; trying direct fallback...",
@@ -586,7 +587,7 @@ class ProviderRouter:
                 await circuit.record_success()
             except asyncio.CancelledError:
                 raise
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 await circuit.record_failure()
                 if is_fallback:
                     yield DegradedLLMResponse(
@@ -708,11 +709,11 @@ class ProviderRouter:
         fallback_routing: dict[str, str] | None = None,
         cascading_routing: dict[str, list[str]] | None = None,
         verbose: bool = False,
-        telemetry: "CallTelemetryPort | None" = None,
+        telemetry: CallTelemetryPort | None = None,
         run_id: str = "",
         preset_id: str = "",
         method: str = "",
-    ) -> "ProviderRouter":
+    ) -> ProviderRouter:
         """Build router from model ID strings."""
         primary = build_provider(primary_id)
         table = {role: build_provider(mid) for role, mid in (routing or {}).items()}
@@ -749,7 +750,7 @@ def _build_telemetry_event(
     circuit_state: str = "closed",
     vendor: str = "",
     bloc: str = "",
-) -> "LLMCallTelemetry":
+) -> LLMCallTelemetry:
     """Build an LLMCallTelemetry event from raw fields.
 
     Defined at module level to avoid circular imports inside ProviderRouter.

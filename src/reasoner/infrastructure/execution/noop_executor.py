@@ -7,7 +7,6 @@ instead of crashing.
 from __future__ import annotations
 
 from reasoner.core.ports.code_executor import (
-    CodeExecutorPort,
     ExecutionLimits,
     ExecutionResult,
 )

@@ -11,9 +11,11 @@ capacity check ineffective — _try_acquire_call() never saw the counter ≥ thr
 
 from __future__ import annotations
 
-import pytest
 import asyncio
-from reasoner.circuit_breaker import CircuitBreaker, CircuitState, CircuitBreakerConfig
+
+import pytest
+
+from reasoner.circuit_breaker import CircuitBreaker, CircuitBreakerConfig, CircuitState
 
 
 class TestBug003HalfOpenDoubleDecrement:

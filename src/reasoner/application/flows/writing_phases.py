@@ -2,17 +2,15 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import re
-from typing import Any
 
-from reasoner.domain.pipeline_state import PipelineState
-from reasoner.domain.core_types import SolutionCandidate
-from reasoner.models import PerspectiveType
-from reasoner.parsing import extract_json
 import reasoner.phases as phases
 from reasoner.application.flows.base import WorkflowServices
+from reasoner.domain.core_types import SolutionCandidate
+from reasoner.domain.pipeline_state import PipelineState
+from reasoner.models import PerspectiveType
+from reasoner.parsing import extract_json
 
 logger = logging.getLogger(__name__)
 
@@ -79,8 +77,8 @@ async def run_writing_source_retrieval_phase(state: PipelineState, services: Wor
         plan = extract_json(raw_plan)
         queries = plan.get("queries", [])[:5]
 
-        from reasoner.presets import get_preset_price_tier
         from reasoner.infrastructure.search.discovery import get_search_client_for_method
+        from reasoner.presets import get_preset_price_tier
         tier = get_preset_price_tier(state.preset_name) or "budget"
         client, _ = await get_search_client_for_method("article", tier, source_type="general")
 

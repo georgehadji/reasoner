@@ -16,10 +16,10 @@ import inspect
 import json
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Callable, Optional
 
 log = logging.getLogger("neuro.sessions")
 
@@ -61,7 +61,7 @@ class SessionManager:
           2026-02-01_session-old001.jsonl.gz  ← deep archive
     """
 
-    def __init__(self, data_dir: Path, config: Optional[SessionConfig] = None):
+    def __init__(self, data_dir: Path, config: SessionConfig | None = None):
         self.data_dir = data_dir
         self.config = config or SessionConfig()
         self.hot_dir = data_dir / "sessions" / "hot"
@@ -71,8 +71,8 @@ class SessionManager:
         for d in [self.hot_dir, self.warm_dir, self.cold_dir]:
             d.mkdir(parents=True, exist_ok=True)
 
-        self._current_session_id: Optional[str] = None
-        self._current_session_file: Optional[Path] = None
+        self._current_session_id: str | None = None
+        self._current_session_file: Path | None = None
         self._last_ingest_time: float = 0
         self._entry_count: int = 0
 
@@ -84,7 +84,7 @@ class SessionManager:
         self._counts_cache: dict[str, int] = {}
 
     def _generate_session_id(self) -> str:
-        ts = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H%M%S")
+        ts = datetime.now(UTC).strftime("%Y-%m-%d_%H%M%S")
         suffix = hashlib.sha256(str(time.time()).encode()).hexdigest()[:6]
         return f"{ts}_{suffix}"
 
@@ -105,7 +105,7 @@ class SessionManager:
         header = {
             "_type": "session_start",
             "session_id": session_id,
-            "started_at": datetime.now(timezone.utc).isoformat(),
+            "started_at": datetime.now(UTC).isoformat(),
         }
         with open(self._current_session_file, "a") as f:
             f.write(json.dumps(header) + "\n")
@@ -120,7 +120,7 @@ class SessionManager:
                 self._file_locks[key] = asyncio.Lock()
             return self._file_locks[key]
 
-    def ingest(self, prompt: str, response: str, metadata: Optional[dict] = None) -> dict:
+    def ingest(self, prompt: str, response: str, metadata: dict | None = None) -> dict:
         """
         Ingest a prompt/response pair into the current session.
         This is the Live Wire — fast, append-only, crash-safe.
@@ -137,7 +137,7 @@ class SessionManager:
 
             entry = {
                 "_type": "exchange",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "prompt": prompt,
                 "response": response,
                 "metadata": metadata or {},
@@ -169,7 +169,7 @@ class SessionManager:
             raise RuntimeError(f"Failed to ingest session: {e}") from e
 
     async def ingest_async(
-        self, prompt: str, response: str, metadata: Optional[dict] = None
+        self, prompt: str, response: str, metadata: dict | None = None
     ) -> dict:
         """
         Async variant of ingest — acquires a per-file asyncio.Lock before writing
@@ -189,7 +189,7 @@ class SessionManager:
 
             entry = {
                 "_type": "exchange",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "prompt": prompt,
                 "response": response,
                 "metadata": metadata or {},
@@ -236,7 +236,7 @@ class SessionManager:
                     "file": f.name,
                     "entries": entries,
                     "size_kb": round(stat.st_size / 1024, 1),
-                    "modified": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
+                    "modified": datetime.fromtimestamp(stat.st_mtime, tz=UTC).isoformat(),
                     "tier": "hot",
                 }
             )
@@ -328,7 +328,7 @@ class SessionManager:
 
         return []
 
-    async def archive_hot_sessions(self, summarize_fn: Optional[Callable] = None) -> list[dict]:
+    async def archive_hot_sessions(self, summarize_fn: Callable | None = None) -> list[dict]:
         """
         Move expired hot sessions to warm storage.
         Optionally summarize them using the reasoning provider.
@@ -336,7 +336,7 @@ class SessionManager:
 
         summarize_fn may be sync or async.
         """
-        cutoff = datetime.now(timezone.utc) - timedelta(days=self.config.hot_days)
+        cutoff = datetime.now(UTC) - timedelta(days=self.config.hot_days)
         archived = []
 
         for session_file in list(self.hot_dir.glob("*.jsonl")):
@@ -344,7 +344,7 @@ class SessionManager:
                 continue
 
             stat = session_file.stat()
-            modified = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc)
+            modified = datetime.fromtimestamp(stat.st_mtime, tz=UTC)
             if modified >= cutoff:
                 continue
 
@@ -362,7 +362,7 @@ class SessionManager:
 
             summary_data = {
                 "session_id": session_id,
-                "archived_at": datetime.now(timezone.utc).isoformat(),
+                "archived_at": datetime.now(UTC).isoformat(),
                 "exchange_count": len(exchanges),
                 "first_exchange": exchanges[0].get("timestamp", ""),
                 "last_exchange": exchanges[-1].get("timestamp", ""),
@@ -402,12 +402,12 @@ class SessionManager:
 
     def archive_warm_to_cold(self) -> list[str]:
         """Move expired warm sessions to cold storage."""
-        cutoff = datetime.now(timezone.utc) - timedelta(days=self.config.warm_days)
+        cutoff = datetime.now(UTC) - timedelta(days=self.config.warm_days)
         moved = []
 
         for gz_file in list(self.warm_dir.glob("*.jsonl.gz")):
             stat = gz_file.stat()
-            modified = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc)
+            modified = datetime.fromtimestamp(stat.st_mtime, tz=UTC)
             if modified >= cutoff:
                 continue
 

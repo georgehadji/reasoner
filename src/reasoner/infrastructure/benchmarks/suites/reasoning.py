@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import asyncio
 from reasoner.infrastructure.benchmarks.suites import BenchmarkResult, BenchmarkSuite
-
 
 _REASONING_PROMPTS = [
     "If all A are B, and some B are C, can we conclude that some A are C? Explain step by step.",

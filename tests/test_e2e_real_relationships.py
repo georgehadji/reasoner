@@ -9,15 +9,13 @@ Tests verify that:
 """
 
 import os
-import json
+
 import pytest
-import asyncio
 
-from reasoner.presets import PRESETS, get_preset, is_valid_preset_name, resolve_preset_name
-from reasoner.llm import ProviderRouter, _REGISTRY
-from reasoner.pipeline import ReasonerPipeline
+from reasoner.llm import _REGISTRY, ProviderRouter
 from reasoner.models import PipelineState
-
+from reasoner.pipeline import ReasonerPipeline
+from reasoner.presets import PRESETS, get_preset, is_valid_preset_name, resolve_preset_name
 
 pytestmark = [
     pytest.mark.slow,

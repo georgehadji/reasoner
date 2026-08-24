@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from reasoner.utils.json_safe import safe_json_loads, JSONDepthExceededError
+from reasoner.utils.json_safe import JSONDepthExceededError, safe_json_loads
 
 
 class TestSafeJsonLoads:

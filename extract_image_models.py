@@ -1,9 +1,10 @@
 import json
 
+
 def extract_image_models():
-    with open('openrouter_models.json', 'r', encoding='utf-8') as f:
+    with open('openrouter_models.json', encoding='utf-8') as f:
         data = json.load(f)
-    
+
     image_models = []
     for model in data.get('data', []):
         output_modalities = model.get('architecture', {}).get('output_modalities', [])
@@ -13,7 +14,7 @@ def extract_image_models():
                 'name': model['name'],
                 'description': model.get('description', '')[:100] + '...'
             })
-    
+
     for m in image_models:
         print(f"ID: {m['id']}")
         print(f"Name: {m['name']}")

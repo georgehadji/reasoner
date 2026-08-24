@@ -11,13 +11,13 @@ import asyncio
 import logging
 from typing import Any
 
-from reasoner.domain.telemetry import LLMCallTelemetry
 from reasoner.domain.model_capabilities import ModelCapabilities
-from reasoner.infrastructure.learning.thompson_sampler import ThompsonSampler
+from reasoner.domain.telemetry import LLMCallTelemetry
+from reasoner.infrastructure.learning.exploration import ExplorationPolicy
 from reasoner.infrastructure.learning.quality_signals import (
     QualitySignalAggregator,
 )
-from reasoner.infrastructure.learning.exploration import ExplorationPolicy
+from reasoner.infrastructure.learning.thompson_sampler import ThompsonSampler
 
 logger = logging.getLogger(__name__)
 

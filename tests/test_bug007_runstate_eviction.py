@@ -1,5 +1,4 @@
 """Verifies RunStateStore eviction works and does not cancel active runs prematurely."""
-import asyncio
 import pytest
 
 

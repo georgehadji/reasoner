@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 
 try:
-    from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+    from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 except Exception:
     def generate_latest(*args, **kwargs):
         return b""
@@ -20,6 +20,7 @@ from fastapi import Response
 
 # Re-export all metrics from shared module
 from reasoner.metrics import *  # noqa: F401, F403
+
 
 async def metrics_endpoint() -> Response:
     """Expose Prometheus metrics.

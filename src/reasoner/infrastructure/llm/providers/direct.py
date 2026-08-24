@@ -169,6 +169,7 @@ class OpenAICompatibleDirectProvider(BaseLLMProvider):
         temperature: float = DEFAULT_TEMPERATURE,
     ) -> str:
         import json
+
         import httpx
         payload = {
             "model": self.model,

@@ -6,7 +6,7 @@ application layer depends on this protocol only, never on asyncpg.
 
 from __future__ import annotations
 
-from typing import Optional, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from reasoner.domain.credits import CreditBalance, CreditLedgerEntry, CreditReason
 
@@ -24,8 +24,8 @@ class CreditRepository(Protocol):
         user_id: str,
         delta: int,
         reason: CreditReason,
-        reference_id: Optional[str] = None,
-        description: Optional[str] = None,
+        reference_id: str | None = None,
+        description: str | None = None,
         allow_overdraft: bool = False,
     ) -> CreditLedgerEntry:
         """Apply ``delta`` to the balance and append a ledger entry atomically.
@@ -56,7 +56,7 @@ class CreditRepository(Protocol):
         user_id: str,
         credits: int,
         period_key: str,
-    ) -> Optional[CreditLedgerEntry]:
+    ) -> CreditLedgerEntry | None:
         """Grant a period's allowance exactly once.
 
         ``period_key`` (e.g. ``"2026-08"``) makes the grant idempotent; returns

@@ -1,6 +1,6 @@
 import os
-import sys
 import subprocess
+import sys
 
 print(f"Current Working Directory: {os.getcwd()}")
 print(f"Python Version: {sys.version}")

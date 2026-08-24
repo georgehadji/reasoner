@@ -1,12 +1,12 @@
-import sys
 import re
 from pathlib import Path
+
 
 def main():
     repo_root = Path(__file__).parent.parent.resolve()
     streaming_path = repo_root / "src" / "reasoner" / "api" / "streaming.py"
-    
-    with open(streaming_path, "r", encoding="utf-8") as f:
+
+    with open(streaming_path, encoding="utf-8") as f:
         content = f.read()
 
     # direct.py
@@ -15,7 +15,7 @@ def main():
     direct_code = ""
     if match_direct:
         direct_code = match_direct.group(0)
-    
+
     direct_content = f"""\"\"\"Direct answer streaming execution.\"\"\"
 
 import time
@@ -35,7 +35,7 @@ from reasoner.api.sse_utils import _event
     web_code = ""
     if match_web:
         web_code = match_web.group(0)
-    
+
     web_search_content = f"""\"\"\"Web search streaming execution.\"\"\"
 
 import asyncio
@@ -54,8 +54,8 @@ _search_service = SearchService()
     # This might include `_broadcast_ws`, but `_broadcast_ws` is in `sse_utils.py` currently!
     # Wait, the instruction says "run cancellation + WS broadcast wiring".
     # In `streaming.py`, there is `_run_tasks: set[asyncio.Task] = set()` and `_tracked_broadcast`.
-    
-    cancel_content = f"""\"\"\"Cancellation and WS broadcast wiring for streaming.\"\"\"
+
+    cancel_content = """\"\"\"Cancellation and WS broadcast wiring for streaming.\"\"\"
 
 import asyncio
 from typing import Awaitable, Callable
@@ -84,13 +84,13 @@ class StreamingConnectionContext:
 
     # pipeline.py (main pipeline SSE adaptation)
     # This might mean my PipelineExecutionService should have been `api/execution/pipeline.py`!
-    
+
     # We will just write a small stub or copy pipeline_execution_service there?
     # No, we already moved logic into PipelineExecutionService which is in application layer.
     # The instruction says "api/execution/pipeline.py # main pipeline SSE adaptation".
-    # I can just leave it in application/services for now since it works and is better layered (CommandHandler calls Application Service), 
+    # I can just leave it in application/services for now since it works and is better layered (CommandHandler calls Application Service),
     # but to follow the exact E1 checklist, I could rename `application/services/pipeline_execution_service.py` to `api/execution/pipeline.py`.
-    
+
     print("Extracted to direct.py, web_search.py, cancel.py")
 
 if __name__ == "__main__":

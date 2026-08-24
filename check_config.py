@@ -1,5 +1,5 @@
+
 from reasoner.core.settings import settings
-import os
 
 vars_to_check = [
     "SEARXNG_URL",

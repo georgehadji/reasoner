@@ -1,12 +1,14 @@
 from __future__ import annotations
+
 import json
-from reasoner.domain.pipeline_state import PipelineState
+
 from reasoner.core.constants import TRUNCATION
 from reasoner.core.vs_constants import (
-    VS_K_CRITIQUE_HYPOTHESES,
     VS_CRITIQUE_STRESS_SEED_TOP_N,
+    VS_K_CRITIQUE_HYPOTHESES,
 )
-from reasoner.phases._shared import get_language_instruction, _followup_context, _wrap_user_input
+from reasoner.domain.pipeline_state import PipelineState
+from reasoner.phases._shared import _followup_context, _wrap_user_input, get_language_instruction
 
 PERSPECTIVE_SYSTEMS = {
     "constructive": "Respond in the same language as the user's problem. Build the strongest, most comprehensive solution. Analyze from first principles, cite historical precedents where relevant, and address 2nd-order consequences. Minimum 4 paragraphs. JSON only.",
@@ -30,7 +32,7 @@ def perspective_prompt(state: PipelineState, perspective: str) -> str:
         if web_snippets:
             context["web_sources"] = web_snippets
     followup = _followup_context(state)
-    
+
     return f'{get_language_instruction(state)}\n{followup}\nContext: {json.dumps(context)}\n\nAnalyze from {perspective} perspective.\n\nYou MUST return EXACTLY this JSON structure with no additional keys. Put all analysis inside "core_analysis" as a single string (3-6 paragraphs). Label factual claims inline with [VERIFIED], [HYPOTHESIS], or [UNKNOWN].\n\nJSON: {{"perspective": "{perspective}", "core_analysis": "<your detailed analysis with inline epistemic labels>", "key_insights": ["<insight 1>", "<insight 2>", "<insight 3>"]}}'
 
 CRITIQUE_SYSTEM = "You are an analytical assistant. Score solutions honestly. Output ONLY valid JSON."

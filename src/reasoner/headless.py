@@ -196,22 +196,49 @@ async def ask(
     effective_preset_name = preflight.effective_preset_name
     final_preset = get_preset(effective_preset_name)
 
-    from reasoner.pipeline import ReasonerPipeline
+    # ── Start EventBus & Initialize Subscribers ──
+    from reasoner.application.event_bus.bus import get_event_bus, init_default_subscribers
+    bus = get_event_bus()
+    await init_default_subscribers()
+    await bus.start()
 
-    pipeline = ReasonerPipeline(
-        router=router,
-        initial_state=None,
+    # ── Compile CQRS Command ──
+    import time
+    import uuid
+
+    from reasoner.application.commands import RunPipelineCommand
+    from reasoner.application.handlers.handlers import RunPipelineCommandHandler
+    from reasoner.infrastructure.persistence.event_store import get_event_store
+
+    command_id = str(uuid.uuid4())
+    command = RunPipelineCommand(
+        command_id=command_id,
+        timestamp=time.time(),
+        problem=sanitized_problem,
+        preset=effective_preset_name,
+        method=preflight.auto_selected_method,
         top_k=args.top_k,
-        parallel_perspectives=not args.sequential,
-        verbose=not args.quiet,
-        preset_name=effective_preset_name,
         source_type=args.source_type,
         domain=args.domain or None,
-        enhance_prompt=args.enhance_prompt,
-        batch_critique_jury=final_preset.batch_critique_jury if final_preset else False,
-        augmentation_methods=preflight.augmentation_methods,
+        parallel=not args.sequential,
+        metadata={
+            "initial_state": None,
+            "enhance_prompt": args.enhance_prompt,
+            "batch_critique_jury": final_preset.batch_critique_jury if final_preset else False,
+            "augmentation_methods": preflight.augmentation_methods,
+        }
     )
-    state = await pipeline.run(sanitized_problem)
+
+    # ── Execute via Command Handler ──
+    handler = RunPipelineCommandHandler(
+        llm_router=router,
+        event_store=get_event_store()
+    )
+    aggregate = await handler.handle(command)
+    state = aggregate.pipeline_state
+
+    # ── Stop EventBus ──
+    await bus.stop()
 
     return HeadlessResult(
         action="pipeline",

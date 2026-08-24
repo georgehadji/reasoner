@@ -12,8 +12,8 @@ Usage:
 """
 
 import logging
-import sys
 import subprocess
+import sys
 from pathlib import Path
 
 # Setup logging

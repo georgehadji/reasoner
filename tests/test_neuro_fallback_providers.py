@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from reasoner.neuro.providers import (
-    ResilientEmbedding,
-    OpenAIEmbedding,
-    OllamaEmbedding,
-    _create_embedding,
-)
+import pytest
+
 from reasoner.neuro.config import ProviderConfig, ResilientProviderConfig
+from reasoner.neuro.providers import (
+    OpenAIEmbedding,
+    ResilientEmbedding,
+)
+
 
 class TestResilientEmbedding:
     @pytest.mark.asyncio
@@ -22,23 +22,23 @@ class TestResilientEmbedding:
             circuit_breaker_threshold=1
         )
         resilient = ResilientEmbedding(config)
-        
+
         # Mock primary to fail
         mock_primary_embed = AsyncMock(side_effect=Exception("Primary failed"))
         resilient.primary.embed = mock_primary_embed
-        
+
         # Mock fallback to succeed
         mock_fallback_embed = AsyncMock(return_value=[0.1, 0.2, 0.3])
         resilient.fallbacks[0].embed = mock_fallback_embed
 
         result = await resilient.embed("test text")
-        
+
         assert result == [0.1, 0.2, 0.3]
         mock_primary_embed.assert_called_once_with("test text")
         mock_fallback_embed.assert_called_once_with("test text")
         assert resilient.failed_over is True
         assert resilient.active_label == "ollama/nomic-embed-text"
-        
+
     @pytest.mark.asyncio
     async def test_circuit_breaker_skips_primary_after_threshold(self):
         config = ResilientProviderConfig(
@@ -47,7 +47,7 @@ class TestResilientEmbedding:
             circuit_breaker_threshold=1
         )
         resilient = ResilientEmbedding(config)
-        
+
         # Mock primary to fail
         resilient.primary.embed = AsyncMock(side_effect=Exception("Primary failed"))
         # Mock fallback to succeed
@@ -56,11 +56,11 @@ class TestResilientEmbedding:
         # First call fails primary, trips breaker
         await resilient.embed("call 1")
         assert resilient.breaker.is_open is True
-        
+
         # Second call should skip primary entirely
         resilient.primary.embed.reset_mock()
         await resilient.embed("call 2")
-        
+
         resilient.primary.embed.assert_not_called()
         assert resilient.fallbacks[0].embed.call_count == 2
 

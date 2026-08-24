@@ -5,7 +5,6 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-
 LATENCY_FILES = [
     Path("src/reasoner/infrastructure/llm/ports.py"),
     Path("src/reasoner/neuro/server.py"),

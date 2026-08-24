@@ -11,9 +11,7 @@ catalog below must be reflected in the UI.
 from __future__ import annotations
 
 import json
-import pytest
 from typing import Any
-
 
 # ── SSE EVENT TYPE CATALOG ──────────────────────────────────────────
 # This is the contract between backend SSE streaming and frontend consumption.
@@ -120,6 +118,7 @@ def test_sse_catalog_complete() -> None:
 def test_sse_event_type_start() -> None:
     """start event structure."""
     import json
+
     from reasoner.api.sse_utils import _event
     ev = _event({"type": "start", "preset": "test-preset"})
     data = json.loads(ev[6:])  # strip "data: "
@@ -186,8 +185,8 @@ def test_sse_event_type_cancelled() -> None:
 
 def test_sse_event_serializer_0_empty() -> None:
     """Serializer _ser_0 returns no extras (empty phase)."""
-    from reasoner.domain.pipeline_state import PipelineState
     from reasoner.api.serializers import _ser_0
+    from reasoner.domain.pipeline_state import PipelineState
     state = PipelineState(problem="test")
     result = _ser_0(state)
     # Should return a dict (may be empty or with specific keys)

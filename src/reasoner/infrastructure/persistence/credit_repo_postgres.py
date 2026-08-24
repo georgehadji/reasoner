@@ -12,8 +12,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from datetime import datetime, timezone
-from typing import Optional
 from uuid import UUID
 
 import asyncpg
@@ -127,8 +125,8 @@ class PostgresCreditRepository(CreditRepository):
         user_id: str,
         delta: int,
         reason: CreditReason,
-        reference_id: Optional[str] = None,
-        description: Optional[str] = None,
+        reference_id: str | None = None,
+        description: str | None = None,
         allow_overdraft: bool = False,
     ) -> CreditLedgerEntry:
         if delta == 0:
@@ -203,7 +201,7 @@ class PostgresCreditRepository(CreditRepository):
         user_id: str,
         credits: int,
         period_key: str,
-    ) -> Optional[CreditLedgerEntry]:
+    ) -> CreditLedgerEntry | None:
         if credits <= 0:
             return None
 

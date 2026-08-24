@@ -1,4 +1,5 @@
 import os
+
 for root, dirs, files in os.walk(r'E:\Documents\Vibe-Coding\Reasoner\src\reasoner\infrastructure', topdown=True):
     for f in files:
         if 'websocket' in f.lower():

@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
 
+from reasoner.application.flows.base import WorkflowServices
 from reasoner.domain.core_types import (
     FinalSolution,
     MetaCognitiveAudit,
@@ -21,7 +21,6 @@ from reasoner.phases.brainstorming import (
     vs_generation_prompt,
     vs_synthesis_prompt,
 )
-from reasoner.application.flows.base import WorkflowServices
 
 logger = logging.getLogger(__name__)
 _LOG_TAG = "BRAINSTORM"

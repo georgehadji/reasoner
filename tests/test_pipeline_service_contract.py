@@ -15,7 +15,6 @@ import inspect
 
 import pytest
 
-
 # Every kwarg the API execution layer passes to create_pipeline().
 # Keep in sync with src/reasoner/api/execution/pipeline.py.
 API_CALL_SITE_KWARGS = {

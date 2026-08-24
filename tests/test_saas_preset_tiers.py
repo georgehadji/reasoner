@@ -1,7 +1,6 @@
 # tests/test_saas_preset_tiers.py
-import pytest
-from reasoner.presets import PRESETS, get_preset_tier
 from reasoner.domain.saas import SubscriptionTier
+from reasoner.presets import PRESETS, get_preset_tier
 
 # NOTE: PipelinePreset.required_tier is never populated by any entry in
 # preset_registry.py — it stays at the dataclass default (FREE) for every

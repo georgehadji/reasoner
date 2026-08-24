@@ -35,8 +35,9 @@ cannot 400 the request.
 from __future__ import annotations
 
 import contextlib
+from collections.abc import Iterator
 from contextvars import ContextVar
-from typing import Any, Iterator
+from typing import Any
 
 # Minimum cacheable prefix is 1024 tokens on the models we route to that honour
 # explicit breakpoints (Anthropic Claude, Gemini 2.5 Flash); Gemini 2.5 Pro needs

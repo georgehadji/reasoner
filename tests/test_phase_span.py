@@ -36,6 +36,7 @@ class TestPhaseSpan:
     async def test_phase_span_latency_tracking(self):
         """PhaseSpan should record reasonable duration (≥ 0)."""
         import asyncio
+
         from reasoner.core.observability.phase_span import PhaseSpan
 
         t0 = asyncio.get_running_loop().time()

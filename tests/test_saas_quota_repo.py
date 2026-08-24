@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-import pytest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
-from reasoner.domain.saas import SubscriptionTier, UsageQuota, QuotaResult
+import pytest
+
+from reasoner.domain.saas import SubscriptionTier
 from reasoner.infrastructure.persistence.quota_repo_postgres import PostgresQuotaRepository
 
 
@@ -38,8 +39,8 @@ async def test_get_quota_existing_user(repo, mock_pool):
         "tier": "free",
         "used_queries": 5,
         "max_queries": 20,
-        "period_start": datetime.now(timezone.utc),
-        "updated_at": datetime.now(timezone.utc),
+        "period_start": datetime.now(UTC),
+        "updated_at": datetime.now(UTC),
     }
     quota = await repo.get_quota("11111111-1111-1111-1111-111111111111")
     assert quota.used_queries == 5
@@ -56,8 +57,8 @@ async def test_get_quota_creates_default_for_new_user(repo, mock_pool):
             "tier": "free",
             "used_queries": 0,
             "max_queries": 20,
-            "period_start": datetime.now(timezone.utc),
-            "updated_at": datetime.now(timezone.utc),
+            "period_start": datetime.now(UTC),
+            "updated_at": datetime.now(UTC),
         },
     ]
     quota = await repo.get_quota("22222222-2222-2222-2222-222222222222")
@@ -79,7 +80,6 @@ async def test_check_and_increment_allows_when_under_limit(repo, mock_pool):
     mock_tx = AsyncMock()
     mock_tx.__aenter__ = AsyncMock(return_value=None)
     mock_tx.__aexit__ = AsyncMock(return_value=False)
-    from unittest.mock import MagicMock
     mock_conn.transaction = MagicMock(return_value=mock_tx)
     mock_pool.acquire = MagicMock(return_value=mock_conn)
 
@@ -101,7 +101,6 @@ async def test_check_and_increment_blocks_when_exhausted(repo, mock_pool):
     mock_tx = AsyncMock()
     mock_tx.__aenter__ = AsyncMock(return_value=None)
     mock_tx.__aexit__ = AsyncMock(return_value=False)
-    from unittest.mock import MagicMock
     mock_conn.transaction = MagicMock(return_value=mock_tx)
     mock_pool.acquire = MagicMock(return_value=mock_conn)
 
@@ -123,7 +122,6 @@ async def test_check_and_increment_unlimited_enterprise(repo, mock_pool):
     mock_tx = AsyncMock()
     mock_tx.__aenter__ = AsyncMock(return_value=None)
     mock_tx.__aexit__ = AsyncMock(return_value=False)
-    from unittest.mock import MagicMock
     mock_conn.transaction = MagicMock(return_value=mock_tx)
     mock_pool.acquire = MagicMock(return_value=mock_conn)
 

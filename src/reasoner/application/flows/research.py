@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from typing import List
-from reasoner.domain.pipeline_state import PipelineState
-from reasoner.application.flows.base import WorkflowStrategy, WorkflowServices, PhaseStep
-from reasoner.application.flows.research_phases import run_research_web_search_phase
+from reasoner.application.flows.base import PhaseStep, WorkflowServices, WorkflowStrategy
 from reasoner.application.flows.perspective_phases import run_critique_phase
+from reasoner.application.flows.research_phases import run_research_web_search_phase
 from reasoner.application.flows.synthesis_phase import run_synthesis_phase
 from reasoner.application.services.serializers import _ser_2, _ser_3, _ser_5
+from reasoner.domain.pipeline_state import PipelineState
+
 
 class ResearchFlow(WorkflowStrategy):
     """
@@ -17,8 +17,8 @@ class ResearchFlow(WorkflowStrategy):
     2. Critique (Vetting)
     3. Synthesis
     """
-    
-    def get_phases(self, state: PipelineState) -> List[PhaseStep]:
+
+    def get_phases(self, state: PipelineState) -> list[PhaseStep]:
         return [
             PhaseStep(2, "Deep Research", run_research_web_search_phase, _ser_2),
             PhaseStep(3, "Critique & Pruning", run_critique_phase, _ser_3, critical=True),
@@ -26,8 +26,8 @@ class ResearchFlow(WorkflowStrategy):
         ]
 
     async def execute(
-        self, 
-        state: PipelineState, 
+        self,
+        state: PipelineState,
         services: WorkflowServices,
     ) -> PipelineState:
         for step in self.get_phases(state):

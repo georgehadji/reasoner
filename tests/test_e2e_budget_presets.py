@@ -11,11 +11,10 @@ Run with: python -m pytest tests/test_e2e_budget_presets.py -v --run-slow
 import os
 
 import pytest
-import asyncio
 
 from reasoner.application.services.preset_service import PresetService
 from reasoner.pipeline import ReasonerPipeline
-from reasoner.presets import PRESETS, get_preset
+from reasoner.presets import PRESETS
 
 pytestmark = [
     pytest.mark.slow,

@@ -2,18 +2,19 @@
 
 from __future__ import annotations
 
-from typing import Any, TYPE_CHECKING
-from reasoner.domain.pipeline_state import PipelineState
-from reasoner.application.flows.base import WorkflowServices, PhaseStep
+from typing import TYPE_CHECKING, Any
+
+from reasoner.application.flows.base import PhaseStep, WorkflowServices
 from reasoner.core.ports.code_executor import CodeExecutorPort
+from reasoner.domain.pipeline_state import PipelineState
 
 if TYPE_CHECKING:
-    from reasoner.pipeline import ReasonerPipeline
     from reasoner.application.flows.runner import WorkflowRunner
+    from reasoner.pipeline import ReasonerPipeline
 
 class PipelineWorkflowServices(WorkflowServices):
     """Binds ReasonerPipeline methods to the WorkflowServices port."""
-    
+
     def __init__(self, pipeline: ReasonerPipeline, runner: WorkflowRunner | None = None) -> None:
         self._pipeline = pipeline
         self.router = pipeline.router
@@ -43,7 +44,9 @@ class PipelineWorkflowServices(WorkflowServices):
 
         if settings.EXEC_SANDBOX_MODE == "container":
             try:
-                from reasoner.infrastructure.execution.container_sandbox import ContainerExecutionSandbox
+                from reasoner.infrastructure.execution.container_sandbox import (
+                    ContainerExecutionSandbox,
+                )
                 self.code_executor = ContainerExecutionSandbox(
                     settings.SANDBOX_WORKER_URL,
                     settings.SANDBOX_WORKER_TOKEN,
@@ -62,10 +65,10 @@ class PipelineWorkflowServices(WorkflowServices):
         except Exception:
             from reasoner.infrastructure.execution.noop_executor import NoopExecutor
             self.code_executor = NoopExecutor()
-        
+
     def log(self, phase: str, message: str, state: PipelineState) -> None:
         self._pipeline._log(phase, message, state)
-        
+
     async def call_llm(
         self,
         role: str,

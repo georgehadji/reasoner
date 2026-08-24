@@ -1,7 +1,9 @@
 from __future__ import annotations
+
 import json
+
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.phases._shared import get_language_instruction, _wrap_user_input
+from reasoner.phases._shared import _wrap_user_input, get_language_instruction
 
 SOCRATIC_QUESTION_SYSTEM = "You are an analytical assistant. Ask probing questions to expose contradictions. Do not answer. Output ONLY valid JSON."
 

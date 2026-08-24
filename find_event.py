@@ -1,4 +1,6 @@
-import os, re
+import os
+import re
+
 root = r'E:\Documents\Vibe-Coding\Reasoner\src\reasoner'
 pattern = r'def _event'
 for dirpath, dirnames, fnames in os.walk(root):

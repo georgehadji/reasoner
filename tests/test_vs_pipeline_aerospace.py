@@ -1,16 +1,14 @@
 """E2E test: Aerospace pipeline failure-mode probes."""
 from __future__ import annotations
-from tests.utils.mocks import MockLLM, MockNLI
 
 import pytest
-from unittest.mock import AsyncMock
 
-from reasoner.phases.vs_probe_generation import generate_probes_with_vs, ProbeGenerationConfig
-from reasoner.phases.vs_generation import generate_with_vs, VSGenerationConfig, GenerationStrategy
-from reasoner.phases.vs_verification_routing import route_claim_by_vs_probability, VerificationRoute
-from reasoner.vs_config import VSFeatureFlags, VSDeploymentProfile
+from reasoner.phases.vs_generation import GenerationStrategy, VSGenerationConfig, generate_with_vs
+from reasoner.phases.vs_probe_generation import ProbeGenerationConfig, generate_probes_with_vs
+from reasoner.phases.vs_verification_routing import VerificationRoute, route_claim_by_vs_probability
+from reasoner.vs_config import VSDeploymentProfile, VSFeatureFlags
 from reasoner.vs_vertical_configs.aerospace_config import AEROSPACE_CONFIG
-
+from tests.utils.mocks import MockLLM, MockNLI
 
 PROBES_JSON = '{"candidates": [{"text": "Failure mode: hydraulic seal degradation", "probability": 0.4}, {"text": "Failure mode: actuator fatigue", "probability": 0.3}, {"text": "Failure mode: contamination in fluid", "probability": 0.3}]}'
 

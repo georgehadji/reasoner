@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-from typing import List
-from reasoner.domain.pipeline_state import PipelineState
-from reasoner.application.flows.base import WorkflowStrategy, WorkflowServices, PhaseStep
+from reasoner.application.flows.base import PhaseStep, WorkflowServices, WorkflowStrategy
 from reasoner.application.flows.perspective_phases import (
+    run_critique_phase,
     run_multi_perspective_research_phase,
     run_perspectives_phase,
-    run_critique_phase,
-    run_stress_test_phase
+    run_stress_test_phase,
 )
 from reasoner.application.flows.synthesis_phase import run_synthesis_phase
 from reasoner.application.services.serializers import _ser_2, _ser_3, _ser_4, _ser_5
+from reasoner.domain.pipeline_state import PipelineState
+
 
 class MultiPerspectiveFlow(WorkflowStrategy):
     """
@@ -22,23 +22,23 @@ class MultiPerspectiveFlow(WorkflowStrategy):
     3. Stress Testing (optional based on complexity)
     4. Synthesis
     """
-    
-    def get_phases(self, state: PipelineState) -> List[PhaseStep]:
+
+    def get_phases(self, state: PipelineState) -> list[PhaseStep]:
         phases = [
             PhaseStep(1.5, "Evidence Search", run_multi_perspective_research_phase, _ser_2),
             PhaseStep(2, "Perspectives", run_perspectives_phase, _ser_2),
             PhaseStep(3, "Critique & Pruning", run_critique_phase, _ser_3, critical=True),
         ]
-        
+
         if state.complexity != "simple":
             phases.append(PhaseStep(4, "Stress Testing", run_stress_test_phase, _ser_4))
-            
+
         phases.append(PhaseStep(5, "Synthesis", run_synthesis_phase, _ser_5))
         return phases
 
     async def execute(
-        self, 
-        state: PipelineState, 
+        self,
+        state: PipelineState,
         services: WorkflowServices,
     ) -> PipelineState:
         for step in self.get_phases(state):

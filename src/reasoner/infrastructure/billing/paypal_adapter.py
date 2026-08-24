@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 import httpx
 
-from reasoner.domain.saas import Subscription, SubscriptionTier, SubscriptionStatus
 from reasoner.application.ports.billing_port import BillingPort
+from reasoner.domain.saas import Subscription, SubscriptionStatus, SubscriptionTier
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ class PayPalBillingAdapter(BillingPort):
 
     async def _get_access_token(self) -> str:
         """Fetch or refresh PayPal OAuth access token."""
-        if self._access_token and self._token_expires and datetime.now(timezone.utc) < self._token_expires:
+        if self._access_token and self._token_expires and datetime.now(UTC) < self._token_expires:
             return self._access_token
 
         async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, connect=10.0)) as client:
@@ -47,7 +47,7 @@ class PayPalBillingAdapter(BillingPort):
             data = resp.json()
             self._access_token = data["access_token"]
             expires_in = data.get("expires_in", 3600)
-            self._token_expires = datetime.now(timezone.utc) + timedelta(seconds=expires_in - 60)
+            self._token_expires = datetime.now(UTC) + timedelta(seconds=expires_in - 60)
             return self._access_token
 
     def _headers(self, token: str) -> dict[str, str]:

@@ -1,7 +1,8 @@
 """Tests for parsing module bug fixes (BUG-004, BUG-005, BUG-006 regression)."""
 
 import pytest
-from reasoner.parsing import extract_json, safe_list, extract_solution_prose, ParseError
+
+from reasoner.parsing import ParseError, extract_json, extract_solution_prose, safe_list
 
 
 class TestExtractJsonRedosPrevention:
@@ -11,7 +12,7 @@ class TestExtractJsonRedosPrevention:
         """Test that very long inputs are truncated before regex processing."""
         # Create a 200KB input (well over the 100KB limit)
         long_input = '{"key": "value"}' + ('x' * 200000)
-        
+
         # Should not hang or crash - should either parse or raise ParseError
         try:
             result = extract_json(long_input)
@@ -25,7 +26,7 @@ class TestExtractJsonRedosPrevention:
         """Test handling of potentially malicious nested backtick patterns."""
         # Pattern that could cause backtracking
         malicious = '```' + ('`' * 1000) + 'test' + ('`' * 1000) + '```'
-        
+
         try:
             extract_json(malicious)
         except ParseError:

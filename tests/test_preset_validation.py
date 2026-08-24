@@ -1,13 +1,14 @@
 """Test that harness_guard lab map covers all preset-referenced models."""
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 
 def test_all_preset_models_have_lab_entries():
     """Every model alias used in any preset must have a lab entry."""
-    from reasoner.domain.preset_registry import _REGISTRY as PRESETS
     from reasoner.application.services.harness_guard import _MODEL_LABS
+    from reasoner.domain.preset_registry import _REGISTRY as PRESETS
 
     used_models: set[str] = set()
     for _name, cfg in PRESETS.items():
@@ -31,8 +32,8 @@ def test_all_preset_models_have_lab_entries():
 
 def test_all_preset_role_names_are_known():
     """Every routing role must be in _KNOWN_ROUTING_ROLES."""
-    from reasoner.domain.preset_registry import _REGISTRY as PRESETS
     from reasoner.domain.preset_core import _KNOWN_ROUTING_ROLES
+    from reasoner.domain.preset_registry import _REGISTRY as PRESETS
 
     unknown: set[str] = set()
     for name, cfg in PRESETS.items():

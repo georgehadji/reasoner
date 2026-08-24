@@ -9,8 +9,8 @@ import pytest
 
 from reasoner.application.event_bus.bus import (
     get_event_bus,
-    reset_event_bus,
     init_default_subscribers,
+    reset_event_bus,
 )
 
 

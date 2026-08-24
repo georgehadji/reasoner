@@ -7,24 +7,23 @@ from __future__ import annotations
 
 import pytest
 
+from reasoner.application.services.role_requirements import (
+    get_all_requirements,
+    get_requirement,
+)
+from reasoner.application.services.utility_scorer import UtilityScorer
 from reasoner.domain.model_capabilities import (
     ModelCapabilities,
     ModelConstraints,
     ModelProfile,
 )
-from reasoner.domain.task_requirements import TaskConstraints, TaskRequirement
 from reasoner.domain.scoring_weights import (
-    BUDGET_WEIGHTS,
     BALANCED_WEIGHTS,
+    BUDGET_WEIGHTS,
     PREMIUM_WEIGHTS,
-    ScoringWeights,
     get_weights_for_tier,
 )
-from reasoner.application.services.role_requirements import (
-    get_requirement,
-    get_all_requirements,
-)
-from reasoner.application.services.utility_scorer import UtilityScorer
+from reasoner.domain.task_requirements import TaskRequirement
 
 
 class TestScoringWeights:

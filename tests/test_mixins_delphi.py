@@ -1,11 +1,12 @@
 """Tests for the DelphiMixin phase methods."""
 
 import json
-import pytest
 from unittest.mock import AsyncMock
 
-from reasoner.pipeline import ReasonerPipeline
+import pytest
+
 from reasoner.models import PipelineState
+from reasoner.pipeline import ReasonerPipeline
 
 
 class FakeRouter:

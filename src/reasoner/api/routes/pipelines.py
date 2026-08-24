@@ -9,10 +9,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from reasoner.api.auth_deps import require_csrf
 from reasoner.api.dependencies import get_current_user
-from reasoner.domain.saas import User
-
 from reasoner.application.queries import GetPipelineStatusQuery
 from reasoner.auth import Scope
+from reasoner.domain.saas import User
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -186,10 +185,10 @@ async def resume_pipeline_stream(
     from fastapi.responses import StreamingResponse
 
     from reasoner.api import get_architecture_components
-    from reasoner.application.commands import ResumePipelineCommand
-    from reasoner.api.streaming import run_stream
     from reasoner.api.schemas import RunRequest
     from reasoner.api.serializers import _event
+    from reasoner.api.streaming import run_stream
+    from reasoner.application.commands import ResumePipelineCommand
 
     _, handler_registry = get_architecture_components()
     command = ResumePipelineCommand(

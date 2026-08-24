@@ -6,7 +6,7 @@ Tests read/write/query operations against an in-memory SQLite database.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -18,7 +18,7 @@ from reasoner.infrastructure.telemetry.call_telemetry_store import (
 # query_model_role_stats() filters to the last 168 hours by default — a
 # hardcoded past timestamp eventually falls outside that window and the
 # fixture rows silently stop matching. Use "now" instead.
-_NOW = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+_NOW = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 @pytest.fixture

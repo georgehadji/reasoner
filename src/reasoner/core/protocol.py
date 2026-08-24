@@ -11,7 +11,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field, replace
 from enum import Enum
-from typing import Any, Protocol, runtime_checkable, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from reasoner.domain.pipeline_state import PipelineState
@@ -44,7 +44,7 @@ class PhaseConfig:
     # None = leave model/registry default. Ignored by non-reasoning models.
     reasoning_effort: str | None = None
 
-    def with_overrides(self, **kwargs: Any) -> "PhaseConfig":
+    def with_overrides(self, **kwargs: Any) -> PhaseConfig:
         """Return a new PhaseConfig with selected fields replaced."""
         return replace(self, **kwargs)
 
@@ -100,7 +100,7 @@ class Phase(Protocol):
 
     async def execute(
         self,
-        state: "PipelineState",
-        router: "ProviderRouter",
+        state: PipelineState,
+        router: ProviderRouter,
     ) -> PhaseResult:
         ...

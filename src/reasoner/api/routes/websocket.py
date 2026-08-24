@@ -20,8 +20,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket
 from reasoner.api.auth_deps import require_csrf
 from reasoner.api.client_ip import get_client_ip
 from reasoner.api.dependencies import get_current_user
-from reasoner.core.settings import settings
 from reasoner.application.services.ws_ticket import issue_ticket, redeem_ticket
+from reasoner.core.settings import settings
 from reasoner.domain.saas import User
 from reasoner.infrastructure.websocket import get_websocket_manager, websocket_endpoint
 from reasoner.infrastructure.websocket.ws_security import (

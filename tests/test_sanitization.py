@@ -5,10 +5,10 @@ from __future__ import annotations
 import pytest
 
 from reasoner.sanitization import (
-    sanitize_for_prompt,
-    sanitize_problem,
     clean_llm_artifacts,
     sanitize_for_logging,
+    sanitize_for_prompt,
+    sanitize_problem,
 )
 
 

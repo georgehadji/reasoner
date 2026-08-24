@@ -8,7 +8,6 @@ from typing import Any, Protocol
 
 from pydantic import BaseModel, Field
 
-from reasoner.reasoner_vs_constants import VS_CONSENSUS_MIN_SUPPORT
 from reasoner.phases.vs_generation import GenerationCandidate
 from reasoner.vs_config import VSFeatureFlags
 
@@ -36,11 +35,11 @@ class ExtractedClaimSet(BaseModel):
 async def _extract_claims(text: str, llm_client: _LLMClient | None) -> list[str]:
     """Extract factual claims from text using LLM, with sentence-split fallback."""
     from reasoner.parsing import extract_json_list
-    
+
     fallback = [s.strip() for s in text.replace("!", ".").replace("?", ".").split(".") if s.strip()]
     if llm_client is None:
         return fallback
-    
+
     try:
         prompt = f"Extract factual claims from this text as a JSON list of strings. Return ONLY the JSON list.\nText: {text}"
         raw = await llm_client.generate(user=prompt)
@@ -89,7 +88,7 @@ async def extract_claims_from_vs_candidates(
     # CONSENSUS
     tasks = [asyncio.create_task(_extract_claims(c.text, llm_client)) for c in candidates]
     results = await asyncio.gather(*tasks, return_exceptions=True)
-    
+
     # Filter out exceptions and flatten
     valid_results: list[list[str]] = []
     for res in results:
@@ -98,7 +97,7 @@ async def extract_claims_from_vs_candidates(
             logging.getLogger(__name__).error(f"Task failed in CONSENSUS claim extraction: {res}")
             continue
         valid_results.append(res)
-        
+
     claim_counts = Counter(claim.lower().strip() for sublist in valid_results for claim in sublist)
     consensus = [claim for sublist in valid_results for claim in sublist if claim_counts[claim.lower().strip()] > len(candidates) / 2]
     # Deduplicate while preserving first-seen order

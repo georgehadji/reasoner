@@ -4,10 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from reasoner.core.constants import (
-    OPENROUTER_BASE_URL as _OPENROUTER_BASE_URL,
-)
-
 
 def _patch_openai_platform_detection() -> None:
     """

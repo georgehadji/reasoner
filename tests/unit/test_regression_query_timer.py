@@ -1,5 +1,5 @@
-import pytest
 from reasoner.api.metrics import QueryTimer
+
 
 def test_query_timer_import_and_functional():
     """Verify that QueryTimer is correctly defined and works."""

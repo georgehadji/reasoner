@@ -6,8 +6,8 @@ This script verifies that all components are properly configured
 and the server is ready to start.
 """
 
-import sys
 import os
+import sys
 
 # Add src directory to path
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -29,27 +29,26 @@ def main():
     print("  Server Readiness Check")
     print("=" * 60)
     print()
-    
+
     checks = []
-    
+
     # Check 1: Domain Events
     def check_events():
-        from reasoner.core.events.domain_events import PipelineStarted, EventType
         return True
     checks.append(check_component("Domain Events", check_events))
-    
+
     # Check 2: Persistence
     def check_persistence():
         from reasoner.infrastructure.persistence import get_event_store
         store = get_event_store()
         return True
     checks.append(check_component("Persistence", check_persistence))
-    
+
     # Check 3: Handlers
     def check_handlers():
         from reasoner.application.handlers import get_handler_registry
         from reasoner.infrastructure.llm.ports import BaseLLMProvider, LLMResponse
-        
+
         class DummyProvider(BaseLLMProvider):
             async def _complete_impl(self, messages, config):
                 return LLMResponse(content="test", model_used="test")
@@ -58,34 +57,35 @@ def main():
             @property
             def provider_name(self):
                 return "test"
-        
+
         registry = get_handler_registry(DummyProvider(model="test"), None)
         return True
     checks.append(check_component("Handlers", check_handlers))
-    
+
     # Check 4: WebSocket
     def check_websocket():
         from reasoner.infrastructure.websocket import get_websocket_manager
         manager = get_websocket_manager()
         return True
     checks.append(check_component("WebSocket", check_websocket))
-    
+
     # Check 5: API App
     def check_api():
         # app is passed into the check context or we just check the title from settings?
         # Actually, the instruction says "Pass `app` as a function parameter; caller in `api/` supplies it."
         # But wait, run_preflight_checks doesn't take `app` as an argument right now.
         return True
-    
+
     # Check 6: LLM Providers
     def check_llm():
         from reasoner.infrastructure.llm.registry import _REGISTRY as registry
         return len(registry) > 10
     checks.append(check_component("LLM Providers", check_llm))
-    
+
     # Check 6b: OpenRouter key quota (soft check - warns but does not fail)
     def check_openrouter_key():
         import httpx
+
         from reasoner.core.settings import settings
         key = settings.OPENROUTER_API_KEY or ""
         if not key:
@@ -104,24 +104,25 @@ def main():
         if limit is not None and usage >= limit:
             raise RuntimeError(f"Quota exceeded ({usage}/{limit})")
         return True
-    
+
     try:
         check_openrouter_key()
         print("[OK]   OpenRouter Key: Quota available")
     except Exception as e:
         print(f"[WARN] OpenRouter Key: {e} — requests will fail with 403")
-    
+
     # Check 7: Widgets
     def check_widgets():
         from reasoner.infrastructure.widgets import get_widget_registry
         registry = get_widget_registry()
         return len(registry.list_widgets()) > 0
     checks.append(check_component("Widgets", check_widgets))
-    
+
     # Check 8: Search Backend (soft check — warns but does not fail)
     def check_search():
-        from reasoner.infrastructure.search.discovery import get_search_client
         import asyncio
+
+        from reasoner.infrastructure.search.discovery import get_search_client
         try:
             loop = asyncio.get_event_loop()
         except RuntimeError:
@@ -129,7 +130,7 @@ def main():
             asyncio.set_event_loop(loop)
         client, _ = loop.run_until_complete(get_search_client())
         return client is not None
-    
+
     try:
         if check_search():
             print("[OK]   Search Backend: OK")
@@ -137,10 +138,10 @@ def main():
             print("[WARN] Search Backend: No backends available (web search disabled)")
     except Exception as e:
         print(f"[WARN] Search Backend: Not available ({e}) - web search disabled")
-    
+
     print()
     print("=" * 60)
-    
+
     if all(checks):
         print("  [OK] All checks passed! Server is ready to start.")
         print()

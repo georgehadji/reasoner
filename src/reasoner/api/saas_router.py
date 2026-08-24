@@ -7,26 +7,21 @@ from growing uncontrollably.
 
 from __future__ import annotations
 
-import asyncio
-import hashlib
-import os
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request, HTTPException
-from fastapi.security import HTTPAuthorizationCredentials
+from fastapi import APIRouter, Depends, HTTPException, Request
 
-from reasoner.domain.saas import User, SubscriptionTier
-from reasoner.application.services.quota_service import TIER_LIMITS
-from reasoner.api.middleware import _anonymize_ip
 from reasoner.api.dependencies import (
+    _get_quota_service,
     get_current_user,
     get_optional_user,
-    _get_quota_service,
-    security,
 )
-from reasoner.rate_limiter import get_rate_limiter, RateLimitConfig
+from reasoner.api.middleware import _anonymize_ip
+from reasoner.application.services.quota_service import TIER_LIMITS
 from reasoner.core.settings import settings
+from reasoner.domain.saas import SubscriptionTier, User
+from reasoner.rate_limiter import RateLimitConfig, get_rate_limiter
 
 router = APIRouter(prefix="/api", tags=["saas"])
 
@@ -119,7 +114,7 @@ async def get_quota_status(user: User = Depends(get_current_user)):
         "used": used,
         "max": TIER_LIMITS[SubscriptionTier.FREE],
         "remaining": result.remaining,
-        "reset_date": (datetime.now(timezone.utc).replace(day=1) + timedelta(days=32)).replace(day=1).isoformat(),
+        "reset_date": (datetime.now(UTC).replace(day=1) + timedelta(days=32)).replace(day=1).isoformat(),
     }
 
 
@@ -171,7 +166,7 @@ async def export_data(
         "subscriptions": [dict(s) for s in subscriptions],
         "quota": dict(quotas) if quotas else {},
         "queries": [dict(q) for q in queries],
-        "exported_at": datetime.now(timezone.utc).isoformat(),
+        "exported_at": datetime.now(UTC).isoformat(),
     }
 
 
@@ -242,7 +237,7 @@ async def delete_account(
     # Phase 3: External side-effects (best-effort, AFTER transaction commits)
     # Uploads
     try:
-        from reasoner.uploader import list_uploads, delete_file
+        from reasoner.uploader import delete_file, list_uploads
         user_uploads = list_uploads(user_id=str(user.id))
         for upload in user_uploads:
             if delete_file(upload["file_id"]):
@@ -252,8 +247,9 @@ async def delete_account(
 
     # History files
     try:
-        from reasoner.api.history import HISTORY_DIR
         import json as _json
+
+        from reasoner.api.history import HISTORY_DIR
         for f in HISTORY_DIR.glob("*.json"):
             try:
                 data = _json.loads(f.read_text(encoding="utf-8"))

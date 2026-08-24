@@ -15,17 +15,15 @@ Slow real-API tests require --run-slow and OPENROUTER_API_KEY.
 
 import json
 import os
+
 import pytest
 import pytest_asyncio
-import asyncio
-from dataclasses import asdict
+from httpx import ASGITransport, AsyncClient
 
 import reasoner.api as api
-from httpx import ASGITransport, AsyncClient
-from reasoner.pipeline import ReasonerPipeline
-from reasoner.presets import get_preset, PRESETS
 from reasoner.models import PipelineState
-
+from reasoner.pipeline import ReasonerPipeline
+from reasoner.presets import get_preset
 
 # ─────────────────────────────────────────────────────────────────────
 # Fake Router Helpers
@@ -42,7 +40,8 @@ class FakeProvider:
 @pytest.fixture(autouse=True)
 def disable_token_cache():
     """Disable global token cache so fake-router tests don't cross-pollute."""
-    from reasoner.pipeline import TOKEN_OPTIMIZATION, token_cache as tc
+    from reasoner.pipeline import TOKEN_OPTIMIZATION
+    from reasoner.pipeline import token_cache as tc
     original = TOKEN_OPTIMIZATION["caching"]
     old_cache = tc
     TOKEN_OPTIMIZATION["caching"] = False

@@ -1,0 +1,346 @@
+# Context: Reasoner root
+
+## Directory: `Project Root`
+
+## Description
+The root of the Reasoner project, containing configurations for environment, docker containers, python packages, build files, and architectural blueprints.
+
+## Files
+- **`19tests.md`**: $ pytest -s tests/test_methods_audit.py
+- **`AGENTS.md`**: <!-- AGENTS.md -- Reasoner v2.1.0 -->
+- **`AI_Orchestrator_Architecture_Audit.md`**: AI Orchestrator Architecture Audit Report
+- **`ARCH-AUDIT-V2-REPORT.md`**: ARCH-AUDIT-V2: Reasoner Architecture Audit
+- **`ARCHITECTURE_MINDMAP.md`**: Architecture Mindmap — Reasoner (Adaptive Reasoning Architecture v2.2)
+- **`ARCHITECTURE_REMEDIATION_PLAN.md`**: Architecture Remediation Plan — Reasoner ARA
+- **`ARCH_AUDIT_REPORT_V2.md`**: Architecture Audit Report (V2.0)
+- **`ARCH_SCORE_9.5_PLAN.md`**: Architecture Remediation Plan — Target Score 9.5 / 10
+- **`ARTICLE_METHOD_SPECIFICATION.md`**: Article Method Specification
+- **`AUTHORS`**: Code or resource asset facilitating system functionality.
+- **`Adapting the Interface, Not the Model-Runtime Harness Adaptation for.pdf`**: Code or resource asset facilitating system functionality.
+- **`BACKGROUND-FX.md`**: Background FX Research
+- **`CHANGELOG.md`**: Changelog
+- **`CLAUDE.md`**: CLAUDE.md
+- **`CONTRIBUTING.md`**: Contributing to Reasoner
+- **`Caddyfile`**: Code or resource asset facilitating system functionality.
+- **`Caddyfile.prod`**: Code or resource asset facilitating system functionality.
+- **`DEPLOY.md`**: Production Deployment Guide — Reasoner
+- **`DESIGN-CURSOR.md`**: Design System: Cursor
+- **`DESIGN-EXPO.md`**: Design System: Expo
+- **`DESIGN-HASHICORP.md`**: Design System: HashiCorp
+- **`Debugging_Testing.md`**: Debugging + Testing Protocol — Reasoner Project
+- **`Dockerfile`**: Code or resource asset facilitating system functionality.
+- **`ENCRYPTION.md`**: Reasoner End-to-End Encryption (E2EE) Architecture
+- **`ENCRYPTION_ROADMAP.md`**: Encryption Roadmap
+- **`GEMINI.md`**: Reasoner - Instructional Context
+- **`HUMANIZER.md`**: ---
+- **`LICENSE`**: Code or resource asset facilitating system functionality.
+- **`QWEN.md`**: Code or resource asset facilitating system functionality.
+- **`README.md`**: Reasoner
+- **`REASONER_COMPLETE_SYSTEM_DOCUMENTATION.md`**: Reasoner: Complete System Documentation
+- **`REASONIX.md`**: Reasoner — Reasonix knowledge base
+- **`REMEDIATION_PLAN.md`**: Remediation Plan
+- **`SAAS.md`**: Plan: Reasoner — Production SaaS Launch
+- **`SIMPLICITY.md`**: Applying John Maeda's Laws of Simplicity to Reasoner
+- **`SSOT_FIX_PLAN.md`**: Plan: Fix SSOT Violations in Reasoner
+- **`VISION_MODELS.md`**: Vision-Capable LLM Models on OpenRouter — Complete Reference
+- **`VISION_TRUTH.md`**: Vision: The Truth-Engine Optimization
+- **`alembic.ini`**: Code or resource asset facilitating system functionality.
+- **`article.md`**: William Zinsser's Principles for Clear and Humane Writing
+- **`asgi.py`**: ASGI entry-point. Run with: uvicorn asgi:app --host 0.0.0.0 --port 8003
+- **`audit-babeltele.md`**: Audit: *Large Language Models Do Not Always Need Readable Language*
+- **`autonomous_debug.py`**: Autonomous Debugging Protocol for Reasoner Project
+- **`autonomous_debugging_protocol_report.md`**: AUTONOMOUS DEBUGGING PROTOCOL — EXECUTION REPORT
+- **`bug_hunt_report.md`**: Autonomous Debugging Report — Reasoner v3.5
+- **`build_chunk_07.py`**: Code or resource asset facilitating system functionality.
+- **`check_config.py`**: Code or resource asset facilitating system functionality.
+- **`check_keys.py`**: Check direct env just in case
+- **`check_modules.py`**: Code or resource asset facilitating system functionality.
+- **`check_modules2.py`**: Code or resource asset facilitating system functionality.
+- **`check_modules3.py`**: Code or resource asset facilitating system functionality.
+- **`check_shadow.py`**: Code or resource asset facilitating system functionality.
+- **`check_sitecustomize.py`**: Code or resource asset facilitating system functionality.
+- **`debug_env.py`**: Code or resource asset facilitating system functionality.
+- **`docker-compose.observability.yml`**: Code or resource asset facilitating system functionality.
+- **`docker-compose.yml`**: Code or resource asset facilitating system functionality.
+- **`docker-entrypoint.sh`**: Code or resource asset facilitating system functionality.
+- **`entities.json`**: Code or resource asset facilitating system functionality.
+- **`extract_image_models.py`**: Code or resource asset facilitating system functionality.
+- **`find_cache.py`**: Code or resource asset facilitating system functionality.
+- **`find_event.py`**: Code or resource asset facilitating system functionality.
+- **`find_greek.py`**: Code or resource asset facilitating system functionality.
+- **`find_ws.py`**: Code or resource asset facilitating system functionality.
+- **`generate_skills.py`**: Pre-defined, professional folder descriptions representing senior developer architecture knowledge
+- **`implementation_audit_report.md`**: Implementation Audit Report
+- **`implementation_plan.md`**: Augmented Article Pipeline — Implementation Plan
+- **`implementation_plan_babeltele.md`**: Implementation Plan — BabelTele Compress→Read Capability for Reasoner
+- **`kill_servers.bat`**: Code or resource asset facilitating system functionality.
+- **`kill_servers.py`**: Kill all Reasoner-related servers.
+- **`knowledge.md`**: Project Knowledge — Reasoner v2.2
+- **`main.py`**: CLI entry-point shim. Keeps `python main.py` working.
+- **`map_workspace.py`**: Load .gitignore patterns to respect them properly
+- **`mcp_server.py`**: MCP stdio entry-point. Launched as a subprocess by MCP hosts (Claude
+- **`mempalace.yaml`**: Code or resource asset facilitating system functionality.
+- **`meta-orchestration-assessment.md`**: ﻿# Meta-Orchestration Assessment — Reasoner (Reasoner Pipeline v2.2)
+- **`meta-review-babeltele.md`**: Meta-Review of the BabelTele Audit
+- **`openrouter_models.json`**: Code or resource asset facilitating system functionality.
+- **`openrouter_models_formatted.txt`**: Code or resource asset facilitating system functionality.
+- **`optimization_plan.md`**: Reasoner Pipeline Optimization Plan — v2.2
+- **`package-lock.json`**: Code or resource asset facilitating system functionality.
+- **`package.json`**: Code or resource asset facilitating system functionality.
+- **`parse_models.py`**: Find cheap models with text output
+- **`patch_rt.py`**: Defensive: test fakes may use _primary instead of primary (see _stream_direct_answer)
+- **`patch_silent.py`**: Code or resource asset facilitating system functionality.
+- **`plan_tmp.md`**: Reasoner Backend Chat and File Upload Exploration Report
+- **`push_to_github.bat`**: Code or resource asset facilitating system functionality.
+- **`push_to_github.py`**: Patterns considered runtime artifacts (not committed by default)
+- **`pyproject.toml`**: Code or resource asset facilitating system functionality.
+- **`pytest.ini`**: Code or resource asset facilitating system functionality.
+- **`pytest_full_output.txt`**: Code or resource asset facilitating system functionality.
+- **`pytest_full_output_2.txt`**: Code or resource asset facilitating system functionality.
+- **`remediation-plan-v2-9.5.md`**: Architecture Remediation Plan v2 — Raise Score from ~7.8 → 9.5
+- **`remediation-status-report.md`**: Architecture Remediation — Implementation Status
+- **`repro_search_bug.py`**: 1. Setup DiscoveryClient
+- **`requirements.lock`**: Code or resource asset facilitating system functionality.
+- **`requirements.txt`**: Code or resource asset facilitating system functionality.
+- **`restart_servers.bat`**: Code or resource asset facilitating system functionality.
+- **`review-babeltele-reconciled.md`**: Review: *Large Language Models Do Not Always Need Readable Language*
+- **`run_real_test.py`**: Load API keys into environment
+- **`run_test.py`**: Get the test file from command line arguments if provided, else default to reliability patches
+- **`run_test_debug.py`**: Add src to path
+- **`start_all.bat`**: Code or resource asset facilitating system functionality.
+- **`start_all.py`**: Orchestrator shim. Keeps `python start_all.py` working.
+- **`temp_list_dirs.py`**: limit depth
+- **`temp_list_tests.py`**: Code or resource asset facilitating system functionality.
+- **`temp_read.py`**: Code or resource asset facilitating system functionality.
+- **`temp_read_gate.py`**: Code or resource asset facilitating system functionality.
+- **`tmp_import_log.txt`**: Code or resource asset facilitating system functionality.
+- **`todo.md`**: 🐛 Bug Report — Failure Propagation Path
+- **`todo.txt`**: Code or resource asset facilitating system functionality.
+- **`transcript_merged.txt`**: Code or resource asset facilitating system functionality.
+- **`verify_encryption.py`**: Add src to path
+- **`verify_import.py`**: Code or resource asset facilitating system functionality.
+
+## Subfolders
+- **`audit`**: Contains various system audits, executive summaries, findings registers, implementation plans, and architectural reviews documenting the health and score of the codebase.
+- **`benchmarks`**: Includes comparative benchmarks for evaluating reasoning methodologies, latencies, calibrations, and overhead of various providers and prompt strategies.
+- **`docs`**: Project documentation, architecture decision records (ADRs), mindmaps, and specialized reports on system features (e.g. agent memory, humanizer pipelines, etc.).
+- **`graphify`**: The core engine components or configurations for the graphify knowledge graph generator tool.
+- **`history`**: Archive files and historical logs tracking previous reasoning sessions, outputs, or state-transition records.
+- **`migrations`**: Alembic relational database schema migration environment and historical version scripts.
+- **`nginx`**: Nginx reverse-proxy and gateway configuration templates for local development and production routing.
+- **`plans`**: Active workspace plans, design blueprints, and execution files for multi-step feature additions and system changes.
+- **`scripts`**: Utility automation scripts for running servers, executing specialized tests, verifying environments, or packaging builds.
+- **`sdk`**: The client software development kits facilitating simple programmatic interface with the Reasoner orchestrator.
+- **`skills`**: Locally active agent skills containing tailored prompt directions and instructions for specialized agent tasks.
+- **`src`**: The backend application root directory housing the FastAPI server and Python pipeline modules.
+- **`tests`**: Test configurations and base setup for the Pytest testing framework.
+- **`ui-next`**: Root folder for the Next.js frontend, styled with Tailwind CSS.
+
+---
+
+## Workspace CONTEXT.md Map
+
+To aid AI agents and developers in codebase navigation, each directory in this project contains a `CONTEXT.md` file summarizing its files, functioning, and subfolders. Below is the complete hierarchical map of these documents:
+
+- [Project root](CONTEXT.md)
+- [Audit](audit/CONTEXT.md)
+- [Benchmarks](benchmarks/CONTEXT.md)
+- [Docs](docs/CONTEXT.md)
+  - [Codemaps](docs/CODEMAPS/CONTEXT.md)
+  - [Adr](docs/adr/CONTEXT.md)
+  - [Audits](docs/audits/CONTEXT.md)
+  - [Decisions](docs/decisions/CONTEXT.md)
+  - [Monitoring](docs/monitoring/CONTEXT.md)
+  - [Plans](docs/plans/CONTEXT.md)
+  - [Research](docs/research/CONTEXT.md)
+  - [Security](docs/security/CONTEXT.md)
+- [Graphify](graphify/CONTEXT.md)
+- [History](history/CONTEXT.md)
+- [Migrations](migrations/CONTEXT.md)
+  - [Alembic](migrations/alembic/CONTEXT.md)
+    - [Versions](migrations/alembic/versions/CONTEXT.md)
+- [Nginx](nginx/CONTEXT.md)
+- [Plans](plans/CONTEXT.md)
+- [Scripts](scripts/CONTEXT.md)
+- [Sdk](sdk/CONTEXT.md)
+  - [Contract](sdk/contract/CONTEXT.md)
+  - [Typescript](sdk/typescript/CONTEXT.md)
+    - [Src](sdk/typescript/src/CONTEXT.md)
+    - [Test](sdk/typescript/test/CONTEXT.md)
+- [Skills](skills/CONTEXT.md)
+  - [Llm-routing-optimizer](skills/llm-routing-optimizer/CONTEXT.md)
+  - [Reasoner-preset-manager](skills/reasoner-preset-manager/CONTEXT.md)
+  - [Reasoner-test-generator](skills/reasoner-test-generator/CONTEXT.md)
+- [Src](src/CONTEXT.md)
+  - [Reasoner](src/reasoner/CONTEXT.md)
+    - [Api](src/reasoner/api/CONTEXT.md)
+      - [Execution](src/reasoner/api/execution/CONTEXT.md)
+      - [Mcp](src/reasoner/api/mcp/CONTEXT.md)
+      - [Routes](src/reasoner/api/routes/CONTEXT.md)
+    - [Application](src/reasoner/application/CONTEXT.md)
+      - [Commands](src/reasoner/application/commands/CONTEXT.md)
+      - [Event Bus](src/reasoner/application/event_bus/CONTEXT.md)
+      - [Flows](src/reasoner/application/flows/CONTEXT.md)
+      - [Handlers](src/reasoner/application/handlers/CONTEXT.md)
+      - [Ports](src/reasoner/application/ports/CONTEXT.md)
+      - [Queries](src/reasoner/application/queries/CONTEXT.md)
+      - [Services](src/reasoner/application/services/CONTEXT.md)
+        - [Renderers](src/reasoner/application/services/renderers/CONTEXT.md)
+    - [Core](src/reasoner/core/CONTEXT.md)
+      - [Aggregates](src/reasoner/core/aggregates/CONTEXT.md)
+      - [Events](src/reasoner/core/events/CONTEXT.md)
+      - [Observability](src/reasoner/core/observability/CONTEXT.md)
+      - [Ports](src/reasoner/core/ports/CONTEXT.md)
+    - [Documents](src/reasoner/documents/CONTEXT.md)
+    - [Domain](src/reasoner/domain/CONTEXT.md)
+      - [Watermark](src/reasoner/domain/watermark/CONTEXT.md)
+    - [Healing](src/reasoner/healing/CONTEXT.md)
+    - [Hypergate](src/reasoner/hypergate/CONTEXT.md)
+      - [Sub Agents](src/reasoner/hypergate/sub_agents/CONTEXT.md)
+    - [Infrastructure](src/reasoner/infrastructure/CONTEXT.md)
+      - [Auth](src/reasoner/infrastructure/auth/CONTEXT.md)
+      - [Benchmarks](src/reasoner/infrastructure/benchmarks/CONTEXT.md)
+        - [Suites](src/reasoner/infrastructure/benchmarks/suites/CONTEXT.md)
+      - [Billing](src/reasoner/infrastructure/billing/CONTEXT.md)
+      - [Documents](src/reasoner/infrastructure/documents/CONTEXT.md)
+      - [Email](src/reasoner/infrastructure/email/CONTEXT.md)
+      - [Execution](src/reasoner/infrastructure/execution/CONTEXT.md)
+        - [Runners](src/reasoner/infrastructure/execution/runners/CONTEXT.md)
+        - [Sandbox Worker](src/reasoner/infrastructure/execution/sandbox_worker/CONTEXT.md)
+          - [Sandbox Image](src/reasoner/infrastructure/execution/sandbox_worker/sandbox_image/CONTEXT.md)
+      - [Learning](src/reasoner/infrastructure/learning/CONTEXT.md)
+      - [Llm](src/reasoner/infrastructure/llm/CONTEXT.md)
+        - [Constraints](src/reasoner/infrastructure/llm/constraints/CONTEXT.md)
+        - [Extraction](src/reasoner/infrastructure/llm/extraction/CONTEXT.md)
+        - [Providers](src/reasoner/infrastructure/llm/providers/CONTEXT.md)
+      - [Observability](src/reasoner/infrastructure/observability/CONTEXT.md)
+      - [Persistence](src/reasoner/infrastructure/persistence/CONTEXT.md)
+      - [Prism](src/reasoner/infrastructure/prism/CONTEXT.md)
+      - [Redis](src/reasoner/infrastructure/redis/CONTEXT.md)
+        - [Scripts](src/reasoner/infrastructure/redis/scripts/CONTEXT.md)
+      - [Search](src/reasoner/infrastructure/search/CONTEXT.md)
+      - [Telemetry](src/reasoner/infrastructure/telemetry/CONTEXT.md)
+      - [Translation](src/reasoner/infrastructure/translation/CONTEXT.md)
+      - [Valkey](src/reasoner/infrastructure/valkey/CONTEXT.md)
+        - [Scripts](src/reasoner/infrastructure/valkey/scripts/CONTEXT.md)
+      - [Watermark](src/reasoner/infrastructure/watermark/CONTEXT.md)
+        - [Image](src/reasoner/infrastructure/watermark/image/CONTEXT.md)
+        - [Pixel](src/reasoner/infrastructure/watermark/pixel/CONTEXT.md)
+      - [Websocket](src/reasoner/infrastructure/websocket/CONTEXT.md)
+      - [Widgets](src/reasoner/infrastructure/widgets/CONTEXT.md)
+    - [Neuro](src/reasoner/neuro/CONTEXT.md)
+    - [Phases](src/reasoner/phases/CONTEXT.md)
+    - [Quality](src/reasoner/quality/CONTEXT.md)
+    - [Security](src/reasoner/security/CONTEXT.md)
+    - [Shared](src/reasoner/shared/CONTEXT.md)
+    - [Subagents](src/reasoner/subagents/CONTEXT.md)
+      - [Critique](src/reasoner/subagents/critique/CONTEXT.md)
+      - [Decomposition](src/reasoner/subagents/decomposition/CONTEXT.md)
+      - [Enhancement](src/reasoner/subagents/enhancement/CONTEXT.md)
+      - [Search](src/reasoner/subagents/search/CONTEXT.md)
+      - [Synthesis](src/reasoner/subagents/synthesis/CONTEXT.md)
+    - [Utils](src/reasoner/utils/CONTEXT.md)
+    - [Vs Vertical Configs](src/reasoner/vs_vertical_configs/CONTEXT.md)
+- [Tests](tests/CONTEXT.md)
+  - [ Data](tests/_data/CONTEXT.md)
+  - [Architecture](tests/architecture/CONTEXT.md)
+  - [Integration](tests/integration/CONTEXT.md)
+  - [Unit](tests/unit/CONTEXT.md)
+  - [Utils](tests/utils/CONTEXT.md)
+- [Ui-next](ui-next/CONTEXT.md)
+  - [E2e](ui-next/e2e/CONTEXT.md)
+  - [Public](ui-next/public/CONTEXT.md)
+    - [Showcase](ui-next/public/showcase/CONTEXT.md)
+  - [Src](ui-next/src/CONTEXT.md)
+    - [App](ui-next/src/app/CONTEXT.md)
+      - [About](ui-next/src/app/about/CONTEXT.md)
+      - [Api](ui-next/src/app/api/CONTEXT.md)
+        - [Account](ui-next/src/app/api/account/CONTEXT.md)
+          - [Api-keys](ui-next/src/app/api/account/api-keys/CONTEXT.md)
+            - [[id]](ui-next/src/app/api/account/api-keys/[id]/CONTEXT.md)
+          - [Delete](ui-next/src/app/api/account/delete/CONTEXT.md)
+        - [Agent](ui-next/src/app/api/agent/CONTEXT.md)
+          - [Run](ui-next/src/app/api/agent/run/CONTEXT.md)
+            - [Sync](ui-next/src/app/api/agent/run/sync/CONTEXT.md)
+        - [Billing](ui-next/src/app/api/billing/CONTEXT.md)
+          - [Checkout](ui-next/src/app/api/billing/checkout/CONTEXT.md)
+          - [Paypal](ui-next/src/app/api/billing/paypal/CONTEXT.md)
+            - [Webhook](ui-next/src/app/api/billing/paypal/webhook/CONTEXT.md)
+          - [Portal](ui-next/src/app/api/billing/portal/CONTEXT.md)
+          - [Subscription](ui-next/src/app/api/billing/subscription/CONTEXT.md)
+          - [Webhook](ui-next/src/app/api/billing/webhook/CONTEXT.md)
+        - [Calculate](ui-next/src/app/api/calculate/CONTEXT.md)
+        - [Credits](ui-next/src/app/api/credits/CONTEXT.md)
+          - [Ledger](ui-next/src/app/api/credits/ledger/CONTEXT.md)
+        - [Csrf](ui-next/src/app/api/csrf/CONTEXT.md)
+        - [Error-report](ui-next/src/app/api/error-report/CONTEXT.md)
+        - [Estimate](ui-next/src/app/api/estimate/CONTEXT.md)
+        - [Feedback](ui-next/src/app/api/feedback/CONTEXT.md)
+        - [Gate](ui-next/src/app/api/gate/CONTEXT.md)
+        - [Generate-image](ui-next/src/app/api/generate-image/CONTEXT.md)
+        - [Health](ui-next/src/app/api/health/CONTEXT.md)
+        - [Models](ui-next/src/app/api/models/CONTEXT.md)
+        - [Neuro](ui-next/src/app/api/neuro/CONTEXT.md)
+          - [Health](ui-next/src/app/api/neuro/health/CONTEXT.md)
+          - [Learn](ui-next/src/app/api/neuro/learn/CONTEXT.md)
+          - [Recall](ui-next/src/app/api/neuro/recall/CONTEXT.md)
+          - [Sessions](ui-next/src/app/api/neuro/sessions/CONTEXT.md)
+        - [Presets](ui-next/src/app/api/presets/CONTEXT.md)
+        - [Provenance](ui-next/src/app/api/provenance/CONTEXT.md)
+          - [Capabilities](ui-next/src/app/api/provenance/capabilities/CONTEXT.md)
+          - [Inspect](ui-next/src/app/api/provenance/inspect/CONTEXT.md)
+          - [Rewrite](ui-next/src/app/api/provenance/rewrite/CONTEXT.md)
+          - [Scrub](ui-next/src/app/api/provenance/scrub/CONTEXT.md)
+        - [Quota](ui-next/src/app/api/quota/CONTEXT.md)
+        - [Run](ui-next/src/app/api/run/CONTEXT.md)
+        - [Run-followup](ui-next/src/app/api/run-followup/CONTEXT.md)
+        - [Search](ui-next/src/app/api/search/CONTEXT.md)
+        - [Stocks](ui-next/src/app/api/stocks/CONTEXT.md)
+        - [Stop](ui-next/src/app/api/stop/CONTEXT.md)
+        - [Upload](ui-next/src/app/api/upload/CONTEXT.md)
+        - [Weather](ui-next/src/app/api/weather/CONTEXT.md)
+        - [Websocket](ui-next/src/app/api/websocket/CONTEXT.md)
+          - [Ticket](ui-next/src/app/api/websocket/ticket/CONTEXT.md)
+      - [Changelog](ui-next/src/app/changelog/CONTEXT.md)
+      - [Chat](ui-next/src/app/chat/CONTEXT.md)
+      - [Contact](ui-next/src/app/contact/CONTEXT.md)
+      - [Cookies](ui-next/src/app/cookies/CONTEXT.md)
+      - [Dashboard](ui-next/src/app/dashboard/CONTEXT.md)
+      - [Docs](ui-next/src/app/docs/CONTEXT.md)
+        - [[slug]](ui-next/src/app/docs/[slug]/CONTEXT.md)
+      - [Faq](ui-next/src/app/faq/CONTEXT.md)
+      - [Forgot-password](ui-next/src/app/forgot-password/CONTEXT.md)
+      - [Help](ui-next/src/app/help/CONTEXT.md)
+      - [How-it-works](ui-next/src/app/how-it-works/CONTEXT.md)
+      - [Landing](ui-next/src/app/landing/CONTEXT.md)
+      - [Llms-full.txt](ui-next/src/app/llms-full.txt/CONTEXT.md)
+      - [Llms.txt](ui-next/src/app/llms.txt/CONTEXT.md)
+      - [Login](ui-next/src/app/login/CONTEXT.md)
+      - [Pricing](ui-next/src/app/pricing/CONTEXT.md)
+      - [Privacy](ui-next/src/app/privacy/CONTEXT.md)
+      - [Reset-password](ui-next/src/app/reset-password/CONTEXT.md)
+      - [Security](ui-next/src/app/security/CONTEXT.md)
+      - [Settings](ui-next/src/app/settings/CONTEXT.md)
+        - [Api-keys](ui-next/src/app/settings/api-keys/CONTEXT.md)
+      - [Signup](ui-next/src/app/signup/CONTEXT.md)
+      - [Status](ui-next/src/app/status/CONTEXT.md)
+      - [Subprocessors](ui-next/src/app/subprocessors/CONTEXT.md)
+      - [Terms](ui-next/src/app/terms/CONTEXT.md)
+    - [Components](ui-next/src/components/CONTEXT.md)
+      - [Brand](ui-next/src/components/brand/CONTEXT.md)
+      - [Chat](ui-next/src/components/chat/CONTEXT.md)
+      - [Docs](ui-next/src/components/docs/CONTEXT.md)
+      - [Landing](ui-next/src/components/landing/CONTEXT.md)
+      - [Layout](ui-next/src/components/layout/CONTEXT.md)
+      - [Not-found](ui-next/src/components/not-found/CONTEXT.md)
+      - [Phases](ui-next/src/components/phases/CONTEXT.md)
+      - [Provenance](ui-next/src/components/provenance/CONTEXT.md)
+      - [Run-record](ui-next/src/components/run-record/CONTEXT.md)
+      - [Seo](ui-next/src/components/seo/CONTEXT.md)
+      - [Ui](ui-next/src/components/ui/CONTEXT.md)
+      - [Widgets](ui-next/src/components/widgets/CONTEXT.md)
+    - [Hooks](ui-next/src/hooks/CONTEXT.md)
+    - [Lib](ui-next/src/lib/CONTEXT.md)
+    - [Stores](ui-next/src/stores/CONTEXT.md)
+    - [Test](ui-next/src/test/CONTEXT.md)
+  - [Test-results](ui-next/test-results/CONTEXT.md)

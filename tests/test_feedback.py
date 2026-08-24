@@ -2,14 +2,17 @@
 
 import json
 import os
-import pytest
-from pathlib import Path
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
+import pytest
 from fastapi.testclient import TestClient
+
 from reasoner.api import app
-from reasoner.infrastructure.persistence.feedback_store import FeedbackStore, FeedbackEntry, FeedbackStats
 from reasoner.core.settings import Settings
+from reasoner.infrastructure.persistence.feedback_store import (
+    FeedbackEntry,
+    FeedbackStore,
+)
 
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-for-local-auth-adapter-only")
 
@@ -98,13 +101,13 @@ class TestFeedbackStore:
         jsonl_path = tmp_path / "feedback.jsonl"
         jsonl_path.write_text(
             json.dumps({
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "conversation_id": "c1",
                 "message_id": "m1",
                 "rating": "up",
             }) + "\n" +
             json.dumps({
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "conversation_id": "c1",
                 "message_id": "m2",
                 "rating": "down",
@@ -187,8 +190,8 @@ class TestFeedbackEndpoint:
         """GET /api/admin/feedback-stats with correct key should return stats."""
         monkeypatch.setattr(Settings, "ADMIN_API_KEY", "test-admin-key")
 
-        from reasoner.infrastructure.auth.local_adapter import LocalAuthAdapter
         from reasoner.infrastructure.auth import set_auth_adapter
+        from reasoner.infrastructure.auth.local_adapter import LocalAuthAdapter
         adapter = LocalAuthAdapter()
         # Force LocalAuthAdapter regardless of ambient SUPABASE_URL/ENVIRONMENT config —
         # get_auth_adapter() otherwise picks SupabaseAuthAdapter outside ENVIRONMENT=testing.

@@ -14,12 +14,13 @@ import re
 import sys
 import time
 import uuid
+from collections.abc import Mapping
 from contextvars import ContextVar
-from dataclasses import dataclass, field, asdict
-from datetime import datetime, timezone
+from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
 from enum import Enum
 from types import MappingProxyType
-from typing import Any, Mapping
+from typing import Any
 
 # Context variables for log context across async calls
 _correlation_id: ContextVar[str] = ContextVar("correlation_id", default="")
@@ -115,10 +116,10 @@ def redact_sensitive(message: str) -> str:
     """
     if not isinstance(message, str):
         message = str(message)
-    
+
     for pattern, replacement in SENSITIVE_PATTERNS:
         message = pattern.sub(replacement, message)
-    
+
     return message
 
 
@@ -137,10 +138,10 @@ def redact_dict(data: dict[str, Any]) -> dict[str, Any]:
         'api_key', 'apikey', 'key', 'secret', 'password', 'token',
         'credential', 'auth', 'authorization', 'bearer'
     }
-    
+
     for k, v in data.items():
         key_lower = k.lower()
-        
+
         # Check if key name suggests sensitive data
         if any(s in key_lower for s in sensitive_keys):
             result[k] = '***REDACTED***'
@@ -157,7 +158,7 @@ def redact_dict(data: dict[str, Any]) -> dict[str, Any]:
             ]
         else:
             result[k] = v
-    
+
     return result
 
 
@@ -289,7 +290,7 @@ class StructuredLogger:
         ctx = _log_context.get()
 
         entry = StructuredLogEntry(
-            timestamp=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            timestamp=datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             level=level.value,
             source=self.source,
             message=safe_message,

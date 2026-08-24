@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-import pytest
 from unittest.mock import AsyncMock
 
-from reasoner.application.services.prism_classifier import classify_query, PrismClassification
+import pytest
+
+from reasoner.application.services.prism_classifier import PrismClassification, classify_query
 from reasoner.domain.pipeline_state import PipelineState
 
 

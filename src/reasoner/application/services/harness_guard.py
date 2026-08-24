@@ -7,11 +7,11 @@ cross-lab terminal.
 
 from __future__ import annotations
 
-from reasoner.domain.harness_metrics import HarnessMutation
 from reasoner.core.evolution_constants import (
     EVOLUTION_MIN_CROSS_LAB_DIVERSITY,
     EVOLUTION_REQUIRE_CROSS_LAB_FALLBACK_TERMINAL,
 )
+from reasoner.domain.harness_metrics import HarnessMutation
 
 # Mapping of model aliases → training ecosystem (lab).
 # Used by the invariant guard to verify cross-lab diversity is preserved.

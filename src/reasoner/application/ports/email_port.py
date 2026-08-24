@@ -7,8 +7,8 @@ exceeded, payment failures, and other critical SaaS events.
 
 from __future__ import annotations
 
-from typing import Protocol
 from dataclasses import dataclass
+from typing import Protocol
 
 
 @dataclass

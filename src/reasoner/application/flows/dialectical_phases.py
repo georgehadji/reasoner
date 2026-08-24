@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
 
-from reasoner.domain.pipeline_state import PipelineState
-from reasoner.parsing import extract_json, ParseError
 import reasoner.phases as phases
 from reasoner.application.flows.base import WorkflowServices
+from reasoner.domain.pipeline_state import PipelineState
 from reasoner.infrastructure.search.discovery import get_search_client_for_method
+from reasoner.parsing import ParseError, extract_json
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +30,6 @@ async def run_scientific_literature_search_phase(state: PipelineState, services:
             state=state
         )
 
-        import json as _json
         plan = extract_json(raw_plan)
         queries = plan.get("queries", [])[:3]
 
@@ -64,7 +62,7 @@ async def run_scientific_hypothesize_phase(state: PipelineState, services: Workf
     raw, _ = await services.call_llm(
         role="primary",
         system_prompt=phases.SCIENTIFIC_HYPOTHESIS_SYSTEM,
-        user_prompt=phases.scientific_hypothesis_prompt(state), 
+        user_prompt=phases.scientific_hypothesis_prompt(state),
         state=state
     )
     data = extract_json(raw)
@@ -75,10 +73,10 @@ async def run_scientific_test_phase(state: PipelineState, services: WorkflowServ
     raw, _ = await services.call_llm(
         role="scoring",
         system_prompt=phases.SCIENTIFIC_TEST_SYSTEM,
-        user_prompt=phases.scientific_test_prompt(state), 
+        user_prompt=phases.scientific_test_prompt(state),
         state=state
     )
-    
+
     try:
         data = extract_json(raw)
     except ParseError:
@@ -92,7 +90,7 @@ async def run_scientific_test_phase(state: PipelineState, services: WorkflowServ
         data = extract_json(raw)
 
     state.scientific_state["test_results"] = data.get("test_results", [])
-    
+
     # Bayesian posterior update
     hypotheses = state.scientific_state.get("hypotheses", [])
     test_results = state.scientific_state.get("test_results", [])
@@ -112,7 +110,7 @@ async def run_socratic_question_phase(state: PipelineState, services: WorkflowSe
     raw, _ = await services.call_llm(
         role="destructive",
         system_prompt=phases.SOCRATIC_QUESTION_SYSTEM,
-        user_prompt=phases.socratic_question_prompt(state), 
+        user_prompt=phases.socratic_question_prompt(state),
         state=state
     )
     data = extract_json(raw)
@@ -123,7 +121,7 @@ async def run_socratic_answer_phase(state: PipelineState, services: WorkflowServ
     raw, _ = await services.call_llm(
         role="constructive",
         system_prompt=phases.SOCRATIC_ANSWER_SYSTEM,
-        user_prompt=phases.socratic_answer_prompt(state), 
+        user_prompt=phases.socratic_answer_prompt(state),
         state=state
     )
     data = extract_json(raw)
@@ -180,7 +178,7 @@ async def run_pre_mortem_failure_phase(state: PipelineState, services: WorkflowS
     raw, _ = await services.call_llm(
         role="destructive",
         system_prompt=phases.PRE_MORTEM_FAILURE_SYSTEM,
-        user_prompt=phases.pre_mortem_failure_prompt(state), 
+        user_prompt=phases.pre_mortem_failure_prompt(state),
         state=state
     )
     data = extract_json(raw)
@@ -193,7 +191,7 @@ async def run_pre_mortem_backtrack_phase(state: PipelineState, services: Workflo
     raw, _ = await services.call_llm(
         role="scoring",
         system_prompt=phases.PRE_MORTEM_BACKTRACK_SYSTEM,
-        user_prompt=phases.pre_mortem_backtrack_prompt(state), 
+        user_prompt=phases.pre_mortem_backtrack_prompt(state),
         state=state
     )
     data = extract_json(raw)
@@ -206,7 +204,7 @@ async def run_pre_mortem_signals_phase(state: PipelineState, services: WorkflowS
     raw, _ = await services.call_llm(
         role="scoring",
         system_prompt=phases.PRE_MORTEM_SIGNALS_SYSTEM,
-        user_prompt=phases.pre_mortem_signals_prompt(state), 
+        user_prompt=phases.pre_mortem_signals_prompt(state),
         state=state
     )
     data = extract_json(raw)
@@ -218,7 +216,7 @@ async def run_pre_mortem_redesign_phase(state: PipelineState, services: Workflow
     raw, _ = await services.call_llm(
         role="synthesis",
         system_prompt=phases.PRE_MORTEM_REDESIGN_SYSTEM,
-        user_prompt=phases.pre_mortem_redesign_prompt(state), 
+        user_prompt=phases.pre_mortem_redesign_prompt(state),
         state=state
     )
     data = extract_json(raw)
@@ -272,7 +270,7 @@ async def run_bayesian_priors_phase(state: PipelineState, services: WorkflowServ
     raw, _ = await services.call_llm(
         role="constructive",
         system_prompt=phases.BAYESIAN_PRIOR_SYSTEM,
-        user_prompt=phases.bayesian_prior_prompt(state), 
+        user_prompt=phases.bayesian_prior_prompt(state),
         state=state
     )
     data = extract_json(raw)
@@ -283,7 +281,7 @@ async def run_bayesian_likelihood_phase(state: PipelineState, services: Workflow
     raw, _ = await services.call_llm(
         role="destructive",
         system_prompt=phases.BAYESIAN_LIKELIHOOD_SYSTEM,
-        user_prompt=phases.bayesian_likelihood_prompt(state), 
+        user_prompt=phases.bayesian_likelihood_prompt(state),
         state=state
     )
     data = extract_json(raw)
@@ -314,7 +312,7 @@ async def run_bayesian_sensitivity_phase(state: PipelineState, services: Workflo
     raw, _ = await services.call_llm(
         role="synthesis",
         system_prompt=phases.BAYESIAN_SENSITIVITY_SYSTEM,
-        user_prompt=phases.bayesian_sensitivity_prompt(state), 
+        user_prompt=phases.bayesian_sensitivity_prompt(state),
         state=state
     )
     data = extract_json(raw)
@@ -328,7 +326,7 @@ async def run_dialectical_thesis_phase(state: PipelineState, services: WorkflowS
     raw, _ = await services.call_llm(
         role="constructive",
         system_prompt=phases.DIALECTICAL_THESIS_SYSTEM,
-        user_prompt=phases.dialectical_thesis_prompt(state), 
+        user_prompt=phases.dialectical_thesis_prompt(state),
         state=state
     )
     data = extract_json(raw)
@@ -341,7 +339,7 @@ async def run_dialectical_antithesis_phase(state: PipelineState, services: Workf
     raw, _ = await services.call_llm(
         role="destructive",
         system_prompt=phases.DIALECTICAL_ANTITHESIS_SYSTEM,
-        user_prompt=phases.dialectical_antithesis_prompt(state), 
+        user_prompt=phases.dialectical_antithesis_prompt(state),
         state=state
     )
     data = extract_json(raw)
@@ -354,7 +352,7 @@ async def run_dialectical_contradictions_phase(state: PipelineState, services: W
     raw, _ = await services.call_llm(
         role="scoring",
         system_prompt=phases.DIALECTICAL_CONTRADICTIONS_SYSTEM,
-        user_prompt=phases.dialectical_contradictions_prompt(state), 
+        user_prompt=phases.dialectical_contradictions_prompt(state),
         state=state
     )
     data = extract_json(raw)
@@ -367,7 +365,7 @@ async def run_dialectical_aufhebung_phase(state: PipelineState, services: Workfl
     raw, _ = await services.call_llm(
         role="synthesis",
         system_prompt=phases.DIALECTICAL_AUFHEBUNG_SYSTEM,
-        user_prompt=phases.dialectical_aufhebung_prompt(state), 
+        user_prompt=phases.dialectical_aufhebung_prompt(state),
         state=state
     )
     data = extract_json(raw)
@@ -420,7 +418,7 @@ async def run_analogical_abstraction_phase(state: PipelineState, services: Workf
     raw, _ = await services.call_llm(
         role="systemic",
         system_prompt=phases.ANALOGICAL_ABSTRACTION_SYSTEM,
-        user_prompt=phases.analogical_abstraction_prompt(state), 
+        user_prompt=phases.analogical_abstraction_prompt(state),
         state=state
     )
     try:
@@ -442,7 +440,7 @@ async def run_analogical_domain_search_phase(state: PipelineState, services: Wor
     raw, _ = await services.call_llm(
         role="systemic",
         system_prompt=phases.ANALOGICAL_DOMAIN_SEARCH_SYSTEM,
-        user_prompt=phases.analogical_domain_search_prompt(state), 
+        user_prompt=phases.analogical_domain_search_prompt(state),
         state=state
     )
     try:
@@ -459,7 +457,7 @@ async def run_analogical_mapping_phase(state: PipelineState, services: WorkflowS
     raw, _ = await services.call_llm(
         role="systemic",
         system_prompt=phases.ANALOGICAL_MAPPING_SYSTEM,
-        user_prompt=phases.analogical_mapping_prompt(state), 
+        user_prompt=phases.analogical_mapping_prompt(state),
         state=state
     )
     try:
@@ -478,7 +476,7 @@ async def run_analogical_transfer_phase(state: PipelineState, services: Workflow
     raw, _ = await services.call_llm(
         role="synthesis",
         system_prompt=phases.ANALOGICAL_TRANSFER_SYSTEM,
-        user_prompt=phases.analogical_transfer_prompt(state), 
+        user_prompt=phases.analogical_transfer_prompt(state),
         state=state
     )
     try:

@@ -12,19 +12,18 @@ if TYPE_CHECKING:
 from reasoner.core.constants import (
     DEFAULT_OLLAMA_URL,
     MODEL_CLAUDE_SONNET,
+    MODEL_GEMINI_31_FLASH_LITE_IMAGE,
     MODEL_GEMINI_PRO,
     MODEL_GPT4O_MINI,
-    MODEL_LAGUNA_XS_FREE,
     MODEL_LAGUNA_M_FREE,
     MODEL_LAGUNA_XS_21,
+    MODEL_LAGUNA_XS_FREE,
     NVIDIA_BASE_URL,
-    MODEL_GEMINI_31_FLASH_LITE_IMAGE,
 )
 from reasoner.infrastructure.llm.providers.openai_compat import (
     OpenAICompatibleProvider,
     OpenRouterProvider,
 )
-
 
 # Whitelist of supported models.  Everything except Ollama routes through OpenRouter.
 _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
@@ -478,9 +477,8 @@ for _mid, _cfg in _MODEL_WHITELIST.items():
 _REGISTRY: MappingProxyType[str, dict[str, Any]] = MappingProxyType(_REGISTRY_MUTABLE)
 
 
-def build_provider(model_id: str, api_key: str | None = None) -> "BaseLLMProvider":
+def build_provider(model_id: str, api_key: str | None = None) -> BaseLLMProvider:
     """Build a provider instance from a model ID string."""
-    from reasoner.infrastructure.llm.base import BaseLLMProvider
 
     if model_id not in _REGISTRY:
         available = ", ".join(sorted(_REGISTRY.keys()))
@@ -490,11 +488,11 @@ Available models:
   {available}"""
         )
     cfg = _REGISTRY[model_id]
-    
+
     # xAI direct routing logic
     is_xai = model_id.startswith("grok-") or _vendor_of(model_id) == "x-ai"
     using_xai_direct = False
-    
+
     key = api_key
     if is_xai and not key:
         xai_key = os.environ.get("XAI_API_KEY", "")
@@ -511,7 +509,7 @@ Available models:
         if ds_key:
             key = ds_key
             using_deepseek_direct = True
-            
+
     if not key:
         key = os.environ.get(cfg["env"], "")
 

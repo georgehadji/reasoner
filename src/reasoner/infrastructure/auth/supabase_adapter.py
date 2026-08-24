@@ -11,9 +11,9 @@ import hashlib
 import logging
 from uuid import UUID
 
-from reasoner.domain.saas import User
 from reasoner.application.ports.auth_port import AuthPort
 from reasoner.auth import AuthenticationError
+from reasoner.domain.saas import User
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ class SupabaseAuthAdapter(AuthPort):
     """
 
     def __init__(self, supabase_url: str, supabase_service_key: str):
-        from supabase import create_client, Client
+        from supabase import Client, create_client
 
         self._client: Client = create_client(supabase_url, supabase_service_key)
 

@@ -7,6 +7,7 @@ Stripe is the default adapter, but the domain never imports stripe.
 from __future__ import annotations
 
 from typing import Any, Protocol
+
 from reasoner.domain.saas import Subscription, SubscriptionTier
 
 

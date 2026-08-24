@@ -101,7 +101,6 @@ def _kill_processes(force: bool = False) -> int:
 
 def _kill_processes_fallback(force: bool = False) -> int:
     """Fallback when psutil is missing."""
-    import os
     killed = 0
     if sys.platform == "win32":
         for kw in TARGET_KEYWORDS:

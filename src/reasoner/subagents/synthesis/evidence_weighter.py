@@ -6,9 +6,8 @@ from __future__ import annotations
 from typing import Any
 
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.subagents.base import PhaseSubAgent
 from reasoner.parsing import extract_json
-
+from reasoner.subagents.base import PhaseSubAgent
 
 EVIDENCE_SYSTEM = """You are an Evidence Weighter. Your ONE JOB is to read all perspective candidates and evaluate which arguments have the STRONGEST supporting evidence.
 

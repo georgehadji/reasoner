@@ -6,17 +6,17 @@ Provides data for smart widgets: Weather, Stocks, Calculations, Discover, Images
 from __future__ import annotations
 
 import ast
-import logging
 import asyncio
+import logging
 import math
 import operator
-from typing import Any, Optional
-from dataclasses import dataclass, asdict
+from typing import Any
+
 import httpx
 
 from reasoner.core.constants import (
-    OPENMETEO_GEOCODING_URL,
     OPENMETEO_FORECAST_URL,
+    OPENMETEO_GEOCODING_URL,
     TIMEOUTS,
 )
 
@@ -147,16 +147,16 @@ def calculate_expression(expression: str) -> dict[str, Any]:
 
     try:
         tree = ast.parse(expr, mode='eval')
-        
+
         # Safely evaluate the AST
         result = _safe_eval_expr(tree)
-        
+
         # Validate result is numeric
         if not isinstance(result, (int, float, complex)):
             return {"error": "Result must be numeric", "valid": False}
-            
+
         return {"result": result, "valid": True, "expression": expression}
-        
+
     except SafeExpressionError as e:
         return {"error": str(e), "valid": False}
     except SyntaxError:
@@ -200,7 +200,7 @@ WEATHER_CONDITIONS = {
 }
 
 
-async def geocode_location(location: str) -> Optional[dict[str, float]]:
+async def geocode_location(location: str) -> dict[str, float] | None:
     """Geocode a location name to coordinates."""
     try:
         async with httpx.AsyncClient(timeout=TIMEOUTS.WIDGET) as client:
@@ -210,7 +210,7 @@ async def geocode_location(location: str) -> Optional[dict[str, float]]:
             )
             response.raise_for_status()
             data = response.json()
-            
+
             if data.get("results"):
                 result = data["results"][0]
                 return {
@@ -220,7 +220,7 @@ async def geocode_location(location: str) -> Optional[dict[str, float]]:
                 }
     except Exception as e:
         logger.error(f"Geocoding error: {e}")
-    
+
     return None
 
 
@@ -234,7 +234,7 @@ async def get_weather_data(location: str) -> dict[str, Any]:
     coords = await geocode_location(location)
     if not coords:
         return {"error": f"Location '{location}' not found"}
-    
+
     try:
         async with httpx.AsyncClient(timeout=TIMEOUTS.WIDGET) as client:
             response = await client.get(
@@ -250,14 +250,14 @@ async def get_weather_data(location: str) -> dict[str, Any]:
             )
             response.raise_for_status()
             data = response.json()
-            
+
             current = data.get("current", {})
             daily = data.get("daily", {})
-            
+
             # Parse current weather
             weather_code = current.get("weather_code", 0)
             condition_info = WEATHER_CONDITIONS.get(weather_code, {"condition": "Unknown", "icon": "question"})
-            
+
             current_weather = {
                 "location": coords["name"],
                 "temperature": current.get("temperature_2m"),
@@ -270,14 +270,14 @@ async def get_weather_data(location: str) -> dict[str, Any]:
                 "wind_direction": current.get("wind_direction_10m"),
                 "pressure": current.get("pressure_msl"),
             }
-            
+
             # Parse forecast
             forecast = []
             if daily.get("time"):
                 for i, date in enumerate(daily["time"]):
                     day_code = daily.get("weather_code", [])[i] if i < len(daily.get("weather_code", [])) else 0
                     day_condition = WEATHER_CONDITIONS.get(day_code, {"condition": "Unknown", "icon": "question"})
-                    
+
                     forecast.append({
                         "date": date,
                         "condition": day_condition["condition"],
@@ -286,13 +286,13 @@ async def get_weather_data(location: str) -> dict[str, Any]:
                         "temp_min": daily.get("temperature_2m_min", [])[i] if i < len(daily.get("temperature_2m_min", [])) else None,
                         "precipitation_probability": daily.get("precipitation_probability_max", [])[i] if i < len(daily.get("precipitation_probability_max", [])) else None,
                     })
-            
+
             return {
                 "current": current_weather,
                 "forecast": forecast,
                 "source": "Open-Meteo",
             }
-            
+
     except httpx.HTTPError as e:
         logger.error(f"Weather API error: {e}")
         return {"error": f"Weather service unavailable: {str(e)}"}
@@ -314,7 +314,6 @@ async def get_weather_data(location: str) -> dict[str, Any]:
 
 def _has_yahooquery() -> bool:
     try:
-        import yahooquery
         return True
     except Exception:
         return False
@@ -322,7 +321,6 @@ def _has_yahooquery() -> bool:
 
 def _has_yfinance() -> bool:
     try:
-        import yfinance
         return True
     except Exception:
         return False
@@ -467,7 +465,7 @@ async def get_discover_content(topic: str = "tech", mode: str = "normal") -> dic
     for query in topic_config["queries"]:
         # Try multi-backend search
         search_results = await search_web(query)
-        
+
         for result in search_results[:5]:
             if result.get("url") not in seen_urls:
                 seen_urls.add(result.get("url"))
@@ -478,10 +476,10 @@ async def get_discover_content(topic: str = "tech", mode: str = "normal") -> dic
                     "source": result.get("source", ""),
                     "published": result.get("publishedDate", ""),
                 })
-        
+
         if len(results) >= 10:
             break
-    
+
     # If no results from search, return curated list
     if not results:
         results = [
@@ -493,7 +491,7 @@ async def get_discover_content(topic: str = "tech", mode: str = "normal") -> dic
                 "published": "",
             },
         ]
-    
+
     return {
         "topic": topic,
         "mode": mode,
@@ -524,7 +522,7 @@ async def search_images_async(query: str, limit: int = 20) -> dict[str, Any]:
         ]
     except Exception:
         results = []
-    
+
     return {
         "query": query,
         "results": results,
@@ -534,7 +532,6 @@ async def search_images_async(query: str, limit: int = 20) -> dict[str, Any]:
 
 def search_images(query: str, limit: int = 20) -> dict[str, Any]:
     """Search for images (sync wrapper)."""
-    import asyncio
     try:
         loop = asyncio.get_event_loop()
     except RuntimeError:
@@ -550,20 +547,19 @@ def search_images(query: str, limit: int = 20) -> dict[str, Any]:
 def search_videos(query: str, limit: int = 20) -> dict[str, Any]:
     """Search for videos using multi-backend search."""
     results = []
-    
+
     # Use multi-backend search
-    import asyncio
     try:
         loop = asyncio.get_event_loop()
     except RuntimeError:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-    
+
     async def _search():
         from reasoner.infrastructure.search.discovery import get_search_client
         client, _ = await get_search_client()
         return await client.search(query, num_results=limit)
-    
+
     raw = loop.run_until_complete(_search())
     results = [
         {
@@ -575,7 +571,7 @@ def search_videos(query: str, limit: int = 20) -> dict[str, Any]:
         }
         for r in raw
     ]
-    
+
     return {
         "query": query,
         "results": results,

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 from uuid import UUID
 
 from reasoner.domain.api_keys import ApiKey
@@ -20,12 +20,12 @@ class ApiKeyRepository(Protocol):
         key_hash: str,
         key_prefix: str,
         scopes: frozenset[str],
-        expires_at: Optional[datetime] = None,
+        expires_at: datetime | None = None,
     ) -> ApiKey:
         """Persist a new key record and return it."""
         ...
 
-    async def get_by_hash(self, key_hash: str) -> Optional[ApiKey]:
+    async def get_by_hash(self, key_hash: str) -> ApiKey | None:
         """Look up a key by its stored hash. Returns None when unknown."""
         ...
 
@@ -49,6 +49,6 @@ class ApiKeyRepository(Protocol):
         """Record that the key was just used. Best-effort, never blocking."""
         ...
 
-    async def get_owner(self, key_id: UUID) -> Optional[UUID]:
+    async def get_owner(self, key_id: UUID) -> UUID | None:
         """Return the user id that owns ``key_id``, or None."""
         ...

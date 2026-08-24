@@ -15,12 +15,12 @@ import asyncio
 import logging
 from typing import Any
 
-from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.domain.pipeline_state import PipelineState
+from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.subagents.models import PhaseSubAgentOutput
+from reasoner.subagents.search.gap_identifier import GapIdentifierSubAgent
 from reasoner.subagents.search.query_generator import QueryGeneratorSubAgent
 from reasoner.subagents.search.source_evaluator import SourceEvaluatorSubAgent
-from reasoner.subagents.search.gap_identifier import GapIdentifierSubAgent
 
 logger = logging.getLogger(__name__)
 

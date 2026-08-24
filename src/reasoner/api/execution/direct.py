@@ -12,7 +12,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import Any, AsyncGenerator
+from collections.abc import AsyncGenerator
+from typing import Any
 
 from reasoner.api.sse_utils import _event
 from reasoner.infrastructure.llm.router import ProviderRouter

@@ -121,7 +121,6 @@ def test_critique_prompt_default_is_budget():
 # ── stress_test_prompt seeding ──────────────────────────────────────────────
 
 def test_stress_prompt_seeds_priority_hypotheses():
-    from reasoner.domain.core_types import SolutionCandidate
     st = _state_with_candidates()
     st.top_candidates = st.candidates[:1]
     st.review_hypotheses = _parse_review_hypotheses(

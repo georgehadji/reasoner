@@ -10,12 +10,20 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
-from pathlib import Path
-from typing import Any, Optional, Callable
-from datetime import datetime
+from collections.abc import Callable
 from dataclasses import asdict
+from datetime import datetime
+from pathlib import Path
+from typing import Any
 
-from reasoner.core.events.domain_events import DomainEvent, PipelineEventType, WidgetEventType, MemoryEventType, SaaSEventType, ALL_EVENT_TYPES
+from reasoner.core.events.domain_events import (
+    ALL_EVENT_TYPES,
+    DomainEvent,
+    MemoryEventType,
+    PipelineEventType,
+    SaaSEventType,
+    WidgetEventType,
+)
 from reasoner.infrastructure.persistence.event_store_connection import EventStoreConnection
 
 logger = logging.getLogger(__name__)
@@ -51,11 +59,11 @@ class EventStore:
 
     async def _run_in_executor(self, func: Callable, *args: Any) -> Any:
         return await self.conn.run_in_executor(func, *args)
-    
+
     def _init_db(self) -> None:
         """Initialize database schema."""
         conn = self._get_connection()
-        
+
         conn.executescript("""
             -- Events table (append-only log)
             CREATE TABLE IF NOT EXISTS events (
@@ -118,9 +126,9 @@ class EventStore:
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
         """)
-        
+
         conn.commit()
-    
+
     async def save_events(self, events: list[DomainEvent]) -> None:
         """
         Save events to the event store.
@@ -213,7 +221,7 @@ class EventStore:
                 raise
 
         await self._run_in_executor(_save_events_sync)
-    
+
     def _get_aggregate_type(self, event_type: PipelineEventType | WidgetEventType | MemoryEventType | SaaSEventType) -> str:
         """Determine aggregate type from event type."""
         if event_type in (
@@ -243,7 +251,7 @@ class EventStore:
             return "saas"
         else:
             return "generic"
-    
+
     def _update_aggregate(
         self,
         conn: sqlite3.Connection,
@@ -252,17 +260,17 @@ class EventStore:
     ) -> None:
         """Update aggregate state snapshot."""
         from reasoner.core.events.domain_events import (
-            PipelineStarted,
             PipelineCompleted,
             PipelineFailed,
+            PipelineStarted,
         )
-        
+
         # Extract relevant fields based on event type
         problem = None
         preset = None
         method = None
         status = None
-        
+
         if isinstance(event, PipelineStarted):
             problem = event.problem
             preset = event.preset
@@ -272,16 +280,16 @@ class EventStore:
             status = "completed"
         elif isinstance(event, PipelineFailed):
             status = "failed"
-        
+
         # Build update query
         updates = []
         values = []
-        
+
         updates.append("current_version = ?")
         values.append(event.version)
-        
+
         updates.append("updated_at = datetime('now')")
-        
+
         if aggregate_type == "pipeline":
             if problem:
                 updates.append("problem = ?")
@@ -295,7 +303,7 @@ class EventStore:
             if status:
                 updates.append("status = ?")
                 values.append(status)
-        
+
         conn.execute(f"""
             INSERT INTO aggregates 
             (aggregate_id, aggregate_type, current_version, status, 
@@ -313,7 +321,7 @@ class EventStore:
             method,
             *values,
         ))
-    
+
     async def get_events(
         self,
         aggregate_id: str,
@@ -357,14 +365,14 @@ class EventStore:
                 raise
 
         return await self._run_in_executor(_get_events_sync)
-    
+
     def _deserialize_event(self, row: sqlite3.Row) -> DomainEvent | None:
         """Deserialize database row to domain event."""
         from reasoner.core.events.domain_events import make_event
-        
+
         try:
             payload = json.loads(row["payload"])
-            
+
             event_type_str = row["event_type"]
             event_type = ALL_EVENT_TYPES.get(event_type_str)
             if event_type is None:
@@ -379,13 +387,13 @@ class EventStore:
                 version=row["version"],
                 **payload,
             )
-            
+
             # Override fields from row
             object.__setattr__(event, 'event_id', row["event_id"])
             object.__setattr__(event, 'timestamp', row["timestamp"])
-            
+
             return event
-            
+
         except Exception as e:
             logger.warning(
                 "Failed to deserialize event (aggregate %s v%s): %s",
@@ -447,7 +455,7 @@ class EventStore:
                 raise
 
         return await self._run_in_executor(_list_pipelines_sync)
-    
+
     async def get_aggregate_state(
         self,
         aggregate_id: str,
@@ -491,7 +499,7 @@ class EventStore:
                 raise
 
         return await self._run_in_executor(_get_aggregate_state_sync)
-    
+
     async def save_snapshot(
         self,
         aggregate_id: str,
@@ -539,7 +547,7 @@ class EventStore:
                 raise
 
         await self._run_in_executor(_save_snapshot_sync)
-    
+
     async def get_snapshot(
         self,
         aggregate_id: str,
@@ -580,7 +588,7 @@ class EventStore:
                 raise
 
         return await self._run_in_executor(_get_snapshot_sync)
-    
+
     async def get_events_since(
         self,
         aggregate_id: str,
@@ -588,7 +596,7 @@ class EventStore:
     ) -> list[DomainEvent]:
         """Get events since a specific version (for sync/resume)."""
         return await self.get_events(aggregate_id, since_version)
-    
+
     async def count_events(self, aggregate_id: str) -> int:
         """
         Count total events for an aggregate.
@@ -683,7 +691,7 @@ class EventStore:
                 raise
 
         await self._run_in_executor(_delete_aggregate_sync)
-    
+
     async def get_stats(self) -> dict[str, Any]:
         """
         Get event store statistics.
@@ -721,7 +729,7 @@ class EventStore:
                 raise
 
         return await self._run_in_executor(_get_stats_sync)
-    
+
     async def prune_events_before(
         self,
         cutoff: datetime,

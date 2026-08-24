@@ -1,5 +1,7 @@
 # backward-compat shim — real module: reasoner.core.parsing
 from reasoner.core.parsing import *  # noqa: F401, F403
-from reasoner.core.parsing import _parse_critique_scores  # noqa: F401  (private re-export)
-from reasoner.core.parsing import _parse_review_hypotheses  # noqa: F401  (private re-export)
-from reasoner.core.parsing import _sanitize_json_escapes  # noqa: F401  (private re-export)
+from reasoner.core.parsing import (
+    _parse_critique_scores,  # noqa: F401  (private re-export)
+    _parse_review_hypotheses,  # noqa: F401  (private re-export)
+    _sanitize_json_escapes,  # noqa: F401  (private re-export)
+)

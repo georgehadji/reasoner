@@ -8,8 +8,7 @@ the service factory only selects it outside production environments.
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from reasoner.core.ports.credit_repository import CreditRepository
@@ -47,8 +46,8 @@ class InMemoryCreditRepository(CreditRepository):
         user_id: str,
         delta: int,
         reason: CreditReason,
-        reference_id: Optional[str] = None,
-        description: Optional[str] = None,
+        reference_id: str | None = None,
+        description: str | None = None,
         allow_overdraft: bool = False,
     ) -> CreditLedgerEntry:
         if delta == 0:
@@ -74,7 +73,7 @@ class InMemoryCreditRepository(CreditRepository):
                 balance=balance_after,
                 lifetime_granted=current.lifetime_granted + (delta if delta > 0 else 0),
                 lifetime_spent=current.lifetime_spent + (-delta if delta < 0 else 0),
-                updated_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(UTC),
             )
 
             entry = CreditLedgerEntry(
@@ -94,7 +93,7 @@ class InMemoryCreditRepository(CreditRepository):
         user_id: str,
         credits: int,
         period_key: str,
-    ) -> Optional[CreditLedgerEntry]:
+    ) -> CreditLedgerEntry | None:
         if credits <= 0:
             return None
         reference_id = f"monthly:{period_key}"

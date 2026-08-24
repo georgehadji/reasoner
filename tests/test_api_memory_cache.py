@@ -1,8 +1,10 @@
 """Tests for the in-memory cache layer in api.py."""
 
 import json
+
 import pytest
-from reasoner.api import _load_cache, _save_cache, _MEMORY_CACHE, CACHE_DIR
+
+from reasoner.api import _MEMORY_CACHE, CACHE_DIR, _load_cache, _save_cache
 
 
 def clear_memory_and_disk():

@@ -9,16 +9,15 @@ Used for:
 
 from __future__ import annotations
 
-import os
 import logging
-from datetime import datetime, timezone, timedelta
-from uuid import UUID, uuid4
+from datetime import UTC, datetime, timedelta
+from uuid import UUID
 
 import jwt
 
-from reasoner.domain.saas import User
 from reasoner.application.ports.auth_port import AuthPort
 from reasoner.auth import AuthenticationError
+from reasoner.domain.saas import User
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +50,7 @@ class LocalAuthAdapter(AuthPort):
         scopes: list[str] | None = None,
     ) -> str:
         """Create a local JWT for testing."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         payload = {
             "sub": user_id,
             "email": email,

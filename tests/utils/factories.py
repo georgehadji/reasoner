@@ -2,25 +2,22 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from typing import Any
 
-from reasoner.infrastructure.llm.ports import Message, MessageRole, LLMConfig, LLMResponse
+from reasoner.core.events.domain_events import EventType, make_event
+from reasoner.infrastructure.llm.ports import LLMConfig, LLMResponse, Message, MessageRole
 from reasoner.models import (
-    PipelineState,
-    SolutionCandidate,
-    CritiqueScore,
-    PerspectiveType,
-    Decomposition,
-    SubProblem,
     Assumption,
     ClaimLabel,
-    StressTestResult,
-    MetaCognitiveAudit,
+    CritiqueScore,
+    Decomposition,
     FinalSolution,
-    CostTrackingState,
+    MetaCognitiveAudit,
+    PerspectiveType,
+    PipelineState,
+    SolutionCandidate,
+    SubProblem,
 )
-from reasoner.core.events.domain_events import EventType, make_event
 
 
 def create_message(

@@ -10,16 +10,16 @@ Covers:
 
 from __future__ import annotations
 
-import pytest
 import time
 
+import pytest
+
 from reasoner.core.search import (
-    _should_include_result,
-    _extract_search_keywords,
     _DECOMPOSITION_CACHE,
     _DECOMPOSITION_TTL_SECONDS,
+    _extract_search_keywords,
+    _should_include_result,
 )
-
 
 # ═════════════════════════════════════════════════════════════════════
 # _should_include_result tests

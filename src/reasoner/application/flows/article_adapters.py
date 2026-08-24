@@ -16,34 +16,34 @@ The existing phase code is NOT modified — this is the Strangler Fig pattern
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, replace
-from typing import Any, Callable
+from typing import Any
 
-from reasoner.domain.pipeline_state import PipelineState
-from reasoner.domain.article_domain import (
-    Context,
-    Document,
-    Claim,
-    Verdict,
-    Budget,
-    PhaseError,
-    Ok,
-    Err,
-    Result,
-    map_verdict,
+from reasoner.application.flows.article_phases import (
+    run_article_adversarial_verify_phase,
+    run_article_developmental_edit_phase,
+    run_article_draft_phase,
+    run_article_final_audit_phase,
+    run_article_outline_phase,
+    run_article_retrieve_sources_phase,
+    run_article_structural_review_phase,
+    run_article_style_copy_edit_phase,
 )
 from reasoner.application.flows.base import WorkflowServices
-from reasoner.application.flows.article_phases import (
-    run_article_retrieve_sources_phase,
-    run_article_outline_phase,
-    run_article_draft_phase,
-    run_article_adversarial_verify_phase,
-    run_article_structural_review_phase,
-    run_article_developmental_edit_phase,
-    run_article_style_copy_edit_phase,
-    run_article_final_audit_phase,
-)
 from reasoner.application.flows.synthesis_phase import run_synthesis_phase
+from reasoner.domain.article_domain import (
+    Claim,
+    Context,
+    Document,
+    Err,
+    Ok,
+    PhaseError,
+    Result,
+    Verdict,
+    map_verdict,
+)
+from reasoner.domain.pipeline_state import PipelineState
 
 logger = logging.getLogger(__name__)
 

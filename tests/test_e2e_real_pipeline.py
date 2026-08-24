@@ -6,12 +6,11 @@ Run with: python -m pytest tests/test_e2e_real_pipeline.py -v --run-slow
 """
 
 import os
+
 import pytest
-import asyncio
 
 from reasoner.pipeline import ReasonerPipeline
 from reasoner.presets import PRESETS, get_preset
-
 
 pytestmark = [
     pytest.mark.slow,

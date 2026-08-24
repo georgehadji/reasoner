@@ -4,23 +4,22 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any
 
-from reasoner.core.constants import TRUNCATION
-from reasoner.domain.pipeline_state import PipelineState
-from reasoner.parsing import extract_json, _parse_critique_scores
 import reasoner.phases as phases
 from reasoner.application.flows.base import WorkflowServices
+from reasoner.core.constants import TRUNCATION
+from reasoner.domain.pipeline_state import PipelineState
+from reasoner.parsing import _parse_critique_scores, extract_json
 
 logger = logging.getLogger(__name__)
 
 async def run_debate_opening_phase(state: PipelineState, services: WorkflowServices) -> None:
     services.log("DEBATE", "Round 1: Opening Statements", state)
-    
+
     # Extract stances from decomposition if available to create a meaningful debate
     stance_a = "In favor of the primary premise or proposing a proactive solution."
     stance_b = "Opposed to the primary premise or proposing a cautious/alternative approach."
-    
+
     if state.decomposition:
          sub_problems = state.decomposition.get("sub_problems", []) if isinstance(state.decomposition, dict) else getattr(state.decomposition, "sub_problems", [])
          if sub_problems:
@@ -33,13 +32,13 @@ async def run_debate_opening_phase(state: PipelineState, services: WorkflowServi
 
     async def _get_opening(side: str, stance: str):
         raw, _ = await services.call_llm(
-            role="constructive" if side=="A" else "destructive", 
-            system_prompt=phases.DEBATE_OPENING_SYSTEM, 
-            user_prompt=phases.debate_opening_prompt(state, side, stance), 
+            role="constructive" if side=="A" else "destructive",
+            system_prompt=phases.DEBATE_OPENING_SYSTEM,
+            user_prompt=phases.debate_opening_prompt(state, side, stance),
             state=state
         )
         return extract_json(raw)
-    
+
     results = await asyncio.gather(_get_opening("A", stance_a), _get_opening("B", stance_b), return_exceptions=True)
     statements = []
     for side, r in zip(["A", "B"], results, strict=True):
@@ -59,10 +58,10 @@ async def run_debate_rebuttal_phase(state: PipelineState, services: WorkflowServ
         services.log("DEBATE", msg, state)
         state.errors.append(msg)
         return
-        
+
     statement_a = opening_statements[0].get('content', '') if opening_statements[0] else ''
     statement_b = opening_statements[1].get('content', '') if len(opening_statements) > 1 and opening_statements[1] else ''
-    
+
     if not statement_a or not statement_b:
         msg = "Debate rebuttal skipped: missing content in one or both opening statements."
         services.log("DEBATE", msg, state)
@@ -72,9 +71,9 @@ async def run_debate_rebuttal_phase(state: PipelineState, services: WorkflowServ
     async def _get_rebuttal(side: str, opponent_statement: str):
         try:
             raw, _ = await services.call_llm(
-                role="constructive" if side=="A" else "destructive", 
-                system_prompt=phases.DEBATE_REBUTTAL_SYSTEM, 
-                user_prompt=phases.debate_rebuttal_prompt(state, side, opponent_statement), 
+                role="constructive" if side=="A" else "destructive",
+                system_prompt=phases.DEBATE_REBUTTAL_SYSTEM,
+                user_prompt=phases.debate_rebuttal_prompt(state, side, opponent_statement),
                 state=state
             )
             data = extract_json(raw)
@@ -84,7 +83,7 @@ async def run_debate_rebuttal_phase(state: PipelineState, services: WorkflowServ
         except Exception as e:
             services.log("DEBATE", f"Error during rebuttal extraction for Side {side}: {e}", state)
             return None
-    
+
     results = await asyncio.gather(_get_rebuttal("A", statement_b), _get_rebuttal("B", statement_a), return_exceptions=True)
     rebuttals = []
     for side, r in zip(["A", "B"], results, strict=True):
@@ -99,7 +98,7 @@ async def run_debate_rebuttal_phase(state: PipelineState, services: WorkflowServ
         else:
             r["side"] = side
             rebuttals.append(r)
-    
+
     if rebuttals:
         state.debate_rounds.append({"round": 2, "type": "rebuttal", "rebuttals": rebuttals})
     else:
@@ -120,13 +119,13 @@ async def run_debate_cross_examine_phase(state: PipelineState, services: Workflo
         services.call_llm(
             role="constructive",
             system_prompt=phases.DEBATE_CROSS_SYSTEM,
-            user_prompt=phases.debate_cross_examine_prompt(state, "A", side_b_claims), 
+            user_prompt=phases.debate_cross_examine_prompt(state, "A", side_b_claims),
             state=state
         ),
         services.call_llm(
             role="destructive",
             system_prompt=phases.DEBATE_CROSS_SYSTEM,
-            user_prompt=phases.debate_cross_examine_prompt(state, "B", side_a_claims), 
+            user_prompt=phases.debate_cross_examine_prompt(state, "B", side_a_claims),
             state=state
         ),
     ]
@@ -151,9 +150,9 @@ async def run_debate_judge_phase(state: PipelineState, services: WorkflowService
         return
     services.log("DEBATE", "Round 3: Judging", state)
     raw, _ = await services.call_llm(
-        role="systemic", 
-        system_prompt=phases.DEBATE_JUDGE_SYSTEM, 
-        user_prompt=phases.debate_judge_prompt(state), 
+        role="systemic",
+        system_prompt=phases.DEBATE_JUDGE_SYSTEM,
+        user_prompt=phases.debate_judge_prompt(state),
         state=state
     )
     data = extract_json(raw)

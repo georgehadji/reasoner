@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from reasoner.api.schemas import RunRequest, FollowupRequest
+from reasoner.api.schemas import FollowupRequest, RunRequest
 
 
 class TestRunRequestValidation:

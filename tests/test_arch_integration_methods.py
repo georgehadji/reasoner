@@ -12,12 +12,11 @@ Usage:
 from __future__ import annotations
 
 import os
-import pytest
-import asyncio
 
-from reasoner.pipeline import ReasonerPipeline
+import pytest
+
 from reasoner.application.services.preset_service import PresetService
-from reasoner.domain.preset_core import get_method_from_preset
+from reasoner.pipeline import ReasonerPipeline
 
 pytestmark = [
     pytest.mark.slow,

@@ -16,13 +16,10 @@ Five governed stages:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
-from typing import Any
 
 from reasoner.core.evolution_constants import EVOLUTION_MAX_MUTATIONS_PER_RUN
 from reasoner.domain.harness_metrics import (
     HarnessMutation,
-    HarnessScorecard,
     PromotionRecord,
 )
 
@@ -47,11 +44,11 @@ class EvolutionAgent:
 
     def _lazy_init(self) -> None:
         """Lazy-init all services to avoid circular imports at module level."""
-        from reasoner.application.services.scorecard_service import ScorecardService
         from reasoner.application.services.harness_diagnosis import HarnessDiagnosisService
         from reasoner.application.services.harness_guard import check_mutation_invariants
         from reasoner.application.services.harness_replay import HarnessReplayService
         from reasoner.application.services.promotion_service import PromotionService
+        from reasoner.application.services.scorecard_service import ScorecardService
 
         self._scorecard = ScorecardService()
         self._diagnosis = HarnessDiagnosisService()

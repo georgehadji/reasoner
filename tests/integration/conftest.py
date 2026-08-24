@@ -5,7 +5,6 @@ import os
 import httpx
 import pytest
 
-
 # Default base URL — override with REASONER_TEST_URL env var
 BASE_URL = os.environ.get("REASONER_TEST_URL", "http://localhost:8003")
 

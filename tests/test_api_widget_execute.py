@@ -1,6 +1,5 @@
 """Tests for POST /api/widget/execute endpoint."""
 
-import pytest
 from fastapi.testclient import TestClient
 
 from reasoner.api import app

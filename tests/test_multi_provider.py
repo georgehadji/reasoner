@@ -2,6 +2,7 @@
 
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 import pytest
@@ -109,8 +110,8 @@ async def test_direct_providers_implement_interface():
 async def test_build_fallback_provider_registry():
     """build_fallback_provider returns instances for all registered providers."""
     from reasoner.infrastructure.llm.providers.direct import (
-        build_fallback_provider,
         _FALLBACK_PROVIDER_REGISTRY,
+        build_fallback_provider,
     )
 
     for name in _FALLBACK_PROVIDER_REGISTRY:

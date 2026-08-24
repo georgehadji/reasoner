@@ -8,16 +8,17 @@ with full request context for debugging production issues.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import sqlite3
-import asyncio
 import threading
-from pathlib import Path
-from typing import Any, Callable
-from dataclasses import dataclass, asdict
-from datetime import datetime, timezone
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ class ErrorEntry:
 
     def __post_init__(self):
         if self.timestamp is None:
-            self.timestamp = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+            self.timestamp = datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 @dataclass
@@ -166,12 +167,10 @@ class ErrorStore:
         """Remove errors older than retention period."""
         try:
             conn = self._get_connection()
-            cutoff = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+            cutoff = datetime.now(UTC).isoformat().replace("+00:00", "Z")
             # SQLite datetime math
             conn.execute(
-                "DELETE FROM errors WHERE datetime(timestamp) < datetime('now', '-{} days')".format(
-                    self._safe_int(self.retention_days)
-                )
+                f"DELETE FROM errors WHERE datetime(timestamp) < datetime('now', '-{self._safe_int(self.retention_days)} days')"
             )
             conn.commit()
         except Exception as exc:
@@ -236,7 +235,7 @@ class ErrorStore:
             conditions.append("user_id = ?")
             params.append(user_id)
         if hours:
-            conditions.append("datetime(timestamp) > datetime('now', '-{} hours')".format(self._safe_int(hours)))
+            conditions.append(f"datetime(timestamp) > datetime('now', '-{self._safe_int(hours)} hours')")
 
         where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
 
@@ -272,18 +271,18 @@ class ErrorStore:
         conn = self._get_connection()
 
         total = conn.execute(
-            "SELECT COUNT(*) FROM errors WHERE datetime(timestamp) > datetime('now', '-{} days')".format(days)
+            f"SELECT COUNT(*) FROM errors WHERE datetime(timestamp) > datetime('now', '-{days} days')"
         ).fetchone()[0]
 
         by_level = {}
         for row in conn.execute(
-            "SELECT level, COUNT(*) FROM errors WHERE datetime(timestamp) > datetime('now', '-{} days') GROUP BY level".format(days)
+            f"SELECT level, COUNT(*) FROM errors WHERE datetime(timestamp) > datetime('now', '-{days} days') GROUP BY level"
         ):
             by_level[row[0]] = row[1]
 
         by_source = {}
         for row in conn.execute(
-            "SELECT source, COUNT(*) FROM errors WHERE datetime(timestamp) > datetime('now', '-{} days') GROUP BY source".format(days)
+            f"SELECT source, COUNT(*) FROM errors WHERE datetime(timestamp) > datetime('now', '-{days} days') GROUP BY source"
         ):
             by_source[row[0]] = row[1]
 
@@ -296,7 +295,7 @@ class ErrorStore:
         ).fetchone()[0]
 
         unique_paths = conn.execute(
-            "SELECT COUNT(DISTINCT path) FROM errors WHERE datetime(timestamp) > datetime('now', '-{} days')".format(days)
+            f"SELECT COUNT(DISTINCT path) FROM errors WHERE datetime(timestamp) > datetime('now', '-{days} days')"
         ).fetchone()[0]
 
         return ErrorStats(

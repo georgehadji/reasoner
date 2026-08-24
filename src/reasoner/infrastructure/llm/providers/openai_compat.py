@@ -6,21 +6,24 @@ import asyncio
 import logging
 import os
 import threading
-from typing import TYPE_CHECKING, Any, AsyncIterator
+from collections.abc import AsyncIterator
+from typing import TYPE_CHECKING, Any
 
 import openai
 
 if TYPE_CHECKING:
     import httpx
 
-from reasoner.exceptions import ProviderUnavailableError
 from reasoner.core.constants import (
     DEFAULT_MAX_RETRIES,
     DEFAULT_MAX_TOKENS,
     DEFAULT_TEMPERATURE,
-    OPENROUTER_BASE_URL as _OPENROUTER_BASE_URL,
     TIMEOUTS,
 )
+from reasoner.core.constants import (
+    OPENROUTER_BASE_URL as _OPENROUTER_BASE_URL,
+)
+from reasoner.exceptions import ProviderUnavailableError
 from reasoner.infrastructure.llm.base import BaseLLMProvider
 from reasoner.infrastructure.llm.caching import build_messages, extract_cache_usage
 from reasoner.infrastructure.llm.utils import _perplexity_response_format
@@ -30,8 +33,8 @@ logger = logging.getLogger(__name__)
 
 class OpenAICompatibleProvider(BaseLLMProvider):
     # Shared connection pool (httpx client) across all instances for performance
-    _shared_pool: "httpx.AsyncClient | None" = None
-    _pool_lock: "asyncio.Lock | None" = None
+    _shared_pool: httpx.AsyncClient | None = None
+    _pool_lock: asyncio.Lock | None = None
     _pool_init_lock: threading.Lock | None = None
     _pool_closed: bool = False
 
@@ -66,7 +69,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         base_url: str | None = None,
         max_retries: int = DEFAULT_MAX_RETRIES,
         extra_body: dict[str, Any] | None = None,
-        http_client: "openai.AsyncOpenAI | None" = None,
+        http_client: openai.AsyncOpenAI | None = None,
         default_headers: dict[str, str] | None = None,
     ) -> None:
         super().__init__(model, max_retries)

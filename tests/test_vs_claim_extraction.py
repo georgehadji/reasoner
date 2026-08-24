@@ -1,20 +1,17 @@
 """Tests for vs_claim_extraction stage."""
 from __future__ import annotations
-from tests.utils.mocks import MockLLM, MockNLI
 
 import pytest
-from unittest.mock import AsyncMock
 
 from reasoner.phases.vs_claim_extraction import (
-    extract_claims_from_vs_candidates,
     ClaimExtractionMode,
-    VSClaimExtractionConfig,
     ExtractedClaimSet,
+    VSClaimExtractionConfig,
+    extract_claims_from_vs_candidates,
 )
 from reasoner.phases.vs_generation import GenerationCandidate
 from reasoner.vs_config import VSFeatureFlags
-
-
+from tests.utils.mocks import MockLLM
 
 
 @pytest.fixture

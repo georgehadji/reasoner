@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 
 class TestPipelineFieldDescriptor:
     """Verify that PipelineField correctly delegates to sub-objects on PipelineState."""
@@ -103,8 +101,8 @@ class TestPipelineFieldDescriptor:
 
     def test_critic_scores_serializer_robustness(self):
         """Verify that _ser_3 serializes CriticScore correctly when critic_scores is deserialized as a list of dicts."""
-        from reasoner.domain.pipeline_state import PipelineState
         from reasoner.application.services.serializers import _ser_3
+        from reasoner.domain.pipeline_state import PipelineState
 
         s = PipelineState(problem="test", preset_name="test")
         s.meta.phase_tokens = None
@@ -125,7 +123,7 @@ class TestPipelineFieldDescriptor:
                 "dissenting_note": "A good candidate.",
             }
         ]
-        
+
         res = _ser_3(s)
         scores = res["critic_scores"]
         assert len(scores) == 1

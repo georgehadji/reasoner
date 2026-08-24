@@ -29,7 +29,13 @@ from reasoner.domain.watermark.marks import (
     is_strip_codepoint,
     strip_kind,
 )
-from reasoner.domain.watermark.report import CharHit, ScrubResult, ScrubStats, TextInspectReport, char_label
+from reasoner.domain.watermark.report import (
+    CharHit,
+    ScrubResult,
+    ScrubStats,
+    TextInspectReport,
+    char_label,
+)
 from reasoner.domain.watermark.rules import (
     CharContext,
     PreservationRule,

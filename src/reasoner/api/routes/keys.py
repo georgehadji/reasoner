@@ -10,9 +10,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from reasoner.api.auth_deps import optional_auth, require_auth, require_csrf
 from reasoner.api.dependencies import check_rate_limit, get_current_user
-from reasoner.domain.saas import User
 from reasoner.auth import Scope
 from reasoner.core.constants import TIMEOUTS, VALIDATION_TEST_MAX_TOKENS
+from reasoner.domain.saas import User
 from reasoner.infrastructure.llm.registry import _REGISTRY, build_provider
 
 logger = logging.getLogger(__name__)
@@ -115,7 +115,7 @@ async def validate_api_keys(
                 "status": "valid",
                 "model_tested": model_id,
             }
-        except asyncio.TimeoutError:
+        except TimeoutError:
             results[env_var] = {
                 "status": "timeout",
                 "reason": "Provider did not respond within 10 seconds",

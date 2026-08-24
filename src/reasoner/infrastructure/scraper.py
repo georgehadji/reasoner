@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 import re
 import threading
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 # Shared HTTP connection pool for all scrape operations.
 # Lazily initialized on first use — avoids per-call client creation overhead.
-_shared_scraper_client: "httpx.AsyncClient | None" = None
+_shared_scraper_client: httpx.AsyncClient | None = None
 _scraper_client_lock: threading.Lock | None = None
 
 
@@ -116,17 +116,17 @@ def _simple_html_to_markdown(html: str) -> str:
     # Remove script and style tags with their content
     html = re.sub(r'<script[^>]*>.*?</script>', '', html, flags=re.DOTALL | re.IGNORECASE)
     html = re.sub(r'<style[^>]*>.*?</style>', '', html, flags=re.DOTALL | re.IGNORECASE)
-    
+
     # Remove HTML comments
     html = re.sub(r'<!--.*?-->', '', html, flags=re.DOTALL)
-    
+
     # Basic tag replacements
     for tag, md in HTML_TAGS_TO_MARKDOWN.items():
         html = html.replace(tag, md)
-    
+
     # Remove remaining HTML tags
     html = re.sub(r'<[^>]+>', '', html)
-    
+
     # Decode HTML entities
     html = html.replace('&nbsp;', ' ')
     html = html.replace('&amp;', '&')
@@ -135,11 +135,11 @@ def _simple_html_to_markdown(html: str) -> str:
     html = html.replace('&quot;', '"')
     html = html.replace('&#39;', "'")
     html = html.replace('&apos;', "'")
-    
+
     # Clean up whitespace
     html = re.sub(r'\n{3,}', '\n\n', html)
     html = html.strip()
-    
+
     return html
 
 
@@ -193,7 +193,7 @@ async def scrape_url(url: str, max_length: int = 10000) -> dict[str, Any]:
             "content": markdown_content,
             "success": True,
         }
-            
+
     except httpx.TimeoutException:
         logger.error(f"Timeout scraping {url}")
         return {"url": url, "title": "", "content": "", "success": False, "error": "Timeout"}
@@ -218,7 +218,7 @@ async def scrape_urls(urls: list[str], max_length: int = 10000) -> list[dict[str
     """
     tasks = [scrape_url(url, max_length) for url in urls]
     results = await asyncio.gather(*tasks, return_exceptions=True)
-    
+
     # Handle any exceptions that weren't caught
     processed_results = []
     for i, result in enumerate(results):
@@ -232,7 +232,7 @@ async def scrape_urls(urls: list[str], max_length: int = 10000) -> list[dict[str
             })
         else:
             processed_results.append(result)
-    
+
     return processed_results
 
 

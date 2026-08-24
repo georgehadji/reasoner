@@ -7,9 +7,9 @@ wire_event_bus/_emit) into EventEmissionService. These tests do NOT require LLM 
 
 from __future__ import annotations
 
-import asyncio
-import pytest
 from typing import Any
+
+import pytest
 
 from reasoner.application.services.event_emission_service import EventEmissionService
 

@@ -1,20 +1,20 @@
 """Tests for PipelineState Core/Meta/Remainder split."""
 
 from __future__ import annotations
-from reasoner.models import save, load
 
-import json
 import tempfile
 from pathlib import Path
 
 from reasoner.models import (
-    PipelineState,
+    PerspectiveType,
     PipelineCore,
     PipelineMeta,
     PipelineRemainder,
-    TaskType,
+    PipelineState,
     SolutionCandidate,
-    PerspectiveType,
+    TaskType,
+    load,
+    save,
 )
 
 

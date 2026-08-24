@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from reasoner.infrastructure.benchmarks.suites import BenchmarkResult, BenchmarkSuite
 
-
 _CODING_PROMPTS = [
     "Write a Python function that merges two sorted lists into one sorted list.",
     "Write a function to check if a string is a palindrome, ignoring case and punctuation.",

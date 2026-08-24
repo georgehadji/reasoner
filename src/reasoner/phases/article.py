@@ -2,9 +2,17 @@ from __future__ import annotations
 
 import json
 
+from reasoner.core.constants import (
+    ARTICLE_MAX_SOURCES_FOR_CLAIM_EXTRACTION,
+    JSON_ONLY_FOOTER,
+    TRUNCATION,
+)
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.core.constants import ARTICLE_MAX_SOURCES_FOR_CLAIM_EXTRACTION, JSON_ONLY_FOOTER, TRUNCATION
-from reasoner.phases._shared import get_language_instruction, _wrap_user_input, _wrap_external_content
+from reasoner.phases._shared import (
+    _wrap_external_content,
+    _wrap_user_input,
+    get_language_instruction,
+)
 
 # ── Retrieval Planning ────────────────────────────────────────────────────────
 
@@ -43,7 +51,7 @@ def article_retrieval_plan_prompt(state: PipelineState) -> str:
             f"Use these insights to refine your search queries — target specific claims, "
             f"counterarguments, and perspectives identified above."
         )
-    base += f'\n\nOutput JSON: {{"queries": ["<query 1>", "<query 2>", "<query 3>"]}}'
+    base += '\n\nOutput JSON: {"queries": ["<query 1>", "<query 2>", "<query 3>"]}'
     return base
 
 

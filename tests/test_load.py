@@ -11,9 +11,8 @@ from __future__ import annotations
 import asyncio
 import time
 
-import pytest
 import httpx
-
+import pytest
 
 # ---------------------------------------------------------------------------
 # Server-availability guard
@@ -78,6 +77,7 @@ async def test_100_concurrent_authenticated_users():
 
     # Generate a test JWT token (matching the test suite's JWT_SECRET)
     import os
+
     import jwt
 
     secret = os.environ.get("JWT_SECRET", "test-secret")

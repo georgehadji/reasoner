@@ -4,11 +4,12 @@ Uses fakes — no OPENROUTER_API_KEY required.
 """
 
 import json
-import pytest
 from unittest.mock import patch
 
-from reasoner.api import run_stream, RunRequest
-from reasoner.models import PipelineState, ConversationState
+import pytest
+
+from reasoner.api import RunRequest, run_stream
+from reasoner.models import ConversationState, PipelineState
 
 
 class FakeProvider:

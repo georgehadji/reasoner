@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import time
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from reasoner.infrastructure.persistence.event_store import EventStore
 from reasoner.core.events.domain_events import DomainEvent, PipelineEventType
+from reasoner.infrastructure.persistence.event_store import EventStore
 
 
 def _make_event(aggregate_id: str, version: int) -> DomainEvent:
@@ -32,7 +32,7 @@ async def test_prune_does_not_delete_without_snapshot(store):
     """Events with no covering snapshot must never be pruned."""
     await store.save_events([_make_event("agg-1", i) for i in range(3)])
     deleted = await store.prune_events_before(
-        cutoff=datetime.now(tz=timezone.utc) + timedelta(days=1)
+        cutoff=datetime.now(tz=UTC) + timedelta(days=1)
     )
     assert deleted == 0
 
@@ -45,7 +45,7 @@ async def test_prune_deletes_events_covered_by_snapshot(store):
     await store.save_snapshot("agg-2", version=3, state={"dummy": True})
 
     deleted = await store.prune_events_before(
-        cutoff=datetime.now(tz=timezone.utc) + timedelta(days=1)
+        cutoff=datetime.now(tz=UTC) + timedelta(days=1)
     )
     # versions 0, 1, 2, 3 are covered by snapshot at v3
     assert deleted == 4
@@ -61,7 +61,7 @@ async def test_prune_respects_cutoff_date(store):
     await store.save_snapshot("agg-3", version=0, state={})
 
     deleted = await store.prune_events_before(
-        cutoff=datetime.now(tz=timezone.utc) - timedelta(days=1)
+        cutoff=datetime.now(tz=UTC) - timedelta(days=1)
     )
     assert deleted == 0
 
@@ -73,7 +73,7 @@ async def test_prune_batch_size_limits_single_pass(store):
     await store.save_snapshot("agg-4", version=9, state={})
 
     deleted_first = await store.prune_events_before(
-        cutoff=datetime.now(tz=timezone.utc) + timedelta(days=1),
+        cutoff=datetime.now(tz=UTC) + timedelta(days=1),
         batch_size=3,
     )
     assert deleted_first == 3
@@ -88,7 +88,7 @@ async def test_count_eligible_events(store):
     await store.save_snapshot("agg-5", version=2, state={})
 
     count = await store.count_eligible_events(
-        datetime.now(tz=timezone.utc) + timedelta(days=1)
+        datetime.now(tz=UTC) + timedelta(days=1)
     )
     assert count == 3  # versions 0, 1, 2
 
@@ -103,7 +103,7 @@ async def test_prune_multiple_aggregates_independent(store):
     # agg-B has no snapshot
 
     await store.prune_events_before(
-        cutoff=datetime.now(tz=timezone.utc) + timedelta(days=1)
+        cutoff=datetime.now(tz=UTC) + timedelta(days=1)
     )
 
     # from_version=-1 → version > -1 → all versions including 0

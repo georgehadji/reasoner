@@ -342,7 +342,7 @@ class CapabilityRegistry:
         if not os.path.exists(path):
             return {}
         try:
-            with open(path, "r") as f:
+            with open(path) as f:
                 data = json.load(f)
             return data.get("capabilities", {})
         except (json.JSONDecodeError, OSError):

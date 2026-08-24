@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-
 # ── Flow strategy ↔ phase module consistency ─────────────────────────
 
 
@@ -102,8 +101,8 @@ def test_preset_methods_map_to_flow_strategies() -> None:
     PipelinePreset has no .method field — method is derived from preset name
     via get_method_from_preset()."""
     from reasoner.application.flows.factory import WorkflowFactory
-    from reasoner.domain.preset_registry import PRESETS
     from reasoner.domain.preset_core import get_method_from_preset
+    from reasoner.domain.preset_registry import PRESETS
 
     factory = WorkflowFactory()
 
@@ -170,8 +169,8 @@ def test_model_registry_keys_are_valid() -> None:
 
 def test_method_slugs_are_consistent() -> None:
     """_METHOD_TO_SLUG keys should be case-foldable to registered methods."""
-    from reasoner.domain.preset_core import _METHOD_TO_SLUG
     from reasoner.application.flows.factory import WorkflowFactory
+    from reasoner.domain.preset_core import _METHOD_TO_SLUG
 
     factory = WorkflowFactory()
 

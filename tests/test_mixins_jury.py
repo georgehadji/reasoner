@@ -1,11 +1,17 @@
 """Tests for the JuryMixin phase methods."""
 
 import json
-import pytest
 from unittest.mock import AsyncMock
 
+import pytest
+
+from reasoner.models import (
+    CritiqueScore,
+    GenerationCandidate,
+    PerspectiveType,
+    PipelineState,
+)
 from reasoner.pipeline import ReasonerPipeline
-from reasoner.models import PipelineState, GenerationCandidate, CriticScore, CritiqueScore, PerspectiveType
 
 
 class FakeRouter:

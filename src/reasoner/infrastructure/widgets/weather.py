@@ -9,8 +9,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from reasoner.infrastructure.widgets.protocol import BaseWidget, WidgetResult, WidgetType
-from reasoner.core.constants import OPENMETEO_GEOCODING_URL, OPENMETEO_FORECAST_URL, TIMEOUTS
+from reasoner.core.constants import OPENMETEO_FORECAST_URL, OPENMETEO_GEOCODING_URL, TIMEOUTS
+from reasoner.infrastructure.widgets.protocol import BaseWidget, WidgetType
 
 
 class WeatherWidget(BaseWidget):
@@ -22,7 +22,7 @@ class WeatherWidget(BaseWidget):
     - 3-day forecast
     - Temperature, humidity, wind, pressure
     """
-    
+
     name = "weather"
     widget_type = WidgetType.WEATHER
     description = "Real-time weather with 3-day forecast"
@@ -33,7 +33,7 @@ class WeatherWidget(BaseWidget):
         re.compile(r'(?:forecast|temperature)\s+(?:for\s+)?([a-z\s]+)', re.I),
         re.compile(r"how's (?:the )?weather(?:\s+in)?\s+([a-z\s]+)", re.I),
     ]
-    
+
     def _extract_from_match(
         self,
         match: re.Match,
@@ -42,29 +42,29 @@ class WeatherWidget(BaseWidget):
         """Extract location from match."""
         # Try to get location from named group or first capture group
         location = match.group(1) if match.lastindex and match.lastindex >= 1 else None
-        
+
         if not location:
             # Try to extract location from query
             location = query.split('weather')[-1].strip() if 'weather' in query.lower() else ''
-        
+
         return {'location': location.strip() if location else 'current location'}
-    
+
     async def _execute_impl(self, params: dict[str, Any]) -> dict[str, Any]:
         """Fetch weather data from Open-Meteo API."""
         location = params.get('location', '')
-        
+
         if not location:
             return {'error': 'Location not specified'}
-        
+
         # Geocode location
         coords = await self._geocode_location(location)
-        
+
         if not coords:
             return {'error': f"Location '{location}' not found"}
-        
+
         # Fetch weather data
         weather_data = await self._fetch_weather(coords['latitude'], coords['longitude'])
-        
+
         return {
             'location': coords['name'],
             'coordinates': {
@@ -73,11 +73,11 @@ class WeatherWidget(BaseWidget):
             },
             **weather_data,
         }
-    
+
     async def _geocode_location(self, location: str) -> dict[str, Any] | None:
         """Geocode location name to coordinates."""
         import httpx
-        
+
         from reasoner.core.constants import TIMEOUTS
         try:
             async with httpx.AsyncClient(timeout=TIMEOUTS.WIDGET_SHORT) as client:
@@ -90,7 +90,7 @@ class WeatherWidget(BaseWidget):
                         'format': 'json',
                     },
                 )
-                
+
                 if response.status_code == 200:
                     data = response.json()
                     if data.get('results'):
@@ -100,11 +100,11 @@ class WeatherWidget(BaseWidget):
                             'longitude': result['longitude'],
                             'name': f"{result['name']}, {result.get('country', '')}",
                         }
-        except Exception as e:
+        except Exception:
             pass
-        
+
         return None
-    
+
     async def _fetch_weather(
         self,
         latitude: float,
@@ -112,7 +112,7 @@ class WeatherWidget(BaseWidget):
     ) -> dict[str, Any]:
         """Fetch weather data from Open-Meteo."""
         import httpx
-        
+
         try:
             async with httpx.AsyncClient(timeout=TIMEOUTS.WIDGET) as client:
                 response = await client.get(
@@ -126,21 +126,21 @@ class WeatherWidget(BaseWidget):
                         'forecast_days': 3,
                     },
                 )
-                
+
                 if response.status_code == 200:
                     data = response.json()
                     return self._parse_weather_data(data)
                 else:
                     return {'error': 'Weather service unavailable'}
-                    
+
         except Exception as e:
             return {'error': f'Weather fetch failed: {str(e)}'}
-    
+
     def _parse_weather_data(self, data: dict[str, Any]) -> dict[str, Any]:
         """Parse Open-Meteo response."""
         current = data.get('current', {})
         daily = data.get('daily', {})
-        
+
         # Weather code mapping
         weather_codes = {
             0: {'condition': 'Clear sky', 'icon': '☀️'},
@@ -165,17 +165,17 @@ class WeatherWidget(BaseWidget):
             96: {'condition': 'Thunderstorm with hail', 'icon': '⛈️'},
             99: {'condition': 'Heavy thunderstorm', 'icon': '⛈️'},
         }
-        
+
         weather_code = current.get('weather_code', 0)
         condition_info = weather_codes.get(weather_code, {'condition': 'Unknown', 'icon': '❓'})
-        
+
         # Parse forecast
         forecast = []
         if daily.get('time'):
             for i, date in enumerate(daily['time']):
                 day_code = daily.get('weather_code', [])[i] if i < len(daily.get('weather_code', [])) else 0
                 day_condition = weather_codes.get(day_code, {'condition': 'Unknown', 'icon': '❓'})
-                
+
                 forecast.append({
                     'date': date,
                     'condition': day_condition['condition'],
@@ -184,7 +184,7 @@ class WeatherWidget(BaseWidget):
                     'temp_min': daily.get('temperature_2m_min', [])[i] if i < len(daily.get('temperature_2m_min', [])) else None,
                     'precipitation_probability': daily.get('precipitation_probability_max', [])[i] if i < len(daily.get('precipitation_probability_max', [])) else None,
                 })
-        
+
         return {
             'current': {
                 'temperature': current.get('temperature_2m'),

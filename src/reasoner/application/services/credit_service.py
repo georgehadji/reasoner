@@ -13,8 +13,7 @@ Business rules enforced here:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from reasoner.core.ports.credit_repository import CreditRepository
 from reasoner.domain.credits import (
@@ -31,9 +30,9 @@ from reasoner.domain.saas import SubscriptionTier
 logger = logging.getLogger(__name__)
 
 
-def current_period_key(now: Optional[datetime] = None) -> str:
+def current_period_key(now: datetime | None = None) -> str:
     """Billing period identifier used to make monthly grants idempotent."""
-    moment = now or datetime.now(timezone.utc)
+    moment = now or datetime.now(UTC)
     return f"{moment.year:04d}-{moment.month:02d}"
 
 
@@ -65,8 +64,8 @@ class CreditService:
         user_id: str,
         credits: int,
         reason: CreditReason,
-        reference_id: Optional[str] = None,
-        description: Optional[str] = None,
+        reference_id: str | None = None,
+        description: str | None = None,
     ) -> CreditLedgerEntry:
         """Add credits to an account. ``credits`` must be positive."""
         if credits <= 0:
@@ -84,8 +83,8 @@ class CreditService:
         self,
         user_id: str,
         tier: SubscriptionTier,
-        now: Optional[datetime] = None,
-    ) -> Optional[CreditLedgerEntry]:
+        now: datetime | None = None,
+    ) -> CreditLedgerEntry | None:
         """Grant this period's tier allowance if it has not been granted yet.
 
         Returns None when the allowance was already granted for the period.
@@ -104,8 +103,8 @@ class CreditService:
         cost_usd: float,
         reference_id: str,
         reason: CreditReason = CreditReason.PIPELINE_RUN,
-        description: Optional[str] = None,
-    ) -> Optional[CreditLedgerEntry]:
+        description: str | None = None,
+    ) -> CreditLedgerEntry | None:
         """Settle a completed unit of work priced in USD.
 
         Returns None when the work was free (zero cost), which happens for
@@ -133,7 +132,7 @@ class CreditService:
         credits: int,
         reference_id: str,
         reason: CreditReason = CreditReason.PIPELINE_RUN,
-        description: Optional[str] = None,
+        description: str | None = None,
     ) -> CreditLedgerEntry:
         """Charge a known credit amount up front, refusing to overdraw.
 
@@ -156,7 +155,7 @@ class CreditService:
         user_id: str,
         credits: int,
         reference_id: str,
-        description: Optional[str] = None,
+        description: str | None = None,
     ) -> CreditLedgerEntry:
         """Return credits for work that was charged but not delivered."""
         if credits <= 0:

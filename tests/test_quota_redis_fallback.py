@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-import pytest
 from unittest.mock import AsyncMock
 
+import pytest
+
+from reasoner.domain.saas import SubscriptionTier, UsageQuota
 from reasoner.infrastructure.cached_quota_repo import CachedQuotaRepository
-from reasoner.domain.saas import UsageQuota, SubscriptionTier
 
 
 @pytest.mark.asyncio

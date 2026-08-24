@@ -9,9 +9,7 @@ from __future__ import annotations
 import json
 
 import httpx
-import pytest
 
-from reasoner.core.ports.code_executor import ExecutionLimits
 from reasoner.infrastructure.execution.container_sandbox import ContainerExecutionSandbox
 
 _TOKEN = "test-token"

@@ -10,15 +10,13 @@ Independent search index (not Google/Bing reseller).
 
 from __future__ import annotations
 
-import asyncio
 import logging
-from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 
-from reasoner.core.settings import settings
 from reasoner.core.constants import TRUNCATION
+from reasoner.core.settings import settings
 
 logger = logging.getLogger(__name__)
 

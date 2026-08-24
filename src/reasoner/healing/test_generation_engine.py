@@ -26,10 +26,9 @@ from __future__ import annotations
 
 import json
 import logging
-import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -210,18 +209,18 @@ class TestGenerationEngine:
     
     Reads introspection report and generates targeted tests.
     """
-    
+
     def __init__(self, project_root: str, introspection_report_path: str):
         self.project_root = Path(project_root)
         self.introspection_report_path = Path(introspection_report_path)
-        self.generated_tests: List[Dict[str, Any]] = []
-    
-    def load_introspection_report(self) -> Dict[str, Any]:
+        self.generated_tests: list[dict[str, Any]] = []
+
+    def load_introspection_report(self) -> dict[str, Any]:
         """Load introspection report JSON."""
-        with open(self.introspection_report_path, 'r', encoding='utf-8') as f:
+        with open(self.introspection_report_path, encoding='utf-8') as f:
             return json.load(f)
-    
-    def generate_tests_for_error_gaps(self, error_gaps: List[Dict[str, Any]]) -> None:
+
+    def generate_tests_for_error_gaps(self, error_gaps: list[dict[str, Any]]) -> None:
         """Generate tests for error handling gaps."""
         for gap in error_gaps:
             test_config = {
@@ -231,65 +230,65 @@ class TestGenerationEngine:
                 "severity": gap["severity"],
                 "recommendation": gap["recommendation"],
             }
-            
+
             # Generate test file content
             test_content = self._generate_io_error_test(test_config)
-            
+
             # Determine test file path
             module_name = Path(gap["file_path"]).stem
             test_file_name = f"test_{module_name}_{gap['function_name']}_auto.py"
             test_file_path = self.project_root / "healing" / "generated_tests" / test_file_name
-            
+
             self.generated_tests.append({
                 "path": str(test_file_path),
                 "function": gap["function_name"],
                 "gap_type": gap["gap_type"],
             })
-            
+
             # Write test file
             test_file_path.parent.mkdir(exist_ok=True, parents=True)
             with open(test_file_path, 'w', encoding='utf-8') as f:
                 f.write(test_content)
-            
+
             logger.info(f"Generated test for {gap['function_name']} → {test_file_path}")
-    
-    def _generate_io_error_test(self, config: Dict[str, Any]) -> str:
+
+    def _generate_io_error_test(self, config: dict[str, Any]) -> str:
         """Generate I/O error handling test."""
         # Ensure module path use dots instead of slashes/backslashes
         raw_path = Path(config["file_path"]).with_suffix('').as_posix()
         module_path = raw_path.replace('/', '.')
         function_name = config["function_name"]
-        
+
         # Determine if async
         is_async = any(
             keyword in config["function_name"].lower()
             for keyword in ["async", "fetch", "load", "save", "get", "post"]
         )
-        
+
         async_test = "@pytest.mark.asyncio\n    async def " if is_async else "def "
         function_call = f"await {function_name}('test_input')" if is_async else f"{function_name}('test_input')"
-        
+
         # Class name from function name
         class_name = "".join(word.capitalize() for word in function_name.split("_"))
-        
+
         return IO_ERROR_HANDLING_TEST_TEMPLATE.format(
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             function_name=function_name,
             module_path=module_path,
             class_name=class_name,
             async_test=async_test,
             function_call=function_call,
         )
-    
+
     def generate_all_tests(self) -> None:
         """Generate all tests from introspection report."""
         report = self.load_introspection_report()
-        
+
         logger.info(f"Generating tests for {len(report['error_gaps'])} error handling gaps...")
         self.generate_tests_for_error_gaps(report["error_gaps"])
-        
+
         logger.info(f"Generated {len(self.generated_tests)} test files")
-    
+
     def generate_summary(self) -> str:
         """Generate test generation summary."""
         summary = [
@@ -300,11 +299,11 @@ class TestGenerationEngine:
             "",
             "Generated Tests:",
         ]
-        
+
         for test in self.generated_tests:
             summary.append(f"  - {test['function']} ({test['gap_type']})")
             summary.append(f"    -> {test['path']}")
-        
+
         summary.extend([
             "",
             "NEXT STEPS:",
@@ -314,7 +313,7 @@ class TestGenerationEngine:
             "4. Fix any error handling issues discovered",
             "="*80,
         ])
-        
+
         return "\n".join(summary)
 
 
@@ -324,19 +323,19 @@ def main():
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
-    
+
     project_root = Path(__file__).parent.parent
     introspection_report = project_root / "healing" / "introspection_report.json"
-    
+
     if not introspection_report.exists():
         logger.error("Introspection report not found. Run introspection_engine.py first.")
         return
-    
+
     engine = TestGenerationEngine(str(project_root), str(introspection_report))
     engine.generate_all_tests()
-    
+
     print(engine.generate_summary())
-    
+
     # SELF-VERIFICATION BLOCK
     print("\nSELF-VERIFICATION:")
     try:

@@ -7,11 +7,8 @@ Critical Enhancements:
 
 from __future__ import annotations
 
-import asyncio
-import time
-
 try:
-    from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
+    from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
     _PROMETHEUS_AVAILABLE = True
 except Exception:  # pragma: no cover
     _PROMETHEUS_AVAILABLE = False

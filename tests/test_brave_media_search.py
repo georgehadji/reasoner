@@ -8,8 +8,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, patch
 
-import pytest
-
 from reasoner.infrastructure.search.brave_adapter import BraveSearchAdapter
 
 

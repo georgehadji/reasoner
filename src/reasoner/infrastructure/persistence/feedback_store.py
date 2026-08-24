@@ -7,16 +7,17 @@ Migrates existing JSONL data on first initialization.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import sqlite3
-import asyncio
 import threading
-from pathlib import Path
-from typing import Any, Callable
-from dataclasses import dataclass, asdict
-from datetime import datetime, timezone
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -151,7 +152,7 @@ class FeedbackStore:
         entries: list[tuple] = []
 
         try:
-            with open(self.jsonl_path, "r", encoding="utf-8") as f:
+            with open(self.jsonl_path, encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
                     if not line:
@@ -163,7 +164,7 @@ class FeedbackStore:
                         continue
 
                     entries.append((
-                        data.get("timestamp", datetime.now(timezone.utc).isoformat()),
+                        data.get("timestamp", datetime.now(UTC).isoformat()),
                         data.get("conversation_id", ""),
                         data.get("message_id", ""),
                         data.get("rating", ""),
@@ -212,7 +213,7 @@ class FeedbackStore:
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                entry.timestamp or datetime.now(timezone.utc).isoformat(),
+                entry.timestamp or datetime.now(UTC).isoformat(),
                 entry.conversation_id,
                 entry.message_id,
                 entry.rating,

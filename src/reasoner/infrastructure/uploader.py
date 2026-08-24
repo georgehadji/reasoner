@@ -9,11 +9,10 @@ import asyncio
 import hashlib
 import json
 import logging
-import os
 import re
 import uuid
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from reasoner.core.settings import settings
 
@@ -155,9 +154,10 @@ def _extract_docx(content: bytes) -> str:
     """Extract text from DOCX file."""
     if not DOCX_AVAILABLE:
         return "[DOCX extraction not available - install python-docx]"
-    
+
     try:
         import io
+
         from docx import Document
         doc = Document(io.BytesIO(content))
         text_parts = []
@@ -274,7 +274,7 @@ async def extract_text(content: bytes, filename: str, *, force_ocr: bool = False
             _extract_text_unbounded(content, filename, force_ocr=force_ocr),
             timeout=timeout,
         )
-    except asyncio.TimeoutError:
+    except TimeoutError:
         logger.warning("Document extraction timed out for %s after %ss", filename, timeout)
         return "[Document extraction timed out]"
 
@@ -398,7 +398,7 @@ async def save_uploaded_file(
     # FIX BUG-008: Prevent path traversal by using only the extension, not the full filename
     file_id = str(uuid.uuid4())[:12]
     ext = _get_file_extension(filename)
-    
+
     # CRITICAL: Sanitize extension to prevent path traversal attacks
     # Only allow the last path component and validate it's a simple extension
     if not ext or not re.match(r'^\.[a-zA-Z0-9]+$', ext):
@@ -406,11 +406,11 @@ async def save_uploaded_file(
             "success": False,
             "error": "Invalid file extension",
         }
-    
+
     # Safe filename: only UUID + validated extension
     safe_filename = f"{file_id}{ext}"
     file_path = UPLOAD_DIR / safe_filename
-    
+
     # CRITICAL: Verify the resolved path is within UPLOAD_DIR (defense in depth)
     try:
         resolved_path = file_path.resolve()
@@ -534,7 +534,7 @@ def _get_upload_meta(file_id: str) -> dict | None:
     return None
 
 
-async def get_file_text(file_id: str, user_id: str | None = None) -> Optional[str]:
+async def get_file_text(file_id: str, user_id: str | None = None) -> str | None:
     """
     Retrieve extracted text from a previously uploaded file.
     
@@ -548,7 +548,7 @@ async def get_file_text(file_id: str, user_id: str | None = None) -> Optional[st
     # Validate file_id to prevent glob injection (e.g., empty string -> '*', '*' -> '**')
     if not file_id or not re.match(r'^[a-f0-9-]+$', file_id):
         return None
-    
+
     meta = _get_upload_meta(file_id)
 
     # Ownership check

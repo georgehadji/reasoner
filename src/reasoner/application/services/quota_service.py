@@ -9,13 +9,13 @@ Enforces business rules:
 
 from __future__ import annotations
 
-from reasoner.domain.saas import (
-    SubscriptionTier,
-    UsageQuota,
-    QuotaResult,
-)
-from reasoner.application.ports.quota_repository import QuotaRepository
+from datetime import UTC
 
+from reasoner.application.ports.quota_repository import QuotaRepository
+from reasoner.domain.saas import (
+    QuotaResult,
+    SubscriptionTier,
+)
 
 TIER_LIMITS: dict[SubscriptionTier, int] = {
     SubscriptionTier.FREE: 20,
@@ -49,8 +49,8 @@ class QuotaService:
         quota = await self._repository.get_quota(user_id)
 
         # Auto-reset if we've crossed into a new month
-        from datetime import datetime, timezone
-        now = datetime.now(timezone.utc)
+        from datetime import datetime
+        now = datetime.now(UTC)
         current_period_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         if quota.period_start < current_period_start:
             await self._repository.reset_monthly(user_id)
@@ -78,7 +78,7 @@ class QuotaService:
 
     def _seconds_until_month_end(self) -> int:
         """Rough estimate for Retry-After header."""
-        from datetime import datetime, timezone, timedelta
-        now = datetime.now(timezone.utc)
+        from datetime import datetime, timedelta
+        now = datetime.now(UTC)
         next_month = (now.replace(day=1) + timedelta(days=32)).replace(day=1)
         return int((next_month - now).total_seconds())

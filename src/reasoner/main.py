@@ -47,7 +47,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import json
 import logging
 import sys
 from pathlib import Path
@@ -57,14 +56,12 @@ sys.path.insert(0, str(Path(__file__).parent))
 from reasoner.application.orchestrator import PipelineOrchestrator
 from reasoner.application.services.adaptive_routing import build_adaptive_routing_service
 from reasoner.application.services.preset_service import PresetService
-from reasoner.renderer import export_to_json, render_pipeline_result
-from reasoner.infrastructure.llm.registry import list_models
-from reasoner.core.settings import settings  # triggers dotenv load
 from reasoner.core.constants import (
-    DEFAULT_CLI_PRESET,
     DIRECT_ANSWER_MAX_TOKENS,
     DIRECT_ANSWER_TEMPERATURE,
 )
+from reasoner.core.settings import settings  # triggers dotenv load
+from reasoner.infrastructure.llm.registry import list_models
 from reasoner.presets import (
     PRESETS,
     get_preset,
@@ -72,6 +69,8 @@ from reasoner.presets import (
     print_presets_summary,
     resolve_preset_name,
 )
+from reasoner.renderer import export_to_json, render_pipeline_result
+
 # GateAgent / HyperGateAgent — handled by PipelineOrchestrator
 
 logging.basicConfig(
@@ -87,9 +86,9 @@ logger = logging.getLogger(__name__)
 # ─────────────────────────────────────────────────────────────────────
 
 def cmd_list_models() -> None:
+    from rich import box
     from rich.console import Console
     from rich.table import Table
-    from rich import box
 
     groups = list_models()
     console = Console()
@@ -124,7 +123,6 @@ async def main(args: argparse.Namespace) -> None:
 
     # Benchmark mode
     if args.benchmark:
-        import asyncio
         from reasoner.infrastructure.benchmarks.engine import BenchmarkEngine
         from reasoner.infrastructure.llm.registry import build_provider
 
@@ -171,7 +169,7 @@ async def main(args: argparse.Namespace) -> None:
         try:
             state = load_state(args.resume)
             print(f"\n{'='*60}")
-            print(f"  Reasoner v2.0 — Resumed from saved state")
+            print("  Reasoner v2.0 — Resumed from saved state")
             print(f"{'='*60}")
             print(f"  Problem: {state.problem[:120]}...")
             print(f"  Resumed at: {state.task_type.value if state.task_type else 'start'}")
@@ -210,7 +208,7 @@ async def main(args: argparse.Namespace) -> None:
                 sys.exit(1)
 
         print(f"\n{'='*60}")
-        print(f"  Reasoner v2.0 — Reasoner")
+        print("  Reasoner v2.0 — Reasoner")
         print(f"{'='*60}")
         short_problem = problem[:120] + ("..." if len(problem) > 120 else "")
         print(f"  Problem: {short_problem}")
@@ -300,21 +298,49 @@ async def main(args: argparse.Namespace) -> None:
 
         final_preset = get_preset(effective_preset_name)
 
-        from reasoner.pipeline import ReasonerPipeline
-        pipeline = ReasonerPipeline(
-            router=router,
-            initial_state=initial_state,
+        # ── Start EventBus & Initialize Subscribers ──
+        from reasoner.application.event_bus.bus import get_event_bus, init_default_subscribers
+        bus = get_event_bus()
+        await init_default_subscribers()
+        await bus.start()
+
+        # ── Compile CQRS Command ──
+        import time
+        import uuid
+
+        from reasoner.application.commands import RunPipelineCommand
+        from reasoner.application.handlers.handlers import RunPipelineCommandHandler
+        from reasoner.infrastructure.persistence.event_store import get_event_store
+
+        command_id = str(uuid.uuid4())
+        command = RunPipelineCommand(
+            command_id=command_id,
+            timestamp=time.time(),
+            problem=problem,
+            preset=effective_preset_name,
+            method=auto_selected_method,
             top_k=args.top_k,
-            parallel_perspectives=not args.sequential,
-            verbose=not args.quiet,
-            preset_name=effective_preset_name,
             source_type=args.source_type,
             domain=args.domain or None,
-            enhance_prompt=args.enhance_prompt,
-            batch_critique_jury=final_preset.batch_critique_jury if final_preset else False,
-            augmentation_methods=preflight.augmentation_methods,
+            parallel=not args.sequential,
+            metadata={
+                "initial_state": initial_state,
+                "enhance_prompt": args.enhance_prompt,
+                "batch_critique_jury": final_preset.batch_critique_jury if final_preset else False,
+                "augmentation_methods": preflight.augmentation_methods,
+            }
         )
-        state = await pipeline.run(problem)
+
+        # ── Execute via Command Handler ──
+        handler = RunPipelineCommandHandler(
+            llm_router=router,
+            event_store=get_event_store()
+        )
+        aggregate = await handler.handle(command)
+        state = aggregate.pipeline_state
+
+        # ── Stop EventBus ──
+        await bus.stop()
 
         render_pipeline_result(state)
 
@@ -331,7 +357,7 @@ async def main(args: argparse.Namespace) -> None:
         # ── Cleanup ──
         from reasoner.scraper import close_scraper_client
         await close_scraper_client()
-        
+
         from reasoner.infrastructure.llm.providers.openai_compat import OpenAICompatibleProvider
         await OpenAICompatibleProvider.close_shared_pool()
 

@@ -1,5 +1,4 @@
 from __future__ import annotations
-from typing import Literal
 
 _SPEED_PROMPT = (
     "You are an extremely fast research agent. Your goal is to gather high-quality, "

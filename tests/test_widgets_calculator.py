@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-import pytest
 import math
+
+import pytest
 
 from reasoner.infrastructure.widgets.calculator import CalculatorWidget
 

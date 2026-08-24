@@ -1,9 +1,10 @@
 """Regression tests for CancelledError handling in BaseLLMProvider (BUG-003)."""
 
 import asyncio
+
 import pytest
 
-from reasoner.infrastructure.llm.ports import BaseLLMProvider, Message, LLMConfig, LLMResponse
+from reasoner.infrastructure.llm.ports import BaseLLMProvider, LLMResponse, Message
 
 
 class HangingProvider(BaseLLMProvider):

@@ -5,11 +5,10 @@ Findings: F-1 (sanitization), F-2 (L2Index), F-3 (TaggedMemory)
 
 from __future__ import annotations
 
-import pytest
-import json
 import tempfile
 from pathlib import Path
 
+import pytest
 
 # ═════════════════════════════════════════════════════════════════════
 # F-1: Sanitization truncates BEFORE injection check

@@ -6,6 +6,7 @@ Wire SafeLoggingFilter at the package level so ALL entry points
 the FastAPI app path.
 """
 from __future__ import annotations
+
 import logging
 
 __version__ = "2.1.0"

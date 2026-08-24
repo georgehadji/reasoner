@@ -14,18 +14,18 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.domain.core_types import (
+    Assumption,
     Decomposition,
     SubProblem,
-    Assumption,
 )
 from reasoner.domain.pipeline_state import PipelineState
+from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.models import ClaimLabel
-from reasoner.subagents.models import PhaseSubAgentOutput
-from reasoner.subagents.decomposition.structural_decomposer import StructuralDecomposerSubAgent
-from reasoner.subagents.decomposition.stakeholder_mapper import StakeholderMapperSubAgent
 from reasoner.subagents.decomposition.coverage_validator import CoverageValidatorSubAgent
+from reasoner.subagents.decomposition.stakeholder_mapper import StakeholderMapperSubAgent
+from reasoner.subagents.decomposition.structural_decomposer import StructuralDecomposerSubAgent
+from reasoner.subagents.models import PhaseSubAgentOutput
 
 logger = logging.getLogger(__name__)
 

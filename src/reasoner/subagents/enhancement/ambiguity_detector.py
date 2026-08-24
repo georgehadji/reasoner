@@ -6,9 +6,8 @@ from __future__ import annotations
 from typing import Any
 
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.subagents.base import PhaseSubAgent
 from reasoner.parsing import extract_json
-
+from reasoner.subagents.base import PhaseSubAgent
 
 AMBIGUITY_SYSTEM = """You are an Ambiguity Detector. Your ONE JOB is to read the user's problem and identify what is unclear, vague, or ambiguous.
 

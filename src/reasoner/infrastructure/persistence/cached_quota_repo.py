@@ -12,8 +12,8 @@ import logging
 from datetime import datetime
 from uuid import UUID
 
-from reasoner.domain.saas import UsageQuota, QuotaResult
 from reasoner.application.ports.quota_repository import QuotaRepository
+from reasoner.domain.saas import QuotaResult, UsageQuota
 from reasoner.infrastructure.valkey.client import get_valkey_pool
 
 logger = logging.getLogger(__name__)

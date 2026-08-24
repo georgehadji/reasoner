@@ -16,15 +16,15 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Protocol, runtime_checkable
 from enum import Enum
+from typing import Any, Protocol, runtime_checkable
 
 from reasoner.core.constants import (
+    DEFAULT_BACKOFF_BASE,
+    DEFAULT_BACKOFF_DELAY,
+    DEFAULT_MAX_RETRIES,
     DEFAULT_MAX_TOKENS,
     DEFAULT_TEMPERATURE,
-    DEFAULT_MAX_RETRIES,
-    DEFAULT_BACKOFF_DELAY,
-    DEFAULT_BACKOFF_BASE,
 )
 
 
@@ -45,7 +45,7 @@ class Message:
     role: MessageRole
     content: str
     metadata: dict[str, Any] = field(default_factory=dict)
-    
+
     def to_dict(self) -> dict[str, str]:
         """Convert to dictionary for API consumption."""
         return {
@@ -80,12 +80,12 @@ class DegradedLLMResponse:
     metadata: dict[str, Any] = field(default_factory=dict)
     degraded: bool = True
     error: str = ""
-    
+
     @property
     def tokens_total(self) -> int:
         """Total tokens used."""
         return self.tokens_prompt + self.tokens_completion
-    
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
@@ -116,7 +116,7 @@ class LLMConfig:
     timeout_seconds: float | None = None
     stop_sequences: list[str] = field(default_factory=list)
     response_format: dict[str, Any] | None = None  # For structured outputs
-    
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for API consumption."""
         config = {
@@ -126,16 +126,16 @@ class LLMConfig:
             'frequency_penalty': self.frequency_penalty,
             'presence_penalty': self.presence_penalty,
         }
-        
+
         if self.timeout_seconds:
             config['timeout'] = self.timeout_seconds
-        
+
         if self.stop_sequences:
             config['stop'] = self.stop_sequences
-        
+
         if self.response_format:
             config['response_format'] = self.response_format
-        
+
         return config
 
 
@@ -168,7 +168,7 @@ class LLMProvider(Protocol):
     
     This is the interface that the domain layer depends on.
     """
-    
+
     async def complete(
         self,
         messages: list[Message],
@@ -190,7 +190,7 @@ class LLMProvider(Protocol):
             AuthenticationError: If authentication fails
         """
         ...
-    
+
     async def complete_stream(
         self,
         messages: list[Message],
@@ -209,16 +209,16 @@ class LLMProvider(Protocol):
             str: Chunks of generated content
         """
         ...
-    
+
     def get_info(self) -> ProviderInfo:
         """Get information about this provider."""
         ...
-    
+
     @property
     def model(self) -> str:
         """The model name this provider uses."""
         ...
-    
+
     @property
     def provider_name(self) -> str:
         """The name of the provider (e.g., 'anthropic', 'openai')."""
@@ -238,7 +238,7 @@ class BaseLLMProvider(ABC):
     - _complete_impl(): The actual API call
     - _complete_stream_impl(): Streaming API call
     """
-    
+
     def __init__(
         self,
         model: str,
@@ -252,7 +252,7 @@ class BaseLLMProvider(ABC):
         self._latency_ms = 0.0
         self._request_count = 0
         self._error_count = 0
-    
+
     @abstractmethod
     async def _complete_impl(
         self,
@@ -265,7 +265,7 @@ class BaseLLMProvider(ABC):
         Subclasses must override this with provider-specific logic.
         """
         ...
-    
+
     @abstractmethod
     async def _complete_stream_impl(
         self,
@@ -278,7 +278,7 @@ class BaseLLMProvider(ABC):
         Subclasses must override this with provider-specific logic.
         """
         ...
-    
+
     async def complete(
         self,
         messages: list[Message],
@@ -289,57 +289,58 @@ class BaseLLMProvider(ABC):
         """
         import asyncio
         import time
+
         from reasoner.infrastructure.llm.exceptions import (
             LLMError,
             RateLimitError,
             is_retryable,
         )
-        
+
         config = config or LLMConfig()
         last_error: Exception | None = None
-        
+
         for attempt in range(self.max_retries + 1):
             start_time = time.perf_counter()
-            
+
             try:
                 response = await self._complete_impl(messages, config)
-                
+
                 # Update health on success
                 self._health = ProviderHealth.HEALTHY
                 self._latency_ms = (time.perf_counter() - start_time) * 1000
                 self._request_count += 1
-                
+
                 return response
-                
+
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
                 last_error = exc
                 self._error_count += 1
-                
+
                 # Update health on error
                 if isinstance(exc, RateLimitError):
                     self._health = ProviderHealth.DEGRADED
                 else:
                     self._health = ProviderHealth.UNHEALTHY
-                
+
                 # Don't retry non-retryable errors
                 if not is_retryable(exc):
                     raise
-                
+
                 # Don't retry if we've exhausted retries
                 if attempt >= self.max_retries:
                     raise
-                
+
                 # Exponential backoff
                 delay = self.base_delay_seconds * (DEFAULT_BACKOFF_BASE ** attempt)
                 await asyncio.sleep(delay)
-        
+
         raise LLMError(
             f"{self.provider_name}({self.model}) failed "
             f"after {self.max_retries + 1} attempts: {last_error}"
         ) from last_error
-    
+
     async def complete_stream(
         self,
         messages: list[Message],
@@ -349,15 +350,15 @@ class BaseLLMProvider(ABC):
         Stream with error handling.
         """
         config = config or LLMConfig()
-        
+
         try:
             async for chunk in self._complete_stream_impl(messages, config):
                 yield chunk
                 self._health = ProviderHealth.HEALTHY
-        except Exception as exc:
+        except Exception:
             self._health = ProviderHealth.UNHEALTHY
             raise
-    
+
     def get_info(self) -> ProviderInfo:
         """Get provider information."""
         return ProviderInfo(
@@ -375,11 +376,11 @@ class BaseLLMProvider(ABC):
                 ),
             },
         )
-    
+
     @property
     def model(self) -> str:
         return self._model
-    
+
     @property
     @abstractmethod
     def provider_name(self) -> str:
@@ -425,7 +426,7 @@ def is_retryable(error: Exception) -> bool:
     """Check if an error is retryable."""
     if isinstance(error, LLMError):
         return error.retryable
-    
+
     # Network errors are generally retryable
     retryable_types = (
         ConnectionError,

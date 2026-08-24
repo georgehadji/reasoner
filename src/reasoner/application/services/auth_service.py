@@ -4,8 +4,8 @@ Auth Service — Thin wrapper over AuthPort with caching and logging.
 
 from __future__ import annotations
 
-from reasoner.domain.saas import User
 from reasoner.application.ports.auth_port import AuthPort
+from reasoner.domain.saas import User
 
 
 class AuthService:

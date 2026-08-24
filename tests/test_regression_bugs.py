@@ -10,9 +10,8 @@ Covers:
 from __future__ import annotations
 
 import asyncio
-import pytest
-from datetime import datetime
 
+import pytest
 
 # ─────────────────────────────────────────────────────────────────────
 # BUG-001: Follow-up neuro persist uses wrong synthesis field
@@ -24,7 +23,7 @@ def test_neuro_persist_prefers_final_solution():
     answer (final_solution.core_solution) to the neuro service, not the
     previous turn's synthesis (previous_synthesis).
     """
-    from reasoner.models import PipelineState, FinalSolution, MetaCognitiveAudit
+    from reasoner.models import FinalSolution, MetaCognitiveAudit, PipelineState
 
     audit = MetaCognitiveAudit(
         most_dangerous_assumption="none",
@@ -102,8 +101,8 @@ async def test_clear_cache_clears_memory_and_disk(seeded_memory_cache, tmp_path,
     Regression: DELETE /api/cache must clear both disk files AND the
     in-memory _MEMORY_CACHE dict.
     """
-    from reasoner.api.cache import _MEMORY_CACHE, CACHE_DIR
     from reasoner.api import clear_cache
+    from reasoner.api.cache import _MEMORY_CACHE, CACHE_DIR
 
     # Write a disk file so we can verify disk clearing too
     test_file = CACHE_DIR / "regression-test-disk.json"

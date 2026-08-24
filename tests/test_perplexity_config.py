@@ -1,7 +1,6 @@
 """Regression tests for provider configuration."""
 
 from reasoner.llm import _REGISTRY, _perplexity_response_format
-from reasoner.presets import get_preset
 
 
 def test_perplexity_registry_defaults_match_intended_search_profiles():

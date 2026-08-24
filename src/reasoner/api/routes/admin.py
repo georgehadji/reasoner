@@ -6,8 +6,8 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from reasoner.core.settings import settings
 from reasoner.api.dependencies import get_current_user
+from reasoner.core.settings import settings
 
 logger = logging.getLogger(__name__)
 

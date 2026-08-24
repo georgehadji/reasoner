@@ -1,9 +1,9 @@
 from __future__ import annotations
+
 import re
-from typing import Union
+
+from reasoner.core.constants import TRUNCATION
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.models import PerspectiveType
-from reasoner.core.constants import JSON_ONLY_FOOTER, TRUNCATION, DEFAULT_SEARCH_RESULTS
 
 
 def detect_language(text: str) -> str:
@@ -14,46 +14,46 @@ def detect_language(text: str) -> str:
     # Greek (full Greek and Coptic block for better coverage)
     if re.search(r'[\u0370-\u03FF]', sample):
         return "Greek"
-    
+
     # Russian/Cyrillic
     if any(c in text for c in 'абвгдеёжзийклмнопрстуфхцчшщъыьэюя'):
         return "Russian"
-    
+
     # Arabic
     if any(c in text for c in 'ابتثجحخدذرزسشصضطظعغفقكلمنهوي'):
         return "Arabic"
-    
+
     # Chinese
     if any('\u4e00' <= c <= '\u9fff' for c in text):
         return "Chinese"
-    
+
     # Japanese (Hiragana/Katakana)
     if any('\u3040' <= c <= '\u309f' or '\u30a0' <= c <= '\u30ff' for c in text):
         return "Japanese"
-    
+
     # Korean (Hangul)
     if any('\uac00' <= c <= '\ud7af' for c in text):
         return "Korean"
-    
+
     # Turkish (distinctive characters: ı, ğ, ç, ş — checked first because ü/ö can overlap with German)
     turkish_exclusive = 'ığıçış'
     if any(c in text for c in turkish_exclusive):
         return "Turkish"
-    
+
     # German (exclusive characters: ä, ö, ß; ü is shared with Spanish)
     german_exclusive = 'äöß'
     if any(c in text for c in german_exclusive):
         return "German"
-    
+
     # Spanish (common Spanish-specific characters)
     spanish_chars = 'áéíóúüñ¿¡'
     if any(c in text for c in spanish_chars):
         return "Spanish"
-    
+
     return "English"
 
 
-def get_language_instruction(state: Union["PipelineState", str]) -> str:
+def get_language_instruction(state: PipelineState | str) -> str:
     if isinstance(state, str):
         language = state
     else:

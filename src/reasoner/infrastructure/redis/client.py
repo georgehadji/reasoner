@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import os
-from typing import Optional
 
 import valkey.asyncio as aioredis
 
-_pool: Optional[aioredis.Redis] = None
+_pool: aioredis.Redis | None = None
 
 
 def get_redis() -> aioredis.Redis:

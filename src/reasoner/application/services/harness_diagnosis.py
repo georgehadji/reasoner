@@ -7,9 +7,8 @@ and ranks harness components (presets, phases, models) by waste and failure rate
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
 
-from reasoner.domain.harness_metrics import HarnessScorecard, PhaseMetrics, PresetScorecard
+from reasoner.domain.harness_metrics import HarnessScorecard
 
 
 @dataclass

@@ -5,11 +5,11 @@ Uses fakes — no API key required.
 """
 
 import json
-import pytest
-from unittest.mock import AsyncMock, patch
 
-from reasoner.pipeline import ReasonerPipeline, TOKEN_OPTIMIZATION
-from reasoner.models import PipelineState, CritiqueScore, PerspectiveType
+import pytest
+
+from reasoner.models import CritiqueScore, PerspectiveType, PipelineState
+from reasoner.pipeline import TOKEN_OPTIMIZATION, ReasonerPipeline
 
 
 @pytest.fixture(autouse=True)

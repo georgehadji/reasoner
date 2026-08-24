@@ -9,7 +9,7 @@ must degrade to the database rather than to a wrong tier.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
@@ -36,7 +36,7 @@ def _subscription(
         status=status,
         stripe_subscription_id="sub_123",
         stripe_customer_id="cus_123",
-        current_period_end=datetime.now(timezone.utc),
+        current_period_end=datetime.now(UTC),
     )
 
 
@@ -73,7 +73,7 @@ async def test_cache_miss_reads_db_and_populates_cache(cached_repo, mock_redis, 
 
 @pytest.mark.asyncio
 async def test_cache_hit_skips_db(cached_repo, mock_redis, underlying):
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     mock_redis.get.return_value = json.dumps({
         "id": str(uuid4()),
         "user_id": USER_ID,

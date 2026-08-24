@@ -13,9 +13,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from reasoner.gate_agent import GateDecision
 from reasoner.hypergate import HyperGateAgent
-from reasoner.hypergate.base_sub_agent import BaseSubAgent
 from reasoner.hypergate.models import HyperContext, SubAgentInput, SubAgentOutput
 from reasoner.hypergate.sub_agents import (
     ComplexityEstimatorSubAgent,
@@ -25,7 +23,6 @@ from reasoner.hypergate.sub_agents import (
     TieBreakerSubAgent,
     WebSearchDetectorSubAgent,
 )
-
 
 # ── Helpers ───────────────────────────────────────────────────────────
 

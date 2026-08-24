@@ -9,9 +9,9 @@ uvicorn workers. Tests verify the warning/error paths.
 from __future__ import annotations
 
 import os
-from unittest.mock import patch, MagicMock
-import pytest
+from unittest.mock import patch
 
+import pytest
 
 # ── Rate limiter mode validation ─────────────────────────────────────
 
@@ -20,7 +20,6 @@ import pytest
 async def test_memory_rate_limiter_warns_in_multi_worker() -> None:
     """When UVICORN_WORKERS > 1 and RATE_LIMITER_MODE=memory,
     a warning should be logged in non-production environments."""
-    from reasoner.core.settings import settings
 
     # Force settings state
     with patch.dict(
@@ -46,7 +45,7 @@ async def test_production_memory_ratelimiter_should_be_redis() -> None:
     """In production, if RATE_LIMITER_MODE=memory with >1 workers, CRITICAL is logged
     and the app should refuse to start. We validate the guard condition exists."""
     import importlib
-    
+
     # Copy environment and pop the keys to test fallback defaults
     env_copy = os.environ.copy()
     env_copy.pop("RATE_LIMITER_MODE", None)
@@ -123,7 +122,7 @@ def test_rate_limit_config_bounds() -> None:
 
 def test_rate_limiter_token_bucket_imports() -> None:
     """Verify rate_limiter module has expected API."""
-    from reasoner.rate_limiter import get_rate_limiter, RateLimitConfig
+    from reasoner.rate_limiter import RateLimitConfig, get_rate_limiter
 
     rate_limiter = get_rate_limiter(
         RateLimitConfig(

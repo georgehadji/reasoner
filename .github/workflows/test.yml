@@ -35,8 +35,8 @@ jobs:
           # E/F/I/N/W/UP profile never ran in CI — only the CLI's B,F821 did. The
           # full profile (now including B) lives in pyproject.toml; bare `ruff check`
           # picks it up. Ratcheted (scripts/ruff_ratchet.py) rather than hard-blocked:
-          # turning the full profile on surfaced 4606 pre-existing violations.
-          python scripts/ruff_ratchet.py --max 4606
+          # turning the full profile on surfaced 2241 pre-existing violations.
+          python scripts/ruff_ratchet.py --max 2241
 
       - name: Security scan (bandit)
         run: |

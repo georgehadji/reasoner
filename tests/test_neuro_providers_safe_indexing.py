@@ -5,8 +5,7 @@ with IndexError when the API returns a 200 with empty choices/data arrays.
 """
 
 import asyncio
-import pytest
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 
 class FakeResponse:

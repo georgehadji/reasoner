@@ -1,15 +1,17 @@
 from __future__ import annotations
+
 import json
-from reasoner.domain.pipeline_state import PipelineState
+
 from reasoner.core.constants import JSON_ONLY_FOOTER
-from reasoner.phases._shared import get_language_instruction, _wrap_user_input
+from reasoner.domain.pipeline_state import PipelineState
+from reasoner.phases._shared import _wrap_user_input, get_language_instruction
 
 DELPHI_EXPERT_SYSTEM = (
     "You are an independent expert forecaster. Make your estimate without knowing what other experts think. "
     "Be specific and provide a numeric estimate where possible. " + JSON_ONLY_FOOTER
 )
 
-def delphi_round1_prompt(state: "PipelineState", expert_num: int) -> str:
+def delphi_round1_prompt(state: PipelineState, expert_num: int) -> str:
     decomp = state.decomposition or {}
     if isinstance(decomp, dict):
         sub_problems = [step.get("action", "") for step in decomp.get("causal_chain", [])]
@@ -34,7 +36,7 @@ DELPHI_AGGREGATION_SYSTEM = (
     "Be objective. Output ONLY valid JSON."
 )
 
-def delphi_aggregation_prompt(state: "PipelineState") -> str:
+def delphi_aggregation_prompt(state: PipelineState) -> str:
     estimates = state.delphi_state.get("round_1_estimates", [])
     return (
         f'{get_language_instruction(state)}\n\n'
@@ -55,7 +57,7 @@ DELPHI_REVISION_SYSTEM = (
     "You may revise toward consensus or defend your original position with reasoning. " + JSON_ONLY_FOOTER
 )
 
-def delphi_round2_prompt(state: "PipelineState", expert_id: str) -> str:
+def delphi_round2_prompt(state: PipelineState, expert_id: str) -> str:
     stats = state.delphi_state.get("aggregated_stats", {})
     original = next(
         (e for e in state.delphi_state.get("round_1_estimates", []) if e.get("expert_id") == expert_id),
@@ -80,7 +82,7 @@ DELPHI_CONVERGENCE_SYSTEM = (
     "You are a Delphi facilitator checking if expert estimates have converged to consensus. " + JSON_ONLY_FOOTER
 )
 
-def delphi_convergence_prompt(state: "PipelineState") -> str:
+def delphi_convergence_prompt(state: PipelineState) -> str:
     r2 = state.delphi_state.get("round_2_estimates", [])
     return (
         f'{get_language_instruction(state)}\n\n'
@@ -98,7 +100,7 @@ DELPHI_DISSENT_SYSTEM = (
     "Explain what the consensus is missing. Output ONLY valid JSON."
 )
 
-def delphi_dissent_prompt(state: "PipelineState") -> str:
+def delphi_dissent_prompt(state: PipelineState) -> str:
     stats = state.delphi_state.get("aggregated_stats", {})
     consensus = state.delphi_state.get("consensus", {})
     return (

@@ -11,6 +11,7 @@ Validates:
 from __future__ import annotations
 
 import os
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -19,17 +20,17 @@ os.environ.setdefault("ENABLE_LEGACY_API_KEY", "true")
 os.environ.setdefault("ENVIRONMENT", "testing")
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-do-not-use-in-production")
 
-from reasoner.infrastructure.auth.local_adapter import LocalAuthAdapter
-from reasoner.infrastructure.auth import set_auth_adapter, get_auth_adapter
 from reasoner.api import app
 from reasoner.api.dependencies import _reset_quota_service
 from reasoner.application.services.quota_service import QuotaService
 from reasoner.core.settings import settings
+from reasoner.infrastructure.auth import set_auth_adapter
+from reasoner.infrastructure.auth.local_adapter import LocalAuthAdapter
 
 
 class _FakeQuotaRepository:
     async def get_quota(self, user_id: str):
-        from reasoner.domain.saas import UsageQuota, SubscriptionTier
+        from reasoner.domain.saas import SubscriptionTier, UsageQuota
         return UsageQuota(user_id=user_id, tier=SubscriptionTier.FREE, used_queries=0, max_queries=20)
 
     async def check_and_increment(self, user_id: str, preset: str):

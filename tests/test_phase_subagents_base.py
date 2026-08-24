@@ -1,8 +1,9 @@
 """
 Unit tests for PhaseSubAgent base class.
 """
-import pytest
 from unittest.mock import AsyncMock
+
+import pytest
 
 from reasoner.models import PipelineState
 from reasoner.subagents.base import PhaseSubAgent

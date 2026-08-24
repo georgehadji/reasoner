@@ -7,24 +7,24 @@ domain layer and infrastructure layer.
 
 from __future__ import annotations
 
-import logging
-import asyncio
 import importlib
+import logging
 from typing import Any
 
 from reasoner.application.commands import (
-    RunPipelineCommand,
-    ResumePipelineCommand,
-    StopPipelineCommand,
     ExecuteWidgetCommand,
+    ResumePipelineCommand,
+    RunPipelineCommand,
+    StopPipelineCommand,
 )
 from reasoner.application.queries import (
-    GetPipelineStatusQuery,
     GetHistoryQuery,
+    GetPipelineStatusQuery,
     ListPresetsQuery,
 )
 from reasoner.core.aggregates.pipeline import PipelineAggregate
-from reasoner.core.events.domain_events import make_event, EventType
+from reasoner.core.events.domain_events import EventType, make_event
+
 # get_event_bus imported lazily in constructors to avoid circular import with api/__init__.py
 
 logger = logging.getLogger(__name__)
@@ -40,11 +40,11 @@ def _get_event_bus():
 # COMMAND HANDLERS
 # ─────────────────────────────────────────────────────────────────────
 
-from typing import Callable, Awaitable, Protocol
+from collections.abc import Awaitable, Callable
+from typing import Protocol
 
-from reasoner.application.commands import RunPipelineCommand
-from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.domain.pipeline_state import PipelineState
+from reasoner.infrastructure.llm.router import ProviderRouter
 
 
 class PipelineExecutionPort(Protocol):
@@ -75,7 +75,7 @@ class RunPipelineCommandHandler:
     Accepts an optional PipelineExecutionPort for SSE streaming;
     falls back to direct pipeline.run() when not provided.
     """
-    
+
     def __init__(
         self,
         llm_router: Any,
@@ -86,16 +86,16 @@ class RunPipelineCommandHandler:
         self.event_store = event_store
         self.event_bus = _get_event_bus()
         self._pipeline_executor = pipeline_executor
-    
+
     async def handle(
-        self, 
-        command: RunPipelineCommand, 
+        self,
+        command: RunPipelineCommand,
         sse_emit: Callable[[dict], Awaitable[None]] | None = None
     ) -> PipelineAggregate:
         """Execute pipeline command, optionally emitting SSE events."""
         # Create aggregate
         aggregate = PipelineAggregate(aggregate_id=command.command_id)
-        
+
         # Record pipeline started event
         start_event = make_event(
             EventType.PIPELINE_STARTED,
@@ -112,17 +112,17 @@ class RunPipelineCommandHandler:
             },
         )
         aggregate.record_event(start_event)
-        
+
         if sse_emit:
             await sse_emit({"type": "start"})
 
         # Persist event
         if self.event_store:
             await self.event_store.save_events([start_event])
-        
+
         # Publish event
         await self.event_bus.publish(start_event)
-        
+
         # Execute pipeline phases
         from reasoner.infrastructure.llm.router import ProviderRouter
 
@@ -130,8 +130,7 @@ class RunPipelineCommandHandler:
 
         try:
             from reasoner.application.services.pipeline_service import PipelineService
-            from reasoner.application.orchestrator import PipelineOrchestrator
-            
+
             if sse_emit:
                 if self._pipeline_executor:
                     state = await self._pipeline_executor.execute_run(
@@ -143,19 +142,27 @@ class RunPipelineCommandHandler:
                         "SSE streaming requested but no PipelineExecutionPort injected"
                     )
             else:
-                # Legacy non-streaming path (sse_emit=None): construct + run pipeline directly.
-                from reasoner.pipeline import ReasonerPipeline
-                pipeline = ReasonerPipeline(
+                # Use PipelineService factory instead of direct ReasonerPipeline construction (CE Boundary)
+                from reasoner.application.services.pipeline_service import PipelineService
+                pipeline_service = PipelineService()
+
+                # Extract options from metadata for non-streaming CLI/headless runs
+                metadata = getattr(command, "metadata", {}) or {}
+                pipeline = pipeline_service.create_pipeline(
                     router=router,
                     preset_name=command.preset,
                     top_k=command.top_k,
+                    parallel_perspectives=command.parallel,
                     source_type=command.source_type,
                     domain=command.domain,
-                    parallel_perspectives=command.parallel,
                     user_id=getattr(command, "user_id", None),
+                    initial_state=metadata.get("initial_state"),
+                    enhance_prompt=metadata.get("enhance_prompt", False),
+                    batch_critique_jury=metadata.get("batch_critique_jury", False),
+                    augmentation_methods=metadata.get("augmentation_methods"),
                 )
                 state = await pipeline.run(problem=command.problem)
-            
+
             # Record completion event
             completion_event = make_event(
                 EventType.PIPELINE_COMPLETED,
@@ -167,7 +174,7 @@ class RunPipelineCommandHandler:
                 phases_completed=len(getattr(state.meta, "phase_results", []) if hasattr(state, "meta") else []),
             )
             aggregate.record_event(completion_event)
-            
+
             if sse_emit:
                 await sse_emit({"type": "end", "data": {"synthesis": {"core_solution": "Completed"}}})
 
@@ -175,12 +182,12 @@ class RunPipelineCommandHandler:
             if self.event_store:
                 await self.event_store.save_events([completion_event])
             await self.event_bus.publish(completion_event)
-            
+
         except Exception as e:
             logger.error(f"Pipeline execution failed: {e}")
             if sse_emit:
                 await sse_emit({"type": "error", "error": str(e)})
-            
+
             # Record failure event
             failure_event = make_event(
                 EventType.PIPELINE_FAILED,
@@ -191,24 +198,25 @@ class RunPipelineCommandHandler:
                 phases_completed=len(aggregate.state_data.phase_results) if hasattr(aggregate, "state_data") else 0,
             )
             aggregate.record_event(failure_event)
-            
+
             if self.event_store:
                 await self.event_store.save_events([failure_event])
             await self.event_bus.publish(failure_event)
-            
+
             raise
-        
+
+        aggregate.pipeline_state = state
         return aggregate
 
 
 class ResumePipelineCommandHandler:
     """Handler for ResumePipelineCommand."""
-    
+
     def __init__(self, event_store: Any, llm_router: Any):
         self.event_store = event_store
         self.llm_router = llm_router
         self.event_bus = _get_event_bus()
-    
+
     async def handle(self, command: ResumePipelineCommand) -> dict[str, Any]:
         """Resume pipeline from event history.
 
@@ -251,11 +259,11 @@ class ResumePipelineCommandHandler:
 
 class StopPipelineCommandHandler:
     """Handler for StopPipelineCommand."""
-    
+
     def __init__(self, event_store: Any | None = None):
         self.event_store = event_store
         self.event_bus = _get_event_bus()
-    
+
     async def handle(self, command: StopPipelineCommand) -> dict[str, Any]:
         """Stop running pipeline."""
         # Signal cancellation via the per-run RunStateStore that api.py
@@ -279,24 +287,24 @@ class StopPipelineCommandHandler:
 
 class ExecuteWidgetCommandHandler:
     """Handler for ExecuteWidgetCommand."""
-    
+
     def __init__(self):
         from reasoner.infrastructure.widgets import get_widget_registry
         self.registry = get_widget_registry()
         self.event_bus = _get_event_bus()
-    
+
     async def handle(self, command: ExecuteWidgetCommand) -> dict[str, Any]:
         """Execute widget."""
         if command.auto_detect:
             # Auto-detect widgets from query
             results = await self.registry.auto_execute(command.query)
-            
+
             if results:
                 return {
                     "detected": True,
                     "widgets": [r.to_dict() for r in results],
                 }
-            
+
             return {"detected": False, "widgets": []}
         else:
             # Execute specific widget
@@ -304,7 +312,7 @@ class ExecuteWidgetCommandHandler:
                 command.widget_type,
                 command.params,
             )
-            
+
             # Publish event
             if result.success:
                 event = make_event(
@@ -323,9 +331,9 @@ class ExecuteWidgetCommandHandler:
                     widget_type=command.widget_type,
                     error=result.error,
                 )
-            
+
             await self.event_bus.publish(event)
-            
+
             return {
                 "detected": True,
                 "widgets": [result.to_dict()],
@@ -338,25 +346,25 @@ class ExecuteWidgetCommandHandler:
 
 class GetPipelineStatusQueryHandler:
     """Handler for GetPipelineStatusQuery."""
-    
+
     def __init__(self, event_store: Any | None = None):
         self.event_store = event_store
-    
+
     async def handle(self, query: GetPipelineStatusQuery) -> dict[str, Any]:
         """Get pipeline status."""
         if not self.event_store:
             return {"error": "Event store not available"}
-        
+
         # Load events
         history = await self.event_store.get_events(query.pipeline_id)
-        
+
         if not history:
             return {"error": "Pipeline not found"}
-        
+
         # Rebuild aggregate
         aggregate = PipelineAggregate(aggregate_id=query.pipeline_id)
         aggregate.load_from_history(history)
-        
+
         return {
             "pipeline_id": query.pipeline_id,
             "status": aggregate.state_data.status,
@@ -371,22 +379,22 @@ class GetPipelineStatusQueryHandler:
 
 class GetHistoryQueryHandler:
     """Handler for GetHistoryQuery."""
-    
+
     def __init__(self, event_store: Any | None = None):
         self.event_store = event_store
-    
+
     async def handle(self, query: GetHistoryQuery) -> dict[str, Any]:
         """Get search history."""
         if not self.event_store:
             # Fallback to file-based history
             return self._get_file_history(query)
-        
+
         # Get from event store
         pipelines = await self.event_store.list_pipelines(
             limit=query.limit,
             offset=query.offset,
         )
-        
+
         return {
             "total": len(pipelines),
             "entries": [
@@ -401,24 +409,24 @@ class GetHistoryQueryHandler:
                 for p in pipelines
             ],
         }
-    
+
     def _get_file_history(self, query: GetHistoryQuery) -> dict[str, Any]:
         """Fallback to file-based history."""
         import json
         from pathlib import Path
-        
+
         history_dir = Path(__file__).parent.parent / "history"
         entries = []
-        
+
         for f in history_dir.glob("*.json"):
             try:
                 data = json.loads(f.read_text(encoding="utf-8"))
                 entries.append(data)
             except Exception:
                 pass
-        
+
         entries = sorted(entries, key=lambda x: x.get("timestamp", ""), reverse=True)
-        
+
         return {
             "total": len(entries),
             "entries": entries[query.offset:query.offset + query.limit],
@@ -427,25 +435,25 @@ class GetHistoryQueryHandler:
 
 class ListPresetsQueryHandler:
     """Handler for ListPresetsQuery."""
-    
+
     async def handle(self, query: ListPresetsQuery) -> dict[str, Any]:
         """List available presets."""
-        from reasoner.presets import PRESETS, get_preset
-        
+        from reasoner.presets import PRESETS
+
         presets = []
         for name, config in PRESETS.items():
             if query.method and query.method not in name:
                 continue
-            
+
             presets.append({
                 "name": name,
                 "description": config.get("description", ""),
                 "method": name.split("-")[0] if "-" in name else "multi-perspective",
                 "tier": self._get_tier(name),
             })
-        
+
         return {"presets": presets, "total": len(presets)}
-    
+
     def _get_tier(self, preset_name: str) -> str:
         """Get preset tier from name."""
         if "budget" in preset_name:
@@ -462,7 +470,7 @@ class ListPresetsQueryHandler:
 
 class HandlerRegistry:
     """Central registry for all command and query handlers."""
-    
+
     def __init__(
         self,
         llm_router: Any,
@@ -471,7 +479,7 @@ class HandlerRegistry:
     ):
         self.llm_router = llm_router
         self.event_store = event_store
-        
+
         # Initialize handlers
         self.command_handlers = {
             "RunPipelineCommand": RunPipelineCommandHandler(llm_router, event_store, pipeline_executor),
@@ -479,31 +487,31 @@ class HandlerRegistry:
             "StopPipelineCommand": StopPipelineCommandHandler(event_store),
             "ExecuteWidgetCommand": ExecuteWidgetCommandHandler(),
         }
-        
+
         self.query_handlers = {
             "GetPipelineStatusQuery": GetPipelineStatusQueryHandler(event_store),
             "GetHistoryQuery": GetHistoryQueryHandler(event_store),
             "ListPresetsQuery": ListPresetsQueryHandler(),
         }
-    
+
     async def handle_command(self, command: Any) -> Any:
         """Route command to appropriate handler."""
         command_name = command.__class__.__name__
         handler = self.command_handlers.get(command_name)
-        
+
         if not handler:
             raise ValueError(f"No handler for command: {command_name}")
-        
+
         return await handler.handle(command)
-    
+
     async def handle_query(self, query: Any) -> Any:
         """Route query to appropriate handler."""
         query_name = query.__class__.__name__
         handler = self.query_handlers.get(query_name)
-        
+
         if not handler:
             raise ValueError(f"No handler for query: {query_name}")
-        
+
         return await handler.handle(query)
 
 
@@ -520,8 +528,8 @@ def get_handler_registry(
     global _handler_registry
     if _handler_registry is None:
         if llm_router is None:
-            from reasoner.infrastructure.llm.router import ProviderRouter
             from reasoner.infrastructure.llm.ports import BaseLLMProvider, LLMResponse
+            from reasoner.infrastructure.llm.router import ProviderRouter
 
             class _DummyProvider(BaseLLMProvider):
                 def __init__(self):

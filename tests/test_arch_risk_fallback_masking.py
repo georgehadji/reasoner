@@ -8,13 +8,12 @@ diagnostic information about which role and model failed.
 
 from __future__ import annotations
 
-import asyncio
 from unittest.mock import patch
 
 import pytest
 
-from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.infrastructure.llm.ports import DegradedLLMResponse
+from reasoner.infrastructure.llm.router import ProviderRouter
 
 
 class FakeProvider:
@@ -47,7 +46,7 @@ async def test_degraded_response_identifies_failing_model() -> None:
 
     with patch(
         "reasoner.infrastructure.llm.router._call_with_circuit",
-        side_effect=asyncio.TimeoutError("timed out"),
+        side_effect=TimeoutError("timed out"),
     ):
         result, metadata = await router.call(
             role="primary",
@@ -69,7 +68,7 @@ async def test_degraded_response_carries_metadata() -> None:
 
     with patch(
         "reasoner.infrastructure.llm.router._call_with_circuit",
-        side_effect=asyncio.TimeoutError("test timeout"),
+        side_effect=TimeoutError("test timeout"),
     ):
         result, metadata = await router.call(
             role="synthesis",
@@ -107,7 +106,7 @@ async def test_fallback_provides_explicit_model_name() -> None:
     with patch.object(settings, "MULTI_PROVIDER_FALLBACK_ENABLED", False):
         with patch(
             "reasoner.infrastructure.llm.router._call_with_circuit",
-            side_effect=asyncio.TimeoutError("timed out"),
+            side_effect=TimeoutError("timed out"),
         ):
             result, metadata = await router.call(
                 role="scoring",

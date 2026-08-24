@@ -7,9 +7,8 @@ from __future__ import annotations
 from typing import Any
 
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.subagents.base import PhaseSubAgent
 from reasoner.parsing import extract_json
-
+from reasoner.subagents.base import PhaseSubAgent
 
 WRITER_SYSTEM = """You are a Synthesis Writer. Your ONE JOB is to write the final answer to the user's problem.
 

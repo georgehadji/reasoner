@@ -1,18 +1,14 @@
 """Tests for vs_decomposition stage."""
 from __future__ import annotations
-from tests.utils.mocks import MockLLM, MockNLI
 
 import pytest
-from unittest.mock import AsyncMock
 
 from reasoner.phases.vs_decomposition import (
-    decompose_with_vs,
     DecompositionVSConfig,
-    VSDecompositionResult,
+    decompose_with_vs,
 )
 from reasoner.vs_config import VSFeatureFlags
-
-
+from tests.utils.mocks import MockLLM
 
 
 @pytest.fixture

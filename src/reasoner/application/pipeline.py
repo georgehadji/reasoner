@@ -6,13 +6,12 @@ composition-based WorkflowStrategy pattern.
 """
 
 from __future__ import annotations
-import asyncio
+
 import functools
-import json
 import logging
-import re
 import time
-from typing import Any, Callable, TypeVar
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 T = TypeVar("T")
 
@@ -34,38 +33,23 @@ def timed(func: Callable[..., T]) -> Callable[..., T]:
                 self._log("TIMING", f"{func.__name__} completed in {elapsed*1000:.1f}ms", state)
     return async_wrapper  # type: ignore[return-value]
 
-from reasoner.domain.pipeline_state import PipelineState
-from reasoner.domain.core_types import (
-    SolutionCandidate,
-    CritiqueScore,
-    StressTestResult,
-    ScenarioType,
-    GenerationCandidate,
-    CriticScore,
-    VerificationResult,
-    MetaEvaluation,
-    FinalSolution,
-    MetaCognitiveAudit,
-)
-from reasoner.models import (
-    ClaimLabel,
-    PerspectiveType,
-    TaskType,
-)
-from reasoner.core.parsing import ParseError, extract_json, safe_list, safe_float, _parse_critique_scores
-from reasoner.infrastructure.llm.router import ProviderRouter
-from reasoner.infrastructure.llm.executor import LLMExecutor
-from reasoner.core import PhaseConfig, make_phase_result, DEFAULT_PERSPECTIVES
-from reasoner.core.protocol import TemperatureStrategy
-from reasoner.core.temperatures import PHASE_TEMPERATURES, PHASE_REASONING_EFFORT
+import reasoner.phases as phases
+from reasoner.core import DEFAULT_PERSPECTIVES, PhaseConfig
 from reasoner.core.constants import (
-    PHASE_TOKEN_BUDGETS,
-    get_token_budget,
-    DEFAULT_MAX_TOKENS,
     TRUNCATION,
 )
+from reasoner.core.parsing import (
+    extract_json,
+)
+from reasoner.core.protocol import TemperatureStrategy
+from reasoner.core.temperatures import PHASE_REASONING_EFFORT, PHASE_TEMPERATURES
+from reasoner.domain.pipeline_state import PipelineState
+from reasoner.infrastructure.llm.executor import LLMExecutor
+from reasoner.infrastructure.llm.router import ProviderRouter
+from reasoner.models import (
+    TaskType,
+)
 from reasoner.token_cache import get_token_cache
-import reasoner.phases as phases
 
 logger = logging.getLogger(__name__)
 
@@ -136,11 +120,11 @@ class ReasonerPipeline:
         self.augmentation_methods = augmentation_methods
         self.user_id = user_id
         self.phase_configs = phase_configs or self._PHASE_CONFIGS
-        
+
         from reasoner.application.flows.factory import WorkflowFactory
         self.flow_factory = WorkflowFactory()
         self.perspectives = list(DEFAULT_PERSPECTIVES)
-        
+
         self._executor = LLMExecutor(
             router=router,
             phase_configs=self.phase_configs,
@@ -410,9 +394,9 @@ class ReasonerPipeline:
         start_time = time.monotonic()
         if not method:
             method = self._get_method_from_preset()
-        
+
         from reasoner.application.event_bus.bus import get_event_bus
-        from reasoner.core.events.domain_events import make_event, EventType
+        from reasoner.core.events.domain_events import EventType, make_event
         bus = get_event_bus()
 
         state = self.initial_state or PipelineState(
@@ -434,12 +418,12 @@ class ReasonerPipeline:
             preset=self.preset_name
         )
         await bus.publish(start_evt)
-        
+
         self._log("ORCHESTRATOR", f"Routing to '{method}' method pipeline.", state)
 
         # ── Optional: Cross-Language Translate In ──
-        from reasoner.core.settings import settings as _settings
         from reasoner.core.constants_limits import NATIVE_LANGUAGE_METHODS
+        from reasoner.core.settings import settings as _settings
         _pivot_eligible = (
             _settings.LANGUAGE_PIVOT_ENABLED
             and state.language
@@ -470,8 +454,9 @@ class ReasonerPipeline:
         # ── E3: Context compression after fusion, gated by flag ──
         if TOKEN_OPTIMIZATION.get("context_compression") and state.candidates:
             try:
-                from reasoner.neuro.compression import smart_compress
                 import dataclasses as _dc
+
+                from reasoner.neuro.compression import smart_compress
                 compressed = []
                 for c in state.candidates:
                     content = getattr(c, "content", None) or (c.get("content") if isinstance(c, dict) else None)
@@ -496,13 +481,13 @@ class ReasonerPipeline:
 
         # --- DYNAMIC METHOD DISPATCH ---
         if self.flow_factory.is_migrated(method):
-            from reasoner.application.flows.services import PipelineWorkflowServices
             from reasoner.application.flows.runner import WorkflowRunner
-            
+            from reasoner.application.flows.services import PipelineWorkflowServices
+
             strategy = self.flow_factory.get_strategy(method)
             runner = WorkflowRunner(PipelineWorkflowServices(self))
             services = PipelineWorkflowServices(self, runner=runner)
-            
+
             await runner.run(strategy, state)
         else:
             # Legacy path (should be empty now)
@@ -553,7 +538,7 @@ class ReasonerPipeline:
                     self._log("PROMPT-ENHANCE", f"Enhanced prompt: {enhanced[:TRUNCATION.API_STORAGE]}...", state)
                 else:
                     state.enhanced_problem = state.problem
-            except Exception as exc:
+            except Exception:
                 state.enhanced_problem = state.problem
             return
 
@@ -680,8 +665,8 @@ class ReasonerPipeline:
             state.errors.append(f"translation-in error: {e}")
 
     async def _phase_cross_language_translate_out(self, state: PipelineState) -> None:
-        from reasoner.infrastructure.translation import get_composite_translator
         from reasoner.core.constants_limits import LANG_NAME_TO_ISO
+        from reasoner.infrastructure.translation import get_composite_translator
         if not state.pivot_active or not state.output_language or state.output_language == "English":
             return
         target_lang_name = state.output_language

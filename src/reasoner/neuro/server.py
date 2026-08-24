@@ -8,8 +8,8 @@ import hashlib
 import logging
 import secrets
 import time
-from datetime import datetime, timezone
-from typing import Literal, Optional
+from datetime import UTC, datetime
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -67,21 +67,21 @@ class NeuroHealthResponse(BaseModel):
 class LearnRequest(BaseModel):
     prompt: str = Field(..., description="The user's prompt")
     response: str = Field(..., description="The agent's response")
-    agent_id: Optional[str] = Field(None, description="Agent ID for tenant isolation")
-    metadata: Optional[dict] = Field(None, description="Optional metadata")
+    agent_id: str | None = Field(None, description="Agent ID for tenant isolation")
+    metadata: dict | None = Field(None, description="Optional metadata")
 
 
 class LearnResponse(BaseModel):
     status: str
     session_id: str
     entry_number: int
-    agent_id: Optional[str]
+    agent_id: str | None
 
 
 class RecallRequest(BaseModel):
     prompt: str = Field(..., description="The prompt to search context for")
-    agent_id: Optional[str] = Field(None, description="Agent ID for tenant isolation")
-    persona: Optional[str] = Field(None, description="Persona mode")
+    agent_id: str | None = Field(None, description="Agent ID for tenant isolation")
+    persona: str | None = Field(None, description="Persona mode")
     max_results: int = Field(5, ge=1, le=20)
     compression: Literal["none", "minimal", "aggressive"] = Field(
         "none", description="Compression level"
@@ -100,7 +100,7 @@ class RecallResponse(BaseModel):
     total_found: int
     latency_ms: float
     cache_hits: dict
-    agent_id: Optional[str]
+    agent_id: str | None
     persona: str
     provider_used: str
 
@@ -108,15 +108,15 @@ class RecallResponse(BaseModel):
 class AuditRequest(BaseModel):
     prompt: str = Field(..., description="The user's original prompt")
     draft_response: str = Field(..., description="The agent's draft response")
-    agent_id: Optional[str] = Field(None)
-    persona: Optional[str] = Field(None, description="Persona mode override")
+    agent_id: str | None = Field(None)
+    persona: str | None = Field(None, description="Persona mode override")
 
 
 class AuditResponse(BaseModel):
     verdict: str
     confidence: float
     reason: str
-    enrichment: Optional[str] = None
+    enrichment: str | None = None
     latency_ms: float
     persona: str
     provider_used: str
@@ -161,7 +161,7 @@ class TenantManager:
         del self._tenants[oldest_key]
         del self._last_access[oldest_key]
 
-    async def get(self, agent_id: Optional[str] = None) -> dict:
+    async def get(self, agent_id: str | None = None) -> dict:
         key = agent_id or "default"
         now = time.monotonic()
         async with self._lock:
@@ -261,7 +261,7 @@ def require_neuro_key(request: Request) -> None:
         raise HTTPException(status_code=403, detail="Neuro access required")
 
 
-def tenant_key(owner: Optional[str], agent_id: Optional[str]) -> Optional[str]:
+def tenant_key(owner: str | None, agent_id: str | None) -> str | None:
     """Scope a caller-supplied agent_id to the identity that owns it.
 
     agent_id is a conversation id that arrives straight from the request body,
@@ -296,7 +296,7 @@ class NeuroService:
     divergent copy of it until something forced a reload.
     """
 
-    def __init__(self, config: Optional[NeuroConfig] = None):
+    def __init__(self, config: NeuroConfig | None = None):
         self.config = config or load_config()
         self.reasoner = create_resilient_reasoning(self.config.reasoning)
         self.embedder = create_resilient_embedding(self.config.embedding)
@@ -306,9 +306,9 @@ class NeuroService:
     async def recall(
         self,
         prompt: str,
-        agent_id: Optional[str] = None,
+        agent_id: str | None = None,
         max_results: int = 5,
-        owner: Optional[str] = None,
+        owner: str | None = None,
     ) -> list[dict]:
         resp = await self.recall_chunks(
             RecallRequest(
@@ -328,9 +328,9 @@ class NeuroService:
         self,
         prompt: str,
         response: str,
-        agent_id: Optional[str] = None,
-        metadata: Optional[dict] = None,
-        owner: Optional[str] = None,
+        agent_id: str | None = None,
+        metadata: dict | None = None,
+        owner: str | None = None,
     ) -> None:
         await self.ingest(
             LearnRequest(
@@ -365,7 +365,7 @@ class NeuroService:
         return NeuroHealthResponse(
             status="ok" if (r_ok and e_ok) else "degraded",
             version="2.1.0",
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             reasoning={**reasoner.status, "healthy": r_ok},
             embedding={**embedder.status, "healthy": e_ok},
             agents_configured=list(config.agents.keys()) + tenants.active_tenants,
@@ -374,7 +374,7 @@ class NeuroService:
         )
 
     async def recall_chunks(
-        self, req: RecallRequest, owner: Optional[str] = None
+        self, req: RecallRequest, owner: str | None = None
     ) -> RecallResponse:
         config, embedder, tenants = self.config, self.embedder, self.tenants
         start = time.perf_counter()
@@ -454,7 +454,7 @@ class NeuroService:
             provider_used=embedder.active_label,
         )
 
-    async def audit(self, req: AuditRequest, owner: Optional[str] = None) -> AuditResponse:
+    async def audit(self, req: AuditRequest, owner: str | None = None) -> AuditResponse:
         config, reasoner, tenants = self.config, self.reasoner, self.tenants
         start = time.perf_counter()
         persona = get_persona(config, req.persona, req.agent_id)
@@ -488,7 +488,7 @@ class NeuroService:
                 provider_used=reasoner.active_label,
             )
 
-    async def ingest(self, req: LearnRequest, owner: Optional[str] = None) -> LearnResponse:
+    async def ingest(self, req: LearnRequest, owner: str | None = None) -> LearnResponse:
         embedder, tenants = self.embedder, self.tenants
         tenant = await tenants.get(tenant_key(owner, req.agent_id))
         # ingest_async(), not ingest(): this runs inside an async request
@@ -543,10 +543,10 @@ class NeuroService:
 
     async def list_sessions(
         self,
-        agent_id: Optional[str] = None,
+        agent_id: str | None = None,
         limit: int = 20,
         offset: int = 0,
-        owner: Optional[str] = None,
+        owner: str | None = None,
     ) -> dict:
         """List recent session entries for browsing memory."""
         tenant = await self.tenants.get(tenant_key(owner, agent_id))
@@ -556,7 +556,7 @@ class NeuroService:
         return {"entries": entries, "total": len(entries)}
 
 
-_service: Optional[NeuroService] = None
+_service: NeuroService | None = None
 
 
 def get_neuro_service() -> NeuroService:
@@ -572,7 +572,7 @@ def get_neuro_service() -> NeuroService:
     return _service
 
 
-def create_neuro_router(config: Optional[NeuroConfig] = None) -> APIRouter:
+def create_neuro_router(config: NeuroConfig | None = None) -> APIRouter:
     """Mount the HTTP surface over a NeuroService.
 
     Passing *config* builds an isolated service (tests); the default shares
@@ -586,7 +586,7 @@ def create_neuro_router(config: Optional[NeuroConfig] = None) -> APIRouter:
     # import would close the cycle.
     from reasoner.api.dependencies import get_optional_user
 
-    async def _owner(user=Depends(get_optional_user)) -> Optional[str]:
+    async def _owner(user=Depends(get_optional_user)) -> str | None:
         """Identity that owns the requested agent_id, or None if anonymous.
 
         Resolved from credentials by FastAPI -- never from the request body,
@@ -606,23 +606,23 @@ def create_neuro_router(config: Optional[NeuroConfig] = None) -> APIRouter:
         return await service.health()
 
     @router.post("/recall", response_model=RecallResponse)
-    async def recall(req: RecallRequest, owner: Optional[str] = Depends(_owner)):
+    async def recall(req: RecallRequest, owner: str | None = Depends(_owner)):
         return await service.recall_chunks(req, owner=owner)
 
     @router.post("/audit", response_model=AuditResponse)
-    async def audit(req: AuditRequest, owner: Optional[str] = Depends(_owner)):
+    async def audit(req: AuditRequest, owner: str | None = Depends(_owner)):
         return await service.audit(req, owner=owner)
 
     @router.post("/learn")
-    async def learn(req: LearnRequest, owner: Optional[str] = Depends(_owner)):
+    async def learn(req: LearnRequest, owner: str | None = Depends(_owner)):
         return await service.ingest(req, owner=owner)
 
     @router.get("/sessions")
     async def list_sessions(
-        agent_id: Optional[str] = None,
+        agent_id: str | None = None,
         limit: int = 20,
         offset: int = 0,
-        owner: Optional[str] = Depends(_owner),
+        owner: str | None = Depends(_owner),
     ):
         return await service.list_sessions(
             agent_id=agent_id, limit=limit, offset=offset, owner=owner

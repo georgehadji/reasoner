@@ -1,15 +1,13 @@
 """Tests for vertical domain configurations."""
 from __future__ import annotations
 
-import pytest
-
-from reasoner.vs_config import VSVerticalRegistry, VSVerticalConfig
 from reasoner.reasoner_vs_constants import (
     VS_K_RADIOLOGY_GENERATION,
-    VS_TAIL_THRESHOLD_RADIOLOGY,
-    VS_TAIL_THRESHOLD_LEGAL,
     VS_TAIL_THRESHOLD_AEROSPACE,
+    VS_TAIL_THRESHOLD_LEGAL,
+    VS_TAIL_THRESHOLD_RADIOLOGY,
 )
+from reasoner.vs_config import VSVerticalConfig, VSVerticalRegistry
 
 
 class TestVerticalRegistry:
@@ -52,7 +50,8 @@ class TestVerticalRegistry:
     def test_auto_register_on_import(self) -> None:
         # Re-import modules to trigger registration after clear
         import importlib
-        from reasoner.vs_vertical_configs import radiology_config, legal_config, aerospace_config
+
+        from reasoner.vs_vertical_configs import aerospace_config, legal_config, radiology_config
         importlib.reload(radiology_config)
         importlib.reload(legal_config)
         importlib.reload(aerospace_config)

@@ -15,19 +15,17 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
-from reasoner.domain.model_capabilities import (
-    ModelCapabilities,
-    ModelConstraints,
-    ModelProfile,
-)
-from reasoner.domain.task_requirements import TaskRequirement
-from reasoner.domain.scoring_weights import ScoringWeights, get_weights_for_tier
+from reasoner.application.services.constraint_resolver import ConstraintResolver
 from reasoner.application.services.role_requirements import (
     ACR_EXCLUDED_ROLES,
     get_requirement,
 )
 from reasoner.application.services.utility_scorer import COLD_START_SCORE, UtilityScorer
-from reasoner.application.services.constraint_resolver import ConstraintResolver
+from reasoner.domain.model_capabilities import (
+    ModelProfile,
+)
+from reasoner.domain.scoring_weights import get_weights_for_tier
+from reasoner.domain.task_requirements import TaskRequirement
 
 logger = logging.getLogger(__name__)
 

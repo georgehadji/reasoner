@@ -8,8 +8,8 @@ from fastapi import HTTPException
 from reasoner.api.auth_deps import (
     _get_auth_manager_instance_auth_deps,
     _get_rate_limiter_instance_auth_deps,
-    require_auth,
     optional_auth,
+    require_auth,
     require_csrf,
 )
 from reasoner.api.dependencies import check_rate_limit
@@ -47,7 +47,6 @@ class TestRequireAuth:
 
     @pytest.mark.asyncio
     async def test_missing_credentials_raises_401(self):
-        from fastapi.security import HTTPAuthorizationCredentials
         with pytest.raises(HTTPException) as exc_info:
             await require_auth(None)  # type: ignore[arg-type]
         assert exc_info.value.status_code == 401

@@ -11,13 +11,12 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
 from reasoner.api.auth_deps import require_csrf
-
 from reasoner.api.schemas import SuggestionRequestModel
 from reasoner.application.commands import ExecuteWidgetCommand
-from reasoner.presets import PRESETS
 from reasoner.infrastructure.llm.registry import list_models
+from reasoner.presets import PRESETS
 from reasoner.sanitization import sanitize_for_prompt
-from reasoner.suggestions import generate_suggestions_async, SuggestionRequest
+from reasoner.suggestions import SuggestionRequest, generate_suggestions_async
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

@@ -6,14 +6,15 @@ Orchestrates deletion of user data across event store, cache, and neuro memory.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from reasoner.infrastructure.persistence.event_store import EventStore
 
 logger = logging.getLogger(__name__)
 
 
-from typing import Callable
+from collections.abc import Callable
+
 
 class UserDataEraser:
     """Application service for GDPR right-to-be-forgotten erasure.
@@ -65,7 +66,7 @@ class UserDataEraser:
 
         # 3. Neuro memory — best-effort clear
         try:
-            from reasoner.neuro.sessions import SessionManager
+            pass
             # SessionManager operates on per-user data directories; clearing the
             # cache ensures no hot-session data remains in memory. Full file-level
             # deletion would require knowing the neuro data path per user.
@@ -90,7 +91,7 @@ class UserDataEraser:
             "deleted_aggregates": deleted_aggregates,
             "deleted_pipelines": deleted_pipelines,
             "cache_evicted": cache_evicted,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "status": status,
         }
         if aggregates_error:

@@ -13,8 +13,7 @@ pytest.skip(
     allow_module_level=True,
 )
 
-from reasoner.application.flows import PipelineFlow, PhaseStep, build_default_flow_registry
-from reasoner.application.flows.pipeline_flow import PhaseFn
+from reasoner.application.flows import PhaseStep, PipelineFlow, build_default_flow_registry
 from reasoner.models import PipelineState
 
 
@@ -95,8 +94,8 @@ class TestBuildDefaultFlowRegistry:
             primary_id="deepseek-v3",
             routing={},
         )
-        from reasoner.pipeline import ReasonerPipeline
         from reasoner.models import PipelineState
+        from reasoner.pipeline import ReasonerPipeline
         initial_state = PipelineState(problem="test", complexity="medium")
         return ReasonerPipeline(router=router, preset_name="multi-perspective-budget", initial_state=initial_state)
 
@@ -188,8 +187,9 @@ class TestBuildDefaultFlowRegistry:
 
 class TestCriticalPhaseHalting:
     def test_critical_phase_failure_halts_sequence(self):
-        from reasoner.pipeline import ReasonerPipeline
         from unittest.mock import MagicMock
+
+        from reasoner.pipeline import ReasonerPipeline
 
         async def retrieve_sources(state: PipelineState) -> None:
             state.writing_state["retrieved_sources"] = []
@@ -222,8 +222,9 @@ class TestCriticalPhaseHalting:
         assert "synthesized" not in state.writing_state
 
     def test_non_critical_phase_failure_does_not_halt(self):
-        from reasoner.pipeline import ReasonerPipeline
         from unittest.mock import MagicMock
+
+        from reasoner.pipeline import ReasonerPipeline
 
         async def decompose(state: PipelineState) -> None:
             state.writing_state["subquestions"] = []

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-from datetime import datetime
 from typing import Any
 
 from reasoner.domain.pipeline_state import PipelineState
@@ -73,7 +71,7 @@ def _ser_1_5(state: PipelineState) -> dict:
     raw = _get_v(state, "vetted_context", [])
     if not raw:
         raw = _get_v(state, "web_discovery_results", [])
-        
+
     # Return vetted results that contain deep read extractions
     clean = []
     for r in raw:
@@ -400,7 +398,7 @@ def _ser_3(state: PipelineState) -> dict:
         for cs in critic_scores:
             candidate_scores = _get_v(cs, 'candidate_scores', {})
             serialized_candidates = {}
-            
+
             # Extract items from candidate_scores safely
             items = candidate_scores.items() if hasattr(candidate_scores, 'items') else []
             for gid, ds in items:
@@ -411,7 +409,7 @@ def _ser_3(state: PipelineState) -> dict:
                     "helpfulness": _get_v(ds, 'helpfulness'),
                     "total": _get_v(ds, 'total'),
                 }
-                
+
             serialized_scores.append({
                 "critic_id": _get_v(cs, 'critic_id'),
                 "critic_model": _get_v(cs, 'critic_model'),
@@ -419,7 +417,7 @@ def _ser_3(state: PipelineState) -> dict:
                 "ranking": _get_v(cs, 'ranking'),
                 "dissenting_note": _get_v(cs, 'dissenting_note'),
             })
-            
+
         return {
             "critic_scores": serialized_scores,
             "tokens": state.phase_tokens.get("Phase 3: Critic Pool", {"input": 0, "output": 0}),

@@ -11,7 +11,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from reasoner.core.evolution_constants import (
-    EVOLUTION_MAX_MUTATIONS_PER_RUN,
     EVOLUTION_MAX_REGRESSION,
     EVOLUTION_MIN_IMPROVEMENT_DELTA,
 )

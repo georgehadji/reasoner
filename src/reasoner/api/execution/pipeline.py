@@ -1,42 +1,46 @@
 
-import asyncio
-import uuid
+import hashlib
 import logging
 import time
-import hashlib
-import json
-from typing import Callable, Awaitable, Any
+import uuid
+from collections.abc import Awaitable, Callable
+from datetime import UTC
+from typing import Any
 
+from reasoner.api.execution.cancel import StreamingConnectionContext
+from reasoner.api.execution.direct import _stream_direct_answer
+from reasoner.api.execution.web_search import _stream_web_search_results
+from reasoner.api.history import HISTORY_DIR, HistoryEntry, _save_history_entry
+from reasoner.api.phase_executor import (
+    get_critical_phases,
+    get_phase_start_models,
+    run_phase_with_keepalive,
+)
+from reasoner.api.schemas import RunRequest
+from reasoner.api.sse_utils import _persist_event
+from reasoner.api.streaming import _get_phase_subagents
 from reasoner.application.commands import RunPipelineCommand
-from reasoner.domain.pipeline_state import PipelineState
-from reasoner.domain.models import TaskType
-from reasoner.infrastructure.llm.router import ProviderRouter
-from reasoner.application.services.preset_service import PresetService
+from reasoner.application.orchestrator import PipelineOrchestrator
+from reasoner.application.services.adaptive_routing import build_adaptive_routing_service
 from reasoner.application.services.pipeline_service import PipelineService
+from reasoner.application.services.preset_service import PresetService
 from reasoner.application.services.spend_limit_service import (
     apply_spend_limits,
     check_run_allowed,
     resolve_user_tier,
 )
-from reasoner.application.orchestrator import PipelineOrchestrator
-from reasoner.application.services.adaptive_routing import build_adaptive_routing_service
+from reasoner.core.constants import TRUNCATION, get_phase_retry_budget, get_phase_timeout
+from reasoner.core.events.domain_events import EventType, make_event
+from reasoner.core.exceptions import ErrorCode, error_code_for_exception
 from reasoner.core.logging_utils import set_correlation_id
-from reasoner.api.schemas import RunRequest
-from reasoner.api.streaming import _get_phase_subagents
-from reasoner.api.execution.direct import _stream_direct_answer
-from reasoner.api.execution.web_search import _stream_web_search_results
-from reasoner.api.execution.cancel import StreamingConnectionContext
-from reasoner.api.history import HistoryEntry, _save_history_entry, HISTORY_DIR
+from reasoner.domain.models import TaskType
+from reasoner.domain.pipeline_state import PipelineState
+from reasoner.exceptions import classify_error, is_retryable
+from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.infrastructure.persistence.pipeline_ownership_repo import get_pipeline_ownership_repo
 from reasoner.infrastructure.redis.run_state import _run_state_manager as _run_store
-from reasoner.core.events.domain_events import make_event, EventType
-from reasoner.api.sse_utils import _event, _broadcast_ws, _persist_event
-from reasoner.api.phase_executor import get_phase_start_models, get_critical_phases, run_phase_with_keepalive
-from reasoner.core.constants import TRUNCATION, get_phase_retry_budget, get_phase_timeout
-from reasoner.exceptions import classify_error, is_retryable
-from reasoner.core.exceptions import ErrorCode, error_code_for_exception
-from reasoner.quality import PhaseMonitor, reset_phase_state
 from reasoner.presets import get_method_from_preset
+from reasoner.quality import PhaseMonitor, reset_phase_state
 
 logger = logging.getLogger(__name__)
 
@@ -59,15 +63,14 @@ class PipelineExecutionService:
             sequential=not command.parallel,
             client_run_id=command.command_id
         )
-        
+
         preset_service = PresetService()
         pipeline_service = PipelineService()
         request = None
-        
+
         from reasoner.core.settings import settings as _settings
 
         run_id = req.client_run_id or str(uuid.uuid4())
-        from reasoner.core.logging_utils import set_correlation_id
         set_correlation_id(run_id)
         event_version = 1
         state: PipelineState | None = None
@@ -212,7 +215,8 @@ class PipelineExecutionService:
             # ── Wire event bus for domain event sourcing ──
             from reasoner.application.event_bus.bus import get_event_bus
             from reasoner.application.services.event_emission_service import (
-                EventEmissionService, set_event_emitter,
+                EventEmissionService,
+                set_event_emitter,
             )
             emitter = EventEmissionService(get_event_bus(), aggregate_id=run_id)
             set_event_emitter(emitter)
@@ -290,19 +294,19 @@ class PipelineExecutionService:
             flow_factory = WorkflowFactory()
             method = state.method or pipeline._get_method_from_preset()
             strategy = flow_factory.get_strategy(method)
-        
+
             phases: list[tuple[int, str, Any, Any]] = []
             step_metadata: dict[str, dict[str, Any]] = {}
             if strategy:
                 for step in strategy.get_phases(state):
-                
+
                     # Wrap the step function so that it accepts only (state)
                     # and calls the strategy function with (state, _services)
                     def make_wrapper(fn):
                         async def wrapper(state: PipelineState):
                             await fn(state, _services)
                         return wrapper
-                    
+
                     phases.append((step.num, step.name, make_wrapper(step.fn), step.serializer))
                     step_metadata[step.name] = {"critical": step.critical}
 
@@ -312,7 +316,9 @@ class PipelineExecutionService:
                 from reasoner.application.services.egress_policy import resolve_egress_policy
                 if resolve_egress_policy().layer_b_enabled and phases:
                     from reasoner.application.flows.base import PhaseStep
-                    from reasoner.application.flows.egress_rewrite_phase import run_egress_rewrite_phase
+                    from reasoner.application.flows.egress_rewrite_phase import (
+                        run_egress_rewrite_phase,
+                    )
                     from reasoner.application.services.serializers import _ser_egress_rewrite
                     egress_step = PhaseStep(
                         phases[-1][0] + 0.5, "Egress Rewrite", run_egress_rewrite_phase, _ser_egress_rewrite
@@ -388,7 +394,7 @@ class PipelineExecutionService:
                             return
                         # Success — break the retry loop
                         break
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         logger.error("Phase %s (%s) timed out after %ss", num, name, phase_timeout)
                         err_msg = f"Phase timeout: {name} exceeded {phase_timeout}s"
                         state.errors.append(err_msg)
@@ -604,9 +610,9 @@ class PipelineExecutionService:
             total_tokens = total_input + total_output
 
             try:
-                from datetime import datetime, timezone
+                from datetime import datetime
 
-                ts = datetime.now(timezone.utc).isoformat()
+                ts = datetime.now(UTC).isoformat()
                 entry = HistoryEntry(
                     id=hashlib.sha256(f"{req.problem}{ts}".encode()).hexdigest()[:16],
                     user_id=user_id,
@@ -620,9 +626,9 @@ class PipelineExecutionService:
                 _save_history_entry(entry)
 
                 try:
-                    from reasoner.core.memory import TaggedMemory
-
                     import re as _re
+
+                    from reasoner.core.memory import TaggedMemory
                     _sanitize = lambda s: _re.sub(r'[^a-zA-Z0-9_-]', '_', s or 'unknown')
                     tagged = TaggedMemory(HISTORY_DIR)
                     method_tag = f"method_{_sanitize(entry.method)}"
@@ -663,7 +669,7 @@ class PipelineExecutionService:
         except Exception as exc:
             logger.error("Pipeline error for run %s: %s", run_id, exc, exc_info=True)
             err_msg = f"Pipeline processing error: {type(exc).__name__}: {str(exc)[:120]}"
-        
+
             # Persist pipeline failure
             fail_evt = make_event(
                 EventType.PIPELINE_FAILED,

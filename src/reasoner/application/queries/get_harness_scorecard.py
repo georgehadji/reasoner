@@ -5,8 +5,7 @@ A read-only query that returns a HarnessScorecard without side effects.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any
+from dataclasses import dataclass
 
 from reasoner.application.services.scorecard_service import ScorecardService
 from reasoner.domain.harness_metrics import HarnessScorecard

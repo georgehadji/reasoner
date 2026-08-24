@@ -1,19 +1,15 @@
 """Tests for vs_coverage_audit stage."""
 from __future__ import annotations
-from tests.utils.mocks import MockLLM, MockNLI
 
 import pytest
-from unittest.mock import AsyncMock
 
 from reasoner.phases.vs_coverage_audit import (
-    audit_claim_coverage_vs,
-    CoverageAuditResult,
     GapType,
     _check_overlap_with_evidence,
+    audit_claim_coverage_vs,
 )
 from reasoner.vs_config import VSFeatureFlags
-
-
+from tests.utils.mocks import MockLLM
 
 
 @pytest.fixture

@@ -1,12 +1,12 @@
-import sys
 import re
 from pathlib import Path
+
 
 def main():
     repo_root = Path(__file__).parent.parent.resolve()
     streaming_path = repo_root / "src" / "reasoner" / "api" / "streaming.py"
-    
-    with open(streaming_path, "r", encoding="utf-8") as f:
+
+    with open(streaming_path, encoding="utf-8") as f:
         content = f.read()
 
     # The new run_stream implementation
@@ -65,27 +65,27 @@ def main():
 
     # We want to keep everything up to `# Creative-writing model tiers`
     # Because _stream_direct_answer, _stream_web_search_results, run_stream follow that.
-    
+
     start_match = re.search(r'# Creative-writing model tiers', content)
     if not start_match:
         print("Could not find '# Creative-writing model tiers'")
         return
-        
+
     start_idx = start_match.start()
-    
+
     # And we want to keep everything from `async def run_followup_stream` to the end
     end_match = re.search(r'async def run_followup_stream\(', content[start_idx:])
     if not end_match:
         print("Could not find 'run_followup_stream'")
         return
-        
+
     end_idx = start_idx + end_match.start()
-    
+
     new_content = content[:start_idx] + "\n" + new_run_stream + "\n\n" + content[end_idx:]
-    
+
     with open(streaming_path, "w", encoding="utf-8") as f:
         f.write(new_content)
-        
+
     print("Fixed streaming.py")
 
 if __name__ == "__main__":

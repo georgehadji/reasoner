@@ -7,22 +7,21 @@ Verifies three defense layers:
 3. Runtime scrubbing of external content (pipeline.py)
 """
 
-import json
-import pytest
 from unittest.mock import AsyncMock, patch
 
+import pytest
 from pydantic import ValidationError
 
+from reasoner.core.settings import settings
 from reasoner.models import PipelineState
 from reasoner.phases import (
+    _wrap_external_content,
+    _wrap_user_input,
     classification_prompt,
     deep_read_prompt,
     shallow_read_prompt,
-    _wrap_user_input,
-    _wrap_external_content,
 )
 from reasoner.sanitization import sanitize_for_prompt
-from reasoner.core.settings import settings
 
 
 @pytest.fixture(autouse=True)

@@ -9,10 +9,10 @@ from __future__ import annotations
 import threading
 from typing import Optional
 
-from reasoner.core.settings import settings
 from reasoner.application.ports.auth_port import AuthPort
+from reasoner.core.settings import settings
 
-_auth_adapter: Optional[AuthPort] = None
+_auth_adapter: AuthPort | None = None
 _auth_lock = threading.Lock()
 
 

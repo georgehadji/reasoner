@@ -9,7 +9,7 @@ from reasoner.core.ports.translation_port import TranslationResult
 
 logger = logging.getLogger(__name__)
 
-_composite: "CompositeTranslator | None" = None
+_composite: CompositeTranslator | None = None
 
 
 class CompositeTranslator:

@@ -3,20 +3,22 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, List
-from reasoner.domain.pipeline_state import PipelineState
-from reasoner.application.flows.base import WorkflowStrategy, WorkflowServices, PhaseStep
+from typing import Any
+
+import reasoner.phases as phases
+from reasoner.application.flows.base import PhaseStep, WorkflowServices, WorkflowStrategy
 from reasoner.application.flows.brainstorming_phases import (
-    run_brainstorm_generate_phase,
     run_brainstorm_cluster_phase,
     run_brainstorm_develop_phase,
-    run_brainstorm_synthesis_phase
+    run_brainstorm_generate_phase,
+    run_brainstorm_synthesis_phase,
 )
 from reasoner.application.services.serializers import _ser_2, _ser_3, _ser_4, _ser_synthesis
+from reasoner.domain.pipeline_state import PipelineState
 from reasoner.infrastructure.search.discovery import get_search_client_for_method
 from reasoner.parsing import extract_json
-import reasoner.phases as phases
 from reasoner.presets import get_preset_price_tier
+
 
 async def run_brainstorm_prior_art_search_phase(state: PipelineState, services: WorkflowServices) -> None:
     """Search for existing solutions and prior art before ideation."""
@@ -59,8 +61,8 @@ class BrainstormingFlow(WorkflowStrategy):
     3. Deep Development
     4. Synthesis
     """
-    
-    def get_phases(self, state: PipelineState) -> List[PhaseStep]:
+
+    def get_phases(self, state: PipelineState) -> list[PhaseStep]:
         return [
             PhaseStep(1.5, "Prior Art Search", run_brainstorm_prior_art_search_phase, _ser_2),
             PhaseStep(2, "VS Idea Generation", run_brainstorm_generate_phase, _ser_2),
@@ -70,8 +72,8 @@ class BrainstormingFlow(WorkflowStrategy):
         ]
 
     async def execute(
-        self, 
-        state: PipelineState, 
+        self,
+        state: PipelineState,
         services: WorkflowServices,
         config: Any = None
     ) -> PipelineState:
@@ -79,5 +81,5 @@ class BrainstormingFlow(WorkflowStrategy):
             success = await services.run_phase(step, state)
             if not success and step.critical:
                 break
-            
+
         return state

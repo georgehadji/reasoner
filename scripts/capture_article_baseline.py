@@ -24,17 +24,15 @@ import argparse
 import json
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 # Add project root and src to sys.path so we can import reasoner
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from tests.test_article_golden_set import capture_baseline, GOLDEN_SET
+from reasoner.domain.pricing import PRICING_DB
+from tests.test_article_golden_set import GOLDEN_SET, capture_baseline
 from tests.test_article_presets import ARTICLE_PRESET_NAMES
-from reasoner.domain.preset_registry import PRESETS
-from reasoner.domain.pricing import get_pricing, PRICING_DB
-
 
 BASELINE_PATH = os.path.join(
     os.path.dirname(__file__), "..", "tests", "_data", "article_baseline.json"
@@ -60,7 +58,7 @@ def collect_full_baseline() -> dict:
     baseline["cost_baseline"] = _collect_cost_baseline()
 
     # Add metadata
-    baseline["meta"]["captured_at"] = datetime.now(timezone.utc).isoformat()
+    baseline["meta"]["captured_at"] = datetime.now(UTC).isoformat()
     baseline["meta"]["preset_count"] = len(ARTICLE_PRESET_NAMES)
     baseline["meta"]["pricing_db_entries"] = len(PRICING_DB)
 
@@ -79,7 +77,7 @@ def load_baseline(path: str = BASELINE_PATH) -> dict | None:
     """Load saved baseline JSON from disk."""
     if not os.path.exists(path):
         return None
-    with open(path, "r", encoding="utf-8") as fh:
+    with open(path, encoding="utf-8") as fh:
         return json.load(fh)
 
 
@@ -147,7 +145,7 @@ def main() -> None:
         return
 
     print(f"\nGolden set: {len(GOLDEN_SET)} entries")
-    print(f"Cost baseline:")
+    print("Cost baseline:")
     for name, cost in baseline.get("cost_baseline", {}).items():
         print(f"  {name}: ${cost:.6f}")
     print(f"Pricing DB: {len(PRICING_DB)} entries")

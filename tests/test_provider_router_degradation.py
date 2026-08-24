@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import asyncio
-import pytest
 from unittest.mock import patch
 
-from reasoner.infrastructure.llm.router import ProviderRouter
+import pytest
+
 from reasoner.infrastructure.llm.ports import DegradedLLMResponse
+from reasoner.infrastructure.llm.router import ProviderRouter
 
 
 class FakeProvider:
@@ -15,7 +15,7 @@ class FakeProvider:
         self.model = model
 
     async def complete_with_retry(self, *args, **kwargs):
-        raise asyncio.TimeoutError("always times out")
+        raise TimeoutError("always times out")
 
 
 @pytest.mark.asyncio
@@ -46,7 +46,7 @@ async def test_all_providers_blocked_returns_degraded_response():
     with patch.object(settings, "MULTI_PROVIDER_FALLBACK_ENABLED", False):
         with patch(
             "reasoner.infrastructure.llm.router._call_with_circuit",
-            side_effect=asyncio.TimeoutError("timed out"),
+            side_effect=TimeoutError("timed out"),
         ):
             result, _metadata = await router.call(
                 role="primary",

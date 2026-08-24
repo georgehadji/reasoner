@@ -5,8 +5,8 @@ from __future__ import annotations
 import logging
 import time
 
-from reasoner.infrastructure.persistence.quota_repo_postgres import PostgresQuotaRepository
 from reasoner.core.settings import settings
+from reasoner.infrastructure.persistence.quota_repo_postgres import PostgresQuotaRepository
 
 logger = logging.getLogger(__name__)
 
@@ -35,8 +35,9 @@ async def run_neuro_maintenance() -> dict:
 
     try:
         from pathlib import Path
+
         from reasoner.neuro.config import NeuroConfig, load_config
-        from reasoner.neuro.sessions import SessionManager, SessionConfig
+        from reasoner.neuro.sessions import SessionConfig, SessionManager
 
         config = load_config() or NeuroConfig()
         agents_dir = Path(config.data_dir) / "agents"

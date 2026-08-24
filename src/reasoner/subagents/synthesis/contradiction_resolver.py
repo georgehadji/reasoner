@@ -6,9 +6,8 @@ from __future__ import annotations
 from typing import Any
 
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.subagents.base import PhaseSubAgent
 from reasoner.parsing import extract_json
-
+from reasoner.subagents.base import PhaseSubAgent
 
 CONTRADICTION_SYSTEM = """You are a Contradiction Resolver. Your ONE JOB is to read all perspective candidates and identify where they DIRECTLY CONTRADICT each other.
 

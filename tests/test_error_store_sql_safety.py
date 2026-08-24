@@ -5,6 +5,7 @@ SQL string formatting in _prune_old, _query_sync, and _stats_sync.
 """
 
 import pytest
+
 from reasoner.infrastructure.persistence.error_store import ErrorStore
 
 

@@ -16,8 +16,8 @@ from reasoner.core.constants import (
 from reasoner.quality.criteria import PhaseQualityResult, evaluate_rules
 
 if TYPE_CHECKING:
-    from reasoner.infrastructure.llm.router import ProviderRouter
     from reasoner.domain.pipeline_state import PipelineState
+    from reasoner.infrastructure.llm.router import ProviderRouter
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +118,7 @@ _PHASE_SUMMARIES: dict[str, str] = {
 }
 
 
-def _build_format_values(state: "PipelineState") -> dict:
+def _build_format_values(state: PipelineState) -> dict:
     """Return all template substitution values derived from pipeline state."""
     ws = getattr(state, "writing_state", {}) or {}
     sol = getattr(state, "final_solution", None)
@@ -152,13 +152,13 @@ def _build_summary(phase_name: str, values: dict) -> str:
 class PhaseMonitor:
     """Evaluates phase output quality using rule-based checks with LLM fallback."""
 
-    def __init__(self, router: "ProviderRouter", preset_name: str = "") -> None:
+    def __init__(self, router: ProviderRouter, preset_name: str = "") -> None:
         self._router = router
         self._judge_model = get_quality_judge_model(preset_name)
         self._threshold = get_quality_judge_threshold(preset_name)
 
     async def evaluate(
-        self, phase_name: str, state: "PipelineState", attempt: int = 1
+        self, phase_name: str, state: PipelineState, attempt: int = 1
     ) -> PhaseQualityResult:
         result = evaluate_rules(phase_name, state)
         if result.passed:
@@ -170,7 +170,7 @@ class PhaseMonitor:
                 timeout=_JUDGE_TIMEOUT,
             )
             return llm_result
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning("LLM judge timed out for phase %r — using rule result", phase_name)
             return result
         except Exception as exc:
@@ -180,7 +180,7 @@ class PhaseMonitor:
     async def _llm_judge(
         self,
         phase_name: str,
-        state: "PipelineState",
+        state: PipelineState,
         rule_result: PhaseQualityResult,
         *,
         attempt: int = 1,

@@ -11,25 +11,25 @@ Methods:
 
 from __future__ import annotations
 
+import io as _io
 import json
+import sys as _sys
 from dataclasses import asdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
+from rich import box
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
-from rich import box
 
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.models import (
     ClaimLabel,
-    PerspectiveType,
 )
 
-import sys as _sys, io as _io
 _stdout_utf8 = _io.TextIOWrapper(_sys.stdout.buffer, encoding="utf-8", errors="replace") if hasattr(_sys.stdout, "buffer") else _sys.stdout
 console = Console(highlight=False, emoji=False, file=_stdout_utf8)
 
@@ -129,7 +129,7 @@ def _label_color(label: ClaimLabel) -> str:
 
 
 def _duration(state: PipelineState) -> float:
-    return (datetime.now(timezone.utc) - state.started_at).total_seconds()
+    return (datetime.now(UTC) - state.started_at).total_seconds()
 
 
 
@@ -152,11 +152,11 @@ def _render_action_blueprint(state: PipelineState, title: str = "Action Blueprin
     fs = state.final_solution
     if not fs:
         return
-    
+
     action_blueprint = _get_attr(fs, 'action_blueprint', [])
     if not action_blueprint:
         return
-        
+
     table = Table(title=title, box=box.SIMPLE_HEAVY)
     table.add_column("#", width=3)
     table.add_column("Action")
@@ -235,11 +235,11 @@ def _render_cost_summary(state: PipelineState) -> None:
     # Only show if we have cost data
     if state.total_cost_usd == 0.0 and not state.phase_costs:
         return
-    
-    from rich.table import Table
-    from rich.panel import Panel
+
     from rich import box
-    
+    from rich.panel import Panel
+    from rich.table import Table
+
     # Build cost table
     table = Table(title="💰 Pipeline Cost Summary", box=box.ROUNDED, show_header=True)
     table.add_column("Phase", style="cyan", width=30)
@@ -247,19 +247,19 @@ def _render_cost_summary(state: PipelineState) -> None:
     table.add_column("Input Tokens", justify="right", style="green")
     table.add_column("Output Tokens", justify="right", style="yellow")
     table.add_column("Cost (USD)", justify="right", style="bold magenta")
-    
+
     total_input = 0
     total_output = 0
-    
+
     for phase, cost in state.phase_costs.items():
         usage = state.detailed_token_usage.get(phase, {})
         input_tok = usage.get("input", 0)
         output_tok = usage.get("output", 0)
         model = usage.get("model", state.phase_models.get(phase, "unknown"))
-        
+
         total_input += input_tok
         total_output += output_tok
-        
+
         table.add_row(
             phase.replace("_", " ").title(),
             model,
@@ -267,7 +267,7 @@ def _render_cost_summary(state: PipelineState) -> None:
             f"{output_tok:,}",
             f"${cost:.4f}",
         )
-    
+
     # Total row
     table.add_row(
         "[bold]TOTAL[/bold]",
@@ -276,9 +276,9 @@ def _render_cost_summary(state: PipelineState) -> None:
         f"[bold]{total_output:,}[/bold]",
         f"[bold]${state.total_cost_usd:.4f}[/bold]",
     )
-    
+
     console.print(table)
-    
+
     # Additional context for free models
     if state.total_cost_usd == 0.0:
         console.print(Panel(

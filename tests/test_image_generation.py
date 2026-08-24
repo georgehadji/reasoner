@@ -7,25 +7,25 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from reasoner.infrastructure.llm.image_generation import (
-    _heuristic_policy_safe_rewrite,
-    _normalize_image_data,
-    _rewrite_prompt_for_policy_safety,
-    _resolve_first_image_candidate,
-    _should_retry_with_policy_safe_prompt,
-    _should_prefer_images_api,
-    _get_modalities,
-    _resolve_model_config,
-    generate_images,
-    generate_image_with_model,
-    ImageGenerationError,
-)
 from reasoner.core.constants_limits import (
     IMAGE_GEN_FALLBACKS,
     IMAGE_GEN_IMAGE_COUNT,
     IMAGE_GEN_PRESETS,
 )
 from reasoner.domain.preset_registry import PRESETS, get_preset
+from reasoner.infrastructure.llm.image_generation import (
+    ImageGenerationError,
+    _get_modalities,
+    _heuristic_policy_safe_rewrite,
+    _normalize_image_data,
+    _resolve_first_image_candidate,
+    _resolve_model_config,
+    _rewrite_prompt_for_policy_safety,
+    _should_prefer_images_api,
+    _should_retry_with_policy_safe_prompt,
+    generate_image_with_model,
+    generate_images,
+)
 
 
 class TestResolveModelConfig:

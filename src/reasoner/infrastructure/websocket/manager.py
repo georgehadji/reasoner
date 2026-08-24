@@ -10,18 +10,18 @@ Supports:
 
 from __future__ import annotations
 
-import json
 import asyncio
+import json
 import logging
 from collections import deque
-from typing import Any, Set, Dict
-from dataclasses import dataclass, asdict
-
-from reasoner.utils.json_safe import safe_json_loads, JSONDepthExceededError
+from dataclasses import dataclass
+from typing import Any
 
 from fastapi import WebSocket, WebSocketDisconnect
 from starlette.websockets import WebSocketState
+
 from reasoner.core.constants import DEFAULT_HEARTBEAT_INTERVAL
+from reasoner.utils.json_safe import JSONDepthExceededError, safe_json_loads
 
 try:
     from reasoner.metrics import REASONER_WEBSOCKET_CONNECTIONS
@@ -76,35 +76,35 @@ class WebSocketManager:
     - Automatic reconnection support
     - Heartbeat/ping-pong
     """
-    
+
     def __init__(self, max_connections: int = 5000, max_replay_events: int = 100):
         # Active connections: {connection_id: websocket}
-        self.active_connections: Dict[str, WebSocket] = {}
-        
+        self.active_connections: dict[str, WebSocket] = {}
+
         # Subscriptions: {pipeline_id: set[connection_id]}
-        self.subscriptions: Dict[str, Set[str]] = {}
-        
+        self.subscriptions: dict[str, set[str]] = {}
+
         # Connection metadata: {connection_id: metadata}
-        self.connection_metadata: Dict[str, dict[str, Any]] = {}
-        
+        self.connection_metadata: dict[str, dict[str, Any]] = {}
+
         # Replay buffer: {pipeline_id: deque[WebSocketMessage]}
-        self._replay_buffers: Dict[str, deque[WebSocketMessage]] = {}
-        
+        self._replay_buffers: dict[str, deque[WebSocketMessage]] = {}
+
         # Background task for heartbeats
         self._heartbeat_task: asyncio.Task | None = None
-        
+
         # Global lock for state mutations
         self._lock: asyncio.Lock = asyncio.Lock()
-        
+
         # Per-connection locks to reduce contention on broadcast/send
         self._connection_locks: dict[str, asyncio.Lock] = {}
-        
+
         # Connection cap to prevent FD exhaustion
         self._max_connections: int = max_connections
-        
+
         # Max events to retain per pipeline for replay
         self._max_replay_events: int = max_replay_events
-    
+
     async def connect(
         self,
         websocket: WebSocket,
@@ -131,7 +131,7 @@ class WebSocketManager:
         await websocket.accept(subprotocol=subprotocol)
 
         logger.info(f"WebSocket connected: {connection_id}")
-        
+
         # Send welcome message outside the lock to avoid deadlock
         # if send_to_connection also tries to acquire the lock.
         await self.send_to_connection(
@@ -141,7 +141,7 @@ class WebSocketManager:
                 data={'connection_id': connection_id},
             ),
         )
-    
+
     def disconnect(self, connection_id: str) -> None:
         """Remove disconnected connection."""
         # asyncio.Lock is not re-entrant, so if this is called from a
@@ -152,7 +152,7 @@ class WebSocketManager:
             async with self._lock:
                 if connection_id in self.active_connections:
                     del self.active_connections[connection_id]
-                
+
                 # Remove from all subscriptions
                 for pipeline_id in list(self.subscriptions.keys()):
                     if connection_id in self.subscriptions[pipeline_id]:
@@ -161,10 +161,10 @@ class WebSocketManager:
                         if not self.subscriptions[pipeline_id]:
                             del self.subscriptions[pipeline_id]
                             self._replay_buffers.pop(pipeline_id, None)
-                
+
                 if connection_id in self.connection_metadata:
                     del self.connection_metadata[connection_id]
-                
+
                 # Clean up per-connection lock
                 self._connection_locks.pop(connection_id, None)
 
@@ -172,7 +172,7 @@ class WebSocketManager:
                 REASONER_WEBSOCKET_CONNECTIONS.set(len(self.active_connections))
 
             logger.info(f"WebSocket disconnected: {connection_id}")
-        
+
         # Schedule the async cleanup on the running loop.
         try:
             loop = asyncio.get_running_loop()
@@ -185,7 +185,7 @@ class WebSocketManager:
         except RuntimeError:
             # No running loop (should not happen in production)
             logger.warning(f"No event loop available to disconnect {connection_id}")
-    
+
     async def subscribe(self, connection_id: str, pipeline_id: str) -> None:
         """Subscribe connection to pipeline updates.
         
@@ -196,25 +196,25 @@ class WebSocketManager:
             if pipeline_id not in self.subscriptions:
                 self.subscriptions[pipeline_id] = set()
             self.subscriptions[pipeline_id].add(connection_id)
-            
+
             # Replay buffered events (copy outside lock)
             buffer = list(self._replay_buffers.get(pipeline_id, []))
-        
+
         for msg in buffer:
             try:
                 await self.send_to_connection(connection_id, msg)
             except Exception as e:
                 logger.warning(f"Replay send failed to {connection_id}: {e}")
                 break
-        
+
         logger.info(f"Connection {connection_id} subscribed to pipeline {pipeline_id}")
-    
+
     async def unsubscribe(self, connection_id: str, pipeline_id: str) -> None:
         """Unsubscribe connection from pipeline updates."""
         async with self._lock:
             if pipeline_id in self.subscriptions:
                 self.subscriptions[pipeline_id].discard(connection_id)
-    
+
     async def broadcast_to_pipeline(
         self,
         pipeline_id: str,
@@ -226,18 +226,18 @@ class WebSocketManager:
             if pipeline_id not in self._replay_buffers:
                 self._replay_buffers[pipeline_id] = deque(maxlen=self._max_replay_events)
             self._replay_buffers[pipeline_id].append(message)
-            
+
             if pipeline_id not in self.subscriptions:
                 return
             connection_ids = list(self.subscriptions[pipeline_id])
-        
+
         for connection_id in connection_ids:
             try:
                 await self.send_to_connection(connection_id, message)
             except Exception as e:
                 logger.error(f"Failed to send to {connection_id}: {e}")
                 self.disconnect(connection_id)
-    
+
     async def send_to_connection(
         self,
         connection_id: str,
@@ -248,16 +248,16 @@ class WebSocketManager:
             if connection_id not in self.active_connections:
                 return
             websocket = self.active_connections[connection_id]
-            
+
             if websocket.client_state != WebSocketState.CONNECTED:
                 pass
             else:
                 pass
-        
+
         if websocket.client_state != WebSocketState.CONNECTED:
             self.disconnect(connection_id)
             return
-        
+
         # Use per-connection lock for the actual send
         conn_lock = self._connection_locks.setdefault(connection_id, asyncio.Lock())
         async with conn_lock:
@@ -266,7 +266,7 @@ class WebSocketManager:
             except Exception as e:
                 logger.error(f"Send error to {connection_id}: {e}")
                 self.disconnect(connection_id)
-    
+
     async def broadcast_event(
         self,
         event: dict[str, Any],
@@ -279,7 +279,7 @@ class WebSocketManager:
             pipeline_id=pipeline_id,
         )
         await self.broadcast_to_pipeline(pipeline_id, message)
-    
+
     async def broadcast_progress(
         self,
         phase: str,
@@ -298,7 +298,7 @@ class WebSocketManager:
             pipeline_id=pipeline_id,
         )
         await self.broadcast_to_pipeline(pipeline_id, message)
-    
+
     async def broadcast_complete(
         self,
         result: dict[str, Any],
@@ -311,7 +311,7 @@ class WebSocketManager:
             pipeline_id=pipeline_id,
         )
         await self.broadcast_to_pipeline(pipeline_id, message)
-    
+
     async def broadcast_error(
         self,
         error: str,
@@ -324,25 +324,25 @@ class WebSocketManager:
             pipeline_id=pipeline_id,
         )
         await self.broadcast_to_pipeline(pipeline_id, message)
-    
+
     def get_connection_count(self) -> int:
         """Get number of active connections."""
         return len(self.active_connections)
-    
+
     def get_subscriber_count(self, pipeline_id: str) -> int:
         """Get number of subscribers for a pipeline."""
         return len(self.subscriptions.get(pipeline_id, set()))
-    
+
     async def start_heartbeat(self, interval: float = DEFAULT_HEARTBEAT_INTERVAL) -> None:
         """Start heartbeat task to detect dead connections."""
         async def heartbeat_loop():
             while True:
                 await asyncio.sleep(interval)
-                
+
                 # Snapshot connections under lock, then ping outside the lock.
                 async with self._lock:
                     connection_ids = list(self.active_connections.keys())
-                
+
                 for connection_id in connection_ids:
                     try:
                         async with self._lock:
@@ -354,9 +354,9 @@ class WebSocketManager:
                             await websocket.send_json({'type': 'ping'})
                     except Exception:
                         self.disconnect(connection_id)
-        
+
         self._heartbeat_task = asyncio.create_task(heartbeat_loop())
-    
+
     async def stop_heartbeat(self) -> None:
         """Stop heartbeat task."""
         if self._heartbeat_task:
@@ -474,7 +474,7 @@ async def websocket_endpoint(
         while True:
             # Receive messages from client
             data = await websocket.receive_text()
-            
+
             try:
                 message = safe_json_loads(data, max_depth=50)
                 await handle_websocket_message(
@@ -488,7 +488,7 @@ async def websocket_endpoint(
                         data={'error': 'Invalid JSON'},
                     ),
                 )
-    
+
     except WebSocketDisconnect:
         manager.disconnect(connection_id)
     except Exception as e:
@@ -503,7 +503,7 @@ async def handle_websocket_message(
 ) -> None:
     """Handle incoming WebSocket message."""
     msg_type = message.get('type')
-    
+
     if msg_type == 'subscribe':
         pipeline_id = message.get('pipeline_id')
         if pipeline_id:
@@ -527,12 +527,12 @@ async def handle_websocket_message(
                     data={'pipeline_id': pipeline_id},
                 ),
             )
-    
+
     elif msg_type == 'unsubscribe':
         pipeline_id = message.get('pipeline_id')
         if pipeline_id:
             await manager.unsubscribe(connection_id, pipeline_id)
-    
+
     elif msg_type == 'stop':
         pipeline_id = message.get('pipeline_id')
         if pipeline_id:
@@ -559,17 +559,17 @@ async def handle_websocket_message(
 
 async def setup_event_bus_integration() -> None:
     """Subscribe WebSocket manager to event bus."""
-    from reasoner.application.event_bus import get_event_bus, handle_all_events
+    from reasoner.application.event_bus import handle_all_events
     from reasoner.core.events.domain_events import DomainEvent
-    
+
     manager = get_websocket_manager()
-    
+
     @handle_all_events()
     async def broadcast_to_websocket(event: DomainEvent):
         """Broadcast all events to WebSocket subscribers."""
         # Extract pipeline_id from event
         pipeline_id = event.aggregate_id
-        
+
         # Convert event to dict
         event_data = {
             'event_type': event.event_type.value,
@@ -577,12 +577,13 @@ async def setup_event_bus_integration() -> None:
             'version': event.version,
             'timestamp': event.timestamp,
         }
-        
+
         # Add event-specific data
         from reasoner.core.events.domain_events import (
-            PhaseCompleted, PhaseFailed, PipelineCompleted, PipelineFailed,
+            PhaseCompleted,
+            PipelineCompleted,
         )
-        
+
         if isinstance(event, PhaseCompleted):
             event_data['phase'] = event.phase_name
             # SECURITY: Do not expose model IDs via WebSocket broadcasts
@@ -590,5 +591,5 @@ async def setup_event_bus_integration() -> None:
         elif isinstance(event, PipelineCompleted):
             event_data['total_tokens'] = event.total_tokens
             event_data['duration'] = event.total_duration_seconds
-        
+
         await manager.broadcast_event(event_data, pipeline_id)

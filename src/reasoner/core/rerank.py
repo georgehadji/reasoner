@@ -9,8 +9,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
-import os
-import re
 import unicodedata
 from typing import Any
 
@@ -312,14 +310,14 @@ async def rerank_via_nemotron(
         *[_score(d) for d in docs],
         return_exceptions=True,
     )
-    
+
     results: list[tuple[dict[str, Any], float]] = []
     for res in results_raw:
         if isinstance(res, BaseException):
             logger.warning("Nemotron rerank task failed: %s", res)
         else:
             results.append(res)
-            
+
     if not results:
         return documents
 

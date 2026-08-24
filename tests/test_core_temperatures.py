@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import pytest
-
-from reasoner.core.temperatures import PHASE_TEMPERATURES, NON_PHASE_TEMPERATURES
+from reasoner.core.temperatures import NON_PHASE_TEMPERATURES, PHASE_TEMPERATURES
 
 
 class TestPhaseTemperatures:

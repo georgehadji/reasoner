@@ -17,14 +17,13 @@ from __future__ import annotations
 
 import ast
 import logging
-from typing import Optional
 
 from reasoner.core.exec_constants import (
     EXEC_IMPORT_ALLOWLIST,
+    SAFETY_BLOCKED,
+    SAFETY_DANGEROUS,
     SAFETY_SAFE,
     SAFETY_SUSPICIOUS,
-    SAFETY_DANGEROUS,
-    SAFETY_BLOCKED,
 )
 
 logger = logging.getLogger(__name__)
@@ -63,7 +62,7 @@ def check_code_safety(code: str) -> str:
         tier = _max_tier(tier, node_tier)
 
     if tier == SAFETY_BLOCKED:
-        raise CodeSafetyError(f"Code blocked: contains prohibited constructs")
+        raise CodeSafetyError("Code blocked: contains prohibited constructs")
 
     return tier
 

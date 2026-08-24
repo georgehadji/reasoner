@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from reasoner.core.constants_limits import LANG_NAME_TO_ISO, NATIVE_LANGUAGE_METHODS
 from reasoner.core.ports.translation_port import TranslationResult
@@ -13,7 +14,6 @@ from reasoner.infrastructure.translation.composite import (
     reset_composite_translator,
 )
 from reasoner.infrastructure.translation.llm_translator import LLMTranslator
-
 
 # ─── LANG_NAME_TO_ISO ────────────────────────────────────────────────────────
 

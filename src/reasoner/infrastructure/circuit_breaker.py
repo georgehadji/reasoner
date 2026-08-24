@@ -16,16 +16,17 @@ from __future__ import annotations
 import asyncio
 import threading
 import time
-from dataclasses import dataclass, field
+from collections.abc import Callable
+from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, TypeVar
+from typing import Any, TypeVar
 
 from reasoner.logging_utils import llm_logger
 
 try:
     from reasoner.metrics import (
-        REASONER_CIRCUIT_BREAKER_STATE,
         REASONER_CIRCUIT_BREAKER_REJECTED,
+        REASONER_CIRCUIT_BREAKER_STATE,
     )
     _METRICS_AVAILABLE = True
 except Exception:
@@ -195,10 +196,10 @@ class CircuitBreaker:
             await self._on_success()
             return result
 
-        except Exception as e:
+        except Exception:
             await self._on_failure()
             raise
-        
+
         finally:
             # Always release the call slot (outside lock to avoid deadlock)
             async with self._lock:
@@ -347,8 +348,9 @@ class RedisCircuitBreaker:
 
     async def _get_script(self):
         if self._script is None:
-            from reasoner.infrastructure.valkey.client import get_valkey_pool
             from pathlib import Path
+
+            from reasoner.infrastructure.valkey.client import get_valkey_pool
 
             valkey = get_valkey_pool()
             script_path = (
@@ -475,6 +477,7 @@ class RedisCircuitBreaker:
 _circuit_breakers: dict[str, CircuitBreaker] = {}
 _redis_circuit_breakers: dict[str, RedisCircuitBreaker] = {}
 from reasoner.core.constants import MAX_CIRCUIT_BREAKER_REGISTRY_SIZE
+
 _MAX_REGISTRY_SIZE: int = MAX_CIRCUIT_BREAKER_REGISTRY_SIZE
 _circuit_breaker_lock = threading.Lock()
 

@@ -3,60 +3,29 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import json
 import logging
 import time
 import uuid
-from typing import Any, AsyncGenerator
+from collections.abc import AsyncGenerator
+from typing import Any
 
+from reasoner.application.services.pipeline_service import PipelineService
+from reasoner.application.services.preset_service import PresetService
 from reasoner.core.constants import (
-    CREATIVE_MAX_TOKENS,
-    CREATIVE_TEMPERATURE,
-    DIRECT_ANSWER_MAX_TOKENS,
-    DIRECT_ANSWER_TEMPERATURE,
     PIPELINE_ABSOLUTE_TIMEOUT_SECONDS,
     SSE_FLUSH_INTERVAL,
-    TRUNCATION,
-    get_phase_retry_budget,
-    get_phase_timeout,
 )
-from reasoner.core.constants_models import (
-    MODEL_CLAUDE_SONNET,
-    MODEL_GEMINI_PRO,
-    MODEL_GPT5,
-    MODEL_KIMI_K2_6,
-    MODEL_MISTRAL_LARGE_3,
-    MODEL_QWEN36_PLUS,
-)
-from reasoner.quality import PhaseMonitor, reset_phase_state
-from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.models import TaskType
-from reasoner.application.services.preset_service import PresetService
-from reasoner.application.services.pipeline_service import PipelineService
-from reasoner.application.services.search_service import SearchService
-from reasoner.application.orchestrator import PipelineOrchestrator
-from reasoner.exceptions import classify_error, is_retryable
-from reasoner.core.exceptions import ErrorCode, error_code_for_exception
 from reasoner.presets import (
-    get_method_from_preset,
     get_preset_price_tier,
 )
-from reasoner.phases._shared import build_followup_context, _wrap_user_input
 
 from .cache import _cache_key, _load_cache, _save_cache
-from .history import HISTORY_DIR, HistoryEntry, _save_history_entry
-from reasoner.infrastructure.redis.run_state import _run_state_manager as _run_store
-from reasoner.core.events.domain_events import make_event, EventType
 from .schemas import FollowupRequest, RunRequest
+
 # SSE protocol helpers shared across streaming endpoints.
-from .sse_utils import _event, _broadcast_ws, _persist_event
-from .phase_executor import (
-    get_phase_start_models,
-    get_critical_phases,
-    run_phase_with_keepalive,
-)
+from .sse_utils import _event
 
 logger = logging.getLogger(__name__)
 
@@ -105,11 +74,11 @@ async def run_stream(
     pipeline_service: PipelineService | None = None,
     request=None,
 ) -> AsyncGenerator[str, None]:
+    import asyncio
+
     from reasoner.application.commands import RunPipelineCommand
     from reasoner.application.handlers.handlers import get_handler_registry
-    import asyncio
-    import uuid
-    
+
     run_id = req.client_run_id or str(uuid.uuid4())
     command = RunPipelineCommand(
         command_id=run_id,
@@ -123,15 +92,15 @@ async def run_stream(
         parallel=not getattr(req, "sequential", False),
         user_id=user_id,
     )
-    
+
     queue = asyncio.Queue(maxsize=256)
-    
+
     async def sse_emit(event: dict | str) -> None:
         if isinstance(event, dict):
             await queue.put(_event(event))
         else:
             await queue.put(event)
-            
+
     async def run_task():
         try:
             registry = get_handler_registry()
@@ -157,7 +126,7 @@ async def run_stream(
             })
         finally:
             await queue.put(None)
-            
+
     # Emit a phase_start keepalive BEFORE any pipeline work.
     # This ensures the SSE client sees its first event immediately,
     # even when preflight (HyperGate LLM call + neuro recall) takes
@@ -181,7 +150,7 @@ async def run_stream(
         async def _timed_task():
             try:
                 await asyncio.wait_for(run_task(), timeout=timeout)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # run_task catches CancelledError (thrown by wait_for's
                 # internal cancel) and emits the error event + queue sentinel.
                 # Nothing left to do — just return cleanly.

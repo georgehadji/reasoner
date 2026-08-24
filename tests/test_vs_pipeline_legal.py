@@ -1,14 +1,12 @@
 """E2E test: Legal pipeline conservative routing."""
 from __future__ import annotations
-from tests.utils.mocks import MockLLM, MockNLI
 
 import pytest
-from unittest.mock import AsyncMock
 
-from reasoner.phases.vs_generation import generate_with_vs, VSGenerationConfig, GenerationStrategy
-from reasoner.phases.vs_verification_routing import route_claim_by_vs_probability, VerificationRoute
-from reasoner.vs_config import VSFeatureFlags, VSDeploymentProfile
-
+from reasoner.phases.vs_generation import GenerationStrategy, VSGenerationConfig, generate_with_vs
+from reasoner.phases.vs_verification_routing import VerificationRoute, route_claim_by_vs_probability
+from reasoner.vs_config import VSDeploymentProfile, VSFeatureFlags
+from tests.utils.mocks import MockLLM, MockNLI
 
 CANDIDATES_JSON = '{"candidates": [{"text": "Clause draft A", "probability": 0.5}, {"text": "Clause draft B", "probability": 0.3}, {"text": "Clause draft C", "probability": 0.2}]}'
 

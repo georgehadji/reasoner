@@ -13,15 +13,21 @@ import json
 import logging
 import re
 import time
-from typing import Any, Optional, Protocol
+from typing import Any, Protocol
 
 logger = logging.getLogger(__name__)
 
-from reasoner.core.ports.search_port import SearchServicePort, SourceType
-from reasoner.core.constants import DEFAULT_SEARCH_RESULTS, TIMEOUTS, MODEL_QWEN35_9B, MODEL_QWEN35_FLASH, MODEL_GEMINI_FLASH, TRUNCATION, DEFAULT_MAX_DECOMPOSED_QUERIES
-from reasoner.core.temperatures import NON_PHASE_TEMPERATURES
+from reasoner.core.constants import (
+    DEFAULT_MAX_DECOMPOSED_QUERIES,
+    DEFAULT_SEARCH_RESULTS,
+    MODEL_GEMINI_FLASH,
+    MODEL_QWEN35_9B,
+    MODEL_QWEN35_FLASH,
+    TRUNCATION,
+)
+from reasoner.core.ports.search_port import SourceType
 from reasoner.core.settings import settings
-
+from reasoner.core.temperatures import NON_PHASE_TEMPERATURES
 
 # ── Lazy build_provider accessor (avoids circular import at module load) ──
 _build_provider = None
@@ -76,9 +82,9 @@ class PerplexitySearchClient:
         self,
         query: str,
         num_results: int = DEFAULT_SEARCH_RESULTS,
-        categories: Optional[list[str]] = None,
-        source_type: Optional[SourceType] = None,
-        domain: Optional[str] = None,
+        categories: list[str] | None = None,
+        source_type: SourceType | None = None,
+        domain: str | None = None,
     ) -> list[dict[str, Any]]:
         try:
             kwargs: dict[str, Any] = {
@@ -123,9 +129,9 @@ class SearchClient(Protocol):
         self,
         query: str,
         num_results: int = DEFAULT_SEARCH_RESULTS,
-        categories: Optional[list[str]] = None,
-        source_type: Optional[SourceType] = None,
-        domain: Optional[str] = None,
+        categories: list[str] | None = None,
+        source_type: SourceType | None = None,
+        domain: str | None = None,
     ) -> list[dict[str, Any]]: ...
 
     async def close(self): ...
@@ -221,7 +227,7 @@ async def _decompose_query(query: str, model_id: str | None = None) -> list[str]
 
 async def smart_search(
     query: str,
-    source_type: Optional[SourceType] = None,
+    source_type: SourceType | None = None,
     num_results: int = 10,
 ) -> list[dict[str, Any]]:
     """
@@ -235,8 +241,8 @@ async def smart_search(
     # module level, so a top-level import here would be circular. These names
     # were referenced without any import at all -> NameError once this function
     # got past decomposition.
-    from reasoner.core.search import _bm25_score, _normalize_url
     from reasoner.core.rerank import rerank_documents
+    from reasoner.core.search import _bm25_score, _normalize_url
 
     client, _ = await get_search_client(source_type=source_type)
 
@@ -328,8 +334,8 @@ async def smart_search(
 async def get_search_client_for_method(
     method: str = "multi_perspective",
     tier: str = "budget",
-    source_type: Optional[SourceType] = None,
-) -> tuple[Any, Optional[SourceType]]:
+    source_type: SourceType | None = None,
+) -> tuple[Any, SourceType | None]:
     """Return the best search client for a method+tier, trying backends in order.
 
     Tries the chain for the given method/tier (from SEARCH_METHOD_CHAINS) and
@@ -392,8 +398,8 @@ _REQUIRED_RESULT_KEYS = ("title", "url", "content", "snippet", "source", "full_c
 
 
 async def get_search_client(
-    source_type: Optional[SourceType] = None,
-) -> tuple[SearchClient, Optional[SourceType]]:
+    source_type: SourceType | None = None,
+) -> tuple[SearchClient, SourceType | None]:
     """Factory: returns the best available search client.
 
     Tries Perplexity (via OpenRouter) first, then Tavily, then Brave.

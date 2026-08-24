@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from reasoner.application.services.sensitivity_service import classify_sensitivity
 from reasoner.core.settings import settings
 from reasoner.domain.pipeline_state import PipelineState
-
 
 # ─── Sensitivity classifier ───────────────────────────────────────────────────
 

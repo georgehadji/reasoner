@@ -5,7 +5,8 @@ from __future__ import annotations
 import hashlib
 import logging
 import time
-from typing import Any, AsyncGenerator
+from collections.abc import AsyncGenerator
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -105,8 +106,9 @@ class SearchService:
         Results are fetched via the configured search client (Perplexity via
         OpenRouter when OPENROUTER_API_KEY is set, otherwise Tavily/Brave).
         """
-        from reasoner.application.services.serializers import _event
         import time
+
+        from reasoner.application.services.serializers import _event
 
         yield _event({"type": "start"})
 

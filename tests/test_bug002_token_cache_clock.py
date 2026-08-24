@@ -14,11 +14,13 @@ immediately evicted.
 
 from __future__ import annotations
 
-import pytest
+import asyncio
 import json
 import time
 from pathlib import Path
-import asyncio
+
+import pytest
+
 from reasoner.token_cache import TokenAwareCache
 
 

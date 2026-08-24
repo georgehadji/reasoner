@@ -6,14 +6,8 @@ held-out problems via ScorecardService, and computes the delta.
 
 from __future__ import annotations
 
-import copy
-import json
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any
-
 from reasoner.core.evolution_constants import EVOLUTION_HELD_OUT_SET_SIZE
-from reasoner.domain.harness_metrics import HarnessMutation, HarnessScorecard, ReplayResult
+from reasoner.domain.harness_metrics import HarnessMutation, ReplayResult
 
 
 class HarnessReplayService:

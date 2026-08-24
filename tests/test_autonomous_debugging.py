@@ -5,9 +5,10 @@ Detection tests for VERIFIED hypotheses H-A, H-B, H-C.
 
 from __future__ import annotations
 
-import pytest
 import time
+from datetime import UTC
 
+import pytest
 
 # ═════════════════════════════════════════════════════════════════════
 # H-A: Cache Poisoning from Incomplete Cache Key
@@ -146,9 +147,10 @@ class TestStopPipelineScope:
 
     @pytest.mark.asyncio
     async def test_global_stop_without_run_id_cancels_all(self):
+        from uuid import UUID
+
         from reasoner.api import _run_store, stop_pipeline
         from reasoner.domain.saas import User
-        from uuid import UUID
 
         await _run_store.reset()
         await _run_store.add("run-a")
@@ -158,11 +160,11 @@ class TestStopPipelineScope:
         class AdminUser(User):
             __slots__ = ("scopes",)
             def __init__(self, id, email, scopes=None):
-                from datetime import datetime, timezone
+                from datetime import datetime
                 object.__setattr__(self, "id", id)
                 object.__setattr__(self, "email", email)
                 object.__setattr__(self, "display_name", None)
-                object.__setattr__(self, "created_at", datetime.now(timezone.utc))
+                object.__setattr__(self, "created_at", datetime.now(UTC))
                 object.__setattr__(self, "scopes", scopes or [])
 
         mock_user = AdminUser(id=UUID("11111111-1111-1111-1111-111111111111"), email="test@example.com", scopes=["admin"])
@@ -185,7 +187,7 @@ class TestRateLimiterSlidingWindow:
         Verify that _in_memory_reset_windows_if_needed snaps window start to the
         exact boundary (+= N * period) rather than resetting to 'now'.
         """
-        from reasoner.rate_limiter import RateLimiter, RateLimitConfig, ClientBucket
+        from reasoner.rate_limiter import ClientBucket, RateLimitConfig, RateLimiter
 
         rl = RateLimiter(RateLimitConfig(requests_per_minute=2, burst_size=2))
         base_time = 1000.0
@@ -205,7 +207,7 @@ class TestRateLimiterSlidingWindow:
         assert bucket.requests_minute == 0
 
     def test_hour_window_snaps_to_exact_boundary(self, monkeypatch):
-        from reasoner.rate_limiter import RateLimiter, RateLimitConfig, ClientBucket
+        from reasoner.rate_limiter import ClientBucket, RateLimitConfig, RateLimiter
 
         rl = RateLimiter(RateLimitConfig(requests_per_minute=2, burst_size=2))
         base_time = 1000.0
@@ -224,7 +226,7 @@ class TestRateLimiterSlidingWindow:
         assert bucket.requests_hour == 0
 
     def test_no_reset_when_inside_window(self, monkeypatch):
-        from reasoner.rate_limiter import RateLimiter, RateLimitConfig, ClientBucket
+        from reasoner.rate_limiter import ClientBucket, RateLimitConfig, RateLimiter
 
         rl = RateLimiter(RateLimitConfig(requests_per_minute=2, burst_size=2))
         base_time = 1000.0

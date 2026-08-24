@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import os
+from unittest.mock import MagicMock
+
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
 
 os.environ.setdefault("ENABLE_LEGACY_API_KEY", "true")
 os.environ.setdefault("ENVIRONMENT", "testing")
@@ -15,10 +16,10 @@ os.environ.setdefault("STRIPE_WEBHOOK_SECRET", "whsec_test")
 os.environ.setdefault("STRIPE_PRO_PRICE_ID", "price_pro")
 os.environ.setdefault("STRIPE_ENTERPRISE_PRICE_ID", "price_ent")
 
-from reasoner.infrastructure.auth.local_adapter import LocalAuthAdapter
-from reasoner.infrastructure.auth import set_auth_adapter
-from reasoner.infrastructure.redis.client import set_redis
 from reasoner.api import app
+from reasoner.infrastructure.auth import set_auth_adapter
+from reasoner.infrastructure.auth.local_adapter import LocalAuthAdapter
+from reasoner.infrastructure.redis.client import set_redis
 
 
 @pytest.fixture

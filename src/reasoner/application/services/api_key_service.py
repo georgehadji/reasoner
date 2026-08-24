@@ -13,14 +13,13 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from reasoner.core.ports.api_key_repository import ApiKeyRepository
 from reasoner.domain.api_keys import (
-    ApiKey,
     MAX_KEYS_PER_USER,
+    ApiKey,
     generate_key,
     hash_key,
     normalize_scopes,
@@ -62,8 +61,8 @@ class ApiKeyService:
         self,
         user_id: str,
         name: str,
-        scopes: Optional[set[str]] = None,
-        expires_in_days: Optional[int] = None,
+        scopes: set[str] | None = None,
+        expires_in_days: int | None = None,
     ) -> MintedKey:
         """Mint a key for ``user_id``.
 
@@ -89,7 +88,7 @@ class ApiKeyService:
 
         granted = normalize_scopes(scopes)
         expires_at = (
-            datetime.now(timezone.utc) + timedelta(days=expires_in_days)
+            datetime.now(UTC) + timedelta(days=expires_in_days)
             if expires_in_days
             else None
         )
@@ -118,7 +117,7 @@ class ApiKeyService:
 
     # ── Authentication ─────────────────────────────────────────────────
 
-    async def authenticate(self, plaintext: str) -> Optional[ApiKey]:
+    async def authenticate(self, plaintext: str) -> ApiKey | None:
         """Resolve a plaintext key to its record, or None if it cannot be used.
 
         Returns None for unknown, revoked, and expired keys alike so callers

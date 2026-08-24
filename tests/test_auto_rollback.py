@@ -6,12 +6,17 @@ when its dependency is missing, without human intervention.
 
 from __future__ import annotations
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from reasoner.core.settings import settings
-from reasoner.core.health_validator import validate_all, _check_openrouter_key, _check_perplexity_key
+import pytest
+
+from reasoner.core.health_validator import (
+    _check_openrouter_key,
+    _check_perplexity_key,
+    validate_all,
+)
 from reasoner.core.rerank import rerank_documents
+from reasoner.core.settings import settings
 from reasoner.pipeline import ReasonerPipeline
 
 

@@ -14,12 +14,12 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.subagents.models import PhaseSubAgentOutput
+from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.subagents.enhancement.ambiguity_detector import AmbiguityDetectorSubAgent
 from reasoner.subagents.enhancement.context_enricher import ContextEnricherSubAgent
 from reasoner.subagents.enhancement.scope_narrower import ScopeNarrowerSubAgent
+from reasoner.subagents.models import PhaseSubAgentOutput
 
 logger = logging.getLogger(__name__)
 

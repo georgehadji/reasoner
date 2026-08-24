@@ -2,34 +2,30 @@
 
 from __future__ import annotations
 
-import os
 import logging
-from typing import TYPE_CHECKING, List
+import os
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from reasoner.domain.article_domain import Context
 
-from reasoner.domain.pipeline_state import PipelineState
-from reasoner.application.flows.base import WorkflowStrategy, WorkflowServices, PhaseStep
 from reasoner.application.flows.article_phases import (
-    run_article_retrieve_sources_phase,
-    run_article_outline_phase,
-    run_article_draft_phase,
     run_article_adversarial_verify_phase,
-    run_article_structural_review_phase,
     run_article_developmental_edit_phase,
-    run_article_style_copy_edit_phase,
+    run_article_draft_phase,
     run_article_final_audit_phase,
+    run_article_outline_phase,
+    run_article_retrieve_sources_phase,
+    run_article_structural_review_phase,
+    run_article_style_copy_edit_phase,
 )
-from reasoner.application.flows.synthesis_phase import run_synthesis_phase
 from reasoner.application.flows.augmentation import (
-    is_deep_question,
-    DEFAULT_AUGMENTATION_METHODS,
-    AUGMENTATION_PROMPTS,
-    AUGMENTATION_ROLES,
     run_augmentation,
 )
+from reasoner.application.flows.base import PhaseStep, WorkflowServices, WorkflowStrategy
+from reasoner.application.flows.synthesis_phase import run_synthesis_phase
 from reasoner.application.services.serializers import _ser_2, _ser_3, _ser_4, _ser_5
+from reasoner.domain.pipeline_state import PipelineState
 
 logger = logging.getLogger(__name__)
 
@@ -40,10 +36,10 @@ _USE_ADAPTERS = os.environ.get("ARTICLE_USE_ADAPTERS", "0") == "1"
 
 async def _adapter_bridge(adapter_fn, state: PipelineState, services: WorkflowServices, **kwargs):
     """Bridge from adapter (Context, Deps) -> Result back to PhaseStep.fn (state, services) -> None."""
-    from reasoner.domain.article_domain import Context
     from reasoner.application.flows.article_adapters import (
-        context_to_writing_state, writing_state_to_context, AdapterDeps,
+        AdapterDeps,
     )
+    from reasoner.domain.article_domain import Context
 
     # Build Context from current PipelineState
     ctx = Context(
@@ -67,7 +63,7 @@ async def _adapter_bridge(adapter_fn, state: PipelineState, services: WorkflowSe
         logger.warning("Adapter '%s' crashed: %s", getattr(adapter_fn, "__name__", "?"), exc, exc_info=True)
         return
 
-    from reasoner.domain.article_domain import Ok, Err
+    from reasoner.domain.article_domain import Err, Ok
     if isinstance(result, Ok):
         new_ctx = result.value
         # Write back to state
@@ -99,8 +95,9 @@ async def _adapter_bridge(adapter_fn, state: PipelineState, services: WorkflowSe
 
 def context_to_writing_state_reverse(ctx: Context, ws: dict) -> Context:
     """Minimal reverse conversion: populate Context fields from writing_state dict."""
-    from reasoner.domain.article_domain import Document, Claim, Verdict
     from dataclasses import replace
+
+    from reasoner.domain.article_domain import Document
 
     doc = ctx.doc
     if ws.get("final_article"):
@@ -128,13 +125,13 @@ class ArticleFlow(WorkflowStrategy):
     7.  Final Editorial Audit
     8.  Synthesis
     """
-    
-    def get_phases(self, state: PipelineState) -> List[PhaseStep]:
+
+    def get_phases(self, state: PipelineState) -> list[PhaseStep]:
         if _USE_ADAPTERS:
             return self._get_phases_adapter(state)
         return self._get_phases_legacy(state)
 
-    def _get_phases_legacy(self, state: PipelineState) -> List[PhaseStep]:
+    def _get_phases_legacy(self, state: PipelineState) -> list[PhaseStep]:
         """Original 9-phase sequence (direct phase functions, no adapters)."""
         return [
             PhaseStep(2,   "Evidence Collection",     run_article_retrieve_sources_phase,    _ser_2),
@@ -148,18 +145,18 @@ class ArticleFlow(WorkflowStrategy):
             PhaseStep(8,   "Synthesis",                run_synthesis_phase,                   _ser_5),
         ]
 
-    def _get_phases_adapter(self, state: PipelineState) -> List[PhaseStep]:
+    def _get_phases_adapter(self, state: PipelineState) -> list[PhaseStep]:
         """11-phase adapter-based sequence with Gap Retrieval, Surface Signals, budget guards."""
         from reasoner.application.flows.article_adapters import (
-            adapter_retrieve_sources,
             adapter_build_outline,
+            adapter_developmental_edit,
             adapter_draft,
             adapter_fact_check,
-            adapter_gap_retrieval,
-            adapter_structural_review,
-            adapter_developmental_edit,
-            adapter_style_copy_edit,
             adapter_final_audit,
+            adapter_gap_retrieval,
+            adapter_retrieve_sources,
+            adapter_structural_review,
+            adapter_style_copy_edit,
             adapter_surface_signals,
             adapter_synthesis,
         )
@@ -185,8 +182,8 @@ class ArticleFlow(WorkflowStrategy):
         ]
 
     async def execute(
-        self, 
-        state: PipelineState, 
+        self,
+        state: PipelineState,
         services: WorkflowServices,
     ) -> PipelineState:
         # ── Pre-processing: run augmentation if depth-detected ──
@@ -194,10 +191,10 @@ class ArticleFlow(WorkflowStrategy):
 
         phases = self.get_phases(state)
         audit_retried = False
-        
+
         for step in phases:
             await services.run_phase(step, state)
-            
+
             # E2: If final audit fails, retry developmental edit + re-audit once
             # Use phase name for detection (works with both legacy and adapter phases)
             if not audit_retried and step.name == "Final Audit":

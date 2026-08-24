@@ -2,6 +2,7 @@
 
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 
@@ -44,7 +45,6 @@ def test_cache_version_is_7():
     # The hash is opaque, but we can verify it changed from v6 by encoding
     # Check that the key is a valid 64-char hex string
     assert len(key) == 64, "SHA-256 produces 64 hex chars"
-    import hashlib
     try:
         int(key, 16)
     except ValueError:
@@ -56,6 +56,7 @@ def test_cache_version_is_7():
 def test_run_request_rejects_extra_fields():
     """RunRequest must reject unknown fields (S1)."""
     from pydantic import ValidationError
+
     from reasoner.api.schemas import RunRequest
 
     try:
@@ -68,6 +69,7 @@ def test_run_request_rejects_extra_fields():
 def test_followup_request_rejects_extra_fields():
     """FollowupRequest must reject unknown fields (S1)."""
     from pydantic import ValidationError
+
     from reasoner.api.schemas import FollowupRequest
 
     try:

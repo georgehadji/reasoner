@@ -14,13 +14,12 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from datetime import datetime
-from pathlib import Path
-from typing import Any, List, Optional
 from dataclasses import asdict
+from datetime import datetime
+from typing import Any
 
-from tenacity import retry, stop_after_attempt, wait_exponential # New import
-from aiocircuitbreaker import CircuitBreaker # New import
+from aiocircuitbreaker import CircuitBreaker  # New import
+from tenacity import retry, stop_after_attempt, wait_exponential  # New import
 
 try:
     import asyncpg
@@ -36,11 +35,19 @@ except ImportError:
         errors like KeyError, TypeError, or ValueError in the try blocks.
         """
 
-from reasoner.core.events.domain_events import DomainEvent, PipelineEventType, WidgetEventType, MemoryEventType, SaaSEventType, ALL_EVENT_TYPES
+from cryptography.fernet import InvalidToken
+
 from reasoner.core.constants import DEFAULT_DB_COMMAND_TIMEOUT
+from reasoner.core.events.domain_events import (
+    ALL_EVENT_TYPES,
+    DomainEvent,
+    MemoryEventType,
+    PipelineEventType,
+    SaaSEventType,
+    WidgetEventType,
+)
 from reasoner.core.ports.crypto_port import EncryptionPort
 from reasoner.security.encryption import get_encryption_service
-from cryptography.fernet import InvalidToken
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +79,7 @@ class PostgreSQLEventStore:
     - Full-text search (Limited for encrypted fields)
     - Partitioning for large datasets
     """
-    
+
     def __init__(
         self,
         connection_string: str | None = None,
@@ -85,11 +92,11 @@ class PostgreSQLEventStore:
         self.pool_size = pool_size
         self.use_read_replica = use_read_replica
         self.read_replica_url = read_replica_url
-        
+
         self._pool = None
         self._read_pool = None
         self._encryption: EncryptionPort = get_encryption_service()
-        
+
         # Initialize circuit breaker.
         # aiocircuitbreaker.CircuitBreaker's constructor is
         # (failure_threshold, recovery_timeout, ...) -- this previously
@@ -105,7 +112,7 @@ class PostgreSQLEventStore:
     async def initialize(self) -> None:
         """Initialize connection pools."""
         import asyncpg
-        
+
         # Primary pool (read-write)
         self._pool = await asyncpg.create_pool(
             dsn=self.connection_string,
@@ -113,7 +120,7 @@ class PostgreSQLEventStore:
             max_size=self.pool_size,
             command_timeout=DEFAULT_DB_COMMAND_TIMEOUT,
         )
-        
+
         # Read replica pool (optional)
         if self.use_read_replica and self.read_replica_url:
             try:
@@ -132,10 +139,10 @@ class PostgreSQLEventStore:
                     pass  # Best-effort cleanup; preserve original exception
                 self._pool = None
                 raise exc
-        
+
         # Initialize schema
         await self._init_schema()
-    
+
     async def _init_schema(self) -> None:
         """Initialize database schema."""
         async with self._pool.acquire(timeout=10.0) as conn:
@@ -238,7 +245,7 @@ class PostgreSQLEventStore:
                     FOR EACH ROW
                     EXECUTE FUNCTION update_updated_at_column();
             """)
-    
+
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=8), reraise=True)
     async def save_events(self, events: list[DomainEvent]) -> None:
         """
@@ -251,7 +258,7 @@ class PostgreSQLEventStore:
         """
         import logging
         logger = logging.getLogger(__name__)
-        
+
         # If circuit breaker is enabled, wrap the operation with it.
         # aiocircuitbreaker.CircuitBreaker is NOT an async context manager
         # (it has only sync __enter__/__exit__); use .call(coro_fn, *args),
@@ -280,9 +287,9 @@ class PostgreSQLEventStore:
                         }
                         payload_json = json.dumps(raw_payload)
                         encrypted_payload = self._encryption.encrypt(payload_json)
-                        
+
                         # Generate blind indexes from the textual content of the raw_payload
-                        blind_indexes: List[str] = []
+                        blind_indexes: list[str] = []
                         if isinstance(raw_payload, dict):
                             # Focus on common textual fields for blind indexing
                             text_to_index = []
@@ -331,7 +338,7 @@ class PostgreSQLEventStore:
         except Exception as e:
             logger.error(f"Unexpected error saving events: {e}")
             raise
-    
+
     def _get_aggregate_type(self, event_type: PipelineEventType | WidgetEventType | MemoryEventType | SaaSEventType) -> str:
         """Determine aggregate type from event."""
         if event_type in (
@@ -355,7 +362,7 @@ class PostgreSQLEventStore:
             return "saas"
         else:
             return "generic"
-    
+
     async def _update_aggregate(
         self,
         conn: Any,
@@ -364,11 +371,13 @@ class PostgreSQLEventStore:
     ) -> None:
         """Update aggregate state."""
         from reasoner.core.events.domain_events import (
-            PipelineStarted, PipelineCompleted, PipelineFailed,
+            PipelineCompleted,
+            PipelineFailed,
+            PipelineStarted,
         )
-        
+
         problem = preset = method = status = None
-        
+
         if isinstance(event, PipelineStarted):
             # Encrypt sensitive problem field (Phase 3: E2EE)
             problem = self._encryption.encrypt(event.problem)
@@ -379,7 +388,7 @@ class PostgreSQLEventStore:
             status = "completed"
         elif isinstance(event, PipelineFailed):
             status = "failed"
-        
+
         # Upsert aggregate
         await conn.execute("""
             INSERT INTO aggregates 
@@ -402,7 +411,7 @@ class PostgreSQLEventStore:
             preset,
             method,
         )
-    
+
     async def get_events(
         self,
         aggregate_id: str,
@@ -417,7 +426,7 @@ class PostgreSQLEventStore:
                 WHERE aggregate_id = $1 AND version > $2
                 ORDER BY version ASC
             """, aggregate_id, from_version)
-            
+
             events = []
             for row in rows:
                 event = await self._deserialize_event(row)
@@ -449,11 +458,11 @@ class PostgreSQLEventStore:
 
     async def _deserialize_event(self, row: Any) -> DomainEvent | None:
         """Deserialize database row to event. Decrypts payload if necessary (Phase 3)."""
-        from reasoner.core.events.domain_events import make_event, PipelineEventType
+        from reasoner.core.events.domain_events import PipelineEventType, make_event
 
         try:
             payload = json.loads(row["payload"])
-            
+
             # Check for encrypted payload (Phase 3: E2EE)
             if "_e" in payload:
                 decrypted_json = self._encryption.decrypt(payload["_e"])
@@ -531,7 +540,7 @@ class PostgreSQLEventStore:
             )
             await self._publish_error_or_persist(error_event, "postgres_store _deserialize_event Exception")
             return None
-    
+
     async def list_pipelines(
         self,
         limit: int = 50,
@@ -540,7 +549,7 @@ class PostgreSQLEventStore:
     ) -> list[dict[str, Any]]:
         """List pipelines with filtering."""
         pool = self._read_pool if self.use_read_replica else self._pool
-        
+
         async with pool.acquire(timeout=10.0) as conn:
             query = """
                 SELECT * FROM aggregates
@@ -556,9 +565,9 @@ class PostgreSQLEventStore:
             query += f" ORDER BY created_at DESC LIMIT ${len(params)}"
             params.append(offset)
             query += f" OFFSET ${len(params)}"
-            
+
             rows = await conn.fetch(query, *params)
-            
+
             results = []
             for row in rows:
                 # Passes legacy plaintext through, but raises on a key
@@ -576,7 +585,7 @@ class PostgreSQLEventStore:
                     "updated_at": row["updated_at"].isoformat(),
                 })
             return results
-    
+
     async def search_events(
         self,
         query: str,
@@ -584,13 +593,13 @@ class PostgreSQLEventStore:
     ) -> list[dict[str, Any]]:
         """Full-text search events."""
         pool = self._read_pool if self.use_read_replica else self._pool
-        
+
         async with pool.acquire(timeout=10.0) as conn:
             # Generate blind indexes for the search query
             search_hashes = self._encryption.generate_blind_index(query)
             if not search_hashes:
                 return [] # No search terms to index
-            
+
             # PostgreSQL array contains operator (jsonb @> array)
             # We need to construct a JSONB array for the @> operator
             search_hashes_jsonb = json.dumps(search_hashes)
@@ -603,7 +612,7 @@ class PostgreSQLEventStore:
                 ORDER BY e.timestamp DESC
                 LIMIT $2
             """, search_hashes_jsonb, limit)
-            
+
             return [
                 {
                     "event_id": row["event_id"],
@@ -617,7 +626,7 @@ class PostgreSQLEventStore:
                 }
                 for row in rows
             ]
-    
+
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=8), reraise=True)
     async def save_snapshot(
         self,
@@ -641,7 +650,7 @@ class PostgreSQLEventStore:
         """
         import logging
         logger = logging.getLogger(__name__)
-        
+
         # If circuit breaker is enabled, wrap the operation with it.
         # See save_events for why this is .call(...) and not `async with`.
         if self._circuit_breaker:
@@ -686,7 +695,7 @@ class PostgreSQLEventStore:
         except Exception as e:
             logger.error(f"Unexpected error saving snapshot for {aggregate_id}: {e}")
             raise
-    
+
     async def get_snapshot(
         self,
         aggregate_id: str,
@@ -697,7 +706,7 @@ class PostgreSQLEventStore:
                 SELECT version, state FROM snapshots 
                 WHERE aggregate_id = $1
             """, aggregate_id)
-            
+
             if row:
                 try:
                     state = json.loads(row["state"])
@@ -711,7 +720,7 @@ class PostgreSQLEventStore:
                         "Corrupted snapshot data for aggregate %s: JSONDecodeError: %s",
                         aggregate_id, exc,
                     )
-                    from reasoner.core.events.domain_events import make_event, PipelineEventType
+                    from reasoner.core.events.domain_events import PipelineEventType, make_event
                     error_event = make_event(
                         PipelineEventType.ERROR_OCCURRED,
                         aggregate_id=aggregate_id,
@@ -724,11 +733,11 @@ class PostgreSQLEventStore:
                     await self._publish_error_or_persist(error_event, "postgres_store get_snapshot")
                     return None
             return None
-    
+
     # ─────────────────────────────────────────────────────────────────────
     # CQRS READ MODEL OPERATIONS
     # ─────────────────────────────────────────────────────────────────────
-    
+
     async def save_read_model(
         self,
         model_name: str,
@@ -741,7 +750,7 @@ class PostgreSQLEventStore:
         """
         import logging
         logger = logging.getLogger(__name__)
-        
+
         try:
             # Encrypt read model data (Phase 3: E2EE). Compress first — read
             # models are denormalized JSON with the same redundancy profile
@@ -769,7 +778,7 @@ class PostgreSQLEventStore:
         except Exception as e:
             logger.error(f"Unexpected error saving read model {model_name}/{model_key}: {e}")
             raise
-    
+
     async def get_read_model(
         self,
         model_name: str,
@@ -777,13 +786,13 @@ class PostgreSQLEventStore:
     ) -> dict[str, Any] | None:
         """Get denormalized read model. Decrypts data (Phase 3: E2EE)."""
         pool = self._read_pool if self.use_read_replica else self._pool
-        
+
         async with pool.acquire(timeout=10.0) as conn:
             row = await conn.fetchrow("""
                 SELECT data, version FROM read_models 
                 WHERE model_name = $1 AND model_key = $2
             """, model_name, model_key)
-            
+
             if row:
                 try:
                     data = json.loads(row["data"])
@@ -797,7 +806,7 @@ class PostgreSQLEventStore:
                         "Corrupted read model data for %s/%s: JSONDecodeError: %s",
                         model_name, model_key, exc,
                     )
-                    from reasoner.core.events.domain_events import make_event, PipelineEventType
+                    from reasoner.core.events.domain_events import PipelineEventType, make_event
                     error_event = make_event(
                         PipelineEventType.ERROR_OCCURRED,
                         aggregate_id=model_key,
@@ -816,7 +825,7 @@ class PostgreSQLEventStore:
                         "Corrupted read model data for %s/%s: ValueError: %s",
                         model_name, model_key, exc,
                     )
-                    from reasoner.core.events.domain_events import make_event, PipelineEventType
+                    from reasoner.core.events.domain_events import PipelineEventType, make_event
                     error_event = make_event(
                         PipelineEventType.ERROR_OCCURRED,
                         aggregate_id=model_key,
@@ -831,18 +840,18 @@ class PostgreSQLEventStore:
                     await self._publish_error_or_persist(error_event, "postgres_store get_read_model ValueError")
                     return None
             return None
-    
+
     async def get_stats(self) -> dict[str, Any]:
         """Get event store statistics."""
         pool = self._read_pool if self.use_read_replica else self._pool
-        
+
         async with pool.acquire(timeout=10.0) as conn:
             # Total events
             total_events = await conn.fetchval("SELECT COUNT(*) FROM events")
-            
+
             # Total aggregates
             total_aggregates = await conn.fetchval("SELECT COUNT(*) FROM aggregates")
-            
+
             # By status
             by_status_rows = await conn.fetch("""
                 SELECT status, COUNT(*) as count 
@@ -850,7 +859,7 @@ class PostgreSQLEventStore:
                 GROUP BY status
             """)
             by_status = {row["status"]: row["count"] for row in by_status_rows}
-            
+
             # By type
             by_type_rows = await conn.fetch("""
                 SELECT aggregate_type, COUNT(*) as count 
@@ -858,7 +867,7 @@ class PostgreSQLEventStore:
                 GROUP BY aggregate_type
             """)
             by_type = {row["aggregate_type"]: row["count"] for row in by_type_rows}
-            
+
             return {
                 "total_events": total_events,
                 "total_aggregates": total_aggregates,
@@ -866,7 +875,7 @@ class PostgreSQLEventStore:
                 "by_type": by_type,
                 "storage": "postgresql",
             }
-    
+
     async def delete_aggregate(self, aggregate_id: str) -> None:
         """
         Delete aggregate and all events (GDPR).
@@ -879,7 +888,7 @@ class PostgreSQLEventStore:
         """
         import logging
         logger = logging.getLogger(__name__)
-        
+
         try:
             async with self._pool.acquire(timeout=10.0) as conn:
                 async with conn.transaction():

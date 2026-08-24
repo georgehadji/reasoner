@@ -7,18 +7,15 @@ from __future__ import annotations
 
 import pytest
 
+from reasoner.application.services.adaptive_routing import (
+    AdaptiveRoutingService,
+)
 from reasoner.domain.model_capabilities import (
     ModelCapabilities,
     ModelConstraints,
     ModelProfile,
 )
-from reasoner.domain.task_requirements import TaskConstraints, TaskRequirement
-from reasoner.application.services.utility_scorer import UtilityScorer
-from reasoner.application.services.constraint_resolver import ConstraintResolver
-from reasoner.application.services.adaptive_routing import (
-    ACRSelectionLog,
-    AdaptiveRoutingService,
-)
+from reasoner.domain.task_requirements import TaskConstraints
 
 
 class FakeRegistry:

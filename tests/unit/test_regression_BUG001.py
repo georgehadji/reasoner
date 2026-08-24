@@ -9,6 +9,7 @@ exhausting half_open_max_calls.
 """
 
 import pytest
+
 from reasoner.circuit_breaker import CircuitBreaker, CircuitBreakerConfig, CircuitState
 
 

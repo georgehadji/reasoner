@@ -6,18 +6,24 @@ Subscribes to LLMGenerationCompleted events and maps them to Langfuse traces.
 
 from __future__ import annotations
 
-import os
-import logging
 import asyncio
-from typing import Any, Dict, Optional
+import logging
+import os
+from typing import Any
 
 # Lazy imports to handle missing/version-mismatched langfuse gracefully
 try:
     from langfuse import Langfuse as _Langfuse
     from langfuse.model import (
-        CreateTrace as _CreateTrace,
-        CreateSpan as _CreateSpan,
         CreateGeneration as _CreateGeneration,
+    )
+    from langfuse.model import (
+        CreateSpan as _CreateSpan,
+    )
+    from langfuse.model import (
+        CreateTrace as _CreateTrace,
+    )
+    from langfuse.model import (
         UpdateGeneration as _UpdateGeneration,
     )
     _LANGFUSE_AVAILABLE = True
@@ -26,8 +32,8 @@ except ImportError:
     _CreateTrace = _CreateSpan = _CreateGeneration = _UpdateGeneration = None
     _LANGFUSE_AVAILABLE = False
 
-from reasoner.core.events.domain_events import LLMGenerationCompleted, PipelineEventType
-from reasoner.metrics import OBSERVABILITY_EVENTS_DROPPED_TOTAL # New import
+from reasoner.core.events.domain_events import LLMGenerationCompleted
+from reasoner.metrics import OBSERVABILITY_EVENTS_DROPPED_TOTAL  # New import
 
 logger = logging.getLogger(__name__)
 
@@ -70,9 +76,9 @@ class LangfuseSubscriber:
         if not _is_langfuse_enabled:
             logger.warning("LangfuseSubscriber initialized but Langfuse is disabled. Observability events will be dropped.")
             OBSERVABILITY_EVENTS_DROPPED_TOTAL.inc() # Increment counter if disabled
-        
-        self._active_traces: Dict[str, Any] = {}
-        self._active_spans: Dict[str, Any] = {}
+
+        self._active_traces: dict[str, Any] = {}
+        self._active_spans: dict[str, Any] = {}
 
     async def handle_llm_generation_completed(self, event: LLMGenerationCompleted) -> None:
         if not _is_langfuse_enabled or _langfuse_client is None: return
@@ -186,7 +192,7 @@ class LangfuseSubscriber:
             logger.debug(f"Langfuse: Flushed and cleaned up failed trace {trace_id}")
 
 
-_langfuse_subscriber: Optional[LangfuseSubscriber] = None
+_langfuse_subscriber: LangfuseSubscriber | None = None
 _subscriber_lock = asyncio.Lock()
 
 async def get_langfuse_subscriber() -> LangfuseSubscriber:

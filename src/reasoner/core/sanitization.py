@@ -8,7 +8,7 @@ from __future__ import annotations
 import html
 import re
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from reasoner.core.constants import DEFAULT_SANITIZER_MAX_LENGTH
 

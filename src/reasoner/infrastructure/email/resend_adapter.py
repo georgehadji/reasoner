@@ -13,7 +13,7 @@ from typing import Any
 
 import httpx
 
-from reasoner.application.ports.email_port import EmailMessage, EmailPort
+from reasoner.application.ports.email_port import EmailMessage
 from reasoner.core.settings import settings
 
 logger = logging.getLogger(__name__)

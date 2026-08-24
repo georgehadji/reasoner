@@ -1,6 +1,5 @@
 """Tests for GET /api/presets and GET /api/models endpoints."""
 
-import pytest
 from fastapi.testclient import TestClient
 
 from reasoner.api import app

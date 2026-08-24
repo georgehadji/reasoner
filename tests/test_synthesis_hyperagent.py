@@ -1,12 +1,15 @@
 """
 Integration tests for SynthesisHyperAgent.
 """
-import pytest
 from unittest.mock import AsyncMock
 
+import pytest
+
 from reasoner.models import (
-    PipelineState, SolutionCandidate, PerspectiveType,
-    FinalSolution, MetaCognitiveAudit, ClaimLabel
+    FinalSolution,
+    PerspectiveType,
+    PipelineState,
+    SolutionCandidate,
 )
 from reasoner.subagents.synthesis.hyper_agent import SynthesisHyperAgent
 

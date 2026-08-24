@@ -3,15 +3,14 @@
 from __future__ import annotations
 
 import pytest
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from reasoner.api.middleware import (
-    SecurityHeadersMiddleware,
     AuditMiddleware,
     MemoryLimitMiddleware,
     RequestTimeoutMiddleware,
+    SecurityHeadersMiddleware,
     _anonymize_ip,
     _sanitize_url_for_audit,
 )

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from reasoner.core.ports.routing_constraint_port import (
     ConstraintViolation,
-    RoutingConstraintPort,
 )
 
 

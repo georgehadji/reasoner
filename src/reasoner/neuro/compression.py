@@ -6,7 +6,7 @@ Uses "Neuro-Squeeze" logic for smart token reduction.
 
 import re
 from enum import Enum
-from typing import Optional
+
 
 class CompressionLevel(Enum):
     NONE = "none"
@@ -38,7 +38,7 @@ class Language(Enum):
 class ContextCompressor:
     def __init__(self, level: CompressionLevel = CompressionLevel.MINIMAL):
         self.level = level
-        
+
         # Core patterns for Neuro-Squeeze
         self.import_pattern = re.compile(r"^(use |import |from |require\(|#include)")
         self.func_signature = re.compile(
@@ -52,7 +52,7 @@ class ContextCompressor:
 
         if self.level == CompressionLevel.AGGRESSIVE:
             return self._compress_aggressive(content, language)
-        
+
         return self._compress_minimal(content, language)
 
     def _get_comment_patterns(self, lang: Language):
@@ -67,10 +67,10 @@ class ContextCompressor:
         line_comment, block_start, block_end = self._get_comment_patterns(lang)
         result = []
         in_block = False
-        
+
         for line in content.splitlines():
             trimmed = line.strip()
-            
+
             # Simple block comment skip
             if block_start and block_start in trimmed:
                 in_block = True
@@ -78,15 +78,15 @@ class ContextCompressor:
                 if block_end and block_end in trimmed:
                     in_block = False
                 continue
-                
+
             # Line comment skip (don't skip docstrings in Python)
             if line_comment and trimmed.startswith(line_comment):
                 continue
-                
+
             if not trimmed:
                 result.append("")
                 continue
-                
+
             result.append(line)
 
         compressed = "\n".join(result)
@@ -103,24 +103,24 @@ class ContextCompressor:
 
         for line in minimal.splitlines():
             trimmed = line.strip()
-            
+
             # Keep imports
             if self.import_pattern.match(trimmed):
                 result.append(line)
                 continue
-                
+
             # Keep signatures
             if self.func_signature.match(trimmed):
                 result.append(line)
                 in_body = True
                 brace_depth = 0
                 continue
-                
+
             if in_body:
                 # Track braces (naive but effective for most C-style and Python indents)
                 brace_depth += trimmed.count("{")
                 brace_depth -= trimmed.count("}")
-                
+
                 # For Python, we'd look at indentation, but here we just keep the signature
                 # and a placeholder if it's a block
                 if brace_depth <= 0:

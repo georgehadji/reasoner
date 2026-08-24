@@ -6,23 +6,26 @@ import asyncio
 import logging
 from typing import Any
 
-from reasoner.core.constants import TRUNCATION, get_token_budget, DEFAULT_MAX_TOKENS
-from reasoner.infrastructure.search.discovery import get_search_client_for_method
-from reasoner.domain.pipeline_state import PipelineState
-from reasoner.domain.core_types import (
-    SolutionCandidate,
-    StressTestResult,
-    ScenarioType,
-)
-from reasoner.models import (
-    PerspectiveRegistry,
-    PerspectiveType,
-)
-from reasoner.parsing import ParseError, extract_json, _parse_critique_scores, _parse_review_hypotheses
-from reasoner.domain.preset_core import get_preset_price_tier
 import reasoner.phases as phases
 from reasoner.application.flows.base import WorkflowServices
 from reasoner.application.services.recovery_service import RecoveryService
+from reasoner.core.constants import DEFAULT_MAX_TOKENS, get_token_budget
+from reasoner.domain.core_types import (
+    ScenarioType,
+    SolutionCandidate,
+    StressTestResult,
+)
+from reasoner.domain.pipeline_state import PipelineState
+from reasoner.domain.preset_core import get_preset_price_tier
+from reasoner.infrastructure.search.discovery import get_search_client_for_method
+from reasoner.models import (
+    PerspectiveRegistry,
+)
+from reasoner.parsing import (
+    _parse_critique_scores,
+    _parse_review_hypotheses,
+    extract_json,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -77,13 +80,13 @@ async def run_multi_perspective_research_phase(state: PipelineState, services: W
 
 
 async def run_perspectives_phase(
-    state: PipelineState, 
+    state: PipelineState,
     services: WorkflowServices,
     parallel: bool = True,
     perspectives: list[Any] = None
 ) -> None:
     services.log("PHASE-2", "Running multi-perspective analysis...", state)
-    
+
     if perspectives is None:
         from reasoner.core import DEFAULT_PERSPECTIVES
         perspectives = list(DEFAULT_PERSPECTIVES)
@@ -139,7 +142,7 @@ async def run_perspectives_phase(
         lang_instruction = phases.get_language_instruction(state)
         system_prompt = f"{lang_instruction}\n\n{base_system}"
         user_prompt = phases.perspective_prompt(state, p_name)
-        
+
         raw, _ = await services.call_llm(
             role=p_name,
             system_prompt=system_prompt,
@@ -152,7 +155,7 @@ async def run_perspectives_phase(
         if not isinstance(core_analysis, str):
             import json
             core_analysis = json.dumps(core_analysis, ensure_ascii=False) if isinstance(core_analysis, (dict, list)) else str(core_analysis)
-        
+
         if not core_analysis and isinstance(data, dict) and len(data) > 1:
             import json
             core_analysis = json.dumps(data, ensure_ascii=False)
@@ -162,7 +165,7 @@ async def run_perspectives_phase(
             key_insights = data.get("key_insights") or []
             if not isinstance(key_insights, list):
                 key_insights = [str(key_insights)] if key_insights else []
-        
+
         return SolutionCandidate(
             perspective=p_enum,
             content=core_analysis,

@@ -204,7 +204,7 @@ class HyperGateAgent:
         if cached := self._cache.get(problem_hash):
             logger.debug("HyperGateAgent top-level cache hit hash=%s…", problem_hash[:16])
             return cached
-            
+
         # Try L2 cache
         if l2_cached := await self._get_l2_cache(problem_hash):
             logger.debug("HyperGateAgent L2 cache hit hash=%s…", problem_hash[:16])

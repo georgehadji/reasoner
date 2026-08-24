@@ -1,0 +1,253 @@
+# Context: Tests
+
+## Directory: `tests`
+
+## Description
+Test configurations and base setup for the Pytest testing framework.
+
+## Files
+- **`__init__.py`**: Tests for Reasoner
+- **`conftest.py`**: Mirror the env the CI test job sets (.github/workflows/test.yml) so a local
+- **`e2e_article_discovery.py`**: Setup minimal logging
+- **`test_acceptance.py`**: Acceptance tests for implementation plan gate criteria.
+- **`test_admin_auth_and_bounded_schemas.py`**: security-remediation-plan.md Phase 5: shared admin-key primitive,
+- **`test_agent_run_sync.py`**: ── The regression ──────────────────────────────────────────────────
+- **`test_agent_tools_contract.py`**: The agent tool schema is a published contract; pin it like one.
+- **`test_aggregates.py`**: Can't directly test without concrete implementation
+- **`test_anonymous_trial_policy.py`**: AnonymousTrialPolicy — security-remediation-plan.md Phase 2 item 3.
+- **`test_api_auth_deps.py`**: Tests for authentication and authorization FastAPI dependencies.
+- **`test_api_cache_clear.py`**: Tests for the DELETE /api/cache endpoint.
+- **`test_api_exception_handling.py`**: Check if HTTPException is raised anywhere in the try body
+- **`test_api_gate.py`**: ─────────────────────────────────────────────────────────────────────
+- **`test_api_keys.py`**: Tests for the API key domain and ApiKeyService.
+- **`test_api_memory_cache.py`**: Tests for the in-memory cache layer in api.py.
+- **`test_api_middleware.py`**: Tests for FastAPI middleware (security headers, audit, memory, timeout).
+- **`test_api_phase_errors.py`**: Unauthenticated runs resolve to the free tier, whose per-run cost limit
+- **`test_api_presets_models.py`**: Tests for GET /api/presets and GET /api/models endpoints.
+- **`test_api_schemas_validation.py`**: Tests for Pydantic request/response schema validation.
+- **`test_api_widget_execute.py`**: Tests for POST /api/widget/execute endpoint.
+- **`test_arch_integration_methods.py`**: ── Problem prompts tailored to each method ──────────────────────────
+- **`test_arch_risk_dead_letter.py`**: Architecture Risk: Dead-letter queue unbounded growth.
+- **`test_arch_risk_fallback_masking.py`**: Architecture Risk: Fallback to primary masks model-specific failures.
+- **`test_arch_risk_pipeline_state_resilience.py`**: ── Truncated / corrupt input ───────────────────────────────────────
+- **`test_arch_risk_streaming_closure.py`**: Architecture Risk: Streaming closure bug in make_wrapper pattern.
+- **`test_arch_risk_system_prompt_drift.py`**: Architecture Risk: System prompt drift across multiple locations.
+- **`test_arch_risk_worker_mode.py`**: Architecture Risk: In-memory singletons in multi-worker deployments.
+- **`test_arch_uncertainty_mixin_migration.py`**: ── Flow factory covers all documented methods ────────────────────────
+- **`test_arch_uncertainty_model_registry_consistency.py`**: Architecture Uncertainty: Model registry consistency.
+- **`test_article_adapters.py`**: ═════════════════════════════════════════════════════════════════════
+- **`test_article_defect_regression.py`**: Defect-hunt regression tests (V7 Protocol — Phase 7 artifacts).
+- **`test_article_followup_scoping.py`**: Tests for referential follow-up detection.
+- **`test_article_golden_set.py`**: ═════════════════════════════════════════════════════════════════════
+- **`test_article_parsing.py`**: ═════════════════════════════════════════════════════════════════════
+- **`test_article_pipeline_regression.py`**: ── Helpers ──────────────────────────────────────────────────────────────────
+- **`test_article_presets.py`**: Preset routing and cost validation tests for the Article method.
+- **`test_article_router.py`**: Tests for article request detection.
+- **`test_ast_check.py`**: Code or resource asset facilitating system functionality.
+- **`test_augmentation_metrics.py`**: Unit tests for augmentation A/B quality metrics service.
+- **`test_augmented_article.py`**: Re-import the HyperGate patterns for direct testing
+- **`test_auth_concurrency.py`**: Concurrency tests for AuthManager.
+- **`test_auth_deps_rate_limiter.py`**: Tests for rate-limiter fail-closed behavior.
+- **`test_auth_manager_lru.py`**: Tests for AuthManager LRU eviction.
+- **`test_auth_security.py`**: Code or resource asset facilitating system functionality.
+- **`test_auto_rollback.py`**: Tests for automatic rollback / graceful degradation behavior.
+- **`test_autonomous_debugging.py`**: Autonomous Debugging Protocol — Adversarial Validation Tests
+- **`test_backend_bugfixes.py`**: Regression tests for CRITICAL and HIGH bugs found in proactive backend scan.
+- **`test_brave_media_search.py`**: BraveSearchAdapter.__init__ does `api_key or settings.BRAVE_SEARCH_API_KEY`,
+- **`test_bug002_token_cache_clock.py`**: Regression tests for BUG-002: Token cache monotonic clock cross-session.
+- **`test_bug003_circuit_breaker_half_open.py`**: Force OPEN
+- **`test_bug004_parsing_truncated_json.py`**: Regression tests for BUG-004: _repair_truncated_json string quote overwrite.
+- **`test_bug007_runstate_eviction.py`**: Verifies RunStateStore eviction works and does not cancel active runs prematurely.
+- **`test_bugfix_agent_cache_setup.py`**: Code or resource asset facilitating system functionality.
+- **`test_bugfix_enum_resume.py`**: Create a state dictionary with an invalid perspective value
+- **`test_bugfix_json_repair.py`**: Truncated right after "action
+- **`test_bugfix_language_preservation.py`**: Original is in Greek
+- **`test_bugfixes_regression.py`**: Regression tests for backend bug fixes.
+- **`test_bugfixes_regression_round2.py`**: ──────────────────────────────────────────────────────────────────────────────
+- **`test_bugfixes_regression_round3.py`**: Regression tests for Round 3 backend bug fixes.
+- **`test_cache_and_schema.py`**: ── WI-1: Cache isolation ──
+- **`test_cancellation_contract.py`**: Contract tests for the cancellation mechanism.
+- **`test_capability_coverage.py`**: Capability coverage gate — security-remediation-plan.md Phase 2 item 4.
+- **`test_circuit_breaker.py`**: Tests for circuit breaker race condition fix (BUG-001 regression).
+- **`test_code_execution_safety.py`**: Regression tests for the generated-code execution containment guard.
+- **`test_codebase_audit.py`**: CODEBASE AUDIT & SAFE REMEDIATION — Detection Tests
+- **`test_cohere_rerank.py`**: Tests for Cohere Rerank 4 Fast integration via OpenRouter.
+- **`test_constants.py`**: Regression tests for centralized constants and settings.
+- **`test_container_sandbox.py`**: Unit tests for ContainerExecutionSandbox — the httpx client side of the
+- **`test_context_vetting.py`**: Simulate the logic from pipeline.py:_phase_context_vetting
+- **`test_core_constants.py`**: Tests for core constants and configuration defaults.
+- **`test_core_protocol.py`**: Tests for core protocol abstractions (PhaseConfig, PhaseResult).
+- **`test_core_temperatures.py`**: Tests for temperature configuration.
+- **`test_cqrs_parity.py`**: Path 1: Direct pipeline.run()
+- **`test_credits.py`**: ── Domain: conversion ──────────────────────────────────────────────
+- **`test_cross_language.py`**: Tests for cross-language reasoning and DeepL translation.
+- **`test_csrf_clock_jump.py`**: Tests for CSRF token resilience against clock jumps.
+- **`test_db_pool_size.py`**: Tests for DB_POOL_SIZE setting.
+- **`test_decompose_json_guard.py`**: Tests for decompose query JSON guard.
+- **`test_deep_read.py`**: Ensure the prompt included the scraped content
+- **`test_document_tenant_safety.py`**: security-remediation-plan.md Phase 4: cross-tenant dedup isolation,
+- **`test_document_vector_store.py`**: step = 20; indices: 0, 20, 40, 60, 80 → 5 chunks
+- **`test_domain_events.py`**: Tests for Domain Events
+- **`test_e2e_budget_presets.py`**: All budget presets across every method
+- **`test_e2e_budget_presets_mock.py`**: Every budget preset in the registry (25 as of v3.4), sorted for stable output.
+- **`test_e2e_comprehensive.py`**: ─────────────────────────────────────────────────────────────────────
+- **`test_e2e_real_api.py`**: Must have start event
+- **`test_e2e_real_pipeline.py`**: Real end-to-end pipeline tests using actual OpenRouter API.
+- **`test_e2e_real_relationships.py`**: All routed roles must resolve to a provider
+- **`test_encryption.py`**: ── core roundtrip ──
+- **`test_end_to_end_edge_cases.py`**: Force local src into path
+- **`test_error_store_sql_safety.py`**: Regression tests for SQL injection prevention in ErrorStore.
+- **`test_event_bus.py`**: Tests for Event Bus
+- **`test_event_bus_backpressure.py`**: Tests for EventBus queue backpressure.
+- **`test_event_bus_isolation.py`**: Tests for Event Bus subscriber isolation.
+- **`test_event_emission_service.py`**: Should not raise even though bus is None
+- **`test_event_store_concurrency.py`**: Tests for EventStore concurrency safety.
+- **`test_event_store_gdpr_ownership.py`**: Tests for EventStore.list_aggregate_ids_for_user (GDPR erasure support).
+- **`test_event_types.py`**: Tests for EventType split into sub-enums.
+- **`test_exceptions_coverage.py`**: Comprehensive tests for exception taxonomy (exceptions.py).
+- **`test_executor_wiring.py`**: Code or resource asset facilitating system functionality.
+- **`test_feedback.py`**: Seed data
+- **`test_followup_agent.py`**: Other roles should remain as defined by the preset
+- **`test_followup_context.py`**: Code or resource asset facilitating system functionality.
+- **`test_headless.py`**: Code or resource asset facilitating system functionality.
+- **`test_hypergate.py`**: Unit tests for the HyperGate sub-agent system.
+- **`test_idempotency.py`**: client_run_id is the only thing standing between a dropped connection and
+- **`test_image_generation.py`**: Code or resource asset facilitating system functionality.
+- **`test_image_generation_routes.py`**: Code or resource asset facilitating system functionality.
+- **`test_image_model_selection.py`**: Unit tests for automatic image-model selection.
+- **`test_images_metering.py`**: No true-up against real spend for images (see estimate_service
+- **`test_io_security.py`**: Tests for I/O and security bug fixes (BUG-007, BUG-008, BUG-009 regression).
+- **`test_llm_cancelled_error.py`**: Regression tests for CancelledError handling in BaseLLMProvider (BUG-003).
+- **`test_load.py`**: Load tests with concurrent async client (Critical Enhancement 7.4).
+- **`test_mcp_tools.py`**: Substrings that would signal an admin/key-management/billing-management
+- **`test_metered_auth_policy.py`**: Regression tests for authentication gates on provider-costing routes.
+- **`test_method_state.py`**: Empty scientific_state should not be in method_state
+- **`test_methods.py`**: ── Method-to-budget-preset mapping ──────────────────────────────────
+- **`test_methods_audit.py`**: Add src to sys.path
+- **`test_mixins_cognitive.py`**: ── CoVe ─────────────────────────────────────────────────────────────
+- **`test_mixins_delphi.py`**: Tests for the DelphiMixin phase methods.
+- **`test_mixins_jury.py`**: Tests for the JuryMixin phase methods.
+- **`test_models.py`**: Create a state with some data
+- **`test_multi_perspective_budget.py`**: Import core.search before ReasonerPipeline to resolve a circular import
+- **`test_multi_provider.py`**: Will fail because SDK is installed but API key is invalid — proves the SDK path works
+- **`test_multilingual_article_detection.py`**: Unit tests for multilingual article request detection.
+- **`test_neuro_agent_id_isolation.py`**: agent_id reaches the neuro data dir straight from request bodies
+- **`test_neuro_cache_wiring.py`**: Pin rerank off: it is orthogonal to tier wiring and reaches the network.
+- **`test_neuro_cli.py`**: cli.py's `status` and `start` commands reach the exact same require_neuro_key
+- **`test_neuro_fallback_providers.py`**: Tests for Neuro Embedding Provider Fallbacks.
+- **`test_neuro_perplexity_provider.py`**: Code or resource asset facilitating system functionality.
+- **`test_neuro_providers_safe_indexing.py`**: ── Reproducer: empty choices/data → no crash ────────────────
+- **`test_ocr.py`**: Create an authenticated client for tests
+- **`test_openrouter.py`**: ─────────────────────────────────────────────────────────────────────
+- **`test_parsing.py`**: Code or resource asset facilitating system functionality.
+- **`test_parsing_fixes.py`**: Create a 200KB input (well over the 100KB limit)
+- **`test_perf_counter_migration.py`**: Tests ensuring latency paths use perf_counter, not time.time.
+- **`test_perplexity_config.py`**: Regression tests for provider configuration.
+- **`test_perplexity_search_client.py`**: Code or resource asset facilitating system functionality.
+- **`test_perspective_registry.py`**: Tests for PerspectiveRegistry runtime extensibility.
+- **`test_perspectives_reach_state.py`**: Regression tests: Phase 2 perspectives must actually reach PipelineState.
+- **`test_persuasion_defense.py`**: =============================================================================
+- **`test_phase_span.py`**: Tests for PhaseSpan — observability context manager for pipeline phases.
+- **`test_phase_subagents_base.py`**: Unit tests for PhaseSubAgent base class.
+- **`test_phases_shared.py`**: Tests for shared phase utilities.
+- **`test_pipeline_field_descriptor.py`**: Code or resource asset facilitating system functionality.
+- **`test_pipeline_fixes.py`**: ─────────────────────────────────────────────────────────────────────
+- **`test_pipeline_flow.py`**: Quarantined: build_default_flow_registry() was removed in the core refactor
+- **`test_pipeline_flow_dag.py`**: Tests for DAG-based phase execution in PipelineFlow.
+- **`test_pipeline_ownership_repo.py`**: Code or resource asset facilitating system functionality.
+- **`test_pipeline_resume.py`**: Tests for pipeline resume endpoints.
+- **`test_pipeline_service_contract.py`**: Contract tests for PipelineService.create_pipeline().
+- **`test_pipeline_state_split.py`**: Code or resource asset facilitating system functionality.
+- **`test_pipelines_authz.py`**: Tests for _check_pipeline_ownership (api/routes/pipelines.py).
+- **`test_pool_cleanup.py`**: Tests for HTTP pool cleanup fix (BUG-002 regression).
+- **`test_postgres_event_store_concurrent.py`**: Tests for PostgreSQL event store concurrent writes.
+- **`test_postgres_gdpr_ownership.py`**: Tests for PostgreSQLEventStore.list_aggregate_ids_for_user.
+- **`test_preflight_gate_isolation.py`**: Code or resource asset facilitating system functionality.
+- **`test_preset_validation.py`**: Test that harness_guard lab map covers all preset-referenced models.
+- **`test_presets.py`**: Tests for preset utilities: tier detection, method extraction, and agent mappings.
+- **`test_prompt_caching.py`**: Arrange
+- **`test_prompt_compression.py`**: Tests for prompt code-block compression in LLMExecutor.
+- **`test_prompt_injection.py`**: Code or resource asset facilitating system functionality.
+- **`test_provider_router_degradation.py`**: Tests for ProviderRouter graceful degradation.
+- **`test_quick_quality_check.py`**: Tests for QuickQualityCheck — fast quality gate for cascading responses.
+- **`test_quota_redis_fallback.py`**: Tests for CachedQuotaRepository Redis fallback.
+- **`test_quota_tier_lookup.py`**: Tier entitlement lives in the application layer — the pipeline executor
+- **`test_rate_limiter_concurrency.py`**: Concurrency tests for RateLimiter.
+- **`test_rate_limiter_edge_cases.py`**: Edge-case tests for rate_limiter.py.
+- **`test_rate_limiter_sharding.py`**: Tests for RateLimiter concurrent access safety.
+- **`test_regression_bugs.py`**: Regression tests for bugs identified by Autonomous Repository Bug-Fixing Protocol v2.0.
+- **`test_reliability_patches.py`**: ─────────────────────────────────────────────────────────────────────
+- **`test_renderer_fixes.py`**: Regression tests for renderer bugs.
+- **`test_run_command_user_id_threading.py`**: Regression tests: the authenticated user_id must reach the ownership write.
+- **`test_run_metering.py`**: ── extract_run_cost ────────────────────────────────────────────────
+- **`test_run_state_store.py`**: Tests for RunStateStore.
+- **`test_saas_auth_integration.py`**: Ensure legacy API keys are enabled for compat tests
+- **`test_saas_cached_quota.py`**: Unit tests for CachedQuotaRepository with mocked Redis.
+- **`test_saas_cached_subscription.py`**: Code or resource asset facilitating system functionality.
+- **`test_saas_domain.py`**: tests/test_saas_domain.py
+- **`test_saas_history.py`**: Tests for history ownership isolation (SEC-007).
+- **`test_saas_ip_anonymization.py`**: Tests for IP anonymization in audit logs (SEC-018).
+- **`test_saas_preset_tier_enforcement.py`**: Code or resource asset facilitating system functionality.
+- **`test_saas_preset_tiers.py`**: tests/test_saas_preset_tiers.py
+- **`test_saas_quota_integration.py`**: SaaS Quota Integration Tests — Phase 3
+- **`test_saas_quota_repo.py`**: _pool is a CLASS attribute and _get_pool() reads it off the class, so an
+- **`test_saas_quota_service.py`**: tests/test_saas_quota_service.py
+- **`test_saas_rate_limit_user.py`**: SaaS Rate Limit User Bucketing Tests — Phase 2
+- **`test_saas_run_state.py`**: First pop should return True
+- **`test_saas_stop_ownership.py`**: Use a fresh RunStateManager with its own fallback store
+- **`test_saas_stripe_adapter.py`**: Unit tests for StripeBillingAdapter with mocked stripe module.
+- **`test_saas_stripe_webhooks.py`**: Tests for Stripe webhook handling with idempotency and error resilience.
+- **`test_sandbox_worker.py`**: Unit tests for the sandbox-worker FastAPI app. docker_runner is monkeypatched
+- **`test_sanitization.py`**: Tests for input sanitization and prompt injection defense.
+- **`test_sanitization_edge_cases.py`**: Security-focused edge-case tests for sanitization.py.
+- **`test_sdk_contract.py`**: Contract tests protecting the client SDKs from silent backend drift.
+- **`test_search_client_factory.py`**: Tests for SearchClient factory routing and SearchService integration.
+- **`test_search_quality.py`**: ═════════════════════════════════════════════════════════════════════
+- **`test_security.py`**: Security Tests - Verify security fixes work correctly.
+- **`test_security_regression.py`**: Force LocalAuthAdapter regardless of ambient SUPABASE_URL/ENVIRONMENT config —
+- **`test_ser_5.py`**: None values should be converted to safe defaults
+- **`test_settings_consistency.py`**: Extract SERVER_PORT default from settings.py
+- **`test_site_capabilities_sync.py`**: Drift guard for ui-next/src/lib/capabilities.generated.ts.
+- **`test_stop_pipeline_handler.py`**: Regression tests for BUG-003: StopPipelineCommandHandler must use the
+- **`test_synthesis_fixes.py`**: Regression tests for synthesis integrity bugs: raw JSON leakage, stale citations,
+- **`test_synthesis_hyperagent.py`**: Consensus mapper
+- **`test_synthesis_latency.py`**: Test that synthesis streaming does not sleep between chunks.
+- **`test_temperature.py`**: Tests for LLM temperature handling (BUG-001 regression).
+- **`test_temperature_strategy.py`**: Tests for TemperatureStrategy and retry-aware temperature resolution.
+- **`test_token_cache_counter_leak.py`**: Regression tests for token cache counter leak on overwrite.
+- **`test_token_cache_semantic.py`**: hello world foo bar -> 4 unique words
+- **`test_utils_json_safe.py`**: Tests for safe JSON loading with depth limits.
+- **`test_vertical_configs.py`**: Tests for vertical domain configurations.
+- **`test_vs_all_flags_disabled.py`**: Golden regression — VS code paths behave correctly when all flags disabled.
+- **`test_vs_calibration.py`**: Code or resource asset facilitating system functionality.
+- **`test_vs_claim_extraction.py`**: Tests for vs_claim_extraction stage.
+- **`test_vs_config_models.py`**: Tests for vs_config models and registry.
+- **`test_vs_conflict_surfacing.py`**: Tests for vs_conflict_surfacing stage.
+- **`test_vs_constants.py`**: Aerospace (most critical) < Legal < Radiology (most lenient)
+- **`test_vs_coverage_audit.py`**: Tests for vs_coverage_audit stage.
+- **`test_vs_decomposition.py`**: Tests for vs_decomposition stage.
+- **`test_vs_generation_invariants.py`**: Invariant tests for vs_generation stage.
+- **`test_vs_generation_strategies.py`**: LATENCY_SENSITIVE budget = 1 NLI call
+- **`test_vs_invariants_global.py`**: Global invariant tests for VS integration.
+- **`test_vs_observability.py`**: Push high entropy values first
+- **`test_vs_pipeline_aerospace.py`**: E2E test: Aerospace pipeline failure-mode probes.
+- **`test_vs_pipeline_legal.py`**: E2E test: Legal pipeline conservative routing.
+- **`test_vs_pipeline_radiology.py`**: E2E test: Radiology pipeline with VS enabled.
+- **`test_vs_primitives.py`**: Code or resource asset facilitating system functionality.
+- **`test_vs_probe_generation.py`**: Tests for vs_probe_generation stage.
+- **`test_vs_verification_routing.py`**: Tests for vs_verification_routing stage.
+- **`test_websocket_auth.py`**: Code or resource asset facilitating system functionality.
+- **`test_websocket_authz.py`**: Should have received an error, not a subscribed confirmation
+- **`test_websocket_manager.py`**: Regression tests for BUG-002: WebSocketManager must protect mutable state
+- **`test_websocket_manager_sharding.py`**: Tests for WebSocketManager lock sharding.
+- **`test_websocket_security.py`**: WebSocket handshake security — security-remediation-plan.md Phase 3
+- **`test_widgets.py`**: Should detect
+- **`test_widgets_calculator.py`**: Tests for Calculator Widget.
+- **`test_ws_ticket.py`**: WebSocket connection tickets — security-remediation-plan.md Phase 3 item 2.
+
+## Subfolders
+- **`_data`**: Mock payloads, sample outputs, and static dataset fixtures used by tests.
+- **`architecture`**: Automated tests asserting code structural invariants (e.g. no core importing infrastructure, dependency lines).
+- **`integration`**: End-to-end integration test suites verifying multi-method pipelines and API routes.
+- **`unit`**: Surgical unit tests verifying isolated functions, parsing strategies, and utilities.
+- **`utils`**: Test assertions and helper functions used to mock third-party dependencies during test runs.

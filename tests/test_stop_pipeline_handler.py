@@ -4,9 +4,10 @@ per-run _cancelled_runs dict instead of the removed _cancel_flag global.
 """
 
 import pytest
+
+import reasoner.api as api
 from reasoner.application.commands import StopPipelineCommand
 from reasoner.application.handlers.handlers import StopPipelineCommandHandler
-import reasoner.api as api
 
 
 class TestStopPipelineCommandHandler:

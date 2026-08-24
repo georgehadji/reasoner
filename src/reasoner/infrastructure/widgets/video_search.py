@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from reasoner.infrastructure.widgets.protocol import BaseWidget, WidgetResult, WidgetType
+from reasoner.infrastructure.widgets.protocol import BaseWidget, WidgetType
 
 
 class VideoSearchWidget(BaseWidget):
@@ -22,18 +22,18 @@ class VideoSearchWidget(BaseWidget):
     - Duration information
     - Multiple video sources (YouTube, Vimeo, etc.)
     """
-    
+
     name = "video_search"
     widget_type = WidgetType.VIDEO_SEARCH
     description = "Video content search results"
-    
+
     trigger_patterns = [
         re.compile(r'(?:show|find|search)\s+videos?\s+(?:for)?\s*(.+)', re.I),
         re.compile(r'(?:videos?|youtube)\s+(?:of|for|about)?\s*(.+)', re.I),
         re.compile(r'show\s+me\s+(?:some)?\s*videos?\s+(?:of)?\s*(.+)', re.I),
         re.compile(r'(?:watch|view)\s+(?:a)?\s*video\s+(?:about|on|for)?\s*(.+)', re.I),
     ]
-    
+
     def _extract_from_match(
         self,
         match: re.Match,
@@ -41,7 +41,7 @@ class VideoSearchWidget(BaseWidget):
     ) -> dict[str, Any]:
         """Extract search query from match."""
         search_query = None
-        
+
         if match.lastindex and match.lastindex >= 1:
             search_query = match.group(1).strip()
         else:
@@ -52,25 +52,25 @@ class VideoSearchWidget(BaseWidget):
                 query,
                 flags=re.I
             ).strip()
-        
+
         return {'query': search_query, 'limit': 20}
-    
+
     async def _execute_impl(self, params: dict[str, Any]) -> dict[str, Any]:
         """Search for videos."""
         query = params.get('query', '')
         limit = params.get('limit', 20)
-        
+
         if not query:
             return {'error': 'Search query not specified'}
-        
+
         results = await self._search_videos(query, limit)
-        
+
         return {
             'query': query,
             'results': results,
             'total': len(results),
         }
-    
+
     async def _search_videos(self, query: str, limit: int) -> list[dict[str, Any]]:
         """Search videos via the Brave Search API.
 

@@ -16,7 +16,6 @@ import logging
 import re
 from typing import Any, Literal
 
-
 from pydantic import BaseModel, Field
 
 from reasoner.core.constants import (
@@ -26,7 +25,7 @@ from reasoner.core.constants import (
     GATE_TIMEOUT_SECONDS,
 )
 from reasoner.infrastructure.llm.router import ProviderRouter
-from reasoner.utils.json_safe import safe_json_loads, JSONDepthExceededError
+from reasoner.utils.json_safe import JSONDepthExceededError, safe_json_loads
 
 logger = logging.getLogger(__name__)
 

@@ -6,7 +6,6 @@ from collections import Counter
 
 from reasoner.core.ports.routing_constraint_port import (
     ConstraintViolation,
-    RoutingConstraintPort,
 )
 from reasoner.infrastructure.llm.registry import _vendor_of
 

@@ -13,8 +13,9 @@ Known exceptions tracked in ALLOWED_LINEAGE (TYPE_CHECKING guards, port adapters
 from __future__ import annotations
 
 import ast
-import pytest
 from pathlib import Path
+
+import pytest
 
 BASE = Path("src/reasoner")
 

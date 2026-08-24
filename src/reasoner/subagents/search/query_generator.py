@@ -6,9 +6,8 @@ from __future__ import annotations
 from typing import Any
 
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.subagents.base import PhaseSubAgent
 from reasoner.parsing import extract_json
-
+from reasoner.subagents.base import PhaseSubAgent
 
 QUERY_SYSTEM = """You are a Query Generator. Your ONE JOB is to generate 3-5 diverse search queries that will help gather evidence for the problem.
 

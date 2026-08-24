@@ -15,8 +15,9 @@ Author: DeepSeek TUI — June 2026
 from __future__ import annotations
 
 import json
+
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.phases._shared import get_language_instruction, _wrap_user_input
+from reasoner.phases._shared import _wrap_user_input, get_language_instruction
 
 GENERATOR_INITIAL_SYSTEM = (
     "You are an expert analytical assistant engaged in an iterative refinement process. "
@@ -104,7 +105,7 @@ def synthesis_prompt(state: PipelineState) -> str:
 
     convergence_reason = getattr(state, "adversarial_convergence_reason", "")
     convergence_round = getattr(state, "adversarial_convergence_round", 0)
-    
+
     msg = (
         f'{get_language_instruction(state)}\n\n'
         f'Problem: {_wrap_user_input(state.problem)}\n\n'

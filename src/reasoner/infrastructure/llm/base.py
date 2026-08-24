@@ -6,15 +6,16 @@ import asyncio
 import logging
 import random
 from abc import ABC, abstractmethod
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from typing import Any
 
-from reasoner.exceptions import (
-    ReasonerError,
-    is_retryable,
-)
 from reasoner.core.constants import (
     DEFAULT_MAX_TOKENS,
     DEFAULT_TEMPERATURE,
+)
+from reasoner.exceptions import (
+    ReasonerError,
+    is_retryable,
 )
 
 logger = logging.getLogger(__name__)

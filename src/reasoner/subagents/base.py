@@ -15,16 +15,14 @@ NOT for pre-flight routing (use HyperGate BaseSubAgent for that).
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 import time
 from abc import ABC, abstractmethod
 from typing import Any
 
 from reasoner.core.constants import HYPERGATE_METHOD_THRESHOLD
-from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.parsing import extract_json
+from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.subagents.models import PhaseSubAgentOutput
 
 logger = logging.getLogger(__name__)

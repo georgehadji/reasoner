@@ -9,21 +9,21 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from reasoner.infrastructure.benchmarks.runner import BenchmarkRunner, BENCHMARK_BUDGET
+from reasoner.infrastructure.benchmarks.runner import BENCHMARK_BUDGET, BenchmarkRunner
 
 logger = logging.getLogger(__name__)
 
 
 def _get_default_suites() -> list[Any]:
     """Lazy-import and return all benchmark suite instances."""
-    from reasoner.infrastructure.benchmarks.suites.reasoning import ReasoningSuite
     from reasoner.infrastructure.benchmarks.suites.coding import CodingSuite
-    from reasoner.infrastructure.benchmarks.suites.writing import WritingSuite
+    from reasoner.infrastructure.benchmarks.suites.consistency import ConsistencySuite
+    from reasoner.infrastructure.benchmarks.suites.critical_thinking import CriticalThinkingSuite
     from reasoner.infrastructure.benchmarks.suites.json_fidelity import JsonFidelitySuite
     from reasoner.infrastructure.benchmarks.suites.long_context import LongContextSuite
     from reasoner.infrastructure.benchmarks.suites.multilingual import MultilingualSuite
-    from reasoner.infrastructure.benchmarks.suites.consistency import ConsistencySuite
-    from reasoner.infrastructure.benchmarks.suites.critical_thinking import CriticalThinkingSuite
+    from reasoner.infrastructure.benchmarks.suites.reasoning import ReasoningSuite
+    from reasoner.infrastructure.benchmarks.suites.writing import WritingSuite
 
     return [
         ReasoningSuite(),
@@ -93,8 +93,9 @@ class BenchmarkEngine:
 
         # Store to registry
         if self.registry and scores:
-            from reasoner.domain.model_capabilities import ModelCapabilities
             import time
+
+            from reasoner.domain.model_capabilities import ModelCapabilities
             caps = ModelCapabilities(
                 scores=scores,
                 source="benchmark",

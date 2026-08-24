@@ -12,9 +12,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any
-from unittest.mock import MagicMock
-
-import pytest
 
 from reasoner.phases.brainstorming import (
     vs_cluster_prompt,
@@ -22,7 +19,6 @@ from reasoner.phases.brainstorming import (
     vs_generation_prompt,
 )
 from reasoner.quality.criteria import evaluate_rules, reset_phase_state
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Minimal state stubs

@@ -21,9 +21,9 @@ os.environ.setdefault("CSRF_ENFORCE_BACKEND", "false")
 os.environ.setdefault("OPENROUTER_API_KEY", "sk-or-test-dummy-openrouter-key-placeholder")
 os.environ.setdefault("RATE_LIMITER_REDIS_FAILURE_MODE", "fail_open")
 
-import httpx
-import pytest
 import asyncio
+
+import pytest
 
 from reasoner.application.event_bus.bus import reset_event_bus
 from reasoner.core.ports.model_registry_port import set_model_registry_port

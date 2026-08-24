@@ -6,11 +6,11 @@ Evaluates mathematical expressions using asteval (BSD-licensed safe evaluator).
 
 from __future__ import annotations
 
-import re
 import math
+import re
 from typing import Any
 
-from reasoner.infrastructure.widgets.protocol import BaseWidget, WidgetResult, WidgetType
+from reasoner.infrastructure.widgets.protocol import BaseWidget, WidgetType
 
 
 class CalculatorWidget(BaseWidget):
@@ -76,7 +76,7 @@ class CalculatorWidget(BaseWidget):
         # Try asteval (BSD-licensed safe expression evaluator)
         try:
             from asteval import Interpreter
-            
+
             # Create evaluator with math functions
             evaluator = Interpreter()
             evaluator.symtable.update({
@@ -94,7 +94,7 @@ class CalculatorWidget(BaseWidget):
                 'floor': math.floor,
                 'ceil': math.ceil,
             })
-            
+
             result = evaluator.eval(expression)
 
             # asteval returns None on parse/evaluation errors; check error state

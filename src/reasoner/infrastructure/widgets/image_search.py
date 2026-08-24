@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from reasoner.infrastructure.widgets.protocol import BaseWidget, WidgetResult, WidgetType
+from reasoner.infrastructure.widgets.protocol import BaseWidget, WidgetType
 
 
 class ImageSearchWidget(BaseWidget):
@@ -21,17 +21,17 @@ class ImageSearchWidget(BaseWidget):
     - Thumbnail previews
     - Multiple image sources
     """
-    
+
     name = "image_search"
     widget_type = WidgetType.IMAGE_SEARCH
     description = "Visual image search results"
-    
+
     trigger_patterns = [
         re.compile(r'(?:show|find|search)\s+images\s+(?:for)?\s*(.+)', re.I),
         re.compile(r'(?:images|pictures|photos)\s+(?:of|for)?\s*(.+)', re.I),
         re.compile(r'show\s+me\s+(?:some)?\s*(?:images|pictures|photos)\s+(?:of)?\s*(.+)', re.I),
     ]
-    
+
     def _extract_from_match(
         self,
         match: re.Match,
@@ -39,7 +39,7 @@ class ImageSearchWidget(BaseWidget):
     ) -> dict[str, Any]:
         """Extract search query from match."""
         search_query = None
-        
+
         if match.lastindex and match.lastindex >= 1:
             search_query = match.group(1).strip()
         else:
@@ -50,25 +50,25 @@ class ImageSearchWidget(BaseWidget):
                 query,
                 flags=re.I
             ).strip()
-        
+
         return {'query': search_query, 'limit': 20}
-    
+
     async def _execute_impl(self, params: dict[str, Any]) -> dict[str, Any]:
         """Search for images."""
         query = params.get('query', '')
         limit = params.get('limit', 20)
-        
+
         if not query:
             return {'error': 'Search query not specified'}
-        
+
         results = await self._search_images(query, limit)
-        
+
         return {
             'query': query,
             'results': results,
             'total': len(results),
         }
-    
+
     async def _search_images(self, query: str, limit: int) -> list[dict[str, Any]]:
         """Search images via the Brave Search API.
 

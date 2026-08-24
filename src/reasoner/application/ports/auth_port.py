@@ -8,6 +8,7 @@ Concrete adapters (Supabase, Auth0, local JWT) implement this interface.
 from __future__ import annotations
 
 from typing import Protocol
+
 from reasoner.domain.saas import User
 
 

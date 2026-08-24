@@ -1,7 +1,9 @@
 """Tests for HTTP pool cleanup fix (BUG-002 regression)."""
 
-import pytest
 import asyncio
+
+import pytest
+
 from reasoner.llm import OpenAICompatibleProvider
 
 
@@ -102,7 +104,7 @@ class TestSharedPoolCleanup:
             base_url="https://test.api"
         )
         await OpenAICompatibleProvider.close_shared_pool()
-        
+
         # Verify closed
         assert OpenAICompatibleProvider._shared_pool is None
         assert OpenAICompatibleProvider._pool_closed == True
@@ -142,10 +144,11 @@ class TestSharedPoolRaceFreeInit:
 
     def test_concurrent_init_creates_single_pool(self):
         """Multiple simultaneous provider instantiations must create only one httpx client."""
-        import httpx
         import time
         from concurrent.futures import ThreadPoolExecutor
         from unittest.mock import patch
+
+        import httpx
 
         OpenAICompatibleProvider._shared_pool = None
         OpenAICompatibleProvider._pool_closed = False

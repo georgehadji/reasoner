@@ -10,9 +10,6 @@ Algorithm:
 
 from __future__ import annotations
 
-import copy
-from typing import Any
-
 from reasoner.core.ports.routing_constraint_port import (
     ConstraintViolation,
     RoutingConstraintPort,

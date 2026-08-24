@@ -5,7 +5,7 @@ Moved from infrastructure/search/port.py to eliminate core -> infrastructure dep
 
 from __future__ import annotations
 
-from typing import Any, Protocol, Literal
+from typing import Any, Literal, Protocol
 
 SourceType = Literal["general", "academic", "social", "news", "code"]
 

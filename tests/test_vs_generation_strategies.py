@@ -1,23 +1,17 @@
 """Tests for vs_generation stage — strategy behaviors and fallback."""
 from __future__ import annotations
-from tests.utils.mocks import MockLLM, MockNLI
 
 import pytest
-from unittest.mock import AsyncMock
 
+from reasoner.exceptions import ProviderError
 from reasoner.phases.vs_generation import (
-    generate_with_vs,
+    GenerationStrategy,
     VSGenerationConfig,
     VSGenerationResult,
-    GenerationStrategy,
-    GenerationCandidate,
+    generate_with_vs,
 )
-from reasoner.exceptions import ProviderError
-from reasoner.vs_config import VSFeatureFlags, VSDeploymentProfile
-
-
-
-
+from reasoner.vs_config import VSDeploymentProfile, VSFeatureFlags
+from tests.utils.mocks import MockLLM, MockNLI
 
 
 @pytest.fixture

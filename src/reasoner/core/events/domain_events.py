@@ -8,9 +8,8 @@ something that happened in the domain.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
-from datetime import datetime
 from enum import Enum
+from typing import Any
 
 
 class PipelineEventType(str, Enum):
@@ -102,7 +101,7 @@ class DomainEvent:
     aggregate_id: str
     version: int
     metadata: dict[str, Any] = field(default_factory=dict)
-    
+
     @property
     def is_critical(self) -> bool:
         """Determines if the event is critical for business logic or state consistency."""
@@ -133,7 +132,7 @@ class DomainEvent:
             **asdict(self),
             'event_type': self.event_type.value,
         }
-    
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> DomainEvent:
         """Deserialize event from dictionary."""
@@ -385,8 +384,8 @@ class RetryAttempted(DomainEvent):
 # EVENT FACTORY
 # ─────────────────────────────────────────────────────────────────────
 
-import uuid
 import time
+import uuid
 
 
 def make_event(
@@ -403,7 +402,7 @@ def make_event(
     - timestamp: Current time
     """
     event_class = EVENT_CLASSES.get(event_type, DomainEvent)
-    
+
     return event_class(
         event_id=str(uuid.uuid4()),
         event_type=event_type,

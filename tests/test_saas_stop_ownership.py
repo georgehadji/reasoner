@@ -30,8 +30,8 @@ def stop_client(monkeypatch):
     fresh_manager = RunStateManager()
 
     # Patch both the source module AND the api module that imported it
-    import reasoner.infrastructure.redis.run_state as redis_run_state_module
     import reasoner.api as api_module
+    import reasoner.infrastructure.redis.run_state as redis_run_state_module
     monkeypatch.setattr(redis_run_state_module, "_run_state_manager", fresh_manager)
     monkeypatch.setattr(api_module, "_run_store", fresh_manager)
 
@@ -39,8 +39,6 @@ def stop_client(monkeypatch):
 
     # Import the stop endpoint logic directly
     from reasoner.api import stop_pipeline
-    from reasoner.api.auth_deps import require_csrf
-    from reasoner.api.dependencies import get_optional_user
 
     app.post("/api/stop")(stop_pipeline)
 

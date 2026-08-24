@@ -6,9 +6,8 @@ from __future__ import annotations
 from typing import Any
 
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.subagents.base import PhaseSubAgent
 from reasoner.parsing import extract_json
-
+from reasoner.subagents.base import PhaseSubAgent
 
 SCOPE_SYSTEM = """You are a Scope Narrower. Your ONE JOB is to determine if the problem is too broad or too narrow for a useful answer, and suggest how to refine it.
 

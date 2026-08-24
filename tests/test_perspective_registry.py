@@ -5,10 +5,10 @@ from __future__ import annotations
 import pytest
 
 from reasoner.models import (
+    CritiqueScore,
     PerspectiveRegistry,
     PerspectiveType,
     SolutionCandidate,
-    CritiqueScore,
 )
 
 

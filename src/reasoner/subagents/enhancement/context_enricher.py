@@ -6,9 +6,8 @@ from __future__ import annotations
 from typing import Any
 
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.subagents.base import PhaseSubAgent
 from reasoner.parsing import extract_json
-
+from reasoner.subagents.base import PhaseSubAgent
 
 CONTEXT_SYSTEM = """You are a Context Enricher. Your ONE JOB is to identify what background information, constraints, or domain knowledge is missing that would help answer the problem better.
 

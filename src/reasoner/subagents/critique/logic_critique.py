@@ -6,9 +6,8 @@ from __future__ import annotations
 from typing import Any
 
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.subagents.base import PhaseSubAgent
 from reasoner.parsing import extract_json
-
+from reasoner.subagents.base import PhaseSubAgent
 
 LOGIC_SYSTEM = """You are a Logic Critique Sub-Agent. Your ONE JOB is to examine each candidate solution and identify formal logical fallacies, circular reasoning, false dichotomies, or structural reasoning flaws.
 

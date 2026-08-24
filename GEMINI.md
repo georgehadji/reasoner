@@ -158,6 +158,7 @@ To maintain code quality and consistency:
 - **Simplicity First**: Make every change as simple as possible. Impact minimal code.
 - **Root Causes**: Find root causes. No temporary fixes. Senior developer standards.
 - **Minimal Impact**: Changes should only touch what's necessary. Avoid introducing bugs.
+- **Architectural & Paradigm Integrity**: Every addition, change, fix, and enhancement suggested and implemented by an agent MUST strictly follow the project's established architecture and use the optimal programming paradigms and design patterns for each specific module.
 
 ## graphify
 
@@ -168,3 +169,7 @@ Rules:
 - If graphify-out/wiki/index.md exists, navigate it instead of reading raw files
 - For cross-module "how does X relate to Y" questions, prefer `graphify query "<question>"`, `graphify path "<A>" "<B>"`, or `graphify explain "<concept>"` over grep — these traverse the graph's EXTRACTED + INFERRED edges instead of scanning files
 - After modifying code files in this session, run `graphify update .` to keep the graph current (AST-only, no API cost)
+
+## Workspace CONTEXT.md Map
+
+To easily navigate the codebase, explore directory structures, and understand file roles, please refer to the root [CONTEXT.md](CONTEXT.md) file. This file contains a complete hierarchical map and points to individual `CONTEXT.md` files detailing the contents and functioning of every single folder in the project.

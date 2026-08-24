@@ -1,16 +1,15 @@
-import pytest
-import asyncio
-import sys
 import os
+import sys
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 # Force local src into path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 
-from reasoner.pipeline import ReasonerPipeline
-from reasoner.models import PipelineState
-from reasoner.domain.preset_core import PipelinePreset
 from reasoner.llm import ProviderRouter
+from reasoner.pipeline import ReasonerPipeline
+
 
 class MockRouter:
     """Mocked router to simulate LLM responses with correct metadata."""
@@ -20,9 +19,9 @@ class MockRouter:
     async def call(self, role, system_prompt, user_prompt, **kwargs):
         self.call_count += 1
         metadata = {"input_tokens": 100, "output_tokens": 100, "cost_usd": 0.001, "model": "mock-model"}
-        
+
         lower_sys = system_prompt.lower()
-        
+
         # --- UNIVERSAL ---
         if role == "classification" or "classify" in lower_sys:
             return '{"task_type": "research", "language": "English", "rationale": "mocked"}', metadata
@@ -54,21 +53,21 @@ class MockRouter:
             return '{"overall_score": 0.9, "must_revise": false, "corrections": []}', metadata
         if role == "article_assemble":
             return '{"article": "Final Mocked Article"}', metadata
-        
+
         return '{}', metadata
 
 @pytest.mark.asyncio
 class TestEndToEndEdgeCases:
-    
+
     async def get_pipeline(self, preset_name="basic-budget"):
         router_logic = MockRouter()
         real_router = MagicMock(spec=ProviderRouter)
         real_router.call = AsyncMock(side_effect=router_logic.call)
-        
+
         mock_provider = MagicMock()
         mock_provider.model = "mock-model"
         real_router.get.return_value = mock_provider
-        
+
         pipeline = ReasonerPipeline(router=real_router, preset_name=preset_name)
         # Mock search to avoid real network calls
         pipeline.search_web = AsyncMock(return_value=[{"url": "http://test.com", "title": "Test"}])
@@ -86,16 +85,16 @@ class TestEndToEndEdgeCases:
         """Edge Case: Research method finds zero search results."""
         pipeline, router = await self.get_pipeline(preset_name="research-budget")
         pipeline.search_web = AsyncMock(return_value=[])
-        
+
         state = await pipeline.run("Test query")
-        
+
         assert state.preset_name == "research-budget"
         assert state.final_solution.core_solution == "Mocked final answer"
 
     async def test_article_method_json_truncation_recovery(self):
         """Edge Case: Verifier returns truncated JSON; salvage should work."""
         pipeline, router = await self.get_pipeline(preset_name="writing-budget")
-        
+
         async def truncated_call(role, *args, **kwargs):
             metadata = {"input_tokens": 100, "output_tokens": 100, "cost_usd": 0.0, "model": "m"}
             if role == "article_verifier":
@@ -104,9 +103,9 @@ class TestEndToEndEdgeCases:
             return await router.call(role, *args, **kwargs)
 
         pipeline.router.call.side_effect = truncated_call
-        
+
         state = await pipeline.run("Test article")
-        
+
         # If it fails, "Article synthesize: no usable claims" appears in state.errors.
         # We check state.errors and also that final_solution is populated.
         assert not any("Article synthesize: no usable claims" in err for err in state.errors)

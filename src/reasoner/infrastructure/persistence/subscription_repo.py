@@ -12,8 +12,7 @@ from uuid import UUID, uuid4
 
 import asyncpg
 
-from reasoner.domain.saas import Subscription, SubscriptionTier, SubscriptionStatus
-from reasoner.core.settings import settings
+from reasoner.domain.saas import Subscription, SubscriptionStatus, SubscriptionTier
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +34,7 @@ class PostgresSubscriptionRepository:
 
         if PostgresSubscriptionRepository._pool is not None:
             return PostgresSubscriptionRepository._pool
-            
+
         async with PostgresSubscriptionRepository._pool_lock:
             if PostgresSubscriptionRepository._pool is None:
                 PostgresSubscriptionRepository._pool = await asyncpg.create_pool(

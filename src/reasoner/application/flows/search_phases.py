@@ -4,27 +4,27 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import re
-from typing import Any
 
 import httpx
 
-from reasoner.core.constants import TRUNCATION, YOUTUBE_OEMBED_URL, YOUTUBE_WATCH_BASE_URL
-from reasoner.core.constants_limits import get_token_budget
-from reasoner.core.settings import settings
-from reasoner.infrastructure.search.discovery import get_search_client_for_method
-from reasoner.core.search import (
-    _should_include_result,
-    _normalize_url,
-    _bm25_score,
-)
-from reasoner.infrastructure.search.discovery import _extract_search_keywords
-from reasoner.domain.pipeline_state import PipelineState
-from reasoner.parsing import ParseError, extract_json, safe_list
-from reasoner.sanitization import sanitize_for_prompt
 import reasoner.phases as phases
 from reasoner.application.flows.base import WorkflowServices
+from reasoner.core.constants import TRUNCATION, YOUTUBE_OEMBED_URL, YOUTUBE_WATCH_BASE_URL
+from reasoner.core.constants_limits import get_token_budget
+from reasoner.core.search import (
+    _bm25_score,
+    _normalize_url,
+    _should_include_result,
+)
+from reasoner.core.settings import settings
+from reasoner.domain.pipeline_state import PipelineState
+from reasoner.infrastructure.search.discovery import (
+    _extract_search_keywords,
+    get_search_client_for_method,
+)
+from reasoner.parsing import ParseError, extract_json, safe_list
+from reasoner.sanitization import sanitize_for_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +101,7 @@ def _enrich_query(query: str, problem: str) -> str:
     return query.strip()
 
 async def run_context_vetting_phase(
-    state: PipelineState, 
+    state: PipelineState,
     services: WorkflowServices,
     source_type: str = "general",
     domain: str | None = None
@@ -319,7 +319,7 @@ async def vet_results(state: PipelineState, results: list[dict], services: Workf
         state.context_quality = "partial"
     else:
         state.context_quality = "good"
-            
+
     clean_results = [r for r in results if not r.get("vetting_flags")]
     dropped_count = total - len(clean_results)
     services.log("VETTING", f"Context vetting complete. Removed {dropped_count} flagged sources. Quality: {state.context_quality}", state)
@@ -356,7 +356,7 @@ async def run_deep_read_phase(state: PipelineState, services: WorkflowServices, 
                 services.log("DEEP_READ", f"Fallback search found {len(sources_to_scrape)} sources.", state)
         except Exception as exc:
             services.log("DEEP_READ", f"Fallback search failed: {exc}", state)
-    
+
     # Try Tavily Extract as a batch replacement for per-URL scraping
     if sources_to_scrape and settings.TAVILY_EXTRACT_ENABLED and settings.TAVILY_API_KEY:
         try:

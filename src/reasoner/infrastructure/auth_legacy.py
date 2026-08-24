@@ -5,16 +5,15 @@ Production-ready auth with API key validation and scoped access control.
 
 from __future__ import annotations
 
-import os
-import secrets
+import asyncio
 import hashlib
-from typing import Any, Optional, Dict, Set, List
+import secrets
+from collections import OrderedDict
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from pathlib import Path
-import asyncio
-from collections import OrderedDict
+from typing import Any
 
 from reasoner.core.settings import settings
 
@@ -46,12 +45,12 @@ class APIKey:
     key_hash: str
     name: str
     created_at: datetime
-    expires_at: Optional[datetime]
-    scopes: Set[str] = field(default_factory=set)
+    expires_at: datetime | None
+    scopes: set[str] = field(default_factory=set)
     is_active: bool = True
     rate_limit_tier: str = "default"  # default, high, unlimited
-    created_by: Optional[str] = None  # Admin who created this key
-    last_used_at: Optional[datetime] = None
+    created_by: str | None = None  # Admin who created this key
+    last_used_at: datetime | None = None
     usage_count: int = 0
 
 
@@ -91,7 +90,7 @@ class AuthManager:
     def __init__(self) -> None:
         self._keys: OrderedDict[str, APIKey] = OrderedDict()
         self._lock = asyncio.Lock()
-        self._admin_keys: Set[str] = set()
+        self._admin_keys: set[str] = set()
 
         # Load admin key from environment
         admin_key = settings.ADMIN_API_KEY
@@ -99,13 +98,13 @@ class AuthManager:
             self._admin_keys.add(self._hash_key(admin_key))
 
         # Optional persistent store
-        self._store: Optional["AuthStore"] = None
+        self._store: AuthStore | None = None
         if settings.AUTH_PERSISTENCE_ENABLED:
             from reasoner.infrastructure.persistence.auth_store import AuthStore
             self._store = AuthStore(Path(settings.AUTH_DB_PATH))
 
         # Local LRU cache for hot-path reads (avoids DB round-trips)
-        self._cache: Dict[str, APIKey] = {}
+        self._cache: dict[str, APIKey] = {}
         self._CACHE_MAX_SIZE = 1000
 
     def _hash_key(self, key: str) -> str:
@@ -122,11 +121,11 @@ class AuthManager:
     async def generate_key(
         self,
         name: str,
-        expires_in_days: Optional[int] = None,
-        scopes: Optional[Set[str]] = None,
+        expires_in_days: int | None = None,
+        scopes: set[str] | None = None,
         role: str = "user",
         rate_limit_tier: str = "default",
-        created_by: Optional[str] = None,
+        created_by: str | None = None,
     ) -> str:
         """
         Generate a new API key.
@@ -147,7 +146,7 @@ class AuthManager:
 
         expires_at = None
         if expires_in_days:
-            expires_at = datetime.now(timezone.utc) + timedelta(days=expires_in_days)
+            expires_at = datetime.now(UTC) + timedelta(days=expires_in_days)
 
         # Use provided scopes or default for role. DEFAULT_SCOPES holds Scope
         # enum members while the parameter takes plain strings, so normalise
@@ -160,7 +159,7 @@ class AuthManager:
         api_key = APIKey(
             key_hash=key_hash,
             name=name,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
             expires_at=expires_at,
             scopes=resolved_scopes,
             rate_limit_tier=rate_limit_tier,
@@ -186,7 +185,7 @@ class AuthManager:
 
         return raw_key
 
-    async def authenticate(self, api_key: Optional[str]) -> Optional[APIKey]:
+    async def authenticate(self, api_key: str | None) -> APIKey | None:
         """
         Authenticate request with API key.
 
@@ -207,8 +206,8 @@ class AuthManager:
         # Fast-path: check local cache
         cached = self._cache.get(key_hash)
         if cached and cached.is_active:
-            if cached.expires_at is None or datetime.now(timezone.utc) <= cached.expires_at:
-                cached.last_used_at = datetime.now(timezone.utc)
+            if cached.expires_at is None or datetime.now(UTC) <= cached.expires_at:
+                cached.last_used_at = datetime.now(UTC)
                 cached.usage_count += 1
                 return cached
             else:
@@ -232,7 +231,7 @@ class AuthManager:
                         return APIKey(
                             key_hash=key_hash,
                             name="admin",
-                            created_at=datetime.now(timezone.utc),
+                            created_at=datetime.now(UTC),
                             expires_at=None,
                             scopes={s.value for s in DEFAULT_SCOPES["admin"]},
                             rate_limit_tier="unlimited",
@@ -244,12 +243,12 @@ class AuthManager:
                 raise AuthenticationError("API key is deactivated")
 
             # Check expiration
-            if stored_key.expires_at and datetime.now(timezone.utc) > stored_key.expires_at:
+            if stored_key.expires_at and datetime.now(UTC) > stored_key.expires_at:
                 stored_key.is_active = False
                 raise AuthenticationError("API key has expired")
 
             # Update usage tracking
-            stored_key.last_used_at = datetime.now(timezone.utc)
+            stored_key.last_used_at = datetime.now(UTC)
             stored_key.usage_count += 1
 
             # Update persistent store and cache
@@ -281,7 +280,7 @@ class AuthManager:
             )
         return True
 
-    async def check_scopes(self, api_key: APIKey, required_scopes: List[str]) -> bool:
+    async def check_scopes(self, api_key: APIKey, required_scopes: list[str]) -> bool:
         """
         Check if key has ALL required scopes.
 
@@ -321,7 +320,7 @@ class AuthManager:
             for k in keys_to_remove:
                 self._cache.pop(k, None)
 
-    async def list_keys(self, requester_scopes: Optional[Set[str]] = None) -> list[dict[str, Any]]:
+    async def list_keys(self, requester_scopes: set[str] | None = None) -> list[dict[str, Any]]:
         """
         List all active keys (without exposing hashes).
 
@@ -357,7 +356,7 @@ class AuthManager:
             keys.append(key_info)
         return keys
 
-    def get_rate_limit_tier(self, api_key: Optional[APIKey]) -> str:
+    def get_rate_limit_tier(self, api_key: APIKey | None) -> str:
         """Get rate limit tier for an API key."""
         if api_key is None:
             return "default"
@@ -369,7 +368,7 @@ class AuthManager:
 # (multi-worker/multi-process), keys created on one worker are invisible to
 # others. Replace with a persistent store (PostgreSQL, Redis) with a local
 # TTL cache for reads.
-_auth_manager: Optional[AuthManager] = None
+_auth_manager: AuthManager | None = None
 
 
 def get_auth_manager() -> AuthManager:

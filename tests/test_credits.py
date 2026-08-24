@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
@@ -81,7 +81,7 @@ def test_grant_reasons_are_distinguished_from_spend_reasons():
 
 @pytest.mark.unit
 def test_period_key_is_year_and_month():
-    stamp = datetime(2026, 8, 14, tzinfo=timezone.utc)
+    stamp = datetime(2026, 8, 14, tzinfo=UTC)
     assert current_period_key(stamp) == "2026-08"
 
 
@@ -129,8 +129,8 @@ async def test_monthly_allowance_is_granted_once_per_period(
 async def test_monthly_allowance_grants_again_in_a_new_period(
     service: CreditService, user_id: str
 ):
-    august = datetime(2026, 8, 1, tzinfo=timezone.utc)
-    september = datetime(2026, 9, 1, tzinfo=timezone.utc)
+    august = datetime(2026, 8, 1, tzinfo=UTC)
+    september = datetime(2026, 9, 1, tzinfo=UTC)
 
     await service.ensure_monthly_allowance(user_id, SubscriptionTier.FREE, now=august)
     await service.ensure_monthly_allowance(user_id, SubscriptionTier.FREE, now=september)

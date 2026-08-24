@@ -8,22 +8,19 @@ Verifies that:
 """
 
 from __future__ import annotations
-from reasoner.models import save, load
 
 import os
 import tempfile
-from pathlib import Path
 
 import pytest
 
-from reasoner.domain.pipeline_state import PipelineState as PS
 from reasoner.domain.core_types import (
-    SolutionCandidate,
-    CritiqueScore,
-    FinalSolution,
-    ScenarioType,
     GenerationCandidate,
+    ScenarioType,
+    SolutionCandidate,
 )
+from reasoner.domain.pipeline_state import PipelineState as PS
+from reasoner.models import load, save
 
 
 class TestPipelineStateBackwardCompat:

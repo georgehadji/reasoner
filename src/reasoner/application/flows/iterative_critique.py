@@ -9,20 +9,23 @@ Author: DeepSeek TUI — June 2026
 
 from __future__ import annotations
 
-from typing import List
-from reasoner.domain.pipeline_state import PipelineState
-from reasoner.application.flows.base import WorkflowStrategy, WorkflowServices, PhaseStep
+from reasoner.application.flows.base import PhaseStep, WorkflowServices, WorkflowStrategy
 from reasoner.application.flows.iterative_critique_phases import (
-    run_generator_phase, run_critic_phase, run_synthesis_phase,
-    AdversarialRound, check_convergence, MAX_ROUNDS,
+    MAX_ROUNDS,
+    AdversarialRound,
+    check_convergence,
+    run_critic_phase,
+    run_generator_phase,
+    run_synthesis_phase,
 )
 from reasoner.application.services.serializers import _ser_5
+from reasoner.domain.pipeline_state import PipelineState
 
 
 class IterativeCritiqueFlow(WorkflowStrategy):
     """Adversarial debate: generator ↔ critic loop until convergence."""
 
-    def get_phases(self, state: PipelineState) -> List[PhaseStep]:
+    def get_phases(self, state: PipelineState) -> list[PhaseStep]:
         return [
             PhaseStep(3, "Adversarial Debate", self._run_debate_loop, _ser_5, critical=False),
             PhaseStep(4, "Synthesis", run_synthesis_phase, _ser_5),

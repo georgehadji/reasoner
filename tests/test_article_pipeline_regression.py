@@ -12,11 +12,11 @@ Structural invariants tested:
 from __future__ import annotations
 
 import json
+
 import pytest
 
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.parsing import extract_json, ParseError, _sanitize_json_escapes
-
+from reasoner.parsing import ParseError, _sanitize_json_escapes, extract_json
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -97,8 +97,9 @@ class TestSynthesisPhase:
     @pytest.mark.asyncio
     async def test_synthesis_phase_runs_with_minimal_state(self):
         """The synthesis phase function should handle missing fields gracefully."""
-        from reasoner.application.flows.synthesis_phase import run_synthesis_phase
         from unittest.mock import AsyncMock
+
+        from reasoner.application.flows.synthesis_phase import run_synthesis_phase
 
         state = _make_bare_state("Test article about renewable energy")
         # Populate writing_state with the minimum the synthesis needs
@@ -138,8 +139,9 @@ class TestArticlePhaseGracefulDegradation:
     @pytest.mark.asyncio
     async def test_retrieve_sources_empty_state(self):
         """Source retrieval shouldn't crash on empty writing_state."""
-        from reasoner.application.flows.article_phases import run_article_retrieve_sources_phase
         from unittest.mock import AsyncMock
+
+        from reasoner.application.flows.article_phases import run_article_retrieve_sources_phase
 
         state = _make_bare_state("Test article")
         ws = state.writing_state
@@ -158,8 +160,9 @@ class TestArticlePhaseGracefulDegradation:
     @pytest.mark.asyncio
     async def test_outline_empty_writing_state(self):
         """Outline phase shouldn't crash on empty writing_state."""
-        from reasoner.application.flows.article_phases import run_article_outline_phase
         from unittest.mock import AsyncMock
+
+        from reasoner.application.flows.article_phases import run_article_outline_phase
 
         state = _make_bare_state("Test article")
         ws = state.writing_state
@@ -289,13 +292,9 @@ class TestArticleFlowExecute:
     @pytest.mark.asyncio
     async def test_execute_retries_on_audit_failure(self):
         """When the final audit fails, the flow retries development edit + re-audit."""
-        from reasoner.application.flows.article import ArticleFlow
-        from reasoner.application.flows.article_phases import (
-            run_article_final_audit_phase,
-            run_article_developmental_edit_phase,
-            run_article_style_copy_edit_phase,
-        )
         from unittest.mock import AsyncMock
+
+        from reasoner.application.flows.article import ArticleFlow
 
         state = _make_bare_state("Test article")
         state.writing_state["editorial_audit"] = {"passes_audit": False, "audit_score": 0.4}

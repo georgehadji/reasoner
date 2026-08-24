@@ -1,4 +1,4 @@
-with open('src/reasoner/api/streaming.py', 'r', encoding='utf-8') as f:
+with open('src/reasoner/api/streaming.py', encoding='utf-8') as f:
     content = f.read()
 
 old = """        # DEBUG: log a few routing entries so we can verify presets are fresh

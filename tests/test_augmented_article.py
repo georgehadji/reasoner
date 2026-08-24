@@ -7,23 +7,20 @@ Unit tests for augmented article pipeline:
 
 from __future__ import annotations
 
-import re
-
 import pytest
 
 from reasoner.application.flows.augmentation import (
-    is_deep_question,
-    DEFAULT_AUGMENTATION_METHODS,
     AUGMENTATION_PROMPTS,
     AUGMENTATION_ROLES,
+    DEFAULT_AUGMENTATION_METHODS,
+    is_deep_question,
 )
 
 # Re-import the HyperGate patterns for direct testing
 from reasoner.hypergate.hyperagent import (
-    _FACTUAL_PATTERNS,
     _DEEP_CONCEPT_PATTERNS,
+    _FACTUAL_PATTERNS,
 )
-
 
 # ── Depth Detection: should-detect cases ─────────────────────────────
 

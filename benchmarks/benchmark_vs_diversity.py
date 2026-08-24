@@ -3,14 +3,11 @@ from __future__ import annotations
 
 import asyncio
 import sys
-from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from reasoner.ara_verbalized_sampling import VSCandidate
-from reasoner.vs_config import VSFeatureFlags
-
 
 VERTICALS = ["radiology", "legal", "aerospace"]
 QUERIES = [

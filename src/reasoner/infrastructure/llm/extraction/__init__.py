@@ -6,12 +6,12 @@ import base64
 import logging
 from typing import Optional
 
-from reasoner.infrastructure.llm.registry import build_provider
 from reasoner.core.constants_models import (
     MODEL_GEMINI_FLASH,
     MODEL_GEMINI_PRO,
     MODEL_QIANFAN_OCR_FAST,
 )
+from reasoner.infrastructure.llm.registry import build_provider
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +93,7 @@ async def describe_image(content: bytes, filename: str) -> str:
         }
     ]
 
-    last_error: Optional[str] = None
+    last_error: str | None = None
     for model_id in _CAPTION_MODELS:
         try:
             provider = build_provider(model_id)
@@ -161,7 +161,7 @@ async def ocr_image(content: bytes, filename: str) -> str:
         }
     ]
 
-    last_error: Optional[str] = None
+    last_error: str | None = None
     for model_id in _OCR_MODELS:
         try:
             provider = build_provider(model_id)

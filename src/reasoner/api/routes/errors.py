@@ -14,7 +14,7 @@ from reasoner.api.auth_deps import require_csrf
 from reasoner.api.dependencies import check_rate_limit, get_current_user
 from reasoner.core.settings import settings
 from reasoner.domain.saas import User
-from reasoner.infrastructure.persistence.error_store import ErrorStore, ErrorEntry
+from reasoner.infrastructure.persistence.error_store import ErrorEntry, ErrorStore
 
 router = APIRouter()
 

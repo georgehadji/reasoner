@@ -5,11 +5,12 @@ WI-4: Atomic idempotency
 WI-3: Parallel state determinism  
 """
 
-import sys, asyncio, json
+import asyncio
+import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 import pytest
-
 
 # ── WI-1: Cross-user cache isolation ──
 
@@ -61,10 +62,10 @@ async def test_atomic_idempotency():
 @pytest.mark.asyncio
 async def test_parallel_accumulation_deterministic():
     """WI-3 acceptance: concurrent _accumulate_tokens must not lose counts."""
+    from reasoner.domain.pipeline_state import PipelineState
+    from reasoner.infrastructure.llm.base import BaseLLMProvider
     from reasoner.infrastructure.llm.executor import LLMExecutor
     from reasoner.infrastructure.llm.router import ProviderRouter
-    from reasoner.infrastructure.llm.base import BaseLLMProvider
-    from reasoner.domain.pipeline_state import PipelineState
 
     class FakeProvider(BaseLLMProvider):
         async def complete(self, **kw): return ""

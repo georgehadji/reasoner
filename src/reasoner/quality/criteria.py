@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from reasoner.domain.pipeline_state import PipelineState
@@ -391,7 +392,7 @@ def reset_phase_state(phase_name: str, state: PipelineState) -> None:
     if reset_fn:
         reset_fn(state)
     # Always clear per-phase token/cost tracking so the retry is measured cleanly
-    phase_key_prefix = f"Phase "
+    phase_key_prefix = "Phase "
     keys_to_clear = [k for k in state.phase_tokens if phase_name in k]
     for k in keys_to_clear:
         state.phase_tokens.pop(k, None)

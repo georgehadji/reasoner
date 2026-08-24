@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from reasoner.infrastructure.widgets.protocol import BaseWidget, WidgetResult, WidgetType
+from reasoner.infrastructure.widgets.protocol import BaseWidget, WidgetType
 
 
 class DiscoverWidget(BaseWidget):
@@ -21,18 +21,18 @@ class DiscoverWidget(BaseWidget):
     - Multiple source integration
     - Real-time trending content
     """
-    
+
     name = "discover"
     widget_type = WidgetType.DISCOVER
     description = "Trending content aggregation by topic"
-    
+
     trigger_patterns = [
         re.compile(r'(?:trending|discover|latest news)\s+(?:in|about)?\s*([a-z]+)?', re.I),
         re.compile(r'(?:show|get|find)\s+(?:the )?(?:latest )?news\s+(?:in|about)?\s*([a-z]+)?', re.I),
         re.compile(r"^what'?s?\s+(?:the )?latest\s+(?:in|for)?\s*([a-z]+)", re.I),
         re.compile(r'(?:tech|finance|science|sports|entertainment)\s+news', re.I),
     ]
-    
+
     topics = {
         'tech': {
             'queries': ['technology news', 'latest tech', 'AI', 'science and innovation'],
@@ -55,7 +55,7 @@ class DiscoverWidget(BaseWidget):
             'sites': ['hollywoodreporter.com', 'variety.com', 'deadline.com'],
         },
     }
-    
+
     def _extract_from_match(
         self,
         match: re.Match,
@@ -63,37 +63,37 @@ class DiscoverWidget(BaseWidget):
     ) -> dict[str, Any]:
         """Extract topic from match."""
         topic = 'tech'  # Default
-        
+
         # Check for explicit topic in query
         query_lower = query.lower()
         for t in self.topics.keys():
             if t in query_lower:
                 topic = t
                 break
-        
+
         # Check capture group
         if match.lastindex and match.lastindex >= 1:
             captured = match.group(1)
             if captured and captured.lower() in self.topics:
                 topic = captured.lower()
-        
+
         return {'topic': topic}
-    
+
     async def _execute_impl(self, params: dict[str, Any]) -> dict[str, Any]:
         """Fetch trending content for topic."""
         topic = params.get('topic', 'tech')
-        
+
         if topic not in self.topics:
             topic = 'tech'
-        
+
         topic_config = self.topics[topic]
         results = []
         seen_urls = set()
-        
+
         # Search using multi-backend client
         for query in topic_config['queries']:
             search_results = await self._search_web(query)
-            
+
             for result in search_results[:5]:
                 url = result.get('url', '')
                 if url not in seen_urls:
@@ -105,10 +105,10 @@ class DiscoverWidget(BaseWidget):
                         'source': result.get('source', ''),
                         'published': result.get('publishedDate', ''),
                     })
-            
+
             if len(results) >= 10:
                 break
-        
+
         if not results:
             # Return demo content if no results
             results = [
@@ -120,14 +120,14 @@ class DiscoverWidget(BaseWidget):
                     'published': '',
                 },
             ]
-        
+
         return {
             'topic': topic,
             'results': results[:10],
             'total': len(results),
             'sources': topic_config['sites'],
         }
-    
+
     async def _search_web(self, query: str) -> list[dict[str, Any]]:
         """Search using multi-backend search client."""
         from reasoner.infrastructure.search.discovery import get_search_client

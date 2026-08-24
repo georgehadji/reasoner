@@ -6,9 +6,8 @@ from __future__ import annotations
 from typing import Any
 
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.subagents.base import PhaseSubAgent
 from reasoner.parsing import extract_json
-
+from reasoner.subagents.base import PhaseSubAgent
 
 COUNTERFACTUAL_SYSTEM = """You are a Counterfactual Sub-Agent. Your ONE JOB is to explore what would happen if the KEY ASSUMPTIONS of each candidate solution were false.
 
@@ -50,7 +49,7 @@ class CounterfactualSubAgent(PhaseSubAgent):
         if state.decomposition and hasattr(state.decomposition, 'assumptions'):
             for a in state.decomposition.assumptions:
                 assumptions.append(f"- {a.text} [{a.label.value}]")
-        user_parts = [f"Problem: {state.problem}", f"\nKnown Assumptions:\n" + "\n".join(assumptions) if assumptions else ""]
+        user_parts = [f"Problem: {state.problem}", "\nKnown Assumptions:\n" + "\n".join(assumptions) if assumptions else ""]
         user_parts.append("\nCandidates:\n" + "\n\n".join(candidate_texts))
         return (COUNTERFACTUAL_SYSTEM, "\n".join(user_parts))
 

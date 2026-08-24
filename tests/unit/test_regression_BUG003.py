@@ -7,6 +7,7 @@ unmasked, violating GDPR anonymization requirements.
 """
 
 import pytest
+
 from reasoner.api.middleware import _anonymize_ip
 
 

@@ -6,9 +6,8 @@ from __future__ import annotations
 from typing import Any
 
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.subagents.base import PhaseSubAgent
 from reasoner.parsing import extract_json
-
+from reasoner.subagents.base import PhaseSubAgent
 
 COVERAGE_SYSTEM = """You are a Coverage Validator. Your ONE JOB is to check whether a given set of sub-problems fully covers the original problem, or if anything is missing.
 

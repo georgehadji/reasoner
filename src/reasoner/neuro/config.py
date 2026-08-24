@@ -3,18 +3,17 @@ Neuro Configuration
 Multi-tenant isolation, provider fallback chains, persona modes.
 """
 
+import copy
 import os
 import re
-import copy
-import yaml
-from pathlib import Path
 from dataclasses import dataclass, field
-from typing import Optional
+from pathlib import Path
+
+import yaml
 
 from reasoner.core.constants import OPENROUTER_BASE_URL, PERPLEXITY_BASE_URL
-from reasoner.core.constants_models import MODEL_GEMINI_FLASH, MODEL_CLAUDE_HAIKU
+from reasoner.core.constants_models import MODEL_CLAUDE_HAIKU, MODEL_GEMINI_FLASH
 from reasoner.core.settings import settings
-
 
 DEFAULT_CONFIG_PATHS = [
     Path("neuro.yaml"),
@@ -49,8 +48,8 @@ class PersonaConfig:
     context_bias: str = "neutral"        # factual | neutral | associative
     max_confidence_for_pass: float = 0.7
     allow_speculative: bool = False
-    l1_similarity_override: Optional[float] = None
-    l2_similarity_override: Optional[float] = None
+    l1_similarity_override: float | None = None
+    l2_similarity_override: float | None = None
     custom_system_prompt: str = ""
 
 
@@ -180,10 +179,10 @@ def _build_persona(name: str, data: dict) -> PersonaConfig:
     )
 
 
-def load_config(path: Optional[str] = None) -> NeuroConfig:
+def load_config(path: str | None = None) -> NeuroConfig:
     import logging
     logger = logging.getLogger(__name__)
-    
+
     config_path = None
     try:
         if path:
@@ -207,9 +206,9 @@ def load_config(path: Optional[str] = None) -> NeuroConfig:
             return _apply_defaults(NeuroConfig())
 
         logger.info(f"Loading config from {config_path}")
-        with open(config_path, 'r', encoding='utf-8') as f:
+        with open(config_path, encoding='utf-8') as f:
             raw = yaml.safe_load(f) or {}
-        
+
         config = _parse_config(raw)
         logger.info(f"Configuration loaded successfully from {config_path}")
         return config
@@ -356,7 +355,7 @@ def _safe_agent_id(agent_id: str) -> str:
     return _AGENT_ID_RE.sub("", agent_id)[:128] or "default"
 
 
-def get_agent_data_dir(cfg: NeuroConfig, agent_id: Optional[str] = None) -> Path:
+def get_agent_data_dir(cfg: NeuroConfig, agent_id: str | None = None) -> Path:
     # Membership is tested against the raw id so operator-configured agent
     # names (trusted, from neuro.yaml) keep resolving to their own data_dir.
     if agent_id and agent_id in cfg.agents:
@@ -369,8 +368,8 @@ def get_agent_data_dir(cfg: NeuroConfig, agent_id: Optional[str] = None) -> Path
     return Path(cfg.data_dir) / "agents" / "default"
 
 
-def get_persona(cfg: NeuroConfig, persona_name: Optional[str] = None,
-                agent_id: Optional[str] = None) -> PersonaConfig:
+def get_persona(cfg: NeuroConfig, persona_name: str | None = None,
+                agent_id: str | None = None) -> PersonaConfig:
     if persona_name and persona_name in cfg.personas:
         return cfg.personas[persona_name]
     if agent_id and agent_id in cfg.agents:

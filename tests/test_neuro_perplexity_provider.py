@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
+from reasoner.neuro.config import ProviderConfig
 from reasoner.neuro.providers import (
-    PerplexityEmbedding,
     EMBEDDING_MAP,
+    PerplexityEmbedding,
     _create_embedding,
 )
-from reasoner.neuro.config import ProviderConfig
 
 
 class TestPerplexityEmbedding:

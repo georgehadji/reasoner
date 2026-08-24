@@ -6,7 +6,6 @@ causing Jaccard similarity to always return 0.0 after a cache reload.
 
 from __future__ import annotations
 
-import asyncio
 import time
 from pathlib import Path
 

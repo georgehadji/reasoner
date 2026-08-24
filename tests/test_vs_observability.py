@@ -6,12 +6,10 @@ import logging
 import pytest
 
 from reasoner.phases.vs_behavioral_audit import (
-    log_vs_behavioral_audit,
     InMemoryVSEntropyStore,
-    VSEntropyStore,
+    log_vs_behavioral_audit,
 )
-from reasoner.phases.vs_generation import VSGenerationResult, GenerationCandidate
-from reasoner.reasoner_vs_constants import LOG_VS_ENTROPY, LOG_VS_MODE_COLLAPSE
+from reasoner.phases.vs_generation import GenerationCandidate, VSGenerationResult
 from reasoner.vs_config import VSFeatureFlags
 
 

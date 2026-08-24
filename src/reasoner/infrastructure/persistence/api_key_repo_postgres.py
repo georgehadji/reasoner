@@ -5,8 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import datetime
 from uuid import UUID
 
 import asyncpg
@@ -74,7 +73,7 @@ class PostgresApiKeyRepository(ApiKeyRepository):
         key_hash: str,
         key_prefix: str,
         scopes: frozenset[str],
-        expires_at: Optional[datetime] = None,
+        expires_at: datetime | None = None,
     ) -> ApiKey:
         pool = await self._get_pool()
         row = await pool.fetchrow(
@@ -89,7 +88,7 @@ class PostgresApiKeyRepository(ApiKeyRepository):
         )
         return _to_key(row)
 
-    async def get_by_hash(self, key_hash: str) -> Optional[ApiKey]:
+    async def get_by_hash(self, key_hash: str) -> ApiKey | None:
         pool = await self._get_pool()
         row = await pool.fetchrow(
             f"SELECT {_COLUMNS} FROM api_keys WHERE key_hash = $1",
@@ -133,7 +132,7 @@ class PostgresApiKeyRepository(ApiKeyRepository):
             key_id,
         )
 
-    async def get_owner(self, key_id: UUID) -> Optional[UUID]:
+    async def get_owner(self, key_id: UUID) -> UUID | None:
         pool = await self._get_pool()
         return await pool.fetchval(
             "SELECT user_id FROM api_keys WHERE id = $1",

@@ -14,12 +14,12 @@ from pydantic import BaseModel, Field
 
 from reasoner.api.auth_deps import require_csrf
 from reasoner.api.dependencies import _get_api_key_service, check_rate_limit, get_current_user
-from reasoner.application.services.api_key_service import ApiKeyLimitError, MAX_EXPIRY_DAYS
+from reasoner.application.services.api_key_service import MAX_EXPIRY_DAYS, ApiKeyLimitError
 from reasoner.domain.api_keys import (
     ASSIGNABLE_SCOPES,
     DEFAULT_SCOPES,
-    InvalidScopeError,
     MAX_KEYS_PER_USER,
+    InvalidScopeError,
 )
 from reasoner.domain.saas import User
 

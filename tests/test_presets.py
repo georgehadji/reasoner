@@ -3,15 +3,17 @@ Tests for preset utilities: tier detection, method extraction, and agent mapping
 """
 
 import pytest
-from reasoner.presets import (
-    PRESETS,
-    get_method_from_preset,
-    get_preset_tier,
-    get_preset_price_tier,
-    FOLLOWUP_AGENT_MODELS,
-)
+
 from reasoner.core.constants_models import MODEL_GROK_43
 from reasoner.domain.saas import SubscriptionTier
+from reasoner.presets import (
+    FOLLOWUP_AGENT_MODELS,
+    PRESETS,
+    get_method_from_preset,
+    get_preset_price_tier,
+    get_preset_tier,
+)
+
 
 class TestGetPresetPriceTier:
     def test_all_budget_presets_return_budget(self):

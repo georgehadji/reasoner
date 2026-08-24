@@ -9,6 +9,7 @@ not lost by the bracket-closing suffix assignment.
 from __future__ import annotations
 
 import pytest
+
 from reasoner.core.parsing import _repair_truncated_json
 
 

@@ -14,12 +14,13 @@ Covers:
 from __future__ import annotations
 
 import asyncio
+
 import pytest
+
 from reasoner.auth import (
-    AuthManager,
     AuthenticationError,
+    AuthManager,
     AuthorizationError,
-    Scope,
 )
 
 

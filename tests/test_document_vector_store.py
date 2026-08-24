@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 import json
-import pytest
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
+from reasoner.core.settings import settings
 from reasoner.documents.vector_store import (
     DocumentVectorStore,
     _chunk_text,
     _cosine_similarity,
 )
-from reasoner.core.settings import settings
 from reasoner.uploader import UPLOAD_DIR
 
 

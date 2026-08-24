@@ -5,16 +5,16 @@ from __future__ import annotations
 import logging
 from dataclasses import asdict
 
+import reasoner.phases as phases
+from reasoner.application.flows.base import WorkflowServices
 from reasoner.core.constants import TRUNCATION
 from reasoner.core.constants_limits import get_token_budget
-from reasoner.domain.pipeline_state import PipelineState
 from reasoner.domain.core_types import (
-    SolutionCandidate,
     GenerationCandidate,
+    SolutionCandidate,
 )
+from reasoner.domain.pipeline_state import PipelineState
 from reasoner.parsing import ParseError, extract_json
-from reasoner.application.flows.base import WorkflowServices
-import reasoner.phases as phases
 
 logger = logging.getLogger(__name__)
 
@@ -23,20 +23,20 @@ class RecoveryService:
 
     @staticmethod
     async def run_recovery_path(
-        state: PipelineState, 
-        services: WorkflowServices, 
+        state: PipelineState,
+        services: WorkflowServices,
         candidate_to_verify: SolutionCandidate | GenerationCandidate
     ) -> None:
         """Executes a cross-verification path for a potentially problematic candidate."""
         cand_id = candidate_to_verify.perspective if isinstance(candidate_to_verify, SolutionCandidate) else candidate_to_verify.generator_id
         services.log("RECOVERY", f"Initiating recovery path for candidate: {cand_id}", state)
-        
+
         try:
             raw_verification, _ = await services.call_llm(
                 role="recovery_path",
                 system_prompt=phases.CROSS_VERIFICATION_SYSTEM,
                 user_prompt=phases.cross_verification_prompt(state, candidate_solution=asdict(candidate_to_verify)),
-                max_tokens=get_token_budget("recovery_path"), 
+                max_tokens=get_token_budget("recovery_path"),
                 state=state
             )
             verification_data = extract_json(raw_verification)
@@ -50,5 +50,5 @@ class RecoveryService:
         except Exception as e:
             services.log("RECOVERY", f"Recovery Path: Verification failed: {e}", state)
             state.errors.append(f"Recovery Path: Verification failed for candidate (id: {cand_id}): {str(e)}")
-        
+
         services.log("RECOVERY", "Recovery path complete.", state)

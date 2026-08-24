@@ -5,9 +5,9 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from reasoner.pipeline import ReasonerPipeline
-from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.domain.pipeline_state import PipelineState
+from reasoner.infrastructure.llm.router import ProviderRouter
+from reasoner.pipeline import ReasonerPipeline
 
 logger = logging.getLogger(__name__)
 
@@ -254,23 +254,37 @@ class PipelineService:
 
 
 import json
-from datetime import datetime, timezone
-from enum import Enum
 from collections import deque
-from dataclasses import asdict, fields as dc_fields
+from dataclasses import asdict
+from dataclasses import fields as dc_fields
+from datetime import UTC, datetime
+from enum import Enum
 from pathlib import Path
-from reasoner.domain.core_types import (
-    SolutionCandidate, CritiqueScore, ReviewHypothesis, StressTestResult,
-    MetaCognitiveAudit, GenerationCandidate, CriticScore, CriticDimensionScore,
-    VerificationResult, MetaEvaluation, Decomposition, FinalSolution, SubProblem, Assumption
-)
-from reasoner.domain.models import TaskType, ClaimLabel, PerspectiveType, PerspectiveRegistry
-from reasoner.domain.core_types import ScenarioType
+
 from reasoner.core.constants import TRUNCATION
+from reasoner.domain.core_types import (
+    Assumption,
+    CriticDimensionScore,
+    CriticScore,
+    CritiqueScore,
+    Decomposition,
+    FinalSolution,
+    GenerationCandidate,
+    MetaCognitiveAudit,
+    MetaEvaluation,
+    ReviewHypothesis,
+    ScenarioType,
+    SolutionCandidate,
+    StressTestResult,
+    SubProblem,
+    VerificationResult,
+)
+from reasoner.domain.models import ClaimLabel, PerspectiveRegistry, TaskType
+
 
 class PipelineSerializationService:
     @staticmethod
-    def to_dict(state: "PipelineState") -> dict[str, Any]:
+    def to_dict(state: PipelineState) -> dict[str, Any]:
         """Serialize complete state to dictionary (for persistence)."""
         def serialize(obj: Any) -> Any:
             if isinstance(obj, Enum):
@@ -286,11 +300,11 @@ class PipelineSerializationService:
             if hasattr(obj, '__dataclass_fields__'):
                 return {k: serialize(v) for k, v in asdict(obj).items()}
             return obj
-        
+
         return serialize(asdict(state))
 
     @staticmethod
-    def save(state: "PipelineState", path: str | Path) -> None:
+    def save(state: PipelineState, path: str | Path) -> None:
         """
         Save state to JSON file.
         
@@ -304,7 +318,7 @@ class PipelineSerializationService:
         """
         import logging
         logger = logging.getLogger(__name__)
-        
+
         path = Path(path)
         if ".." in path.parts:
             raise ValueError("Invalid path: directory traversal not allowed")
@@ -327,7 +341,7 @@ class PipelineSerializationService:
             raise
 
     @staticmethod
-    def load(path: str | Path) -> "PipelineState":
+    def load(path: str | Path) -> PipelineState:
         """
         Load state from JSON file.
         
@@ -345,17 +359,17 @@ class PipelineSerializationService:
         """
         import logging
         logger = logging.getLogger(__name__)
-        
+
         path = Path(path)
         if ".." in path.parts:
             raise ValueError("Invalid path: directory traversal not allowed")
         try:
             if not path.exists():
                 raise FileNotFoundError(f"PipelineState file not found: {path}")
-            
-            with open(path, 'r', encoding='utf-8') as f:
+
+            with open(path, encoding='utf-8') as f:
                 data = json.load(f)
-            
+
             state = PipelineSerializationService._from_dict(data)
             logger.info(f"PipelineState loaded from {path}")
             return state
@@ -372,7 +386,7 @@ class PipelineSerializationService:
             raise ValueError(f"Failed to load PipelineState: {e}") from e
 
     @staticmethod
-    def _from_dict(data: dict[str, Any]) -> "PipelineState":
+    def _from_dict(data: dict[str, Any]) -> PipelineState:
         """Deserialize dictionary to PipelineState with proper type reconstruction."""
         # ── Phase A: Migrate old flat-format to new nested structure FIRST ──
         # This ensures all downstream reconstruction works on the new layout.
@@ -472,7 +486,7 @@ class PipelineSerializationService:
         if meta.get('started_at'):
             dt = datetime.fromisoformat(meta['started_at'])
             if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
+                dt = dt.replace(tzinfo=UTC)
             meta['started_at'] = dt
 
         # Reconstruct decomposition inside core
@@ -497,7 +511,7 @@ class PipelineSerializationService:
                     _constraints = sp.get('constraints', [])
                     if not isinstance(_constraints, list):
                         _constraints = [str(_constraints)] if _constraints else []
-                    
+
                     _sub_problems.append(SubProblem(
                         id=str(sp.get('id', '')),
                         description=str(sp.get('description', '')),
@@ -508,7 +522,7 @@ class PipelineSerializationService:
                 except (TypeError, ValueError, KeyError):
                     pass  # skip malformed sub_problem entry
             dec['sub_problems'] = _sub_problems
-            
+
             # Use .get() with fallbacks: a missing 'rationale' or 'label' key in a
             # saved assumption entry must not crash the entire resume.  Direct
             # subscript access caused KeyError for any partially-written state file.
@@ -528,7 +542,7 @@ class PipelineSerializationService:
             # Preserve critical_sources if present
             _cs = dec.get('critical_sources', [])
             dec['critical_sources'] = [dict(cs) for cs in _cs if isinstance(cs, dict)]
-            
+
             # Strip unknown keys before constructing Decomposition
             _known = {f.name for f in dc_fields(Decomposition)}
             core['decomposition'] = Decomposition(**{k: v for k, v in dec.items() if k in _known})
@@ -629,7 +643,7 @@ class PipelineSerializationService:
             else:
                 # Ensure it's a dict
                 fs_dict = fs if isinstance(fs, dict) else {}
-                
+
                 # Safely reconstruct meta_audit
                 ma = fs_dict.get('meta_audit', {})
                 if not isinstance(ma, dict): ma = {}
@@ -640,7 +654,7 @@ class PipelineSerializationService:
                     assumption_failure_impact=ma.get('assumption_failure_impact', ''),
                     non_obvious_insight=ma.get('non_obvious_insight', '')
                 )
-                
+
                 # Safely reconstruct claim_labels
                 raw_labels = fs_dict.get('claim_labels', {})
                 if not isinstance(raw_labels, dict): raw_labels = {}
@@ -668,7 +682,7 @@ class PipelineSerializationService:
             core['generation_candidates'] = [
                 GenerationCandidate(**gc) for gc in core['generation_candidates']
             ]
-        
+
         # Reconstruct critic_scores.
         # CriticDimensionScore(**v) and CriticScore(**cs) have required fields with
         # no defaults — a truncated or partially-written state file causes TypeError.

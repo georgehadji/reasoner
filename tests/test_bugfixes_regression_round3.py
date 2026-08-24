@@ -11,10 +11,9 @@ Bugs covered:
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # router.py: CancelledError should not poison circuit breaker
@@ -26,9 +25,9 @@ class TestRouterCircuitBreakerCancelledError:
     @pytest.mark.asyncio
     async def test_cancelled_error_does_not_record_failure(self):
         """When a task is cancelled, the circuit breaker must NOT increment failures."""
-        from reasoner.infrastructure.llm.router import _call_with_circuit
-        from reasoner.infrastructure.llm.base import BaseLLMProvider
         from reasoner.circuit_breaker import get_circuit_breaker
+        from reasoner.infrastructure.llm.base import BaseLLMProvider
+        from reasoner.infrastructure.llm.router import _call_with_circuit
 
         # Create a mock provider that raises CancelledError
         provider = MagicMock(spec=BaseLLMProvider)
@@ -57,9 +56,9 @@ class TestRouterCircuitBreakerCancelledError:
     @pytest.mark.asyncio
     async def test_real_exception_does_record_failure(self):
         """Non-CancelledError exceptions should still trigger record_failure()."""
-        from reasoner.infrastructure.llm.router import _call_with_circuit
-        from reasoner.infrastructure.llm.base import BaseLLMProvider
         from reasoner.circuit_breaker import get_circuit_breaker
+        from reasoner.infrastructure.llm.base import BaseLLMProvider
+        from reasoner.infrastructure.llm.router import _call_with_circuit
 
         provider = MagicMock(spec=BaseLLMProvider)
         provider.model = "test-model-2"
@@ -92,8 +91,8 @@ class TestCodingTruncationAccess:
 
     def test_coding_spec_prompt_uses_dot_notation(self):
         """coding_spec_prompt must use TRUNCATION.PROBLEM not TRUNCATION['problem']."""
-        from reasoner.phases.coding import coding_spec_prompt
         from reasoner.models import PipelineState
+        from reasoner.phases.coding import coding_spec_prompt
 
         state = PipelineState(problem="Write a Python script to scrape news headlines")
         # This should not raise TypeError: 'TruncationLimits' object is not subscriptable
@@ -103,8 +102,8 @@ class TestCodingTruncationAccess:
 
     def test_coding_generate_prompt_uses_dot_notation(self):
         """coding_generate_prompt must use TRUNCATION.PROBLEM not TRUNCATION['problem']."""
-        from reasoner.phases.coding import coding_generate_prompt
         from reasoner.models import PipelineState
+        from reasoner.phases.coding import coding_generate_prompt
 
         state = PipelineState(problem="Write a Python script to scrape news headlines")
         state.coding_state["spec"] = {
@@ -131,6 +130,7 @@ class TestSearchMixinGatherErrorHandling:
     def test_deep_read_gather_has_return_exceptions(self):
         """The source code must call asyncio.gather with return_exceptions=True."""
         import inspect
+
         from reasoner.application.mixins import search_mixin
 
         source = inspect.getsource(search_mixin)
@@ -152,6 +152,7 @@ class TestArticlePipelineSearchDefensive:
     async def test_search_one_handles_string_return(self, monkeypatch):
         """If client.search() returns a string, _search_one must return [] not crash."""
         from reasoner.application.mixins.article_pipeline import ArticlePipelineMixin
+
         from reasoner.models import PipelineState
 
         mixin = ArticlePipelineMixin.__new__(ArticlePipelineMixin)
@@ -198,6 +199,7 @@ class TestArticlePipelineSearchDefensive:
     async def test_search_one_handles_list_return(self, monkeypatch):
         """If client.search() returns a proper list, _search_one should work normally."""
         from reasoner.application.mixins.article_pipeline import ArticlePipelineMixin
+
         from reasoner.models import PipelineState
 
         mixin = ArticlePipelineMixin.__new__(ArticlePipelineMixin)

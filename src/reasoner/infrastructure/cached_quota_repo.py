@@ -12,7 +12,7 @@ import logging
 from typing import Any
 
 from reasoner.application.ports.quota_repository import QuotaRepository
-from reasoner.domain.saas import UsageQuota, QuotaResult
+from reasoner.domain.saas import QuotaResult, UsageQuota
 
 logger = logging.getLogger(__name__)
 

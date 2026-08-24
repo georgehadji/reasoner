@@ -6,9 +6,8 @@ from __future__ import annotations
 from typing import Any
 
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.subagents.base import PhaseSubAgent
 from reasoner.parsing import extract_json
-
+from reasoner.subagents.base import PhaseSubAgent
 
 STRUCTURAL_SYSTEM = """You are a Structural Decomposer. Your ONE JOB is to break the problem into a hierarchical decomposition: WHAT needs to happen, WHY it matters, and HOW to approach it.
 

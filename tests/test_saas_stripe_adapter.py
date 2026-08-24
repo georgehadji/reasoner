@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import os
-import pytest
-from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
-from reasoner.domain.saas import SubscriptionTier, SubscriptionStatus
+import pytest
+
+from reasoner.domain.saas import SubscriptionStatus, SubscriptionTier
 from reasoner.infrastructure.billing.stripe_adapter import StripeBillingAdapter
 
 

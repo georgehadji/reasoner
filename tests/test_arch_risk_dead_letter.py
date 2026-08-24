@@ -8,12 +8,6 @@ concurrent writes and that the log file location is correct.
 
 from __future__ import annotations
 
-import asyncio
-import json
-import tempfile
-from pathlib import Path
-from unittest.mock import patch, MagicMock
-
 import pytest
 
 from reasoner.core.events.domain_events import DomainEvent, EventType, make_event

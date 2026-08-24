@@ -6,8 +6,12 @@ Imports:
     from reasoner.core import PerspectiveDefinition, DEFAULT_PERSPECTIVES, PERSPECTIVES_BY_NAME
 """
 
+from reasoner.core.perspectives import (
+    DEFAULT_PERSPECTIVES,
+    PERSPECTIVES_BY_NAME,
+    PerspectiveDefinition,
+)
 from reasoner.core.protocol import Phase, PhaseConfig, PhaseResult, make_phase_result
-from reasoner.core.perspectives import PerspectiveDefinition, DEFAULT_PERSPECTIVES, PERSPECTIVES_BY_NAME
 
 __all__ = [
     "Phase",

@@ -18,7 +18,7 @@ caller.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import HTTPException
 
@@ -29,7 +29,7 @@ _WINDOW_TTL_SECONDS = 86_400
 
 
 def _daily_key(client_ip: str) -> str:
-    day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    day = datetime.now(UTC).strftime("%Y-%m-%d")
     return f"{_KEY_PREFIX}:{client_ip}:{day}"
 
 

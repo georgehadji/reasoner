@@ -10,13 +10,12 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from datetime import datetime, timezone
 from uuid import UUID
 
 import asyncpg
 
-from reasoner.domain.saas import UsageQuota, QuotaResult, SubscriptionTier
 from reasoner.application.ports.quota_repository import QuotaRepository
+from reasoner.domain.saas import QuotaResult, SubscriptionTier, UsageQuota
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +38,7 @@ class PostgresQuotaRepository(QuotaRepository):
 
         if PostgresQuotaRepository._pool is not None:
             return PostgresQuotaRepository._pool
-            
+
         async with PostgresQuotaRepository._pool_lock:
             if PostgresQuotaRepository._pool is None:
                 PostgresQuotaRepository._pool = await asyncpg.create_pool(

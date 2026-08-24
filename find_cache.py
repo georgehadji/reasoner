@@ -1,8 +1,7 @@
-import os
 import glob
 
 for path in glob.glob("tests/**/*.py", recursive=True):
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         try:
             content = f.read()
             if "_cache.clear" in content:

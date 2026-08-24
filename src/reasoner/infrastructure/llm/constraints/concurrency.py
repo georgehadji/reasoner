@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from reasoner.core.ports.routing_constraint_port import (
     ConstraintViolation,
-    RoutingConstraintPort,
 )
 
 # Threshold: warn when concurrency usage exceeds this fraction
@@ -61,7 +60,8 @@ class ConcurrencyConstraint:
         """
         try:
             from reasoner.infrastructure.llm.router import (
-                _get_llm_semaphore, _get_model_limit,
+                _get_llm_semaphore,
+                _get_model_limit,
             )
             sem = _get_llm_semaphore(model_id)
             limit = _get_model_limit(model_id)

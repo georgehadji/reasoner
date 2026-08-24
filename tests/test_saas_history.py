@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-import json
 import tempfile
 from pathlib import Path
 from uuid import UUID
 
 import pytest
 
-from reasoner.api.history import HISTORY_DIR, HistoryEntry, _list_history, _save_history_entry
-from reasoner.domain.saas import User
+from reasoner.api.history import HistoryEntry, _list_history, _save_history_entry
 
 
 @pytest.fixture
@@ -123,14 +121,13 @@ def test_list_history_without_filter_includes_all(temp_history_dir):
 @pytest.fixture
 def history_client(temp_history_dir, monkeypatch):
     """Build a TestClient with history routes mounted."""
-    import os
 
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
 
     from reasoner.api.routes.history import router as history_router
-    from reasoner.infrastructure.auth.local_adapter import LocalAuthAdapter
     from reasoner.infrastructure.auth import set_auth_adapter
+    from reasoner.infrastructure.auth.local_adapter import LocalAuthAdapter
 
     # Ensure JWT secret is strong enough
     monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key-for-local-auth-adapter-only")

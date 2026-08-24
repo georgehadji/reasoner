@@ -1,25 +1,24 @@
 """Tests for OCR-enhanced file extraction."""
 
 import io
-import pytest
-from pathlib import Path
+
+# Create an authenticated client for tests
+import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from fastapi.testclient import TestClient
 
 from reasoner.api import app
 from reasoner.core.settings import settings
-from reasoner.infrastructure.auth.local_adapter import LocalAuthAdapter
 from reasoner.infrastructure.auth import set_auth_adapter
+from reasoner.infrastructure.auth.local_adapter import LocalAuthAdapter
 from reasoner.uploader import (
     extract_text,
     save_uploaded_file,
     save_uploaded_files,
-    _extract_pdf,
 )
 
-# Create an authenticated client for tests
-import os
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-for-local-auth-adapter-only")
 _adapter = LocalAuthAdapter()
 # Force LocalAuthAdapter regardless of ambient SUPABASE_URL/ENVIRONMENT config —

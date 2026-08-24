@@ -16,15 +16,14 @@ import asyncio
 import logging
 from typing import Any
 
-from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.domain.core_types import CritiqueScore
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.models import PerspectiveType
-from reasoner.subagents.models import PhaseSubAgentOutput
-from reasoner.subagents.critique.logic_critique import LogicCritiqueSubAgent
-from reasoner.subagents.critique.evidence_critique import EvidenceCritiqueSubAgent
+from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.subagents.critique.bias_critique import BiasCritiqueSubAgent
 from reasoner.subagents.critique.counterfactual import CounterfactualSubAgent
+from reasoner.subagents.critique.evidence_critique import EvidenceCritiqueSubAgent
+from reasoner.subagents.critique.logic_critique import LogicCritiqueSubAgent
+from reasoner.subagents.models import PhaseSubAgentOutput
 
 logger = logging.getLogger(__name__)
 

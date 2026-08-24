@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 from reasoner.domain.core_types import CritiqueScore, ReviewHypothesis
 from reasoner.models import PerspectiveRegistry
-from reasoner.utils.json_safe import safe_json_loads, JSONDepthExceededError
+from reasoner.utils.json_safe import JSONDepthExceededError, safe_json_loads
 
 
 class ParseError(Exception):
@@ -76,7 +76,7 @@ def extract_json(text: str) -> dict[str, Any]:
     """
     if not text or not text.strip():
         return {}
-    
+
     # 1. Strip markdown fences and any surrounding whitespace
     text = text.strip()
     if text.startswith("```json"):
@@ -85,19 +85,19 @@ def extract_json(text: str) -> dict[str, Any]:
         text = text[3:].strip()
     if text.endswith("```"):
         text = text[:-3].strip()
-    
+
     # 2. Extract using core engine
     parsed = extract_json_any(text)
-    
+
     # 3. Validate - if it's already a dict, it was successfully extracted
     if isinstance(parsed, dict):
         return parsed
-    
+
     # If it's a list (which extract_json_any can return if the JSON root is an array),
     # treat it as a list of results wrapped in a "results" key to maintain dict-like behavior.
     if isinstance(parsed, list):
         return {"results": parsed}
-    
+
     raise ParseError(
         f"Could not extract valid JSON object from response. "
         f"Parsed type: {type(parsed).__name__}. "
@@ -116,7 +116,7 @@ def extract_json_list(text: str) -> list[Any]:
     if isinstance(parsed, dict):
         # Graceful degradation: extract values from dict
         return list(parsed.values())
-    
+
     raise ParseError(
         f"Could not extract valid JSON list from response. "
         f"First 200 chars: {text[:200]!r}"
@@ -149,10 +149,10 @@ def extract_json_any(text: str) -> Any:
     Returns dict, list, or None.
     """
     # CRITICAL: Limit input length to prevent regex DoS (ReDoS) attacks
-    MAX_INPUT_LENGTH = 100000  
+    MAX_INPUT_LENGTH = 100000
     if len(text) > MAX_INPUT_LENGTH:
         text = text[:MAX_INPUT_LENGTH]
-    
+
     text = strip_perplexity_citations(text.strip())
     text = strip_provider_artifacts(text)
     text = _strip_reasoning_tags(text)
@@ -211,7 +211,7 @@ def extract_json_any(text: str) -> Any:
     # Find outermost structural boundaries
     start_obj = text.find("{")
     start_arr = text.find("[")
-    
+
     # Always prefer objects over arrays — objects carry semantic meaning (keys)
     # while arrays are often incidental or decorative in LLM responses.
     if start_obj != -1:
@@ -595,7 +595,7 @@ def extract_solution_prose(text: str) -> str | None:
     match = re.search(r"\[SOLUTION\]\s*(.*?)\s*\[/SOLUTION\]", text, re.DOTALL)
     if not match:
         return None
-    
+
     # CRITICAL FIX: Return None for empty/whitespace-only content
     # This allows callers to distinguish between "no solution" and "empty solution"
     content = match.group(1).strip()
@@ -737,7 +737,7 @@ def _parse_review_hypotheses(raw_hypotheses: Any) -> list[ReviewHypothesis]:
     return out
 
 
-def parse_evidence_bundle(data: dict[str, Any]) -> "EvidenceBundle":
+def parse_evidence_bundle(data: dict[str, Any]) -> EvidenceBundle:
     """Tolerantly parse an EvidenceBundle from raw {label, checks_run, ...} dict.
 
     Returns an all-default bundle on any parse failure (``--resume`` safe).
@@ -758,7 +758,7 @@ def parse_evidence_bundle(data: dict[str, Any]) -> "EvidenceBundle":
         return EvidenceBundle()
 
 
-def parse_plan_contract(data: dict[str, Any]) -> "PlanContract":
+def parse_plan_contract(data: dict[str, Any]) -> PlanContract:
     """Tolerantly parse a PlanContract from raw decomposition LLM output.
 
     Returns an all-default contract on any parse failure (``--resume`` safe).
@@ -784,13 +784,12 @@ def parse_plan_contract(data: dict[str, Any]) -> "PlanContract":
 
 def parse_evidence_bundles(
     raw: list[dict[str, Any]] | dict[str, Any] | None,
-) -> dict[str, "EvidenceBundle"]:
+) -> dict[str, EvidenceBundle]:
     """Parse a dict of {claim_text: bundle_dict} from synthesis LLM output.
 
     Accepts list[dict] (coerces to dict by index), dict, or None.
     Returns a dict keyed by claim text.
     """
-    from reasoner.domain.core_types import EvidenceBundle
 
     result: dict[str, EvidenceBundle] = {}
 

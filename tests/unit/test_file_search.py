@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import json
-import pytest
-from pathlib import Path
 from unittest.mock import AsyncMock
+
+import pytest
 
 from reasoner.infrastructure.prism.file_search import PrismFileSearch
 from reasoner.infrastructure.uploader import UPLOAD_DIR

@@ -1,12 +1,12 @@
-import sys
 import re
 from pathlib import Path
+
 
 def main():
     repo_root = Path(__file__).parent.parent.resolve()
     streaming_path = repo_root / "src" / "reasoner" / "api" / "streaming.py"
-    
-    with open(streaming_path, "r", encoding="utf-8") as f:
+
+    with open(streaming_path, encoding="utf-8") as f:
         content = f.read()
 
     # Extract the full body of run_stream
@@ -15,29 +15,29 @@ def main():
     if not start_match:
         print("Could not find run_stream")
         return
-        
+
     start_idx = start_match.end()
-    
+
     # run_stream ends before run_followup_stream
     end_match = re.search(r'async def run_followup_stream\(', content[start_idx:])
     if not end_match:
         print("Could not find run_followup_stream")
         return
-        
+
     end_idx = start_idx + end_match.start()
-    
+
     run_stream_body = content[start_idx:end_idx]
-    
+
     # We need to adapt run_stream_body for PipelineExecutionService
     # Replacements:
     # `yield _event(payload)` -> `await sse_emit(payload)`
-    # `yield _ka` -> `await sse_emit(_ka)` (Wait, `run_phase_with_keepalive` yields formatted SSE strings? No, wait. 
+    # `yield _ka` -> `await sse_emit(_ka)` (Wait, `run_phase_with_keepalive` yields formatted SSE strings? No, wait.
     # Let's just make sse_emit accept dict and format it later, or accept both. Let's make sse_emit accept dict, but if we need to emit raw string...
     # `yield _event(start_payload)` -> `await sse_emit(start_payload)`
-    
+
     # `req.` -> `command.` (mostly)
     # Actually, we should just reconstruct `req` inside `PipelineExecutionService` from `command` to minimize changes!
-    
+
     execution_service_content = f"""
 import asyncio
 import uuid
@@ -104,26 +104,26 @@ class PipelineExecutionService:
     # Replace `yield _event(x)` with `await sse_emit(x)`
     # Replace `yield chunk` with `await sse_emit(chunk)`
     # Replace `yield _ka` with `await sse_emit(_ka)`
-    
+
     execution_service_content = re.sub(r'yield _event\((.*?)\)', r'await sse_emit(\1)', execution_service_content)
     execution_service_content = re.sub(r'yield chunk', r'await sse_emit(chunk)', execution_service_content)
     execution_service_content = re.sub(r'yield _ka', r'await sse_emit(_ka)', execution_service_content)
-    
+
     # Remove the NotImplementedError at the start
     execution_service_content = re.sub(
-        r'    if not _settings\.CQRS_BYPASS_STREAMING:.*?raise NotImplementedError\(.*?C1\."\n        \)', 
-        '', 
-        execution_service_content, 
+        r'    if not _settings\.CQRS_BYPASS_STREAMING:.*?raise NotImplementedError\(.*?C1\."\n        \)',
+        '',
+        execution_service_content,
         flags=re.DOTALL
     )
 
     with open(repo_root / "src" / "reasoner" / "application" / "services" / "pipeline_execution_service.py", "w", encoding="utf-8") as f:
         f.write(execution_service_content)
-        
+
     print("Created pipeline_execution_service.py")
 
     # Now rewrite api/streaming.py
-    
+
     new_run_stream = """async def run_stream(
     req: RunRequest,
     initial_state: PipelineState | None = None,
@@ -180,7 +180,7 @@ class PipelineExecutionService:
     new_streaming_content = content[:start_match.start()] + new_run_stream + content[end_idx:]
     with open(streaming_path, "w", encoding="utf-8") as f:
         f.write(new_streaming_content)
-        
+
     print("Updated streaming.py")
 
 if __name__ == "__main__":

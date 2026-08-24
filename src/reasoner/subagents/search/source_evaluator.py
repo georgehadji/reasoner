@@ -6,9 +6,8 @@ from __future__ import annotations
 from typing import Any
 
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.subagents.base import PhaseSubAgent
 from reasoner.parsing import extract_json
-
+from reasoner.subagents.base import PhaseSubAgent
 
 SOURCE_SYSTEM = """You are a Source Evaluator. Your ONE JOB is to evaluate the credibility and relevance of search results for the problem.
 

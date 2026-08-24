@@ -13,18 +13,9 @@ These are read-only structural tests — no LLM calls.
 from __future__ import annotations
 
 import pytest
-from typing import Any
 
 from reasoner.domain.preset_registry import PRESETS
-from reasoner.domain.pricing import get_pricing, ModelPricing, PRICING_DB
-from reasoner.core.constants import (
-    ARTICLE_MIN_SOURCE_COUNT,
-    ARTICLE_MAX_SOURCE_COUNT,
-    ARTICLE_SEARCH_RESULTS_PER_QUERY,
-    ARTICLE_MAX_SOURCES_FOR_CLAIM_EXTRACTION,
-    ARTICLE_MIN_CLAIM_SUPPORT_RATIO,
-    ARTICLE_CRITIC_MAX_WORDS,
-)
+from reasoner.domain.pricing import PRICING_DB, get_pricing
 
 # ═════════════════════════════════════════════════════════════════════
 # Preset structure

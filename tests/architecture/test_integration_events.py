@@ -10,20 +10,17 @@ Uses a mock ProviderRouter so no real LLM calls are made.
 """
 
 from __future__ import annotations
-from reasoner.models import save, load
 
-import asyncio
-import json
 import os
 import tempfile
+from typing import Any
+
 import pytest
-from typing import Any, AsyncGenerator
 
-from reasoner.domain.pipeline_state import PipelineState
-from reasoner.application.event_bus.bus import EventBus, get_event_bus, reset_event_bus
+from reasoner.application.event_bus.bus import get_event_bus, reset_event_bus
 from reasoner.application.services.event_emission_service import EventEmissionService
-from reasoner.infrastructure.persistence.event_store import EventStore, get_event_store as _get_es
-
+from reasoner.domain.pipeline_state import PipelineState
+from reasoner.models import load, save
 
 # ── Mock Router ─────────────────────────────────────────────────────
 
@@ -96,14 +93,14 @@ class TestEventSourcingIntegration:
 
     async def test_pipeline_event_publishing(self) -> None:
         """Publishing events through EventBus directly works (real bus)."""
-        from reasoner.core.events.domain_events import make_event, PipelineEventType
+        from reasoner.core.events.domain_events import PipelineEventType, make_event
 
         bus = get_event_bus()
         event = make_event(PipelineEventType.PIPELINE_STARTED, aggregate_id="test", version=1, problem="test")
-        
+
         # Publish synchronously via the real bus
         await bus.publish(event)
-        
+
         # Event was published without error
         assert event.event_type == PipelineEventType.PIPELINE_STARTED
 
@@ -149,17 +146,17 @@ class TestEventSourcingIntegration:
         """to_dict / _from_dict round-trip preserves all core fields."""
         state = PipelineState(problem="serial test", language="French")
         state.complexity = "medium"
-        
+
         d = state.to_dict()
         loaded = PipelineState._from_dict(d)
-        
+
         assert loaded.problem == "serial test"
         assert loaded.language == "French"
         assert loaded.complexity == "medium"
 
     async def test_event_types_catalog(self) -> None:
         """All expected event types exist in the domain events module."""
-        from reasoner.core.events.domain_events import EventType, PipelineEventType
+        from reasoner.core.events.domain_events import PipelineEventType
         expected = [
             PipelineEventType.PIPELINE_STARTED,
             PipelineEventType.PIPELINE_COMPLETED,

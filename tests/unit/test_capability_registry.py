@@ -6,7 +6,6 @@ Tests domain objects and the CapabilityRegistry implementation.
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pytest
 
@@ -174,7 +173,7 @@ class TestCapabilityRegistry:
 
         # Read back the file
         profiles_path = str(tmp_path / "profiles.json")
-        with open(profiles_path, "r") as f:
+        with open(profiles_path) as f:
             data = json.load(f)
         assert "gpt-5-nano" in data["capabilities"]
         assert data["capabilities"]["gpt-5-nano"]["scores"]["reasoning"] == 0.80

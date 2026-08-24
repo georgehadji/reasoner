@@ -10,19 +10,18 @@ auto-detects which cipher wrote a given token; callers never choose.
 
 from __future__ import annotations
 
-import os
 import base64
-import logging
-import hmac
 import hashlib
+import hmac
+import logging
+import os
 import re
 import threading
 import unicodedata
 import zlib
-from typing import Optional, Union, List
 
-from cryptography.fernet import Fernet, MultiFernet, InvalidToken
 from cryptography.exceptions import InvalidTag
+from cryptography.fernet import Fernet, InvalidToken, MultiFernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
@@ -107,7 +106,7 @@ def _derive_aesgcm_key(fernet_key_material: bytes) -> bytes:
     ).derive(fernet_key_material)
 
 
-def _normalize_tokens(text: str) -> List[str]:
+def _normalize_tokens(text: str) -> list[str]:
     """
     Normalize free text into deduplicated, script-agnostic search tokens.
 
@@ -117,7 +116,7 @@ def _normalize_tokens(text: str) -> List[str]:
     decomposed = unicodedata.normalize("NFKD", text)
     folded = "".join(c for c in decomposed if not unicodedata.combining(c)).casefold()
 
-    tokens: List[str] = []
+    tokens: list[str] = []
     for token in _TOKEN_RE.findall(folded):
         tokens.append(token)
         if len(token) > 1 and _UNSPACED_SCRIPT_RE.search(token):
@@ -138,9 +137,9 @@ class EncryptionService:
 
     def __init__(
         self,
-        keys: Optional[Union[str, List[str]]] = None,
-        blind_index_key: Optional[str] = None,
-        write_format: Optional[str] = None,
+        keys: str | list[str] | None = None,
+        blind_index_key: str | None = None,
+        write_format: str | None = None,
     ):
         """
         Initialize with one or more encryption keys and an optional blind index key.
@@ -240,7 +239,7 @@ class EncryptionService:
         normalized to InvalidToken rather than leaking library-specific
         exception types to callers that only catch InvalidToken.
         """
-        last_exc: Optional[Exception] = None
+        last_exc: Exception | None = None
         try:
             token = base64.urlsafe_b64decode(encoded)
             nonce, ct = token[:_AESGCM_NONCE_BYTES], token[_AESGCM_NONCE_BYTES:]
@@ -253,7 +252,7 @@ class EncryptionService:
             last_exc = exc
         raise InvalidToken("AES-GCM decryption failed: no configured key matches.") from last_exc
 
-    def encrypt(self, data: Union[str, bytes], *, compress: bool = False) -> str:
+    def encrypt(self, data: str | bytes, *, compress: bool = False) -> str:
         """
         Encrypt data and return a URL-safe base64 encoded string.
 
@@ -279,7 +278,7 @@ class EncryptionService:
         token = self._fernet.encrypt(payload).decode()
         return f"z{token}" if do_compress else token
 
-    def _decrypt_raw(self, token: Union[str, bytes]) -> bytes:
+    def _decrypt_raw(self, token: str | bytes) -> bytes:
         """Decrypt under whichever cipher wrote this token, reversing compress=True."""
         if isinstance(token, bytes):
             token = token.decode()
@@ -298,7 +297,7 @@ class EncryptionService:
         raw = self._fernet.decrypt(inner)
         return zlib.decompress(raw) if compressed else raw
 
-    def decrypt(self, token: Union[str, bytes]) -> str:
+    def decrypt(self, token: str | bytes) -> str:
         """
         Decrypt a token and return the plaintext string.
         """
@@ -311,7 +310,7 @@ class EncryptionService:
             logger.error(f"Unexpected decryption error: {e}")
             raise
 
-    def decrypt_bytes(self, token: Union[str, bytes]) -> bytes:
+    def decrypt_bytes(self, token: str | bytes) -> bytes:
         """
         Decrypt a token and return the plaintext bytes.
         """
@@ -321,7 +320,7 @@ class EncryptionService:
             logger.error("Decryption failed: Invalid token or key mismatch.")
             raise
 
-    def generate_blind_index(self, text: str) -> List[str]:
+    def generate_blind_index(self, text: str) -> list[str]:
         """
         Generate a list of deterministic, blinded hashes for search terms.
         These hashes can be stored and searched without compromising data privacy.
@@ -339,7 +338,7 @@ class EncryptionService:
             blind_indexes.append(base64.urlsafe_b64encode(digest).decode())
         return blind_indexes
 
-    def decrypt_optional(self, value: Optional[str]) -> Optional[str]:
+    def decrypt_optional(self, value: str | None) -> str | None:
         """
         Decrypt a value that may predate encryption being enabled.
 
@@ -361,13 +360,13 @@ class EncryptionService:
 
 
 # Global singleton instance
-_instance: Optional[EncryptionService] = None
+_instance: EncryptionService | None = None
 _lock = threading.Lock()
 
 
 def get_encryption_service(
-    encryption_key: Optional[Union[str, List[str]]] = None,
-    blind_index_key: Optional[str] = None,
+    encryption_key: str | list[str] | None = None,
+    blind_index_key: str | None = None,
 ) -> EncryptionService:
     """
     Get or create the global EncryptionService instance (thread-safe).

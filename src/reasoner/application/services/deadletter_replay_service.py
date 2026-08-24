@@ -10,7 +10,6 @@ import asyncio
 import json
 import logging
 from pathlib import Path
-from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +94,7 @@ class EventBusReplayService:
             dict with "replayed" (int), "failed" (int), "errors" (list).
         """
         from reasoner.application.event_bus.bus import get_event_bus
-        from reasoner.core.events.domain_events import DomainEvent, ALL_EVENT_TYPES
+        from reasoner.core.events.domain_events import ALL_EVENT_TYPES, DomainEvent
 
         bus = get_event_bus()
         replayed_ids = await self._load_replayed_ids()

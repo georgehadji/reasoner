@@ -8,10 +8,10 @@ Always returns a canned response indicating missing configuration.
 
 from __future__ import annotations
 
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
-from reasoner.infrastructure.llm.ports import BaseLLMProvider, LLMResponse, LLMConfig, Message
 from reasoner.infrastructure.llm.exceptions import LLMError
+from reasoner.infrastructure.llm.ports import BaseLLMProvider, LLMConfig, LLMResponse, Message
 
 
 class NoopProvider(BaseLLMProvider):

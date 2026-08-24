@@ -18,7 +18,7 @@ so the boundary is structurally checked even without runtime injection.
 
 from __future__ import annotations
 
-from typing import List, Optional, Protocol, Union, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 
 @runtime_checkable
@@ -31,18 +31,18 @@ class EncryptionPort(Protocol):
     a given ciphertext.
     """
 
-    def encrypt(self, data: Union[str, bytes], *, compress: bool = False) -> str: ...
+    def encrypt(self, data: str | bytes, *, compress: bool = False) -> str: ...
 
-    def decrypt(self, token: Union[str, bytes]) -> str: ...
+    def decrypt(self, token: str | bytes) -> str: ...
 
-    def decrypt_bytes(self, token: Union[str, bytes]) -> bytes: ...
+    def decrypt_bytes(self, token: str | bytes) -> bytes: ...
 
-    def decrypt_optional(self, value: Optional[str]) -> Optional[str]:
+    def decrypt_optional(self, value: str | None) -> str | None:
         """Legacy plaintext passes through unchanged; ciphertext that fails
         to decrypt raises rather than being silently treated as plaintext."""
         ...
 
-    def generate_blind_index(self, text: str) -> List[str]: ...
+    def generate_blind_index(self, text: str) -> list[str]: ...
 
 
 @runtime_checkable

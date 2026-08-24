@@ -14,8 +14,8 @@ import copy
 import logging
 from typing import Any
 
-from reasoner.domain.pipeline_state import PipelineState
 from reasoner.application.flows.base import WorkflowServices
+from reasoner.domain.pipeline_state import PipelineState
 
 logger = logging.getLogger(__name__)
 

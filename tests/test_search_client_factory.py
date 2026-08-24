@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
 
 from reasoner.application.services.search_service import SearchService
 
@@ -46,7 +47,7 @@ class TestGetSearchClientFactory:
     @pytest.mark.asyncio
     async def test_perplexity_selected_when_openrouter_key_present(self):
         """When OPENROUTER_API_KEY is set, return PerplexitySearchClient."""
-        from reasoner.core.search import get_search_client, PerplexitySearchClient
+        from reasoner.core.search import get_search_client
 
         with patch("reasoner.infrastructure.search.discovery.settings") as mock_settings:
             mock_settings.OPENROUTER_API_KEY = "sk-or-test-key"

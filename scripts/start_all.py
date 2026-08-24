@@ -294,11 +294,11 @@ def main() -> int:
                     continue
                 else:
                     print(f"[WARN] Could not free port {port}.")
-            print(f"        Stop the existing process or use a different port:")
+            print("        Stop the existing process or use a different port:")
             print(f"        python start_all.py --main-port {port + 1}")
             if not args.force:
-                print(f"        Or force-free the port:")
-                print(f"        python start_all.py --force")
+                print("        Or force-free the port:")
+                print("        python start_all.py --force")
             return 1
 
     processes: list[tuple[str, subprocess.Popen]] = []
@@ -344,7 +344,7 @@ def main() -> int:
         if _wait_for_health(args.main_port, timeout=30.0):
             print(f"[OK]    Backend responding on port {args.main_port}")
         else:
-            print(f"[WARN]  Backend did not respond within 30s. It may still be starting.")
+            print("[WARN]  Backend did not respond within 30s. It may still be starting.")
 
         # Start standalone neuro server if requested
         if not args.no_neuro:

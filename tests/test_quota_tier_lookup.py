@@ -9,9 +9,9 @@ These tests pin the entitlement rules:
   - every other outcome (no row, cancelled, past_due, lookup error) -> FREE
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
-from uuid import uuid4, UUID
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -34,7 +34,7 @@ def _subscription(user_id: UUID, tier: SubscriptionTier, status: SubscriptionSta
         user_id=user_id,
         tier=tier,
         status=status,
-        current_period_end=datetime.now(timezone.utc),
+        current_period_end=datetime.now(UTC),
     )
 
 

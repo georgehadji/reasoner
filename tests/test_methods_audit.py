@@ -1,14 +1,13 @@
-import pytest
-import asyncio
 import sys
 from pathlib import Path
+
+import pytest
 
 # Add src to sys.path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from reasoner.pipeline import ReasonerPipeline
 from reasoner.presets import get_preset
-from reasoner.models import PipelineState
 
 # Real-pipeline audit: every case runs pipeline.run() against live providers and
 # writes test_audit_results.log. Requires a funded OPENROUTER_API_KEY + network,
@@ -44,24 +43,24 @@ async def test_method_execution(preset_name, problem):
     print(output)
     with open("test_audit_results.log", "a", encoding="utf-8") as f:
         f.write(output)
-    
+
     preset = get_preset(preset_name)
     router = preset.build_router()
-    
+
     pipeline = ReasonerPipeline(
         router=router,
         preset_name=preset_name,
         verbose=True,
     )
-    
+
     try:
         state = await pipeline.run(problem)
-        
+
         assert state.final_solution is not None, f"Final solution is missing for {preset_name}"
         assert state.final_solution.core_solution is not None, f"Core solution is missing for {preset_name}"
         assert len(state.final_solution.core_solution) > 100, f"Synthesis too short for {preset_name}"
         assert not state.errors, f"Errors in pipeline run for {preset_name}: {state.errors}"
-        
+
         msg = f">>> SUCCESS: {preset_name}\n"
         print(msg)
         with open("test_audit_results.log", "a", encoding="utf-8") as f:

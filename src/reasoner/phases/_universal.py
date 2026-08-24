@@ -1,14 +1,15 @@
 from __future__ import annotations
+
 import json
+
+from reasoner.core.constants import DEFAULT_SEARCH_RESULTS, JSON_ONLY_FOOTER, TRUNCATION
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.core.constants import JSON_ONLY_FOOTER, TRUNCATION, DEFAULT_SEARCH_RESULTS
 from reasoner.phases._shared import (
-    detect_language,
-    get_language_instruction,
-    _followup_context,
-    _wrap_user_input,
-    _wrap_external_content,
     HUMANIZATION_RULES,
+    _followup_context,
+    _wrap_external_content,
+    _wrap_user_input,
+    get_language_instruction,
 )
 
 DISAMBIGUATION_SYSTEM = "You are an analytical assistant. Detect whether a problem is ambiguous and could be interpreted in multiple ways. Output ONLY valid JSON."
@@ -51,7 +52,7 @@ def decomposition_prompt(state: PipelineState) -> str:
     jury_instr = " Add jury_guidelines." if is_jury else ""
     web_context = f"\nWeb: {state.web_discovery_results[:TRUNCATION.KEY_INSIGHTS]}" if state.web_discovery_results else ""
     followup = _followup_context(state)
-    
+
     return f'''{get_language_instruction(state)}
 
 {followup}

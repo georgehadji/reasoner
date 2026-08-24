@@ -1,5 +1,6 @@
-from reasoner.core.settings import settings
 import os
+
+from reasoner.core.settings import settings
 
 keys = [
     "OPENROUTER_API_KEY",

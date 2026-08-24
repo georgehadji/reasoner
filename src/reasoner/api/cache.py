@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from reasoner.api.schemas import RunRequest
 
 try:
-    from reasoner.metrics import REASONER_CACHE_HIT_RATE, REASONER_CACHE_ENTRIES
+    from reasoner.metrics import REASONER_CACHE_ENTRIES, REASONER_CACHE_HIT_RATE
     _METRICS_AVAILABLE = True
 except Exception:
     _METRICS_AVAILABLE = False
@@ -85,7 +85,7 @@ def clear_memory_cache() -> None:
         _MEMORY_CACHE.clear()
 
 
-def _cache_key(req: "RunRequest", user_id: str | None = None) -> str:
+def _cache_key(req: RunRequest, user_id: str | None = None) -> str:
     # v=7 includes user_id to prevent cross-tenant cache disclosure (D1)
     attachments_key = None
     if getattr(req, "attachments", None):
@@ -93,7 +93,7 @@ def _cache_key(req: "RunRequest", user_id: str | None = None) -> str:
             {"file_id": a.file_id, "text_hash": hashlib.sha256(a.extracted_text.encode()).hexdigest()[:16]}
             for a in req.attachments
         ]
-    
+
     # For anonymous users with CACHE_SHARE_ANONYMOUS enabled, use a sentinel
     user_key = user_id
     if user_key is None:
@@ -103,7 +103,7 @@ def _cache_key(req: "RunRequest", user_id: str | None = None) -> str:
                 user_key = "__anonymous__"
         except Exception:
             user_key = None
-    
+
     payload = json.dumps({
         "problem": req.problem,
         "preset":  req.preset,

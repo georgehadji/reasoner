@@ -3,13 +3,13 @@ from __future__ import annotations
 
 import pytest
 
+from reasoner.reasoner_vs_constants import VS_K_GENERATION, VS_TAIL_THRESHOLD_RADIOLOGY
 from reasoner.vs_config import (
     VSDeploymentProfile,
     VSFeatureFlags,
     VSVerticalConfig,
     VSVerticalRegistry,
 )
-from reasoner.reasoner_vs_constants import VS_K_GENERATION, VS_TAIL_THRESHOLD_RADIOLOGY
 
 
 class TestVSDeploymentProfile:

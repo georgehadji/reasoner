@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 from reasoner.core.rerank import (
+    _is_circuit_open,
+    _sanitize_text,
     rerank_documents,
     rerank_memory_chunks,
-    _sanitize_text,
-    _is_circuit_open,
 )
 from reasoner.core.settings import settings
 from reasoner.neuro.cache import ContextChunk

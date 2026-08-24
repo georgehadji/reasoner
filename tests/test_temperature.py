@@ -1,6 +1,7 @@
 """Tests for LLM temperature handling (BUG-001 regression)."""
 
 import pytest
+
 from reasoner.llm import OpenAICompatibleProvider
 
 
@@ -93,14 +94,14 @@ class TestTemperatureRegistry:
     """Verify the centralized temperature registry is wired correctly."""
 
     def test_phase_temperatures_are_valid(self):
-        from reasoner.core.temperatures import PHASE_TEMPERATURES, NON_PHASE_TEMPERATURES
+        from reasoner.core.temperatures import NON_PHASE_TEMPERATURES, PHASE_TEMPERATURES
         for name, temp in {**PHASE_TEMPERATURES, **NON_PHASE_TEMPERATURES}.items():
             assert isinstance(temp, float), f"{name} must be a float"
             assert 0.0 <= temp <= 2.0, f"{name} temperature {temp} out of valid range"
 
     def test_pipeline_phase_configs_use_registry(self):
-        from reasoner.pipeline import ReasonerPipeline
         from reasoner.core.temperatures import PHASE_TEMPERATURES
+        from reasoner.pipeline import ReasonerPipeline
         # Use a dummy router so __init__ doesn't need real credentials
         class DummyRouter:
             def call(self, **kwargs):
@@ -121,9 +122,9 @@ class TestTemperatureRegistry:
 
     def test_call_llm_cached_resolves_temperature_from_phase_configs(self):
         from reasoner import pipeline as pipeline_module
-        from reasoner.pipeline import ReasonerPipeline
-        from reasoner.models import PipelineState
         from reasoner.core.temperatures import PHASE_TEMPERATURES
+        from reasoner.models import PipelineState
+        from reasoner.pipeline import ReasonerPipeline
 
         class DummyRouter:
             async def call(self, **kwargs):
@@ -152,8 +153,8 @@ class TestTemperatureRegistry:
 
     def test_call_llm_cached_allows_explicit_override(self):
         from reasoner import pipeline as pipeline_module
-        from reasoner.pipeline import ReasonerPipeline
         from reasoner.models import PipelineState
+        from reasoner.pipeline import ReasonerPipeline
 
         class DummyRouter:
             async def call(self, **kwargs):
@@ -181,9 +182,9 @@ class TestTemperatureRegistry:
 
     def test_call_llm_cached_uses_phase_key_for_role_alias(self):
         from reasoner import pipeline as pipeline_module
-        from reasoner.pipeline import ReasonerPipeline
-        from reasoner.models import PipelineState
         from reasoner.core.temperatures import PHASE_TEMPERATURES
+        from reasoner.models import PipelineState
+        from reasoner.pipeline import ReasonerPipeline
 
         class DummyRouter:
             async def call(self, **kwargs):

@@ -1,21 +1,17 @@
 """Tests for vs_probe_generation stage."""
 from __future__ import annotations
-from tests.utils.mocks import MockLLM, MockNLI
 
 import pytest
-from unittest.mock import AsyncMock
 
 from reasoner.phases.vs_probe_generation import (
-    generate_probes_with_vs,
+    DOMAIN_PROBE_TEMPLATES,
     ProbeGenerationConfig,
     ProbeSet,
-    DOMAIN_PROBE_TEMPLATES,
     _semantic_distance,
+    generate_probes_with_vs,
 )
-from reasoner.reasoner_verbalized_sampling import VSMode
 from reasoner.vs_config import VSFeatureFlags
-
-
+from tests.utils.mocks import MockLLM
 
 
 @pytest.fixture

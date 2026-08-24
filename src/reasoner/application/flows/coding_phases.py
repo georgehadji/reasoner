@@ -6,13 +6,13 @@ import asyncio
 import logging
 from typing import Any
 
-from reasoner.domain.pipeline_state import PipelineState
-from reasoner.domain.core_types import SolutionCandidate
-from reasoner.models import PerspectiveType
-from reasoner.parsing import extract_json
 import reasoner.phases as phases
 from reasoner.application.flows.base import WorkflowServices
+from reasoner.domain.core_types import SolutionCandidate
+from reasoner.domain.pipeline_state import PipelineState
 from reasoner.infrastructure.search.discovery import get_search_client_for_method
+from reasoner.models import PerspectiveType
+from reasoner.parsing import extract_json
 
 logger = logging.getLogger(__name__)
 

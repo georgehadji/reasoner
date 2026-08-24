@@ -7,22 +7,22 @@ import logging
 from dataclasses import asdict
 from typing import Any
 
-from reasoner.domain.pipeline_state import PipelineState
-from reasoner.domain.core_types import (
-    GenerationCandidate,
-    CriticScore,
-    CriticDimensionScore,
-    VerificationResult,
-    MetaEvaluation,
-    SolutionCandidate,
-)
-from reasoner.models import ClaimLabel
-from reasoner.parsing import extract_json
-from reasoner.core.constants import TRUNCATION
-from reasoner.core.constants_limits import get_token_budget
 import reasoner.phases as phases
 from reasoner.application.flows.base import WorkflowServices
 from reasoner.application.services.recovery_service import RecoveryService
+from reasoner.core.constants import TRUNCATION
+from reasoner.core.constants_limits import get_token_budget
+from reasoner.domain.core_types import (
+    CriticDimensionScore,
+    CriticScore,
+    GenerationCandidate,
+    MetaEvaluation,
+    SolutionCandidate,
+    VerificationResult,
+)
+from reasoner.domain.pipeline_state import PipelineState
+from reasoner.models import ClaimLabel
+from reasoner.parsing import extract_json
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ async def run_recovery_path(state: PipelineState, services: WorkflowServices, ca
     """Executes a cross-verification path for a potentially problematic candidate."""
     candidate_id = candidate_to_verify.perspective if isinstance(candidate_to_verify, SolutionCandidate) else candidate_to_verify.generator_id
     services.log("RECOVERY", f"Initiating recovery path for candidate: {candidate_id}", state)
-    
+
     try:
         raw_verification, _ = await services.call_llm(
             role="recovery_path",
@@ -64,7 +64,7 @@ def _create_generation_candidate(data: dict[str, Any] | str | list[Any], generat
     # 1. Handle potential wrapping in 'results' key
     if "results" in data and isinstance(data["results"], list) and len(data["results"]) > 0:
         data = data["results"][0]
-    
+
     return GenerationCandidate(
         generator_id=generator_id,
         model_used=model_used,
@@ -76,19 +76,19 @@ def _create_generation_candidate(data: dict[str, Any] | str | list[Any], generat
 
 async def run_jury_generate_phase(state: PipelineState, services: WorkflowServices, gen_roles: list[str] | None = None) -> None:
     services.log("JURY", "Generating independent solutions...", state)
-    
+
     if not gen_roles:
         gen_roles = ["generator_1", "generator_2", "generator_3"]
-            
+
     async def _get_generator(gen_id: str):
         raw, model = await services.call_llm(
             role=gen_id,
             system_prompt=phases.JURY_GENERATOR_SYSTEM,
-            user_prompt=phases.jury_generator_prompt(state, gen_id), 
+            user_prompt=phases.jury_generator_prompt(state, gen_id),
             state=state
         )
         data = extract_json(raw)
-        
+
         # Rescue loop: If data is empty or malformed (empty dict after extraction), try one more time
         if not data:
             services.log("JURY", f"Generator {gen_id} failed JSON extraction, retrying...", state)
@@ -115,7 +115,7 @@ async def run_jury_generate_phase(state: PipelineState, services: WorkflowServic
 
 async def run_jury_critique_phase(state: PipelineState, services: WorkflowServices, critic_roles: list[str] | None = None, batch_critique: bool = False) -> None:
     services.log("JURY_CRITIQUE", "Jury critiquing candidates...", state)
-    
+
     async def _get_jury_critique(critic_id: str):
         raw, _ = await services.call_llm(
             role=critic_id,
@@ -150,7 +150,7 @@ async def run_jury_critique_phase(state: PipelineState, services: WorkflowServic
     else:
         if not critic_roles:
             critic_roles = ["critic_1", "critic_2", "critic_3"]
-            
+
         tasks = [_get_jury_critique(role) for role in critic_roles]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         for i, r in enumerate(results):
@@ -216,7 +216,7 @@ async def run_jury_verify_and_meta_eval_phase(state: PipelineState, services: Wo
     raw_v, _ = await services.call_llm(
         role="verifier",
         system_prompt=phases.JURY_VERIFIER_SYSTEM,
-        user_prompt=phases.jury_verifier_prompt(state), 
+        user_prompt=phases.jury_verifier_prompt(state),
         state=state
     )
     v_data = extract_json(raw_v)
@@ -226,7 +226,7 @@ async def run_jury_verify_and_meta_eval_phase(state: PipelineState, services: Wo
     raw_m, _ = await services.call_llm(
         role="meta_evaluator",
         system_prompt=phases.JURY_META_EVAL_SYSTEM,
-        user_prompt=phases.jury_meta_eval_prompt(state), 
+        user_prompt=phases.jury_meta_eval_prompt(state),
         state=state
     )
     m_data = extract_json(raw_m)
@@ -237,7 +237,7 @@ async def run_jury_weighted_ranking_phase(state: PipelineState, services: Workfl
     reliability: dict[str, float] = {}
     if state.meta_evaluation:
         reliability = state.meta_evaluation.critic_reliability or {}
-    
+
     def _safe_float(v) -> float:
         if isinstance(v, (int, float)):
             return float(v)
@@ -255,7 +255,7 @@ async def run_jury_weighted_ranking_phase(state: PipelineState, services: Workfl
             score = (_safe_float(dims.factuality) + _safe_float(dims.reasoning)
                    + _safe_float(dims.completeness) + _safe_float(dims.helpfulness))
             generator_scores[gen_id] = generator_scores.get(gen_id, 0.0) + (score * weight)
-    
+
     state.jury_weighted_ranking = sorted(
         generator_scores.keys(),
         key=lambda gid: generator_scores[gid],

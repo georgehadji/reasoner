@@ -4,12 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any
 
-from reasoner.domain.pipeline_state import PipelineState
-from reasoner.parsing import extract_json, ParseError
 import reasoner.phases as phases
 from reasoner.application.flows.base import WorkflowServices
+from reasoner.domain.pipeline_state import PipelineState
+from reasoner.parsing import ParseError, extract_json
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +18,7 @@ async def run_delphi_round1_phase(state: PipelineState, services: WorkflowServic
         services.call_llm(
             role=f"expert_{i+1}",
             system_prompt=phases.DELPHI_EXPERT_SYSTEM,
-            user_prompt=phases.delphi_round1_prompt(state, expert_num=i+1), 
+            user_prompt=phases.delphi_round1_prompt(state, expert_num=i+1),
             state=state
         )
         for i in range(4)
@@ -88,7 +87,7 @@ async def run_delphi_aggregation_phase(state: PipelineState, services: WorkflowS
         raw, _ = await services.call_llm(
             role="synthesis",
             system_prompt=phases.DELPHI_AGGREGATION_SYSTEM,
-            user_prompt=phases.delphi_aggregation_prompt(state), 
+            user_prompt=phases.delphi_aggregation_prompt(state),
             state=state
         )
         data = extract_json(raw)
@@ -103,7 +102,7 @@ async def run_delphi_round2_phase(state: PipelineState, services: WorkflowServic
         services.call_llm(
             role=eid,
             system_prompt=phases.DELPHI_REVISION_SYSTEM,
-            user_prompt=phases.delphi_round2_prompt(state, expert_id=eid), 
+            user_prompt=phases.delphi_round2_prompt(state, expert_id=eid),
             state=state
         )
         for eid in expert_ids
@@ -152,7 +151,7 @@ async def run_delphi_convergence_phase(state: PipelineState, services: WorkflowS
         raw, _ = await services.call_llm(
             role="synthesis",
             system_prompt=phases.DELPHI_CONVERGENCE_SYSTEM,
-            user_prompt=phases.delphi_convergence_prompt(state), 
+            user_prompt=phases.delphi_convergence_prompt(state),
             state=state
         )
         data = extract_json(raw)
@@ -168,7 +167,7 @@ async def run_delphi_dissent_phase(state: PipelineState, services: WorkflowServi
     raw, _ = await services.call_llm(
         role=role,
         system_prompt=phases.DELPHI_DISSENT_SYSTEM,
-        user_prompt=phases.delphi_dissent_prompt(state), 
+        user_prompt=phases.delphi_dissent_prompt(state),
         state=state
     )
     data = extract_json(raw)

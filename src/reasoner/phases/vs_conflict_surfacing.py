@@ -6,9 +6,8 @@ from typing import Any, Protocol
 
 from pydantic import BaseModel, Field
 
-from reasoner.reasoner_vs_constants import VS_CONSENSUS_MIN_SUPPORT
-from reasoner.phases.vs_generation import GenerationCandidate
 from reasoner.phases.vs_claim_extraction import _extract_claims
+from reasoner.phases.vs_generation import GenerationCandidate
 from reasoner.vs_config import VSFeatureFlags
 
 

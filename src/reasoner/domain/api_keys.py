@@ -21,8 +21,7 @@ import hashlib
 import hmac
 import secrets
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 from uuid import UUID
 
 #: Namespace that distinguishes Reasoner keys from OAuth JWTs on the wire.
@@ -65,21 +64,21 @@ class ApiKey:
     key_hash: str
     key_prefix: str
     scopes: frozenset[str] = field(default_factory=frozenset)
-    last_used_at: Optional[datetime] = None
-    expires_at: Optional[datetime] = None
-    revoked_at: Optional[datetime] = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    last_used_at: datetime | None = None
+    expires_at: datetime | None = None
+    revoked_at: datetime | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     @property
     def is_revoked(self) -> bool:
         return self.revoked_at is not None
 
-    def is_expired(self, now: Optional[datetime] = None) -> bool:
+    def is_expired(self, now: datetime | None = None) -> bool:
         if self.expires_at is None:
             return False
-        return (now or datetime.now(timezone.utc)) >= self.expires_at
+        return (now or datetime.now(UTC)) >= self.expires_at
 
-    def is_usable(self, now: Optional[datetime] = None) -> bool:
+    def is_usable(self, now: datetime | None = None) -> bool:
         """A key authenticates only while it is neither revoked nor expired."""
         return not self.is_revoked and not self.is_expired(now)
 
@@ -139,7 +138,7 @@ def looks_like_api_key(token: str) -> bool:
     return len(parts) == 3 and parts[1] in (LIVE_ENV, TEST_ENV) and bool(parts[2])
 
 
-def normalize_scopes(requested: Optional[set[str]]) -> frozenset[str]:
+def normalize_scopes(requested: set[str] | None) -> frozenset[str]:
     """Validate requested scopes, falling back to the read-only default set.
 
     Raises:

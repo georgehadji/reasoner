@@ -17,8 +17,8 @@ from reasoner.api.dependencies import (
 from reasoner.auth import Scope
 from reasoner.domain.credits import (
     CREDITS_PER_USD,
-    CreditReason,
     TIER_MONTHLY_CREDITS,
+    CreditReason,
     credits_to_usd,
     monthly_allowance,
 )

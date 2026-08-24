@@ -10,8 +10,8 @@ from __future__ import annotations
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Protocol, runtime_checkable
 from enum import Enum
+from typing import Any, Protocol, runtime_checkable
 
 
 class WidgetType(str, Enum):
@@ -38,7 +38,7 @@ class WidgetResult:
     error: str = ""
     duration_seconds: float = 0.0
     metadata: dict[str, Any] = field(default_factory=dict)
-    
+
     def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary."""
         return {
@@ -49,7 +49,7 @@ class WidgetResult:
             'duration': self.duration_seconds,
             'metadata': self.metadata,
         }
-    
+
     @classmethod
     def success_result(
         cls,
@@ -66,7 +66,7 @@ class WidgetResult:
             duration_seconds=duration,
             metadata=metadata or {},
         )
-    
+
     @classmethod
     def error_result(
         cls,
@@ -93,19 +93,19 @@ class Widget(Protocol):
     
     This is the interface that the domain layer depends on.
     """
-    
+
     name: str
     """Unique identifier for the widget."""
-    
+
     widget_type: WidgetType
     """Type of widget."""
-    
+
     trigger_patterns: list[re.Pattern]
     """Regex patterns to detect when widget should activate."""
-    
+
     description: str
     """Human-readable description of the widget."""
-    
+
     async def detect(self, query: str) -> bool:
         """
         Detect if this widget should activate for the given query.
@@ -117,7 +117,7 @@ class Widget(Protocol):
             True if widget should activate
         """
         ...
-    
+
     async def execute(self, params: dict[str, Any]) -> WidgetResult:
         """
         Execute the widget with given parameters.
@@ -129,7 +129,7 @@ class Widget(Protocol):
             WidgetResult with data or error
         """
         ...
-    
+
     def extract_params(self, query: str) -> dict[str, Any] | None:
         """
         Extract parameters from the query.
@@ -156,34 +156,34 @@ class BaseWidget(ABC):
     - name, widget_type, description
     - _execute_impl(): The actual widget logic
     """
-    
+
     name: str
     widget_type: WidgetType
     description: str
     trigger_patterns: list[re.Pattern]
-    
+
     def __init__(self):
         self._initialized = False
-    
+
     async def detect(self, query: str) -> bool:
         """Detect if widget should activate based on patterns."""
         query_lower = query.lower()
-        
+
         for pattern in self.trigger_patterns:
             if pattern.search(query_lower):
                 return True
-        
+
         return False
-    
+
     def extract_params(self, query: str) -> dict[str, Any] | None:
         """Extract parameters from query using regex patterns."""
         for pattern in self.trigger_patterns:
             match = pattern.search(query)
             if match:
                 return self._extract_from_match(match, query)
-        
+
         return None
-    
+
     def _extract_from_match(
         self,
         match: re.Match,
@@ -196,32 +196,32 @@ class BaseWidget(ABC):
         """
         # Default: return all named groups
         return match.groupdict()
-    
+
     async def execute(self, params: dict[str, Any]) -> WidgetResult:
         """Execute with error handling."""
         import time
-        
+
         start_time = time.perf_counter()
-        
+
         try:
             data = await self._execute_impl(params)
             duration = time.perf_counter() - start_time
-            
+
             return WidgetResult.success_result(
                 widget_type=self.widget_type,
                 data=data,
                 duration=duration,
             )
-            
+
         except Exception as e:
             duration = time.perf_counter() - start_time
-            
+
             return WidgetResult.error_result(
                 widget_type=self.widget_type,
                 error=str(e),
                 duration=duration,
             )
-    
+
     @abstractmethod
     async def _execute_impl(self, params: dict[str, Any]) -> dict[str, Any]:
         """
@@ -242,7 +242,7 @@ class WidgetDetectionResult:
     widget: Widget
     confidence: float
     params: dict[str, Any]
-    
+
     def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary."""
         return {

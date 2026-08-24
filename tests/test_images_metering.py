@@ -5,7 +5,7 @@ tests pin reserve-on-request, refund-on-failure, and no-double-charge.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
@@ -18,7 +18,7 @@ pytestmark = pytest.mark.unit
 
 
 def _user() -> User:
-    return User(id=uuid4(), email="test@example.com", created_at=datetime.now(timezone.utc))
+    return User(id=uuid4(), email="test@example.com", created_at=datetime.now(UTC))
 
 
 class _RecordingReservation:

@@ -6,8 +6,6 @@ public APIs work correctly.
 
 from __future__ import annotations
 
-import pytest
-
 
 class TestDomainModels:
     """domain/models.py — TaskType, ClaimLabel, PerspectiveType enums."""
@@ -39,8 +37,7 @@ class TestDomainModels:
         assert PerspectiveType.DESTRUCTIVE
 
     def test_perspective_registry_coerce(self) -> None:
-        from reasoner.domain.models import PerspectiveRegistry
-        from reasoner.domain.models import PerspectiveType
+        from reasoner.domain.models import PerspectiveRegistry, PerspectiveType
         result = PerspectiveRegistry.coerce("constructive")
         assert result == PerspectiveType.CONSTRUCTIVE
 
@@ -106,13 +103,15 @@ class TestCorePorts:
     """core/ports/ — LLMPort and SearchServicePort protocols."""
 
     def test_llm_port_exists(self) -> None:
-        from reasoner.core.ports.llm_port import LLMPort
         from typing import Protocol
+
+        from reasoner.core.ports.llm_port import LLMPort
         assert issubclass(LLMPort, Protocol)
 
     def test_search_port_exists(self) -> None:
-        from reasoner.core.ports.search_port import SearchServicePort, SourceType
         from typing import Protocol
+
+        from reasoner.core.ports.search_port import SearchServicePort, SourceType
         assert issubclass(SearchServicePort, Protocol)
         assert SourceType  # Literal type resolves
 
@@ -133,8 +132,9 @@ class TestCoreProtocol:
         assert config.temperature == 0.5  # Original unchanged (frozen)
 
     def test_phase_result_construction(self) -> None:
-        from reasoner.core.protocol import PhaseResult, make_phase_result
         import time
+
+        from reasoner.core.protocol import make_phase_result
         start = time.monotonic()
         result = make_phase_result("TestPhase", "output", {"input": 10, "output": 20}, "test-model", start)
         assert result.phase_name == "TestPhase"

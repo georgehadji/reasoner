@@ -1,16 +1,17 @@
 from __future__ import annotations
 
-from reasoner.application.services.renderers._shared import (
-    console, _get_attr, _duration, _label_color,
-    _render_stress, _render_action_blueprint, _render_errors,
-    render_routing_table, render_perspective_content,
-)
-from reasoner.domain.pipeline_state import PipelineState
-
+from rich import box
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
-from rich import box
+
+from reasoner.application.services.renderers._shared import (
+    _render_action_blueprint,
+    _render_errors,
+    console,
+)
+from reasoner.domain.pipeline_state import PipelineState
+
 
 def _render_delphi(state: PipelineState) -> None:
     d = state.delphi_state

@@ -1,21 +1,20 @@
+import argparse
 import asyncio
 import json
 import logging
 import os
-import argparse
-import time
 
 import asyncpg
 from asyncpg.exceptions import PostgresError
-
 from cryptography.fernet import InvalidToken
 
-from reasoner.core.ports.crypto_port import EncryptionPort
-from reasoner.security.encryption import get_encryption_service
-from reasoner.infrastructure.persistence.postgres_store import PostgreSQLEventStore, get_postgres_store
-from reasoner.core.constants import DEFAULT_DB_COMMAND_TIMEOUT
-from reasoner.core.events.domain_events import PipelineEventType, make_event
 from reasoner.application.event_bus.bus import get_event_bus
+from reasoner.core.events.domain_events import PipelineEventType, make_event
+from reasoner.core.ports.crypto_port import EncryptionPort
+from reasoner.infrastructure.persistence.postgres_store import (
+    PostgreSQLEventStore,
+)
+from reasoner.security.encryption import get_encryption_service
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -87,7 +86,7 @@ async def migrate_events(store: PostgreSQLEventStore, encryption_service: Encryp
                     else:
                         logger.warning(f"Event {event_id}: Unknown payload format, skipping. Payload: {current_payload}")
                         asyncio.create_task(bus.publish(make_event(
-                            PipelineEventType.ERROR_OCCURRED, aggregate_id, version, 
+                            PipelineEventType.ERROR_OCCURRED, aggregate_id, version,
                             message=f"Unknown event payload format for migration: {event_id}"
                         )))
                         continue
@@ -119,7 +118,7 @@ async def migrate_events(store: PostgreSQLEventStore, encryption_service: Encryp
                 except (PostgresError, json.JSONDecodeError) as e:
                     logger.error(f"Error migrating event {event_id} (aggregate {aggregate_id}): {e}")
                     asyncio.create_task(bus.publish(make_event(
-                        PipelineEventType.ERROR_OCCURRED, aggregate_id, version, 
+                        PipelineEventType.ERROR_OCCURRED, aggregate_id, version,
                         message=f"Error migrating event {event_id}: {e}",
                         details={
                             "event_id": str(event_id),
@@ -130,7 +129,7 @@ async def migrate_events(store: PostgreSQLEventStore, encryption_service: Encryp
                 except Exception as e:
                     logger.error(f"Unexpected error migrating event {event_id} (aggregate {aggregate_id}): {e}", exc_info=True)
                     asyncio.create_task(bus.publish(make_event(
-                        PipelineEventType.ERROR_OCCURRED, aggregate_id, version, 
+                        PipelineEventType.ERROR_OCCURRED, aggregate_id, version,
                         message=f"Unexpected error migrating event {event_id}: {e}",
                         details={
                             "event_id": str(event_id),
@@ -138,7 +137,7 @@ async def migrate_events(store: PostgreSQLEventStore, encryption_service: Encryp
                             "payload_sample": str(current_payload)[:200]
                         }
                     )))
-            
+
             offset += len(events_batch)
             if len(events_batch) < batch_size: break # End of events
             await asyncio.sleep(delay_seconds) # Throttle to prevent DB overload
@@ -275,7 +274,7 @@ async def migrate_snapshots(store: PostgreSQLEventStore, encryption_service: Enc
                     else:
                         logger.warning(f"Snapshot {aggregate_id} (v{version}): Unknown state format, skipping. State: {current_state}")
                         asyncio.create_task(bus.publish(make_event(
-                            PipelineEventType.ERROR_OCCURRED, aggregate_id, version, 
+                            PipelineEventType.ERROR_OCCURRED, aggregate_id, version,
                             message=f"Unknown snapshot state format for migration: {aggregate_id}"
                         )))
                         continue
@@ -294,7 +293,7 @@ async def migrate_snapshots(store: PostgreSQLEventStore, encryption_service: Enc
                 except (PostgresError, json.JSONDecodeError) as e:
                     logger.error(f"Error migrating snapshot {aggregate_id} (v{version}): {e}")
                     asyncio.create_task(bus.publish(make_event(
-                        PipelineEventType.ERROR_OCCURRED, aggregate_id, version, 
+                        PipelineEventType.ERROR_OCCURRED, aggregate_id, version,
                         message=f"Error migrating snapshot {aggregate_id} (v{version}): {e}",
                         details={
                             "aggregate_id": str(aggregate_id),
@@ -305,7 +304,7 @@ async def migrate_snapshots(store: PostgreSQLEventStore, encryption_service: Enc
                 except Exception as e:
                     logger.error(f"Unexpected error migrating snapshot {aggregate_id} (v{version}): {e}", exc_info=True)
                     asyncio.create_task(bus.publish(make_event(
-                        PipelineEventType.ERROR_OCCURRED, aggregate_id, version, 
+                        PipelineEventType.ERROR_OCCURRED, aggregate_id, version,
                         message=f"Unexpected error migrating snapshot {aggregate_id} (v{version}): {e}",
                         details={
                             "aggregate_id": str(aggregate_id),
@@ -313,7 +312,7 @@ async def migrate_snapshots(store: PostgreSQLEventStore, encryption_service: Enc
                             "state_sample": str(current_state)[:200]
                         }
                     )))
-            
+
             offset += len(snapshots_batch)
             if len(snapshots_batch) < batch_size: break # End of snapshots
             await asyncio.sleep(delay_seconds) # Throttle

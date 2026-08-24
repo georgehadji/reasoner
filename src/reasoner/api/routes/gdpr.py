@@ -29,8 +29,8 @@ async def erase_user_data(user: User = Depends(get_current_user)) -> dict:
     """
     # Instantiate the event store
     store = EventStore()
-    from reasoner.application.services.data_eraser import UserDataEraser
     from reasoner.api.cache import clear_memory_cache
+    from reasoner.application.services.data_eraser import UserDataEraser
 
     eraser = UserDataEraser(store, clear_cache_fn=clear_memory_cache)
     receipt = await eraser.erase(user.id)

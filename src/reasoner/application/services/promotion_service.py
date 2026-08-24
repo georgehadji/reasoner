@@ -7,16 +7,15 @@ require HITL approval. Each promotion writes an auditable patch artifact.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 
+from reasoner.application.services.regression_gate import RegressionGate
 from reasoner.domain.harness_metrics import (
     HarnessMutation,
     PromotionRecord,
     ReplayResult,
 )
-from reasoner.application.services.regression_gate import RegressionGate, GateVerdict
 
 
 class PromotionService:
@@ -56,7 +55,7 @@ class PromotionService:
             return PromotionRecord(
                 mutation=mutation,
                 result=result,
-                promoted_at=datetime.now(timezone.utc).isoformat(),
+                promoted_at=datetime.now(UTC).isoformat(),
                 promoted_by=approver,
                 artifact_path="",
                 status=f"rejected: {verdict.summary}",
@@ -67,7 +66,7 @@ class PromotionService:
             return PromotionRecord(
                 mutation=mutation,
                 result=result,
-                promoted_at=datetime.now(timezone.utc).isoformat(),
+                promoted_at=datetime.now(UTC).isoformat(),
                 promoted_by="auto",
                 artifact_path="",
                 status="requires_human_approval",
@@ -78,7 +77,7 @@ class PromotionService:
 
         # 4. Emit promotion event
         try:
-            from reasoner.core.events.domain_events import make_event, PipelineEventType
+            from reasoner.core.events.domain_events import PipelineEventType, make_event
             ev = make_event(
                 PipelineEventType.HARNESS_MUTATION_PROMOTED,
                 aggregate_id=f"mutation_{mutation.target}",
@@ -96,7 +95,7 @@ class PromotionService:
         return PromotionRecord(
             mutation=mutation,
             result=result,
-            promoted_at=datetime.now(timezone.utc).isoformat(),
+            promoted_at=datetime.now(UTC).isoformat(),
             promoted_by=approver,
             artifact_path=str(artifact),
             status="promoted",
@@ -111,13 +110,13 @@ class PromotionService:
         audit_dir = Path(self._audit_dir)
         audit_dir.mkdir(parents=True, exist_ok=True)
 
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
         safe_target = mutation.target.replace(":", "_").replace(".", "_")
         filename = f"{timestamp}_{safe_target}_{mutation.risk_tier}.json"
         artifact_path = audit_dir / filename
 
         artifact = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "mutation": mutation.to_dict(),
             "result": result.to_dict(),
             "rollback": mutation.rollback,

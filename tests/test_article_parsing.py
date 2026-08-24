@@ -12,15 +12,10 @@ Pure functions under test:
 
 from __future__ import annotations
 
-import json
-import pytest
-from typing import Any
-
 from reasoner.application.flows.article_phases import (
-    _parse_sonar_citations,
     _extract_source_metadata,
+    _parse_sonar_citations,
 )
-
 
 # ═════════════════════════════════════════════════════════════════════
 # _parse_sonar_citations

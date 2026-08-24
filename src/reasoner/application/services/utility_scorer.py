@@ -9,16 +9,13 @@ Uses weighted dot product for capability matching — NOT cosine similarity.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
 
 from reasoner.domain.model_capabilities import ModelProfile
-from reasoner.domain.task_requirements import TaskRequirement
 from reasoner.domain.scoring_weights import (
     BALANCED_WEIGHTS,
     ScoringWeights,
-    get_weights_for_tier,
 )
-
+from reasoner.domain.task_requirements import TaskRequirement
 
 COLD_START_SCORE = 0.5
 """Score returned for a model with no measured capabilities.

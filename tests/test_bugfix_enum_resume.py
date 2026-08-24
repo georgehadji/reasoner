@@ -1,9 +1,10 @@
-import pytest
 import json
 import os
-from pathlib import Path
-from reasoner.models import PipelineState, PerspectiveType, SolutionCandidate, TaskType
-from reasoner.models import load
+
+import pytest
+
+from reasoner.models import PerspectiveType, load
+
 
 def test_resume_with_invalid_enum_value(tmp_path):
     """
@@ -11,7 +12,7 @@ def test_resume_with_invalid_enum_value(tmp_path):
     PerspectiveType string does not crash the application.
     """
     state_file = tmp_path / "corrupted_state.json"
-    
+
     # Create a state dictionary with an invalid perspective value
     data = {
         "problem": "Test problem",
@@ -33,13 +34,13 @@ def test_resume_with_invalid_enum_value(tmp_path):
         "scores": [],
         "top_candidates": []
     }
-    
+
     with open(state_file, "w") as f:
         json.dump(data, f)
-    
+
     # This should NOT raise ValueError
     state = load(state_file)
-    
+
     # Verify that the invalid candidate was skipped but the valid one remains
     assert len(state.candidates) == 1
     assert state.candidates[0].perspective == PerspectiveType.CONSTRUCTIVE

@@ -13,16 +13,17 @@ Each test asserts: fails without the fix, passes with it.
 
 from __future__ import annotations
 
-import pytest
 from unittest.mock import AsyncMock
 
-from reasoner.domain.article_domain import (
-    Context, Document, Claim, Verdict, Budget,
-)
 from reasoner.application.flows.article_adapters import (
-    writing_state_to_context,
-    context_to_writing_state,
     AdapterDeps,
+    context_to_writing_state,
+    writing_state_to_context,
+)
+from reasoner.domain.article_domain import (
+    Context,
+    Document,
+    Verdict,
 )
 
 

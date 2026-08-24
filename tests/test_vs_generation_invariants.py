@@ -1,24 +1,16 @@
 """Invariant tests for vs_generation stage."""
 from __future__ import annotations
-from tests.utils.mocks import MockLLM, MockNLI
 
 import asyncio
 
-import pytest
-from unittest.mock import AsyncMock
-
 from reasoner.phases.vs_generation import (
-    generate_with_vs,
+    GenerationStrategy,
     VSGenerationConfig,
     VSGenerationResult,
-    GenerationStrategy,
+    generate_with_vs,
 )
-from reasoner.vs_config import VSFeatureFlags, VSDeploymentProfile
-
-
-
-
-
+from reasoner.vs_config import VSFeatureFlags
+from tests.utils.mocks import MockLLM, MockNLI
 
 CANDIDATES_JSON = '{"candidates": [{"text": "A", "probability": 0.6}, {"text": "B", "probability": 0.4}]}'
 

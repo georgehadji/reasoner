@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -30,7 +29,7 @@ class VSFeatureFlags(BaseModel):
     behavioral_audit: bool = True
 
     @classmethod
-    def all_disabled(cls) -> "VSFeatureFlags":
+    def all_disabled(cls) -> VSFeatureFlags:
         return cls(**{k: False for k in cls.model_fields})
 
 

@@ -6,8 +6,12 @@ from typing import Any, Protocol
 
 from pydantic import BaseModel
 
+from reasoner.reasoner_verbalized_sampling import (
+    VSMode,
+    build_vs_prompt,
+    parse_vs_response,
+)
 from reasoner.reasoner_vs_constants import VS_K_CLAIMS
-from reasoner.reasoner_verbalized_sampling import VSMode, build_vs_prompt, parse_vs_response, VSCandidate
 from reasoner.vs_config import VSFeatureFlags
 
 

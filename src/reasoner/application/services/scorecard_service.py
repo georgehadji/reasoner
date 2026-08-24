@@ -10,12 +10,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from reasoner.core.scorecard_constants import SCORECARD_DEFAULT_WINDOW_DAYS
 from reasoner.domain.harness_metrics import (
     HarnessScorecard,
     PhaseMetrics,
     PresetScorecard,
 )
-from reasoner.core.scorecard_constants import SCORECARD_DEFAULT_WINDOW_DAYS
 
 
 class ScorecardService:
@@ -60,7 +60,7 @@ class ScorecardService:
             phase_rows_task, fallback_events_task, recovery_task, run_counts_task,
             return_exceptions=True
         )
-        
+
         parsed_results = []
         for i, res in enumerate(results):
             if isinstance(res, BaseException):
@@ -69,7 +69,7 @@ class ScorecardService:
                 parsed_results.append([] if i == 0 else {})
             else:
                 parsed_results.append(res)
-                
+
         phase_rows, fallback_by_preset, recovery_counts, run_counts = parsed_results
 
         # Group rows into PresetScorecard objects

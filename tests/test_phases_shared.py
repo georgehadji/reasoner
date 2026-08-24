@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import pytest
-
-from reasoner.phases._shared import detect_language, get_language_instruction
 from reasoner.models import PipelineState
+from reasoner.phases._shared import detect_language, get_language_instruction
 
 
 class TestDetectLanguage:

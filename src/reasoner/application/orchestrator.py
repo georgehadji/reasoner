@@ -14,8 +14,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
-from reasoner.core.constants import DEFAULT_CLI_PRESET, GATE_TIMEOUT_SECONDS
-from reasoner.core.settings import settings
+from reasoner.application.flows.augmentation import get_tier_augmentation_methods
 from reasoner.application.ports.service_protocols import (
     NeuroClientProtocol,
     PipelineServiceProtocol,
@@ -23,17 +22,14 @@ from reasoner.application.ports.service_protocols import (
     SearchServiceProtocol,
     TelemetryStoreProtocol,
 )
-from reasoner.core.events.domain_events import make_event, EventType
+from reasoner.core.constants import DEFAULT_CLI_PRESET, GATE_TIMEOUT_SECONDS
+from reasoner.core.ports.model_registry_port import get_model_registry_port
+from reasoner.domain.pipeline_state import PipelineState
 from reasoner.hypergate import HyperGateAgent
 from reasoner.infrastructure.llm.router import ProviderRouter
-from reasoner.core.ports.model_registry_port import get_model_registry_port
-from reasoner.infrastructure.persistence.event_store import get_event_store
-from reasoner.domain.pipeline_state import PipelineState
-from reasoner.models import TaskType
+from reasoner.phases._shared import is_article_request
 from reasoner.pipeline import ReasonerPipeline
-from reasoner.phases._shared import is_article_request, build_followup_context
-from reasoner.presets import get_method_from_preset, get_preset_price_tier
-from reasoner.application.flows.augmentation import get_tier_augmentation_methods
+from reasoner.presets import get_preset_price_tier
 
 logger = logging.getLogger(__name__)
 
@@ -70,11 +66,11 @@ class PipelineOrchestrator:
 
     def __init__(
         self,
-        preset_service: "PresetServiceProtocol",
-        pipeline_service: "PipelineServiceProtocol",
-        search_service: "SearchServiceProtocol | None" = None,
-        neuro_client: "NeuroClientProtocol | None" = None,
-        telemetry_store: "TelemetryStoreProtocol | None" = None,
+        preset_service: PresetServiceProtocol,
+        pipeline_service: PipelineServiceProtocol,
+        search_service: SearchServiceProtocol | None = None,
+        neuro_client: NeuroClientProtocol | None = None,
+        telemetry_store: TelemetryStoreProtocol | None = None,
         adaptive_routing: Any = None,  # AdaptiveRoutingService
     ) -> None:
         self.preset_service = preset_service
@@ -246,7 +242,7 @@ class PipelineOrchestrator:
             """Run one preflight task under its own budget; never raise."""
             try:
                 await asyncio.wait_for(coro, timeout=timeout)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning(
                     "Preflight %s exceeded %.0fs; continuing without it.",
                     label,
@@ -328,8 +324,11 @@ class PipelineOrchestrator:
             decision.augmentation_methods = get_tier_augmentation_methods(tier)
 
         # ── A/B test: randomly assign baseline arm → disable augmentation ──
-        from reasoner.application.services.augmentation_metrics import should_disable_augmentation_for_ab
         import hashlib as _hashlib
+
+        from reasoner.application.services.augmentation_metrics import (
+            should_disable_augmentation_for_ab,
+        )
         ab_run_id = _hashlib.sha256(req.problem.encode()).hexdigest()[:16]
         if should_disable_augmentation_for_ab(req.problem, ab_run_id):
             decision.augmentation_methods = []

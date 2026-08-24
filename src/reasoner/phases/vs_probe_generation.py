@@ -6,16 +6,15 @@ from typing import Any, Protocol
 
 from pydantic import BaseModel, Field
 
+from reasoner.reasoner_verbalized_sampling import VSMode, build_vs_prompt, parse_vs_response
 from reasoner.reasoner_vs_constants import (
-    VS_K_PROBES,
-    VS_TAIL_THRESHOLD_RADIOLOGY,
-    VS_PROBE_MIN_SEMANTIC_DISTANCE,
     LOG_VS_PROBE_COUNT,
     LOG_VS_PROBE_DOMAIN,
+    VS_K_PROBES,
+    VS_PROBE_MIN_SEMANTIC_DISTANCE,
+    VS_TAIL_THRESHOLD_RADIOLOGY,
 )
-from reasoner.reasoner_verbalized_sampling import VSMode, build_vs_prompt, parse_vs_response
 from reasoner.vs_config import VSFeatureFlags
-
 
 DOMAIN_PROBE_TEMPLATES = {
     "radiology": "Generate {k} distinct clinical questions a radiologist would ask about: {query}",

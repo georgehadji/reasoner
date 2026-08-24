@@ -3,17 +3,16 @@
 from __future__ import annotations
 
 import hashlib
-
 import logging
 
 from fastapi import Depends, HTTPException, Request, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from reasoner.auth import AuthenticationError, get_auth_manager
-from reasoner.infrastructure.auth_legacy import AuthManager
 from reasoner.api.client_ip import get_client_ip
 from reasoner.api.csrf import verify_csrf_token
+from reasoner.auth import AuthenticationError, get_auth_manager
 from reasoner.domain.api_keys import looks_like_api_key
+from reasoner.infrastructure.auth_legacy import AuthManager
 
 logger = logging.getLogger(__name__)
 from reasoner.core.settings import settings

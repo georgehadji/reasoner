@@ -10,31 +10,36 @@ Tests cover:
 from __future__ import annotations
 
 import json
-import pytest
-from dataclasses import replace
 from typing import Any
 from unittest.mock import AsyncMock
 
-from reasoner.domain.article_domain import (
-    Ok, Err, PhaseError, Verdict, VerifyMethod, HumanDecision,
-    Claim, Document, Budget, Context, map_verdict, claim_support_ratio,
-)
+import pytest
+
 from reasoner.application.flows.article_adapters import (
+    ADAPTER_PHASES,
     AdapterDeps,
-    context_to_writing_state,
-    writing_state_to_context,
-    adapter_retrieve_sources,
     adapter_build_outline,
     adapter_draft,
     adapter_fact_check,
-    adapter_structural_review,
-    adapter_developmental_edit,
+    adapter_retrieve_sources,
     adapter_style_copy_edit,
-    adapter_final_audit,
-    ADAPTER_PHASES,
+    context_to_writing_state,
+    writing_state_to_context,
+)
+from reasoner.domain.article_domain import (
+    Budget,
+    Claim,
+    Context,
+    Document,
+    Err,
+    Ok,
+    PhaseError,
+    Verdict,
+    VerifyMethod,
+    claim_support_ratio,
+    map_verdict,
 )
 from reasoner.domain.pipeline_state import PipelineState
-
 
 # ═════════════════════════════════════════════════════════════════════
 # Helpers
@@ -358,7 +363,6 @@ class TestAdapters:
         deps.services.call_llm = AsyncMock(side_effect=ValueError("LLM failed"))
         deps.call_llm = deps.services.call_llm
 
-        from unittest.mock import ANY
         result = await _run_phase_adapter(ctx, deps, run_article_draft_phase, "draft")
         assert isinstance(result, Err), f"Expected Err on LLM failure, got {type(result).__name__}"
         assert result.error == PhaseError.INTERNAL
@@ -422,7 +426,7 @@ class TestReconcileLedger:
     """reconcile() must carry forward claims, drop vanished ones, flag deltas."""
 
     def test_exact_match_carried_forward(self):
-        from reasoner.domain.article_domain import reconcile, Claim, Verdict, Document
+        from reasoner.domain.article_domain import Claim, Document, Verdict, reconcile
         doc = Document(version=2, markdown="This is a verified claim. And another sentence.",
                        title="T", produced_by="edit")
         ledger = (
@@ -435,7 +439,7 @@ class TestReconcileLedger:
         assert carried[0].verified_against_version == 2
 
     def test_vanished_claim_dropped(self):
-        from reasoner.domain.article_domain import reconcile, Claim, Verdict, Document
+        from reasoner.domain.article_domain import Claim, Document, Verdict, reconcile
         doc = Document(version=2, markdown="Completely different content now.",
                        title="T", produced_by="edit")
         ledger = (
@@ -446,7 +450,7 @@ class TestReconcileLedger:
         assert len(carried) == 0
 
     def test_new_sentence_detected_as_delta(self):
-        from reasoner.domain.article_domain import reconcile, Claim, Verdict, Document
+        from reasoner.domain.article_domain import Claim, Document, Verdict, reconcile
         doc = Document(version=2, markdown="Old claim. This is a new factual sentence added later. End.",
                        title="T", produced_by="edit")
         ledger = (
@@ -461,7 +465,7 @@ class TestReconcileLedger:
         assert any("new factual sentence" in d["text"] for d in deltas)
 
     def test_fuzzy_match_carries_with_needs_review(self):
-        from reasoner.domain.article_domain import reconcile, Claim, Verdict, Document
+        from reasoner.domain.article_domain import Claim, Document, Verdict, reconcile
         doc = Document(version=2,
                        markdown="The climate is changing rapidly according to scientists.",
                        title="T", produced_by="edit")
@@ -475,13 +479,13 @@ class TestReconcileLedger:
         assert carried[0].needs_review is True
 
     def test_empty_ledger_returns_no_carried(self):
-        from reasoner.domain.article_domain import reconcile, Document
+        from reasoner.domain.article_domain import Document, reconcile
         doc = Document(version=1, markdown="Some content.", title="T", produced_by="test")
         carried, deltas = reconcile((), doc)
         assert len(carried) == 0
 
     def test_headers_not_flagged_as_deltas(self):
-        from reasoner.domain.article_domain import reconcile, Document
+        from reasoner.domain.article_domain import Document, reconcile
         doc = Document(version=1, markdown="## Introduction\nThis is content.",
                        title="T", produced_by="test")
         carried, deltas = reconcile((), doc)
@@ -533,8 +537,7 @@ class TestAdapterReconciliationWiring:
 
     @pytest.mark.asyncio
     async def test_adapter_style_copy_edit_reconciles_ledger(self):
-        from reasoner.domain.article_domain import Claim, Verdict, Document, reconcile
-        from reasoner.application.flows.article_adapters import adapter_style_copy_edit
+        from reasoner.domain.article_domain import Claim, Document, Verdict
 
         doc = Document(version=1, markdown="Verified claim.",
                        title="T", produced_by="draft")
@@ -562,8 +565,7 @@ class TestAdapterReconciliationWiring:
     @pytest.mark.asyncio
     async def test_adapter_style_copy_edit_span_lock(self):
         """When style edit alters verified content, the adapter must revert."""
-        from reasoner.domain.article_domain import Claim, Verdict, Document, reconcile
-        from reasoner.application.flows.article_adapters import adapter_style_copy_edit
+        from reasoner.domain.article_domain import Claim, Document, Verdict
 
         doc = Document(
             version=1,
@@ -724,7 +726,7 @@ class TestBudgetGuard:
     @pytest.mark.asyncio
     async def test_budget_guard_skips_when_exhausted(self):
         from reasoner.application.flows.article_adapters import with_budget_guard
-        from reasoner.domain.article_domain import Budget, PhaseError, Err
+        from reasoner.domain.article_domain import Budget, Err, PhaseError
 
         ctx = _make_test_ctx(budget=Budget(usd_cap=1.0, seconds_cap=60.0, usd_spent=1.0))
         deps = _make_adapter_deps()
@@ -739,7 +741,10 @@ class TestBudgetGuard:
 
     @pytest.mark.asyncio
     async def test_budget_guard_passes_when_budget_remaining(self):
-        from reasoner.application.flows.article_adapters import with_budget_guard, adapter_retrieve_sources
+        from reasoner.application.flows.article_adapters import (
+            adapter_retrieve_sources,
+            with_budget_guard,
+        )
         from reasoner.domain.article_domain import Budget, Ok
 
         ctx = _make_test_ctx(budget=Budget(usd_cap=1.0, seconds_cap=60.0, usd_spent=0.0))
@@ -793,7 +798,7 @@ class TestGapRetrieval:
 
         result = await adapter_gap_retrieval(ctx, deps)
         # Should complete gracefully
-        from reasoner.domain.article_domain import Ok, Err
+        from reasoner.domain.article_domain import Err, Ok
         assert isinstance(result, (Ok, Err))
 
     def test_has_evidence_gaps_detects_gaps_in_verification(self):
@@ -875,7 +880,7 @@ class TestSurfaceSignals:
     @pytest.mark.asyncio
     async def test_emits_claim_summary(self):
         from reasoner.application.flows.article_adapters import adapter_surface_signals
-        from reasoner.domain.article_domain import Claim, Verdict, Ok
+        from reasoner.domain.article_domain import Claim, Ok, Verdict
 
         ledger = (
             Claim(id="1", text="C1", verdict=Verdict.VERIFIED, confidence=1.0),

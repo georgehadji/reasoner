@@ -707,7 +707,7 @@ async def generate_image_with_model(
     model_id = cfg["model"]
     # Create a deep copy to avoid mutating the registry
     extra_body = copy.deepcopy(cfg.get("extra_body", {}))
-    
+
     # Inject image_config for aspect ratio and resolution
     width, height = IMAGE_GEN_DEFAULT_WIDTH, IMAGE_GEN_DEFAULT_HEIGHT
     if "x" in resolution:
@@ -729,7 +729,7 @@ async def generate_image_with_model(
         "width": width,
         "height": height
     }
-    
+
     # Merge into extra_body
     if "image_config" in extra_body:
         extra_body["image_config"].update(image_config)
@@ -1056,8 +1056,8 @@ async def generate_images(
 
 
 async def _generate_image_guarded(
-    prompt: str, 
-    model_alias: str, 
+    prompt: str,
+    model_alias: str,
     api_key: str | None,
     aspect_ratio: str = IMAGE_GEN_DEFAULT_ASPECT_RATIO,
     resolution: str = IMAGE_GEN_DEFAULT_RESOLUTION,
@@ -1066,8 +1066,8 @@ async def _generate_image_guarded(
     """Wrapper that catches exceptions and returns a dict."""
     try:
         return await generate_image_with_model(
-            prompt, 
-            model_alias, 
+            prompt,
+            model_alias,
             api_key=api_key,
             aspect_ratio=aspect_ratio,
             resolution=resolution,

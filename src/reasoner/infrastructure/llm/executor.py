@@ -15,8 +15,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
-import time # Ensure time is imported once
-from typing import TYPE_CHECKING, Any, AsyncIterator, ClassVar # Add ClassVar for _LANG_TO_EXT
+import time  # Ensure time is imported once
+from collections.abc import AsyncIterator  # Add ClassVar for _LANG_TO_EXT
+from typing import TYPE_CHECKING, Any, ClassVar
 
 if TYPE_CHECKING:
     from reasoner.infrastructure.llm.ports import DegradedLLMResponse
@@ -26,14 +27,15 @@ from reasoner.core.constants import (
     PHASE_TOKEN_BUDGETS,
     TRUNCATION,
 )
-from reasoner.infrastructure.llm.caching import user_cache_prefix
-from reasoner.infrastructure.llm.router import ProviderRouter
-from reasoner.domain.pipeline_state import PipelineState
 
 # New imports for event emission
-from reasoner.core.events.domain_events import LLMGenerationCompleted, PipelineEventType, make_event
+from reasoner.core.events.domain_events import PipelineEventType, make_event
 from reasoner.core.events.ports import EventPublisher
 from reasoner.core.temperatures import PHASE_TEMPERATURES
+from reasoner.domain.pipeline_state import PipelineState
+from reasoner.infrastructure.llm.caching import user_cache_prefix
+from reasoner.infrastructure.llm.router import ProviderRouter
+
 # get_event_bus imported lazily inside methods to avoid circular import with api/__init__.py
 
 logger = logging.getLogger(__name__)
@@ -198,7 +200,7 @@ class LLMExecutor:
                     TOKEN_SAVINGS_USD.inc(estimated_output * 0.000001)
                 except Exception:
                     pass  # Metrics are best-effort
-                
+
                 # Emit LLMGenerationCompleted event for cache hit
                 bus = self._event_publisher or _get_event_bus()
                 event = make_event(
@@ -240,7 +242,7 @@ class LLMExecutor:
             logger.debug(f"[EXECUTOR] defaulted max_tokens={kwargs['max_tokens']} for role={role}")
 
         cascading_models = self.cascading_routing.get(role)
-        
+
         llm_call_start_time = time.monotonic() # Capture start time for LLM call
 
         if cascading_models:
@@ -324,7 +326,7 @@ class LLMExecutor:
                 except Exception as exc:
                     last_error = exc
                     logger.warning(f"[CASCADING] Model '{model_id}' failed for role '{role}': {exc}")
-            
+
             if last_error:
                 logger.error(f"All cascading models failed for role={role}: {last_error}")
                 # Emit LLMGenerationCompleted event for failed cascading
@@ -361,7 +363,7 @@ class LLMExecutor:
                     PipelineEventType.LLM_GENERATION_COMPLETED,
                     aggregate_id=state.conversation_id or "unknown",
                     version=1,
-                    model_name="unknown", 
+                    model_name="unknown",
                     system_prompt=system_prompt,
                     user_prompt=user_prompt,
                     raw_response="",
@@ -407,7 +409,7 @@ class LLMExecutor:
                     PipelineEventType.LLM_GENERATION_COMPLETED,
                     aggregate_id=state.conversation_id or "unknown",
                     version=1,
-                    model_name=metadata.get("model", "unknown"), 
+                    model_name=metadata.get("model", "unknown"),
                     system_prompt=system_prompt,
                     user_prompt=user_prompt,
                     raw_response=raw.error, # Store error message
@@ -432,7 +434,7 @@ class LLMExecutor:
                     PipelineEventType.LLM_GENERATION_COMPLETED,
                     aggregate_id=state.conversation_id or "unknown",
                     version=1,
-                    model_name=metadata.get("model", "unknown"), 
+                    model_name=metadata.get("model", "unknown"),
                     system_prompt=system_prompt,
                     user_prompt=user_prompt,
                     raw_response=raw,
@@ -500,7 +502,7 @@ class LLMExecutor:
                     response=raw,
                     tokens_used=input_tokens + output_tokens,
                 )
-            
+
             # Emit LLMGenerationCompleted event for successful standard call
             bus = self._event_publisher or _get_event_bus()
             event = make_event(

@@ -10,9 +10,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
 
 import aiosqlite
 
@@ -85,8 +84,8 @@ class AuthStore:
         is_active: bool,
         rate_limit_tier: str,
         created_at: datetime,
-        expires_at: Optional[datetime],
-        created_by: Optional[str],
+        expires_at: datetime | None,
+        created_by: str | None,
     ) -> None:
         """Insert a new API key. Metadata is encrypted (Phase 3: E2EE)."""
         conn = await self._get_conn()
@@ -108,8 +107,8 @@ class AuthStore:
                     encrypted_scopes,
                     1 if is_active else 0,
                     rate_limit_tier,
-                    created_at.astimezone(timezone.utc).isoformat(),
-                    expires_at.astimezone(timezone.utc).isoformat() if expires_at else None,
+                    created_at.astimezone(UTC).isoformat(),
+                    expires_at.astimezone(UTC).isoformat() if expires_at else None,
                     created_by,
                     None,
                     0,
@@ -119,7 +118,7 @@ class AuthStore:
         finally:
             await conn.close()
 
-    async def get_by_hash(self, key_hash: str) -> Optional[dict]:
+    async def get_by_hash(self, key_hash: str) -> dict | None:
         """Retrieve a key by its hash. Returns None if not found."""
         conn = await self._get_conn()
         try:
@@ -144,7 +143,7 @@ class AuthStore:
                     last_used_at = ?
                 WHERE key_hash = ?
                 """,
-                (datetime.now(timezone.utc).isoformat(), key_hash),
+                (datetime.now(UTC).isoformat(), key_hash),
             )
             await conn.commit()
         finally:

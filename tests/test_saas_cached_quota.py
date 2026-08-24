@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import json
-import pytest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock
 
-from reasoner.domain.saas import SubscriptionTier, UsageQuota, QuotaResult
+import pytest
+
+from reasoner.domain.saas import QuotaResult, SubscriptionTier, UsageQuota
 from reasoner.infrastructure.persistence.cached_quota_repo import CachedQuotaRepository
 
 
@@ -31,7 +32,7 @@ def cached_repo(underlying, mock_redis, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_get_quota_cache_hit(cached_repo, mock_redis):
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     mock_redis.get.return_value = json.dumps({
         "user_id": "11111111-1111-1111-1111-111111111111",
         "tier": "free",
@@ -48,7 +49,7 @@ async def test_get_quota_cache_hit(cached_repo, mock_redis):
 @pytest.mark.asyncio
 async def test_get_quota_cache_miss(cached_repo, mock_redis, underlying):
     mock_redis.get.return_value = None
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     underlying.get_quota.return_value = UsageQuota(
         user_id="11111111-1111-1111-1111-111111111111",
         tier=SubscriptionTier.PRO,

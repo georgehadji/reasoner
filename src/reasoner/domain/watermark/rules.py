@@ -18,7 +18,6 @@ from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
 from reasoner.domain.watermark.marks import (
-    BIDI_POP_DIRECTIONAL_FORMATTING,
     EMOJI_GLUE_CODEPOINTS,
     HANGUL_FILLER_CODEPOINTS,
     KHMER_INHERENT_VOWEL_CODEPOINTS,

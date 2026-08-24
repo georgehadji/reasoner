@@ -8,9 +8,10 @@ with a single in-memory lock (_fallback_lock) only for the fallback path.
 from __future__ import annotations
 
 import asyncio
+
 import pytest
 
-from reasoner.rate_limiter import RateLimiter, RateLimitConfig
+from reasoner.rate_limiter import RateLimitConfig, RateLimiter
 
 
 @pytest.mark.asyncio

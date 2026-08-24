@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+
 from reasoner.infrastructure.benchmarks.suites import BenchmarkResult, BenchmarkSuite
 
 _JSON_PROMPTS = [

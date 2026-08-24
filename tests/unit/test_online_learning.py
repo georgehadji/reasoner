@@ -6,25 +6,24 @@ and the online learner loop.
 
 from __future__ import annotations
 
-import math
+from unittest.mock import MagicMock
+
 import pytest
-from unittest.mock import MagicMock, AsyncMock
 
 from reasoner.domain.telemetry import LLMCallTelemetry
-from reasoner.infrastructure.learning.thompson_sampler import (
-    BetaPosterior,
-    ThompsonSampler,
-)
-from reasoner.infrastructure.learning.quality_signals import (
-    QualitySignalAggregator,
-)
 from reasoner.infrastructure.learning.exploration import (
     ExplorationPolicy,
 )
 from reasoner.infrastructure.learning.online_learner import (
     OnlineLearner,
 )
-
+from reasoner.infrastructure.learning.quality_signals import (
+    QualitySignalAggregator,
+)
+from reasoner.infrastructure.learning.thompson_sampler import (
+    BetaPosterior,
+    ThompsonSampler,
+)
 
 # ── Beta Posterior ──────────────────────────────────────────────────────
 

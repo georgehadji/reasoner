@@ -13,16 +13,21 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import random
-from pathlib import Path
-from typing import Any, Callable, Awaitable
+import time  # New import
 from collections import defaultdict
-import time # New import
+from collections.abc import Awaitable, Callable
+from pathlib import Path
 
+from reasoner.core.events.domain_events import (
+    DomainEvent,
+    PipelineEventType,
+    _AllEventType,
+)
 from reasoner.core.settings import settings
-from reasoner.core.events.domain_events import DomainEvent, EventType, _AllEventType, PipelineEventType
-from reasoner.infrastructure.observability.langfuse_subscriber import get_langfuse_subscriber # New import
+from reasoner.infrastructure.observability.langfuse_subscriber import (
+    get_langfuse_subscriber,  # New import
+)
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +68,7 @@ class EventBus:
     - Wildcard subscriptions
     - Error isolation (one handler failure doesn't affect others)
     """
-    
+
     def __init__(self, max_queue_size: int = 1000):
         self._handlers: dict[_AllEventType, list[EventHandler]] = defaultdict(list)
         self._global_handlers: list[EventHandler] = []
@@ -74,7 +79,7 @@ class EventBus:
         self._semaphore = asyncio.Semaphore(200)  # Max 200 concurrent handler executions
         self._dropped_event_count: int = 0
         self._dead_letter_enabled: bool = True
-    
+
     def subscribe(
         self,
         event_type: _AllEventType,
@@ -89,7 +94,7 @@ class EventBus:
         """
         self._handlers[event_type].append(handler)
         logger.debug(f"Subscribed handler to {event_type.value}")
-    
+
     def subscribe_all(
         self,
         handler: EventHandler,
@@ -102,7 +107,7 @@ class EventBus:
         """
         self._global_handlers.append(handler)
         logger.debug("Subscribed global handler")
-    
+
     def on_error(
         self,
         handler: Callable[[DomainEvent, Exception], Awaitable[None]],
@@ -114,7 +119,7 @@ class EventBus:
             handler: Async function called when a handler fails
         """
         self._error_handlers.append(handler)
-    
+
     async def start(self) -> None:
         """Start the background queue consumer."""
         if self._running:
@@ -166,7 +171,7 @@ class EventBus:
             return
         try:
             await asyncio.wait_for(self._task_queue.join(), timeout=timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             remaining = self._task_queue.qsize()
             logger.warning(
                 "EventBus drain timed out after %.1fs with %d events remaining.",
@@ -232,7 +237,7 @@ class EventBus:
 
         tasks = [asyncio.create_task(_bounded(h)) for h in handlers]
         await asyncio.gather(*tasks, return_exceptions=True)
-    
+
     async def _safe_execute(
         self,
         handler: EventHandler,
@@ -316,7 +321,7 @@ class EventBus:
         self._handlers.clear()
         self._global_handlers.clear()
         self._error_handlers.clear()
-    
+
     @property
     def dropped_event_count(self) -> int:
         """Total events dropped since startup due to full queue."""
@@ -325,7 +330,7 @@ class EventBus:
     def get_subscriber_count(self, event_type: _AllEventType) -> int:
         """Get number of subscribers for an event type."""
         return len(self._handlers.get(event_type, []))
-    
+
     @property
     def total_subscribers(self) -> int:
         """Get total number of subscribers."""
@@ -373,7 +378,7 @@ def handle_event(event_type: _AllEventType) -> Callable[[EventHandler], EventHan
         bus = get_event_bus()
         bus.subscribe(event_type, handler)
         return handler
-    
+
     return decorator
 
 
@@ -390,7 +395,7 @@ def handle_all_events() -> Callable[[EventHandler], EventHandler]:
         bus = get_event_bus()
         bus.subscribe_all(handler)
         return handler
-    
+
     return decorator
 
 
@@ -409,11 +414,11 @@ async def log_all_events(event: DomainEvent) -> None:
 async def track_pipeline_metrics(event: DomainEvent) -> None:
     """Track metrics for pipeline events."""
     from reasoner.core.events.domain_events import (
+        PhaseCompleted,
         PipelineCompleted,
         PipelineFailed,
-        PhaseCompleted,
     )
-    
+
     if isinstance(event, PipelineCompleted):
         token_info = event.total_tokens
         if isinstance(token_info, dict):
@@ -477,7 +482,7 @@ async def init_default_subscribers(bus: EventBus | None = None) -> None:
     _register_notification_subscriber(bus)
 
 
-def _register_notification_subscriber(bus: "EventBus") -> None:
+def _register_notification_subscriber(bus: EventBus) -> None:
     """Register the email notification subscriber for critical events."""
     from reasoner.core.settings import settings as _s
     if not _s.NOTIFICATION_EMAIL:
@@ -495,7 +500,7 @@ def _register_notification_subscriber(bus: "EventBus") -> None:
     try:
         from reasoner.application.services.notification_subscriber import NotificationSubscriber
         subscriber = NotificationSubscriber(email_adapter=adapter)
-        from reasoner.core.events.domain_events import SaaSEventType, PipelineEventType
+        from reasoner.core.events.domain_events import PipelineEventType, SaaSEventType
         # Subscribe to critical SaaS events
         bus.subscribe(SaaSEventType.WEBHOOK_PROCESSING_FAILED, subscriber.handle_critical_event)
         bus.subscribe(SaaSEventType.SPEND_CAP_EXCEEDED, subscriber.handle_critical_event)
