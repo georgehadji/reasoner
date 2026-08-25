@@ -174,7 +174,7 @@ async def validate_api_keys(
                 timeout=TIMEOUTS.MODEL_VALIDATION,
             )
             results[env_var] = {"status": "valid", "model_tested": model_id}
-        except asyncio.TimeoutError:
+        except TimeoutError:
             results[env_var] = {
                 "status": "timeout",
                 "reason": "Provider did not respond within 10 seconds",

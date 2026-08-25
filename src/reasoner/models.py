@@ -12,7 +12,39 @@ All existing imports continue to work through this shim.
 from pathlib import Path
 
 # Re-export domain model types that were historically exposed via models.py
-from reasoner.domain.pipeline_state import (
+from reasoner.core.parsing import (  # noqa: F401
+    ParseError,
+    _parse_critique_scores,
+    _parse_review_hypotheses,
+    extract_json,
+    extract_solution_prose,
+    parse_evidence_bundles,
+    strip_json_fences,
+)
+from reasoner.domain.core_types import (  # noqa: F401
+    Assumption,
+    CritiqueScore,
+    Decomposition,
+    FinalSolution,
+    GenerationCandidate,
+    MetaCognitiveAudit,
+    ScenarioType,
+    SolutionCandidate,
+    SubProblem,
+)
+from reasoner.domain.models import (  # noqa: F401
+    ClaimLabel,
+    PerspectiveRegistry,
+    PerspectiveType,
+    TaskType,
+)
+from reasoner.domain.pipeline_state import (  # noqa: F401
+    ConversationState,
+    CostTrackingState,
+    MethodState,
+    PipelineCore,
+    PipelineMeta,
+    PipelineRemainder,
     PipelineState,
 )
 

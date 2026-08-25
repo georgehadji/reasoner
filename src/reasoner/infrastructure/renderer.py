@@ -14,8 +14,10 @@ from reasoner.application.services.renderers import (
 )
 
 # Re-export all renderer functions for backward compatibility
-from reasoner.application.services.renderers._shared import (
+from reasoner.application.services.renderers._shared import (  # noqa: F401
     _render_cost_summary,
+    console,
+    export_to_json,
 )
 from reasoner.domain.pipeline_state import PipelineState
 

@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from reasoner.domain.core_types import EvidenceBundle, PlanContract
 
 from reasoner.domain.core_types import CritiqueScore, ReviewHypothesis
-from reasoner.models import PerspectiveRegistry
+from reasoner.domain.models import PerspectiveRegistry
 from reasoner.utils.json_safe import JSONDepthExceededError, safe_json_loads
 
 

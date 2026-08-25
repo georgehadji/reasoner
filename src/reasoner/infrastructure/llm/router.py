@@ -8,7 +8,8 @@ import os
 import time
 import uuid
 from collections import OrderedDict
-from typing import TYPE_CHECKING, Any, AsyncIterator
+from collections.abc import AsyncIterator
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from reasoner.domain.telemetry import LLMCallTelemetry
@@ -219,7 +220,7 @@ async def _call_with_tools_circuit(
 # only a shortcut, and every router holds its own reference to the providers it
 # was built with.
 _RESOLVED_CACHE_MAX = 512
-_GLOBAL_RESOLVED_CACHE: "OrderedDict[str, BaseLLMProvider]" = OrderedDict()
+_GLOBAL_RESOLVED_CACHE: OrderedDict[str, BaseLLMProvider] = OrderedDict()
 _PER_MODEL_SEMAPHORES: dict[str, asyncio.Semaphore] = {}
 _SEMAPHORE_CONFIG: dict[str, int] | None = None
 
@@ -474,19 +475,27 @@ class ProviderRouter:
         output_tokens = getattr(provider, "last_output_tokens", 0) or 0
         cost_usd = getattr(provider, "last_cost_usd", 0.0) or 0.0
 
-        # Emit Prometheus metrics
+        # Emit Prometheus metrics.
+        # Guarded for the same reason record_call() below is: this runs on every
+        # LLM call via _attempt_call_and_record(), so an exception here does not
+        # merely lose a metric, it kills the request being measured. A provider
+        # whose last_cost_usd/token counters are non-numeric (a stub, a test
+        # double, an adapter that never set them) must not take down the call.
         if _HAS_ACR_METRICS:
-            LLM_CALL_DURATION.labels(
-                model=provider.model, role=role, preset=self.preset_id,
-            ).observe(latency_ms / 1000.0)
-            if success:
-                LLM_CALL_SUCCESS.labels(model=provider.model, role=role).inc()
-            else:
-                LLM_CALL_FAILURE.labels(
-                    model=provider.model, role=role,
-                    reason=fallback_reason or "error",
-                ).inc()
-            LLM_CALL_COST.labels(model=provider.model, role=role).inc(cost_usd)
+            try:
+                LLM_CALL_DURATION.labels(
+                    model=provider.model, role=role, preset=self.preset_id,
+                ).observe(latency_ms / 1000.0)
+                if success:
+                    LLM_CALL_SUCCESS.labels(model=provider.model, role=role).inc()
+                else:
+                    LLM_CALL_FAILURE.labels(
+                        model=provider.model, role=role,
+                        reason=fallback_reason or "error",
+                    ).inc()
+                LLM_CALL_COST.labels(model=provider.model, role=role).inc(cost_usd)
+            except Exception:
+                logger.debug("Failed to emit Prometheus call metrics", exc_info=True)
 
         # Emit telemetry event
         if self.telemetry:
@@ -641,7 +650,7 @@ class ProviderRouter:
                 await circuit.record_success()
             except asyncio.CancelledError:
                 raise
-            except asyncio.TimeoutError as exc:
+            except TimeoutError as exc:
                 timed_out = True
                 failure = exc
             except Exception as exc:

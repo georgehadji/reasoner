@@ -614,9 +614,9 @@ async def _run_followup_stream_with_metrics(
     _run_stream_with_metrics above -- the reservation and the settlement must
     share one reference_id.
     """
-    from reasoner.logging_utils import set_log_context
     from reasoner.api.run_observability import CreditSink, PrometheusObserver
     from reasoner.application.services.run_metering import RunContext, metered
+    from reasoner.logging_utils import set_log_context
 
     tier = "anonymous" if user is None else "free"
     preset = req.preset or "auto-budget"
@@ -756,8 +756,8 @@ async def run_followup_pipeline(
     provider keys behind nothing but the per-IP rate limiter.
     """
     _require_auth_if_legacy_disabled(user)
-    from reasoner.api.idempotency_http import register_run_or_error
     from reasoner.api.dependencies import reserve_or_402
+    from reasoner.api.idempotency_http import register_run_or_error
 
     if user is None:
         from reasoner.api.client_ip import get_client_ip

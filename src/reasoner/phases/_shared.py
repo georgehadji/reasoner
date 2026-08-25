@@ -2,7 +2,14 @@ from __future__ import annotations
 
 import re
 
-from reasoner.core.constants import TRUNCATION
+from reasoner.core.constants import (  # noqa: F401  (DEFAULT_SEARCH_RESULTS/JSON_ONLY_FOOTER re-exported via phases/__init__.py)
+    DEFAULT_SEARCH_RESULTS,
+    JSON_ONLY_FOOTER,
+    TRUNCATION,
+)
+from reasoner.domain.models import (
+    PerspectiveType,  # noqa: F401  (re-exported via phases/__init__.py)
+)
 from reasoner.domain.pipeline_state import PipelineState
 
 

@@ -9,8 +9,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
-import os
-import re
 import time
 import unicodedata
 from typing import Any

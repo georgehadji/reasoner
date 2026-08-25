@@ -8,6 +8,7 @@ This file contains only the FastAPI metrics endpoint + QueryTimer.
 from __future__ import annotations
 
 import asyncio
+import time
 
 try:
     from prometheus_client import CONTENT_TYPE_LATEST, generate_latest

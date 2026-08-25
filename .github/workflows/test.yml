@@ -36,7 +36,9 @@ jobs:
           # full profile (now including B) lives in pyproject.toml; bare `ruff check`
           # picks it up. Ratcheted (scripts/ruff_ratchet.py) rather than hard-blocked:
           # turning the full profile on surfaced 2241 pre-existing violations.
-          python scripts/ruff_ratchet.py --max 2241
+          # 2238: merging the unpushed local branch added debt from commits never
+          # counted against this ratchet; ruff's own safe --fix paid it back down.
+          python scripts/ruff_ratchet.py --max 2238
 
       - name: Security scan (bandit)
         run: |
@@ -52,7 +54,10 @@ jobs:
           # (non-strict) profile over the full tree surfaced 429 pre-existing
           # errors across 128 files — ratcheted, not hard-blocked, same pattern
           # as scripts/ruff_ratchet.py.
-          python scripts/mypy_ratchet.py --max 429
+          # 426: restoring the stripped re-export shims (models.py, phases/_shared.py,
+          # api/run_state.py, infrastructure/renderer.py) resolved the type errors
+          # that the broken imports were producing.
+          python scripts/mypy_ratchet.py --max 426
 
       - name: Run tests
         run: |

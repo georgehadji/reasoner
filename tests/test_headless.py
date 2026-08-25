@@ -87,7 +87,14 @@ async def test_ask_pipeline_action_returns_state():
 
     with patch.object(
         headless.PipelineOrchestrator, "preflight", new=AsyncMock(return_value=decision)
-    ), patch("reasoner.pipeline.ReasonerPipeline", return_value=fake_pipeline):
+    ), patch(
+        # Patch where the name is looked up, not where it is defined:
+        # pipeline_service does `from reasoner.pipeline import ReasonerPipeline`
+        # at import time, so patching reasoner.pipeline.ReasonerPipeline is a
+        # no-op and the real pipeline runs against the mock router.
+        "reasoner.application.services.pipeline_service.ReasonerPipeline",
+        return_value=fake_pipeline,
+    ):
         result = await headless.ask("Is X better than Y?", preset="research-budget")
 
     assert result.action == "pipeline"

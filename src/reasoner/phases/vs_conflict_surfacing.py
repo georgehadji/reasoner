@@ -8,6 +8,10 @@ from pydantic import BaseModel, Field
 
 from reasoner.phases.vs_claim_extraction import _extract_claims
 from reasoner.phases.vs_generation import GenerationCandidate
+from reasoner.reasoner_vs_constants import (
+    VS_ROUTING_HIGH_PROB,
+    VS_ROUTING_MEDIUM_PROB,
+)
 from reasoner.vs_config import VSFeatureFlags
 
 
@@ -33,7 +37,7 @@ async def _check_contradictions(claim: str, candidates: list[GenerationCandidate
             continue
         try:
             score = await nli_gate.score_entailment(claim, c.text)
-            if score < 0.3:
+            if score < VS_ROUTING_MEDIUM_PROB:
                 contradictions.append(c.text)
         except Exception:
             continue
@@ -70,9 +74,9 @@ async def surface_cross_candidate_conflicts(
         contradictions = await _check_contradictions(claim, candidates, nli_gate)
         if contradictions:
             priority = len(contradictions)
-            if support_ratio < 0.3:
+            if support_ratio < VS_ROUTING_MEDIUM_PROB:
                 rec = "HUMAN_REVIEW"
-            elif support_ratio < 0.7:
+            elif support_ratio < VS_ROUTING_HIGH_PROB:
                 rec = "FLAG"
             else:
                 rec = "MONITOR"

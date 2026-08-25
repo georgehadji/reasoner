@@ -5,7 +5,7 @@ import pytest
 
 from reasoner.gate_agent import GateDecision
 from reasoner.hypergate.hyperagent import HyperGateAgent
-from reasoner.models import ClaimLabel, PerspectiveType, load
+from reasoner.models import ClaimLabel, PerspectiveType, PipelineState, load
 
 # ─────────────────────────────────────────────────────────────────────
 # BUG-002: Enum Reconstruction Resilience
@@ -98,7 +98,7 @@ async def test_cli_cleanup_on_exit():
     # object fails deep inside it (e.g. "Custom routing must include a 'primary' key"),
     # so preflight itself is mocked to hand back a canned "go straight to pipeline" decision.
     with patch("reasoner.main.PipelineOrchestrator") as mock_orchestrator_cls, \
-         patch("reasoner.pipeline.ReasonerPipeline") as mock_pipeline, \
+         patch("reasoner.application.services.pipeline_service.ReasonerPipeline") as mock_pipeline, \
          patch("reasoner.main.render_pipeline_result"), \
          patch("reasoner.main.export_to_json"), \
          patch("reasoner.scraper.close_scraper_client", new_callable=AsyncMock) as mock_close_scraper, \
@@ -110,8 +110,12 @@ async def test_cli_cleanup_on_exit():
             effective_preset_name="multi-perspective-budget",
         ))
 
-        # Mock successful pipeline run
-        mock_pipeline.return_value.run = AsyncMock(return_value=MagicMock())
+        # Mock successful pipeline run. A real PipelineState, not MagicMock:
+        # handle() builds the PIPELINE_COMPLETED event from state.meta/state.core,
+        # and MagicMock attributes are not valid event payload values.
+        mock_pipeline.return_value.run = AsyncMock(
+            return_value=PipelineState(problem="test problem")
+        )
 
         await main(args)
 
