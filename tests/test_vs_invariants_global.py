@@ -1,6 +1,7 @@
 """Global invariant tests for VS integration."""
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -61,16 +62,39 @@ class TestTaintPropagation:
 
 class TestZeroMagicNumbers:
     def test_all_vs_phases_import_constants(self) -> None:
-        """Every VS phase file must import from reasoner_vs_constants."""
+        """Every VS phase file with a tunable literal must source it from
+        reasoner_vs_constants.
+
+        Scoped to files that actually contain such a literal. The check used to
+        require the import from every vs_*.py unconditionally, which a file with
+        no magic numbers can only satisfy by adding an import nothing uses --
+        the opposite of what this class is guarding. 0/1 and the 2 of a
+        halving/midpoint are structural, not tunable thresholds, so they do not
+        by themselves oblige a module to reach for the constants table.
+        """
         phases_dir = Path(__file__).parent.parent / "src" / "reasoner" / "phases"
         vs_files = sorted(phases_dir.glob("vs_*.py"))
         assert vs_files, "No vs_*.py files found"
 
+        # A bare int/float literal, ignoring attribute access, identifiers and
+        # anything inside a string.
+        literal_re = re.compile(r"(?<![\w.])\d+(?:\.\d+)?(?![\w.])")
+        structural = {"0", "1", "2"}
+
         missing = []
         for fpath in vs_files:
             source = fpath.read_text(encoding="utf-8")
-            if "reasoner_vs_constants" not in source:
-                missing.append(fpath.name)
+            if "reasoner_vs_constants" in source:
+                continue
+            tunable = [
+                m.group()
+                for line in source.splitlines()
+                if not line.lstrip().startswith("#")
+                for m in literal_re.finditer(line)
+                if m.group() not in structural
+            ]
+            if tunable:
+                missing.append(f"{fpath.name} (literals: {sorted(set(tunable))})")
 
         if missing:
-            pytest.fail(f"Files not importing reasoner_vs_constants: {missing}")
+            pytest.fail(f"Files with tunable literals not importing reasoner_vs_constants: {missing}")

@@ -41,6 +41,7 @@ from reasoner.core.settings import settings
 from reasoner.domain.api_keys import looks_like_api_key
 from reasoner.domain.saas import QuotaResult, SubscriptionTier, User
 from reasoner.infrastructure.auth import get_auth_adapter
+from reasoner.presets import get_preset_tier
 from reasoner.rate_limiter import RateLimitConfig, get_rate_limiter
 
 # ── Rate Limiter Singleton ──
@@ -697,6 +698,14 @@ async def check_preset_access(
     # TODO(#501): Replace with actual preset-to-tier mapping from DB.
     # For now, fail closed in production to prevent unauthorized access.
     from fastapi import HTTPException
+
+    # Resolved but deliberately not enforced: per SEC-017 every tier may reach
+    # every preset today (see tests/test_saas_preset_tier_enforcement.py, whose
+    # cases all assert this returns None). Looking the tier up here keeps the
+    # value observable, and gives #501 a single call site to switch over to a
+    # real comparison once the preset-to-tier mapping exists.
+    required_tier = get_preset_tier(preset)
+    logger.debug("Preset %s maps to tier %s (not enforced)", preset, required_tier)
 
     if settings.ENVIRONMENT == "production":
         raise HTTPException(
