@@ -28,6 +28,21 @@ _test_token = _adapter.create_token("11111111-1111-1111-1111-111111111111", "tes
 client = TestClient(app, headers={"Authorization": f"Bearer {_test_token}"})
 
 
+@pytest.fixture(autouse=True)
+def _pin_auth_adapter():
+    """Re-install this module's adapter before every test in it.
+
+    set_auth_adapter() above runs once, at import. The adapter it sets is a
+    process global, and other modules replace it from inside fixtures at test
+    time (test_saas_quota_integration.py sets its own and then clears it), so on
+    an xdist worker that ran those first, _test_token below was validated
+    against the wrong adapter and every request here came back 401. Pinning it
+    per test makes this module independent of whatever ran before it.
+    """
+    set_auth_adapter(_adapter)
+    yield
+
+
 class TestExtractTextOCR:
     """Unit tests for OCR dispatch in extract_text()."""
 
