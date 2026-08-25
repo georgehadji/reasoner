@@ -60,6 +60,7 @@ folders:
 | `audits/architectural-reaper-v7-2026-07-08.md` | Deep architecture audit. |
 | `audits/reaper-v7-remediation-plan.md`, `audits/reaper-v7-verification-2026-07-08.md` | Its remediation and verification passes. |
 | `security/threat-model.md` | STRIDE threat model. |
+| `MIND_VIRUS_MITIGATION.md` | Research note: self-propagating-idea threat model (arXiv:2608.10218) mapped onto Reasoner's architecture, mitigations ranked by measured effect size. Analysis only — nothing in it is implemented. |
 | `AUDIT_REPORT.md`, `architecture-audit-2026-06-02.md`, `architecture-audit-finale-2026-06-02.md` | Earlier audits. |
 | `bug_hunt_report.md` | Precision bug hunt. |
 

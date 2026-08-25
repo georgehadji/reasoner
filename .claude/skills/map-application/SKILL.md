@@ -140,7 +140,6 @@ Convention: `<method>.py` holds the strategy class (phase sequence); `<method>_p
 | `compaction_service.py` | Decides when to compact the event store; nightly loop. |
 | `deadletter_replay_service.py` | Admin inspect/replay of dead-letter events. |
 | `event_emission_service.py` | Domain event publishing for pipeline execution, kept out of `PipelineState`. |
-| `augmentation_metrics.py` | A/B arm assignment and quality metrics for augmentation. |
 
 ## Key entry points & gotchas
 

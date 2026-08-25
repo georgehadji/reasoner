@@ -69,7 +69,7 @@ pytest tests/ --cov=src/reasoner --cov-report=html
 | `test_neuro_*` | 6 | Agent-id isolation, cache wiring, CLI, fallback providers, Perplexity provider, safe indexing. |
 | `test_websocket_*` / `test_ws_*` | 6 | Auth, authz, manager, sharding, security, tickets. |
 | `test_auth_*` | 4 | Concurrency, rate limiter deps, LRU, security. |
-| `test_bugfix*_` / `test_bug0*` | 11 | Named regression cases (enum resume, JSON repair, language preservation, token-cache clock, circuit-breaker half-open, truncated JSON, runstate eviction, rounds 1-3). |
+| `test_bugfix*_` / `test_bug0*` / `test_defect_hunt_fixes` | 12 | Named regression cases (enum resume, JSON repair, language preservation, token-cache clock, circuit-breaker half-open, truncated JSON, runstate eviction, rounds 1-3, defect-hunt fixes). |
 | `test_core_*`, `test_constants`, `test_temperature*` | 6 | Constants, protocol, temperatures and strategy. |
 | `test_image_*`, `test_images_metering`, `test_ocr` | 5 | Image generation, routes, model selection, metering, OCR. |
 | `test_rate_limiter_*`, `test_circuit_breaker` | 4 | Concurrency, edge cases, sharding, breaker states. |
