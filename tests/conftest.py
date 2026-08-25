@@ -29,6 +29,7 @@ from reasoner.application.event_bus.bus import reset_event_bus
 from reasoner.core.ports.model_registry_port import set_model_registry_port
 from reasoner.core.rerank import reset_rerank_circuit
 from reasoner.infrastructure.llm.registry import RegistryAdapter
+from reasoner.infrastructure.rate_limiter import reset_rate_limiter_state
 from reasoner.infrastructure.observability.langfuse_subscriber import reset_langfuse
 from reasoner.token_cache import reset_token_cache
 
@@ -51,6 +52,13 @@ async def auto_clean_state():
     # test_auto_rollback.py. Sync and loop-independent, so it runs outside the
     # loop branches below.
     reset_rerank_circuit()
+
+    # The rate limiter keys its in-memory buckets by client IP, and every
+    # TestClient request presents the same one, so the bucket drains as a
+    # session progresses and later API tests get 429s instead of the response
+    # they assert on. Same shape as the rerank circuit above: sync and
+    # loop-independent, so it runs outside the loop branches below.
+    reset_rate_limiter_state()
 
     # Ensure event loop is running for async resets
     if asyncio.get_event_loop().is_running():

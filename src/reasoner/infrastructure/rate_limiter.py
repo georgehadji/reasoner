@@ -519,3 +519,21 @@ def get_rate_limiter(config: RateLimitConfig | None = None) -> RateLimiter:
     if _rate_limiter is None: # Removed conditional for _REDIS_RATE_LIMITER_ENABLED as RateLimiter handles it internally
         _rate_limiter = RateLimiter(config)
     return _rate_limiter
+
+
+def reset_rate_limiter_state() -> None:
+    """Clear the in-memory token buckets of the process-wide limiter.
+
+    The singleton above keys its buckets by client IP, and every FastAPI
+    TestClient request presents the same one. A long session therefore drains
+    that single bucket, and each later API test sharing the xdist worker gets
+    429s instead of the response it asserted on -- which surfaced as unrelated
+    upload/admin/pipeline failures that passed in isolation. Exposed as a reset
+    hook rather than reached into directly so the suite has one supported way
+    to clear it (see tests/conftest.py's ``auto_clean_state``). Synchronous and
+    lock-free by design: it runs between tests, when nothing is contending, and
+    taking the asyncio.Lock here would bind that lock to whichever loop
+    happened to run the reset.
+    """
+    if _rate_limiter is not None:
+        _rate_limiter._buckets.clear()
