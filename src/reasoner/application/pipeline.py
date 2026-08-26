@@ -1,4 +1,4 @@
-# Author: Georgios-Chrysovalantis Chatzivantsidis
+# Author: Polytonic
 """
 Reasoner Pipeline - Strategy-based Orchestrator
 Refactored to eliminate mixin-based God Object in favor of 

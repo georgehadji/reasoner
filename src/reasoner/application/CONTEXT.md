@@ -8,7 +8,7 @@ Application-level orchestrators, workflow commands, event bus definitions, and c
 ## Files
 - **`__init__.py`**: Application Layer - CQRS Commands and Queries
 - **`orchestrator.py`**: PipelineOrchestrator — single entry point for pipeline execution.
-- **`pipeline.py`**: Author: Georgios-Chrysovalantis Chatzivantsidis
+- **`pipeline.py`**: Author: Polytonic
 
 ## Subfolders
 - **`commands`**: Command handlers implementing the CQRS write model for modifying system state.

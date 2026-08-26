@@ -530,4 +530,4 @@ Contributions are welcome. Please read [`CONTRIBUTING.md`](CONTRIBUTING.md) befo
 
 ## License
 
-[Business Source License 1.1](LICENSE) © 2026 Georgios-Chrysovalantis Chatzivantsidis. Free for self-hosted internal and personal use; converts to Apache-2.0 on 2030-08-17. See [LICENSE](LICENSE) for the Additional Use Grant.
+[Business Source License 1.1](LICENSE) © 2026 Polytonic. Free for self-hosted internal and personal use; converts to Apache-2.0 on 2030-08-17. See [LICENSE](LICENSE) for the Additional Use Grant.
