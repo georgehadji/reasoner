@@ -15,6 +15,7 @@ folders:
 |------|--------------|
 | `registry.py` (48KB) | **The model whitelist and provider factory.** `build_provider`, `list_models`, `_vendor_of`, `bloc_of`, `resolved_model_of`, `RegistryAdapter` (implements `ModelRegistryPort`). Add a model here. |
 | `router.py` (32KB) | `ProviderRouter` (implements `LLMPort`): role-based routing, fallback chain, circuit-breaker wrapping, per-model semaphores, telemetry event emission. |
+| `propagation_resistance.py` | Per-model resistance to self-propagating content, from Papadopoulos et al. (arXiv:2608.10218): `propagation_resistance_of`, `is_measured`. Published measurements only — untested models score UNMEASURED and fail closed, because capability does not predict resistance. |
 | `executor.py` (36KB) | `LLMExecutor` — temperature resolution from phase configs, token-aware truncation, retry, response handling. Extracted out of `ReasonerPipeline`. |
 | `base.py` | `BaseLLMProvider` + `LLMError`. |
 | `ports.py` | Provider-side types: `Message`, `MessageRole`, `LLMResponse`, `DegradedLLMResponse`, `LLMConfig`, `ProviderHealth`, `ProviderInfo`. |
@@ -46,6 +47,7 @@ folders:
 | `budget_ceiling.py` | Total estimated cost ≤ preset tier budget. |
 | `circuit_state.py` | Skip models whose circuit breaker is open. |
 | `concurrency.py` | Avoid models near their concurrency limit. |
+| `propagation_resistance.py` | Terminal roles (synthesis, verify) must meet a measured propagation-resistance floor. Ships soft — 0/49 presets clear any floor, since the published evidence base covers ~7 model families. |
 
 ## learning/ and benchmarks/ (ACR Phases 6–7)
 

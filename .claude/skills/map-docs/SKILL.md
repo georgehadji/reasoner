@@ -60,7 +60,10 @@ folders:
 | `audits/architectural-reaper-v7-2026-07-08.md` | Deep architecture audit. |
 | `audits/reaper-v7-remediation-plan.md`, `audits/reaper-v7-verification-2026-07-08.md` | Its remediation and verification passes. |
 | `security/threat-model.md` | STRIDE threat model. |
-| `MIND_VIRUS_MITIGATION.md` | Research note: self-propagating-idea threat model (arXiv:2608.10218) mapped onto Reasoner's architecture, mitigations ranked by measured effect size. Analysis only — nothing in it is implemented. |
+| `MIND_VIRUS_MITIGATION.md` | Research note: self-propagating-idea threat model (arXiv:2608.10218) mapped onto Reasoner's architecture, mitigations ranked by measured effect size. **Living reference** — implemented 2026-08-26; the exposure map in §2 still describes the shape of each channel. |
+| `MIND_VIRUS_IMPLEMENTATION_PLAN.md` | Build plan for the above, with a STATUS section recording what actually shipped and three deviations found during implementation — notably that 0/49 presets clear any propagation-resistance floor, so that constraint is observability, not a gate. Read before touching `harden_system_prompt`, `build_memory_context`, or the resistance table. |
+| `SYCOPHANCY_MITIGATION.md` | Research note on sycophancy resistance (Ibrahim et al., arXiv:2605.07912v3), same shape as the mind-virus pair. Untracked WIP from a parallel workstream at time of writing. |
+| `plans/sycophancy-mitigation.md` | Its build plan (S1–S9 + W10). Touches `phases/_shared.py`, which the propagation-resistance work also changed — check for overlap before implementing. |
 | `AUDIT_REPORT.md`, `architecture-audit-2026-06-02.md`, `architecture-audit-finale-2026-06-02.md` | Earlier audits. |
 | `bug_hunt_report.md` | Precision bug hunt. |
 

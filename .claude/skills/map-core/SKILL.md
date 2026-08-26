@@ -23,6 +23,7 @@ folders:
 | `temperatures.py` | Per-phase temperature + reasoning-effort: `temperature_for`, `reasoning_extra_body`. |
 | `parsing.py` (29KB) | Robust LLM output handling: `extract_json`, `extract_json_list`, reasoning/think-tag stripping, Perplexity citation and provider-artifact stripping, prose-preamble stripping. |
 | `sanitization.py` | `InputSanitizer`, `sanitize_problem`, `sanitize_for_prompt`, `clean_llm_artifacts`, `sanitize_for_logging`. |
+| `propagation_signals.py` | Scores text for self-propagating structure before it becomes long-term memory: `score_propagation_shape`, `PropagationSignal`. Weights imperative structure over the viral lexicon; telemetry only, never a gate. |
 | `exceptions.py` | Full exception taxonomy: `ReasonerError` root, `ErrorCode`, parse/provider/auth/rate-limit/model-not-found families. |
 | `logging_utils.py` | Structured JSON logging, correlation IDs, queue logging, automatic secret redaction (`redact_sensitive`, `redact_dict`). |
 | `health_validator.py` | Startup validation of API keys/dependencies; auto-disables features. `validate_all`, `HealthReport`. |
