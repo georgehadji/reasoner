@@ -34,8 +34,13 @@ const FRAME_MS = 1000 / 30;
 /** Retina buys nothing on a field of 1px dots, and costs 4x the fill. */
 const MAX_DPR = 1.5;
 
-/** Dark needs roughly double: the same alpha vanishes against #131211. */
-const ALPHA_LIGHT = 0.5;
+/**
+ * Both themes need most of the alpha, for opposite reasons. In dark the
+ * neutral token sits close to the background and disappears into it. In light
+ * it is a warm mid-grey on near-white, so every point of alpha washes it
+ * toward the paper -- at 0.5 the field was there but nobody saw it.
+ */
+const ALPHA_LIGHT = 0.85;
 const ALPHA_DARK = 0.9;
 
 interface Point {
@@ -168,7 +173,7 @@ export function DisagreementField() {
         /* One group in accent. Four neutral clouds read as texture; a single
            divergent colour reads as a population that disagrees. */
         const channels = point.group === 1 ? accent : neutral;
-        const fade = point.group === 1 ? alpha * 1.25 : alpha;
+        const fade = point.group === 1 ? Math.min(1, alpha * 1.25) : alpha;
 
         context.fillStyle = `rgba(${channels},${fade})`;
         context.beginPath();
