@@ -35,7 +35,7 @@ _REGISTRY: dict[str, dict] = {
         "fusion":         "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
         "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — $0.03/$0.13 (-54% vs 3.5-flash), newer gen, 1M ctx, vision
         "scoring":        "hy3",              # 🇨🇳 Tencent — anti-hallucination scoring, configurable CoT, $0.20/$0.80 (was gpt-4o-mini)
-        "stress_testing": "ring-2.6-1t",
+        "stress_testing": "glm-5.3-flash",
         "verifier":       "gemini-2.5-flash-lite",   # Google 🇺🇸 — 3.3% HHEM hallucination (3rd best measured), $0.10/$0.40
         "post_synthesis_verify": "sonar",  # added v3.5
         },
@@ -50,14 +50,14 @@ _REGISTRY: dict[str, dict] = {
             "synthesis": "llama-4-maverick",  # 🇺🇸 Meta — $0.200/$0.800 per M, 1048K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
             # ── Per-perspective cross-bloc diversity (2🇨🇳 + 1🇺🇸 + 1🇫🇷, ultra-cheap) ──
             "constructive":  "stepfun-3.7-flash",    # 🇨🇳 StepFun — $0.20/$1.15
-            "destructive":   "ling-2.6-flash-free",  # 🇨🇳 inclusionAI — FREE
+            "destructive":   "ling-3.0-flash-free",  # 🇨🇳 inclusionAI — $0.021/$0.063 (was ling-2.6-flash-free; OpenRouter delisted the 2.6 line)
             "systemic":      "gpt-oss-20b",          # 🇺🇸 OpenAI open-weight — $0.029/$0.14 (was qwen3.6-flash, added US bloc)
             "minimalist":    "ministral-8b",         # 🇫🇷 Mistral — $0.075/$0.20
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
         "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — $0.03/$0.13 (-54% vs 3.5-flash), newer gen, 1M ctx, vision
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
-        "stress_testing": "ring-2.6-1t",
+        "stress_testing": "glm-5.3-flash",
         "verifier":       "gemini-2.5-flash-lite",   # Google 🇺🇸 — 3.3% HHEM hallucination (3rd best measured), $0.10/$0.40
         "post_synthesis_verify": "sonar",  # added v3.5
         },
@@ -99,7 +99,7 @@ _REGISTRY: dict[str, dict] = {
         "fusion":         "gemini-flash-lite",  # 🇨🇳 Qwen — $0.065/$0.260 per M, 1000K ctx (was deepseek-v4-flash; one model per phase)
         "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — $0.03/$0.13 (-54% vs 3.5-flash), newer gen, 1M ctx, vision
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
-        "stress_testing": "ring-2.6-1t",
+        "stress_testing": "glm-5.3-flash",
         "verifier":       "gemini-2.5-flash-lite",   # Google 🇺🇸 — 3.3% HHEM hallucination (3rd best measured), $0.10/$0.40
         "post_synthesis_verify": "sonar",  # added v3.5
         },
@@ -134,7 +134,7 @@ _REGISTRY: dict[str, dict] = {
         "fusion":         "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
         "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — $0.03/$0.13 (-54% vs 3.5-flash), newer gen, 1M ctx, vision
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
-        "stress_testing": "ring-2.6-1t",
+        "stress_testing": "glm-5.3-flash",
         "verifier":       "gemini-2.5-flash-lite",   # Google 🇺🇸 — 3.3% HHEM hallucination (3rd best measured), $0.10/$0.40
         "post_synthesis_verify": "sonar",  # added v3.5
         },
@@ -166,7 +166,7 @@ _REGISTRY: dict[str, dict] = {
         "fusion":         "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
         "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — $0.03/$0.13 (-54% vs 3.5-flash), newer gen, 1M ctx, vision
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
-        "stress_testing": "ring-2.6-1t",
+        "stress_testing": "glm-5.3-flash",
         "verifier":       "gemini-2.5-flash-lite",   # Google 🇺🇸 — 3.3% HHEM hallucination (3rd best measured), $0.10/$0.40
         "post_synthesis_verify": "sonar",  # added v3.5
         },
@@ -200,7 +200,7 @@ _REGISTRY: dict[str, dict] = {
         "fusion":         "deepseek-v4-flash",
         "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — $0.03/$0.13 (-54% vs 3.5-flash), newer gen, 1M ctx, vision
         "scoring":        "qwen3.6-flash",           # Qwen 🇨🇳 — cross-lab falsification (≠ Anthropic primary)
-        "stress_testing": "ring-2.6-1t",
+        "stress_testing": "glm-5.3-flash",
         "verifier":       "gemini-2.5-flash-lite",   # Google 🇺🇸 — 3.3% HHEM hallucination (3rd best measured), $0.10/$0.40
         "post_synthesis_verify": "sonar",  # added v3.5
         },
@@ -231,7 +231,7 @@ _REGISTRY: dict[str, dict] = {
         "fusion":         "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
         "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — $0.03/$0.13 (-54% vs 3.5-flash), newer gen, 1M ctx, vision
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
-        "stress_testing": "ring-2.6-1t",
+        "stress_testing": "glm-5.3-flash",
         "verifier":       "gemini-2.5-flash-lite",   # Google 🇺🇸 — 3.3% HHEM hallucination (3rd best measured), $0.10/$0.40
         "post_synthesis_verify": "sonar",  # added v3.5
         },
@@ -262,7 +262,7 @@ _REGISTRY: dict[str, dict] = {
         "fusion":         "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
         "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — $0.03/$0.13 (-54% vs 3.5-flash), newer gen, 1M ctx, vision
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
-        "stress_testing": "ring-2.6-1t",
+        "stress_testing": "glm-5.3-flash",
         "verifier":       "gemini-2.5-flash-lite",   # Google 🇺🇸 — 3.3% HHEM hallucination (3rd best measured), $0.10/$0.40
         "post_synthesis_verify": "sonar",  # added v3.5
         },
@@ -293,7 +293,7 @@ _REGISTRY: dict[str, dict] = {
         "fusion":         "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
         "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — $0.03/$0.13 (-54% vs 3.5-flash), newer gen, 1M ctx, vision
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
-        "stress_testing": "ring-2.6-1t",
+        "stress_testing": "glm-5.3-flash",
         "verifier":       "gemini-2.5-flash-lite",   # Google 🇺🇸 — 3.3% HHEM hallucination (3rd best measured), $0.10/$0.40
         "post_synthesis_verify": "sonar",  # added v3.5
         },
@@ -324,7 +324,7 @@ _REGISTRY: dict[str, dict] = {
         "fusion":         "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
         "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — $0.03/$0.13 (-54% vs 3.5-flash), newer gen, 1M ctx, vision
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
-        "stress_testing": "ring-2.6-1t",
+        "stress_testing": "glm-5.3-flash",
         "verifier":       "gemini-2.5-flash-lite",   # Google 🇺🇸 — 3.3% HHEM hallucination (3rd best measured), $0.10/$0.40
         "post_synthesis_verify": "sonar",  # added v3.5
         },
@@ -355,7 +355,7 @@ _REGISTRY: dict[str, dict] = {
         "fusion":         "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
         "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — $0.03/$0.13 (-54% vs 3.5-flash), newer gen, 1M ctx, vision
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
-        "stress_testing": "ring-2.6-1t",
+        "stress_testing": "glm-5.3-flash",
         "verifier":       "gemini-2.5-flash-lite",   # Google 🇺🇸 — 3.3% HHEM hallucination (3rd best measured), $0.10/$0.40
         "post_synthesis_verify": "sonar",  # added v3.5
         },
@@ -386,7 +386,7 @@ _REGISTRY: dict[str, dict] = {
         "fusion":         "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
         "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — $0.03/$0.13 (-54% vs 3.5-flash), newer gen, 1M ctx, vision
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
-        "stress_testing": "ring-2.6-1t",
+        "stress_testing": "glm-5.3-flash",
         "verifier":       "gemini-2.5-flash-lite",   # Google 🇺🇸 — 3.3% HHEM hallucination (3rd best measured), $0.10/$0.40
         "post_synthesis_verify": "sonar",  # added v3.5
         },
@@ -420,7 +420,7 @@ _REGISTRY: dict[str, dict] = {
         "fusion":         "hy3",  # 🇨🇳 Tencent — $0.132/$0.528 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
         "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — $0.03/$0.13 (-54% vs 3.5-flash), newer gen, 1M ctx, vision
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
-        "stress_testing": "ring-2.6-1t",
+        "stress_testing": "glm-5.3-flash",
         "verifier":       "gemini-2.5-flash-lite",   # Google 🇺🇸 — 3.3% HHEM hallucination (3rd best measured), $0.10/$0.40
         "post_synthesis_verify": "sonar",  # added v3.5
         },
@@ -454,7 +454,7 @@ _REGISTRY: dict[str, dict] = {
         "fusion":         "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
         "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — $0.03/$0.13 (-54% vs 3.5-flash), newer gen, 1M ctx, vision
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
-        "stress_testing": "ring-2.6-1t",
+        "stress_testing": "glm-5.3-flash",
         "verifier":       "gemini-2.5-flash-lite",   # Google 🇺🇸 — 3.3% HHEM hallucination (3rd best measured), $0.10/$0.40
         "post_synthesis_verify": "sonar",  # added v3.5
         },
@@ -485,7 +485,7 @@ _REGISTRY: dict[str, dict] = {
         "fusion":         "hy3",  # 🇨🇳 Tencent — $0.132/$0.528 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
         "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — $0.03/$0.13 (-54% vs 3.5-flash), newer gen, 1M ctx, vision
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
-        "stress_testing": "ring-2.6-1t",
+        "stress_testing": "glm-5.3-flash",
         "tot_backtrack":  "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
         "tot_decompose":  "mimo-v2-flash",  # 🇨🇳 Xiaomi — $0.140/$0.280 per M, 1050K ctx (was deepseek-v4-flash; one model per phase)
         "tot_evaluate":   "seed-2.0-mini",  # 🇨🇳 ByteDance — $0.100/$0.400 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
@@ -522,7 +522,7 @@ _REGISTRY: dict[str, dict] = {
         "fusion":         "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
         "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — $0.03/$0.13 (-54% vs 3.5-flash), newer gen, 1M ctx, vision
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
-        "stress_testing": "ring-2.6-1t",
+        "stress_testing": "glm-5.3-flash",
         "verifier":       "gemini-2.5-flash-lite",   # Google 🇺🇸 — 3.3% HHEM hallucination (3rd best measured), $0.10/$0.40
         "post_synthesis_verify": "sonar",  # added v3.5
         },
@@ -556,7 +556,7 @@ _REGISTRY: dict[str, dict] = {
         "sd_adapt":       "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
         "sd_implement":   "mimo-v2-flash",  # 🇨🇳 Xiaomi — $0.140/$0.280 per M, 1050K ctx (was deepseek-v4-flash; one model per phase)
         "sd_select":      "seed-2.0-mini",  # 🇨🇳 ByteDance — $0.100/$0.400 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
-        "stress_testing": "ring-2.6-1t",
+        "stress_testing": "glm-5.3-flash",
         "verifier":       "gemini-2.5-flash-lite",   # Google 🇺🇸 — 3.3% HHEM hallucination (3rd best measured), $0.10/$0.40
         "post_synthesis_verify": "sonar",  # added v3.5
         },
@@ -590,7 +590,7 @@ _REGISTRY: dict[str, dict] = {
         "fusion":                     "hy3",  # 🇨🇳 Tencent — $0.132/$0.528 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
         "meta_evaluator":             "minimax-m3",  # 🇨🇳 MiniMax — $0.300/$1.200 per M, 1048K ctx (was qwen3.7-plus; one model per phase)
         "scoring":                    "deepseek-v4-flash",  # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
-        "stress_testing":             "ring-2.6-1t",
+        "stress_testing":             "glm-5.3-flash",
         "subagent_critique_bias":     "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
         "subagent_critique_counter":  "qwen3.7-flash",  # 🇨🇳 Qwen — $0.030/$0.130 per M, 1000K ctx (was deepseek-v4-flash; one model per phase)
         "subagent_critique_evidence": "mimo-v2-flash",  # 🇨🇳 Xiaomi — $0.140/$0.280 per M, 1050K ctx (was deepseek-v4-flash; one model per phase)
@@ -736,7 +736,7 @@ _REGISTRY: dict[str, dict] = {
         "fusion":          "qwen3.7-flash",  # 🇨🇳 Qwen — $0.030/$0.130 per M, 1000K ctx (was deepseek-v4-flash; one model per phase)
         "meta_evaluator":  "minimax-m3",  # 🇨🇳 MiniMax — $0.300/$1.200 per M, 1048K ctx (was qwen3.7-plus; one model per phase)
         "scoring":         "deepseek-v4-flash",  # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
-        "stress_testing":  "ring-2.6-1t",
+        "stress_testing":  "glm-5.3-flash",
         "verifier":        "qwen3.7-plus",  # cross-lab from DeepSeek scoring
         "post_synthesis_verify": "sonar",  # added v3.5
         },
@@ -790,7 +790,7 @@ _REGISTRY: dict[str, dict] = {
         "fusion":         "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
         "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — $0.03/$0.13 (-54% vs 3.5-flash), newer gen, 1M ctx, vision
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
-        "stress_testing": "ring-2.6-1t",
+        "stress_testing": "glm-5.3-flash",
         "verifier":       "gemini-2.5-flash-lite",   # Google 🇺🇸 — 3.3% HHEM hallucination (3rd best measured), $0.10/$0.40
         "post_synthesis_verify": "sonar",  # added v3.5
         },
@@ -831,7 +831,7 @@ _REGISTRY: dict[str, dict] = {
         "fusion":         "gemini-flash-lite",  # 🇨🇳 Qwen — $0.065/$0.260 per M, 1000K ctx (was deepseek-v4-flash; one model per phase)
         "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — $0.03/$0.13 (-54% vs 3.5-flash), newer gen, 1M ctx, vision
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
-        "stress_testing": "ring-2.6-1t",
+        "stress_testing": "glm-5.3-flash",
         "verifier":       "gemini-2.5-flash-lite",   # Google 🇺🇸 — 3.3% HHEM hallucination (3rd best measured), $0.10/$0.40
         "post_synthesis_verify": "sonar",  # added v3.5
         },
@@ -867,7 +867,7 @@ _REGISTRY: dict[str, dict] = {
         "fusion":         "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
         "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — $0.03/$0.13 (-54% vs 3.5-flash), newer gen, 1M ctx, vision
         "scoring":        "deepseek-v4-flash",
-        "stress_testing": "ring-2.6-1t",
+        "stress_testing": "glm-5.3-flash",
         "verifier":       "gemini-2.5-flash-lite",   # Google 🇺🇸 — 3.3% HHEM hallucination (3rd best measured), $0.10/$0.40
         "post_synthesis_verify": "sonar",  # added v3.5
         },
@@ -938,7 +938,7 @@ _REGISTRY: dict[str, dict] = {
         "fusion":         "deepseek-v4-flash",     # DeepSeek 🇨🇳 — fast, cheap analytical integration
         "meta_evaluator": "mistral-small-2603",    # Mistral 🇫🇷 — meta-level debate structure critique
         "scoring":        "qwen3.6-flash",         # Qwen 🇨🇳 — structured numerical evaluation
-        "stress_testing": "ring-2.6-1t",           # inclusionAI (Ant Group) 🇨🇳 — AIME 95.83, GPQA-D 88.27, PinchBench 87.60 agent mode
+        "stress_testing": "glm-5.3-flash",           # inclusionAI (Ant Group) 🇨🇳 — AIME 95.83, GPQA-D 88.27, PinchBench 87.60 agent mode
         "verifier":       "gemini-flash-lite-real", # Google 🇺🇸 — Gemini 3.1 Flash Lite, structured fact-checking
         "post_synthesis_verify": "sonar",  # added v3.5
         },

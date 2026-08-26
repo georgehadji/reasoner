@@ -266,6 +266,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # NB: z-ai/glm-5.2:batch is *more* expensive ($0.70/$2.20) and caps at 512K ctx.
     # Do not add it as a "cheaper batch tier" — for this model the batch lane is a trap.
     "glm-5.3":          {"model": "z-ai/glm-5.3"},                # $1.40/$4.40 per M, 1M ctx — newest Zhipu gen, ~3x the price of 5.2 (verify against the catalogue before moving budget presets onto it)
+    "glm-5.3-flash":    {"model": "z-ai/glm-5.3-flash"},          # $0.075/$0.25 per M, 1.31M ctx — took over stress_testing from the dead ring-2.6-1t (same bloc, same input price, cheaper output)
     # ═══════════════════════════════════════════════════════════════
     # OpenRouter native
     # ═══════════════════════════════════════════════════════════════
@@ -323,10 +324,13 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ═══════════════════════════════════════════════════════════════
     # inclusionAI (Ant Group)
     # ═══════════════════════════════════════════════════════════════
-    "ling-2.6-flash-free": {"model": "inclusionai/ling-2.6-flash"},  # v3.5: :free tier dead -> paid non-free model
     "ling-3.0-flash-free": {"model": "inclusionai/ling-3.0-flash"},  # v3.8: :free tier died (as predicted) -> paid, $0.021/$0.063 per M, 262K ctx
-    "ring-2.6-1t":         {"model": "inclusionai/ring-2.6-1t"},     # $0.075/$0.625 per M, 63B active/1T total, thinking model
-    "ling-2.6-1t":         {"model": "inclusionai/ling-2.6-1t"},     # $0.075/$0.625 per M, general-purpose counterpart to ring-2.6-1t (non-reasoning)
+    # The whole inclusionAI 2.6 line was delisted by 2026-08-26: ring-2.6-1t and
+    # ling-2.6-1t 404 ("no longer available as a free model") and ling-2.6-flash
+    # left the OpenRouter catalogue entirely. Not a billing issue — other paid
+    # models bill fine on the same key. Reroutes: stress_testing -> glm-5.3-flash
+    # (same CN bloc, $0.075/$0.25 vs the dead $0.075/$0.625); ultra-budget
+    # destructive -> ling-3.0-flash-free (same vendor, still live, cheaper).
     # ═══════════════════════════════════════════════════════════════
     # StepFun — ultra-cheap multimodal MoE
     # ═══════════════════════════════════════════════════════════════
@@ -446,6 +450,10 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "recraft-v4.1-vector":            {"model": "recraft/recraft-v4.1-vector",     "extra_body": {"include_images": True}},  # 🇺🇸 Recraft — SVG output
     "recraft-v4.1-pro-vector":        {"model": "recraft/recraft-v4.1-pro-vector", "extra_body": {"include_images": True}},  # 🇺🇸 Recraft — SVG output
     "recraft-v4.1-utility-pro":       {"model": "recraft/recraft-v4.1-utility-pro", "extra_body": {"include_images": True}},  # 🇺🇸 Recraft
+    "recraft-v4-styles":              {"model": "recraft/recraft-v4-styles",            "extra_body": {"include_images": True}},  # 🇺🇸 Recraft — from $0.035, 65K ctx
+    "recraft-v4-styles-pro":          {"model": "recraft/recraft-v4-styles-pro",        "extra_body": {"include_images": True}},  # 🇺🇸 Recraft — from $0.10, 65K ctx
+    "recraft-v4-styles-vector":       {"model": "recraft/recraft-v4-styles-vector",     "extra_body": {"include_images": True}},  # 🇺🇸 Recraft — SVG output, from $0.05, 65K ctx
+    "recraft-v4-styles-pro-vector":   {"model": "recraft/recraft-v4-styles-pro-vector", "extra_body": {"include_images": True}},  # 🇺🇸 Recraft — SVG output, from $0.12, 65K ctx
     "riverflow-v2-pro":               {"model": "sourceful/riverflow-v2-pro",      "extra_body": {"include_images": True}},  # 🇺🇸 Sourceful
     "riverflow-v2.5-fast":            {"model": "sourceful/riverflow-v2.5-fast",   "extra_body": {"include_images": True}},  # 🇺🇸 Sourceful
     "riverflow-v2.5-pro":             {"model": "sourceful/riverflow-v2.5-pro",    "extra_body": {"include_images": True}},  # 🇺🇸 Sourceful
