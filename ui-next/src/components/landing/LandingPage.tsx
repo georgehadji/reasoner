@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { DisagreementField } from '@/components/landing/DisagreementField';
+import { MechanismDiagram } from '@/components/landing/MechanismDiagram';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
 import { CAPABILITIES, PROVIDERS } from '@/lib/capabilities.generated';
@@ -38,24 +39,33 @@ function Section({
   id,
   marker,
   name,
+  tone,
   children,
 }: {
   id?: string;
   marker: string;
   name: string;
+  /**
+   * `invert` runs the section against the page's ground — dark on the ivory
+   * theme, ivory on the dark one — and takes it full-bleed, because a band
+   * that stops at the 72rem measure reads as a card rather than as a change
+   * of ground. The inversion is a token swap in globals.css; nothing inside
+   * a section needs to know which ground it is standing on.
+   */
+  tone?: 'invert';
   children: ReactNode;
 }) {
-  return (
+  const inner = (
     <section
       id={id}
       className="mx-auto w-full max-w-[var(--width-wide)] scroll-mt-[var(--space-20)] px-[var(--gutter)] py-[var(--section-y)]"
     >
       <div className="grid gap-[var(--space-6)] lg:grid-cols-[9rem_minmax(0,1fr)] lg:gap-[var(--space-12)]">
         <div className="lg:sticky lg:top-[var(--space-24)] lg:self-start">
-          <p className="nums-tabular font-mono text-[length:var(--text-xs)] text-[var(--accent)]">
+          <p className="nums-tabular font-mono text-[8pt] text-[var(--accent)]">
             {marker}
           </p>
-          <p className="mt-[var(--space-1)] font-sans text-[length:var(--text-xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
+          <p className="mt-[var(--space-1)] font-sans text-[8pt] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
             {name}
           </p>
         </div>
@@ -63,11 +73,15 @@ function Section({
       </div>
     </section>
   );
+
+  if (tone !== 'invert') return inner;
+
+  return <div className="invert-band bg-[var(--bg)] text-[var(--text)]">{inner}</div>;
 }
 
 function Heading({ children }: { children: ReactNode }) {
   return (
-    <h2 className="font-serif text-[length:var(--text-3xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-snug)] text-[var(--text)]">
+    <h2 className="font-serif text-[21pt] sm:text-[34pt] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)]">
       {children}
     </h2>
   );
@@ -75,7 +89,7 @@ function Heading({ children }: { children: ReactNode }) {
 
 function Lede({ children }: { children: ReactNode }) {
   return (
-    <p className="prose-measure mt-[var(--space-6)] font-serif text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-2)]">
+    <p className="prose-measure mt-[var(--space-6)] font-serif text-[21pt] leading-[var(--lh-body)] text-[var(--text-2)]">
       {children}
     </p>
   );
@@ -83,7 +97,7 @@ function Lede({ children }: { children: ReactNode }) {
 
 function Body({ children }: { children: ReactNode }) {
   return (
-    <p className="prose-measure mt-[var(--space-4)] font-serif text-[length:var(--text-base)] leading-[var(--lh-body)] text-[var(--text-muted)]">
+    <p className="prose-measure mt-[var(--space-4)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
       {children}
     </p>
   );
@@ -94,7 +108,7 @@ function Aside({ href, children }: { href: string; children: ReactNode }) {
   return (
     <Link
       href={href}
-      className="link-smooth mt-[var(--space-6)] inline-flex font-sans text-[length:var(--text-sm)] font-semibold leading-[var(--lh-ui)] text-[var(--accent)] hover:text-[var(--accent-hover)]"
+      className="link-smooth mt-[var(--space-6)] inline-flex font-sans text-[13pt] font-semibold leading-[var(--lh-ui)] text-[var(--accent)] hover:text-[var(--accent-hover)]"
     >
       {children}
     </Link>
@@ -176,40 +190,6 @@ const TERMS = [
   },
 ];
 
-/**
- * The masthead visual is the product's own output rather than a picture of
- * it. Every competing hero in this market opens on a gradient, an angled
- * dashboard, or an abstraction of neural connections; a visitor learns
- * nothing from any of them. Three claims — one per epistemic label — teach
- * the whole product in a glance, and the UNKNOWN row does the most work,
- * because a product admitting what it does not know on its own front door
- * is the argument the rest of the page spends eight sections making.
- *
- * Illustrative, and captioned as such under the card. The real captured run
- * is one click away at /how-it-works; dressing an example up as a record
- * would contradict §1 in the same viewport that states it.
- */
-const SPECIMEN_CLAIMS = [
-  {
-    label: 'Verified',
-    tone: 'epistemic-verified',
-    claim: 'Aurora replicates storage six ways across three availability zones.',
-    basis: 'source: AWS Aurora storage docs — read, not recalled',
-  },
-  {
-    label: 'Hypothesis',
-    tone: 'epistemic-hypothesis',
-    claim: 'Your p99 write latency improves once the WAL leaves the instance.',
-    basis: 'asserted by 3 of 4 models · no source · downgraded in code',
-  },
-  {
-    label: 'Unknown',
-    tone: 'epistemic-unknown',
-    claim: 'What this costs you. I/O-optimized flips the pricing model entirely.',
-    basis: 'needs your read/write ratio — not in the question',
-  },
-];
-
 /* ── Page ─────────────────────────────────────────────────────────── */
 
 export default function LandingPage() {
@@ -222,8 +202,17 @@ export default function LandingPage() {
             States the spine once, then proves it in the same viewport. Left
             column is the argument, right column is the product's own output.
             Every section below is an instance of the same claim, which is
-            what stops the page reading as a list. */}
-        <header className="relative mx-auto w-full max-w-[var(--width-wide)] px-[var(--gutter)] pb-[var(--section-y)] pt-[var(--space-48)]">
+            what stops the page reading as a list.
+
+            Holds the viewport so §1 starts at the fold rather than peeking
+            above it. min-h rather than h: on a short window the content grows
+            the box instead of being clipped inside it, and centring by flex
+            cannot then push the top of the headline out of reach. svh rather
+            than vh because mobile vh is measured against the LARGE viewport,
+            so a 100vh hero sits taller than the screen until the browser
+            chrome retracts. SiteHeader is fixed, so it costs no layout height
+            here -- the top padding is what keeps the headline clear of it. */}
+        <header className="relative mx-auto flex min-h-svh w-full max-w-[var(--width-wide)] flex-col justify-center px-[var(--gutter)] pb-[var(--section-y)] pt-[var(--space-48)]">
           <DisagreementField />
 
           <div className="relative grid gap-[var(--space-12)] lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:items-start lg:gap-[var(--space-16)]">
@@ -231,7 +220,7 @@ export default function LandingPage() {
               {/* The mechanism, direct. No eyebrow needed — the claim reads
                   on its own and the product's own output (right column)
                   teaches what it means. */}
-              <h1 className="max-w-[18ch] text-balance font-serif text-[89pt] font-normal leading-[var(--lh-display)] tracking-[var(--tracking-tight)] text-[var(--text)]">
+              <h1 className="max-w-[18ch] text-balance font-serif text-[34pt] font-normal leading-[var(--lh-display)] sm:text-[55pt] lg:text-[89pt] tracking-[var(--tracking-tight)] text-[var(--text)]">
                 Models that disagree, on the record.
               </h1>
             </div>
@@ -251,41 +240,72 @@ export default function LandingPage() {
                   feels.
                 </strong>
               </p>
-
-              <div className="mt-[var(--space-10)] flex flex-wrap items-center gap-[var(--space-3)] gap-x-[var(--space-8)]">
-                <Link
-                  href="/chat"
-                  className="btn-lift group flex min-h-[var(--space-12)] items-center gap-[var(--space-2)] rounded-[var(--radius)] bg-[var(--accent)] px-[var(--space-8)] font-sans text-[length:var(--text-base)] font-semibold leading-[var(--lh-ui)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)]"
-                >
-                  Ask a question
-                  <span
-                    aria-hidden="true"
-                    className="transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
-                  >
-                    &rarr;
-                  </span>
-                </Link>
-                {/* Points at a captured production run, not a demo request.
-                    The reader this headline attracts is a sceptic, and a
-                    sceptic converts on evidence they can read alone. */}
-                <Link
-                  href="/how-it-works"
-                  className="link-smooth flex min-h-[var(--space-12)] items-center font-sans text-[length:var(--text-base)] font-medium leading-[var(--lh-ui)] text-[var(--text-2)] underline decoration-[var(--border-strong)] underline-offset-4 hover:text-[var(--text)]"
-                >
-                  Read a complete run
-                </Link>
-              </div>
-
-              {/* The number does what the word "free" cannot: it answers the
-                  price objection and the what-is-the-catch objection in the
-                  same six words. The one figure on this page that is not
-                  machine-generated — keep it in step with /pricing. */}
-              <p className="mt-[var(--space-4)] font-sans text-[length:var(--text-sm)] leading-[var(--lh-ui)] text-[var(--text-muted)]">
-                20 questions a month on the free tier.
-              </p>
             </div>
           </div>
+
+          {/* Sits under both columns so the claim and the mechanism have both
+              landed before the reader is asked to act. */}
+          <div className="relative mt-[var(--space-12)] flex flex-wrap items-center justify-center gap-[var(--space-3)] gap-x-[var(--space-8)]">
+            <Link
+              href="/chat"
+              className="btn-lift group flex min-h-[var(--space-12)] items-center gap-[var(--space-2)] rounded-[var(--radius)] bg-[var(--accent)] px-[var(--space-8)] font-sans text-[13pt] font-semibold leading-[var(--lh-ui)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)]"
+            >
+              Ask a question
+              <span
+                aria-hidden="true"
+                className="transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
+              >
+                &rarr;
+              </span>
+            </Link>
+            {/* Points at a captured production run, not a demo request.
+                The reader this headline attracts is a sceptic, and a
+                sceptic converts on evidence they can read alone. */}
+            <Link
+              href="/how-it-works"
+              className="link-smooth flex min-h-[var(--space-12)] items-center font-sans text-[13pt] font-medium leading-[var(--lh-ui)] text-[var(--text-2)] underline decoration-[var(--border-strong)] underline-offset-4 hover:text-[var(--text)]"
+            >
+              Read a complete run
+            </Link>
+          </div>
+
+          {/* The number does what the word "free" cannot: it answers the
+              price objection and the what-is-the-catch objection in the
+              same six words. The one figure on this page that is not
+              machine-generated — keep it in step with /pricing. */}
+          <p className="relative mt-[var(--space-4)] text-center font-sans text-[13pt] leading-[var(--lh-ui)] text-[var(--text-muted)]">
+            20 questions a month on the free tier.
+          </p>
         </header>
+
+        {/* ── Mechanism ─────────────────────────────────────────
+            The page's correction to its own worst habit. Multi-perspective
+            analysis is the default preset, and a default has a way of
+            becoming the description — visitors, and the product's own
+            copy, kept calling that one pipeline "Reasoner." The rail is
+            what is actually true of every run; the method is stage 03's
+            replaceable part, and saying so here stops §5 reading as an
+            afterthought bolted onto a fixed pipeline.
+
+            It sits above §1 because these four stages are the frame the
+            eight sections hang on, and because the four failures it names
+            are what the reader arrived carrying. */}
+        <Section marker="—" name="Mechanism" tone="invert">
+          <Heading>Four failures, stopped at four different points.</Heading>
+          <Lede>
+            Bias, mind-virus propagation, sycophancy, and hallucination are the four ways a
+            confident answer goes wrong, and none of them is a knowledge problem — a larger model
+            fixes none of them. Reasoner meets each at a different stage of the run.
+          </Lede>
+          <Body>
+            What sits inside the reasoning stage changes with the question: {CAPABILITIES.methods}{' '}
+            methods, from adversarial debate to code that is actually executed. Multi-perspective
+            analysis is one of them, and the default — not the product. The four defences below
+            hold whichever one runs.
+          </Body>
+
+          <MechanismDiagram />
+        </Section>
 
         {/* ── §1 Hallucination ──────────────────────────────────
             Leads the page because it is the only deterministic
@@ -305,19 +325,19 @@ export default function LandingPage() {
 
           <dl className="mt-[var(--space-10)] grid gap-[var(--space-6)] sm:grid-cols-2">
             <div className="border-t border-[var(--border)] pt-[var(--space-4)]">
-              <dt className="epistemic-hypothesis pl-[var(--space-3)] font-sans text-[length:var(--text-sm)] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)]">
+              <dt className="epistemic-hypothesis pl-[var(--space-3)] font-sans text-[8pt] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)]">
                 Hypothesis
               </dt>
-              <dd className="mt-[var(--space-3)] font-serif text-[length:var(--text-base)] leading-[var(--lh-body)] text-[var(--text-muted)]">
+              <dd className="mt-[var(--space-3)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
                 The model asserted it and nothing else backs it. Plausible, reasoned, unconfirmed —
                 and never dressed up as more.
               </dd>
             </div>
             <div className="border-t border-[var(--border)] pt-[var(--space-4)]">
-              <dt className="epistemic-verified pl-[var(--space-3)] font-sans text-[length:var(--text-sm)] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)]">
+              <dt className="epistemic-verified pl-[var(--space-3)] font-sans text-[8pt] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)]">
                 Verified
               </dt>
-              <dd className="mt-[var(--space-3)] font-serif text-[length:var(--text-base)] leading-[var(--lh-body)] text-[var(--text-muted)]">
+              <dd className="mt-[var(--space-3)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
                 A source outside the model carries it. Cited, and traceable back to the thing that
                 carried it.
               </dd>
@@ -392,7 +412,7 @@ export default function LandingPage() {
 
           <ol
             role="list"
-            className="mt-[var(--space-8)] grid list-none gap-[var(--space-4)] font-mono text-[length:var(--text-xs)] leading-[var(--lh-body)]"
+            className="mt-[var(--space-8)] grid list-none gap-[var(--space-4)] font-mono text-[13pt] leading-[var(--lh-body)]"
           >
             {QUERY_PROGRESSION.map((query, i) => (
               <li key={query} className="flex gap-[var(--space-4)]">
@@ -413,10 +433,10 @@ export default function LandingPage() {
           <dl className="mt-[var(--space-8)] grid gap-x-[var(--space-8)] gap-y-[var(--space-4)] sm:grid-cols-2">
             {RESEARCH_ACTIONS.map(({ name, desc }) => (
               <div key={name} className="border-t border-[var(--border)] pt-[var(--space-3)]">
-                <dt className="font-sans text-[length:var(--text-sm)] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
+                <dt className="font-sans text-[13pt] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
                   {name}
                 </dt>
-                <dd className="mt-[var(--space-1)] font-serif text-[length:var(--text-base)] leading-[var(--lh-body)] text-[var(--text-muted)]">
+                <dd className="mt-[var(--space-1)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
                   {desc}
                 </dd>
               </div>
@@ -439,10 +459,10 @@ export default function LandingPage() {
           <dl className="mt-[var(--space-10)] grid gap-x-[var(--space-8)] gap-y-[var(--space-5)] sm:grid-cols-2">
             {METHODS.map(({ name, desc }) => (
               <div key={name}>
-                <dt className="font-sans text-[length:var(--text-sm)] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
+                <dt className="font-sans text-[13pt] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
                   {name}
                 </dt>
-                <dd className="mt-[var(--space-1)] font-serif text-[length:var(--text-base)] leading-[var(--lh-body)] text-[var(--text-muted)]">
+                <dd className="mt-[var(--space-1)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
                   {desc}
                 </dd>
               </div>
@@ -469,7 +489,7 @@ export default function LandingPage() {
 
           {/* One real run, left as it happened — including the two fallbacks. */}
           <figure className="mt-[var(--space-10)]">
-            <p className="font-mono text-[length:var(--text-xs)] leading-[var(--lh-body)] text-[var(--text-muted)]">
+            <p className="font-mono text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
               &ldquo;{SHOWCASE_PROMPT}&rdquo;
             </p>
 
@@ -488,7 +508,7 @@ export default function LandingPage() {
                     decoding="async"
                     className="aspect-square w-full border border-[var(--border)] object-cover"
                   />
-                  <p className="mt-[var(--space-3)] font-sans text-[length:var(--text-sm)] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
+                  <p className="mt-[var(--space-3)] font-sans text-[13pt] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
                     {lab}
                     {fallback ? (
                       <sup className="font-normal text-[var(--warn)]" aria-hidden="true">
@@ -497,14 +517,14 @@ export default function LandingPage() {
                       </sup>
                     ) : null}
                   </p>
-                  <p className="mt-[var(--space-1)] font-mono text-[length:var(--text-2xs)] leading-[var(--lh-body)] text-[var(--text-subtle)]">
+                  <p className="mt-[var(--space-1)] font-mono text-[8pt] leading-[var(--lh-body)] text-[var(--text-subtle)]">
                     {model} · {origin}
                   </p>
                 </li>
               ))}
             </ul>
 
-            <figcaption className="mt-[var(--space-6)] font-sans text-[length:var(--text-xs)] leading-[var(--lh-body)] text-[var(--text-muted)]">
+            <figcaption className="mt-[var(--space-6)] font-sans text-[8pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
               <span aria-hidden="true">†</span> Two of the configured primaries failed on this run
               and fallbacks took over mid-flight. Left as it happened — a chain you can watch
               working is worth more than one you have to take on faith.
@@ -536,11 +556,11 @@ export default function LandingPage() {
               <li key={phase} className="flex gap-[var(--space-3)] border-t border-[var(--border)] pt-[var(--space-3)]">
                 <span
                   aria-hidden="true"
-                  className="nums-tabular shrink-0 font-mono text-[length:var(--text-xs)] text-[var(--text-subtle)]"
+                  className="nums-tabular shrink-0 font-mono text-[8pt] text-[var(--text-subtle)]"
                 >
                   {String(i + 1).padStart(2, '0')}
                 </span>
-                <span className="font-sans text-[length:var(--text-sm)] leading-[var(--lh-ui)] text-[var(--text-2)]">
+                <span className="font-sans text-[13pt] leading-[var(--lh-ui)] text-[var(--text-2)]">
                   {phase}
                 </span>
               </li>
@@ -576,16 +596,16 @@ export default function LandingPage() {
           <dl className="mt-[var(--space-8)] grid gap-x-[var(--space-8)] gap-y-[var(--space-5)] sm:grid-cols-2">
             {TERMS.map(({ term, detail }) => (
               <div key={term}>
-                <dt className="font-sans text-[length:var(--text-sm)] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
+                <dt className="font-sans text-[13pt] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
                   {term}
                 </dt>
-                <dd className="mt-[var(--space-1)] font-serif text-[length:var(--text-base)] leading-[var(--lh-body)] text-[var(--text-muted)]">
+                <dd className="mt-[var(--space-1)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
                   {detail}
                 </dd>
               </div>
             ))}
           </dl>
-          <p className="mt-[var(--space-8)] font-sans text-[length:var(--text-sm)] leading-[var(--lh-ui)] text-[var(--text-muted)]">
+          <p className="mt-[var(--space-8)] font-sans text-[13pt] leading-[var(--lh-ui)] text-[var(--text-muted)]">
             Routes across {PROVIDERS.join(', ')}, and{' '}
             {CAPABILITIES.routableModels.toLocaleString('en-US')} models through OpenRouter. Full
             detail in{' '}
@@ -620,13 +640,13 @@ export default function LandingPage() {
               <div className="mt-[var(--space-10)] flex flex-wrap items-center gap-[var(--space-4)]">
                 <Link
                   href="/chat"
-                  className="btn-lift flex min-h-[var(--space-12)] items-center rounded-[var(--radius)] bg-[var(--accent)] px-[var(--space-8)] font-sans text-[length:var(--text-base)] font-semibold leading-[var(--lh-ui)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)]"
+                  className="btn-lift flex min-h-[var(--space-12)] items-center rounded-[var(--radius)] bg-[var(--accent)] px-[var(--space-8)] font-sans text-[13pt] font-semibold leading-[var(--lh-ui)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)]"
                 >
                   Ask a question
                 </Link>
                 <Link
                   href="/pricing"
-                  className="link-smooth flex min-h-[var(--space-12)] items-center font-sans text-[length:var(--text-base)] font-medium leading-[var(--lh-ui)] text-[var(--text-2)] underline decoration-[var(--border-strong)] underline-offset-4 hover:text-[var(--text)]"
+                  className="link-smooth flex min-h-[var(--space-12)] items-center font-sans text-[13pt] font-medium leading-[var(--lh-ui)] text-[var(--text-2)] underline decoration-[var(--border-strong)] underline-offset-4 hover:text-[var(--text)]"
                 >
                   See pricing
                 </Link>

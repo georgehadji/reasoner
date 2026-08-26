@@ -994,6 +994,125 @@
 }
 
 /* ============================================================
+   Inverted band
+
+   A full-bleed section that runs against the page's ground: dark on
+   the ivory theme, ivory on the dark one. It is a token swap and
+   nothing else — every element inside already paints from --text,
+   --border and --accent, so the band inverts by redefining those
+   rather than by any component knowing it is on dark.
+
+   Defined once per theme selector, mirroring the three palettes above:
+   :root is the ivory theme (so the band takes the dark values), while
+   the dark theme — whether reached by preference or by the explicit
+   .dark class — takes the ivory ones. The (0,3,0) selectors outrank
+   the (0,2,0) one, so a reader who forces a theme still gets a band
+   that contrasts with it.
+
+   --accent has to move with the rest. The ivory theme's #96401F is a
+   6.5:1 coral on ivory and a 2.4:1 near-brown on #131211, so a band
+   that swapped only the greys would quietly drop its links below AA.
+   ============================================================ */
+
+:root .invert-band {
+  color-scheme: dark;
+
+  --bg:            #131211;
+  --surface:       #1C1A18;
+  --surface-2:     #252220;
+  --surface-3:     #302D29;
+  --surface-hover: #201E1B;
+
+  --text:        #FAF9F5;
+  --text-2:      #CFCABE;
+  --text-muted:  #A29C90;
+  --text-subtle: #857F74;
+  --text-small:  #A29C90;
+
+  --border:        rgb(250 249 245 / 0.11);
+  --border-strong: rgb(250 249 245 / 0.24);
+
+  --accent:       #E39B80;
+  --accent-hover: #EDB79F;
+  --accent-text:  #2A1610;
+  --accent-dim:   rgb(227 155 128 / 0.13);
+  --accent-glow:  0 0 40px rgb(227 155 128 / 0.22);
+
+  --ok:      #7BC79B;
+  --warn:    #E8C878;
+  --unknown: #A29C90;
+
+  --shadow:    0 1px 2px rgb(0 0 0 / 0.30), 0 8px 24px -12px rgb(0 0 0 / 0.55);
+  --shadow-lg: 0 2px 4px rgb(0 0 0 / 0.26), 0 24px 56px -20px rgb(0 0 0 / 0.60);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) .invert-band {
+    color-scheme: light;
+
+    --bg:            #FAF9F5;
+    --surface:       #FFFFFF;
+    --surface-2:     #F1EFE7;
+    --surface-3:     #E6E3D8;
+    --surface-hover: #F5F3EC;
+
+    --text:        #191817;
+    --text-2:      #46433D;
+    --text-muted:  #6E6960;
+    --text-subtle: #756F65;
+    --text-small:  #6E6960;
+
+    --border:        rgb(19 18 17 / 0.12);
+    --border-strong: rgb(19 18 17 / 0.26);
+
+    --accent:       #96401F;
+    --accent-hover: #7E3519;
+    --accent-text:  #FFFFFF;
+    --accent-dim:   rgb(150 64 31 / 0.09);
+    --accent-glow:  0 0 24px rgb(150 64 31 / 0.18);
+
+    --ok:      #2F6E4F;
+    --warn:    #7A6012;
+    --unknown: #6E6960;
+
+    --shadow:    0 1px 2px rgb(19 18 17 / 0.05), 0 8px 24px -12px rgb(19 18 17 / 0.18);
+    --shadow-lg: 0 2px 4px rgb(19 18 17 / 0.04), 0 24px 56px -20px rgb(19 18 17 / 0.22);
+  }
+}
+
+:root.dark .invert-band {
+  color-scheme: light;
+
+  --bg:            #FAF9F5;
+  --surface:       #FFFFFF;
+  --surface-2:     #F1EFE7;
+  --surface-3:     #E6E3D8;
+  --surface-hover: #F5F3EC;
+
+  --text:        #191817;
+  --text-2:      #46433D;
+  --text-muted:  #6E6960;
+  --text-subtle: #756F65;
+  --text-small:  #6E6960;
+
+  --border:        rgb(19 18 17 / 0.12);
+  --border-strong: rgb(19 18 17 / 0.26);
+
+  --accent:       #96401F;
+  --accent-hover: #7E3519;
+  --accent-text:  #FFFFFF;
+  --accent-dim:   rgb(150 64 31 / 0.09);
+  --accent-glow:  0 0 24px rgb(150 64 31 / 0.18);
+
+  --ok:      #2F6E4F;
+  --warn:    #7A6012;
+  --unknown: #6E6960;
+
+  --shadow:    0 1px 2px rgb(19 18 17 / 0.05), 0 8px 24px -12px rgb(19 18 17 / 0.18);
+  --shadow-lg: 0 2px 4px rgb(19 18 17 / 0.04), 0 24px 56px -20px rgb(19 18 17 / 0.22);
+}
+
+/* ============================================================
    Accessibility — Reduced motion preference
    ============================================================ */
 
