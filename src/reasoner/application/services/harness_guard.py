@@ -52,7 +52,7 @@ _MODEL_LABS: dict[str, str] = {
     "qwen3-30b-a3b": "qwen", "qwen3-max-real": "qwen", "qwen3.5-9b": "qwen",
     "qwen3.6-27b": "qwen", "qwen3.6-35b-a3b": "qwen", "qwen3.6-max-preview": "qwen",
     # GLM (Zhipu)
-    "glm-5.2": "zhipu", "glm-5.3": "zhipu",
+    "glm-5.2": "zhipu", "glm-5.3": "zhipu", "glm-5.3-flash": "zhipu",
     # Tencent
     "hy3": "tencent", "hy3-preview": "tencent",
     "hy-mt2-30b": "tencent", "hy-mt2-1.8b": "tencent",
@@ -93,7 +93,7 @@ _MODEL_LABS: dict[str, str] = {
     # Sourceful
     "riverflow-v2-fast-preview": "sourceful",
     # InclusionAI (Ant Group)
-    "ring-2.6-1t": "inclusionai", "ling-2.6-flash-free": "inclusionai",
+    "ling-3.0-flash-free": "inclusionai",
     # Xiaomi — MiMo
     "mimo-v2.5-pro": "xiaomi", "mimo-v2.5": "xiaomi",
     "mimo-v2-pro": "xiaomi", "mimo-v2-flash": "xiaomi",
@@ -105,7 +105,7 @@ _MODEL_LABS: dict[str, str] = {
     "sonar": "perplexity", "sonar-reasoning-pro": "perplexity", "sonar-deep-research": "perplexity",
     # NVIDIA
     "nemotron-3-ultra-free": "nvidia", "nemotron-3-super-free": "nvidia",
-    "nemotron-nano-omni-free": "nvidia", "nemotron-nano-30b-free": "nvidia",
+    "nemotron-nano-omni-free": "nvidia", "nemotron-nano-30b": "nvidia",
     "llama-nemotron-super-49b": "nvidia",
 }
 

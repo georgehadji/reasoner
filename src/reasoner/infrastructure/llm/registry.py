@@ -362,10 +362,11 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "nemotron-3-ultra-free":      {"model": "nvidia/nemotron-3-ultra-550b-a55b:free"},    # FREE — 550B/55B MoE, 1M ctx, frontier reasoning
     "nemotron-3-super-free":      {"model": "nvidia/nemotron-3-super-120b-a12b:free"},    # FREE — 120B/12B MoE, 1M ctx
     "nemotron-nano-omni-free":    {"model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"}, # FREE — 30B/3B, multimodal reasoning
-    "nemotron-nano-30b-free":     {"model": "nvidia/nemotron-3-nano-30b-a3b:free"},       # FREE — 30B/3B MoE
-    "nemotron-nano-30b":          {"model": "nvidia/nemotron-3-nano-30b-a3b"},            # paid fallback for the :free tier above — $0.05/$0.20 per M
+    "nemotron-nano-30b":          {"model": "nvidia/nemotron-3-nano-30b-a3b"},            # $0.05/$0.20 per M — was the paid fallback for the delisted :free tier
     "nemotron-3-ultra":           {"model": "nvidia/nemotron-3-ultra-550b-a55b"},         # paid fallback for nemotron-3-ultra-free — $0.60/$3.60 per M, 512K ctx
-    "nemotron-nano-9b-v2-free":   {"model": "nvidia/nemotron-nano-9b-v2:free"},           # FREE — 9B, unified reasoning
+    # nemotron-nano-30b-free / nemotron-nano-9b-v2-free removed 2026-08-26 — both
+    # :free tiers left the OpenRouter catalogue. Neither was routed by a preset.
+    # The 30B keeps its paid sibling above; the 9B has no paid tier on OpenRouter.
     # llama-nemotron-super-49b removed — dead pin, redundant with nemotron-3-super pins above
     # NVIDIA NIM (direct, not via OpenRouter)
     "nvidia-nemotron-super": {

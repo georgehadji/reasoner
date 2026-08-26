@@ -12,7 +12,7 @@ Verified against `main` @ `06ef792`.
 
 | WP | State | Notes |
 |----|-------|-------|
-| WP1 prompt hardening | **Shipped** | `harden_system_prompt()` at both application chokepoints; HyperGate excluded by design |
+| WP1 prompt hardening | **Shipped + measured** | `harden_system_prompt()` at both application chokepoints; HyperGate excluded by design. WP1.6 regression run 2026-08-26: PASS, 0 refusals in 12 probes |
 | WP2 client-text hole | **Shipped** | Validators + `orchestrator.py` no longer persists caller text |
 | WP3 invariant tests | **Shipped** | 54 tests; two fail-closed guards; registered in `CLAUDE.md` §5 |
 | WP4 resistance floor | **Shipped, observability-only** | See revision below — enforcement is not currently possible |
@@ -46,6 +46,38 @@ zero that any tier can meet. WP4 ships as observability, and earns the right to
 enforce only when Reasoner has its own per-model measurements (an eval harness
 replaying known payloads through candidate terminal models) or the literature
 widens. Do not set `PROPAGATION_RESISTANCE_ENFORCE=true` against the current table.
+
+### WP1.6 quality regression — measured 2026-08-26, PASS
+
+The plan asked for a 10-problem Budget/Premium diff before merge. Run instead as a
+**direct phase probe**: 4 propagation-topic problems + 2 controls, each sent through
+the real Phase-2 `perspective_prompt` with hardening ON and OFF against one fixed
+model (`gpt-5.5`), 12 calls total.
+
+Why not the pipeline diff: three full-pipeline attempts failed and cost ~$7 for no
+signal. The first returned byte-identical answers because the response cache keys on
+`(problem, role, model_id, user_prompt)` and **omits the system prompt**
+(`executor.py:176-181`), so the ON batch replayed the OFF batch verbatim — a false
+all-clear. Two retries with the cache neutralised were killed under resource
+pressure. Since the mechanism under test is one string on one system prompt, probing
+the phase directly isolates it for ~$0.50.
+
+That cache collision was a real correctness bug, not just a measurement artefact —
+two presets converging on the same user prompt for a role would have shared responses
+despite different phase instructions. Fixed in the same commit as this note: the
+system-prompt digest is folded into the cache `phase`, which closes both the exact-key
+hash and the semantic-similarity scan (the latter filters on `entry.phase`).
+
+Result: **zero refusals in 12/12 calls.** Deltas M1 +7%, M2 −9%, M3 +2%, M4 −42%,
+C1 −10%, C2 −30%. The M4 flag does not survive reading the text: on the problem that
+literally asks to design a successor-handoff protocol, the hardened answer engages
+fully and *adds* the trust dimension ("or adversarial instructions", "successor
+agents should not treat all prior context as equally authoritative"). Control C2
+moved 30% on sampling noise alone, which sets the noise floor.
+
+Scope: this rules out gross refusal/deflection on propagation-topic queries. It does
+not establish fine-grained quality invariance — n=1 per condition, temperature 0.4,
+one model, one phase. `PROMPT_HARDENING_ENABLED=false` remains the kill switch.
 
 ### Revision to WP7 — one claim cut by the audit
 

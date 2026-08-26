@@ -133,7 +133,16 @@ class RunPipelineCommandHandler:
         # Execute pipeline phases
         from reasoner.infrastructure.llm.router import ProviderRouter
 
-        router = ProviderRouter(primary=self.llm_router)
+        # llm_router may already be a fully-built ProviderRouter (main.py and
+        # headless.py both pass preflight.router) or a bare provider. Wrapping a
+        # router in a router produced one whose routing_table was empty and whose
+        # `primary` was the inner router, so resolve() returned the wrapper for
+        # every role and the first phase died on `.model`. Accept either.
+        router = (
+            self.llm_router
+            if isinstance(self.llm_router, ProviderRouter)
+            else ProviderRouter(primary=self.llm_router)
+        )
 
         try:
             from reasoner.application.services.pipeline_service import PipelineService

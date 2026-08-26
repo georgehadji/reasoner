@@ -1113,6 +1113,66 @@
 }
 
 /* ============================================================
+   Scroll-linked growth
+
+   The inverted band opens inset and reaches full bleed as it comes up
+   the viewport, and gives the width back on the way out. Scrolling up
+   reverses it exactly, because a view() timeline is scrubbed by the
+   element's position in the scrollport rather than driven by scroll
+   events — there is no state to get stuck, no direction to detect, and
+   a reader who stops halfway stops halfway.
+
+   Done in CSS rather than with a scroll listener on purpose. A JS
+   handler for this runs on the main thread at whatever rate the wheel
+   fires and fights the compositor for the same frames the masthead
+   canvas is already using; a view() timeline is driven by the
+   compositor and costs nothing per frame.
+
+   The radius travels with the scale and lands at zero. That pairing is
+   the whole illusion: a rounded inset rectangle reads as a card sitting
+   on the page, and a square full-width one reads as the page's own
+   ground changing colour. Growing the scale while squaring the corners
+   turns the first into the second, which is what the band is for.
+
+   Text under a transform is resampled, so the type softens while the
+   band is in transit and is sharp only at rest. At 0.68 that is visible
+   if you look for it. It is the accepted cost of the effect: the band
+   is at full scale for the entire time it is centred in the viewport,
+   which is the whole of the time anyone is reading it.
+
+   @supports guards the whole thing: a browser without view timelines
+   renders the band at its natural size, which is the finished state.
+   ============================================================ */
+
+@supports (animation-timeline: view()) {
+  .scroll-grow {
+    animation: scroll-grow linear both;
+    animation-timeline: view();
+    /* Measured over `cover`, not `entry`. The entry range's end depends
+       on the element being shorter than the viewport, and this band is
+       not — `cover` is well defined at any height. */
+    animation-range: cover 0% cover 30%;
+    transform-origin: center top;
+    will-change: transform;
+  }
+
+  @keyframes scroll-grow {
+    from {
+      transform: scale(0.68);
+      /* Specified radius is multiplied by the scale, so 80px renders at
+         roughly 54px while the band is at 0.68 — a corner deep enough to
+         read as a card across a 980px-wide plate, where the app's own
+         24px slab radius would vanish at that size. */
+      border-radius: 80px;
+    }
+    to {
+      transform: scale(1);
+      border-radius: 0;
+    }
+  }
+}
+
+/* ============================================================
    Accessibility — Reduced motion preference
    ============================================================ */
 
@@ -1130,6 +1190,15 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  /* Scroll-driven animations are scrubbed by a timeline, not by a clock,
+     so they ignore the animation-duration override above entirely. A
+     reader who asked for stillness has to be opted out by name. */
+  .scroll-grow {
+    animation: none !important;
+    transform: none !important;
+    border-radius: 0 !important;
   }
 
   /* Utility: re-enable transitions for opacity/color state changes */

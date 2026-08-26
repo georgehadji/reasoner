@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { CollagePlate, type PlateVariant } from '@/components/landing/CollagePlate';
 import { PipelineRail } from '@/components/landing/PipelineRail';
 
 /**
@@ -25,6 +26,8 @@ import { PipelineRail } from '@/components/landing/PipelineRail';
 
 interface Stage {
   readonly href: string;
+  /** Which plate is drawn above this stage. */
+  readonly plate: PlateVariant;
   readonly ordinal: string;
   /** The failure mode, named. This is the line the section exists to state. */
   readonly failure: string;
@@ -42,6 +45,7 @@ interface Stage {
 const STAGES: readonly Stage[] = [
   {
     href: '#bias',
+    plate: 'bias',
     ordinal: '01',
     failure: 'Bias',
     stage: 'Routing',
@@ -50,6 +54,7 @@ const STAGES: readonly Stage[] = [
   },
   {
     href: '#propagation',
+    plate: 'propagation',
     ordinal: '02',
     failure: 'Mind-virus propagation',
     stage: 'Reasoning',
@@ -58,6 +63,7 @@ const STAGES: readonly Stage[] = [
   },
   {
     href: '/how-it-works#adjudication',
+    plate: 'sycophancy',
     ordinal: '03',
     failure: 'Sycophancy',
     stage: 'Critique',
@@ -75,6 +81,7 @@ const STAGES: readonly Stage[] = [
   },
   {
     href: '#hallucination',
+    plate: 'hallucination',
     ordinal: '04',
     failure: 'Hallucination',
     stage: 'Labelling',
@@ -100,7 +107,7 @@ export function MechanismDiagram() {
         role="list"
         className="grid list-none gap-x-[var(--space-8)] gap-y-[var(--space-10)] [perspective:1400px] sm:grid-cols-2 lg:grid-cols-4"
       >
-        {STAGES.map(({ href, ordinal, failure, stage, defence }) => (
+        {STAGES.map(({ href, plate, ordinal, failure, stage, defence }) => (
           <li
             key={href}
             className="card-hover group relative border-t border-[var(--border)] pt-[var(--space-5)] [transform-style:preserve-3d] hover:border-[var(--border-strong)] hover:[transform:translateZ(26px)_rotateX(3.5deg)] motion-reduce:hover:[transform:none]"
@@ -114,7 +121,12 @@ export function MechanismDiagram() {
               className="absolute -top-[3px] left-0 block h-[5px] w-[5px] bg-[var(--accent)] lg:hidden"
             />
 
-            <p className="nums-tabular font-mono text-[8pt] leading-[var(--lh-ui)] text-[var(--accent)]">
+            {/* The plate leads. It is the only part of a stage a reader
+                takes in without reading, so it earns the top of the column
+                and the heading answers the question it raises. */}
+            <CollagePlate variant={plate} />
+
+            <p className="nums-tabular mt-[var(--space-5)] font-mono text-[8pt] leading-[var(--lh-ui)] text-[var(--accent)]">
               {ordinal}
               <span className="ml-[var(--space-3)] font-sans font-semibold uppercase tracking-[var(--tracking-label)] text-[var(--text-subtle)]">
                 {stage}

@@ -13,6 +13,7 @@ Responsible for:
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import re
 import time  # Ensure time is imported once
@@ -173,13 +174,25 @@ class LLMExecutor:
             else user_prompt[: TRUNCATION.PROBLEM]
         )
 
+        # The cache key must include the system prompt. Without it, two calls
+        # sharing (problem, role, model, user_prompt) collide even when their
+        # system prompts differ — which silently defeated the WP1 hardening A/B
+        # (the second variant replayed the first's answers verbatim) and would
+        # let two presets share responses despite different phase instructions.
+        #
+        # Folding the digest into `phase` rather than adding a parameter closes
+        # BOTH lookup paths at once: the exact key hashes `phase`, and the
+        # semantic-similarity scan filters candidates on `entry.phase != phase`.
+        # Prometheus labels use `role`, not this, so metrics are unaffected.
+        cache_phase = f"{role}#{hashlib.sha256(system_prompt.encode()).hexdigest()[:12]}"
+
         if self._token_cache and self._caching_enabled and not stream:
             # For caching, we need a specific model_id. If cascading, we'll cache against the first model.
             # This is a simplification; a more robust cache would handle model cascades explicitly.
             model_id_for_cache = self.cascading_routing.get(role, [self.router.get(role).model])[0]
             cached_response = await self._token_cache.get(
                 problem=state.problem,
-                phase=role,
+                phase=cache_phase,
                 model_id=model_id_for_cache,
                 prompt=cache_prompt,
             )
@@ -292,7 +305,7 @@ class LLMExecutor:
                     if self._token_cache and self._caching_enabled:
                         await self._token_cache.set(
                             problem=state.problem,
-                            phase=role,
+                            phase=cache_phase,
                             model_id=model_id,
                             prompt=cache_prompt,
                             response=raw,
@@ -496,7 +509,7 @@ class LLMExecutor:
                 )
                 await self._token_cache.set(
                     problem=state.problem,
-                    phase=role,
+                    phase=cache_phase,
                     model_id=model_id,
                     prompt=cache_prompt,
                     response=raw,

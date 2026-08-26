@@ -61,6 +61,17 @@ function Section({
       className="mx-auto w-full max-w-[var(--width-wide)] scroll-mt-[var(--space-20)] px-[var(--gutter)] py-[var(--section-y)]"
     >
       <div className="grid gap-[var(--space-6)] lg:grid-cols-[9rem_minmax(0,1fr)] lg:gap-[var(--space-12)]">
+        {/* The marker parks itself alongside the section it labels, on every
+            section including the band — it is the device that makes this page
+            and the run record read as one document, so the band cannot be the
+            one place it goes missing.
+
+            On the band it does drift slightly while the growth range plays: a
+            transformed ancestor is a containing block, so a sticky child is
+            scaled along with everything else instead of holding still. The
+            range ends at cover 30%, which means the scale is already 1 for
+            the whole time the band sits centred in the viewport, and that is
+            the whole time the marker is actually being parked against. */}
         <div className="lg:sticky lg:top-[var(--space-24)] lg:self-start">
           <p className="nums-tabular font-mono text-[8pt] text-[var(--accent)]">
             {marker}
@@ -76,7 +87,9 @@ function Section({
 
   if (tone !== 'invert') return inner;
 
-  return <div className="invert-band bg-[var(--bg)] text-[var(--text)]">{inner}</div>;
+  return (
+    <div className="scroll-grow invert-band bg-[var(--bg)] text-[var(--text)]">{inner}</div>
+  );
 }
 
 function Heading({ children }: { children: ReactNode }) {
@@ -225,7 +238,11 @@ export default function LandingPage() {
               </h1>
             </div>
 
-            <div>
+            {/* Drops to the foot of the row so the paragraph's last line sits
+                on the headline's baseline. The two columns are one sentence
+                and its proof, and hanging the short one from the top of a
+                three-line display leaves it floating against nothing. */}
+            <div className="lg:self-end">
               {/* One sentence, in the order a sceptic needs it: rival labs
                   (why the disagreement is real) → kept, not averaged (what
                   is different) → by rule (why it can be trusted). The last

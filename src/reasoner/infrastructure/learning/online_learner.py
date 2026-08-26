@@ -11,6 +11,7 @@ import asyncio
 import logging
 from typing import Any
 
+from reasoner.core.learning_guard import check_reward_signal_purity
 from reasoner.domain.model_capabilities import ModelCapabilities
 from reasoner.domain.telemetry import LLMCallTelemetry
 from reasoner.infrastructure.learning.exploration import ExplorationPolicy
@@ -59,6 +60,10 @@ class OnlineLearner:
             min_samples_for_export: Minimum observations before a model's
                 capabilities are exported to the registry.
         """
+        ok, reason = check_reward_signal_purity(frozenset(LLMCallTelemetry.__dataclass_fields__))
+        if not ok:
+            raise ValueError(reason)
+
         self.sampler = sampler or ThompsonSampler()
         self.signal_aggregator = signal_aggregator or QualitySignalAggregator()
         self.exploration_policy = exploration_policy or ExplorationPolicy()

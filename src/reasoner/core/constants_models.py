@@ -68,7 +68,6 @@ MODEL_MISTRAL_SMALL: str = "mistral-small"
 
 # v3.2 — new ultra-VFM models
 MODEL_STEPFUN_37_FLASH: str = "stepfun-3.7-flash"
-MODEL_RING_26_1T: str = "ring-2.6-1t"
 MODEL_NEX_N2_PRO_FREE: str = "nex-n2-pro-free"
 MODEL_NEMOTRON_3_ULTRA_FREE: str = "nemotron-3-ultra-free"
 
@@ -80,8 +79,6 @@ MODEL_GEMINI_PRO_LATEST: str = "gemini-pro-latest"
 MODEL_GEMINI_FLASH_LATEST: str = "gemini-flash-latest"
 MODEL_NEMOTRON_3_SUPER_FREE: str = "nemotron-3-super-free"
 MODEL_NEMOTRON_NANO_OMNI_FREE: str = "nemotron-nano-omni-free"
-MODEL_NEMOTRON_NANO_30B_FREE: str = "nemotron-nano-30b-free"
-MODEL_NEMOTRON_NANO_9B_V2_FREE: str = "nemotron-nano-9b-v2-free"
 MODEL_LLAMA_NEMOTRON_SUPER_49B: str = "llama-nemotron-super-49b"
 
 # ── Additional model aliases used across the codebase ──
@@ -172,7 +169,6 @@ MODEL_SEEDREAM_5_LITE: str = "seedream-5-lite"
 MODEL_QIANFAN_OCR_FAST: str = "qianfan-ocr-fast"
 
 # inclusionAI
-MODEL_LING_26_FLASH_FREE: str = "ling-2.6-flash-free"
 
 # Meta
 MODEL_LLAMA_33_70B: str = "llama-3.3-70b"
