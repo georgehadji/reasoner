@@ -175,6 +175,40 @@ const TERMS = [
   },
 ];
 
+/**
+ * The masthead visual is the product's own output rather than a picture of
+ * it. Every competing hero in this market opens on a gradient, an angled
+ * dashboard, or an abstraction of neural connections; a visitor learns
+ * nothing from any of them. Three claims — one per epistemic label — teach
+ * the whole product in a glance, and the UNKNOWN row does the most work,
+ * because a product admitting what it does not know on its own front door
+ * is the argument the rest of the page spends eight sections making.
+ *
+ * Illustrative, and captioned as such under the card. The real captured run
+ * is one click away at /how-it-works; dressing an example up as a record
+ * would contradict §1 in the same viewport that states it.
+ */
+const SPECIMEN_CLAIMS = [
+  {
+    label: 'Verified',
+    tone: 'epistemic-verified',
+    claim: 'Aurora replicates storage six ways across three availability zones.',
+    basis: 'source: AWS Aurora storage docs — read, not recalled',
+  },
+  {
+    label: 'Hypothesis',
+    tone: 'epistemic-hypothesis',
+    claim: 'Your p99 write latency improves once the WAL leaves the instance.',
+    basis: 'asserted by 3 of 4 models · no source · downgraded in code',
+  },
+  {
+    label: 'Unknown',
+    tone: 'epistemic-unknown',
+    claim: 'What this costs you. I/O-optimized flips the pricing model entirely.',
+    basis: 'needs your read/write ratio — not in the question',
+  },
+];
+
 /* ── Page ─────────────────────────────────────────────────────────── */
 
 export default function LandingPage() {
@@ -184,67 +218,77 @@ export default function LandingPage() {
 
       <main id="main-content">
         {/* ── Masthead ───────────────────────────────────────────
-            States the spine once. Every section below is an instance
-            of it, which is what stops the page reading as a list. */}
+            States the spine once, then proves it in the same viewport. Left
+            column is the argument, right column is the product's own output.
+            Every section below is an instance of the same claim, which is
+            what stops the page reading as a list. */}
         <header className="mx-auto w-full max-w-[var(--width-wide)] px-[var(--gutter)] pb-[var(--section-y)] pt-[var(--space-32)]">
-          <div className="grid gap-[var(--space-12)] lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-[var(--space-16)]">
+          <div className="grid gap-[var(--space-12)] lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:items-start lg:gap-[var(--space-16)]">
             <div>
-              <p className="font-sans text-[length:var(--text-xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--accent)]">
-                Reasoner
-              </p>
-
-              <h1 className="mt-[var(--space-6)] max-w-[18ch] font-serif text-[length:var(--text-5xl)] font-normal leading-[var(--lh-display)] tracking-[var(--tracking-tight)] text-[var(--text)]">
+              {/* The mechanism, direct. No eyebrow needed — the claim reads
+                  on its own and the product's own output (right column)
+                  teaches what it means. */}
+              <h1 className="max-w-[18ch] text-balance font-serif text-[144px] font-normal leading-[var(--lh-display)] tracking-[var(--tracking-tight)] text-[var(--text)]">
                 Models that disagree, on the record.
               </h1>
 
+              {/* One sentence, in the order a sceptic needs it: rival labs
+                  (why the disagreement is real) → kept, not averaged (what
+                  is different) → by rule (why it can be trusted). The last
+                  clause is the only emphasis above the fold and the only
+                  claim a competitor cannot also make; it is a weight shift
+                  rather than a colour so it never competes with the CTA.
+                  The second paragraph that used to sit here is §1's job. */}
+              <p className="prose-measure mt-[var(--space-8)] font-serif text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-2)]">
+                Reasoner puts your question to models from rival labs, keeps their disagreement
+                instead of averaging it away, and labels every claim{' '}
+                <strong className="font-medium text-[var(--text)]">
+                  verified, hypothesis, or unknown &mdash; by rule, not by asking a model how sure
+                  it feels
+                </strong>
+                .
+              </p>
+
+              <div className="mt-[var(--space-10)] flex flex-wrap items-center gap-[var(--space-3)] gap-x-[var(--space-8)]">
+                <Link
+                  href="/chat"
+                  className="btn-lift group flex min-h-[var(--space-12)] items-center gap-[var(--space-2)] rounded-[var(--radius)] bg-[var(--accent)] px-[var(--space-8)] font-sans text-[length:var(--text-base)] font-semibold leading-[var(--lh-ui)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)]"
+                >
+                  Ask a question
+                  <span
+                    aria-hidden="true"
+                    className="transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
+                  >
+                    &rarr;
+                  </span>
+                </Link>
+                {/* Points at a captured production run, not a demo request.
+                    The reader this headline attracts is a sceptic, and a
+                    sceptic converts on evidence they can read alone. */}
+                <Link
+                  href="/how-it-works"
+                  className="link-smooth flex min-h-[var(--space-12)] items-center font-sans text-[length:var(--text-base)] font-medium leading-[var(--lh-ui)] text-[var(--text-2)] underline decoration-[var(--border-strong)] underline-offset-4 hover:text-[var(--text)]"
+                >
+                  Read a complete run
+                </Link>
+              </div>
+
+              {/* The number does what the word "free" cannot: it answers the
+                  price objection and the what-is-the-catch objection in the
+                  same six words. The one figure on this page that is not
+                  machine-generated — keep it in step with /pricing. */}
+              <p className="mt-[var(--space-4)] font-sans text-[length:var(--text-sm)] leading-[var(--lh-ui)] text-[var(--text-muted)]">
+                20 questions a month on the free tier.
+              </p>
+            </div>
+
+            <div>
               <p className="prose-measure mt-[var(--space-8)] font-serif text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-2)]">
                 One model checking its own work is one opinion. Reasoner runs every question past
                 models from competing labs and rival geopolitical blocs, then keeps the
                 disagreement in the output instead of averaging it away.
               </p>
-
-              <p className="prose-measure mt-[var(--space-4)] font-serif text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
-                That one mechanism is what mitigates hallucination, what surfaces bias, and what
-                puts four images from four labs in front of you instead of one house style.
-              </p>
-
-              <div className="mt-[var(--space-10)] flex flex-wrap items-center gap-[var(--space-4)]">
-                <Link
-                  href="/chat"
-                  className="btn-lift flex min-h-[var(--space-12)] items-center rounded-[var(--radius)] bg-[var(--accent)] px-[var(--space-8)] font-sans text-[length:var(--text-base)] font-semibold leading-[var(--lh-ui)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)]"
-                >
-                  Ask a question
-                </Link>
-                <Link
-                  href="/how-it-works"
-                  className="link-smooth flex min-h-[var(--space-12)] items-center font-sans text-[length:var(--text-base)] font-medium leading-[var(--lh-ui)] text-[var(--text-2)] underline decoration-[var(--border-strong)] underline-offset-4 hover:text-[var(--text)]"
-                >
-                  See a complete run
-                </Link>
-              </div>
             </div>
-
-            {/* Counted from the live registry, never typed. */}
-            <dl className="h-fit border-b border-[var(--border)] lg:mt-[var(--space-2)]">
-              {[
-                { label: 'Methods', value: `${CAPABILITIES.methods} distinct pipelines` },
-                { label: 'Presets', value: `${CAPABILITIES.presets} routing configurations` },
-                { label: 'Models', value: `${CAPABILITIES.routableModels.toLocaleString('en-US')} routable` },
-                { label: 'Labs', value: `${CAPABILITIES.providerAdapters} direct adapters` },
-              ].map(({ label, value }) => (
-                <div
-                  key={label}
-                  className="flex flex-col gap-[var(--space-1)] border-t border-[var(--border)] py-[var(--space-3)] sm:flex-row sm:gap-[var(--space-6)]"
-                >
-                  <dt className="w-[7rem] shrink-0 font-sans text-[length:var(--text-2xs)] uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-subtle)]">
-                    {label}
-                  </dt>
-                  <dd className="min-w-0 font-mono text-[length:var(--text-xs)] leading-[var(--lh-body)] text-[var(--text-2)]">
-                    {value}
-                  </dd>
-                </div>
-              ))}
-            </dl>
           </div>
         </header>
 
