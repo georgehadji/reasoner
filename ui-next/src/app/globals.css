@@ -505,6 +505,7 @@
     --space-20: calc(var(--space-unit) * 20);  /*  80px */
     --space-24: calc(var(--space-unit) * 24);  /*  96px — section */
     --space-32: calc(var(--space-unit) * 32);  /* 128px — page-level break */
+    --space-48: calc(var(--space-unit) * 48);  /* 192px — masthead lead-in */
 
     /* Fluid section rhythm. Fixed section padding is the reason mobile
        pages feel cramped and 4K pages feel empty: 96px is a third of a
@@ -996,6 +997,12 @@
    Accessibility — Reduced motion preference
    ============================================================ */
 
+/* This block reaches CSS animations and transitions only. It cannot reach a
+   requestAnimationFrame loop: a <canvas> painting itself frame by frame has no
+   animation-duration for the cascade to zero, so it keeps running at full rate
+   for a user who asked for stillness. Anything driving motion from JS must read
+   the preference itself — use usePrefersReducedMotion() (hooks/) and render a
+   single static frame, not a slowed one. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

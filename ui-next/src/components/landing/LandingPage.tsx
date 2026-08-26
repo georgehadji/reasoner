@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { DisagreementField } from '@/components/landing/DisagreementField';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
 import { CAPABILITIES, PROVIDERS } from '@/lib/capabilities.generated';
@@ -222,31 +223,33 @@ export default function LandingPage() {
             column is the argument, right column is the product's own output.
             Every section below is an instance of the same claim, which is
             what stops the page reading as a list. */}
-        <header className="mx-auto w-full max-w-[var(--width-wide)] px-[var(--gutter)] pb-[var(--section-y)] pt-[var(--space-32)]">
-          <div className="grid gap-[var(--space-12)] lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:items-start lg:gap-[var(--space-16)]">
+        <header className="relative mx-auto w-full max-w-[var(--width-wide)] px-[var(--gutter)] pb-[var(--section-y)] pt-[var(--space-48)]">
+          <DisagreementField />
+
+          <div className="relative grid gap-[var(--space-12)] lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:items-start lg:gap-[var(--space-16)]">
             <div>
               {/* The mechanism, direct. No eyebrow needed — the claim reads
                   on its own and the product's own output (right column)
                   teaches what it means. */}
-              <h1 className="max-w-[18ch] text-balance font-serif text-[144px] font-normal leading-[var(--lh-display)] tracking-[var(--tracking-tight)] text-[var(--text)]">
+              <h1 className="max-w-[18ch] text-balance font-serif text-[89pt] font-normal leading-[var(--lh-display)] tracking-[var(--tracking-tight)] text-[var(--text)]">
                 Models that disagree, on the record.
               </h1>
+            </div>
 
+            <div>
               {/* One sentence, in the order a sceptic needs it: rival labs
                   (why the disagreement is real) → kept, not averaged (what
                   is different) → by rule (why it can be trusted). The last
                   clause is the only emphasis above the fold and the only
                   claim a competitor cannot also make; it is a weight shift
-                  rather than a colour so it never competes with the CTA.
-                  The second paragraph that used to sit here is §1's job. */}
-              <p className="prose-measure mt-[var(--space-8)] font-serif text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-2)]">
-                Reasoner puts your question to models from rival labs, keeps their disagreement
-                instead of averaging it away, and labels every claim{' '}
+                  rather than a colour so it never competes with the CTA. */}
+              <p className="prose-measure font-serif text-[21pt] leading-[1.6] text-[var(--text-2)]">
+                Reasoner puts your question to models from rival labs and rival geopolitical blocs,
+                keeps their disagreement instead of averaging it away, and labels every claim{' '}
                 <strong className="font-medium text-[var(--text)]">
-                  verified, hypothesis, or unknown &mdash; by rule, not by asking a model how sure
-                  it feels
+                  verified, hypothesis, or unknown. By rule, not by asking a model how sure it
+                  feels.
                 </strong>
-                .
               </p>
 
               <div className="mt-[var(--space-10)] flex flex-wrap items-center gap-[var(--space-3)] gap-x-[var(--space-8)]">
@@ -279,14 +282,6 @@ export default function LandingPage() {
                   machine-generated — keep it in step with /pricing. */}
               <p className="mt-[var(--space-4)] font-sans text-[length:var(--text-sm)] leading-[var(--lh-ui)] text-[var(--text-muted)]">
                 20 questions a month on the free tier.
-              </p>
-            </div>
-
-            <div>
-              <p className="prose-measure mt-[var(--space-8)] font-serif text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-2)]">
-                One model checking its own work is one opinion. Reasoner runs every question past
-                models from competing labs and rival geopolitical blocs, then keeps the
-                disagreement in the output instead of averaging it away.
               </p>
             </div>
           </div>
