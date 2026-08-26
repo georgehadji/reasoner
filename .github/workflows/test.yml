@@ -41,7 +41,10 @@ jobs:
           # back down. The +1 is one E402 in api/dependencies.py, whose import
           # block already sits below a statement -- get_preset_tier has to be
           # module-level there because the tests patch it as a module attribute.
-          python scripts/ruff_ratchet.py --max 2239
+          # 2237: the propagation-resistance work replaced four hand-rolled copies
+          # of the web-snippet block with build_web_sources_block(), retiring two
+          # long lines along with the duplication.
+          python scripts/ruff_ratchet.py --max 2237
 
       - name: Security scan (bandit)
         run: |
