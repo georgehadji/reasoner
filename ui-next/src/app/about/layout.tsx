@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 import { absoluteUrl } from '@/lib/site';
 
-// The page itself is a client component and therefore cannot export metadata;
-// a route-segment layout is the supported way to give it a title, description,
-// and canonical URL without rewriting the page.
+// Metadata lives here rather than in page.tsx so the two stay separable: the
+// page has been a client component before and may be again, and a route-segment
+// layout carries the title, description, and canonical URL either way.
 export const metadata: Metadata = {
   title: 'About',
   description:
