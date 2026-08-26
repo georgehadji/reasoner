@@ -131,7 +131,7 @@ ui-next/src/
 
 tests/                      # pytest suite (~197 test files)
 scripts/
-└── update_mindmap_meta.py  # Patches live counts into ARCHITECTURE_MINDMAP.md (runs post-commit)
+└── update_mindmap_meta.py  # Patches live counts into ARCHITECTURE_MINDMAP.md (run manually — see §10)
 ```
 
 ---
@@ -302,8 +302,8 @@ Cross-lab diversity prevents echo chambers:
 
 | Doc | How it updates |
 |-----|---------------|
-| `ARCHITECTURE_MINDMAP.md` | `post-commit` hook patches date + counts (models, presets, files) automatically via `scripts/update_mindmap_meta.py` |
-| `graphify-out/` | `post-commit` and `post-checkout` hooks rebuild the knowledge graph automatically |
+| `ARCHITECTURE_MINDMAP.md` | **Manual** — run `python scripts/update_mindmap_meta.py` to patch date + counts (models, presets, files). This was a `post-commit` hook, but `core.hooksPath` now points at `.githooks/`, which contains only `pre-commit` and `pre-push`; `core.hooksPath` replaces `.git/hooks/` with no fallback, so the old hook stopped running and the file goes stale until someone runs the script |
+| `graphify-out/` | **Manual** — same cause: the `post-commit` / `post-checkout` hooks that rebuilt the knowledge graph live in `.git/hooks/` and are no longer reachable. Run `/graphify` to rebuild |
 | `.claude/skills/map-*/SKILL.md` | `scripts/check_skill_maps.py` (pre-commit warning + `PostToolUse` hook on Write) reports which map a new or deleted file made stale; run `/update-maps` to rewrite the affected map, then `--update` to re-baseline |
 | `AGENTS.md` | Manual — update when adding methods, presets, or major architectural changes |
 

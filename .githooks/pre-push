@@ -4,7 +4,19 @@
 # private free-plan repo (Phase 0.1), so no hosted check runs today; this is
 # the real gate until that's resolved — see "Switching triggers" in
 # docs/plans/architecture-score-9-remediation-plan.md.
-# Skip with: git push --no-verify
+#
+# DISABLED BY DEFAULT as of 2026-08-26. scripts/ci-local.sh runs the full CI
+# mirror on every push; on a loaded machine that exceeded ten minutes and
+# blocked pushing entirely. Gating the push on it cost more than it caught,
+# because the same checks are run directly during development.
+#
+# Opt in for a run:   REASONER_PREPUSH_CI=1 git push
+# Or run it directly: bash scripts/ci-local.sh
+#
+# NOTE: with this off and GitHub Actions billing lapsed, nothing gates a push.
+# Re-enable by deleting the guard below once hosted CI is running again.
+
+[ "$REASONER_PREPUSH_CI" = "1" ] || exit 0
 
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$SCRIPT_DIR" || exit 1
