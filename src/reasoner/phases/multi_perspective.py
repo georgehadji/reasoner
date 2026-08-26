@@ -8,7 +8,13 @@ from reasoner.core.vs_constants import (
     VS_K_CRITIQUE_HYPOTHESES,
 )
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.phases._shared import _followup_context, _wrap_user_input, get_language_instruction
+from reasoner.phases._shared import (
+    _followup_context,
+    _wrap_user_input,
+    build_memory_context,
+    build_web_sources_block,
+    get_language_instruction,
+)
 
 PERSPECTIVE_SYSTEMS = {
     "constructive": "Respond in the same language as the user's problem. Build the strongest, most comprehensive solution. Analyze from first principles, cite historical precedents where relevant, and address 2nd-order consequences. Minimum 4 paragraphs. JSON only.",
@@ -23,17 +29,14 @@ def perspective_prompt(state: PipelineState, perspective: str) -> str:
         context["chain"] = len(state.decomposition.get("causal_chain", []))
     if state.reflexion_memory:
         context["memory"] = state.reflexion_memory[:TRUNCATION.MEMORY]
-    if state.web_discovery_results:
-        web_snippets = [
-            f"  - {r.get('title', '')}: {r.get('snippet', '')[:300]}"
-            for r in state.web_discovery_results[:5]
-            if r.get('title') or r.get('snippet')
-        ]
-        if web_snippets:
-            context["web_sources"] = web_snippets
     followup = _followup_context(state)
+    # Web sources and recalled memory are web- or model-authored text, so they are
+    # rendered through the shared delimited builders instead of being interpolated
+    # raw into the JSON context blob. Both return "" when empty.
+    web_block = build_web_sources_block(state)
+    memory_block = build_memory_context(state)
 
-    return f'{get_language_instruction(state)}\n{followup}\nContext: {json.dumps(context)}\n\nAnalyze from {perspective} perspective.\n\nYou MUST return EXACTLY this JSON structure with no additional keys. Put all analysis inside "core_analysis" as a single string (3-6 paragraphs). Label factual claims inline with [VERIFIED], [HYPOTHESIS], or [UNKNOWN].\n\nJSON: {{"perspective": "{perspective}", "core_analysis": "<your detailed analysis with inline epistemic labels>", "key_insights": ["<insight 1>", "<insight 2>", "<insight 3>"]}}'
+    return f'{get_language_instruction(state)}\n{followup}{memory_block}\nContext: {json.dumps(context)}{web_block}\n\nAnalyze from {perspective} perspective.\n\nYou MUST return EXACTLY this JSON structure with no additional keys. Put all analysis inside "core_analysis" as a single string (3-6 paragraphs). Label factual claims inline with [VERIFIED], [HYPOTHESIS], or [UNKNOWN].\n\nJSON: {{"perspective": "{perspective}", "core_analysis": "<your detailed analysis with inline epistemic labels>", "key_insights": ["<insight 1>", "<insight 2>", "<insight 3>"]}}'
 
 CRITIQUE_SYSTEM = "You are an analytical assistant. Score solutions honestly. Output ONLY valid JSON."
 

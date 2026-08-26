@@ -225,6 +225,65 @@ def sanitize_for_prompt(text: str) -> tuple[str, list[str]]:
     return result.sanitized, warnings
 
 
+def neutralize_for_replay(text: str) -> tuple[str, list[str]]:
+    """Sanitise text that is being *replayed* into a prompt, not accepted as a
+    fresh instruction. Never raises, never blocks, never rewrites wording.
+
+    Two different surfaces need two different policies:
+
+    ``sanitize_for_prompt`` guards the front door — a user's actual request. It
+    blocks on an injection pattern, which is right: a fresh instruction that
+    looks like an override should be refused outright.
+
+    This function guards replay channels — prior-turn text supplied by an API
+    caller, and long-term memory recalled from an earlier run. Blocking there is
+    wrong twice over. Empty input is normal (the first follow-up in a
+    conversation has no previous synthesis), and the content is usually
+    Reasoner's *own* prose coming back, which can legitimately contain a phrase
+    like "System:" when the answer is about prompt engineering or logs. Refusing
+    those would be a self-inflicted denial of service on our own output.
+
+    So the policy here is: strip what is unambiguously unsafe (control
+    characters, invisible Unicode carriers, over-length input), leave the wording
+    intact, and *report* any injection pattern found so the caller can count it.
+    The real controls on this channel are the ``<<<EXTERNAL_CONTENT>>>`` wrapper
+    applied by ``build_followup_context``/``build_memory_context`` and the
+    propagation-resistance rule in the system prompt. This is defence in depth
+    underneath those, not the primary control.
+
+    Returns (sanitised_text, warnings). ``warnings`` is non-empty when something
+    was changed or flagged.
+    """
+    if not text or not text.strip():
+        return "", []
+
+    from reasoner.domain.watermark import scrub_text
+
+    warnings: list[str] = []
+
+    scrub_result = scrub_text(text)
+    if scrub_result.stats.total_changed:
+        text = scrub_result.text
+        warnings.append(
+            f"Removed {scrub_result.stats.total_changed} invisible/format Unicode "
+            "character(s) from replayed text"
+        )
+
+    # Report injection patterns without acting on them — see docstring.
+    if InputSanitizer._injection_regex.search(text):
+        warnings.append("Potential prompt injection pattern in replayed text")
+
+    sanitizer = InputSanitizer(
+        max_length=DEFAULT_SANITIZER_MAX_LENGTH,
+        allow_html=True,
+        block_injection=False,
+    )
+    result = sanitizer.sanitize(text)
+    if result.blocked:  # only reachable if the text was whitespace-only
+        return "", warnings
+    return result.sanitized, [*warnings, *result.warnings]
+
+
 _SENTENCEPIECE_SPACE = chr(0x2581)  # SentencePiece's leading-space marker
 
 

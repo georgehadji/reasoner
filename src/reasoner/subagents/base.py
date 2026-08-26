@@ -89,9 +89,16 @@ class PhaseSubAgent(ABC):
         t0 = time.monotonic()
         try:
             system_prompt, user_prompt = self._build_prompt(state)
+            # Propagation resistance (docs/MIND_VIRUS_MITIGATION.md M1/M2).
+            # Subagents reach the router directly instead of through
+            # WorkflowServices.call_llm, so the hardening is applied here too:
+            # enhancement subagents read scraped web content, critique subagents
+            # read other models' output.
+            from reasoner.phases._shared import harden_system_prompt
+
             raw, meta = await router.call(
                 role=self.ROLE,
-                system_prompt=system_prompt,
+                system_prompt=harden_system_prompt(system_prompt),
                 user_prompt=user_prompt,
                 max_tokens=self.MAX_TOKENS,
                 temperature=self.TEMPERATURE,

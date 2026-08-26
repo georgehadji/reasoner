@@ -6,7 +6,7 @@ import { CAPABILITIES, PROVIDERS } from '@/lib/capabilities.generated';
 import { SHOWCASE_IMAGES, SHOWCASE_PROMPT } from '@/lib/image-showcase';
 
 /**
- * The home page argues one thing seven ways.
+ * The home page argues one thing eight ways.
  *
  * Every capability below is the same mechanism seen from a different angle:
  * Reasoner runs work past models that disagree, then makes the disagreement
@@ -30,7 +30,7 @@ import { SHOWCASE_IMAGES, SHOWCASE_PROMPT } from '@/lib/image-showcase';
  * Shares the run record's marginal-label idiom so the two pages read as one
  * document. Sections are separated by the §n marker and --section-y
  * whitespace alone — no rule between them. A line reads as a wall between
- * unrelated blocks; this page is one argument in seven parts, and the
+ * unrelated blocks; this page is one argument in eight parts, and the
  * marker's number is what says "new part," not a border.
  */
 function Section({
@@ -313,8 +313,37 @@ export default function LandingPage() {
           <Aside href="/how-it-works#adjudication">See the score matrix and its bias flags →</Aside>
         </Section>
 
-        {/* ── §3 Research ───────────────────────────────────────── */}
-        <Section id="research" marker="§3" name="Research">
+        {/* ── §3 Propagation ────────────────────────────────────── */}
+        <Section id="propagation" marker="§3" name="Propagation">
+          <Heading>An idea does not get to spread itself here.</Heading>
+          <Lede>
+            Systems that pass work between models have a failure mode a single model does not.
+            Text that persuades one stage to carry it into the next can ride the whole pipeline
+            and settle into what the system remembers. Reasoner is built so it has nowhere to
+            travel.
+          </Lede>
+          <Body>
+            Every stage that reads outside text — a web page, an earlier model, a recalled memory,
+            an API caller — is told in its system prompt that such text is data and never
+            instruction, and that anything asking to be repeated, preserved, or passed onward is a
+            finding to report rather than an order to obey. The four generators never read each
+            other, so nothing moves sideways between them. Recalled memory enters as a user
+            message, never as an instruction, carrying the run and model it came from.
+          </Body>
+          <Body>
+            The design follows Papadopoulos et al., <em>Mind Viruses: Self-Propagating Ideas in
+            Multi-Agent LLM Systems</em> (2026), which measures each of these controls
+            independently. The system-prompt warning is the one that held against fifteen
+            generations of adversarial payloads; keeping memory out of the instruction channel is
+            the difference the paper measures between most propagation succeeding and almost none
+            of it. Both are held by tests, so a change that reopens either fails the build.
+          </Body>
+
+          <Aside href="/how-it-works#synthesis">See what a recalled memory looks like in a run →</Aside>
+        </Section>
+
+        {/* ── §4 Research ───────────────────────────────────────── */}
+        <Section id="research" marker="§4" name="Research">
           <Heading>It searches like a researcher, not a search box.</Heading>
           <Lede>
             A single query returns what the query deserved. Reasoner runs an agentic loop that
@@ -358,8 +387,8 @@ export default function LandingPage() {
           <Aside href="/how-it-works#evidence">See what one run actually read →</Aside>
         </Section>
 
-        {/* ── §4 Methods ────────────────────────────────────────── */}
-        <Section id="methods" marker="§4" name="Methods">
+        {/* ── §5 Methods ────────────────────────────────────────── */}
+        <Section id="methods" marker="§5" name="Methods">
           <Heading>{CAPABILITIES.methods} methods. Not {CAPABILITIES.methods} prompts.</Heading>
           <Lede>
             Named reasoning techniques are usually sold as instructions bolted onto one chat
@@ -390,8 +419,8 @@ export default function LandingPage() {
           <Aside href="/docs">Read the method reference →</Aside>
         </Section>
 
-        {/* ── §5 Images ─────────────────────────────────────────── */}
-        <Section id="images" marker="§5" name="Images">
+        {/* ── §6 Images ─────────────────────────────────────────── */}
+        <Section id="images" marker="§6" name="Images">
           <Heading>One prompt. Four images. Four labs.</Heading>
           <Lede>
             The same argument, applied to pixels. Four models from four different labs generate in
@@ -451,8 +480,8 @@ export default function LandingPage() {
           </Body>
         </Section>
 
-        {/* ── §6 Writing ────────────────────────────────────────── */}
-        <Section id="writing" marker="§6" name="Writing">
+        {/* ── §7 Writing ────────────────────────────────────────── */}
+        <Section id="writing" marker="§7" name="Writing">
           <Heading>Drafted, fact-checked, audited, then edited again.</Heading>
           <Lede>
             An article is not one generation. It moves through nine phases, and the fact-check is a
@@ -488,7 +517,7 @@ export default function LandingPage() {
         </Section>
 
         {/* ── §7 Ideas and code ─────────────────────────────────── */}
-        <Section id="ideas" marker="§7" name="Ideas &amp; code">
+        <Section id="ideas" marker="§8" name="Ideas &amp; code">
           <Heading>Divergence where you want it. Rigour where you need it.</Heading>
           <Lede>
             Brainstorming generates widely, then deduplicates by meaning rather than wording,

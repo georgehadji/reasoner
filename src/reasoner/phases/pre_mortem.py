@@ -3,20 +3,19 @@ from __future__ import annotations
 import json
 
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.phases._shared import _wrap_user_input, get_language_instruction
+from reasoner.phases._shared import (
+    _wrap_user_input,
+    build_memory_context,
+    build_web_sources_block,
+    get_language_instruction,
+)
 
 PRE_MORTEM_FAILURE_SYSTEM = "You are an analytical assistant. Assume failure has already occurred and reconstruct why. Be specific and unflinching. Output ONLY valid JSON."
 
 def pre_mortem_failure_prompt(state: PipelineState) -> str:
-    web_context = ""
-    if state.web_discovery_results:
-        web_snippets = [
-            f"  - {r.get('title', '')}: {r.get('snippet', '')[:300]}"
-            for r in state.web_discovery_results[:5]
-            if r.get('title') or r.get('snippet')
-        ]
-        if web_snippets:
-            web_context = "\n\nRelevant real-world case studies of similar failures:\n" + "\n".join(web_snippets) + "\n"
+    web_context = build_web_sources_block(
+        state, heading="Relevant real-world case studies of similar failures"
+    ) + build_memory_context(state)
 
     return (
         f'{get_language_instruction(state)}\n\n'

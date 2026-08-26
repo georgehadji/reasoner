@@ -187,6 +187,47 @@ class FollowupRequest(BaseModel):
         v, _ = sanitize_for_prompt(v)
         return v
 
+    # ── Prior-turn text is caller-supplied, not system-authored ──────────────
+    # `previous_synthesis` and `history` arrive verbatim in the request body and
+    # are rendered into every phase prompt by build_followup_context. Labelling
+    # them "assistant turn" is a claim the caller makes, not one we can verify —
+    # over MCP the caller is literally another agent.
+    #
+    # They use neutralize_for_replay, NOT the blocking sanitize_for_prompt used
+    # for `question`. Blocking is right for a fresh instruction and wrong here:
+    # an empty previous_synthesis is normal on the first follow-up, and this text
+    # is usually Reasoner's own prose coming back, which can legitimately contain
+    # a phrase like "System:". Rejecting those would be a self-inflicted denial
+    # of service on our own output. The controls that actually matter on this
+    # channel are the <<<EXTERNAL_CONTENT>>> wrapper and the propagation-
+    # resistance rule in the system prompt.
+    # See docs/MIND_VIRUS_MITIGATION.md §2.2.
+
+    @field_validator("previous_synthesis")
+    @classmethod
+    def validate_previous_synthesis(cls, v: str) -> str:
+        from reasoner.infrastructure.metrics import count_propagation_pattern
+        from reasoner.sanitization import neutralize_for_replay
+
+        v, warnings = neutralize_for_replay(v)
+        if warnings:
+            count_propagation_pattern("followup_synthesis", len(warnings))
+        return v
+
+    @field_validator("history")
+    @classmethod
+    def validate_history(cls, v: list[dict[str, str]]) -> list[dict[str, str]]:
+        from reasoner.infrastructure.metrics import count_propagation_pattern
+        from reasoner.sanitization import neutralize_for_replay
+
+        cleaned: list[dict[str, str]] = []
+        for turn in v:
+            content, warnings = neutralize_for_replay(str(turn.get("content", "")))
+            if warnings:
+                count_propagation_pattern("followup_history", len(warnings))
+            cleaned.append({**turn, "content": content})
+        return cleaned
+
 
 class GenerateImageRequest(BaseModel):
     """Request model for image generation."""

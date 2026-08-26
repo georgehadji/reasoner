@@ -242,8 +242,15 @@ Cross-lab diversity prevents echo chambers:
 
 - Method-specific state uses `dict[str, Any]` fields with `field(default_factory=dict)`. Always access via `.get()`, never direct subscript — enables `--resume` with older state files.
 - All LLM responses parsed via `parsing.extract_json()`, never direct `json.loads`.
-- `sanitize_for_prompt()` must gate all user-supplied text before it enters any prompt.
+- `sanitize_for_prompt()` must gate all user-supplied text before it enters any prompt. It **blocks** (raises) on a match — correct for a fresh user instruction. For *replayed* text (prior turns from a caller, recalled memory) use `neutralize_for_replay()` instead, which strips and reports without rejecting; blocking there would refuse an empty first-turn synthesis and refuse our own output containing a phrase like "System:".
 - `CSRF_ENFORCE_BACKEND=false` in CI envs (no `CSRF_SECRET` available).
+
+**Propagation resistance** (docs/MIND_VIRUS_MITIGATION.md; tests/test_mind_virus_resistance.py). These four hold today and are load-bearing — the first two by *omission*, so a refactor can break them silently:
+
+- **Recalled Neuro memory never enters a system prompt.** It is injected at user-message position via `build_memory_context()`, wrapped, with provenance. Papadopoulos et al. (arXiv:2608.10218) measure ~88% of successful propagation as memory re-entering the *instruction* channel vs ~12% otherwise. Moving it is the single most damaging change available here.
+- **Phase-2 generators are blind to each other.** `perspective_prompt()` must never receive a sibling's output; a "let perspectives see each other for coherence" change converts the topology from separate to fully-connected, which is where viruses spread best.
+- **Every phase/subagent system prompt is hardened.** `harden_system_prompt()` is applied at the two application chokepoints (`flows/services.call_llm`, `subagents/base`). HyperGate is deliberately excluded — documented at its call site.
+- **Model- or web-authored text is wrapped**, never interpolated raw — use `build_web_sources_block()` / `_wrap_external_content()`. Never persist caller-supplied `previous_synthesis` to memory as system output.
 
 ---
 

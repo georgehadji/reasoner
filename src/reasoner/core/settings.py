@@ -190,6 +190,37 @@ class Settings:
     NEURO_RECALL_TIMEOUT_SECONDS: float = float(
         os.getenv("NEURO_RECALL_TIMEOUT_SECONDS", "10.0")
     )
+    # Feed recalled long-term memory into phase prompts. Recall itself always runs
+    # (the chunks are surfaced to the client either way); this gates whether they
+    # reach a model. Off ⇒ recall is display-only, which is how the system behaved
+    # before the loop was closed. See docs/MIND_VIRUS_MITIGATION.md §2.1 — recalled
+    # memory is model-authored text re-entering a *different* model's prompt, so it
+    # is injected at user-message position only, wrapped, and sanitised on read.
+    NEURO_CONTEXT_IN_PROMPTS: bool = os.getenv(
+        "NEURO_CONTEXT_IN_PROMPTS", "true"
+    ).lower() == "true"
+    # Max recalled chunks rendered into a prompt. Dilution across independent inputs
+    # is itself a propagation defence — keep this small.
+    NEURO_CONTEXT_MAX_CHUNKS: int = int(os.getenv("NEURO_CONTEXT_MAX_CHUNKS", "5"))
+
+    # ── Prompt Hardening (propagation resistance) ──
+    # Prepends CONTENT_TRUST_RULE + PROPAGATION_RESISTANCE_RULE to every phase and
+    # subagent system prompt. Kill switch for the rare case where the "flag, don't
+    # obey" framing degrades output on meta-reasoning topics.
+    PROMPT_HARDENING_ENABLED: bool = os.getenv(
+        "PROMPT_HARDENING_ENABLED", "true"
+    ).lower() == "true"
+    # Resistance floor for terminal roles (synthesis, verification). Most of the
+    # whitelist is UNMEASURED, so this ships observable-but-not-blocking: the
+    # violation is reported at "soft" severity until the routing consequences on
+    # the Budget tier are known. Set PROPAGATION_RESISTANCE_ENFORCE=true to make
+    # it a hard constraint. 0.0 disables the check entirely.
+    PROPAGATION_RESISTANCE_FLOOR: float = float(
+        os.getenv("PROPAGATION_RESISTANCE_FLOOR", "0.60")
+    )
+    PROPAGATION_RESISTANCE_ENFORCE: bool = os.getenv(
+        "PROPAGATION_RESISTANCE_ENFORCE", "false"
+    ).lower() == "true"
 
     # ── Multi-Provider Fallback ──
     MULTI_PROVIDER_FALLBACK_ENABLED: bool = os.getenv(

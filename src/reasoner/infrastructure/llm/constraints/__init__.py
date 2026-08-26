@@ -25,6 +25,9 @@ from reasoner.infrastructure.llm.constraints.concurrency import (
 from reasoner.infrastructure.llm.constraints.no_repeat_lab import (
     NoRepeatLabConstraint,
 )
+from reasoner.infrastructure.llm.constraints.propagation_resistance import (
+    PropagationResistanceConstraint,
+)
 
 __all__ = [
     "ConstraintViolation",
@@ -34,4 +37,5 @@ __all__ = [
     "CircuitStateConstraint",
     "ConcurrencyConstraint",
     "NoRepeatLabConstraint",
+    "PropagationResistanceConstraint",
 ]

@@ -59,6 +59,31 @@ STRIPE_WEBHOOK_SIG_FAILURES = Counter(
     "Stripe webhook signature verification failures",
 )
 
+# ── Propagation resistance (docs/MIND_VIRUS_MITIGATION.md) ──
+# Injection patterns found in text that is *already inside* the system: replayed
+# long-term memory, or prior-turn text supplied by an API caller. Distinct from
+# the user-input sanitiser, which guards the front door. A non-zero rate here
+# means something got past the front door earlier, or a caller is probing.
+REASONER_PROPAGATION_PATTERN_TOTAL = Counter(
+    "reasoner_propagation_pattern_total",
+    "Injection/propagation patterns sanitised out of system-internal text",
+    # neuro_recall | followup_synthesis | followup_history | synthesis_learn
+    ["surface"],
+)
+
+
+def count_propagation_pattern(surface: str, count: int = 1) -> None:
+    """Record injection patterns found in system-internal text.
+
+    Best-effort by construction: observability must never fail a request, and
+    prometheus_client is an optional dependency (Counter degrades to _NoOpMetric
+    when it is absent). Callers therefore do not need to guard this.
+    """
+    try:
+        REASONER_PROPAGATION_PATTERN_TOTAL.labels(surface=surface).inc(count)
+    except Exception:  # pragma: no cover - observability is never load-bearing
+        pass
+
 # Latency histograms
 REASONER_QUERY_DURATION = Histogram(
     "reasoner_query_duration_seconds",

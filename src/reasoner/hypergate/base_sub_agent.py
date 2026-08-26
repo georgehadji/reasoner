@@ -140,6 +140,15 @@ class BaseSubAgent(ABC):
         if not is_openai:
             kwargs["temperature"] = self.TEMPERATURE
 
+        # NOTE: deliberately NOT wrapped in harden_system_prompt(), unlike the
+        # other two LLM chokepoints (flows/services.call_llm, subagents/base).
+        # HyperGate sub-agents see only the already-sanitised problem, never
+        # scraped pages, stored memory, or another model's prose, and they emit
+        # opaque-letter classifications with no free-text passthrough — so there
+        # is no channel for propagating content to ride. Five of these run in
+        # parallel on every single request, so the ~120-token preamble would be
+        # real added latency and cost for no exposure. Re-adding it needs a
+        # reason; see docs/MIND_VIRUS_IMPLEMENTATION_PLAN.md WP1.3.
         result = await router.call(
             role="primary",
             system_prompt=self._system_prompt(),

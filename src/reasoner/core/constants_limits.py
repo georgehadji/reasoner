@@ -357,6 +357,11 @@ class TruncationLimits:
     API_STORAGE: int = 200
     KEY_INSIGHTS: int = 3
     MEMORY: int = 2
+    # Characters per recalled Neuro chunk rendered into a prompt. Distinct from
+    # MEMORY above, which is a list-slice count. Deliberately tight: a recalled
+    # chunk is replayed model output, and keeping each one short both bounds cost
+    # and dilutes any single chunk's influence over the run.
+    MEMORY_CHUNK: int = 1200
     SESSION_LOG: int = 200
     SESSION_EXCERPT: int = 100
     ASSUMPTION: int = 150

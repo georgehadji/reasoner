@@ -33,6 +33,56 @@ from reasoner.presets import get_preset_price_tier
 
 logger = logging.getLogger(__name__)
 
+# Provenance schema version for Neuro `learn` metadata. Chunks written before v1
+# carry no run/model attribution, so they cannot be revoked by lineage and are
+# dropped on recall rather than replayed. Bump when the metadata shape changes.
+NEURO_PROVENANCE_SCHEMA_VERSION = 1
+
+
+def _synthesis_model_of(state: PipelineState) -> str:
+    """Best-effort model id that produced the final synthesis, for provenance.
+
+    Reads the canonical per-phase model map on cost_state. Returns "" rather than
+    raising — provenance is metadata, and a missing model id must not cost the
+    run its memory write.
+    """
+    try:
+        by_key = getattr(state.cost_state, "_phase_models_by_key", {}) or {}
+        for key in ("synthesis", "phase5_synthesis", "final_synthesis"):
+            if models := by_key.get(key):
+                return str(models[-1])
+    except Exception:  # pragma: no cover - provenance is never load-bearing
+        pass
+    return ""
+
+
+def _observe_propagation_shape(text: str, run_id: str | None) -> None:
+    """Score outbound synthesis before it becomes long-term memory.
+
+    Emit-only. This is the boundary where a synthesis stops being this run's
+    output and becomes something a future run reads back, which makes it the
+    analogue of the memory-file metric in Papadopoulos et al. It does NOT block
+    the write: Reasoner legitimately reasons about multi-agent systems, so a
+    correct answer on that topic scores like the thing it describes. Gate only
+    after the false-positive rate on real traffic is known.
+    """
+    try:
+        from reasoner.core.propagation_signals import score_propagation_shape
+
+        signal = score_propagation_shape(text)
+        if not signal.has_structure:
+            return
+        logger.warning(
+            "Propagation-shaped structure in synthesis before memory write "
+            "(run=%s, score=%.2f, signals=%s). Not blocked — telemetry only.",
+            run_id or "unknown", signal.score, ",".join(signal.structural_hits),
+        )
+        from reasoner.infrastructure.metrics import count_propagation_pattern
+
+        count_propagation_pattern("synthesis_learn", len(signal.structural_hits))
+    except Exception:  # pragma: no cover - observability is never load-bearing
+        pass
+
 
 @dataclass
 class PreflightDecision:
@@ -328,19 +378,82 @@ class PipelineOrchestrator:
     async def _recall_neuro_context(
         self, problem: str, agent_id: str | None = None, owner: str | None = None
     ) -> list[dict]:
-        """Fetch relevant past context from Neuro memory."""
+        """Fetch relevant past context from Neuro memory.
+
+        Chunks returned here are replayed into phase prompts by
+        phases._shared.build_memory_context. That makes this the read half of a
+        learn→recall loop carrying *model-authored text across runs and across
+        models*, so two things happen before the content leaves this method:
+
+        1. Every chunk is re-sanitised. Ingest-time sanitisation is not enough —
+           memory outlives any given deployment of the injection-pattern list, so
+           a chunk stored before a pattern was added would otherwise bypass it
+           forever.
+        2. Chunks with no provenance are dropped. A chunk that cannot be
+           attributed also cannot be revoked when a lineage turns out to be bad,
+           and revocation is the expensive half of this problem
+           (docs/MIND_VIRUS_MITIGATION.md §1, "recovery").
+
+        See also: the wrapping and user-message-position rules enforced in
+        build_memory_context — this method must not be the only line of defence.
+        """
         from reasoner.core.ports.memory_port import get_memory_port
+        from reasoner.core.settings import settings
+        from reasoner.sanitization import neutralize_for_replay
 
         port = get_memory_port()
         if port is None:
             return []
         try:
-            return await port.recall(
-                problem, agent_id=agent_id, max_results=5, owner=owner
+            chunks = await port.recall(
+                problem,
+                agent_id=agent_id,
+                max_results=settings.NEURO_CONTEXT_MAX_CHUNKS,
+                owner=owner,
             )
         except Exception as exc:
             logger.debug("Neuro recall failed: %s", exc)
-        return []
+            return []
+
+        cleaned: list[dict] = []
+        dropped_unattributed = 0
+        for chunk in chunks or []:
+            if not isinstance(chunk, dict):
+                continue
+            if int(chunk.get("schema_version") or 0) < NEURO_PROVENANCE_SCHEMA_VERSION:
+                # Pre-provenance chunk: no run/model attribution, so it could never
+                # be revoked if its lineage turned out to be bad. Skipping keeps
+                # "every chunk replayed into a prompt is revocable" a real
+                # invariant instead of an aspiration. Memory refills from normal
+                # traffic within a few runs, so this drains rather than breaks.
+                dropped_unattributed += 1
+                continue
+            content, warnings = neutralize_for_replay(str(chunk.get("content", "")))
+            if not content.strip():
+                continue
+            if warnings:
+                # Something in stored memory matched an injection pattern. Keep the
+                # sanitised text (dropping it silently would erode recall quality
+                # for a signal that is usually benign), but make it countable.
+                logger.warning(
+                    "Neuro recall sanitised %d pattern(s) from stored chunk "
+                    "(run=%s, source=%s)",
+                    len(warnings),
+                    chunk.get("run_id", "unknown"),
+                    chunk.get("source", "unknown"),
+                )
+                from reasoner.infrastructure.metrics import count_propagation_pattern
+
+                count_propagation_pattern("neuro_recall", len(warnings))
+            cleaned.append({**chunk, "content": content})
+
+        if dropped_unattributed:
+            logger.info(
+                "Neuro recall dropped %d unattributed chunk(s) (schema_version < %d)",
+                dropped_unattributed,
+                NEURO_PROVENANCE_SCHEMA_VERSION,
+            )
+        return cleaned
 
     def create_pipeline(
         self,
@@ -393,19 +506,35 @@ class PipelineOrchestrator:
             from reasoner.core.ports.memory_port import get_memory_port
 
             port = get_memory_port()
+            # Only this pipeline's own synthesis is eligible for long-term memory.
+            #
+            # This used to fall back to state.previous_synthesis when synthesis
+            # produced nothing — but previous_synthesis arrives verbatim from the
+            # API caller (FollowupRequest / the MCP tool), so on any empty-synthesis
+            # run a caller-supplied string was persisted as if the system had
+            # reasoned its way to it. Combined with recall, that was a write
+            # primitive into memory reachable by anyone who can call the API.
+            # There is no safe fallback here: writing nothing is correct.
             synthesis_text = ""
             if state.final_solution:
                 synthesis_text = getattr(state.final_solution, "core_solution", "") or ""
-            if not synthesis_text:
-                synthesis_text = getattr(state, "previous_synthesis", "")
 
             if port is not None and synthesis_text:
+                _observe_propagation_shape(synthesis_text, run_id)
                 await port.learn(
                     prompt=getattr(req, "problem", ""),
                     response=synthesis_text,
                     agent_id=getattr(state, "conversation_id", None),
                     owner=user_id,
                     metadata={
+                        # ── Provenance (WP5.1) ──
+                        # Written on every chunk so a lineage that later turns out
+                        # to be poisoned can be revoked in bulk by run, model, or
+                        # window. Recall drops chunks lacking this.
+                        "provenance": "pipeline_synthesis",
+                        "schema_version": NEURO_PROVENANCE_SCHEMA_VERSION,
+                        "run_id": run_id or "",
+                        "model_id": _synthesis_model_of(state),
                         "preset": getattr(state, "preset_name", ""),
                         "type": "pipeline",
                         "method": getattr(state.meta, "method", None),

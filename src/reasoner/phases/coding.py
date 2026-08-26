@@ -7,6 +7,8 @@ from reasoner.phases._shared import (
     TRUNCATION,
     PipelineState,
     _wrap_user_input,
+    build_memory_context,
+    build_web_sources_block,
 )
 
 __all__ = [
@@ -127,14 +129,10 @@ def coding_generate_prompt(state: PipelineState, file_spec: dict) -> str:
 
     # Include library search context if available
     lib_context = ""
-    if state and state.web_discovery_results:
-        lib_snippets = [
-            f"  - {r.get('title', '')}: {r.get('snippet', '')[:300]}"
-            for r in state.web_discovery_results[:5]
-            if r.get('title') or r.get('snippet')
-        ]
-        if lib_snippets:
-            lib_context = "\n\nRelevant API/docs references:\n" + "\n".join(lib_snippets) + "\n"
+    if state:
+        lib_context = build_web_sources_block(
+            state, heading="Relevant API/docs references"
+        ) + build_memory_context(state)
 
     return (
         f"Original request:\n{problem}\n\n"

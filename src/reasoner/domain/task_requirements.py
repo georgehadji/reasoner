@@ -21,6 +21,12 @@ class TaskConstraints:
     requires_temperature: bool = True  # Excludes o-series by default
     excluded_blocs: frozenset[str] = field(default_factory=frozenset)
     excluded_models: frozenset[str] = field(default_factory=frozenset)
+    # Minimum measured resistance to self-propagating content, 0.0-1.0. Only
+    # meaningful for terminal roles (synthesis, verification) whose output is
+    # persisted, replayed as recalled memory, or shown to the user as the answer.
+    # 0.0 = no requirement. See infrastructure/llm/propagation_resistance.py for
+    # why this is a measured table rather than a capability heuristic.
+    min_propagation_resistance: float = 0.0
 
 
 @dataclass(frozen=True)
