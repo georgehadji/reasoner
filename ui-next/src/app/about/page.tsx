@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
 import { CAPABILITIES } from '@/lib/capabilities.generated';
+import { SITE } from '@/lib/site';
 
 /**
  * The About page argues the same thing the home page argues, turned inward.
@@ -141,7 +142,7 @@ const COMMITMENTS = [
     term: 'You can read the code, and leave with it',
     detail:
       'Source-available under a Business Source Licence that converts to Apache-2.0 in 2030. Self-hostable today against your own Postgres, your keys, your infrastructure.',
-    cost: 'Costs: lock-in, which was never mine to take',
+    cost: 'Costs: lock-in, which was never ours to take',
   },
 ] as const;
 
@@ -215,7 +216,7 @@ export default function AboutPage() {
 
         {/* ── §2 ─────────────────────────────────────────────── */}
         <Section id="origin" marker="§2" name="Where it started">
-          <Heading>I did not trust myself either.</Heading>
+          <Heading>We did not trust ourselves either.</Heading>
           <Lede>
             The honest version of this section is not a founding anecdote. It is a test file.
           </Lede>
@@ -224,9 +225,9 @@ export default function AboutPage() {
             {CAPABILITIES.presets} presets, {CAPABILITIES.routableModels.toLocaleString('en-US')}{' '}
             routable models &mdash; is regenerated from the live registry on every commit. Edit one
             by hand to make it sound better and a test fails, and the build stops. That test was
-            written early, deliberately, and pointed at me: the same pressure that makes a model
-            overstate its confidence operates on a founder writing his own marketing page. I did not
-            think I was immune. I thought I should be checkable.
+            written early, deliberately, and pointed back at us: the same pressure that makes a
+            model overstate its confidence operates on the people writing its marketing page. We did
+            not think we were immune. We thought we should be checkable.
           </Body>
           <Body>
             That instinct is the whole product in miniature. Not a wrapper, not a prompt library.
@@ -327,7 +328,7 @@ export default function AboutPage() {
         </Section>
 
         {/* ── §5 ─────────────────────────────────────────────── */}
-        <Section id="unfinished" marker="§5" name="What I owe you">
+        <Section id="unfinished" marker="§5" name="What we owe you">
           <Heading>The part that is not finished.</Heading>
 
           <Claim tone="hypothesis">
@@ -348,7 +349,7 @@ export default function AboutPage() {
 
         {/* ── §6 ─────────────────────────────────────────────── */}
         <Section id="who" marker="§6" name="Who">
-          <Heading>One person, and a habit of reading the paper first.</Heading>
+          <Heading>We read the paper before we write the code.</Heading>
           <Lede>
             Before the mind-virus defences existed in code, they existed as a research note: the
             paper&rsquo;s findings in a table, each mitigation ranked by the effect size its authors
@@ -362,9 +363,9 @@ export default function AboutPage() {
             that produces a system you can argue with, and it is why this took as long as it did.
           </Body>
           <Body>
-            There is no growth team behind this, no content pipeline, no roadmap written to impress
-            an investor. When something here turns out to be wrong, there is exactly one person to
-            email about it, and he answers.
+            None of it is written to impress an investor. The same standard the pipeline applies to
+            an answer is the one we try to hold ourselves to, and when something here turns out to
+            be wrong we would rather hear it than not.
           </Body>
         </Section>
 
@@ -396,7 +397,7 @@ export default function AboutPage() {
           </div>
 
           <p className="prose-measure mt-[var(--space-12)] border-t border-[var(--border)] pt-[var(--space-6)] font-sans text-[length:var(--text-sm)] leading-[var(--lh-ui)] text-[var(--text-subtle)]">
-            Reasoner is built and operated by Georgios-Chrysovalantis Chatzivantsidis. Something here
+            {SITE.name} is built and operated by {SITE.legalName}. Something here
             wrong, or a claim you want the receipts for?{' '}
             <Link
               href="/contact"

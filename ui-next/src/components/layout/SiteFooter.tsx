@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Logo } from '@/components/brand/Logo';
+import { SITE } from '@/lib/site';
 import { SecurityBadge } from './SecurityBadge';
 
 const LINKS = {
@@ -64,7 +65,9 @@ export function SiteFooter() {
         </div>
 
         <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-[var(--border)] pt-8 text-xs text-[var(--text-2)] sm:flex-row">
-          <p>© {new Date().getFullYear()} Reasoner, operated by Georgios-Chrysovalantis Chatzivantsidis.</p>
+          <p>
+            © {new Date().getFullYear()} {SITE.name}, operated by {SITE.legalName}.
+          </p>
           <p>Built for critical decisions.</p>
         </div>
       </div>

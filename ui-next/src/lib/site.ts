@@ -22,7 +22,14 @@ export const SITE_URL = normalizeOrigin(
 
 export const SITE = {
   name: 'Reasoner',
-  legalName: 'Reasoner',
+  /**
+   * The company that builds and operates Reasoner — the single source of truth
+   * for it. Feeds the JSON-LD Organization node and every "operated by" line in
+   * the UI (SiteFooter, /about), so the company can be renamed here alone.
+   * `name` above is the product and is deliberately separate: the two are not
+   * the same thing and must be able to differ.
+   */
+  legalName: 'Polytonic',
   /** Renders as the browser title on every route, so it has to say what the
    *  product does rather than how it feels. */
   tagline: 'Reasoning with the argument attached',
