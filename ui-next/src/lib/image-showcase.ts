@@ -1,12 +1,17 @@
 /**
- * A real four-model image run, captured 2026-08-18 from the production code
+ * A real four-model image run, captured 2026-08-27 from the production code
  * path (`generate_images(preset="budget", num_images=4)`).
  *
  * Two of the four are the budget tier's configured primaries; the other two are
- * fallbacks that took over when Krea and ByteDance failed on the call. That is
+ * fallbacks that took over when Krea and Alibaba failed on the call. That is
  * left exactly as it happened rather than re-rolled for a tidier lineup — the
  * fallback chain doing its job is the more honest demonstration, and a page
  * that claims resilience should show it working rather than assert it.
+ *
+ * The prompt is chosen to make the labs disagree. A quiet interior is where
+ * four models agree, which makes four plates under a heading about four
+ * different labs read as a stock-photo grid; rain, night and a single light
+ * source is where house style, colour grading and tone-mapping visibly part.
  *
  * Source of truth: `ui-next/public/showcase/manifest.json`.
  */
@@ -26,7 +31,7 @@ export interface ShowcaseImage {
 
 /** The prompt as typed, before automatic enhancement. */
 export const SHOWCASE_PROMPT =
-  'A single wooden reading chair beside a tall window in an empty gallery, early morning light raking across a bare floor, warm ivory walls, editorial photography, quiet and still';
+  'A street food stall at dusk in heavy rain, one bare hanging bulb above the counter, steam rising off the griddle, wet asphalt reflecting the light, no people, cinematic';
 
 export const SHOWCASE_IMAGES: readonly ShowcaseImage[] = [
   {
@@ -43,15 +48,15 @@ export const SHOWCASE_IMAGES: readonly ShowcaseImage[] = [
   },
   {
     src: '/showcase/image-3.webp',
-    model: 'gemini-flash-image',
-    lab: 'Google',
+    model: 'grok-imagine',
+    lab: 'xAI',
     origin: 'United States',
     fallback: true,
   },
   {
     src: '/showcase/image-4.webp',
-    model: 'recraft-v4.1-utility',
-    lab: 'Recraft',
+    model: 'gpt-5-image-mini',
+    lab: 'OpenAI',
     origin: 'United States',
     fallback: true,
   },

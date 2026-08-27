@@ -186,6 +186,10 @@ MODEL_ELEPHANT_ALPHA: str = "elephant-alpha"
 
 # xAI image
 MODEL_GROK_IMAGINE_QUALITY: str = "grok-imagine"
+MODEL_GROK_IMAGINE_IMAGE_2: str = "grok-imagine-image-2"
+
+# Alibaba image
+MODEL_QWEN_IMAGE_3: str = "qwen-image-3"
 
 # Black Forest Labs
 MODEL_FLUX_2_MAX: str = "flux.2-max"

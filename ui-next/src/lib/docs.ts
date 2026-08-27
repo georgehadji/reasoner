@@ -250,7 +250,7 @@ In the [app](/chat), press the image toggle in the composer, describe what you w
 Two calls happen, in order:
 
 1. **Enhancement.** A fast text model expands your description into a full generation prompt — subject, style, composition, lighting, colour palette, and texture. The expanded prompt is shown in the chat *before* anything is drawn, so you always see what was actually sent.
-2. **Generation.** Several image models run in parallel on that prompt. You get every image that came back, each labelled with the model that produced it.
+2. **Generation.** Four models from four different labs run in parallel on that prompt. You get every image that came back, each labelled with the lab that produced it.
 
 Enhancement is on by default because short prompts underspecify everything except the subject, and image models fill those gaps with their own house style. Send \`enhance: false\` when you have already written a full prompt and want it used verbatim.
 
@@ -258,10 +258,12 @@ Enhancement is on by default because short prompts underspecify everything excep
 
 Model choice follows the tier, and always spans more than one vendor:
 
+Labs rather than model ids: the tiers are re-ranked whenever measured prices move, so a model name here would be stale within the week. The rule that holds is one model per lab, and a bloc boundary crossed in both tiers.
+
 | Tier | Runs in parallel | Falls back to |
 | --- | --- | --- |
-| **Budget** | grok-imagine, riverflow-v2-fast-preview, gemini-flash-image | seedream-4.5, flux.2-pro, recraft-v4.1-utility |
-| **Premium** | gpt-5.4-image-2, recraft-v4.1-pro | gpt-5-image, gemini-3.1-flash-image-preview, mai-image-2.5, recraft-v4-pro |
+| **Budget** | Black Forest Labs, Krea, Sourceful, Alibaba | xAI, OpenAI, ByteDance, Recraft, Google |
+| **Premium** | OpenAI, Google, Black Forest Labs, ByteDance | Recraft, Microsoft, Sourceful, Krea, OpenAI |
 
 The primaries fire concurrently. If fewer images come back than you asked for, fallbacks are tried one at a time until the count is met or the list runs out. A model that fails does not fail the request — you get what the survivors produced.
 
@@ -279,7 +281,7 @@ When this happens the response carries a \`rewritten_prompt\`. That field is the
 
 Attach up to **four** images to steer style, character, or composition.
 
-Attaching any switches routing to models that accept image input — the Gemini and GPT image models. Flux, Riverflow, and Recraft are text-to-image only and are skipped for those requests, so a reference-image run draws from a smaller pool than the table above.
+Attaching any switches routing to a fixed set of Google and OpenAI models, so a reference-image run draws from a smaller pool than the table above.
 
 Reference images must be \`data:image/...\` URLs. A link to a file on the internet is rejected.
 

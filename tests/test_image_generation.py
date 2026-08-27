@@ -453,8 +453,13 @@ class TestGenerateImages:
             "reasoner.infrastructure.llm.image_generation.generate_image_with_model",
             new_callable=AsyncMock,
         ) as mock_gen:
+            # Named from the preset, not hardcoded: the tiers are re-ranked
+            # whenever OpenRouter's prices move, and a literal alias here turns
+            # that into a false failure of the fallback chain.
+            winner = IMAGE_GEN_FALLBACKS["budget"][0]
+
             def _side_effect(prompt, alias, *args, **kwargs):
-                if alias == "flux.2-pro":
+                if alias == winner:
                     return {"success": True, "image_data": "data:image/png;base64,fallback", "model_used": alias}
                 raise ImageGenerationError(f"{alias} failed")
             mock_gen.side_effect = _side_effect
@@ -473,8 +478,12 @@ class TestGenerateImages:
             "reasoner.infrastructure.llm.image_generation.generate_image_with_model",
             new_callable=AsyncMock,
         ) as mock_gen:
+            # The LAST fallback, so the whole chain is walked before the one
+            # success lands. Read from the preset for the same reason as above.
+            winner = IMAGE_GEN_FALLBACKS["budget"][-1]
+
             def _side_effect(prompt, alias, *args, **kwargs):
-                if alias == "riverflow-v2-fast-preview":
+                if alias == winner:
                     return {"success": True, "image_data": "data:image/png;base64,ok", "model_used": alias}
                 raise ImageGenerationError(f"{alias} failed")
             mock_gen.side_effect = _side_effect
