@@ -48,6 +48,20 @@ const MARKETING_ROUTES: readonly NavigableRoute[] = [
     aliases: ['plans', 'plan', 'billing', 'cost', 'costs', 'price', 'subscribe'],
   },
   {
+    href: '/capabilities',
+    label: 'Capabilities',
+    blurb: 'The mechanisms behind a run, and what holds each one.',
+    weight: 0.9,
+    aliases: ['capability', 'mechanisms', 'abilities', 'what-it-does'],
+  },
+  {
+    href: '/developers',
+    label: 'Developers',
+    blurb: 'MCP server, HTTP endpoints, and tool discovery.',
+    weight: 0.8,
+    aliases: ['developer', 'dev', 'mcp', 'sdk', 'integrations', 'api-docs'],
+  },
+  {
     href: '/how-it-works',
     label: 'How it works',
     blurb: 'The pipeline, phase by phase, end to end.',
@@ -195,6 +209,7 @@ export const DOC_SLUGS: readonly string[] = [
   'api-keys',
   'api-reference',
   'agent-integration',
+  'mcp',
   'security-and-privacy',
   'troubleshooting',
 ];

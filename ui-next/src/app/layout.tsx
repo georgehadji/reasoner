@@ -34,6 +34,17 @@ export const metadata: Metadata = {
   publisher: SITE.name,
   alternates: {
     canonical: '/',
+    /* Advertises the machine-readable index from every page. An agent that
+       lands anywhere on the site can follow this to /llms.txt rather than
+       reconstructing the documentation from rendered navigation — and the
+       first thing that file names is the MCP server. A route that sets its
+       own `alternates` replaces this object wholesale, so pages that do must
+       repeat the entry. */
+    types: {
+      'text/plain': [
+        { url: '/llms.txt', title: `${SITE.name} documentation index for LLMs` },
+      ],
+    },
   },
   robots: {
     index: true,

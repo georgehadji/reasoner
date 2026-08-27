@@ -429,7 +429,14 @@ export default function RunRecord() {
           </ul>
 
           <p className="mt-[var(--space-6)] font-sans text-[length:var(--text-xs)] leading-[var(--lh-body)] text-[var(--text-subtle)]">
-            Direct adapters: {PROVIDERS.join(', ')}. Everything else routes through OpenRouter.
+            Direct adapters: {PROVIDERS.join(', ')}. Everything else routes through OpenRouter.{' '}
+            <Link
+              href="/developers"
+              className="link-smooth underline underline-offset-4 hover:text-[var(--text-2)]"
+            >
+              The developer surface
+            </Link>
+            .
           </p>
         </Section>
 

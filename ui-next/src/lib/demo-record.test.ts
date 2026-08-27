@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { RUN, RUN_MODELS, SCORE_AXES } from './demo-record';
+import EVENTS from './demo-run.json';
+import { CLAIM_SPECIMENS, LABELLED_CLAIMS, RUN, RUN_MODELS, SCORE_AXES } from './demo-record';
 
 /**
  * The home page states every one of its figures by counting this record. If the
@@ -52,5 +53,44 @@ describe('demo record', () => {
       RUN.citations.map((_, i) => i + 1),
     );
     expect(new Set(RUN.citations.map((c) => c.url)).size).toBe(RUN.citations.length);
+  });
+});
+
+/**
+ * The home page's agents section quotes three of these as its exhibit. Two
+ * things have to hold for that to be honest: they must come out of the run
+ * rather than out of an editor, and they must be readable once lifted away
+ * from the paragraph that produced them.
+ */
+describe('labelled claims', () => {
+  const RAW = JSON.stringify(EVENTS);
+
+  it('finds labelled claims across the run', () => {
+    expect(LABELLED_CLAIMS.length).toBeGreaterThan(5);
+    expect(new Set(LABELLED_CLAIMS.map((c) => c.label)).size).toBe(3);
+  });
+
+  it('shows one specimen per label, in descending confidence', () => {
+    expect(CLAIM_SPECIMENS.map((c) => c.label)).toEqual([
+      'VERIFIED',
+      'HYPOTHESIS',
+      'UNKNOWN',
+    ]);
+  });
+
+  it('quotes the run rather than paraphrasing it', () => {
+    for (const { claim } of CLAIM_SPECIMENS) {
+      // The opening connective is stripped and the next word capitalised, so
+      // the tail is the part that must survive verbatim.
+      expect(RAW).toContain(claim.slice(-60));
+    }
+  });
+
+  it('picks specimens that stand on their own', () => {
+    for (const { claim } of CLAIM_SPECIMENS) {
+      expect(claim).not.toMatch(/^(however|finally|first|second|ultimately)\b/i);
+      expect(claim).not.toMatch(/\b(these|those|the proposal)\b/i);
+      expect(claim.length).toBeGreaterThan(40);
+    }
   });
 });

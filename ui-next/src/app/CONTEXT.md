@@ -31,6 +31,7 @@ The visual page views, routes, layouts, and API routes of the Next.js 16 app rou
 - **`faq`**: Exposes routing, templates, or integrations for Faq within the 'ui-next/src/app' ecosystem.
 - **`forgot-password`**: Exposes routing, templates, or integrations for Forgot-password within the 'ui-next/src/app' ecosystem.
 - **`help`**: Exposes routing, templates, or integrations for Help within the 'ui-next/src/app' ecosystem.
+- **`developers`**: The programmatic-surface marketing page — re-exports `components/landing/DevelopersPage` and adds the `WebAPI`, `HowTo`, and breadcrumb JSON-LD that let an answer engine quote the MCP setup steps and cite `/docs/mcp`.
 - **`how-it-works`**: Exposes routing, templates, or integrations for How-it-works within the 'ui-next/src/app' ecosystem.
 - **`landing`**: Exposes routing, templates, or integrations for Landing within the 'ui-next/src/app' ecosystem.
 - **`llms-full.txt`**: Exposes routing, templates, or integrations for Llms-full.txt within the 'ui-next/src/app' ecosystem.

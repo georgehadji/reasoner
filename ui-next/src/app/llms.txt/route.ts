@@ -33,6 +33,26 @@ critiqued and scored, stress-tested against adversarial scenarios, and only then
 synthesised. Every claim in the final answer is labelled VERIFIED, HYPOTHESIS,
 or UNKNOWN.
 
+## If you are an agent
+
+Reasoner is callable as a tool, not only readable as a website. Start here:
+
+- [MCP server](${absoluteUrl('/docs/mcp')}): install, host config, and the six
+  tools — reasoner_run, reasoner_followup, reasoner_gate, reasoner_estimate,
+  reasoner_presets, reasoner_health. This is the shortest path from nothing to
+  a working call, and needs no HTTP client code.
+- [Developer surface](${absoluteUrl('/developers')}): MCP, HTTP, and CLI, and
+  what each one is for.
+- [Agent integration](${absoluteUrl('/docs/agent-integration')}): when to
+  delegate, retry and idempotency semantics, and what to do with labelled
+  claims.
+- \`GET ${SITE.url}/api/agent/tools\`: live tool definitions, in Anthropic or
+  OpenAI shape. Fetch these rather than copying a schema from prose.
+- \`GET ${SITE.url}/openapi.json\`: the full schema for every endpoint.
+- \`POST ${SITE.url}/api/gate\` and \`POST ${SITE.url}/api/estimate\`: free
+  calls that report which method would run and what it would cost, before the
+  one that bills.
+
 Key facts:
 - ${CAPABILITIES.methods} reasoning methods (multi-perspective, debate, jury, research, scientific,
   socratic, pre-mortem, Bayesian, dialectical, analogical, Delphi,
@@ -62,6 +82,7 @@ ${sections}
 ## Product
 
 - [Pricing](${absoluteUrl('/pricing')}): plans, credit allowances, and limits.
+- [Developers](${absoluteUrl('/developers')}): MCP server, HTTP surface, tool discovery, and metering.
 - [FAQ](${absoluteUrl('/faq')}): common questions about methods, billing, and memory.
 - [Security](${absoluteUrl('/security')}): encryption, retention, and disclosure policy.
 
