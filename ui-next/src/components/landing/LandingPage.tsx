@@ -30,40 +30,6 @@ import { SHOWCASE_IMAGES, SHOWCASE_PROMPT } from '@/lib/image-showcase';
 
 /* ── Content ────────────────────────────────────────────── */
 
-/**
- * The two image tiers, as core/constants_limits.py configures them
- * (IMAGE_GEN_BUDGET_MODELS / IMAGE_GEN_PREMIUM_MODELS). Both field four
- * models from four different labs and both cross a bloc boundary; the tier
- * decides which model each lab sends, never how many labs answer. Hand-kept
- * against those two lists — the only place on the home page that names a
- * model's lab, because "premium" means nothing until a reader can see what
- * it actually swaps.
- */
-const IMAGE_TIERS = [
-  {
-    name: 'Budget',
-    badge: 'Default',
-    note: 'The four cheapest capable models in the catalogue, one per lab, ranked on measured price rather than on reputation.',
-    labs: [
-      { lab: 'Black Forest Labs', origin: 'Germany' },
-      { lab: 'Krea', origin: 'United States' },
-      { lab: 'Sourceful', origin: 'United States' },
-      { lab: 'ByteDance', origin: 'China' },
-    ],
-  },
-  {
-    name: 'Premium',
-    badge: 'One toggle away',
-    note: 'The same four-lab rule with each lab’s strongest image model instead. Switch tier in the composer; nothing else about the run changes.',
-    labs: [
-      { lab: 'OpenAI', origin: 'United States' },
-      { lab: 'Google', origin: 'United States' },
-      { lab: 'Recraft', origin: 'United States' },
-      { lab: 'ByteDance', origin: 'China' },
-    ],
-  },
-];
-
 /** The nine article phases, in order (application/flows/article.py). */
 const ARTICLE_PHASES = [
   'Evidence collection',
@@ -249,18 +215,37 @@ export default function LandingPage() {
             where the differences between labs are actually visible,
             which is the entire point of showing four.
 
-            Two things the reader must leave with, in this order: four
-            images come back from four different labs on every run, and
-            the premium tier is a toggle rather than a different
-            product. The tier panels below carry the second — they are
-            the only place on this page that names models, because
-            "premium" means nothing until you can see what changes. */}
+            Two things the reader must leave with: four images come
+            back from four different labs on every run, and the premium
+            tier is a toggle rather than a different product. Both live
+            in the one paragraph below, which is deliberately the whole
+            of the prose here — the plates are the argument, and a
+            reader who stops after the heading has still been told the
+            thing that matters.
+
+            Do NOT list the tier line-ups. Naming the models each
+            preset fields dates the page against constants_limits.py
+            and turns a claim about how the run is composed into a spec
+            sheet a competitor can shop against. */}
         <Section id="images">
           <Heading>Every prompt goes to four labs at once.</Heading>
           <Lede>
-            One prompt, four models, four different labs, generating in parallel. No single house
-            style, outage, or content refusal decides what comes back, and every primary has a
-            fallback behind it. The four below are one real run, left as it happened.
+            One prompt, four models, four different labs, generating in parallel, so no single
+            house style, outage, or content refusal decides what comes back, and every primary has
+            a fallback behind it. The tier changes which model each lab sends, never how many labs
+            answer: budget runs by default on the cheapest capable model in the catalogue, ranked
+            on measured price rather than on reputation, while premium is one toggle away in the
+            composer and takes each lab&rsquo;s strongest instead. Reference images, five aspect
+            ratios, and automatic prompt enhancement come as standard on both. The four below are
+            one real run; which models answered it, and what happens when one of them refuses, is
+            the routing described under{' '}
+            <Link
+              href="/capabilities#image-making"
+              className="link-smooth text-[var(--accent)] hover:text-[var(--accent-hover)]"
+            >
+              image making
+            </Link>
+            .
           </Lede>
 
           <figure className="mt-[var(--space-10)]">
@@ -272,7 +257,7 @@ export default function LandingPage() {
               role="list"
               className="mt-[var(--space-6)] grid list-none gap-[var(--space-5)] grid-cols-2 lg:grid-cols-4"
             >
-              {SHOWCASE_IMAGES.map(({ src, model, lab, origin, fallback }) => (
+              {SHOWCASE_IMAGES.map(({ src, model, lab, origin }) => (
                 <li key={src} className="card-hover">
                   <img
                     src={src}
@@ -285,12 +270,6 @@ export default function LandingPage() {
                   />
                   <p className="mt-[var(--space-3)] font-sans text-[13pt] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
                     {lab}
-                    {fallback ? (
-                      <sup className="font-normal text-[var(--warn)]" aria-hidden="true">
-                        {' '}
-                        †
-                      </sup>
-                    ) : null}
                   </p>
                   <p className="mt-[var(--space-1)] font-mono text-[8pt] leading-[var(--lh-body)] text-[var(--text-subtle)]">
                     {model} · {origin}
@@ -298,77 +277,7 @@ export default function LandingPage() {
                 </li>
               ))}
             </ul>
-
-            <figcaption className="mt-[var(--space-5)] font-sans text-[8pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
-              <span aria-hidden="true">†</span> Two of the configured primaries failed on this run
-              and fallbacks took over mid-flight. Left as it happened. A chain you can watch
-              working is worth more than one you have to take on faith.
-            </figcaption>
           </figure>
-
-          {/* The tier is a swap of which model each lab sends, never a
-              change to how many labs answer. Saying that in the header
-              above the panels stops the cheaper tier reading as the
-              crippled one, which is what a bare feature table would do. */}
-          <div className="mt-[var(--space-16)] border-t border-[var(--border-strong)] pt-[var(--space-6)]">
-            <h3 className="font-serif text-[21pt] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)]">
-              Four labs either way. The tier picks which model each one sends.
-            </h3>
-
-            <div className="mt-[var(--space-8)] grid gap-[var(--space-10)] sm:grid-cols-2">
-              {IMAGE_TIERS.map(({ name, badge, note, labs }) => (
-                <div key={name}>
-                  <div className="flex flex-wrap items-baseline gap-x-[var(--space-3)] gap-y-[var(--space-1)]">
-                    <h4 className="font-sans text-[13pt] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
-                      {name}
-                    </h4>
-                    <span className="font-mono text-[8pt] uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--accent)]">
-                      {badge}
-                    </span>
-                  </div>
-                  <p className="mt-[var(--space-2)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
-                    {note}
-                  </p>
-                  <ul role="list" className="mt-[var(--space-4)] list-none">
-                    {labs.map(({ lab, origin }) => (
-                      <li
-                        key={lab}
-                        className="flex items-baseline justify-between gap-[var(--space-4)] border-t border-[var(--border)] py-[var(--space-2)]"
-                      >
-                        <span className="font-sans text-[13pt] leading-[var(--lh-ui)] text-[var(--text-2)]">
-                          {lab}
-                        </span>
-                        <span className="font-mono text-[8pt] leading-[var(--lh-ui)] text-[var(--text-subtle)]">
-                          {origin}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Deliberately does NOT restate the routing. Which four models
-              answered, why they came from four labs, and what happens when one
-              refuses is /capabilities §4's argument; repeating it here would
-              make the page claim the same mechanism twice and leave the
-              exhibit doing the explaining. This paragraph carries only what
-              that section does not: the controls a reader gets to hold. */}
-          <Body>
-            Reference images, five aspect ratios, and automatic prompt enhancement come as
-            standard on both tiers. Which four models answered this one, and what happens when one
-            of them refuses, is the routing described under{' '}
-            <Link
-              href="/capabilities#image-making"
-              className="link-smooth text-[var(--accent)] hover:text-[var(--accent-hover)]"
-            >
-              image making
-            </Link>
-            .
-          </Body>
-
-          <Aside href="/capabilities#image-making">See how these four were picked →</Aside>
         </Section>
 
         {/* ── §1 Writing ─────────────────────────────────────────── */}
