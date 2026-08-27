@@ -17,7 +17,12 @@ from typing import Any
 
 from reasoner.api.sse_utils import _event
 from reasoner.infrastructure.llm.router import ProviderRouter
-from reasoner.phases.direct import DirectProfile, build_direct_prompt, select_direct_profile
+from reasoner.phases.direct import (
+    DIRECT_WEB_SEARCH_SYSTEM,
+    DirectProfile,
+    build_direct_prompt,
+    select_direct_profile,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +102,7 @@ async def _stream_direct_answer(
 
     if web_search:
         profile = DirectProfile(
-            system_prompt="You are an analytical assistant. Provide a clear, concise, well-sourced answer.",
+            system_prompt=DIRECT_WEB_SEARCH_SYSTEM,
             max_tokens=2048,
             temperature=0.7,
             models=(),  # resolved via PERPLEXITY_SEARCH_TIER below, not the generic fallback chain

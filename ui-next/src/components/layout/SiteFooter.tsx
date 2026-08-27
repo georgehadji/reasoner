@@ -5,6 +5,7 @@ import { SecurityBadge } from './SecurityBadge';
 
 const LINKS = {
   Product: [
+    { label: 'Capabilities', href: '/capabilities' },
     { label: 'How it works', href: '/how-it-works' },
     { label: 'About', href: '/about' },
     { label: 'Pricing', href: '/pricing' },
@@ -34,7 +35,8 @@ export function SiteFooter() {
               <SecurityBadge />
             </div>
             <p className="mt-4 max-w-sm text-sm leading-relaxed text-[var(--text)]">
-              Advanced Reasoning Architecture — multi-method pipelines with verified, auditable outputs.
+              Advanced Reasoning Architecture. Multi-method pipelines with verified, auditable
+              outputs.
             </p>
           </div>
 

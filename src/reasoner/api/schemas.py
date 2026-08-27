@@ -368,6 +368,7 @@ class RunResult(BaseModel):
     critical_insights: list[str] = []
     open_questions: list[str] = []
     claim_labels: dict[str, str] = {}
+    premises: list[dict] = []
     action_blueprint: list[dict] = []
     citations: list[dict] = []
     models_used: list[str] = []

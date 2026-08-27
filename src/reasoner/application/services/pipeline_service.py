@@ -158,17 +158,13 @@ class PipelineService:
                     "outputs": _get_attr(sp, "outputs", []),
                     "constraints": _get_attr(sp, "constraints", []),
                 }
-                for sp in (decomp.sub_problems
-                           if decomp and hasattr(decomp, "sub_problems")
-                           else [])
+                for sp in _get_attr(decomp, "sub_problems", [])
             ],
             "assumptions": [
                 {"text": (_get_attr(a, "text", "")[:TRUNCATION.ASSUMPTION] if use_neuro
                           else _get_attr(a, "text", "")),
                  "label": _get_value(_get_attr(a, "label", ClaimLabel.UNKNOWN))}
-                for a in (decomp.assumptions
-                          if decomp and hasattr(decomp, "assumptions")
-                          else [])
+                for a in _get_attr(decomp, "assumptions", [])
             ],
             "candidates": [
                 {
@@ -534,6 +530,12 @@ class PipelineSerializationService:
                         label=ClaimLabel(str(a.get('label', ClaimLabel.UNKNOWN.value))),
                         rationale=str(a.get('rationale', '')),
                         source_hint=str(a.get('source_hint', '')),
+                        # W2 premise audit fields — absent on pre-W2 state files,
+                        # which is why every one of these has a safe default.
+                        origin=str(a.get('origin', 'analyst')),
+                        load_bearing=bool(a.get('load_bearing', False)),
+                        falsifier=str(a.get('falsifier', '')),
+                        resolvable_by=str(a.get('resolvable_by', '')),
                     ))
                 except (ValueError, KeyError):
                     pass  # skip malformed assumption entry

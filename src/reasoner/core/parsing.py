@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from reasoner.domain.core_types import EvidenceBundle, PlanContract
 
-from reasoner.domain.core_types import CritiqueScore, ReviewHypothesis
+from reasoner.domain.core_types import Assumption, CritiqueScore, ReviewHypothesis
 from reasoner.domain.models import PerspectiveRegistry
 from reasoner.utils.json_safe import JSONDepthExceededError, safe_json_loads
 
@@ -735,6 +735,74 @@ def _parse_review_hypotheses(raw_hypotheses: Any) -> list[ReviewHypothesis]:
             logger.warning("Skipping malformed ReviewHypothesis entry: %s", exc)
     out.sort(key=lambda x: x.probability, reverse=True)
     return out
+
+
+_VALID_PREMISE_ORIGINS = {"user_stated", "user_implied", "analyst"}
+_USER_PREMISE_ORIGINS = {"user_stated", "user_implied"}
+
+
+def _parse_premises(raw_assumptions: Any) -> list[Assumption]:
+    """Safely build the typed premise-audit projection from Phase-1 ``assumptions``.
+
+    Same defensive contract as ``_parse_review_hypotheses``: coerce a keyed dict
+    to a list, tolerate missing fields via ``.get()``, skip malformed entries
+    rather than emptying the list. The existing raw-dict consumers of
+    ``state.decomposition["assumptions"]`` are untouched by this — this produces
+    a typed projection alongside, not a replacement.
+
+    Enforces docs/plans/sycophancy-mitigation.md W2's load-bearing rule in code,
+    not just in the prompt: a user-origin premise cannot stay VERIFIED on the
+    user's word alone. A model that ignores the prompt instruction still gets
+    downgraded here, which is the point — trust the parser, not the prompt.
+    """
+    from reasoner.core.sycophancy_constants import PREMISE_MAX_CLAIMS
+    from reasoner.domain.models import ClaimLabel
+
+    if isinstance(raw_assumptions, dict):
+        raw_assumptions = list(raw_assumptions.values())
+    if not isinstance(raw_assumptions, list):
+        return []
+
+    out: list[Assumption] = []
+    for a in raw_assumptions:
+        if not isinstance(a, dict):
+            continue
+        text = str(a.get("text") or "").strip()
+        if not text:
+            continue  # a premise with no text carries no signal
+
+        origin = str(a.get("origin") or "analyst").strip().lower()
+        if origin not in _VALID_PREMISE_ORIGINS:
+            origin = "analyst"
+
+        try:
+            label = ClaimLabel(str(a.get("label") or ClaimLabel.UNKNOWN.value).strip().upper())
+        except ValueError:
+            label = ClaimLabel.UNKNOWN
+
+        source_hint = str(a.get("source_hint") or "").strip()
+        if origin in _USER_PREMISE_ORIGINS and label == ClaimLabel.VERIFIED and not source_hint:
+            # The user asserting it is not a source — the single most important
+            # rule in W2 (docs/plans/sycophancy-mitigation.md §2a).
+            label = ClaimLabel.HYPOTHESIS
+
+        resolvable_by = str(a.get("resolvable_by") or "").strip().lower()
+        if origin in _USER_PREMISE_ORIGINS and not resolvable_by:
+            resolvable_by = "other_party"
+
+        out.append(Assumption(
+            text=text,
+            label=label,
+            rationale=str(a.get("rationale") or ""),
+            source_hint=source_hint,
+            origin=origin,
+            load_bearing=bool(a.get("load_bearing", False)),
+            falsifier=str(a.get("falsifier") or ""),
+            resolvable_by=resolvable_by,
+        ))
+
+    out.sort(key=lambda p: not p.load_bearing)  # load-bearing first; stable sort
+    return out[:PREMISE_MAX_CLAIMS]
 
 
 def parse_evidence_bundle(data: dict[str, Any]) -> EvidenceBundle:

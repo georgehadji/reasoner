@@ -603,6 +603,27 @@ class ReasonerPipeline:
         }
         self._log("PHASE-FUSION", f"Task type: {state.task_type.value}, Language: {state.language}", state)
 
+        # W2 premise audit (docs/plans/sycophancy-mitigation.md) — counts only;
+        # the premise text itself is already carried on state.decomposition.
+        try:
+            from reasoner.application.event_bus.bus import get_event_bus
+            from reasoner.core.events.domain_events import EventType, make_event
+            from reasoner.core.parsing import _parse_premises
+            premises = _parse_premises(state.decomposition["assumptions"])
+            if premises:
+                audit_evt = make_event(
+                    EventType.PREMISES_AUDITED,
+                    aggregate_id=state.conversation_id or "unknown",
+                    version=1,
+                    total=len(premises),
+                    user_origin=sum(1 for p in premises if p.origin in ("user_stated", "user_implied")),
+                    load_bearing=sum(1 for p in premises if p.load_bearing),
+                    unverifiable_by_search=sum(1 for p in premises if p.resolvable_by == "other_party"),
+                )
+                await get_event_bus().publish(audit_evt)
+        except Exception as exc:
+            logger.debug("W2 premise audit event skipped: %s", exc)
+
     @timed
     async def _phase_post_synthesis_verify(self, state: PipelineState) -> None:
         if not state.final_solution: return

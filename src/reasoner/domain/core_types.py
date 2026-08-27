@@ -55,6 +55,13 @@ class Assumption:
     label: ClaimLabel
     rationale: str = ""
     source_hint: str = ""
+    # W2 premise audit (docs/plans/sycophancy-mitigation.md) — origin distinguishes
+    # what the model introduced from what the user asserted, which is what the
+    # destructive perspective and synthesis "what I took on your word" section key on.
+    origin: str = "analyst"          # "user_stated" | "user_implied" | "analyst"
+    load_bearing: bool = False       # recommendation would change if this were false
+    falsifier: str = ""              # what would have to be true for this to be wrong
+    resolvable_by: str = ""          # "other_party" | "record" | "observation" | ""
 
 
 @dataclass

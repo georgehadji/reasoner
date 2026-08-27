@@ -27,6 +27,7 @@ class PipelineEventType(str, Enum):
     CONTEXT_FETCHED = "context_fetched"
     CONTEXT_VETTED = "context_vetted"
     SOURCE_ADDED = "source_added"
+    PREMISES_AUDITED = "premises_audited"
     ERROR_OCCURRED = "error_occurred"
     LLM_GENERATION_COMPLETED = "llm_generation_completed"
     RESEARCH_STEP_EMITTED = "research_step_emitted"
@@ -239,6 +240,21 @@ class SourceAdded(DomainEvent):
 
 
 @dataclass(frozen=True)
+class PremisesAudited(DomainEvent):
+    """W2 premise audit (docs/plans/sycophancy-mitigation.md) completed for Phase 1.
+
+    Counts, not content — the premise text itself lives on the decomposition
+    payload already carried in phase output; this event is what lets a
+    replayed PipelineAggregate answer "how many premises did this run take on
+    trust?" without re-deriving it from the raw assumptions list.
+    """
+    total: int = 0
+    user_origin: int = 0
+    load_bearing: int = 0
+    unverifiable_by_search: int = 0
+
+
+@dataclass(frozen=True)
 class ResearchStepEmitted(DomainEvent):
     """Single iteration progress event from PrismResearcher loop."""
     step_type: str = ""       # "searching" | "reasoning" | "reading"
@@ -424,6 +440,7 @@ PIPELINE_EVENT_CLASSES: dict[PipelineEventType, type[DomainEvent]] = {
     PipelineEventType.CONTEXT_FETCHED: ContextFetched,
     PipelineEventType.CONTEXT_VETTED: ContextVetted,
     PipelineEventType.SOURCE_ADDED: SourceAdded,
+    PipelineEventType.PREMISES_AUDITED: PremisesAudited,
     PipelineEventType.PERSPECTIVE_GENERATED: PerspectiveGenerated,
     PipelineEventType.CANDIDATE_SCORED: CandidateScored,
     PipelineEventType.STRESS_TEST_COMPLETED: StressTestCompleted,

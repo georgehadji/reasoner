@@ -48,6 +48,7 @@ def _summary_to_dict(summary) -> dict[str, Any]:
         "critical_insights": list(summary.critical_insights),
         "open_questions": list(summary.open_questions),
         "claim_labels": dict(summary.claim_labels),
+        "premises": list(summary.premises),
         "action_blueprint": list(summary.action_blueprint),
         "citations": list(summary.citations),
         "models_used": list(summary.models_used),

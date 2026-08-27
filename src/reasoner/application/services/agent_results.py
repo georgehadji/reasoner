@@ -162,6 +162,7 @@ class RunSummary:
     critical_insights: tuple[str, ...] = ()
     open_questions: tuple[str, ...] = ()
     claim_labels: Mapping[str, str] = field(default_factory=lambda: types.MappingProxyType({}))
+    premises: tuple[Mapping[str, Any], ...] = ()
     action_blueprint: tuple[Mapping[str, Any], ...] = ()
     citations: tuple[Mapping[str, Any], ...] = ()
     models_used: tuple[str, ...] = ()
@@ -211,6 +212,7 @@ def summarise(events: Sequence[Mapping[str, Any]], *, preset: str) -> RunSummary
             if isinstance(labels, dict)
             else {}
         ),
+        premises=tuple(coerce_dict_list(synthesis.get("premises"))),
         action_blueprint=tuple(coerce_dict_list(synthesis.get("action_blueprint"))),
         citations=tuple(extract_citations(list(events))),
         models_used=tuple(extract_models_used(events)),

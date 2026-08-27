@@ -46,6 +46,25 @@ def classification_prompt(problem: str, language: str, state: PipelineState | No
         f'JSON: {{"task_type": "analytical", "rationale": "<why>", "language": "{language}"}}'
     )
 
+# W2 premise audit (docs/plans/sycophancy-mitigation.md) — shared by both Phase-1
+# prompt builders below so the schema can't drift between them.
+_ASSUMPTION_SCHEMA = (
+    '{"text": "<assumption>", "origin": "user_stated|user_implied|analyst", '
+    '"label": "VERIFIED|HYPOTHESIS|UNKNOWN", "load_bearing": true|false, '
+    '"falsifier": "<what would have to be true for this to be wrong>", '
+    '"resolvable_by": "other_party|record|observation|", '
+    '"rationale": "<why this label>", "source_hint": "<source name or URL if VERIFIED>"}'
+)
+_PREMISE_RULES = (
+    '"user_stated" = the user asserted it outright; "user_implied" = their framing '
+    'depends on it without saying it; "analyst" = you are introducing it. '
+    'load_bearing=true if the recommendation would change were it false. For any '
+    'user-origin assumption about another person\'s motives, intent, or behaviour, set '
+    'resolvable_by="other_party" — you cannot verify it and neither can a search. Never '
+    'label a user-origin assumption VERIFIED without a source_hint; the user asserting '
+    'it is not a source. Cap at 6 assumptions, prefer load-bearing ones.'
+)
+
 DECOMPOSITION_SYSTEM = "Decompose problem into sub-problems. JSON only."
 def decomposition_prompt(state: PipelineState) -> str:
     is_jury = "jury" in (state.preset_name or "")
@@ -59,9 +78,9 @@ def decomposition_prompt(state: PipelineState) -> str:
 Problem: {_wrap_user_input(state.problem)}{web_context}
 Decompose.{jury_instr}
 
-JSON: {{"causal_chain": [{{"step": 1, "action": "<action>", "produces": ["<output>"]}}], "assumptions": [{{"text": "<assumption>", "label": "VERIFIED|HYPOTHESIS|UNKNOWN", "rationale": "<why this label>", "source_hint": "<source name or URL if VERIFIED>"}}], "failure_modes": ["<failure>"], "critical_sources": [{{"url": "<URL>", "reason": "<why it matters>"}}]}}
+JSON: {{"causal_chain": [{{"step": 1, "action": "<action>", "produces": ["<output>"]}}], "assumptions": [{_ASSUMPTION_SCHEMA}], "failure_modes": ["<failure>"], "critical_sources": [{{"url": "<URL>", "reason": "<why it matters>"}}]}}
 
-Rules: Max 5 steps. Surface assumptions with rationale. VERIFIED assumptions MUST cite a source_hint. If web results exist, list 1-2 critical_sources. Be specific.'''
+Rules: Max 5 steps. Surface assumptions with rationale. {_PREMISE_RULES} If web results exist, list 1-2 critical_sources. Be specific.'''
 
 FUSION_SYSTEM = """You are an analytical assistant. Your job is to classify the task type, detect the language, and decompose the problem into a causal chain. Output ONLY valid JSON."""
 
@@ -89,11 +108,12 @@ def fusion_prompt(state: PipelineState, language: str) -> str:
         f'  "task_rationale": "<why this task type>",\n'
         f'  "language": "{language}",\n'
         f'  "causal_chain": [{{"step": 1, "action": "<action>", "produces": ["<output>"]}}],\n'
-        f'  "assumptions": [{{"text": "<assumption>", "label": "VERIFIED|HYPOTHESIS|UNKNOWN", "rationale": "<why>", "source_hint": "<source name or URL if VERIFIED>"}}],\n'
+        f'  "assumptions": [{_ASSUMPTION_SCHEMA}],\n'
         f'  "failure_modes": ["<failure>"],\n'
         f'  "critical_sources": [{{"url": "<URL>", "reason": "<why it matters>"}}]\n'
         f'}}\n\n'
-        f'Rules: Max 5 steps for causal_chain. Surface assumptions with rationale. VERIFIED assumptions MUST cite a source_hint. If web results exist, list 1-2 critical_sources. Be specific.'
+        f'Rules: Max 5 steps for causal_chain. Surface assumptions with rationale. {_PREMISE_RULES} '
+        f'If web results exist, list 1-2 critical_sources. Be specific.'
     )
 
 SYNTHESIS_SYSTEM = """You are a senior analytical strategist and expert technical writer. Your goal is to produce a definitive, professional synthesis that resolves complex problems with clarity and authority.
@@ -184,7 +204,36 @@ def synthesis_prompt(state: PipelineState) -> str:
     followup = _followup_context(state)
     quality_note = f"\nCONTEXT QUALITY: {state.context_quality}\n" if state.context_quality and state.context_quality != "unknown" else ""
 
-    return f'{get_language_instruction(state)}\n{followup}\nFinal Context:\n{_wrap_external_content(json.dumps(final_context, indent=2))}\n{_wrap_external_content(sources_info)}{quality_note}\n\n{method_hint}\n\nUse this exact format: [SOLUTION]...prose with structured headings and citations...[/SOLUTION] ```json...``` with fields: critical_insights, action_blueprint, open_questions, claim_labels, meta_audit, sources, layout_hints, evidence.'
+    # W2 premise audit (docs/plans/sycophancy-mitigation.md §2c) — read straight from
+    # state.decomposition rather than `final_context`, which only carries assumptions
+    # when decomposition is a typed Decomposition object; the live fusion phase stores
+    # a plain dict there, so final_context["assumptions"] is empty in production.
+    raw_assumptions = (
+        state.decomposition.get("assumptions", [])
+        if isinstance(state.decomposition, dict)
+        else getattr(state.decomposition, "assumptions", None) or []
+    )
+    premises_instruction = ""
+    if raw_assumptions:
+        from reasoner.core.parsing import _parse_premises
+        user_premises = [
+            p for p in _parse_premises(raw_assumptions)
+            if p.origin in ("user_stated", "user_implied") and p.load_bearing
+        ]
+        if user_premises:
+            premises_block = "\nLOAD-BEARING PREMISES TAKEN ON THE USER'S WORD:\n" + json.dumps([
+                {"text": p.text, "label": p.label.value, "falsifier": p.falsifier}
+                for p in user_premises
+            ], indent=2)
+            quality_note += f"\n{_wrap_external_content(premises_block)}\n"
+            premises_instruction = (
+                '\n\nInclude a short "What I took on your word" section in the prose '
+                "naming the load-bearing premises above that you could not independently "
+                "verify. This is not a disclaimer — it is the part of the analysis the "
+                "reader needs in order to act on the rest."
+            )
+
+    return f'{get_language_instruction(state)}\n{followup}\nFinal Context:\n{_wrap_external_content(json.dumps(final_context, indent=2))}\n{_wrap_external_content(sources_info)}{quality_note}\n\n{method_hint}{premises_instruction}\n\nUse this exact format: [SOLUTION]...prose with structured headings and citations...[/SOLUTION] ```json...``` with fields: critical_insights, action_blueprint, open_questions, claim_labels, meta_audit, sources, layout_hints, evidence.'
 
 COT_DETECTION_SYSTEM = """You are a meticulous, skeptical, and ruthless analytical assistant. Your primary function is to shield the reasoning pipeline from low-quality, irrelevant, or misleading information. Review retrieved text for factual errors, unsubstantiated claims, obvious speculation, or low relevance to the user's core problem. Output ONLY valid JSON.
 

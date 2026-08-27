@@ -58,7 +58,12 @@ def _ser_1(state: PipelineState) -> dict:
             {
                 "text": _get_v(a, 'text', ''),
                 "label": (lambda x: x.value if hasattr(x, 'value') else str(x))(_get_v(a, 'label', 'UNKNOWN')),
-                "rationale": _get_v(a, 'rationale', '')
+                "rationale": _get_v(a, 'rationale', ''),
+                # W2 premise audit (docs/plans/sycophancy-mitigation.md)
+                "origin": _get_v(a, 'origin', 'analyst'),
+                "load_bearing": _get_v(a, 'load_bearing', False),
+                "falsifier": _get_v(a, 'falsifier', ''),
+                "resolvable_by": _get_v(a, 'resolvable_by', ''),
             } for a in assumptions
         ],
         "failure_modes": _get_v(dec, 'failure_modes', []),
@@ -1061,12 +1066,34 @@ def _ser_synthesis(state: PipelineState) -> dict:
                 "non_obvious_insight": _get_v(meta, "non_obvious_insight", ""),
             }
 
+        # W2 premise audit (docs/plans/sycophancy-mitigation.md §2d) — the
+        # load-bearing, user-origin premises the synthesis was built on, so an
+        # API/MCP consumer sees what was taken on trust alongside the answer.
+        dec = _get_v(state, 'decomposition')
+        raw_assumptions = _get_v(dec, 'assumptions', []) if dec is not None else []
+        premises: list[dict[str, Any]] = []
+        if raw_assumptions:
+            from reasoner.core.parsing import _parse_premises
+            premises = [
+                {
+                    "text": p.text,
+                    "origin": p.origin,
+                    "label": p.label.value,
+                    "load_bearing": p.load_bearing,
+                    "falsifier": p.falsifier,
+                    "resolvable_by": p.resolvable_by,
+                }
+                for p in _parse_premises(raw_assumptions)
+                if p.origin in ("user_stated", "user_implied")
+            ]
+
         result = {
             "core_solution": _get_v(fs, "core_solution", ""),
             "critical_insights": _get_v(fs, "critical_insights", []),
             "action_blueprint": clean_bp,
             "open_questions": _get_v(fs, "open_questions", []),
             "claim_labels": clean_labels,
+            "premises": premises,
             "evidence": _get_v(fs, "evidence", {}),
             "meta_audit": meta_audit,
             "layout_hints": _get_v(fs, "layout_hints", {}),

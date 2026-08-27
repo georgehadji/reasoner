@@ -147,6 +147,29 @@ class TestPipelineStateContext:
         assert "candidates" in context
         assert "scores" in context
 
+    def test_to_context_dict_reads_plain_dict_decomposition(self):
+        """`_phase_fusion` (application/pipeline.py) stores state.decomposition as a
+        plain dict, not a typed Decomposition object. to_context_dict() must read
+        sub_problems/assumptions off that dict too, not just off Decomposition's
+        attributes — a prior version silently returned [] for both on every live
+        run because it gated on hasattr(decomp, "sub_problems"), which a dict
+        never has.
+        """
+        state = PipelineState(core=PipelineCore(problem="Test problem"))
+        state.decomposition = {
+            "sub_problems": [{"id": "sp1", "description": "do the thing", "inputs": [], "outputs": [], "constraints": []}],
+            "assumptions": [{"text": "user says X", "label": "HYPOTHESIS"}],
+            "causal_chain": [],
+            "critical_sources": [],
+        }
+
+        context = state.to_context_dict(phase="synthesis")
+
+        assert context["sub_problems"] == [
+            {"id": "sp1", "description": "do the thing", "inputs": [], "outputs": [], "constraints": []}
+        ]
+        assert context["assumptions"] == [{"text": "user says X", "label": "HYPOTHESIS"}]
+
 
 class TestScenarioTypeCoercion:
     """Stress-test enums should tolerate common LLM casing variants."""
