@@ -1,7 +1,9 @@
 import Link from 'next/link';
 import { DisagreementField } from '@/components/landing/DisagreementField';
+import { IdeaField } from '@/components/landing/IdeaField';
 import { MechanismDiagram } from '@/components/landing/MechanismDiagram';
 import { Aside, Body, Heading, Lede, Section } from '@/components/landing/prose';
+import { ReviewHandoff } from '@/components/landing/ReviewHandoff';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
 import { CAPABILITIES, PROVIDERS } from '@/lib/capabilities.generated';
@@ -18,9 +20,10 @@ import { SHOWCASE_IMAGES, SHOWCASE_PROMPT } from '@/lib/image-showcase';
  * are the parts a first-time reader can check without being asked to read an
  * essay first.
  *
- * Ideation (§3) came back from /capabilities on that test: it is an exhibit,
- * not an essay. Its `brainstorming` anchor moved with it, so the numbering at
- * /capabilities closed up while every id on both pages stayed put.
+ * Ideation came back from /capabilities on that test: it is an exhibit, not
+ * an essay. It carries no marker/name — the first thing on the page after the
+ * masthead should not compete with the masthead for a section number — but
+ * kept its `brainstorming` anchor, so old #brainstorming links still resolve.
  *
  * Copy discipline: every figure comes from `capabilities.generated.ts`, which
  * is regenerated from the live registry on each commit. Nothing here is typed
@@ -45,22 +48,22 @@ const ARTICLE_PHASES = [
 
 /**
  * The creativity tier every generated idea carries out of the Verbalized
- * Sampling rounds (phases/brainstorming.py). The tag is the model's own, which
- * is the whole point of showing it: it declares where in its own distribution
- * the idea came from, so the safe ones cannot pass themselves off as reaches.
+ * Sampling rounds (phases/brainstorming.py) — internally a probability the
+ * model assigns its own output, but the copy sells the shelf, not the gauge:
+ * this is what comes back, not the mechanism that sorted it.
  */
 const IDEA_TIERS = [
   {
     name: 'Conventional',
-    desc: 'What the field would already say. Kept, because a baseline is worth seeing named.',
+    desc: 'The safe answer. Worth having on record — never worth stopping at.',
   },
   {
     name: 'Lateral',
-    desc: 'A move sideways. Structure borrowed from a domain that is not this one.',
+    desc: 'Structure borrowed from a domain this problem has never been put next to.',
   },
   {
     name: 'Disruptive',
-    desc: 'Low probability by the model’s own reckoning. Usually wrong, occasionally the answer.',
+    desc: 'The one a single prompt would never have handed you.',
   },
 ];
 
@@ -207,92 +210,103 @@ export default function LandingPage() {
           <Aside href="/capabilities">Read the argument for each &rarr;</Aside>
         </Section>
 
-        {/* ── Images ─────────────────────────────────────────────
-            Runs without a marginal column. The four images ARE the
-            argument here, and the 9rem label track was costing them a
-            ninth of the measure to repeat a word the heading already
-            says. Full width also lets the plates sit four-up at a size
-            where the differences between labs are actually visible,
-            which is the entire point of showing four.
+        {/* ── Writing ────────────────────────────────────────────
+            Runs without a marginal column, like Images. The nine-step
+            list IS the label: a 9rem track repeating the word "writing"
+            beside an ordered sequence of named phases spends a ninth of
+            the measure saying what the reader can already see. The two
+            sections that keep their markers are the ones whose content
+            does not announce itself.
 
-            Two things the reader must leave with: four images come
-            back from four different labs on every run, and the premium
-            tier is a toggle rather than a different product. Both live
-            in the one paragraph below, which is deliberately the whole
-            of the prose here — the plates are the argument, and a
-            reader who stops after the heading has still been told the
-            thing that matters.
+            The one section on this page written to a reader with money
+            at stake, because this is the one capability people are paid
+            for. It is also the only section competing in a market that
+            has heard every claim: the humaniser category sells
+            "undetectable" and "100% bypass", the detectors retrain
+            against it, and the reader has already been burned. Matching
+            that claim would put us in the same sentence as the tools
+            that fail it.
 
-            Do NOT list the tier line-ups. Naming the models each
-            preset fields dates the page against constants_limits.py
-            and turns a claim about how the run is composed into a spec
-            sheet a competitor can shop against. */}
-        <Section id="images">
-          <Heading>Every prompt goes to four labs at once.</Heading>
+            So the section refuses the category's frame instead. The
+            detector is not the gate that pays; an editor is. That
+            reframing is the whole heading, and it lets the mechanism
+            below do the persuading, which is the only move left in a
+            market this sophisticated.
+
+            Two constraints, both easy to break by accident:
+
+            1. Do NOT claim undetectable, human-indistinguishable, or
+               anything about passing a detector. It is unprovable, it
+               dates the moment a detector ships, and it is the exact
+               claim this section is positioned against.
+            2. Do NOT re-argue voice. §6 at /capabilities owns the tells
+               argument and states honestly that the brief is not a
+               validator. This section shows the one thing an ARTICLE
+               run adds on top: a phase that quotes the tells still
+               standing, then rewrites without them. Contradicting or
+               duplicating §6 costs us the credibility both pages are
+               built on.
+
+            Prose here also avoids em-dashes, which the same reader now
+            reads as a machine signature. A section promising prose that
+            does not sound generated cannot be punctuated like the thing
+            it is arguing against.
+
+            GROUND TRUTH, audited 2026-08-27 against the article flow.
+            Four claims that had stood here were false. Three were then
+            made true in code rather than deleted; one stays deleted.
+
+            FIXED, so the claim is now allowed:
+            - The tell-quoting humanize pass. writing_humanize_prompt had
+              zero call sites; article phase 6a ran ARTICLE_STYLE_EDIT_SYSTEM
+              instead, five bullets with no tell list. Phase 6a now runs
+              WRITING_HUMANIZE_SYSTEM (flows/article_phases.py), which must
+              quote each tell before rewriting, with the old prose pass kept
+              as the parse-failure fallback. Needed article_humanize: 8192 in
+              PHASE_TOKEN_BUDGETS, because it returns the whole article
+              inside a JSON string and 2048 truncated it mid-object.
+            - HUMANIZATION_RULES on the article body. It reached only the
+              phase 8 synthesis. Now appended to ARTICLE_DRAFT_SYSTEM.
+              Draft ONLY: the developmental edit is told not to touch voice
+              or register and the copy edit not to change word choice, so
+              the same rules there contradict the prompt they hang on.
+            - Sources from the links actually in the text. The deterministic
+              extraction existed only in the writing flow; the article flow
+              now imports the same helper and appends ## Sources.
+            - The audit retry, which was real but CLI-only, because the SSE
+              driver never calls ArticleFlow.execute(). It now lives inside
+              run_article_final_audit_phase, so every driver gets it, and
+              the second failure is recorded to state.errors instead of
+              shipping silently.
+
+            STILL FALSE, do not write these:
+            - "The fact-check is a hard gate." Deliberate. Every article
+              PhaseStep is critical=False, and a low claim-support ratio
+              logs and writes gaps_noted. Advisory by product decision:
+              the reader gets a usable draft with the holes marked, not a
+              dead run they already paid phases for. Say labelled, never
+              gated.
+            - Author or publication voice matching. style_brief is written
+              by tests and nothing else, there is no API field for it, and
+              /capabilities §5 says a tone control is not something we
+              intend to sell. Offering it here would contradict that.
+
+            Nothing below is a validator, and the last paragraph says so.
+            Keep it saying so. */}
+        <Section id="writing">
+          <Heading>It has to survive an editor, not a detector.</Heading>
           <Lede>
-            One prompt, four models, four different labs, generating in parallel, so no single
-            house style, outage, or content refusal decides what comes back, and every primary has
-            a fallback behind it. The tier changes which model each lab sends, never how many labs
-            answer: budget runs by default on the cheapest capable model in the catalogue, ranked
-            on measured price rather than on reputation, while premium is one toggle away in the
-            composer and takes each lab&rsquo;s strongest instead. Reference images, five aspect
-            ratios, and automatic prompt enhancement come as standard on both. The four below are
-            one real run; which models answered it, and what happens when one of them refuses, is
-            the routing described under{' '}
-            <Link
-              href="/capabilities#image-making"
-              className="link-smooth text-[var(--accent)] hover:text-[var(--accent-hover)]"
-            >
-              image making
-            </Link>
-            .
+            Nobody pays for a draft that passes a detector. They pay for one that does not come
+            back. So an article here is not one generation. It moves through nine phases, each on
+            its own model, and the one that writes the draft is never the one that fact-checks it,
+            never the one that cuts it, and never the one that signs off the final audit.
           </Lede>
 
-          <figure className="mt-[var(--space-10)]">
-            <p className="font-mono text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
-              &ldquo;{SHOWCASE_PROMPT}&rdquo;
-            </p>
-
-            <ul
-              role="list"
-              className="mt-[var(--space-6)] grid list-none gap-[var(--space-5)] grid-cols-2 lg:grid-cols-4"
-            >
-              {SHOWCASE_IMAGES.map(({ src, model, lab, origin }) => (
-                <li key={src} className="card-hover">
-                  <img
-                    src={src}
-                    alt={`${lab}'s interpretation of the prompt: a wooden reading chair beside a tall gallery window in morning light`}
-                    width={720}
-                    height={720}
-                    loading="lazy"
-                    decoding="async"
-                    className="aspect-square w-full border border-[var(--border)] object-cover"
-                  />
-                  <p className="mt-[var(--space-3)] font-sans text-[13pt] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
-                    {lab}
-                  </p>
-                  <p className="mt-[var(--space-1)] font-mono text-[8pt] leading-[var(--lh-body)] text-[var(--text-subtle)]">
-                    {model} · {origin}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </figure>
-        </Section>
-
-        {/* ── §1 Writing ─────────────────────────────────────────── */}
-        <Section id="writing" marker="§1" name="Writing">
-          <Heading>Drafted, fact-checked, audited, then edited again.</Heading>
-          <Lede>
-            An article is not one generation. It moves through nine phases, and the fact-check is a
-            hard gate: a run that fails it stops rather than quietly publishing around it. If the
-            final audit fails, the piece goes back for another editorial pass automatically.
-          </Lede>
-
-          <ol
-            role="list"
-            className="mt-[var(--space-8)] grid list-none gap-[var(--space-3)] sm:grid-cols-3"
-          >
+          {/* One column, not three. These are nine steps in a fixed order and
+              a multi-column grid makes the reader work out the reading
+              direction before they can see the sequence. Stacked, the order is
+              the shape. */}
+          <ol role="list" className="mt-[var(--space-8)] grid list-none gap-[var(--space-3)]">
             {ARTICLE_PHASES.map((phase, i) => (
               <li key={phase} className="flex gap-[var(--space-3)] border-t border-[var(--border)] pt-[var(--space-3)]">
                 <span
@@ -309,58 +323,192 @@ export default function LandingPage() {
           </ol>
 
           <Body>
-            Phase seven is the style pass described under{' '}
+            Phase four is adversarial by instruction. A model from another lab is told to assume
+            the draft invented its statistics and misattributed its quotes, and to rate every
+            claim it makes verified, supported, partial, speculative, or unsupported. That ledger
+            is handed to the final audit rather than being formed again by impression, and the
+            draft before it is told to mark a claim it cannot source UNVERIFIED instead of
+            smoothing over it.
+          </Body>
+
+          <Body>
+            Phase seven decides how it reads, on a model of its own again. It has to quote the
+            machine-prose{' '}
             <Link
               href="/capabilities#voice"
               className="link-smooth text-[var(--accent)] hover:text-[var(--accent-hover)]"
             >
-              voice
-            </Link>
-            , run here against a finished draft rather than a first answer. Sources are assembled
-            from the links actually present in that draft, so the bibliography describes the
-            article rather than the intention.
+              tells
+            </Link>{' '}
+            it can find in the draft before it is allowed to rewrite, because a model asked only
+            to sound more human reaches for synonyms, while one made to name the pattern first has
+            to deal with the sentence it just quoted. The same banned constructions go into the
+            drafting prompt, so most of them are never written.
+          </Body>
+
+          <Body>
+            A piece that fails the final audit is edited again and re-audited before anyone sees
+            it, and if it fails twice that is recorded rather than quietly shipped. Sources are
+            assembled from the links actually present in the finished text, so the bibliography
+            describes the article rather than the intention. None of that is a validator: nothing
+            diffs the published text against the list afterwards. It is a brief given to models,
+            and a page arguing for checkable claims is the wrong place to pretend otherwise.
           </Body>
         </Section>
 
-        {/* ── §2 Ideation ───────────────────────────────────────
+        {/* ── Images ─────────────────────────────────────────────
+            Runs without a marginal column. The four images ARE the
+            argument here, and the 9rem label track was costing them a
+            ninth of the measure to repeat a word the heading already
+            says. 2x2 rather than 4-up: at this width four-across shrinks
+            each plate below the size where a house style actually reads,
+            which is the entire point of showing four.
+
+            Two things the reader must leave with: four images come
+            back from four different labs on every run, and the premium
+            tier is a toggle rather than a different product. Both live
+            in the one paragraph below, which is deliberately the whole
+            of the prose here — the plates are the argument, and a
+            reader who stops after the heading has still been told the
+            thing that matters.
+
+            Do NOT list the tier line-ups. Naming the models each
+            preset fields dates the page against constants_limits.py
+            and turns a claim about how the run is composed into a spec
+            sheet a competitor can shop against. */}
+        <Section id="images">
+          {/* The name of the capability, since nothing else here says it.
+              Dropping the marginal column bought the plates the full measure
+              but cost the section its label, and a reader arriving at four
+              photographs under a heading about labs has been shown the
+              product without being told what it is. Same 8pt uppercase spec
+              the marginal column uses, so it is the page's own label idiom
+              moved inline rather than a second one invented for this
+              section. */}
+          <p className="font-sans text-[8pt] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
+            Image generation
+          </p>
+
+          <div className="mt-[var(--space-6)] grid gap-x-[var(--space-12)] gap-y-[var(--space-6)] lg:grid-cols-2 lg:items-end">
+            {/* One step up from the shared Heading (34pt): this section leads
+                the page's exhibits and the display size is what makes the
+                two-column split read as a masthead rather than as a caption. */}
+            <h2 className="font-serif text-[34pt] sm:text-[55pt] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)]">
+              Every prompt goes to four labs at once.
+            </h2>
+            <p className="font-serif text-[21pt] leading-[var(--lh-body)] text-[var(--text-2)]">
+              Write one prompt and four labs answer it at once, so you pick between four takes
+              instead of arguing with one. Reference images, five aspect ratios and prompt
+              enhancement come as standard. Premium is one toggle in the composer: still four
+              labs, each sending its best.
+            </p>
+          </div>
+
+          <figure className="relative mt-[var(--space-10)]">
+            {/* The light the tilt implies. Four plates leaning back off a
+                shared vanishing point need a source above them, or the
+                rotation reads as a rendering glitch rather than as an object
+                being lit. Static gradient on an existing theme token — no
+                canvas, no loop, nothing to pause off-screen. Painted first
+                and never given a z-index: the plates are opaque and come
+                later in the DOM, so they cover it without a stacking
+                context being invented for the section. */}
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-[-8%] top-[10%] h-[55%] bg-[radial-gradient(ellipse_at_top,var(--accent-dim),transparent_70%)]"
+            />
+
+            <p className="font-mono text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+              &ldquo;{SHOWCASE_PROMPT}&rdquo;
+            </p>
+
+            {/* Perspective on the grid, not on each plate — one shared
+                vanishing point is what makes four tilted squares read as one
+                object seen at an angle instead of four cards that each warped
+                alone. Same depth language and same numbers as
+                MechanismDiagram; the page should only own one. */}
+            <ul
+              role="list"
+              className="mt-[var(--space-6)] grid list-none grid-cols-2 gap-[var(--space-5)] [perspective:1400px]"
+            >
+              {/* Lab name only. Model id and country stay in the showcase data
+                  and in manifest.json as the run's provenance, but neither is
+                  shown: the id dates the page the moment a tier is re-ranked,
+                  and the country is an argument this page is not making here.
+                  The claim is which HOUSE answered. */}
+              {SHOWCASE_IMAGES.map(({ src, lab }) => (
+                <li
+                  key={src}
+                  className="plate-reveal card-hover group [transform-style:preserve-3d] hover:[transform:translateZ(26px)_rotateX(3.5deg)] motion-reduce:hover:[transform:none]"
+                >
+                  {/* Held slightly under-saturated at rest and released on
+                      hover. Four photographs at full colour side by side
+                      fight each other; pulling them back a notch makes the
+                      grid read as one exhibit and makes the one you are
+                      pointing at the only one at full strength. Filter only —
+                      a scale here would need overflow:hidden, and that forces
+                      transform-style back to flat and kills the tilt. */}
+                  <img
+                    src={src}
+                    alt={`${lab}'s interpretation of the prompt: a street food stall at dusk in heavy rain, lit by one bare bulb, steam rising off the griddle`}
+                    width={720}
+                    height={720}
+                    loading="lazy"
+                    decoding="async"
+                    fetchPriority="low"
+                    sizes="(max-width: 768px) 45vw, 30vw"
+                    className="aspect-square w-full border border-[var(--border)] object-cover saturate-[0.9] transition-[filter,border-color] duration-[var(--dur-component)] ease-[var(--ease-standard)] group-hover:border-[var(--border-strong)] group-hover:saturate-100"
+                  />
+                  <p className="mt-[var(--space-3)] font-sans text-[13pt] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
+                    {lab}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </figure>
+        </Section>
+
+        {/* ── Ideation ────────────────────────────────────────────
             Lives here rather than with the rest of the mechanism
             argument at /capabilities, because it passes the test
             everything on this page has to pass: the three tiers are
             an exhibit, something to look at, and the claim above
             them is checkable in a sentence without the surrounding
-            essay. Its anchor stayed `brainstorming` through the
-            move, so the id is stable even though the page it hangs
-            on is not — an old /capabilities#brainstorming link now
-            lands on that page with nothing to scroll to, which is
-            the one cost of the move and worth a redirect if those
-            links turn out to exist anywhere public.
+            essay. No marker/name — the first thing after the
+            masthead should not compete with the masthead for a
+            section number. Kept the `brainstorming` id through
+            every move, so old #brainstorming links still resolve.
 
-            Copy discipline is tighter here than anywhere else on
-            the page, because the honest version is weaker than the
-            version that writes itself. The clustering, the merging
-            of near-duplicates and the three ratings are a brief
-            given to one model, NOT code — no embeddings, no
-            similarity threshold, no weighted rank. Do not promote
-            them. What is genuinely enforced is the separation of
-            models, the mode-collapse check on the generated tail,
-            and the use-case gate on development; those are the only
-            things below that claim to be rules. */}
-        <Section id="brainstorming" marker="§2" name="Ideation">
-          <Heading>The model with the ideas does not get to score them.</Heading>
+            Deliberately not a mechanism explainer. The brief from
+            this section's last review still holds — the clustering,
+            the merging of near-duplicates and the three ratings are
+            given to one model, NOT code, so do not promote them as
+            enforced — but the standing instruction on TOP of that is
+            to not walk the reader through process at all (rounds,
+            counts, gates). Name what is genuinely advanced —
+            Verbalized Sampling, four models across four labs, a
+            code-level mode-collapse check — as credibility, and stop
+            there. Anyone who wants the mechanism has the Aside link
+            to the full essay. Copy sells the shelf, not the gauge:
+            see IDEA_TIERS above for the same rule applied to the
+            tier descriptions. */}
+        <Section id="brainstorming">
+          <Heading>Your best idea is the one it almost didn&rsquo;t say.</Heading>
           <Lede>
-            Ask a model to brainstorm and it hands you its most probable answers, the same ones it
-            would hand anyone. Reasoner asks for the distribution instead: three rounds, five ideas
-            a round, each carrying the probability the model itself puts on it. The unlikely tail is
-            the point, and a round that comes back entirely safe fails a check in code rather than
-            being passed along.
+            Ask a model to brainstorm and it hands you the answer built to please &mdash; the same
+            safe idea it would give the next person who asked.
           </Lede>
           <Body>
-            The technique is Verbalized Sampling, which treats a model&rsquo;s sameness as a
-            sampling problem rather than something to prompt harder against. Every idea arrives
-            tagged with how far it reached.
+            Reasoner is engineered to get past that reflex. Verbalized Sampling reaches outside a
+            model&rsquo;s own habits instead of asking it to try harder. Four models from four
+            different labs mean no single lab&rsquo;s taste decides what survives. And a check
+            written into the code &mdash; not a prompt &mdash; refuses a batch of ideas that comes
+            back entirely safe.
           </Body>
 
-          <dl className="mt-[var(--space-8)] grid gap-x-[var(--space-8)] gap-y-[var(--space-5)] sm:grid-cols-3">
+          <IdeaField />
+
+          <dl className="mt-[var(--space-4)] grid gap-x-[var(--space-8)] gap-y-[var(--space-5)] sm:grid-cols-3">
             {IDEA_TIERS.map(({ name, desc }) => (
               <div key={name} className="border-t border-[var(--border)] pt-[var(--space-3)]">
                 <dt className="font-sans text-[13pt] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
@@ -374,32 +522,112 @@ export default function LandingPage() {
           </dl>
 
           <Body>
-            Generating, pruning, developing, and writing up then run on four models from four
-            different labs. The one that merges the near-duplicates and rates what survives for
-            feasibility, novelty, and impact is never the one that produced them; the one that
-            writes the final answer is a fourth again. Three ideas go through to deep development,
-            and a development that will not commit to a concrete use case is sent back for another
-            pass.
+            The model that had the ideas is never the one that scores them. A different lab decides
+            what survives &mdash; every time, not by exception.
           </Body>
 
           <Aside href="/capabilities#bias">Why a different lab is the one scoring →</Aside>
         </Section>
 
-        {/* ── §3 Code ───────────────────────────────────────────
-            Brainstorming used to open this section, which left it
-            trying to carry ideation and code in two sentences and
-            serving neither. Ideation is §2 above; this says the one
-            thing about code worth the space. */}
-        <Section id="code" marker="§3" name="Code">
-          <Heading>Reasoning that runs, not reasoning that claims.</Heading>
+        {/* ── Code ──────────────────────────────────────────────
+            Was three sentences and a §2 marker. The marker went with
+            the marginal column: Ideation above it dropped its own in
+            an earlier pass, so a lone §2 was numbering a sequence that
+            no longer existed, and the exhibit wanted the 9rem back.
+            Labelled inline instead, the same way Images is.
+
+            THE WEDGE, and the only reason this section exists. Every
+            coding assistant on the market ships code that the model
+            which wrote it has just told you looks fine. One model,
+            author and reviewer, marking its own homework. Splitting
+            those two across labs is the one thing here a competitor
+            cannot also claim, so it is the heading, the lede and the
+            drawing, and everything else is support.
+
+            Do NOT reach for the obvious second claim. This section is
+            positioned against single-model assistants, not against
+            human review, and copy that implies the reviewer replaces
+            an engineer would be the same overreach the writing
+            section refuses when it declines to promise a detector
+            bypass.
+
+            GROUND TRUTH, verified 2026-08-27 against the coding flow.
+            The full claim-to-code table is in lib/code-showcase.ts and
+            is the thing to read before editing a word of this. The
+            three that are easiest to overstate by accident:
+
+            - Security Review is the one phase built with critical=True
+              (flows/coding.py:43) and the SSE path really does honour
+              it (api/execution/pipeline.py:311,427,467), unlike the
+              article flow where every step is critical=False. But it
+              is a phase-FAILURE gate. It stops a run whose review did
+              not complete, NOT a run whose review found problems.
+              "Nothing ships until the review passes" is a lie.
+            - Author lab ≠ reviewer lab is how both coding presets are
+              routed (preset_registry.py:728-761,766-772), and it is
+              NOT enforced: BlocDiversityConstraint's _GENERATOR_ROLES
+              does not list coding_generate. Say the presets route it
+              that way. Never "by rule" — that phrase is the
+              masthead's promise about epistemic labels and is load-
+              bearing everywhere else on this page.
+            - Tests are generated, not run. The prompt tells them to
+              cover what the review flagged (phases/coding.py:219-225),
+              which is the real and sufficient claim. Contract
+              validation commands DO reach the sandbox
+              (flows/coding_phases.py:200-216) but only when the spec
+              emitted any, so it cannot be stated unconditionally.
+
+            The PoT sandbox line survives from the old copy because it
+            is still true and still checkable: NoopExecutor is
+            installed rather than None precisely so a phase can never
+            fall back to letting an LLM narrate an execution it did not
+            perform (flows/services.py:26-43). */}
+        <Section id="code">
+          <p className="font-sans text-[8pt] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
+            Code generation
+          </p>
+
+          <div className="mt-[var(--space-6)]">
+            <Heading>Written by one lab. Attacked by another.</Heading>
+          </div>
+
+          {/* "Most assistants", not "every assistant". The claim is about the
+              default arrangement, which is fair and checkable; an absolute
+              quantifier over every product on the market is one a competitor
+              could break with a single counter-example, and this page cannot
+              afford to be caught out on a number or a scope. */}
           <Lede>
-            Coding runs the opposite way from ideation: specification, generation, review, tests,
-            assembly. There is a right answer, and nothing is served by diverging from it.
+            On most assistants the model that wrote your code is the same one that tells you it
+            looks fine. Author and reviewer, one model, marking its own homework. Here they are
+            two: the file is written by one model, then handed to a different one from a different
+            lab, briefed as a hostile reviewer and told to find every flaw before you see it.
           </Lede>
+
           <Body>
-            Code written under Program-of-Thoughts is executed in a sandbox with a wall-clock limit
-            and a memory cap, so a reasoning step that claims a result has actually produced it.
+            That reviewer is not working from memory either. Before it reads a line, Reasoner
+            searches for known vulnerabilities and hardening guidance for the exact language and
+            framework your spec named, and hands those references to the review along with the
+            code. What comes back is not a verdict, it is a list: severity, file, line, and the
+            fix. The test suite is written last, on a third model, and is told to cover the issues
+            the review just raised.
           </Body>
+
+          <ReviewHandoff />
+
+          <Body>
+            Of the seven phases, the security review is the only one the run cannot skip past &mdash;
+            a review that fails to complete ends the run rather than letting the code through
+            unread. And where a step reasons in code rather than prose, that code is executed in a
+            sandbox under a wall-clock limit and a memory cap. When the sandbox is off, the phase
+            is refused outright. It is never handed to a model to narrate an execution that never
+            happened.
+          </Body>
+
+          {/* "All n", not "the other n" — coding is one of the n, and an
+              off-by-one is exactly the kind of thing this page is read for. */}
+          <Aside href="/capabilities#methods">
+            All {CAPABILITIES.methods} reasoning methods &rarr;
+          </Aside>
         </Section>
 
         {/* ── Terms ─────────────────────────────────────────────── */}
