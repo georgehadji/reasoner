@@ -351,6 +351,117 @@ export const SCORE_AXES = [
   { key: 'feasibility', label: 'Feasibility' },
 ] as const satisfies ReadonlyArray<{ key: keyof RunScore; label: string }>;
 
+/* ── Labelled claims ──────────────────────────────────────────────── */
+
+/** One claim from the captured synthesis, paired with the label it carries. */
+export interface LabelledClaim {
+  /** The sentence the label was attached to, as the run wrote it. */
+  claim: string;
+  label: EpistemicLabel;
+  /** The run's own reason, e.g. "from team size data". Often empty. */
+  qualifier: string;
+}
+
+/** Trailing sentence of `text`, without the markdown that opened its block. */
+function lastSentence(text: string): string {
+  const parts = text.split(/(?<=[.!?])\s+/);
+  return (parts[parts.length - 1] ?? '')
+    .replace(/^(#{3,4}\s+|-\s+|\d+\.\s*)/, '')
+    .trim();
+}
+
+/** Pull the labelled claims out of one run of segments. */
+function claimsIn(segments: readonly Segment[]): LabelledClaim[] {
+  const claims: LabelledClaim[] = [];
+  let buffer = '';
+
+  for (const segment of segments) {
+    if (segment.kind === 'text' || segment.kind === 'strong') {
+      buffer += segment.text;
+    } else if (segment.kind === 'label') {
+      const claim = lastSentence(buffer);
+      if (claim) claims.push({ claim, label: segment.label, qualifier: segment.qualifier });
+      buffer = '';
+    }
+  }
+
+  return claims;
+}
+
+/**
+ * Every labelled claim in the captured run, in document order.
+ *
+ * A label segment sits immediately after the sentence it qualifies, so the
+ * claim is the text accumulated since the last sentence boundary. Derived
+ * rather than transcribed: a page that quotes the product's own labelling
+ * must not be able to quote something the run never said.
+ *
+ * Both the synthesis and the full phase-2 positions are read. Labelling
+ * starts at generation, not at synthesis (see the `excerpt` note on
+ * RunPosition), and this run's synthesis carries a single label — reading
+ * only that would leave two of the three labels with no real specimen.
+ */
+export const LABELLED_CLAIMS: LabelledClaim[] = [
+  ...RUN.synthesis.flatMap((block) =>
+    block.kind === 'heading' || block.kind === 'subheading' ? [] : claimsIn(block.segments),
+  ),
+  ...(phaseData('Perspectives')?.candidates ?? []).flatMap((candidate) =>
+    // The full position, not RunPosition.excerpt: the excerpt is truncated
+    // for display and cuts off most of the labels with it.
+    claimsIn(parseInline(candidate.content, makeCiteNumbering())),
+  ),
+];
+
+/** Discourse openers that only make sense in the paragraph they came from. */
+const CONNECTIVE =
+  /^(however|finally|first|second|third|next|ultimately|additionally|moreover|therefore|consequently|constructively|at scale|from first principles|addressing [a-z- ]+ effects)\b[,:]?\s+/i;
+
+/** Reference to something outside the sentence: unreadable when quoted alone. */
+const DANGLING = /\b(these|those|the proposal|this choice|the decision)\b/i;
+
+function unhitch(claim: string): string {
+  const stripped = claim.replace(CONNECTIVE, '');
+  return stripped.charAt(0).toUpperCase() + stripped.slice(1);
+}
+
+/**
+ * How well a claim reads on its own, quoted away from its paragraph.
+ *
+ * A specimen shown on the marketing page has to be true AND legible: a real
+ * sentence that opens "Finally, the proposal fails..." is honest and useless,
+ * because the reader has neither the proposal nor the three points before it.
+ * Ranking beats hand-picking here — an editor choosing by eye would end up
+ * transcribing, and a transcribed claim can drift from what the run said.
+ */
+function legibility(entry: LabelledClaim): number {
+  const claim = unhitch(entry.claim);
+  const length = claim.length;
+
+  let score = 0;
+  if (!DANGLING.test(claim)) score += 2;
+  // The run's own reason for the label ("from team size data") is the part a
+  // reader learns most from, so a claim carrying one outranks a bare claim.
+  if (entry.qualifier) score += 1;
+  if (length >= 80 && length <= 190) score += 2;
+  else if (length <= 240) score += 1;
+  return score;
+}
+
+/**
+ * One real example of each label: the most legible, shortest to break a tie.
+ *
+ * Order is VERIFIED, HYPOTHESIS, UNKNOWN — descending confidence, which is
+ * how the product presents them everywhere else.
+ */
+export const CLAIM_SPECIMENS: LabelledClaim[] = (
+  ['VERIFIED', 'HYPOTHESIS', 'UNKNOWN'] as const
+).flatMap((label) => {
+  const best = LABELLED_CLAIMS.filter((c) => c.label === label).sort(
+    (a, b) => legibility(b) - legibility(a) || a.claim.length - b.claim.length,
+  )[0];
+  return best ? [{ ...best, claim: unhitch(best.claim) }] : [];
+});
+
 /** Distinct models this run actually touched, in phase order. */
 export const RUN_MODELS: string[] = [
   ...new Set(RUN.phases.flatMap((p) => p.models)),
