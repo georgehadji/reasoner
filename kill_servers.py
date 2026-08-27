@@ -10,7 +10,9 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
 import shutil
+import socket
 import subprocess
 import sys
 import time
@@ -55,7 +57,7 @@ def _kill_processes(force: bool = False) -> int:
             pid = info["pid"]
 
             # Avoid killing ourselves
-            if pid == sys.modules["os"].getpid():
+            if pid == os.getpid():
                 continue
 
             is_target = False
@@ -219,10 +221,47 @@ def _kill_ports() -> int:
     return freed
 
 
+def _port_owner(port: int) -> str:
+    """Describe what holds *port*, without needing psutil or PowerShell."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(0.3)
+        if sock.connect_ex(("127.0.0.1", port)) != 0:
+            return "free"
+
+    try:
+        import psutil
+    except ImportError:
+        return "in use"
+
+    for conn in psutil.net_connections(kind="inet"):
+        if conn.laddr and conn.laddr.port == port and conn.pid:
+            try:
+                return f"{psutil.Process(conn.pid).name()} (PID {conn.pid})"
+            except psutil.Error:
+                return f"PID {conn.pid}"
+    return "in use"
+
+
+def print_status() -> None:
+    """Print the occupancy of every port this script would free."""
+    print("  Active Reasoner processes:")
+    for port in TARGET_PORTS:
+        print(f"    :{port}  ->  {_port_owner(port)}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Kill all Reasoner servers")
     parser.add_argument("--force", action="store_true", help="Kill immediately without graceful termination")
+    parser.add_argument(
+        "--status",
+        action="store_true",
+        help="Report what holds each Reasoner port and exit without killing anything",
+    )
     args = parser.parse_args()
+
+    if args.status:
+        print_status()
+        return 0
 
     print("=" * 64)
     print("  Reasoner - Server Killer")
