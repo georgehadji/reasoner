@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from reasoner.domain.core_types import EvidenceBundle, PlanContract
 
-from reasoner.domain.core_types import CritiqueScore, ReviewHypothesis
+from reasoner.domain.core_types import Assumption, CritiqueScore, ReviewHypothesis
 from reasoner.domain.models import PerspectiveRegistry
 from reasoner.utils.json_safe import JSONDepthExceededError, safe_json_loads
 
@@ -756,7 +756,6 @@ def _parse_premises(raw_assumptions: Any) -> list[Assumption]:
     downgraded here, which is the point — trust the parser, not the prompt.
     """
     from reasoner.core.sycophancy_constants import PREMISE_MAX_CLAIMS
-    from reasoner.domain.core_types import Assumption
     from reasoner.domain.models import ClaimLabel
 
     if isinstance(raw_assumptions, dict):
