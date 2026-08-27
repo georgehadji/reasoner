@@ -12,11 +12,15 @@ import { SHOWCASE_IMAGES, SHOWCASE_PROMPT } from '@/lib/image-showcase';
  * making good on it.
  *
  * The mechanism argument used to run down this page as nine numbered
- * sections; it now lives at /capabilities, with its anchors and its numbering
- * intact. What stays here is the claim, the four-stage rail that frames it,
- * and the exhibits — a real image run and a real article run — because those
+ * sections; it now lives at /capabilities, with its anchors intact. What stays
+ * here is the claim, the four-stage rail that frames it, and the exhibits — a
+ * real image run, a real article run, and the ideation tiers — because those
  * are the parts a first-time reader can check without being asked to read an
  * essay first.
+ *
+ * Ideation (§3) came back from /capabilities on that test: it is an exhibit,
+ * not an essay. Its `brainstorming` anchor moved with it, so the numbering at
+ * /capabilities closed up while every id on both pages stayed put.
  *
  * Copy discipline: every figure comes from `capabilities.generated.ts`, which
  * is regenerated from the live registry on each commit. Nothing here is typed
@@ -25,6 +29,40 @@ import { SHOWCASE_IMAGES, SHOWCASE_PROMPT } from '@/lib/image-showcase';
  */
 
 /* ── Content ────────────────────────────────────────────── */
+
+/**
+ * The two image tiers, as core/constants_limits.py configures them
+ * (IMAGE_GEN_BUDGET_MODELS / IMAGE_GEN_PREMIUM_MODELS). Both field four
+ * models from four different labs and both cross a bloc boundary; the tier
+ * decides which model each lab sends, never how many labs answer. Hand-kept
+ * against those two lists — the only place on the home page that names a
+ * model's lab, because "premium" means nothing until a reader can see what
+ * it actually swaps.
+ */
+const IMAGE_TIERS = [
+  {
+    name: 'Budget',
+    badge: 'Default',
+    note: 'The four cheapest capable models in the catalogue, one per lab, ranked on measured price rather than on reputation.',
+    labs: [
+      { lab: 'Black Forest Labs', origin: 'Germany' },
+      { lab: 'Krea', origin: 'United States' },
+      { lab: 'Sourceful', origin: 'United States' },
+      { lab: 'ByteDance', origin: 'China' },
+    ],
+  },
+  {
+    name: 'Premium',
+    badge: 'One toggle away',
+    note: 'The same four-lab rule with each lab’s strongest image model instead. Switch tier in the composer; nothing else about the run changes.',
+    labs: [
+      { lab: 'OpenAI', origin: 'United States' },
+      { lab: 'Google', origin: 'United States' },
+      { lab: 'Recraft', origin: 'United States' },
+      { lab: 'ByteDance', origin: 'China' },
+    ],
+  },
+];
 
 /** The nine article phases, in order (application/flows/article.py). */
 const ARTICLE_PHASES = [
@@ -37,6 +75,27 @@ const ARTICLE_PHASES = [
   'Style and copy edit',
   'Final audit',
   'Synthesis',
+];
+
+/**
+ * The creativity tier every generated idea carries out of the Verbalized
+ * Sampling rounds (phases/brainstorming.py). The tag is the model's own, which
+ * is the whole point of showing it: it declares where in its own distribution
+ * the idea came from, so the safe ones cannot pass themselves off as reaches.
+ */
+const IDEA_TIERS = [
+  {
+    name: 'Conventional',
+    desc: 'What the field would already say. Kept, because a baseline is worth seeing named.',
+  },
+  {
+    name: 'Lateral',
+    desc: 'A move sideways. Structure borrowed from a domain that is not this one.',
+  },
+  {
+    name: 'Disruptive',
+    desc: 'Low probability by the model’s own reckoning. Usually wrong, occasionally the answer.',
+  },
 ];
 
 const TERMS = [
@@ -182,16 +241,28 @@ export default function LandingPage() {
           <Aside href="/capabilities">Read the argument for each &rarr;</Aside>
         </Section>
 
-        {/* ── §1 Images ──────────────────────────────────────────── */}
-        <Section id="images" marker="§1" name="Images">
-          <Heading>One prompt. Four images. Four labs.</Heading>
+        {/* ── Images ─────────────────────────────────────────────
+            Runs without a marginal column. The four images ARE the
+            argument here, and the 9rem label track was costing them a
+            ninth of the measure to repeat a word the heading already
+            says. Full width also lets the plates sit four-up at a size
+            where the differences between labs are actually visible,
+            which is the entire point of showing four.
+
+            Two things the reader must leave with, in this order: four
+            images come back from four different labs on every run, and
+            the premium tier is a toggle rather than a different
+            product. The tier panels below carry the second — they are
+            the only place on this page that names models, because
+            "premium" means nothing until you can see what changes. */}
+        <Section id="images">
+          <Heading>Every prompt goes to four labs at once.</Heading>
           <Lede>
-            The same argument, applied to pixels. Four models from four different labs generate in
-            parallel, so no single house style, outage, or content refusal decides what you get
-            back. Every primary has a fallback behind it.
+            One prompt, four models, four different labs, generating in parallel. No single house
+            style, outage, or content refusal decides what comes back, and every primary has a
+            fallback behind it. The four below are one real run, left as it happened.
           </Lede>
 
-          {/* One real run, left as it happened — including the two fallbacks. */}
           <figure className="mt-[var(--space-10)]">
             <p className="font-mono text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
               &ldquo;{SHOWCASE_PROMPT}&rdquo;
@@ -199,7 +270,7 @@ export default function LandingPage() {
 
             <ul
               role="list"
-              className="mt-[var(--space-6)] grid list-none gap-[var(--space-4)] sm:grid-cols-2 lg:grid-cols-4"
+              className="mt-[var(--space-6)] grid list-none gap-[var(--space-5)] grid-cols-2 lg:grid-cols-4"
             >
               {SHOWCASE_IMAGES.map(({ src, model, lab, origin, fallback }) => (
                 <li key={src} className="card-hover">
@@ -228,12 +299,55 @@ export default function LandingPage() {
               ))}
             </ul>
 
-            <figcaption className="mt-[var(--space-6)] font-sans text-[8pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+            <figcaption className="mt-[var(--space-5)] font-sans text-[8pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
               <span aria-hidden="true">†</span> Two of the configured primaries failed on this run
               and fallbacks took over mid-flight. Left as it happened. A chain you can watch
               working is worth more than one you have to take on faith.
             </figcaption>
           </figure>
+
+          {/* The tier is a swap of which model each lab sends, never a
+              change to how many labs answer. Saying that in the header
+              above the panels stops the cheaper tier reading as the
+              crippled one, which is what a bare feature table would do. */}
+          <div className="mt-[var(--space-16)] border-t border-[var(--border-strong)] pt-[var(--space-6)]">
+            <h3 className="font-serif text-[21pt] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)]">
+              Four labs either way. The tier picks which model each one sends.
+            </h3>
+
+            <div className="mt-[var(--space-8)] grid gap-[var(--space-10)] sm:grid-cols-2">
+              {IMAGE_TIERS.map(({ name, badge, note, labs }) => (
+                <div key={name}>
+                  <div className="flex flex-wrap items-baseline gap-x-[var(--space-3)] gap-y-[var(--space-1)]">
+                    <h4 className="font-sans text-[13pt] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
+                      {name}
+                    </h4>
+                    <span className="font-mono text-[8pt] uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--accent)]">
+                      {badge}
+                    </span>
+                  </div>
+                  <p className="mt-[var(--space-2)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+                    {note}
+                  </p>
+                  <ul role="list" className="mt-[var(--space-4)] list-none">
+                    {labs.map(({ lab, origin }) => (
+                      <li
+                        key={lab}
+                        className="flex items-baseline justify-between gap-[var(--space-4)] border-t border-[var(--border)] py-[var(--space-2)]"
+                      >
+                        <span className="font-sans text-[13pt] leading-[var(--lh-ui)] text-[var(--text-2)]">
+                          {lab}
+                        </span>
+                        <span className="font-mono text-[8pt] leading-[var(--lh-ui)] text-[var(--text-subtle)]">
+                          {origin}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </div>
 
           {/* Deliberately does NOT restate the routing. Which four models
               answered, why they came from four labs, and what happens when one
@@ -243,8 +357,8 @@ export default function LandingPage() {
               that section does not: the controls a reader gets to hold. */}
           <Body>
             Reference images, five aspect ratios, and automatic prompt enhancement come as
-            standard. Which four models answered this one, and what happens when one of them
-            refuses, is the routing described under{' '}
+            standard on both tiers. Which four models answered this one, and what happens when one
+            of them refuses, is the routing described under{' '}
             <Link
               href="/capabilities#image-making"
               className="link-smooth text-[var(--accent)] hover:text-[var(--accent-hover)]"
@@ -299,13 +413,75 @@ export default function LandingPage() {
           </Body>
         </Section>
 
-        {/* ── §3 Code ───────────────────────────────────────────
+        {/* ── §3 Ideation ───────────────────────────────────────
+            Lives here rather than with the rest of the mechanism
+            argument at /capabilities, because it passes the test
+            everything on this page has to pass: the three tiers are
+            an exhibit, something to look at, and the claim above
+            them is checkable in a sentence without the surrounding
+            essay. Its anchor stayed `brainstorming` through the
+            move, so the id is stable even though the page it hangs
+            on is not — an old /capabilities#brainstorming link now
+            lands on that page with nothing to scroll to, which is
+            the one cost of the move and worth a redirect if those
+            links turn out to exist anywhere public.
+
+            Copy discipline is tighter here than anywhere else on
+            the page, because the honest version is weaker than the
+            version that writes itself. The clustering, the merging
+            of near-duplicates and the three ratings are a brief
+            given to one model, NOT code — no embeddings, no
+            similarity threshold, no weighted rank. Do not promote
+            them. What is genuinely enforced is the separation of
+            models, the mode-collapse check on the generated tail,
+            and the use-case gate on development; those are the only
+            things below that claim to be rules. */}
+        <Section id="brainstorming" marker="§3" name="Ideation">
+          <Heading>The model with the ideas does not get to score them.</Heading>
+          <Lede>
+            Ask a model to brainstorm and it hands you its most probable answers, the same ones it
+            would hand anyone. Reasoner asks for the distribution instead: three rounds, five ideas
+            a round, each carrying the probability the model itself puts on it. The unlikely tail is
+            the point, and a round that comes back entirely safe fails a check in code rather than
+            being passed along.
+          </Lede>
+          <Body>
+            The technique is Verbalized Sampling, which treats a model&rsquo;s sameness as a
+            sampling problem rather than something to prompt harder against. Every idea arrives
+            tagged with how far it reached.
+          </Body>
+
+          <dl className="mt-[var(--space-8)] grid gap-x-[var(--space-8)] gap-y-[var(--space-5)] sm:grid-cols-3">
+            {IDEA_TIERS.map(({ name, desc }) => (
+              <div key={name} className="border-t border-[var(--border)] pt-[var(--space-3)]">
+                <dt className="font-sans text-[13pt] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
+                  {name}
+                </dt>
+                <dd className="mt-[var(--space-1)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+                  {desc}
+                </dd>
+              </div>
+            ))}
+          </dl>
+
+          <Body>
+            Generating, pruning, developing, and writing up then run on four models from four
+            different labs. The one that merges the near-duplicates and rates what survives for
+            feasibility, novelty, and impact is never the one that produced them; the one that
+            writes the final answer is a fourth again. Three ideas go through to deep development,
+            and a development that will not commit to a concrete use case is sent back for another
+            pass.
+          </Body>
+
+          <Aside href="/capabilities#bias">Why a different lab is the one scoring →</Aside>
+        </Section>
+
+        {/* ── §4 Code ───────────────────────────────────────────
             Brainstorming used to open this section, which left it
             trying to carry ideation and code in two sentences and
-            serving neither. Ideation has its own section on
-            /capabilities; this says the one thing about code worth
-            the space. */}
-        <Section id="code" marker="§3" name="Code">
+            serving neither. Ideation is §3 above; this says the one
+            thing about code worth the space. */}
+        <Section id="code" marker="§4" name="Code">
           <Heading>Reasoning that runs, not reasoning that claims.</Heading>
           <Lede>
             Coding runs the opposite way from ideation: specification, generation, review, tests,

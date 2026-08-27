@@ -26,6 +26,7 @@ The visual page views, routes, layouts, and API routes of the Next.js 16 app rou
 - **`contact`**: Exposes routing, templates, or integrations for Contact within the 'ui-next/src/app' ecosystem.
 - **`cookies`**: Exposes routing, templates, or integrations for Cookies within the 'ui-next/src/app' ecosystem.
 - **`dashboard`**: User analytical dashboards tracking credits, token limits, history, and active pipelines.
+- **`capabilities`**: The nine mechanism sections (§1–§9) that used to run down the home page — re-exports `components/landing/CapabilitiesPage`.
 - **`docs`**: Browsers-friendly system documentation renderer and page views.
 - **`faq`**: Exposes routing, templates, or integrations for Faq within the 'ui-next/src/app' ecosystem.
 - **`forgot-password`**: Exposes routing, templates, or integrations for Forgot-password within the 'ui-next/src/app' ecosystem.

@@ -5,14 +5,21 @@ import { SiteFooter } from '@/components/layout/SiteFooter';
 import { CAPABILITIES, SYCOPHANCY_CONTROLS } from '@/lib/capabilities.generated';
 
 /**
- * The mechanism argument, in nine parts.
+ * The mechanism argument, in eight parts.
  *
  * These sections used to run down the home page. They were moved here because
  * the home page has one job — state the claim, show the product's own output,
  * ask for the click — and nine sections of mechanism between the masthead and
- * the exhibits buried both. Nothing about the argument changed in the move:
- * the §n numbering, the anchors, and the copy are the same, so an inbound link
- * to #sycophancy still lands on the section it was written for, one URL over.
+ * the exhibits buried both. The anchors and the copy survived that move
+ * unchanged, so an inbound link to #sycophancy still lands on the section it
+ * was written for, one URL over.
+ *
+ * Ideation (#brainstorming) has since gone back to the home page: its three
+ * tiers are an exhibit rather than an essay, which is the test that page
+ * applies. The §n markers here closed up over the gap it left, so the marker a
+ * section carries is no longer the one it had on the home page. The anchors did
+ * not move, and they are what links are written against — never renumber by
+ * changing an id.
  *
  * Every section is the same claim from a different angle: Reasoner runs work
  * past models that disagree, then makes the disagreement part of the output.
@@ -47,27 +54,6 @@ const QUERY_PROGRESSION = [
   'Tesla Model Y',
   'Tesla Model Y Q2 2025 earnings',
   'Tesla Model Y 2025 production cost breakdown',
-];
-
-/**
- * The creativity tier every generated idea carries out of the Verbalized
- * Sampling rounds (phases/brainstorming.py). The tag is the model's own, which
- * is the whole point of showing it: it declares where in its own distribution
- * the idea came from, so the safe ones cannot pass themselves off as reaches.
- */
-const IDEA_TIERS = [
-  {
-    name: 'Conventional',
-    desc: 'What the field would already say. Kept, because a baseline is worth seeing named.',
-  },
-  {
-    name: 'Lateral',
-    desc: 'A move sideways. Structure borrowed from a domain that is not this one.',
-  },
-  {
-    name: 'Disruptive',
-    desc: 'Low probability by the model’s own reckoning. Usually wrong, occasionally the answer.',
-  },
 ];
 
 /**
@@ -228,67 +214,12 @@ export default function CapabilitiesPage() {
           <Aside href="/how-it-works#adjudication">See the score matrix and its bias flags →</Aside>
         </Section>
 
-        {/* ── §3 Ideation ───────────────────────────────────────
-            Follows §2 because it is the same argument one level
-            down. §2 states the routing rule; this is what that
-            separation is worth on the task where a model's defaults
-            are most visible — asked for ideas, a model returns the
-            ones it would give anyone.
-
-            Copy discipline is tighter here than anywhere else on
-            the page, because the honest version is weaker than the
-            version that writes itself. The clustering, the merging
-            of near-duplicates and the three ratings are a brief
-            given to one model, NOT code — no embeddings, no
-            similarity threshold, no weighted rank. Do not promote
-            them. What is genuinely enforced is the separation of
-            models, the mode-collapse check on the generated tail,
-            and the use-case gate on development; those are the only
-            things below that claim to be rules. */}
-        <Section id="brainstorming" marker="§3" name="Ideation">
-          <Heading>The model with the ideas does not get to score them.</Heading>
-          <Lede>
-            Ask a model to brainstorm and it hands you its most probable answers, the same ones it
-            would hand anyone. Reasoner asks for the distribution instead: three rounds, five ideas
-            a round, each carrying the probability the model itself puts on it. The unlikely tail is
-            the point, and a round that comes back entirely safe fails a check in code rather than
-            being passed along.
-          </Lede>
-          <Body>
-            The technique is Verbalized Sampling, which treats a model&rsquo;s sameness as a
-            sampling problem rather than something to prompt harder against. Every idea arrives
-            tagged with how far it reached.
-          </Body>
-
-          <dl className="mt-[var(--space-8)] grid gap-x-[var(--space-8)] gap-y-[var(--space-5)] sm:grid-cols-3">
-            {IDEA_TIERS.map(({ name, desc }) => (
-              <div key={name} className="border-t border-[var(--border)] pt-[var(--space-3)]">
-                <dt className="font-sans text-[13pt] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
-                  {name}
-                </dt>
-                <dd className="mt-[var(--space-1)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
-                  {desc}
-                </dd>
-              </div>
-            ))}
-          </dl>
-
-          <Body>
-            Generating, pruning, developing, and writing up then run on four models from four
-            different labs. The one that merges the near-duplicates and rates what survives for
-            feasibility, novelty, and impact is never the one that produced them; the one that
-            writes the final answer is a fourth again. Three ideas go through to deep development,
-            and a development that will not commit to a concrete use case is sent back for another
-            pass.
-          </Body>
-        </Section>
-
-        {/* ── §4 Image making ───────────────────────────────────
-            Sits here because §3 has just established that what a
-            request is asking for decides which models see it, and
-            images are where that rule is easiest to watch working:
-            the family a prompt lands in changes the models, the
-            output format and the price.
+        {/* ── §3 Image making ───────────────────────────────────
+            Sits here because §2 has just established that which
+            models see a request is decided by rule rather than by
+            preference, and images are where that is easiest to
+            watch working: the family a prompt lands in changes the
+            models, the output format and the price.
 
             The exhibit lives on the home page. This section is the
             mechanism and that one is the evidence; collapsing them
@@ -301,7 +232,7 @@ export default function CapabilitiesPage() {
             infrastructure/llm/image_generation.py (fallback
             hand-off, policy rewrite, retry). The family call is the
             only judgement here that a model makes. */}
-        <Section id="image-making" marker="§4" name="Image making">
+        <Section id="image-making" marker="§3" name="Image making">
           <Heading>No house model, and no favourite lab.</Heading>
           <Lede>
             An image prompt is read for what it is asking for — a logo, a photograph, a poster, an
@@ -347,8 +278,8 @@ export default function CapabilitiesPage() {
           <Aside href="/#images">See four labs answer the same prompt →</Aside>
         </Section>
 
-        {/* ── §5 Propagation ────────────────────────────────────── */}
-        <Section id="propagation" marker="§5" name="Propagation">
+        {/* ── §4 Propagation ────────────────────────────────────── */}
+        <Section id="propagation" marker="§4" name="Propagation">
           <Heading>An idea does not get to spread itself here.</Heading>
           <Lede>
             Systems that pass work between models have a failure mode a single model does not.
@@ -376,7 +307,7 @@ export default function CapabilitiesPage() {
           <Aside href="/how-it-works#synthesis">See what a recalled memory looks like in a run →</Aside>
         </Section>
 
-        {/* ── §6 Sycophancy ─────────────────────────────────────────
+        {/* ── §5 Sycophancy ─────────────────────────────────────────
             Last of the four Mechanism failures because it is the only one
             where the reader is the source of the distortion, and the page
             has spent five sections earning the standing to say so. Every
@@ -385,7 +316,7 @@ export default function CapabilitiesPage() {
             comment and tests/test_site_capabilities_sync.py. Do not add a
             paragraph here without adding its detector to
             scripts/update_mindmap_meta.py first. */}
-        <Section id="sycophancy" marker="§6" name="Sycophancy">
+        <Section id="sycophancy" marker="§5" name="Sycophancy">
           <Heading>It is not built to be agreed with.</Heading>
           <Lede>
             Assistants trained on human approval learn that agreement scores well. Across five
@@ -424,7 +355,7 @@ export default function CapabilitiesPage() {
           <Aside href="/how-it-works#adjudication">See the penalty on a real score matrix →</Aside>
         </Section>
 
-        {/* ── §7 Voice ─────────────────────────────────
+        {/* ── §6 Voice ─────────────────────────────────
             Sits after the four Mechanism failures rather than among them,
             because it is the only section on the page whose subject is not a
             wrong answer. The prose can be flawless and still read as machine
@@ -437,7 +368,7 @@ export default function CapabilitiesPage() {
             dedicated style pass (role article_humanize), which is a real
             phase with a real model behind it. No count of the rules appears
             here; see the PROSE_TELLS comment for why. */}
-        <Section id="voice" marker="§7" name="Voice">
+        <Section id="voice" marker="§6" name="Voice">
           <Heading>A model cannot hear how it sounds.</Heading>
           <Lede>
             Machine prose has a fingerprint, and the model producing it is the last thing able to
@@ -479,8 +410,8 @@ export default function CapabilitiesPage() {
           <Aside href="/#writing">See the run that pass belongs to &rarr;</Aside>
         </Section>
 
-        {/* ── §8 Research ───────────────────────────────────────── */}
-        <Section id="research" marker="§8" name="Research">
+        {/* ── §7 Research ───────────────────────────────────────── */}
+        <Section id="research" marker="§7" name="Research">
           <Heading>It searches like a researcher, not a search box.</Heading>
           <Lede>
             A single query returns what the query deserved. Reasoner runs an agentic loop that
@@ -524,8 +455,8 @@ export default function CapabilitiesPage() {
           <Aside href="/how-it-works#evidence">See what one run actually read →</Aside>
         </Section>
 
-        {/* ── §9 Methods ────────────────────────────────────────── */}
-        <Section id="methods" marker="§9" name="Methods">
+        {/* ── §8 Methods ────────────────────────────────────────── */}
+        <Section id="methods" marker="§8" name="Methods">
           <Heading>{CAPABILITIES.methods} methods. Not {CAPABILITIES.methods} prompts.</Heading>
           <Lede>
             Named reasoning techniques are usually sold as instructions bolted onto one chat
