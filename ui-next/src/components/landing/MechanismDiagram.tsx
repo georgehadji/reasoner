@@ -62,22 +62,20 @@ const STAGES: readonly Stage[] = [
       'No stage can hand an instruction to the next. Generators never read each other, and memory returns as evidence, never as an order.',
   },
   {
-    href: '/how-it-works#adjudication',
+    // Points at the page's own §5 now that it exists, not at the run record —
+    // "How it holds" should land on the argument, and /how-it-works#adjudication
+    // is still there as that section's own Aside target.
+    href: '#sycophancy',
     plate: 'sycophancy',
     ordinal: '03',
     failure: 'Sycophancy',
-    stage: 'Critique',
-    // Both clauses are checkable, and deliberately narrower than the obvious
-    // phrasing. "Nothing scores well for agreeing with you" would claim the
-    // critic pushes back on the reader's own framing; it does not — it scores
-    // the candidates the system generated, against the problem as given. What
-    // is true, and rarer, is that the reader's approval is not wired to
-    // anything: compute_reward() reads completion, schema validity, critique
-    // score and stress-test survival, and FeedbackStore has no consumer on the
-    // learning path at all. Claim the absent gradient, not a premise audit
-    // that has not been built.
+    // W2 premise audit shipped (docs/plans/sycophancy-mitigation.md) — Phase 1
+    // now labels which assumptions came from the user, and the destructive
+    // perspective is instructed to attack exactly those. `stage` reflects
+    // where that now runs, ahead of Critique.
+    stage: 'Premises',
     defence:
-      'Your approval is never an input. A critic from another lab scores the candidate answers on stated criteria, and no rating you give reaches model selection.',
+      'Your approval is never an input, and neither is your framing taken as settled. Phase 1 labels which assumptions came from you, a critic from another lab scores the candidates on stated criteria, and no rating you give reaches model selection.',
   },
   {
     href: '#hallucination',

@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from reasoner.domain.preset_core import get_preset_price_tier
-from reasoner.phases._shared import _wrap_user_input, build_followup_context
+from reasoner.phases._shared import HUMANIZATION_RULES, _wrap_user_input, build_followup_context
 
 
 @dataclass(frozen=True)
@@ -21,7 +21,37 @@ class DirectProfile:
     models: tuple[str, ...]  # preference order; empty = use the router's own routing
 
 
-DIRECT_ANALYTICAL_SYSTEM = "You are an analytical assistant. Provide a clear, concise answer."
+# See docs/SYCOPHANCY_MITIGATION.md §2.1 / docs/plans/sycophancy-mitigation.md W1:
+# the DIRECT path has no critique or stress-test stage, so this prompt is the only
+# guard a user's stated conclusion ever meets.
+_DIRECT_EPISTEMIC_RULES = """
+When the user's message contains a conclusion, a judgment about another person, or a
+decision they have already made, treat it as a claim to evaluate, not a premise to build
+on.
+
+- Name what you are taking on trust. If the account of another person's motives or
+  behaviour comes only from the user, say so once, plainly.
+- Agreement is not the failure mode; unearned agreement is. Where the available
+  information supports the user's view, say so directly and say why.
+- Where it does not, lead with that. Do not bury a disagreement after a paragraph of
+  validation.
+- Do not open by affirming the user. Do not substitute "your feelings are valid" for
+  engaging with the substance.
+- If the decision turns on facts only the other people involved hold, say which facts and
+  who has them.
+"""
+
+DIRECT_ANALYTICAL_SYSTEM = (
+    "You are an analytical assistant. Provide a clear, concise answer.\n"
+    + _DIRECT_EPISTEMIC_RULES
+    + HUMANIZATION_RULES
+)
+
+DIRECT_WEB_SEARCH_SYSTEM = (
+    "You are an analytical assistant. Provide a clear, concise, well-sourced answer.\n"
+    + _DIRECT_EPISTEMIC_RULES
+    + HUMANIZATION_RULES
+)
 
 # Enhanced system prompt for creative writing with hallucination guards.
 DIRECT_CREATIVE_SYSTEM = (
@@ -42,6 +72,12 @@ DIRECT_CREATIVE_SYSTEM = (
     "SELF-CORRECTION:\n"
     "Before finalizing, mentally review your draft for any unsupported factual claims. "
     "Replace dubious claims with safer, more general statements.\n"
+    "\n"
+    "SCOPE OF COMPLIANCE:\n"
+    "Follow the user's instructions precisely on form — tone, length, format, style, "
+    "point of view. Do not extend that compliance to endorsing the user's account of a "
+    "real situation or a real person as fact.\n"
+    + HUMANIZATION_RULES
 )
 
 _CREATIVE_MODELS_PREMIUM: tuple[str, ...] = ("claude-sonnet", "gpt-5", "gemini-pro")

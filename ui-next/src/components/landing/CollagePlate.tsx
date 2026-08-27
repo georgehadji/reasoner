@@ -192,10 +192,10 @@ export function CollagePlate({ variant }: { variant: PlateVariant }) {
       focusable="false"
       /* Capped rather than column-width. A plate that grows to fill a
          two-column breakpoint reaches 420px and starts competing with the
-         masthead; held at 220px it stays what it is — a plate beside a
+         masthead; held at 150px it stays what it is — a plate beside a
          paragraph — at every width, and the air left beside it in a wide
          column is the same air the reference leaves. */
-      className="block aspect-square w-full max-w-[220px]"
+      className="block aspect-square w-full max-w-[150px]"
     >
       <Blocks variant={variant} />
       <Ink variant={variant} />

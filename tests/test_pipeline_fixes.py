@@ -288,7 +288,7 @@ async def test_decomposition_prompt_demands_rationale_and_critical_sources():
     assert "rationale" in prompt
     assert "source_hint" in prompt
     assert "critical_sources" in prompt
-    assert "VERIFIED assumptions MUST cite a source_hint" in prompt
+    assert "user-origin assumption VERIFIED without a source_hint" in prompt
 
 
 @pytest.mark.asyncio

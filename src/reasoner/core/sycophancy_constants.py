@@ -7,3 +7,6 @@ from __future__ import annotations
 # W6 — framing-divergence measurement
 FRAMING_DIVERGENCE_FLOOR = 0.15   # above this, DIRECT is tracking the user's framing
 SELF_FOCUS_SAMPLE_RATE = 0.05     # telemetry sampling rate for the self-focus scorer
+
+# W2 — premise audit
+PREMISE_MAX_CLAIMS = 6            # cap per run; prefer load-bearing ones over this

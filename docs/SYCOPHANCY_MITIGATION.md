@@ -9,8 +9,34 @@ Companion to [MIND_VIRUS_MITIGATION.md](MIND_VIRUS_MITIGATION.md), which follows
 same structure for a different failure mode. Where the two overlap — the Neuro memory
 tier, the follow-up channel — this note defers to that one and says so.
 
-Status: analysis only. Nothing in this document has been implemented.
-Code references verified against `main` @ `eb25a44` (2026-08-25).
+Status: P0 of the implementation plan has landed (see
+[docs/plans/sycophancy-mitigation.md](plans/sycophancy-mitigation.md) for the full
+workstream breakdown and current status per item). Shipped so far:
+
+- **S5 — reward-signal-purity invariant.** `core/learning_guard.py` +
+  `OnlineLearner.__init__` fails fast if telemetry ever carries an approval-shaped
+  field. Tested in `tests/test_sycophancy_invariants.py`.
+- **S6 (partial) — framing scorers.** `core/framing_signals.py`
+  (`agreement_score`, `self_focus_ratio`), mirroring `core/propagation_signals.py`'s
+  telemetry-not-a-gate discipline. The paired-prompt divergence benchmark from S6b is
+  not yet built — the scorers exist, the corpus does not.
+- **S7 — revision licence.** One clause in `build_followup_context`
+  (`phases/_shared.py`) permitting the model to contradict its own prior synthesis.
+- **S8a (interim) — recall disclaimer.** One clause in `build_memory_context`
+  stating that recalled content is not established by having been stored. The full
+  fix (S8b, routing recalled positions through a typed `PremiseClaim`) still needs
+  S2/W2, which has not shipped.
+- **S10 — landing declaration.** `SYCOPHANCY_CONTROLS` generated in
+  `capabilities.generated.ts`, a gated `§5 Sycophancy` section on the landing page,
+  and the `MechanismDiagram` rail's stage-03 entry corrected and pointed at it.
+  Enforced by `tests/test_site_capabilities_sync.py`.
+
+Not yet built: S1 (DIRECT-path epistemic prompt), S2 (premise audit), S3
+(de-affirmation egress), S4 (advisory route — blocked on a crisis-handling decision),
+S9 (blueprint verification step).
+
+Code references verified against `main` @ `060996a` (2026-08-26); the P0 work above
+landed in this session on top of it.
 
 ---
 

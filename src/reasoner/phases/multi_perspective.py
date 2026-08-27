@@ -10,6 +10,7 @@ from reasoner.core.vs_constants import (
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.phases._shared import (
     _followup_context,
+    _wrap_external_content,
     _wrap_user_input,
     build_memory_context,
     build_web_sources_block,
@@ -36,7 +37,34 @@ def perspective_prompt(state: PipelineState, perspective: str) -> str:
     web_block = build_web_sources_block(state)
     memory_block = build_memory_context(state)
 
-    return f'{get_language_instruction(state)}\n{followup}{memory_block}\nContext: {json.dumps(context)}{web_block}\n\nAnalyze from {perspective} perspective.\n\nYou MUST return EXACTLY this JSON structure with no additional keys. Put all analysis inside "core_analysis" as a single string (3-6 paragraphs). Label factual claims inline with [VERIFIED], [HYPOTHESIS], or [UNKNOWN].\n\nJSON: {{"perspective": "{perspective}", "core_analysis": "<your detailed analysis with inline epistemic labels>", "key_insights": ["<insight 1>", "<insight 2>", "<insight 3>"]}}'
+    # W2 premise audit (docs/plans/sycophancy-mitigation.md §2c): only the
+    # destructive perspective sees the user-origin premises, and only to attack
+    # the framing — the other three perspectives stay blind to this, preserving
+    # the Phase-2 independence invariant (docs/MIND_VIRUS_MITIGATION.md).
+    premises_block = ""
+    if perspective == "destructive" and state.decomposition:
+        raw_assumptions = (
+            state.decomposition.get("assumptions", [])
+            if isinstance(state.decomposition, dict)
+            else getattr(state.decomposition, "assumptions", None) or []
+        )
+        if raw_assumptions:
+            from reasoner.core.parsing import _parse_premises
+            user_premises = [
+                p for p in _parse_premises(raw_assumptions)
+                if p.origin in ("user_stated", "user_implied")
+            ]
+            if user_premises:
+                claims = "\n".join(f'- {p.text} (label: {p.label.value})' for p in user_premises)
+                premises_block = _wrap_external_content(
+                    "\n[USER PREMISES]\n"
+                    "These are claims the user supplied, not established facts. Attack the "
+                    "framing: which of these, if false, changes the answer, and what is the "
+                    "strongest reason to doubt each one? Do not attack the user.\n"
+                    f"{claims}\n"
+                )
+
+    return f'{get_language_instruction(state)}\n{followup}{memory_block}\nContext: {json.dumps(context)}{web_block}{premises_block}\n\nAnalyze from {perspective} perspective.\n\nYou MUST return EXACTLY this JSON structure with no additional keys. Put all analysis inside "core_analysis" as a single string (3-6 paragraphs). Label factual claims inline with [VERIFIED], [HYPOTHESIS], or [UNKNOWN].\n\nJSON: {{"perspective": "{perspective}", "core_analysis": "<your detailed analysis with inline epistemic labels>", "key_insights": ["<insight 1>", "<insight 2>", "<insight 3>"]}}'
 
 CRITIQUE_SYSTEM = "You are an analytical assistant. Score solutions honestly. Output ONLY valid JSON."
 

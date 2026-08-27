@@ -11,7 +11,7 @@ export const CAPABILITIES = {
   directModels: 178,
   routableModels: 456,
   providerAdapters: 8,
-  testFiles: 240,
+  testFiles: 241,
   generatedAt: '2026-08-27',
 } as const;
 
@@ -30,8 +30,8 @@ export const SYCOPHANCY_CONTROLS = {
   mandatoryDissent: true,
   confidencePenalty: true,
   noStyleSelector: true,
-  directPathEpistemicRules: false,
-  premiseAudit: false,
+  directPathEpistemicRules: true,
+  premiseAudit: true,
   deaffirmEgress: false,
   advisoryRoute: false,
   revisionLicence: true,

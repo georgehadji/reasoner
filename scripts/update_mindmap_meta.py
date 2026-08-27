@@ -113,6 +113,119 @@ def _count_provider_adapters() -> int:
     return len(_fallback_provider_registry())
 
 
+# ── Sycophancy controls ──────────────────────────────────────────────────────
+# Each detector inspects the code a landing-page claim is about and returns
+# True only when the mechanism is actually present, at its use site rather
+# than its definition — the same contract as the counts above: marketing copy
+# cannot state a control the code does not implement. See
+# docs/plans/sycophancy-mitigation.md workstream W10.
+
+def _reward_signal_excludes_user_rating() -> bool:
+    """W5: the online learner's reward has no approval-shaped input, and is wired to check it."""
+    try:
+        import importlib
+        sys.path.insert(0, str(ROOT / "src"))
+        guard = importlib.import_module("reasoner.core.learning_guard")
+        telemetry_mod = importlib.import_module("reasoner.domain.telemetry")
+        fields = frozenset(telemetry_mod.LLMCallTelemetry.__dataclass_fields__)
+        ok, _ = guard.check_reward_signal_purity(fields)
+        if not ok:
+            return False
+        learner_src = (
+            ROOT / "src" / "reasoner" / "infrastructure" / "learning" / "online_learner.py"
+        ).read_text(encoding="utf-8")
+        return "check_reward_signal_purity(" in learner_src
+    except Exception:
+        return False
+
+
+def _destructive_in_default_perspectives() -> bool:
+    """W... (existing property): DEFAULT_PERSPECTIVES always includes 'destructive'."""
+    try:
+        import importlib
+        sys.path.insert(0, str(ROOT / "src"))
+        mod = importlib.import_module("reasoner.core.perspectives")
+        names = {p.name for p in getattr(mod, "DEFAULT_PERSPECTIVES", [])}
+        return "destructive" in names
+    except Exception:
+        return False
+
+
+def _critique_prompt_has_confidence_penalty() -> bool:
+    """critique_prompt() penalises confident-but-unsupported claims."""
+    path = ROOT / "src" / "reasoner" / "phases" / "multi_perspective.py"
+    if not path.exists():
+        return False
+    return "confidence_vs_accuracy_penalty" in path.read_text(encoding="utf-8")
+
+
+def _no_preset_varies_by_stance() -> bool:
+    """No preset config carries a tone/stance/personality field.
+
+    A structural check against the field names PipelinePreset actually has,
+    not a claim about runtime behaviour that would need every preset executed
+    to verify.
+    """
+    banned = {"tone", "stance", "personality", "style", "warmth"}
+    try:
+        import importlib
+        sys.path.insert(0, str(ROOT / "src"))
+        mod = importlib.import_module("reasoner.presets")
+        presets = getattr(mod, "PRESETS", None) or {}
+        for cfg in presets.values():
+            keys = set(vars(cfg).keys()) if hasattr(cfg, "__dict__") else set(cfg.keys())
+            if keys & banned:
+                return False
+        return True
+    except Exception:
+        return False
+
+
+def _direct_prompts_carry_epistemic_rules() -> bool:
+    """W1: DIRECT-path system prompts treat a stated conclusion as a claim, not a premise."""
+    path = ROOT / "src" / "reasoner" / "phases" / "direct.py"
+    if not path.exists():
+        return False
+    return "_DIRECT_EPISTEMIC_RULES" in path.read_text(encoding="utf-8")
+
+
+def _premise_audit_enabled() -> bool:
+    """W2: Phase-1 assumptions carry origin/load_bearing and a parser enforces the VERIFIED rule."""
+    core_types = ROOT / "src" / "reasoner" / "domain" / "core_types.py"
+    parsing = ROOT / "src" / "reasoner" / "core" / "parsing.py"
+    if not (core_types.exists() and parsing.exists()):
+        return False
+    return (
+        "load_bearing: bool" in core_types.read_text(encoding="utf-8")
+        and "_parse_premises" in parsing.read_text(encoding="utf-8")
+    )
+
+
+def _detect_sycophancy_controls() -> dict[str, bool]:
+    return {
+        "noApprovalGradient": _reward_signal_excludes_user_rating(),
+        "mandatoryDissent": _destructive_in_default_perspectives(),
+        "confidencePenalty": _critique_prompt_has_confidence_penalty(),
+        "noStyleSelector": _no_preset_varies_by_stance(),
+        # Light up as later workstreams land; detectors added alongside each.
+        "directPathEpistemicRules": _direct_prompts_carry_epistemic_rules(),
+        "premiseAudit": _premise_audit_enabled(),
+        "deaffirmEgress": False,
+        "advisoryRoute": False,
+        "revisionLicence": _followup_context_has_revision_licence(),
+        "verificationStep": False,
+    }
+
+
+def _followup_context_has_revision_licence() -> bool:
+    """W7: build_followup_context licenses the model to contradict a prior turn."""
+    path = ROOT / "src" / "reasoner" / "phases" / "_shared.py"
+    if not path.exists():
+        return False
+    src = path.read_text(encoding="utf-8")
+    return "_REVISION_LICENCE" in src and "Consistency with your own earlier answer" in src
+
+
 def _provider_names() -> list[str]:
     """Display names for the direct (non-OpenRouter) fallback adapters.
 
@@ -231,6 +344,10 @@ def _render_capabilities_ts(today: str, presets: int, methods: int) -> str:
     adapters = _count_provider_adapters()
     providers_literal = ", ".join(f"'{name}'" for name in _provider_names())
     tests = _count_test_files()
+    controls = _detect_sycophancy_controls()
+    controls_literal = ",\n".join(
+        f"  {key}: {'true' if value else 'false'}" for key, value in controls.items()
+    )
 
     return f"""/**
  * AUTO-GENERATED by scripts/update_mindmap_meta.py on {today} — do not edit
@@ -251,6 +368,17 @@ export const CAPABILITIES = {{
 
 /** Display names for the direct (non-OpenRouter) fallback provider adapters. */
 export const PROVIDERS = [{providers_literal}] as const;
+
+/**
+ * Sycophancy controls that are actually present in the code, per commit.
+ * See docs/SYCOPHANCY_MITIGATION.md and docs/plans/sycophancy-mitigation.md.
+ * A control renders true only when its detector finds the mechanism at the
+ * place it is used, not merely defined — landing-page copy must be gated on
+ * these, never hand-written past them.
+ */
+export const SYCOPHANCY_CONTROLS = {{
+{controls_literal},
+}} as const;
 """
 
 

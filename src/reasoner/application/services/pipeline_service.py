@@ -534,6 +534,12 @@ class PipelineSerializationService:
                         label=ClaimLabel(str(a.get('label', ClaimLabel.UNKNOWN.value))),
                         rationale=str(a.get('rationale', '')),
                         source_hint=str(a.get('source_hint', '')),
+                        # W2 premise audit fields — absent on pre-W2 state files,
+                        # which is why every one of these has a safe default.
+                        origin=str(a.get('origin', 'analyst')),
+                        load_bearing=bool(a.get('load_bearing', False)),
+                        falsifier=str(a.get('falsifier', '')),
+                        resolvable_by=str(a.get('resolvable_by', '')),
                     ))
                 except (ValueError, KeyError):
                     pass  # skip malformed assumption entry
