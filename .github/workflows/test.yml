@@ -44,7 +44,7 @@ jobs:
           # 2237: the propagation-resistance work replaced four hand-rolled copies
           # of the web-snippet block with build_web_sources_block(), retiring two
           # long lines along with the duplication.
-          python scripts/ruff_ratchet.py --max 2242
+          python scripts/ruff_ratchet.py --max 2238
 
       - name: Security scan (bandit)
         run: |

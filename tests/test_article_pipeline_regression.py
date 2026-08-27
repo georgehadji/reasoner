@@ -208,12 +208,19 @@ class TestArticlePromptBuilders:
         assert "Research Topic" in prompt
         assert "AI" in prompt
 
-    def test_draft_prompt_reflects_style_brief(self):
+    def test_draft_prompt_ignores_style_brief(self):
+        """style_brief is inert: nothing in production ever wrote the key.
+
+        Voice now travels through the user's own request, which the prompt
+        already carries and ARTICLE_DRAFT_SYSTEM already tells the model to
+        honour. This asserts the dead branch stays dead -- re-adding a second,
+        structured copy of the same instruction is the regression.
+        """
         from reasoner.phases.article import article_draft_prompt
         state = self._make_test_state({"style_brief": {"author": "Test Author", "publication": "Test Pub"}})
         prompt = article_draft_prompt(state)
-        assert "STYLE REQUIREMENT" in prompt
-        assert "Test Author" in prompt
+        assert "STYLE REQUIREMENT" not in prompt
+        assert "Test Author" not in prompt
 
     def test_verify_prompt_sonar_flag_skips_sources(self):
         from reasoner.phases.article import article_verify_prompt
