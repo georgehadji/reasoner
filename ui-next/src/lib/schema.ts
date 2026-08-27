@@ -124,3 +124,90 @@ export function techArticleSchema(doc: {
     publisher: { '@id': absoluteUrl('/#organization') },
   };
 }
+
+/**
+ * The programmatic surface, as an entity in its own right.
+ *
+ * Answer engines asked "how do I call Reasoner from an agent?" need something
+ * to cite that is not a paragraph of marketing prose. A WebAPI node with its
+ * documentation, its terms, and its entry points named is the machine-readable
+ * form of that answer, and it is what makes /developers extractable rather
+ * than merely indexable.
+ */
+export function webApiSchema(): Record<string, unknown> {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'WebAPI',
+    '@id': absoluteUrl('/#api'),
+    name: `${SITE.name} API`,
+    description:
+      'Run multi-model reasoning pipelines from software: an MCP server, a synchronous and a streaming HTTP endpoint, and a command-line entry point. Every claim in a result is labelled VERIFIED, HYPOTHESIS, or UNKNOWN.',
+    url: absoluteUrl('/developers'),
+    documentation: absoluteUrl('/docs/api-reference'),
+    termsOfService: absoluteUrl('/terms'),
+    provider: { '@id': absoluteUrl('/#organization') },
+    isPartOf: { '@id': absoluteUrl('/#software') },
+    potentialAction: [
+      {
+        '@type': 'ConsumeAction',
+        name: 'Call the Model Context Protocol server',
+        target: {
+          '@type': 'EntryPoint',
+          urlTemplate: absoluteUrl('/docs/mcp'),
+          actionPlatform: 'https://modelcontextprotocol.io',
+        },
+      },
+      {
+        '@type': 'ConsumeAction',
+        name: 'Run a pipeline over HTTP',
+        target: {
+          '@type': 'EntryPoint',
+          urlTemplate: `${SITE.url}/api/agent/run/sync`,
+          httpMethod: 'POST',
+          contentType: 'application/json',
+        },
+      },
+      {
+        '@type': 'ConsumeAction',
+        name: 'Fetch the live tool definitions',
+        target: {
+          '@type': 'EntryPoint',
+          urlTemplate: `${SITE.url}/api/agent/tools`,
+          httpMethod: 'GET',
+          contentType: 'application/json',
+        },
+      },
+    ],
+  };
+}
+
+/**
+ * A procedure, in the form answer engines quote back as steps.
+ *
+ * Used for the MCP setup on /developers: a reader who arrives from a generated
+ * answer should get the three real steps, not a summary of a page that has
+ * them.
+ */
+export function howToSchema(howTo: {
+  name: string;
+  description: string;
+  url: string;
+  steps: ReadonlyArray<{ name: string; text: string }>;
+}): Record<string, unknown> {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'HowTo',
+    name: howTo.name,
+    description: howTo.description,
+    url: absoluteUrl(howTo.url),
+    inLanguage: 'en',
+    publisher: { '@id': absoluteUrl('/#organization') },
+    step: howTo.steps.map((step, index) => ({
+      '@type': 'HowToStep',
+      position: index + 1,
+      name: step.name,
+      text: step.text,
+      url: `${absoluteUrl(howTo.url)}#mcp`,
+    })),
+  };
+}

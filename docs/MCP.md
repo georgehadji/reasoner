@@ -80,5 +80,6 @@ Pass `client_run_id` to make a call retry-safe — reusing an id in flight retur
 
 ## See also
 
+- [`/docs/mcp`](https://reasoner.app/docs/mcp) — this document, published for users of the hosted app. Keep the two in step: setup, tool list, and the caveats below are the same contract.
 - [`/docs/agent-integration`](https://reasoner.app/docs/agent-integration) — the general agent integration guide (HTTP surface, retry semantics, what to do with labelled claims). Most of it applies here too; the MCP-specific parts are this document.
 - `tests/test_mcp_tools.py` — the contract this document describes, enforced.

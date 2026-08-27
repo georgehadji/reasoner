@@ -64,6 +64,31 @@ const IDEA_TIERS = [
   },
 ];
 
+/**
+ * The three driving adapters an agent can come through, in order of how little
+ * code each one costs the caller. Every claim here is checkable: the MCP tools
+ * are in src/reasoner/api/mcp/tools.py, the bearer-key endpoints in
+ * api/routes/agent.py, and the CLI and in-process entry points are main.py and
+ * reasoner.headless.ask().
+ */
+const AGENT_DOORS = [
+  {
+    name: 'MCP',
+    detail:
+      'Six tools in a config block. Claude Desktop, Claude Code, and most agent frameworks pick it up with no client code, and report progress per phase.',
+  },
+  {
+    name: 'HTTP',
+    detail:
+      'One authenticated POST. Take the whole result as JSON, or stream the phases as they land. Tool definitions are served live rather than copied.',
+  },
+  {
+    name: 'CLI',
+    detail:
+      'A run from a shell or a cron job, exported to a JSON file — or the pipeline imported in-process, with no server between you and it.',
+  },
+];
+
 const TERMS = [
   {
     term: 'Source-available',
@@ -400,6 +425,66 @@ export default function LandingPage() {
             Code written under Program-of-Thoughts is executed in a sandbox with a wall-clock limit
             and a memory cap, so a reasoning step that claims a result has actually produced it.
           </Body>
+        </Section>
+
+        {/* ── §4 Agents ─────────────────────────────────────────
+            Sits last of the numbered sections because it is the only
+            one whose reader is not a person typing a question. The
+            three doors are the claim, and the claim is that they are
+            doors rather than products: MCP (api/mcp/tools.py), the
+            bearer-key HTTP surface (api/routes/agent.py), and the CLI
+            and in-process module (main.py, headless.ask) all enter the
+            same application layer. Do not describe a capability here
+            that holds on only one of them.
+
+            The detail — install, the six tool names, idempotency,
+            status codes — belongs at /developers. This section makes
+            the argument and hands off. */}
+        <Section id="agents" marker="§4" name="Agents">
+          <Heading>An agent can call it, and read the answer.</Heading>
+          <Lede>
+            A single model hands your program prose, and leaves it to judge how much of that to
+            trust. A run comes back with every claim already labelled VERIFIED, HYPOTHESIS, or UNKNOWN,
+            the open questions named, and each step of the plan carrying the criterion that says
+            whether it worked — which is what makes an answer something software can act on rather
+            than paraphrase.
+          </Lede>
+
+          <dl className="mt-[var(--space-10)] grid gap-x-[var(--space-8)] gap-y-[var(--space-5)] sm:grid-cols-3">
+            {AGENT_DOORS.map(({ name, detail }) => (
+              <div key={name} className="border-t border-[var(--border)] pt-[var(--space-3)]">
+                <dt className="font-sans text-[13pt] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
+                  {name}
+                </dt>
+                <dd className="mt-[var(--space-1)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+                  {detail}
+                </dd>
+              </div>
+            ))}
+          </dl>
+
+          <Body>
+            The three are adapters onto one pipeline, not three products. A run started from Claude
+            Desktop resolves credentials, guards against a duplicate, and settles credits exactly
+            as one started from curl — and either way, two free calls will tell you which method
+            would run and what it would cost before you commit to the one that bills.
+          </Body>
+          <Body>
+            {/* The direct MCP link is deliberate and load-bearing: this
+                section is where a crawling agent reads that Reasoner is
+                callable, and the next thing it needs is the setup page, not
+                another essay. Keep an inline link to /docs/mcp here. */}
+            Setup is a config block and one dependency —{' '}
+            <Link
+              href="/docs/mcp"
+              className="link-smooth text-[var(--accent)] underline decoration-[var(--border-strong)] underline-offset-4 hover:text-[var(--accent-hover)]"
+            >
+              add the MCP server to your host
+            </Link>
+            , or read the whole surface below.
+          </Body>
+
+          <Aside href="/developers">The developer surface, in full →</Aside>
         </Section>
 
         {/* ── Terms ─────────────────────────────────────────────── */}
