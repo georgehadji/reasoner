@@ -157,8 +157,12 @@ function inkOutline(
     const nx = -ty / len;
     const ny = tx / len;
 
-    /* A straight line has no apex to swell at, so it takes full width and
-       gets its life from the slow breathe term alone. */
+    /* The jitter is what saves a nominally straight stroke here: it makes
+       the samples non-collinear, so even the hallucination line registers
+       real turning angles and varies about 2x along its run rather than
+       coming out uniform. The guard below only fires for a stroke drawn
+       with no wobble at all, which would otherwise be pinned at the floor
+       width for its whole length. */
     const bend = peak > CURVE_EPS ? curve[i] / peak : 1;
     const breathe = 0.9 + 0.1 * Math.sin((i / pts.length) * Math.PI * 3 + seed);
     const half = (baseWidth * (WIDTH_FLOOR + (1 - WIDTH_FLOOR) * bend) * breathe) / 2;
@@ -201,16 +205,31 @@ export type PlateVariant = 'bias' | 'propagation' | 'sycophancy' | 'hallucinatio
  * Fringe settings, per variant so the four plates do not share one noise
  * field and repeat each other's edge.
  *
- * `scale` is in user units, and the plate renders 200 of them into 150px, so
- * 2.2 units is about 1.7px of displacement. That is the width of the fringe
- * in the reference at the same rendered size. Much past 3 and the stroke
- * stops reading as a mark and starts reading as a filter.
+ * Both numbers are measured off the reference rather than dialled by eye,
+ * because eyeballing them lands about five times too strong. In the 3x crop
+ * the stroke is roughly 30px wide on a 2000px plate, so 1.5% of the plate,
+ * which is 3 units here and matches the widths above. The fringe on it runs
+ * 2 to 3px, so 10 to 15% of the stroke, which is 0.3 to 0.5 units.
+ *
+ * That sets both:
+ *
+ *   scale      the maximum displacement, so it must stay well under the
+ *              thinnest part of the stroke it is applied to. The thinnest
+ *              here is propagation's first copy at 2.25 units, and a
+ *              displacement near that would pinch the stroke into pieces
+ *              rather than fray it.
+ *   frequency  feature size is 1/frequency, so hair-like fringe at 0.3
+ *              units needs roughly 3, not the sub-1 values that read as a
+ *              slow wave along the edge instead of a torn one.
+ *
+ * numOctaves stays at 2. Further octaves only add lower frequencies, which
+ * is the wave this is trying not to be.
  */
 const FRINGE: Record<PlateVariant, { seed: number; frequency: number; scale: number }> = {
-  bias: { seed: 7, frequency: 0.65, scale: 2.2 },
-  propagation: { seed: 19, frequency: 0.72, scale: 1.9 },
-  sycophancy: { seed: 31, frequency: 0.68, scale: 2.1 },
-  hallucination: { seed: 43, frequency: 0.6, scale: 2.4 },
+  bias: { seed: 7, frequency: 2.9, scale: 0.7 },
+  propagation: { seed: 19, frequency: 3.3, scale: 0.5 },
+  sycophancy: { seed: 31, frequency: 3.1, scale: 0.65 },
+  hallucination: { seed: 43, frequency: 2.7, scale: 0.8 },
 };
 
 /**
@@ -326,7 +345,7 @@ export function CollagePlate({ variant }: { variant: PlateVariant }) {
           <feTurbulence
             type="fractalNoise"
             baseFrequency={fringe.frequency}
-            numOctaves="3"
+            numOctaves="2"
             seed={fringe.seed}
             result="fringe"
           />
