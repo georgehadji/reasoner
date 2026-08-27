@@ -397,6 +397,10 @@ export function validateSearchRequest(body: unknown): { query: string; source_ty
 // Rate limiting
 const RATE_LIMITS: Record<string, { limit: number; windowMs: number }> = {
   run: { limit: 10, windowMs: SECURITY_CONSTANTS.rateLimitWindowMs },
+  // A resume restarts pipeline work on the backend, so it costs what a run
+  // costs -- same bucket size. Without this entry it would fall through to
+  // `default` (30) and sit three times looser than the run it resumes.
+  'pipeline-resume': { limit: 10, windowMs: SECURITY_CONSTANTS.rateLimitWindowMs },
   // Agent callers are servers, not browser tabs, and often share an egress
   // IP (NAT, a datacenter range). This is a coarse outer guard only — the
   // authoritative, per-account limit is enforced by the backend's
