@@ -42,11 +42,11 @@ def test_backward_compat_value_comparison() -> None:
 
 def test_event_classes_populated() -> None:
     """All 4 registries have correct entries."""
-    assert len(PIPELINE_EVENT_CLASSES) == 23
+    assert len(PIPELINE_EVENT_CLASSES) == 24
     assert len(WIDGET_EVENT_CLASSES) == 3
     assert len(MEMORY_EVENT_CLASSES) == 2
     assert len(SAAS_EVENT_CLASSES) == 12
-    assert len(EVENT_CLASSES) == 40
+    assert len(EVENT_CLASSES) == 41
 
 
 def test_make_event_with_sub_type() -> None:
@@ -124,7 +124,7 @@ async def test_saas_only_subscription() -> None:
 
 def test_all_event_types_map() -> None:
     """ALL_EVENT_TYPES contains all enum values."""
-    assert len(ALL_EVENT_TYPES) == 40
+    assert len(ALL_EVENT_TYPES) == 41
     assert ALL_EVENT_TYPES["pipeline_started"] == PipelineEventType.PIPELINE_STARTED
     assert ALL_EVENT_TYPES["widget_detected"] == WidgetEventType.WIDGET_DETECTED
     assert ALL_EVENT_TYPES["memory_stored"] == MemoryEventType.MEMORY_STORED
