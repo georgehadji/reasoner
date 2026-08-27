@@ -150,10 +150,6 @@ def context_to_writing_state(ctx: Context) -> dict[str, Any]:
     if ctx.pre_research_insights:
         ws["pre_research_insights"] = list(ctx.pre_research_insights)
 
-    # Style brief
-    if ctx.style_brief is not None:
-        ws["style_brief"] = ctx.style_brief
-
     # Argument map (derived from outline)
     if ctx.outline and isinstance(ctx.outline, dict):
         ws["argument_map"] = ctx.outline.get("argument_map", {})

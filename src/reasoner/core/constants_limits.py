@@ -183,6 +183,16 @@ PHASE_TOKEN_BUDGETS: dict[str, int] = {
     "coding_review":    4096,
     "coding_tests":     8192,
     "coding_assemble": 16384,
+    # Article pipeline — every one of these roles emits the FULL 800-1200 word
+    # article, so DEFAULT_MAX_TOKENS (2048) clips them. article_humanize is the
+    # tightest: it returns the article inside a JSON string alongside the tell
+    # audit, so escaping and the ai_tells array push it past 2048 even in
+    # English. "article" is also a NATIVE_LANGUAGE_METHOD, and EL/RU/AR tokenize
+    # 2-3x worse, which is what turned this into silent mid-JSON truncation.
+    "article_humanize": 8192,
+    "writing_assemble": 8192,
+    "writing_draft":    8192,
+    "article_revise":   8192,
     # Default fallback
     "default": 1536,
 }
@@ -408,9 +418,12 @@ PHASE_TIMEOUTS: dict[str, float] = {
     "Journal Review": 90.0,
     "Final Assembly": 120.0,
     "Humanize": 90.0,
-    # Article flow — combined style + copy edit runs two sequential LLM calls across the full article
-    "Style + Copy Edit": 180.0,
-    "Style + Copy Edit (retry)": 180.0,
+    # Article flow — combined humanize + copy edit runs two sequential LLM calls
+    # across the full article, and three on the worst path: if the humanize pass
+    # returns unparseable JSON it falls back to the prose style edit before the
+    # copy edit still runs.
+    "Style + Copy Edit": 240.0,
+    "Style + Copy Edit (retry)": 240.0,
     # Brainstorming (Verbalized Sampling) — sequential multi-round LLM calls need headroom
     "VS Idea Generation": 300.0,   # 5 rounds × ~45s each worst-case
     "Cluster & Score": 120.0,

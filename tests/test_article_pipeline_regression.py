@@ -287,42 +287,102 @@ class TestExtractJsonSafety:
 # ── Phase 6: Article flow execute with mock services ─────────────────────────
 
 class TestArticleFlowExecute:
-    """Tests for the ArticleFlow.execute() structural behavior."""
+    """The audit-failure retry, which lives in the phase, not in execute().
+
+    It was moved there because execute() is only reached by the CLI: the SSE
+    driver builds a flat list from get_phases() and calls the phase functions
+    directly, so a retry held in execute() never ran for a web user. These tests
+    therefore drive the phase function, which is what both drivers call.
+    """
+
+    @staticmethod
+    def _patched_audit_run(state, calls, fail_audit=True):
+        """Patch the three inner passes and run the audit phase against `state`."""
+        from unittest.mock import AsyncMock, patch
+
+        from reasoner.application.flows import article_phases
+
+        async def fake_audit(s, _svc):
+            calls["audit"] += 1
+            s.writing_state["editorial_audit"] = {
+                "passes_audit": not fail_audit,
+                "audit_score": 0.4 if fail_audit else 0.9,
+            }
+
+        async def fake_dev(s, _svc):
+            calls["dev"] += 1
+
+        async def fake_style(s, _svc):
+            calls["style"] += 1
+
+        services = AsyncMock(spec_set=["log", "call_llm", "run_phase"])
+        services.log = lambda *a, **k: None
+
+        return patch.multiple(
+            article_phases,
+            _run_final_audit=fake_audit,
+            run_article_developmental_edit_phase=fake_dev,
+            run_article_style_copy_edit_phase=fake_style,
+        ), services
 
     @pytest.mark.asyncio
-    async def test_execute_retries_on_audit_failure(self):
-        """When the final audit fails, the flow retries development edit + re-audit."""
-        from unittest.mock import AsyncMock
-
-        from reasoner.application.flows.article import ArticleFlow
+    async def test_failed_audit_retries_edit_passes_once(self):
+        from reasoner.application.flows import article_phases
 
         state = _make_bare_state("Test article")
-        state.writing_state["editorial_audit"] = {"passes_audit": False, "audit_score": 0.4}
+        state.writing_state["final_article"] = "draft"
+        calls = {"audit": 0, "dev": 0, "style": 0}
+        patcher, services = self._patched_audit_run(state, calls)
 
-        call_count = {"final_audit": 0, "dev_edit": 0, "style_copy": 0}
+        with patcher:
+            await article_phases.run_article_final_audit_phase(state, services)
 
-        async def mock_run_phase(step, _state, **kwargs):
-            name = step.name
-            if "Final Audit" in name:
-                call_count["final_audit"] += 1
-            elif "Developmental" in name:
-                call_count["dev_edit"] += 1
-                _state.writing_state["final_article"] = "Retry article draft."
-            elif "Style" in name or "Copy" in name:
-                call_count["style_copy"] += 1
-                _state.writing_state["final_article"] = "Retry article final."
-            return True
+        # Audited, failed, re-edited, re-audited. Once, not in a loop.
+        assert calls == {"audit": 2, "dev": 1, "style": 1}, calls
 
-        flow = ArticleFlow()
-        # Override phases so only the audit and edit phases run
-        mock_services = AsyncMock(spec_set=["log", "call_llm", "run_phase"])
-        mock_services.log = AsyncMock()
-        mock_services.call_llm = AsyncMock(return_value=("", {"model": "test"}))
-        mock_services.run_phase = mock_run_phase
+    @pytest.mark.asyncio
+    async def test_second_failure_is_recorded_not_swallowed(self):
+        """An article that fails twice must not ship looking like one that passed."""
+        from reasoner.application.flows import article_phases
 
-        # Execute — due to audit failure, should call dev edit + style + re-audit
-        await flow.execute(state, mock_services)
+        state = _make_bare_state("Test article")
+        calls = {"audit": 0, "dev": 0, "style": 0}
+        patcher, services = self._patched_audit_run(state, calls)
 
-        # Even with minimal mock setup, the flow executes without crashing
-        # (some phase errors may be swallowed by the services.log)
-        assert True, "ArticleFlow.execute completed without exception"
+        with patcher:
+            await article_phases.run_article_final_audit_phase(state, services)
+
+        assert any("failed after retry" in str(e) for e in state.errors), state.errors
+
+    @pytest.mark.asyncio
+    async def test_passing_audit_does_not_retry(self):
+        from reasoner.application.flows import article_phases
+
+        state = _make_bare_state("Test article")
+        calls = {"audit": 0, "dev": 0, "style": 0}
+        patcher, services = self._patched_audit_run(state, calls, fail_audit=False)
+
+        with patcher:
+            await article_phases.run_article_final_audit_phase(state, services)
+
+        assert calls == {"audit": 1, "dev": 0, "style": 0}, calls
+        assert not any("failed after retry" in str(e) for e in state.errors)
+
+    @pytest.mark.asyncio
+    async def test_prior_edit_timeout_suppresses_retry(self):
+        """The guard reads state.errors, where both drivers write timeouts.
+
+        It used to read state.pending_events, which no article phase writes, so
+        it never fired and a timed-out draft was re-edited on broken input.
+        """
+        from reasoner.application.flows import article_phases
+
+        state = _make_bare_state("Test article")
+        state.errors.append("Phase timeout: Style + Copy Edit exceeded 240s")
+        calls = {"audit": 0, "dev": 0, "style": 0}
+        patcher, services = self._patched_audit_run(state, calls)
+
+        with patcher:
+            await article_phases.run_article_final_audit_phase(state, services)
+
+        assert calls == {"audit": 1, "dev": 0, "style": 0}, calls
