@@ -346,7 +346,8 @@ export default function CapabilitiesPage() {
             <Body>
               A stated conclusion is treated as a claim to evaluate, not a premise to build on —
               on the direct-answer path by system prompt, and inside the full pipeline by an
-              explicit audit of Phase 1's assumptions. A claim about another person's motives that
+              explicit audit of Phase 1&rsquo;s assumptions. A claim about another person&rsquo;s
+              motives that
               only you supplied cannot be marked verified on your word alone; the destructive
               perspective is instructed to attack exactly those claims, not you.
             </Body>

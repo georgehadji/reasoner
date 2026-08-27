@@ -371,8 +371,8 @@ export default function LandingPage() {
           <Aside href="/capabilities#image-making">See how these four were picked →</Aside>
         </Section>
 
-        {/* ── §2 Writing ─────────────────────────────────────────── */}
-        <Section id="writing" marker="§2" name="Writing">
+        {/* ── §1 Writing ─────────────────────────────────────────── */}
+        <Section id="writing" marker="§1" name="Writing">
           <Heading>Drafted, fact-checked, audited, then edited again.</Heading>
           <Lede>
             An article is not one generation. It moves through nine phases, and the fact-check is a
@@ -413,7 +413,7 @@ export default function LandingPage() {
           </Body>
         </Section>
 
-        {/* ── §3 Ideation ───────────────────────────────────────
+        {/* ── §2 Ideation ───────────────────────────────────────
             Lives here rather than with the rest of the mechanism
             argument at /capabilities, because it passes the test
             everything on this page has to pass: the three tiers are
@@ -436,7 +436,7 @@ export default function LandingPage() {
             models, the mode-collapse check on the generated tail,
             and the use-case gate on development; those are the only
             things below that claim to be rules. */}
-        <Section id="brainstorming" marker="§3" name="Ideation">
+        <Section id="brainstorming" marker="§2" name="Ideation">
           <Heading>The model with the ideas does not get to score them.</Heading>
           <Lede>
             Ask a model to brainstorm and it hands you its most probable answers, the same ones it
@@ -476,12 +476,12 @@ export default function LandingPage() {
           <Aside href="/capabilities#bias">Why a different lab is the one scoring →</Aside>
         </Section>
 
-        {/* ── §4 Code ───────────────────────────────────────────
+        {/* ── §3 Code ───────────────────────────────────────────
             Brainstorming used to open this section, which left it
             trying to carry ideation and code in two sentences and
-            serving neither. Ideation is §3 above; this says the one
+            serving neither. Ideation is §2 above; this says the one
             thing about code worth the space. */}
-        <Section id="code" marker="§4" name="Code">
+        <Section id="code" marker="§3" name="Code">
           <Heading>Reasoning that runs, not reasoning that claims.</Heading>
           <Lede>
             Coding runs the opposite way from ideation: specification, generation, review, tests,

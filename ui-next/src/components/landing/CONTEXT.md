@@ -6,7 +6,7 @@
 The public marketing surface: the home page, the `/capabilities` page split off from it, the chrome they share, and the mechanism visuals both draw on.
 
 ## Files
-- **`LandingPage.tsx`**: The home page. States the claim once, frames it with the four-stage rail, then shows the product's own output — a real image run (§1), a real article run (§2), the ideation tiers (§3, anchor `#brainstorming`), and the code note (§4). The rest of the mechanism argument that used to run down this page now lives in `CapabilitiesPage.tsx`.
+- **`LandingPage.tsx`**: The home page. States the claim once, frames it with the four-stage rail, then shows the product's own output — a real article run (§1), the ideation tiers (§2, anchor `#brainstorming`), and the code note (§3). The rest of the mechanism argument that used to run down this page now lives in `CapabilitiesPage.tsx`.
 - **`CapabilitiesPage.tsx`**: The mechanism argument in eight sections (§1 Hallucination through §8 Methods), served at `/capabilities`. Anchors are unchanged from when these ran on the home page, so inbound links still land — but the §n markers are not: Ideation (`#brainstorming`) moved back to the home page and the numbering closed up over it. Link against ids, never against markers. Every claim maps to code; §5 Sycophancy is additionally gated by `SYCOPHANCY_CONTROLS` and guarded by `tests/test_site_capabilities_sync.py`.
 - **`prose.tsx`**: `Section` / `Heading` / `Lede` / `Body` / `Aside` — the editorial chrome both pages share. It lives apart from either because a divergence between the two would read as two sites rather than one argument split across two URLs.
 - **`DisagreementField.tsx`**: `'use client'` canvas behind the hero — four point groups orbit one attractor and never reach it.
