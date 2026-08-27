@@ -1,5 +1,5 @@
 @echo off
-setlocal EnableDelayedExpansion
+setlocal
 title Reasoner - Stopping...
 cls
 
@@ -9,63 +9,64 @@ echo    Reasoner  -  Stop All Servers
 echo  ============================================================
 echo.
 
-:: ── Switch to the batch file's directory ─────────────────────────────
+:: Switch to the batch file's directory.
 cd /d "%~dp0"
 
-:: ── Working directory guard ──────────────────────────────────────────
+:: Pause only when launched from Explorer. --quiet suppresses the pause as
+:: well, for scripted callers.
+set "INTERACTIVE="
+echo %CMDCMDLINE% | find /i "%~nx0" >nul 2>&1 && set "INTERACTIVE=1"
+
+:: Working directory guard.
 if not exist "kill_servers.py" (
     echo  [ERROR] Run from the project root ^(where kill_servers.py lives^).
     echo.
-    pause & exit /b 1
+    if defined INTERACTIVE pause
+    exit /b 1
 )
 
-:: ── Python check ─────────────────────────────────────────────────────
-where python >nul 2>&1
-if errorlevel 1 (
-    echo  [ERROR] python not found in PATH.
+:: `where python` also matches the Microsoft Store alias in WindowsApps,
+:: which is a stub that opens the Store and exits nonzero. Only a python
+:: that actually executes counts, and py -3 is the standard fallback.
+set "PY="
+python -c "import sys" >nul 2>&1 && set "PY=python"
+if not defined PY py -3 -c "import sys" >nul 2>&1 && set "PY=py -3"
+
+if not defined PY (
+    echo  [ERROR] No working Python found in PATH.
+    echo          Install Python 3.12+ and re-run, or fix the PATH entry:
+    echo          a "python" that opens the Microsoft Store is not one.
     echo.
-    pause & exit /b 1
+    if defined INTERACTIVE pause
+    exit /b 1
 )
 
-:: ── Parse arguments ──────────────────────────────────────────────────
-set QUIET_FLAG=
+:: Parse arguments: --quiet is ours, everything else goes to the script.
+set "QUIET_FLAG="
 set "EXTRA_ARGS="
 
 :PARSE_LOOP
 if "%~1"=="" goto :PARSE_DONE
-
 if "%~1"=="--quiet" (
-    set QUIET_FLAG=1
+    set "QUIET_FLAG=1"
     shift
     goto :PARSE_LOOP
 )
-
-:: Pass through everything else (--force, etc.)
 set "EXTRA_ARGS=%EXTRA_ARGS% %1"
 shift
 goto :PARSE_LOOP
-
 :PARSE_DONE
 
-:: ── Port status (single PowerShell call for all three ports) ─────────
+:: Port status. This used to be an inline PowerShell block carrying its own
+:: copy of the port list - identical to the one in restart_servers.bat, and
+:: a third copy of TARGET_PORTS in kill_servers.py. One source now, and no
+:: PowerShell dependency.
 if not defined QUIET_FLAG (
-    echo  Active Reasoner processes:
-    "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -Command ^
-        "foreach ($port in @(8003, 8002, 50001, 3000)) {" ^
-        "  try {" ^
-        "    $c = Get-NetTCPConnection -LocalPort $port -EA Stop;" ^
-        "    $p = Get-Process -Id $c[0].OwningProcess -EA SilentlyContinue;" ^
-        "    $name = if ($p) { $p.ProcessName + ' (PID ' + $p.Id + ')' } else { 'unknown' };" ^
-        "    Write-Host ('    :' + $port + '  ->  ' + $name)" ^
-        "  } catch {" ^
-        "    Write-Host ('    :' + $port + '  ->  free')" ^
-        "  }" ^
-        "}"
+    %PY% kill_servers.py --status
     echo.
 )
 
-:: ── Kill servers ──────────────────────────────────────────────────────
-python kill_servers.py%EXTRA_ARGS%
+%PY% kill_servers.py%EXTRA_ARGS%
 set EXIT_CODE=%ERRORLEVEL%
 
 title Reasoner - Stopped
@@ -77,9 +78,6 @@ if %EXIT_CODE% neq 0 (
 )
 echo.
 
-if defined QUIET_FLAG (
-    endlocal & exit /b %EXIT_CODE%
-)
-pause
-endlocal
+if defined QUIET_FLAG exit /b %EXIT_CODE%
+if defined INTERACTIVE pause
 exit /b %EXIT_CODE%

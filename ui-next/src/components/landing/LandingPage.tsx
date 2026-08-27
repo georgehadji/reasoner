@@ -7,6 +7,7 @@ import { ReviewHandoff } from '@/components/landing/ReviewHandoff';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
 import { CAPABILITIES, PROVIDERS } from '@/lib/capabilities.generated';
+import { CLAIM_SPECIMENS } from '@/lib/demo-record';
 import { SHOWCASE_IMAGES, SHOWCASE_PROMPT } from '@/lib/image-showcase';
 
 /**
@@ -66,6 +67,42 @@ const IDEA_TIERS = [
     desc: 'The one a single prompt would never have handed you.',
   },
 ];
+
+/**
+ * The three driving adapters an agent can come through, ordered by how little
+ * code each costs the caller. Every claim here is checkable: the MCP tools are
+ * in src/reasoner/api/mcp/tools.py, the bearer-key endpoints in
+ * api/routes/agent.py, and the CLI and in-process entry points are main.py and
+ * reasoner.headless.ask().
+ */
+const AGENT_DOORS = [
+  {
+    name: 'MCP',
+    detail:
+      'Six tools, one config block, no client code. Claude Desktop, Claude Code and most agent frameworks pick it up and show progress phase by phase.',
+  },
+  {
+    name: 'HTTP',
+    detail:
+      'One authenticated POST. Take the finished result as JSON, or stream the phases as they land. Tool definitions are served live, never copied.',
+  },
+  {
+    name: 'CLI',
+    detail:
+      'A shell or a cron job, written out as JSON — or the pipeline imported in-process, with no server standing between you and it.',
+  },
+];
+
+/**
+ * Rule style per label, from the utilities in globals.css. Fill AND rule
+ * pattern carry the same information, so the three stay distinguishable in
+ * monochrome and to a colour-blind reader.
+ */
+const CLAIM_RULE: Record<string, string> = {
+  VERIFIED: 'epistemic-verified',
+  HYPOTHESIS: 'epistemic-hypothesis',
+  UNKNOWN: 'epistemic-unknown',
+};
 
 const TERMS = [
   {
@@ -628,6 +665,109 @@ export default function LandingPage() {
           <Aside href="/capabilities#methods">
             All {CAPABILITIES.methods} reasoning methods &rarr;
           </Aside>
+        </Section>
+
+        {/* ── §4 Agents ─────────────────────────────────────────
+            Last of the numbered sections because it is the only one
+            whose reader is not a person typing a question.
+
+            It obeys the same test as the rest of the page: exhibit,
+            not essay. The specimens are three real labelled claims
+            pulled out of the captured run by CLAIM_SPECIMENS, so this
+            section shows the thing an integrator is buying — a
+            machine-readable verdict — rather than describing it. They
+            are derived, never transcribed: nothing here can quote a
+            claim the run did not make.
+
+            The three doors are the argument: MCP (api/mcp/tools.py),
+            the bearer-key HTTP surface (api/routes/agent.py), and the
+            CLI and in-process module (main.py, headless.ask) all enter
+            the same application layer. Do not describe a capability
+            here that holds on only one of them.
+
+            Install, the six tool names, idempotency and status codes
+            belong at /developers and /docs/mcp. This section makes the
+            case and hands off. */}
+        <Section id="agents" marker="§4" name="Agents">
+          <Heading>Your agent does not have to take a model&rsquo;s word for it.</Heading>
+          <Lede>
+            Ask one model and you get prose, plus the job of deciding how much of it to believe.
+            Ask this and the answer arrives sorted: what a source outside the model carries, what
+            the run is only proposing, and what nothing settled. Three labels your code can branch
+            on, from an answer that had to survive being argued with first.
+          </Lede>
+
+          {/* Real output, not an illustration of one. */}
+          <dl className="mt-[var(--space-10)] space-y-[var(--space-5)]">
+            {CLAIM_SPECIMENS.map(({ claim, label, qualifier }) => (
+              <div key={label} className="border-t border-[var(--border)] pt-[var(--space-4)]">
+                <dt
+                  className={`${CLAIM_RULE[label]} pl-[var(--space-3)] font-sans text-[8pt] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)]`}
+                >
+                  {label}
+                  {qualifier ? (
+                    <span className="font-normal normal-case tracking-normal text-[var(--text-subtle)]">
+                      {' '}
+                      {qualifier}
+                    </span>
+                  ) : null}
+                </dt>
+                <dd className="prose-measure mt-[var(--space-2)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+                  {claim}
+                </dd>
+              </div>
+            ))}
+          </dl>
+
+          <Body>
+            Those three are lifted out of{' '}
+            <Link
+              href="/how-it-works"
+              className="link-smooth text-[var(--accent)] hover:text-[var(--accent-hover)]"
+            >
+              one captured run
+            </Link>
+            , with its labelling untouched. An agent gets them as fields rather than as prose:
+            the claims and their labels, the questions the run could not close, and a plan whose
+            every step carries the criterion that says whether it worked.
+          </Body>
+
+          <dl className="mt-[var(--space-10)] grid gap-x-[var(--space-8)] gap-y-[var(--space-5)] sm:grid-cols-3">
+            {AGENT_DOORS.map(({ name, detail }) => (
+              <div key={name} className="border-t border-[var(--border)] pt-[var(--space-3)]">
+                <dt className="font-sans text-[13pt] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
+                  {name}
+                </dt>
+                <dd className="mt-[var(--space-1)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+                  {detail}
+                </dd>
+              </div>
+            ))}
+          </dl>
+
+          <Body>
+            Three doors, one pipeline. A run started from Claude Desktop resolves credentials,
+            guards against a duplicate and settles against the same ledger as one started from
+            curl — there is no second product with its own accounting. And two of the calls are
+            free: one tells you which method a question would get, the other what it would cost,
+            so an agent can look before it spends.
+          </Body>
+          <Body>
+            {/* The direct MCP link is deliberate and load-bearing: this
+                section is where a crawling agent reads that Reasoner is
+                callable, and the next thing it needs is the setup page, not
+                another essay. Keep an inline link to /docs/mcp here. */}
+            Setup is one dependency and a config block —{' '}
+            <Link
+              href="/docs/mcp"
+              className="link-smooth text-[var(--accent)] underline decoration-[var(--border-strong)] underline-offset-4 hover:text-[var(--accent-hover)]"
+            >
+              add the MCP server to your host
+            </Link>
+            .
+          </Body>
+
+          <Aside href="/developers">The developer surface, in full →</Aside>
         </Section>
 
         {/* ── Terms ─────────────────────────────────────────────── */}

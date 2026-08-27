@@ -174,12 +174,24 @@ def _try_free_port(port: int, pid: int | None) -> bool:
     return False
 
 
-def _wait_for_health(port: int, timeout: float = 30.0) -> bool:
-    """Poll the backend root endpoint until it responds (any 2xx–4xx means it's up)."""
+def _wait_for_health(
+    port: int,
+    timeout: float = 30.0,
+    proc: subprocess.Popen | None = None,
+) -> bool:
+    """Poll the backend root endpoint until it responds (any 2xx-4xx means it's up).
+
+    Stops early if *proc* dies. A backend that exits on the first line -- a
+    missing dependency, a bad import, a port it cannot bind -- is never going
+    to answer, and spending the full timeout on it delays the error by half a
+    minute and reports it as a timeout rather than as the crash it was.
+    """
     import urllib.request
     url = f"http://127.0.0.1:{port}/"
     deadline = time.time() + timeout
     while time.time() < deadline:
+        if proc is not None and proc.poll() is not None:
+            return False
         try:
             with urllib.request.urlopen(url, timeout=2) as resp:
                 if 200 <= resp.status < 500:
@@ -218,13 +230,23 @@ def spawn_process(
 
 
 def shutdown_process(name: str, proc: subprocess.Popen):
-    """Gracefully terminate a subprocess."""
+    """Gracefully terminate a subprocess and anything it spawned."""
     if proc.poll() is not None:
         return
     print(f"[STOP]  {name} (PID {proc.pid})")
     try:
-        if sys.platform == "win32" and not getattr(proc, "_reasoner_shell", False):
-            proc.send_signal(signal.CTRL_BREAK_EVENT)
+        if sys.platform == "win32":
+            if getattr(proc, "_reasoner_shell", False):
+                # The handle we hold is cmd.exe, not the server. Terminating
+                # it leaves `next dev` running and port 3000 bound, which is
+                # the state the next start then aborts on. taskkill /T is the
+                # only way to reach the whole tree from here.
+                subprocess.run(
+                    ["taskkill", "/T", "/F", "/PID", str(proc.pid)],
+                    capture_output=True,
+                )
+            else:
+                proc.send_signal(signal.CTRL_BREAK_EVENT)
         else:
             proc.terminate()
         proc.wait(timeout=5)
@@ -271,31 +293,38 @@ def main() -> int:
         return 1
 
     # ── Port conflict check ──────────────────────────────────────
-    for svc, port in (
-        ("Main API Server", args.main_port),
-        ("Neuro Server", args.neuro_port),
-        ("Next.js Frontend", args.frontend_port),
-    ):
+    # Two things this list fixes. Only services this run will actually start
+    # are checked -- the old loop checked all three unconditionally, so
+    # --no-frontend still aborted the run when something unrelated held
+    # :3000. And each entry carries its own flag, so the "use a different
+    # port" hint names the one that would move the service in front of the
+    # reader rather than always naming --main-port.
+    port_checks = [("Main API Server", args.main_port, "--main-port")]
+    if not args.no_neuro:
+        port_checks.append(("Neuro Server", args.neuro_port, "--neuro-port"))
+    if not args.no_frontend:
+        port_checks.append(("Next.js Frontend", args.frontend_port, "--frontend-port"))
+
+    for svc, port, flag in port_checks:
         in_use, pid = _port_in_use(port)
-        if in_use:
-            print(f"\n[ABORT] {svc} port {port} is already in use.", end="")
-            if pid:
-                print(f" (PID {pid})")
-            else:
-                print(" (zombie socket)")
-            if args.force:
-                print(f"[INFO] Attempting to free port {port}...")
-                if _try_free_port(port, pid):
-                    print(f"[OK]   Port {port} freed.")
-                    continue
-                else:
-                    print(f"[WARN] Could not free port {port}.")
-            print("        Stop the existing process or use a different port:")
-            print(f"        python start_all.py --main-port {port + 1}")
-            if not args.force:
-                print("        Or force-free the port:")
-                print("        python start_all.py --force")
-            return 1
+        if not in_use:
+            continue
+
+        owner = f"PID {pid}" if pid else "zombie socket"
+        if args.force:
+            print(f"\n[INFO]  {svc} port {port} is in use ({owner}). Freeing...")
+            if _try_free_port(port, pid):
+                print(f"[OK]    Port {port} freed.")
+                continue
+            print(f"[WARN]  Could not free port {port}.")
+
+        print(f"\n[ABORT] {svc} port {port} is already in use ({owner}).")
+        print("        Stop the existing process or use a different port:")
+        print(f"        python start_all.py {flag} {port + 1}")
+        if not args.force:
+            print("        Or force-free the port:")
+            print("        python start_all.py --force")
+        return 1
 
     processes: list[tuple[str, subprocess.Popen]] = []
 
@@ -308,10 +337,25 @@ def main() -> int:
             elif shutil.which("npm") is None:
                 print("[WARN] npm not found in PATH, skipping frontend start.")
             else:
+                if not os.environ.get("CSRF_SECRET"):
+                    # Next loads ui-next/.env*, not the repo-root .env — but
+                    # reasoner.core.settings has already read the root .env
+                    # into os.environ by the time this runs, so an unset value
+                    # here means it is genuinely unset. Without it the proxy
+                    # middleware raises on every request and the whole site
+                    # answers 500, with the reason visible only in the dev
+                    # server's own console.
+                    print("[WARN] CSRF_SECRET is not set. The frontend will return 500 on")
+                    print("       every route until it is. Set it in .env (32+ random bytes).")
+                # API_BASE_URL is the variable the Next proxy routes read
+                # (getApiBaseUrl in ui-next/src/lib/security-server.ts); it
+                # falls back to a hardcoded :8003 when unset, so without this
+                # line --main-port moves the backend and leaves every proxy
+                # route pointing at the old port.
                 frontend_env = {
                     **os.environ,
                     "PORT": str(args.frontend_port),
-                    "NEXT_PUBLIC_API_BASE": f"http://localhost:{args.main_port}",
+                    "API_BASE_URL": f"http://localhost:{args.main_port}",
                 }
                 frontend_shell = sys.platform == "win32"
                 frontend_cmd = " ".join(FRONTEND_CMD) if frontend_shell else FRONTEND_CMD.copy()
@@ -325,7 +369,10 @@ def main() -> int:
                 if frontend_shell:
                     frontend_proc._reasoner_shell = True  # type: ignore[attr-defined]
                 processes.append(("Next.js Frontend", frontend_proc))
-                time.sleep(3)
+                # No sleep here: next dev boots on its own clock and nothing
+                # below waits on it. The backend health poll further down is
+                # the only readiness gate that buys anything, and it starts
+                # sooner for the three seconds this used to cost.
 
         # Start main API server
         main_cmd = MAIN_SERVER_CMD.copy()
@@ -339,8 +386,16 @@ def main() -> int:
 
         # ── Health polling ───────────────────────────────────────────
         print("[WAIT]  Polling backend health...")
-        if _wait_for_health(args.main_port, timeout=30.0):
+        if _wait_for_health(args.main_port, timeout=30.0, proc=main_proc):
             print(f"[OK]    Backend responding on port {args.main_port}")
+        elif main_proc.poll() is not None:
+            # Printing "started successfully" over a process that has already
+            # exited is worse than printing nothing: it sends the reader
+            # looking for a network problem instead of at the traceback the
+            # backend just wrote above this line.
+            print(f"[ABORT] Backend exited with code {main_proc.returncode} before serving.")
+            print("        The cause is in the backend output above.")
+            raise SystemExit(main_proc.returncode or 1)
         else:
             print("[WARN]  Backend did not respond within 30s. It may still be starting.")
 

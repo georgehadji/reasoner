@@ -898,7 +898,7 @@ If your agent host speaks [MCP](https://modelcontextprotocol.io) — Claude Desk
 }
 \`\`\`
 
-A run started this way is billed and idempotency-guarded identically to \`/api/agent/run/sync\` — MCP is a different door onto the same pipeline, not a different product. Full setup and the complete tool reference live in \`docs/MCP.md\` in the repository.
+A run started this way is billed and idempotency-guarded identically to \`/api/agent/run/sync\` — MCP is a different door onto the same pipeline, not a different product. Full setup, the complete tool reference, and the streamable-HTTP transport are in [MCP server](/docs/mcp).
 
 ## Choose the preset deliberately
 
@@ -962,6 +962,116 @@ An agent that has never seen this API can bootstrap from:
 ## Self-hosted deployments
 
 The endpoints above work identically on a self-hosted instance – same paths, same \`rsn_live_\` account keys, same metering. One addition: with \`ENABLE_LEGACY_API_KEY=true\`, a legacy admin key also authenticates on these paths, for instances mid-migration off the pre-account-key auth system. New deployments should leave that flag off and mint account keys instead.
+`,
+  },
+  {
+    slug: 'mcp',
+    title: 'MCP server',
+    description:
+      'Add Reasoner to Claude Desktop, Claude Code, or any MCP host: install, config, the six tools, per-phase progress, and idempotent billing.',
+    section: 'Developers',
+    minutes: 6,
+    keywords: [
+      'mcp',
+      'model context protocol',
+      'claude desktop',
+      'claude code',
+      'stdio',
+      'tools',
+      'agent',
+      'integration',
+    ],
+    body: `
+Reasoner ships an [MCP](https://modelcontextprotocol.io) server, so any host that speaks Model Context Protocol — Claude Desktop, Claude Code, most current agent frameworks — can call it as a tool provider with no HTTP client code.
+
+It is a driving adapter, the same tier as the REST API. An MCP tool call runs the identical application-layer path as \`POST /api/agent/run\`: same auth resolution, same idempotency guard, same credit metering, same run ownership record. A run started from Claude Desktop is billed exactly like one started from curl.
+
+## Install
+
+The server lives behind an optional extra:
+
+\`\`\`bash
+pip install "reasoner[mcp]"
+\`\`\`
+
+From a source checkout, \`pip install -e ".[mcp]"\`. If you manage dependencies yourself, the only requirement is \`mcp>=1.2,<2\`.
+
+## Run it over stdio
+
+This is what Claude Desktop and Claude Code use. Add the server to your host's MCP config:
+
+\`\`\`json
+{
+  "mcpServers": {
+    "reasoner": {
+      "command": "python",
+      "args": ["mcp_server.py"],
+      "env": { "REASONER_API_KEY": "rsn_live_..." }
+    }
+  }
+}
+\`\`\`
+
+Point \`args\` at \`mcp_server.py\` in your checkout — use an absolute path unless you are certain the host's working directory is the repo root. The host launches it as a subprocess and talks to it over stdin and stdout; nothing is exposed on the network.
+
+\`REASONER_API_KEY\` is a normal account key from [Settings → API keys](/settings/api-keys). The two metered tools need it. The four read-only tools work without one, exactly as their unauthenticated HTTP counterparts do.
+
+## Or over streamable HTTP
+
+For a deployment that wants an MCP endpoint without running a second process:
+
+\`\`\`bash
+ENABLE_MCP_HTTP=true
+\`\`\`
+
+That mounts the MCP server at \`/mcp\` on the same FastAPI app that serves the REST API, authenticated the same way — \`Authorization: Bearer <key>\` on the request. It is off by default; most installs use stdio.
+
+## The tools
+
+| Tool | Cost | What it does |
+| --- | --- | --- |
+| \`reasoner_run\` | Paid | Runs a reasoning pipeline. Blocks, and reports progress per phase. |
+| \`reasoner_followup\` | Paid | Continues a conversation with a prior synthesis as context. |
+| \`reasoner_gate\` | Free | Previews routing — direct, web search, or pipeline, and which method — without running it. |
+| \`reasoner_estimate\` | Free | Estimates tokens, cost, and duration without running it. |
+| \`reasoner_presets\` | Free | Lists presets with method, description, and primary model. |
+| \`reasoner_health\` | Free | Liveness and dependency status, public detail only. |
+
+\`reasoner_run\` takes \`problem\` plus optional \`preset\`, \`top_k\`, \`web_search\`, \`source_type\`, and \`client_run_id\`. Leaving \`preset\` unset means \`auto-budget\`: the router picks the method and the cheaper tier, which is the right default for an agent.
+
+Fetch \`reasoner_presets\` once per session and cache it rather than hardcoding preset ids. They are data, and the catalogue moves independently of the tool schema.
+
+There is no admin tool, no key-management tool, and no data-export tool on this surface, and there will not be. That boundary is enforced by a test rather than by convention.
+
+## Progress
+
+A twenty-to-ninety-second tool call that returns nothing until it finishes is a bad experience in a chat host. \`reasoner_run\` and \`reasoner_followup\` emit an MCP progress notification for each \`phase_start\` and \`phase_complete\`, so a host UI can show *Phase 3: Critique* instead of an opaque spinner.
+
+## Idempotency and billing
+
+Pass \`client_run_id\` to make a call retry-safe. Reusing an id that is in flight returns a clean tool error instead of running — and billing — the pipeline a second time. It is the same contract as the REST API's \`client_run_id\`.
+
+Runs settle after they complete, from the run's actual cost. A failed run costs nothing. See [Credits](/docs/credits) for how the metering works.
+
+## What this does not do
+
+- **No per-session concurrency limit.** An agent that fires several \`reasoner_run\` calls back to back can run them concurrently, each billed independently. A standard function-calling loop calls one tool, waits, then decides — so this has not been a problem in practice, but it is assumed rather than enforced. If your loop can call tools without waiting, throttle it yourself.
+- **No pinned output schema.** Tool results come back as an MCP structured-content dict derived from the Python return type. The shape matches the REST \`RunResult\` — \`synthesis\`, \`critical_insights\`, \`claim_labels\`, \`action_blueprint\`, \`citations\`, \`total_cost_usd\` — but it is not yet published as a versioned JSON Schema the way the HTTP tool-discovery format is.
+
+## Troubleshooting
+
+| Symptom | Cause |
+| --- | --- |
+| Host shows no Reasoner tools | \`mcp\` extra not installed, or \`args\` points at a path the host cannot resolve. Use an absolute path. |
+| "No credentials" on \`reasoner_run\` | \`REASONER_API_KEY\` missing from the server's \`env\` block. The free tools keep working without it. |
+| A tool error naming a duplicate run | A \`client_run_id\` still in flight. Reuse that run's result; you were not billed twice. |
+| Calls fail with 402 | The account's credits are exhausted. Retrying cannot succeed — see [Credits](/docs/credits). |
+
+## See also
+
+- [Agent integration](/docs/agent-integration) — the general guide: when to delegate, retry semantics, and what to do with labelled claims. Most of it applies here.
+- [API reference](/docs/api-reference) — the HTTP surface the MCP tools sit on top of.
+- [API keys](/docs/api-keys) — scopes, rotation, and revocation.
 `,
   },
   {

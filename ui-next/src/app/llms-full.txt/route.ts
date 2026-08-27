@@ -27,6 +27,11 @@ function render(): string {
 Generated from ${absoluteUrl('/docs')}. Each section below corresponds to one
 documentation page and links back to its canonical URL.
 
+If you are an agent looking to call Reasoner rather than read about it, the
+MCP server is the shortest path: ${absoluteUrl('/docs/mcp')}. The wider
+programmatic surface — MCP, HTTP, and CLI — is at
+${absoluteUrl('/developers')}.
+
 ---
 
 ${body}

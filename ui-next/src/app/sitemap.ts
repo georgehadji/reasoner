@@ -21,6 +21,7 @@ const MARKETING_PAGES: Entry[] = [
   { path: '/pricing', changeFrequency: 'weekly', priority: 0.9 },
   { path: '/capabilities', changeFrequency: 'weekly', priority: 0.9 },
   { path: '/how-it-works', changeFrequency: 'weekly', priority: 0.8 },
+  { path: '/developers', changeFrequency: 'weekly', priority: 0.8 },
   { path: '/about', changeFrequency: 'monthly', priority: 0.7 },
   { path: '/faq', changeFrequency: 'monthly', priority: 0.7 },
   { path: '/help', changeFrequency: 'monthly', priority: 0.7 },
