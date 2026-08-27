@@ -23,6 +23,10 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 import update_mindmap_meta as mindmap  # noqa: E402
 
+#: The mechanism sections (§1–§9) live here, not on the home page — they were
+#: split off so the landing page could carry the claim and the exhibits alone.
+CAPABILITIES_PAGE = Path("ui-next/src/components/landing/CapabilitiesPage.tsx")
+
 
 def _strip_volatile(text: str) -> str:
     """Drop fields that legitimately differ between two runs of this test.
@@ -112,19 +116,24 @@ def test_no_control_claimed_without_mechanism() -> None:
             )
 
 
-def test_landing_renders_no_ungated_sycophancy_claim() -> None:
-    """Every §5 Sycophancy paragraph must sit behind a SYCOPHANCY_CONTROLS guard.
+def test_capabilities_page_renders_no_ungated_sycophancy_claim() -> None:
+    """Every §6 Sycophancy paragraph must sit behind a SYCOPHANCY_CONTROLS guard.
 
     This is the test that stops the next hand-written sentence — the exact
     failure mode observed once already on the rail's stage-03 `defence`
     string before it was corrected. A <Body> block with no preceding
     SYCOPHANCY_CONTROLS reference is an ungated claim.
+
+    The section moved from LandingPage.tsx to CapabilitiesPage.tsx when the
+    mechanism argument was split off the home page onto /capabilities; the
+    guard contract did not move with it in spirit only, so this asserts
+    against the new file.
     """
-    landing = Path("ui-next/src/components/landing/LandingPage.tsx").read_text(encoding="utf-8")
+    page = CAPABILITIES_PAGE.read_text(encoding="utf-8")
     match = re.search(
-        r'<Section id="sycophancy".*?</Section>', landing, re.DOTALL,
+        r'<Section id="sycophancy".*?</Section>', page, re.DOTALL,
     )
-    assert match, "LandingPage.tsx has no §5 Sycophancy section"
+    assert match, "CapabilitiesPage.tsx has no §6 Sycophancy section"
     section = match.group(0)
 
     idx = 0
@@ -140,7 +149,7 @@ def test_landing_renders_no_ungated_sycophancy_claim() -> None:
     for pos in body_positions:
         preceding_block = section[prev_end:pos]
         assert "SYCOPHANCY_CONTROLS." in preceding_block, (
-            "Found a <Body> in the §5 Sycophancy section with no "
+            "Found a <Body> in the §6 Sycophancy section with no "
             "SYCOPHANCY_CONTROLS.* guard immediately before it — every claim in "
             "that section must be gated, never hand-added past the generator."
         )
@@ -148,19 +157,22 @@ def test_landing_renders_no_ungated_sycophancy_claim() -> None:
 
 
 def test_rail_and_section_agree() -> None:
-    """MechanismDiagram's stage-03 entry and LandingPage's §5 must point at each other.
+    """The rail's stage-03 entry and the §6 Sycophancy section must point at each other.
 
     Before this test existed, stage 03 linked to /how-it-works#adjudication
-    while the landing page had no #sycophancy section at all — a claim with
-    nothing to click through to. Once §5 exists, the rail must reference it.
+    while the site had no #sycophancy section at all — a claim with nothing to
+    click through to. The rail stayed on the home page when the mechanism
+    sections moved to /capabilities, so the href is now cross-page; what the
+    test guards is unchanged — the link must resolve to the section that
+    exists.
     """
     rail = Path("ui-next/src/components/landing/MechanismDiagram.tsx").read_text(encoding="utf-8")
-    landing = Path("ui-next/src/components/landing/LandingPage.tsx").read_text(encoding="utf-8")
+    page = CAPABILITIES_PAGE.read_text(encoding="utf-8")
 
-    assert 'id="sycophancy"' in landing, "LandingPage.tsx must define the #sycophancy anchor"
-    assert "href: '#sycophancy'" in rail, (
-        "MechanismDiagram's sycophancy stage must link to '#sycophancy' now that "
-        "the section exists — see docs/plans/sycophancy-mitigation.md W10c."
+    assert 'id="sycophancy"' in page, "CapabilitiesPage.tsx must define the #sycophancy anchor"
+    assert "href: '/capabilities#sycophancy'" in rail, (
+        "MechanismDiagram's sycophancy stage must link to '/capabilities#sycophancy' "
+        "now that the section lives there — see docs/plans/sycophancy-mitigation.md W10c."
     )
 
     controls = mindmap._detect_sycophancy_controls()

@@ -5,6 +5,7 @@ import { SecurityBadge } from './SecurityBadge';
 
 const LINKS = {
   Product: [
+    { label: 'Capabilities', href: '/capabilities' },
     { label: 'How it works', href: '/how-it-works' },
     { label: 'About', href: '/about' },
     { label: 'Pricing', href: '/pricing' },

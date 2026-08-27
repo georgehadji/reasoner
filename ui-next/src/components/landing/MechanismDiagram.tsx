@@ -44,7 +44,7 @@ interface Stage {
  */
 const STAGES: readonly Stage[] = [
   {
-    href: '#bias',
+    href: '/capabilities#bias',
     plate: 'bias',
     ordinal: '01',
     failure: 'Bias',
@@ -53,7 +53,7 @@ const STAGES: readonly Stage[] = [
       'The model that writes the answer and the model that scores it never come from the same geopolitical bloc.',
   },
   {
-    href: '#propagation',
+    href: '/capabilities#propagation',
     plate: 'propagation',
     ordinal: '02',
     failure: 'Mind-virus propagation',
@@ -65,7 +65,7 @@ const STAGES: readonly Stage[] = [
     // Points at the page's own §5 now that it exists, not at the run record —
     // "How it holds" should land on the argument, and /how-it-works#adjudication
     // is still there as that section's own Aside target.
-    href: '#sycophancy',
+    href: '/capabilities#sycophancy',
     plate: 'sycophancy',
     ordinal: '03',
     failure: 'Sycophancy',
@@ -78,7 +78,7 @@ const STAGES: readonly Stage[] = [
       'Your approval is never an input, and neither is your framing taken as settled. Phase 1 labels which assumptions came from you, a critic from another lab scores the candidates on stated criteria, and no rating you give reaches model selection.',
   },
   {
-    href: '#hallucination',
+    href: '/capabilities#hallucination',
     plate: 'hallucination',
     ordinal: '04',
     failure: 'Hallucination',

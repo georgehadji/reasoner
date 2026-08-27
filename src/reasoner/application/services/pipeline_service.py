@@ -158,17 +158,13 @@ class PipelineService:
                     "outputs": _get_attr(sp, "outputs", []),
                     "constraints": _get_attr(sp, "constraints", []),
                 }
-                for sp in (decomp.sub_problems
-                           if decomp and hasattr(decomp, "sub_problems")
-                           else [])
+                for sp in _get_attr(decomp, "sub_problems", [])
             ],
             "assumptions": [
                 {"text": (_get_attr(a, "text", "")[:TRUNCATION.ASSUMPTION] if use_neuro
                           else _get_attr(a, "text", "")),
                  "label": _get_value(_get_attr(a, "label", ClaimLabel.UNKNOWN))}
-                for a in (decomp.assumptions
-                          if decomp and hasattr(decomp, "assumptions")
-                          else [])
+                for a in _get_attr(decomp, "assumptions", [])
             ],
             "candidates": [
                 {

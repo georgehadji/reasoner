@@ -4,14 +4,11 @@
  *
  * The reference is the way Anthropic illustrates an argument: a 1:1 square,
  * hard-edged flat blocks of colour cutting across each other, and one heavy
- * hand-drawn ink line laid over the top. No labels, no arrows, no legend —
- * the picture carries the feeling and the prose carries the fact. Their
- * plates add a third layer, a greyscale photographic scrap (marbled paper,
- * a stone, an old survey map). We have two of the three; see the note at the
- * bottom of this file for the slot the third one goes in.
+ * hand-drawn ink line laid over the top. No labels, no arrows, no legend.
+ * The picture carries the feeling and the prose carries the fact.
  *
  * Where this departs from the reference on purpose: their line is a mood,
- * ours is a claim. Each of the four strokes is the failure mode drawn —
+ * ours is a claim. Each of the four strokes is the failure mode drawn.
  *
  *   bias         a wave whose every turn bends the same way, so it drifts
  *                off-centre instead of oscillating around it
@@ -22,17 +19,45 @@
  *   hallucination a confident straight line that runs off the end of the
  *                block supporting it and keeps going over nothing
  *
- * Server-rendered SVG, not canvas. The jitter that makes a stroke read as
- * ink rather than as a bezier comes from a seeded PRNG evaluated once at
- * module load, so the markup is deterministic — the server and the first
- * client frame cannot disagree, there is no hydration flash, and the whole
- * thing costs no JavaScript at runtime.
+ * WHAT MAKES IT READ AS INK
+ * =========================
+ * Studied from a 3x crop of the reference rather than guessed, because the
+ * obvious guess is wrong in a specific way. At that magnification the flat
+ * blocks are perfectly clean: no grain, no paper texture, no noise, a hard
+ * edge at the boundary. All of the texture lives in the stroke. A paper
+ * grain laid over the whole plate, which is where the instinct goes, would
+ * be a departure rather than a match.
+ *
+ * The stroke itself does three things a plain SVG stroke cannot:
+ *
+ *   1. Its edges are ragged, with a fine fibrous fringe on both sides.
+ *      feTurbulence into feDisplacementMap, applied to the ink only.
+ *   2. Its width varies, swelling through the apex of a bend and thinning
+ *      on the straights. stroke-width is constant per path, so the strokes
+ *      are emitted as filled outlines instead: each sample is offset along
+ *      its own normal by a width driven by the local turning angle.
+ *   3. Its ends are blunt rather than round, which a filled outline gives
+ *      for free and a round line cap actively prevents.
+ *
+ * Everything is a seeded PRNG evaluated once at module load and a fixed
+ * filter seed, so the markup is deterministic. The server and the first
+ * client frame cannot disagree, there is no hydration flash, and none of it
+ * costs any JavaScript at runtime.
  *
  * Colours are tokens, so the plates invert along with the band they sit in.
  */
 
 /** Plate coordinate space. Square, matching the reference's 1:1 crops. */
 const SIZE = 200;
+
+/** Straights are drawn at this fraction of the width an apex gets. */
+const WIDTH_FLOOR = 0.52;
+
+/** Samples either side to average turning angle over. */
+const CURVE_SMOOTH = 6;
+
+/** Below this, a path is straight and the curvature term is meaningless. */
+const CURVE_EPS = 1e-4;
 
 /**
  * Deterministic, so the markup is stable across renders. Same generator as
@@ -49,19 +74,29 @@ function mulberry32(seed: number): () => number {
   };
 }
 
+interface Point {
+  readonly x: number;
+  readonly y: number;
+}
+
 /**
  * Walk a parametric curve and shove every sample sideways by a small random
- * amount. A clean bezier reads as software; a line that wobbles by a couple
- * of units and never quite closes the same way twice reads as a hand.
+ * amount, then thicken it into a closed outline.
+ *
+ * The jitter moves the centreline, which is what a hand does at the scale of
+ * a whole stroke. The varying width is what a hand does at the scale of a
+ * single bend: pressure rises through a turn. Doing only the first is what
+ * makes a generated line still read as generated.
  */
-function inkPath(
+function inkOutline(
   seed: number,
   samples: number,
   wobble: number,
+  baseWidth: number,
   at: (t: number) => readonly [number, number],
 ): string {
   const rand = mulberry32(seed);
-  const points: string[] = [];
+  const pts: Point[] = [];
 
   for (let i = 0; i <= samples; i += 1) {
     const t = i / samples;
@@ -69,43 +104,123 @@ function inkPath(
     /* Taper the wobble at both ends: a hand starts and finishes a stroke
        more precisely than it moves through the middle of one. */
     const taper = Math.sin(Math.PI * t);
-    const dx = (rand() - 0.5) * wobble * taper;
-    const dy = (rand() - 0.5) * wobble * taper;
-    points.push(`${(x + dx).toFixed(1)},${(y + dy).toFixed(1)}`);
+    pts.push({
+      x: x + (rand() - 0.5) * wobble * taper,
+      y: y + (rand() - 0.5) * wobble * taper,
+    });
   }
 
-  return `M${points.join('L')}`;
+  const before = (i: number) => pts[Math.max(0, i - 1)];
+  const after = (i: number) => pts[Math.min(pts.length - 1, i + 1)];
+
+  /* Turning angle at each sample. High where the line is bending hard. */
+  const turn = pts.map((p, i) => {
+    const a = before(i);
+    const c = after(i);
+    const inbound = Math.atan2(p.y - a.y, p.x - a.x);
+    const outbound = Math.atan2(c.y - p.y, c.x - p.x);
+    let delta = outbound - inbound;
+    while (delta > Math.PI) delta -= Math.PI * 2;
+    while (delta < -Math.PI) delta += Math.PI * 2;
+    return Math.abs(delta);
+  });
+
+  /* Averaged, so the width swells through a bend instead of spiking at the
+     one sample that happened to carry the sharpest angle. */
+  const curve = turn.map((_, i) => {
+    let sum = 0;
+    let n = 0;
+    for (let k = -CURVE_SMOOTH; k <= CURVE_SMOOTH; k += 1) {
+      const j = i + k;
+      if (j >= 0 && j < turn.length) {
+        sum += turn[j];
+        n += 1;
+      }
+    }
+    return sum / n;
+  });
+
+  const peak = Math.max(...curve);
+
+  const left: string[] = [];
+  const right: string[] = [];
+
+  for (let i = 0; i < pts.length; i += 1) {
+    const p = pts[i];
+    const a = before(i);
+    const c = after(i);
+
+    /* Normal from the central-difference tangent. */
+    const tx = c.x - a.x;
+    const ty = c.y - a.y;
+    const len = Math.hypot(tx, ty) || 1;
+    const nx = -ty / len;
+    const ny = tx / len;
+
+    /* A straight line has no apex to swell at, so it takes full width and
+       gets its life from the slow breathe term alone. */
+    const bend = peak > CURVE_EPS ? curve[i] / peak : 1;
+    const breathe = 0.9 + 0.1 * Math.sin((i / pts.length) * Math.PI * 3 + seed);
+    const half = (baseWidth * (WIDTH_FLOOR + (1 - WIDTH_FLOOR) * bend) * breathe) / 2;
+
+    left.push(`${(p.x + nx * half).toFixed(1)},${(p.y + ny * half).toFixed(1)}`);
+    right.push(`${(p.x - nx * half).toFixed(1)},${(p.y - ny * half).toFixed(1)}`);
+  }
+
+  right.reverse();
+  return `M${left.join('L')}L${right.join('L')}Z`;
 }
 
 /** A wave whose turns all bend one way, so the whole line leans as it runs. */
-const BIAS_LINE = inkPath(0x1ea5, 150, 3.4, (t) => [
+const BIAS_INK = inkOutline(0x1ea5, 150, 3.4, 7, (t) => [
   22 + t * 156,
   /* The mean drifts instead of holding: that is the lean. */
   46 + t * 92 + Math.sin(t * Math.PI * 3.1) * 34 * (1 - t * 0.45),
 ]);
 
-/** One mark, repeated and amplified — the shape a spreading idea makes. */
-const PROPAGATION_LINES = [0, 1, 2, 3].map((i) =>
-  inkPath(0x51ade + i * 977, 60, 2.2 + i * 0.9, (t) => [
+/** One mark, repeated and amplified. The shape a spreading idea makes. */
+const PROPAGATION_INK = [0, 1, 2, 3].map((i) =>
+  inkOutline(0x51ade + i * 977, 60, 2.2 + i * 0.9, 4 + i * 1.6, (t) => [
     30 + i * 44 + Math.sin(t * Math.PI * 2) * (5 + i * 3),
     36 + t * 128,
   ]),
 );
 
 /** Two strokes that agree at every point. The second only echoes. */
-const SYCOPHANCY_LINES = [
-  inkPath(0x5c0f, 110, 3.0, (t) => [30 + t * 140, 66 + Math.sin(t * Math.PI * 2.2) * 30]),
-  inkPath(0x5c10, 110, 3.0, (t) => [30 + t * 140, 134 - Math.sin(t * Math.PI * 2.2) * 30]),
+const SYCOPHANCY_INK = [
+  inkOutline(0x5c0f, 110, 3.0, 6.5, (t) => [30 + t * 140, 66 + Math.sin(t * Math.PI * 2.2) * 30]),
+  inkOutline(0x5c10, 110, 3.0, 6.5, (t) => [30 + t * 140, 134 - Math.sin(t * Math.PI * 2.2) * 30]),
 ];
 
 /** Straight, certain, and still going after its support has ended. */
-const HALLUCINATION_LINE = inkPath(0xa11c, 130, 2.6, (t) => [18 + t * 168, 104 - t * 8]);
+const HALLUCINATION_INK = inkOutline(0xa11c, 130, 2.6, 8, (t) => [18 + t * 168, 104 - t * 8]);
 
 export type PlateVariant = 'bias' | 'propagation' | 'sycophancy' | 'hallucination';
 
 /**
- * Flat blocks per plate. Hard rectangles only — the reference never feathers
+ * Fringe settings, per variant so the four plates do not share one noise
+ * field and repeat each other's edge.
+ *
+ * `scale` is in user units, and the plate renders 200 of them into 150px, so
+ * 2.2 units is about 1.7px of displacement. That is the width of the fringe
+ * in the reference at the same rendered size. Much past 3 and the stroke
+ * stops reading as a mark and starts reading as a filter.
+ */
+const FRINGE: Record<PlateVariant, { seed: number; frequency: number; scale: number }> = {
+  bias: { seed: 7, frequency: 0.65, scale: 2.2 },
+  propagation: { seed: 19, frequency: 0.72, scale: 1.9 },
+  sycophancy: { seed: 31, frequency: 0.68, scale: 2.1 },
+  hallucination: { seed: 43, frequency: 0.6, scale: 2.4 },
+};
+
+/**
+ * Flat blocks per plate. Hard rectangles only. The reference never feathers
  * an edge, and a gradient here would read as a different studio.
+ *
+ * These are deliberately outside the ink filter. At 3x the reference's
+ * blocks carry no texture at all, and roughening them would be the one
+ * change on this plate that copies the idea of the idiom rather than the
+ * idiom.
  */
 function Blocks({ variant }: { variant: PlateVariant }) {
   switch (variant) {
@@ -129,7 +244,7 @@ function Blocks({ variant }: { variant: PlateVariant }) {
         </>
       );
     case 'sycophancy':
-      /* Two equal halves, mirrored — the composition agrees with itself. */
+      /* Two equal halves, mirrored. The composition agrees with itself. */
       return (
         <>
           <rect x="0" y="0" width={SIZE} height="100" fill="var(--surface-3)" />
@@ -147,35 +262,34 @@ function Blocks({ variant }: { variant: PlateVariant }) {
   }
 }
 
+/**
+ * Filled outlines, never strokes. Width is already baked into the path, and
+ * a filled shape ends bluntly where a stroke would round itself off.
+ */
 function Ink({ variant }: { variant: PlateVariant }) {
-  const stroke = {
-    stroke: 'var(--text)',
-    fill: 'none',
-    strokeLinecap: 'round' as const,
-    strokeLinejoin: 'round' as const,
-  };
+  const fill = 'var(--text)';
 
   switch (variant) {
     case 'bias':
-      return <path d={BIAS_LINE} strokeWidth="7" {...stroke} />;
+      return <path d={BIAS_INK} fill={fill} />;
     case 'propagation':
       return (
         <>
-          {PROPAGATION_LINES.map((d, i) => (
-            <path key={d.slice(0, 12) + i} d={d} strokeWidth={4 + i * 1.6} {...stroke} />
+          {PROPAGATION_INK.map((d, i) => (
+            <path key={`propagation-${i}`} d={d} fill={fill} />
           ))}
         </>
       );
     case 'sycophancy':
       return (
         <>
-          {SYCOPHANCY_LINES.map((d) => (
-            <path key={d.slice(0, 12)} d={d} strokeWidth="6.5" {...stroke} />
+          {SYCOPHANCY_INK.map((d, i) => (
+            <path key={`sycophancy-${i}`} d={d} fill={fill} />
           ))}
         </>
       );
     case 'hallucination':
-      return <path d={HALLUCINATION_LINE} strokeWidth="8" {...stroke} />;
+      return <path d={HALLUCINATION_INK} fill={fill} />;
   }
 }
 
@@ -185,6 +299,13 @@ function Ink({ variant }: { variant: PlateVariant }) {
  * "Hallucination" gains nothing from also being told about a line.
  */
 export function CollagePlate({ variant }: { variant: PlateVariant }) {
+  const fringe = FRINGE[variant];
+
+  /* Filter ids resolve document-wide, so two plates sharing one id would
+     silently both use whichever rendered first. Keyed by variant, which is
+     unique across the four on the page. */
+  const filterId = `plate-ink-${variant}`;
+
   return (
     <svg
       viewBox={`0 0 ${SIZE} ${SIZE}`}
@@ -192,20 +313,47 @@ export function CollagePlate({ variant }: { variant: PlateVariant }) {
       focusable="false"
       /* Capped rather than column-width. A plate that grows to fill a
          two-column breakpoint reaches 420px and starts competing with the
-         masthead; held at 150px it stays what it is — a plate beside a
-         paragraph — at every width, and the air left beside it in a wide
-         column is the same air the reference leaves. */
+         masthead; held at 150px it stays what it is, a plate beside a
+         paragraph, at every width. The air left beside it in a wide column
+         is the same air the reference leaves. */
       className="block aspect-square w-full max-w-[150px]"
     >
+      <defs>
+        {/* Generous region: the displacement pushes pixels past the path's
+            own bounding box, and the default 10% would shave the fringe off
+            the ends of a stroke that runs close to the plate edge. */}
+        <filter id={filterId} x="-15%" y="-15%" width="130%" height="130%">
+          <feTurbulence
+            type="fractalNoise"
+            baseFrequency={fringe.frequency}
+            numOctaves="3"
+            seed={fringe.seed}
+            result="fringe"
+          />
+          <feDisplacementMap
+            in="SourceGraphic"
+            in2="fringe"
+            scale={fringe.scale}
+            xChannelSelector="R"
+            yChannelSelector="G"
+          />
+        </filter>
+      </defs>
+
       <Blocks variant={variant} />
-      <Ink variant={variant} />
+
+      <g filter={`url(#${filterId})`}>
+        <Ink variant={variant} />
+      </g>
+
       {/*
         The third layer goes here: a greyscale photographic scrap clipped to
         one of the blocks above, which is what gives the reference plates
-        their weight. It needs real assets — put four square greyscale images
-        in public/ and render them as <image clipPath="…"> between Blocks and
-        Ink. Two flat layers and a drawn line is a complete composition on its
-        own, so this ships without it rather than shipping a fake texture.
+        their weight. It needs real assets. Put four square greyscale images
+        in public/ and render them as <image clipPath="..."> between Blocks
+        and the ink group. Two flat layers and a drawn line is a complete
+        composition on its own, so this ships without it rather than shipping
+        a fake texture.
       */}
     </svg>
   );
