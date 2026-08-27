@@ -221,7 +221,7 @@ async def agent_run_sync(
         critical_insights=list(summary.critical_insights),
         open_questions=list(summary.open_questions),
         claim_labels=dict(summary.claim_labels),
-        premises=list(summary.premises),
+        premises=[dict(p) for p in summary.premises],
         action_blueprint=list(summary.action_blueprint),
         citations=list(summary.citations),
         models_used=list(summary.models_used),
