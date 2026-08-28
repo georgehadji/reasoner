@@ -93,13 +93,13 @@ export function IdeaField() {
 
     let neutral = '110,105,96';
     let accent = '150,64,31';
-    let strong = '38,35,31';
+    let strong = '18,24,20';
     let alpha = ALPHA_LIGHT;
 
     const readTheme = () => {
-      neutral = readChannels(root, '--text-subtle', '#6E6960');
-      accent = readChannels(root, '--accent', '#96401F');
-      strong = readChannels(root, '--text', '#26231F');
+      neutral = readChannels(root, '--text-subtle', '#606963');
+      accent = readChannels(root, '--accent', '#2F3832');
+      strong = readChannels(root, '--text', '#121814');
       alpha = root.classList.contains('dark') ? ALPHA_DARK : ALPHA_LIGHT;
     };
 

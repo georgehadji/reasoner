@@ -56,11 +56,11 @@ function readPalette(el: HTMLElement): Palette {
   const read = (name: string, fallback: string) => cs.getPropertyValue(name).trim() || fallback;
   return {
     rail: read('--border-strong', '#8884'),
-    node: read('--accent', '#96401F'),
-    packet: read('--text-subtle', '#756F65'),
-    verified: read('--ok', '#2F6E4F'),
-    hypothesis: read('--warn', '#7A6012'),
-    unknown: read('--unknown', '#6E6960'),
+    node: read('--accent', '#2F3832'),
+    packet: read('--text-subtle', '#606963'),
+    verified: read('--ok', '#2E449F'),
+    hypothesis: read('--warn', '#7B4193'),
+    unknown: read('--unknown', '#2C697D'),
   };
 }
 

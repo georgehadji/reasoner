@@ -1,0 +1,57 @@
+name: quality
+
+# Scoped to the ui-next frontend. Reasoner's Python backend is covered by test.yml,
+# coverage.yml and security.yml and is deliberately out of this workflow's scope.
+#
+# Triggers are narrow on purpose: this gate must not red-X pushes that never touch
+# the frontend. Manual dispatch is available for a full on-demand run.
+on:
+  pull_request:
+    paths:
+      - 'ui-next/**'
+      - 'scripts/check-tokens.sh'
+      - 'lighthouserc.json'
+      - '.github/workflows/quality.yml'
+  workflow_dispatch:
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ui-next
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: ui-next/package-lock.json
+      - run: npm ci
+
+      - name: Contrast gate (WCAG AA, every ink x every ground, both themes)
+        working-directory: .
+        run: node scripts/check-contrast.mjs
+        # BLOCKING on purpose, and the only non-advisory step here. The previous
+        # design system annotated contrast against one ground out of nine and
+        # shipped seven sub-AA pairs; --border-strong failed the exact WCAG
+        # 1.4.11 criterion its own comment cited. A comment is not a check.
+
+      - name: Design tokens not bypassed
+        working-directory: .
+        run: bash scripts/check-tokens.sh
+        # Advisory until /adopt has written ui-next/src/styles/tokens.css and the
+        # existing raw values have been migrated. Flip to blocking after that pass.
+        continue-on-error: true
+
+      - run: npm run build
+
+      - name: Accessibility (axe, WCAG 2.2 AA)
+        run: npx playwright install --with-deps chromium && npx playwright test e2e/a11y.spec.ts
+        # Advisory until the baseline /qa-gate report is triaged.
+        continue-on-error: true
+
+      - name: Performance budgets (Lighthouse CI)
+        working-directory: .
+        run: npx --yes @lhci/cli autorun
+        continue-on-error: true
