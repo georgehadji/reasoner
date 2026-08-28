@@ -266,7 +266,6 @@ def article_sot_solve_prompt(state, section: dict, claims_json: str) -> str:
         f'- Inline [Source: URL] citations\n'
         f'- Do not invent new facts\n'
         f'- Target word count: {section.get("word_count", 200)}\n'
-        f'{style_section}\n'
         f'Output JSON: {{"content": "...", "word_count": 200}}'
     )
 
