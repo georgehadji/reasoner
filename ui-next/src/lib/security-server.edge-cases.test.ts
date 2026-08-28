@@ -253,6 +253,41 @@ describe('validateUpstreamUrl — edge cases', () => {
     expect(() => validateUpstreamUrl('http://[fe80::1]:8003')).toThrow();
     vi.unstubAllEnvs();
   });
+
+  /**
+   * Every case here was reachable in production until the bracket-stripping
+   * fix: `new URL()` reports an IPv6 literal's hostname *with* its brackets,
+   * so a guard written against the bare address form never fired once. The
+   * table is deliberately exhaustive per range rather than one sample, because
+   * the bug was not a missing range — it was a whole address family silently
+   * not being checked, and a single sample is what let that survive.
+   */
+  it.each([
+    ['IPv6 loopback', 'http://[::1]:8003'],
+    ['IPv6 unspecified', 'http://[::]:8003'],
+    ['unique-local fd00::/8', 'http://[fd00::1]:8003'],
+    ['unique-local fc00::/8', 'http://[fc00::1]:8003'],
+    ['unique-local, uppercased', 'http://[FD00::1]:8003'],
+    ['link-local fe80::/10', 'http://[fe80::1]:8003'],
+    ['site-local fec0::/10', 'http://[fec0::1]:8003'],
+    ['IPv4-mapped loopback', 'http://[::ffff:127.0.0.1]:8003'],
+    ['loopback outside .0.0.1', 'http://127.1.2.3:8003'],
+    ['loopback as a decimal integer', 'http://2130706433:8003'],
+    ['loopback in octal', 'http://0177.0.0.1:8003'],
+  ])('rejects %s in production', (_label, url) => {
+    vi.stubEnv('NODE_ENV', 'production');
+    expect(() => validateUpstreamUrl(url)).toThrow(
+      'Upstream URL points to a private network in production'
+    );
+    vi.unstubAllEnvs();
+  });
+
+  it('still allows public hosts in production', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    expect(validateUpstreamUrl('https://example.com')).toBe('https://example.com');
+    expect(validateUpstreamUrl('https://api.openai.com')).toBe('https://api.openai.com');
+    vi.unstubAllEnvs();
+  });
 });
 
 

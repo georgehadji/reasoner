@@ -64,7 +64,7 @@ Each route forwards to the backend with CSRF and auth handling. Every entry in `
 | `docs/` | `DocMarkdown.tsx`, `DocsSidebar.tsx` — server components so every doc URL is a real anchor. |
 | `provenance/` | `EgressSettings`, `ProvenanceBadge`, `ProvenanceReport`. |
 | `widgets/` | `WidgetRenderer` plus `WeatherWidget`, `StockWidget`, `CalculationWidget`. |
-| `ui/` | `Button`, `Badge`, `Spinner`, `Tooltip`, `ThemeToggle`, `ProfessionalRenderer`, `index.ts` barrel. |
+| `ui/` | `Button`, `Badge`, `Spinner`, `Tooltip`, `ThemeToggle`, `ProfessionalRenderer`, `index.ts` barrel. Plus two components adapted from React Bits: `LogoLoop` (infinite horizontal marquee — the provider strip in the masthead) and `SpotlightCard` (cursor-follow accent wash — the pricing tiers). Both opt out entirely under `prefers-reduced-motion`. |
 | `brand/`, `seo/`, `not-found/` | `Logo` / `LogoMark`, `JsonLd`, `NotFoundView`. |
 
 ## hooks/

@@ -11,7 +11,7 @@ export async function proxy(request: NextRequest) {
   const response = NextResponse.next();
 
   const csp = buildContentSecurityPolicy({
-    allowUnsafeScripts: process.env.NODE_ENV !== 'production',
+    allowUnsafeEval: process.env.NODE_ENV !== 'production',
   });
 
   response.headers.set('Content-Security-Policy', csp);
