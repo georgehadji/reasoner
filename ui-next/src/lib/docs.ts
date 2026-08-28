@@ -262,8 +262,8 @@ Labs rather than model ids: the tiers are re-ranked whenever measured prices mov
 
 | Tier | Runs in parallel | Falls back to |
 | --- | --- | --- |
-| **Budget** | Black Forest Labs, Krea, Sourceful, Alibaba | xAI, OpenAI, ByteDance, Recraft, Google |
-| **Premium** | OpenAI, Google, Black Forest Labs, ByteDance | Recraft, Microsoft, Sourceful, Krea, OpenAI |
+| **Budget** | Black Forest Labs, Sourceful, xAI, OpenAI | Recraft, ByteDance, Google, Microsoft |
+| **Premium** | Google, xAI, OpenAI, Recraft | OpenAI, Google, Microsoft, ByteDance |
 
 The primaries fire concurrently. If fewer images come back than you asked for, fallbacks are tried one at a time until the count is met or the list runs out. A model that fails does not fail the request — you get what the survivors produced.
 
