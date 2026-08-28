@@ -7,7 +7,7 @@ import { ReviewHandoff } from '@/components/landing/ReviewHandoff';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
 import { LogoLoop } from '@/components/ui/LogoLoop';
-import { CAPABILITIES, PROVIDERS } from '@/lib/capabilities.generated';
+import { CAPABILITIES, MARQUEE_LABS, PROVIDERS } from '@/lib/capabilities.generated';
 import { CLAIM_SPECIMENS } from '@/lib/demo-record';
 import { SHOWCASE_IMAGES, SHOWCASE_PROMPT } from '@/lib/image-showcase';
 
@@ -70,19 +70,19 @@ const IDEA_TIERS = [
 ];
 
 /**
- * Where each direct provider adapter's lab is headquartered.
+ * Where each marquee lab is headquartered.
  *
  * The masthead claims rival labs *and rival geopolitical blocs*. A reader can
  * check the first half by recognising the names; the second half is the part
  * that needs saying, and it is the half no competitor's logo strip can copy.
  *
- * Keyed off `PROVIDERS` rather than restating it, so a provider added to
+ * Keyed off `MARQUEE_LABS` rather than restating it, so a lab added to
  * capabilities.generated.ts by scripts/update_mindmap_meta.py appears in the
  * strip on the next commit. An unmapped one renders as a bare wordmark — a
  * missing origin is a gap, a guessed one is a false claim, and this page's
  * whole argument is that it does not make those.
  */
-const PROVIDER_ORIGIN: Readonly<Record<string, string>> = {
+const LAB_ORIGIN: Readonly<Record<string, string>> = {
   Anthropic: 'US',
   OpenAI: 'US',
   Google: 'US',
@@ -91,6 +91,10 @@ const PROVIDER_ORIGIN: Readonly<Record<string, string>> = {
   xAI: 'US',
   Perplexity: 'US',
   Qwen: 'CN',
+  'Moonshot AI': 'CN',
+  Meta: 'US',
+  'Zhipu AI': 'CN',
+  MiniMax: 'CN',
 };
 
 /**
@@ -260,15 +264,15 @@ export default function LandingPage() {
               it is not the place to claim otherwise. */}
           <div className="relative mt-[var(--space-12)]">
             <LogoLoop
-              ariaLabel="Model providers Reasoner routes to directly, with the country each lab is based in"
-              items={PROVIDERS.map((name) => (
+              ariaLabel="Model labs Reasoner routes to, with the country each lab is based in"
+              items={MARQUEE_LABS.map((name) => (
                 <span key={name} className="flex items-baseline gap-[var(--space-2)]">
                   <span className="font-sans text-[13pt] font-medium leading-[var(--lh-ui)] text-[var(--text-2)]">
                     {name}
                   </span>
-                  {PROVIDER_ORIGIN[name] ? (
+                  {LAB_ORIGIN[name] ? (
                     <span className="font-sans text-[8pt] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-subtle)]">
-                      {PROVIDER_ORIGIN[name]}
+                      {LAB_ORIGIN[name]}
                     </span>
                   ) : null}
                 </span>
