@@ -241,6 +241,53 @@ def _provider_names() -> list[str]:
     return [display.get(name, name.title()) for name in _fallback_provider_registry()]
 
 
+def _whitelist_model_ids() -> set[str]:
+    """Underlying vendor/model strings actually served by _MODEL_WHITELIST.
+
+    Used to gate curated marquee labs against the live registry — see
+    _marquee_lab_names() — so a lab retired from the whitelist drops out of
+    the marquee on the next regeneration instead of sitting there as a claim
+    with nothing behind it.
+    """
+    try:
+        import importlib
+        sys.path.insert(0, str(ROOT / "src"))
+        mod = importlib.import_module("reasoner.infrastructure.llm.registry")
+        whitelist = getattr(mod, "_MODEL_WHITELIST", None) or {}
+        return {
+            cfg["model"].lstrip("~")
+            for cfg in whitelist.values()
+            if isinstance(cfg, dict) and cfg.get("model")
+        }
+    except Exception:
+        return set()
+
+
+#: Labs notable enough for the marketing marquee beyond the ones with a real
+#: fallback API adapter (_provider_names() above) — which lab is "notable" to
+#: a first-time visitor isn't something the registry can derive, so this is a
+#: curated allowlist, not a dump of every OpenRouter vendor prefix in the
+#: whitelist. Each entry is still gated on actually having a model in
+#: _MODEL_WHITELIST (see _whitelist_model_ids()), so this can only shrink on
+#: its own — a lab never appears here without a live model behind it.
+_CURATED_MARQUEE_LABS: dict[str, str] = {
+    "moonshotai/": "Moonshot AI",
+    "meta-llama/": "Meta",
+    "z-ai/": "Zhipu AI",
+    "minimax/": "MiniMax",
+}
+
+
+def _marquee_lab_names() -> list[str]:
+    """PROVIDERS plus the curated labs above that still have a live model."""
+    names = list(_provider_names())
+    served = _whitelist_model_ids()
+    for prefix, display in _CURATED_MARQUEE_LABS.items():
+        if display not in names and any(model.startswith(prefix) for model in served):
+            names.append(display)
+    return names
+
+
 def _count_test_files() -> int:
     tests_dir = ROOT / "tests"
     return len(list(tests_dir.glob("*.py"))) if tests_dir.exists() else 0
@@ -343,6 +390,7 @@ def _render_capabilities_ts(today: str, presets: int, methods: int) -> str:
     routable = _count_routable_models()
     adapters = _count_provider_adapters()
     providers_literal = ", ".join(f"'{name}'" for name in _provider_names())
+    marquee_literal = ", ".join(f"'{name}'" for name in _marquee_lab_names())
     tests = _count_test_files()
     controls = _detect_sycophancy_controls()
     controls_literal = ",\n".join(
@@ -368,6 +416,16 @@ export const CAPABILITIES = {{
 
 /** Display names for the direct (non-OpenRouter) fallback provider adapters. */
 export const PROVIDERS = [{providers_literal}] as const;
+
+/**
+ * PROVIDERS plus a curated set of additional labs notable enough to name on
+ * the landing page marquee even though they route only through OpenRouter,
+ * not through a direct fallback adapter — see _CURATED_MARQUEE_LABS in
+ * scripts/update_mindmap_meta.py. Each is still gated on having a live model
+ * in the registry, so this can shrink but never carries a lab with nothing
+ * behind it.
+ */
+export const MARQUEE_LABS = [{marquee_literal}] as const;
 
 /**
  * Sycophancy controls that are actually present in the code, per commit.
