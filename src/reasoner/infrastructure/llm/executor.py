@@ -24,9 +24,9 @@ if TYPE_CHECKING:
     from reasoner.infrastructure.llm.ports import DegradedLLMResponse
 
 from reasoner.core.constants import (
-    DEFAULT_MAX_TOKENS,
-    PHASE_TOKEN_BUDGETS,
     TRUNCATION,
+    TRUNCATION_RETRY_MAX_TOKENS,
+    get_token_budget,
 )
 
 # New imports for event emission
@@ -36,6 +36,7 @@ from reasoner.core.temperatures import PHASE_TEMPERATURES
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.infrastructure.llm.caching import user_cache_prefix
 from reasoner.infrastructure.llm.router import ProviderRouter
+from reasoner.infrastructure.llm.utils import _requests_strict_json
 
 # get_event_bus imported lazily inside methods to avoid circular import with api/__init__.py
 
@@ -49,6 +50,19 @@ def _get_event_bus() -> EventPublisher:
 
 # Regex for fenced code blocks inside prompts
 _CODE_FENCE_RE = re.compile(r"```(\w+)?\n(.*?)\n```", re.DOTALL)
+
+
+def _record_truncation(role: str, model: str) -> None:
+    """Best-effort Prometheus counter for a finish_reason="length" response.
+
+    Never allowed to break the call it is observing — a metrics backend being
+    unreachable must not fail the phase.
+    """
+    try:
+        from reasoner.infrastructure.metrics import TRUNCATED_RESPONSES
+        TRUNCATED_RESPONSES.labels(phase=role, model=model).inc()
+    except Exception:
+        logger.debug("Failed to record truncation metric", exc_info=True)
 
 # P1.9: monthly spend totals live in infrastructure.llm.spend_tracker, keyed
 # by billing subject (user id) rather than conversation.
@@ -250,8 +264,14 @@ class LLMExecutor:
 
         # ── LLM call (with cascading logic if configured) ──────────────────────
         # Defensive: ensure max_tokens is always set before reaching the provider.
+        # get_token_budget() and this call must agree on the unlisted-role
+        # fallback (PHASE_TOKEN_BUDGETS["default"] = 1536) — this used to fall
+        # back to DEFAULT_MAX_TOKENS (2048) instead, so the same unlisted role
+        # got two different answers depending which of these two call sites
+        # asked. 1536 is also the more conspicuous of the two: an unlisted role
+        # should clip visibly, not almost-silently.
         if "max_tokens" not in kwargs:
-            kwargs["max_tokens"] = PHASE_TOKEN_BUDGETS.get(role, DEFAULT_MAX_TOKENS)
+            kwargs["max_tokens"] = get_token_budget(role)
             logger.debug(f"[EXECUTOR] defaulted max_tokens={kwargs['max_tokens']} for role={role}")
 
         cascading_models = self.cascading_routing.get(role)
@@ -462,6 +482,10 @@ class LLMExecutor:
                 )
                 await bus.publish(event)
 
+            if isinstance(raw, str) and metadata.get("finish_reason") == "length":
+                raw, metadata = await self._retry_after_truncation(
+                    role, system_prompt, user_prompt, kwargs, raw, metadata,
+                )
 
             cost_usd = metadata.get("cost_usd", 0.0)
             input_tokens = metadata.get("input_tokens", 0)
@@ -539,6 +563,70 @@ class LLMExecutor:
 
             return raw, metadata
 
+    async def _retry_after_truncation(
+        self,
+        role: str,
+        system_prompt: str,
+        user_prompt: str,
+        kwargs: dict[str, Any],
+        raw: str,
+        metadata: dict[str, Any],
+    ) -> tuple[str, dict[str, Any]]:
+        """One-shot retry at a doubled budget when finish_reason="length".
+
+        A response cut off mid-generation is byte-identical to a complete one
+        everywhere above the provider — this is the only place that ever sees
+        finish_reason, so it is the only place that can react to it. For a
+        role whose contract is JSON (checked via the same heuristic that gates
+        response_format in infrastructure.llm.utils), a truncated response is
+        cut mid-object and extract_json() cannot recover from that no matter
+        how the prompt is worded — doubling the budget once is cheaper than
+        the phase, and everything downstream of it, failing outright. Prose
+        roles are left alone: long output is not necessarily broken output.
+
+        Never raises: a retry that also degrades or comes back empty just
+        means the original (truncated) answer is still the best one available,
+        so it is returned unchanged rather than losing it to a second failure.
+        """
+        model = metadata.get("model", "unknown")
+        current_budget = kwargs.get("max_tokens") or get_token_budget(role)
+        logger.warning(
+            "[EXECUTOR] role=%s model=%s truncated at max_tokens=%s (finish_reason=length)",
+            role, model, current_budget,
+        )
+        _record_truncation(role, model)
+        metadata["truncated"] = True
+
+        if not _requests_strict_json(system_prompt, user_prompt):
+            return raw, metadata
+
+        retry_budget = min(current_budget * 2, TRUNCATION_RETRY_MAX_TOKENS)
+        if retry_budget <= current_budget:
+            return raw, metadata
+
+        logger.warning(
+            "[EXECUTOR] retrying role=%s at max_tokens=%d after truncation", role, retry_budget,
+        )
+        retry_kwargs = {**kwargs, "max_tokens": retry_budget}
+        retried_raw, retried_metadata = await self.router.call(
+            role=role, system_prompt=system_prompt, user_prompt=user_prompt, **retry_kwargs,
+        )
+        if not isinstance(retried_raw, str) or not retried_raw.strip():
+            # Retry degraded (timeout, provider error) or came back empty —
+            # the truncated original is still the best answer available.
+            return raw, metadata
+
+        # Fold the wasted first attempt's spend into the total so cost/spend-cap
+        # accounting (below, in the caller) reflects what was actually charged,
+        # not just the retry's numbers.
+        for key in ("cost_usd", "input_tokens", "output_tokens"):
+            retried_metadata[key] = retried_metadata.get(key, 0) + metadata.get(key, 0)
+        retried_metadata["truncated_retry"] = True
+        retried_metadata["truncated"] = retried_metadata.get("finish_reason") == "length"
+        if retried_metadata["truncated"]:
+            _record_truncation(role, retried_metadata.get("model", model))
+        return retried_raw, retried_metadata
+
     async def execute_stream(
         self,
         role: str,
@@ -560,7 +648,7 @@ class LLMExecutor:
         from reasoner.infrastructure.llm.ports import DegradedLLMResponse
 
         if "max_tokens" not in kwargs:
-            kwargs["max_tokens"] = PHASE_TOKEN_BUDGETS.get(role, DEFAULT_MAX_TOKENS)
+            kwargs["max_tokens"] = get_token_budget(role)
 
         if self._caching_enabled:
             logger.warning("Caching is currently not supported for streaming LLM calls.")

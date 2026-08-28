@@ -692,6 +692,28 @@ _REGISTRY: dict[str, dict] = {
         "fusion":           "gemini-flash-lite",  # 🇨🇳 Qwen — $0.065/$0.260 per M, 1000K ctx (was deepseek-v4-flash; one model per phase)
         "post_synthesis_verify": "sonar-deep-research",  # 🇺🇸 Perplexity — $2.000/$8.000 per M, 128K ctx (was sonar; one model per phase)
         },
+        # Cross-bloc fallback per role (v3.9, researched against the 2026-08-28
+        # catalogue refresh) — every article role above previously fell back
+        # straight to primary_id (deepseek-v4-flash) with no role-specific
+        # reasoning if its provider failed. writing_factcheck and
+        # post_synthesis_verify are the one deliberate exception: Perplexity is
+        # the only live-web-search vendor in this registry, so their fallback
+        # steps to a different Sonar tier rather than a non-search model that
+        # would silently drop the citation-grounding these phases exist for.
+        "fallback_routing": {
+            "primary":               "qwen3.7-flash",         # 🇨🇳 Qwen — $0.03/$0.13 per M, 1M ctx, cross-bloc from Arcee
+            "writing_draft":         "deepseek-v4-pro",       # 🇨🇳 DeepSeek — $0.87/$1.74 per M, 1M ctx, cross-bloc from Claude
+            "writing_factcheck":     "sonar-pro",             # 🇺🇸 Perplexity — same-vendor step-up (see note above)
+            "writing_assemble":      "seed-2.0-mini",         # 🇨🇳 ByteDance — $0.10/$0.40 per M, cross-bloc from OpenAI
+            "article_sot_skeleton":  "glm-5.3-flash",         # 🇨🇳 Zhipu — $0.075/$0.25 per M, 1.31M ctx, cross-bloc from Meta
+            "article_critic":        "gemini-2.5-flash",      # 🇺🇸 Google — $0.30/$2.50 per M, cross-bloc from Tencent
+            "article_revise":        "gemini-flash-lite-real",# 🇺🇸 Google — $0.25/$1.50 per M, 1M ctx, cross-bloc from Qwen
+            "article_humanize":      "glm-5.2",               # 🇨🇳 Zhipu — $0.476/$1.496 per M, cross-bloc from OpenAI
+            "article_verifier":      "gemini-2.5-flash-lite", # 🇺🇸 Google — 3.3% HHEM hallucination rate, cross-bloc from Qwen
+            "fusion":                "llama-4-scout",         # 🇺🇸 Meta — $0.10/$0.30 per M, 10M ctx, cross-bloc from Qwen
+            "post_synthesis_verify": "sonar-reasoning-pro",   # 🇺🇸 Perplexity — same-vendor step-up (see note above)
+            "synthesis":             "gemini-3.7-flash",      # 🇺🇸 Google — $0.375/$1.875 per M, cross-bloc from Qwen
+        },
         "tags": ["budget", "writing", "article"],
     },
     "article-premium": {
@@ -714,6 +736,25 @@ _REGISTRY: dict[str, dict] = {
         "fusion":            "qwen3-max-real",  # 🇨🇳 Qwen — $0.780/$3.900 per M, 262K ctx (was deepseek-v4-pro; one model per phase)
         "writing_assemble":  "gpt-4o-mini",         # 🇺🇸 OpenAI — proven reliable copy edit (was gpt-5-mini, empty response)
         "post_synthesis_verify": "sonar-pro-search",  # 🇺🇸 Perplexity — $3.000/$15.000 per M, 200K ctx (was sonar-pro; one model per phase)
+        },
+        # Cross-bloc fallback per role (v3.9) — see article-budget's
+        # fallback_routing comment for the writing_factcheck /
+        # post_synthesis_verify same-vendor-step-up rationale, which applies
+        # here too.
+        "fallback_routing": {
+            "primary":               "glm-5.3",           # 🇨🇳 Zhipu — $1.40/$4.40 per M, cross-bloc from Arcee
+            "writing_draft":         "qwen3.7-max",       # 🇨🇳 Qwen — $1.475/$4.425 per M, 1M ctx, cross-bloc from GPT-5
+            "writing_outline":       "qwen3.7-max",       # 🇨🇳 Qwen — cross-bloc from real Gemini Pro
+            "article_sot_skeleton":  "glm-5.3",           # 🇨🇳 Zhipu — cross-bloc from GPT-5.6 Terra
+            "article_critic":        "deepseek-v4-pro",   # 🇨🇳 DeepSeek — 1.6T MoE, cross-bloc from Grok
+            "article_revise":        "claude-sonnet",     # 🇺🇸 Anthropic — this preset's own primary_id, cross-bloc from DeepSeek
+            "article_humanize":      "qwen3-max-real",    # 🇨🇳 Qwen — $0.78/$3.90 per M, cross-bloc from GPT-5.6 Terra Pro
+            "article_verifier":      "gemini-2.5-flash",  # 🇺🇸 Google — low-hallucination profile, cross-bloc from Zhipu
+            "fusion":                "gemini-3.7-flash",  # 🇺🇸 Google — $0.375/$1.875 per M, cross-bloc from Qwen
+            "writing_assemble":      "qwen3.7-plus",      # 🇨🇳 Qwen — "best VFM" per its own registry comment, cross-bloc from OpenAI
+            "synthesis":             "gemini-pro-real",   # 🇺🇸 Google — real Gemini Pro, cross-bloc from Qwen
+            "writing_factcheck":     "sonar-pro-search",  # 🇺🇸 Perplexity — same-vendor step-up (see note above)
+            "post_synthesis_verify": "sonar-reasoning-pro", # 🇺🇸 Perplexity — same-vendor step-up (see note above)
         },
         "tags": ["premium", "writing", "article"],
     },

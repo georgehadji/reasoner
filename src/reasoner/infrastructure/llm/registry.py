@@ -97,7 +97,18 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # and the dict quietly had one fewer model than it appeared to. The xAI
     # block is the single definition; a real Google flash lives under
     # gemini-3.6-flash / gemini-2.5-flash.
-    "gemini-flash-lite": {"model": "qwen/qwen3.5-flash-02-23"},     # budget primary — $0.065/$0.26, fast & reliable
+    # extra_body: reasoning.exclude — this alias serves several JSON-contract
+    # article roles (article_sot_skeleton, article_critic) whose prompts
+    # demand a bare JSON object; observed on 2026-08-28 spending its entire
+    # output budget narrating "Thinking Process: 1. Analyze the Request..."
+    # as plain content and never reaching JSON. Belt-and-braces alongside
+    # response_format (infrastructure.llm.utils._json_response_format) — the
+    # OpenRouter catalogue lists "reasoning"/"include_reasoning" as supported
+    # for this served model, so this is a legitimate attempt at the control it
+    # advertises, not a guess; response_format is the change actually proven
+    # to stop free-text preambles at the decoding level; see
+    # docs/plans/article-flow-truncation-remediation.md W4.
+    "gemini-flash-lite": {"model": "qwen/qwen3.5-flash-02-23", "extra_body": {"reasoning": {"exclude": True}}},     # budget primary — $0.065/$0.26, fast & reliable
     # ── Real Google models (not aliased to other labs) ──
     "gemini-pro-real":         {"model": "google/gemini-3.1-pro-preview"},     # true Google Pro — $2/$12 per M, 1M ctx
     "gemini-flash-lite-real":  {"model": "google/gemini-3.1-flash-lite"},      # true Google Flash Lite — $0.25/$1.50, 1M ctx
@@ -213,7 +224,9 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "qwen3.6-27b":         {"model": "qwen/qwen3.6-27b"},        # $0.2885/$3.17 per M, 262K ctx, dense
     "qwen3.6-max-preview": {"model": "qwen/qwen3.6-max-preview"}, # $1.04/$6.24 per M, 262K ctx, ~1T MoE preview
     # ── 3.5 (early-mid 2026) ──
-    "qwen3.5-flash":       {"model": "qwen/qwen3.5-flash-02-23"}, # cheapest Qwen — $0.065/$0.26 per M, 1M ctx
+    # extra_body: reasoning.exclude — see the gemini-flash-lite alias above
+    # (same served model, same fix, same reasoning).
+    "qwen3.5-flash":       {"model": "qwen/qwen3.5-flash-02-23", "extra_body": {"reasoning": {"exclude": True}}}, # cheapest Qwen — $0.065/$0.26 per M, 1M ctx
     "qwen3.5-9b":          {"model": "qwen/qwen3.5-9b"},          # $0.10/$0.15 per M, 262K ctx
     "qwen3.5-27b":         {"model": "qwen/qwen3.5-27b"},         # $0.195/$1.56 per M, 262K ctx, dense
     "qwen3.5-35b-a3b":     {"model": "qwen/qwen3.5-35b-a3b"},     # $0.14/$1.00 per M, 262K ctx, MoE
@@ -225,7 +238,8 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ── Qwen3 Max Thinking — dedicated reasoning (Jan 2026) ──
     "qwen3-max-thinking":  {"model": "qwen/qwen3-max-thinking"},   # $0.78/$3.90 per M, 262K ctx — deep multi-step reasoning
     # ── Turbo (dead — replaced with 3.5-flash) ──
-    "qwen3-turbo":         {"model": "qwen/qwen3.5-flash-02-23"},  # was qwen/qwen-turbo (DEAD) -> qwen3.5-flash
+    # extra_body: reasoning.exclude — see the gemini-flash-lite alias above.
+    "qwen3-turbo":         {"model": "qwen/qwen3.5-flash-02-23", "extra_body": {"reasoning": {"exclude": True}}},  # was qwen/qwen-turbo (DEAD) -> qwen3.5-flash
     # ── Coder series ──
     "qwen3-coder":            {"model": "qwen/qwen3-coder-plus"},        # proprietary — $0.65/$3.25 per M, 1M ctx
     "qwen3-coder-flash":      {"model": "qwen/qwen3-coder-flash"},       # $0.195/$0.975 per M, 1M ctx

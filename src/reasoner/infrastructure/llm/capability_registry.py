@@ -187,6 +187,17 @@ def _build_constraints(model_id: str) -> ModelConstraints:
     )
 
 
+def get_constraints(model_id: str) -> ModelConstraints:
+    """Stateless constraint lookup: catalogue -> hint -> unknown.
+
+    Use this — not ``CapabilityRegistry().get_profile()`` — when only the
+    static facts are needed. It never touches the persisted capability-profiles
+    file, so it is safe to call from a hot request path (e.g. deciding whether
+    to send ``response_format`` on a single LLM call) without file I/O.
+    """
+    return _build_constraints(model_id)
+
+
 class CapabilityRegistry:
     """In-memory capability registry backed by JSON file for persistence.
 

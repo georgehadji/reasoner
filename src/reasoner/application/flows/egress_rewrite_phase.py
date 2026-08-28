@@ -58,6 +58,21 @@ _WORD_RE = re.compile(r"[a-z]+")
 _MIN_LENGTH_RATIO = 0.6
 _MAX_LENGTH_RATIO = 1.6
 
+# Methods whose deliverable does not live in final_solution.core_solution, or
+# already passes through an equivalent editorial rewrite before this phase
+# ever runs. The article flow is the concrete case: its deliverable is
+# writing_state["final_article"], produced by two dedicated passes
+# (humanize + developmental edit — application/flows/article_phases.py) that
+# already do what Layer B does for other methods' raw synthesis output.
+# core_solution for this method holds a short generic synthesis summary, not
+# the article, so a rewrite here protects nothing the reader ever sees and the
+# guards reject it near-certainly (confirmed 2026-08-28: 542-char summary,
+# 3.8x drift). Skipping is a product decision, not a guard tweak — revisit
+# alongside docs/plans/watermark-removal-integration.md before adding to this
+# set, since it takes a method out of Layer B protection entirely rather than
+# just tuning when the guards fire.
+_SKIP_FOR_METHODS: frozenset[str] = frozenset({"article"})
+
 _REWRITE_SYSTEM_PROMPT = "You rewrite text exactly as instructed. Output only the rewritten text."
 
 
@@ -88,6 +103,12 @@ def _record(state: PipelineState, report: dict) -> None:
 async def run_egress_rewrite_phase(state: PipelineState, services: WorkflowServices) -> None:
     policy = resolve_egress_policy()
     if not policy.layer_b_enabled:
+        return
+
+    if state.method in _SKIP_FOR_METHODS:
+        reason = f"method '{state.method}' already editorial-rewritten before this phase"
+        services.log("EGRESS_REWRITE", f"Skipping rewrite: {reason}", state)
+        _record(state, {"rewritten": False, "rejected_reason": reason})
         return
 
     fs = state.final_solution

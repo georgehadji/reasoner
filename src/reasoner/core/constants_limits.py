@@ -187,6 +187,16 @@ PHASE_TOKEN_BUDGETS: dict[str, int] = {
     "writing_assemble": 8192,
     "writing_draft":    8192,
     "article_revise":   8192,
+    # Article editorial roles that were missing entirely and silently fell
+    # back to DEFAULT_MAX_TOKENS (2048) — three of them hit that cap exactly
+    # on 2026-08-28 (outline and structural-review JSON truncated mid-object;
+    # verifier timed out reading the full article + claim ledger). See
+    # docs/plans/article-flow-truncation-remediation.md W1.
+    "article_sot_skeleton": 4096,  # argument map + per-section outline, structure only
+    "article_critic":       4096,  # logical gaps + counterarguments, per-item rationale
+    "article_verifier":     8192,  # full article + claim ledger, per-claim verdicts
+    "writing_factcheck":    4096,  # ran at 1982/2048 live — 3% headroom
+    "egress_rewrite":       8192,  # rewrites a full text blob (see W5)
     # Default fallback
     "default": 1536,
 }
@@ -195,6 +205,14 @@ PHASE_TOKEN_BUDGETS: dict[str, int] = {
 def get_token_budget(role: str) -> int:
     """Get token budget for a specific role/phase."""
     return PHASE_TOKEN_BUDGETS.get(role, PHASE_TOKEN_BUDGETS["default"])
+
+
+# A JSON-contract role that comes back with finish_reason="length" was cut off
+# mid-object, not mid-sentence — extract_json() cannot recover from that no
+# matter how the prompt is worded. LLMExecutor retries such a role once at
+# double its configured budget (see W0); this is the ceiling on that retry so
+# a misconfigured role cannot compound into an unbounded spend.
+TRUNCATION_RETRY_MAX_TOKENS: int = 16384
 
 
 # ═════════════════════════════════════════════════════════════════════
@@ -418,6 +436,21 @@ PHASE_TIMEOUTS: dict[str, float] = {
     # copy edit still runs.
     "Style + Copy Edit": 240.0,
     "Style + Copy Edit (retry)": 240.0,
+    # Article flow — phases that were falling through to "default" (90s) and
+    # either don't fit in it (Final Audit timed out twice on 2026-08-28 reading
+    # a full article + claim ledger) or were never explicit despite siblings
+    # above being generously provisioned. See
+    # docs/plans/article-flow-truncation-remediation.md W2.
+    "Evidence Collection": 180.0,     # parallel web search
+    "Argument Map / Outline": 90.0,   # structure only, no prose
+    "First Draft": 120.0,             # single call, full article (writing_draft, 8192 budget)
+    "Fact Check + Ledger": 120.0,     # web-grounded verification against retrieved sources
+    "Structural Review": 120.0,
+    "Developmental Edit": 180.0,      # full-article rewrite
+    "Final Audit": 180.0,             # full article + ledger, per-claim verdicts
+    "Gap Retrieval": 120.0,           # adapter-flow branch
+    "Surface Signals": 60.0,          # adapter-flow branch
+    "Egress Rewrite": 120.0,
     # Brainstorming (Verbalized Sampling) — sequential multi-round LLM calls need headroom
     "VS Idea Generation": 300.0,   # 5 rounds × ~45s each worst-case
     "Cluster & Score": 120.0,

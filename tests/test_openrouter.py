@@ -102,6 +102,43 @@ class TestOpenRouterRegistry:
             assert model_id in _REGISTRY, f"Expected model '{model_id}' not found in registry"
 
 
+class TestReasoningSuppressionAliases:
+    """gemini-flash-lite / qwen3.5-flash / qwen3-turbo all resolve to
+    qwen/qwen3.5-flash-02-23, which serves several JSON-contract article
+    roles and was observed on 2026-08-28 spending its entire output budget
+    narrating "Thinking Process: ..." as plain content instead of emitting
+    JSON. See docs/plans/article-flow-truncation-remediation.md W4.
+    """
+
+    _ALIASES = ("gemini-flash-lite", "qwen3.5-flash", "qwen3-turbo")
+
+    def test_aliases_still_resolve_to_the_flagged_served_model(self):
+        """Guard the guard: if this ever fails, the alias was repointed and
+        the extra_body below is now attached to the wrong model."""
+        for alias in self._ALIASES:
+            assert _REGISTRY[alias]["model"] == "qwen/qwen3.5-flash-02-23", (
+                f"{alias} no longer resolves to qwen/qwen3.5-flash-02-23 -- "
+                f"the reasoning.exclude extra_body may need to move"
+            )
+
+    def test_aliases_carry_reasoning_exclude(self):
+        for alias in self._ALIASES:
+            extra_body = _REGISTRY[alias].get("extra_body") or {}
+            assert extra_body.get("reasoning") == {"exclude": True}, (
+                f"{alias}: expected extra_body.reasoning == {{'exclude': True}}, got {extra_body}"
+            )
+
+    def test_extra_body_reaches_the_built_provider(self):
+        """build_provider() must carry extra_body through to the instance --
+        LLMExecutor and the streaming path both read provider.extra_body, not
+        the registry dict directly."""
+        for alias in self._ALIASES:
+            provider = build_provider(alias, api_key="test-key-not-sent")
+            assert provider.extra_body.get("reasoning") == {"exclude": True}, (
+                f"{alias}: built provider lost reasoning.exclude"
+            )
+
+
 # ─────────────────────────────────────────────────────────────────────
 # TEST 2: Provider Building
 # ─────────────────────────────────────────────────────────────────────
