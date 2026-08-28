@@ -16,22 +16,27 @@
  * down the page, so preloading it would contend with the two families
  * that actually block first meaningful paint.
  */
-import { DM_Sans, Newsreader, Inconsolata } from 'next/font/google';
+import { Public_Sans, Piazzolla, Inconsolata } from 'next/font/google';
 
-/** UI chrome. DM Sans provides excellent UI clarity at dense sizing (11–13px).
- *  Above the fold everywhere. */
-export const dmSans = DM_Sans({
+/** UI chrome. Public Sans (USWDS) — a Libre Franklin derivative drawn for
+ *  documents that must be read by anyone and defended in public. Neutral
+ *  without being Helvetica-neutral. Above the fold everywhere.
+ *  Replaces DM Sans — see spec/art-direction.md §4, migration step 2a. */
+export const publicSans = Public_Sans({
   subsets: ['latin'],
-  variable: '--font-dm-sans',
+  variable: '--font-public-sans',
   display: 'swap',
   preload: true,
 });
 
-/** Running prose. Newsreader is a contemporary serif optimized for screen reading.
- *  Above the fold everywhere. */
-export const newsreader = Newsreader({
+/** Display only (see globals.css --font-serif usage note). Piazzolla — a
+ *  screen-first Palatino descendant with angular humanist forms; reads as
+ *  a technical monograph rather than a magazine. Variable on both `wght`
+ *  and `opsz`, so large display sizes get the optical-size cut for free.
+ *  Replaces Newsreader — see spec/art-direction.md §4, migration step 2a. */
+export const piazzolla = Piazzolla({
   subsets: ['latin'],
-  variable: '--font-newsreader',
+  variable: '--font-piazzolla',
   display: 'swap',
   preload: true,
 });
@@ -47,7 +52,7 @@ export const inconsolata = Inconsolata({
 
 /** Space-joined className carrying the three webfont CSS variables. */
 export const fontVariables = [
-  dmSans.variable,
-  newsreader.variable,
+  publicSans.variable,
+  piazzolla.variable,
   inconsolata.variable,
 ].join(' ');

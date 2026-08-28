@@ -69,7 +69,7 @@ export function SiteHeader() {
 
   const navLinkClass = (active: boolean) =>
     cn(
-      'group relative flex h-10 items-center rounded-[var(--radius)] px-[var(--space-4)]',
+      'group relative flex h-10 items-center whitespace-nowrap rounded-[var(--radius)] px-[var(--space-2)]',
       'text-[length:var(--text-sm)] leading-[var(--lh-ui)] font-medium',
       'transition-colors duration-[var(--dur-micro)] ease-[var(--ease-standard)]',
       active
@@ -116,7 +116,7 @@ export function SiteHeader() {
                 <span
                   aria-hidden="true"
                   className={cn(
-                    'pointer-events-none absolute inset-x-[var(--space-4)] bottom-[var(--space-1)]',
+                    'pointer-events-none absolute inset-x-[var(--space-2)] bottom-[var(--space-1)]',
                     'h-[2px] origin-left rounded-[var(--radius-pill)] bg-[var(--accent)]',
                     'transition-transform duration-[var(--dur-state)] ease-[var(--ease-entrance)]',
                     'group-hover:scale-x-100 group-hover:duration-[var(--dur-micro)]',
@@ -144,7 +144,7 @@ export function SiteHeader() {
             <>
               <button
                 onClick={() => router.push('/chat')}
-                className="hidden h-10 items-center rounded-[var(--radius)] bg-[var(--accent)] px-[var(--space-4)] text-[length:var(--text-sm)] leading-[var(--lh-ui)] font-semibold text-[var(--accent-text)] transition-colors duration-[var(--dur-micro)] ease-[var(--ease-standard)] hover:bg-[var(--accent-hover)] active:scale-[0.97] sm:inline-flex"
+                className="whitespace-nowrap hidden h-10 items-center rounded-[var(--radius)] bg-[var(--accent)] px-[var(--space-4)] text-[length:var(--text-sm)] leading-[var(--lh-ui)] font-semibold text-[var(--accent-text)] transition-colors duration-[var(--dur-micro)] ease-[var(--ease-standard)] hover:bg-[var(--accent-hover)] active:scale-[0.97] sm:inline-flex"
               >
                 Open App
               </button>
@@ -154,13 +154,13 @@ export function SiteHeader() {
             <>
               <button
                 onClick={() => router.push('/login')}
-                className="hidden h-10 items-center rounded-[var(--radius)] px-[var(--space-4)] text-[length:var(--text-sm)] leading-[var(--lh-ui)] font-medium text-[var(--text-muted)] transition-colors duration-[var(--dur-micro)] ease-[var(--ease-standard)] hover:text-[var(--text)] sm:flex"
+                className="whitespace-nowrap hidden h-10 items-center rounded-[var(--radius)] px-[var(--space-4)] text-[length:var(--text-sm)] leading-[var(--lh-ui)] font-medium text-[var(--text-muted)] transition-colors duration-[var(--dur-micro)] ease-[var(--ease-standard)] hover:text-[var(--text)] sm:flex"
               >
                 Sign in
               </button>
               <button
                 onClick={() => router.push('/chat')}
-                className="flex h-10 items-center rounded-[var(--radius)] bg-[var(--accent)] px-[var(--space-4)] text-[length:var(--text-sm)] leading-[var(--lh-ui)] font-semibold text-[var(--accent-text)] transition-colors duration-[var(--dur-micro)] ease-[var(--ease-standard)] hover:bg-[var(--accent-hover)] active:scale-[0.97]"
+                className="whitespace-nowrap flex h-10 items-center rounded-[var(--radius)] bg-[var(--accent)] px-[var(--space-4)] text-[length:var(--text-sm)] leading-[var(--lh-ui)] font-semibold text-[var(--accent-text)] transition-colors duration-[var(--dur-micro)] ease-[var(--ease-standard)] hover:bg-[var(--accent-hover)] active:scale-[0.97]"
               >
                 Get started
               </button>
