@@ -106,3 +106,23 @@ deepseek-harness/
 .coverage
 coverage.xml
 htmlcov/
+
+# --- studio design pipeline (adopt-into-existing.sh) ---
+# Backups taken when the studio block was appended / settings merged. Delete once
+# you are satisfied with the merged CLAUDE.md and .claude/settings.json.
+*.studio-bak
+.claude/settings.studio.json
+# Gate marker is local state, armed by /adopt per-checkout.
+spec/.gate-enabled
+# Scaffolding scripts and the source template are tooling, not part of Reasoner.
+# vibe-studio-site-template/ carries its own .git — never commit it as a gitlink.
+/vibe-studio-site-template/
+/bootstrap-web-studio.sh
+/harden-hooks-windows.sh
+/adopt-into-existing.sh
+/website-production-prompt-system.md
+# The generic build/ rule above is for compiled output. The studio pipeline ships a
+# skill named build/ which must be tracked.
+!.claude/skills/build/
+!.claude/skills/build/**
+

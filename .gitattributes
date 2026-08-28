@@ -23,3 +23,5 @@
 *.db binary
 *.sqlite binary
 *.sqlite3 binary
+*.sh text eol=lf
+.claude/hooks/* text eol=lf

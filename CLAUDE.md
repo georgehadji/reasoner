@@ -312,3 +312,57 @@ Cross-lab diversity prevents echo chambers:
 ## Workspace CONTEXT.md Map
 
 To easily navigate the codebase, explore directory structures, and understand file roles, please refer to the root [CONTEXT.md](CONTEXT.md) file. This file contains a complete hierarchical map and points to individual `CONTEXT.md` files detailing the contents and functioning of every single folder in the project.
+
+<!-- studio-pipeline -->
+# Studio operating rules (adopted design pipeline)
+
+## Scope — read this before invoking any stage
+
+Reasoner is an **application**, not a client marketing site. Only four stages apply:
+`/adopt` → `/art-direction` → `/build` → `/qa-gate`.
+
+`/positioning`, `/copy`, `/architecture`, `/intake` and `/growth` presuppose a buyer, a
+funnel and an SEO surface. They are installed but **do not run them here** — they will
+produce fiction against this repo.
+
+The surface under this pipeline is **`ui-next/` only**. `src/reasoner/**` is the Python
+backend and is out of scope for every stage; the write gate is scoped so arming it can
+never block backend work.
+
+## Artifacts
+`spec/brief.md` → `spec/art-direction.md` + `ui-next/src/styles/tokens.css`
+→ `spec/ia.md` → source → `spec/qa-report.md`
+
+## Hard rules
+- Never invent a fact. Metrics, benchmarks, model claims, dates: if it is not verifiable
+  in this repo, write `[INPUT REQUIRED: <question>]`.
+- Never introduce a raw colour, font-size, spacing or radius value in `ui-next/src/**`
+  component code. Every value comes from `ui-next/src/styles/tokens.css`.
+- Tailwind v4 declares the theme CSS-natively in `ui-next/src/app/globals.css`. Do not
+  create `tailwind.config.ts`. Reconcile tokens against globals.css; do not duplicate it.
+- Never write into `ui-next/src/` before `spec/art-direction.md` and
+  `ui-next/src/styles/tokens.css` exist and are non-empty. A hook blocks this; do not
+  work around it. The hook is inert until `spec/.gate-enabled` exists.
+- `spec/banlist.md` is binding on every visual decision.
+- Label non-obvious claims VERIFIED / INFERENCE / HYPOTHESIS / UNKNOWN.
+- If a required input is missing, stop and ask. Do not proceed on assumption.
+
+## Quality floor (never announced, never negotiable)
+Responsive from 320px. Visible keyboard focus. `prefers-reduced-motion` respected.
+Semantic landmarks. Real alt text. WCAG 2.2 AA.
+
+## Budgets (see .github/workflows/quality.yml, currently advisory)
+LCP <= 2.0s and CLS <= 0.05 lab; field targets LCP <= 2.5s / INP <= 200ms / CLS <= 0.1 at p75.
+Max 2 font families, 4 weights, self-hosted woff2.
+
+## Hook wiring is not in git
+
+`.claude/settings.json` is gitignored, so the three studio hooks (`SessionStart`
+session-context, `PreToolUse` stage-guard, `PostToolUse` token-guard) are wired only in
+this checkout. The scripts in `.claude/hooks/` ARE tracked. On a fresh clone the gate is
+silently absent rather than merely inert — re-add the three entries before relying on it.
+
+## Adopted project
+This project existed before the pipeline. Run `/adopt` once to populate `spec/`.
+Local dev is `npm --prefix ui-next run dev` on http://localhost:3000 — always the dev
+server, never a production build (the prod build's SSRF guard blocks the localhost backend).
