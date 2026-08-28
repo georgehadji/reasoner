@@ -140,7 +140,15 @@ export function validateUpstreamUrl(url: string): string {
   }
 
   if (process.env.NODE_ENV === 'production') {
-    const hostname = parsed.hostname;
+    /* WHATWG URL keeps the brackets on an IPv6 literal: `new URL('http://[::1]/')`
+       has hostname `"[::1]"`, not `"::1"`. Every IPv6 arm below was written
+       against the unbracketed form, so none of them could ever match and the
+       whole IPv6 half of this guard was dead — `::1`, `::`, the unique-local
+       range and the link-local range were all reachable upstream targets in
+       production. Strip the brackets once, here, and lowercase so the hex
+       comparisons below do not depend on how the caller cased the address. */
+    const hostname = parsed.hostname.replace(/^\[|\]$/g, '').toLowerCase();
+
     if (
       hostname === 'localhost' ||
       hostname === '127.0.0.1' ||
@@ -152,9 +160,24 @@ export function validateUpstreamUrl(url: string): string {
       hostname.startsWith('192.168.') ||
       hostname.startsWith('10.') ||
       hostname.startsWith('169.254.') ||
+      /^127\./.test(hostname) ||
       /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) ||
-      /^fc[0-9a-f]{2}:/i.test(hostname) ||
-      /^fe[89ab][0-9a-f]:/i.test(hostname)
+      /* Unique-local is fc00::/7 — the top seven bits, which means a leading
+         byte of either `fc` or `fd`. The old `fc[0-9a-f]{2}` covered only half
+         the range and would have missed every `fd..` address even with the
+         brackets stripped; `fd00::/8` is the half actually used in practice,
+         since fc00::/8 is unassigned. */
+      /^f[cd][0-9a-f]{2}:/.test(hostname) ||
+      /* Link-local fe80::/10. */
+      /^fe[89ab][0-9a-f]:/.test(hostname) ||
+      /* Deprecated site-local fec0::/10 — still routed by some stacks. */
+      /^fe[cdef][0-9a-f]:/.test(hostname) ||
+      /* IPv4-mapped (::ffff:0:0/96). Node normalises the embedded address to
+         hex — `::ffff:127.0.0.1` arrives as `::ffff:7f00:1` — so decoding it
+         back to a dotted quad to re-run the checks above would be the only way
+         to filter these individually. Nothing legitimate configures an upstream
+         as an IPv4-mapped literal, so the whole range goes. */
+      hostname.startsWith('::ffff:')
     ) {
       throw new Error('Upstream URL points to a private network in production');
     }
