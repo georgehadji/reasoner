@@ -1148,27 +1148,43 @@
   .scroll-grow {
     animation: scroll-grow linear both;
     animation-timeline: view();
-    /* Measured over `cover`, not `entry`. The entry range's end depends
-       on the element being shorter than the viewport, and this band is
-       not — `cover` is well defined at any height. */
-    animation-range: cover 0% cover 30%;
+    /* Extend range: scales from small → full → small as viewport
+       progresses from entry to exit. On scroll-up, reverses exactly. */
+    animation-range: cover 0% cover 100%;
     transform-origin: center top;
     will-change: transform;
   }
 
   @keyframes scroll-grow {
-    from {
-      transform: scale(0.68);
-      /* Specified radius is multiplied by the scale, so 80px renders at
-         roughly 54px while the band is at 0.68 — a corner deep enough to
-         read as a card across a 980px-wide plate, where the app's own
-         24px slab radius would vanish at that size. */
+    0% {
+      transform: scale(0.62);
       border-radius: 80px;
     }
-    to {
+    100% {
       transform: scale(1);
       border-radius: 0;
     }
+  }
+
+  /* ── Plate reveal ────────────────────────────────────────
+     Opacity only, deliberately. The plates this runs on also carry
+     a hover tilt, and an animation with a fill mode beats a hover
+     rule in the cascade — a reveal that rose as well as faded would
+     have silently killed the tilt for the whole of the page's life.
+     Fading is the half of the effect that composes.
+
+     No stagger is declared because none is needed: view() measures
+     each plate's own box, so the second row of a 2×2 resolves after
+     the first for the same reason it looks later — it is. */
+  .plate-reveal {
+    animation: plate-reveal linear both;
+    animation-timeline: view();
+    animation-range: entry 12% cover 30%;
+  }
+
+  @keyframes plate-reveal {
+    from { opacity: 0; }
+    to   { opacity: 1; }
   }
 }
 
@@ -1199,6 +1215,11 @@
     animation: none !important;
     transform: none !important;
     border-radius: 0 !important;
+  }
+
+  .plate-reveal {
+    animation: none !important;
+    opacity: 1 !important;
   }
 
   /* Utility: re-enable transitions for opacity/color state changes */

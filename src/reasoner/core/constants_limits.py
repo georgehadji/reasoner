@@ -13,26 +13,20 @@ from typing import Literal
 
 from reasoner.core.constants_models import (
     MODEL_FLUX_2_KLEIN_4B,
-    MODEL_FLUX_2_MAX,
-    MODEL_FLUX_2_PRO,
     MODEL_GEMINI_31_FLASH_IMAGE_PREVIEW,
     MODEL_GEMINI_FLASH,
     MODEL_GEMINI_FLASH_IMAGE,
     MODEL_GEMINI_FLASH_LITE,
+    MODEL_GEMINI_PRO_IMAGE,
     MODEL_GPT5_IMAGE,
-    MODEL_GPT54_IMAGE_2,
-    MODEL_GPT_IMAGE_2,
-    MODEL_KREA_2_MEDIUM_TURBO,
+    MODEL_GPT5_IMAGE_MINI,
+    MODEL_GROK_IMAGINE,
+    MODEL_GROK_IMAGINE_IMAGE_2,
     MODEL_MAI_IMAGE_25,
     MODEL_MAI_IMAGE_25_PRO,
-    MODEL_RECRAFT_V4_PRO,
+    MODEL_RECRAFT_V41,
     MODEL_RECRAFT_V41_PRO,
-    MODEL_RECRAFT_V41_UTILITY,
-    MODEL_RIVERFLOW_V2_FAST_PREVIEW,
     MODEL_RIVERFLOW_V25_FAST,
-    MODEL_RIVERFLOW_V25_PRO,
-    MODEL_SEEDREAM_5_LITE,
-    MODEL_SEEDREAM_5_PRO,
     MODEL_SEEDREAM_45,
 )
 
@@ -183,6 +177,16 @@ PHASE_TOKEN_BUDGETS: dict[str, int] = {
     "coding_review":    4096,
     "coding_tests":     8192,
     "coding_assemble": 16384,
+    # Article pipeline — every one of these roles emits the FULL 800-1200 word
+    # article, so DEFAULT_MAX_TOKENS (2048) clips them. article_humanize is the
+    # tightest: it returns the article inside a JSON string alongside the tell
+    # audit, so escaping and the ai_tells array push it past 2048 even in
+    # English. "article" is also a NATIVE_LANGUAGE_METHOD, and EL/RU/AR tokenize
+    # 2-3x worse, which is what turned this into silent mid-JSON truncation.
+    "article_humanize": 8192,
+    "writing_assemble": 8192,
+    "writing_draft":    8192,
+    "article_revise":   8192,
     # Default fallback
     "default": 1536,
 }
@@ -408,9 +412,12 @@ PHASE_TIMEOUTS: dict[str, float] = {
     "Journal Review": 90.0,
     "Final Assembly": 120.0,
     "Humanize": 90.0,
-    # Article flow — combined style + copy edit runs two sequential LLM calls across the full article
-    "Style + Copy Edit": 180.0,
-    "Style + Copy Edit (retry)": 180.0,
+    # Article flow — combined humanize + copy edit runs two sequential LLM calls
+    # across the full article, and three on the worst path: if the humanize pass
+    # returns unparseable JSON it falls back to the prose style edit before the
+    # copy edit still runs.
+    "Style + Copy Edit": 240.0,
+    "Style + Copy Edit (retry)": 240.0,
     # Brainstorming (Verbalized Sampling) — sequential multi-round LLM calls need headroom
     "VS Idea Generation": 300.0,   # 5 rounds × ~45s each worst-case
     "Cluster & Score": 120.0,
@@ -469,37 +476,72 @@ IMAGE_GEN_MAX_IMAGE_COUNT: int = IMAGE_GEN_IMAGE_COUNT * 2
 # fallbacks, and each primary is a different lab — one lab outage or one policy
 # refusal can never zero out a run.
 #
-# Ordering is by measured OpenRouter price (image / image_output columns of
-# domain/openrouter_models.json), not by reputation. Note grok-imagine bills
-# $0.01 *per image* flat — the single most expensive image model in the
-# catalogue — so it is deliberately NOT in the budget tier despite the name.
+# Ordering is by measured OpenRouter price, re-derived 2026-08-27 from the LIVE
+# per-model endpoint (`GET /models/{id}/endpoints`), not from the flat
+# `/models` listing: that listing omits image-generation models entirely (11 of
+# 50 returned), so anything ranked from it is ranked from a fifth of the
+# catalogue. domain/openrouter_models.json is a snapshot and had drifted —
+# gemini-2.5-flash-image was half the price it claimed, seedream-5-0-pro a
+# fifth of it.
+#
+# Where a pure generator publishes BOTH a flat `image` price and an
+# `image_output` token rate (Qwen, Seed), the tiers are ranked on the HIGHER of
+# the two. The two disagree by 3-4x and the flat field is the one that would
+# flatter us; ranking on it would put a lab in the budget tier on a number we
+# cannot stand behind.
+#
+# Both tiers ship one model per lab, and both cross a bloc boundary, so no
+# single lab outage, house style, or content policy decides a run. Premium is
+# ranked on capability with price only breaking ties (the doctrine
+# image_model_catalogue.py enforces for automatic selection); budget is ranked
+# on price alone.
+#
+# EVERY alias below returned an image on a live call on 2026-08-27. Price is
+# NOT sufficient to earn a slot here, because a cheaper model can be one this
+# code path cannot reach at all:
+#   * Krea and Qwen are images-API-only — OpenRouter answers chat/completions
+#     with "cannot be used with the chat/completions endpoint". They were the
+#     two cheapest models in the catalogue and they never produced a pixel.
+#     generate_image_with_model() has an images-API branch, but its guard
+#     (`"openrouter.ai" not in base_url`) excludes the only base URL it ever
+#     runs against, so the branch is dead and these models are unreachable
+#     until that is fixed.
+#   * gpt-image-2 returns "No endpoints found"; flux.2-pro, flux.2-max,
+#     gpt-5.4-image-2 and riverflow-v2.5-pro fail with an empty provider error.
+#   * The seedream-5 line 500s; seedream-4.5 is the working ByteDance model and
+#     is therefore what carries the cross-bloc slot in both tiers.
+# Re-probe before promoting anything back — scripts are throwaway, the rule is
+# not: no alias goes in a tier on a price alone.
+# Budget: the cheapest working model from each of four labs. Fallbacks are the
+# next four cheapest, again one per lab and no lab repeated from the primaries,
+# so a lab-wide outage cannot take out a primary and its own understudy.
 IMAGE_GEN_BUDGET_MODELS: list[str] = [
-    MODEL_FLUX_2_KLEIN_4B,      # 🇩🇪 Black Forest Labs — cheapest image_output rate
-    MODEL_KREA_2_MEDIUM_TURBO,  # 🇺🇸 Krea — latency-optimised
-    MODEL_RIVERFLOW_V25_FAST,   # 🇺🇸 Sourceful
-    MODEL_SEEDREAM_5_LITE,      # 🇨🇳 ByteDance — cross-bloc diversity
+    MODEL_FLUX_2_KLEIN_4B,      # 🇩🇪 Black Forest Labs — $0.0044
+    MODEL_RIVERFLOW_V25_FAST,   # 🇺🇸 Sourceful — $0.0059
+    MODEL_GROK_IMAGINE_IMAGE_2, # 🇺🇸 xAI — $0.0100
+    MODEL_GPT5_IMAGE_MINI,      # 🇺🇸 OpenAI — $0.0103
 ]
 IMAGE_GEN_BUDGET_FALLBACK_MODELS: list[str] = [
-    MODEL_GEMINI_FLASH_IMAGE,       # 🇺🇸 Google — token-priced hybrid, very cheap
-    MODEL_RECRAFT_V41_UTILITY,      # 🇺🇸 Recraft
-    MODEL_FLUX_2_PRO,               # 🇩🇪 Black Forest Labs
-    MODEL_RIVERFLOW_V2_FAST_PREVIEW,# 🇺🇸 Sourceful
-    MODEL_SEEDREAM_45,              # 🇨🇳 ByteDance
+    MODEL_RECRAFT_V41,          # 🇺🇸 Recraft — $0.0108
+    MODEL_SEEDREAM_45,          # 🇨🇳 ByteDance — $0.0124, cross-bloc diversity
+    MODEL_GEMINI_FLASH_IMAGE,   # 🇺🇸 Google — $0.0193
+    MODEL_MAI_IMAGE_25,         # 🇺🇸 Microsoft — $0.0606
 ]
+# Premium: the best working model from Google, xAI and OpenAI, plus Recraft for
+# the design and in-image-text work the other three are weakest at. OpenAI's
+# dedicated image models (gpt-image-2, gpt-5.4-image-2) return no endpoints, so
+# its slot is held by the chat-native gpt-5-image.
 IMAGE_GEN_PREMIUM_MODELS: list[str] = [
-    MODEL_GPT_IMAGE_2,      # 🇺🇸 OpenAI — strongest in-image text rendering
-    MODEL_GEMINI_31_FLASH_IMAGE_PREVIEW,  # 🇺🇸 Google (alias routes to the GA id)
-    MODEL_RECRAFT_V41_PRO,  # 🇺🇸 Recraft — design/vector-grade
-    MODEL_SEEDREAM_5_PRO,   # 🇨🇳 ByteDance — cross-bloc diversity
+    MODEL_GEMINI_PRO_IMAGE, # 🇺🇸 Google — $0.1548, the pro line beats the flash line
+    MODEL_GROK_IMAGINE,     # 🇺🇸 xAI — $0.0100, the quality tier
+    MODEL_GPT5_IMAGE,       # 🇺🇸 OpenAI — $0.0516
+    MODEL_RECRAFT_V41_PRO,  # 🇺🇸 Recraft — $0.0649, design-grade
 ]
 IMAGE_GEN_PREMIUM_FALLBACK_MODELS: list[str] = [
-    MODEL_GPT54_IMAGE_2,    # 🇺🇸 OpenAI
-    MODEL_MAI_IMAGE_25_PRO, # 🇺🇸 Microsoft
-    MODEL_FLUX_2_MAX,       # 🇩🇪 Black Forest Labs
-    MODEL_RIVERFLOW_V25_PRO,# 🇺🇸 Sourceful
-    MODEL_GPT5_IMAGE,       # 🇺🇸 OpenAI
-    MODEL_MAI_IMAGE_25,     # 🇺🇸 Microsoft
-    MODEL_RECRAFT_V4_PRO,   # 🇺🇸 Recraft
+    MODEL_GPT5_IMAGE_MINI,  # 🇺🇸 OpenAI — $0.0103
+    MODEL_GEMINI_31_FLASH_IMAGE_PREVIEW,  # 🇺🇸 Google — $0.0774
+    MODEL_MAI_IMAGE_25_PRO, # 🇺🇸 Microsoft — $0.1393
+    MODEL_SEEDREAM_45,      # 🇨🇳 ByteDance — $0.0124, cross-bloc diversity
 ]
 IMAGE_GEN_PRESETS: dict[str, list[str]] = {
     "budget": IMAGE_GEN_BUDGET_MODELS,

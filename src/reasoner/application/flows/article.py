@@ -186,49 +186,16 @@ class ArticleFlow(WorkflowStrategy):
         state: PipelineState,
         services: WorkflowServices,
     ) -> PipelineState:
-        # ── Pre-processing: run augmentation if depth-detected ──
-        await run_augmentation(state, services.call_llm, services.log)
-
-        phases = self.get_phases(state)
-        audit_retried = False
-
-        for step in phases:
-            await services.run_phase(step, state)
-
-            # E2: If final audit fails, retry developmental edit + re-audit once
-            # Use phase name for detection (works with both legacy and adapter phases)
-            if not audit_retried and step.name == "Final Audit":
-                audit = state.writing_state.get("editorial_audit", {})
-                # Default to False if audit data is empty (parse failure = failed audit)
-                if not audit.get("passes_audit", False):
-                    # Check for prior timeouts to avoid cascading retry failures
-                    timed_out = any(
-                        "Style + Copy Edit" in e.get("message", "")
-                        for e in getattr(state, "pending_events", [])
-                        if isinstance(e, dict)
-                    )
-                    if timed_out:
-                        services.log(
-                            "WRITING",
-                            "Skipping retry — Style + Copy Edit already timed out on primary pass",
-                            state,
-                        )
-                    else:
-                        services.log("WRITING", "Audit failed — retrying developmental edit and re-audit...", state)
-                        audit_retried = True
-                        # Re-run developmental edit
-                        await services.run_phase(
-                            PhaseStep(5.1, "Developmental Edit (retry)", run_article_developmental_edit_phase, _ser_4),
-                            state,
-                        )
-                        # Re-run style + copy edit
-                        await services.run_phase(
-                            PhaseStep(5.2, "Style + Copy Edit (retry)", run_article_style_copy_edit_phase, _ser_5),
-                            state,
-                        )
-                        # Re-run audit
-                        await services.run_phase(
-                            PhaseStep(5.3, "Final Audit (retry)", run_article_final_audit_phase, _ser_5),
-                            state,
-                        )
+        # Augmentation and the audit-failure retry used to live here. They now
+        # sit inside run_article_retrieve_sources_phase and
+        # run_article_final_audit_phase (article_phases.py), because this method
+        # is only ever reached by the CLI: the SSE driver at
+        # api/execution/pipeline.py builds a flat list from get_phases() and
+        # calls the phase functions itself, so everything held here was dead for
+        # every user of the website. What is left is the same loop every other
+        # flow uses.
+        for step in self.get_phases(state):
+            success = await services.run_phase(step, state)
+            if not success and step.critical:
+                break
         return state

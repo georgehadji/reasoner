@@ -7,6 +7,7 @@ import logging
 
 import reasoner.phases as phases
 from reasoner.application.flows.base import WorkflowServices
+from reasoner.application.flows.writing_phases import _extract_markdown_source_links
 from reasoner.core.constants import (
     ARTICLE_MIN_CLAIM_SUPPORT_RATIO,
 )
@@ -75,6 +76,15 @@ def _parse_sonar_citations(raw_text: str) -> list[dict[str, str]]:
 
 
 async def run_article_retrieve_sources_phase(state: PipelineState, services: WorkflowServices, domain: str | None = None) -> None:
+    # Pre-draft augmentation runs here rather than in ArticleFlow.execute() for
+    # the same reason as the audit retry: execute() is CLI-only, so on the web
+    # this pass simply never happened. Guarded on the key it produces, because a
+    # quality retry of this phase, and adapter_gap_retrieval which reuses this
+    # function, would otherwise pay for it a second time.
+    if "pre_research_insights" not in state.writing_state:
+        from reasoner.application.flows.augmentation import run_augmentation
+        await run_augmentation(state, services.call_llm, services.log)
+
     services.log("WRITING", "Retrieving targeted sources for article...", state)
     try:
         raw_plan, meta = await services.call_llm(
@@ -257,20 +267,52 @@ async def run_article_developmental_edit_phase(state: PipelineState, services: W
 # ── Style + Copy Edit (sequential, one PhaseStep) ─────────────────────────────
 
 async def run_article_style_copy_edit_phase(state: PipelineState, services: WorkflowServices) -> None:
-    """Two sequential passes: style edit (article_humanize) then copy edit (writing_assemble)."""
-    services.log("WRITING", "Running style edit...", state)
+    """Humanize (tell audit + rewrite), then copy edit, then assemble Sources.
+
+    The humanize pass is two-step by construction: the model must first quote the
+    AI-writing tells it can find in the draft, then emit the article rewritten
+    without them. Enumerating before rewriting is the point — a model asked only
+    to "make this sound human" reaches for synonyms, while one made to name the
+    pattern first has to act on the specific sentence it just quoted.
+
+    Falls back to the older single-step prose style edit when the JSON contract
+    fails, so a parse error costs the audit rather than the whole phase.
+    """
+    services.log("WRITING", "Running humanize pass (AI-tell audit and rewrite)...", state)
+    draft = state.writing_state.get("final_article", "")
+    tells: list = []
     try:
-        styled, _ = await services.call_llm(
+        raw, _ = await services.call_llm(
             role="article_humanize",
-            system_prompt=phases.ARTICLE_STYLE_EDIT_SYSTEM,
-            user_prompt=phases.article_style_edit_prompt(state),
+            system_prompt=phases.WRITING_HUMANIZE_SYSTEM,
+            user_prompt=phases.writing_humanize_prompt(state, draft),
             state=state,
         )
-        if styled and styled.strip():
-            state.writing_state["final_article"] = styled
+        data = extract_json(raw)
+        humanized = str(data.get("humanized_article", "") or "").strip()
+        if not humanized:
+            raise ValueError("humanized_article empty")
+        tells = data.get("ai_tells", []) or []
+        state.writing_state["final_article"] = humanized
+        # The serializer reads ai_tells_found, the prompt emits ai_tells. Re-key
+        # here or the audit never reaches the client.
+        state.writing_state["ai_tells_found"] = tells
+        services.log("WRITING", f"Humanize complete: {len(tells)} AI tells found and rewritten.", state)
     except Exception as exc:
-        services.log("WRITING", f"Style edit failed: {exc} — proceeding to copy edit on pre-style draft.", state)
-        state.errors.append(f"Article style edit: {exc}")
+        services.log("WRITING", f"Humanize failed ({exc}) — falling back to prose style edit.", state)
+        state.errors.append(f"Article humanize: {exc}")
+        try:
+            styled, _ = await services.call_llm(
+                role="article_humanize",
+                system_prompt=phases.ARTICLE_STYLE_EDIT_SYSTEM,
+                user_prompt=phases.article_style_edit_prompt(state),
+                state=state,
+            )
+            if styled and styled.strip():
+                state.writing_state["final_article"] = styled
+        except Exception as exc2:
+            services.log("WRITING", f"Style edit failed: {exc2} — proceeding to copy edit on pre-style draft.", state)
+            state.errors.append(f"Article style edit: {exc2}")
 
     services.log("WRITING", "Running copy edit and final assembly...", state)
     raw, _ = await services.call_llm(
@@ -279,14 +321,35 @@ async def run_article_style_copy_edit_phase(state: PipelineState, services: Work
         user_prompt=phases.article_copy_edit_prompt(state),
         state=state,
     )
-    state.writing_state["final_article"] = raw
-    services.log("WRITING", "Style + copy edit complete.", state)
+
+    # ── Sources, from the links actually in the finished text ──
+    # Prompt instruction alone left the bibliography describing the intention
+    # rather than the article. The writing flow has always done this
+    # deterministically; the article flow was the one that did not.
+    final_article = raw
+    extracted_links = _extract_markdown_source_links(final_article)
+    if extracted_links and "## Sources" not in final_article:
+        final_article = final_article.rstrip() + "\n\n## Sources\n" + "\n".join(
+            f"- [{link['title'] or link['url']}]({link['url']})" for link in extracted_links
+        )
+    state.writing_state["final_article"] = final_article
+    state.writing_state["sources_cited"] = extracted_links
+    # Written last and equal to final_article on purpose: _ser_synthesis maps
+    # humanized_article onto the published article, so setting it mid-phase
+    # would ship the pre-copy-edit text.
+    if tells:
+        state.writing_state["humanized_article"] = final_article
+    services.log(
+        "WRITING",
+        f"Style + copy edit complete: {len(extracted_links)} sources cited.",
+        state,
+    )
 
 
 # ── Final Editorial Audit ──────────────────────────────────────────────────────
 
-async def run_article_final_audit_phase(state: PipelineState, services: WorkflowServices) -> None:
-    """Pre-publication structured checklist audit."""
+async def _run_final_audit(state: PipelineState, services: WorkflowServices) -> None:
+    """One pass of the pre-publication structured checklist audit."""
     services.log("WRITING", "Running final editorial audit...", state)
     raw, _ = await services.call_llm(
         role="article_verifier",
@@ -309,3 +372,48 @@ async def run_article_final_audit_phase(state: PipelineState, services: Workflow
         f"Editorial audit complete: score={score}, passes={passes}",
         state,
     )
+
+
+async def run_article_final_audit_phase(state: PipelineState, services: WorkflowServices) -> None:
+    """Audit the article; on failure redo the edit passes and audit once more.
+
+    The retry lives in the phase rather than in ArticleFlow.execute() because
+    execute() is only reached by the CLI. The SSE driver
+    (api/execution/pipeline.py) builds a flat list from get_phases() and calls
+    the phase functions directly, so anything held in execute() never runs for a
+    web user. Here it runs on every driver, including the adapter path, which
+    delegates back to this function.
+    """
+    await _run_final_audit(state, services)
+
+    # An empty audit dict means the parse failed, and a failed parse is a failed
+    # audit rather than a pass by default.
+    if (state.writing_state.get("editorial_audit") or {}).get("passes_audit", False):
+        return
+
+    # A prior timeout on the edit pass means the draft is already degraded.
+    # Retrying spends another full budget on the same broken input. Reads
+    # state.errors, where both drivers actually write timeouts; the previous
+    # version of this guard read state.pending_events, which no article phase
+    # writes, so it never once fired.
+    if any("Style + Copy Edit" in str(e) for e in state.errors):
+        services.log(
+            "WRITING",
+            "Skipping retry: Style + Copy Edit already timed out on the primary pass",
+            state,
+        )
+        return
+
+    services.log("WRITING", "Audit failed. Retrying developmental edit and re-auditing...", state)
+    await run_article_developmental_edit_phase(state, services)
+    await run_article_style_copy_edit_phase(state, services)
+    await _run_final_audit(state, services)
+
+    # The re-audit used to be run and then ignored, so an article that failed
+    # twice shipped exactly like one that passed. Record it: state.errors is
+    # surfaced to the client on the next phase_complete.
+    retried = state.writing_state.get("editorial_audit") or {}
+    if not retried.get("passes_audit", False):
+        msg = f"Article final audit failed after retry (score={retried.get('audit_score', 0.0)})"
+        services.log("WRITING", msg, state)
+        state.errors.append(msg)

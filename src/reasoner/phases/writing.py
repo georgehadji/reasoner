@@ -252,8 +252,6 @@ def academic_sot_skeleton_prompt(state, claims_json: str) -> str:
 
 def article_sot_solve_prompt(state, section: dict, claims_json: str) -> str:
     section_heading = section.get("heading", "")
-    style_brief = state.writing_state.get("style_brief", "")
-    style_section = f"\nStyle Brief:\n{style_brief}\n" if style_brief else ""
     return (
         f'{get_language_instruction(state)}\n\n'
         f'Topic: {state.problem}\n\n'
@@ -268,7 +266,6 @@ def article_sot_solve_prompt(state, section: dict, claims_json: str) -> str:
         f'- Inline [Source: URL] citations\n'
         f'- Do not invent new facts\n'
         f'- Target word count: {section.get("word_count", 200)}\n'
-        f'{style_section}\n'
         f'Output JSON: {{"content": "...", "word_count": 200}}'
     )
 
@@ -452,24 +449,18 @@ WRITING_HUMANIZE_SYSTEM = (
 
 
 def writing_humanize_prompt(state: PipelineState, article: str) -> str:
-    style_brief = state.writing_state.get("style_brief", {})
-    style_hint = ""
-    if style_brief.get("author") or style_brief.get("publication"):
-        author = style_brief.get("author", "")
-        publication = style_brief.get("publication", "")
-        parts = []
-        if author:
-            parts.append(f"in the style of {author}")
-        if publication:
-            parts.append(f"for {publication}")
-        if parts:
-            style_hint = (
-                f"CRITICAL STYLE CONSTRAINT: The article was requested to be written {' '.join(parts)}. "
-                f"When rewriting, preserve the distinctive voice, rhythm, and register of that author/publication. "
-                f"Do NOT flatten it into generic 'human' prose. "
-                f"Remove AI tells while keeping the stylistic fingerprints intact: "
-                f"sentence rhythm, vocabulary level, narrative devices, and tonal quirks.\n\n"
-            )
+    # This pass sees the draft and nothing else, so it cannot know whether a
+    # particular voice was asked for upstream. It used to read a style_brief
+    # that nothing outside the tests ever populated; the standing instruction
+    # below replaces it and costs no plumbing. Without something here the
+    # rewrite is the one step in the run that can flatten a deliberately
+    # voiced piece into generic "human" prose while removing the tells.
+    style_hint = (
+        "STYLE CONSTRAINT: This draft may already be written in a deliberate voice. "
+        "Preserve its rhythm, vocabulary level, narrative devices and tonal quirks. "
+        "Remove the AI tells while keeping the stylistic fingerprints intact; do NOT "
+        "flatten it into generic 'human' prose.\n\n"
+    )
     return (
         f'{get_language_instruction(state)}\n\n'
         f'{style_hint}'

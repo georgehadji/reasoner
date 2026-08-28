@@ -9,6 +9,7 @@ from reasoner.core.constants import (
 )
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.phases._shared import (
+    HUMANIZATION_RULES,
     _wrap_external_content,
     _wrap_user_input,
     get_language_instruction,
@@ -66,6 +67,14 @@ ARTICLE_DRAFT_SYSTEM = (
     "Write for a sophisticated general audience — no jargon without explanation, "
     "no unverified statistics, no invented quotes. "
     "Output the full article as a single prose document. Do NOT use JSON for the article body."
+    # Appended here and nowhere else in this module. The developmental edit is
+    # told not to touch voice or register, and the copy edit is told not to
+    # change word choice at all, so the same rules there would contradict the
+    # prompt they are attached to. The draft is the one article prompt that
+    # generates prose with no competing style clause, which mirrors
+    # WRITING_DRAFT_SYSTEM (phases/writing.py). Suppressing a tell at the point
+    # the sentence is written beats asking a later pass to find and undo it.
+    + HUMANIZATION_RULES
 )
 
 
@@ -77,21 +86,13 @@ def article_draft_prompt(state: PipelineState) -> str:
         if sources_truncated
         else "No sources retrieved — write from general knowledge and clearly mark any factual claims as [UNVERIFIED]."
     )
-    style_brief = state.writing_state.get("style_brief", {})
-    style_block = ""
-    if isinstance(style_brief, dict) and (style_brief.get("author") or style_brief.get("publication")):
-        author = style_brief.get("author", "")
-        pub = style_brief.get("publication", "")
-        parts = []
-        if author:
-            parts.append(f"in the style of {author}")
-        if pub:
-            parts.append(f"as published in {pub}")
-        style_block = (
-            f"STYLE REQUIREMENT: Write {', '.join(parts)}. "
-            f"Closely emulate the voice, narrative structure, anecdote-driven openings, "
-            f"counterintuitive insights, and rhetorical rhythm of that author/publication.\n\n"
-        )
+    # A style_brief block used to be assembled here from
+    # writing_state["style_brief"], which nothing outside the tests ever wrote,
+    # so the branch was unreachable. Removed rather than plumbed: the drafting
+    # model is already handed the user's own request, and ARTICLE_DRAFT_SYSTEM
+    # already tells it to honour a named author or publication precisely, so
+    # "write this like Paul Graham" works through the prompt without a second,
+    # structured copy of the same instruction.
     def _safe_join_list(value) -> str:
         """Safely join a list value — handles None, int, bool, string gracefully."""
         if not isinstance(value, (list, tuple)):
@@ -123,7 +124,6 @@ def article_draft_prompt(state: PipelineState) -> str:
 
     return (
         f"{get_language_instruction(state)}\n\n"
-        f"{style_block}"
         f"{argument_block}"
         f"Assignment: {_wrap_user_input(state.problem[:TRUNCATION.PROMPT])}\n\n"
         f"Sources (use these as your evidence base):\n"
@@ -246,12 +246,6 @@ def article_outline_prompt(state: PipelineState) -> str:
         if sources_truncated
         else "[]"
     )
-    style_brief = state.writing_state.get("style_brief", {})
-    style_block = ""
-    if isinstance(style_brief, dict) and (style_brief.get("publication")):
-        pub = style_brief.get("publication", "")
-        style_block = f"\nTarget publication: {pub}\n"
-
     # ── Inject pre-research insights ──
     pre_research = state.writing_state.get("pre_research_summary", "")
     pre_research_block = ""
@@ -263,7 +257,7 @@ def article_outline_prompt(state: PipelineState) -> str:
 
     return (
         f"{get_language_instruction(state)}\n\n"
-        f"Topic: {_wrap_user_input(state.problem[:TRUNCATION.PROMPT])}{style_block}\n\n"
+        f"Topic: {_wrap_user_input(state.problem[:TRUNCATION.PROMPT])}\n\n"
         f"Available Sources:\n{_wrap_external_content(sources_text)}"
         f"{pre_research_block}\n"
         f"Construct an argument blueprint. Incorporate the pre-research insights where "
@@ -441,21 +435,14 @@ ARTICLE_STYLE_EDIT_SYSTEM = (
 
 def article_style_edit_prompt(state: PipelineState) -> str:
     draft = state.writing_state.get("final_article", "")
-    publication_style = ""
-    style_brief = state.writing_state.get("style_brief", {})
-    if isinstance(style_brief, dict) and style_brief.get("publication"):
-        publication_style = (
-            f"\nTarget publication: {style_brief['publication']}.\n"
-            f"Match their typical sentence length, paragraph structure, technical depth, "
-            f"and use of quotations.\n"
-        )
 
     return (
         f"{get_language_instruction(state)}\n\n"
-        f"Article Draft:\n{_wrap_external_content(draft)}\n"
-        f"{publication_style}\n"
+        f"Article Draft:\n{_wrap_external_content(draft)}\n\n"
         f"Refine the style of this article. Make it read like a human wrote it. "
         f"Preserve all facts, citations, and structural organization. "
+        f"The draft may already be written in a deliberate voice; keep it rather than "
+        f"flattening the piece into a neutral register. "
         f"Output the full stylistically refined article as a single prose document."
     )
 

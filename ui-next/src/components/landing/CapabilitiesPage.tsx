@@ -368,22 +368,39 @@ export default function CapabilitiesPage() {
             saying so. The only enforcement claimed is the article pipeline's
             dedicated style pass (role article_humanize), which is a real
             phase with a real model behind it. No count of the rules appears
-            here; see the PROSE_TELLS comment for why. */}
+            here; see the PROSE_TELLS comment for why.
+
+            Audited 2026-08-27, when this section carried three claims the
+            code did not support. Two were fixed in code:
+            HUMANIZATION_RULES reached only the synthesis, and now also
+            ARTICLE_DRAFT_SYSTEM; the tell-quoting pass was dead
+            (writing_humanize_prompt, zero call sites) and now runs as
+            article phase 6a. Hence "the drafting prompt" below rather than
+            the older, wrong "every phase of an article" — the developmental
+            and copy edits are told NOT to change voice or word choice, so
+            the rules cannot go there without contradicting them.
+
+            The third claim was removed and must not return: author and
+            publication voice matching. style_brief is populated by tests
+            only, there is no API field for it, and §5 on this page says a
+            tone control is not something we intend to sell. */}
         <Section id="voice" marker="§6" name="Voice">
           <Heading>A model cannot hear how it sounds.</Heading>
           <Lede>
             Machine prose has a fingerprint, and the model producing it is the last thing able to
             notice: significance inflation, vague attribution, the reflexive rule of three,{' '}
             <em>serves as</em> standing in for <em>is</em>. Reasoner does not ask for good writing.
-            Every model that writes a sentence you will read is handed the tells by name and told
-            not to produce them.
+            Every model that drafts prose you will read is handed the tells by name and told not
+            to produce them.
           </Lede>
           <Body>
             The list is Wikipedia&rsquo;s, kept by the editors who clean this prose out of articles
             at volume and had to learn its signatures to do it. It arrives in four groups: the
             words, the openers, the structural tics, and the patterns that fake depth. The same
             block goes into the synthesis that closes a full run, into the instant answers, and
-            into every phase of an article, so the standard is not a setting on one method.
+            into the prompt that drafts an article, so the standard is not a setting on one
+            method. It goes in where the sentence is written, which is cheaper than finding the
+            tell later and asking a second model to undo it.
           </Body>
 
           <dl className="mt-[var(--space-8)] grid gap-x-[var(--space-8)] gap-y-[var(--space-5)] sm:grid-cols-2">
@@ -403,9 +420,17 @@ export default function CapabilitiesPage() {
           <Body>
             A brief is not a validator, and nothing checks the finished text against the list
             afterwards. What an article run adds is a phase whose only job is the tells that got
-            through: an editor model quotes each one it can find in the draft, then rewrites the
-            piece without them. Ask for a particular author or publication and that pass is told to
-            keep the voice rather than flatten the piece into a neutral register.
+            through: an editor model quotes each one it can find in the draft, and only then is it
+            allowed to rewrite the piece without them. Quoting first is the part that matters. A
+            model asked to sound more human reaches for synonyms; one made to name the pattern has
+            to deal with the sentence it just named.
+          </Body>
+
+          <Body>
+            The editing passes on either side of it are not given the list, and that is deliberate.
+            They are told not to change word choice, so a rule ordering them to substitute words
+            would contradict the prompt it was attached to. A standard that is applied where it
+            fits and withheld where it does not is worth more than one claimed everywhere.
           </Body>
 
           <Aside href="/#writing">See the run that pass belongs to &rarr;</Aside>

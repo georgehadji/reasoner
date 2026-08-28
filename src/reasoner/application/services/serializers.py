@@ -833,6 +833,11 @@ def _ser_5(state: PipelineState) -> dict:
                 "ai_tells_found": writing.get("ai_tells_found", []),
                 "humanize_skipped": writing.get("humanize_skipped", False),
                 "humanize_skip_reason": writing.get("humanize_skip_reason", ""),
+                # This branch returns before the Final Assembly branch below, and
+                # it serves article phases 6, 7 and 8 as well as the writing
+                # flow. Without this line the bibliography disappears from the
+                # payload of every phase after the humanize pass has run.
+                "sources_cited": writing.get("sources_cited", []),
             },
             "tokens": state.phase_tokens.get("Phase 5.5: Humanize", {"input": 0, "output": 0}),
         }

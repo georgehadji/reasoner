@@ -411,6 +411,14 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # same price with a larger context (65K -> 131K) than the preview endpoints.
     "gemini-pro-image":               {"model": "google/gemini-3-pro-image",          "extra_body": {"include_images": True}},  # $2/$12 per M, 131K ctx
     "gemini-3.1-flash-image-preview": {"model": "google/gemini-3.1-flash-image",      "extra_body": {"include_images": True}},  # $0.50/$3 per M, 131K ctx
+    # The alias above points at the GA id; this is the preview BUILD, still served
+    # separately. Declared so the registry covers every id GET /api/v1/images/models
+    # returns (48 of 48). Same price as GA — reach for it only to reproduce a run
+    # that was pinned to the preview.
+    "gemini-3.1-flash-image-preview-build": {
+        "model": "google/gemini-3.1-flash-image-preview",
+        "extra_body": {"include_images": True},
+    },
     MODEL_GEMINI_31_FLASH_LITE_IMAGE: {"model": "google/gemini-3.1-flash-lite-image", "extra_body": {"include_images": True}},
     "gpt-5-image":                    {"model": "openai/gpt-5-image",       "extra_body": {"include_images": True}},
     "gpt-5-image-mini":               {"model": "openai/gpt-5-image-mini",  "extra_body": {"include_images": True}},
@@ -418,6 +426,8 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ── Pure image generators (priced per image, not per token) ──
     # These have no prompt/completion pricing at all; cost is `image` /
     # `image_output`. Do not reason about their cost from the per-M columns above.
+    # 🇺🇸 Meta — $0.0031/image, the cheapest image model in the catalogue.
+    "muse-image": {"model": "meta/muse-image", "extra_body": {"include_images": True}},
     "qwen-image-3":                   {"model": "qwen/qwen-image-3",        "extra_body": {"include_images": True}},  # $0.003/image, 65K ctx
     "qwen-image-3-pro":               {"model": "qwen/qwen-image-3-pro",    "extra_body": {"include_images": True}},  # $0.003/image, higher per-token image rate
     "seedream-5-pro":                 {"model": "bytedance-seed/seedream-5-0-pro",  "extra_body": {"include_images": True}},  # 🇨🇳 ByteDance — $0.003/image
