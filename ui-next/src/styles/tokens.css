@@ -1,0 +1,293 @@
+/* ============================================================
+   tokens.css — Reasoner colour system
+
+   Hue is a data channel. It is spent on epistemic status
+   (--ok / --warn / --unknown) and on danger (--red). It is spent
+   nowhere on brand: --accent is achromatic by decision, not by
+   omission. Five chromatic roles do not fit on one wheel once the
+   ground family and danger are spoken for; four do. If the site
+   ever needs a brand hue, it is one value change here — the token
+   survives so the ~213 accent call sites never have to be touched.
+
+   VALUES ARE HEX ON PURPOSE. lib/canvas-fx.ts returns mid-grey for
+   any token that is not 6-char hex, silently, with no test. The
+   oklch() spec in each comment is the authoring record; the hex is
+   what ships.
+
+   CONTRAST: every ink is annotated against --bg / --surface /
+   --surface-2 / --surface-3, and LEGAL names the grounds it clears
+   AA on. The previous system annotated against --bg only and shipped
+   seven sub-AA pairs — see spec/art-direction.md §0.
+
+   LIGHT IS THE BASE. An unclassed render — SSR before next-themes,
+   print, an embed — must be light.
+
+   The dark block is written TWICE on purpose: a media query and a
+   class selector cannot share a declaration list. EDIT BOTH.
+   The .invert-band blocks in globals.css are a THIRD and FOURTH
+   copy. EDIT THOSE TOO — the band redefines --accent because a band
+   that swapped only the greys would drop its links below AA.
+
+   Verify with: node scripts/check-contrast.mjs
+   ============================================================ */
+
+@layer base {
+  :root {
+    color-scheme: light;
+
+    /* ---- Grounds. Hue 158 at C 0.006–0.013: a green-grey proofing
+       stock. Chosen because the two conventional neutral casts are
+       taken — warm tan (the borrowed one, ~40deg) and blue slate
+       (every dev-tools product).
+
+       HONEST NOTE: three of four independently-generated directions
+       landed in hue 152–168. Read that as a gap in the market, or as
+       where "not warm, not blue" mechanically lands. A human has to
+       look at this on screen and decide which. If it reads as an
+       escape rather than a decision, change 158 across the grounds
+       and ink and re-run check-contrast.mjs — nothing else moves.
+
+       --bg drops from oklch 0.977 (ivory) to 0.950. That buys a card
+       lift of 1.12:1 where the old #FFFFFF-on-#FAF9F5 was 1.05:1 —
+       3x the step, so elevation becomes a tone and --shadow-lg can
+       leave containers. It is NOT enough for a boundary (3:1), so
+       --border-strong still carries WCAG 1.4.11. Do not claim
+       otherwise.                                                ---- */
+    --bg:             #EBF0ED;  /* oklch(0.950 0.006 158) */
+    --surface:        #F9FCFA;  /* oklch(0.988 0.004 158) — 1.12:1 lift over --bg */
+    --surface-hover:  #F2F5F3;  /* oklch(0.968 0.005 158) */
+    --surface-2:      #E3E9E5;  /* oklch(0.928 0.008 158) */
+    --surface-3:      #D9E0DB;  /* oklch(0.900 0.010 158) */
+
+    /* Sidebar keeps its own ramp: hover/active must move toward
+       contrast in BOTH themes, which --surface-hover cannot do.
+       Unlike the previous system these are no longer within one unit
+       per channel of --surface-2/-3 — the rail is a real ground now. */
+    --sidebar-bg:     #E4EBE7;  /* oklch(0.934 0.009 158) */
+    --sidebar-hover:  #DCE4DE;  /* oklch(0.910 0.011 158) */
+    --sidebar-active: #D2DBD5;  /* oklch(0.884 0.013 158) */
+    --sidebar-field:  #FCFEFD;  /* oklch(0.995 0.003 158) — inset field on the rail */
+
+    /* ---- Ink. Same hue as the ground at ~2x chroma: ink is the
+       ground concentrated, never a foreign grey.
+       Annotated   bg / surface / surface-2 / surface-3          ---- */
+    --text:        #121814;  /* 15.62  17.43  14.62  13.40  AAA — LEGAL: all grounds */
+    --text-2:      #404943;  /*  8.09   9.03   7.57   6.94  AAA — LEGAL: all grounds */
+    --text-muted:  #57605A;  /*  5.65   6.30   5.29   4.85  AA  — LEGAL: all grounds,
+                                 worst case --sidebar-active 4.60 */
+    --text-subtle: #606963;  /*  4.93   5.50   4.61   4.23
+                                 LEGAL: --bg, --surface, --surface-hover, --surface-2,
+                                 --sidebar-bg, --sidebar-field.
+                                 NOT legal on --surface-3 (4.23), --sidebar-hover (4.38),
+                                 --sidebar-active (4.01). Use --text-muted there.
+                                 Nine grounds cannot carry four AA ink steps in light
+                                 mode. The old system pretended otherwise and shipped
+                                 five failures; this one declares the restriction. */
+
+    /* ---- Borders: alpha of the opposite ground, never a grey token.
+       Recorded failure worth keeping: rgba(160,160,160,0.10) was tried
+       and is invisible on both grounds — a mid grey at low alpha
+       resolves toward whichever ground it sits on.
+
+       The alphas below are SOLVED for 3:1, which the old values were
+       not: rgb(19 18 17 / 0.26) measured 1.80:1 on --surface, i.e. it
+       failed the exact criterion its own comment cited.          ---- */
+    --border:        rgb(18 24 20 / 0.14);  /* 1.34:1 — decorative separators only */
+    --border-strong: rgb(18 24 20 / 0.49);  /* 3.30 surface · 3.21 bg · 3.14 surface-2 — WCAG 1.4.11.
+                                               Raised from the spec's 0.47, which measured
+                                               2.98 on --surface-2 and missed 3:1. */
+
+    /* ---- Interactive role. Achromatic BY DECISION. See header.
+       An ink-filled CTA measures 11.74:1 against its own label —
+       ~1.8x the contrast of the coral it replaces (6.54:1), so the
+       most important control on every page gets louder, not quieter.
+
+       Links carry a 1px underline at 0.14em offset: with no hue,
+       WCAG 1.4.1 requires a second channel. ~33 call sites, applied
+       in migration step 6.                                      ---- */
+    --accent:       #2F3832;  /* oklch(0.330 0.016 158) — 10.52:1 on --bg */
+    --accent-hover: #1B231E;  /* oklch(0.245 0.015 158) — 13.95:1 on --bg */
+    --accent-text:  #F9FCFA;  /* 11.74:1 on --accent */
+    --accent-dim:   rgb(47 56 50 / 0.09);
+
+    /* ---- Epistemic labels — VERIFIED / HYPOTHESIS / UNKNOWN.
+       These tokens do nothing else, and as of this system that is
+       TRUE: operational status (server online, quota, phase result)
+       is ink plus a shape, never one of these three. Enforcing that
+       is migration step 6; until then ~53 non-epistemic uses remain.
+
+       The ladder is ink density, not a hue set: confidence is a
+       scalar so it is encoded as one. Solved to 6.40 / 5.20 / 4.60
+       on --surface-3, the worst ground they render on, which
+       produces a monotone 7.46 / 6.03 / 5.32 on --bg.
+
+       Green/amber/grey is the default confidence palette and is
+       deliberately not used. Hue separation is 46deg (ok–warn) and
+       92deg (warn–unknown); luminance separation is 1.24:1 and
+       1.12:1. That is NOT enough on its own and this system does not
+       pretend it is — solid / dashed / dotted on .epistemic-* in
+       globals.css is the carrier. Do not restyle those rules.
+
+       OPEN TASTE CALL: --warn at hue 315 (plum) for HYPOTHESIS breaks
+       the amber convention hard. The alternative that keeps everything
+       else is hue 85 (ochre), which costs ~15deg of clearance from the
+       ground family and re-imports a warm residue.               ---- */
+    --ok:      #2E449F;  /* oklch(0.424 0.150 269)  7.46  8.32  6.98  6.40  AAA */
+    --warn:    #7B4193;  /* oklch(0.482 0.140 315)  6.03  6.73  5.65  5.18  AA  */
+    --unknown: #2A6376;  /* oklch(0.465 0.068 223)  5.79  6.47  5.44  4.97  AA
+                            Darkened from the spec's #2C697D, which measured 4.33 on
+                            --sidebar-active and failed AA. Still the quietest rung:
+                            5.79 sits below --warn's 6.03, so the density ladder holds.
+                            No longer byte-identical to --text-muted, which is what
+                            made an UNKNOWN dot indistinguishable from muted chrome.
+                            It sits at the same LIGHTNESS as --text-muted by design
+                            (it is the quietest rung) and is separated by 65deg of
+                            hue and 5x the chroma. */
+
+    /* ---- Danger. The one hue outside the epistemic set. A failed
+       request is not a low-confidence claim and the two must never be
+       confusable: 25deg is >=70deg from every epistemic hue.     ---- */
+    --red:        #AF2A2D;  /* oklch(0.500 0.170 25)  5.71  6.37  5.34  4.90  AA */
+    --red-bg:     rgb(175 42 45 / 0.08);
+    --red-border: rgb(175 42 45 / 0.22);
+
+    /* ---- Elevation. --shadow-float is for floating layers only —
+       Tooltip, CommandPalette, UserMenu, modals, Composer, ChatFeed
+       popovers — where a 1.12:1 lift cannot say "above unknown
+       ground". Containers use tone, not shadow.                 ---- */
+    --shadow:       0 1px 2px rgb(18 24 20 / 0.05), 0 8px 24px -12px rgb(18 24 20 / 0.18);
+    --shadow-float: 0 2px 4px rgb(18 24 20 / 0.04), 0 24px 56px -20px rgb(18 24 20 / 0.22);
+
+    --glass-bg:      rgb(249 252 250 / 0.80);
+    --glass-bg-soft: rgb(249 252 250 / 0.66);
+
+    /* Scrim darkens in BOTH themes, so it is deliberately not derived
+       from --text or --bg (either would invert). */
+    --scrim:   rgb(12 16 14 / 0.55);
+    --overlay: rgb(12 16 14 / 0.72);
+
+    /* ---- DEPRECATED. Retained so this step ships alone with zero
+       call-site churn. Values re-derived achromatic so nothing coral
+       survives. Removal is migration step 3 (ornament) and step 6.
+         --accent-glow  8 uses   -> delete with SpotlightCard / hover glows
+         --accent-2     2 uses   -> Composer secondary control
+         --accent-2-dim 3 uses   -> Composer secondary control
+         --shadow-lg   13 uses   -> rename to --shadow-float at call sites
+       --text-small had 0 var() uses and is simply gone.          ---- */
+    --accent-glow:  0 0 24px rgb(47 56 50 / 0.18);
+    --accent-2:     #7C857F;
+    --accent-2-dim: rgb(124 133 127 / 0.12);
+    --shadow-lg:    var(--shadow-float);
+
+    --background: var(--bg);
+    --foreground: var(--text);
+  }
+
+  /* System preference — an explicit .light choice must win over it. */
+  @media (prefers-color-scheme: dark) {
+    :root:not(.light) {
+      color-scheme: dark;
+
+      --bg:             #141816;  /* oklch(0.205 0.009 158) */
+      --surface:        #1D221F;  /* oklch(0.245 0.010 158) — 1.11:1 lift */
+      --surface-hover:  #181D1A;  /* oklch(0.225 0.010 158) */
+      --surface-2:      #262C28;  /* oklch(0.285 0.011 158) */
+      --surface-3:      #2F3632;  /* oklch(0.325 0.012 158) */
+
+      --sidebar-bg:     #0F1311;  /* oklch(0.183 0.009 158) — rail recedes below --bg */
+      --sidebar-hover:  #1D2320;  /* oklch(0.250 0.011 158) */
+      --sidebar-active: #2A312D;  /* oklch(0.305 0.012 158) */
+      --sidebar-field:  #1D2320;  /* oklch(0.250 0.011 158) */
+
+      /*             bg / surface / surface-2 / surface-3 */
+      --text:        #EDF6F0;  /* 16.25  14.64  12.92  11.24  AAA — LEGAL: all */
+      --text-2:      #BAC4BE;  /* 10.01   9.02   7.96   6.92  AAA — LEGAL: all */
+      --text-muted:  #96A09A;  /*  6.65   5.99   5.29   4.60  AA  — LEGAL: all */
+      --text-subtle: #8C948F;  /*  5.76   5.19   4.58   3.98
+                                  NOT legal on --surface-3 or --sidebar-active (4.28).
+                                  Same restriction as light. Use --text-muted there. */
+
+      --border:        rgb(237 246 240 / 0.13);  /* 1.47:1 */
+      --border-strong: rgb(237 246 240 / 0.36);  /* 3.10:1 on --surface — WCAG 1.4.11 */
+
+      --accent:       #C4CFC8;  /* oklch(0.845 0.016 158) — 11.18:1 on --bg */
+      --accent-hover: #D9E2DC;  /* oklch(0.905 0.013 158) — 13.53:1 on --bg */
+      --accent-text:  #141816;  /* 11.18:1 on --accent */
+      --accent-dim:   rgb(196 207 200 / 0.13);
+
+      --ok:      #A2B9FA;  /* oklch(0.793 0.095 269)  9.26  8.35  7.37  6.41  AAA */
+      --warn:    #CE90EA;  /* oklch(0.747 0.140 315)  7.51  6.77  5.97  5.19  AAA */
+      --unknown: #6AA6BC;  /* oklch(0.693 0.070 223)  6.65  6.00  5.29  4.60  AA  */
+
+      --red:        #FB7D76;  /* oklch(0.733 0.154 25)  7.08  6.38  5.63  4.90  AAA */
+      --red-bg:     rgb(251 125 118 / 0.10);
+      --red-border: rgb(251 125 118 / 0.26);
+
+      --shadow:       0 1px 2px rgb(0 0 0 / 0.40), 0 8px 24px -12px rgb(0 0 0 / 0.70);
+      --shadow-float: 0 2px 4px rgb(0 0 0 / 0.45), 0 24px 56px -20px rgb(0 0 0 / 0.80);
+
+      --glass-bg:      rgb(29 34 31 / 0.78);
+      --glass-bg-soft: rgb(29 34 31 / 0.62);
+      --scrim:         rgb(0 0 0 / 0.68);
+      --overlay:       rgb(0 0 0 / 0.80);
+
+      /* DEPRECATED — see light block */
+      --accent-glow:  0 0 40px rgb(196 207 200 / 0.22);
+      --accent-2:     #96A09A;
+      --accent-2-dim: rgb(150 160 154 / 0.12);
+      --shadow-lg:    var(--shadow-float);
+    }
+  }
+
+  /* Explicit dark choice — MUST mirror the media query block above
+     declaration for declaration. EDIT BOTH. */
+  :root.dark {
+    color-scheme: dark;
+
+    --bg:             #141816;
+    --surface:        #1D221F;
+    --surface-hover:  #181D1A;
+    --surface-2:      #262C28;
+    --surface-3:      #2F3632;
+
+    --sidebar-bg:     #0F1311;
+    --sidebar-hover:  #1D2320;
+    --sidebar-active: #2A312D;
+    --sidebar-field:  #1D2320;
+
+    --text:        #EDF6F0;
+    --text-2:      #BAC4BE;
+    --text-muted:  #96A09A;
+    --text-subtle: #8C948F;
+
+    --border:        rgb(237 246 240 / 0.13);
+    --border-strong: rgb(237 246 240 / 0.36);
+
+    --accent:       #C4CFC8;
+    --accent-hover: #D9E2DC;
+    --accent-text:  #141816;
+    --accent-dim:   rgb(196 207 200 / 0.13);
+
+    --ok:      #A2B9FA;
+    --warn:    #CE90EA;
+    --unknown: #6AA6BC;
+
+    --red:        #FB7D76;
+    --red-bg:     rgb(251 125 118 / 0.10);
+    --red-border: rgb(251 125 118 / 0.26);
+
+    --shadow:       0 1px 2px rgb(0 0 0 / 0.40), 0 8px 24px -12px rgb(0 0 0 / 0.70);
+    --shadow-float: 0 2px 4px rgb(0 0 0 / 0.45), 0 24px 56px -20px rgb(0 0 0 / 0.80);
+
+    --glass-bg:      rgb(29 34 31 / 0.78);
+    --glass-bg-soft: rgb(29 34 31 / 0.62);
+    --scrim:         rgb(0 0 0 / 0.68);
+    --overlay:       rgb(0 0 0 / 0.80);
+
+    /* DEPRECATED — see light block */
+    --accent-glow:  0 0 40px rgb(196 207 200 / 0.22);
+    --accent-2:     #96A09A;
+    --accent-2-dim: rgb(150 160 154 / 0.12);
+    --shadow-lg:    var(--shadow-float);
+  }
+}

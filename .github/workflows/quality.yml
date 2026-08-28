@@ -29,6 +29,14 @@ jobs:
           cache-dependency-path: ui-next/package-lock.json
       - run: npm ci
 
+      - name: Contrast gate (WCAG AA, every ink x every ground, both themes)
+        working-directory: .
+        run: node scripts/check-contrast.mjs
+        # BLOCKING on purpose, and the only non-advisory step here. The previous
+        # design system annotated contrast against one ground out of nine and
+        # shipped seven sub-AA pairs; --border-strong failed the exact WCAG
+        # 1.4.11 criterion its own comment cited. A comment is not a check.
+
       - name: Design tokens not bypassed
         working-directory: .
         run: bash scripts/check-tokens.sh

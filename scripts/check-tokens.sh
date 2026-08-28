@@ -10,7 +10,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 FILES="$(find "$ROOT/ui-next/src" -type f \( -name '*.css' -o -name '*.tsx' -o -name '*.jsx' \) 2>/dev/null | grep -vE 'tokens\.css|globals\.css' || true)"
 [ -z "$FILES" ] && { echo "check-tokens: no ui-next source files found"; exit 0; }
 for f in $FILES; do
-  HITS="$(grep -nE '#[0-9a-fA-F]{3,8}\b|rgba?\(' "$f" | grep -v 'var(--' || true)"
+  HITS="$(grep -nE '#[0-9a-fA-F]{3,8}\b|rgba?\(|oklch\(' "$f" | grep -v 'var(--' || true)"
   if [ -n "$HITS" ]; then echo "TOKEN DRIFT ${f#$ROOT/}"; echo "$HITS"; STATUS=1; fi
 done
 exit $STATUS
