@@ -555,6 +555,16 @@ class PipelineExecutionService:
                     phase_errors = state.errors[errors_before_phase:]
                     if phase_errors:
                         data["errors"] = phase_errors
+                        # Explicit alongside `errors` rather than left for the UI to
+                        # infer from array length: a phase that appended to
+                        # state.errors and recovered (e.g. article_phases.py's
+                        # outline/critic parse-error fallback to {}) still emits
+                        # `phase_complete`, so without this it renders identically
+                        # to a clean pass — confirmed on the 2026-08-28 article run
+                        # where two such phases showed green while the drafts and
+                        # revisions built on their empty output. See
+                        # docs/plans/article-flow-truncation-remediation.md W7.
+                        data["status"] = "degraded"
                     phase_models = state.cost_state._phase_models_by_key.get(phase_key, [])
                     if phase_models:
                         data["models"] = phase_models

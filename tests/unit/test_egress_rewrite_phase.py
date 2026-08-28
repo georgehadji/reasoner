@@ -139,6 +139,30 @@ class TestEgressRewritePhase:
         assert not services.logs
 
     @pytest.mark.asyncio
+    async def test_article_method_is_skipped(self, layer_b_on):
+        """The article flow's deliverable is writing_state['final_article'],
+        already through two dedicated editorial passes (humanize +
+        developmental edit) -- core_solution here is a short generic
+        synthesis summary the reader never sees. Rewriting it protects
+        nothing and the guards reject it near-certainly (confirmed live
+        2026-08-28: 542-char summary, 3.8x length drift). See
+        docs/plans/article-flow-truncation-remediation.md W5.
+        """
+        state = PipelineState()
+        state.method = "article"
+        state.final_solution = _final_solution("original text")
+        services = FakeServices(response="rewritten text")
+
+        await run_egress_rewrite_phase(state, services)
+
+        assert state.final_solution.core_solution == "original text"
+        report = state.meta.provenance_report["egress_rewrite"]
+        assert report["rewritten"] is False
+        assert "article" in report["rejected_reason"]
+        # Skipped before any provider was ever resolved.
+        assert "egress_rewrite" not in services.router.routing_table
+
+    @pytest.mark.asyncio
     async def test_no_candidate_model_rejects(self, monkeypatch, layer_b_on):
         monkeypatch.setattr(layer_b_on, "select_rewrite_model", lambda origin: None)
         state = PipelineState()

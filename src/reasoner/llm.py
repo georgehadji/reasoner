@@ -17,8 +17,8 @@ from reasoner.infrastructure.llm.registry import (
 )
 from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.infrastructure.llm.utils import (
+    _json_response_format,
     _patch_openai_platform_detection,
-    _perplexity_response_format,
     _requests_strict_json,
 )
 
@@ -34,5 +34,5 @@ __all__ = [
     "ProviderRouter",
     "_patch_openai_platform_detection",
     "_requests_strict_json",
-    "_perplexity_response_format",
+    "_json_response_format",
 ]

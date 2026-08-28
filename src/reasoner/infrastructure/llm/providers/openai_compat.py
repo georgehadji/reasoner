@@ -30,7 +30,7 @@ from reasoner.infrastructure.llm.base import (
     secret_digest,
 )
 from reasoner.infrastructure.llm.caching import build_messages, extract_cache_usage
-from reasoner.infrastructure.llm.utils import _perplexity_response_format
+from reasoner.infrastructure.llm.utils import _json_response_format
 
 logger = logging.getLogger(__name__)
 
@@ -181,7 +181,14 @@ class OpenAICompatibleProvider(BaseLLMProvider):
 
         async with self.client.chat.completions.create(**kwargs) as response:
             async for chunk in response:
-                if chunk.choices and chunk.choices[0].delta.content:
+                if not chunk.choices:
+                    continue
+                # Only the final chunk of a stream carries a non-null
+                # finish_reason; earlier chunks leave it None, so this
+                # naturally lands on the terminal value.
+                if chunk.choices[0].finish_reason:
+                    self.last_finish_reason = chunk.choices[0].finish_reason
+                if chunk.choices[0].delta.content:
                     yield chunk.choices[0].delta.content
 
     # Substrings identifying models that REJECT a custom temperature (fixed at
@@ -265,7 +272,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
 
         if self.extra_body:
             kwargs["extra_body"] = self.extra_body
-        response_format = _perplexity_response_format(self.model, system_prompt, user_prompt)
+        response_format = _json_response_format(self.model, system_prompt, user_prompt)
         if response_format is not None:
             kwargs["response_format"] = response_format
 
@@ -339,7 +346,9 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         # Track token, cache and cost usage when available
         self._record_usage(getattr(response, "usage", None))
 
-        message = response.choices[0].message
+        choice = response.choices[0]
+        self.last_finish_reason = choice.finish_reason or "stop"
+        message = choice.message
         content = message.content or ""
         tool_calls_out = []
         if message.tool_calls:
@@ -404,3 +413,5 @@ class OpenRouterProvider(OpenAICompatibleProvider):
         self.last_input_tokens: int = 0
         self.last_output_tokens: int = 0
         self.last_cost_usd: float = 0.0
+        self.last_finish_reason: str = "stop"
+        self.last_finish_reason: str = "stop"

@@ -116,6 +116,62 @@ def test_primary_is_key_safe(preset_id):
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize(
+    "preset_id", [p for p in _NON_EXEMPT if PRESETS[p].get("method") == "article"]
+)
+def test_article_critique_roles_are_cross_bloc(preset_id):
+    """Article method's draft->critique and style->audit pairs must be cross-bloc.
+
+    The article flow has no parallel generator roles (test_generation_spans_
+    multiple_blocs skips method == "article" for exactly that reason), but it
+    does have two sequential draft/critique pairs where the same failure mode
+    applies: if the critic shares the drafter's bloc, the critique inherits
+    the same blind spots it exists to catch — the same reasoning invariant A
+    applies to synthesis/scoring, here applied to article's own editorial
+    chain. See docs/plans/article-flow-truncation-remediation.md W6.
+
+    Written as a ratchet, not a blanket assertion (house convention — see the
+    "primary_id must differ from synthesis" note below this test): a known
+    violation is named explicitly rather than silently exempted, so it stays
+    visible instead of disappearing into a passing suite.
+    """
+    _KNOWN_VIOLATIONS: frozenset[tuple[str, str]] = frozenset({
+        # article-premium: writing_draft=gpt-5 and article_critic=grok-4.6 are
+        # both US. Found 2026-08-28 while investigating a routing anomaly on a
+        # live run (this static check is not itself what produced that
+        # anomaly — the preset's definition is internally consistent; the
+        # anomaly was the ROUTER's runtime resolution diverging from this
+        # definition, which a traced run has not yet explained. See W6.1).
+        # Fix by picking a non-US critic for article-premium's article_critic
+        # slot, or replace this entry with a comment explaining why premium's
+        # critic stays US.
+        ("article-premium", "draft_vs_critic"),
+    })
+
+    routing = PRESETS[preset_id].get("routing", {})
+    primary = PRESETS[preset_id].get("primary_id", "")
+
+    draft = routing.get("writing_draft") or primary
+    critic = routing.get("article_critic")
+    if critic and (preset_id, "draft_vs_critic") not in _KNOWN_VIOLATIONS:
+        assert bloc_of(draft) != bloc_of(critic), (
+            f"{preset_id}: writing_draft ({draft} -> {bloc_of(draft)}) and "
+            f"article_critic ({critic} -> {bloc_of(critic)}) share a bloc; "
+            f"the critic must not share the drafter's blind spots"
+        )
+
+    humanize = routing.get("article_humanize") or routing.get("writing_assemble") or primary
+    verifier = routing.get("article_verifier")
+    if verifier and (preset_id, "humanize_vs_verifier") not in _KNOWN_VIOLATIONS:
+        assert bloc_of(humanize) != bloc_of(verifier), (
+            f"{preset_id}: article_humanize/writing_assemble ({humanize} -> "
+            f"{bloc_of(humanize)}) and article_verifier ({verifier} -> "
+            f"{bloc_of(verifier)}) share a bloc; the final audit must not "
+            f"share the style pass's blind spots"
+        )
+
+
+@pytest.mark.unit
 def test_bloc_of_resolves_cross_vendor_aliases():
     """Aliases that route to another vendor must be scored by the real vendor."""
     # gemini-flash-lite routes to qwen (CN); gemini-pro routes to anthropic (US).

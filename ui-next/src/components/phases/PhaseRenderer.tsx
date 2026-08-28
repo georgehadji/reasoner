@@ -68,6 +68,23 @@ function getDuration(data: unknown): number | undefined {
   return typeof duration === 'number' ? duration : undefined;
 }
 
+/**
+ * True when this phase recorded a caught error (a parse failure it fell back
+ * from, an empty step) without failing outright. The backend sets both
+ * `status: 'degraded'` and `errors` on the same `phase_complete` payload
+ * (api/execution/pipeline.py) — `errors` is checked independently since it
+ * existed first and older payloads may carry it without the newer flag.
+ * Distinct from `errorPhases` (hard failures reported via a separate
+ * `phase_error` SSE event): a degraded phase still completed and its data is
+ * still real, it just earned less trust than a clean pass.
+ */
+function hasRecordedErrors(data: unknown): boolean {
+  if (!data || typeof data !== 'object') return false;
+  const d = data as Record<string, unknown>;
+  if (d.status === 'degraded') return true;
+  return Array.isArray(d.errors) && d.errors.length > 0;
+}
+
 function getQuality(data: unknown): { score: number; passed: boolean } | null {
   if (!data || typeof data !== 'object') return null;
   const d = data as Record<string, unknown>;
@@ -128,6 +145,11 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
   const defaultOpen = isSynthesisPhase(name) || phaseNum === 0;
   const isSynth = isSynthesisPhase(name);
   const phaseTextClass = isSynth ? TEXT_SIZES.synthesis : TEXT_SIZES.phaseCard;
+  const cardStatus: 'error' | 'degraded' | 'completed' = errorPhases.includes(phaseNum)
+    ? 'error'
+    : hasRecordedErrors(data)
+      ? 'degraded'
+      : 'completed';
 
   // Direct Response / Web Search: render inline without a phase card
   if (name === 'Direct Response' || name === 'Web Search') {
@@ -143,7 +165,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
     ('task_type' in data || 'rationale' in data)
   ) {
     return (
-      <PhaseCard index={index} phase={phaseNum} name={name} tokens={tokens} models={models} subagents={subagents} duration={duration} defaultOpen={defaultOpen} forceOpen={forceOpen} compact={isCompact} status={errorPhases.includes(phaseNum) ? 'error' : 'completed'} quality={quality}>
+      <PhaseCard index={index} phase={phaseNum} name={name} tokens={tokens} models={models} subagents={subagents} duration={duration} defaultOpen={defaultOpen} forceOpen={forceOpen} compact={isCompact} status={cardStatus} quality={quality}>
         <ClassificationCard data={data} />
         {onComplete && <CompletionTrigger onComplete={onComplete} />}
       </PhaseCard>
@@ -160,7 +182,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
     scoresArray.length > 0
   ) {
     return (
-      <PhaseCard index={index} phase={phaseNum} name={name} tokens={tokens} models={models} subagents={subagents} duration={duration} defaultOpen={defaultOpen} forceOpen={forceOpen} compact={isCompact} status={errorPhases.includes(phaseNum) ? 'error' : 'completed'} quality={quality}>
+      <PhaseCard index={index} phase={phaseNum} name={name} tokens={tokens} models={models} subagents={subagents} duration={duration} defaultOpen={defaultOpen} forceOpen={forceOpen} compact={isCompact} status={cardStatus} quality={quality}>
         <CritiqueCard data={data} />
         {onComplete && <CompletionTrigger onComplete={onComplete} />}
       </PhaseCard>
@@ -175,7 +197,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
   ) {
     const md = buildMarkdownFromPhase(index, phaseNum, name, data, { omitSections: ['vetted_context'], omitHeading: true });
     return (
-      <PhaseCard index={index} phase={phaseNum} name={name} tokens={tokens} models={models} subagents={subagents} duration={duration} defaultOpen={defaultOpen} forceOpen={forceOpen} compact={isCompact} status={errorPhases.includes(phaseNum) ? 'error' : 'completed'} quality={quality}>
+      <PhaseCard index={index} phase={phaseNum} name={name} tokens={tokens} models={models} subagents={subagents} duration={duration} defaultOpen={defaultOpen} forceOpen={forceOpen} compact={isCompact} status={cardStatus} quality={quality}>
         {vettedContext.length > 0 && <VettedContextBlock items={vettedContext} />}
         <div className={`markdown-body ${phaseTextClass}`}><MarkdownRenderer>{md}</MarkdownRenderer></div>
         {onComplete && <CompletionTrigger onComplete={onComplete} />}
@@ -191,7 +213,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
   ) {
     const md = buildMarkdownFromPhase(index, phaseNum, name, data, { omitSections: ['vetted_context'], omitHeading: true });
     return (
-      <PhaseCard index={index} phase={phaseNum} name={name} tokens={tokens} models={models} subagents={subagents} duration={duration} defaultOpen={defaultOpen} forceOpen={forceOpen} compact={isCompact} status={errorPhases.includes(phaseNum) ? 'error' : 'completed'} quality={quality}>
+      <PhaseCard index={index} phase={phaseNum} name={name} tokens={tokens} models={models} subagents={subagents} duration={duration} defaultOpen={defaultOpen} forceOpen={forceOpen} compact={isCompact} status={cardStatus} quality={quality}>
         {vettedContext.length > 0 && <VettedContextBlock items={vettedContext} />}
         <div className={`markdown-body ${phaseTextClass}`}><MarkdownRenderer>{md}</MarkdownRenderer></div>
         {onComplete && <CompletionTrigger onComplete={onComplete} />}
@@ -216,7 +238,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
       };
 
       return (
-        <PhaseCard index={index} phase={phaseNum} name={name} tokens={tokens} models={models} subagents={subagents} duration={duration} defaultOpen={defaultOpen} forceOpen={forceOpen} compact={isCompact} status={errorPhases.includes(phaseNum) ? 'error' : 'completed'} quality={quality}>
+        <PhaseCard index={index} phase={phaseNum} name={name} tokens={tokens} models={models} subagents={subagents} duration={duration} defaultOpen={defaultOpen} forceOpen={forceOpen} compact={isCompact} status={cardStatus} quality={quality}>
           {/* Phase 2: Raw VS ideas */}
           {rawIdeas.length > 0 && clusters.length === 0 && (
             <div className="space-y-2">
@@ -306,7 +328,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
   ) {
     const md = buildMarkdownFromPhase(index, phaseNum, name, data, { omitSections: ['vetted_context'], omitHeading: true });
     return (
-      <PhaseCard index={index} phase={phaseNum} name={name} tokens={tokens} models={models} subagents={subagents} duration={duration} defaultOpen={defaultOpen} forceOpen={forceOpen} compact={isCompact} status={errorPhases.includes(phaseNum) ? 'error' : 'completed'} quality={quality}>
+      <PhaseCard index={index} phase={phaseNum} name={name} tokens={tokens} models={models} subagents={subagents} duration={duration} defaultOpen={defaultOpen} forceOpen={forceOpen} compact={isCompact} status={cardStatus} quality={quality}>
         {vettedContext.length > 0 && <VettedContextBlock items={vettedContext} />}
         <div className={`markdown-body ${phaseTextClass}`}><MarkdownRenderer>{md}</MarkdownRenderer></div>
         {onComplete && <CompletionTrigger onComplete={onComplete} />}
@@ -410,7 +432,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
     omitHeading: true,
   });
   return (
-      <PhaseCard index={index} phase={phaseNum} name={name} tokens={tokens} models={models} subagents={subagents} duration={duration} defaultOpen={defaultOpen} forceOpen={forceOpen} compact={isCompact} status={errorPhases.includes(phaseNum) ? 'error' : 'completed'} quality={quality}>
+      <PhaseCard index={index} phase={phaseNum} name={name} tokens={tokens} models={models} subagents={subagents} duration={duration} defaultOpen={defaultOpen} forceOpen={forceOpen} compact={isCompact} status={cardStatus} quality={quality}>
       {vettedContext.length > 0 && <VettedContextBlock items={vettedContext} />}
       {isSynth ? (
         <SynthesisRenderer text={md} className={phaseTextClass} />
