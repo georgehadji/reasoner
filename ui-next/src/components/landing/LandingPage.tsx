@@ -6,6 +6,7 @@ import { Aside, Body, Heading, Lede, Section } from '@/components/landing/prose'
 import { ReviewHandoff } from '@/components/landing/ReviewHandoff';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
+import { LogoLoop } from '@/components/ui/LogoLoop';
 import { CAPABILITIES, PROVIDERS } from '@/lib/capabilities.generated';
 import { CLAIM_SPECIMENS } from '@/lib/demo-record';
 import { SHOWCASE_IMAGES, SHOWCASE_PROMPT } from '@/lib/image-showcase';
@@ -67,6 +68,30 @@ const IDEA_TIERS = [
     desc: 'The one a single prompt would never have handed you.',
   },
 ];
+
+/**
+ * Where each direct provider adapter's lab is headquartered.
+ *
+ * The masthead claims rival labs *and rival geopolitical blocs*. A reader can
+ * check the first half by recognising the names; the second half is the part
+ * that needs saying, and it is the half no competitor's logo strip can copy.
+ *
+ * Keyed off `PROVIDERS` rather than restating it, so a provider added to
+ * capabilities.generated.ts by scripts/update_mindmap_meta.py appears in the
+ * strip on the next commit. An unmapped one renders as a bare wordmark — a
+ * missing origin is a gap, a guessed one is a false claim, and this page's
+ * whole argument is that it does not make those.
+ */
+const PROVIDER_ORIGIN: Readonly<Record<string, string>> = {
+  Anthropic: 'US',
+  OpenAI: 'US',
+  Google: 'US',
+  Mistral: 'FR',
+  DeepSeek: 'CN',
+  xAI: 'US',
+  Perplexity: 'US',
+  Qwen: 'CN',
+};
 
 /**
  * The three driving adapters an agent can come through, ordered by how little
@@ -213,6 +238,43 @@ export default function LandingPage() {
           <p className="relative mt-[var(--space-4)] text-center font-sans text-[13pt] leading-[var(--lh-ui)] text-[var(--text-muted)]">
             20 questions a month on the free tier.
           </p>
+
+          {/* The lede's one unverifiable-sounding phrase, made checkable:
+              rival labs, and the countries they answer to.
+
+              Names only — no logos. Every wordmark here is a trademark we
+              have no licence to reproduce, the CSP forbids a third-party
+              image host anyway, and set in the page's own type the strip
+              reads as a list of facts rather than a wall of borrowed brands.
+
+              Below the price line rather than above the buttons: this is
+              evidence for a reader who has already decided to be sceptical,
+              and putting a moving element between the claim and the call to
+              action taxes everyone else to serve them.
+
+              Measured, it lands under the fold on a 900px-tall viewport — as
+              the price line above it already did, since the masthead's
+              content has been taller than `min-h-svh` for a while. So it is
+              the first thing scrolling reveals, not something the reader
+              meets beside the headline. That is still the right place for it;
+              it is not the place to claim otherwise. */}
+          <div className="relative mt-[var(--space-12)]">
+            <LogoLoop
+              ariaLabel="Model providers Reasoner routes to directly, with the country each lab is based in"
+              items={PROVIDERS.map((name) => (
+                <span key={name} className="flex items-baseline gap-[var(--space-2)]">
+                  <span className="font-sans text-[13pt] font-medium leading-[var(--lh-ui)] text-[var(--text-2)]">
+                    {name}
+                  </span>
+                  {PROVIDER_ORIGIN[name] ? (
+                    <span className="font-sans text-[8pt] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-subtle)]">
+                      {PROVIDER_ORIGIN[name]}
+                    </span>
+                  ) : null}
+                </span>
+              ))}
+            />
+          </div>
         </header>
 
         {/* ── Mechanism ─────────────────────────────────────────
