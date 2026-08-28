@@ -78,6 +78,59 @@ class TestArticleFlowStructure:
         ]
         assert names == expected, f"Phase names mismatch:\n  got:      {names}\n  expected: {expected}"
 
+    def test_every_phase_name_has_an_explicit_timeout(self):
+        """Every ArticleFlow phase name (legacy and adapter branches) must have
+        an explicit PHASE_TIMEOUTS entry, not fall through to "default" (90s).
+
+        Two article phases hit exactly this on 2026-08-28: Final Audit timed
+        out twice at the 90s default reading a full article + claim ledger.
+        Written as a ratchet so the next phase added to either branch fails
+        loudly here instead of silently inheriting a timeout nobody chose for
+        it. See docs/plans/article-flow-truncation-remediation.md W2.
+        """
+        from reasoner.application.flows.article import ArticleFlow
+        from reasoner.core.constants_limits import PHASE_TIMEOUTS
+
+        flow = ArticleFlow()
+        state = _make_bare_state()
+        names = {p.name for p in flow._get_phases_legacy(state)} | {
+            p.name for p in flow._get_phases_adapter(state)
+        }
+        missing = sorted(n for n in names if n not in PHASE_TIMEOUTS)
+        assert not missing, f"Article phase names with no explicit PHASE_TIMEOUTS entry: {missing}"
+
+    def test_every_llm_role_has_an_explicit_token_budget(self):
+        """Every role the article flow calls services.call_llm() with must have
+        an explicit PHASE_TOKEN_BUDGETS entry, not fall through to the 1536
+        default.
+
+        Five of these were missing on 2026-08-28 and LLMExecutor silently
+        defaulted them to 2048 -- three phases hit that cap exactly and
+        produced unparseable truncated JSON. Adapter-branch functions
+        (article_adapters.py) delegate to these same phase functions, so the
+        role set is shared between both branches. Written as a ratchet: the
+        next role added to article_phases.py fails here instead of silently
+        inheriting a budget nobody chose for it. See
+        docs/plans/article-flow-truncation-remediation.md W1.
+        """
+        from reasoner.core.constants_limits import PHASE_TOKEN_BUDGETS
+
+        # Every `role="..."` argument passed to services.call_llm() across
+        # application/flows/article_phases.py, hand-enumerated because the
+        # alternative (parsing the source) would just be testing the parser.
+        # "primary" deliberately excluded: it is a generic role name shared
+        # across many methods (not article-specific), so giving it an explicit
+        # budget here would silently change behaviour for every other method
+        # that also routes through it -- out of scope for the article-flow fix
+        # this ratchet guards.
+        article_roles = {
+            "writing_draft", "writing_factcheck",
+            "article_sot_skeleton", "article_critic", "article_revise",
+            "article_humanize", "writing_assemble", "article_verifier",
+        }
+        missing = sorted(r for r in article_roles if r not in PHASE_TOKEN_BUDGETS)
+        assert not missing, f"Article roles with no explicit PHASE_TOKEN_BUDGETS entry: {missing}"
+
 
 # ── Phase 2: Synthesis phase safety ──────────────────────────────────────────
 

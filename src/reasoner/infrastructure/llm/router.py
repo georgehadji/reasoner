@@ -453,6 +453,12 @@ class ProviderRouter:
             metadata["cache_read_tokens"] = provider.last_cache_read_tokens
         if hasattr(provider, "last_cache_write_tokens"):
             metadata["cache_write_tokens"] = provider.last_cache_write_tokens
+        # "length" means the provider hit max_tokens mid-generation — the only
+        # signal that distinguishes a truncated response from a complete one
+        # once content has already collapsed to a plain string. Absent for
+        # provider types that never populate it (direct-fallback providers).
+        if hasattr(provider, "last_finish_reason"):
+            metadata["finish_reason"] = provider.last_finish_reason
         return metadata
 
     async def _emit_telemetry(

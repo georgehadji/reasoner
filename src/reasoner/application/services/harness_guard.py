@@ -38,7 +38,7 @@ _MODEL_LABS: dict[str, str] = {
     "gemini-2.5-flash": "google",
     # Note: gemini-pro → Anthropic (claude-sonnet), gemini-flash-lite → Qwen (qwen3.5-flash)
     # Meta
-    "llama-3.3-70b": "meta", "llama-4-maverick": "meta",
+    "llama-3.3-70b": "meta", "llama-4-maverick": "meta", "llama-4-scout": "meta",
     # Mistral
     "mistral-large-3": "mistral", "mistral-small": "mistral", "mistral-small-2603": "mistral",
     "ministral-8b": "mistral", "codestral-2508": "mistral", "mistral-medium-3-5": "mistral",

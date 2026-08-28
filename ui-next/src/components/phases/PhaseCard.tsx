@@ -11,6 +11,7 @@ import {
   Circle,
   CheckCircle2,
   AlertTriangle,
+  AlertCircle,
   Loader2,
 } from 'lucide-react';
 import { Tooltip } from '@/components/ui/Tooltip';
@@ -38,7 +39,7 @@ interface PhaseCardProps {
   subagents?: SubagentInfo[] | null;
   duration?: number;
   compact?: boolean;
-  status?: 'idle' | 'active' | 'completed' | 'error';
+  status?: 'idle' | 'active' | 'completed' | 'error' | 'degraded';
   quality?: { score: number; passed: boolean } | null;
 }
 
@@ -76,6 +77,13 @@ const STATUS_MARK = {
     label: 'Running',
   },
   completed: { Icon: CheckCircle2, cls: 'text-[var(--ok)]', label: 'Completed' },
+  // Distinct from both `completed` (nothing recorded) and `error` (the phase
+  // itself failed outright): the phase ran to the end, but recorded at least
+  // one caught error along the way (a parse failure it fell back from, an
+  // empty step) — every field below is still real, but it earned less trust
+  // than a clean pass. A different icon, not just colour, so it survives
+  // monochrome the same way the others do.
+  degraded: { Icon: AlertCircle, cls: 'text-[var(--warn)]', label: 'Completed with errors' },
   error: { Icon: AlertTriangle, cls: 'text-[var(--red)]', label: 'Failed' },
 } as const;
 

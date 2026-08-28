@@ -227,6 +227,17 @@ class Settings:
         "MULTI_PROVIDER_FALLBACK_ENABLED", "true"
     ).lower() in ("1", "true", "yes")
 
+    # ── LLM JSON Mode ──
+    # Sends a json_object response_format on JSON-contract calls to models
+    # whose capability profile supports it (infrastructure.llm.utils.
+    # _json_response_format), instead of relying on the prose instruction
+    # alone. Kill switch for the first release of this behaviour — flip off if
+    # it produces unexpected 400s on a model class the capability data got
+    # wrong, without a redeploy.
+    LLM_JSON_MODE_ENABLED: bool = os.getenv(
+        "LLM_JSON_MODE_ENABLED", "true"
+    ).lower() in ("1", "true", "yes")
+
     # ── Cache Isolation ──
     CACHE_SHARE_ANONYMOUS: bool = os.getenv(
         "CACHE_SHARE_ANONYMOUS", "false"

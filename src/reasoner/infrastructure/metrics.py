@@ -157,6 +157,12 @@ TOKEN_SAVINGS_USD = Counter(
     "Estimated cost savings from cache",
 )
 
+TRUNCATED_RESPONSES = Counter(
+    "reasoner_truncated_responses_total",
+    "LLM responses that hit max_tokens mid-generation (finish_reason=length)",
+    ["phase", "model"],
+)
+
 OBSERVABILITY_EVENTS_DROPPED_TOTAL = Counter(
     "reasoner_observability_events_dropped_total",
     "Total observability events dropped due to client being disabled or unreachable",
