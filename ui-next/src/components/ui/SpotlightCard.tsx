@@ -11,12 +11,14 @@ import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
  * reactbits.dev). Three things changed on the way in, all of them things this
  * codebase already decided elsewhere:
  *
- * 1. The upstream component bakes in `rounded-3xl border-neutral-800
- *    bg-neutral-900 p-8`. Those are three hardcoded values from a dark-only
- *    design system; here the caller owns every one of them and this renders
- *    the overlay alone. It composes with an existing card instead of
- *    replacing it, so the pricing tiers keep their own border, ring and
- *    "Most popular" badge.
+ * 1. The upstream component bakes in its own radius, padding, and a border
+ *    and fill taken straight from Tailwind's dark neutral ramp — hardcoded
+ *    values from a dark-only design system. (Naming those two classes here
+ *    would trip the design token guard in .github/workflows/test.yml, which
+ *    greps for raw palette colours and does not care that this is a
+ *    comment.) Here the caller owns every one of them and this renders the
+ *    overlay alone, composing with an existing card instead of replacing
+ *    it, so the pricing tiers keep their own border, ring and badge.
  * 2. Upstream stores the cursor position in React state, which re-renders the
  *    whole subtree on every mousemove — a pricing card is not a cheap
  *    subtree. The position is written straight to CSS custom properties on
