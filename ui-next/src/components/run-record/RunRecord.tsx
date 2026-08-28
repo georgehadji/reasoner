@@ -397,6 +397,7 @@ export default function RunRecord() {
           <pre className="mt-[var(--space-8)] overflow-x-auto border border-[var(--border)] bg-[var(--surface)] p-[var(--space-6)] font-mono text-[length:var(--text-xs)] leading-[var(--lh-body)] text-[var(--text-2)]">
             <code>{`curl https://reasoner.app/api/agent/run/sync \\
   -H "Authorization: Bearer $REASONER_API_KEY" \\
+  -H "Content-Type: application/json" \\
   -d '{"problem": "${RUN.question}",
        "preset": "${RUN.preset}"}'
 

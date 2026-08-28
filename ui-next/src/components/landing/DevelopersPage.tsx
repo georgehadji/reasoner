@@ -114,6 +114,7 @@ result = await headless.ask("...", preset="research-budget")`;
 
 const CURL = `curl -s https://reasoner.app/api/agent/run/sync \\
   -H "Authorization: Bearer $REASONER_API_KEY" \\
+  -H "Content-Type: application/json" \\
   -d '{"problem": "Should we migrate off our monolith?"}'
 
 # → { "synthesis": …,
