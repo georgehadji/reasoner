@@ -13,7 +13,6 @@ from reasoner.core.constants import (
     DEFAULT_OLLAMA_URL,
     MODEL_CLAUDE_SONNET,
     MODEL_GEMINI_31_FLASH_LITE_IMAGE,
-    MODEL_GEMINI_PRO,
     MODEL_GPT4O_MINI,
     MODEL_LAGUNA_M_FREE,
     MODEL_LAGUNA_XS_21,
@@ -87,29 +86,25 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ═══════════════════════════════════════════════════════════════
     # Google — Gemini series
     # ═══════════════════════════════════════════════════════════════
-    # gemini-pro -> claude-sonnet (premium primary, not Google — changed v3.4)
-    # gemini-flash-lite -> qwen3.5-flash (budget primary, not Google — changed v3.4)
-    MODEL_GEMINI_PRO:   {"model": "anthropic/claude-sonnet-5"},     # premium primary (Anthropic, not Google)
-    # No MODEL_GEMINI_FLASH entry here: v3.6 swapped that alias's *value* to
-    # "grok-4.3" without renaming it, so an entry keyed on the constant was a
-    # duplicate of the literal "grok-4.3" key in the xAI block below. The later
-    # key won, this one's google/gemini-3.5-flash value was silently discarded,
-    # and the dict quietly had one fewer model than it appeared to. The xAI
-    # block is the single definition; a real Google flash lives under
-    # gemini-3.6-flash / gemini-2.5-flash.
-    # extra_body: reasoning.exclude — this alias serves several JSON-contract
-    # article roles (article_sot_skeleton, article_critic) whose prompts
-    # demand a bare JSON object; observed on 2026-08-28 spending its entire
-    # output budget narrating "Thinking Process: 1. Analyze the Request..."
-    # as plain content and never reaching JSON. Belt-and-braces alongside
-    # response_format (infrastructure.llm.utils._json_response_format) — the
-    # OpenRouter catalogue lists "reasoning"/"include_reasoning" as supported
-    # for this served model, so this is a legitimate attempt at the control it
-    # advertises, not a guess; response_format is the change actually proven
-    # to stop free-text preambles at the decoding level; see
-    # docs/plans/article-flow-truncation-remediation.md W4.
-    "gemini-flash-lite": {"model": "qwen/qwen3.5-flash-02-23", "extra_body": {"reasoning": {"exclude": True}}},     # budget primary — $0.065/$0.26, fast & reliable
-    # ── Real Google models (not aliased to other labs) ──
+    # Two Google-named aliases used to live here and served other labs:
+    #   "gemini-pro"        -> anthropic/claude-sonnet-5   (v3.4)
+    #   "gemini-flash-lite" -> qwen/qwen3.5-flash-02-23    (v3.4)
+    # Both were removed in favour of the honestly-named entries that already
+    # served the identical model string: "claude-sonnet" (Anthropic block) and
+    # "qwen3.5-flash" (Qwen block). No routing changed — only the names.
+    #
+    # A third, MODEL_GEMINI_FLASH, never had an entry here at all: v3.6 swapped
+    # that symbol's *value* to "grok-4.3" without renaming it, so an entry keyed
+    # on the constant collided with the literal "grok-4.3" key in the xAI block
+    # below. The later key won, this one's google/gemini-3.5-flash value was
+    # silently discarded, and the dict quietly had one fewer model than it
+    # appeared to. That symbol is now MODEL_GROK_43. This is the concrete cost
+    # of naming an alias after a vendor and then repointing it, and the reason
+    # the three names above were retired rather than left with a comment.
+    #
+    # Real Google models live under gemini-3.6-flash / gemini-2.5-flash and the
+    # entries immediately below.
+    # ── Real Google models ──
     "gemini-pro-real":         {"model": "google/gemini-3.1-pro-preview"},     # true Google Pro — $2/$12 per M, 1M ctx
     "gemini-flash-lite-real":  {"model": "google/gemini-3.1-flash-lite"},      # true Google Flash Lite — $0.25/$1.50, 1M ctx
     "gemini-2.5-flash-lite":   {"model": "google/gemini-2.5-flash-lite"},      # cheapest Google — $0.10/$0.40, 1M ctx
@@ -122,7 +117,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "gemini-flash-latest":     {"model": "~google/gemini-flash-latest"},       # always -> latest Gemini Flash
     # ── Legacy ──
     "gemini-3.1-flash-lite":   {"model": "google/gemini-3.1-flash-lite"},      # -> gemini-flash-lite-real
-    "google/gemma-2-9b-it":    {"model": "google/gemma-3-12b-it"},
+    "gemma-3-12b":             {"model": "google/gemma-3-12b-it"},              # was keyed "google/gemma-2-9b-it" — wrong version, and the only key carrying a vendor prefix
     "gemma-4-26b":             {"model": "google/gemma-4-26b-a4b-it"},
     "gemma-4-31b":             {"model": "google/gemma-4-31b-it"},
     # ═══════════════════════════════════════════════════════════════
@@ -156,7 +151,10 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "mistral-small-2603": {"model": "mistralai/mistral-small-2603"},    # explicit alias for preset pinning
     "codestral":          {"model": "mistralai/codestral-2508"},        # v3.5: was 2501 (dead) -> 2508
     "codestral-2508":     {"model": "mistralai/codestral-2508"},
-    "ministral-8b":       {"model": "mistralai/mistral-small-3.2-24b-instruct"},
+    # Was keyed "ministral-8b", which named neither the right family nor the
+    # right size — the real Ministral 3 8B is a different model and is not in
+    # this registry.
+    "mistral-small-3.2-24b": {"model": "mistralai/mistral-small-3.2-24b-instruct"},
     "ministral-3b":       {"model": "mistralai/ministral-3b-2512"},   # $0.10/$0.10 flat, 131K ctx — real Ministral tier
     "ministral-14b":      {"model": "mistralai/ministral-14b-2512"},  # $0.20/$0.20 flat, 262K ctx — real Ministral tier
     # devstral, devstral-medium, devstral-small removed — no longer on OpenRouter
@@ -224,9 +222,21 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "qwen3.6-27b":         {"model": "qwen/qwen3.6-27b"},        # $0.2885/$3.17 per M, 262K ctx, dense
     "qwen3.6-max-preview": {"model": "qwen/qwen3.6-max-preview"}, # $1.04/$6.24 per M, 262K ctx, ~1T MoE preview
     # ── 3.5 (early-mid 2026) ──
-    # extra_body: reasoning.exclude — see the gemini-flash-lite alias above
-    # (same served model, same fix, same reasoning).
-    "qwen3.5-flash":       {"model": "qwen/qwen3.5-flash-02-23", "extra_body": {"reasoning": {"exclude": True}}}, # cheapest Qwen — $0.065/$0.26 per M, 1M ctx
+    # extra_body: reasoning.exclude — this alias serves several JSON-contract
+    # article roles (article_sot_skeleton, article_critic) whose prompts demand
+    # a bare JSON object; observed on 2026-08-28 spending its entire output
+    # budget narrating "Thinking Process: 1. Analyze the Request..." as plain
+    # content and never reaching JSON. Belt-and-braces alongside response_format
+    # (infrastructure.llm.utils._json_response_format) — the OpenRouter
+    # catalogue lists "reasoning"/"include_reasoning" as supported for this
+    # served model, so this is a legitimate attempt at the control it
+    # advertises, not a guess; response_format is the change actually proven to
+    # stop free-text preambles at the decoding level; see
+    # docs/plans/article-flow-truncation-remediation.md W4.
+    # (This rationale previously lived on the "gemini-flash-lite" alias, which
+    # named Google and served this same Qwen model. That alias is gone; this is
+    # now the single definition.)
+    "qwen3.5-flash":       {"model": "qwen/qwen3.5-flash-02-23", "extra_body": {"reasoning": {"exclude": True}}}, # budget primary — $0.065/$0.26 per M, 1M ctx, fast & reliable
     "qwen3.5-9b":          {"model": "qwen/qwen3.5-9b"},          # $0.10/$0.15 per M, 262K ctx
     "qwen3.5-27b":         {"model": "qwen/qwen3.5-27b"},         # $0.195/$1.56 per M, 262K ctx, dense
     "qwen3.5-35b-a3b":     {"model": "qwen/qwen3.5-35b-a3b"},     # $0.14/$1.00 per M, 262K ctx, MoE

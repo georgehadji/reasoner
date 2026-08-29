@@ -14,16 +14,16 @@ from typing import Literal
 from reasoner.core.constants_models import (
     MODEL_FLUX_2_KLEIN_4B,
     MODEL_GEMINI_31_FLASH_IMAGE_PREVIEW,
-    MODEL_GEMINI_FLASH,
     MODEL_GEMINI_FLASH_IMAGE,
-    MODEL_GEMINI_FLASH_LITE,
     MODEL_GEMINI_PRO_IMAGE,
     MODEL_GPT5_IMAGE,
     MODEL_GPT5_IMAGE_MINI,
+    MODEL_GROK_43,
     MODEL_GROK_IMAGINE,
     MODEL_GROK_IMAGINE_IMAGE_2,
     MODEL_MAI_IMAGE_25,
     MODEL_MAI_IMAGE_25_PRO,
+    MODEL_QWEN35_FLASH,
     MODEL_RECRAFT_V41,
     MODEL_RECRAFT_V41_PRO,
     MODEL_RIVERFLOW_V25_FAST,
@@ -69,7 +69,7 @@ GATE_MAX_TOKENS: int = 256
 GATE_TEMPERATURE: float = 0.0
 GATE_TIMEOUT_SECONDS: float = 5.0
 GATE_CONFIDENCE_THRESHOLD: float = 0.70
-GATE_DEFAULT_MODEL: str = MODEL_GEMINI_FLASH  # non-OpenAI model that supports temperature=0
+GATE_DEFAULT_MODEL: str = MODEL_GROK_43  # non-OpenAI model that supports temperature=0
 
 # ═════════════════════════════════════════════════════════════════════
 # HYPERGATE AGENT (sub-agent orchestrator replacing GateAgent)
@@ -242,9 +242,9 @@ def get_phase_retry_budget(phase_name: str) -> int:
 # ═════════════════════════════════════════════════════════════════════
 
 QUALITY_JUDGE_MODELS: dict[str, str] = {
-    "budget":  MODEL_GEMINI_FLASH_LITE,
-    "premium": MODEL_GEMINI_FLASH,
-    "default": MODEL_GEMINI_FLASH_LITE,
+    "budget":  MODEL_QWEN35_FLASH,
+    "premium": MODEL_GROK_43,
+    "default": MODEL_QWEN35_FLASH,
 }
 
 QUALITY_JUDGE_THRESHOLDS: dict[str, float] = {
@@ -495,7 +495,7 @@ IMAGE_GEN_REMOTE_TIMEOUT_SECONDS: float = 20.0
 IMAGE_GEN_COMPLETION_TIMEOUT_SECONDS: float = 90.0
 IMAGE_GEN_PROMPT_MAX_TOKENS: int = 512
 IMAGE_GEN_PROMPT_TEMPERATURE: float = 0.7
-IMAGE_GEN_ENHANCEMENT_MODEL: str = MODEL_GEMINI_FLASH
+IMAGE_GEN_ENHANCEMENT_MODEL: str = MODEL_GROK_43
 # Every tier returns this many images; each preset below carries exactly this
 # many primaries so one model failure degrades into a fallback, not a short run.
 IMAGE_GEN_IMAGE_COUNT: int = 4

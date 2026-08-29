@@ -4,8 +4,13 @@
 
 MODEL_CLAUDE_SONNET: str = "claude-sonnet"
 MODEL_CLAUDE_HAIKU: str = "claude-haiku"
-MODEL_GEMINI_FLASH: str = "grok-4.3"  # Swapped to xAI for budget tier (v3.6)
-MODEL_GEMINI_PRO: str = "gemini-pro"
+# Was MODEL_GEMINI_FLASH, whose value v3.6 swapped to xAI without renaming the
+# symbol. Every consumer below (captioning, OCR, decomposition, image-gen
+# enhancement, the gate default) has been calling Grok while reading "Gemini".
+MODEL_GROK_43: str = "grok-4.3"
+# MODEL_GEMINI_PRO removed: its value "gemini-pro" was a registry alias for
+# anthropic/claude-sonnet-5, i.e. an exact duplicate of MODEL_CLAUDE_SONNET
+# above. Use MODEL_CLAUDE_SONNET.
 MODEL_GPT4O_MINI: str = "gpt-4o-mini"
 MODEL_GEMINI_FLASH_IMAGE: str = "gemini-flash-image"
 MODEL_GEMINI_PRO_IMAGE: str = "gemini-pro-image"
@@ -62,8 +67,9 @@ MODEL_MIMO_V2_PRO: str = "mimo-v2-pro"
 MODEL_MIMO_V2_FLASH: str = "mimo-v2-flash"
 
 # DeepSeek (reasoning-effort modes)
-# Verified low-latency models: gemini-pro / gemini-flash-lite
-MODEL_GEMINI_FLASH_LITE: str = "gemini-flash-lite"
+# MODEL_GEMINI_FLASH_LITE removed: its value "gemini-flash-lite" was a registry
+# alias for qwen/qwen3.5-flash-02-23, i.e. an exact duplicate of
+# MODEL_QWEN35_FLASH. Use MODEL_QWEN35_FLASH.
 MODEL_MISTRAL_SMALL: str = "mistral-small"
 
 # v3.2 — new ultra-VFM models
@@ -100,7 +106,7 @@ MODEL_O3: str = "o3"
 # Google
 MODEL_GEMMA_4_26B: str = "gemma-4-26b"
 MODEL_GEMMA_4_31B: str = "gemma-4-31b"
-MODEL_GEMMA_2_9B_IT: str = "google/gemma-2-9b-it"
+MODEL_GEMMA_3_12B: str = "gemma-3-12b"
 
 # xAI — Grok series (grok-4.1-fast, grok-4, grok-3, grok-3-mini removed — EOL)
 MODEL_GROK_43: str = "grok-4.3"
@@ -115,7 +121,7 @@ MODEL_CODESTRAL_2508: str = "codestral-2508"
 MODEL_DEVSTRAL: str = "devstral"
 MODEL_DEVSTRAL_MEDIUM: str = "devstral-medium"
 MODEL_DEVSTRAL_SMALL: str = "devstral-small"
-MODEL_MINISTRAL_8B: str = "ministral-8b"
+MODEL_MISTRAL_SMALL_24B: str = "mistral-small-3.2-24b"
 
 # DeepSeek
 MODEL_DEEPSEEK_V4_FLASH: str = "deepseek-v4-flash"

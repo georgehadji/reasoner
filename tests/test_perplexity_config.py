@@ -75,7 +75,7 @@ def test_structured_outputs_withheld_for_unprofiled_model():
 
 
 def test_google_registry_uses_current_stable_gemini_model_ids():
-    # "gemini-pro" is a deliberate cross-vendor alias to claude-sonnet-5
+    # "claude-sonnet" is a deliberate cross-vendor alias to claude-sonnet-5
     # (v3.4) and "gemini-flash" doesn't exist as a key (dedup fix, see
     # registry.py comment above the Google block) — real Google IDs live
     # under "gemini-pro-real" / "gemini-2.5-flash".

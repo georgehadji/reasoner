@@ -80,7 +80,7 @@ DIRECT_CREATIVE_SYSTEM = (
     + HUMANIZATION_RULES
 )
 
-_CREATIVE_MODELS_PREMIUM: tuple[str, ...] = ("claude-sonnet", "gpt-5", "gemini-pro")
+_CREATIVE_MODELS_PREMIUM: tuple[str, ...] = ("claude-sonnet", "gpt-5", "claude-sonnet")
 _CREATIVE_MODELS_BUDGET: tuple[str, ...] = ()  # budget tier uses the router's own primary
 
 

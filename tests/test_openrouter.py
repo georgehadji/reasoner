@@ -14,7 +14,7 @@ import os
 import pytest
 
 from reasoner.application.services.preset_service import PresetService
-from reasoner.core.constants_models import MODEL_GEMINI_FLASH
+from reasoner.core.constants_models import MODEL_GROK_43
 from reasoner.domain.preset_registry import get_preset
 from reasoner.llm import (
     _REGISTRY,
@@ -90,7 +90,7 @@ class TestOpenRouterRegistry:
             "claude-opus",
             "claude-sonnet",
             "gpt-5",
-            MODEL_GEMINI_FLASH,
+            MODEL_GROK_43,
             "deepseek-v3",
             "qwen3-max",
             "kimi-k2-5",
@@ -110,7 +110,7 @@ class TestReasoningSuppressionAliases:
     JSON. See docs/plans/article-flow-truncation-remediation.md W4.
     """
 
-    _ALIASES = ("gemini-flash-lite", "qwen3.5-flash", "qwen3-turbo")
+    _ALIASES = ("qwen3.5-flash", "qwen3.5-flash", "qwen3-turbo")
 
     def test_aliases_still_resolve_to_the_flagged_served_model(self):
         """Guard the guard: if this ever fails, the alias was repointed and
@@ -288,7 +288,7 @@ class TestProviderRouter:
         router = ProviderRouter.from_model_ids(
             primary_id="claude-sonnet",
             routing={
-                "classification": MODEL_GEMINI_FLASH,
+                "classification": MODEL_GROK_43,
                 "constructive": "deepseek-v3",
                 "synthesis": "glm-5.2",
             }
@@ -327,10 +327,10 @@ class TestBackwardCompatibility:
     def test_direct_api_models_still_exist(self):
         """Direct API models should still be in registry."""
         # Alias constants, not literals: "gemini-flash" was never a registry
-        # key -- MODEL_GEMINI_FLASH's value was swapped to an xAI model in v3.6
+        # key -- MODEL_GROK_43's value was swapped to an xAI model in v3.6
         # without renaming the constant, so the literal named nothing.
         direct_models = [
-            "claude-opus", "gpt-5", MODEL_GEMINI_FLASH,
+            "claude-opus", "gpt-5", MODEL_GROK_43,
             "deepseek-v3", "qwen3-max", "glm-5.2",
         ]
         for model_id in direct_models:

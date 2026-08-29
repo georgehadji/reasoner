@@ -483,7 +483,7 @@ class TestPropagationResistanceTable:
         assert is_measured("some-model-never-tested") is False
 
     def test_alias_resolves_to_underlying_served_model(self):
-        """The registry has deliberate alias collisions — 'gemini-pro' routes to
+        """The registry has deliberate alias collisions — 'claude-sonnet' routes to
         Anthropic. Resistance must follow the model that actually runs, not the
         alias's name."""
         from reasoner.infrastructure.llm.propagation_resistance import (
@@ -491,8 +491,8 @@ class TestPropagationResistanceTable:
         )
         from reasoner.infrastructure.llm.registry import resolved_model_of
 
-        alias_score = propagation_resistance_of("gemini-pro")
-        served = resolved_model_of("gemini-pro")
+        alias_score = propagation_resistance_of("claude-sonnet")
+        served = resolved_model_of("claude-sonnet")
         assert propagation_resistance_of(served) == alias_score
 
 

@@ -271,7 +271,7 @@ class PipelineOrchestrator:
                 from reasoner.infrastructure.llm.router import ProviderRouter
                 registry = get_model_registry_port()
                 hypergate_routing = dict(router.routing_table)
-                hypergate_routing["hypergate_subagent"] = registry.get_provider("gemini-flash-lite")
+                hypergate_routing["hypergate_subagent"] = registry.get_provider("qwen3.5-flash")
                 hypergate_router = ProviderRouter(
                     primary=registry.get_provider("grok-4.5"),
                     routing_table=hypergate_routing,

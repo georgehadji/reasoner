@@ -36,7 +36,7 @@ async def decide_route(problem: str, preset: str) -> dict[str, Any]:
     # Override HyperGate router: grok-4.5 for primary, gemini-flash-lite for sub-agents
     registry = get_model_registry_port()
     hypergate_routing = dict(router_instance.routing_table)
-    hypergate_routing["hypergate_subagent"] = registry.get_provider("gemini-flash-lite")
+    hypergate_routing["hypergate_subagent"] = registry.get_provider("qwen3.5-flash")
     # _resolve_fallback's rule is "explicit > primary > none". Since primary
     # IS grok-4.5 here, a timed-out grok-4.5 call can never fall back to
     # itself — without an explicit "primary" entry this table inherits from

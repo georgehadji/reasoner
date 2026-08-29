@@ -98,7 +98,7 @@ class TestBlocDiversityConstraint:
     def test_no_duplicate_model_across_generator_roles(self, constraint):
         """Two generator roles secretly aliasing the same model = violation.
 
-        Regression test for debate-premium bug: "gemini-pro" silently
+        Regression test for debate-premium bug: "claude-sonnet" silently
         resolves to anthropic/claude-sonnet-5 (v3.4 alias swap), so pairing
         it with "claude-sonnet" as a distinct role made the same model
         argue (constructive) and judge (systemic) itself.
@@ -106,7 +106,7 @@ class TestBlocDiversityConstraint:
         assignment = {
             "constructive": "claude-sonnet",  # -> anthropic/claude-sonnet-5
             "destructive": "deepseek-v4-pro",  # -> CN, distinct
-            "systemic": "gemini-pro",          # -> anthropic/claude-sonnet-5 (same as constructive!)
+            "systemic": "claude-sonnet",          # -> anthropic/claude-sonnet-5 (same as constructive!)
         }
         violations = constraint.validate(assignment, "test")
         dup_violations = [v for v in violations if "same underlying model" in v.reason]

@@ -13,8 +13,8 @@ from pathlib import Path
 
 from reasoner.core.constants_models import (
     MODEL_CLAUDE_HAIKU,
-    MODEL_GEMINI_FLASH,
     MODEL_GPT4O_MINI,
+    MODEL_GROK_43,
 )
 
 try:
@@ -179,7 +179,7 @@ class Settings:
     NEURO_REASONING_MODEL: str = os.getenv("NEURO_REASONING_MODEL", MODEL_GPT4O_MINI)
     NEURO_REASONING_FALLBACK_MODELS: str = os.getenv(
         "NEURO_REASONING_FALLBACK_MODELS",
-        f"{MODEL_GEMINI_FLASH},{MODEL_CLAUDE_HAIKU}",
+        f"{MODEL_GROK_43},{MODEL_CLAUDE_HAIKU}",
     )
     NEURO_EMBEDDING_MODEL: str = os.getenv("NEURO_EMBEDDING_MODEL", "qwen/qwen3-embedding-8b")
     NEURO_EMBEDDING_FALLBACK_MODELS: str = os.getenv(

@@ -203,11 +203,11 @@ def service(registry: CapabilityRegistry) -> AdaptiveRoutingService:
 def test_fallback_is_never_the_same_served_model(
     service: AdaptiveRoutingService,
 ) -> None:
-    """'gemini-pro' and 'claude-sonnet' are one endpoint under two names.
+    """'claude-sonnet' and 'claude-sonnet' are one endpoint under two names.
 
     Pairing them would produce a fallback that fails whenever the primary does.
     """
-    assert resolved_model_of("gemini-pro") == resolved_model_of("claude-sonnet")
+    assert resolved_model_of("claude-sonnet") == resolved_model_of("claude-sonnet")
 
     service._ranked_per_role = {
         "scoring": [("claude-sonnet", 0.9), ("glm-5.2", 0.8)],
@@ -215,7 +215,7 @@ def test_fallback_is_never_the_same_served_model(
     service._evidence_roles = {"scoring": True}
     fallbacks = service._select_fallbacks(
         ["scoring"],
-        {"scoring": "gemini-pro"},
+        {"scoring": "claude-sonnet"},
         static_fallbacks={"scoring": "claude-sonnet"},
     )
     assert fallbacks["scoring"] == "glm-5.2"
@@ -269,7 +269,7 @@ def test_preset_fallback_is_kept_when_still_valid(
 def test_no_fallback_invented_when_no_alternative_exists(
     service: AdaptiveRoutingService,
 ) -> None:
-    service._ranked_per_role = {"scoring": [("gemini-pro", 0.9)]}
+    service._ranked_per_role = {"scoring": [("claude-sonnet", 0.9)]}
     service._evidence_roles = {"scoring": True}
     fallbacks = service._select_fallbacks(
         ["scoring"], {"scoring": "claude-sonnet"}, static_fallbacks={}

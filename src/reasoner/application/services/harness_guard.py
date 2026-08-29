@@ -36,12 +36,15 @@ _MODEL_LABS: dict[str, str] = {
     "gemini-3.1-flash-image-preview": "google", "gemini-3.1-flash-lite-image": "google",
     "gemini-3.7-flash": "google", "gemini-3.6-flash": "google",
     "gemini-2.5-flash": "google",
-    # Note: gemini-pro → Anthropic (claude-sonnet), gemini-flash-lite → Qwen (qwen3.5-flash)
+    # The "gemini-pro" → Anthropic and "gemini-flash-lite" → Qwen aliases this
+    # note used to warn about no longer exist; those slots are now keyed
+    # "claude-sonnet" and "qwen3.5-flash", in the Anthropic and Qwen blocks.
     # Meta
     "llama-3.3-70b": "meta", "llama-4-maverick": "meta", "llama-4-scout": "meta",
     # Mistral
     "mistral-large-3": "mistral", "mistral-small": "mistral", "mistral-small-2603": "mistral",
-    "ministral-8b": "mistral", "codestral-2508": "mistral", "mistral-medium-3-5": "mistral",
+    "mistral-small-3.2-24b": "mistral", "codestral-2508": "mistral",
+    "mistral-medium-3-5": "mistral",
     # DeepSeek
     "deepseek-v3": "deepseek", "deepseek-v4-pro": "deepseek", "deepseek-v4-flash": "deepseek",
     # Qwen (Alibaba)
@@ -75,8 +78,10 @@ _MODEL_LABS: dict[str, str] = {
     # OpenAI — Codex
     "gpt-5.1-codex-mini": "openai", "gpt-5.1-codex": "openai",
     # Google — misc
-    "google/gemma-2-9b-it": "google", "gemini-flash-lite": "qwen",
-    "gemini-pro": "anthropic", "gemini-pro-image": "google",
+    # ("qwen3.5-flash" and "claude-sonnet" were listed here too, under their old
+    # Google-sounding alias names; both are already declared in their own
+    # vendor blocks above, so the entries here were exact duplicates.)
+    "gemma-3-12b": "google", "gemini-pro-image": "google",
     # NVIDIA
     "nvidia-nemotron-super": "nvidia",
     # NousResearch

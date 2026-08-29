@@ -7,8 +7,8 @@ import logging
 from typing import Optional
 
 from reasoner.core.constants_models import (
-    MODEL_GEMINI_FLASH,
-    MODEL_GEMINI_PRO,
+    MODEL_CLAUDE_SONNET,
+    MODEL_GROK_43,
     MODEL_QIANFAN_OCR_FAST,
 )
 from reasoner.infrastructure.llm.registry import build_provider
@@ -17,10 +17,10 @@ logger = logging.getLogger(__name__)
 
 # Cheap vision model for image captioning — prioritizes cost-effectiveness
 # Tiered fallback: Gemini Flash-Lite (cheapest) → Gemini 2.5 Flash
-_CAPTION_MODELS = [MODEL_GEMINI_FLASH, MODEL_GEMINI_PRO]
+_CAPTION_MODELS = [MODEL_GROK_43, MODEL_CLAUDE_SONNET]
 
 # OCR-optimized models — free/cheap models that specialize in verbatim text extraction
-_OCR_MODELS = [MODEL_QIANFAN_OCR_FAST, MODEL_GEMINI_FLASH]
+_OCR_MODELS = [MODEL_QIANFAN_OCR_FAST, MODEL_GROK_43]
 
 # Cache to avoid re-describing the same image (LRU-bounded, v3.4)
 _MAX_IMAGE_CACHE = 128
