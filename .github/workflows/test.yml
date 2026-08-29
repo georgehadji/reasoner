@@ -51,7 +51,11 @@ jobs:
           # _MODEL_LABS keys removed, one E501 reflowed, three import blocks
           # re-sorted after the symbol renames). Whoever finds the 23-violation
           # drift is welcome to bisect it; this number is the honest count now.
-          python scripts/ruff_ratchet.py --max 2260
+          # 2253: W2 (docs/plans/gate-and-registry-remediation.md) deleted the
+          # dead GateAgent class, its drifted _TAXONOMY, and the unused imports
+          # that came with it -- -7, a real paydown from removing code, not a
+          # rename.
+          python scripts/ruff_ratchet.py --max 2253
 
       - name: Security scan (bandit)
         run: |
