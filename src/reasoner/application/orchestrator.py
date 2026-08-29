@@ -267,22 +267,15 @@ class PipelineOrchestrator:
         async def _run_hypergate():
             nonlocal gate_decision_fb
             if not getattr(req, "force_pipeline", False):
-                # Override HyperGate router: grok-4.5 for primary, gemini-flash-lite for sub-agents
-                from reasoner.infrastructure.llm.router import ProviderRouter
-                registry = get_model_registry_port()
-                hypergate_routing = dict(router.routing_table)
-                hypergate_routing["hypergate_subagent"] = registry.get_provider("qwen3.5-flash")
-                hypergate_router = ProviderRouter(
-                    primary=registry.get_provider("grok-4.5"),
-                    routing_table=hypergate_routing,
-                    fallback_table=router.fallback_table,
-                    cascading_routing=router.cascading_routing,
-                    verbose=router.verbose,
-                    run_id=router.run_id,
-                    preset_id=f"hypergate-{router.preset_id}",
-                    method=router.method,
+                # Was a verbatim copy of gate_service's override block, minus
+                # its fallback entries -- so this path kept logging
+                # "fallback 'N/A'" long after /api/gate had been fixed. One
+                # definition now; see build_hypergate_router for why each
+                # fallback entry is load-bearing.
+                from reasoner.application.services.gate_service import (
+                    build_hypergate_router,
                 )
-                gate = HyperGateAgent(hypergate_router)
+                gate = HyperGateAgent(build_hypergate_router(router))
                 gate_decision_fb = await gate.decide(req.problem)
 
         _gate_timeout = max(GATE_TIMEOUT_SECONDS * 2, 5.0)

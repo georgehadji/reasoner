@@ -375,3 +375,112 @@ def test_hyper_context_to_dict_keys():
     assert "direct_signals" in d
     assert "web_signals" in d
     assert "method_signals" in d
+
+
+# ── Routing role: the model resolved must be the model called ─────────
+
+
+@pytest.mark.asyncio
+async def test_sub_agents_call_the_role_they_resolve():
+    """Every sub-agent must call role="hypergate_subagent", not "primary".
+
+    Regression: _llm_call used to resolve "hypergate_subagent" purely to sniff
+    the provider, then issue the call with role="primary". ProviderRouter.resolve
+    consults routing_table[role] first and only falls back to self.primary, so
+    the model that actually answered was whichever one the preset had put in the
+    primary slot -- grok-4.5 for 45 of the 49 presets, and a different model
+    again for the four that declare routing["primary"] themselves. Nothing in
+    the response revealed which had run.
+    """
+    seen_roles: list[str] = []
+
+    async def recording_call(role, system_prompt, user_prompt, **kwargs):
+        seen_roles.append(role)
+        return _j(language="English", confidence=0.9), {
+            "input_tokens": 10, "output_tokens": 5, "model": "fake-model",
+        }
+
+    router = MagicMock()
+    router.get.return_value = FakeProvider()
+    router.call = recording_call
+
+    for agent_cls in (
+        LanguageDetectorSubAgent, ComplexityEstimatorSubAgent, DirectDetectorSubAgent,
+        WebSearchDetectorSubAgent, MethodClassifierSubAgent, TieBreakerSubAgent,
+    ):
+        agent = agent_cls()
+        agent._cache.clear()
+        await agent.execute(
+            SubAgentInput(problem=f"probe for {agent_cls.__name__}", agent_name="probe"),
+            router,
+        )
+
+    assert seen_roles, "no sub-agent issued an LLM call"
+    assert set(seen_roles) == {"hypergate_subagent"}, (
+        f"sub-agents called roles {sorted(set(seen_roles))}; all must use "
+        f"BaseSubAgent.ROLE so the resolved provider is the one that answers"
+    )
+
+
+@pytest.mark.asyncio
+async def test_temperature_is_left_to_the_provider():
+    """_llm_call must always pass temperature and never sniff the model itself.
+
+    The removed sniff inspected router.get(ROLE) and then called a *different*
+    role, so on any fallback it gated on the wrong model. OpenAICompatibleProvider
+    already drops temperature per-model in complete(), against the model it is
+    about to call, which is the only place that can be correct.
+    """
+    seen: dict[str, Any] = {}
+
+    async def recording_call(role, system_prompt, user_prompt, **kwargs):
+        seen.update(kwargs)
+        return _j(language="English", confidence=0.9), {
+            "input_tokens": 10, "output_tokens": 5, "model": "fake-model",
+        }
+
+    router = MagicMock()
+    # An OpenAI model here used to make the sniff suppress temperature.
+    router.get.return_value = FakeProvider(model="openai/gpt-4o-mini")
+    router.call = recording_call
+
+    agent = LanguageDetectorSubAgent()
+    agent._cache.clear()
+    await agent.execute(
+        SubAgentInput(problem="temperature probe", agent_name="probe"), router
+    )
+
+    assert "temperature" in seen, "temperature must reach the router unconditionally"
+    assert seen["temperature"] == LanguageDetectorSubAgent.TEMPERATURE
+    assert seen["timeout_seconds"] == LanguageDetectorSubAgent.TIMEOUT_SECONDS
+
+
+def test_hypergate_router_gives_the_subagent_role_its_own_fallback():
+    """fallback_routing must name hypergate_subagent explicitly.
+
+    _resolve_fallback only consults fallback_table["primary"] when the failing
+    provider IS the router's primary. For any other role it falls through to the
+    primary provider itself -- so without this entry, a failing sub-agent would
+    retry on the router's primary, which is exactly the slow model the
+    sub-agent role exists to avoid.
+    """
+    from reasoner.application.services.gate_service import build_hypergate_router
+    from reasoner.infrastructure.llm.registry import build_provider
+    from reasoner.infrastructure.llm.router import ProviderRouter
+
+    base = ProviderRouter(primary=build_provider("qwen3.5-flash"))
+    gate_router = build_hypergate_router(base)
+
+    assert "hypergate_subagent" in gate_router.routing_table
+    assert "hypergate_subagent" in gate_router.fallback_table, (
+        "sub-agent role has no explicit fallback; it would silently inherit "
+        "the router's primary provider"
+    )
+
+    assigned = gate_router.resolve("hypergate_subagent")
+    fb = gate_router._resolve_fallback("hypergate_subagent", assigned)
+    assert fb is not None, "sub-agent role resolved no fallback at all"
+    assert fb.model != assigned.model
+    assert fb.model != gate_router.resolve_primary().model, (
+        "sub-agent fallback is the router primary -- the slow path it must avoid"
+    )

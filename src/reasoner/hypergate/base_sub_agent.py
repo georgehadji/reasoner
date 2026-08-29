@@ -34,6 +34,12 @@ class BaseSubAgent(ABC):
     """One job. One cache. One execute() call."""
 
     AGENT_NAME: str = "base"
+    # The routing role these agents run on, mirroring subagents/base.py's ROLE.
+    # Declaring it is the point: sub-agents previously *resolved* this role to
+    # inspect the provider and then called role="primary", so which model they
+    # actually ran on was whatever the preset had put in the primary slot, and
+    # the two could differ without anything surfacing it.
+    ROLE: str = "hypergate_subagent"
     MAX_TOKENS: int = 128
     TEMPERATURE: float = 0.0
     TIMEOUT_SECONDS: float = HYPERGATE_TIMEOUT_SECONDS
@@ -121,10 +127,6 @@ class BaseSubAgent(ABC):
     async def _llm_call(
         self, inp: SubAgentInput, router: ProviderRouter
     ) -> tuple[str, dict[str, Any]]:
-        provider = router.get("hypergate_subagent")
-        model_name = getattr(provider, "model", "").lower()
-        is_openai = any(model_name.startswith(p) for p in ("gpt-", "o1", "o3", "openai/"))
-
         user_prompt = inp.problem
         if inp.context:
             # TieBreaker passes Phase-1 context; inject it as a JSON suffix.
@@ -133,12 +135,14 @@ class BaseSubAgent(ABC):
                 f"[Phase-1 analysis context]\n{json.dumps(inp.context, ensure_ascii=False, indent=2)}"
             )
 
-        kwargs: dict[str, Any] = {
-            "max_tokens": self.MAX_TOKENS,
-            "timeout_seconds": self.TIMEOUT_SECONDS,
-        }
-        if not is_openai:
-            kwargs["temperature"] = self.TEMPERATURE
+        # temperature is passed unconditionally. There used to be an is_openai
+        # prefix sniff here that suppressed it, which was wrong three ways: it
+        # inspected the provider resolved for ROLE while the call went to
+        # role="primary", so it read one model and gated another; it duplicated
+        # OpenAICompatibleProvider._FIXED_TEMPERATURE_MARKERS incompletely
+        # (missing claude-opus, claude-fable, pareto-code); and it was redundant,
+        # because the provider already drops temperature per-model in complete()
+        # and stream_complete() using the model it is actually about to call.
 
         # NOTE: deliberately NOT wrapped in harden_system_prompt(), unlike the
         # other two LLM chokepoints (flows/services.call_llm, subagents/base).
@@ -150,10 +154,12 @@ class BaseSubAgent(ABC):
         # real added latency and cost for no exposure. Re-adding it needs a
         # reason; see docs/MIND_VIRUS_IMPLEMENTATION_PLAN.md WP1.3.
         result = await router.call(
-            role="primary",
+            role=self.ROLE,
             system_prompt=self._system_prompt(),
             user_prompt=user_prompt,
-            **kwargs,
+            max_tokens=self.MAX_TOKENS,
+            temperature=self.TEMPERATURE,
+            timeout_seconds=self.TIMEOUT_SECONDS,
         )
         from reasoner.infrastructure.llm.ports import DegradedLLMResponse
         if isinstance(result, DegradedLLMResponse):
