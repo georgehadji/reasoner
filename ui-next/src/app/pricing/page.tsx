@@ -6,7 +6,6 @@ import { apiFetch } from '@/lib/api-client';
 import { Check, X, Shield, CreditCard, Clock, Mail } from 'lucide-react';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
-import { SpotlightCard } from '@/components/ui/SpotlightCard';
 
 // Two self-serve plans. Enterprise stays a real, billable tier in the
 // backend (SubscriptionTier.ENTERPRISE, Stripe/PayPal price IDs, spend
@@ -128,16 +127,16 @@ export default function PricingPage() {
 
         <div className="mx-auto grid max-w-3xl grid-cols-1 gap-6 sm:grid-cols-2">
           {plans.map((plan) => (
-            /* SpotlightCard renders the accent wash and nothing else — the
-               border, ring, shadow and padding stay here, so the highlighted
-               tier keeps reading as the recommended one whether or not a
-               pointer is anywhere near it. */
-            <SpotlightCard
+            /* Elevation is a tone, not a shadow: --surface lifts 1.12:1 off
+               --bg, which is 3x the old step. The recommended tier is marked
+               by ground and border weight alone — no ring, no shadow, and no
+               cursor-following wash. */
+            <div
               key={plan.name}
-              className={`flex flex-col rounded-[var(--radius-lg)] border bg-[var(--surface)] p-6 transition-all ${
+              className={`relative flex flex-col rounded-[var(--radius-lg)] border p-6 ${
                 plan.highlighted
-                  ? 'border-[var(--border-strong)] shadow-[var(--shadow-lg)] ring-1 ring-[color-mix(in_oklab,var(--accent)_20%,transparent)]'
-                  : 'border-[var(--border)] hover:shadow-[var(--shadow-lg)]'
+                  ? 'border-[var(--border-strong)] bg-[var(--surface)]'
+                  : 'border-[var(--border)] bg-[var(--surface-2)]'
               }`}
             >
               {plan.highlighted && (
@@ -244,7 +243,7 @@ export default function PricingPage() {
                   Current Plan
                 </button>
               )}
-            </SpotlightCard>
+            </div>
           ))}
         </div>
 

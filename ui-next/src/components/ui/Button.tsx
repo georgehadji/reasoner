@@ -9,7 +9,7 @@ import { Spinner } from './Spinner';
 const buttonVariants = {
   primary:
     'bg-[var(--accent)] text-[var(--accent-text)] ' +
-    'hover:bg-[var(--accent-hover)] hover:shadow-[var(--accent-glow)] hover:-translate-y-px ' +
+    'hover:bg-[var(--accent-hover)] hover:-translate-y-px ' +
     'active:translate-y-0 active:shadow-none',
 
   secondary:

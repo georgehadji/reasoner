@@ -1,6 +1,7 @@
 'use client';
 
 import { esc, formatMarketCap } from '@/lib/utils';
+import { TrendingUp } from 'lucide-react';
 
 interface StockData {
   symbol: string;
@@ -20,7 +21,9 @@ export function StockWidget({ data }: { data: StockData }) {
   return (
     <div className="widget stock-widget">
       <div className="widget-header">
-        <span className="widget-icon">📈</span>
+        <span className="widget-icon" aria-hidden="true">
+          <TrendingUp className="h-4 w-4" strokeWidth={1.75} />
+        </span>
         <span className="widget-title">{esc(data.symbol)} Stock Price</span>
       </div>
       <div className="widget-content">

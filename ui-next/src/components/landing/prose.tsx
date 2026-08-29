@@ -78,7 +78,7 @@ export function Section({
   if (tone !== 'invert') return inner;
 
   return (
-    <div className="scroll-grow invert-band bg-[var(--bg)] text-[var(--text)]">{inner}</div>
+    <div className="invert-band bg-[var(--bg)] text-[var(--text)]">{inner}</div>
   );
 }
 

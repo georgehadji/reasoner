@@ -61,8 +61,8 @@ export function StreamingIndicator() {
           <span
             key={delay}
             aria-hidden="true"
-            className="h-[var(--space-2)] w-[var(--space-2)] rounded-[var(--radius-pill)] bg-[var(--text-muted)] animate-[skeleton-pulse_var(--dur-scene)_var(--ease-standard)_infinite]"
-            style={{ animationDelay: `calc(var(--dur-scene) / 3 * ${i})` }}
+            className="h-[var(--space-2)] w-[var(--space-2)] rounded-[var(--radius-pill)] bg-[var(--text-muted)] animate-[skeleton-pulse_var(--dur-pulse)_var(--ease-standard)_infinite]"
+            style={{ animationDelay: `calc(var(--dur-pulse) / 3 * ${i})` }}
           />
         ))}
       </div>

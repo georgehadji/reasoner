@@ -208,7 +208,7 @@ export function NotFoundView() {
         >
           <Link
             href="/chat"
-            className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-6 text-[length:var(--text-base)] font-semibold text-[var(--accent-text)] transition-all duration-[var(--dur-state)] hover:-translate-y-px hover:bg-[var(--accent-hover)] hover:shadow-[var(--accent-glow)] active:translate-y-0 active:scale-[0.97]"
+            className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-6 text-[length:var(--text-base)] font-semibold text-[var(--accent-text)] transition-all duration-[var(--dur-state)] hover:-translate-y-px hover:bg-[var(--accent-hover)] active:translate-y-0 active:scale-[0.97]"
           >
             Ask Reasoner instead
             <ArrowUpRight aria-hidden="true" className="h-4 w-4" />

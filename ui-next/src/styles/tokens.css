@@ -169,12 +169,13 @@
     /* ---- DEPRECATED. Retained so this step ships alone with zero
        call-site churn. Values re-derived achromatic so nothing coral
        survives. Removal is migration step 3 (ornament) and step 6.
-         --accent-glow  8 uses   -> delete with SpotlightCard / hover glows
          --accent-2     2 uses   -> Composer secondary control
          --accent-2-dim 3 uses   -> Composer secondary control
-         --shadow-lg   13 uses   -> rename to --shadow-float at call sites
+         --shadow-lg   11 uses   -> rename to --shadow-float at call sites
+       --accent-glow is GONE: its three utility classes (.text-glow,
+       .glow-hover, .btn-glow) had zero .tsx callers and its four live
+       hover sites were a grey haze once --accent went achromatic.
        --text-small had 0 var() uses and is simply gone.          ---- */
-    --accent-glow:  0 0 24px rgb(60 51 46 / 0.18);
     --accent-2:     #89807B;
     --accent-2-dim: rgb(137 128 123 / 0.12);
     --shadow-lg:    var(--shadow-float);
@@ -234,7 +235,6 @@
       --overlay:       rgb(0 0 0 / 0.80);
 
       /* DEPRECATED — see light block */
-      --accent-glow:  0 0 40px rgb(212 201 195 / 0.22);
       --accent-2:     #A59B95;
       --accent-2-dim: rgb(165 155 149 / 0.12);
       --shadow-lg:    var(--shadow-float);
@@ -287,7 +287,6 @@
     --overlay:       rgb(0 0 0 / 0.80);
 
     /* DEPRECATED — see light block */
-    --accent-glow:  0 0 40px rgb(212 201 195 / 0.22);
     --accent-2:     #A59B95;
     --accent-2-dim: rgb(165 155 149 / 0.12);
     --shadow-lg:    var(--shadow-float);

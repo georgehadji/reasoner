@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { DisagreementField } from '@/components/landing/DisagreementField';
-import { IdeaField } from '@/components/landing/IdeaField';
 import { MechanismDiagram } from '@/components/landing/MechanismDiagram';
 import { Aside, Body, Heading, Lede, Section } from '@/components/landing/prose';
 import { ReviewHandoff } from '@/components/landing/ReviewHandoff';
@@ -608,8 +607,6 @@ export default function LandingPage() {
             written into the code &mdash; not a prompt &mdash; refuses a batch of ideas that comes
             back entirely safe.
           </Body>
-
-          <IdeaField />
 
           <dl className="mt-[var(--space-4)] grid gap-x-[var(--space-8)] gap-y-[var(--space-5)] sm:grid-cols-3">
             {IDEA_TIERS.map(({ name, desc }) => (

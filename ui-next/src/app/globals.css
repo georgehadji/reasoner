@@ -74,7 +74,16 @@
     --dur-micro:     120ms;  /* hover, press, colour — 100–200ms */
     --dur-state:     220ms;  /* UI state change      — 150–300ms */
     --dur-component: 340ms;  /* component enter/exit — 250–450ms */
-    --dur-scene:     600ms;  /* route / large transition — 400–800ms */
+    --dur-scene:     380ms;  /* route / large transition — 250–400ms.
+                                Was 600ms, which is the token system itself
+                                sanctioning "any animation over 400ms that is
+                                not the signature element". */
+
+    /* Ambient loops are not transitions and are deliberately exempt from the
+       400ms ceiling: a loading pulse is a continuous indicator, not a thing
+       arriving. Split out of --dur-scene so rebanding that token could not
+       silently make every skeleton in the app frantic. */
+    --dur-pulse:     600ms;
 
     /* Stagger unit. Six children × 40ms lands the last one at 200ms,
        still inside the "instant" perceptual window. */
@@ -143,8 +152,9 @@
 
   /* Hero headings only — scoped via class, not global tag */
   /* h1,h2,h3 text-shadow removed: caused halos in light mode and
-     reduced sharpness on high-DPI screens. Use .hero-heading for
-     decorative glow on landing page. */
+     reduced sharpness on high-DPI screens. The .hero-heading glow that
+     replaced it is gone too — it was a text-shadow of --accent-glow,
+     which says nothing once the accent is achromatic. */
 
   /* Smooth color transitions on text elements */
   p, span, li {
@@ -462,10 +472,6 @@
   animation: fade-up-deep 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.text-glow {
-  text-shadow: var(--accent-glow);
-}
-
 /* ── Phase timeline ping ───────────────────────────────── */
 
 @keyframes phase-ping {
@@ -606,14 +612,6 @@
   }
 
   /* Glow on hover for cards/containers */
-  .glow-hover {
-    transition: box-shadow var(--dur-state) var(--ease-standard),
-                border-color var(--dur-state) var(--ease-standard);
-  }
-  .glow-hover:hover {
-    box-shadow: var(--accent-glow);
-  }
-
   /* Smooth background color transition */
   .bg-transition {
     transition: background-color var(--dur-state) var(--ease-standard),
@@ -650,17 +648,6 @@
   .stagger-children > *:nth-child(5) { animation-delay: calc(var(--stagger-step) * 4); }
   .stagger-children > *:nth-child(6) { animation-delay: calc(var(--stagger-step) * 5); }
 
-  /* Loading spinner for buttons */
-  @keyframes btn-loading {
-    0% { background-position: 200% center; }
-    100% { background-position: -200% center; }
-  }
-  .btn-loading {
-    background: linear-gradient(90deg, var(--accent) 0%, var(--accent-hover) 50%, var(--accent) 100%);
-    background-size: 200% 100%;
-    animation: btn-loading 1.5s ease infinite;
-  }
-
   /* Glass — derived from --surface so it tracks the theme.
      Previously hardcoded rgba(10,15,22,.70), a colour from the retired
      blue-black palette that no longer matched any surface token. */
@@ -682,20 +669,6 @@
   .dot-grid {
     background-image: radial-gradient(var(--border-strong) 1px, transparent 1px);
     background-size: 32px 32px;
-  }
-
-  /* Gradient text — accent-derived, tracks the theme */
-  .gradient-text {
-    background: linear-gradient(135deg, var(--text) 0%, var(--accent) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    color: var(--text); /* fallback before clip applies */
-  }
-
-  /* Accent button glow */
-  .btn-glow:hover {
-    box-shadow: var(--accent-glow);
   }
 
   /* Scrollbar styling */
@@ -769,11 +742,6 @@
     color: var(--accent-text);
     font-weight: 600;
     z-index: 9999;
-  }
-
-  /* Decorative hero heading glow — scoped to landing page only */
-  .hero-heading {
-    text-shadow: var(--accent-glow);
   }
 
   /* Epistemic label utilities — fill and rule style carry the same
@@ -852,7 +820,6 @@
   --shadow-float: 0 2px 4px rgb(0 0 0 / 0.45), 0 24px 56px -20px rgb(0 0 0 / 0.80);
 
   /* DEPRECATED — see styles/tokens.css */
-  --accent-glow:  0 0 40px rgb(212 201 195 / 0.22);
   --accent-2:     #A59B95;
   --accent-2-dim: rgb(165 155 149 / 0.12);
   --shadow-lg:    var(--shadow-float);
@@ -897,7 +864,6 @@
     --shadow-float: 0 2px 4px rgb(0 0 0 / 0.45), 0 24px 56px -20px rgb(0 0 0 / 0.80);
 
     /* DEPRECATED — see styles/tokens.css */
-    --accent-glow:  0 0 40px rgb(212 201 195 / 0.22);
     --accent-2:     #A59B95;
     --accent-2-dim: rgb(165 155 149 / 0.12);
     --shadow-lg:    var(--shadow-float);
@@ -942,7 +908,6 @@
   --shadow-float: 0 2px 4px rgb(0 0 0 / 0.45), 0 24px 56px -20px rgb(0 0 0 / 0.80);
 
   /* DEPRECATED — see styles/tokens.css */
-  --accent-glow:  0 0 40px rgb(212 201 195 / 0.22);
   --accent-2:     #A59B95;
   --accent-2-dim: rgb(165 155 149 / 0.12);
   --shadow-lg:    var(--shadow-float);
@@ -981,27 +946,6 @@
    ============================================================ */
 
 @supports (animation-timeline: view()) {
-  .scroll-grow {
-    animation: scroll-grow linear both;
-    animation-timeline: view();
-    /* Extend range: scales from small → full → small as viewport
-       progresses from entry to exit. On scroll-up, reverses exactly. */
-    animation-range: cover 0% cover 100%;
-    transform-origin: center top;
-    will-change: transform;
-  }
-
-  @keyframes scroll-grow {
-    0% {
-      transform: scale(0.62);
-      border-radius: 80px;
-    }
-    100% {
-      transform: scale(1);
-      border-radius: 0;
-    }
-  }
-
   /* ── Plate reveal ────────────────────────────────────────
      Opacity only, deliberately. The plates this runs on also carry
      a hover tilt, and an animation with a fill mode beats a hover
@@ -1047,12 +991,6 @@
   /* Scroll-driven animations are scrubbed by a timeline, not by a clock,
      so they ignore the animation-duration override above entirely. A
      reader who asked for stillness has to be opted out by name. */
-  .scroll-grow {
-    animation: none !important;
-    transform: none !important;
-    border-radius: 0 !important;
-  }
-
   .plate-reveal {
     animation: none !important;
     opacity: 1 !important;

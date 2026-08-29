@@ -103,8 +103,8 @@ function PhaseIndicator({
           {TIMING.streamingBounceDelays.map((delay, i) => (
             <span
               key={delay}
-              className="h-[var(--space-2)] w-[var(--space-2)] rounded-[var(--radius-pill)] bg-[var(--text-muted)] animate-[skeleton-pulse_var(--dur-scene)_var(--ease-standard)_infinite]"
-              style={{ animationDelay: `calc(var(--dur-scene) / 3 * ${i})` }}
+              className="h-[var(--space-2)] w-[var(--space-2)] rounded-[var(--radius-pill)] bg-[var(--text-muted)] animate-[skeleton-pulse_var(--dur-pulse)_var(--ease-standard)_infinite]"
+              style={{ animationDelay: `calc(var(--dur-pulse) / 3 * ${i})` }}
             />
           ))}
         </div>
@@ -130,7 +130,7 @@ function PhaseIndicator({
             <Tooltip key={a.name} text={a.task}>
               <span className={CHIP}>
                 <span
-                  className="h-1.5 w-1.5 rounded-[var(--radius-pill)] bg-[var(--accent)] animate-[skeleton-pulse_var(--dur-scene)_var(--ease-standard)_infinite]"
+                  className="h-1.5 w-1.5 rounded-[var(--radius-pill)] bg-[var(--accent)] animate-[skeleton-pulse_var(--dur-pulse)_var(--ease-standard)_infinite]"
                   aria-hidden="true"
                 />
                 {a.name}
@@ -186,7 +186,7 @@ function ImageGenerationIndicator({ prompt }: { prompt?: string }) {
           </div>
           <div className="inline-flex items-center gap-[var(--space-1)] rounded-[var(--radius-pill)] border border-[var(--border)] bg-[var(--surface-2)] px-[var(--space-3)] py-[var(--space-1)] text-[length:var(--text-xs)] font-medium text-[var(--text)]">
             <span
-              className="h-[var(--space-2)] w-[var(--space-2)] rounded-[var(--radius-pill)] bg-[var(--accent)] animate-[skeleton-pulse_var(--dur-scene)_var(--ease-standard)_infinite] motion-reduce:animate-none"
+              className="h-[var(--space-2)] w-[var(--space-2)] rounded-[var(--radius-pill)] bg-[var(--accent)] animate-[skeleton-pulse_var(--dur-pulse)_var(--ease-standard)_infinite] motion-reduce:animate-none"
               aria-hidden="true"
             />
             <span className="nums-tabular">{percent}%</span>
