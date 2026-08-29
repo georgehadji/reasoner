@@ -7,6 +7,7 @@ every test is deterministic and offline.
 
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
@@ -484,3 +485,79 @@ def test_hypergate_router_gives_the_subagent_role_its_own_fallback():
     assert fb.model != gate_router.resolve_primary().model, (
         "sub-agent fallback is the router primary -- the slow path it must avoid"
     )
+
+
+# ── decide_route total budget (W3b) ────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_decide_route_enforces_total_budget():
+    """decide_route must not block past HYPERGATE_TOTAL_BUDGET_SECONDS.
+
+    Regression: /api/gate used to await gate.decide() with no ceiling at all --
+    measured 30,189ms on one complex prompt before this. On expiry it must
+    return the same conservative verdict the pipeline preflight already
+    produces on its own timeout (action=pipeline, low confidence,
+    needs_confirmation=True), not hang and not raise past the caller.
+
+    A warm-up call precedes the timed one. PresetService.build_router() pays a
+    one-time lazy-init cost on its first call in a process (measured 2-2.9s
+    here; near-zero on every call after) that is unrelated to the gate LLM
+    call this budget bounds -- a real server pays it once at startup or on its
+    first request, not per request. Timing cold would measure that warm-up
+    cost, not asyncio.wait_for's enforcement.
+    """
+    import time
+    from unittest.mock import patch
+
+    from reasoner.application.services import gate_service
+    from reasoner.hypergate import GateDecision
+
+    async def _fast(problem):
+        return GateDecision(action="direct", confidence=0.95, reasoning="warm-up")
+
+    async def _stalls_past_budget(problem):
+        await asyncio.sleep(gate_service.HYPERGATE_TOTAL_BUDGET_SECONDS + 5)
+
+    with patch("reasoner.application.services.gate_service.HyperGateAgent") as mock_cls:
+        mock_cls.return_value.decide = _fast
+        await gate_service.decide_route("warm up the preset registry", "auto-budget")
+
+    with patch("reasoner.application.services.gate_service.HyperGateAgent") as mock_cls:
+        mock_cls.return_value.decide = _stalls_past_budget
+        t0 = time.monotonic()
+        result = await gate_service.decide_route("stalls forever", "auto-budget")
+        elapsed = time.monotonic() - t0
+
+    assert elapsed < gate_service.HYPERGATE_TOTAL_BUDGET_SECONDS + 1.0, (
+        f"decide_route took {elapsed:.1f}s, budget is "
+        f"{gate_service.HYPERGATE_TOTAL_BUDGET_SECONDS}s"
+    )
+    assert result["action"] == "pipeline"
+    assert result["confidence"] == 0.0
+    assert result["needs_confirmation"] is True
+    assert "budget" in result["reasoning"].lower()
+
+
+@pytest.mark.asyncio
+async def test_decide_route_happy_path_unaffected_by_budget_wrapper():
+    """A gate decision that returns well within budget must pass through untouched."""
+    from unittest.mock import patch
+
+    from reasoner.application.services import gate_service
+    from reasoner.hypergate import GateDecision
+
+    fast_decision = GateDecision(
+        action="direct", confidence=0.95, reasoning="Detected simple factual lookup"
+    )
+
+    async def _fast(problem):
+        return fast_decision
+
+    with patch("reasoner.application.services.gate_service.HyperGateAgent") as mock_cls:
+        mock_cls.return_value.decide = _fast
+        result = await gate_service.decide_route("What is the capital of France?", "auto-budget")
+
+    assert result["action"] == "direct"
+    assert result["confidence"] == 0.95
+    assert result["needs_confirmation"] is False

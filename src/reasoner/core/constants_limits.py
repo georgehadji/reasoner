@@ -85,10 +85,18 @@ HYPERGATE_AMBIGUOUS_FLOOR: float = 0.45    # Below this on all agents → hard f
 # legitimately cost up to 3x this value plus backoff before its fallback is
 # even tried. The old name (HYPERGATE_TIMEOUT_SECONDS) and comment
 # ("Per-sub-agent call timeout") both implied a role-level ceiling that does
-# not exist. No total-request ceiling exists yet either -- /api/gate awaits
-# decide_route with no wrapping timeout at all (docs/plans/
-# gate-and-registry-remediation.md W3b).
+# not exist.
 HYPERGATE_ATTEMPT_TIMEOUT_SECONDS: float = 6.0
+# Ceiling on the WHOLE gate decision (all sub-agents, TieBreaker if it fires),
+# enforced in gate_service.decide_route via asyncio.wait_for. Interim value --
+# measured 2026-08-29 at 5.86s mean for the sub-agent role under 5-way
+# concurrency on one endpoint (contention, not model speed; see
+# docs/plans/gate-and-registry-remediation.md W4), against 1.9s measured for
+# the same model probed alone. 12s covers that mean plus one retry-and-backoff
+# cycle without approving an effectively-unbounded wait. Revisit downward once
+# W4 spreads the sub-agents across roles/vendors and cuts the contention that
+# makes 5.86s the mean today.
+HYPERGATE_TOTAL_BUDGET_SECONDS: float = 12.0
 HYPERGATE_CACHE_SIZE: int = 512            # LRU size (per sub-agent + top-level)
 HYPERGATE_CACHE_TTL_SECONDS: int = 3600  # 1-hour TTL for top-level routing decisions
 HYPERGATE_MAX_TOKENS_LANGUAGE: int = 80

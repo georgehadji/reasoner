@@ -7,15 +7,22 @@ HTTP coupling. One implementation; both adapters call it.
 
 from __future__ import annotations
 
+import asyncio
+import logging
 from typing import Any
 
 from reasoner.application.services.preset_service import PresetService
-from reasoner.core.constants import HYPERGATE_METHOD_THRESHOLD
+from reasoner.core.constants import (
+    HYPERGATE_METHOD_THRESHOLD,
+    HYPERGATE_TOTAL_BUDGET_SECONDS,
+)
 from reasoner.core.ports.model_registry_port import get_model_registry_port
 from reasoner.domain.preset_core import build_auto_preset
-from reasoner.hypergate import HyperGateAgent
+from reasoner.hypergate import GateDecision, HyperGateAgent
 from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.presets import get_preset_price_tier
+
+logger = logging.getLogger(__name__)
 
 
 def build_hypergate_router(base: ProviderRouter) -> ProviderRouter:
@@ -103,6 +110,13 @@ async def decide_route(problem: str, preset: str) -> dict[str, Any]:
     + force_pipeline=true to lock in a specific method without re-invoking
     HyperGate. Shares HyperGateAgent's own L1/L2 cache, so a following run on
     the same problem does not re-pay the HyperGate LLM cost.
+
+    The whole decision is bounded by HYPERGATE_TOTAL_BUDGET_SECONDS. Before
+    this, /api/gate awaited gate.decide() with no ceiling at all -- measured
+    30,189ms on one complex prompt (docs/plans/gate-and-registry-remediation.md
+    W3). PipelineOrchestrator's preflight has its own separate timeout around
+    the same call (orchestrator.py's `_guard`); this is the equivalent for the
+    HTTP/MCP path, which had none.
     """
     preset_service = PresetService()
     raw_preset = preset or "auto-budget"
@@ -111,7 +125,31 @@ async def decide_route(problem: str, preset: str) -> dict[str, Any]:
     _effective_preset_name, router_instance = preset_service.build_router(gate_preset_name)
 
     gate = HyperGateAgent(build_hypergate_router(router_instance))
-    decision = await gate.decide(problem)
+    try:
+        decision = await asyncio.wait_for(
+            gate.decide(problem), timeout=HYPERGATE_TOTAL_BUDGET_SECONDS
+        )
+    except TimeoutError:
+        from reasoner.infrastructure.metrics import HYPERGATE_BUDGET_EXCEEDED_TOTAL
+
+        HYPERGATE_BUDGET_EXCEEDED_TOTAL.inc()
+        logger.warning(
+            "HyperGate exceeded total budget of %.0fs; falling back to pipeline.",
+            HYPERGATE_TOTAL_BUDGET_SECONDS,
+        )
+        # Same conservative verdict HyperGateAgent._synthesize's own Step 5
+        # hard-fallback produces on total sub-agent failure -- a budget timeout
+        # and "every sub-agent came back empty" should look identical to the
+        # caller, both being "we could not get a confident answer in time".
+        decision = GateDecision(
+            action="pipeline",
+            method="multi_perspective",
+            confidence=0.0,
+            reasoning=(
+                f"HyperGate exceeded total budget of "
+                f"{HYPERGATE_TOTAL_BUDGET_SECONDS:.0f}s, fallback to pipeline"
+            ),
+        )
 
     def _with_preset(method: str | None) -> str | None:
         return build_auto_preset(method, tier) if method else None

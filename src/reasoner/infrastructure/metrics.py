@@ -275,3 +275,13 @@ LLM_CALL_COST = Counter(
     "Cumulative cost by model and role",
     ["model", "role"],
 )
+
+# HyperGate had no total-request ceiling at all before
+# docs/plans/gate-and-registry-remediation.md W3b -- LLM_CALL_FAILURE only
+# covers a single provider call, not the whole gate decision (five sub-agents,
+# TieBreaker if it fires). A rising rate here means HYPERGATE_TOTAL_BUDGET_SECONDS
+# is too tight for real traffic, not that any one call is failing.
+HYPERGATE_BUDGET_EXCEEDED_TOTAL = Counter(
+    "reasoner_hypergate_budget_exceeded_total",
+    "Gate decisions that exceeded the total request budget and fell back to pipeline",
+)
