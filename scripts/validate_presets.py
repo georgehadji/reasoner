@@ -81,8 +81,8 @@ def main() -> int:
 
     valid_methods = {
         "multi-perspective", "debate", "jury", "research", "scientific",
-        "socratic", "pre-mortem", "bayesian", "dialectical", "analogical",
-        "delphi", "cove", "sot", "tot", "pot", "self-discover",
+        "socratic", "pre_mortem", "bayesian", "dialectical", "analogical",
+        "delphi", "cove", "sot", "tot", "pot", "self_discover",
         "writing", "article", "coding", "brainstorming", "subagent",
         "cross-language", "iterative-critique", "image-gen",
     }

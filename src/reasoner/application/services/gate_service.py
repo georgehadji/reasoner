@@ -37,10 +37,19 @@ async def decide_route(problem: str, preset: str) -> dict[str, Any]:
     registry = get_model_registry_port()
     hypergate_routing = dict(router_instance.routing_table)
     hypergate_routing["hypergate_subagent"] = registry.get_provider("gemini-flash-lite")
+    # _resolve_fallback's rule is "explicit > primary > none". Since primary
+    # IS grok-4.5 here, a timed-out grok-4.5 call can never fall back to
+    # itself — without an explicit "primary" entry this table inherits from
+    # router_instance has none, so every grok-4.5 timeout was unrecoverable
+    # (confidence 0.0, "all sub-agents failed"). gpt-4o-mini is fast and
+    # cross-lab (OpenAI vs. xAI), matching the project's cross-lab fallback
+    # convention.
+    hypergate_fallback_table = dict(router_instance.fallback_table)
+    hypergate_fallback_table["primary"] = registry.get_provider("gpt-4o-mini")
     hypergate_router = ProviderRouter(
         primary=registry.get_provider("grok-4.5"),
         routing_table=hypergate_routing,
-        fallback_table=router_instance.fallback_table,
+        fallback_table=hypergate_fallback_table,
         cascading_routing=router_instance.cascading_routing,
         verbose=router_instance.verbose,
         run_id=router_instance.run_id,

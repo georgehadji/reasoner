@@ -700,8 +700,18 @@ _REGISTRY: dict[str, dict] = {
         # the only live-web-search vendor in this registry, so their fallback
         # steps to a different Sonar tier rather than a non-search model that
         # would silently drop the citation-grounding these phases exist for.
+        #
+        # "primary" is a dual-purpose key (ProviderRouter._resolve_fallback):
+        # it is both the explicit fallback for the "primary" ROLE below (Arcee,
+        # 🇺🇸) and the catch-all fallback for any role that resolves through
+        # primary_id itself (deepseek-v4-flash, 🇨🇳) — e.g. a role filter_routing()
+        # downgraded for a missing key, or any role this preset doesn't itemize.
+        # One value has to be cross-bloc from both sources at once, so it must
+        # sit in a third bloc — 🇪🇺 — rather than 🇨🇳 (same bloc as primary_id,
+        # which would silently no-op the catch-all fallback) or 🇺🇸 (same bloc
+        # as Arcee).
         "fallback_routing": {
-            "primary":               "qwen3.7-flash",         # 🇨🇳 Qwen — $0.03/$0.13 per M, 1M ctx, cross-bloc from Arcee
+            "primary":               "mistral-small",         # 🇪🇺 Mistral — $0.15/$0.60 per M, 262K ctx, cross-bloc from BOTH Arcee (🇺🇸 role) and deepseek-v4-flash (🇨🇳 primary_id catch-all)
             "writing_draft":         "deepseek-v4-pro",       # 🇨🇳 DeepSeek — $0.87/$1.74 per M, 1M ctx, cross-bloc from Claude
             "writing_factcheck":     "sonar-pro",             # 🇺🇸 Perplexity — same-vendor step-up (see note above)
             "writing_assemble":      "seed-2.0-mini",         # 🇨🇳 ByteDance — $0.10/$0.40 per M, cross-bloc from OpenAI
@@ -740,9 +750,13 @@ _REGISTRY: dict[str, dict] = {
         # Cross-bloc fallback per role (v3.9) — see article-budget's
         # fallback_routing comment for the writing_factcheck /
         # post_synthesis_verify same-vendor-step-up rationale, which applies
-        # here too.
+        # here too. "primary" is the same dual-purpose key described there
+        # (role fallback + primary_id catch-all) — it needs no third-bloc
+        # workaround here because this preset's "primary" role (Arcee, 🇺🇸)
+        # and its primary_id (claude-sonnet, 🇺🇸) already share a bloc, so one
+        # 🇨🇳 fallback is cross-bloc from both at once.
         "fallback_routing": {
-            "primary":               "glm-5.3",           # 🇨🇳 Zhipu — $1.40/$4.40 per M, cross-bloc from Arcee
+            "primary":               "glm-5.3",           # 🇨🇳 Zhipu — $1.40/$4.40 per M, cross-bloc from BOTH Arcee (🇺🇸 role) and claude-sonnet (🇺🇸 primary_id catch-all)
             "writing_draft":         "qwen3.7-max",       # 🇨🇳 Qwen — $1.475/$4.425 per M, 1M ctx, cross-bloc from GPT-5
             "writing_outline":       "qwen3.7-max",       # 🇨🇳 Qwen — cross-bloc from real Gemini Pro
             "article_sot_skeleton":  "glm-5.3",           # 🇨🇳 Zhipu — cross-bloc from GPT-5.6 Terra
