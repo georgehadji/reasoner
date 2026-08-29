@@ -441,10 +441,12 @@ returns to the `7844682` state without touching the sub-agent classes.
 
 ### Open question
 
-> [INPUT REQUIRED: is spreading across four vendors acceptable operationally —
-> four upstream dependencies for one gate decision — or would you rather take
-> the contention and keep one vendor? The measured cost of one vendor is ~3x
-> latency; the cost of four is four ways to have an outage, each of which the
+> [INPUT REQUIRED: is spreading across three vendors acceptable operationally
+> (the assignment table above uses Mistral, Poolside and OpenAI across six
+> roles) — three upstream dependencies for one gate decision, four counting a
+> cross-vendor fallback for each — or would you rather take the contention and
+> keep one vendor? The measured cost of one vendor is ~3x latency; the cost of
+> spreading out is that many more ways to have an outage, each of which the
 > per-role fallback already covers.]
 
 ---
