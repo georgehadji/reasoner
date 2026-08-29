@@ -779,3 +779,15 @@ class RegistryAdapter:
     def entry(self, model_id: str) -> dict[str, Any] | None:
         """Return the registry config entry for *model_id*, or None."""
         return _REGISTRY.get(model_id)
+
+    def vendor_of(self, model_id: str) -> str:
+        """Delegate to :func:`_vendor_of` — see ``ModelRegistryPort.vendor_of``."""
+        return _vendor_of(model_id)
+
+    def bloc_of(self, model_id: str) -> str:
+        """Delegate to :func:`bloc_of` — see ``ModelRegistryPort.bloc_of``."""
+        return bloc_of(model_id)
+
+    def resolved_model_of(self, model_id: str) -> str:
+        """Delegate to :func:`resolved_model_of` — see ``ModelRegistryPort.resolved_model_of``."""
+        return resolved_model_of(model_id)

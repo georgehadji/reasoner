@@ -27,9 +27,15 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
 from reasoner.application.services.harness_guard import get_model_lab  # noqa: E402
+from reasoner.core.ports.model_registry_port import set_model_registry_port  # noqa: E402
 from reasoner.domain.preset_registry import _REGISTRY as PRESETS  # noqa: E402
 from reasoner.infrastructure.llm.capability_registry import CapabilityRegistry  # noqa: E402
-from reasoner.infrastructure.llm.registry import resolved_model_of  # noqa: E402
+from reasoner.infrastructure.llm.registry import RegistryAdapter, resolved_model_of  # noqa: E402
+
+# get_model_lab (W6) now resolves vendors through ModelRegistryPort instead of
+# a standalone dict, so this standalone script needs the same DI wiring
+# api/__init__.py and main.py do at startup.
+set_model_registry_port(RegistryAdapter())
 
 DOC_METHODS = ROOT / "docs" / "methods_and_presets.md"
 DOC_MATRIX = ROOT / "docs" / "preset-phase-model-matrix.md"

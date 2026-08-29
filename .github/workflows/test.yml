@@ -55,7 +55,9 @@ jobs:
           # dead GateAgent class, its drifted _TAXONOMY, and the unused imports
           # that came with it -- -7, a real paydown from removing code, not a
           # rename.
-          python scripts/ruff_ratchet.py --max 2253
+          # 2251: W6 deleted harness_guard.py's hand-maintained ~150-entry
+          # _MODEL_LABS dict in favour of ModelRegistryPort.vendor_of() -- -2.
+          python scripts/ruff_ratchet.py --max 2251
 
       - name: Security scan (bandit)
         run: |
