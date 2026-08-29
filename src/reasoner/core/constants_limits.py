@@ -79,7 +79,16 @@ HYPERGATE_DIRECT_THRESHOLD: float = 0.80   # DirectDetector confidence floor
 HYPERGATE_WEB_THRESHOLD: float = 0.65      # WebDetector confidence floor
 HYPERGATE_METHOD_THRESHOLD: float = 0.70   # MethodClassifier confidence floor
 HYPERGATE_AMBIGUOUS_FLOOR: float = 0.45    # Below this on all agents → hard fallback
-HYPERGATE_TIMEOUT_SECONDS: float = 6.0     # Per-sub-agent call timeout
+# Per PROVIDER ATTEMPT, not per role. complete_with_retry (infrastructure/
+# llm/base.py) retries up to max_retries=2 more times on top of this -- three
+# attempts total -- with exponential backoff between them, so one role can
+# legitimately cost up to 3x this value plus backoff before its fallback is
+# even tried. The old name (HYPERGATE_TIMEOUT_SECONDS) and comment
+# ("Per-sub-agent call timeout") both implied a role-level ceiling that does
+# not exist. No total-request ceiling exists yet either -- /api/gate awaits
+# decide_route with no wrapping timeout at all (docs/plans/
+# gate-and-registry-remediation.md W3b).
+HYPERGATE_ATTEMPT_TIMEOUT_SECONDS: float = 6.0
 HYPERGATE_CACHE_SIZE: int = 512            # LRU size (per sub-agent + top-level)
 HYPERGATE_CACHE_TTL_SECONDS: int = 3600  # 1-hour TTL for top-level routing decisions
 HYPERGATE_MAX_TOKENS_LANGUAGE: int = 80

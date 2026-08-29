@@ -19,9 +19,9 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from reasoner.core.constants import (
+    HYPERGATE_ATTEMPT_TIMEOUT_SECONDS,
     HYPERGATE_CACHE_SIZE,
     HYPERGATE_METHOD_THRESHOLD,
-    HYPERGATE_TIMEOUT_SECONDS,
 )
 from reasoner.hypergate.models import SubAgentInput, SubAgentOutput
 from reasoner.infrastructure.llm.router import ProviderRouter
@@ -42,7 +42,7 @@ class BaseSubAgent(ABC):
     ROLE: str = "hypergate_subagent"
     MAX_TOKENS: int = 128
     TEMPERATURE: float = 0.0
-    TIMEOUT_SECONDS: float = HYPERGATE_TIMEOUT_SECONDS
+    TIMEOUT_SECONDS: float = HYPERGATE_ATTEMPT_TIMEOUT_SECONDS
 
     _MAX_CACHE: int = HYPERGATE_CACHE_SIZE
 
