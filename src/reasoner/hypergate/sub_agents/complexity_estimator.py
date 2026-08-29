@@ -30,6 +30,7 @@ _VALID = {"simple", "medium", "complex"}
 
 class ComplexityEstimatorSubAgent(BaseSubAgent):
     AGENT_NAME = "complexity_estimator"
+    ROLE = "hypergate_complexity"
     MAX_TOKENS = HYPERGATE_MAX_TOKENS_COMPLEXITY
 
     def _system_prompt(self) -> str:

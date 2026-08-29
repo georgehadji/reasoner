@@ -439,7 +439,7 @@ python scripts/validate_presets.py
 Point all six roles at `ministral-14b` in `build_hypergate_router`. Behaviour
 returns to the `7844682` state without touching the sub-agent classes.
 
-### Open question
+### Open question — ANSWERED 2026-08-29
 
 > [INPUT REQUIRED: is spreading across three vendors acceptable operationally
 > (the assignment table above uses Mistral, Poolside and OpenAI across six
@@ -448,6 +448,29 @@ returns to the `7844682` state without touching the sub-agent classes.
 > keep one vendor? The measured cost of one vendor is ~3x latency; the cost of
 > spreading out is that many more ways to have an outage, each of which the
 > per-role fallback already covers.]
+
+**Decision: three vendors accepted.** Mistral, Poolside and OpenAI; every role
+also falls back across vendors, so all three are in the fallback set too.
+
+**One deviation from the proposed table above, made while implementing.** The
+proposal put `hypergate_direct` on `ministral-14b`, which left `direct` and
+`method` — both Phase-1, both concurrent — on the same served model, so two of
+the five calls would still have contended on one endpoint. `direct` moved to
+`gpt-4o-mini` instead (5/5 parsed, 1.81 s, and `ministral-3b` was only ever
+excluded from this role because it fails it). The five concurrent roles now
+resolve to five distinct models across three vendors, which is the invariant
+`test_concurrent_gate_roles_resolve_to_distinct_models` pins.
+
+`hypergate_tiebreak` also uses `gpt-4o-mini` and `hypergate_subagent` also uses
+`ministral-14b`; neither overlap is concurrent (the tie-breaker runs after
+Phase 1 returns, and `hypergate_subagent` is reached only by
+`ImageModelSelector` from `api/routes/images.py`), so neither can contend. The
+exemption is written out in that test rather than inferred.
+
+**Step 5 (re-measurement) was NOT performed** and step 6 (feeding the result
+back into W3's budget) is therefore still open. The five `/api/gate` probes are
+live paid calls to three vendors; nothing in the test suite exercises them.
+`HYPERGATE_TOTAL_BUDGET_SECONDS` stays at 12 s until someone runs them.
 
 ---
 

@@ -115,6 +115,20 @@ _KNOWN_ROUTING_ROLES: frozenset[str] = frozenset({
     "image_generate",
     # Post-synthesis verification (all presets, v3.5)
     "post_synthesis_verify",
+    # HyperGate sub-agent roles (W4). One per sub-agent, so the five that run
+    # concurrently in Phase 1 can be spread across models and vendors instead
+    # of serialising against one endpoint. These are populated by
+    # application/services/gate_service.build_hypergate_router, not by presets;
+    # they are listed here so a preset MAY override one, and because
+    # __post_init__ rejects any routing key absent from this set -- until now
+    # "hypergate_subagent" itself was missing, so a preset naming it raised.
+    "hypergate_subagent",
+    "hypergate_language",
+    "hypergate_complexity",
+    "hypergate_direct",
+    "hypergate_web",
+    "hypergate_method",
+    "hypergate_tiebreak",
 })
 
 

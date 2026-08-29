@@ -25,73 +25,124 @@ from reasoner.presets import get_preset_price_tier
 logger = logging.getLogger(__name__)
 
 
+# ── HyperGate per-role routing (W4) ───────────────────────────────────
+#
+# One role per sub-agent instead of one shared role. Two reasons, both measured
+# on 2026-08-29 (docs/plans/gate-and-registry-remediation.md W4):
+#
+# 1. Contention. `ministral-14b` answers a single sub-agent prompt in 1.47-1.92s
+#    when probed alone, but averaged 5.86s in the running app (93.83s / 16 calls
+#    from this deployment's own reasoner_llm_call_duration_seconds). The five
+#    Phase-1 agents fire concurrently via asyncio.gather and every one of them
+#    resolved the same role, therefore the same provider and the same upstream
+#    endpoint. The gate's parallelism was defeating itself.
+#
+# 2. Capability. The measurements below ran all five sub-agent system prompts
+#    against each candidate; the verdict is simply whether the reply parsed.
+#
+#        ministral-14b   5/5 parsed   1.92s   mistralai (EU)
+#        laguna-s-2.1    5/5 parsed   1.88s   poolside  (US)
+#        gpt-4o-mini     5/5 parsed   1.81s   openai    (US)
+#        grok-4.3        5/5 parsed   4.64s   x-ai      (US)  -- 2.4x slower
+#        ministral-3b    4/5 parsed   0.97s   fastest; fails direct_detector
+#        laguna-xs-2.1   4/5 parsed   1.20s   fails method_classifier
+#        gemma-4-31b     2/5 parsed   --      emits -1 for string fields
+#        qwen3.6-flash   0/5 parsed   --      returns ""
+#        qwen3.5-flash   0/5 parsed   --      returns -1.0000000000000002e+308
+#
+#    The two cheapest models each fail exactly one job. A per-role table can use
+#    them for the four jobs they pass; a single shared role could not, and had
+#    to pay for the strongest model on the easiest task.
+#
+# qwen3.5-flash is what the shared role was configured with, and it never ran:
+# sub-agents resolved the role and then called role="primary", so grok-4.5
+# answered instead and the broken config was invisible. It is broken at every
+# max_tokens tried (80/256/1024/4096) -- on a plain prose prompt it replies
+# "Thinking Process:" followed by a numbered plan -- i.e. reasoning.exclude does
+# not suppress its narration, and under the response_format JSON contract
+# that narration collapses to a degenerate float. Not a token-budget problem.
+#
+# grok-4.5 is gone from the primary slot for the same kind of reason, measured
+# on this deployment's own histogram: 16.1s mean over 10 calls with 6 failures,
+# against a 6s per-attempt timeout. Nothing in the repo ever justified it.
+_HYPERGATE_ROLE_MODELS: dict[str, str] = {
+    # -- the five that run concurrently in Phase 1 --
+    # No two share a served model, which is the whole point: five parallel
+    # calls now reach five distinct models across three vendors.
+    "hypergate_language": "ministral-3b",     # trivial task, fastest verified
+    "hypergate_complexity": "laguna-xs-2.1",  # passes; second vendor
+    "hypergate_direct": "gpt-4o-mini",        # third vendor; ministral-3b fails this
+    "hypergate_web": "laguna-s-2.1",          # passes; distinct from complexity
+    "hypergate_method": "ministral-14b",      # hardest task, needs 5/5 model
+    # -- Phase 2, runs alone after Phase 1 has returned --
+    # Sharing gpt-4o-mini with hypergate_direct is deliberate and safe: the
+    # tie-breaker only fires once Phase 1 is complete, so the two are never in
+    # flight together and cannot contend.
+    "hypergate_tiebreak": "gpt-4o-mini",
+    # -- the default BaseSubAgent.ROLE --
+    # Only ImageModelSelector still uses it, invoked on its own from
+    # api/routes/images.py, so its overlap with hypergate_method is likewise
+    # never concurrent.
+    "hypergate_subagent": "ministral-14b",
+}
+
+# Fallbacks are NOT optional and are NOT derivable. _resolve_fallback consults
+# fallback_table["primary"] only when the failing provider *is* the router
+# primary; for any other role it falls through to the primary provider itself.
+# Every role therefore needs its own entry or it silently inherits the primary.
+#
+# Two constraints on each value, both asserted in tests/test_hypergate.py:
+#   * a different vendor than the role's primary model, per the project's
+#     cross-lab convention -- a fallback sharing an upstream with the model
+#     that just failed is not a fallback;
+#   * never the router primary itself, which is what an absent entry would
+#     silently give you.
+# Only 5/5-parsing models appear here: a fallback firing on a job its model
+# cannot do turns a slow failure into a wrong answer.
+_HYPERGATE_ROLE_FALLBACKS: dict[str, str] = {
+    "hypergate_language": "laguna-s-2.1",     # mistralai -> poolside
+    "hypergate_complexity": "gpt-4o-mini",    # poolside  -> openai
+    "hypergate_direct": "laguna-s-2.1",       # openai    -> poolside
+    "hypergate_web": "gpt-4o-mini",           # poolside  -> openai
+    "hypergate_method": "gpt-4o-mini",        # mistralai -> openai
+    "hypergate_tiebreak": "laguna-s-2.1",     # openai    -> poolside
+    "hypergate_subagent": "gpt-4o-mini",      # mistralai -> openai
+}
+
+# The router primary. Roles resolve through the tables above, so this is only
+# reached for a role nobody declared; it stays on the strongest verified model.
+_HYPERGATE_PRIMARY: str = "ministral-14b"
+
+
 def build_hypergate_router(base: ProviderRouter) -> ProviderRouter:
     """Derive HyperGate's router from a preset's router.
 
     Single definition, called by both gate paths (this module's decide_route
     for /api/gate and the MCP tool, and PipelineOrchestrator's preflight).
     It used to be copy-pasted into both; they drifted, and only one of the two
-    received the fallback fix below, so the pipeline preflight kept failing in
-    the way /api/gate had already been fixed for.
+    received the fallback fix, so the pipeline preflight kept failing in the way
+    /api/gate had already been fixed for.
 
-    Routing, and why each entry has to be here:
-
-    * ``hypergate_subagent`` is the role every BaseSubAgent calls. It carries
-      the real gate workload: five of these run in parallel per request, each
-      emitting <=128 tokens, with the user waiting on the result.
-    * ``fallback_routing["hypergate_subagent"]`` is NOT optional. _resolve_fallback
-      only consults ``fallback_table["primary"]`` when the failing provider *is*
-      the router's primary; for any other role it falls through to the primary
-      provider itself. Without this entry a failing sub-agent would retry on
-      ``primary`` -- measured at a 16.1s mean and a 6/10 failure rate against a
-      6s timeout -- turning the slowest model in the chain into the safety net
-      for the fastest.
-    * ``fallback_table["primary"]`` stays for the primary role itself, whose
-      rule is the mirror image: primary cannot fall back to itself, and
-      candidates are deduped by served model, so without an explicit entry a
-      timeout there is structurally unrecoverable.
-
-    Model choice, measured 2026-08-29 by running all five sub-agent system
-    prompts against each candidate and checking whether the reply parsed
-    (verdict / slowest of the five):
-
-        ministral-14b   5/5 parsed   1.92s   EU   <- chosen
-        laguna-s-2.1    5/5 parsed   1.88s   --
-        gpt-4o-mini     5/5 parsed   1.81s   US   <- chosen as fallback
-        grok-4.3        5/5 parsed   4.64s   US
-        ministral-3b    4/5 parsed   0.97s        fails direct_detector
-        laguna-xs-2.1   4/5 parsed   1.20s        fails method_classifier
-        gemma-4-31b     2/5 parsed   --           emits -1 for string fields
-        qwen3.6-flash   0/5 parsed   --           returns ""
-        qwen3.5-flash   0/5 parsed   --           returns -1.0000000000000002e+308
-
-    qwen3.5-flash is what this role was configured with, and it never ran:
-    sub-agents resolved the role and then called role="primary", so grok-4.5
-    answered instead and the broken config was invisible. It is broken at every
-    max_tokens tried (80/256/1024/4096) -- on a plain prose prompt it replies
-    "Thinking Process:\\n1. **Analyze the Request:**...", i.e. reasoning.exclude
-    does not suppress its narration, and under the response_format JSON contract
-    that narration collapses to a degenerate float. Not a token-budget problem.
-
-    grok-4.5 is gone from the primary slot for the same kind of reason, measured
-    on this deployment's own histogram: 16.1s mean over 10 calls with 6 failures,
-    against a 6s per-attempt timeout. Nothing in the repo ever justified it.
-
-    Speed was not the deciding axis -- laguna-xs-2.1 is the fastest candidate and
-    is rejected, because it is a coding-specialised model and returns "" for the
-    one genuinely hard job here, picking among ~16 opaque method letters.
-    Correctness first, then latency.
+    Every role in _HYPERGATE_ROLE_MODELS is populated here together with its
+    fallback -- see those tables for which model answers which sub-agent and
+    why. ``fallback_table["primary"]`` stays for the primary role itself, whose
+    rule is the mirror image: primary cannot fall back to itself, and candidates
+    are deduped by served model, so without an explicit entry a timeout there is
+    structurally unrecoverable.
     """
     registry = get_model_registry_port()
+
     routing = dict(base.routing_table)
-    routing["hypergate_subagent"] = registry.get_provider("ministral-14b")
+    for role, model_id in _HYPERGATE_ROLE_MODELS.items():
+        routing[role] = registry.get_provider(model_id)
 
     fallback = dict(base.fallback_table)
-    fallback["hypergate_subagent"] = registry.get_provider("gpt-4o-mini")
+    for role, model_id in _HYPERGATE_ROLE_FALLBACKS.items():
+        fallback[role] = registry.get_provider(model_id)
     fallback["primary"] = registry.get_provider("gpt-4o-mini")
 
     return ProviderRouter(
-        primary=registry.get_provider("ministral-14b"),
+        primary=registry.get_provider(_HYPERGATE_PRIMARY),
         routing_table=routing,
         fallback_table=fallback,
         cascading_routing=base.cascading_routing,

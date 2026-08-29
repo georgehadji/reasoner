@@ -34,11 +34,24 @@ class BaseSubAgent(ABC):
     """One job. One cache. One execute() call."""
 
     AGENT_NAME: str = "base"
-    # The routing role these agents run on, mirroring subagents/base.py's ROLE.
+    # The routing role this agent runs on, mirroring subagents/base.py's ROLE.
     # Declaring it is the point: sub-agents previously *resolved* this role to
     # inspect the provider and then called role="primary", so which model they
     # actually ran on was whatever the preset had put in the primary slot, and
     # the two could differ without anything surfacing it.
+    #
+    # Every subclass that runs inside the gate overrides this with its own role
+    # (W4). One shared role meant the five Phase-1 agents fired concurrently at
+    # a single model on a single upstream endpoint and serialised against each
+    # other -- 1.47-1.92s probed alone, a 5.86s mean in the running app. It also
+    # forced one model to be good at all five jobs, when the measurements show
+    # the cheapest models each fail exactly one of them (see
+    # application/services/gate_service.py for the table).
+    #
+    # This default remains for sub-agents that run on their own, outside the
+    # gate's parallel phase -- currently only ImageModelSelector, invoked
+    # on-demand from api/routes/images.py. Every value here must be listed in
+    # domain/preset_core.py's _KNOWN_ROUTING_ROLES.
     ROLE: str = "hypergate_subagent"
     MAX_TOKENS: int = 128
     TEMPERATURE: float = 0.0

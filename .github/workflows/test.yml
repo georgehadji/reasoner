@@ -76,7 +76,13 @@ jobs:
           # 426: restoring the stripped re-export shims (models.py, phases/_shared.py,
           # api/run_state.py, infrastructure/renderer.py) resolved the type errors
           # that the broken imports were producing.
-          python scripts/mypy_ratchet.py --max 426
+          # 423: NOT a paydown by the commit that lowered it (W4). Measured on a
+          # tree with W4's source changes stashed: also 423, and the two error
+          # sets are identical line-for-line apart from line numbers shifted by
+          # W4's added lines. Commits since 426 was set moved the count without
+          # moving MAX -- the same drift the ruff ratchet hit at 2260. This is
+          # the honest count now; whoever wants the three back can bisect them.
+          python scripts/mypy_ratchet.py --max 423
 
       - name: Run tests
         run: |

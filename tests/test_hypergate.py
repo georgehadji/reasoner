@@ -14,6 +14,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from reasoner.application.services.gate_service import (
+    _HYPERGATE_ROLE_FALLBACKS,
+    _HYPERGATE_ROLE_MODELS,
+)
 from reasoner.hypergate import HyperGateAgent
 from reasoner.hypergate.models import HyperContext, SubAgentInput, SubAgentOutput
 from reasoner.hypergate.sub_agents import (
@@ -24,6 +28,17 @@ from reasoner.hypergate.sub_agents import (
     TieBreakerSubAgent,
     WebSearchDetectorSubAgent,
 )
+
+# The five that HyperGateAgent._run_phase1 fires concurrently via
+# asyncio.gather, in that order, and the tie-breaker that follows them.
+_PHASE1_SUB_AGENTS = (
+    LanguageDetectorSubAgent,
+    ComplexityEstimatorSubAgent,
+    DirectDetectorSubAgent,
+    WebSearchDetectorSubAgent,
+    MethodClassifierSubAgent,
+)
+_GATE_SUB_AGENTS = (*_PHASE1_SUB_AGENTS, TieBreakerSubAgent)
 
 # ── Helpers ───────────────────────────────────────────────────────────
 
@@ -383,15 +398,18 @@ def test_hyper_context_to_dict_keys():
 
 @pytest.mark.asyncio
 async def test_sub_agents_call_the_role_they_resolve():
-    """Every sub-agent must call role="hypergate_subagent", not "primary".
+    """Every sub-agent must call its own ROLE, not "primary".
 
-    Regression: _llm_call used to resolve "hypergate_subagent" purely to sniff
+    Regression: _llm_call used to resolve the sub-agent role purely to sniff
     the provider, then issue the call with role="primary". ProviderRouter.resolve
     consults routing_table[role] first and only falls back to self.primary, so
     the model that actually answered was whichever one the preset had put in the
     primary slot -- grok-4.5 for 45 of the 49 presets, and a different model
     again for the four that declare routing["primary"] themselves. Nothing in
     the response revealed which had run.
+
+    Since W4 the roles are per-agent, so this also pins the mapping: an agent
+    calling a role other than its own would silently take another agent's model.
     """
     seen_roles: list[str] = []
 
@@ -405,22 +423,18 @@ async def test_sub_agents_call_the_role_they_resolve():
     router.get.return_value = FakeProvider()
     router.call = recording_call
 
-    for agent_cls in (
-        LanguageDetectorSubAgent, ComplexityEstimatorSubAgent, DirectDetectorSubAgent,
-        WebSearchDetectorSubAgent, MethodClassifierSubAgent, TieBreakerSubAgent,
-    ):
+    for agent_cls in _GATE_SUB_AGENTS:
         agent = agent_cls()
         agent._cache.clear()
+        seen_roles.clear()
         await agent.execute(
             SubAgentInput(problem=f"probe for {agent_cls.__name__}", agent_name="probe"),
             router,
         )
-
-    assert seen_roles, "no sub-agent issued an LLM call"
-    assert set(seen_roles) == {"hypergate_subagent"}, (
-        f"sub-agents called roles {sorted(set(seen_roles))}; all must use "
-        f"BaseSubAgent.ROLE so the resolved provider is the one that answers"
-    )
+        assert seen_roles == [agent_cls.ROLE], (
+            f"{agent_cls.__name__} called roles {seen_roles}; it must use its own "
+            f"ROLE ({agent_cls.ROLE!r}) so the resolved provider is the one that answers"
+        )
 
 
 @pytest.mark.asyncio
@@ -456,34 +470,107 @@ async def test_temperature_is_left_to_the_provider():
     assert seen["timeout_seconds"] == LanguageDetectorSubAgent.TIMEOUT_SECONDS
 
 
-def test_hypergate_router_gives_the_subagent_role_its_own_fallback():
-    """fallback_routing must name hypergate_subagent explicitly.
-
-    _resolve_fallback only consults fallback_table["primary"] when the failing
-    provider IS the router's primary. For any other role it falls through to the
-    primary provider itself -- so without this entry, a failing sub-agent would
-    retry on the router's primary, which is exactly the slow model the
-    sub-agent role exists to avoid.
-    """
+def _gate_router():
+    """A gate router built off an arbitrary preset router, as production does."""
     from reasoner.application.services.gate_service import build_hypergate_router
     from reasoner.infrastructure.llm.registry import build_provider
     from reasoner.infrastructure.llm.router import ProviderRouter
 
-    base = ProviderRouter(primary=build_provider("qwen3.5-flash"))
-    gate_router = build_hypergate_router(base)
+    # qwen3.5-flash is deliberately a model the gate must NOT end up using:
+    # it is the one that returns -1.0000000000000002e+308 for every field.
+    return build_hypergate_router(ProviderRouter(primary=build_provider("qwen3.5-flash")))
 
-    assert "hypergate_subagent" in gate_router.routing_table
-    assert "hypergate_subagent" in gate_router.fallback_table, (
-        "sub-agent role has no explicit fallback; it would silently inherit "
-        "the router's primary provider"
+
+def test_every_gate_sub_agent_declares_a_known_role():
+    """A new sub-agent cannot ship without a routing role the domain accepts.
+
+    PipelinePreset.__post_init__ rejects any routing key outside
+    _KNOWN_ROUTING_ROLES, so a role missing from that frozenset makes every
+    preset declaring it raise at construction -- which is how
+    "hypergate_subagent" itself sat unlisted until W4.
+    """
+    from reasoner.domain.preset_core import _KNOWN_ROUTING_ROLES
+
+    for agent_cls in _GATE_SUB_AGENTS:
+        assert agent_cls.ROLE in _KNOWN_ROUTING_ROLES, (
+            f"{agent_cls.__name__}.ROLE = {agent_cls.ROLE!r} is not in "
+            f"_KNOWN_ROUTING_ROLES; a preset naming it would raise"
+        )
+
+
+def test_each_gate_sub_agent_has_its_own_role():
+    """The five Phase-1 agents must not share a role.
+
+    Sharing one role is what made asyncio.gather fire five concurrent calls at
+    a single upstream endpoint: probed alone the model answered in 1.47-1.92s,
+    in the running app it averaged 5.86s.
+    """
+    roles = [cls.ROLE for cls in _PHASE1_SUB_AGENTS]
+    assert len(set(roles)) == len(roles), f"Phase-1 agents share a role: {roles}"
+
+
+@pytest.mark.parametrize("role", sorted(_HYPERGATE_ROLE_MODELS))
+def test_every_gate_role_has_a_usable_explicit_fallback(role):
+    """fallback_routing must name every gate role explicitly.
+
+    _resolve_fallback only consults fallback_table["primary"] when the failing
+    provider IS the router's primary. For any other role it falls through to the
+    primary provider itself -- so without an entry, a failing sub-agent retries
+    on the router's primary, which is neither cross-vendor nor necessarily
+    capable of that agent's job.
+    """
+    gate_router = _gate_router()
+
+    assert role in gate_router.routing_table
+    assert role in gate_router.fallback_table, (
+        f"{role} has no explicit fallback; it would silently inherit the "
+        f"router's primary provider"
     )
 
-    assigned = gate_router.resolve("hypergate_subagent")
-    fb = gate_router._resolve_fallback("hypergate_subagent", assigned)
-    assert fb is not None, "sub-agent role resolved no fallback at all"
+    assigned = gate_router.resolve(role)
+    fb = gate_router._resolve_fallback(role, assigned)
+    assert fb is not None, f"{role} resolved no fallback at all"
     assert fb.model != assigned.model
     assert fb.model != gate_router.resolve_primary().model, (
-        "sub-agent fallback is the router primary -- the slow path it must avoid"
+        f"{role}'s fallback is the router primary -- the default an absent "
+        f"entry already gives you, so the entry buys nothing"
+    )
+
+
+@pytest.mark.parametrize("role", sorted(_HYPERGATE_ROLE_MODELS))
+def test_every_gate_role_falls_back_across_vendors(role):
+    """A fallback sharing a vendor with the model that just failed is not one.
+
+    Same cross-lab convention the presets follow: an upstream outage or rate
+    limit takes out every model behind it, so the retry has to leave the vendor.
+    """
+    from reasoner.core.ports.model_registry_port import get_model_registry_port
+
+    registry = get_model_registry_port()
+    primary_vendor = registry.vendor_of(_HYPERGATE_ROLE_MODELS[role])
+    fallback_vendor = registry.vendor_of(_HYPERGATE_ROLE_FALLBACKS[role])
+    assert primary_vendor != fallback_vendor, (
+        f"{role} falls back from {primary_vendor} to itself"
+    )
+
+
+def test_concurrent_gate_roles_resolve_to_distinct_models():
+    """No two Phase-1 roles may share a served model.
+
+    This is the invariant W4 exists to establish, and the same one
+    validate_presets.py Invariant C enforces for presets. Roles that never run
+    at the same time are exempt and are listed explicitly rather than inferred:
+    hypergate_tiebreak runs only after Phase 1 has returned, and
+    hypergate_subagent is reached only by ImageModelSelector, invoked on its own
+    from api/routes/images.py.
+    """
+    gate_router = _gate_router()
+    concurrent = [cls.ROLE for cls in _PHASE1_SUB_AGENTS]
+
+    resolved = {role: gate_router.resolve(role).model for role in concurrent}
+    assert len(set(resolved.values())) == len(resolved), (
+        f"Phase-1 roles collide on a served model, so they will contend on one "
+        f"upstream endpoint exactly as before W4: {resolved}"
     )
 
 

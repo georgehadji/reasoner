@@ -376,12 +376,35 @@ land on ``write`` rather than the generic default.
 
 # ── Roles ACR must not touch ──────────────────────────────────────────────────
 
-ACR_EXCLUDED_ROLES: frozenset[str] = frozenset({"image_generate"})
+ACR_EXCLUDED_ROLES: frozenset[str] = frozenset({
+    "image_generate",
+    # HyperGate sub-agent roles (W4). Their models are chosen by measurement,
+    # not by catalogue score: every candidate was run against all five sub-agent
+    # system prompts and kept only if the reply parsed. Utility scoring would
+    # undo that -- qwen3.5-flash and qwen3.6-flash rank respectably on
+    # reasoning/writing and return -1.0000000000000002e+308 and "" here, and
+    # gemma-4-31b emits -1 for string fields. It would also ignore the point of
+    # the split: no two of the five concurrent roles may resolve to the same
+    # model, an invariant a per-role ranking cannot see. See
+    # application/services/gate_service.py for the table and the measurements.
+    "hypergate_subagent",
+    "hypergate_language",
+    "hypergate_complexity",
+    "hypergate_direct",
+    "hypergate_web",
+    "hypergate_method",
+    "hypergate_tiebreak",
+})
 """Roles selected by machinery other than text-model utility scoring.
 
 ``image_generate`` is resolved by ``hypergate.sub_agents.image_model_selector``
 against ``image_model_catalogue``; ranking it on reasoning/writing scores would
 pick a text model for an image call.
+
+The ``hypergate_*`` roles are resolved by
+``application/services/gate_service.build_hypergate_router`` from a table of
+models that were probed with the real prompts, per the project's rule that no
+model may be routed on catalogue metadata alone.
 """
 
 # ── Catch-all Fallback ──

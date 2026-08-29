@@ -51,7 +51,7 @@ if want python; then
     gate "ruff"   python scripts/ruff_ratchet.py --max 2251
     gate "bandit" bandit -r src/ -t B307,B308,B102 -f txt -q
     gate "mypy-strict-auth_legacy" mypy --strict src/reasoner/infrastructure/auth_legacy.py --ignore-missing-imports
-    gate "mypy-ratchet" python scripts/mypy_ratchet.py --max 426
+    gate "mypy-ratchet" python scripts/mypy_ratchet.py --max 423
     gate "pytest" python -m pytest tests/ -m "not slow and not integration" \
         --tb=short --timeout=60 -q -p no:cacheprovider
 fi

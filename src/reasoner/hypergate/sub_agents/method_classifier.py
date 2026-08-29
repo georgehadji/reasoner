@@ -88,6 +88,7 @@ No markdown, no extra text.\
 
 class MethodClassifierSubAgent(BaseSubAgent):
     AGENT_NAME = "method_classifier"
+    ROLE = "hypergate_method"
     MAX_TOKENS = HYPERGATE_MAX_TOKENS_METHOD
 
     def _system_prompt(self) -> str:
