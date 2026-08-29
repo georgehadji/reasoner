@@ -102,8 +102,8 @@ export function DisagreementField() {
     let alpha = ALPHA_LIGHT;
 
     const readTheme = () => {
-      neutral = readChannels(root, '--text-subtle', '#606963');
-      accent = readChannels(root, '--accent', '#2F3832');
+      neutral = readChannels(root, '--text-subtle', '#6D645F');
+      accent = readChannels(root, '--accent', '#3C332E');
       alpha = root.classList.contains('dark') ? ALPHA_DARK : ALPHA_LIGHT;
     };
 

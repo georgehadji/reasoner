@@ -809,8 +809,8 @@
    the (0,2,0) one, so a reader who forces a theme still gets a band
    that contrasts with it.
 
-   --accent has to move with the rest. The light theme's #2F3832 is a
-   10.5:1 ink on #EBF0ED but only 1.4:1 on the band's #141816, so a band
+   --accent has to move with the rest. The light theme's #3C332E is a
+   10.5:1 ink on #F2EEEA but only 1.4:1 on the band's #1A1614, so a band
    that swapped only the greys would quietly drop its links below AA.
    ============================================================ */
 
@@ -821,24 +821,24 @@
      the dark palette — see the EDIT BOTH note there; this makes it four.
      --accent is redeclared because a band that swapped only the greys
      would drop its links below AA. */
-  --bg:             #141816;
-  --surface:        #1D221F;
-  --surface-hover:  #181D1A;
-  --surface-2:      #262C28;
-  --surface-3:      #2F3632;
+  --bg:             #1A1614;
+  --surface:        #24201C;
+  --surface-hover:  #1F1B17;
+  --surface-2:      #2F2925;
+  --surface-3:      #39332E;
 
-  --text:        #EDF6F0;
-  --text-2:      #BAC4BE;
-  --text-muted:  #96A09A;
-  --text-subtle: #8C948F;   /* NOT legal on --surface-3 — use --text-muted */
+  --text:        #FAF1EC;
+  --text-2:      #C9BFB9;
+  --text-muted:  #A59B95;
+  --text-subtle: #98908B;   /* NOT legal on --surface-3 — use --text-muted */
 
-  --border:        rgb(237 246 240 / 0.13);
-  --border-strong: rgb(237 246 240 / 0.36);   /* 3.10:1 — WCAG 1.4.11 */
+  --border:        rgb(250 241 236 / 0.13);
+  --border-strong: rgb(250 241 236 / 0.38);   /* 3.10:1 — WCAG 1.4.11 */
 
-  --accent:       #C4CFC8;
-  --accent-hover: #D9E2DC;
-  --accent-text:  #141816;
-  --accent-dim:   rgb(196 207 200 / 0.13);
+  --accent:       #D4C9C3;
+  --accent-hover: #E6DDD8;
+  --accent-text:  #1A1614;
+  --accent-dim:   rgb(212 201 195 / 0.13);
 
   --ok:      #A2B9FA;
   --warn:    #CE90EA;
@@ -852,9 +852,9 @@
   --shadow-float: 0 2px 4px rgb(0 0 0 / 0.45), 0 24px 56px -20px rgb(0 0 0 / 0.80);
 
   /* DEPRECATED — see styles/tokens.css */
-  --accent-glow:  0 0 40px rgb(196 207 200 / 0.22);
-  --accent-2:     #96A09A;
-  --accent-2-dim: rgb(150 160 154 / 0.12);
+  --accent-glow:  0 0 40px rgb(212 201 195 / 0.22);
+  --accent-2:     #A59B95;
+  --accent-2-dim: rgb(165 155 149 / 0.12);
   --shadow-lg:    var(--shadow-float);
 }
 
@@ -866,24 +866,24 @@
        the dark palette — see the EDIT BOTH note there; this makes it four.
        --accent is redeclared because a band that swapped only the greys
        would drop its links below AA. */
-    --bg:             #141816;
-    --surface:        #1D221F;
-    --surface-hover:  #181D1A;
-    --surface-2:      #262C28;
-    --surface-3:      #2F3632;
+    --bg:             #1A1614;
+    --surface:        #24201C;
+    --surface-hover:  #1F1B17;
+    --surface-2:      #2F2925;
+    --surface-3:      #39332E;
 
-    --text:        #EDF6F0;
-    --text-2:      #BAC4BE;
-    --text-muted:  #96A09A;
-    --text-subtle: #8C948F;   /* NOT legal on --surface-3 — use --text-muted */
+    --text:        #FAF1EC;
+    --text-2:      #C9BFB9;
+    --text-muted:  #A59B95;
+    --text-subtle: #98908B;   /* NOT legal on --surface-3 — use --text-muted */
 
-    --border:        rgb(237 246 240 / 0.13);
-    --border-strong: rgb(237 246 240 / 0.36);   /* 3.10:1 — WCAG 1.4.11 */
+    --border:        rgb(250 241 236 / 0.13);
+    --border-strong: rgb(250 241 236 / 0.38);   /* 3.10:1 — WCAG 1.4.11 */
 
-    --accent:       #C4CFC8;
-    --accent-hover: #D9E2DC;
-    --accent-text:  #141816;
-    --accent-dim:   rgb(196 207 200 / 0.13);
+    --accent:       #D4C9C3;
+    --accent-hover: #E6DDD8;
+    --accent-text:  #1A1614;
+    --accent-dim:   rgb(212 201 195 / 0.13);
 
     --ok:      #A2B9FA;
     --warn:    #CE90EA;
@@ -897,9 +897,9 @@
     --shadow-float: 0 2px 4px rgb(0 0 0 / 0.45), 0 24px 56px -20px rgb(0 0 0 / 0.80);
 
     /* DEPRECATED — see styles/tokens.css */
-    --accent-glow:  0 0 40px rgb(196 207 200 / 0.22);
-    --accent-2:     #96A09A;
-    --accent-2-dim: rgb(150 160 154 / 0.12);
+    --accent-glow:  0 0 40px rgb(212 201 195 / 0.22);
+    --accent-2:     #A59B95;
+    --accent-2-dim: rgb(165 155 149 / 0.12);
     --shadow-lg:    var(--shadow-float);
   }
 }
@@ -911,24 +911,24 @@
      the dark palette — see the EDIT BOTH note there; this makes it four.
      --accent is redeclared because a band that swapped only the greys
      would drop its links below AA. */
-  --bg:             #141816;
-  --surface:        #1D221F;
-  --surface-hover:  #181D1A;
-  --surface-2:      #262C28;
-  --surface-3:      #2F3632;
+  --bg:             #1A1614;
+  --surface:        #24201C;
+  --surface-hover:  #1F1B17;
+  --surface-2:      #2F2925;
+  --surface-3:      #39332E;
 
-  --text:        #EDF6F0;
-  --text-2:      #BAC4BE;
-  --text-muted:  #96A09A;
-  --text-subtle: #8C948F;   /* NOT legal on --surface-3 — use --text-muted */
+  --text:        #FAF1EC;
+  --text-2:      #C9BFB9;
+  --text-muted:  #A59B95;
+  --text-subtle: #98908B;   /* NOT legal on --surface-3 — use --text-muted */
 
-  --border:        rgb(237 246 240 / 0.13);
-  --border-strong: rgb(237 246 240 / 0.36);   /* 3.10:1 — WCAG 1.4.11 */
+  --border:        rgb(250 241 236 / 0.13);
+  --border-strong: rgb(250 241 236 / 0.38);   /* 3.10:1 — WCAG 1.4.11 */
 
-  --accent:       #C4CFC8;
-  --accent-hover: #D9E2DC;
-  --accent-text:  #141816;
-  --accent-dim:   rgb(196 207 200 / 0.13);
+  --accent:       #D4C9C3;
+  --accent-hover: #E6DDD8;
+  --accent-text:  #1A1614;
+  --accent-dim:   rgb(212 201 195 / 0.13);
 
   --ok:      #A2B9FA;
   --warn:    #CE90EA;
@@ -942,9 +942,9 @@
   --shadow-float: 0 2px 4px rgb(0 0 0 / 0.45), 0 24px 56px -20px rgb(0 0 0 / 0.80);
 
   /* DEPRECATED — see styles/tokens.css */
-  --accent-glow:  0 0 40px rgb(196 207 200 / 0.22);
-  --accent-2:     #96A09A;
-  --accent-2-dim: rgb(150 160 154 / 0.12);
+  --accent-glow:  0 0 40px rgb(212 201 195 / 0.22);
+  --accent-2:     #A59B95;
+  --accent-2-dim: rgb(165 155 149 / 0.12);
   --shadow-lg:    var(--shadow-float);
 }
 
@@ -1075,8 +1075,8 @@
 
 @media (prefers-contrast: more) {
   :root {
-    --border:        rgb(18 24 20 / 0.42);
-    --border-strong: rgb(18 24 20 / 0.68);
+    --border:        rgb(27 21 17 / 0.42);
+    --border-strong: rgb(27 21 17 / 0.68);
     --text-muted:    var(--text-2);
     --text-subtle:   var(--text-2);
 
@@ -1091,8 +1091,8 @@
   }
 
   :root.dark {
-    --border:        rgb(237 246 240 / 0.42);
-    --border-strong: rgb(237 246 240 / 0.68);
+    --border:        rgb(250 241 236 / 0.42);
+    --border-strong: rgb(250 241 236 / 0.68);
     --text-muted:    var(--text-2);
     --text-subtle:   var(--text-2);
 
@@ -1105,8 +1105,8 @@
 
   @media (prefers-color-scheme: dark) {
     :root:not(.light) {
-      --border:        rgb(237 246 240 / 0.42);
-      --border-strong: rgb(237 246 240 / 0.68);
+      --border:        rgb(250 241 236 / 0.42);
+      --border-strong: rgb(250 241 236 / 0.68);
       --text-muted:    var(--text-2);
       --text-subtle:   var(--text-2);
 

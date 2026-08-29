@@ -97,9 +97,9 @@ export function IdeaField() {
     let alpha = ALPHA_LIGHT;
 
     const readTheme = () => {
-      neutral = readChannels(root, '--text-subtle', '#606963');
-      accent = readChannels(root, '--accent', '#2F3832');
-      strong = readChannels(root, '--text', '#121814');
+      neutral = readChannels(root, '--text-subtle', '#6D645F');
+      accent = readChannels(root, '--accent', '#3C332E');
+      strong = readChannels(root, '--text', '#1B1511');
       alpha = root.classList.contains('dark') ? ALPHA_DARK : ALPHA_LIGHT;
     };
 
