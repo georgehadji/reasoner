@@ -268,6 +268,14 @@ class TestArticlePromptBuilders:
         already carries and ARTICLE_DRAFT_SYSTEM already tells the model to
         honour. This asserts the dead branch stays dead -- re-adding a second,
         structured copy of the same instruction is the regression.
+
+        Three tests that asserted the OLD behaviour (style_brief flowing
+        through to the prompt) were deleted alongside this one staying, once
+        their contradiction with it was noticed: test_article_adapters.py's
+        test_style_brief_preserved, and test_article_golden_set.py's
+        test_style_brief_integration plus the two golden-set entries that
+        existed only to feed it. This test is the reason we know that removal
+        was deliberate rather than a regression.
         """
         from reasoner.phases.article import article_draft_prompt
         state = self._make_test_state({"style_brief": {"author": "Test Author", "publication": "Test Pub"}})
