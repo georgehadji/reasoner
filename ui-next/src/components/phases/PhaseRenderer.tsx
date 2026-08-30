@@ -9,6 +9,7 @@ import { PhaseCard } from './PhaseCard';
 import { SynthesisCard } from './SynthesisCard';
 import { ClassificationCard } from './ClassificationCard';
 import { CritiqueCard } from './CritiqueCard';
+import { PerspectivesRenderer } from './PerspectivesRenderer';
 import { buildMarkdownFromPhase } from '@/lib/markdown';
 import { copyToClipboard } from '@/lib/utils';
 import { isEnabled } from '@/hooks/useFeatureFlags';
@@ -184,6 +185,17 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
     return (
       <PhaseCard index={index} phase={phaseNum} name={name} tokens={tokens} models={models} subagents={subagents} duration={duration} defaultOpen={defaultOpen} forceOpen={forceOpen} compact={isCompact} status={cardStatus} quality={quality}>
         <CritiqueCard data={data} />
+        {onComplete && <CompletionTrigger onComplete={onComplete} />}
+      </PhaseCard>
+    );
+  }
+
+  // Perspectives (phase 2 generation candidates — gutter of epistemic labels)
+  const candidatesArray = data && typeof data === 'object' ? (data as Record<string, unknown>).candidates : undefined;
+  if (name === 'Perspectives' && Array.isArray(candidatesArray) && candidatesArray.length > 0) {
+    return (
+      <PhaseCard index={index} phase={phaseNum} name={name} tokens={tokens} models={models} subagents={subagents} duration={duration} defaultOpen={defaultOpen} forceOpen={forceOpen} compact={isCompact} status={cardStatus} quality={quality}>
+        <PerspectivesRenderer candidates={candidatesArray as Array<{ perspective: string; content: string; key_insights: string[]; model_used?: string }>} />
         {onComplete && <CompletionTrigger onComplete={onComplete} />}
       </PhaseCard>
     );

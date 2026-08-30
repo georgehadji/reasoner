@@ -1,4 +1,5 @@
 import type { Segment } from '@/lib/demo-record';
+import { EPISTEMIC_TAG, epistemicClassName } from '@/lib/remark-epistemic';
 
 /**
  * Renders one run of parsed inline segments.
@@ -12,11 +13,7 @@ import type { Segment } from '@/lib/demo-record';
  * to show what an answer looks like when the provenance was never kept.
  */
 
-const MARK_CLASS: Record<string, string> = {
-  VERIFIED: 'epistemic-verified',
-  HYPOTHESIS: 'epistemic-hypothesis',
-  UNKNOWN: 'epistemic-unknown',
-};
+const MARK_CLASS: Record<string, string> = EPISTEMIC_TAG;
 
 interface MarksProps {
   segments: readonly Segment[];
@@ -43,7 +40,7 @@ export function Marks({ segments, withRecord = true }: MarksProps) {
             return (
               <span
                 key={i}
-                className={`${MARK_CLASS[segment.label]} ml-[var(--space-1)] pl-[var(--space-2)] font-sans text-[length:var(--text-2xs)] font-semibold uppercase tracking-[var(--tracking-label)]`}
+                className={epistemicClassName(MARK_CLASS[segment.label])}
               >
                 {segment.label}
                 {segment.qualifier ? ` ${segment.qualifier}` : ''}
