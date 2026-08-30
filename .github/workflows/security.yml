@@ -23,13 +23,17 @@ jobs:
       # <reason>, expires <date>` inline, reviewed in the PR that adds it.
       # No blanket / unreviewed suppression.
       - run: pip-audit --requirement requirements.txt
-      - run: bandit -r src/ -f json -o bandit-report.json
-      # Was a bare `bandit -r src/`, which exits 1 on any finding at any
-      # severity. src/ carries 148 and no `# nosec` anywhere, so this step
-      # failed the day it was written and this workflow has no successful run
-      # in its last 100 -- it could not report a NEW finding, because it was
-      # already red. The ratchet prints every finding unchanged and fails on
-      # 149. Nothing is filtered or skipped; see the script for the backlog.
+      # Two steps before: `bandit ... -o bandit-report.json` then a bare
+      # `bandit -r src/`. The first still exits 1 on any finding -- `-o`
+      # redirects the report, not the exit code -- and nothing in this repo
+      # ever consumed bandit-report.json (no upload-artifact, no reader), so
+      # it was a second full scan whose only effect was failing the job.
+      # The bare run had the same problem: src/ carries 148 findings and no
+      # `# nosec` anywhere, so this job failed the day it was written and
+      # this workflow has no successful run in its last 100 -- it could not
+      # report a NEW finding, because it was already red. The ratchet prints
+      # every finding unchanged and fails on 149. Nothing is filtered or
+      # skipped; see the script for the backlog.
       - run: python scripts/bandit_ratchet.py --max 148
       - run: python scripts/scan-secrets.py
 
