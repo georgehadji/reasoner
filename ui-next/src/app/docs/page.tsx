@@ -47,7 +47,7 @@ export default function DocsIndexPage() {
           ]),
         ]}
       />
-      <div className="mx-auto grid max-w-6xl gap-12 px-6 py-16 lg:grid-cols-[220px_minmax(0,1fr)]">
+      <div className="mx-auto grid max-w-[var(--width-wide)] gap-[var(--space-12)] px-[var(--gutter)] py-[var(--space-16)] lg:grid-cols-[220px_minmax(0,1fr)]">
         <aside className="hidden lg:block">
           <div className="sticky top-24">
             <DocsSidebar />
@@ -55,8 +55,8 @@ export default function DocsIndexPage() {
         </aside>
 
         <main id="main-content">
-          <h1 className="text-4xl font-bold tracking-tight">Documentation</h1>
-          <p className="mt-3 max-w-2xl text-lg text-[var(--text-muted)]">
+          <h1 className="font-serif text-[length:var(--text-4xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)]">Documentation</h1>
+          <p className="prose-measure mt-[var(--space-3)] max-w-2xl text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-2)]">
             Everything needed to run Reasoner well — from a first query to metered
             production usage over the API.
           </p>

@@ -3,7 +3,7 @@
 import { useCallback, useState } from 'react';
 import Link from 'next/link';
 import { apiFetch } from '@/lib/api-client';
-import { Check, X, Shield, CreditCard, Clock, Mail } from 'lucide-react';
+import { Check, X, CreditCard, Mail } from 'lucide-react';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
 
@@ -110,12 +110,29 @@ export default function PricingPage() {
   return (
     <div className="flex min-h-screen flex-col bg-[var(--bg)] text-[var(--text)]">
       <SiteHeader />
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-12">
-        <div className="mb-10 text-center">
-          <h1 className="text-3xl font-bold text-[var(--text)]">Simple, Transparent Pricing</h1>
-          <p className="mt-2 text-[var(--text-muted)]">Start free. Scale with confidence. No hidden fees.</p>
-        </div>
+      <main className="flex-1">
+        {/* ── Masthead ───────────────────────────────────────────
+            Same marginal-marker idiom as /about and /capabilities: a
+            left-aligned label column, not a centred hero. */}
+        <header className="mx-auto w-full max-w-[var(--width-wide)] px-[var(--gutter)] pb-[var(--section-y)] pt-[var(--space-48)]">
+          <div className="grid gap-[var(--space-6)] lg:grid-cols-[9rem_minmax(0,1fr)] lg:gap-[var(--space-12)]">
+            <div>
+              <p className="mt-[var(--space-1)] font-sans text-[8pt] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
+                Pricing
+              </p>
+            </div>
+            <div className="min-w-0">
+              <h1 className="max-w-[20ch] text-balance font-serif text-[34pt] font-normal leading-[var(--lh-display)] sm:text-[55pt] tracking-[var(--tracking-tight)] text-[var(--text)]">
+                Simple, transparent pricing.
+              </h1>
+              <p className="prose-measure mt-[var(--space-6)] text-[21pt] leading-[var(--lh-body)] text-[var(--text-2)]">
+                Start free. Scale with confidence. No hidden fees.
+              </p>
+            </div>
+          </div>
+        </header>
 
+        <div className="mx-auto w-full max-w-[var(--width-wide)] px-[var(--gutter)] pb-[var(--section-y)]">
         {error && (
           <div className="mx-auto mb-6 max-w-lg rounded-[var(--radius)] bg-[var(--red-bg)] p-3 text-sm text-[var(--red)]" role="alert">
             <div className="flex items-center gap-2">
@@ -263,21 +280,6 @@ export default function PricingPage() {
             Contact us for Enterprise
           </Link>
         </div>
-
-        {/* Trust badges */}
-        <div className="mt-12 flex flex-wrap items-center justify-center gap-6 text-xs text-[var(--text-subtle)]">
-          <div className="flex items-center gap-1.5">
-            <Shield className="h-4 w-4" />
-            <span>Secure checkout (Stripe &amp; PayPal)</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <CreditCard className="h-4 w-4" />
-            <span>Cancel anytime</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Clock className="h-4 w-4" />
-            <span>14-day money-back guarantee</span>
-          </div>
         </div>
       </main>
       <SiteFooter />

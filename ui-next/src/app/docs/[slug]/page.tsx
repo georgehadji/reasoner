@@ -62,7 +62,7 @@ export default async function DocPage({ params }: DocParams) {
           ]),
         ]}
       />
-      <div className="mx-auto grid max-w-6xl gap-12 px-6 py-16 lg:grid-cols-[220px_minmax(0,1fr)]">
+      <div className="mx-auto grid max-w-[var(--width-wide)] gap-[var(--space-12)] px-[var(--gutter)] py-[var(--space-16)] lg:grid-cols-[220px_minmax(0,1fr)]">
         <aside className="hidden lg:block">
           <div className="sticky top-24">
             <DocsSidebar activeSlug={doc.slug} />
@@ -82,11 +82,11 @@ export default async function DocPage({ params }: DocParams) {
 
           <article>
             <header className="mb-10 border-b border-[var(--border)] pb-8">
-              <h1 className="text-4xl font-bold tracking-tight text-[var(--text)]">{doc.title}</h1>
-              <p className="mt-3 text-lg leading-relaxed text-[var(--text-muted)]">
+              <h1 className="font-serif text-[length:var(--text-4xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)]">{doc.title}</h1>
+              <p className="prose-measure mt-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-2)]">
                 {doc.description}
               </p>
-              <p className="mt-4 text-xs uppercase tracking-[0.12em] text-[var(--text-muted)]">
+              <p className="mt-[var(--space-4)] font-sans text-[length:var(--text-xs)] uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
                 {doc.minutes} min read
               </p>
             </header>

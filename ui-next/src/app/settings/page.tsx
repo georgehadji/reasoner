@@ -76,9 +76,25 @@ export default function SettingsPage() {
   return (
     <div className="flex min-h-screen flex-col bg-[var(--bg)] text-[var(--text)]">
       <SiteHeader />
-      <main className="mx-auto max-w-3xl px-4 py-12 flex-1 w-full">
-      <h1 className="mb-8 text-3xl font-bold text-[var(--text)]">Account Settings</h1>
+      <main className="flex-1 w-full">
+        {/* ── Masthead ───────────────────────────────────────────
+            Same marginal-marker idiom as the other generic routes —
+            no lede here, this is an account-management page, not a
+            pitch, so there is nothing genuine to put in one. */}
+        <header className="mx-auto w-full max-w-3xl px-[var(--gutter)] pb-[var(--space-8)] pt-[var(--space-48)]">
+          <div className="grid gap-[var(--space-6)] lg:grid-cols-[9rem_minmax(0,1fr)] lg:gap-[var(--space-12)]">
+            <div>
+              <p className="mt-[var(--space-1)] font-sans text-[length:var(--text-xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
+                Settings
+              </p>
+            </div>
+            <h1 className="min-w-0 font-serif text-[length:var(--text-3xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)]">
+              Account settings.
+            </h1>
+          </div>
+        </header>
 
+      <div className="mx-auto max-w-3xl px-[var(--gutter)] pb-[var(--space-12)] w-full">
       {message.text && (
         <div className={`mb-6 rounded-lg p-4 text-sm ${message.type === 'error' ? 'bg-[var(--red-bg)] text-[var(--red)]' : 'bg-[var(--surface-2)] font-medium text-[var(--text)]'}`}>
           {message.text}
@@ -199,6 +215,7 @@ export default function SettingsPage() {
             </button>
           </div>
         </section>
+      </div>
       </div>
       </main>
       <SiteFooter />
