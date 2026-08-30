@@ -1,19 +1,15 @@
 from __future__ import annotations
 
 import os
-import secrets
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import asyncio
-import json
 import logging
 import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
-
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -209,42 +205,11 @@ async def lifespan(app: FastAPI):
         from reasoner.infrastructure.llm.registry import RegistryAdapter, build_provider
         set_build_provider(build_provider)
         set_model_registry_port(RegistryAdapter())
+        from reasoner.infrastructure.valkey import inject_shared_cache_port
+        await inject_shared_cache_port()
         logger.info("Core→infra dependencies injected: build_provider, model_registry_port")
     except Exception as exc:
         logger.warning("Failed to inject core→infra deps: %s", exc)
-
-    # Shared cache port — consumed by gate_service.run_gate_cached (W5). Probed
-    # rather than assumed: ValkeyCacheAdapter swallows its own connection errors
-    # and returns a miss, so an unreachable Valkey would leave every lookup
-    # paying the client's 2s socket timeout for a guaranteed miss -- strictly
-    # worse than no cache. One round-trip here decides which adapter to inject.
-    # The in-memory fallback is per-worker, which is still the fix: the bug was
-    # a cache that did not survive a single request.
-    try:
-        from reasoner.core.ports.shared_cache_port import set_shared_cache_port
-        from reasoner.infrastructure.valkey import ValkeyCacheAdapter
-        if not (os.environ.get("VALKEY_URL") or os.environ.get("REDIS_URL")):
-            # get_valkey_pool() defaults to redis://localhost:6379/0 when neither
-            # is set, so probing would spend two 2s connect timeouts on every dev
-            # startup to learn what the unset variables already say.
-            raise RuntimeError("no VALKEY_URL/REDIS_URL configured")
-        _cache_port = ValkeyCacheAdapter()
-        await _cache_port.set("_shared_cache_probe", "1", ttl=10)
-        if await _cache_port.get("_shared_cache_probe") is None:
-            raise RuntimeError("Valkey cache probe did not round-trip")
-        set_shared_cache_port(_cache_port)
-        logger.info("SharedCachePort injected: ValkeyCacheAdapter")
-    except Exception as exc:
-        try:
-            from reasoner.core.ports.shared_cache_port import set_shared_cache_port
-            from reasoner.infrastructure.valkey import InMemoryCacheAdapter
-            set_shared_cache_port(InMemoryCacheAdapter())
-            logger.info(
-                "SharedCachePort injected: InMemoryCacheAdapter "
-                "(Valkey unavailable: %s). Per-worker, not shared.", exc,
-            )
-        except Exception as fallback_exc:
-            logger.warning("Failed to inject SharedCachePort: %s", fallback_exc)
 
     # Memory is best-effort: a broken neuro config must not stop the app, it
     # just leaves get_memory_port() returning None and recall returning [].

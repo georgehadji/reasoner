@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from typing import Any
 
 from reasoner.core.ports.shared_cache_port import SharedCachePort
@@ -73,3 +74,49 @@ class ValkeyCacheAdapter:
 
 # Verify protocol conformance at import time
 _: SharedCachePort = ValkeyCacheAdapter()  # type: ignore[assignment]
+
+
+async def inject_shared_cache_port() -> None:
+    """Pick a cache backend and install it as the process-wide SharedCachePort.
+
+    Lives here rather than in the API lifespan because choosing between these
+    two adapters is this module's business, and because api/__init__.py is
+    under a pinned line-count cap whose rule is to shrink the module before
+    growing it (tests/architecture/test_layer_boundaries.py).
+
+    Valkey is probed rather than assumed: ValkeyCacheAdapter swallows its own
+    connection errors and reports a miss, so an unreachable Valkey would leave
+    every lookup paying the client's 2s socket timeout for a guaranteed miss --
+    strictly worse than no cache at all. The in-memory fallback is per-worker,
+    which is still the fix for what it was written for: a HyperGate cache that
+    did not survive a single request.
+
+    Never raises. A process with no cache answers correctly, just slower.
+    """
+    from reasoner.core.ports.shared_cache_port import set_shared_cache_port
+    from reasoner.infrastructure.valkey.memory_cache_adapter import InMemoryCacheAdapter
+
+    try:
+        if not (os.environ.get("VALKEY_URL") or os.environ.get("REDIS_URL")):
+            # get_valkey_pool() defaults to redis://localhost:6379/0 when neither
+            # is set, so probing would spend two 2s connect timeouts on every dev
+            # startup to learn what the unset variables already say.
+            raise RuntimeError("no VALKEY_URL/REDIS_URL configured")
+        port = ValkeyCacheAdapter()
+        await port.set("_shared_cache_probe", "1", ttl=10)
+        if await port.get("_shared_cache_probe") is None:
+            raise RuntimeError("Valkey cache probe did not round-trip")
+        set_shared_cache_port(port)
+        logger.info("SharedCachePort injected: ValkeyCacheAdapter")
+        return
+    except Exception as exc:
+        reason = exc
+
+    try:
+        set_shared_cache_port(InMemoryCacheAdapter())
+        logger.info(
+            "SharedCachePort injected: InMemoryCacheAdapter (Valkey unavailable: "
+            "%s). Per-worker, not shared.", reason,
+        )
+    except Exception as exc:
+        logger.warning("Failed to inject SharedCachePort: %s", exc)
