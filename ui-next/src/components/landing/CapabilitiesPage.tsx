@@ -127,7 +127,7 @@ export default function CapabilitiesPage() {
             told what Reasoner is, either by the home page or by a link
             straight into a §. The job of this block is to say what kind
             of document follows, and then get out of the way of §1. */}
-        <header className="mx-auto w-full max-w-[var(--width-wide)] px-[var(--gutter)] pb-[var(--section-y)] pt-[var(--space-40)]">
+        <header className="mx-auto w-full max-w-[var(--width-wide)] px-[var(--gutter)] pb-[var(--section-y)] pt-[var(--space-48)]">
           <div className="grid gap-[var(--space-6)] lg:grid-cols-[9rem_minmax(0,1fr)] lg:gap-[var(--space-12)]">
             <div>
               <p className="mt-[var(--space-1)] font-sans text-[8pt] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
@@ -136,7 +136,7 @@ export default function CapabilitiesPage() {
             </div>
             <div className="min-w-0">
               <h1 className="max-w-[20ch] text-balance font-serif text-[34pt] font-normal leading-[var(--lh-display)] sm:text-[55pt] tracking-[var(--tracking-tight)] text-[var(--text)]">
-                Nine mechanisms, and what holds each one.
+                Eight mechanisms, and what holds each one.
               </h1>
               <p className="prose-measure mt-[var(--space-6)] text-[21pt] leading-[var(--lh-body)] text-[var(--text-2)]">
                 Every section below is the same argument from a different angle: run the work past
