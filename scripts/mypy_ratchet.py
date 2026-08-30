@@ -5,9 +5,10 @@ CI previously ran `mypy --strict` against exactly one file
 touched the other ~250 source files. Running the pyproject.toml-configured
 (non-strict) profile over the full tree surfaced 429 pre-existing errors
 across 128 files. Hard-blocking on day one would fail every PR immediately,
-so this ratchets the same two-way way as scripts/ruff_ratchet.py and
-scripts/count_importlinter_exceptions.py: MAX must move in lockstep with the
-real count, in either direction.
+so this ratchets like scripts/ruff_ratchet.py and
+scripts/count_importlinter_exceptions.py -- with one deliberate difference:
+dropping BELOW max is a note here, not a failure. Those two count deterministic
+things; this one does not. See the note in main() for the measurement.
 
 The existing `mypy --strict auth_legacy.py` check is kept alongside this,
 unchanged — that file is already clean under --strict and stays that way.
@@ -54,11 +55,22 @@ def main() -> int:
         print(f"FAIL: {count} errors exceeds ratchet MAX={args.max}")
         return 1
     if count < args.max:
+        # Warn, do not fail. Unlike ruff's, this count is not reproducible
+        # across environments: on identical source (7a731ce) CI measured 405
+        # and a Windows dev box measured 423. Two causes, both structural --
+        # CI installs `mypy` unpinned so the version floats, and mypy narrows
+        # `sys.platform` branches, so a tree containing Windows-only code
+        # (e.g. start_all.py's taskkill path) genuinely yields a different
+        # error set per platform. An exact-equality assertion over a number
+        # that depends on where it is measured cannot hold in both places, and
+        # the gate's actual job -- keeping new type debt out -- is done
+        # entirely by the upper bound above.
         print(
-            f"FAIL: {count} errors is below ratchet MAX={args.max} — "
-            f"debt was paid down; lower MAX to {count} in the same change."
+            f"NOTE: {count} errors is below ratchet MAX={args.max}. Debt was "
+            f"paid down, or this environment simply counts fewer than the one "
+            f"that set MAX. Lower MAX only if you can reproduce {count} in CI."
         )
-        return 1
+        return 0
     print(f"PASS: {count} errors matches ratchet MAX={args.max}")
     return 0
 
