@@ -28,14 +28,14 @@ const CHECK_LABELS: Record<string, string> = {
 };
 
 function overallTone(status: HealthResponse['status'] | 'unreachable') {
-  if (status === 'healthy') return { label: 'All systems operational', tone: 'text-[var(--ok)]', Icon: CheckCircle2 };
-  if (status === 'degraded') return { label: 'Degraded performance', tone: 'text-[var(--warn)]', Icon: AlertTriangle };
+  if (status === 'healthy') return { label: 'All systems operational', tone: 'text-[var(--text)]', Icon: CheckCircle2 };
+  if (status === 'degraded') return { label: 'Degraded performance', tone: 'text-[var(--text-muted)]', Icon: AlertTriangle };
   return { label: 'Service disruption', tone: 'text-[var(--red)]', Icon: XCircle };
 }
 
 function checkTone(status: CheckStatus) {
-  if (status === 'ok') return { tone: 'text-[var(--ok)]', Icon: CheckCircle2 };
-  if (status === 'warning' || status === 'degraded') return { tone: 'text-[var(--warn)]', Icon: AlertTriangle };
+  if (status === 'ok') return { tone: 'text-[var(--text)]', Icon: CheckCircle2 };
+  if (status === 'warning' || status === 'degraded') return { tone: 'text-[var(--text-muted)]', Icon: AlertTriangle };
   if (status === 'error') return { tone: 'text-[var(--red)]', Icon: XCircle };
   return { tone: 'text-[var(--text-subtle)]', Icon: AlertTriangle };
 }

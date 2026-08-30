@@ -274,7 +274,7 @@ export default function ApiKeysPage() {
                 className="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 text-sm font-medium transition-colors hover:bg-[var(--surface-2)]"
               >
                 {copied ? (
-                  <Check className="h-4 w-4 text-[var(--ok)]" aria-hidden="true" />
+                  <Check className="h-4 w-4 text-[var(--text)]" aria-hidden="true" />
                 ) : (
                   <Copy className="h-4 w-4" aria-hidden="true" />
                 )}

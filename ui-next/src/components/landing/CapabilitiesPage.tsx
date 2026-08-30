@@ -138,7 +138,7 @@ export default function CapabilitiesPage() {
               <h1 className="max-w-[20ch] text-balance font-serif text-[34pt] font-normal leading-[var(--lh-display)] sm:text-[55pt] tracking-[var(--tracking-tight)] text-[var(--text)]">
                 Nine mechanisms, and what holds each one.
               </h1>
-              <p className="prose-measure mt-[var(--space-6)] font-serif text-[21pt] leading-[var(--lh-body)] text-[var(--text-2)]">
+              <p className="prose-measure mt-[var(--space-6)] text-[21pt] leading-[var(--lh-body)] text-[var(--text-2)]">
                 Every section below is the same argument from a different angle: run the work past
                 models that disagree, then keep the disagreement. Each says which part is a rule in
                 code and which part is a brief given to a model, because the difference is the
@@ -170,7 +170,7 @@ export default function CapabilitiesPage() {
               <dt className="epistemic-hypothesis pl-[var(--space-3)] font-sans text-[8pt] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)]">
                 Hypothesis
               </dt>
-              <dd className="mt-[var(--space-3)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+              <dd className="mt-[var(--space-3)] text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
                 The model asserted it and nothing else backs it. Plausible, reasoned, unconfirmed,
                 and never dressed up as more.
               </dd>
@@ -179,7 +179,7 @@ export default function CapabilitiesPage() {
               <dt className="epistemic-verified pl-[var(--space-3)] font-sans text-[8pt] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)]">
                 Verified
               </dt>
-              <dd className="mt-[var(--space-3)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+              <dd className="mt-[var(--space-3)] text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
                 A source outside the model carries it. Cited, and traceable back to the thing that
                 carried it.
               </dd>
@@ -247,7 +247,7 @@ export default function CapabilitiesPage() {
                 <dt className="font-sans text-[13pt] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
                   {name}
                 </dt>
-                <dd className="mt-[var(--space-1)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+                <dd className="mt-[var(--space-1)] text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
                   {desc}
                 </dd>
               </div>
@@ -471,7 +471,7 @@ export default function CapabilitiesPage() {
                 <dt className="font-sans text-[13pt] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
                   {name}
                 </dt>
-                <dd className="mt-[var(--space-1)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+                <dd className="mt-[var(--space-1)] text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
                   {desc}
                 </dd>
               </div>
@@ -497,7 +497,7 @@ export default function CapabilitiesPage() {
                 <dt className="font-sans text-[13pt] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
                   {name}
                 </dt>
-                <dd className="mt-[var(--space-1)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+                <dd className="mt-[var(--space-1)] text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
                   {desc}
                 </dd>
               </div>

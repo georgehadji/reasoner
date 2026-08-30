@@ -120,7 +120,10 @@ function DashboardContent() {
   };
 
   const percent = quota && quota.max > 0 ? Math.min((quota.used / quota.max) * 100, 100) : 0;
-  const barColor = percent >= 90 ? 'bg-[var(--red)]' : percent >= 70 ? 'bg-[var(--warn)]' : 'bg-[var(--accent)]';
+  // --warn is reserved for epistemic labels — the near-limit tier escalates
+  // from --accent to full ink instead, so it still reads as "more urgent"
+  // without a hue change.
+  const barColor = percent >= 90 ? 'bg-[var(--red)]' : percent >= 70 ? 'bg-[var(--text)]' : 'bg-[var(--accent)]';
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
@@ -255,8 +258,8 @@ function DashboardContent() {
                 </div>
                 <div className="shrink-0 text-right">
                   <p
-                    className={`text-sm font-medium ${
-                      entry.delta > 0 ? 'text-[var(--ok)]' : 'text-[var(--text)]'
+                    className={`text-sm ${
+                      entry.delta > 0 ? 'font-semibold text-[var(--text)]' : 'font-medium text-[var(--text)]'
                     }`}
                   >
                     {entry.delta > 0 ? '+' : ''}

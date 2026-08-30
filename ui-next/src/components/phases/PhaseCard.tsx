@@ -76,14 +76,15 @@ const STATUS_MARK = {
     cls: 'text-[var(--accent)] animate-spin motion-reduce:animate-none',
     label: 'Running',
   },
-  completed: { Icon: CheckCircle2, cls: 'text-[var(--ok)]', label: 'Completed' },
+  completed: { Icon: CheckCircle2, cls: 'text-[var(--text)]', label: 'Completed' },
   // Distinct from both `completed` (nothing recorded) and `error` (the phase
   // itself failed outright): the phase ran to the end, but recorded at least
   // one caught error along the way (a parse failure it fell back from, an
   // empty step) — every field below is still real, but it earned less trust
   // than a clean pass. A different icon, not just colour, so it survives
-  // monochrome the same way the others do.
-  degraded: { Icon: AlertCircle, cls: 'text-[var(--warn)]', label: 'Completed with errors' },
+  // monochrome the same way the others do; --warn is reserved for epistemic
+  // labels now, so the softer trust level reads as softer ink instead.
+  degraded: { Icon: AlertCircle, cls: 'text-[var(--text-muted)]', label: 'Completed with errors' },
   error: { Icon: AlertTriangle, cls: 'text-[var(--red)]', label: 'Failed' },
 } as const;
 
@@ -133,7 +134,7 @@ export function QualityChip({ quality }: { quality: { score: number; passed: boo
       <span className={cn(CHIP, 'gap-[var(--space-2)]')}>
         <Icon
           aria-hidden="true"
-          className={cn(ICON_SM, quality.passed ? 'text-[var(--ok)]' : 'text-[var(--warn)]')}
+          className={cn(ICON_SM, quality.passed ? 'text-[var(--text)]' : 'text-[var(--text-muted)]')}
         />
         <span className={MICRO_LABEL}>Quality</span>
         <ScoreMeter value={quality.score} className="w-[var(--space-8)]" />

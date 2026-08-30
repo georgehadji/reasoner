@@ -197,7 +197,7 @@ export default function LandingPage() {
                   clause is the only emphasis above the fold and the only
                   claim a competitor cannot also make; it is a weight shift
                   rather than a colour so it never competes with the CTA. */}
-              <p className="prose-measure font-serif text-[21pt] leading-[1.6] text-[var(--text-2)]">
+              <p className="prose-measure text-[21pt] leading-[1.6] text-[var(--text-2)]">
                 Reasoner puts your question to models from rival labs and rival geopolitical blocs,
                 keeps their disagreement instead of averaging it away, and labels every claim{' '}
                 <strong className="font-medium text-[var(--text)]">
@@ -438,7 +438,7 @@ export default function LandingPage() {
             machine-prose{' '}
             <Link
               href="/capabilities#voice"
-              className="link-smooth text-[var(--accent)] hover:text-[var(--accent-hover)]"
+              className="link-smooth text-[var(--accent)] underline decoration-[var(--border-strong)] underline-offset-4 hover:text-[var(--accent-hover)]"
             >
               tells
             </Link>{' '}
@@ -498,7 +498,7 @@ export default function LandingPage() {
             <h2 className="font-serif text-[34pt] sm:text-[55pt] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)]">
               Every prompt goes to four labs at once.
             </h2>
-            <p className="font-serif text-[21pt] leading-[var(--lh-body)] text-[var(--text-2)]">
+            <p className="text-[21pt] leading-[var(--lh-body)] text-[var(--text-2)]">
               Write one prompt and four labs answer it at once, so you pick between four takes
               instead of arguing with one. Reference images, five aspect ratios and prompt
               enhancement come as standard. Premium is one toggle in the composer: still four
@@ -614,7 +614,7 @@ export default function LandingPage() {
                 <dt className="font-sans text-[13pt] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
                   {name}
                 </dt>
-                <dd className="mt-[var(--space-1)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+                <dd className="mt-[var(--space-1)] text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
                   {desc}
                 </dd>
               </div>
@@ -775,7 +775,7 @@ export default function LandingPage() {
                     </span>
                   ) : null}
                 </dt>
-                <dd className="prose-measure mt-[var(--space-2)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+                <dd className="prose-measure mt-[var(--space-2)] text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
                   {claim}
                 </dd>
               </div>
@@ -786,7 +786,7 @@ export default function LandingPage() {
             Those three are lifted out of{' '}
             <Link
               href="/how-it-works"
-              className="link-smooth text-[var(--accent)] hover:text-[var(--accent-hover)]"
+              className="link-smooth text-[var(--accent)] underline decoration-[var(--border-strong)] underline-offset-4 hover:text-[var(--accent-hover)]"
             >
               one captured run
             </Link>
@@ -801,7 +801,7 @@ export default function LandingPage() {
                 <dt className="font-sans text-[13pt] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
                   {name}
                 </dt>
-                <dd className="mt-[var(--space-1)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+                <dd className="mt-[var(--space-1)] text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
                   {detail}
                 </dd>
               </div>
@@ -842,7 +842,7 @@ export default function LandingPage() {
                 <dt className="font-sans text-[13pt] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
                   {term}
                 </dt>
-                <dd className="mt-[var(--space-1)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+                <dd className="mt-[var(--space-1)] text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
                   {detail}
                 </dd>
               </div>
@@ -852,17 +852,17 @@ export default function LandingPage() {
             Routes across {PROVIDERS.join(', ')}, and{' '}
             {CAPABILITIES.routableModels.toLocaleString('en-US')} models through OpenRouter. Full
             detail in{' '}
-            <Link href="/security" className="link-smooth text-[var(--accent)] hover:text-[var(--accent-hover)]">
+            <Link href="/security" className="link-smooth text-[var(--accent)] underline decoration-[var(--border-strong)] underline-offset-4 hover:text-[var(--accent-hover)]">
               security
             </Link>
             ,{' '}
-            <Link href="/privacy" className="link-smooth text-[var(--accent)] hover:text-[var(--accent-hover)]">
+            <Link href="/privacy" className="link-smooth text-[var(--accent)] underline decoration-[var(--border-strong)] underline-offset-4 hover:text-[var(--accent-hover)]">
               privacy
             </Link>
             , and{' '}
             <Link
               href="/subprocessors"
-              className="link-smooth text-[var(--accent)] hover:text-[var(--accent-hover)]"
+              className="link-smooth text-[var(--accent)] underline decoration-[var(--border-strong)] underline-offset-4 hover:text-[var(--accent-hover)]"
             >
               sub-processors
             </Link>

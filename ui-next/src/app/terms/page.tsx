@@ -40,8 +40,8 @@ export default function TermsPage() {
 
             <section>
               <h3 className="text-2xl font-bold mb-6 text-[var(--text)]">3. Service Accuracy & AI Disclaimer</h3>
-              <div className="bg-[color-mix(in_oklab,var(--warn)_5%,transparent)] border border-[color-mix(in_oklab,var(--warn)_20%,transparent)] rounded-xl p-6">
-                <p className="flex items-center gap-2 font-bold text-[var(--warn)] mb-2">
+              <div className="bg-[var(--surface-2)] border border-[var(--border-strong)] rounded-xl p-6">
+                <p className="flex items-center gap-2 font-bold text-[var(--text)] mb-2">
                   <AlertCircle className="h-5 w-5" />
                   AI Generation Disclosure
                 </p>

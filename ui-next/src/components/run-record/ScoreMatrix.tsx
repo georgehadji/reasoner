@@ -59,7 +59,7 @@ export function ScoreMatrix({ scores = RUN.scores, caption }: ScoreMatrixProps =
                 >
                   {column.position}
                   {column.biasFlags.length > 0 && (
-                    <sup className="ml-[2px] font-mono text-[var(--warn)]">†</sup>
+                    <sup className="ml-[2px] font-mono text-[var(--text)]">†</sup>
                   )}
                 </th>
               ))}
@@ -123,7 +123,7 @@ export function ScoreMatrix({ scores = RUN.scores, caption }: ScoreMatrixProps =
                   key={column.position}
                   className="px-[var(--space-4)] py-[var(--space-3)] text-right font-sans text-[length:var(--text-2xs)] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)]"
                 >
-                  <span className={column.retained ? 'text-[var(--ok)]' : 'text-[var(--text-subtle)]'}>
+                  <span className={column.retained ? 'text-[var(--text)]' : 'text-[var(--text-subtle)]'}>
                     {column.retained ? 'Carried forward' : 'Pruned'}
                   </span>
                 </td>
@@ -136,7 +136,7 @@ export function ScoreMatrix({ scores = RUN.scores, caption }: ScoreMatrixProps =
       <figcaption className="mt-[var(--space-6)] font-sans text-[length:var(--text-xs)] leading-[var(--lh-body)] text-[var(--text-subtle)]">
         {FLAGGED.map((column) => (
           <span key={column.position} className="mb-[var(--space-2)] block">
-            <span className="font-mono text-[var(--warn)]">†</span> {column.position} —{' '}
+            <span className="font-mono text-[var(--text)]">†</span> {column.position} —{' '}
             {column.biasFlags.join('; ')}
           </span>
         ))}

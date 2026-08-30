@@ -75,7 +75,7 @@ function Heading({ children }: { children: ReactNode }) {
 
 function Lede({ children }: { children: ReactNode }) {
   return (
-    <p className="prose-measure mt-[var(--space-6)] font-serif text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-2)]">
+    <p className="prose-measure mt-[var(--space-6)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-2)]">
       {children}
     </p>
   );
@@ -83,7 +83,7 @@ function Lede({ children }: { children: ReactNode }) {
 
 function Body({ children }: { children: ReactNode }) {
   return (
-    <p className="prose-measure mt-[var(--space-4)] font-serif text-[length:var(--text-base)] leading-[var(--lh-body)] text-[var(--text-muted)]">
+    <p className="prose-measure mt-[var(--space-4)] text-[length:var(--text-base)] leading-[var(--lh-body)] text-[var(--text-muted)]">
       {children}
     </p>
   );
@@ -105,7 +105,7 @@ function Claim({ tone, children }: { tone: 'verified' | 'hypothesis'; children: 
       <p className="font-sans text-[length:var(--text-xs)] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)]">
         {tone === 'verified' ? 'Verified' : 'Hypothesis'}
       </p>
-      <p className="mt-[var(--space-2)] font-serif text-[length:var(--text-base)] leading-[var(--lh-body)] text-[var(--text-muted)]">
+      <p className="mt-[var(--space-2)] text-[length:var(--text-base)] leading-[var(--lh-body)] text-[var(--text-muted)]">
         {children}
       </p>
     </div>
@@ -172,7 +172,7 @@ export default function AboutPage() {
                 Nothing here asks to be believed.
               </h1>
 
-              <p className="prose-measure mt-[var(--space-8)] font-serif text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-2)]">
+              <p className="prose-measure mt-[var(--space-8)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-2)]">
                 Reasoner exists because of one uncomfortable fact: a language model sounds exactly
                 the same whether it checked something or invented it. Fluency came free.{' '}
                 <strong className="font-medium text-[var(--text)]">Truth did not.</strong> Everything
@@ -182,7 +182,7 @@ export default function AboutPage() {
             </div>
 
             <div>
-              <p className="prose-measure mt-[var(--space-8)] font-serif text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-2)]">
+              <p className="prose-measure mt-[var(--space-8)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-2)]">
                 This page is that same rule turned on itself. Every claim below is marked with what
                 it actually is: something you can go and verify, or something still only hoped for.
               </p>
@@ -316,7 +316,7 @@ export default function AboutPage() {
                 <dt className="font-sans text-[length:var(--text-sm)] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
                   {term}
                 </dt>
-                <dd className="mt-[var(--space-2)] font-serif text-[length:var(--text-base)] leading-[var(--lh-body)] text-[var(--text-muted)]">
+                <dd className="mt-[var(--space-2)] text-[length:var(--text-base)] leading-[var(--lh-body)] text-[var(--text-muted)]">
                   {detail}
                 </dd>
                 <dd className="mt-[var(--space-2)] font-mono text-[length:var(--text-2xs)] leading-[var(--lh-body)] text-[var(--accent)]">
@@ -401,7 +401,7 @@ export default function AboutPage() {
             wrong, or a claim you want the receipts for?{' '}
             <Link
               href="/contact"
-              className="link-smooth text-[var(--accent)] hover:text-[var(--accent-hover)]"
+              className="link-smooth text-[var(--accent)] underline decoration-[var(--border-strong)] underline-offset-4 hover:text-[var(--accent-hover)]"
             >
               Get in touch
             </Link>

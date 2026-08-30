@@ -122,12 +122,14 @@
     font-variation-settings: normal;
   }
 
-  /* Running prose opts into the serif. Anthropic's warmth comes at least
-     as much from serif body copy as from the ivory ground. */
+  /* Role inversion (migration step 6): serif is display-only now — a
+     heading's typeface, not running prose's. This class still carries
+     everything else long-form copy needs (measure, ligatures, hanging
+     punctuation); only the typeface flips to match the rest of body text. */
   .prose-serif,
   article.prose-serif,
   .synthesis-body {
-    font-family: var(--font-serif);
+    font-family: var(--font-sans);
     font-size: var(--text-md);
     line-height: var(--lh-body);
     letter-spacing: 0;

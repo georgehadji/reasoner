@@ -269,7 +269,7 @@ function MessageActions({
             is doing the work alone. */}
         {copied ? (
           <>
-            <Check className="h-3.5 w-3.5 text-[var(--ok)]" aria-hidden="true" /> Copied
+            <Check className="h-3.5 w-3.5 text-[var(--text)]" aria-hidden="true" /> Copied
           </>
         ) : (
           <>

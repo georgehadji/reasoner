@@ -143,7 +143,7 @@ export default function ContactPage() {
             role="status"
             className="flex flex-col items-center gap-[var(--space-3)] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-[var(--space-8)] text-center shadow-[var(--shadow)]"
           >
-            <Check aria-hidden="true" className="size-[var(--space-8)] text-[var(--ok)]" />
+            <Check aria-hidden="true" className="size-[var(--space-8)] text-[var(--text)]" />
             <h2 className="text-[length:var(--text-xl)] font-semibold">Message Sent</h2>
             <p className="max-w-[var(--measure-tight)] text-[length:var(--text-base)] leading-[var(--lh-body)] text-[var(--text-2)]">
               Thank you for reaching out. Our support team will get back to you within 24 hours.

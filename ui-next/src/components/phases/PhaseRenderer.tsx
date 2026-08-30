@@ -245,7 +245,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
     if (rawIdeas.length > 0 || clusters.length > 0 || developments.length > 0) {
       const tierColor: Record<string, string> = {
         conventional: 'text-[var(--text-muted)]',
-        lateral: 'text-[var(--warn)]',
+        lateral: 'text-[var(--text)]',
         disruptive: 'text-[var(--accent)]',
       };
 

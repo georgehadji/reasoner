@@ -70,7 +70,7 @@ function Notice({ children }: { children: React.ReactNode }) {
       role="status"
       className="flex items-start gap-[var(--space-2)] rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-2)] px-[var(--space-3)] py-[var(--space-3)] text-[length:var(--text-sm)] leading-[var(--lh-ui)] text-[var(--text-2)]"
     >
-      <Check aria-hidden="true" className="mt-px size-[var(--space-4)] shrink-0 text-[var(--ok)]" />
+      <Check aria-hidden="true" className="mt-px size-[var(--space-4)] shrink-0 text-[var(--text)]" />
       <span>{children}</span>
     </p>
   );

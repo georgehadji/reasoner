@@ -159,7 +159,7 @@ export default function DevelopersPage() {
               <h1 className="max-w-[20ch] text-balance font-serif text-[34pt] font-normal leading-[var(--lh-display)] sm:text-[55pt] tracking-[var(--tracking-tight)] text-[var(--text)]">
                 An answer your code can act on.
               </h1>
-              <p className="prose-measure mt-[var(--space-6)] font-serif text-[21pt] leading-[var(--lh-body)] text-[var(--text-2)]">
+              <p className="prose-measure mt-[var(--space-6)] text-[21pt] leading-[var(--lh-body)] text-[var(--text-2)]">
                 A single model returns prose, and your program has to decide how much of it to
                 believe. Reasoner returns a synthesis in which every claim is already labelled
                 VERIFIED, HYPOTHESIS, or UNKNOWN — which is what makes the output safe to branch
@@ -200,7 +200,7 @@ export default function DevelopersPage() {
                     {cost}
                   </span>
                 </dt>
-                <dd className="mt-[var(--space-1)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+                <dd className="mt-[var(--space-1)] text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
                   {desc}
                 </dd>
               </div>
@@ -303,7 +303,7 @@ export default function DevelopersPage() {
                 <dt className="font-mono text-[13pt] leading-[var(--lh-ui)] text-[var(--text)]">
                   {path}
                 </dt>
-                <dd className="mt-[var(--space-1)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+                <dd className="mt-[var(--space-1)] text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
                   {desc}
                 </dd>
               </div>
@@ -371,7 +371,7 @@ export default function DevelopersPage() {
                 <dt className="font-mono text-[13pt] leading-[var(--lh-ui)] text-[var(--text)]">
                   {code}
                 </dt>
-                <dd className="font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+                <dd className="text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
                   {desc}
                 </dd>
               </div>

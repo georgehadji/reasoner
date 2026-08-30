@@ -90,13 +90,13 @@ export default function SecurityPage() {
 
       <main className="mx-auto w-full max-w-[var(--width-content)] flex-1 px-[var(--gutter)] py-[var(--space-24)]">
         <div className="mb-[var(--space-16)] text-center">
-          <div className="mx-auto mb-[var(--space-6)] flex h-16 w-16 items-center justify-center rounded-[var(--radius-lg)] bg-[color-mix(in_oklab,var(--ok)_10%,transparent)] text-[var(--ok)]">
+          <div className="mx-auto mb-[var(--space-6)] flex h-16 w-16 items-center justify-center rounded-[var(--radius-lg)] bg-[var(--surface-2)] text-[var(--text)]">
             <ShieldCheck className="h-8 w-8" aria-hidden="true" />
           </div>
           <h1 className="font-serif text-[length:var(--text-4xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)] md:text-[length:var(--text-5xl)]">
             Security &amp; Trust
           </h1>
-          <p className="prose-measure mx-auto mt-[var(--space-6)] font-serif text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
+          <p className="prose-measure mx-auto mt-[var(--space-6)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
             We do not train on your data, we encrypt it end to end, and we log every access.
             Here is exactly what that means today — and what is still on the roadmap.
           </p>
@@ -118,7 +118,7 @@ export default function SecurityPage() {
                   return (
                     <li key={label} className="flex gap-[var(--space-3)]">
                       <StatusIcon
-                        className={`h-5 w-5 shrink-0 ${done ? 'text-[var(--ok)]' : 'text-[var(--text-subtle)]'}`}
+                        className={`h-5 w-5 shrink-0 ${done ? 'text-[var(--text)]' : 'text-[var(--text-subtle)]'}`}
                         aria-hidden="true"
                       />
                       <span className="text-[length:var(--text-sm)] leading-[var(--lh-body)] text-[var(--text-muted)]">

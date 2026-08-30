@@ -97,7 +97,7 @@ export function CritiqueCard({ data }: CritiqueCardProps) {
 
             {dissentingNote && (
               <p className="mt-[var(--space-3)] border-t border-[var(--border)] pt-[var(--space-2)] text-[length:var(--text-sm)] leading-[var(--lh-body)] text-[var(--text-muted)]">
-                <span className="mr-[var(--space-1)] inline-flex items-center gap-[var(--space-1)] font-medium text-[var(--warn)]">
+                <span className="mr-[var(--space-1)] inline-flex items-center gap-[var(--space-1)] font-medium text-[var(--text)]">
                   <AlertTriangle aria-hidden="true" className={ICON_SM} />
                   Dissenting note:
                 </span>

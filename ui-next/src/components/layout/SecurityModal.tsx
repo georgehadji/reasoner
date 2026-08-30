@@ -40,7 +40,7 @@ export function SecurityModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
       >
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-lg)] bg-[color-mix(in_oklab,var(--ok)_10%,transparent)] text-[var(--ok)]">
+            <div className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-lg)] bg-[var(--surface-2)] text-[var(--text)]">
               <ShieldCheck className="h-6 w-6" />
             </div>
             <div>

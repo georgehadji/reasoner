@@ -92,7 +92,7 @@ export function Heading({ children }: { children: ReactNode }) {
 
 export function Lede({ children }: { children: ReactNode }) {
   return (
-    <p className="prose-measure mt-[var(--space-6)] font-serif text-[21pt] leading-[var(--lh-body)] text-[var(--text-2)]">
+    <p className="prose-measure mt-[var(--space-6)] text-[21pt] leading-[var(--lh-body)] text-[var(--text-2)]">
       {children}
     </p>
   );
@@ -100,7 +100,7 @@ export function Lede({ children }: { children: ReactNode }) {
 
 export function Body({ children }: { children: ReactNode }) {
   return (
-    <p className="prose-measure mt-[var(--space-4)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+    <p className="prose-measure mt-[var(--space-4)] text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
       {children}
     </p>
   );

@@ -138,7 +138,7 @@ export function MechanismDiagram() {
               {failure}
             </h3>
 
-            <p className="mt-[var(--space-3)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+            <p className="mt-[var(--space-3)] text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
               {defence}
             </p>
 

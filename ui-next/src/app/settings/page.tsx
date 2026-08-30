@@ -80,7 +80,7 @@ export default function SettingsPage() {
       <h1 className="mb-8 text-3xl font-bold text-[var(--text)]">Account Settings</h1>
 
       {message.text && (
-        <div className={`mb-6 rounded-lg p-4 text-sm ${message.type === 'error' ? 'bg-[var(--red-bg)] text-[var(--red)]' : 'bg-[color-mix(in_oklab,var(--ok)_10%,transparent)] text-[var(--ok)]'}`}>
+        <div className={`mb-6 rounded-lg p-4 text-sm ${message.type === 'error' ? 'bg-[var(--red-bg)] text-[var(--red)]' : 'bg-[var(--surface-2)] font-medium text-[var(--text)]'}`}>
           {message.text}
         </div>
       )}
@@ -109,7 +109,7 @@ export default function SettingsPage() {
         {/* Privacy & Data Section */}
         <section className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6">
           <h2 className="mb-4 flex items-center gap-2 text-xl font-semibold text-[var(--text)]">
-            <Database className="h-5 w-5 text-[var(--ok)]" /> Privacy & Data
+            <Database className="h-5 w-5 text-[var(--accent)]" /> Privacy & Data
           </h2>
           
           <div className="space-y-6">
@@ -129,10 +129,10 @@ export default function SettingsPage() {
               </button>
             </div>
 
-            <div className="flex items-start gap-3 rounded-lg bg-[color-mix(in_oklab,var(--ok)_6%,transparent)] p-4 border border-[color-mix(in_oklab,var(--ok)_22%,transparent)]">
-              <ShieldCheck className="h-5 w-5 text-[var(--ok)] shrink-0 mt-0.5" />
+            <div className="flex items-start gap-3 rounded-lg bg-[var(--surface-2)] p-4 border border-[var(--border)]">
+              <ShieldCheck className="h-5 w-5 text-[var(--text)] shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-semibold text-[var(--ok)]">Encryption Active</p>
+                <p className="text-sm font-semibold text-[var(--text)]">Encryption Active</p>
                 <p className="text-xs text-[var(--text-muted)] leading-relaxed mt-1">
                   All your data is currently protected with AES-256-GCM encryption at rest and TLS 1.3 in transit.
                 </p>

@@ -138,7 +138,7 @@ export function ReviewHandoff() {
                     {CODE_SHOWCASE_FILE.path}:{line}
                   </span>
                 </p>
-                <p className="mt-[var(--space-2)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-2)]">
+                <p className="mt-[var(--space-2)] text-[13pt] leading-[var(--lh-body)] text-[var(--text-2)]">
                   {issue}
                 </p>
                 {fix ? (

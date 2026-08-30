@@ -85,7 +85,7 @@ export default function ForgotPasswordPage() {
               role="status"
               className="flex items-start gap-[var(--space-2)] rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-2)] px-[var(--space-4)] py-[var(--space-4)] text-[length:var(--text-sm)] leading-[var(--lh-ui)] text-[var(--text-2)]"
             >
-              <Check aria-hidden="true" className="mt-px size-[var(--space-4)] shrink-0 text-[var(--ok)]" />
+              <Check aria-hidden="true" className="mt-px size-[var(--space-4)] shrink-0 text-[var(--text)]" />
               <span>Check your email for a reset link.</span>
             </p>
             <p className="text-center text-[length:var(--text-sm)] leading-[var(--lh-ui)] text-[var(--text-muted)]">

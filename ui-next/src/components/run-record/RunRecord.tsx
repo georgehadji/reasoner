@@ -92,7 +92,7 @@ function Section({
 
 function Lede({ children }: { children: ReactNode }) {
   return (
-    <p className="prose-measure font-serif text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-2)]">
+    <p className="prose-measure text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-2)]">
       {children}
     </p>
   );
@@ -135,13 +135,13 @@ export default function RunRecord() {
                 One run, with nothing left out.
               </h1>
 
-              <p className="prose-measure mt-[var(--space-8)] font-serif text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-2)]">
+              <p className="prose-measure mt-[var(--space-8)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-2)]">
                 Reasoner puts a question through evidence search, four opposed positions written in
                 parallel by models from competing labs, independent scoring, adversarial stress
                 tests, and a synthesis whose claims are labelled VERIFIED, HYPOTHESIS, or UNKNOWN.
               </p>
 
-              <p className="prose-measure mt-[var(--space-4)] font-serif text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
+              <p className="prose-measure mt-[var(--space-4)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
                 The rest of this page is one complete run of that pipeline — its sources, its
                 scores, the two positions it threw away, and what it cost. It is a capture of the
                 production code path, not a mockup.
@@ -229,7 +229,7 @@ export default function RunRecord() {
                     href={source.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="link-smooth block font-serif text-[length:var(--text-base)] leading-[var(--lh-subhead)] text-[var(--text-2)] underline decoration-[var(--border-strong)] underline-offset-4 hover:text-[var(--accent)]"
+                    className="link-smooth block text-[length:var(--text-base)] leading-[var(--lh-subhead)] text-[var(--text-2)] underline decoration-[var(--border-strong)] underline-offset-4 hover:text-[var(--accent)]"
                   >
                     {source.title}
                   </a>
@@ -266,7 +266,7 @@ export default function RunRecord() {
                 <h3 className="font-sans text-[length:var(--text-xs)] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text)]">
                   {position.id}
                 </h3>
-                <p className="mt-[var(--space-3)] font-serif text-[length:var(--text-sm)] leading-[var(--lh-body)] text-[var(--text-muted)]">
+                <p className="mt-[var(--space-3)] text-[length:var(--text-sm)] leading-[var(--lh-body)] text-[var(--text-muted)]">
                   <Marks segments={position.excerpt} />
                 </p>
                 {position.insights[0] && (
@@ -333,7 +333,7 @@ export default function RunRecord() {
                   />
                 </span>
 
-                <p className="prose-measure mt-[var(--space-4)] font-serif text-[length:var(--text-sm)] leading-[var(--lh-body)] text-[var(--text-muted)]">
+                <p className="prose-measure mt-[var(--space-4)] text-[length:var(--text-sm)] leading-[var(--lh-body)] text-[var(--text-muted)]">
                   {test.failureMode || (
                     <span className="text-[var(--text-subtle)]">
                       This test returned a rate with no accompanying prose. Shown as it came back
@@ -456,7 +456,7 @@ export default function RunRecord() {
                 <dt className="w-[14rem] shrink-0 font-sans text-[length:var(--text-sm)] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
                   {term}
                 </dt>
-                <dd className="prose-measure font-serif text-[length:var(--text-base)] leading-[var(--lh-body)] text-[var(--text-muted)]">
+                <dd className="prose-measure text-[length:var(--text-base)] leading-[var(--lh-body)] text-[var(--text-muted)]">
                   {detail}
                 </dd>
               </div>
@@ -486,7 +486,7 @@ export default function RunRecord() {
               <h2 className="prose-measure font-serif text-[length:var(--text-3xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-snug)] text-[var(--text)]">
                 Your question gets the same treatment.
               </h2>
-              <p className="prose-measure mt-[var(--space-4)] font-serif text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
+              <p className="prose-measure mt-[var(--space-4)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
                 Same phases, same scoring, same record at the end — and a decision you can hand to
                 someone else with the working attached.
               </p>
