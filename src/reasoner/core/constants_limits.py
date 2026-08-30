@@ -97,7 +97,14 @@ HYPERGATE_ATTEMPT_TIMEOUT_SECONDS: float = 6.0
 # W4 spreads the sub-agents across roles/vendors and cuts the contention that
 # makes 5.86s the mean today.
 HYPERGATE_TOTAL_BUDGET_SECONDS: float = 12.0
-HYPERGATE_CACHE_SIZE: int = 512            # LRU size (per sub-agent + top-level)
+HYPERGATE_CACHE_SIZE: int = 512            # LRU size (per sub-agent, in BaseSubAgent)
+# Shared L2 cache for the whole gate decision, in gate_service.run_gate_cached.
+# core/ports/shared_cache_port.py's docstring already named the "HyperGate L2
+# decision cache" as a consumer; W5 is where that became true. Before it, this
+# TTL was unused and HyperGateAgent's own _get_l2_cache/_set_l2_cache were
+# literally `return None` / `pass` while two documents claimed a working cache.
+# Set HYPERGATE_CACHE_ENABLED=False to bypass the lookup without a deploy.
+HYPERGATE_CACHE_ENABLED: bool = True
 HYPERGATE_CACHE_TTL_SECONDS: int = 3600  # 1-hour TTL for top-level routing decisions
 HYPERGATE_MAX_TOKENS_LANGUAGE: int = 80
 HYPERGATE_MAX_TOKENS_COMPLEXITY: int = 80

@@ -37,3 +37,30 @@ class SharedCachePort(Protocol):
     async def exists(self, key: str) -> bool: ...
 
     async def close(self) -> None: ...
+
+
+# ── Dependency injection for application → infrastructure boundary ────────
+# Mirrors model_registry_port.set_model_registry_port(), with one deliberate
+# difference: the getter returns None instead of raising when nothing has been
+# injected. A missing registry is a bug -- nothing can route without it. A
+# missing cache is a degraded mode: every consumer here is an optimisation and
+# must still answer correctly with no backend at all. Raising would turn a cold
+# cache into a 500.
+_SHARED_CACHE_PORT: SharedCachePort | None = None
+
+
+def set_shared_cache_port(port: SharedCachePort | None) -> None:
+    """Inject the concrete cache adapter. Called once at startup.
+
+    Accepts None so a test can restore the uninjected state.
+    """
+    global _SHARED_CACHE_PORT
+    _SHARED_CACHE_PORT = port
+
+
+def get_shared_cache_port() -> SharedCachePort | None:
+    """Return the injected cache port, or None if there is no cache.
+
+    Callers MUST treat None as "no caching this run", never as an error.
+    """
+    return _SHARED_CACHE_PORT

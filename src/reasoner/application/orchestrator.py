@@ -274,9 +274,13 @@ class PipelineOrchestrator:
                 # fallback entry is load-bearing.
                 from reasoner.application.services.gate_service import (
                     build_hypergate_router,
+                    run_gate_cached,
                 )
                 gate = HyperGateAgent(build_hypergate_router(router))
-                gate_decision_fb = await gate.decide(req.problem)
+                # Through the cache for the same reason /api/gate is (W5): the
+                # common flow is a /api/gate call immediately followed by a run,
+                # which asks this exact question a second time.
+                gate_decision_fb = await run_gate_cached(gate, req.problem)
 
         _gate_timeout = max(GATE_TIMEOUT_SECONDS * 2, 5.0)
         _neuro_recall_timeout = settings.NEURO_RECALL_TIMEOUT_SECONDS

@@ -8,15 +8,19 @@ HTTP coupling. One implementation; both adapters call it.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 from typing import Any
 
 from reasoner.application.services.preset_service import PresetService
 from reasoner.core.constants import (
+    HYPERGATE_CACHE_ENABLED,
+    HYPERGATE_CACHE_TTL_SECONDS,
     HYPERGATE_METHOD_THRESHOLD,
     HYPERGATE_TOTAL_BUDGET_SECONDS,
 )
 from reasoner.core.ports.model_registry_port import get_model_registry_port
+from reasoner.core.ports.shared_cache_port import get_shared_cache_port
 from reasoner.domain.preset_core import build_auto_preset
 from reasoner.hypergate import GateDecision, HyperGateAgent
 from reasoner.infrastructure.llm.router import ProviderRouter
@@ -153,14 +157,101 @@ def build_hypergate_router(base: ProviderRouter) -> ProviderRouter:
     )
 
 
+# ── L2 gate decision cache (W5) ───────────────────────────────────────
+#
+# Lives here, not in HyperGateAgent, for the reason its own stub comment gave
+# before it was deleted: hypergate/ sits below application/ and must not reach
+# for a cache backend itself. The application layer may consume SharedCachePort,
+# so this is the lowest place the wiring is legal.
+#
+# The key must carry a routing identity, not just the problem text. A gate
+# verdict is a function of the problem AND of which models answered it, and W4
+# made the second half real -- the roles now resolve to five different models
+# across three vendors, and any of those can be re-pointed. A bare sha256 of the
+# problem would serve the old configuration's verdict for an hour after a model
+# swap. There is precedent in this repo: the LLM cache bug fixed on 2026-08-26
+# was exactly a key that ignored part of the request (the system prompt), and it
+# presented as byte-identical output from a deliberate A/B.
+_GATE_CACHE_PREFIX = "gate:v1:"
+
+
+def routing_fingerprint(router: ProviderRouter) -> str:
+    """Digest the (role, served model) pairs this router will actually use.
+
+    Served model, not alias: aliases route cross-vendor, so two aliases can name
+    the same upstream model and two identical-looking aliases can differ. Only
+    the gate's own roles plus the primary are digested -- the rest of the
+    inherited routing table has no bearing on a gate decision, and including it
+    would evict the whole cache on any unrelated preset edit.
+    """
+    parts = [
+        f"{role}={getattr(router.resolve(role), 'model', '?')}"
+        for role in sorted(_HYPERGATE_ROLE_MODELS)
+    ]
+    parts.append(f"primary={getattr(router.resolve_primary(), 'model', '?')}")
+    return hashlib.sha256("|".join(parts).encode()).hexdigest()[:16]
+
+
+def _is_cacheable(decision: GateDecision) -> bool:
+    """Whether *decision* is confident enough to persist for an hour.
+
+    The same two conditions HyperGateAgent.decide applied before its (dead)
+    cache write, rewritten only to fold the empty-reasoning case. A verdict
+    that is degraded -- low confidence, or reasoning mentioning a fallback --
+    is a statement about one bad minute upstream, not about the problem, and
+    must never outlive it.
+    """
+    return decision.confidence >= HYPERGATE_METHOD_THRESHOLD and (
+        "fallback" not in (decision.reasoning or "").lower()
+    )
+
+
+async def run_gate_cached(gate: HyperGateAgent, problem: str) -> GateDecision:
+    """Run *gate* on *problem*, reading and writing the shared L2 cache.
+
+    Every cache interaction degrades to a miss: no port injected, an unreachable
+    backend, a stored payload that no longer validates against GateDecision. The
+    cache is an optimisation and may never be the reason a request fails.
+    """
+    cache = get_shared_cache_port() if HYPERGATE_CACHE_ENABLED else None
+    key = ""
+    if cache is not None:
+        key = (
+            f"{_GATE_CACHE_PREFIX}{hashlib.sha256(problem.encode()).hexdigest()}"
+            f":{routing_fingerprint(gate.router)}"
+        )
+        try:
+            raw = await cache.get(key)
+            if raw:
+                decision = GateDecision.model_validate(raw)
+                logger.debug("HyperGate cache hit key=%s", key[:40])
+                return decision
+        except Exception as exc:
+            logger.debug("HyperGate cache lookup failed (%s): %s", key[:40], exc)
+
+    decision = await gate.decide(problem)
+
+    if cache is not None and _is_cacheable(decision):
+        try:
+            await cache.set(
+                key, decision.model_dump(mode="json"), ttl=HYPERGATE_CACHE_TTL_SECONDS
+            )
+        except Exception as exc:
+            logger.debug("HyperGate cache store failed (%s): %s", key[:40], exc)
+
+    return decision
+
+
 async def decide_route(problem: str, preset: str) -> dict[str, Any]:
     """Return HyperGate's routing decision for *problem*, without running it.
 
     Each candidate (top pick + alternatives) is resolved to a concrete preset
     name via build_auto_preset(), so a caller can re-submit with that preset
     + force_pipeline=true to lock in a specific method without re-invoking
-    HyperGate. Shares HyperGateAgent's own L1/L2 cache, so a following run on
-    the same problem does not re-pay the HyperGate LLM cost.
+    HyperGate. The decision goes through the shared L2 cache (run_gate_cached),
+    so a following run on the same problem and the same routing does not re-pay
+    the HyperGate LLM cost. Until W5 this docstring claimed that while the cache
+    it named was two stub methods returning None.
 
     The whole decision is bounded by HYPERGATE_TOTAL_BUDGET_SECONDS. Before
     this, /api/gate awaited gate.decide() with no ceiling at all -- measured
@@ -178,7 +269,7 @@ async def decide_route(problem: str, preset: str) -> dict[str, Any]:
     gate = HyperGateAgent(build_hypergate_router(router_instance))
     try:
         decision = await asyncio.wait_for(
-            gate.decide(problem), timeout=HYPERGATE_TOTAL_BUDGET_SECONDS
+            run_gate_cached(gate, problem), timeout=HYPERGATE_TOTAL_BUDGET_SECONDS
         )
     except TimeoutError:
         from reasoner.infrastructure.metrics import HYPERGATE_BUDGET_EXCEEDED_TOTAL
@@ -225,4 +316,4 @@ async def decide_route(problem: str, preset: str) -> dict[str, Any]:
     }
 
 
-__all__ = ["decide_route"]
+__all__ = ["build_hypergate_router", "decide_route", "run_gate_cached"]

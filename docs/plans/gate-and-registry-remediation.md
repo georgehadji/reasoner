@@ -476,6 +476,34 @@ live paid calls to three vendors; nothing in the test suite exercises them.
 
 ## 6. W5 — Wire the L2 gate cache the architecture already declares
 
+> **STATUS: DONE 2026-08-30.** Built as designed, with three notes.
+>
+> 1. **Both** gate call paths go through `run_gate_cached`, not just
+>    `decide_route`. The orchestrator preflight was one extra line and it is the
+>    path that benefits most: the common flow is a `/api/gate` call followed by
+>    a run, which asks the identical question twice.
+> 2. Step 1 took the deletion option in full. `HyperGateAgent` now owns no cache
+>    at all — the L1 dict, `_get_l2_cache`, `_set_l2_cache`, `_safe_create_task`
+>    and `_cache_set` are gone, and `test_hypergate_agent_owns_no_cache` fails if
+>    one comes back. `BaseSubAgent`'s per-instance LRU was left alone; it is
+>    equally dead in production but removing it is not this workstream.
+> 3. The old `test_hypergate_top_level_cache` asserted the per-instance L1 and so
+>    could never have failed for a real user. Retargeted at `run_gate_cached`
+>    with two separately constructed agents, which is what a second request does.
+>
+> Step 4 found no existing setter, so `set_shared_cache_port` /
+> `get_shared_cache_port` were added next to the port. The getter returns `None`
+> rather than raising, unlike `get_model_registry_port`: a missing registry is a
+> bug, a missing cache is a degraded mode. Injection happens in
+> `api/__init__.py` only — Valkey if a probe round-trips, in-memory otherwise.
+> The CLI and headless entry points get no cache, deliberately: a single-shot
+> process cannot hit one.
+>
+> **Not measured live.** The verification block's two-identical-`/api/gate`-calls
+> check was not run — that is paid calls to three vendors. The claim rests on the
+> unit tests (`gate.calls == 1` on the second identical call) and on the code
+> path, not on a measured wall-clock delta.
+
 **Priority:** after W4. The cache key depends on W4's routing shape.
 **Risk:** medium — a wrong cache key serves one preset's verdict to another.
 

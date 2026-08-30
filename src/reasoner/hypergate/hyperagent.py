@@ -18,7 +18,6 @@ from typing import Literal
 
 from reasoner.core.constants import (
     HYPERGATE_AMBIGUOUS_FLOOR,
-    HYPERGATE_CACHE_SIZE,
     HYPERGATE_DIRECT_THRESHOLD,
     HYPERGATE_METHOD_THRESHOLD,
     HYPERGATE_WEB_THRESHOLD,
@@ -154,11 +153,16 @@ class HyperGateAgent:
     then synthesises their outputs into a final GateDecision.
     """
 
-    _MAX_CACHE: int = HYPERGATE_CACHE_SIZE
+    # No cache lives here (W5). What was here was an L1 dict on an instance that
+    # is rebuilt on every request -- so it never survived one -- sitting in front
+    # of an L2 pair (_get_l2_cache / _set_l2_cache) whose bodies were `return
+    # None` and `pass`, fed by a fire-and-forget task that called the no-op. The
+    # real cache is application-layer, in gate_service.run_gate_cached, which is
+    # where the SharedCachePort may be consumed without hypergate/ reaching
+    # below itself for a backend. Both call sites of decide() go through it.
 
     def __init__(self, router: ProviderRouter) -> None:
         self.router = router
-        self._cache: dict[str, GateDecision] = {}
         self._lang = LanguageDetectorSubAgent()
         self._complexity = ComplexityEstimatorSubAgent()
         self._direct = DirectDetectorSubAgent()
@@ -166,53 +170,15 @@ class HyperGateAgent:
         self._method = MethodClassifierSubAgent()
         self._tiebreaker = TieBreakerSubAgent()
 
-    async def _get_l2_cache(self, problem_hash: str) -> GateDecision | None:
-        """L2 cache lookup disabled (moved to orchestrator layer to avoid arch violation)."""
-        return None
-
-    async def _set_l2_cache(self, problem_hash: str, decision: GateDecision) -> None:
-        """L2 cache save disabled (moved to orchestrator layer to avoid arch violation)."""
-        pass
-
-    @staticmethod
-    def _safe_create_task(coro, name: str) -> None:
-        """Spawn a fire-and-forget task with exception logging."""
-        import asyncio
-        task = asyncio.create_task(coro, name=name)
-        task.add_done_callback(
-            lambda t: logger.warning(
-                "Background task '%s' failed: %s", name, t.exception()
-            ) if t.exception() and not t.cancelled() else None
-        )
-
-    def _cache_set(self, problem_hash: str, decision: GateDecision) -> None:
-        """Set in L1 and dispatch async task for L2."""
-        self._cache[problem_hash] = decision
-        if len(self._cache) > self._MAX_CACHE:
-            self._cache.pop(next(iter(self._cache)))
-        # Fire-and-forget L2 set to not block the critical path
-        self._safe_create_task(
-            self._set_l2_cache(problem_hash, decision),
-            "hypergate_l2_cache_set",
-        )
-
     # ── Public API (same signature as GateAgent.decide) ──────────────
 
     async def decide(self, problem: str) -> GateDecision:
-        """Return a routing decision. Never raises — falls back to pipeline on any error."""
-        problem_hash = hashlib.sha256(problem.encode()).hexdigest()
-        if cached := self._cache.get(problem_hash):
-            logger.debug("HyperGateAgent top-level cache hit hash=%s…", problem_hash[:16])
-            return cached
+        """Return a routing decision. Never raises — falls back to pipeline on any error.
 
-        # Try L2 cache
-        if l2_cached := await self._get_l2_cache(problem_hash):
-            logger.debug("HyperGateAgent L2 cache hit hash=%s…", problem_hash[:16])
-            # Warm up L1
-            self._cache[problem_hash] = l2_cached
-            if len(self._cache) > self._MAX_CACHE:
-                self._cache.pop(next(iter(self._cache)))
-            return l2_cached
+        Uncached by design; see the class comment. Callers that want the decision
+        cached call gate_service.run_gate_cached instead of this directly.
+        """
+        problem_hash = hashlib.sha256(problem.encode()).hexdigest()
 
         if len(problem.strip()) < 10:
             return GateDecision(
@@ -230,7 +196,6 @@ class HyperGateAgent:
                 reasoning="Detected research-backed writing intent (article/essay/blog/report)",
                 complexity="complex"
             )
-            self._cache_set(problem_hash, decision)
             logger.info(
                 "HyperGateAgent fast-path: writing-intent hash=%s action=pipeline method=writing",
                 problem_hash[:16],
@@ -246,7 +211,6 @@ class HyperGateAgent:
                 reasoning="Detected real-time data query (prices/news/weather/scores)",
                 complexity="simple",
             )
-            self._cache_set(problem_hash, decision)
             logger.info(
                 "HyperGateAgent fast-path: realtime hash=%s action=web_search",
                 problem_hash[:16],
@@ -264,7 +228,6 @@ class HyperGateAgent:
                 reasoning="Detected simple factual lookup, assumed direct answer",
                 complexity="simple",
             )
-            self._cache_set(problem_hash, decision)
             logger.info(
                 "HyperGateAgent fast-path: factual-lookup hash=%s action=direct",
                 problem_hash[:16],
@@ -284,11 +247,6 @@ class HyperGateAgent:
             decision.method,
             decision.confidence,
         )
-
-        if decision.confidence >= HYPERGATE_METHOD_THRESHOLD and (
-            not decision.reasoning or "fallback" not in decision.reasoning.lower()
-        ):
-            self._cache_set(problem_hash, decision)
 
         return decision
 

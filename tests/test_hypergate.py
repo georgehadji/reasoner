@@ -17,8 +17,10 @@ import pytest
 from reasoner.application.services.gate_service import (
     _HYPERGATE_ROLE_FALLBACKS,
     _HYPERGATE_ROLE_MODELS,
+    run_gate_cached,
 )
 from reasoner.hypergate import HyperGateAgent
+from reasoner.hypergate.gate_agent import GateDecision
 from reasoner.hypergate.models import HyperContext, SubAgentInput, SubAgentOutput
 from reasoner.hypergate.sub_agents import (
     ComplexityEstimatorSubAgent,
@@ -326,8 +328,16 @@ async def test_hypergate_all_fail_fallback():
 
 
 @pytest.mark.asyncio
-async def test_hypergate_top_level_cache():
-    """Identical problem on second call returns cached GateDecision."""
+async def test_hypergate_top_level_cache(gate_cache):
+    """Identical problem on second call costs no further LLM calls.
+
+    Same property this asserted before W5, moved to the layer that now owns it.
+    It used to call agent.decide() twice on one HyperGateAgent and pass on that
+    instance's L1 dict -- which production never got, because both call paths
+    build a fresh HyperGateAgent per request. Going through run_gate_cached is
+    what the app actually does, and it is the only version of this test that
+    could ever have failed for a real user.
+    """
     router = _make_phase1_router(
         is_direct=True, dir_conf=0.92,
         cpx="simple", cpx_conf=0.95,
@@ -342,12 +352,12 @@ async def test_hypergate_top_level_cache():
 
     router.call = counting_call
 
-    agent = HyperGateAgent(router)
     problem = "Hello, how are you today? (cache test)"
-    d1 = await agent.decide(problem)
+    d1 = await run_gate_cached(HyperGateAgent(router), problem)
     calls_after_first = call_count["n"]
 
-    d2 = await agent.decide(problem)
+    # A second, separately constructed agent — as the next request would build.
+    d2 = await run_gate_cached(HyperGateAgent(router), problem)
     assert call_count["n"] == calls_after_first  # no new LLM calls
     assert d1.action == d2.action
     assert d1.confidence == d2.confidence
@@ -648,3 +658,215 @@ async def test_decide_route_happy_path_unaffected_by_budget_wrapper():
     assert result["action"] == "direct"
     assert result["confidence"] == 0.95
     assert result["needs_confirmation"] is False
+
+
+# -- L2 gate decision cache (W5) --------------------------------------
+
+
+class _CountingGate:
+    """Stands in for HyperGateAgent: run_gate_cached only touches these two."""
+
+    def __init__(self, router, decision):
+        self.router = router
+        self.decision = decision
+        self.calls = 0
+
+    async def decide(self, problem: str):
+        self.calls += 1
+        return self.decision
+
+
+def _fake_router(models: dict[str, str], primary: str = "vendor/primary"):
+    """A router whose resolve() answers from *models*, for fingerprint tests."""
+    router = MagicMock()
+    router.resolve.side_effect = lambda role: FakeProvider(
+        model=models.get(role, "vendor/unmapped")
+    )
+    router.resolve_primary.return_value = FakeProvider(model=primary)
+    return router
+
+
+def _all_gate_roles(**overrides) -> dict[str, str]:
+    return {**{role: f"vendor/{role}" for role in _HYPERGATE_ROLE_MODELS}, **overrides}
+
+
+@pytest.fixture
+def gate_cache():
+    """Install a real in-memory SharedCachePort, and remove it afterwards."""
+    from reasoner.core.ports.shared_cache_port import set_shared_cache_port
+    from reasoner.infrastructure.valkey import InMemoryCacheAdapter
+
+    adapter = InMemoryCacheAdapter()
+    set_shared_cache_port(adapter)
+    yield adapter
+    set_shared_cache_port(None)
+
+
+def _confident() -> GateDecision:
+    return GateDecision(
+        action="pipeline",
+        method="debate",
+        confidence=0.91,
+        reasoning="clear adversarial framing",
+        complexity="complex",
+    )
+
+
+@pytest.mark.asyncio
+async def test_same_problem_and_routing_is_answered_from_cache(gate_cache):
+    """The whole point: a repeat question does not re-pay the gate's LLM cost."""
+    gate = _CountingGate(_fake_router(_all_gate_roles()), _confident())
+
+    first = await run_gate_cached(gate, "should we rewrite the scheduler?")
+    second = await run_gate_cached(gate, "should we rewrite the scheduler?")
+
+    assert gate.calls == 1, "second identical call must not reach the LLM"
+    assert second.model_dump() == first.model_dump()
+
+
+@pytest.mark.asyncio
+async def test_different_routing_is_a_different_cache_entry(gate_cache):
+    """The test that makes the key correct -- it fails if the fingerprint is dropped.
+
+    Same problem text, different models answering it. A key over the problem
+    alone would serve the first routing's verdict for the second for an hour,
+    which is the 2026-08-26 LLM-cache bug in a new place.
+    """
+    problem = "should we rewrite the scheduler?"
+    gate_a = _CountingGate(_fake_router(_all_gate_roles()), _confident())
+    gate_b = _CountingGate(
+        _fake_router(_all_gate_roles(hypergate_method="othervendor/swapped")),
+        _confident(),
+    )
+
+    await run_gate_cached(gate_a, problem)
+    await run_gate_cached(gate_b, problem)
+
+    assert gate_b.calls == 1, (
+        "a routing change must miss the cache; the key is not carrying the "
+        "routing fingerprint"
+    )
+
+
+@pytest.mark.asyncio
+async def test_fingerprint_ignores_roles_the_gate_does_not_use(gate_cache):
+    """An unrelated preset edit must not evict every cached gate decision."""
+    problem = "should we rewrite the scheduler?"
+    gate_a = _CountingGate(_fake_router(_all_gate_roles()), _confident())
+    gate_b = _CountingGate(
+        _fake_router(_all_gate_roles(synthesis="vendor/some-other-model")),
+        _confident(),
+    )
+
+    await run_gate_cached(gate_a, problem)
+    await run_gate_cached(gate_b, problem)
+
+    assert gate_b.calls == 0, "a non-gate role must not change the fingerprint"
+
+
+@pytest.mark.parametrize(
+    "decision",
+    [
+        pytest.param(
+            GateDecision(
+                action="pipeline",
+                method="multi_perspective",
+                confidence=0.0,
+                reasoning="HyperGate exceeded total budget of 12s, fallback to pipeline",
+            ),
+            id="budget-fallback",
+        ),
+        pytest.param(
+            GateDecision(
+                action="pipeline",
+                method="debate",
+                confidence=0.4,
+                reasoning="weak signal",
+            ),
+            id="low-confidence",
+        ),
+        pytest.param(
+            GateDecision(
+                action="pipeline",
+                method="debate",
+                confidence=0.95,
+                reasoning="sub-agents empty, hard FALLBACK applied",
+            ),
+            id="confident-but-a-fallback",
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_degraded_verdicts_are_never_stored(gate_cache, decision):
+    """A bad minute upstream must not be served as an answer for an hour."""
+    gate = _CountingGate(_fake_router(_all_gate_roles()), decision)
+
+    await run_gate_cached(gate, "a problem")
+    await run_gate_cached(gate, "a problem")
+
+    assert gate.calls == 2, f"{decision.reasoning!r} must not be cached"
+
+
+@pytest.mark.asyncio
+async def test_gate_answers_with_no_cache_port_injected():
+    """No port injected is the CLI/headless case, and must be a plain miss."""
+    from reasoner.core.ports.shared_cache_port import set_shared_cache_port
+
+    set_shared_cache_port(None)
+    gate = _CountingGate(_fake_router(_all_gate_roles()), _confident())
+
+    decision = await run_gate_cached(gate, "a problem")
+
+    assert decision.method == "debate"
+    assert gate.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_gate_answers_when_the_cache_backend_is_broken():
+    """An unreachable backend degrades to a miss; it never fails the request."""
+    from reasoner.core.ports.shared_cache_port import set_shared_cache_port
+
+    broken = MagicMock()
+    broken.get = AsyncMock(side_effect=ConnectionError("valkey down"))
+    broken.set = AsyncMock(side_effect=ConnectionError("valkey down"))
+    set_shared_cache_port(broken)
+    try:
+        gate = _CountingGate(_fake_router(_all_gate_roles()), _confident())
+
+        decision = await run_gate_cached(gate, "a problem")
+
+        assert decision.method == "debate"
+        assert gate.calls == 1
+    finally:
+        set_shared_cache_port(None)
+
+
+@pytest.mark.asyncio
+async def test_a_corrupt_cache_entry_is_a_miss_not_a_crash(gate_cache):
+    """A payload from an older GateDecision shape must not 500 the endpoint."""
+    gate = _CountingGate(_fake_router(_all_gate_roles()), _confident())
+
+    await run_gate_cached(gate, "a problem")
+    key = next(iter(gate_cache._store))
+    await gate_cache.set(key, {"action": "not-a-valid-action"}, ttl=60)
+
+    decision = await run_gate_cached(gate, "a problem")
+
+    assert decision.method == "debate"
+    assert gate.calls == 2
+
+
+def test_hypergate_agent_owns_no_cache():
+    """W5 moved caching out; a re-added L1 here would be per-request and dead.
+
+    HyperGateAgent is constructed fresh on every request in both call paths, so
+    any cache attribute on the instance cannot survive a single request. It also
+    could not see the routing fingerprint, which is what makes the key correct.
+    """
+    from reasoner.infrastructure.llm.router import ProviderRouter
+
+    agent = HyperGateAgent(ProviderRouter(primary=FakeProvider()))
+
+    assert not hasattr(agent, "_cache"), "gate caching belongs in run_gate_cached"
+    assert not hasattr(agent, "_get_l2_cache")
+    assert not hasattr(agent, "_set_l2_cache")
