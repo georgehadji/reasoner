@@ -1130,7 +1130,7 @@ export default function ChatPage() {
                 dot vs. a hollow ring carries "connected" vs. "undetermined"
                 by shape (fill state), the same way epistemic marks carry
                 their state by border-style — --red stays for a real fault. */}
-            <Tooltip text={serverOnline === true ? 'Online' : serverOnline === false ? 'Offline' : 'Checking…'}>
+            <Tooltip side="bottom" text={serverOnline === true ? 'Online' : serverOnline === false ? 'Offline' : 'Checking…'}>
               <div
                 className={`h-2 w-2 rounded-full ${
                   serverOnline === true
@@ -1143,7 +1143,7 @@ export default function ChatPage() {
             </Tooltip>
             {wsStatus !== 'idle' && (
               <div className="flex items-center gap-1.5">
-                <Tooltip text={wsStatus === 'error' && wsLastError ? wsLastError : `WebSocket: ${wsStatus}`}>
+                <Tooltip side="bottom" text={wsStatus === 'error' && wsLastError ? wsLastError : `WebSocket: ${wsStatus}`}>
                   <div
                     className={`h-2 w-2 rounded-full ${
                       wsStatus === 'connected'
