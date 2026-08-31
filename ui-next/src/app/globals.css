@@ -247,6 +247,8 @@
     --text-4xl: clamp(35px, 4.4vw + 17px, 49px);   /* h2, major headings */
     --text-5xl: clamp(40px, 6.0vw + 16px, 61px);   /* h1, hero display */
     --text-6xl: clamp(46px, 7.6vw + 16px, 76px);   /* display hero */
+    --text-7xl: clamp(76px, 11.6vw, 119px);        /* homepage hero, lg and up —
+                                                      picks up where 6xl caps */
 
     /* Line height tokens — absolute scale, chosen by hand */
     --leading-tight:  1.25;

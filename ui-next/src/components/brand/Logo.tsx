@@ -60,7 +60,7 @@ export function Logo({
 
       {showWordmark && (
         <span
-          className="text-[17px] font-semibold tracking-[-0.02em]"
+          className="text-[length:var(--text-md)] font-semibold tracking-[-0.02em]"
           style={{ color }}
         >
           Reasoner

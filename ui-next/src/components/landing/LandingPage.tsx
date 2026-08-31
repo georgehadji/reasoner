@@ -181,7 +181,7 @@ export default function LandingPage() {
               {/* The mechanism, direct. No eyebrow needed — the claim reads
                   on its own and the product's own output (right column)
                   teaches what it means. */}
-              <h1 className="max-w-[18ch] text-balance font-serif text-[34pt] font-normal leading-[var(--lh-display)] sm:text-[55pt] lg:text-[89pt] tracking-[var(--tracking-tight)] text-[var(--text)]">
+              <h1 className="max-w-[18ch] text-balance font-serif text-[length:var(--text-6xl)] font-normal leading-[var(--lh-display)] lg:text-[length:var(--text-7xl)] tracking-[var(--tracking-tight)] text-[var(--text)]">
                 Models that disagree, on the record.
               </h1>
             </div>
@@ -270,7 +270,7 @@ export default function LandingPage() {
                     {name}
                   </span>
                   {LAB_ORIGIN[name] ? (
-                    <span className="font-sans text-[8pt] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-subtle)]">
+                    <span className="font-sans text-[length:var(--text-2xs)] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-subtle)]">
                       {LAB_ORIGIN[name]}
                     </span>
                   ) : null}
@@ -413,7 +413,7 @@ export default function LandingPage() {
               <li key={phase} className="flex gap-[var(--space-3)] border-t border-[var(--border)] pt-[var(--space-3)]">
                 <span
                   aria-hidden="true"
-                  className="nums-tabular shrink-0 font-mono text-[8pt] text-[var(--text-subtle)]"
+                  className="nums-tabular shrink-0 font-mono text-[length:var(--text-2xs)] text-[var(--text-subtle)]"
                 >
                   {String(i + 1).padStart(2, '0')}
                 </span>
@@ -487,7 +487,7 @@ export default function LandingPage() {
               the marginal column uses, so it is the page's own label idiom
               moved inline rather than a second one invented for this
               section. */}
-          <p className="font-sans text-[8pt] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
+          <p className="font-sans text-[length:var(--text-2xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
             Image generation
           </p>
 
@@ -683,7 +683,7 @@ export default function LandingPage() {
             fall back to letting an LLM narrate an execution it did not
             perform (flows/services.py:26-43). */}
         <Section id="code">
-          <p className="font-sans text-[8pt] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
+          <p className="font-sans text-[length:var(--text-2xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
             Code generation
           </p>
 
@@ -765,7 +765,7 @@ export default function LandingPage() {
             {CLAIM_SPECIMENS.map(({ claim, label, qualifier }) => (
               <div key={label} className="border-t border-[var(--border)] pt-[var(--space-4)]">
                 <dt
-                  className={`${CLAIM_RULE[label]} pl-[var(--space-3)] font-sans text-[8pt] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)]`}
+                  className={`${CLAIM_RULE[label]} pl-[var(--space-3)] font-sans text-[length:var(--text-2xs)] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)]`}
                 >
                   {label}
                   {qualifier ? (

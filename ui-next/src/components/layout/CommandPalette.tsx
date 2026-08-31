@@ -150,12 +150,12 @@ export function CommandPalette({
             placeholder="Type a command..."
             className="flex-1 bg-transparent text-[length:var(--text-sm)] text-[var(--text)] outline-none placeholder:text-[var(--text-muted)]"
           />
-          <kbd className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 text-[10px] text-[var(--text-muted)]">ESC</kbd>
+          <kbd className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 text-[length:var(--text-2xs)] text-[var(--text-muted)]">ESC</kbd>
         </div>
 
         {recentCommands.length > 0 && !query && (
           <div className="px-2 py-2">
-            <p className="mb-1 px-2 text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)]">Recent</p>
+            <p className="mb-1 px-2 text-[length:var(--text-2xs)] font-medium uppercase tracking-wider text-[var(--text-muted)]">Recent</p>
             {recentCommands.map((id) => {
               const cmd = commands.find((c) => c.id === id);
               if (!cmd) return null;
@@ -199,7 +199,7 @@ export function CommandPalette({
                 <span>{cmd.label}</span>
               </div>
               {cmd.shortcut && (
-                <kbd className="rounded bg-[var(--surface-3)] px-1.5 py-0.5 text-[10px] text-[var(--text-muted)]">{cmd.shortcut}</kbd>
+                <kbd className="rounded bg-[var(--surface-3)] px-1.5 py-0.5 text-[length:var(--text-2xs)] text-[var(--text-muted)]">{cmd.shortcut}</kbd>
               )}
             </button>
           ))}

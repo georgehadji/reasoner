@@ -58,18 +58,18 @@ export function MethodChoicePrompt({
               onClick={() => onChoose(c.preset!)}
               className="group flex w-full items-start gap-3 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-left transition-colors hover:border-[var(--accent)] hover:bg-[var(--surface-3)]"
             >
-              <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[var(--border)] text-[10px] text-[var(--text-muted)] group-hover:border-[var(--accent)]">
+              <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[var(--border)] text-[length:var(--text-2xs)] text-[var(--text-muted)] group-hover:border-[var(--accent)]">
                 {i === 0 ? <Check className="h-3 w-3" /> : i + 1}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="text-[length:var(--text-sm)] font-medium text-[var(--text)]">{prettyMethod(c.method)}</span>
                   {i === 0 && (
-                    <span className="rounded-full bg-[color-mix(in_oklab,var(--accent)_15%,transparent)] px-2 py-0.5 text-[10px] font-medium text-[var(--accent)]">
+                    <span className="rounded-full bg-[color-mix(in_oklab,var(--accent)_15%,transparent)] px-2 py-0.5 text-[length:var(--text-2xs)] font-medium text-[var(--accent)]">
                       Suggested
                     </span>
                   )}
-                  <span className="text-[10px] text-[var(--text-subtle)]">{Math.round(c.confidence * 100)}% confidence</span>
+                  <span className="text-[length:var(--text-2xs)] text-[var(--text-subtle)]">{Math.round(c.confidence * 100)}% confidence</span>
                 </div>
                 {c.rationale && (
                   <div className="mt-0.5 text-[length:var(--text-xs)] text-[var(--text-muted)]">{c.rationale}</div>

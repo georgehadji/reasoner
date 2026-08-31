@@ -17,7 +17,7 @@ export function DocsSidebar({ activeSlug }: { activeSlug?: string }) {
       <div className="space-y-7">
         {docsBySection().map(({ section, pages }) => (
           <div key={section}>
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+            <p className="mb-2 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
               {section}
             </p>
             <ul className="space-y-0.5">

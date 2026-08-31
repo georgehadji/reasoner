@@ -69,10 +69,10 @@ export function ReviewHandoff() {
         {/* ── The file, as written ───────────────────────────── */}
         <div className="plate-reveal card-hover group border border-[var(--border)] bg-[var(--surface)] [transform-style:preserve-3d] hover:border-[var(--border-strong)] hover:[transform:translateZ(26px)_rotateX(3.5deg)] motion-reduce:hover:[transform:none]">
           <div className="flex items-baseline justify-between gap-[var(--space-4)] border-b border-[var(--border)] px-[var(--space-5)] py-[var(--space-3)]">
-            <p className="font-mono text-[8pt] leading-[var(--lh-ui)] text-[var(--text-2)]">
+            <p className="font-mono text-[length:var(--text-2xs)] leading-[var(--lh-ui)] text-[var(--text-2)]">
               {CODE_SHOWCASE_FILE.path}
             </p>
-            <p className="font-sans text-[8pt] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
+            <p className="font-sans text-[length:var(--text-2xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
               Written
             </p>
           </div>
@@ -89,7 +89,7 @@ export function ReviewHandoff() {
                       without counting rows. */}
                   <span
                     aria-hidden="true"
-                    className={`nums-tabular w-[1.5em] shrink-0 text-right text-[8pt] ${
+                    className={`nums-tabular w-[1.5em] shrink-0 text-right text-[length:var(--text-2xs)] ${
                       flagged ? 'text-[var(--accent)]' : 'text-[var(--text-subtle)]'
                     }`}
                   >
@@ -118,10 +118,10 @@ export function ReviewHandoff() {
             margin puts it over a sibling that is opaque. */}
         <div className="plate-reveal card-hover group relative z-10 border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-lg)] [transform-style:preserve-3d] hover:border-[var(--border-strong)] hover:[transform:translateZ(26px)_rotateX(3.5deg)] motion-reduce:hover:[transform:none] lg:-ml-[var(--space-10)] lg:mt-[var(--space-12)]">
           <div className="flex items-baseline justify-between gap-[var(--space-4)] border-b border-[var(--border)] px-[var(--space-5)] py-[var(--space-3)]">
-            <p className="font-sans text-[8pt] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
+            <p className="font-sans text-[length:var(--text-2xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
               Reviewed &mdash; different model, different lab
             </p>
-            <p className="nums-tabular font-mono text-[8pt] leading-[var(--lh-ui)] text-[var(--red)]">
+            <p className="nums-tabular font-mono text-[length:var(--text-2xs)] leading-[var(--lh-ui)] text-[var(--red)]">
               {CODE_SHOWCASE_VERDICT}
             </p>
           </div>
@@ -132,7 +132,7 @@ export function ReviewHandoff() {
                 key={`${severity}-${line}`}
                 className="border-b border-[var(--border)] py-[var(--space-4)] last:border-b-0"
               >
-                <p className="nums-tabular font-mono text-[8pt] leading-[var(--lh-ui)]">
+                <p className="nums-tabular font-mono text-[length:var(--text-2xs)] leading-[var(--lh-ui)]">
                   <span className={`font-semibold ${SEVERITY_CLASS[severity]}`}>{severity}</span>
                   <span className="ml-[var(--space-3)] text-[var(--text-subtle)]">
                     {CODE_SHOWCASE_FILE.path}:{line}
@@ -142,7 +142,7 @@ export function ReviewHandoff() {
                   {issue}
                 </p>
                 {fix ? (
-                  <p className="mt-[var(--space-1)] font-mono text-[8pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+                  <p className="mt-[var(--space-1)] font-mono text-[length:var(--text-2xs)] leading-[var(--lh-body)] text-[var(--text-muted)]">
                     {fix}
                   </p>
                 ) : null}

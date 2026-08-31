@@ -130,7 +130,7 @@ export default function CapabilitiesPage() {
         <header className="mx-auto w-full max-w-[var(--width-wide)] px-[var(--gutter)] pb-[var(--section-y)] pt-[var(--space-48)]">
           <div className="grid gap-[var(--space-6)] lg:grid-cols-[9rem_minmax(0,1fr)] lg:gap-[var(--space-12)]">
             <div>
-              <p className="mt-[var(--space-1)] font-sans text-[8pt] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
+              <p className="mt-[var(--space-1)] font-sans text-[length:var(--text-2xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
                 Capabilities
               </p>
             </div>
@@ -167,7 +167,7 @@ export default function CapabilitiesPage() {
 
           <dl className="mt-[var(--space-10)] grid gap-[var(--space-6)] sm:grid-cols-2">
             <div className="border-t border-[var(--border)] pt-[var(--space-4)]">
-              <dt className="epistemic-hypothesis pl-[var(--space-3)] font-sans text-[8pt] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)]">
+              <dt className="epistemic-hypothesis pl-[var(--space-3)] font-sans text-[length:var(--text-2xs)] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)]">
                 Hypothesis
               </dt>
               <dd className="mt-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
@@ -176,7 +176,7 @@ export default function CapabilitiesPage() {
               </dd>
             </div>
             <div className="border-t border-[var(--border)] pt-[var(--space-4)]">
-              <dt className="epistemic-verified pl-[var(--space-3)] font-sans text-[8pt] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)]">
+              <dt className="epistemic-verified pl-[var(--space-3)] font-sans text-[length:var(--text-2xs)] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)]">
                 Verified
               </dt>
               <dd className="mt-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">

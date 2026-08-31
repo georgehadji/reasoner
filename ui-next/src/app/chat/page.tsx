@@ -1157,7 +1157,7 @@ export default function ChatPage() {
                     aria-label={`WebSocket ${wsStatus}`}
                   />
                 </Tooltip>
-                <span className="hidden text-[10px] text-[var(--text-muted)] sm:inline">
+                <span className="hidden text-[length:var(--text-2xs)] text-[var(--text-muted)] sm:inline">
                   {wsStatus === 'connected' ? 'Live' : wsStatus}
                 </span>
               </div>

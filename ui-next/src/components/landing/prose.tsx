@@ -63,9 +63,9 @@ export function Section({
              visible for as long as the section it names is. */
           <div className="lg:sticky lg:top-[var(--space-24)] lg:self-start">
             {marker ? (
-              <p className="nums-tabular font-mono text-[8pt] text-[var(--accent)]">{marker}</p>
+              <p className="nums-tabular font-mono text-[length:var(--text-2xs)] text-[var(--accent)]">{marker}</p>
             ) : null}
-            <p className="mt-[var(--space-1)] font-sans text-[8pt] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
+            <p className="mt-[var(--space-1)] font-sans text-[length:var(--text-2xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
               {name}
             </p>
           </div>

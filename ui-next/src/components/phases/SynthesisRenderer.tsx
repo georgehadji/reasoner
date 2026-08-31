@@ -54,7 +54,7 @@ export const SynthesisRenderer = memo(function SynthesisRenderer({
           <ol className="space-y-2 text-[length:var(--text-sm)] text-[var(--text)]">
             {footnotes.map((c) => (
               <li key={c.index} id={`ref-${c.index}`} className="flex gap-2">
-                <sup className="mt-0.5 text-[10px] text-[var(--text-subtle)]">[{c.index}]</sup>
+                <sup className="mt-0.5 text-[length:var(--text-2xs)] text-[var(--text-subtle)]">[{c.index}]</sup>
                 <span>
                   {c.title}.{' '}
                   <a

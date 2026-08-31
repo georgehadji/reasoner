@@ -124,7 +124,7 @@ export function MechanismDiagram() {
                 and the heading answers the question it raises. */}
             <CollagePlate variant={plate} />
 
-            <p className="nums-tabular mt-[var(--space-5)] font-mono text-[8pt] leading-[var(--lh-ui)] text-[var(--accent)]">
+            <p className="nums-tabular mt-[var(--space-5)] font-mono text-[length:var(--text-2xs)] leading-[var(--lh-ui)] text-[var(--accent)]">
               {ordinal}
               <span className="ml-[var(--space-3)] font-sans font-semibold uppercase tracking-[var(--tracking-label)] text-[var(--text-subtle)]">
                 {stage}
@@ -147,7 +147,7 @@ export function MechanismDiagram() {
             <Link
               href={href}
               aria-label={`How Reasoner stops ${failure.toLowerCase()}`}
-              className="link-smooth mt-[var(--space-5)] inline-flex font-sans text-[8pt] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--accent)] after:absolute after:inset-0 hover:text-[var(--accent-hover)]"
+              className="link-smooth mt-[var(--space-5)] inline-flex font-sans text-[length:var(--text-2xs)] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--accent)] after:absolute after:inset-0 hover:text-[var(--accent-hover)]"
             >
               How it holds
               <span

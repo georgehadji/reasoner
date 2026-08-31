@@ -128,7 +128,7 @@ const CURL = `curl -s https://reasoner.app/api/agent/run/sync \\
 function Code({ children, label }: { children: string; label: string }) {
   return (
     <figure className="mt-[var(--space-8)]">
-      <figcaption className="font-sans text-[8pt] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
+      <figcaption className="font-sans text-[length:var(--text-2xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
         {label}
       </figcaption>
       <pre className="mt-[var(--space-3)] overflow-x-auto border border-[var(--border)] bg-[var(--surface)] p-[var(--space-6)] font-mono text-[length:var(--text-xs)] leading-[var(--lh-body)] text-[var(--text-2)]">
@@ -151,7 +151,7 @@ export default function DevelopersPage() {
         <header className="mx-auto w-full max-w-[var(--width-wide)] px-[var(--gutter)] pb-[var(--section-y)] pt-[var(--space-48)]">
           <div className="grid gap-[var(--space-6)] lg:grid-cols-[9rem_minmax(0,1fr)] lg:gap-[var(--space-12)]">
             <div>
-              <p className="mt-[var(--space-1)] font-sans text-[8pt] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
+              <p className="mt-[var(--space-1)] font-sans text-[length:var(--text-2xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
                 Developers
               </p>
             </div>
@@ -196,7 +196,7 @@ export default function DevelopersPage() {
                   <span className="font-mono text-[length:var(--text-md)] leading-[var(--lh-ui)] text-[var(--text)]">
                     {name}
                   </span>
-                  <span className="font-sans text-[8pt] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-subtle)]">
+                  <span className="font-sans text-[length:var(--text-2xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-subtle)]">
                     {cost}
                   </span>
                 </dt>

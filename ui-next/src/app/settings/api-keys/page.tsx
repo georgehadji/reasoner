@@ -403,7 +403,7 @@ export default function ApiKeysPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium">{key.name}</span>
                     {!key.is_active && (
-                      <span className="rounded-full bg-[var(--surface-3)] px-2 py-0.5 text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+                      <span className="rounded-full bg-[var(--surface-3)] px-2 py-0.5 text-[length:var(--text-2xs)] uppercase tracking-wide text-[var(--text-muted)]">
                         Expired
                       </span>
                     )}
@@ -415,7 +415,7 @@ export default function ApiKeysPage() {
                     {key.scopes.map((scope) => (
                       <span
                         key={scope}
-                        className="rounded-md bg-[var(--surface-2)] px-2 py-0.5 font-mono text-[11px] text-[var(--text-2)]"
+                        className="rounded-md bg-[var(--surface-2)] px-2 py-0.5 font-mono text-[length:var(--text-2xs)] text-[var(--text-2)]"
                       >
                         {scope}
                       </span>
