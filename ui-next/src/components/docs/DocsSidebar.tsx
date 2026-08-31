@@ -7,10 +7,10 @@ import { docsBySection } from '@/lib/docs';
  */
 export function DocsSidebar({ activeSlug }: { activeSlug?: string }) {
   return (
-    <nav aria-label="Documentation" className="text-sm">
+    <nav aria-label="Documentation" className="text-[length:var(--text-sm)]">
       <Link
         href="/docs"
-        className="mb-6 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)] transition-colors hover:text-[var(--text)]"
+        className="mb-6 block text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)] transition-colors hover:text-[var(--text)]"
       >
         Documentation
       </Link>

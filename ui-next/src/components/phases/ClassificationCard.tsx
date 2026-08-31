@@ -24,12 +24,12 @@ export function ClassificationCard({ data }: ClassificationCardProps) {
           // category. --ok/--warn/--unknown are reserved for epistemic
           // labels, and the word itself already distinguishes "Strategic"
           // from "Creative"; a per-type hue was decoration, not information.
-          <span className="rounded-full bg-[var(--surface-3)] px-2.5 py-1 text-xs font-medium text-[var(--text)]">
+          <span className="rounded-full bg-[var(--surface-3)] px-2.5 py-1 text-[length:var(--text-xs)] font-medium text-[var(--text)]">
             {taskType}
           </span>
         )}
         {language && (
-          <span className="rounded-full border border-[var(--border)] px-2.5 py-1 text-xs text-[var(--text-muted)]">
+          <span className="rounded-full border border-[var(--border)] px-2.5 py-1 text-[length:var(--text-xs)] text-[var(--text-muted)]">
             {language}
           </span>
         )}

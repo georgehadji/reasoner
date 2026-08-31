@@ -38,15 +38,15 @@ export default function GlobalError({
             <line x1="12" x2="12.01" y1="16" y2="16" />
           </svg>
         </div>
-        <h2 className="mb-2 text-xl font-semibold text-[#FAF1EC]">
+        <h2 className="mb-2 text-[length:var(--text-xl)] font-semibold text-[#FAF1EC]">
           Critical Error
         </h2>
-        <p className="mb-8 max-w-sm text-sm leading-relaxed text-[#A59B95]">
+        <p className="mb-8 max-w-sm text-[length:var(--text-sm)] leading-relaxed text-[#A59B95]">
           The application failed to load. We&apos;ve been notified. Please refresh the page to try again.
         </p>
         <button
           onClick={() => reset()}
-          className="inline-flex items-center justify-center rounded-xl bg-[#D4C9C3] px-5 py-2.5 text-sm font-semibold text-[#1A1614] transition-all hover:opacity-90 active:scale-[0.98]"
+          className="inline-flex items-center justify-center rounded-xl bg-[#D4C9C3] px-5 py-2.5 text-[length:var(--text-sm)] font-semibold text-[#1A1614] transition-all hover:opacity-90 active:scale-[0.98]"
         >
           Refresh
         </button>

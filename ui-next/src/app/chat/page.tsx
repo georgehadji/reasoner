@@ -1168,19 +1168,19 @@ export default function ChatPage() {
               <>
                 <button
                   onClick={() => router.push('/about')}
-                  className="text-sm font-medium text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
+                  className="text-[length:var(--text-sm)] font-medium text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
                 >
                   About
                 </button>
                 <button
                   onClick={() => router.push('/pricing')}
-                  className="text-sm font-medium text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
+                  className="text-[length:var(--text-sm)] font-medium text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
                 >
                   Pricing
                 </button>
                 <button
                   onClick={() => router.push('/login')}
-                  className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-[var(--accent-text)] transition-opacity hover:opacity-90"
+                  className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-[length:var(--text-sm)] font-medium text-[var(--accent-text)] transition-opacity hover:opacity-90"
                 >
                   Sign In
                 </button>
@@ -1194,7 +1194,7 @@ export default function ChatPage() {
 
         {hasMessages && activeAssistantMsg && (
           <div>
-            <div className="px-4 pt-2 text-xs text-[var(--text-muted)]">
+            <div className="px-4 pt-2 text-[length:var(--text-xs)] text-[var(--text-muted)]">
               <Tooltip text={METHOD_DESCRIPTIONS[autoSelectedMethod.replace(/_/g, '-')] || ''}>
                 <span className="cursor-help">
                   Method: <span className="text-[var(--text)]">{autoSelectedMethod.replace(/_/g, '-').replace(/\b\w/g, (l) => l.toUpperCase())}</span>
@@ -1262,7 +1262,7 @@ export default function ChatPage() {
         {hasMessages && (
           <div className="w-full">
             {followupAgentBadge && (
-              <div className="mx-auto max-w-3xl px-4 pb-2 text-xs text-muted-foreground">
+              <div className="mx-auto max-w-3xl px-4 pb-2 text-[length:var(--text-xs)] text-muted-foreground">
                 {followupAgentBadge}
               </div>
             )}

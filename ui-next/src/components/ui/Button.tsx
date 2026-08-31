@@ -38,9 +38,9 @@ const buttonVariants = {
 } as const;
 
 const buttonSizes = {
-  sm: 'h-8 px-2.5 gap-1 text-xs',
-  md: 'h-10 px-4 gap-1.5 text-sm',
-  lg: 'h-12 px-6 gap-2 text-base',
+  sm: 'h-8 px-2.5 gap-1 text-[length:var(--text-xs)]',
+  md: 'h-10 px-4 gap-1.5 text-[length:var(--text-sm)]',
+  lg: 'h-12 px-6 gap-2 text-[length:var(--text-base)]',
 } as const;
 
 /* ────────────────────────────────────────────────────────────────────────────

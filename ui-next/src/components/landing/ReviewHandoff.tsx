@@ -57,7 +57,7 @@ export function ReviewHandoff() {
         className="pointer-events-none absolute inset-x-[-8%] top-[4%] h-[55%] bg-[radial-gradient(ellipse_at_top,var(--accent-dim),transparent_70%)]"
       />
 
-      <p className="relative font-mono text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+      <p className="relative font-mono text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
         &ldquo;{CODE_SHOWCASE_REQUEST}&rdquo;
       </p>
 
@@ -81,7 +81,7 @@ export function ReviewHandoff() {
               transformed element forces transform-style back to flat and
               kills the tilt for the whole column. */}
           <pre className="overflow-x-auto px-[var(--space-5)] py-[var(--space-4)]">
-            <code className="block font-mono text-[13pt] leading-[1.7]">
+            <code className="block font-mono text-[length:var(--text-md)] leading-[1.7]">
               {CODE_SHOWCASE_FILE.lines.map(({ n, text, flagged }) => (
                 <span key={n} className="flex gap-[var(--space-4)]">
                   {/* The gutter says which lines the review came back on,
@@ -138,7 +138,7 @@ export function ReviewHandoff() {
                     {CODE_SHOWCASE_FILE.path}:{line}
                   </span>
                 </p>
-                <p className="mt-[var(--space-2)] text-[13pt] leading-[var(--lh-body)] text-[var(--text-2)]">
+                <p className="mt-[var(--space-2)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-2)]">
                   {issue}
                 </p>
                 {fix ? (
@@ -155,7 +155,7 @@ export function ReviewHandoff() {
       {/* Says plainly what this is. The image grid above it is a real run and
           this is not, and a page that spends its credibility arguing for
           checkable claims cannot let a reader assume otherwise. */}
-      <figcaption className="relative mt-[var(--space-6)] font-sans text-[13pt] leading-[var(--lh-ui)] text-[var(--text-muted)]">
+      <figcaption className="relative mt-[var(--space-6)] font-sans text-[length:var(--text-md)] leading-[var(--lh-ui)] text-[var(--text-muted)]">
         The fields every review returns, on a file small enough to check by eye. Seven phases run
         in all: library research, spec, generation, CVE search, security review, tests, assembly.
       </figcaption>
@@ -174,7 +174,7 @@ export function ReviewHandoff() {
         {CODE_CONTRACT.map((clause) => (
           <li
             key={clause}
-            className="border-t border-[var(--border)] pt-[var(--space-3)] font-sans text-[13pt] leading-[var(--lh-ui)] text-[var(--text-2)]"
+            className="border-t border-[var(--border)] pt-[var(--space-3)] font-sans text-[length:var(--text-md)] leading-[var(--lh-ui)] text-[var(--text-2)]"
           >
             {clause}
           </li>

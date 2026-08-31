@@ -38,7 +38,7 @@ export function ShortcutModal({ isOpen, onClose }: ShortcutModalProps) {
         )}
       >
         <div className="mb-4 flex items-center justify-between">
-          <span className="text-base font-semibold text-[var(--text)]">Keyboard Shortcuts</span>
+          <span className="text-[length:var(--text-base)] font-semibold text-[var(--text)]">Keyboard Shortcuts</span>
           <button
             type="button"
             onClick={onClose}
@@ -48,7 +48,7 @@ export function ShortcutModal({ isOpen, onClose }: ShortcutModalProps) {
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="space-y-3 text-sm">
+        <div className="space-y-3 text-[length:var(--text-sm)]">
           {shortcuts.map((shortcut) => (
             <div key={shortcut.label} className="flex items-center justify-between">
               <div className="flex items-center gap-1">

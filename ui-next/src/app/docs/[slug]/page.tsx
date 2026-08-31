@@ -70,7 +70,7 @@ export default async function DocPage({ params }: DocParams) {
         </aside>
 
         <main id="main-content" className="min-w-0 max-w-3xl">
-          <nav aria-label="Breadcrumb" className="mb-6 text-sm text-[var(--text-muted)]">
+          <nav aria-label="Breadcrumb" className="mb-6 text-[length:var(--text-sm)] text-[var(--text-muted)]">
             <Link href="/docs" className="transition-colors hover:text-[var(--text)]">
               Docs
             </Link>
@@ -104,7 +104,7 @@ export default async function DocPage({ params }: DocParams) {
                   href={`/docs/${prev.slug}`}
                   className="group flex flex-col rounded-xl border border-[var(--border)] p-4 transition-colors hover:border-[var(--accent)]"
                 >
-                  <span className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+                  <span className="flex items-center gap-1.5 text-[length:var(--text-xs)] text-[var(--text-muted)]">
                     <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
                     Previous
                   </span>
@@ -120,7 +120,7 @@ export default async function DocPage({ params }: DocParams) {
                   href={`/docs/${next.slug}`}
                   className="group flex flex-col rounded-xl border border-[var(--border)] p-4 text-right transition-colors hover:border-[var(--accent)] sm:col-start-2"
                 >
-                  <span className="flex items-center justify-end gap-1.5 text-xs text-[var(--text-muted)]">
+                  <span className="flex items-center justify-end gap-1.5 text-[length:var(--text-xs)] text-[var(--text-muted)]">
                     Next
                     <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
                   </span>

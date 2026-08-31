@@ -76,7 +76,7 @@ export function UpgradeModal({ open, onClose }: UpgradeModalProps) {
         )}
       >
         <div className="mb-4 flex items-center justify-between">
-          <h2 id="upgrade-title" className="text-xl font-bold text-[var(--text)]">
+          <h2 id="upgrade-title" className="text-[length:var(--text-xl)] font-bold text-[var(--text)]">
             Upgrade to Pro
           </h2>
           <button
@@ -94,17 +94,17 @@ export function UpgradeModal({ open, onClose }: UpgradeModalProps) {
         </p>
 
         {error && (
-          <div className="mb-4 rounded-[var(--radius)] bg-[var(--red-bg)] p-3 text-sm text-[var(--red)]" role="alert">
+          <div className="mb-4 rounded-[var(--radius)] bg-[var(--red-bg)] p-3 text-[length:var(--text-sm)] text-[var(--red)]" role="alert">
             {error}
           </div>
         )}
 
         <div className="mb-6 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-2)] p-4">
-          <div className="flex items-center gap-2 text-sm font-medium text-[var(--text)]">
+          <div className="flex items-center gap-2 text-[length:var(--text-sm)] font-medium text-[var(--text)]">
             <Lock className="h-4 w-4 text-[var(--accent)]" />
             Pro Plan — $12/month
           </div>
-          <ul className="mt-2 space-y-1 text-sm text-[var(--text-muted)]">
+          <ul className="mt-2 space-y-1 text-[length:var(--text-sm)] text-[var(--text-muted)]">
             <li>500 queries per month</li>
             <li>All premium presets</li>
             <li>Priority support</li>

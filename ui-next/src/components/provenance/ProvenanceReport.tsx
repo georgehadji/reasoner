@@ -39,7 +39,7 @@ export function ProvenanceReport({ isOpen, onClose, report }: ProvenanceReportPr
               <Eraser className="h-5 w-5" aria-hidden="true" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-[var(--text)]">Provenance scrub report</h3>
+              <h3 className="text-[length:var(--text-sm)] font-bold text-[var(--text)]">Provenance scrub report</h3>
               <p className="text-[length:var(--text-xs)] text-[var(--text-2)]">
                 {total > 0
                   ? `${total} invisible character${total === 1 ? '' : 's'} removed from this response`

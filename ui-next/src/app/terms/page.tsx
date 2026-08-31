@@ -10,14 +10,14 @@ export default function TermsPage() {
       <SiteHeader />
       <main className="mx-auto max-w-4xl px-6 py-20 flex-1 w-full">
         <header className="mb-12 border-b border-[var(--border)] pb-12">
-          <h1 className="text-4xl md:text-5xl font-bold mb-4 tracking-tight">Terms of Service</h1>
-          <p className="text-[var(--text-muted)] text-lg">Last updated: {lastUpdated}</p>
+          <h1 className="text-[length:var(--text-4xl)] md:text-[length:var(--text-5xl)] font-bold mb-4 tracking-tight">Terms of Service</h1>
+          <p className="text-[var(--text-muted)] text-[length:var(--text-lg)]">Last updated: {lastUpdated}</p>
         </header>
 
         <div className="grid gap-12 lg:grid-cols-[1fr_280px]">
           <div className="space-y-12 text-[var(--text-muted)] leading-relaxed">
             <section>
-              <h3 className="text-2xl font-bold mb-6 text-[var(--text)]">1. Acceptance of Terms</h3>
+              <h3 className="text-[length:var(--text-2xl)] font-bold mb-6 text-[var(--text)]">1. Acceptance of Terms</h3>
               <p>
                 By accessing or using the Reasoner platform, you agree to be bound by these Terms of Service 
                 and all applicable laws and regulations. If you do not agree with any of these terms, you are 
@@ -26,7 +26,7 @@ export default function TermsPage() {
             </section>
 
             <section>
-              <h3 className="text-2xl font-bold mb-6 text-[var(--text)]">2. Use License & Enterprise Rights</h3>
+              <h3 className="text-[length:var(--text-2xl)] font-bold mb-6 text-[var(--text)]">2. Use License & Enterprise Rights</h3>
               <p className="mb-4">
                 Permission is granted to access and use the Reasoner reasoning engine for professional, 
                 educational, or research purposes.
@@ -39,13 +39,13 @@ export default function TermsPage() {
             </section>
 
             <section>
-              <h3 className="text-2xl font-bold mb-6 text-[var(--text)]">3. Service Accuracy & AI Disclaimer</h3>
+              <h3 className="text-[length:var(--text-2xl)] font-bold mb-6 text-[var(--text)]">3. Service Accuracy & AI Disclaimer</h3>
               <div className="bg-[var(--surface-2)] border border-[var(--border-strong)] rounded-xl p-6">
                 <p className="flex items-center gap-2 font-bold text-[var(--text)] mb-2">
                   <AlertCircle className="h-5 w-5" />
                   AI Generation Disclosure
                 </p>
-                <p className="text-sm">
+                <p className="text-[length:var(--text-sm)]">
                   Reasoner utilizes advanced artificial intelligence. AI-generated content can contain inaccuracies, 
                   hallucinations, or biases. Our system is designed to provide structured reasoning and verification, 
                   but users must independently verify all critical outputs. Reasoner is a tool for thought, not a 
@@ -55,7 +55,7 @@ export default function TermsPage() {
             </section>
 
             <section>
-              <h3 className="text-2xl font-bold mb-6 text-[var(--text)]">4. Prohibited Uses</h3>
+              <h3 className="text-[length:var(--text-2xl)] font-bold mb-6 text-[var(--text)]">4. Prohibited Uses</h3>
               <p className="mb-4">You agree not to use the platform to:</p>
               <ul className="list-disc pl-6 space-y-2">
                 <li>Generate illegal or harmful content.</li>
@@ -66,7 +66,7 @@ export default function TermsPage() {
             </section>
 
             <section>
-              <h3 className="text-2xl font-bold mb-6 text-[var(--text)]">5. Service Availability & Termination</h3>
+              <h3 className="text-[length:var(--text-2xl)] font-bold mb-6 text-[var(--text)]">5. Service Availability & Termination</h3>
               <p>
                 While we strive for 99.9% uptime, Reasoner is provided &quot;as is&quot;. We reserve the right to
                 modify or discontinue the service with reasonable notice to enterprise customers. 
@@ -75,7 +75,7 @@ export default function TermsPage() {
             </section>
 
             <section>
-              <h3 className="text-2xl font-bold mb-6 text-[var(--text)]">6. Governing Law</h3>
+              <h3 className="text-[length:var(--text-2xl)] font-bold mb-6 text-[var(--text)]">6. Governing Law</h3>
               <p>
                 These terms shall be governed by and construed in accordance with the laws of the jurisdiction 
                 in which the service provider is headquartered, without regard to its conflict of law provisions.
@@ -86,27 +86,27 @@ export default function TermsPage() {
           {/* Quick Info Sidebar */}
           <aside className="space-y-6">
             <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 sticky top-24">
-              <h4 className="text-sm font-bold uppercase tracking-wider text-[var(--text-subtle)] mb-4">Summary</h4>
+              <h4 className="text-[length:var(--text-sm)] font-bold uppercase tracking-wider text-[var(--text-subtle)] mb-4">Summary</h4>
               <div className="space-y-4">
                 <div className="flex items-start gap-3">
                   <FileText className="h-5 w-5 text-[var(--accent)] shrink-0" />
                   <div>
-                    <p className="text-sm font-bold text-[var(--text)]">Professional Use</p>
-                    <p className="text-xs">Built for high-stakes reasoning.</p>
+                    <p className="text-[length:var(--text-sm)] font-bold text-[var(--text)]">Professional Use</p>
+                    <p className="text-[length:var(--text-xs)]">Built for high-stakes reasoning.</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
                   <Gavel className="h-5 w-5 text-[var(--accent)] shrink-0" />
                   <div>
-                    <p className="text-sm font-bold text-[var(--text)]">Your Ownership</p>
-                    <p className="text-xs">You own all inputs and outputs.</p>
+                    <p className="text-[length:var(--text-sm)] font-bold text-[var(--text)]">Your Ownership</p>
+                    <p className="text-[length:var(--text-xs)]">You own all inputs and outputs.</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
                   <Globe className="h-5 w-5 text-[var(--accent)] shrink-0" />
                   <div>
-                    <p className="text-sm font-bold text-[var(--text)]">Global Compliance</p>
-                    <p className="text-xs">Standardized legal frameworks.</p>
+                    <p className="text-[length:var(--text-sm)] font-bold text-[var(--text)]">Global Compliance</p>
+                    <p className="text-[length:var(--text-xs)]">Standardized legal frameworks.</p>
                   </div>
                 </div>
               </div>

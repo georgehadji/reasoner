@@ -37,7 +37,7 @@ export function MethodChoicePrompt({
     <div className="flex w-full justify-center px-4">
       <div className="w-full max-w-3xl rounded-[10px] border border-[var(--border)] bg-[var(--surface-2)] p-4">
         <div className="mb-3 flex items-center justify-between">
-          <div className="text-sm font-medium text-[var(--text)]">
+          <div className="text-[length:var(--text-sm)] font-medium text-[var(--text)]">
             Not sure which reasoning method fits best — pick one:
           </div>
           <button
@@ -63,7 +63,7 @@ export function MethodChoicePrompt({
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-[var(--text)]">{prettyMethod(c.method)}</span>
+                  <span className="text-[length:var(--text-sm)] font-medium text-[var(--text)]">{prettyMethod(c.method)}</span>
                   {i === 0 && (
                     <span className="rounded-full bg-[color-mix(in_oklab,var(--accent)_15%,transparent)] px-2 py-0.5 text-[10px] font-medium text-[var(--accent)]">
                       Suggested
@@ -72,14 +72,14 @@ export function MethodChoicePrompt({
                   <span className="text-[10px] text-[var(--text-subtle)]">{Math.round(c.confidence * 100)}% confidence</span>
                 </div>
                 {c.rationale && (
-                  <div className="mt-0.5 text-xs text-[var(--text-muted)]">{c.rationale}</div>
+                  <div className="mt-0.5 text-[length:var(--text-xs)] text-[var(--text-muted)]">{c.rationale}</div>
                 )}
               </div>
             </button>
           ))}
         </div>
 
-        <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs text-[var(--text-muted)]">
+        <label className="mt-3 flex cursor-pointer items-center gap-2 text-[length:var(--text-xs)] text-[var(--text-muted)]">
           <input
             type="checkbox"
             checked={alwaysAuto}
@@ -96,7 +96,7 @@ export function MethodChoicePrompt({
 export function MethodChoiceLoading() {
   return (
     <div className="flex w-full justify-center px-4">
-      <div className="flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-4 py-2 text-sm text-[var(--text-muted)]">
+      <div className="flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-4 py-2 text-[length:var(--text-sm)] text-[var(--text-muted)]">
         <Loader2 className="h-3.5 w-3.5 animate-spin" />
         Checking best reasoning method…
       </div>

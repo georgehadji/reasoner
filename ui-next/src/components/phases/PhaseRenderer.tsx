@@ -254,7 +254,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
           {/* Phase 2: Raw VS ideas */}
           {rawIdeas.length > 0 && clusters.length === 0 && (
             <div className="space-y-2">
-              <p className={`text-xs font-medium uppercase tracking-wide opacity-60 ${phaseTextClass}`}>
+              <p className={`text-[length:var(--text-xs)] font-medium uppercase tracking-wide opacity-60 ${phaseTextClass}`}>
                 {rawIdeas.length} ideas generated
               </p>
               {rawIdeas.map((idea, i) => {
@@ -263,13 +263,13 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
                 return (
                   <div key={i} className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className={`text-sm font-semibold ${phaseTextClass}`}>{String(idea.title ?? '')}</span>
-                      <span className={`text-xs font-medium ${tierColor[tier] ?? 'text-[var(--text-muted)]'}`}>{tier}</span>
+                      <span className={`text-[length:var(--text-sm)] font-semibold ${phaseTextClass}`}>{String(idea.title ?? '')}</span>
+                      <span className={`text-[length:var(--text-xs)] font-medium ${tierColor[tier] ?? 'text-[var(--text-muted)]'}`}>{tier}</span>
                       {prob !== null && (
-                        <span className="ml-auto text-xs opacity-50">p={prob.toFixed(2)}</span>
+                        <span className="ml-auto text-[length:var(--text-xs)] opacity-50">p={prob.toFixed(2)}</span>
                       )}
                     </div>
-                    <p className={`text-xs opacity-70 ${phaseTextClass}`}>{String(idea.core_insight ?? idea.description ?? '')}</p>
+                    <p className={`text-[length:var(--text-xs)] opacity-70 ${phaseTextClass}`}>{String(idea.core_insight ?? idea.description ?? '')}</p>
                   </div>
                 );
               })}
@@ -283,11 +283,11 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
                 const keptIdeas = clusterIdeas.filter(i => i.keep !== false);
                 return (
                   <div key={ci} className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2">
-                    <p className={`text-xs font-semibold uppercase tracking-wide mb-2 ${phaseTextClass}`}>{String(cluster.theme ?? `Theme ${ci + 1}`)}</p>
+                    <p className={`text-[length:var(--text-xs)] font-semibold uppercase tracking-wide mb-2 ${phaseTextClass}`}>{String(cluster.theme ?? `Theme ${ci + 1}`)}</p>
                     {keptIdeas.map((idea, ii) => (
                       <div key={ii} className="flex items-center gap-2 py-1 border-t border-[var(--border)]">
-                        <span className={`text-xs flex-1 ${phaseTextClass}`}>{String(idea.title ?? '')}</span>
-                        <span className="text-xs opacity-50">N:{String(idea.novelty ?? '—')} F:{String(idea.feasibility ?? '—')} I:{String(idea.impact ?? '—')}</span>
+                        <span className={`text-[length:var(--text-xs)] flex-1 ${phaseTextClass}`}>{String(idea.title ?? '')}</span>
+                        <span className="text-[length:var(--text-xs)] opacity-50">N:{String(idea.novelty ?? '—')} F:{String(idea.feasibility ?? '—')} I:{String(idea.impact ?? '—')}</span>
                       </div>
                     ))}
                   </div>
@@ -303,17 +303,17 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
                 const risks = Array.isArray(dev.risks) ? dev.risks as string[] : [];
                 return (
                   <div key={di} className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-2)] px-3 py-3 space-y-2">
-                    <p className={`text-sm font-semibold ${phaseTextClass}`}>{String(dev.title ?? '')}</p>
-                    {!!dev.use_case && <p className={`text-xs opacity-80 ${phaseTextClass}`}>{String(dev.use_case)}</p>}
+                    <p className={`text-[length:var(--text-sm)] font-semibold ${phaseTextClass}`}>{String(dev.title ?? '')}</p>
+                    {!!dev.use_case && <p className={`text-[length:var(--text-xs)] opacity-80 ${phaseTextClass}`}>{String(dev.use_case)}</p>}
                     {steps.length > 0 && (
-                      <ol className={`text-xs space-y-1 list-decimal list-inside opacity-80 ${phaseTextClass}`}>
+                      <ol className={`text-[length:var(--text-xs)] space-y-1 list-decimal list-inside opacity-80 ${phaseTextClass}`}>
                         {steps.map((s, si) => <li key={si}>{s}</li>)}
                       </ol>
                     )}
                     {risks.length > 0 && (
                       <div>
-                        <p className={`text-xs font-medium opacity-60 ${phaseTextClass}`}>Risks</p>
-                        <ul className={`text-xs list-disc list-inside opacity-70 ${phaseTextClass}`}>
+                        <p className={`text-[length:var(--text-xs)] font-medium opacity-60 ${phaseTextClass}`}>Risks</p>
+                        <ul className={`text-[length:var(--text-xs)] list-disc list-inside opacity-70 ${phaseTextClass}`}>
                           {risks.map((r, ri) => <li key={ri}>{r}</li>)}
                         </ul>
                       </div>
@@ -367,7 +367,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
           <div className="mb-4 grid gap-4">
             {synthesisSections.criticalInsights.length > 0 && (
               <section id="critical-insights" className="scroll-mt-24 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--chip-bg,var(--surface-2))] p-4">
-                <h3 className="mb-2 text-sm font-semibold text-[var(--text)]">Critical Insights</h3>
+                <h3 className="mb-2 text-[length:var(--text-sm)] font-semibold text-[var(--text)]">Critical Insights</h3>
                 <ol className="list-decimal space-y-1 pl-5 text-[length:var(--text-sm)] text-[var(--text)]">
                   {synthesisSections.criticalInsights.map((item, i) => (
                     <li key={i}>{item}</li>
@@ -378,7 +378,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
             {synthesisSections.actionBlueprint.length > 0 && (
               <section id="action-blueprint" className="scroll-mt-24 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--chip-bg,var(--surface-2))] p-4">
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <h3 className="text-sm font-semibold text-[var(--text)]">Action Blueprint</h3>
+                  <h3 className="text-[length:var(--text-sm)] font-semibold text-[var(--text)]">Action Blueprint</h3>
                   <button
                     type="button"
                     onClick={() => {
@@ -413,7 +413,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
             )}
             {synthesisSections.openQuestions.length > 0 && (
               <section id="open-questions" className="scroll-mt-24 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--chip-bg,var(--surface-2))] p-4">
-                <h3 className="mb-2 text-sm font-semibold text-[var(--text)]">Open Questions</h3>
+                <h3 className="mb-2 text-[length:var(--text-sm)] font-semibold text-[var(--text)]">Open Questions</h3>
                 <ul className="space-y-1 text-[length:var(--text-sm)] text-[var(--text)]">
                   {synthesisSections.openQuestions.map((item, i) => (
                     <li key={i}>• {item}</li>
@@ -460,7 +460,7 @@ function VettedContextBlock({ items }: { items: Array<Record<string, unknown>> }
   return (
     <div className="mb-4 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--chip-bg,var(--surface-2))] p-4">
       <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">Vetted Context</h3>
+        <h3 className="text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">Vetted Context</h3>
         <span className={`${TEXT_SIZES.tiny} text-[var(--text-subtle)]`}>{items.length} source{items.length === 1 ? '' : 's'}</span>
       </div>
       <div className="space-y-3">
@@ -471,7 +471,7 @@ function VettedContextBlock({ items }: { items: Array<Record<string, unknown>> }
           const summary = typeof item.summary === 'string' ? item.summary : typeof item.snippet === 'string' ? item.snippet : '';
           const keyFacts = Array.isArray(item.key_facts) ? item.key_facts : [];
           return (
-            <div key={idx} className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-2)] p-3 text-sm text-[var(--text)]">
+            <div key={idx} className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-2)] p-3 text-[length:var(--text-sm)] text-[var(--text)]">
               <div className="flex flex-wrap items-center gap-2">
                 {url ? (
                   <a href={url} target="_blank" rel="noopener noreferrer" className="font-semibold underline">
@@ -480,11 +480,11 @@ function VettedContextBlock({ items }: { items: Array<Record<string, unknown>> }
                 ) : (
                   <span className="font-semibold">{title}</span>
                 )}
-                {date ? <span className="text-xs text-[var(--text-subtle)]">{date}</span> : null}
+                {date ? <span className="text-[length:var(--text-xs)] text-[var(--text-subtle)]">{date}</span> : null}
               </div>
               {summary ? <p className="mt-2 text-[length:var(--text-sm)] text-[var(--text)]">{summary}</p> : null}
               {keyFacts.length > 0 && (
-                <ul className="mt-2 space-y-1 text-sm text-[var(--text-subtle)]">
+                <ul className="mt-2 space-y-1 text-[length:var(--text-sm)] text-[var(--text-subtle)]">
                   {keyFacts.slice(0, 4).map((fact, i) => (
                     <li key={i}>• {fact}</li>
                   ))}

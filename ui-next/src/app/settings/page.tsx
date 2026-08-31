@@ -96,7 +96,7 @@ export default function SettingsPage() {
 
       <div className="mx-auto max-w-3xl px-[var(--gutter)] pb-[var(--space-12)] w-full">
       {message.text && (
-        <div className={`mb-6 rounded-lg p-4 text-sm ${message.type === 'error' ? 'bg-[var(--red-bg)] text-[var(--red)]' : 'bg-[var(--surface-2)] font-medium text-[var(--text)]'}`}>
+        <div className={`mb-6 rounded-lg p-4 text-[length:var(--text-sm)] ${message.type === 'error' ? 'bg-[var(--red-bg)] text-[var(--red)]' : 'bg-[var(--surface-2)] font-medium text-[var(--text)]'}`}>
           {message.text}
         </div>
       )}
@@ -104,19 +104,19 @@ export default function SettingsPage() {
       <div className="space-y-8">
         {/* Profile Section */}
         <section className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6">
-          <h2 className="mb-4 flex items-center gap-2 text-xl font-semibold">
+          <h2 className="mb-4 flex items-center gap-2 text-[length:var(--text-xl)] font-semibold">
             <User className="h-5 w-5 text-[var(--accent)]" /> Profile
           </h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-[var(--text-muted)]">Email Address</label>
+              <label className="mb-1 block text-[length:var(--text-sm)] font-medium text-[var(--text-muted)]">Email Address</label>
               <div className="rounded-lg bg-[var(--surface-2)] p-3 text-[var(--text)]">{user.email}</div>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-[var(--text-muted)]">Current Plan</label>
+              <label className="mb-1 block text-[length:var(--text-sm)] font-medium text-[var(--text-muted)]">Current Plan</label>
               <div className="flex items-center justify-between rounded-lg bg-[var(--surface-2)] p-3 text-[var(--text)] capitalize">
                 {subscription?.tier || 'Free'}
-                <button onClick={() => router.push('/dashboard')} className="text-sm text-[var(--accent)] hover:underline">Manage</button>
+                <button onClick={() => router.push('/dashboard')} className="text-[length:var(--text-sm)] text-[var(--accent)] hover:underline">Manage</button>
               </div>
             </div>
           </div>
@@ -124,7 +124,7 @@ export default function SettingsPage() {
 
         {/* Privacy & Data Section */}
         <section className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6">
-          <h2 className="mb-4 flex items-center gap-2 text-xl font-semibold text-[var(--text)]">
+          <h2 className="mb-4 flex items-center gap-2 text-[length:var(--text-xl)] font-semibold text-[var(--text)]">
             <Database className="h-5 w-5 text-[var(--accent)]" /> Privacy & Data
           </h2>
           
@@ -132,7 +132,7 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between gap-4 border-b border-[var(--border)] pb-6 opacity-60">
               <div>
                 <p className="font-medium text-[var(--text)]">Zero-Retention Mode</p>
-                <p className="text-sm text-[var(--text-muted)]">Coming soon — not yet available. To request deletion of stored data today, use <a href="/contact" className="underline hover:text-[var(--accent)]">Contact</a>.</p>
+                <p className="text-[length:var(--text-sm)] text-[var(--text-muted)]">Coming soon — not yet available. To request deletion of stored data today, use <a href="/contact" className="underline hover:text-[var(--accent)]">Contact</a>.</p>
               </div>
               <button
                 type="button"
@@ -148,8 +148,8 @@ export default function SettingsPage() {
             <div className="flex items-start gap-3 rounded-lg bg-[var(--surface-2)] p-4 border border-[var(--border)]">
               <ShieldCheck className="h-5 w-5 text-[var(--text)] shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-semibold text-[var(--text)]">Encryption Active</p>
-                <p className="text-xs text-[var(--text-muted)] leading-relaxed mt-1">
+                <p className="text-[length:var(--text-sm)] font-semibold text-[var(--text)]">Encryption Active</p>
+                <p className="text-[length:var(--text-xs)] text-[var(--text-muted)] leading-relaxed mt-1">
                   All your data is currently protected with AES-256-GCM encryption at rest and TLS 1.3 in transit.
                 </p>
               </div>
@@ -159,19 +159,19 @@ export default function SettingsPage() {
 
         {/* Developer Access */}
         <section className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6">
-          <h2 className="mb-4 flex items-center gap-2 text-xl font-semibold">
+          <h2 className="mb-4 flex items-center gap-2 text-[length:var(--text-xl)] font-semibold">
             <Key className="h-5 w-5 text-[var(--accent)]" /> Developer access
           </h2>
           <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
             <div>
               <p className="font-medium text-[var(--text)]">API keys</p>
-              <p className="text-sm text-[var(--text-muted)]">
+              <p className="text-[length:var(--text-sm)] text-[var(--text-muted)]">
                 Call Reasoner from your own code with scoped, revocable keys.
               </p>
             </div>
             <Link
               href="/settings/api-keys"
-              className="whitespace-nowrap rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-2 text-sm font-medium transition-colors hover:bg-[var(--surface-3)]"
+              className="whitespace-nowrap rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-2 text-[length:var(--text-sm)] font-medium transition-colors hover:bg-[var(--surface-3)]"
             >
               Manage keys
             </Link>
@@ -180,16 +180,16 @@ export default function SettingsPage() {
 
         {/* Security Section */}
         <section className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6">
-          <h2 className="mb-4 text-xl font-semibold">Security</h2>
+          <h2 className="mb-4 text-[length:var(--text-xl)] font-semibold">Security</h2>
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <p className="font-medium text-[var(--text)]">Password</p>
-              <p className="text-sm text-[var(--text-muted)]">Receive an email to reset your password.</p>
+              <p className="text-[length:var(--text-sm)] text-[var(--text-muted)]">Receive an email to reset your password.</p>
             </div>
             <button
               onClick={handleResetPassword}
               disabled={loading}
-              className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-2 text-sm font-medium hover:bg-[var(--surface-3)] transition-colors disabled:opacity-50"
+              className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-2 text-[length:var(--text-sm)] font-medium hover:bg-[var(--surface-3)] transition-colors disabled:opacity-50"
             >
               Reset Password
             </button>
@@ -198,18 +198,18 @@ export default function SettingsPage() {
 
         {/* Danger Zone */}
         <section className="rounded-xl border border-[var(--red-border)] bg-[var(--red-bg)] p-6">
-          <h2 className="mb-4 flex items-center gap-2 text-xl font-semibold text-[var(--red)]">
+          <h2 className="mb-4 flex items-center gap-2 text-[length:var(--text-xl)] font-semibold text-[var(--red)]">
             <ShieldAlert className="h-5 w-5" /> Danger Zone
           </h2>
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <p className="font-medium text-[var(--text)]">Delete Account</p>
-              <p className="text-sm text-[var(--text-muted)]">Permanently delete your account and all associated data.</p>
+              <p className="text-[length:var(--text-sm)] text-[var(--text-muted)]">Permanently delete your account and all associated data.</p>
             </div>
             <button
               onClick={handleDeleteAccount}
               disabled={loading}
-              className="rounded-lg bg-[var(--red)] px-4 py-2 text-sm font-medium text-[var(--bg)] hover:bg-[color-mix(in_oklab,var(--red)_86%,var(--text))] transition-colors disabled:opacity-50 whitespace-nowrap"
+              className="rounded-lg bg-[var(--red)] px-4 py-2 text-[length:var(--text-sm)] font-medium text-[var(--bg)] hover:bg-[color-mix(in_oklab,var(--red)_86%,var(--text))] transition-colors disabled:opacity-50 whitespace-nowrap"
             >
               Delete Account
             </button>

@@ -288,11 +288,11 @@ export const TEXT_SIZES = {
   /** DESIGN.md Tiny (10px) — badges, fine print, source numbers. */
   tiny: 'text-[10px]',
   /** Synthesis / final output — maps to DESIGN.md Body (~18px). */
-  synthesis: 'text-[17px] leading-relaxed',
+  synthesis: 'text-[length:var(--text-md)] leading-relaxed',
   /** Intermediate phase cards — maps to DESIGN.md Nav/UI (15px). */
-  phaseCard: 'text-[15px] leading-relaxed',
+  phaseCard: 'text-[length:var(--text-sm)] leading-relaxed',
   /** Chat feed body — maps to DESIGN.md Body (18px). */
-  body: 'text-[18px]',
+  body: 'text-[length:var(--text-md)]',
 };
 
 export const TIMING = {

@@ -34,15 +34,15 @@ export default function Error({
           <line x1="12" x2="12.01" y1="16" y2="16" />
         </svg>
       </div>
-      <h2 className="mb-2 text-xl font-semibold text-[var(--text)]">
+      <h2 className="mb-2 text-[length:var(--text-xl)] font-semibold text-[var(--text)]">
         Something went wrong
       </h2>
-      <p className="mb-8 max-w-sm text-sm leading-relaxed text-[var(--text-2)]">
+      <p className="mb-8 max-w-sm text-[length:var(--text-sm)] leading-relaxed text-[var(--text-2)]">
         We&apos;ve been notified and are looking into it. If this persists, try refreshing the page.
       </p>
       <button
         onClick={() => reset()}
-        className="inline-flex items-center justify-center rounded-[var(--radius-lg)] bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-[var(--accent-text)] transition-all hover:opacity-90 active:scale-[0.98]"
+        className="inline-flex items-center justify-center rounded-[var(--radius-lg)] bg-[var(--accent)] px-5 py-2.5 text-[length:var(--text-sm)] font-semibold text-[var(--accent-text)] transition-all hover:opacity-90 active:scale-[0.98]"
       >
         Try again
       </button>

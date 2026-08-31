@@ -94,7 +94,7 @@ function PhaseTimelineComponent({
               </span>
 
               {/* Label */}
-              <span className="text-xs transition-colors duration-300">
+              <span className="text-[length:var(--text-xs)] transition-colors duration-300">
                 {p.short}
                 {isCompleted && phaseDurations?.[p.id] !== undefined && (
                   <span className="ml-1 opacity-50 tabular-nums">{phaseDurations[p.id].toFixed(1)}s</span>

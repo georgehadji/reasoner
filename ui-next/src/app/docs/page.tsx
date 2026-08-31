@@ -63,7 +63,7 @@ export default function DocsIndexPage() {
 
           <Link
             href="/docs/quickstart"
-            className="mt-8 inline-flex h-11 items-center gap-2 rounded-lg bg-[var(--accent)] px-5 text-sm font-semibold text-[var(--accent-text)] transition-all duration-200 hover:bg-[var(--accent-hover)] active:scale-[0.98]"
+            className="mt-8 inline-flex h-11 items-center gap-2 rounded-lg bg-[var(--accent)] px-5 text-[length:var(--text-sm)] font-semibold text-[var(--accent-text)] transition-all duration-200 hover:bg-[var(--accent-hover)] active:scale-[0.98]"
           >
             Start with the quickstart
             <ArrowRight className="h-4 w-4" aria-hidden="true" />
@@ -74,7 +74,7 @@ export default function DocsIndexPage() {
               <section key={section} aria-labelledby={`section-${section.replace(/\s+/g, '-')}`}>
                 <h2
                   id={`section-${section.replace(/\s+/g, '-')}`}
-                  className="mb-4 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]"
+                  className="mb-4 text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]"
                 >
                   {section}
                 </h2>
@@ -85,13 +85,13 @@ export default function DocsIndexPage() {
                       href={`/docs/${page.slug}`}
                       className="group flex flex-col rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 transition-colors hover:border-[var(--accent)]"
                     >
-                      <h3 className="text-base font-semibold text-[var(--text)] transition-colors group-hover:text-[var(--accent)]">
+                      <h3 className="text-[length:var(--text-base)] font-semibold text-[var(--text)] transition-colors group-hover:text-[var(--accent)]">
                         {page.title}
                       </h3>
-                      <p className="mt-2 flex-1 text-sm leading-relaxed text-[var(--text-2)]">
+                      <p className="mt-2 flex-1 text-[length:var(--text-sm)] leading-relaxed text-[var(--text-2)]">
                         {page.description}
                       </p>
-                      <span className="mt-4 text-xs text-[var(--text-muted)]">
+                      <span className="mt-4 text-[length:var(--text-xs)] text-[var(--text-muted)]">
                         {page.minutes} min read
                       </span>
                     </Link>

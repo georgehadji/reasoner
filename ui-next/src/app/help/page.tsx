@@ -104,10 +104,10 @@ export default function HelpPage() {
               className="group flex flex-col rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 transition-colors hover:border-[var(--accent)]"
             >
               <Icon className="mb-4 h-8 w-8 text-[var(--accent)]" aria-hidden="true" />
-              <h2 className="mb-2 text-xl font-bold transition-colors group-hover:text-[var(--accent)]">
+              <h2 className="mb-2 text-[length:var(--text-xl)] font-bold transition-colors group-hover:text-[var(--accent)]">
                 {title}
               </h2>
-              <p className="text-sm leading-relaxed text-[var(--text-2)]">{body}</p>
+              <p className="text-[length:var(--text-sm)] leading-relaxed text-[var(--text-2)]">{body}</p>
             </Link>
           ))}
         </div>
@@ -117,7 +117,7 @@ export default function HelpPage() {
             <LifeBuoy className="mt-0.5 h-6 w-6 shrink-0 text-[var(--accent)]" aria-hidden="true" />
             <div>
               <h2 className="font-semibold">Still stuck?</h2>
-              <p className="text-sm text-[var(--text-2)]">
+              <p className="text-[length:var(--text-sm)] text-[var(--text-2)]">
                 Check{' '}
                 <Link href="/docs/troubleshooting" className="text-[var(--accent)] hover:underline">
                   troubleshooting
@@ -132,7 +132,7 @@ export default function HelpPage() {
           </div>
           <Link
             href="/contact"
-            className="inline-flex h-10 shrink-0 items-center justify-center rounded-lg bg-[var(--accent)] px-5 text-sm font-semibold text-[var(--accent-text)] transition-colors hover:bg-[var(--accent-hover)]"
+            className="inline-flex h-10 shrink-0 items-center justify-center rounded-lg bg-[var(--accent)] px-5 text-[length:var(--text-sm)] font-semibold text-[var(--accent-text)] transition-colors hover:bg-[var(--accent-hover)]"
           >
             Contact support
           </Link>

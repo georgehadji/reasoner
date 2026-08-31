@@ -30,10 +30,10 @@ export function ResearchProgress({ steps }: ResearchProgressProps) {
 
   return (
     <div className="mb-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
-      <p className="mb-2 text-xs font-medium text-[var(--text-muted)]">Research Activity</p>
+      <p className="mb-2 text-[length:var(--text-xs)] font-medium text-[var(--text-muted)]">Research Activity</p>
       <div className="space-y-2">
         {steps.map((step, i) => (
-          <div key={i} className="flex items-start gap-2 text-xs">
+          <div key={i} className="flex items-start gap-2 text-[length:var(--text-xs)]">
             <span className="mt-0.5 shrink-0 text-[var(--accent)]">
               {stepIcon[step.step_type] || stepIcon.reasoning}
             </span>

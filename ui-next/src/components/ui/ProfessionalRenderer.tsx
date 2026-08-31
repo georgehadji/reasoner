@@ -26,9 +26,9 @@ export const ProfessionalRenderer: FC<ProfessionalRendererProps> = ({ content, c
     : 'var(--accent)';
 
   const components = useMemo<Components>(() => ({
-    h1: ({ ...props }) => <h1 className="mb-4 mt-2 border-b-2 pb-2 text-3xl font-bold" style={{ borderColor: validThemeColor }} {...props} />,
-    h2: ({ ...props }) => <h2 className="mb-3 mt-4 border-b pb-2 text-2xl font-semibold" {...props} />,
-    h3: ({ ...props }) => <h3 className="mb-3 mt-4 text-xl font-semibold" {...props} />,
+    h1: ({ ...props }) => <h1 className="mb-4 mt-2 border-b-2 pb-2 text-[length:var(--text-3xl)] font-bold" style={{ borderColor: validThemeColor }} {...props} />,
+    h2: ({ ...props }) => <h2 className="mb-3 mt-4 border-b pb-2 text-[length:var(--text-2xl)] font-semibold" {...props} />,
+    h3: ({ ...props }) => <h3 className="mb-3 mt-4 text-[length:var(--text-xl)] font-semibold" {...props} />,
     p: ({ ...props }) => <p className="mb-4 leading-relaxed text-[var(--text-muted)]" {...props} />,
     ul: ({ ...props }) => <ul className="mb-4 ml-6 list-disc [&>li]:mt-2" {...props} />,
     ol: ({ ...props }) => <ol className="mb-4 ml-6 list-decimal [&>li]:mt-2" {...props} />,
@@ -41,7 +41,7 @@ export const ProfessionalRenderer: FC<ProfessionalRendererProps> = ({ content, c
           {String(children).replace(/\n$/, '')}
         </SyntaxHighlighter>
       ) : (
-        <code className="rounded bg-[var(--surface-2)] px-1 py-0.5 font-mono text-sm text-[var(--text)]">
+        <code className="rounded bg-[var(--surface-2)] px-1 py-0.5 font-mono text-[length:var(--text-sm)] text-[var(--text)]">
           {children}
         </code>
       );

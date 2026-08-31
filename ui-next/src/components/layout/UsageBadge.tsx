@@ -14,7 +14,7 @@ export function UsageBadge() {
     percent >= 90 ? 'text-[var(--red)] font-semibold' : percent >= 70 ? 'text-[var(--text)] font-semibold' : 'text-[var(--accent)]';
 
   return (
-    <div className={`text-xs font-medium ${tone}`}>
+    <div className={`text-[length:var(--text-xs)] font-medium ${tone}`}>
       {quota.used} / {quota.max} queries
     </div>
   );

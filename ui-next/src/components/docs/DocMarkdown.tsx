@@ -17,17 +17,17 @@ interface DocMarkdownProps {
 
 export function DocMarkdown({ children }: DocMarkdownProps) {
   return (
-    <div className="text-[16px] leading-[1.75] text-[var(--text-2)]">
+    <div className="text-[length:var(--text-base)] leading-[1.75] text-[var(--text-2)]">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
           h2: ({ children: c }) => (
-            <h2 className="mt-12 mb-4 scroll-mt-24 text-2xl font-bold tracking-tight text-[var(--text)]">
+            <h2 className="mt-12 mb-4 scroll-mt-24 text-[length:var(--text-2xl)] font-bold tracking-tight text-[var(--text)]">
               {c}
             </h2>
           ),
           h3: ({ children: c }) => (
-            <h3 className="mt-8 mb-3 scroll-mt-24 text-lg font-semibold text-[var(--text)]">
+            <h3 className="mt-8 mb-3 scroll-mt-24 text-[length:var(--text-lg)] font-semibold text-[var(--text)]">
               {c}
             </h3>
           ),
@@ -66,12 +66,12 @@ export function DocMarkdown({ children }: DocMarkdownProps) {
             const isBlock = Boolean(className?.startsWith('language-'));
             if (!isBlock) {
               return (
-                <code className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-[13px] text-[var(--text)]">
+                <code className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-[length:var(--text-xs)] text-[var(--text)]">
                   {c}
                 </code>
               );
             }
-            return <code className="font-mono text-[13px] leading-relaxed">{c}</code>;
+            return <code className="font-mono text-[length:var(--text-xs)] leading-relaxed">{c}</code>;
           },
           pre: ({ children: c }) => (
             <pre className="my-6 overflow-x-auto rounded-xl border border-[var(--border)] bg-[var(--surface-2)] p-4 text-[var(--text)]">
@@ -80,7 +80,7 @@ export function DocMarkdown({ children }: DocMarkdownProps) {
           ),
           table: ({ children: c }) => (
             <div className="my-6 overflow-x-auto rounded-xl border border-[var(--border)]">
-              <table className="w-full border-collapse text-left text-[15px]">{c}</table>
+              <table className="w-full border-collapse text-left text-[length:var(--text-sm)]">{c}</table>
             </div>
           ),
           thead: ({ children: c }) => <thead className="bg-[var(--surface-2)]">{c}</thead>,
