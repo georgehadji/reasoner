@@ -63,7 +63,7 @@ export default function DocsIndexPage() {
 
           <Link
             href="/docs/quickstart"
-            className="mt-8 inline-flex h-11 items-center gap-2 rounded-lg bg-[var(--accent)] px-5 text-[length:var(--text-sm)] font-semibold text-[var(--accent-text)] transition-all duration-200 hover:bg-[var(--accent-hover)] active:scale-[0.98]"
+            className="mt-8 inline-flex h-11 items-center gap-2 rounded-lg bg-[var(--accent)] px-5 text-[length:var(--text-sm)] font-semibold text-[var(--accent-text)] transition-all duration-[var(--dur-micro)] hover:bg-[var(--accent-hover)] active:scale-[0.98]"
           >
             Start with the quickstart
             <ArrowRight className="h-4 w-4" aria-hidden="true" />

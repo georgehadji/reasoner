@@ -58,7 +58,7 @@ export function UpgradeModal({ open, onClose }: UpgradeModalProps) {
   return (
     <div
       className={cn(
-        'fixed inset-0 z-50 flex items-center justify-center px-4 transition-all duration-300',
+        'fixed inset-0 z-50 flex items-center justify-center px-4 transition-all duration-[var(--dur-component)]',
         open ? 'bg-[var(--scrim)] opacity-100' : 'bg-transparent opacity-0 pointer-events-none',
       )}
       role="dialog"
@@ -71,7 +71,7 @@ export function UpgradeModal({ open, onClose }: UpgradeModalProps) {
     >
       <div
         className={cn(
-          'w-full max-w-[var(--width-form)] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[var(--shadow-lg)] transition-all duration-300',
+          'w-full max-w-[var(--width-form)] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[var(--shadow-lg)] transition-all duration-[var(--dur-component)]',
           open ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-4 opacity-0 scale-95',
         )}
       >

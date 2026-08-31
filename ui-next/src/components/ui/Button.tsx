@@ -89,7 +89,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           // Typography
           'font-medium',
           // Transition
-          'transition-all duration-200 ease-out',
+          'transition-all duration-[var(--dur-micro)] ease-out',
           'active:scale-[0.97] active:duration-100',
           // Focus is not styled here. globals.css already gives every button an
           // accent outline with a transparent 2px offset, which reads correctly

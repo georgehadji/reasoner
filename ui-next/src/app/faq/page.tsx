@@ -77,7 +77,7 @@ export default function FAQPage() {
               <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5 font-medium text-[var(--text)] transition-colors hover:bg-[var(--surface-2)] [&::-webkit-details-marker]:hidden">
                 <h2 className="text-[length:var(--text-base)] font-medium">{faq.q}</h2>
                 <ChevronDown
-                  className="h-5 w-5 shrink-0 text-[var(--text-muted)] transition-transform duration-200 group-open:rotate-180"
+                  className="h-5 w-5 shrink-0 text-[var(--text-muted)] transition-transform duration-[var(--dur-state)] group-open:rotate-180"
                   aria-hidden="true"
                 />
               </summary>

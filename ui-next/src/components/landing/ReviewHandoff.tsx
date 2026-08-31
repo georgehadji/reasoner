@@ -14,14 +14,10 @@ import {
  * the review overhanging the code it is about, which is the one arrangement
  * that says "this came after that and is about it" without a caption saying so.
  *
- * DEPTH. The page owns exactly one depth language and this borrows it rather
- * than inventing a second: `[perspective:1400px]` on the container so both
- * plates share a vanishing point, and the canonical
- * `translateZ(26px) rotateX(3.5deg)` on hover — the same numbers as
- * MechanismDiagram and the image grid. Nothing here adds a keyframe or a
- * class to globals.css, so there is also nothing new for the
- * prefers-reduced-motion block to have to opt out by name (the two
- * scroll-driven animations already there had to be, see globals.css:1211).
+ * DEPTH. The hover tilt this section shared with MechanismDiagram and the
+ * image grid (`translateZ(26px) rotateX(3.5deg)`, `[perspective:1400px]` on
+ * the container) is gone — banlist ornament, deleted per art-direction.md §6.
+ * `card-hover`'s own translateY lift is what's left, same as everywhere else.
  *
  * At rest the plates stay flat and the depth is carried by overlap, a real
  * shadow and the accent light above — not by rotation. MechanismDiagram's
@@ -65,9 +61,9 @@ export function ReviewHandoff() {
           listing that must not need a scrollbar, whereas the findings
           reflow to whatever they are given. gap-0 because the overlap
           below IS the gap. */}
-      <div className="relative mt-[var(--space-6)] grid items-start gap-[var(--space-6)] [perspective:1400px] lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:gap-0">
+      <div className="relative mt-[var(--space-6)] grid items-start gap-[var(--space-6)] lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:gap-0">
         {/* ── The file, as written ───────────────────────────── */}
-        <div className="plate-reveal card-hover group border border-[var(--border)] bg-[var(--surface)] [transform-style:preserve-3d] hover:border-[var(--border-strong)] hover:[transform:translateZ(26px)_rotateX(3.5deg)] motion-reduce:hover:[transform:none]">
+        <div className="plate-reveal card-hover group border border-[var(--border)] bg-[var(--surface)] hover:border-[var(--border-strong)]">
           <div className="flex items-baseline justify-between gap-[var(--space-4)] border-b border-[var(--border)] px-[var(--space-5)] py-[var(--space-3)]">
             <p className="font-mono text-[length:var(--text-2xs)] leading-[var(--lh-ui)] text-[var(--text-2)]">
               {CODE_SHOWCASE_FILE.path}
@@ -116,7 +112,7 @@ export function ReviewHandoff() {
             the review read as a thing laid on top of the file rather than
             as a second panel sitting beside it. z-10 because the negative
             margin puts it over a sibling that is opaque. */}
-        <div className="plate-reveal card-hover group relative z-10 border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-lg)] [transform-style:preserve-3d] hover:border-[var(--border-strong)] hover:[transform:translateZ(26px)_rotateX(3.5deg)] motion-reduce:hover:[transform:none] lg:-ml-[var(--space-10)] lg:mt-[var(--space-12)]">
+        <div className="plate-reveal card-hover group relative z-10 border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-lg)] hover:border-[var(--border-strong)] lg:-ml-[var(--space-10)] lg:mt-[var(--space-12)]">
           <div className="flex items-baseline justify-between gap-[var(--space-4)] border-b border-[var(--border)] px-[var(--space-5)] py-[var(--space-3)]">
             <p className="font-sans text-[length:var(--text-2xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
               Reviewed &mdash; different model, different lab

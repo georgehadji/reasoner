@@ -122,7 +122,7 @@ export function CommandPalette({
   return (
     <div
       className={cn(
-        'fixed inset-0 z-[400] flex items-start justify-center p-4 pt-[20vh] transition-all duration-200',
+        'fixed inset-0 z-[400] flex items-start justify-center p-4 pt-[20vh] transition-all duration-[var(--dur-component)]',
         isOpen
           ? 'bg-[var(--scrim)] opacity-100'
           : 'bg-transparent opacity-0 pointer-events-none',
@@ -133,7 +133,7 @@ export function CommandPalette({
     >
       <div
         className={cn(
-          'w-full max-w-lg overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-lg)] transition-all duration-200',
+          'w-full max-w-lg overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-lg)] transition-all duration-[var(--dur-component)]',
           isOpen ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0',
         )}
       >

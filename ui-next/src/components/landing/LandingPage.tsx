@@ -541,7 +541,7 @@ export default function LandingPage() {
               {SHOWCASE_IMAGES.map(({ src, lab }) => (
                 <li
                   key={src}
-                  className="plate-reveal card-hover group [transform-style:preserve-3d] hover:[transform:translateZ(26px)_rotateX(3.5deg)] motion-reduce:hover:[transform:none]"
+                  className="plate-reveal card-hover group"
                 >
                   {/* Held slightly under-saturated at rest and released on
                       hover. Four photographs at full colour side by side

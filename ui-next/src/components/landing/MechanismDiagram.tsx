@@ -108,7 +108,7 @@ export function MechanismDiagram() {
         {STAGES.map(({ href, plate, ordinal, failure, stage, defence }) => (
           <li
             key={href}
-            className="card-hover group relative border-t border-[var(--border)] pt-[var(--space-5)] [transform-style:preserve-3d] hover:border-[var(--border-strong)] hover:[transform:translateZ(26px)_rotateX(3.5deg)] motion-reduce:hover:[transform:none]"
+            className="card-hover group relative border-t border-[var(--border)] pt-[var(--space-5)] hover:border-[var(--border-strong)]"
           >
             {/* The node on the rail. Square rather than round: the page has
                 no other circles in it, and a 5px mark is the smallest that
