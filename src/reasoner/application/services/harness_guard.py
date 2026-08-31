@@ -11,112 +11,32 @@ from reasoner.core.evolution_constants import (
     EVOLUTION_MIN_CROSS_LAB_DIVERSITY,
     EVOLUTION_REQUIRE_CROSS_LAB_FALLBACK_TERMINAL,
 )
+from reasoner.core.ports.model_registry_port import get_model_registry_port
 from reasoner.domain.harness_metrics import HarnessMutation
-
-# Mapping of model aliases → training ecosystem (lab).
-# Used by the invariant guard to verify cross-lab diversity is preserved.
-_MODEL_LABS: dict[str, str] = {
-    # Anthropic
-    "claude-sonnet": "anthropic", "claude-haiku": "anthropic",
-    "claude-opus-latest": "anthropic", "claude-sonnet-latest": "anthropic",
-    # OpenAI — GPT
-    "gpt-5": "openai", "gpt-5.5": "openai", "gpt-5.5-pro": "openai",
-    "gpt-5-mini": "openai", "gpt-5.4-mini": "openai", "gpt-5.4-nano": "openai",
-    "gpt-latest": "openai", "gpt-mini-latest": "openai",
-    "gpt-4o-mini": "openai", "o3": "openai", "o3-mini": "openai",
-    "gpt-oss-120b": "openai", "gpt-oss-20b": "openai",
-    "gpt-5.6-sol": "openai", "gpt-5.6-terra": "openai", "gpt-5.6-luna": "openai",
-    "gpt-5.6-sol-pro": "openai", "gpt-5.6-terra-pro": "openai", "gpt-5.6-luna-pro": "openai",
-    "gpt-5-nano": "openai",
-    # Google — Gemini
-    "gemini-flash": "google", "gemini-pro-real": "google",
-    "gemini-flash-lite-real": "google", "gemini-2.5-flash-lite": "google",
-    "gemini-pro-latest": "google", "gemini-flash-latest": "google",
-    "gemini-flash-image": "google", "gemini-pro-image": "google",
-    "gemini-3.1-flash-image-preview": "google", "gemini-3.1-flash-lite-image": "google",
-    "gemini-3.7-flash": "google", "gemini-3.6-flash": "google",
-    "gemini-2.5-flash": "google",
-    # Note: gemini-pro → Anthropic (claude-sonnet), gemini-flash-lite → Qwen (qwen3.5-flash)
-    # Meta
-    "llama-3.3-70b": "meta", "llama-4-maverick": "meta", "llama-4-scout": "meta",
-    # Mistral
-    "mistral-large-3": "mistral", "mistral-small": "mistral", "mistral-small-2603": "mistral",
-    "ministral-8b": "mistral", "codestral-2508": "mistral", "mistral-medium-3-5": "mistral",
-    # DeepSeek
-    "deepseek-v3": "deepseek", "deepseek-v4-pro": "deepseek", "deepseek-v4-flash": "deepseek",
-    # Qwen (Alibaba)
-    "qwen3-max": "qwen", "qwen3.7-max": "qwen", "qwen3.7-plus": "qwen", "qwen3.5-flash": "qwen",
-    "qwen3-max-thinking": "qwen", "qwen3.6-flash": "qwen", "qwen3.6-plus-real": "qwen",
-    "qwen3-coder-flash": "qwen", "qwen3-coder-30b-a3b": "qwen",
-    "qwen3.7-flash": "qwen", "qwen3.8-max": "qwen",
-    "qwen3-30b-a3b": "qwen", "qwen3-max-real": "qwen", "qwen3.5-9b": "qwen",
-    "qwen3.6-27b": "qwen", "qwen3.6-35b-a3b": "qwen", "qwen3.6-max-preview": "qwen",
-    # GLM (Zhipu)
-    "glm-5.2": "zhipu", "glm-5.3": "zhipu", "glm-5.3-flash": "zhipu",
-    # Tencent
-    "hy3": "tencent", "hy3-preview": "tencent",
-    "hy-mt2-30b": "tencent", "hy-mt2-1.8b": "tencent",
-    # ByteDance Seed (text tiers; the seedream image models are grouped below)
-    "seed-2.0-mini": "bytedance", "seed-2.0-lite": "bytedance",
-    # MiniMax
-    "minimax-m3": "minimax", "minimax-m2.7": "minimax", "minimax-m2.5": "minimax",
-    "minimax-m2.1": "minimax", "minimax-m2": "minimax", "minimax-m1": "minimax",
-    # Moonshot (Kimi)
-    "kimi-k2-6": "moonshot", "kimi-k2-5": "moonshot", "kimi-k2": "moonshot", "kimi-k2-7-code": "moonshot",
-    "kimi-k3": "moonshot",
-    # StepFun
-    "stepfun-3.7-flash": "stepfun",
-    # Image generators (pure image output, priced per image)
-    "qwen-image-3": "qwen", "qwen-image-3-pro": "qwen",
-    "seedream-5-pro": "bytedance", "seedream-5-lite": "bytedance",
-    "seedream-4.5": "bytedance", "gpt-image-2": "openai",
-    "grok-imagine-image-2": "xai",
-    "krea-2-large": "krea", "krea-2-medium": "krea", "krea-2-medium-turbo": "krea",
-    # OpenAI — Codex
-    "gpt-5.1-codex-mini": "openai", "gpt-5.1-codex": "openai",
-    # Google — misc
-    "google/gemma-2-9b-it": "google", "gemini-flash-lite": "qwen",
-    "gemini-pro": "anthropic", "gemini-pro-image": "google",
-    # NVIDIA
-    "nvidia-nemotron-super": "nvidia",
-    # NousResearch
-    "hermes-4-70b": "nousresearch", "hermes-4-405b": "nousresearch",
-    # Arcee AI
-    "arcee-trinity-large-thinking": "arcee", "arcee-virtuoso-large": "arcee",
-    # Thinking Machines
-    "inkling": "thinkingmachines", "inkling-small": "thinkingmachines",
-    # Poolside
-    "laguna-xs-2.1": "poolside",
-    # KwaiPilot (Kuaishou) — coding cascade in coding-budget
-    "kat-coder-air-v2.5": "kwaipilot", "kat-coder-pro-v2.5": "kwaipilot",
-    "kat-coder-pro-v2": "kwaipilot",
-    # Sourceful
-    "riverflow-v2-fast-preview": "sourceful",
-    # InclusionAI (Ant Group)
-    "ling-3.0-flash-free": "inclusionai",
-    # Xiaomi — MiMo
-    "mimo-v2.5-pro": "xiaomi", "mimo-v2.5": "xiaomi",
-    "mimo-v2-pro": "xiaomi", "mimo-v2-flash": "xiaomi",
-    # xAI — Grok
-    "grok-4.3": "xai", "grok-build-0.1": "xai",
-    "grok-4.6": "xai", "grok-latest": "xai",
-    # Perplexity
-    "sonar-pro": "perplexity", "sonar-pro-search": "perplexity",
-    "sonar": "perplexity", "sonar-reasoning-pro": "perplexity", "sonar-deep-research": "perplexity",
-    # NVIDIA
-    "nemotron-3-ultra-free": "nvidia", "nemotron-3-super-free": "nvidia",
-    "nemotron-nano-omni-free": "nvidia", "nemotron-nano-30b": "nvidia",
-    "llama-nemotron-super-49b": "nvidia",
-}
 
 
 def get_model_lab(model_alias: str) -> str:
-    """Return the training ecosystem for a model alias.
+    """Return the training ecosystem (vendor) for a model alias, via the registry port.
 
-    Unknown models default to "unknown" so they don't crash the guard
-    but also don't count toward diversity.
+    Was a hand-maintained ~150-entry dict here (``_MODEL_LABS``) that mirrored
+    ``infrastructure.llm.registry`` and drifted from it — a model added to the
+    registry needed a second, manual edit here to stay covered, and nothing
+    enforced that; see docs/plans/gate-and-registry-remediation.md W6.
+
+    Raises ``ValueError`` for an alias the registry doesn't know (W6, option
+    (a)): the aliases this guard receives come from routing tables built off
+    the registry, so an unknown one means the caller passed a bad alias, not
+    that the model is genuinely lab-less. The previous "unknown" sentinel let
+    that same bug pass silently in both directions — see
+    ``check_mutation_invariants``.
     """
-    return _MODEL_LABS.get(model_alias, "unknown")
+    port = get_model_registry_port()
+    if not port.contains(model_alias):
+        raise ValueError(
+            f"harness_guard received unregistered model alias {model_alias!r}. "
+            "Mutation model aliases must come from the model registry."
+        )
+    return port.vendor_of(model_alias)
 
 
 def check_mutation_invariants(

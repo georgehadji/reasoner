@@ -10,15 +10,15 @@ export default function PrivacyPage() {
       <SiteHeader />
       <main className="mx-auto max-w-4xl px-6 py-20 flex-1 w-full">
         <header className="mb-12 border-b border-[var(--border)] pb-12">
-          <h1 className="text-4xl md:text-5xl font-bold mb-4 tracking-tight">Privacy Policy</h1>
-          <p className="text-[var(--text-muted)] text-lg">Last updated: {lastUpdated}</p>
+          <h1 className="text-[length:var(--text-4xl)] md:text-[length:var(--text-5xl)] font-bold mb-4 tracking-tight">Privacy Policy</h1>
+          <p className="text-[var(--text-muted)] text-[length:var(--text-lg)]">Last updated: {lastUpdated}</p>
         </header>
 
         <div className="grid gap-12 lg:grid-cols-[1fr_280px]">
           <div className="space-y-12 text-[var(--text-muted)] leading-relaxed">
             {/* Mission Statement */}
             <section className="bg-[var(--accent)]/5 border border-[var(--accent)]/10 rounded-2xl p-8 mb-12">
-              <h2 className="text-[var(--text)] font-bold text-xl mb-4 flex items-center gap-2">
+              <h2 className="text-[var(--text)] font-bold text-[length:var(--text-xl)] mb-4 flex items-center gap-2">
                 <ShieldCheck className="h-6 w-6 text-[var(--accent)]" />
                 Our Privacy Commitment
               </h2>
@@ -30,7 +30,7 @@ export default function PrivacyPage() {
             </section>
 
             <section>
-              <h3 className="text-2xl font-bold mb-6 text-[var(--text)]">1. Data Sovereignty & Training</h3>
+              <h3 className="text-[length:var(--text-2xl)] font-bold mb-6 text-[var(--text)]">1. Data Sovereignty & Training</h3>
               <p className="mb-4">
                 <strong>Zero-Training Guarantee:</strong> We never use your inputs, outputs, or uploaded files to train 
                 or fine-tune our internal models or any third-party models.
@@ -42,7 +42,7 @@ export default function PrivacyPage() {
             </section>
 
             <section>
-              <h3 className="text-2xl font-bold mb-6 text-[var(--text)]">2. Encryption & Security</h3>
+              <h3 className="text-[length:var(--text-2xl)] font-bold mb-6 text-[var(--text)]">2. Encryption & Security</h3>
               <p className="mb-4">
                 <strong>Encryption at Rest:</strong> All sensitive data, including pipeline snapshots, history, and 
                 authentication metadata, is encrypted using industry-standard <strong>AES-256-GCM</strong> before storage.
@@ -55,7 +55,7 @@ export default function PrivacyPage() {
             </section>
 
             <section>
-              <h3 className="text-2xl font-bold mb-6 text-[var(--text)]">3. Information We Collect</h3>
+              <h3 className="text-[length:var(--text-2xl)] font-bold mb-6 text-[var(--text)]">3. Information We Collect</h3>
               <ul className="list-disc pl-6 space-y-3">
                 <li><strong>Account Information:</strong> Email address and billing details required to manage your subscription.</li>
                 <li><strong>Usage Data:</strong> We collect metadata (timestamp, model used, token count) to provide service reliability and billing accuracy.</li>
@@ -64,7 +64,7 @@ export default function PrivacyPage() {
             </section>
 
             <section>
-              <h3 className="text-2xl font-bold mb-6 text-[var(--text)]">4. Data Retention & Deletion</h3>
+              <h3 className="text-[length:var(--text-2xl)] font-bold mb-6 text-[var(--text)]">4. Data Retention & Deletion</h3>
               <p>
                 We do not yet publish a fixed retention period. To request export or deletion of your
                 data, contact us via the{' '}
@@ -76,7 +76,7 @@ export default function PrivacyPage() {
             </section>
 
             <section>
-              <h3 className="text-2xl font-bold mb-6 text-[var(--text)]">5. Third-Party LLM Providers</h3>
+              <h3 className="text-[length:var(--text-2xl)] font-bold mb-6 text-[var(--text)]">5. Third-Party LLM Providers</h3>
               <p>
                 Reasoner routes requests to the model providers listed on our{' '}
                 <a href="/subprocessors" className="underline hover:text-[var(--accent)]">
@@ -91,27 +91,27 @@ export default function PrivacyPage() {
           {/* Quick Info Sidebar */}
           <aside className="space-y-6">
             <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 sticky top-24">
-              <h4 className="text-sm font-bold uppercase tracking-wider text-[var(--text-subtle)] mb-4">At a Glance</h4>
+              <h4 className="text-[length:var(--text-sm)] font-bold uppercase tracking-wider text-[var(--text-subtle)] mb-4">At a Glance</h4>
               <div className="space-y-4">
                 <div className="flex items-start gap-3">
                   <EyeOff className="h-5 w-5 text-[var(--accent)] shrink-0" />
                   <div>
-                    <p className="text-sm font-bold text-[var(--text)]">No Training</p>
-                    <p className="text-xs">Your data is never used for training.</p>
+                    <p className="text-[length:var(--text-sm)] font-bold text-[var(--text)]">No Training</p>
+                    <p className="text-[length:var(--text-xs)]">Your data is never used for training.</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
                   <Lock className="h-5 w-5 text-[var(--accent)] shrink-0" />
                   <div>
-                    <p className="text-sm font-bold text-[var(--text)]">AES-256-GCM</p>
-                    <p className="text-xs">Standardized encryption at rest.</p>
+                    <p className="text-[length:var(--text-sm)] font-bold text-[var(--text)]">AES-256-GCM</p>
+                    <p className="text-[length:var(--text-xs)]">Standardized encryption at rest.</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
                   <Scale className="h-5 w-5 text-[var(--accent)] shrink-0" />
                   <div>
-                    <p className="text-sm font-bold text-[var(--text)]">GDPR</p>
-                    <p className="text-xs">EU data subject rights — export and deletion on request.</p>
+                    <p className="text-[length:var(--text-sm)] font-bold text-[var(--text)]">GDPR</p>
+                    <p className="text-[length:var(--text-xs)]">EU data subject rights — export and deletion on request.</p>
                   </div>
                 </div>
               </div>

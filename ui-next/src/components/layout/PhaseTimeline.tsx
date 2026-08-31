@@ -61,7 +61,7 @@ function PhaseTimelineComponent({
               aria-label={`${p.name} \u2014 ${isActive ? 'In progress' : isError ? 'Error' : isCompleted ? 'Completed' : 'Pending'}`}
               className={cn(
                 'flex shrink-0 cursor-pointer items-center gap-1.5 rounded-[var(--radius)] px-3 py-2.5 text-left',
-                'transition-all duration-300 ease-out',
+                'transition-all duration-[var(--dur-state)] ease-out',
                 isActive
                   ? 'bg-[var(--accent-dim)] text-[var(--text)]'
                   : isCompleted
@@ -73,7 +73,7 @@ function PhaseTimelineComponent({
               <span className="relative flex h-2 w-2 shrink-0 items-center justify-center">
                 <span
                   className={cn(
-                    'h-2 w-2 rounded-full transition-all duration-500',
+                    'h-2 w-2 rounded-full transition-all duration-[var(--dur-state)]',
                     isError
                       ? 'bg-[var(--red)]'
                       : isActive
@@ -94,7 +94,7 @@ function PhaseTimelineComponent({
               </span>
 
               {/* Label */}
-              <span className="text-xs transition-colors duration-300">
+              <span className="text-[length:var(--text-xs)] transition-colors duration-[var(--dur-micro)]">
                 {p.short}
                 {isCompleted && phaseDurations?.[p.id] !== undefined && (
                   <span className="ml-1 opacity-50 tabular-nums">{phaseDurations[p.id].toFixed(1)}s</span>
@@ -111,7 +111,7 @@ function PhaseTimelineComponent({
             <button
               type="button"
               onClick={onExpandAll}
-              className="cursor-pointer rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-[length:var(--text-2xs)] font-medium text-[var(--text-muted)] transition-all duration-200 hover:border-[var(--border-strong)] hover:text-[var(--text)]"
+              className="cursor-pointer rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-[length:var(--text-2xs)] font-medium text-[var(--text-muted)] transition-all duration-[var(--dur-micro)] hover:border-[var(--border-strong)] hover:text-[var(--text)]"
             >
               Expand all
             </button>
@@ -120,7 +120,7 @@ function PhaseTimelineComponent({
             <button
               type="button"
               onClick={onCollapseAll}
-              className="cursor-pointer rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-[length:var(--text-2xs)] font-medium text-[var(--text-muted)] transition-all duration-200 hover:border-[var(--border-strong)] hover:text-[var(--text)]"
+              className="cursor-pointer rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-[length:var(--text-2xs)] font-medium text-[var(--text-muted)] transition-all duration-[var(--dur-micro)] hover:border-[var(--border-strong)] hover:text-[var(--text)]"
             >
               Collapse all
             </button>

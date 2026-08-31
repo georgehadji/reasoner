@@ -11,10 +11,12 @@ import { RUN, SCORE_AXES, type RunScore } from '@/lib/demo-record';
  * would leave the page indistinguishable from a feature grid.
  */
 
-/** Columns run best-first — the order a reader of any results table expects. */
-const COLUMNS: RunScore[] = [...RUN.scores].sort((a, b) => b.total - a.total);
-
-const FLAGGED = COLUMNS.filter((c) => c.biasFlags.length > 0);
+interface ScoreMatrixProps {
+  /** Defaults to the captured demo run, which is what the marketing page wants. */
+  scores?: RunScore[];
+  /** The marketing page states the phase; the live pipeline already labels it. */
+  caption?: string;
+}
 
 function cellClass(retained: boolean): string {
   return `nums-tabular border-b border-[var(--border)] px-[var(--space-4)] py-[var(--space-3)] text-right font-mono text-[length:var(--text-sm)] ${
@@ -22,14 +24,21 @@ function cellClass(retained: boolean): string {
   }`;
 }
 
-export function ScoreMatrix() {
+export function ScoreMatrix({ scores = RUN.scores, caption }: ScoreMatrixProps = {}) {
+  if (!scores.length) return null;
+
+  /* Columns run best-first — the order a reader of any results table expects. */
+  const COLUMNS: RunScore[] = [...scores].sort((a, b) => b.total - a.total);
+  const FLAGGED = COLUMNS.filter((c) => c.biasFlags.length > 0);
+
   return (
     <figure className="m-0">
       {/* Wide content scrolls inside its own box; the page body never does. */}
       <div className="-mx-[var(--gutter)] overflow-x-auto px-[var(--gutter)]">
         <table className="w-full min-w-[34rem] border-collapse text-left">
           <caption className="mb-[var(--space-4)] text-left font-sans text-[length:var(--text-sm)] leading-[var(--lh-ui)] text-[var(--text-muted)]">
-            Critique &amp; Pruning — independent scoring of all four positions, 0–10 per axis.
+            {caption ??
+              'Critique & Pruning — independent scoring of all four positions, 0–10 per axis.'}
           </caption>
 
           <thead>
@@ -50,7 +59,7 @@ export function ScoreMatrix() {
                 >
                   {column.position}
                   {column.biasFlags.length > 0 && (
-                    <sup className="ml-[2px] font-mono text-[var(--warn)]">†</sup>
+                    <sup className="ml-[2px] font-mono text-[var(--text)]">†</sup>
                   )}
                 </th>
               ))}
@@ -114,7 +123,7 @@ export function ScoreMatrix() {
                   key={column.position}
                   className="px-[var(--space-4)] py-[var(--space-3)] text-right font-sans text-[length:var(--text-2xs)] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)]"
                 >
-                  <span className={column.retained ? 'text-[var(--ok)]' : 'text-[var(--text-subtle)]'}>
+                  <span className={column.retained ? 'text-[var(--text)]' : 'text-[var(--text-subtle)]'}>
                     {column.retained ? 'Carried forward' : 'Pruned'}
                   </span>
                 </td>
@@ -127,7 +136,7 @@ export function ScoreMatrix() {
       <figcaption className="mt-[var(--space-6)] font-sans text-[length:var(--text-xs)] leading-[var(--lh-body)] text-[var(--text-subtle)]">
         {FLAGGED.map((column) => (
           <span key={column.position} className="mb-[var(--space-2)] block">
-            <span className="font-mono text-[var(--warn)]">†</span> {column.position} —{' '}
+            <span className="font-mono text-[var(--text)]">†</span> {column.position} —{' '}
             {column.biasFlags.join('; ')}
           </span>
         ))}

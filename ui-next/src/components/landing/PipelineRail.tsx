@@ -56,8 +56,8 @@ function readPalette(el: HTMLElement): Palette {
   const read = (name: string, fallback: string) => cs.getPropertyValue(name).trim() || fallback;
   return {
     rail: read('--border-strong', '#8884'),
-    node: read('--accent', '#2F3832'),
-    packet: read('--text-subtle', '#606963'),
+    node: read('--accent', '#3C332E'),
+    packet: read('--text-subtle', '#6D645F'),
     verified: read('--ok', '#2E449F'),
     hypothesis: read('--warn', '#7B4193'),
     unknown: read('--unknown', '#2C697D'),

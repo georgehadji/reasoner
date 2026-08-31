@@ -25,7 +25,7 @@ export function SecurityModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
   return createPortal(
     <div
       className={cn(
-        'fixed inset-0 z-[300] flex items-center justify-center p-4 transition-all duration-300',
+        'fixed inset-0 z-[300] flex items-center justify-center p-4 transition-all duration-[var(--dur-component)]',
         isOpen ? 'bg-[var(--scrim)] opacity-100' : 'bg-transparent opacity-0 pointer-events-none',
       )}
       onClick={(e) => {
@@ -34,18 +34,18 @@ export function SecurityModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
     >
       <div
         className={cn(
-          'w-full max-w-[var(--width-content)] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-8 shadow-[var(--shadow-lg)] transition-all duration-300',
+          'w-full max-w-[var(--width-content)] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-8 shadow-[var(--shadow-lg)] transition-all duration-[var(--dur-component)]',
           isOpen ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-4 opacity-0 scale-95',
         )}
       >
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-lg)] bg-[color-mix(in_oklab,var(--ok)_10%,transparent)] text-[var(--ok)]">
+            <div className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-lg)] bg-[var(--surface-2)] text-[var(--text)]">
               <ShieldCheck className="h-6 w-6" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-[var(--text)]">Enterprise Security & Trust</h3>
-              <p className="text-sm text-[var(--text-2)]">Advanced safeguards for mission-critical reasoning.</p>
+              <h3 className="text-[length:var(--text-lg)] font-bold text-[var(--text)]">Enterprise Security & Trust</h3>
+              <p className="text-[length:var(--text-sm)] text-[var(--text-2)]">Advanced safeguards for mission-critical reasoning.</p>
             </div>
           </div>
           <button
@@ -67,7 +67,7 @@ export function SecurityModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
               </div>
               <div>
                 <h4 className="font-semibold text-[var(--text-2)] mb-1 uppercase tracking-wider text-[length:var(--text-2xs)]">Compliance</h4>
-                <h5 className="font-bold text-[var(--text)] text-sm mb-1">SOC 2 Type II — Roadmap</h5>
+                <h5 className="font-bold text-[var(--text)] text-[length:var(--text-sm)] mb-1">SOC 2 Type II — Roadmap</h5>
                 <p className="text-[length:var(--text-xs)] text-[var(--text-2)] leading-relaxed">
                   Not yet certified. See our <a href="/security" className="underline hover:text-[var(--text)]">security page</a> for current controls and audit history.
                 </p>
@@ -80,7 +80,7 @@ export function SecurityModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
               </div>
               <div>
                 <h4 className="font-semibold text-[var(--text-2)] mb-1 uppercase tracking-wider text-[length:var(--text-2xs)]">Data Privacy</h4>
-                <h5 className="font-bold text-[var(--text)] text-sm mb-1">Data Privacy</h5>
+                <h5 className="font-bold text-[var(--text)] text-[length:var(--text-sm)] mb-1">Data Privacy</h5>
                 <p className="text-[length:var(--text-xs)] text-[var(--text-2)] leading-relaxed">
                   Zero-Training Guarantee. We never train models on your data. GDPR data subject
                   rights (export, deletion) supported on request.
@@ -94,7 +94,7 @@ export function SecurityModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
               </div>
               <div>
                 <h4 className="font-semibold text-[var(--text-2)] mb-1 uppercase tracking-wider text-[length:var(--text-2xs)]">Encryption</h4>
-                <h5 className="font-bold text-[var(--text)] text-sm mb-1">Encryption</h5>
+                <h5 className="font-bold text-[var(--text)] text-[length:var(--text-sm)] mb-1">Encryption</h5>
                 <p className="text-[length:var(--text-xs)] text-[var(--text-2)] leading-relaxed">
                   E2EE in transit and at rest using AES-256-GCM.
                   <br />
@@ -112,7 +112,7 @@ export function SecurityModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
               </div>
               <div>
                 <h4 className="font-semibold text-[var(--text-2)] mb-1 uppercase tracking-wider text-[length:var(--text-2xs)]">Access Control</h4>
-                <h5 className="font-bold text-[var(--text)] text-sm mb-1">SSO & SAML — Roadmap</h5>
+                <h5 className="font-bold text-[var(--text)] text-[length:var(--text-sm)] mb-1">SSO & SAML — Roadmap</h5>
                 <p className="text-[length:var(--text-xs)] text-[var(--text-2)] leading-relaxed">
                   Okta, Azure AD, and Google Workspace integration is planned, not yet available.
                 </p>
@@ -125,7 +125,7 @@ export function SecurityModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
               </div>
               <div>
                 <h4 className="font-semibold text-[var(--text-2)] mb-1 uppercase tracking-wider text-[length:var(--text-2xs)]">Governance</h4>
-                <h5 className="font-bold text-[var(--text)] text-sm mb-1">Audit Logs & Retention</h5>
+                <h5 className="font-bold text-[var(--text)] text-[length:var(--text-sm)] mb-1">Audit Logs & Retention</h5>
                 <p className="text-[length:var(--text-xs)] text-[var(--text-2)] leading-relaxed">
                   Comprehensive audit trails for all actions. Configurable data retention policies to meet legal requirements.
                 </p>
@@ -138,7 +138,7 @@ export function SecurityModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
               </div>
               <div>
                 <h4 className="font-semibold text-[var(--text-2)] mb-1 uppercase tracking-wider text-[length:var(--text-2xs)]">Network</h4>
-                <h5 className="font-bold text-[var(--text)] text-sm mb-1">Zero-Trust Architecture</h5>
+                <h5 className="font-bold text-[var(--text)] text-[length:var(--text-sm)] mb-1">Zero-Trust Architecture</h5>
                 <p className="text-[length:var(--text-xs)] text-[var(--text-2)] leading-relaxed">
                   All inter-component communication is authenticated and encrypted via internal PKI. No plaintext data on the wire.
                 </p>
@@ -149,7 +149,7 @@ export function SecurityModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
 
         <button
           onClick={onClose}
-          className="mt-8 w-full rounded-[var(--radius-lg)] bg-[var(--accent)] py-3 text-sm font-semibold text-[var(--accent-text)] transition-all hover:opacity-90 active:scale-[0.98]"
+          className="mt-8 w-full rounded-[var(--radius-lg)] bg-[var(--accent)] py-3 text-[length:var(--text-sm)] font-semibold text-[var(--accent-text)] transition-all hover:opacity-90 active:scale-[0.98]"
         >
           Got it
         </button>

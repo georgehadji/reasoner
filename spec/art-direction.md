@@ -466,6 +466,12 @@ Deletion is the design act here — the landing page runs six orchestrated momen
 
 **Dead components:** `Testimonial.tsx` (no importer; `TESTIMONIALS = []`). Preserve the file's comment as a note in this spec — returning `null` rather than fabricating a quote is the discipline, and it is why nothing in §3 invents a number.
 
+> **Preserved verbatim from `Testimonial.tsx` before deletion (migration step 3):**
+>
+> *"No entries yet. Renders nothing rather than a placeholder — a landing page with no testimonials reliably outperforms one with an invented or generic one, and a fabricated quote is exactly the class of claim removed from this site in 2026-08."*
+>
+> This is the binding rule for any future social-proof component: it renders real entries or it renders nothing. It never renders a placeholder, a lorem quote, or a composite.
+
 **Tokens:** `--accent-glow` (4 sites), `--accent-2` / `--accent-2-dim` (2 sites), `--text-small` (0 `var()` uses), `--shadow-lg` on containers.
 
 **Emoji as iconography — banlist item 11, verbatim, on the PAID surface.** All four directions missed it. Three files, ~141 lines total: `components/widgets/WeatherWidget.tsx:22` (🌤️), `StockWidget.tsx:23` (📈), `CalculationWidget.tsx:9` (🧮), each inside `<span className="widget-icon">`. Cheapest fix on the board.

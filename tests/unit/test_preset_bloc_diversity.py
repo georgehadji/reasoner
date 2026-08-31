@@ -175,8 +175,8 @@ def test_article_critique_roles_are_cross_bloc(preset_id):
 def test_bloc_of_resolves_cross_vendor_aliases():
     """Aliases that route to another vendor must be scored by the real vendor."""
     # gemini-flash-lite routes to qwen (CN); gemini-pro routes to anthropic (US).
-    assert bloc_of("gemini-flash-lite") == "CN"
-    assert bloc_of("gemini-pro") == "US"
+    assert bloc_of("qwen3.5-flash") == "CN"
+    assert bloc_of("claude-sonnet") == "US"
     assert bloc_of("deepseek-v4-pro") == "CN"
     assert bloc_of("mistral-large-3") == "EU"
     assert bloc_of("gpt-5.5") == "US"

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ShieldCheck, Lock, Database, Server, Users, ShieldAlert, CheckCircle2, Clock } from 'lucide-react';
+import { Lock, Database, Server, Users, ShieldAlert, CheckCircle2, Clock } from 'lucide-react';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
 import { PROVIDERS } from '@/lib/capabilities.generated';
@@ -88,20 +88,31 @@ export default function SecurityPage() {
     <div className="flex min-h-screen flex-col bg-[var(--bg)] text-[var(--text)]">
       <SiteHeader />
 
-      <main className="mx-auto w-full max-w-[var(--width-content)] flex-1 px-[var(--gutter)] py-[var(--space-24)]">
-        <div className="mb-[var(--space-16)] text-center">
-          <div className="mx-auto mb-[var(--space-6)] flex h-16 w-16 items-center justify-center rounded-[var(--radius-lg)] bg-[color-mix(in_oklab,var(--ok)_10%,transparent)] text-[var(--ok)]">
-            <ShieldCheck className="h-8 w-8" aria-hidden="true" />
+      <main className="flex-1">
+        {/* ── Masthead ───────────────────────────────────────────
+            Same marginal-marker idiom as /about, /capabilities and
+            /pricing: a left-aligned label column, not a centred hero
+            with an icon plate. */}
+        <header className="mx-auto w-full max-w-[var(--width-content)] px-[var(--gutter)] pb-[var(--space-16)] pt-[var(--space-48)]">
+          <div className="grid gap-[var(--space-6)] lg:grid-cols-[9rem_minmax(0,1fr)] lg:gap-[var(--space-12)]">
+            <div>
+              <p className="mt-[var(--space-1)] font-sans text-[length:var(--text-xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
+                Security
+              </p>
+            </div>
+            <div className="min-w-0">
+              <h1 className="font-serif text-[length:var(--text-4xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)] md:text-[length:var(--text-5xl)]">
+                Security &amp; Trust
+              </h1>
+              <p className="prose-measure mt-[var(--space-6)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-2)]">
+                We do not train on your data, we encrypt it end to end, and we log every access.
+                Here is exactly what that means today — and what is still on the roadmap.
+              </p>
+            </div>
           </div>
-          <h1 className="font-serif text-[length:var(--text-4xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)] md:text-[length:var(--text-5xl)]">
-            Security &amp; Trust
-          </h1>
-          <p className="prose-measure mx-auto mt-[var(--space-6)] font-serif text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
-            We do not train on your data, we encrypt it end to end, and we log every access.
-            Here is exactly what that means today — and what is still on the roadmap.
-          </p>
-        </div>
+        </header>
 
+        <div className="mx-auto w-full max-w-[var(--width-content)] px-[var(--gutter)] pb-[var(--space-24)]">
         <div className="grid gap-[var(--space-8)] md:grid-cols-2">
           {CARDS.map(({ icon: Icon, title, items }) => (
             <div
@@ -118,7 +129,7 @@ export default function SecurityPage() {
                   return (
                     <li key={label} className="flex gap-[var(--space-3)]">
                       <StatusIcon
-                        className={`h-5 w-5 shrink-0 ${done ? 'text-[var(--ok)]' : 'text-[var(--text-subtle)]'}`}
+                        className={`h-5 w-5 shrink-0 ${done ? 'text-[var(--text)]' : 'text-[var(--text-subtle)]'}`}
                         aria-hidden="true"
                       />
                       <span className="text-[length:var(--text-sm)] leading-[var(--lh-body)] text-[var(--text-muted)]">
@@ -206,6 +217,7 @@ export default function SecurityPage() {
             </Link>
           </div>
         </section>
+        </div>
       </main>
 
       <SiteFooter />

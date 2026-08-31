@@ -52,17 +52,44 @@ def test_structured_outputs_only_enable_for_strict_json_non_hybrid_perplexity_ca
 def test_structured_outputs_extend_to_any_model_the_capability_registry_says_supports_it():
     # The generalisation this replaces a Perplexity-only hardcode with: a
     # non-Perplexity model that advertises response_format/structured_outputs
-    # in the OpenRouter catalogue now gets JSON mode too. This is the actual
-    # bug from docs/plans/article-flow-truncation-remediation.md — qwen3.5-flash
-    # answered a JSON-contract prompt with chain-of-thought prose instead of
-    # JSON, and nothing was asking it to use the mode it advertised.
+    # in the OpenRouter catalogue now gets JSON mode too.
+    #
+    # This used to assert on qwen/qwen3.5-flash-02-23, named after the bug in
+    # docs/plans/article-flow-truncation-remediation.md: that model answered a
+    # JSON-contract prompt with chain-of-thought prose, and the conclusion was
+    # that it simply had not been asked to use the mode it advertised. Measured
+    # 2026-08-29, asking it does not help -- under json_object it collapses to a
+    # bare scalar ("-1.0000000000000002e+308", "-1.025467398554854e+20") which
+    # extract_json cannot parse at all, whereas with response_format omitted the
+    # prose is merely a preamble and extract_json finds the object after it. It
+    # is now in _JSON_MODE_DENYLIST, and the case below pins that.
+    #
+    # qwen3.7-flash keeps this test honest about what it is for: still a
+    # non-Perplexity model, and verified to answer correctly both with and
+    # without json_object.
     result = _json_response_format(
-        "qwen/qwen3.5-flash-02-23",
+        "qwen/qwen3.7-flash",
         "Output ONLY valid JSON. No prose.",
         'Output JSON: {"argument_map": {}}',
     )
     assert result is not None
     assert result["type"] == "json_object"
+
+
+def test_structured_outputs_withheld_for_models_that_collapse_under_json_mode():
+    """Denylisted models must get no response_format, however capable the catalogue says they are.
+
+    Both advertise structured-output support and both produce unparseable
+    output when it is used: qwen3.5-flash a bare float, qwen3.6-flash an empty
+    string. Omitting response_format is what makes them usable, so the denylist
+    is load-bearing rather than a precaution.
+    """
+    for model in ("qwen/qwen3.5-flash-02-23", "qwen/qwen3.6-flash"):
+        assert _json_response_format(
+            model,
+            "Output ONLY valid JSON. No prose.",
+            'Output JSON: {"argument_map": {}}',
+        ) is None, f"{model} is denylisted but was still handed a response_format"
 
 
 def test_structured_outputs_withheld_for_unprofiled_model():
@@ -75,7 +102,7 @@ def test_structured_outputs_withheld_for_unprofiled_model():
 
 
 def test_google_registry_uses_current_stable_gemini_model_ids():
-    # "gemini-pro" is a deliberate cross-vendor alias to claude-sonnet-5
+    # "claude-sonnet" is a deliberate cross-vendor alias to claude-sonnet-5
     # (v3.4) and "gemini-flash" doesn't exist as a key (dedup fix, see
     # registry.py comment above the Google block) — real Google IDs live
     # under "gemini-pro-real" / "gemini-2.5-flash".

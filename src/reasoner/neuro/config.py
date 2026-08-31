@@ -12,7 +12,7 @@ from pathlib import Path
 import yaml
 
 from reasoner.core.constants import OPENROUTER_BASE_URL, PERPLEXITY_BASE_URL
-from reasoner.core.constants_models import MODEL_CLAUDE_HAIKU, MODEL_GEMINI_FLASH
+from reasoner.core.constants_models import MODEL_CLAUDE_HAIKU, MODEL_GROK_43
 from reasoner.core.settings import settings
 
 DEFAULT_CONFIG_PATHS = [
@@ -287,7 +287,7 @@ def _apply_defaults(cfg: NeuroConfig) -> NeuroConfig:
         cfg.reasoning.fallbacks = [
             ProviderConfig(
                 provider="openrouter",
-                model=fallbacks[0] if len(fallbacks) > 0 else MODEL_GEMINI_FLASH,
+                model=fallbacks[0] if len(fallbacks) > 0 else MODEL_GROK_43,
                 api_key=p.api_key,
                 api_base=OPENROUTER_BASE_URL,
             ),

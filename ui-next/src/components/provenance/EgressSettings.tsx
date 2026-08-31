@@ -35,7 +35,7 @@ function ToggleRow({ id, label, description, checked, onChange, disabled, locked
       )}
     >
       <span>
-        <span className="block text-sm font-medium text-[var(--text)]">{label}</span>
+        <span className="block text-[length:var(--text-sm)] font-medium text-[var(--text)]">{label}</span>
         <span className="block text-[length:var(--text-xs)] text-[var(--text-2)]">{description}</span>
       </span>
       <input

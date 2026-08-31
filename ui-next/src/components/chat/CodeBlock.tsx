@@ -43,7 +43,7 @@ export function CodeBlock({
         <button
           type="button"
           onClick={handleCopy}
-          className="flex items-center gap-1 rounded-md px-2 py-1 text-xs transition-colors hover:bg-[var(--surface-3)]"
+          className="flex items-center gap-1 rounded-md px-2 py-1 text-[length:var(--text-xs)] transition-colors hover:bg-[var(--surface-3)]"
         >
           {copied ? (
             <>

@@ -38,6 +38,24 @@ class ModelRegistryPort(Protocol):
         """Return the registry config entry for *model_id*, or None if unknown."""
         ...
 
+    def vendor_of(self, model_id: str) -> str:
+        """Return the OpenRouter vendor prefix *model_id* resolves to (e.g. ``"mistralai"``).
+
+        Resolves through the registry's served-model string, not the alias, so
+        cross-vendor aliases (e.g. an alias named after one lab that is actually
+        routed to another) resolve correctly. Unknown model IDs return the ID
+        itself, unchanged from ``infrastructure.llm.registry._vendor_of``.
+        """
+        ...
+
+    def bloc_of(self, model_id: str) -> str:
+        """Return the geopolitical training bloc for *model_id*: US, CN, EU, or OTHER."""
+        ...
+
+    def resolved_model_of(self, model_id: str) -> str:
+        """Return the full ``vendor/model`` string *model_id* resolves to."""
+        ...
+
 
 # ── Dependency injection for application → infrastructure boundary ────────
 # Mirrors core/search.py's set_build_provider() precedent: the concrete

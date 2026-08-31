@@ -20,7 +20,7 @@ import { Marks } from './Segments';
 
 function SynthesisBlocks({ blocks, withRecord }: { blocks: Block[]; withRecord: boolean }) {
   return (
-    <div className="prose-measure font-serif text-[length:var(--text-base)] leading-[var(--lh-body)] text-[var(--text-2)]">
+    <div className="prose-measure text-[length:var(--text-base)] leading-[var(--lh-body)] text-[var(--text-2)]">
       {blocks.map((block, i) => {
         switch (block.kind) {
           case 'heading':

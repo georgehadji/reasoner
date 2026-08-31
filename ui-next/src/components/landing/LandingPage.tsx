@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { DisagreementField } from '@/components/landing/DisagreementField';
-import { IdeaField } from '@/components/landing/IdeaField';
 import { MechanismDiagram } from '@/components/landing/MechanismDiagram';
 import { Aside, Body, Heading, Lede, Section } from '@/components/landing/prose';
 import { ReviewHandoff } from '@/components/landing/ReviewHandoff';
@@ -182,7 +181,7 @@ export default function LandingPage() {
               {/* The mechanism, direct. No eyebrow needed — the claim reads
                   on its own and the product's own output (right column)
                   teaches what it means. */}
-              <h1 className="max-w-[18ch] text-balance font-serif text-[34pt] font-normal leading-[var(--lh-display)] sm:text-[55pt] lg:text-[89pt] tracking-[var(--tracking-tight)] text-[var(--text)]">
+              <h1 className="max-w-[18ch] text-balance font-serif text-[length:var(--text-6xl)] font-normal leading-[var(--lh-display)] lg:text-[length:var(--text-7xl)] tracking-[var(--tracking-tight)] text-[var(--text)]">
                 Models that disagree, on the record.
               </h1>
             </div>
@@ -198,7 +197,7 @@ export default function LandingPage() {
                   clause is the only emphasis above the fold and the only
                   claim a competitor cannot also make; it is a weight shift
                   rather than a colour so it never competes with the CTA. */}
-              <p className="prose-measure font-serif text-[21pt] leading-[1.6] text-[var(--text-2)]">
+              <p className="prose-measure text-[length:var(--text-2xl)] leading-[1.6] text-[var(--text-2)]">
                 Reasoner puts your question to models from rival labs and rival geopolitical blocs,
                 keeps their disagreement instead of averaging it away, and labels every claim{' '}
                 <strong className="font-medium text-[var(--text)]">
@@ -214,7 +213,7 @@ export default function LandingPage() {
           <div className="relative mt-[var(--space-12)] flex flex-wrap items-center justify-center gap-[var(--space-3)] gap-x-[var(--space-8)]">
             <Link
               href="/chat"
-              className="btn-lift group flex min-h-[var(--space-12)] items-center gap-[var(--space-2)] rounded-[var(--radius)] bg-[var(--accent)] px-[var(--space-8)] font-sans text-[13pt] font-semibold leading-[var(--lh-ui)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)]"
+              className="btn-lift group flex min-h-[var(--space-12)] items-center gap-[var(--space-2)] rounded-[var(--radius)] bg-[var(--accent)] px-[var(--space-8)] font-sans text-[length:var(--text-md)] font-semibold leading-[var(--lh-ui)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)]"
             >
               Ask a question
               <span
@@ -229,7 +228,7 @@ export default function LandingPage() {
                 sceptic converts on evidence they can read alone. */}
             <Link
               href="/how-it-works"
-              className="link-smooth flex min-h-[var(--space-12)] items-center font-sans text-[13pt] font-medium leading-[var(--lh-ui)] text-[var(--text-2)] underline decoration-[var(--border-strong)] underline-offset-4 hover:text-[var(--text)]"
+              className="link-smooth flex min-h-[var(--space-12)] items-center font-sans text-[length:var(--text-md)] font-medium leading-[var(--lh-ui)] text-[var(--text-2)] underline decoration-[var(--border-strong)] underline-offset-4 hover:text-[var(--text)]"
             >
               Read a complete run
             </Link>
@@ -239,7 +238,7 @@ export default function LandingPage() {
               price objection and the what-is-the-catch objection in the
               same six words. The one figure on this page that is not
               machine-generated — keep it in step with /pricing. */}
-          <p className="relative mt-[var(--space-4)] text-center font-sans text-[13pt] leading-[var(--lh-ui)] text-[var(--text-muted)]">
+          <p className="relative mt-[var(--space-4)] text-center font-sans text-[length:var(--text-md)] leading-[var(--lh-ui)] text-[var(--text-muted)]">
             20 questions a month on the free tier.
           </p>
 
@@ -267,11 +266,11 @@ export default function LandingPage() {
               ariaLabel="Model labs Reasoner routes to, with the country each lab is based in"
               items={MARQUEE_LABS.map((name) => (
                 <span key={name} className="flex items-baseline gap-[var(--space-2)]">
-                  <span className="font-sans text-[13pt] font-medium leading-[var(--lh-ui)] text-[var(--text-2)]">
+                  <span className="font-sans text-[length:var(--text-md)] font-medium leading-[var(--lh-ui)] text-[var(--text-2)]">
                     {name}
                   </span>
                   {LAB_ORIGIN[name] ? (
-                    <span className="font-sans text-[8pt] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-subtle)]">
+                    <span className="font-sans text-[length:var(--text-2xs)] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-subtle)]">
                       {LAB_ORIGIN[name]}
                     </span>
                   ) : null}
@@ -414,11 +413,11 @@ export default function LandingPage() {
               <li key={phase} className="flex gap-[var(--space-3)] border-t border-[var(--border)] pt-[var(--space-3)]">
                 <span
                   aria-hidden="true"
-                  className="nums-tabular shrink-0 font-mono text-[8pt] text-[var(--text-subtle)]"
+                  className="nums-tabular shrink-0 font-mono text-[length:var(--text-2xs)] text-[var(--text-subtle)]"
                 >
                   {String(i + 1).padStart(2, '0')}
                 </span>
-                <span className="font-sans text-[13pt] leading-[var(--lh-ui)] text-[var(--text-2)]">
+                <span className="font-sans text-[length:var(--text-md)] leading-[var(--lh-ui)] text-[var(--text-2)]">
                   {phase}
                 </span>
               </li>
@@ -439,7 +438,7 @@ export default function LandingPage() {
             machine-prose{' '}
             <Link
               href="/capabilities#voice"
-              className="link-smooth text-[var(--accent)] hover:text-[var(--accent-hover)]"
+              className="link-smooth text-[var(--accent)] underline decoration-[var(--border-strong)] underline-offset-4 hover:text-[var(--accent-hover)]"
             >
               tells
             </Link>{' '}
@@ -488,7 +487,7 @@ export default function LandingPage() {
               the marginal column uses, so it is the page's own label idiom
               moved inline rather than a second one invented for this
               section. */}
-          <p className="font-sans text-[8pt] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
+          <p className="font-sans text-[length:var(--text-2xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
             Image generation
           </p>
 
@@ -496,10 +495,10 @@ export default function LandingPage() {
             {/* One step up from the shared Heading (34pt): this section leads
                 the page's exhibits and the display size is what makes the
                 two-column split read as a masthead rather than as a caption. */}
-            <h2 className="font-serif text-[34pt] sm:text-[55pt] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)]">
+            <h2 className="font-serif text-[length:var(--text-4xl)] sm:text-[length:var(--text-6xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)]">
               Every prompt goes to four labs at once.
             </h2>
-            <p className="font-serif text-[21pt] leading-[var(--lh-body)] text-[var(--text-2)]">
+            <p className="text-[length:var(--text-2xl)] leading-[var(--lh-body)] text-[var(--text-2)]">
               Write one prompt and four labs answer it at once, so you pick between four takes
               instead of arguing with one. Reference images, five aspect ratios and prompt
               enhancement come as standard. Premium is one toggle in the composer: still four
@@ -521,7 +520,7 @@ export default function LandingPage() {
               className="pointer-events-none absolute inset-x-[-8%] top-[10%] h-[55%] bg-[radial-gradient(ellipse_at_top,var(--accent-dim),transparent_70%)]"
             />
 
-            <p className="font-mono text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+            <p className="font-mono text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
               &ldquo;{SHOWCASE_PROMPT}&rdquo;
             </p>
 
@@ -542,7 +541,7 @@ export default function LandingPage() {
               {SHOWCASE_IMAGES.map(({ src, lab }) => (
                 <li
                   key={src}
-                  className="plate-reveal card-hover group [transform-style:preserve-3d] hover:[transform:translateZ(26px)_rotateX(3.5deg)] motion-reduce:hover:[transform:none]"
+                  className="plate-reveal card-hover group"
                 >
                   {/* Held slightly under-saturated at rest and released on
                       hover. Four photographs at full colour side by side
@@ -562,7 +561,7 @@ export default function LandingPage() {
                     sizes="(max-width: 768px) 45vw, 30vw"
                     className="aspect-square w-full border border-[var(--border)] object-cover saturate-[0.9] transition-[filter,border-color] duration-[var(--dur-component)] ease-[var(--ease-standard)] group-hover:border-[var(--border-strong)] group-hover:saturate-100"
                   />
-                  <p className="mt-[var(--space-3)] font-sans text-[13pt] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
+                  <p className="mt-[var(--space-3)] font-sans text-[length:var(--text-md)] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
                     {lab}
                   </p>
                 </li>
@@ -609,15 +608,13 @@ export default function LandingPage() {
             back entirely safe.
           </Body>
 
-          <IdeaField />
-
           <dl className="mt-[var(--space-4)] grid gap-x-[var(--space-8)] gap-y-[var(--space-5)] sm:grid-cols-3">
             {IDEA_TIERS.map(({ name, desc }) => (
               <div key={name} className="border-t border-[var(--border)] pt-[var(--space-3)]">
-                <dt className="font-sans text-[13pt] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
+                <dt className="font-sans text-[length:var(--text-md)] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
                   {name}
                 </dt>
-                <dd className="mt-[var(--space-1)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+                <dd className="mt-[var(--space-1)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
                   {desc}
                 </dd>
               </div>
@@ -686,7 +683,7 @@ export default function LandingPage() {
             fall back to letting an LLM narrate an execution it did not
             perform (flows/services.py:26-43). */}
         <Section id="code">
-          <p className="font-sans text-[8pt] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
+          <p className="font-sans text-[length:var(--text-2xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
             Code generation
           </p>
 
@@ -768,7 +765,7 @@ export default function LandingPage() {
             {CLAIM_SPECIMENS.map(({ claim, label, qualifier }) => (
               <div key={label} className="border-t border-[var(--border)] pt-[var(--space-4)]">
                 <dt
-                  className={`${CLAIM_RULE[label]} pl-[var(--space-3)] font-sans text-[8pt] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)]`}
+                  className={`${CLAIM_RULE[label]} pl-[var(--space-3)] font-sans text-[length:var(--text-2xs)] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)]`}
                 >
                   {label}
                   {qualifier ? (
@@ -778,7 +775,7 @@ export default function LandingPage() {
                     </span>
                   ) : null}
                 </dt>
-                <dd className="prose-measure mt-[var(--space-2)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+                <dd className="prose-measure mt-[var(--space-2)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
                   {claim}
                 </dd>
               </div>
@@ -789,7 +786,7 @@ export default function LandingPage() {
             Those three are lifted out of{' '}
             <Link
               href="/how-it-works"
-              className="link-smooth text-[var(--accent)] hover:text-[var(--accent-hover)]"
+              className="link-smooth text-[var(--accent)] underline decoration-[var(--border-strong)] underline-offset-4 hover:text-[var(--accent-hover)]"
             >
               one captured run
             </Link>
@@ -801,10 +798,10 @@ export default function LandingPage() {
           <dl className="mt-[var(--space-10)] grid gap-x-[var(--space-8)] gap-y-[var(--space-5)] sm:grid-cols-3">
             {AGENT_DOORS.map(({ name, detail }) => (
               <div key={name} className="border-t border-[var(--border)] pt-[var(--space-3)]">
-                <dt className="font-sans text-[13pt] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
+                <dt className="font-sans text-[length:var(--text-md)] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
                   {name}
                 </dt>
-                <dd className="mt-[var(--space-1)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+                <dd className="mt-[var(--space-1)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
                   {detail}
                 </dd>
               </div>
@@ -842,30 +839,30 @@ export default function LandingPage() {
           <dl className="mt-[var(--space-8)] grid gap-x-[var(--space-8)] gap-y-[var(--space-5)] sm:grid-cols-2">
             {TERMS.map(({ term, detail }) => (
               <div key={term}>
-                <dt className="font-sans text-[13pt] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
+                <dt className="font-sans text-[length:var(--text-md)] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
                   {term}
                 </dt>
-                <dd className="mt-[var(--space-1)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+                <dd className="mt-[var(--space-1)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
                   {detail}
                 </dd>
               </div>
             ))}
           </dl>
-          <p className="mt-[var(--space-8)] font-sans text-[13pt] leading-[var(--lh-ui)] text-[var(--text-muted)]">
+          <p className="mt-[var(--space-8)] font-sans text-[length:var(--text-md)] leading-[var(--lh-ui)] text-[var(--text-muted)]">
             Routes across {PROVIDERS.join(', ')}, and{' '}
             {CAPABILITIES.routableModels.toLocaleString('en-US')} models through OpenRouter. Full
             detail in{' '}
-            <Link href="/security" className="link-smooth text-[var(--accent)] hover:text-[var(--accent-hover)]">
+            <Link href="/security" className="link-smooth text-[var(--accent)] underline decoration-[var(--border-strong)] underline-offset-4 hover:text-[var(--accent-hover)]">
               security
             </Link>
             ,{' '}
-            <Link href="/privacy" className="link-smooth text-[var(--accent)] hover:text-[var(--accent-hover)]">
+            <Link href="/privacy" className="link-smooth text-[var(--accent)] underline decoration-[var(--border-strong)] underline-offset-4 hover:text-[var(--accent-hover)]">
               privacy
             </Link>
             , and{' '}
             <Link
               href="/subprocessors"
-              className="link-smooth text-[var(--accent)] hover:text-[var(--accent-hover)]"
+              className="link-smooth text-[var(--accent)] underline decoration-[var(--border-strong)] underline-offset-4 hover:text-[var(--accent-hover)]"
             >
               sub-processors
             </Link>
@@ -886,13 +883,13 @@ export default function LandingPage() {
               <div className="mt-[var(--space-10)] flex flex-wrap items-center gap-[var(--space-4)]">
                 <Link
                   href="/chat"
-                  className="btn-lift flex min-h-[var(--space-12)] items-center rounded-[var(--radius)] bg-[var(--accent)] px-[var(--space-8)] font-sans text-[13pt] font-semibold leading-[var(--lh-ui)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)]"
+                  className="btn-lift flex min-h-[var(--space-12)] items-center rounded-[var(--radius)] bg-[var(--accent)] px-[var(--space-8)] font-sans text-[length:var(--text-md)] font-semibold leading-[var(--lh-ui)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)]"
                 >
                   Ask a question
                 </Link>
                 <Link
                   href="/pricing"
-                  className="link-smooth flex min-h-[var(--space-12)] items-center font-sans text-[13pt] font-medium leading-[var(--lh-ui)] text-[var(--text-2)] underline decoration-[var(--border-strong)] underline-offset-4 hover:text-[var(--text)]"
+                  className="link-smooth flex min-h-[var(--space-12)] items-center font-sans text-[length:var(--text-md)] font-medium leading-[var(--lh-ui)] text-[var(--text-2)] underline decoration-[var(--border-strong)] underline-offset-4 hover:text-[var(--text)]"
                 >
                   See pricing
                 </Link>

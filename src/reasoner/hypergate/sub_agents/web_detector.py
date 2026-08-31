@@ -31,6 +31,7 @@ _SYSTEM = (
 
 class WebSearchDetectorSubAgent(BaseSubAgent):
     AGENT_NAME = "web_detector"
+    ROLE = "hypergate_web"
     MAX_TOKENS = HYPERGATE_MAX_TOKENS_WEB
 
     def _system_prompt(self) -> str:

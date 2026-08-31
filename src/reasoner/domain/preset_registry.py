@@ -30,7 +30,7 @@ _REGISTRY: dict[str, dict] = {
             "constructive":  "deepseek-v3",           # 🇨🇳 DeepSeek — v3 alias now routes to v4-flash (API deprecated v3.2)
             "destructive":   "hermes-4-70b",      # 🇺🇸 Nous Research — critic-specialized ($0.13/$0.40) (was ring-2.6-1t 🇨🇳, cross-bloc echo resistance)
             "systemic":      "qwen3-30b-a3b",  # 🇨🇳 Qwen — $0.130/$0.520 per M, 131K ctx (was hy3; one model per phase)
-            "minimalist":    "ministral-8b",     # 🇫🇷 Mistral — $0.075/$0.20
+            "minimalist":    "mistral-small-3.2-24b",     # 🇫🇷 Mistral — $0.075/$0.20
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
         "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — $0.03/$0.13 (-54% vs 3.5-flash), newer gen, 1M ctx, vision
@@ -43,7 +43,7 @@ _REGISTRY: dict[str, dict] = {
     },
     "multi-perspective-ultra-budget": {
         "method": "multi-perspective",
-        "primary_id": "gemini-flash-lite",
+        "primary_id": "qwen3.5-flash",
         "routing": {
             "perspective_cot": "mimo-v2-flash",  # 🇨🇳 Xiaomi — $0.140/$0.280 per M, 1050K ctx (was qwen3.5-flash; one model per phase)
             "perspective_analysis": "qwen3.6-flash",   # was qwen3.5-9b → stronger reasoning, 1M ctx
@@ -52,7 +52,7 @@ _REGISTRY: dict[str, dict] = {
             "constructive":  "stepfun-3.7-flash",    # 🇨🇳 StepFun — $0.20/$1.15
             "destructive":   "ling-3.0-flash-free",  # 🇨🇳 inclusionAI — $0.021/$0.063 (was ling-2.6-flash-free; OpenRouter delisted the 2.6 line)
             "systemic":      "gpt-oss-20b",          # 🇺🇸 OpenAI open-weight — $0.029/$0.14 (was qwen3.6-flash, added US bloc)
-            "minimalist":    "ministral-8b",         # 🇫🇷 Mistral — $0.075/$0.20
+            "minimalist":    "mistral-small-3.2-24b",         # 🇫🇷 Mistral — $0.075/$0.20
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
         "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — $0.03/$0.13 (-54% vs 3.5-flash), newer gen, 1M ctx, vision
@@ -96,7 +96,7 @@ _REGISTRY: dict[str, dict] = {
             "systemic":     "grok-4.3",     # 🇺🇸 xAI — judging (was Google, swapped to Grok for budget v3.6)
             "synthesis": "llama-4-maverick",  # 🇺🇸 Meta — $0.200/$0.800 per M, 1048K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (budget, v3.4) ──
-        "fusion":         "gemini-flash-lite",  # 🇨🇳 Qwen — $0.065/$0.260 per M, 1000K ctx (was deepseek-v4-flash; one model per phase)
+        "fusion":         "qwen3.5-flash",  # 🇨🇳 Qwen — $0.065/$0.260 per M, 1000K ctx (was deepseek-v4-flash; one model per phase)
         "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — $0.03/$0.13 (-54% vs 3.5-flash), newer gen, 1M ctx, vision
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "glm-5.3-flash",
@@ -112,7 +112,7 @@ _REGISTRY: dict[str, dict] = {
             # ── Cross-bloc adversarial diversity (🇺🇸 vs 🇨🇳, 🇺🇸 judge) ──
             "constructive": "claude-sonnet",     # 🇺🇸 Anthropic — strongest argumentation
             "destructive":  "deepseek-v4-pro",   # 🇨🇳 DeepSeek — adversarial reasoning
-            "systemic":     "gemini-pro-real",   # 🇺🇸 Google (real) — judging; "gemini-pro" alias now routes to Anthropic, would duplicate constructive
+            "systemic":     "gemini-pro-real",   # 🇺🇸 Google (real) — judging; "claude-sonnet" alias now routes to Anthropic, would duplicate constructive
             "synthesis": "inkling-small",  # 🇺🇸 Thinking Machines — $0.450/$1.200 per M, 524K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-3.7-flash",    # Google 🇺🇸 — AA Intel 56.0 vs 47.7, 1M ctx, $0.375/$1.875 (5.3x cheaper)
@@ -127,7 +127,7 @@ _REGISTRY: dict[str, dict] = {
     },
     "jury-budget": {
         "method": "jury",
-        "primary_id": "gemini-flash-lite",
+        "primary_id": "qwen3.5-flash",
         "routing": {
             "synthesis": "llama-4-maverick",  # 🇺🇸 Meta — $0.200/$0.800 per M, 1048K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (budget, v3.4) ──
@@ -142,7 +142,7 @@ _REGISTRY: dict[str, dict] = {
     },
     "jury-premium": {
         "method": "jury",
-        "primary_id": "gemini-pro",
+        "primary_id": "claude-sonnet",
         "routing": {
             "synthesis": "inkling-small",  # 🇺🇸 Thinking Machines — $0.450/$1.200 per M, 524K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (premium, v3.4) ──
@@ -174,7 +174,7 @@ _REGISTRY: dict[str, dict] = {
     },
     "research-premium": {
         "method": "research",
-        "primary_id": "gemini-pro",
+        "primary_id": "claude-sonnet",
         "routing": {
             "synthesis": "deepseek-v4-pro",      # 🇨🇳 DeepSeek — cross-bloc from 🇺🇸 sonar scoring (web-grounded fact-check stays US)
         # ── Reasoning model assignments (premium, v3.4) ──
@@ -208,7 +208,7 @@ _REGISTRY: dict[str, dict] = {
     },
     "scientific-premium": {
         "method": "scientific",
-        "primary_id": "gemini-pro",
+        "primary_id": "claude-sonnet",
         "routing": {
             "synthesis": "inkling-small",  # 🇺🇸 Thinking Machines — $0.450/$1.200 per M, 524K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (premium, v3.4) ──
@@ -224,7 +224,7 @@ _REGISTRY: dict[str, dict] = {
     },
     "socratic-budget": {
         "method": "socratic",
-        "primary_id": "gemini-flash-lite",
+        "primary_id": "qwen3.5-flash",
         "routing": {
             "synthesis": "llama-4-maverick",  # 🇺🇸 Meta — $0.200/$0.800 per M, 1048K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (budget, v3.4) ──
@@ -239,7 +239,7 @@ _REGISTRY: dict[str, dict] = {
     },
     "socratic-premium": {
         "method": "socratic",
-        "primary_id": "gemini-pro",
+        "primary_id": "claude-sonnet",
         "routing": {
             "synthesis": "inkling-small",  # 🇺🇸 Thinking Machines — $0.450/$1.200 per M, 524K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (premium, v3.4) ──
@@ -255,7 +255,7 @@ _REGISTRY: dict[str, dict] = {
     },
     "pre-mortem-budget": {
         "method": "pre_mortem",
-        "primary_id": "gemini-flash-lite",
+        "primary_id": "qwen3.5-flash",
         "routing": {
             "synthesis": "llama-4-maverick",  # 🇺🇸 Meta — $0.200/$0.800 per M, 1048K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (budget, v3.4) ──
@@ -270,7 +270,7 @@ _REGISTRY: dict[str, dict] = {
     },
     "pre-mortem-premium": {
         "method": "pre_mortem",
-        "primary_id": "gemini-pro",
+        "primary_id": "claude-sonnet",
         "routing": {
             "synthesis": "inkling-small",  # 🇺🇸 Thinking Machines — $0.450/$1.200 per M, 524K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (premium, v3.4) ──
@@ -301,7 +301,7 @@ _REGISTRY: dict[str, dict] = {
     },
     "bayesian-premium": {
         "method": "bayesian",
-        "primary_id": "gemini-pro",
+        "primary_id": "claude-sonnet",
         "routing": {
             "synthesis": "inkling-small",  # 🇺🇸 Thinking Machines — $0.450/$1.200 per M, 524K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (premium, v3.4) ──
@@ -317,7 +317,7 @@ _REGISTRY: dict[str, dict] = {
     },
     "dialectical-budget": {
         "method": "dialectical",
-        "primary_id": "gemini-flash-lite",
+        "primary_id": "qwen3.5-flash",
         "routing": {
             "synthesis": "llama-4-maverick",  # 🇺🇸 Meta — $0.200/$0.800 per M, 1048K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (budget, v3.4) ──
@@ -332,7 +332,7 @@ _REGISTRY: dict[str, dict] = {
     },
     "dialectical-premium": {
         "method": "dialectical",
-        "primary_id": "gemini-pro",
+        "primary_id": "claude-sonnet",
         "routing": {
             "synthesis": "inkling-small",  # 🇺🇸 Thinking Machines — $0.450/$1.200 per M, 524K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (premium, v3.4) ──
@@ -348,7 +348,7 @@ _REGISTRY: dict[str, dict] = {
     },
     "analogical-budget": {
         "method": "analogical",
-        "primary_id": "gemini-flash-lite",
+        "primary_id": "qwen3.5-flash",
         "routing": {
             "synthesis": "llama-4-maverick",  # 🇺🇸 Meta — $0.200/$0.800 per M, 1048K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (budget, v3.4) ──
@@ -363,7 +363,7 @@ _REGISTRY: dict[str, dict] = {
     },
     "analogical-premium": {
         "method": "analogical",
-        "primary_id": "gemini-pro",
+        "primary_id": "claude-sonnet",
         "routing": {
             "synthesis": "inkling-small",  # 🇺🇸 Thinking Machines — $0.450/$1.200 per M, 524K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (premium, v3.4) ──
@@ -379,7 +379,7 @@ _REGISTRY: dict[str, dict] = {
     },
     "delphi-budget": {
         "method": "delphi",
-        "primary_id": "gemini-flash-lite",
+        "primary_id": "qwen3.5-flash",
         "routing": {
             "synthesis": "llama-4-maverick",  # 🇺🇸 Meta — $0.200/$0.800 per M, 1048K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (budget, v3.4) ──
@@ -394,7 +394,7 @@ _REGISTRY: dict[str, dict] = {
     },
     "delphi-premium": {
         "method": "delphi",
-        "primary_id": "gemini-pro",
+        "primary_id": "claude-sonnet",
         "routing": {
             "synthesis": "inkling-small",  # 🇺🇸 Thinking Machines — $0.450/$1.200 per M, 524K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (premium, v3.4) ──
@@ -410,7 +410,7 @@ _REGISTRY: dict[str, dict] = {
     },
     "cove-budget": {
         "method": "cove",
-        "primary_id": "gemini-flash-lite",
+        "primary_id": "qwen3.5-flash",
         "routing": {
             "synthesis": "llama-4-maverick",  # 🇺🇸 Meta — $0.200/$0.800 per M, 1048K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (budget, v3.4) ──
@@ -428,7 +428,7 @@ _REGISTRY: dict[str, dict] = {
     },
     "cove-premium": {
         "method": "cove",
-        "primary_id": "gemini-pro",
+        "primary_id": "claude-sonnet",
         "routing": {
             "synthesis": "inkling-small",  # 🇺🇸 Thinking Machines — $0.450/$1.200 per M, 524K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (premium, v3.4) ──
@@ -447,7 +447,7 @@ _REGISTRY: dict[str, dict] = {
     },
     "sot-budget": {
         "method": "sot",
-        "primary_id": "gemini-flash-lite",
+        "primary_id": "qwen3.5-flash",
         "routing": {
             "synthesis": "llama-4-maverick",  # 🇺🇸 Meta — $0.200/$0.800 per M, 1048K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (budget, v3.4) ──
@@ -462,7 +462,7 @@ _REGISTRY: dict[str, dict] = {
     },
     "sot-premium": {
         "method": "sot",
-        "primary_id": "gemini-pro",
+        "primary_id": "claude-sonnet",
         "routing": {
             "synthesis": "inkling-small",  # 🇺🇸 Thinking Machines — $0.450/$1.200 per M, 524K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (premium, v3.4) ──
@@ -478,7 +478,7 @@ _REGISTRY: dict[str, dict] = {
     },
     "tot-budget": {
         "method": "tot",
-        "primary_id": "gemini-flash-lite",
+        "primary_id": "qwen3.5-flash",
         "routing": {
             "synthesis": "llama-4-maverick",  # 🇺🇸 Meta — $0.200/$0.800 per M, 1048K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (budget, v3.4) ──
@@ -496,7 +496,7 @@ _REGISTRY: dict[str, dict] = {
     },
     "tot-premium": {
         "method": "tot",
-        "primary_id": "gemini-pro",
+        "primary_id": "claude-sonnet",
         "routing": {
             "synthesis": "inkling-small",  # 🇺🇸 Thinking Machines — $0.450/$1.200 per M, 524K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (premium, v3.4) ──
@@ -515,7 +515,7 @@ _REGISTRY: dict[str, dict] = {
     },
     "pot-budget": {
         "method": "pot",
-        "primary_id": "gemini-flash-lite",
+        "primary_id": "qwen3.5-flash",
         "routing": {
             "synthesis": "llama-4-maverick",  # 🇺🇸 Meta — $0.200/$0.800 per M, 1048K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (budget, v3.4) ──
@@ -530,7 +530,7 @@ _REGISTRY: dict[str, dict] = {
     },
     "pot-premium": {
         "method": "pot",
-        "primary_id": "gemini-pro",
+        "primary_id": "claude-sonnet",
         "routing": {
             "synthesis": "inkling-small",  # 🇺🇸 Thinking Machines — $0.450/$1.200 per M, 524K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (premium, v3.4) ──
@@ -546,7 +546,7 @@ _REGISTRY: dict[str, dict] = {
     },
     "self-discover-budget": {
         "method": "self_discover",
-        "primary_id": "gemini-flash-lite",
+        "primary_id": "qwen3.5-flash",
         "routing": {
             "synthesis": "llama-4-maverick",  # 🇺🇸 Meta — $0.200/$0.800 per M, 1048K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (budget, v3.4) ──
@@ -564,7 +564,7 @@ _REGISTRY: dict[str, dict] = {
     },
     "self-discover-premium": {
         "method": "self_discover",
-        "primary_id": "gemini-pro",
+        "primary_id": "claude-sonnet",
         "routing": {
             "synthesis": "inkling-small",  # 🇺🇸 Thinking Machines — $0.450/$1.200 per M, 524K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (premium, v3.4) ──
@@ -583,7 +583,7 @@ _REGISTRY: dict[str, dict] = {
     },
     "subagent-budget": {
         "method": "subagent",
-        "primary_id": "gemini-flash-lite",
+        "primary_id": "qwen3.5-flash",
         "routing": {
             "synthesis": "llama-4-maverick",  # 🇺🇸 Meta — $0.200/$0.800 per M, 1048K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (budget, v3.4) ──
@@ -624,7 +624,7 @@ _REGISTRY: dict[str, dict] = {
     },
     "writing-budget": {
         "method": "writing",
-        "primary_id": "gemini-flash-lite",
+        "primary_id": "qwen3.5-flash",
         "routing": {
             "synthesis": "llama-4-maverick",  # 🇺🇸 Meta — $0.200/$0.800 per M, 1048K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Article-flow roles (budget, v3.5) ──
@@ -640,7 +640,7 @@ _REGISTRY: dict[str, dict] = {
     },
     "writing-premium": {
         "method": "writing",
-        "primary_id": "gemini-pro",
+        "primary_id": "claude-sonnet",
         "routing": {
             "synthesis": "gemini-3.7-flash",  # 🇺🇸 Google — $0.375/$1.875 per M, 1048K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Article-flow roles (premium, v3.5) ──
@@ -670,7 +670,7 @@ _REGISTRY: dict[str, dict] = {
         # registry fix had already removed, on the false premise that some
         # entry has env=None — none does; every non-local entry is
         # OPENROUTER_API_KEY.) That swap also broke cross-lab diversity:
-        # "gemini-flash-lite" is an alias for qwen/qwen3.5-flash-02-23, the same
+        # "qwen3.5-flash" is an alias for qwen/qwen3.5-flash-02-23, the same
         # lab as this preset's qwen3.7-plus synthesis, so a degraded environment
         # collapsed the whole preset onto one lab — the opposite of the
         # "fail to a cross-lab equivalent" rule in CLAUDE.md §5.
@@ -689,7 +689,7 @@ _REGISTRY: dict[str, dict] = {
         "article_humanize":     "gpt-5",  # 🇺🇸 OpenAI — $1.250/$10.000 per M, 400K ctx (was claude-sonnet; one model per phase)
         "article_verifier":     "qwen3-30b-a3b",  # 🇨🇳 Qwen — $0.130/$0.520 per M, 131K ctx (was hy3; one model per phase)
         # ── Reasoning model assignments (budget, v3.5) ──
-        "fusion":           "gemini-flash-lite",  # 🇨🇳 Qwen — $0.065/$0.260 per M, 1000K ctx (was deepseek-v4-flash; one model per phase)
+        "fusion":           "qwen3.5-flash",  # 🇨🇳 Qwen — $0.065/$0.260 per M, 1000K ctx (was deepseek-v4-flash; one model per phase)
         "post_synthesis_verify": "sonar-deep-research",  # 🇺🇸 Perplexity — $2.000/$8.000 per M, 128K ctx (was sonar; one model per phase)
         },
         # Cross-bloc fallback per role (v3.9, researched against the 2026-08-28
@@ -700,8 +700,18 @@ _REGISTRY: dict[str, dict] = {
         # the only live-web-search vendor in this registry, so their fallback
         # steps to a different Sonar tier rather than a non-search model that
         # would silently drop the citation-grounding these phases exist for.
+        #
+        # "primary" is a dual-purpose key (ProviderRouter._resolve_fallback):
+        # it is both the explicit fallback for the "primary" ROLE below (Arcee,
+        # 🇺🇸) and the catch-all fallback for any role that resolves through
+        # primary_id itself (deepseek-v4-flash, 🇨🇳) — e.g. a role filter_routing()
+        # downgraded for a missing key, or any role this preset doesn't itemize.
+        # One value has to be cross-bloc from both sources at once, so it must
+        # sit in a third bloc — 🇪🇺 — rather than 🇨🇳 (same bloc as primary_id,
+        # which would silently no-op the catch-all fallback) or 🇺🇸 (same bloc
+        # as Arcee).
         "fallback_routing": {
-            "primary":               "qwen3.7-flash",         # 🇨🇳 Qwen — $0.03/$0.13 per M, 1M ctx, cross-bloc from Arcee
+            "primary":               "mistral-small",         # 🇪🇺 Mistral — $0.15/$0.60 per M, 262K ctx, cross-bloc from BOTH Arcee (🇺🇸 role) and deepseek-v4-flash (🇨🇳 primary_id catch-all)
             "writing_draft":         "deepseek-v4-pro",       # 🇨🇳 DeepSeek — $0.87/$1.74 per M, 1M ctx, cross-bloc from Claude
             "writing_factcheck":     "sonar-pro",             # 🇺🇸 Perplexity — same-vendor step-up (see note above)
             "writing_assemble":      "seed-2.0-mini",         # 🇨🇳 ByteDance — $0.10/$0.40 per M, cross-bloc from OpenAI
@@ -740,9 +750,13 @@ _REGISTRY: dict[str, dict] = {
         # Cross-bloc fallback per role (v3.9) — see article-budget's
         # fallback_routing comment for the writing_factcheck /
         # post_synthesis_verify same-vendor-step-up rationale, which applies
-        # here too.
+        # here too. "primary" is the same dual-purpose key described there
+        # (role fallback + primary_id catch-all) — it needs no third-bloc
+        # workaround here because this preset's "primary" role (Arcee, 🇺🇸)
+        # and its primary_id (claude-sonnet, 🇺🇸) already share a bloc, so one
+        # 🇨🇳 fallback is cross-bloc from both at once.
         "fallback_routing": {
-            "primary":               "glm-5.3",           # 🇨🇳 Zhipu — $1.40/$4.40 per M, cross-bloc from Arcee
+            "primary":               "glm-5.3",           # 🇨🇳 Zhipu — $1.40/$4.40 per M, cross-bloc from BOTH Arcee (🇺🇸 role) and claude-sonnet (🇺🇸 primary_id catch-all)
             "writing_draft":         "qwen3.7-max",       # 🇨🇳 Qwen — $1.475/$4.425 per M, 1M ctx, cross-bloc from GPT-5
             "writing_outline":       "qwen3.7-max",       # 🇨🇳 Qwen — cross-bloc from real Gemini Pro
             "article_sot_skeleton":  "glm-5.3",           # 🇨🇳 Zhipu — cross-bloc from GPT-5.6 Terra
@@ -773,7 +787,7 @@ _REGISTRY: dict[str, dict] = {
         "coding_assemble": "laguna-xs-2.1",    # 🇺🇸 Poolside ($0.06/$0.12) — dedicated coding agent (was deepseek-v4-flash)
         "coding_review":   "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
         "coding_spec":     "qwen3.6-35b-a3b",  # 🇨🇳 Qwen — $0.140/$1.000 per M, 262K ctx (was qwen3-coder-flash; one model per phase)
-        "coding_tests":    "gemini-flash-lite",  # 🇨🇳 Qwen — $0.065/$0.260 per M, 1000K ctx (was deepseek-v4-flash; one model per phase)
+        "coding_tests":    "qwen3.5-flash",  # 🇨🇳 Qwen — $0.065/$0.260 per M, 1000K ctx (was deepseek-v4-flash; one model per phase)
         "fusion":          "qwen3.7-flash",  # 🇨🇳 Qwen — $0.030/$0.130 per M, 1000K ctx (was deepseek-v4-flash; one model per phase)
         "meta_evaluator":  "minimax-m3",  # 🇨🇳 MiniMax — $0.300/$1.200 per M, 1048K ctx (was qwen3.7-plus; one model per phase)
         "scoring":         "deepseek-v4-flash",  # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
@@ -811,7 +825,7 @@ _REGISTRY: dict[str, dict] = {
         "coding_assemble": "deepseek-v4-flash",
         "coding_review":   "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
         "coding_spec":     "gpt-5.1-codex",  # 🇺🇸 OpenAI — $1.250/$10.000 per M, 400K ctx (was claude-sonnet; one model per phase)
-        "coding_tests":    "gemini-flash-lite",  # 🇨🇳 Qwen — $0.065/$0.260 per M, 1000K ctx (was deepseek-v4-flash; one model per phase)
+        "coding_tests":    "qwen3.5-flash",  # 🇨🇳 Qwen — $0.065/$0.260 per M, 1000K ctx (was deepseek-v4-flash; one model per phase)
         "deep_read":       "gemini-2.5-flash",  # 🇺🇸 Google — $0.300/$2.500 per M, 1048K ctx; honours temperature (phase target 0.2) (was claude-sonnet: fixed-temp, silently ran at 1.0)
         "fusion":          "deepseek-v4-pro",
         "meta_evaluator":  "qwen3.6-27b",  # 🇨🇳 Qwen — $0.600/$3.600 per M, 262K ctx (was glm-5.2; one model per phase)
@@ -824,7 +838,7 @@ _REGISTRY: dict[str, dict] = {
     },
     "cross-language-budget": {
         "method": "cross-language",
-        "primary_id": "gemini-flash-lite",
+        "primary_id": "qwen3.5-flash",
         "routing": {
             "synthesis": "llama-4-maverick",  # 🇺🇸 Meta — $0.200/$0.800 per M, 1048K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (budget, v3.4) ──
@@ -842,7 +856,7 @@ _REGISTRY: dict[str, dict] = {
     },
     "cross-language-premium": {
         "method": "cross-language",
-        "primary_id": "gemini-pro",
+        "primary_id": "claude-sonnet",
         "routing": {
             "synthesis": "glm-5.2",              # 🇨🇳 Zhipu — cross-bloc final voice, $0.476/$1.496 live (comment said $0.95/$3.00)
         # ── Reasoning model assignments (premium, v3.4) ──
@@ -865,11 +879,11 @@ _REGISTRY: dict[str, dict] = {
         "method": "brainstorming",
         "primary_id": "claude-haiku",
         "routing": {
-            "brainstorm_cluster": "google/gemma-2-9b-it",
+            "brainstorm_cluster": "gemma-3-12b",
             "brainstorm_develop": "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
             "synthesis": "llama-4-maverick",  # 🇺🇸 Meta — $0.200/$0.800 per M, 1048K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (budget, v3.4) ──
-        "fusion":         "gemini-flash-lite",  # 🇨🇳 Qwen — $0.065/$0.260 per M, 1000K ctx (was deepseek-v4-flash; one model per phase)
+        "fusion":         "qwen3.5-flash",  # 🇨🇳 Qwen — $0.065/$0.260 per M, 1000K ctx (was deepseek-v4-flash; one model per phase)
         "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — $0.03/$0.13 (-54% vs 3.5-flash), newer gen, 1M ctx, vision
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "glm-5.3-flash",
@@ -939,7 +953,7 @@ _REGISTRY: dict[str, dict] = {
     },
     "image-gen-premium": {
         "method": "image-gen",
-        "primary_id": "gemini-pro",
+        "primary_id": "claude-sonnet",
         "routing": {
             "image_generate": "gemini-pro-image",
         # ── Reasoning model assignments (premium, v3.4) ──
@@ -964,7 +978,7 @@ _REGISTRY: dict[str, dict] = {
             "fusion":          "qwen3-max-real",        # 🇨🇳 Qwen — cross-vendor from DeepSeek
             "meta_evaluator":  "mistral-medium-3-5",    # 🇫🇷 Mistral — EU bloc
             "scoring":         "kimi-k2-6",             # 🇨🇳 Moonshot — cross-vendor from Zhipu, keeps scoring CN vs 🇺🇸 synthesis. Not deepseek-v4-pro: that is this preset's fusion model, so falling back to it would run one model in two phases.
-            "stress_testing":  "gemini-pro-real",       # 🇺🇸 Google (real) — "gemini-pro" would alias to Anthropic
+            "stress_testing":  "gemini-pro-real",       # 🇺🇸 Google (real) — "claude-sonnet" would alias to Anthropic
             "verifier":        "gemini-flash-lite-real",# 🇺🇸 Google (real) — cross-vendor from xAI
             "post_synthesis_verify": "sonar-deep-research",  # 🇺🇸 Perplexity — search family preserved
         },

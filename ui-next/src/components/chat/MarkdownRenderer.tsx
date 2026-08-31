@@ -4,11 +4,28 @@ import { memo, Suspense, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { EPISTEMIC_TAG, epistemicClassName, remarkEpistemic } from '@/lib/remark-epistemic';
 
 // CodeBlock is in its own JS chunk (~400KB with Prism), loaded on demand
 const CodeBlock = dynamic(
   () => import('./CodeBlock').then((mod) => mod.CodeBlock),
   { ssr: false },
+);
+
+/** One component per `.epistemic-*` tag `remarkEpistemic` emits — defined at
+ *  module scope so each stays referentially stable across renders. Marks
+ *  only ever populate on a phase's finished markdown; during active SSE
+ *  streaming `ChatFeed` renders raw text directly and never reaches this
+ *  component (see `StreamingMarkdown.tsx`'s docblock). */
+function epistemicMark(tag: string) {
+  const className = epistemicClassName(tag);
+  return function EpistemicMark({ children }: { children?: React.ReactNode }) {
+    return <span className={className}>{children}</span>;
+  };
+}
+
+const epistemicComponents = Object.fromEntries(
+  Object.values(EPISTEMIC_TAG).map((tag) => [tag, epistemicMark(tag)]),
 );
 
 const MarkdownRendererComponent = ({ children }: { children: string | React.ReactNode }) => {
@@ -29,8 +46,9 @@ const MarkdownRendererComponent = ({ children }: { children: string | React.Reac
   return (
     <div className="markdown-body">
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[remarkGfm, remarkEpistemic]}
         components={{
+          ...epistemicComponents,
           h1({ children }) {
             return <Heading level={1}>{children}</Heading>;
           },

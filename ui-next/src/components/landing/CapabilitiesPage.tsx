@@ -127,18 +127,18 @@ export default function CapabilitiesPage() {
             told what Reasoner is, either by the home page or by a link
             straight into a §. The job of this block is to say what kind
             of document follows, and then get out of the way of §1. */}
-        <header className="mx-auto w-full max-w-[var(--width-wide)] px-[var(--gutter)] pb-[var(--section-y)] pt-[var(--space-40)]">
+        <header className="mx-auto w-full max-w-[var(--width-wide)] px-[var(--gutter)] pb-[var(--section-y)] pt-[var(--space-48)]">
           <div className="grid gap-[var(--space-6)] lg:grid-cols-[9rem_minmax(0,1fr)] lg:gap-[var(--space-12)]">
             <div>
-              <p className="mt-[var(--space-1)] font-sans text-[8pt] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
+              <p className="mt-[var(--space-1)] font-sans text-[length:var(--text-2xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
                 Capabilities
               </p>
             </div>
             <div className="min-w-0">
-              <h1 className="max-w-[20ch] text-balance font-serif text-[34pt] font-normal leading-[var(--lh-display)] sm:text-[55pt] tracking-[var(--tracking-tight)] text-[var(--text)]">
-                Nine mechanisms, and what holds each one.
+              <h1 className="max-w-[20ch] text-balance font-serif text-[length:var(--text-4xl)] font-normal leading-[var(--lh-display)] sm:text-[length:var(--text-6xl)] tracking-[var(--tracking-tight)] text-[var(--text)]">
+                Eight mechanisms, and what holds each one.
               </h1>
-              <p className="prose-measure mt-[var(--space-6)] font-serif text-[21pt] leading-[var(--lh-body)] text-[var(--text-2)]">
+              <p className="prose-measure mt-[var(--space-6)] text-[length:var(--text-2xl)] leading-[var(--lh-body)] text-[var(--text-2)]">
                 Every section below is the same argument from a different angle: run the work past
                 models that disagree, then keep the disagreement. Each says which part is a rule in
                 code and which part is a brief given to a model, because the difference is the
@@ -167,19 +167,19 @@ export default function CapabilitiesPage() {
 
           <dl className="mt-[var(--space-10)] grid gap-[var(--space-6)] sm:grid-cols-2">
             <div className="border-t border-[var(--border)] pt-[var(--space-4)]">
-              <dt className="epistemic-hypothesis pl-[var(--space-3)] font-sans text-[8pt] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)]">
+              <dt className="epistemic-hypothesis pl-[var(--space-3)] font-sans text-[length:var(--text-2xs)] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)]">
                 Hypothesis
               </dt>
-              <dd className="mt-[var(--space-3)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+              <dd className="mt-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
                 The model asserted it and nothing else backs it. Plausible, reasoned, unconfirmed,
                 and never dressed up as more.
               </dd>
             </div>
             <div className="border-t border-[var(--border)] pt-[var(--space-4)]">
-              <dt className="epistemic-verified pl-[var(--space-3)] font-sans text-[8pt] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)]">
+              <dt className="epistemic-verified pl-[var(--space-3)] font-sans text-[length:var(--text-2xs)] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)]">
                 Verified
               </dt>
-              <dd className="mt-[var(--space-3)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+              <dd className="mt-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
                 A source outside the model carries it. Cited, and traceable back to the thing that
                 carried it.
               </dd>
@@ -244,10 +244,10 @@ export default function CapabilitiesPage() {
           <dl className="mt-[var(--space-8)] grid gap-x-[var(--space-8)] gap-y-[var(--space-5)] sm:grid-cols-3">
             {IMAGE_FAMILIES.map(({ name, desc }) => (
               <div key={name} className="border-t border-[var(--border)] pt-[var(--space-3)]">
-                <dt className="font-sans text-[13pt] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
+                <dt className="font-sans text-[length:var(--text-md)] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
                   {name}
                 </dt>
-                <dd className="mt-[var(--space-1)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+                <dd className="mt-[var(--space-1)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
                   {desc}
                 </dd>
               </div>
@@ -406,10 +406,10 @@ export default function CapabilitiesPage() {
           <dl className="mt-[var(--space-8)] grid gap-x-[var(--space-8)] gap-y-[var(--space-5)] sm:grid-cols-2">
             {PROSE_TELLS.map(({ tell, fix }) => (
               <div key={tell} className="border-t border-[var(--border)] pt-[var(--space-3)]">
-                <dt className="font-mono text-[13pt] leading-[var(--lh-body)] text-[var(--text-subtle)]">
+                <dt className="font-mono text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-subtle)]">
                   <s className="decoration-[var(--border-strong)]">{tell}</s>
                 </dt>
-                <dd className="mt-[var(--space-1)] font-mono text-[13pt] leading-[var(--lh-body)] text-[var(--text-2)]">
+                <dd className="mt-[var(--space-1)] font-mono text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-2)]">
                   <span aria-hidden="true" className="text-[var(--text-subtle)]">&rarr;{' '}</span>
                   {fix}
                 </dd>
@@ -447,7 +447,7 @@ export default function CapabilitiesPage() {
 
           <ol
             role="list"
-            className="mt-[var(--space-8)] grid list-none gap-[var(--space-4)] font-mono text-[13pt] leading-[var(--lh-body)]"
+            className="mt-[var(--space-8)] grid list-none gap-[var(--space-4)] font-mono text-[length:var(--text-md)] leading-[var(--lh-body)]"
           >
             {QUERY_PROGRESSION.map((query, i) => (
               <li key={query} className="flex gap-[var(--space-4)]">
@@ -468,10 +468,10 @@ export default function CapabilitiesPage() {
           <dl className="mt-[var(--space-8)] grid gap-x-[var(--space-8)] gap-y-[var(--space-4)] sm:grid-cols-2">
             {RESEARCH_ACTIONS.map(({ name, desc }) => (
               <div key={name} className="border-t border-[var(--border)] pt-[var(--space-3)]">
-                <dt className="font-sans text-[13pt] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
+                <dt className="font-sans text-[length:var(--text-md)] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
                   {name}
                 </dt>
-                <dd className="mt-[var(--space-1)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+                <dd className="mt-[var(--space-1)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
                   {desc}
                 </dd>
               </div>
@@ -494,10 +494,10 @@ export default function CapabilitiesPage() {
           <dl className="mt-[var(--space-10)] grid gap-x-[var(--space-8)] gap-y-[var(--space-5)] sm:grid-cols-2">
             {METHODS.map(({ name, desc }) => (
               <div key={name}>
-                <dt className="font-sans text-[13pt] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
+                <dt className="font-sans text-[length:var(--text-md)] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
                   {name}
                 </dt>
-                <dd className="mt-[var(--space-1)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+                <dd className="mt-[var(--space-1)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
                   {desc}
                 </dd>
               </div>
@@ -526,13 +526,13 @@ export default function CapabilitiesPage() {
               <div className="mt-[var(--space-10)] flex flex-wrap items-center gap-[var(--space-4)]">
                 <Link
                   href="/chat"
-                  className="btn-lift flex min-h-[var(--space-12)] items-center rounded-[var(--radius)] bg-[var(--accent)] px-[var(--space-8)] font-sans text-[13pt] font-semibold leading-[var(--lh-ui)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)]"
+                  className="btn-lift flex min-h-[var(--space-12)] items-center rounded-[var(--radius)] bg-[var(--accent)] px-[var(--space-8)] font-sans text-[length:var(--text-md)] font-semibold leading-[var(--lh-ui)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)]"
                 >
                   Ask a question
                 </Link>
                 <Link
                   href="/how-it-works"
-                  className="link-smooth flex min-h-[var(--space-12)] items-center font-sans text-[13pt] font-medium leading-[var(--lh-ui)] text-[var(--text-2)] underline decoration-[var(--border-strong)] underline-offset-4 hover:text-[var(--text)]"
+                  className="link-smooth flex min-h-[var(--space-12)] items-center font-sans text-[length:var(--text-md)] font-medium leading-[var(--lh-ui)] text-[var(--text-2)] underline decoration-[var(--border-strong)] underline-offset-4 hover:text-[var(--text)]"
                 >
                   Read a complete run
                 </Link>

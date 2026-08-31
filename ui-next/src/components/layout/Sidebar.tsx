@@ -68,9 +68,9 @@ function MemoryStatus() {
      to a red/green-blind user and to a monochrome print. */
   const { StatusIcon, statusTone, statusLabel } =
     status === 'ok'
-      ? { StatusIcon: CheckCircle2, statusTone: 'text-[var(--ok)]', statusLabel: 'Memory healthy' }
+      ? { StatusIcon: CheckCircle2, statusTone: 'text-[var(--text)]', statusLabel: 'Memory healthy' }
       : status === 'degraded'
-      ? { StatusIcon: AlertTriangle, statusTone: 'text-[var(--warn)]', statusLabel: 'Memory degraded' }
+      ? { StatusIcon: AlertTriangle, statusTone: 'text-[var(--text-muted)]', statusLabel: 'Memory degraded' }
       : status === 'loading'
       ? { StatusIcon: Loader2, statusTone: 'text-[var(--text-subtle)]', statusLabel: 'Checking memory…' }
       : { StatusIcon: HelpCircle, statusTone: 'text-[var(--red)]', statusLabel: 'Memory unavailable' };

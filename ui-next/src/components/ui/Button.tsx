@@ -9,7 +9,7 @@ import { Spinner } from './Spinner';
 const buttonVariants = {
   primary:
     'bg-[var(--accent)] text-[var(--accent-text)] ' +
-    'hover:bg-[var(--accent-hover)] hover:shadow-[var(--accent-glow)] hover:-translate-y-px ' +
+    'hover:bg-[var(--accent-hover)] hover:-translate-y-px ' +
     'active:translate-y-0 active:shadow-none',
 
   secondary:
@@ -38,9 +38,9 @@ const buttonVariants = {
 } as const;
 
 const buttonSizes = {
-  sm: 'h-8 px-2.5 gap-1 text-xs',
-  md: 'h-10 px-4 gap-1.5 text-sm',
-  lg: 'h-12 px-6 gap-2 text-base',
+  sm: 'h-8 px-2.5 gap-1 text-[length:var(--text-xs)]',
+  md: 'h-10 px-4 gap-1.5 text-[length:var(--text-sm)]',
+  lg: 'h-12 px-6 gap-2 text-[length:var(--text-base)]',
 } as const;
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -89,7 +89,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           // Typography
           'font-medium',
           // Transition
-          'transition-all duration-200 ease-out',
+          'transition-all duration-[var(--dur-micro)] ease-out',
           'active:scale-[0.97] active:duration-100',
           // Focus is not styled here. globals.css already gives every button an
           // accent outline with a transparent 2px offset, which reads correctly

@@ -8,7 +8,10 @@ in core/ports/:
   - InMemoryStateAdapter    → DistributedStatePort (fallback)
 """
 
-from reasoner.infrastructure.valkey.cache_adapter import ValkeyCacheAdapter
+from reasoner.infrastructure.valkey.cache_adapter import (
+    ValkeyCacheAdapter,
+    inject_shared_cache_port,
+)
 from reasoner.infrastructure.valkey.client import (
     close_valkey_pool,
     get_valkey_pool,

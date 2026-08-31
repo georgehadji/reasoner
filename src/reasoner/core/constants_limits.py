@@ -14,16 +14,16 @@ from typing import Literal
 from reasoner.core.constants_models import (
     MODEL_FLUX_2_KLEIN_4B,
     MODEL_GEMINI_31_FLASH_IMAGE_PREVIEW,
-    MODEL_GEMINI_FLASH,
     MODEL_GEMINI_FLASH_IMAGE,
-    MODEL_GEMINI_FLASH_LITE,
     MODEL_GEMINI_PRO_IMAGE,
     MODEL_GPT5_IMAGE,
     MODEL_GPT5_IMAGE_MINI,
+    MODEL_GROK_43,
     MODEL_GROK_IMAGINE,
     MODEL_GROK_IMAGINE_IMAGE_2,
     MODEL_MAI_IMAGE_25,
     MODEL_MAI_IMAGE_25_PRO,
+    MODEL_QWEN35_FLASH,
     MODEL_RECRAFT_V41,
     MODEL_RECRAFT_V41_PRO,
     MODEL_RIVERFLOW_V25_FAST,
@@ -69,7 +69,7 @@ GATE_MAX_TOKENS: int = 256
 GATE_TEMPERATURE: float = 0.0
 GATE_TIMEOUT_SECONDS: float = 5.0
 GATE_CONFIDENCE_THRESHOLD: float = 0.70
-GATE_DEFAULT_MODEL: str = MODEL_GEMINI_FLASH  # non-OpenAI model that supports temperature=0
+GATE_DEFAULT_MODEL: str = MODEL_GROK_43  # non-OpenAI model that supports temperature=0
 
 # ═════════════════════════════════════════════════════════════════════
 # HYPERGATE AGENT (sub-agent orchestrator replacing GateAgent)
@@ -79,8 +79,32 @@ HYPERGATE_DIRECT_THRESHOLD: float = 0.80   # DirectDetector confidence floor
 HYPERGATE_WEB_THRESHOLD: float = 0.65      # WebDetector confidence floor
 HYPERGATE_METHOD_THRESHOLD: float = 0.70   # MethodClassifier confidence floor
 HYPERGATE_AMBIGUOUS_FLOOR: float = 0.45    # Below this on all agents → hard fallback
-HYPERGATE_TIMEOUT_SECONDS: float = 6.0     # Per-sub-agent call timeout
-HYPERGATE_CACHE_SIZE: int = 512            # LRU size (per sub-agent + top-level)
+# Per PROVIDER ATTEMPT, not per role. complete_with_retry (infrastructure/
+# llm/base.py) retries up to max_retries=2 more times on top of this -- three
+# attempts total -- with exponential backoff between them, so one role can
+# legitimately cost up to 3x this value plus backoff before its fallback is
+# even tried. The old name (HYPERGATE_TIMEOUT_SECONDS) and comment
+# ("Per-sub-agent call timeout") both implied a role-level ceiling that does
+# not exist.
+HYPERGATE_ATTEMPT_TIMEOUT_SECONDS: float = 6.0
+# Ceiling on the WHOLE gate decision (all sub-agents, TieBreaker if it fires),
+# enforced in gate_service.decide_route via asyncio.wait_for. Interim value --
+# measured 2026-08-29 at 5.86s mean for the sub-agent role under 5-way
+# concurrency on one endpoint (contention, not model speed; see
+# docs/plans/gate-and-registry-remediation.md W4), against 1.9s measured for
+# the same model probed alone. 12s covers that mean plus one retry-and-backoff
+# cycle without approving an effectively-unbounded wait. Revisit downward once
+# W4 spreads the sub-agents across roles/vendors and cuts the contention that
+# makes 5.86s the mean today.
+HYPERGATE_TOTAL_BUDGET_SECONDS: float = 12.0
+HYPERGATE_CACHE_SIZE: int = 512            # LRU size (per sub-agent, in BaseSubAgent)
+# Shared L2 cache for the whole gate decision, in gate_service.run_gate_cached.
+# core/ports/shared_cache_port.py's docstring already named the "HyperGate L2
+# decision cache" as a consumer; W5 is where that became true. Before it, this
+# TTL was unused and HyperGateAgent's own _get_l2_cache/_set_l2_cache were
+# literally `return None` / `pass` while two documents claimed a working cache.
+# Set HYPERGATE_CACHE_ENABLED=False to bypass the lookup without a deploy.
+HYPERGATE_CACHE_ENABLED: bool = True
 HYPERGATE_CACHE_TTL_SECONDS: int = 3600  # 1-hour TTL for top-level routing decisions
 HYPERGATE_MAX_TOKENS_LANGUAGE: int = 80
 HYPERGATE_MAX_TOKENS_COMPLEXITY: int = 80
@@ -242,9 +266,9 @@ def get_phase_retry_budget(phase_name: str) -> int:
 # ═════════════════════════════════════════════════════════════════════
 
 QUALITY_JUDGE_MODELS: dict[str, str] = {
-    "budget":  MODEL_GEMINI_FLASH_LITE,
-    "premium": MODEL_GEMINI_FLASH,
-    "default": MODEL_GEMINI_FLASH_LITE,
+    "budget":  MODEL_QWEN35_FLASH,
+    "premium": MODEL_GROK_43,
+    "default": MODEL_QWEN35_FLASH,
 }
 
 QUALITY_JUDGE_THRESHOLDS: dict[str, float] = {
@@ -495,7 +519,7 @@ IMAGE_GEN_REMOTE_TIMEOUT_SECONDS: float = 20.0
 IMAGE_GEN_COMPLETION_TIMEOUT_SECONDS: float = 90.0
 IMAGE_GEN_PROMPT_MAX_TOKENS: int = 512
 IMAGE_GEN_PROMPT_TEMPERATURE: float = 0.7
-IMAGE_GEN_ENHANCEMENT_MODEL: str = MODEL_GEMINI_FLASH
+IMAGE_GEN_ENHANCEMENT_MODEL: str = MODEL_GROK_43
 # Every tier returns this many images; each preset below carries exactly this
 # many primaries so one model failure degrades into a fallback, not a short run.
 IMAGE_GEN_IMAGE_COUNT: int = 4

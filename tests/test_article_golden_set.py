@@ -55,7 +55,6 @@ class ArticleTestCase:
     language: str
     expect_deep_question: bool = False
     expect_article_request: bool = True
-    style_brief: dict | None = None
     expected_language: str = "English"
     tags: tuple[str, ...] = ()
 
@@ -173,24 +172,6 @@ GOLDEN_SET: tuple[ArticleTestCase, ...] = (
         language="Greek",
         expected_language="Greek",
         tags=("greek", "technology", "economy"),
-    ),
-
-    # ── Articles with style briefs ──────────────────────────────────
-    ArticleTestCase(
-        id="styled_newyorker",
-        problem="Write an article about the decline of local news in rural America",
-        content_class="blog",
-        language="English",
-        style_brief={"author": "Jane Doe", "publication": "The New Yorker"},
-        tags=("style", "media", "society"),
-    ),
-    ArticleTestCase(
-        id="styled_financial",
-        problem="Draft an article analyzing the investment implications of deglobalization for emerging markets",
-        content_class="policy_brief",
-        language="English",
-        style_brief={"publication": "Financial Times"},
-        tags=("style", "finance", "economics"),
     ),
 
     # ── Deep / philosophical questions ──────────────────────────────
@@ -325,8 +306,6 @@ def _build_state(tc: ArticleTestCase) -> PipelineState:
         "audit_score": 0.8,
         "passes_audit": True,
     }
-    if tc.style_brief:
-        ws["style_brief"] = tc.style_brief
     return state
 
 
@@ -464,17 +443,6 @@ class TestGoldenSetInvariants:
                     f"{tc.id}: XSS pattern '{pat}' found in prompt"
                 )
 
-    @pytest.mark.parametrize("tc", GOLDEN_SET, ids=lambda tc: tc.id)
-    def test_style_brief_integration(self, tc: ArticleTestCase):
-        """When style_brief has author/publication, the draft prompt includes a
-        STYLE REQUIREMENT block."""
-        state = _build_state(tc)
-        if tc.style_brief and tc.style_brief.get("author", tc.style_brief.get("publication")):
-            prompt = article_prompts.article_draft_prompt(state)
-            assert "STYLE REQUIREMENT" in prompt, (
-                f"{tc.id}: style_brief set but not reflected in draft prompt"
-            )
-
     def test_article_constants_are_sane(self):
         """Article-specific constants must have reasonable values."""
         assert ARTICLE_MIN_SOURCE_COUNT >= 3, "Too few minimum sources"
@@ -610,7 +578,6 @@ def capture_baseline() -> dict[str, Any]:
             "language": tc.language,
             "expected_language": tc.expected_language,
             "expect_deep_question": tc.expect_deep_question,
-            "has_style_brief": tc.style_brief is not None,
             "prompt_lengths": prompt_lengths,
         }
 

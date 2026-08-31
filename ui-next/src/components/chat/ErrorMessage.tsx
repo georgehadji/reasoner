@@ -88,15 +88,16 @@ export function ErrorMessage({ content, errorType, retryable, onRetry, onEditRet
       role={isWarning ? 'status' : 'alert'}
       className={`max-w-[min(100%,var(--measure))] rounded-[var(--radius)] border px-[var(--space-4)] py-[var(--space-3)] font-sans text-[length:var(--text-base)] ${
         isWarning
-          ? 'border-[color-mix(in_oklab,var(--warn)_30%,transparent)] bg-[color-mix(in_oklab,var(--warn)_10%,transparent)] text-[var(--text)]'
+          ? 'border-[var(--border-strong)] bg-[var(--surface-2)] text-[var(--text)]'
           : 'border-[var(--red-border)] bg-[var(--red-bg)] text-[var(--red)]'
       }`}
     >
       <div className="flex items-start gap-[var(--space-2)]">
-        {/* Severity is carried by the glyph as well as the hue — the shape
-            survives monochrome and every form of colour blindness. */}
+        {/* Severity is carried by the glyph, the role, and (for a real error)
+            --red — --warn is reserved for epistemic labels now, so a warning
+            reads as plain ink with a heavier border instead of a hue. */}
         {isWarning ? (
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--warn)]" aria-hidden="true" />
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--text)]" aria-hidden="true" />
         ) : (
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--red)]" aria-hidden="true" />
         )}
@@ -120,7 +121,7 @@ export function ErrorMessage({ content, errorType, retryable, onRetry, onEditRet
             >
               {copied ? (
                 <>
-                  <Check className="h-3.5 w-3.5 text-[var(--ok)]" aria-hidden="true" /> Copied
+                  <Check className="h-3.5 w-3.5 text-[var(--text)]" aria-hidden="true" /> Copied
                 </>
               ) : (
                 <>

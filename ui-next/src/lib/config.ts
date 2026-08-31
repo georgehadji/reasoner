@@ -285,14 +285,15 @@ export const STORAGE_KEYS = {
 
 /** Typography sizes per DESIGN.md hierarchy. */
 export const TEXT_SIZES = {
-  /** DESIGN.md Tiny (10px) — badges, fine print, source numbers. */
-  tiny: 'text-[10px]',
+  /** DESIGN.md Tiny — badges, fine print, source numbers. 11px, not 10:
+      the token floor is set at the smallest size that stays readable. */
+  tiny: 'text-[length:var(--text-2xs)]',
   /** Synthesis / final output — maps to DESIGN.md Body (~18px). */
-  synthesis: 'text-[17px] leading-relaxed',
+  synthesis: 'text-[length:var(--text-md)] leading-relaxed',
   /** Intermediate phase cards — maps to DESIGN.md Nav/UI (15px). */
-  phaseCard: 'text-[15px] leading-relaxed',
+  phaseCard: 'text-[length:var(--text-sm)] leading-relaxed',
   /** Chat feed body — maps to DESIGN.md Body (18px). */
-  body: 'text-[18px]',
+  body: 'text-[length:var(--text-md)]',
 };
 
 export const TIMING = {

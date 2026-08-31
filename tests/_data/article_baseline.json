@@ -1,11 +1,11 @@
 {
   "meta": {
     "description": "Article pipeline golden set baseline (Phase 0)",
-    "count": 21,
+    "count": 19,
     "format_version": 1,
-    "captured_at": "2026-07-18T19:23:37.879316+00:00",
+    "captured_at": "2026-08-29T13:52:36.353618+00:00",
     "preset_count": 2,
-    "pricing_db_entries": 1
+    "pricing_db_entries": 421
   },
   "entries": {
     "blog_climate": {
@@ -14,17 +14,16 @@
       "language": "English",
       "expected_language": "English",
       "expect_deep_question": false,
-      "has_style_brief": false,
       "prompt_lengths": {
         "retrieval_plan": 479,
         "draft": 1741,
         "outline": 1810,
-        "verify": 1381,
+        "verify": 1445,
         "critic": 1623,
         "dev_edit": 901,
-        "style_edit": 357,
+        "style_edit": 479,
         "copy_edit": 341,
-        "final_audit": 1026
+        "final_audit": 1395
       }
     },
     "blog_remote_work": {
@@ -33,17 +32,16 @@
       "language": "English",
       "expected_language": "English",
       "expect_deep_question": false,
-      "has_style_brief": false,
       "prompt_lengths": {
         "retrieval_plan": 462,
         "draft": 1724,
         "outline": 1793,
-        "verify": 1381,
+        "verify": 1445,
         "critic": 1623,
         "dev_edit": 901,
-        "style_edit": 357,
+        "style_edit": 479,
         "copy_edit": 341,
-        "final_audit": 1026
+        "final_audit": 1395
       }
     },
     "explainer_quantum": {
@@ -52,17 +50,16 @@
       "language": "English",
       "expected_language": "English",
       "expect_deep_question": false,
-      "has_style_brief": false,
       "prompt_lengths": {
         "retrieval_plan": 442,
         "draft": 1704,
         "outline": 1773,
-        "verify": 1381,
+        "verify": 1445,
         "critic": 1623,
         "dev_edit": 901,
-        "style_edit": 357,
+        "style_edit": 479,
         "copy_edit": 341,
-        "final_audit": 1026
+        "final_audit": 1395
       }
     },
     "explainer_immunity": {
@@ -71,17 +68,16 @@
       "language": "English",
       "expected_language": "English",
       "expect_deep_question": false,
-      "has_style_brief": false,
       "prompt_lengths": {
         "retrieval_plan": 485,
         "draft": 1747,
         "outline": 1816,
-        "verify": 1381,
+        "verify": 1445,
         "critic": 1623,
         "dev_edit": 901,
-        "style_edit": 357,
+        "style_edit": 479,
         "copy_edit": 341,
-        "final_audit": 1026
+        "final_audit": 1395
       }
     },
     "oped_ai_regulation": {
@@ -90,17 +86,16 @@
       "language": "English",
       "expected_language": "English",
       "expect_deep_question": false,
-      "has_style_brief": false,
       "prompt_lengths": {
         "retrieval_plan": 486,
         "draft": 1748,
         "outline": 1817,
-        "verify": 1381,
+        "verify": 1445,
         "critic": 1623,
         "dev_edit": 901,
-        "style_edit": 357,
+        "style_edit": 479,
         "copy_edit": 341,
-        "final_audit": 1026
+        "final_audit": 1395
       }
     },
     "oped_education": {
@@ -109,17 +104,16 @@
       "language": "English",
       "expected_language": "English",
       "expect_deep_question": false,
-      "has_style_brief": false,
       "prompt_lengths": {
         "retrieval_plan": 452,
         "draft": 1714,
         "outline": 1783,
-        "verify": 1381,
+        "verify": 1445,
         "critic": 1623,
         "dev_edit": 901,
-        "style_edit": 357,
+        "style_edit": 479,
         "copy_edit": 341,
-        "final_audit": 1026
+        "final_audit": 1395
       }
     },
     "policy_eu_data": {
@@ -128,17 +122,16 @@
       "language": "English",
       "expected_language": "English",
       "expect_deep_question": false,
-      "has_style_brief": false,
       "prompt_lengths": {
         "retrieval_plan": 483,
         "draft": 1745,
         "outline": 1814,
-        "verify": 1381,
+        "verify": 1445,
         "critic": 1623,
         "dev_edit": 901,
-        "style_edit": 357,
+        "style_edit": 479,
         "copy_edit": 341,
-        "final_audit": 1026
+        "final_audit": 1395
       }
     },
     "policy_energy": {
@@ -147,17 +140,16 @@
       "language": "English",
       "expected_language": "English",
       "expect_deep_question": false,
-      "has_style_brief": false,
       "prompt_lengths": {
         "retrieval_plan": 491,
         "draft": 1753,
         "outline": 1822,
-        "verify": 1381,
+        "verify": 1445,
         "critic": 1623,
         "dev_edit": 901,
-        "style_edit": 357,
+        "style_edit": 479,
         "copy_edit": 341,
-        "final_audit": 1026
+        "final_audit": 1395
       }
     },
     "news_semiconductor": {
@@ -166,17 +158,16 @@
       "language": "English",
       "expected_language": "English",
       "expect_deep_question": false,
-      "has_style_brief": false,
       "prompt_lengths": {
         "retrieval_plan": 495,
         "draft": 1757,
         "outline": 1826,
-        "verify": 1381,
+        "verify": 1445,
         "critic": 1623,
         "dev_edit": 901,
-        "style_edit": 357,
+        "style_edit": 479,
         "copy_edit": 341,
-        "final_audit": 1026
+        "final_audit": 1395
       }
     },
     "news_cyber": {
@@ -185,17 +176,16 @@
       "language": "English",
       "expected_language": "English",
       "expect_deep_question": false,
-      "has_style_brief": false,
       "prompt_lengths": {
         "retrieval_plan": 502,
         "draft": 1764,
         "outline": 1833,
-        "verify": 1381,
+        "verify": 1445,
         "critic": 1623,
         "dev_edit": 901,
-        "style_edit": 357,
+        "style_edit": 479,
         "copy_edit": 341,
-        "final_audit": 1026
+        "final_audit": 1395
       }
     },
     "technical_llm": {
@@ -204,17 +194,16 @@
       "language": "English",
       "expected_language": "English",
       "expect_deep_question": false,
-      "has_style_brief": false,
       "prompt_lengths": {
         "retrieval_plan": 486,
         "draft": 1748,
         "outline": 1817,
-        "verify": 1381,
+        "verify": 1445,
         "critic": 1623,
         "dev_edit": 901,
-        "style_edit": 357,
+        "style_edit": 479,
         "copy_edit": 341,
-        "final_audit": 1026
+        "final_audit": 1395
       }
     },
     "technical_rust": {
@@ -223,17 +212,16 @@
       "language": "English",
       "expected_language": "English",
       "expect_deep_question": false,
-      "has_style_brief": false,
       "prompt_lengths": {
         "retrieval_plan": 479,
         "draft": 1741,
         "outline": 1810,
-        "verify": 1381,
+        "verify": 1445,
         "critic": 1623,
         "dev_edit": 901,
-        "style_edit": 357,
+        "style_edit": 479,
         "copy_edit": 341,
-        "final_audit": 1026
+        "final_audit": 1395
       }
     },
     "greek_geopolitics": {
@@ -242,17 +230,16 @@
       "language": "Greek",
       "expected_language": "Greek",
       "expect_deep_question": false,
-      "has_style_brief": false,
       "prompt_lengths": {
         "retrieval_plan": 487,
         "draft": 1749,
         "outline": 1818,
-        "verify": 1384,
+        "verify": 1448,
         "critic": 1626,
         "dev_edit": 904,
-        "style_edit": 360,
+        "style_edit": 482,
         "copy_edit": 344,
-        "final_audit": 1029
+        "final_audit": 1398
       }
     },
     "greek_technology": {
@@ -261,55 +248,16 @@
       "language": "Greek",
       "expected_language": "Greek",
       "expect_deep_question": false,
-      "has_style_brief": false,
       "prompt_lengths": {
         "retrieval_plan": 468,
         "draft": 1730,
         "outline": 1799,
-        "verify": 1384,
+        "verify": 1448,
         "critic": 1626,
         "dev_edit": 904,
-        "style_edit": 360,
+        "style_edit": 482,
         "copy_edit": 344,
-        "final_audit": 1029
-      }
-    },
-    "styled_newyorker": {
-      "problem": "Write an article about the decline of local news in rural America",
-      "content_class": "blog",
-      "language": "English",
-      "expected_language": "English",
-      "expect_deep_question": false,
-      "has_style_brief": true,
-      "prompt_lengths": {
-        "retrieval_plan": 442,
-        "draft": 1939,
-        "outline": 1809,
-        "verify": 1381,
-        "critic": 1623,
-        "dev_edit": 901,
-        "style_edit": 492,
-        "copy_edit": 341,
-        "final_audit": 1026
-      }
-    },
-    "styled_financial": {
-      "problem": "Draft an article analyzing the investment implications of deglobalization for emerging markets",
-      "content_class": "policy_brief",
-      "language": "English",
-      "expected_language": "English",
-      "expect_deep_question": false,
-      "has_style_brief": true,
-      "prompt_lengths": {
-        "retrieval_plan": 471,
-        "draft": 1943,
-        "outline": 1839,
-        "verify": 1381,
-        "critic": 1623,
-        "dev_edit": 901,
-        "style_edit": 493,
-        "copy_edit": 341,
-        "final_audit": 1026
+        "final_audit": 1398
       }
     },
     "deep_consciousness": {
@@ -318,17 +266,16 @@
       "language": "English",
       "expected_language": "English",
       "expect_deep_question": true,
-      "has_style_brief": false,
       "prompt_lengths": {
         "retrieval_plan": 477,
         "draft": 1739,
         "outline": 1808,
-        "verify": 1381,
+        "verify": 1445,
         "critic": 1623,
         "dev_edit": 901,
-        "style_edit": 357,
+        "style_edit": 479,
         "copy_edit": 341,
-        "final_audit": 1026
+        "final_audit": 1395
       }
     },
     "deep_free_will": {
@@ -337,17 +284,16 @@
       "language": "English",
       "expected_language": "English",
       "expect_deep_question": true,
-      "has_style_brief": false,
       "prompt_lengths": {
         "retrieval_plan": 460,
         "draft": 1722,
         "outline": 1791,
-        "verify": 1381,
+        "verify": 1445,
         "critic": 1623,
         "dev_edit": 901,
-        "style_edit": 357,
+        "style_edit": 479,
         "copy_edit": 341,
-        "final_audit": 1026
+        "final_audit": 1395
       }
     },
     "deep_greek_techne": {
@@ -356,17 +302,16 @@
       "language": "Greek",
       "expected_language": "Greek",
       "expect_deep_question": true,
-      "has_style_brief": false,
       "prompt_lengths": {
         "retrieval_plan": 496,
         "draft": 1758,
         "outline": 1827,
-        "verify": 1384,
+        "verify": 1448,
         "critic": 1626,
         "dev_edit": 904,
-        "style_edit": 360,
+        "style_edit": 482,
         "copy_edit": 344,
-        "final_audit": 1029
+        "final_audit": 1398
       }
     },
     "short_book_review": {
@@ -375,17 +320,16 @@
       "language": "English",
       "expected_language": "English",
       "expect_deep_question": false,
-      "has_style_brief": false,
       "prompt_lengths": {
         "retrieval_plan": 485,
         "draft": 1747,
         "outline": 1816,
-        "verify": 1381,
+        "verify": 1445,
         "critic": 1623,
         "dev_edit": 901,
-        "style_edit": 357,
+        "style_edit": 479,
         "copy_edit": 341,
-        "final_audit": 1026
+        "final_audit": 1395
       }
     },
     "factual_space": {
@@ -394,17 +338,16 @@
       "language": "English",
       "expected_language": "English",
       "expect_deep_question": false,
-      "has_style_brief": false,
       "prompt_lengths": {
         "retrieval_plan": 493,
         "draft": 1755,
         "outline": 1824,
-        "verify": 1381,
+        "verify": 1445,
         "critic": 1623,
         "dev_edit": 901,
-        "style_edit": 357,
+        "style_edit": 479,
         "copy_edit": 341,
-        "final_audit": 1026
+        "final_audit": 1395
       }
     }
   },

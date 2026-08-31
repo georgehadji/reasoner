@@ -3,10 +3,9 @@
 import { useCallback, useState } from 'react';
 import Link from 'next/link';
 import { apiFetch } from '@/lib/api-client';
-import { Check, X, Shield, CreditCard, Clock, Mail } from 'lucide-react';
+import { Check, X, CreditCard, Mail } from 'lucide-react';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
-import { SpotlightCard } from '@/components/ui/SpotlightCard';
 
 // Two self-serve plans. Enterprise stays a real, billable tier in the
 // backend (SubscriptionTier.ENTERPRISE, Stripe/PayPal price IDs, spend
@@ -111,14 +110,31 @@ export default function PricingPage() {
   return (
     <div className="flex min-h-screen flex-col bg-[var(--bg)] text-[var(--text)]">
       <SiteHeader />
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-12">
-        <div className="mb-10 text-center">
-          <h1 className="text-3xl font-bold text-[var(--text)]">Simple, Transparent Pricing</h1>
-          <p className="mt-2 text-[var(--text-muted)]">Start free. Scale with confidence. No hidden fees.</p>
-        </div>
+      <main className="flex-1">
+        {/* ── Masthead ───────────────────────────────────────────
+            Same marginal-marker idiom as /about and /capabilities: a
+            left-aligned label column, not a centred hero. */}
+        <header className="mx-auto w-full max-w-[var(--width-wide)] px-[var(--gutter)] pb-[var(--section-y)] pt-[var(--space-48)]">
+          <div className="grid gap-[var(--space-6)] lg:grid-cols-[9rem_minmax(0,1fr)] lg:gap-[var(--space-12)]">
+            <div>
+              <p className="mt-[var(--space-1)] font-sans text-[length:var(--text-2xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
+                Pricing
+              </p>
+            </div>
+            <div className="min-w-0">
+              <h1 className="max-w-[20ch] text-balance font-serif text-[length:var(--text-4xl)] font-normal leading-[var(--lh-display)] sm:text-[length:var(--text-6xl)] tracking-[var(--tracking-tight)] text-[var(--text)]">
+                Simple, transparent pricing.
+              </h1>
+              <p className="prose-measure mt-[var(--space-6)] text-[length:var(--text-2xl)] leading-[var(--lh-body)] text-[var(--text-2)]">
+                Start free. Scale with confidence. No hidden fees.
+              </p>
+            </div>
+          </div>
+        </header>
 
+        <div className="mx-auto w-full max-w-[var(--width-wide)] px-[var(--gutter)] pb-[var(--section-y)]">
         {error && (
-          <div className="mx-auto mb-6 max-w-lg rounded-[var(--radius)] bg-[var(--red-bg)] p-3 text-sm text-[var(--red)]" role="alert">
+          <div className="mx-auto mb-6 max-w-lg rounded-[var(--radius)] bg-[var(--red-bg)] p-3 text-[length:var(--text-sm)] text-[var(--red)]" role="alert">
             <div className="flex items-center gap-2">
               <X className="h-4 w-4 shrink-0" />
               {error}
@@ -128,34 +144,34 @@ export default function PricingPage() {
 
         <div className="mx-auto grid max-w-3xl grid-cols-1 gap-6 sm:grid-cols-2">
           {plans.map((plan) => (
-            /* SpotlightCard renders the accent wash and nothing else — the
-               border, ring, shadow and padding stay here, so the highlighted
-               tier keeps reading as the recommended one whether or not a
-               pointer is anywhere near it. */
-            <SpotlightCard
+            /* Elevation is a tone, not a shadow: --surface lifts 1.12:1 off
+               --bg, which is 3x the old step. The recommended tier is marked
+               by ground and border weight alone — no ring, no shadow, and no
+               cursor-following wash. */
+            <div
               key={plan.name}
-              className={`flex flex-col rounded-[var(--radius-lg)] border bg-[var(--surface)] p-6 transition-all ${
+              className={`relative flex flex-col rounded-[var(--radius-lg)] border p-6 ${
                 plan.highlighted
-                  ? 'border-[var(--border-strong)] shadow-[var(--shadow-lg)] ring-1 ring-[color-mix(in_oklab,var(--accent)_20%,transparent)]'
-                  : 'border-[var(--border)] hover:shadow-[var(--shadow-lg)]'
+                  ? 'border-[var(--border-strong)] bg-[var(--surface)]'
+                  : 'border-[var(--border)] bg-[var(--surface-2)]'
               }`}
             >
               {plan.highlighted && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-[var(--accent)] px-3 py-0.5 text-xs font-semibold text-[var(--accent-text)]">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-[var(--accent)] px-3 py-0.5 text-[length:var(--text-xs)] font-semibold text-[var(--accent-text)]">
                   Recommended
                 </div>
               )}
 
               <div className="mb-4">
-                <h2 className="text-lg font-semibold text-[var(--text)]">{plan.name}</h2>
+                <h2 className="text-[length:var(--text-lg)] font-semibold text-[var(--text)]">{plan.name}</h2>
                 <div className="mt-2 flex items-baseline gap-1">
-                  <span className="text-4xl font-bold text-[var(--text)]">{plan.price}</span>
-                  <span className="text-sm text-[var(--text-muted)]">{plan.period}</span>
+                  <span className="text-[length:var(--text-4xl)] font-bold text-[var(--text)]">{plan.price}</span>
+                  <span className="text-[length:var(--text-sm)] text-[var(--text-muted)]">{plan.period}</span>
                 </div>
-                <p className="mt-1 text-sm text-[var(--text-muted)]">{plan.queries}</p>
+                <p className="mt-1 text-[length:var(--text-sm)] text-[var(--text-muted)]">{plan.queries}</p>
               </div>
 
-              <ul className="mb-4 flex-1 space-y-2.5 text-left text-sm text-[var(--text-2)]">
+              <ul className="mb-4 flex-1 space-y-2.5 text-left text-[length:var(--text-sm)] text-[var(--text-2)]">
                 {plan.features.map((f) => (
                   <li key={f} className="flex items-start gap-2.5">
                     <Check className="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent)]" />
@@ -216,7 +232,7 @@ export default function PricingPage() {
                       </button>
                       <button
                         onClick={() => setSelectedTier(null)}
-                        className="w-full py-1 text-xs text-[var(--text-muted)] hover:text-[var(--text)]"
+                        className="w-full py-1 text-[length:var(--text-xs)] text-[var(--text-muted)] hover:text-[var(--text)]"
                       >
                         Cancel
                       </button>
@@ -244,13 +260,13 @@ export default function PricingPage() {
                   Current Plan
                 </button>
               )}
-            </SpotlightCard>
+            </div>
           ))}
         </div>
 
         {/* Enterprise — custom terms, not a fixed self-serve price */}
         <div className="mx-auto mt-8 max-w-3xl rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)] px-6 py-4 text-center">
-          <p className="text-sm text-[var(--text)]">
+          <p className="text-[length:var(--text-sm)] text-[var(--text)]">
             <span className="font-semibold">Need more than Pro?</span>{' '}
             <span className="text-[var(--text-muted)]">
               Custom model integrations, self-hosted deployment, SLAs, and volume pricing.
@@ -258,27 +274,12 @@ export default function PricingPage() {
           </p>
           <Link
             href="/contact?topic=enterprise"
-            className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--accent)] hover:underline"
+            className="mt-2 inline-flex items-center gap-1.5 text-[length:var(--text-sm)] font-medium text-[var(--accent)] hover:underline"
           >
             <Mail className="h-4 w-4" />
             Contact us for Enterprise
           </Link>
         </div>
-
-        {/* Trust badges */}
-        <div className="mt-12 flex flex-wrap items-center justify-center gap-6 text-xs text-[var(--text-subtle)]">
-          <div className="flex items-center gap-1.5">
-            <Shield className="h-4 w-4" />
-            <span>Secure checkout (Stripe &amp; PayPal)</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <CreditCard className="h-4 w-4" />
-            <span>Cancel anytime</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Clock className="h-4 w-4" />
-            <span>14-day money-back guarantee</span>
-          </div>
         </div>
       </main>
       <SiteFooter />

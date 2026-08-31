@@ -140,7 +140,7 @@ async def _auto_select_models(
         from reasoner.infrastructure.llm.registry import build_provider
         from reasoner.infrastructure.llm.router import ProviderRouter
 
-        sub_router = ProviderRouter(primary=build_provider("gemini-flash-lite"), verbose=False)
+        sub_router = ProviderRouter(primary=build_provider("qwen3.5-flash"), verbose=False)
         out = await ImageModelSelector().execute(
             SubAgentInput(problem=body.prompt, agent_name="image_model"), sub_router
         )

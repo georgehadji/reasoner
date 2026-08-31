@@ -63,9 +63,9 @@ export function Section({
              visible for as long as the section it names is. */
           <div className="lg:sticky lg:top-[var(--space-24)] lg:self-start">
             {marker ? (
-              <p className="nums-tabular font-mono text-[8pt] text-[var(--accent)]">{marker}</p>
+              <p className="nums-tabular font-mono text-[length:var(--text-2xs)] text-[var(--accent)]">{marker}</p>
             ) : null}
-            <p className="mt-[var(--space-1)] font-sans text-[8pt] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
+            <p className="mt-[var(--space-1)] font-sans text-[length:var(--text-2xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
               {name}
             </p>
           </div>
@@ -78,13 +78,13 @@ export function Section({
   if (tone !== 'invert') return inner;
 
   return (
-    <div className="scroll-grow invert-band bg-[var(--bg)] text-[var(--text)]">{inner}</div>
+    <div className="invert-band bg-[var(--bg)] text-[var(--text)]">{inner}</div>
   );
 }
 
 export function Heading({ children }: { children: ReactNode }) {
   return (
-    <h2 className="font-serif text-[21pt] sm:text-[34pt] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)]">
+    <h2 className="font-serif text-[length:var(--text-2xl)] sm:text-[length:var(--text-4xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)]">
       {children}
     </h2>
   );
@@ -92,7 +92,7 @@ export function Heading({ children }: { children: ReactNode }) {
 
 export function Lede({ children }: { children: ReactNode }) {
   return (
-    <p className="prose-measure mt-[var(--space-6)] font-serif text-[21pt] leading-[var(--lh-body)] text-[var(--text-2)]">
+    <p className="prose-measure mt-[var(--space-6)] text-[length:var(--text-2xl)] leading-[var(--lh-body)] text-[var(--text-2)]">
       {children}
     </p>
   );
@@ -100,7 +100,7 @@ export function Lede({ children }: { children: ReactNode }) {
 
 export function Body({ children }: { children: ReactNode }) {
   return (
-    <p className="prose-measure mt-[var(--space-4)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+    <p className="prose-measure mt-[var(--space-4)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
       {children}
     </p>
   );
@@ -111,7 +111,7 @@ export function Aside({ href, children }: { href: string; children: ReactNode })
   return (
     <Link
       href={href}
-      className="link-smooth mt-[var(--space-6)] inline-flex font-sans text-[13pt] font-semibold leading-[var(--lh-ui)] text-[var(--accent)] hover:text-[var(--accent-hover)]"
+      className="link-smooth mt-[var(--space-6)] inline-flex font-sans text-[length:var(--text-md)] font-semibold leading-[var(--lh-ui)] text-[var(--accent)] hover:text-[var(--accent-hover)]"
     >
       {children}
     </Link>

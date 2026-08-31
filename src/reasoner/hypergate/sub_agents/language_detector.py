@@ -22,6 +22,7 @@ _SYSTEM = (
 
 class LanguageDetectorSubAgent(BaseSubAgent):
     AGENT_NAME = "language_detector"
+    ROLE = "hypergate_language"
     MAX_TOKENS = HYPERGATE_MAX_TOKENS_LANGUAGE
 
     def _system_prompt(self) -> str:

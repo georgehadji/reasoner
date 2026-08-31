@@ -69,16 +69,33 @@ export default function HelpPage() {
         ])}
       />
       <SiteHeader />
-      <main id="main-content" className="mx-auto w-full max-w-4xl flex-1 px-6 py-16 pt-24">
-        <h1 className="mb-3 text-4xl font-bold tracking-tight">Help Center</h1>
-        <p className="mb-12 text-lg text-[var(--text-muted)]">
-          Guides for getting the most out of Reasoner. For the full reference, see the{' '}
-          <Link href="/docs" className="font-medium text-[var(--accent)] hover:underline">
-            documentation
-          </Link>
-          .
-        </p>
+      <main id="main-content" className="flex-1">
+        {/* ── Masthead ───────────────────────────────────────────
+            Same marginal-marker idiom as /about, /capabilities,
+            /pricing, /security and /faq. */}
+        <header className="mx-auto w-full max-w-[var(--width-content)] px-[var(--gutter)] pb-[var(--space-12)] pt-[var(--space-48)]">
+          <div className="grid gap-[var(--space-6)] lg:grid-cols-[9rem_minmax(0,1fr)] lg:gap-[var(--space-12)]">
+            <div>
+              <p className="mt-[var(--space-1)] font-sans text-[length:var(--text-xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
+                Help
+              </p>
+            </div>
+            <div className="min-w-0">
+              <h1 className="font-serif text-[length:var(--text-4xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)]">
+                Help center.
+              </h1>
+              <p className="prose-measure mt-[var(--space-6)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-2)]">
+                Guides for getting the most out of Reasoner. For the full reference, see the{' '}
+                <Link href="/docs" className="font-medium text-[var(--accent)] hover:underline">
+                  documentation
+                </Link>
+                .
+              </p>
+            </div>
+          </div>
+        </header>
 
+        <div className="mx-auto w-full max-w-[var(--width-content)] px-[var(--gutter)] pb-[var(--space-24)]">
         <div className="grid gap-6 md:grid-cols-2">
           {TOPICS.map(({ href, icon: Icon, title, body }) => (
             <Link
@@ -87,10 +104,10 @@ export default function HelpPage() {
               className="group flex flex-col rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 transition-colors hover:border-[var(--accent)]"
             >
               <Icon className="mb-4 h-8 w-8 text-[var(--accent)]" aria-hidden="true" />
-              <h2 className="mb-2 text-xl font-bold transition-colors group-hover:text-[var(--accent)]">
+              <h2 className="mb-2 text-[length:var(--text-xl)] font-bold transition-colors group-hover:text-[var(--accent)]">
                 {title}
               </h2>
-              <p className="text-sm leading-relaxed text-[var(--text-2)]">{body}</p>
+              <p className="text-[length:var(--text-sm)] leading-relaxed text-[var(--text-2)]">{body}</p>
             </Link>
           ))}
         </div>
@@ -100,7 +117,7 @@ export default function HelpPage() {
             <LifeBuoy className="mt-0.5 h-6 w-6 shrink-0 text-[var(--accent)]" aria-hidden="true" />
             <div>
               <h2 className="font-semibold">Still stuck?</h2>
-              <p className="text-sm text-[var(--text-2)]">
+              <p className="text-[length:var(--text-sm)] text-[var(--text-2)]">
                 Check{' '}
                 <Link href="/docs/troubleshooting" className="text-[var(--accent)] hover:underline">
                   troubleshooting
@@ -115,10 +132,11 @@ export default function HelpPage() {
           </div>
           <Link
             href="/contact"
-            className="inline-flex h-10 shrink-0 items-center justify-center rounded-lg bg-[var(--accent)] px-5 text-sm font-semibold text-[var(--accent-text)] transition-colors hover:bg-[var(--accent-hover)]"
+            className="inline-flex h-10 shrink-0 items-center justify-center rounded-lg bg-[var(--accent)] px-5 text-[length:var(--text-sm)] font-semibold text-[var(--accent-text)] transition-colors hover:bg-[var(--accent-hover)]"
           >
             Contact support
           </Link>
+        </div>
         </div>
       </main>
       <SiteFooter />

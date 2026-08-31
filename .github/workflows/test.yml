@@ -44,7 +44,26 @@ jobs:
           # 2237: the propagation-resistance work replaced four hand-rolled copies
           # of the web-snippet block with build_web_sources_block(), retiring two
           # long lines along with the duplication.
-          python scripts/ruff_ratchet.py --max 2237
+          # 2260: NOT a paydown of 2237 -- measured 2261 at 80e36b8 in a clean
+          # worktree, i.e. this gate was already failing by 24 before the alias
+          # rename touched anything. Commits since 2237 was set moved the count
+          # without moving MAX. The rename itself is -1 (two duplicate
+          # _MODEL_LABS keys removed, one E501 reflowed, three import blocks
+          # re-sorted after the symbol renames). Whoever finds the 23-violation
+          # drift is welcome to bisect it; this number is the honest count now.
+          # 2253: W2 (docs/plans/gate-and-registry-remediation.md) deleted the
+          # dead GateAgent class, its drifted _TAXONOMY, and the unused imports
+          # that came with it -- -7, a real paydown from removing code, not a
+          # rename.
+          # 2251: W6 deleted harness_guard.py's hand-maintained ~150-entry
+          # _MODEL_LABS dict in favour of ModelRegistryPort.vendor_of() -- -2.
+          # 2249: paying for W5. tests/architecture/test_layer_boundaries.py
+          # pins api/__init__.py at 1104 lines with the rule "do not raise a cap
+          # without shrinking the corresponding module first", so the cache-port
+          # wiring moved to infrastructure/valkey/cache_adapter.py and three dead
+          # stdlib imports (secrets, json, datetime/timezone) went with it -- -4
+          # F401 there, +2 elsewhere in the moved block.
+          python scripts/ruff_ratchet.py --max 2249
 
       - name: Security scan (bandit)
         run: |
@@ -63,7 +82,13 @@ jobs:
           # 426: restoring the stripped re-export shims (models.py, phases/_shared.py,
           # api/run_state.py, infrastructure/renderer.py) resolved the type errors
           # that the broken imports were producing.
-          python scripts/mypy_ratchet.py --max 426
+          # 423: NOT a paydown by the commit that lowered it (W4). Measured on a
+          # tree with W4's source changes stashed: also 423, and the two error
+          # sets are identical line-for-line apart from line numbers shifted by
+          # W4's added lines. Commits since 426 was set moved the count without
+          # moving MAX -- the same drift the ruff ratchet hit at 2260. This is
+          # the honest count now; whoever wants the three back can bisect them.
+          python scripts/mypy_ratchet.py --max 423
 
       - name: Run tests
         run: |

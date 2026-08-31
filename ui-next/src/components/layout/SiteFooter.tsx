@@ -35,7 +35,7 @@ export function SiteFooter() {
               <Logo showWordmark size={22} />
               <SecurityBadge />
             </div>
-            <p className="mt-4 max-w-sm text-sm leading-relaxed text-[var(--text)]">
+            <p className="mt-4 max-w-sm text-[length:var(--text-sm)] leading-relaxed text-[var(--text)]">
               Advanced Reasoning Architecture. Multi-method pipelines with verified, auditable
               outputs.
             </p>
@@ -44,7 +44,7 @@ export function SiteFooter() {
           {/* Links */}
           {Object.entries(LINKS).map(([group, items]) => (
             <div key={group}>
-              <div className="mb-4 text-xs font-semibold uppercase tracking-widest text-[var(--text)]">
+              <div className="mb-4 text-[length:var(--text-xs)] font-semibold uppercase tracking-widest text-[var(--text)]">
                 {group}
               </div>
               <ul className="flex flex-col">
@@ -67,7 +67,7 @@ export function SiteFooter() {
           ))}
         </div>
 
-        <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-[var(--border)] pt-8 text-xs text-[var(--text-2)] sm:flex-row">
+        <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-[var(--border)] pt-8 text-[length:var(--text-xs)] text-[var(--text-2)] sm:flex-row">
           <p>
             © {new Date().getFullYear()} {SITE.name}, operated by {SITE.legalName}.
           </p>

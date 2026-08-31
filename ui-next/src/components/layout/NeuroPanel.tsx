@@ -151,7 +151,7 @@ export function NeuroPanel({ conversationId, lastUserPrompt, lastAssistantRespon
         <button
           type="button"
           onClick={() => setActiveTab('search')}
-          className={`flex flex-1 items-center justify-center gap-1.5 rounded-[var(--radius)] px-2 py-1.5 text-xs font-medium transition-colors ${
+          className={`flex flex-1 items-center justify-center gap-1.5 rounded-[var(--radius)] px-2 py-1.5 text-[length:var(--text-xs)] font-medium transition-colors ${
             activeTab === 'search'
               ? 'bg-[var(--surface-2)] text-[var(--text)]'
               : 'text-[var(--text-muted)] hover:bg-[var(--surface-2)]'
@@ -163,7 +163,7 @@ export function NeuroPanel({ conversationId, lastUserPrompt, lastAssistantRespon
         <button
           type="button"
           onClick={() => setActiveTab('recent')}
-          className={`flex flex-1 items-center justify-center gap-1.5 rounded-[var(--radius)] px-2 py-1.5 text-xs font-medium transition-colors ${
+          className={`flex flex-1 items-center justify-center gap-1.5 rounded-[var(--radius)] px-2 py-1.5 text-[length:var(--text-xs)] font-medium transition-colors ${
             activeTab === 'recent'
               ? 'bg-[var(--surface-2)] text-[var(--text)]'
               : 'text-[var(--text-muted)] hover:bg-[var(--surface-2)]'
@@ -178,7 +178,7 @@ export function NeuroPanel({ conversationId, lastUserPrompt, lastAssistantRespon
         <>
           {/* Recall Section */}
           <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-1.5 text-xs font-medium text-[var(--text-muted)]">
+            <div className="flex items-center gap-1.5 text-[length:var(--text-xs)] font-medium text-[var(--text-muted)]">
               <Search className="h-3.5 w-3.5" />
               Recall Memory
             </div>
@@ -191,13 +191,13 @@ export function NeuroPanel({ conversationId, lastUserPrompt, lastAssistantRespon
                   if (e.key === 'Enter') handleRecall();
                 }}
                 placeholder="Search past reasoning..."
-                className="h-8 flex-1 rounded-md border border-[var(--border)] bg-[var(--bg)] px-2.5 text-xs text-[var(--text)] placeholder:text-[var(--text-muted)] focus:border-[var(--border-strong)] focus:outline-none"
+                className="h-8 flex-1 rounded-md border border-[var(--border)] bg-[var(--bg)] px-2.5 text-[length:var(--text-xs)] text-[var(--text)] placeholder:text-[var(--text-muted)] focus:border-[var(--border-strong)] focus:outline-none"
               />
               <button
                 type="button"
                 onClick={handleRecall}
                 disabled={recallLoading || !query.trim()}
-                className="inline-flex h-8 items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-2.5 text-xs font-medium text-[var(--text)] transition-colors hover:bg-[var(--surface-3)] disabled:opacity-50"
+                className="inline-flex h-8 items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-2.5 text-[length:var(--text-xs)] font-medium text-[var(--text)] transition-colors hover:bg-[var(--surface-3)] disabled:opacity-50"
               >
                 {recallLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
                 Recall
@@ -211,7 +211,7 @@ export function NeuroPanel({ conversationId, lastUserPrompt, lastAssistantRespon
               {recallResults.map((chunk, idx) => (
                 <div
                   key={idx}
-                  className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface-2)] p-2.5 text-xs"
+                  className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface-2)] p-2.5 text-[length:var(--text-xs)]"
                 >
                   <div className="mb-1 flex items-center gap-2">
                     <span className="rounded-[var(--radius-sm)] bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-medium text-[var(--accent-text)]">
@@ -232,12 +232,12 @@ export function NeuroPanel({ conversationId, lastUserPrompt, lastAssistantRespon
           )}
 
           {recallResults.length === 0 && !recallLoading && query && !error && (
-            <div className="text-xs text-[var(--text-muted)]">No memory chunks found.</div>
+            <div className="text-[length:var(--text-xs)] text-[var(--text-muted)]">No memory chunks found.</div>
           )}
 
           {/* Learn Section */}
           <div className="mt-1 flex flex-col gap-2">
-            <div className="flex items-center gap-1.5 text-xs font-medium text-[var(--text-muted)]">
+            <div className="flex items-center gap-1.5 text-[length:var(--text-xs)] font-medium text-[var(--text-muted)]">
               <BookOpen className="h-3.5 w-3.5" />
               Learn from Last Turn
             </div>
@@ -245,33 +245,33 @@ export function NeuroPanel({ conversationId, lastUserPrompt, lastAssistantRespon
               type="button"
               onClick={handleLearn}
               disabled={learnLoading || !canLearn}
-              className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 text-xs font-medium text-[var(--text)] transition-colors hover:bg-[var(--surface-3)] disabled:opacity-50"
+              className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 text-[length:var(--text-xs)] font-medium text-[var(--text)] transition-colors hover:bg-[var(--surface-3)] disabled:opacity-50"
             >
               {learnLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Brain className="h-3.5 w-3.5" />}
               {canLearn ? 'Learn this turn' : 'No turn to learn'}
             </button>
             {learnStatus && (
-              <div className="text-xs text-[var(--accent)]">{learnStatus}</div>
+              <div className="text-[length:var(--text-xs)] text-[var(--accent)]">{learnStatus}</div>
             )}
           </div>
         </>
       ) : (
         /* Recent tab */
         <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-1.5 text-xs font-medium text-[var(--text-muted)]">
+          <div className="flex items-center gap-1.5 text-[length:var(--text-xs)] font-medium text-[var(--text-muted)]">
             <Clock className="h-3.5 w-3.5" />
             Recent Memory
           </div>
 
           {recentEntries.length === 0 && !recentLoading && (
-            <div className="text-xs text-[var(--text-muted)]">No recent entries found.</div>
+            <div className="text-[length:var(--text-xs)] text-[var(--text-muted)]">No recent entries found.</div>
           )}
 
           <div className="flex flex-col gap-2">
             {recentEntries.map((entry, idx) => (
               <div
                 key={idx}
-                className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface-2)] p-2.5 text-xs"
+                className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface-2)] p-2.5 text-[length:var(--text-xs)]"
               >
                 <button
                   type="button"
@@ -304,7 +304,7 @@ export function NeuroPanel({ conversationId, lastUserPrompt, lastAssistantRespon
               type="button"
               onClick={() => loadRecent(recentOffset)}
               disabled={recentLoading}
-              className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 text-xs font-medium text-[var(--text)] transition-colors hover:bg-[var(--surface-3)] disabled:opacity-50"
+              className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 text-[length:var(--text-xs)] font-medium text-[var(--text)] transition-colors hover:bg-[var(--surface-3)] disabled:opacity-50"
             >
               {recentLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Load more'}
             </button>
@@ -314,7 +314,7 @@ export function NeuroPanel({ conversationId, lastUserPrompt, lastAssistantRespon
 
       {/* Error */}
       {error && (
-        <div className="rounded-[var(--radius)] border border-[var(--red-border)] bg-[var(--red-bg)] px-2.5 py-2 text-xs text-[var(--red)]">
+        <div className="rounded-[var(--radius)] border border-[var(--red-border)] bg-[var(--red-bg)] px-2.5 py-2 text-[length:var(--text-xs)] text-[var(--red)]">
           {error}
         </div>
       )}

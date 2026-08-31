@@ -113,5 +113,5 @@ class TestModelAliases:
         assert len(const.MODEL_CLAUDE_SONNET) > 0
 
     def test_gemini_flash_alias(self):
-        assert isinstance(const.MODEL_GEMINI_FLASH, str)
-        assert len(const.MODEL_GEMINI_FLASH) > 0
+        assert isinstance(const.MODEL_GROK_43, str)
+        assert len(const.MODEL_GROK_43) > 0

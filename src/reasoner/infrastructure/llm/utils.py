@@ -47,6 +47,19 @@ _JSON_MODE_DENYLIST: frozenset[str] = frozenset({
     # Long-form research calls can collapse to an empty `{}` under a
     # permissive generic schema.
     "perplexity/sonar-deep-research",
+    # Collapses to a bare scalar instead of an object -- observed
+    # "-1.0000000000000002e+308", "-1.025467398554854e+20", "-1.0". The
+    # _json_response_format docstring below already names this model for
+    # exactly this failure, but concluded that moving json_schema ->
+    # json_object had fixed it. Re-measured 2026-08-29 against a realistic
+    # decomposition prompt at max_tokens=2048: it did not. json_object still
+    # collapses; only which scalar comes back changed. With response_format
+    # omitted the same call parses fine, so the model is usable -- it is
+    # structured-output mode specifically that breaks it.
+    "qwen/qwen3.5-flash-02-23",
+    # Same class, different degenerate output: returns "" under json_object,
+    # and a clean object with it omitted.
+    "qwen/qwen3.6-flash",
 })
 
 # The OpenRouter catalogue snapshot omits response_format/structured_outputs

@@ -133,7 +133,7 @@ def test_provider_router_describe_output_format() -> None:
             "scoring": "sonar-pro",
         },
         fallback_models={
-            "synthesis": "gemini-pro",
+            "synthesis": "claude-sonnet",
         },
     )
     desc = router.describe()
@@ -141,7 +141,7 @@ def test_provider_router_describe_output_format() -> None:
     assert desc["[primary]"] == "gpt-5"
     assert "synthesis" in desc
     # Should show fallback with → notation
-    assert "gemini-pro" in desc["synthesis"]
+    assert "claude-sonnet" in desc["synthesis"]
 
 
 def test_get_returns_primary_for_unknown_role() -> None:

@@ -5,7 +5,7 @@ Rules (derived from Buyl et al., npj AI 2026):
 2. Perspective/debate generator roles span ≥2 blocs
 3. No single bloc holds >2 generator roles
 4. No two generator roles resolve to the identical underlying model
-   (catches alias collisions, e.g. "gemini-pro" and "claude-sonnet" both
+   (catches alias collisions, e.g. "claude-sonnet" and "claude-sonnet" both
    secretly routing to anthropic/claude-sonnet-5 — same model arguing
    and judging itself)
 """

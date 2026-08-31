@@ -66,7 +66,7 @@ _REWRITE_CANDIDATES: tuple[str, ...] = (
     "qwen3.8-max",       # CN / qwen
     "gpt-5.5",           # US / openai
     "kimi-k2-6",         # CN / moonshotai
-    "gemini-pro",        # US (resolves cross-vendor -- see _vendor_of)
+    "claude-sonnet",        # US (resolves cross-vendor -- see _vendor_of)
     "mistral-medium",    # EU / mistralai
 )
 

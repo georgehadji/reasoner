@@ -339,7 +339,7 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
         className={cn(
           'min-touch rounded-[var(--radius-pill)] font-semibold transition-colors duration-[var(--dur-micro)]',
           hasContent
-            ? 'cursor-pointer bg-[var(--accent)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)] hover:shadow-[var(--accent-glow)]'
+            ? 'cursor-pointer bg-[var(--accent)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)]'
             : 'cursor-not-allowed bg-[var(--surface-3)] text-[var(--text-subtle)]',
         )}
         aria-label={isImageMode ? 'Generate image' : 'Send message'}
@@ -359,7 +359,7 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
       className={cn(
         'relative rounded-[var(--radius-xl)] border bg-[var(--surface)] shadow-[var(--shadow)] transition-[border-color,box-shadow,background-color] duration-[var(--dur-state)] ease-[var(--ease-standard)]',
         isDragging
-          ? 'border-[var(--accent)] shadow-[var(--accent-glow)]'
+          ? 'border-[var(--accent)]'
           : running
             // Busy is --accent-2, not --accent: the focus ring below is
             // --accent, and when both used it the two states were

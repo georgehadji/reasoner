@@ -23,7 +23,7 @@ export function WidgetRenderer({ widget }: { widget: WidgetData }) {
   const Component = WIDGET_MAP[widget.widget_type];
   if (!Component) {
     return (
-      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3 text-sm text-[var(--text-muted)]">
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3 text-[length:var(--text-sm)] text-[var(--text-muted)]">
         Unknown widget: {widget.widget_type}
       </div>
     );

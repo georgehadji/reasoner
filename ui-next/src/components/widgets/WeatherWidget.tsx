@@ -1,6 +1,7 @@
 'use client';
 
 import { esc } from '@/lib/utils';
+import { CloudSun } from 'lucide-react';
 
 interface WeatherData {
   current: {
@@ -19,7 +20,9 @@ export function WeatherWidget({ data }: { data: WeatherData }) {
   return (
     <div className="widget weather-widget">
       <div className="widget-header">
-        <span className="widget-icon">🌤️</span>
+        <span className="widget-icon" aria-hidden="true">
+          <CloudSun className="h-4 w-4" strokeWidth={1.75} />
+        </span>
         <span className="widget-title">Weather in {esc(current.location)}</span>
       </div>
       <div className="widget-content">

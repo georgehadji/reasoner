@@ -122,7 +122,7 @@ export function CommandPalette({
   return (
     <div
       className={cn(
-        'fixed inset-0 z-[400] flex items-start justify-center p-4 pt-[20vh] transition-all duration-200',
+        'fixed inset-0 z-[400] flex items-start justify-center p-4 pt-[20vh] transition-all duration-[var(--dur-component)]',
         isOpen
           ? 'bg-[var(--scrim)] opacity-100'
           : 'bg-transparent opacity-0 pointer-events-none',
@@ -133,7 +133,7 @@ export function CommandPalette({
     >
       <div
         className={cn(
-          'w-full max-w-lg overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-lg)] transition-all duration-200',
+          'w-full max-w-lg overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-lg)] transition-all duration-[var(--dur-component)]',
           isOpen ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0',
         )}
       >
@@ -148,14 +148,14 @@ export function CommandPalette({
               setSelectedIndex(0);
             }}
             placeholder="Type a command..."
-            className="flex-1 bg-transparent text-sm text-[var(--text)] outline-none placeholder:text-[var(--text-muted)]"
+            className="flex-1 bg-transparent text-[length:var(--text-sm)] text-[var(--text)] outline-none placeholder:text-[var(--text-muted)]"
           />
-          <kbd className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 text-[10px] text-[var(--text-muted)]">ESC</kbd>
+          <kbd className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 text-[length:var(--text-2xs)] text-[var(--text-muted)]">ESC</kbd>
         </div>
 
         {recentCommands.length > 0 && !query && (
           <div className="px-2 py-2">
-            <p className="mb-1 px-2 text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)]">Recent</p>
+            <p className="mb-1 px-2 text-[length:var(--text-2xs)] font-medium uppercase tracking-wider text-[var(--text-muted)]">Recent</p>
             {recentCommands.map((id) => {
               const cmd = commands.find((c) => c.id === id);
               if (!cmd) return null;
@@ -168,7 +168,7 @@ export function CommandPalette({
                     onRecordCommand?.(cmd.id);
                     onClose();
                   }}
-                  className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm text-[var(--text)] transition-colors hover:bg-[var(--surface-2)]"
+                  className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-[length:var(--text-sm)] text-[var(--text)] transition-colors hover:bg-[var(--surface-2)]"
                 >
                   <span className="text-[var(--text-muted)]">{cmd.icon}</span>
                   <span>{cmd.label}</span>
@@ -190,7 +190,7 @@ export function CommandPalette({
               }}
               onMouseEnter={() => setSelectedIndex(idx)}
               className={cn(
-                'flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-sm transition-colors',
+                'flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-[length:var(--text-sm)] transition-colors',
                 idx === selectedIndex ? 'bg-[var(--surface-2)] text-[var(--text)]' : 'text-[var(--text)] hover:bg-[var(--surface-2)]'
               )}
             >
@@ -199,12 +199,12 @@ export function CommandPalette({
                 <span>{cmd.label}</span>
               </div>
               {cmd.shortcut && (
-                <kbd className="rounded bg-[var(--surface-3)] px-1.5 py-0.5 text-[10px] text-[var(--text-muted)]">{cmd.shortcut}</kbd>
+                <kbd className="rounded bg-[var(--surface-3)] px-1.5 py-0.5 text-[length:var(--text-2xs)] text-[var(--text-muted)]">{cmd.shortcut}</kbd>
               )}
             </button>
           ))}
           {filtered.length === 0 && (
-            <div className="px-2 py-4 text-center text-sm text-[var(--text-muted)]">No commands found</div>
+            <div className="px-2 py-4 text-center text-[length:var(--text-sm)] text-[var(--text-muted)]">No commands found</div>
           )}
         </div>
       </div>

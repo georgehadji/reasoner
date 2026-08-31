@@ -1,4 +1,4 @@
-"""Test that harness_guard lab map covers all preset-referenced models."""
+"""Test that harness_guard's registry-backed lab lookup covers all preset-referenced models."""
 import sys
 from pathlib import Path
 
@@ -6,8 +6,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 
 def test_all_preset_models_have_lab_entries():
-    """Every model alias used in any preset must have a lab entry."""
-    from reasoner.application.services.harness_guard import _MODEL_LABS
+    """Every model alias used in any preset must resolve to a lab via the registry port.
+
+    get_model_lab (application/services/harness_guard.py) used to check a
+    hand-maintained dict that mirrored the registry and drifted from it; it
+    now delegates to ModelRegistryPort.vendor_of and raises ValueError for
+    anything the registry doesn't know (W6). This test now exercises that
+    path directly instead of checking dict membership.
+    """
+    from reasoner.application.services.harness_guard import get_model_lab
     from reasoner.domain.preset_registry import _REGISTRY as PRESETS
 
     used_models: set[str] = set()
@@ -22,11 +29,17 @@ def test_all_preset_models_have_lab_entries():
             for m in chain:
                 used_models.add(m)
 
-    missing = used_models - set(_MODEL_LABS.keys())
+    missing: list[str] = []
+    for model in sorted(used_models):
+        try:
+            get_model_lab(model)
+        except ValueError:
+            missing.append(model)
+
     assert not missing, (
-        f"{len(missing)} model(s) used in presets but missing from harness_guard "
-        f"_MODEL_LABS: {sorted(missing)}. Add lab entries to "
-        f"src/reasoner/application/services/harness_guard.py"
+        f"{len(missing)} model(s) used in presets but not registered in "
+        f"infrastructure/llm/registry.py, so harness_guard.get_model_lab() "
+        f"rejects them: {missing}"
     )
 
 

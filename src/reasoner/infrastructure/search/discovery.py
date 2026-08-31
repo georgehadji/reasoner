@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 from reasoner.core.constants import (
     DEFAULT_MAX_DECOMPOSED_QUERIES,
     DEFAULT_SEARCH_RESULTS,
-    MODEL_GEMINI_FLASH,
+    MODEL_GROK_43,
     MODEL_QWEN35_9B,
     MODEL_QWEN35_FLASH,
     TRUNCATION,
@@ -144,7 +144,7 @@ class SearchClient(Protocol):
 #  Query Decomposition
 # ─────────────────────────────────────────────
 
-_DECOMPOSITION_MODELS = [MODEL_QWEN35_9B, MODEL_QWEN35_FLASH, MODEL_GEMINI_FLASH]
+_DECOMPOSITION_MODELS = [MODEL_QWEN35_9B, MODEL_QWEN35_FLASH, MODEL_GROK_43]
 
 _DECOMPOSITION_CACHE: dict[str, tuple[list[str], float]] = {}
 _DECOMPOSITION_TTL_SECONDS = 300.0

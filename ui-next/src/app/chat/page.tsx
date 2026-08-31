@@ -1126,34 +1126,38 @@ export default function ChatPage() {
             conversation, so a rule here just boxes the column in. */}
         <header className={`flex h-14 shrink-0 items-center justify-between px-4 ${collapsed ? 'sm:ml-14' : ''}`}>
           <div className="flex items-center gap-3">
-            <Tooltip text={serverOnline === true ? 'Online' : serverOnline === false ? 'Offline' : 'Checking…'}>
+            {/* --ok/--unknown are reserved for epistemic labels now. A filled
+                dot vs. a hollow ring carries "connected" vs. "undetermined"
+                by shape (fill state), the same way epistemic marks carry
+                their state by border-style — --red stays for a real fault. */}
+            <Tooltip side="bottom" text={serverOnline === true ? 'Online' : serverOnline === false ? 'Offline' : 'Checking…'}>
               <div
                 className={`h-2 w-2 rounded-full ${
                   serverOnline === true
-                    ? 'bg-[var(--ok)]'
+                    ? 'bg-[var(--text)]'
                     : serverOnline === false
                     ? 'bg-[var(--red)]'
-                    : 'bg-[var(--unknown)]'
+                    : 'border border-[var(--text-subtle)]'
                 }`}
               />
             </Tooltip>
             {wsStatus !== 'idle' && (
               <div className="flex items-center gap-1.5">
-                <Tooltip text={wsStatus === 'error' && wsLastError ? wsLastError : `WebSocket: ${wsStatus}`}>
+                <Tooltip side="bottom" text={wsStatus === 'error' && wsLastError ? wsLastError : `WebSocket: ${wsStatus}`}>
                   <div
                     className={`h-2 w-2 rounded-full ${
                       wsStatus === 'connected'
-                        ? 'bg-[var(--ok)]'
+                        ? 'bg-[var(--text)]'
                         : wsStatus === 'reconnecting'
                         ? 'bg-[var(--accent)] animate-pulse'
                         : wsStatus === 'error'
                         ? 'bg-[var(--red)]'
-                        : 'bg-[var(--unknown)]'
+                        : 'border border-[var(--text-subtle)]'
                     }`}
                     aria-label={`WebSocket ${wsStatus}`}
                   />
                 </Tooltip>
-                <span className="hidden text-[10px] text-[var(--text-muted)] sm:inline">
+                <span className="hidden text-[length:var(--text-2xs)] text-[var(--text-muted)] sm:inline">
                   {wsStatus === 'connected' ? 'Live' : wsStatus}
                 </span>
               </div>
@@ -1164,19 +1168,19 @@ export default function ChatPage() {
               <>
                 <button
                   onClick={() => router.push('/about')}
-                  className="text-sm font-medium text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
+                  className="text-[length:var(--text-sm)] font-medium text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
                 >
                   About
                 </button>
                 <button
                   onClick={() => router.push('/pricing')}
-                  className="text-sm font-medium text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
+                  className="text-[length:var(--text-sm)] font-medium text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
                 >
                   Pricing
                 </button>
                 <button
                   onClick={() => router.push('/login')}
-                  className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-[var(--accent-text)] transition-opacity hover:opacity-90"
+                  className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-[length:var(--text-sm)] font-medium text-[var(--accent-text)] transition-opacity hover:opacity-90"
                 >
                   Sign In
                 </button>
@@ -1190,7 +1194,7 @@ export default function ChatPage() {
 
         {hasMessages && activeAssistantMsg && (
           <div>
-            <div className="px-4 pt-2 text-xs text-[var(--text-muted)]">
+            <div className="px-4 pt-2 text-[length:var(--text-xs)] text-[var(--text-muted)]">
               <Tooltip text={METHOD_DESCRIPTIONS[autoSelectedMethod.replace(/_/g, '-')] || ''}>
                 <span className="cursor-help">
                   Method: <span className="text-[var(--text)]">{autoSelectedMethod.replace(/_/g, '-').replace(/\b\w/g, (l) => l.toUpperCase())}</span>
@@ -1258,7 +1262,7 @@ export default function ChatPage() {
         {hasMessages && (
           <div className="w-full">
             {followupAgentBadge && (
-              <div className="mx-auto max-w-3xl px-4 pb-2 text-xs text-muted-foreground">
+              <div className="mx-auto max-w-3xl px-4 pb-2 text-[length:var(--text-xs)] text-muted-foreground">
                 {followupAgentBadge}
               </div>
             )}

@@ -108,7 +108,7 @@ export function MechanismDiagram() {
         {STAGES.map(({ href, plate, ordinal, failure, stage, defence }) => (
           <li
             key={href}
-            className="card-hover group relative border-t border-[var(--border)] pt-[var(--space-5)] [transform-style:preserve-3d] hover:border-[var(--border-strong)] hover:[transform:translateZ(26px)_rotateX(3.5deg)] motion-reduce:hover:[transform:none]"
+            className="card-hover group relative border-t border-[var(--border)] pt-[var(--space-5)] hover:border-[var(--border-strong)]"
           >
             {/* The node on the rail. Square rather than round: the page has
                 no other circles in it, and a 5px mark is the smallest that
@@ -124,7 +124,7 @@ export function MechanismDiagram() {
                 and the heading answers the question it raises. */}
             <CollagePlate variant={plate} />
 
-            <p className="nums-tabular mt-[var(--space-5)] font-mono text-[8pt] leading-[var(--lh-ui)] text-[var(--accent)]">
+            <p className="nums-tabular mt-[var(--space-5)] font-mono text-[length:var(--text-2xs)] leading-[var(--lh-ui)] text-[var(--accent)]">
               {ordinal}
               <span className="ml-[var(--space-3)] font-sans font-semibold uppercase tracking-[var(--tracking-label)] text-[var(--text-subtle)]">
                 {stage}
@@ -134,11 +134,11 @@ export function MechanismDiagram() {
             {/* The failure is the headline. Naming the disease before the
                 cure is the whole point of the section — a reader who does
                 not recognise the problem has no use for the mechanism. */}
-            <h3 className="mt-[var(--space-3)] font-serif text-[21pt] font-semibold leading-[var(--lh-subhead)] tracking-[var(--tracking-snug)] text-[var(--text)]">
+            <h3 className="mt-[var(--space-3)] font-serif text-[length:var(--text-2xl)] font-semibold leading-[var(--lh-subhead)] tracking-[var(--tracking-snug)] text-[var(--text)]">
               {failure}
             </h3>
 
-            <p className="mt-[var(--space-3)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+            <p className="mt-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
               {defence}
             </p>
 
@@ -147,7 +147,7 @@ export function MechanismDiagram() {
             <Link
               href={href}
               aria-label={`How Reasoner stops ${failure.toLowerCase()}`}
-              className="link-smooth mt-[var(--space-5)] inline-flex font-sans text-[8pt] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--accent)] after:absolute after:inset-0 hover:text-[var(--accent-hover)]"
+              className="link-smooth mt-[var(--space-5)] inline-flex font-sans text-[length:var(--text-2xs)] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--accent)] after:absolute after:inset-0 hover:text-[var(--accent-hover)]"
             >
               How it holds
               <span

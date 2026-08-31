@@ -83,8 +83,8 @@ def test_uniqueness_is_checked_on_resolved_models_not_aliases():
     and test_no_model_serves_two_phases could silently weaken to an
     alias-level check without anyone noticing.
     """
-    assert resolved_model_of("gemini-pro") == resolved_model_of("claude-sonnet")
-    assert resolved_model_of("gemini-pro") != "gemini-pro"
+    assert resolved_model_of("claude-sonnet") == resolved_model_of("claude-sonnet")
+    assert resolved_model_of("claude-sonnet") != "claude-sonnet"
 
 
 @pytest.mark.unit

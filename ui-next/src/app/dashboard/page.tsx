@@ -120,26 +120,29 @@ function DashboardContent() {
   };
 
   const percent = quota && quota.max > 0 ? Math.min((quota.used / quota.max) * 100, 100) : 0;
-  const barColor = percent >= 90 ? 'bg-[var(--red)]' : percent >= 70 ? 'bg-[var(--warn)]' : 'bg-[var(--accent)]';
+  // --warn is reserved for epistemic labels — the near-limit tier escalates
+  // from --accent to full ink instead, so it still reads as "more urgent"
+  // without a hue change.
+  const barColor = percent >= 90 ? 'bg-[var(--red)]' : percent >= 70 ? 'bg-[var(--text)]' : 'bg-[var(--accent)]';
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
-      <h1 className="mb-6 text-2xl font-bold text-[var(--text)]">Dashboard</h1>
+      <h1 className="mb-6 text-[length:var(--text-2xl)] font-bold text-[var(--text)]">Dashboard</h1>
 
       <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {creditsLoading ? (
           <StatCardSkeleton />
         ) : (
           <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-6">
-            <p className="text-sm text-[var(--text-muted)]">Credits</p>
+            <p className="text-[length:var(--text-sm)] text-[var(--text-muted)]">Credits</p>
             <p
-              className={`mt-1 text-2xl font-bold ${
+              className={`mt-1 text-[length:var(--text-2xl)] font-bold ${
                 (credits?.balance ?? 0) <= 0 ? 'text-[var(--red)]' : 'text-[var(--text)]'
               }`}
             >
               {credits?.balance?.toLocaleString() ?? '—'}
             </p>
-            <p className="mt-1 text-xs text-[var(--text-muted)]">
+            <p className="mt-1 text-[length:var(--text-xs)] text-[var(--text-muted)]">
               {credits
                 ? `≈ $${credits.balance_usd.toFixed(2)} · ${credits.monthly_allowance.toLocaleString()}/mo`
                 : 'Balance unavailable'}
@@ -147,7 +150,7 @@ function DashboardContent() {
             {credits && credits.balance <= 0 && (
               <Link
                 href="/pricing"
-                className="mt-2 inline-flex text-sm font-medium text-[var(--accent)] hover:underline"
+                className="mt-2 inline-flex text-[length:var(--text-sm)] font-medium text-[var(--accent)] hover:underline"
               >
                 Top up
               </Link>
@@ -159,8 +162,8 @@ function DashboardContent() {
           <StatCardSkeleton />
         ) : (
           <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-6">
-            <p className="text-sm text-[var(--text-muted)]">Queries This Month</p>
-            <p className="mt-1 text-2xl font-bold text-[var(--text)]">
+            <p className="text-[length:var(--text-sm)] text-[var(--text-muted)]">Queries This Month</p>
+            <p className="mt-1 text-[length:var(--text-2xl)] font-bold text-[var(--text)]">
               {quota?.used ?? 0} / {quota?.max ?? 20}
             </p>
             <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-[var(--surface-3)]">
@@ -173,8 +176,8 @@ function DashboardContent() {
           <StatCardSkeleton />
         ) : (
           <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-6">
-            <p className="text-sm text-[var(--text-muted)]">Remaining</p>
-            <p className="mt-1 text-2xl font-bold text-[var(--text)]">{quota?.remaining ?? '-'}</p>
+            <p className="text-[length:var(--text-sm)] text-[var(--text-muted)]">Remaining</p>
+            <p className="mt-1 text-[length:var(--text-2xl)] font-bold text-[var(--text)]">{quota?.remaining ?? '-'}</p>
           </div>
         )}
 
@@ -182,14 +185,14 @@ function DashboardContent() {
           <StatCardSkeleton />
         ) : (
           <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-6">
-            <p className="text-sm text-[var(--text-muted)]">Plan</p>
-            <p className="mt-1 text-2xl font-bold text-[var(--text)] capitalize">
+            <p className="text-[length:var(--text-sm)] text-[var(--text-muted)]">Plan</p>
+            <p className="mt-1 text-[length:var(--text-2xl)] font-bold text-[var(--text)] capitalize">
               {subscription?.tier || 'Free'}
             </p>
             {subscription?.tier && subscription.tier !== 'free' && (
               <button
                 onClick={openPortal}
-                className="mt-2 flex min-h-[40px] items-center text-sm font-medium text-[var(--accent)] hover:underline"
+                className="mt-2 flex min-h-[40px] items-center text-[length:var(--text-sm)] font-medium text-[var(--accent)] hover:underline"
               >
                 Manage Billing
               </button>
@@ -199,7 +202,7 @@ function DashboardContent() {
       </div>
 
       {portalError && (
-        <div className="mb-4 rounded-[var(--radius)] bg-[var(--red-bg)] p-3 text-sm text-[var(--red)]" role="alert">
+        <div className="mb-4 rounded-[var(--radius)] bg-[var(--red-bg)] p-3 text-[length:var(--text-sm)] text-[var(--red)]" role="alert">
           {portalError}
         </div>
       )}
@@ -238,7 +241,7 @@ function DashboardContent() {
         <section className="mt-8 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-6">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="font-semibold text-[var(--text)]">Credit activity</h2>
-            <Link href="/docs/credits" className="text-sm text-[var(--accent)] hover:underline">
+            <Link href="/docs/credits" className="text-[length:var(--text-sm)] text-[var(--accent)] hover:underline">
               How credits work
             </Link>
           </div>
@@ -246,23 +249,23 @@ function DashboardContent() {
             {ledger.map((entry) => (
               <li key={entry.id} className="flex items-center justify-between gap-4 py-3">
                 <div className="min-w-0">
-                  <p className="truncate text-sm text-[var(--text)]">
+                  <p className="truncate text-[length:var(--text-sm)] text-[var(--text)]">
                     {entry.description || LEDGER_LABELS[entry.reason] || entry.reason}
                   </p>
-                  <p className="text-xs text-[var(--text-muted)]">
+                  <p className="text-[length:var(--text-xs)] text-[var(--text-muted)]">
                     {new Date(entry.created_at).toLocaleString()}
                   </p>
                 </div>
                 <div className="shrink-0 text-right">
                   <p
-                    className={`text-sm font-medium ${
-                      entry.delta > 0 ? 'text-[var(--ok)]' : 'text-[var(--text)]'
+                    className={`text-[length:var(--text-sm)] ${
+                      entry.delta > 0 ? 'font-semibold text-[var(--text)]' : 'font-medium text-[var(--text)]'
                     }`}
                   >
                     {entry.delta > 0 ? '+' : ''}
                     {entry.delta.toLocaleString()}
                   </p>
-                  <p className="text-xs text-[var(--text-muted)]">
+                  <p className="text-[length:var(--text-xs)] text-[var(--text-muted)]">
                     {entry.balance_after.toLocaleString()} left
                   </p>
                 </div>

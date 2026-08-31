@@ -37,6 +37,7 @@ _SYSTEM = (
 
 class DirectDetectorSubAgent(BaseSubAgent):
     AGENT_NAME = "direct_detector"
+    ROLE = "hypergate_direct"
     MAX_TOKENS = HYPERGATE_MAX_TOKENS_DIRECT
 
     def _system_prompt(self) -> str:

@@ -35,7 +35,7 @@
   :root {
     color-scheme: light;
 
-    /* ---- Grounds. Hue 158 at C 0.006–0.013: a green-grey proofing
+    /* ---- Grounds. Hue 55 at C 0.006–0.013: a green-grey proofing
        stock. Chosen because the two conventional neutral casts are
        taken — warm tan (the borrowed one, ~40deg) and blue slate
        (every dev-tools product).
@@ -48,34 +48,34 @@
        and ink and re-run check-contrast.mjs — nothing else moves.
 
        --bg drops from oklch 0.977 (ivory) to 0.950. That buys a card
-       lift of 1.12:1 where the old #FFFFFF-on-#FAF9F5 was 1.05:1 —
+       lift of 1.12:1 where the old #FFFFFF-on-#FCF8F6 was 1.05:1 —
        3x the step, so elevation becomes a tone and --shadow-lg can
        leave containers. It is NOT enough for a boundary (3:1), so
        --border-strong still carries WCAG 1.4.11. Do not claim
        otherwise.                                                ---- */
-    --bg:             #EBF0ED;  /* oklch(0.950 0.006 158) */
-    --surface:        #F9FCFA;  /* oklch(0.988 0.004 158) — 1.12:1 lift over --bg */
-    --surface-hover:  #F2F5F3;  /* oklch(0.968 0.005 158) */
-    --surface-2:      #E3E9E5;  /* oklch(0.928 0.008 158) */
-    --surface-3:      #D9E0DB;  /* oklch(0.900 0.010 158) */
+    --bg:             #F2EEEA;  /* oklch(0.950 0.006 55) */
+    --surface:        #FDFAF9;  /* oklch(0.988 0.004 55) — 1.12:1 lift over --bg */
+    --surface-hover:  #F6F3F2;  /* oklch(0.968 0.005 55) */
+    --surface-2:      #ECE6E2;  /* oklch(0.928 0.008 55) */
+    --surface-3:      #E4DCD8;  /* oklch(0.900 0.010 55) */
 
     /* Sidebar keeps its own ramp: hover/active must move toward
        contrast in BOTH themes, which --surface-hover cannot do.
        Unlike the previous system these are no longer within one unit
        per channel of --surface-2/-3 — the rail is a real ground now. */
-    --sidebar-bg:     #E4EBE7;  /* oklch(0.934 0.009 158) */
-    --sidebar-hover:  #DCE4DE;  /* oklch(0.910 0.011 158) */
-    --sidebar-active: #D2DBD5;  /* oklch(0.884 0.013 158) */
-    --sidebar-field:  #FCFEFD;  /* oklch(0.995 0.003 158) — inset field on the rail */
+    --sidebar-bg:     #EEE8E3;  /* oklch(0.934 0.009 55) */
+    --sidebar-hover:  #E8E0DA;  /* oklch(0.910 0.011 55) */
+    --sidebar-active: #DFD6D1;  /* oklch(0.884 0.013 55) */
+    --sidebar-field:  #FFFDFC;  /* oklch(0.995 0.003 55) — inset field on the rail */
 
     /* ---- Ink. Same hue as the ground at ~2x chroma: ink is the
        ground concentrated, never a foreign grey.
        Annotated   bg / surface / surface-2 / surface-3          ---- */
-    --text:        #121814;  /* 15.62  17.43  14.62  13.40  AAA — LEGAL: all grounds */
-    --text-2:      #404943;  /*  8.09   9.03   7.57   6.94  AAA — LEGAL: all grounds */
-    --text-muted:  #57605A;  /*  5.65   6.30   5.29   4.85  AA  — LEGAL: all grounds,
+    --text:        #1B1511;  /* 15.62  17.43  14.62  13.40  AAA — LEGAL: all grounds */
+    --text-2:      #4D443F;  /*  8.09   9.03   7.57   6.94  AAA — LEGAL: all grounds */
+    --text-muted:  #645B56;  /*  5.65   6.30   5.29   4.85  AA  — LEGAL: all grounds,
                                  worst case --sidebar-active 4.60 */
-    --text-subtle: #606963;  /*  4.93   5.50   4.61   4.23
+    --text-subtle: #6D645F;  /*  4.93   5.50   4.61   4.23
                                  LEGAL: --bg, --surface, --surface-hover, --surface-2,
                                  --sidebar-bg, --sidebar-field.
                                  NOT legal on --surface-3 (4.23), --sidebar-hover (4.38),
@@ -92,8 +92,8 @@
        The alphas below are SOLVED for 3:1, which the old values were
        not: rgb(19 18 17 / 0.26) measured 1.80:1 on --surface, i.e. it
        failed the exact criterion its own comment cited.          ---- */
-    --border:        rgb(18 24 20 / 0.14);  /* 1.34:1 — decorative separators only */
-    --border-strong: rgb(18 24 20 / 0.49);  /* 3.30 surface · 3.21 bg · 3.14 surface-2 — WCAG 1.4.11.
+    --border:        rgb(27 21 17 / 0.14);  /* 1.34:1 — decorative separators only */
+    --border-strong: rgb(27 21 17 / 0.49);  /* 3.30 surface · 3.21 bg · 3.14 surface-2 — WCAG 1.4.11.
                                                Raised from the spec's 0.47, which measured
                                                2.98 on --surface-2 and missed 3:1. */
 
@@ -105,10 +105,10 @@
        Links carry a 1px underline at 0.14em offset: with no hue,
        WCAG 1.4.1 requires a second channel. ~33 call sites, applied
        in migration step 6.                                      ---- */
-    --accent:       #2F3832;  /* oklch(0.330 0.016 158) — 10.52:1 on --bg */
-    --accent-hover: #1B231E;  /* oklch(0.245 0.015 158) — 13.95:1 on --bg */
-    --accent-text:  #F9FCFA;  /* 11.74:1 on --accent */
-    --accent-dim:   rgb(47 56 50 / 0.09);
+    --accent:       #3C332E;  /* oklch(0.330 0.016 55) — 10.52:1 on --bg */
+    --accent-hover: #271F1A;  /* oklch(0.245 0.015 55) — 13.95:1 on --bg */
+    --accent-text:  #FDFAF9;  /* 11.74:1 on --accent */
+    --accent-dim:   rgb(60 51 46 / 0.09);
 
     /* ---- Epistemic labels — VERIFIED / HYPOTHESIS / UNKNOWN.
        These tokens do nothing else, and as of this system that is
@@ -155,28 +155,29 @@
        Tooltip, CommandPalette, UserMenu, modals, Composer, ChatFeed
        popovers — where a 1.12:1 lift cannot say "above unknown
        ground". Containers use tone, not shadow.                 ---- */
-    --shadow:       0 1px 2px rgb(18 24 20 / 0.05), 0 8px 24px -12px rgb(18 24 20 / 0.18);
-    --shadow-float: 0 2px 4px rgb(18 24 20 / 0.04), 0 24px 56px -20px rgb(18 24 20 / 0.22);
+    --shadow:       0 1px 2px rgb(27 21 17 / 0.05), 0 8px 24px -12px rgb(27 21 17 / 0.18);
+    --shadow-float: 0 2px 4px rgb(27 21 17 / 0.04), 0 24px 56px -20px rgb(27 21 17 / 0.22);
 
-    --glass-bg:      rgb(249 252 250 / 0.80);
-    --glass-bg-soft: rgb(249 252 250 / 0.66);
+    --glass-bg:      rgb(253 250 249 / 0.80);
+    --glass-bg-soft: rgb(253 250 249 / 0.66);
 
     /* Scrim darkens in BOTH themes, so it is deliberately not derived
        from --text or --bg (either would invert). */
-    --scrim:   rgb(12 16 14 / 0.55);
-    --overlay: rgb(12 16 14 / 0.72);
+    --scrim:   rgb(18 14 12 / 0.55);
+    --overlay: rgb(18 14 12 / 0.72);
 
     /* ---- DEPRECATED. Retained so this step ships alone with zero
        call-site churn. Values re-derived achromatic so nothing coral
        survives. Removal is migration step 3 (ornament) and step 6.
-         --accent-glow  8 uses   -> delete with SpotlightCard / hover glows
          --accent-2     2 uses   -> Composer secondary control
          --accent-2-dim 3 uses   -> Composer secondary control
-         --shadow-lg   13 uses   -> rename to --shadow-float at call sites
+         --shadow-lg   11 uses   -> rename to --shadow-float at call sites
+       --accent-glow is GONE: its three utility classes (.text-glow,
+       .glow-hover, .btn-glow) had zero .tsx callers and its four live
+       hover sites were a grey haze once --accent went achromatic.
        --text-small had 0 var() uses and is simply gone.          ---- */
-    --accent-glow:  0 0 24px rgb(47 56 50 / 0.18);
-    --accent-2:     #7C857F;
-    --accent-2-dim: rgb(124 133 127 / 0.12);
+    --accent-2:     #89807B;
+    --accent-2-dim: rgb(137 128 123 / 0.12);
     --shadow-lg:    var(--shadow-float);
 
     --background: var(--bg);
@@ -188,32 +189,34 @@
     :root:not(.light) {
       color-scheme: dark;
 
-      --bg:             #141816;  /* oklch(0.205 0.009 158) */
-      --surface:        #1D221F;  /* oklch(0.245 0.010 158) — 1.11:1 lift */
-      --surface-hover:  #181D1A;  /* oklch(0.225 0.010 158) */
-      --surface-2:      #262C28;  /* oklch(0.285 0.011 158) */
-      --surface-3:      #2F3632;  /* oklch(0.325 0.012 158) */
+      --bg:             #1A1614;  /* oklch(0.205 0.009 55) */
+      --surface:        #24201C;  /* oklch(0.245 0.010 55) — 1.11:1 lift */
+      --surface-hover:  #1F1B17;  /* oklch(0.225 0.010 55) */
+      --surface-2:      #2F2925;  /* oklch(0.285 0.011 55) */
+      --surface-3:      #39332E;  /* oklch(0.325 0.012 55) */
 
-      --sidebar-bg:     #0F1311;  /* oklch(0.183 0.009 158) — rail recedes below --bg */
-      --sidebar-hover:  #1D2320;  /* oklch(0.250 0.011 158) */
-      --sidebar-active: #2A312D;  /* oklch(0.305 0.012 158) */
-      --sidebar-field:  #1D2320;  /* oklch(0.250 0.011 158) */
+      --sidebar-bg:     #15110F;  /* oklch(0.183 0.009 55) — rail recedes below --bg */
+      --sidebar-hover:  #25201D;  /* oklch(0.250 0.011 55) */
+      --sidebar-active: #342E29;  /* oklch(0.305 0.012 55) */
+      --sidebar-field:  #25201D;  /* oklch(0.250 0.011 55) */
 
       /*             bg / surface / surface-2 / surface-3 */
-      --text:        #EDF6F0;  /* 16.25  14.64  12.92  11.24  AAA — LEGAL: all */
-      --text-2:      #BAC4BE;  /* 10.01   9.02   7.96   6.92  AAA — LEGAL: all */
-      --text-muted:  #96A09A;  /*  6.65   5.99   5.29   4.60  AA  — LEGAL: all */
-      --text-subtle: #8C948F;  /*  5.76   5.19   4.58   3.98
+      --text:        #FAF1EC;  /* 16.25  14.64  12.92  11.24  AAA — LEGAL: all */
+      --text-2:      #C9BFB9;  /* 10.01   9.02   7.96   6.92  AAA — LEGAL: all */
+      --text-muted:  #A59B95;  /*  6.65   5.99   5.29   4.60  AA  — LEGAL: all */
+      --text-subtle: #98908B;  /*  5.76   5.19   4.58   3.98
                                   NOT legal on --surface-3 or --sidebar-active (4.28).
                                   Same restriction as light. Use --text-muted there. */
 
-      --border:        rgb(237 246 240 / 0.13);  /* 1.47:1 */
-      --border-strong: rgb(237 246 240 / 0.36);  /* 3.10:1 on --surface — WCAG 1.4.11 */
+      --border:        rgb(250 241 236 / 0.13);  /* 1.47:1 */
+      --border-strong: rgb(250 241 236 / 0.38);  /* 3.29 surface · 3.31 bg · 3.16 surface-2 — WCAG 1.4.11.
+                                                    0.36 measured 2.98 on --surface-2 after the hue
+                                                    rotation and missed 3:1. */
 
-      --accent:       #C4CFC8;  /* oklch(0.845 0.016 158) — 11.18:1 on --bg */
-      --accent-hover: #D9E2DC;  /* oklch(0.905 0.013 158) — 13.53:1 on --bg */
-      --accent-text:  #141816;  /* 11.18:1 on --accent */
-      --accent-dim:   rgb(196 207 200 / 0.13);
+      --accent:       #D4C9C3;  /* oklch(0.845 0.016 55) — 11.18:1 on --bg */
+      --accent-hover: #E6DDD8;  /* oklch(0.905 0.013 55) — 13.53:1 on --bg */
+      --accent-text:  #1A1614;  /* 11.18:1 on --accent */
+      --accent-dim:   rgb(212 201 195 / 0.13);
 
       --ok:      #A2B9FA;  /* oklch(0.793 0.095 269)  9.26  8.35  7.37  6.41  AAA */
       --warn:    #CE90EA;  /* oklch(0.747 0.140 315)  7.51  6.77  5.97  5.19  AAA */
@@ -226,15 +229,14 @@
       --shadow:       0 1px 2px rgb(0 0 0 / 0.40), 0 8px 24px -12px rgb(0 0 0 / 0.70);
       --shadow-float: 0 2px 4px rgb(0 0 0 / 0.45), 0 24px 56px -20px rgb(0 0 0 / 0.80);
 
-      --glass-bg:      rgb(29 34 31 / 0.78);
-      --glass-bg-soft: rgb(29 34 31 / 0.62);
+      --glass-bg:      rgb(36 32 28 / 0.78);
+      --glass-bg-soft: rgb(36 32 28 / 0.62);
       --scrim:         rgb(0 0 0 / 0.68);
       --overlay:       rgb(0 0 0 / 0.80);
 
       /* DEPRECATED — see light block */
-      --accent-glow:  0 0 40px rgb(196 207 200 / 0.22);
-      --accent-2:     #96A09A;
-      --accent-2-dim: rgb(150 160 154 / 0.12);
+      --accent-2:     #A59B95;
+      --accent-2-dim: rgb(165 155 149 / 0.12);
       --shadow-lg:    var(--shadow-float);
     }
   }
@@ -244,29 +246,29 @@
   :root.dark {
     color-scheme: dark;
 
-    --bg:             #141816;
-    --surface:        #1D221F;
-    --surface-hover:  #181D1A;
-    --surface-2:      #262C28;
-    --surface-3:      #2F3632;
+    --bg:             #1A1614;
+    --surface:        #24201C;
+    --surface-hover:  #1F1B17;
+    --surface-2:      #2F2925;
+    --surface-3:      #39332E;
 
-    --sidebar-bg:     #0F1311;
-    --sidebar-hover:  #1D2320;
-    --sidebar-active: #2A312D;
-    --sidebar-field:  #1D2320;
+    --sidebar-bg:     #15110F;
+    --sidebar-hover:  #25201D;
+    --sidebar-active: #342E29;
+    --sidebar-field:  #25201D;
 
-    --text:        #EDF6F0;
-    --text-2:      #BAC4BE;
-    --text-muted:  #96A09A;
-    --text-subtle: #8C948F;
+    --text:        #FAF1EC;
+    --text-2:      #C9BFB9;
+    --text-muted:  #A59B95;
+    --text-subtle: #98908B;
 
-    --border:        rgb(237 246 240 / 0.13);
-    --border-strong: rgb(237 246 240 / 0.36);
+    --border:        rgb(250 241 236 / 0.13);
+    --border-strong: rgb(250 241 236 / 0.38);
 
-    --accent:       #C4CFC8;
-    --accent-hover: #D9E2DC;
-    --accent-text:  #141816;
-    --accent-dim:   rgb(196 207 200 / 0.13);
+    --accent:       #D4C9C3;
+    --accent-hover: #E6DDD8;
+    --accent-text:  #1A1614;
+    --accent-dim:   rgb(212 201 195 / 0.13);
 
     --ok:      #A2B9FA;
     --warn:    #CE90EA;
@@ -279,15 +281,14 @@
     --shadow:       0 1px 2px rgb(0 0 0 / 0.40), 0 8px 24px -12px rgb(0 0 0 / 0.70);
     --shadow-float: 0 2px 4px rgb(0 0 0 / 0.45), 0 24px 56px -20px rgb(0 0 0 / 0.80);
 
-    --glass-bg:      rgb(29 34 31 / 0.78);
-    --glass-bg-soft: rgb(29 34 31 / 0.62);
+    --glass-bg:      rgb(36 32 28 / 0.78);
+    --glass-bg-soft: rgb(36 32 28 / 0.62);
     --scrim:         rgb(0 0 0 / 0.68);
     --overlay:       rgb(0 0 0 / 0.80);
 
     /* DEPRECATED — see light block */
-    --accent-glow:  0 0 40px rgb(196 207 200 / 0.22);
-    --accent-2:     #96A09A;
-    --accent-2-dim: rgb(150 160 154 / 0.12);
+    --accent-2:     #A59B95;
+    --accent-2-dim: rgb(165 155 149 / 0.12);
     --shadow-lg:    var(--shadow-float);
   }
 }

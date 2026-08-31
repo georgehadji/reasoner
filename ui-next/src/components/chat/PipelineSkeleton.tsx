@@ -34,7 +34,7 @@ export const PipelineSkeleton = memo(function PipelineSkeleton({ method }: Pipel
               }}
             />
             {i === 0 && (
-              <span className="ml-auto text-[10px] text-[var(--text-subtle)]">Initializing…</span>
+              <span className="ml-auto text-[length:var(--text-2xs)] text-[var(--text-subtle)]">Initializing…</span>
             )}
           </div>
           <div className="mt-3 space-y-2">

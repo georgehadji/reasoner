@@ -24,7 +24,7 @@ export function ShortcutModal({ isOpen, onClose }: ShortcutModalProps) {
   return (
     <div
       className={cn(
-        'fixed inset-0 z-[300] flex items-center justify-center p-4 transition-all duration-300',
+        'fixed inset-0 z-[300] flex items-center justify-center p-4 transition-all duration-[var(--dur-component)]',
         isOpen ? 'bg-[var(--scrim)] opacity-100' : 'bg-transparent opacity-0 pointer-events-none',
       )}
       onClick={(e) => {
@@ -33,12 +33,12 @@ export function ShortcutModal({ isOpen, onClose }: ShortcutModalProps) {
     >
       <div
         className={cn(
-          'w-full max-w-[var(--width-form)] rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[var(--shadow-lg)] transition-all duration-300',
+          'w-full max-w-[var(--width-form)] rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[var(--shadow-lg)] transition-all duration-[var(--dur-component)]',
           isOpen ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-4 opacity-0 scale-95',
         )}
       >
         <div className="mb-4 flex items-center justify-between">
-          <span className="text-base font-semibold text-[var(--text)]">Keyboard Shortcuts</span>
+          <span className="text-[length:var(--text-base)] font-semibold text-[var(--text)]">Keyboard Shortcuts</span>
           <button
             type="button"
             onClick={onClose}
@@ -48,7 +48,7 @@ export function ShortcutModal({ isOpen, onClose }: ShortcutModalProps) {
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="space-y-3 text-sm">
+        <div className="space-y-3 text-[length:var(--text-sm)]">
           {shortcuts.map((shortcut) => (
             <div key={shortcut.label} className="flex items-center justify-between">
               <div className="flex items-center gap-1">

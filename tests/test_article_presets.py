@@ -203,7 +203,7 @@ class TestArticlePresetRoutingDiversity:
         "gpt-mini-latest": "openai",
         # Google
         "gemini-flash": "google",
-        "gemini-pro": "anthropic",  # aliased in this config
+        "claude-sonnet": "anthropic",  # aliased in this config
         # DeepSeek
         "deepseek-v4-flash": "deepseek",
         "deepseek-v4-pro": "deepseek",

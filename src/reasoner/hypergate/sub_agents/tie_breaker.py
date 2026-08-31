@@ -44,6 +44,7 @@ _VALID_METHODS = {
 
 class TieBreakerSubAgent(BaseSubAgent):
     AGENT_NAME = "tie_breaker"
+    ROLE = "hypergate_tiebreak"
     MAX_TOKENS = HYPERGATE_MAX_TOKENS_TIEBREAK
 
     def _system_prompt(self) -> str:

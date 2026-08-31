@@ -208,7 +208,7 @@ export default function ApiKeysPage() {
     <div className="flex min-h-screen flex-col bg-[var(--bg)] text-[var(--text)]">
       <SiteHeader />
       <main id="main-content" className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 pt-24">
-        <nav className="mb-6 text-sm text-[var(--text-muted)]">
+        <nav className="mb-6 text-[length:var(--text-sm)] text-[var(--text-muted)]">
           <Link href="/settings" className="transition-colors hover:text-[var(--text)]">
             Settings
           </Link>
@@ -220,7 +220,7 @@ export default function ApiKeysPage() {
 
         <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold">API keys</h1>
+            <h1 className="text-[length:var(--text-3xl)] font-bold">API keys</h1>
             <p className="mt-2 max-w-xl text-[var(--text-muted)]">
               Authenticate scripts, agents, and backend services. See the{' '}
               <Link href="/docs/api-keys" className="text-[var(--accent)] hover:underline">
@@ -232,7 +232,7 @@ export default function ApiKeysPage() {
           <button
             onClick={() => setShowForm((v) => !v)}
             disabled={atLimit}
-            className="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg bg-[var(--accent)] px-4 text-sm font-semibold text-[var(--accent-text)] transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg bg-[var(--accent)] px-4 text-[length:var(--text-sm)] font-semibold text-[var(--accent-text)] transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Plus className="h-4 w-4" aria-hidden="true" />
             New key
@@ -240,7 +240,7 @@ export default function ApiKeysPage() {
         </div>
 
         {atLimit && limits && (
-          <p className="mb-6 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-4 text-sm text-[var(--text-2)]">
+          <p className="mb-6 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-4 text-[length:var(--text-sm)] text-[var(--text-2)]">
             You have reached the limit of {limits.max_keys} keys. Revoke one to create another.
           </p>
         )}
@@ -248,7 +248,7 @@ export default function ApiKeysPage() {
         {error && (
           <div
             role="alert"
-            className="mb-6 flex items-start gap-2 rounded-lg border border-[var(--red-border)] bg-[var(--red-bg)] p-4 text-sm text-[var(--red)]"
+            className="mb-6 flex items-start gap-2 rounded-lg border border-[var(--red-border)] bg-[var(--red-bg)] p-4 text-[length:var(--text-sm)] text-[var(--red)]"
           >
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             <span>{error}</span>
@@ -261,20 +261,20 @@ export default function ApiKeysPage() {
               <Key className="h-4 w-4 text-[var(--accent)]" aria-hidden="true" />
               Copy your key now
             </h2>
-            <p className="mt-1 text-sm text-[var(--text-2)]">
+            <p className="mt-1 text-[length:var(--text-sm)] text-[var(--text-2)]">
               This is the only time it will be shown. Only its hash is stored, so it cannot be
               recovered.
             </p>
             <div className="mt-4 flex items-center gap-2">
-              <code className="flex-1 overflow-x-auto rounded-lg bg-[var(--surface-2)] px-3 py-2.5 font-mono text-[13px] text-[var(--text)]">
+              <code className="flex-1 overflow-x-auto rounded-lg bg-[var(--surface-2)] px-3 py-2.5 font-mono text-[length:var(--text-xs)] text-[var(--text)]">
                 {newKey}
               </code>
               <button
                 onClick={handleCopy}
-                className="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 text-sm font-medium transition-colors hover:bg-[var(--surface-2)]"
+                className="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 text-[length:var(--text-sm)] font-medium transition-colors hover:bg-[var(--surface-2)]"
               >
                 {copied ? (
-                  <Check className="h-4 w-4 text-[var(--ok)]" aria-hidden="true" />
+                  <Check className="h-4 w-4 text-[var(--text)]" aria-hidden="true" />
                 ) : (
                   <Copy className="h-4 w-4" aria-hidden="true" />
                 )}
@@ -283,7 +283,7 @@ export default function ApiKeysPage() {
             </div>
             <button
               onClick={() => setNewKey(null)}
-              className="mt-4 text-sm text-[var(--text-muted)] hover:text-[var(--text)]"
+              className="mt-4 text-[length:var(--text-sm)] text-[var(--text-muted)] hover:text-[var(--text)]"
             >
               I have stored it — dismiss
             </button>
@@ -296,7 +296,7 @@ export default function ApiKeysPage() {
             className="mb-8 space-y-5 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5"
           >
             <div>
-              <label htmlFor="key-name" className="mb-1.5 block text-sm font-medium">
+              <label htmlFor="key-name" className="mb-1.5 block text-[length:var(--text-sm)] font-medium">
                 Name
               </label>
               <input
@@ -306,18 +306,18 @@ export default function ApiKeysPage() {
                 required
                 maxLength={64}
                 placeholder="prod-ingest"
-                className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2.5 text-sm focus:border-[var(--accent)] focus:outline-none"
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2.5 text-[length:var(--text-sm)] focus:border-[var(--accent)] focus:outline-none"
               />
-              <p className="mt-1.5 text-xs text-[var(--text-muted)]">
+              <p className="mt-1.5 text-[length:var(--text-xs)] text-[var(--text-muted)]">
                 Name it after where it runs, so a leak is traceable to one place.
               </p>
             </div>
 
             <fieldset>
-              <legend className="mb-2 text-sm font-medium">Scopes</legend>
+              <legend className="mb-2 text-[length:var(--text-sm)] font-medium">Scopes</legend>
               <div className="space-y-2">
                 {limits.assignable_scopes.map((scope) => (
-                  <label key={scope} className="flex cursor-pointer items-start gap-3 text-sm">
+                  <label key={scope} className="flex cursor-pointer items-start gap-3 text-[length:var(--text-sm)]">
                     <input
                       type="checkbox"
                       checked={scopes.includes(scope)}
@@ -325,28 +325,28 @@ export default function ApiKeysPage() {
                       className="mt-0.5 h-4 w-4 accent-[var(--accent)]"
                     />
                     <span>
-                      <code className="font-mono text-[13px] text-[var(--text)]">{scope}</code>
-                      <span className="block text-xs text-[var(--text-muted)]">
+                      <code className="font-mono text-[length:var(--text-xs)] text-[var(--text)]">{scope}</code>
+                      <span className="block text-[length:var(--text-xs)] text-[var(--text-muted)]">
                         {SCOPE_LABELS[scope] ?? scope}
                       </span>
                     </span>
                   </label>
                 ))}
               </div>
-              <p className="mt-2 text-xs text-[var(--text-muted)]">
+              <p className="mt-2 text-[length:var(--text-xs)] text-[var(--text-muted)]">
                 Grant the least a key needs. Scopes can never exceed your own permissions.
               </p>
             </fieldset>
 
             <div>
-              <label htmlFor="key-expiry" className="mb-1.5 block text-sm font-medium">
+              <label htmlFor="key-expiry" className="mb-1.5 block text-[length:var(--text-sm)] font-medium">
                 Expiry
               </label>
               <select
                 id="key-expiry"
                 value={expiry}
                 onChange={(e) => setExpiry(e.target.value)}
-                className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2.5 text-sm focus:border-[var(--accent)] focus:outline-none"
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2.5 text-[length:var(--text-sm)] focus:border-[var(--accent)] focus:outline-none"
               >
                 {EXPIRY_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -360,14 +360,14 @@ export default function ApiKeysPage() {
               <button
                 type="submit"
                 disabled={creating || !name.trim() || scopes.length === 0}
-                className="inline-flex h-10 items-center rounded-lg bg-[var(--accent)] px-4 text-sm font-semibold text-[var(--accent-text)] transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-10 items-center rounded-lg bg-[var(--accent)] px-4 text-[length:var(--text-sm)] font-semibold text-[var(--accent-text)] transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {creating ? 'Creating…' : 'Create key'}
               </button>
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
-                className="inline-flex h-10 items-center rounded-lg border border-[var(--border)] px-4 text-sm font-medium transition-colors hover:bg-[var(--surface-2)]"
+                className="inline-flex h-10 items-center rounded-lg border border-[var(--border)] px-4 text-[length:var(--text-sm)] font-medium transition-colors hover:bg-[var(--surface-2)]"
               >
                 Cancel
               </button>
@@ -388,7 +388,7 @@ export default function ApiKeysPage() {
           <div className="rounded-xl border border-dashed border-[var(--border)] p-10 text-center">
             <Key className="mx-auto mb-3 h-8 w-8 text-[var(--text-muted)]" aria-hidden="true" />
             <p className="font-medium">No API keys yet</p>
-            <p className="mt-1 text-sm text-[var(--text-muted)]">
+            <p className="mt-1 text-[length:var(--text-sm)] text-[var(--text-muted)]">
               Create one to call Reasoner from your own code.
             </p>
           </div>
@@ -403,25 +403,25 @@ export default function ApiKeysPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium">{key.name}</span>
                     {!key.is_active && (
-                      <span className="rounded-full bg-[var(--surface-3)] px-2 py-0.5 text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+                      <span className="rounded-full bg-[var(--surface-3)] px-2 py-0.5 text-[length:var(--text-2xs)] uppercase tracking-wide text-[var(--text-muted)]">
                         Expired
                       </span>
                     )}
                   </div>
-                  <code className="mt-1 block font-mono text-[13px] text-[var(--text-muted)]">
+                  <code className="mt-1 block font-mono text-[length:var(--text-xs)] text-[var(--text-muted)]">
                     {key.key_prefix}…
                   </code>
                   <div className="mt-3 flex flex-wrap gap-1.5">
                     {key.scopes.map((scope) => (
                       <span
                         key={scope}
-                        className="rounded-md bg-[var(--surface-2)] px-2 py-0.5 font-mono text-[11px] text-[var(--text-2)]"
+                        className="rounded-md bg-[var(--surface-2)] px-2 py-0.5 font-mono text-[length:var(--text-2xs)] text-[var(--text-2)]"
                       >
                         {scope}
                       </span>
                     ))}
                   </div>
-                  <p className="mt-3 text-xs text-[var(--text-muted)]">
+                  <p className="mt-3 text-[length:var(--text-xs)] text-[var(--text-muted)]">
                     Created {formatDate(key.created_at)} · Last used{' '}
                     {formatDate(key.last_used_at)}
                     {key.expires_at ? ` · Expires ${formatDate(key.expires_at)}` : ''}
@@ -431,7 +431,7 @@ export default function ApiKeysPage() {
                   onClick={() => handleRevoke(key)}
                   className={cn(
                     'inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-[var(--border)] px-3',
-                    'text-sm font-medium text-[var(--text-2)] transition-colors',
+                    'text-[length:var(--text-sm)] font-medium text-[var(--text-2)] transition-colors',
                     'hover:border-[var(--red-border)] hover:bg-[var(--red-bg)] hover:text-[var(--red)]',
                   )}
                 >

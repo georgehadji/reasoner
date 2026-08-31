@@ -128,7 +128,7 @@ const CURL = `curl -s https://reasoner.app/api/agent/run/sync \\
 function Code({ children, label }: { children: string; label: string }) {
   return (
     <figure className="mt-[var(--space-8)]">
-      <figcaption className="font-sans text-[8pt] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
+      <figcaption className="font-sans text-[length:var(--text-2xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
         {label}
       </figcaption>
       <pre className="mt-[var(--space-3)] overflow-x-auto border border-[var(--border)] bg-[var(--surface)] p-[var(--space-6)] font-mono text-[length:var(--text-xs)] leading-[var(--lh-body)] text-[var(--text-2)]">
@@ -148,18 +148,18 @@ export default function DevelopersPage() {
             Short, like /capabilities. The reader arriving here wants to
             know whether this is callable and what comes back, and §1
             answers both in the first screen after it. */}
-        <header className="mx-auto w-full max-w-[var(--width-wide)] px-[var(--gutter)] pb-[var(--section-y)] pt-[var(--space-40)]">
+        <header className="mx-auto w-full max-w-[var(--width-wide)] px-[var(--gutter)] pb-[var(--section-y)] pt-[var(--space-48)]">
           <div className="grid gap-[var(--space-6)] lg:grid-cols-[9rem_minmax(0,1fr)] lg:gap-[var(--space-12)]">
             <div>
-              <p className="mt-[var(--space-1)] font-sans text-[8pt] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
+              <p className="mt-[var(--space-1)] font-sans text-[length:var(--text-2xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
                 Developers
               </p>
             </div>
             <div className="min-w-0">
-              <h1 className="max-w-[20ch] text-balance font-serif text-[34pt] font-normal leading-[var(--lh-display)] sm:text-[55pt] tracking-[var(--tracking-tight)] text-[var(--text)]">
+              <h1 className="max-w-[20ch] text-balance font-serif text-[length:var(--text-4xl)] font-normal leading-[var(--lh-display)] sm:text-[length:var(--text-6xl)] tracking-[var(--tracking-tight)] text-[var(--text)]">
                 An answer your code can act on.
               </h1>
-              <p className="prose-measure mt-[var(--space-6)] font-serif text-[21pt] leading-[var(--lh-body)] text-[var(--text-2)]">
+              <p className="prose-measure mt-[var(--space-6)] text-[length:var(--text-2xl)] leading-[var(--lh-body)] text-[var(--text-2)]">
                 A single model returns prose, and your program has to decide how much of it to
                 believe. Reasoner returns a synthesis in which every claim is already labelled
                 VERIFIED, HYPOTHESIS, or UNKNOWN — which is what makes the output safe to branch
@@ -193,14 +193,14 @@ export default function DevelopersPage() {
             {MCP_TOOLS.map(({ name, cost, desc }) => (
               <div key={name} className="border-t border-[var(--border)] pt-[var(--space-3)]">
                 <dt className="flex items-baseline gap-[var(--space-3)]">
-                  <span className="font-mono text-[13pt] leading-[var(--lh-ui)] text-[var(--text)]">
+                  <span className="font-mono text-[length:var(--text-md)] leading-[var(--lh-ui)] text-[var(--text)]">
                     {name}
                   </span>
-                  <span className="font-sans text-[8pt] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-subtle)]">
+                  <span className="font-sans text-[length:var(--text-2xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-subtle)]">
                     {cost}
                   </span>
                 </dt>
-                <dd className="mt-[var(--space-1)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+                <dd className="mt-[var(--space-1)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
                   {desc}
                 </dd>
               </div>
@@ -221,8 +221,8 @@ export default function DevelopersPage() {
           <Heading>Or one POST, and one JSON body back.</Heading>
           <Lede>
             The HTTP surface is the same pipeline through a different door.{' '}
-            <code className="font-mono text-[11pt] text-[var(--text-2)]">/api/agent/run/sync</code>{' '}
-            blocks and returns one result; <code className="font-mono text-[11pt] text-[var(--text-2)]">/api/agent/run</code>{' '}
+            <code className="font-mono text-[length:var(--text-sm)] text-[var(--text-2)]">/api/agent/run/sync</code>{' '}
+            blocks and returns one result; <code className="font-mono text-[length:var(--text-sm)] text-[var(--text-2)]">/api/agent/run</code>{' '}
             streams the phases as Server-Sent Events. Neither is the lesser path — the sync
             endpoint is the streaming pipeline with the collapsing done for you, server-side.
           </Lede>
@@ -230,18 +230,18 @@ export default function DevelopersPage() {
           <Code label="One call, one result">{CURL}</Code>
 
           <Body>
-            The labels are the payload. <code className="font-mono text-[11pt] text-[var(--text-2)]">claim_labels</code>{' '}
+            The labels are the payload. <code className="font-mono text-[length:var(--text-sm)] text-[var(--text-2)]">claim_labels</code>{' '}
             says what is carried by a source outside the model and what is only asserted;{' '}
-            <code className="font-mono text-[11pt] text-[var(--text-2)]">open_questions</code> is
+            <code className="font-mono text-[length:var(--text-sm)] text-[var(--text-2)]">open_questions</code> is
             the run telling you what it could not settle; each{' '}
-            <code className="font-mono text-[11pt] text-[var(--text-2)]">action_blueprint</code>{' '}
+            <code className="font-mono text-[length:var(--text-sm)] text-[var(--text-2)]">action_blueprint</code>{' '}
             step carries a go-criterion you can check later. An integration that flattens those
             back into undifferentiated prose has thrown away the reason it called.
           </Body>
           <Body>
             TypeScript callers can skip the plumbing:{' '}
-            <code className="font-mono text-[11pt] text-[var(--text-2)]">@reasoner/sdk</code>{' '}
-            exposes <code className="font-mono text-[11pt] text-[var(--text-2)]">runToCompletion()</code>,
+            <code className="font-mono text-[length:var(--text-sm)] text-[var(--text-2)]">@reasoner/sdk</code>{' '}
+            exposes <code className="font-mono text-[length:var(--text-sm)] text-[var(--text-2)]">runToCompletion()</code>,
             which returns the same fields already parsed.
           </Body>
 
@@ -269,15 +269,15 @@ export default function DevelopersPage() {
           <Body>
             A long run can be saved mid-flight and resumed from the state file, which is what makes
             an interrupted batch recoverable rather than repayable.{' '}
-            <code className="font-mono text-[11pt] text-[var(--text-2)]">--list-presets</code> and{' '}
-            <code className="font-mono text-[11pt] text-[var(--text-2)]">--list-models</code> print
+            <code className="font-mono text-[length:var(--text-sm)] text-[var(--text-2)]">--list-presets</code> and{' '}
+            <code className="font-mono text-[length:var(--text-sm)] text-[var(--text-2)]">--list-models</code> print
             the live catalogues with their key status, and{' '}
-            <code className="font-mono text-[11pt] text-[var(--text-2)]">--sequential</code> walks
+            <code className="font-mono text-[length:var(--text-sm)] text-[var(--text-2)]">--sequential</code> walks
             the phases one model at a time for providers that rate-limit hard.
           </Body>
           <Body>
             A host application that would rather not shell out can import the pipeline instead.{' '}
-            <code className="font-mono text-[11pt] text-[var(--text-2)]">headless.ask()</code>{' '}
+            <code className="font-mono text-[length:var(--text-sm)] text-[var(--text-2)]">headless.ask()</code>{' '}
             returns the routing decision alongside the result, so your code can tell a one-second
             direct answer from a full run and treat them differently.
           </Body>
@@ -300,10 +300,10 @@ export default function DevelopersPage() {
           <dl className="mt-[var(--space-8)] grid gap-x-[var(--space-8)] gap-y-[var(--space-4)] sm:grid-cols-2">
             {DISCOVERY.map(({ path, desc }) => (
               <div key={path} className="border-t border-[var(--border)] pt-[var(--space-3)]">
-                <dt className="font-mono text-[13pt] leading-[var(--lh-ui)] text-[var(--text)]">
+                <dt className="font-mono text-[length:var(--text-md)] leading-[var(--lh-ui)] text-[var(--text)]">
                   {path}
                 </dt>
-                <dd className="mt-[var(--space-1)] font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+                <dd className="mt-[var(--space-1)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
                   {desc}
                 </dd>
               </div>
@@ -325,16 +325,16 @@ export default function DevelopersPage() {
           <Lede>
             A reasoning run costs real money and takes real time, so both facts are available
             before you commit to either.{' '}
-            <code className="font-mono text-[11pt] text-[var(--text-2)]">POST /api/gate</code>{' '}
+            <code className="font-mono text-[length:var(--text-sm)] text-[var(--text-2)]">POST /api/gate</code>{' '}
             returns the route, the method it would use, and a confidence;{' '}
-            <code className="font-mono text-[11pt] text-[var(--text-2)]">POST /api/estimate</code>{' '}
+            <code className="font-mono text-[length:var(--text-sm)] text-[var(--text-2)]">POST /api/estimate</code>{' '}
             returns tokens, dollars, and duration. Both take the body you were going to send
             anyway.
           </Lede>
           <Body>
             The router shares its cache between the two, so a gate call followed by a real run does
             not pay the routing cost twice. When the gate answers{' '}
-            <code className="font-mono text-[11pt] text-[var(--text-2)]">needs_confirmation</code>,
+            <code className="font-mono text-[length:var(--text-sm)] text-[var(--text-2)]">needs_confirmation</code>,
             it is unsure — a good moment for an agent to ask its own caller rather than spend on
             its own judgement.
           </Body>
@@ -358,7 +358,7 @@ export default function DevelopersPage() {
           <Body>
             Runs settle after they complete, from the actual cost on the terminal frame. A run that
             fails costs nothing. Send a{' '}
-            <code className="font-mono text-[11pt] text-[var(--text-2)]">client_run_id</code> on
+            <code className="font-mono text-[length:var(--text-sm)] text-[var(--text-2)]">client_run_id</code> on
             every call: it is both the duplicate-run guard and the credit idempotency key, so a
             dropped stream is resumed by reconnecting with the same id rather than by paying for
             the question twice. A pipeline is capped at 600 seconds — set the client timeout above
@@ -368,10 +368,10 @@ export default function DevelopersPage() {
           <dl className="nums-tabular mt-[var(--space-8)] grid gap-x-[var(--space-8)] gap-y-[var(--space-4)] sm:grid-cols-2">
             {STATUSES.map(({ code, desc }) => (
               <div key={code} className="flex items-baseline gap-[var(--space-4)] border-t border-[var(--border)] pt-[var(--space-3)]">
-                <dt className="font-mono text-[13pt] leading-[var(--lh-ui)] text-[var(--text)]">
+                <dt className="font-mono text-[length:var(--text-md)] leading-[var(--lh-ui)] text-[var(--text)]">
                   {code}
                 </dt>
-                <dd className="font-serif text-[13pt] leading-[var(--lh-body)] text-[var(--text-muted)]">
+                <dd className="text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
                   {desc}
                 </dd>
               </div>
@@ -397,7 +397,7 @@ export default function DevelopersPage() {
           </Body>
           <Body>
             The same endpoints, the same{' '}
-            <code className="font-mono text-[11pt] text-[var(--text-2)]">rsn_live_</code> keys, and
+            <code className="font-mono text-[length:var(--text-sm)] text-[var(--text-2)]">rsn_live_</code> keys, and
             the same metering work on a self-hosted instance. The source is available under a
             Business Source License that converts to Apache-2.0 in 2030, and the stack runs against
             your own Postgres and Valkey.
@@ -419,13 +419,13 @@ export default function DevelopersPage() {
               <div className="mt-[var(--space-10)] flex flex-wrap items-center gap-[var(--space-4)]">
                 <Link
                   href="/docs/mcp"
-                  className="btn-lift flex min-h-[var(--space-12)] items-center rounded-[var(--radius)] bg-[var(--accent)] px-[var(--space-8)] font-sans text-[13pt] font-semibold leading-[var(--lh-ui)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)]"
+                  className="btn-lift flex min-h-[var(--space-12)] items-center rounded-[var(--radius)] bg-[var(--accent)] px-[var(--space-8)] font-sans text-[length:var(--text-md)] font-semibold leading-[var(--lh-ui)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)]"
                 >
                   Set up the MCP server
                 </Link>
                 <Link
                   href="/docs/api-reference"
-                  className="link-smooth flex min-h-[var(--space-12)] items-center font-sans text-[13pt] font-medium leading-[var(--lh-ui)] text-[var(--text-2)] underline decoration-[var(--border-strong)] underline-offset-4 hover:text-[var(--text)]"
+                  className="link-smooth flex min-h-[var(--space-12)] items-center font-sans text-[length:var(--text-md)] font-medium leading-[var(--lh-ui)] text-[var(--text-2)] underline decoration-[var(--border-strong)] underline-offset-4 hover:text-[var(--text)]"
                 >
                   Read the API reference
                 </Link>

@@ -16,7 +16,13 @@ Implement a **HyperGate pre-router** that classifies each request before any pip
 - Three possible actions: `direct` (short LLM call), `web_search` (grounded search), `pipeline` (full multi-phase)
 - Fast-path regex checks run before sub-agents to short-circuit obvious cases
 - Method names are obfuscated in prompts (letters B–Q instead of real names) to prevent gaming
-- Sub-agent results are LRU-cached to avoid redundant classification
+- The whole gate decision is cached in a shared L2 cache (`SharedCachePort`), keyed on the
+  problem hash **and** a fingerprint of the `(role, served model)` pairs that answered it, so
+  a routing change cannot serve a stale verdict. Wired in `gate_service.run_gate_cached`
+  (W5, 2026-08-30). This line previously read "sub-agent results are LRU-cached"; each
+  sub-agent does hold an LRU, but it lives on an instance rebuilt per request, so it has
+  never survived one. The gate's own L2 methods were stubs (`return None` / `pass`) from the
+  day this ADR was written until W5.
 
 ## Consequences
 

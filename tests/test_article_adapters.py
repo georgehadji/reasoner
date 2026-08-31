@@ -261,12 +261,6 @@ class TestContextConversion:
         assert ws["claim_ledger"][0]["claim"] == "Claim A"
         assert ws["claim_ledger"][0]["status"] == "verified"
 
-    def test_style_brief_preserved(self):
-        style = {"author": "Jane", "publication": "The Atlantic"}
-        ctx = _make_test_ctx(style_brief=style)
-        ws = context_to_writing_state(ctx)
-        assert ws["style_brief"] == style
-
     def test_immutable_context_not_mutated_by_conversion(self):
         doc = Document(version=1, markdown="Original", title="T", produced_by="test")
         ctx = _make_test_ctx(doc=doc)
