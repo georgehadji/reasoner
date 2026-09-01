@@ -13,7 +13,7 @@ from datetime import datetime
 from uuid import UUID
 
 from reasoner.application.ports.quota_repository import QuotaRepository
-from reasoner.domain.saas import QuotaResult, UsageQuota
+from reasoner.domain.saas import QuotaResult, SubscriptionTier, UsageQuota
 from reasoner.infrastructure.valkey.client import get_valkey_pool
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,13 @@ class CachedQuotaRepository(QuotaRepository):
                 data = json.loads(cached)
                 return UsageQuota(
                     user_id=UUID(data["user_id"]),
-                    tier=data["tier"],
+                    # SubscriptionTier(...), not the raw str: the field is
+                    # declared as the enum and is serialized via .tier.value
+                    # below, so handing back a str made a cache hit return a
+                    # differently-typed UsageQuota than a cache miss (and any
+                    # downstream .tier.value then raised AttributeError).
+                    # cached_subscription_repo._deserialize does this already.
+                    tier=SubscriptionTier(data["tier"]),
                     used_queries=data["used_queries"],
                     max_queries=data["max_queries"],
                     period_start=datetime.fromisoformat(data["period_start"]),

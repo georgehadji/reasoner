@@ -141,9 +141,12 @@ class EventStore:
             OSError: If database file is inaccessible
         """
         def _save_events_sync():
+            # Acquired OUTSIDE the try: every except branch below calls
+            # conn.rollback(), so a failure to open the connection raised
+            # UnboundLocalError from the handler and destroyed the real
+            # sqlite3.Error this method documents itself as raising.
+            conn = self._get_connection()
             try:
-                conn = self._get_connection()
-
                 for event in events:
                     # Serialize event payload
                     payload = json.dumps({
@@ -285,7 +288,13 @@ class EventStore:
         updates = []
         values = []
 
-        updates.append("current_version = ?")
+        # MAX(), not plain assignment: two writers append to the same
+        # aggregate concurrently (the request coroutine's _persist_event and
+        # the event bus' persist_all_events subscriber), so the last INSERT to
+        # win the lock is not the one carrying the highest version. Assigning
+        # unconditionally let current_version regress below the aggregate's
+        # true head, which get_aggregate_state()/list_pipelines() then report.
+        updates.append("current_version = MAX(current_version, ?)")
         values.append(event.version)
 
         updates.append("updated_at = datetime('now')")
