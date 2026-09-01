@@ -360,19 +360,23 @@ def sanitize_for_logging(text: str, max_length: int = 200) -> str:
     """
     Sanitize text for logging (removes sensitive patterns).
     """
-    # Broader regex for secrets (SEC-025)
-    sanitized = re.sub(
-        r"(api[_-]?key|token|secret|password|bearer|authorization)[\s=:]+[^\s&]{4,}",
-        r"\1=***REDACTED***",
-        text,
-        flags=re.IGNORECASE,
-    )
-
-    # Catch JWT-like patterns
+    # Catch JWT-like patterns first so the auth-scheme pass below can't
+    # swallow the JWT into a generic ***REDACTED*** before this sees it.
     sanitized = re.sub(
         r"eyJ[A-Za-z0-9_-]*\.eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*",
         "***JWT_REDACTED***",
+        text,
+    )
+
+    # Broader regex for secrets (SEC-025). The optional second token covers
+    # "Authorization: Bearer <token>": without it, [^\s&]{4,} stops at the
+    # scheme word "Bearer" and leaves the actual credential unredacted.
+    sanitized = re.sub(
+        r"(api[_-]?key|token|secret|password|bearer|authorization)[\s=:]+"
+        r"[^\s&]{4,}(?:\s+(?!\*\*\*)[^\s&]{4,})?",
+        r"\1=***REDACTED***",
         sanitized,
+        flags=re.IGNORECASE,
     )
 
     # Truncate if too long
