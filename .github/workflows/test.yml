@@ -57,13 +57,13 @@ jobs:
           # rename.
           # 2251: W6 deleted harness_guard.py's hand-maintained ~150-entry
           # _MODEL_LABS dict in favour of ModelRegistryPort.vendor_of() -- -2.
-          # 2249: paying for W5. tests/architecture/test_layer_boundaries.py
+          # 2243: paying for W5. tests/architecture/test_layer_boundaries.py
           # pins api/__init__.py at 1104 lines with the rule "do not raise a cap
           # without shrinking the corresponding module first", so the cache-port
           # wiring moved to infrastructure/valkey/cache_adapter.py and three dead
           # stdlib imports (secrets, json, datetime/timezone) went with it -- -4
           # F401 there, +2 elsewhere in the moved block.
-          python scripts/ruff_ratchet.py --max 2249
+          python scripts/ruff_ratchet.py --max 2243
 
       - name: Security scan (bandit)
         run: |
