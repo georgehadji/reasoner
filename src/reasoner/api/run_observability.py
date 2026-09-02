@@ -64,7 +64,7 @@ class CreditSink:
         reference_id: str,
         preset: str,
     ) -> None:
-        from reasoner.api.dependencies import _get_credit_service
+        from reasoner.api.dependencies import _get_credit_service, _get_quota_service
 
         await _get_credit_service().charge_usd(
             user_id,
@@ -72,6 +72,13 @@ class CreditSink:
             reference_id=reference_id,
             description=f"Pipeline run ({preset})",
         )
+        # The one place a run is known to have both succeeded and been billed.
+        # QuotaService.check() deliberately does not increment ("call
+        # increment() separately after a successful pipeline run to avoid
+        # charging for failed runs") but nothing ever called it, so
+        # used_queries never advanced and the query quota could not deny.
+        # After the charge, not before: an unbilled run must not eat a slot.
+        await _get_quota_service().increment(user_id, preset)
 
 
 class PrometheusObserver:
