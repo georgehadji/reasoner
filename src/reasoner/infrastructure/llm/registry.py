@@ -29,6 +29,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ═══════════════════════════════════════════════════════════════
     # Anthropic
     # ═══════════════════════════════════════════════════════════════
+    "claude-fable-5.1":  {"model": "anthropic/claude-fable-5.1"},    # v3.8: newest ultra-premium — $10/$50 per M, 1M ctx, supports reasoning_effort
     "claude-fable-5":    {"model": "anthropic/claude-fable-5"},      # ultra-premium creative/synthesis — $10/$50 per M, 1M ctx
     "claude-opus":       {"model": "anthropic/claude-opus-5"},       # v3.7: was opus-4.8 -> opus-5, same $5/$25 per M, 1M ctx, strict upgrade
     "claude-opus-4.8":   {"model": "anthropic/claude-opus-4.8"},     # legacy pin, kept for reproducibility — $5/$25 per M, 1M ctx
@@ -109,7 +110,8 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "gemini-flash-lite-real":  {"model": "google/gemini-3.1-flash-lite"},      # true Google Flash Lite — $0.25/$1.50, 1M ctx
     "gemini-2.5-flash-lite":   {"model": "google/gemini-2.5-flash-lite"},      # cheapest Google — $0.10/$0.40, 1M ctx
     "gemini-2.5-flash":        {"model": "google/gemini-2.5-flash"},           # $0.30/$2.50 per M, 1M ctx
-    "gemini-3.7-flash":        {"model": "google/gemini-3.7-flash"},           # newest Google flash — $0.375/$1.875 per M, 1M ctx (half the price of 3.6-flash)
+    "gemini-3.8-flash":        {"model": "google/gemini-3.8-flash"},           # v3.8: latest Google flash — $0.375/$1.875 per M, 1M ctx
+    "gemini-3.7-flash":        {"model": "google/gemini-3.7-flash"},           # $0.375/$1.875 per M, 1M ctx (half the price of 3.6-flash)
     "gemini-3.6-flash":        {"model": "google/gemini-3.6-flash"},           # $0.75/$3.75 per M, 1M ctx (repriced down from $1.50/$7.50)
     "gemini-3.5-flash-lite":   {"model": "google/gemini-3.5-flash-lite"},      # $0.30/$2.50 per M, 1M ctx
     # ── Auto-updating (always latest) ──
@@ -204,7 +206,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # Qwen (Alibaba) — 3.5 -> 3.8 series
     # ═══════════════════════════════════════════════════════════════
     # ── 3.8 (latest) ──
-    "qwen3.8-max":         {"model": "qwen/qwen3.8-max"},        # newest flagship
+    "qwen3.8-max":         {"model": "qwen/qwen3.8-max"},        # v3.8: latest flagship — $0.002/$0.006 per M, 1M ctx
     # ── 3.7 (Jun 2026) ──
     "qwen3.7-max":         {"model": "qwen/qwen3.7-max"},        # flagship agent — $1.475/$4.425 per M, 1M ctx
     "qwen3.7-plus":        {"model": "qwen/qwen3.7-plus"},       # best VFM — $0.32/$1.28 per M, 1M ctx
