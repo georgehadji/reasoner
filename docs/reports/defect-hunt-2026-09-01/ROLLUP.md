@@ -54,7 +54,7 @@ Three of these (1, 2, 4) ship a `strict=True` xfail tripwire, so the test flips 
 
 - untransacted compaction (T2)
 - missing `(aggregate_id, version)` uniqueness constraint (T2)
-- **a contradiction the package has with itself**: `quota_repo_postgres.py:71` and `subscription_repo.py:207` wrap `row["user_id"]` in `UUID(...)`; `credit_repo_postgres.py:101` does not. One of the two is wrong.
+- ~~a contradiction the package has with itself in the `UUID(row["user_id"])` wrapping~~ **RESOLVED 2026-09-02, see section 9.** The two that wrapped were wrong, and the consequence was a complete quota bypass on PostgreSQL.
 
 **Authorization on the WebSocket path.** `websocket_endpoint` never calls `_check_pipeline_ownership` (T3). Named by T3 as its own highest-value next hunt.
 
@@ -116,3 +116,38 @@ Regions T1 through T7 were audited for the defect classes listed in each tier re
 This is **not** a claim that the backend is sound. `phases/**` and `subagents/**` were never audited. Every PostgreSQL path is unexecuted. Nine escalations remain open, including one that corrupts billing attribution under concurrency and one that means an entire retry and timeout layer has never run.
 
 **Highest-value next hunt:** the PostgreSQL paths, against a real server. It is the largest unexecuted surface, it holds a contradiction the package has with itself (`UUID(row["user_id"])` applied in two repos and not a third), and every finding there is currently UNKNOWN rather than cleared.
+
+---
+
+## 9. Resolved after the hunt: the PostgreSQL contradiction
+
+Docker became available on 2026-09-02, so the item this register named as its highest-value next hunt was executed rather than left UNKNOWN.
+
+**Verdict: the two repositories that wrapped were wrong, and the failure mode was a quota bypass, not a crash.**
+
+Every `user_id` column is declared `UUID`, asyncpg decodes a UUID column to a `uuid.UUID` object, and no `set_type_codec` exists anywhere in `src/`. Against PostgreSQL 16.14 with the real repository code:
+
+```
+PostgresQuotaRepository.get_quota   -> RAISES AttributeError:
+    'asyncpg.pgproto.pgproto.UUID' object has no attribute 'replace'
+PostgresCreditRepository.get_balance -> RESULT: CreditBalance(user_id=UUID(...), balance=0, ...)
+```
+
+`api/dependencies.py:659-667` catches `Exception` from the quota check and returns `QuotaResult(allowed=True, remaining=10)`. Because `get_quota` raised on every call, that catch was the only path on PostgreSQL. Combined with T1's finding that `QuotaService.increment()` has no callers, **quota enforcement did not exist on any PostgreSQL deployment**. The comment above that catch documents a previous fail-open fix, so this is the second time that path has failed open.
+
+**Why seven tiers of static analysis could not catch it:** `tests/test_saas_quota_repo.py` mocks `user_id` as a string. `UUID(str)` succeeds and `UUID(UUID)` does not, so the fixture was faithful to nothing. This is the second unfaithful fixture the hunt has found concealing a real defect, after a test that stubbed an async client method as synchronous (T4). **An unfaithful test fake is now the single most productive defect signature found in this codebase.**
+
+### Still UNKNOWN on PostgreSQL
+
+The container proved the UUID item only. These remain unexecuted:
+
+- untransacted compaction (T2)
+- missing `(aggregate_id, version)` uniqueness constraint (T2)
+
+### Found while applying migrations, not fixed
+
+`migrations/003_add_indexes.sql` fails to apply: `ERROR: relation "query_log" does not exist`. Migration ordering or a missing prerequisite. Unrelated to the hunt.
+
+### Pre-existing flaky test, not fixed
+
+`tests/test_phase_span.py::TestPhaseSpan::test_phase_span_latency_tracking` asserts `elapsed >= 0.01` after `await asyncio.sleep(0.01)`, racing the wall clock. Measured on this machine: `elapsed < 0.01` in 31 of 2000 trials (1.55%), minimum observed 0.0 from clock granularity. Its own docstring says "reasonable duration (>= 0)", so the assertion is stricter than the stated intent, and it tests `asyncio.sleep` rather than `PhaseSpan`. Left alone deliberately: relaxing an assertion to make a suite look green is not a fix.
