@@ -126,19 +126,40 @@ def test_any_valid_json_object_round_trips_unchanged(payload: dict[str, str]) ->
     assert extract_json(json.dumps(payload)) == payload
 
 
-# ── D2: confirmed, unfixed (chokepoint outside the T6 surface) ─────────────
+# ── D2: fixed. Was escalated (chokepoint sat outside the T6 file surface) ──
+# The xfail(strict=True) that stood here is gone because it now passes: the
+# fix landed in reasoner.utils.json_safe.safe_json_loads (parse_constant) and
+# reasoner.core.parsing.safe_float.
 
-@pytest.mark.xfail(
-    reason="VERIFIED DEFECT, escalated: bare NaN/Infinity survive extract_json. "
-           "Fix belongs in reasoner.utils.json_safe.safe_json_loads (parse_constant), "
-           "outside the T6 file surface.",
-    strict=True,
-)
-def test_non_finite_json_constants_are_rejected() -> None:
+def test_non_finite_json_constants_do_not_survive_the_parse() -> None:
+    """The original proof-of-defect: this raised ValueError on allow_nan=False.
+
+    Three parse routes had to be closed, not the one the escalation named:
+    safe_json_loads' parse_constant, safe_float's clamp, and
+    _extract_json_dict_fallback, which reconstructs dicts with float() and
+    never touches json at all.
+    """
     parsed = extract_json('{"logical_consistency": NaN, "feasibility": Infinity}')
-    json.dumps(parsed, allow_nan=False)  # raises ValueError today
+    json.dumps(parsed, allow_nan=False)  # raised ValueError before the fix
 
 
-def test_safe_float_clamps_nan_to_the_upper_bound_not_the_default() -> None:
-    """Documents the damaging consequence of D2: NaN reads as a perfect score."""
-    assert safe_float(float("nan")) == 10.0  # not 0.0 — the reason D2 matters
+def test_safe_float_returns_the_default_for_nan_not_the_upper_bound() -> None:
+    """Why D2 mattered: every comparison against NaN is False, so clamping
+    returned max_val and a malformed score read as a perfect one."""
+    assert safe_float(float("nan")) == 0.0
+    assert safe_float(float("inf")) == 0.0
+    assert safe_float(float("-inf")) == 0.0
+
+
+def test_a_non_finite_token_scores_zero_not_ten_end_to_end() -> None:
+    """Boundary: the surviving raw token must still score as the default."""
+    parsed = extract_json('{"logical_consistency": NaN}')
+    assert safe_float(parsed["logical_consistency"]) == 0.0
+
+
+def test_safe_float_still_clamps_finite_values() -> None:
+    """No-regression: the bounds still apply to ordinary numbers."""
+    assert safe_float(5.0) == 5.0
+    assert safe_float(99.0) == 10.0
+    assert safe_float(-4.0) == 0.0
+    assert safe_float("not a number") == 0.0

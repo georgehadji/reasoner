@@ -277,11 +277,13 @@ async def lifespan(app: FastAPI):
     # ── Shutdown (each close wrapped in try/except so one failure doesn't skip others) ──
     global _event_store, _health_postgres_pool
 
-    if _event_store and hasattr(_event_store, 'close'):
-        try:
-            _event_store.close()
-        except Exception as exc:
-            logger.warning("Event store close failed: %s", exc)
+    try:
+        # Awaits an async backend close: Postgres' is a coroutine over both pools.
+        from reasoner.infrastructure.persistence import close_event_store
+        await close_event_store()
+        _event_store = None  # this module caches its own binding (see ~line 400)
+    except Exception as exc:
+        logger.warning("Event store close failed: %s", exc)
 
     try:
         from reasoner.infrastructure.llm.providers.openai_compat import OpenAICompatibleProvider
