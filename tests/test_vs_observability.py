@@ -5,6 +5,7 @@ import logging
 
 import pytest
 
+from reasoner.core.vs_constants import LOG_VS_MODE_COLLAPSE
 from reasoner.phases.vs_behavioral_audit import (
     InMemoryVSEntropyStore,
     log_vs_behavioral_audit,
@@ -81,7 +82,38 @@ class TestBehavioralAudit:
         )
         with caplog.at_level(logging.WARNING):
             await log_vs_behavioral_audit(result, store, VSFeatureFlags())
-        assert "mode collapse" in caplog.text.lower() or store.size == 21
+
+        # The `or store.size == 21` this assertion used to carry was always
+        # true: test_entropy_pushed proves the call pushes exactly one entry,
+        # so 20 + 1 satisfied the disjunct whether or not the alert fired.
+        # Replacing the detection with `if False:` left all 9 tests green.
+        assert "mode collapse" in caplog.text.lower()
+        assert any(
+            getattr(record, LOG_VS_MODE_COLLAPSE, False) for record in caplog.records
+        ), "the alert must carry the structured key log consumers filter on"
+
+    async def test_no_alert_when_entropy_is_stable(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """The other half of the contract: a stable window must stay quiet.
+
+        Without this, `assert "mode collapse" in caplog.text` alone is passed
+        by an implementation that warns unconditionally.
+        """
+        store = InMemoryVSEntropyStore()
+        for _ in range(20):
+            await store.push(1.0)
+
+        result = VSGenerationResult(
+            candidates=[
+                GenerationCandidate(text="a", probability=1.0, selected=True),
+            ],
+            selected=GenerationCandidate(text="a", probability=1.0, selected=True),
+        )
+        with caplog.at_level(logging.WARNING):
+            await log_vs_behavioral_audit(result, store, VSFeatureFlags())
+
+        assert "mode collapse" not in caplog.text.lower()
 
     async def test_non_blocking(self) -> None:
         store = InMemoryVSEntropyStore()
