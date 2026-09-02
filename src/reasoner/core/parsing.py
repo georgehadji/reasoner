@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import re
 from typing import TYPE_CHECKING, Any
 
@@ -357,9 +358,15 @@ def _extract_json_dict_fallback(text: str) -> dict[str, Any] | None:
                     result[key] = int(bare)
                 except ValueError:
                     try:
-                        result[key] = float(bare)
+                        num = float(bare)
                     except ValueError:
                         result[key] = bare
+                    else:
+                        # float() accepts "NaN"/"Infinity"; JSON does not, and
+                        # this fallback reconstructs dicts without json, so the
+                        # parse_constant guard in safe_json_loads never sees it.
+                        # Keep the raw token rather than a non-finite float.
+                        result[key] = bare if not math.isfinite(num) else num
     return result if result else None
 
 
@@ -634,11 +641,19 @@ def strip_json_fences(text: str) -> str:
 
 
 def safe_float(value: Any, default: float = 0.0, min_val: float = 0.0, max_val: float = 10.0) -> float:
-    """Safely coerce a value to float within bounds."""
+    """Safely coerce a value to float within bounds.
+
+    Non-finite input returns *default*, not a bound. Every comparison against
+    NaN is False, so clamping it would return max_val -- a malformed score
+    reading as a perfect one. Checked before the clamp, not after.
+    """
     try:
-        return max(min_val, min(max_val, float(value)))
+        num = float(value)
     except (TypeError, ValueError):
         return default
+    if not math.isfinite(num):
+        return default
+    return max(min_val, min(max_val, num))
 
 
 def safe_list(value: Any) -> list[str]:
