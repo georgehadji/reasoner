@@ -120,3 +120,23 @@ async def inject_shared_cache_port() -> None:
         )
     except Exception as exc:
         logger.warning("Failed to inject SharedCachePort: %s", exc)
+
+
+async def close_shared_cache_port() -> None:
+    """Undo inject_shared_cache_port(). Symmetric with close_valkey_pool().
+
+    Every other DI global api/__init__.py's lifespan sets gets torn down on
+    shutdown; this one didn't, so it outlived independent app lifecycles
+    sharing one process -- e.g. pytest-xdist workers, where whichever test
+    happened to trigger real app startup left its adapter answering for
+    every test that ran afterward in that worker.
+    """
+    from reasoner.core.ports.shared_cache_port import get_shared_cache_port, set_shared_cache_port
+
+    try:
+        if (port := get_shared_cache_port()) is not None:
+            await port.close()
+    except Exception as exc:
+        logger.warning("Shared cache port close failed: %s", exc)
+    finally:
+        set_shared_cache_port(None)

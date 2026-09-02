@@ -320,10 +320,16 @@ async def lifespan(app: FastAPI):
         # Close health-check Postgres pool
         if _health_postgres_pool is not None:
             await _health_postgres_pool.close()
-            _health_postgres_pool = None
     except Exception as exc:
         logger.warning("Health-check Postgres pool close failed: %s", exc)
+    finally:
         _health_postgres_pool = None
+
+    try:
+        from reasoner.infrastructure.valkey import close_shared_cache_port
+        await close_shared_cache_port()
+    except Exception as exc:
+        logger.warning("Shared cache port close failed: %s", exc)
 
     logger.info("Reasoner shutdown complete")
 

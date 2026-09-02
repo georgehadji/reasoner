@@ -48,14 +48,21 @@ class AnthropicDirectProvider(BaseLLMProvider):
                     "cache_control": breakpoint_marker(self.model),
                 }]
 
-            client = AsyncAnthropic(api_key=self._api_key, timeout=TIMEOUTS.LLM_CALL)
-            response = await client.messages.create(
-                model=self.model,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                system=system,
-                messages=[{"role": "user", "content": user_prompt}],
-            )
+            # `async with`: a fallback provider is built fresh per call
+            # (_try_direct_fallback), and each SDK client owns an httpx
+            # connection pool. Leaving it unclosed leaks a pool per call on
+            # exactly the path that only runs during an upstream outage —
+            # i.e. when call volume through it is highest.
+            async with AsyncAnthropic(
+                api_key=self._api_key, timeout=TIMEOUTS.LLM_CALL
+            ) as client:
+                response = await client.messages.create(
+                    model=self.model,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    system=system,
+                    messages=[{"role": "user", "content": user_prompt}],
+                )
             return response.content[0].text
         except ImportError as exc:
             raise LLMError("anthropic SDK not installed. pip install anthropic") from exc
@@ -88,16 +95,34 @@ class OpenAIDirectProvider(BaseLLMProvider):
     ) -> str:
         try:
             import openai
-            client = openai.AsyncOpenAI(api_key=self._api_key, timeout=TIMEOUTS.LLM_CALL)
-            response = await client.chat.completions.create(
-                model=self.model,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                messages=[
+
+            from reasoner.infrastructure.llm.providers.openai_compat import (
+                OpenAICompatibleProvider as _Compat,
+            )
+            # The default model here is gpt-5.5, and direct OpenAI endpoints
+            # reject `max_tokens` (they want `max_completion_tokens`) and reject
+            # a custom `temperature` on the gpt-5/o-series. Both facts are
+            # already encoded in _Compat; reuse them rather than restating them.
+            probe = _Compat.__new__(_Compat)
+            probe.model = self.model
+            kwargs: dict[str, Any] = {
+                "model": self.model,
+                "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
-            )
+            }
+            if probe._uses_completion_tokens():
+                kwargs["max_completion_tokens"] = max_tokens
+            else:
+                kwargs["max_tokens"] = max_tokens
+            if probe._supports_temperature():
+                kwargs["temperature"] = temperature
+            # See AnthropicDirectProvider.complete on why this is a context manager.
+            async with openai.AsyncOpenAI(
+                api_key=self._api_key, timeout=TIMEOUTS.LLM_CALL
+            ) as client:
+                response = await client.chat.completions.create(**kwargs)
             return response.choices[0].message.content or ""
         except Exception as e:
             raise LLMError(f"OpenAI direct API failed: {e}") from e
@@ -128,8 +153,17 @@ class GoogleDirectProvider(BaseLLMProvider):
     ) -> str:
         try:
             import google.genai as genai
-            client = genai.aio.Client(api_key=self._api_key, http_options={"timeout": int(TIMEOUTS.LLM_CALL * 1000)})
-            response = await client.models.generate_content(
+            # google-genai has no `genai.aio` module: the async surface is
+            # `Client(...).aio`. The old `genai.aio.Client(...)` raised
+            # AttributeError on every call, which the except below turned into
+            # a generic LLMError — so this fallback lane was permanently dead
+            # and just cost the chain one provider's timeout. The client owns
+            # no closable transport, so it needs no context manager.
+            client = genai.Client(
+                api_key=self._api_key,
+                http_options={"timeout": int(TIMEOUTS.LLM_CALL * 1000)},
+            )
+            response = await client.aio.models.generate_content(
                 model=self.model,
                 contents=f"{system_prompt}\n\n{user_prompt}",
                 config={"max_output_tokens": max_tokens, "temperature": temperature},

@@ -489,6 +489,20 @@ class ReasonerPipeline:
             from reasoner.application.flows.services import PipelineWorkflowServices
 
             strategy = self.flow_factory.get_strategy(method)
+            # KNOWN DEFECT — do not "tidy" this without reading
+            # docs/reports/defect-hunt-2026-09-01/T5-orchestration.md (D2).
+            # `runner.run()` hands the strategy *its own* services — the
+            # runner-less one built on the next line up — so every phase takes
+            # PipelineWorkflowServices.run_phase's bare `await step.fn(...)`
+            # fallback and the whole WorkflowRunner (retries, per-phase
+            # timeouts, quality gate, PHASE_* events, `_current_phase_key` and
+            # therefore phase_tokens/phase_durations) is bypassed on this
+            # non-SSE path. `services` below is consequently unused.
+            # Wiring it up is NOT a one-line change: WorkflowRunner.run_phase
+            # and _handle_phase_error construct PhaseStarted(phase_number=…),
+            # PhaseFailed(is_fatal=…) and EventType.PHASE_QUALITY_CHECKED /
+            # PHASE_RETRIED, none of which exist — the first phase would raise
+            # TypeError. See the report for the full diff.
             runner = WorkflowRunner(PipelineWorkflowServices(self))
             services = PipelineWorkflowServices(self, runner=runner)
 
@@ -513,7 +527,12 @@ class ReasonerPipeline:
             await self._phase_cross_language_translate_out(state)
 
         # ── Publish Pipeline Completed Event ──
-        total_tokens = sum(t.get("total", 0) for t in state.phase_tokens.values())
+        # phase_tokens entries are {"input": N, "output": M} — no "total" key
+        # (see LLMExecutor._accumulate_tokens and subagents/base), so summing
+        # "total" reported 0 for every run that ever completed.
+        total_tokens = sum(
+            t.get("input", 0) + t.get("output", 0) for t in state.phase_tokens.values()
+        )
         done_evt = make_event(
             EventType.PIPELINE_COMPLETED,
             aggregate_id=state.conversation_id or "unknown",
