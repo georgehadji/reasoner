@@ -129,8 +129,13 @@ class SnapshotStrategy:
 
         version, snapshot_data = result
 
-        # Deserialize state
-        state = self._deserialize_state(snapshot_data)
+        # create_snapshot() persists a WRAPPER: {'state': ..., 'version': ...,
+        # 'timestamp': ...}. _deserialize_state splats its argument straight
+        # into PipelineStateData, which has none of those three field names --
+        # so passing the wrapper raised TypeError on every snapshot that this
+        # class itself wrote. Unwrap here; the fallback keeps a flat state
+        # written directly through EventStore.save_snapshot working too.
+        state = self._deserialize_state(snapshot_data.get("state", snapshot_data))
 
         return version, state
 
@@ -207,13 +212,14 @@ class SnapshotManager:
         if snapshot_result:
             version, state = snapshot_result
 
-            # Load events since snapshot (exclude the version already in snapshot)
+            # Load events since snapshot. get_events' from_version is
+            # EXCLUSIVE (`WHERE version > ?`), so `version` already excludes
+            # the snapshotted version; passing `version + 1` skipped the first
+            # event after the snapshot, which the gap guard below then reported
+            # as store corruption on every otherwise-healthy load.
             events = await self.event_store.get_events(
-                aggregate_id, from_version=version + 1
+                aggregate_id, from_version=version
             )
-
-            if not events:
-                return None
 
             # Guard against event gaps left by incorrect compaction.
             # Versions must be a contiguous sequence from snapshot_version+1.
@@ -226,7 +232,10 @@ class SnapshotManager:
                     f"expected versions {expected_versions}, got {actual_versions}"
                 )
 
-            # Rebuild aggregate
+            # Rebuild aggregate. An empty `events` is the normal terminal case
+            # (snapshot taken on PipelineCompleted, nothing after it) -- it
+            # means "the snapshot IS the state", not "no such aggregate".
+            # Returning None here reported completed runs as missing.
             aggregate = PipelineAggregate(aggregate_id=aggregate_id)
 
             # Apply snapshot state

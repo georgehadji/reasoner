@@ -122,10 +122,16 @@ async def metered(
 ) -> AsyncIterator[str]:
     """Yield every frame untouched, then settle what the run actually cost.
 
-    Settlement happens in ``finally`` so a client that disconnects mid-run is
-    still charged for the work already performed, and it never raises: the
-    answer has been delivered, so a ledger outage is reconciled later rather
-    than surfaced to a caller who can do nothing about it.
+    Settlement happens in ``finally`` so a client that hangs up *after* the
+    terminal ``done`` frame is still charged, and it never raises: the answer
+    has been delivered, so a ledger outage is reconciled later rather than
+    surfaced to a caller who can do nothing about it.
+
+    Known gap: cost is only observable on that terminal frame, so a run
+    abandoned *before* it reports 0 and has its whole reservation released --
+    the LLM spend already incurred goes unbilled to the ledger, bounded only
+    by the per-worker `infrastructure.llm.spend_tracker` monthly ceiling.
+    Closing it needs a running cost on the intermediate frames.
     """
     cost_usd = 0.0
     has_error = False
