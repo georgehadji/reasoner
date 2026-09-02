@@ -692,14 +692,26 @@ def _all_gate_roles(**overrides) -> dict[str, str]:
 
 @pytest.fixture
 def gate_cache():
-    """Install a real in-memory SharedCachePort, and remove it afterwards."""
+    """Install a real in-memory SharedCachePort, and remove it afterwards.
+
+    try/finally, not a bare yield: _SHARED_CACHE_PORT is a process-global. A
+    test using this fixture that fails, or is interrupted mid-await by
+    pytest-timeout's signal-based enforcement (Linux CI: `timeout method:
+    signal`), must not leave a real adapter injected for whichever test runs
+    next in this worker process. That exact leak made
+    tests/test_preflight_gate_isolation.py fail on CI while passing locally
+    every time: its _FakeGate has no .router, which only gets touched when
+    a real cache port is present.
+    """
     from reasoner.core.ports.shared_cache_port import set_shared_cache_port
     from reasoner.infrastructure.valkey import InMemoryCacheAdapter
 
     adapter = InMemoryCacheAdapter()
     set_shared_cache_port(adapter)
-    yield adapter
-    set_shared_cache_port(None)
+    try:
+        yield adapter
+    finally:
+        set_shared_cache_port(None)
 
 
 def _confident() -> GateDecision:
