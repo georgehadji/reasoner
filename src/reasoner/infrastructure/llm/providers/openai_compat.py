@@ -108,6 +108,17 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         # Populated from the response when the provider reports cache usage.
         self.last_cache_read_tokens: int = 0
         self.last_cache_write_tokens: int = 0
+        # Per-call usage counters, declared here rather than on OpenRouterProvider
+        # alone: build_provider() returns a *bare* OpenAICompatibleProvider for the
+        # xAI-direct, DeepSeek-direct and Ollama lanes. Without these attributes
+        # _record_usage's hasattr guards silently no-op and ProviderRouter._build_metadata
+        # omits the keys entirely, so those lanes reported zero tokens — which also
+        # disables LLMExecutor's "estimate cost from token counts" fallback and bills
+        # the run at $0.
+        self.last_input_tokens: int = 0
+        self.last_output_tokens: int = 0
+        self.last_cost_usd: float = 0.0
+        self.last_finish_reason: str = "stop"
 
         # If a pre-configured OpenAI client is provided, use it directly
         if http_client is not None:
@@ -179,7 +190,12 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         if self.extra_body:
             kwargs["extra_body"] = self.extra_body
 
-        async with self.client.chat.completions.create(**kwargs) as response:
+        # `AsyncCompletions.create` is an `async def`: without the await this is
+        # `async with <coroutine>`, which raises TypeError before a single byte
+        # is streamed. Every real streaming call failed; the pre-existing unit
+        # test stubbed `create` as a *sync* function returning an async context
+        # manager, which is not the SDK's shape, so it never saw this.
+        async with await self.client.chat.completions.create(**kwargs) as response:
             async for chunk in response:
                 if not chunk.choices:
                     continue
@@ -304,6 +320,12 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             )
         # Track token, cache and cost usage when available (OpenRouter, OpenAI, etc.)
         self._record_usage(getattr(response, "usage", None))
+        # finish_reason == "length" is the only signal that separates a response
+        # cut off at max_tokens from a complete one once content collapses to a
+        # string. Only stream_complete()/call_with_tools() recorded it, so every
+        # non-streaming call — i.e. the whole pipeline — reported a stale "stop"
+        # and LLMExecutor._retry_after_truncation could never fire.
+        self.last_finish_reason = response.choices[0].finish_reason or "stop"
         return response.choices[0].message.content or ""
 
     def supports_tools(self) -> bool:
@@ -413,5 +435,4 @@ class OpenRouterProvider(OpenAICompatibleProvider):
         self.last_input_tokens: int = 0
         self.last_output_tokens: int = 0
         self.last_cost_usd: float = 0.0
-        self.last_finish_reason: str = "stop"
         self.last_finish_reason: str = "stop"
