@@ -138,6 +138,17 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # ui-next has had 23 vitest files and no job running them: the `npm test`
+      # in the sdk job below caches a different lockfile, and quality.yml's
+      # Playwright a11y spec is continue-on-error. So these 211 assertions,
+      # four of them security suites, have never gated a merge.
+      #
+      # Here rather than in quality.yml: that workflow is path-filtered to
+      # ui-next/** and advisory, and a backend change can break a frontend
+      # contract test without touching a single ui-next file.
+      - name: Test
+        run: npm test
+
       - name: Design token guard (no raw Tailwind palette colors)
         run: |
           # global-error.tsx is exempt: it renders outside the root layout
