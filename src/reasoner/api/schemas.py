@@ -23,6 +23,7 @@ from reasoner.core.constants import (
     IMAGE_GEN_MAX_IMAGE_COUNT,
     TRUNCATION,
 )
+from reasoner.core.settings import settings
 from reasoner.presets import is_valid_preset_name, resolve_preset_name
 
 
@@ -39,6 +40,14 @@ class SearchRequest(BaseModel):
             raise ValueError("Query cannot be empty")
         if len(v) > TRUNCATION.PROBLEM:
             raise ValueError(f"Query too long (max {TRUNCATION.PROBLEM} characters)")
+        # With smart=True the query becomes the *user_prompt* of
+        # infrastructure.search.discovery._decompose_query, so it is prompt
+        # text and CLAUDE.md §5's gate applies to it exactly as it does to
+        # RunRequest.problem. Blocking (not neutralising) is right: this is a
+        # fresh caller instruction, not replayed text.
+        from reasoner.sanitization import sanitize_for_prompt
+
+        v, _ = sanitize_for_prompt(v.strip())
         return v.strip()
 
     @field_validator("num_results")
@@ -49,14 +58,39 @@ class SearchRequest(BaseModel):
     model_config = {"extra": "forbid"}
 
 
+# `extracted_text` arrives verbatim in the request body -- the client posts back
+# whatever /api/upload extracted, so an API caller controls it outright -- and
+# ReasonerPipeline._build_attachment_context renders it into every phase prompt.
+# Unbounded, that is a request-body DoS and an unmetered token-cost amplifier;
+# unsanitised, it is an ungated prompt channel. 1 MB is far above any real text
+# extraction and far below anything the pipeline can consume (build_context
+# already cuts each attachment to TRUNCATION.LARGE_CONTENT = 16 000 chars).
+MAX_ATTACHMENT_TEXT_CHARS = 1_000_000
+
+
 class AttachmentRef(BaseModel):
     file_id: str
     filename: str
     mime_type: str
-    extracted_text: str
+    extracted_text: str = Field(..., max_length=MAX_ATTACHMENT_TEXT_CHARS)
     size: int = 0
 
     model_config = {"extra": "forbid"}
+
+    @field_validator("extracted_text")
+    @classmethod
+    def validate_extracted_text(cls, v: str) -> str:
+        # neutralize_for_replay, not the blocking sanitize_for_prompt: document
+        # content is replayed text, and a log file or a paper about prompt
+        # injection legitimately contains "System:". Rejecting it would be a
+        # self-inflicted denial of service. See docs/MIND_VIRUS_MITIGATION.md §2.2.
+        from reasoner.sanitization import neutralize_for_replay
+
+        # Its own ceiling, not the default 10 000: truncating a document to the
+        # prior-turn-synthesis limit would silently drop content the pipeline is
+        # meant to read (build_context already allows 16 000 per attachment).
+        v, _ = neutralize_for_replay(v, max_length=MAX_ATTACHMENT_TEXT_CHARS)
+        return v
 
 
 class RunRequest(BaseModel):
@@ -73,7 +107,11 @@ class RunRequest(BaseModel):
     smart_search: bool = True
     source_type: str = DEFAULT_SOURCE_TYPE
     domain: str | None = None
-    attachments: list[AttachmentRef] = []
+    # Bounded by the same ceiling /api/upload enforces per request: without it
+    # one body could carry an unbounded number of MAX_ATTACHMENT_TEXT_CHARS blobs.
+    attachments: list[AttachmentRef] = Field(
+        default_factory=list, max_length=settings.UPLOAD_MAX_FILES
+    )
     file_ids: list[str] = []
     client_run_id: str | None = None
 
@@ -170,7 +208,9 @@ class FollowupRequest(BaseModel):
     history: list[dict[str, str]]
     previous_synthesis: str
     agent_model: str | None = None
-    attachments: list[AttachmentRef] = []
+    attachments: list[AttachmentRef] = Field(
+        default_factory=list, max_length=settings.UPLOAD_MAX_FILES
+    )
     file_ids: list[str] = []
     client_run_id: str | None = None
 
@@ -306,6 +346,18 @@ class ContextAnalysisRequest(BaseModel):
     def validate_problem(cls, v: str) -> str:
         if not v or len(v.strip()) == 0:
             raise ValueError("Problem cannot be empty")
+        # /api/run-with-context builds PipelineState(problem=req.problem)
+        # directly, bypassing RunRequest and therefore every gate on it. Same
+        # channel, same rule (CLAUDE.md §5): a fresh caller instruction is
+        # blocked, not neutralised.
+        if len(v) > DEFAULT_SANITIZER_MAX_LENGTH:
+            raise ValueError(f"Problem too long (max {DEFAULT_SANITIZER_MAX_LENGTH} characters)")
+        from reasoner.sanitization import sanitize_for_prompt
+
+        v, _ = sanitize_for_prompt(v)
+        v = v.strip()
+        if not v:
+            raise ValueError("Problem cannot be empty after sanitization")
         return v
 
     @field_validator("context")
