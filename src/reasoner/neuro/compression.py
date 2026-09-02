@@ -71,8 +71,13 @@ class ContextCompressor:
         for line in content.splitlines():
             trimmed = line.strip()
 
-            # Simple block comment skip
-            if block_start and block_start in trimmed:
+            # Block comment skip. startswith, not `in`: a mid-line "/*" --
+            # a glob ("src/*.ts"), a URL ("https://x/*"), an SQL hint -- used
+            # to open block mode on ordinary prose, and since no later line
+            # ever closed it the ENTIRE remainder of the text was discarded
+            # and compress() returned "". Losing the tail is a far worse
+            # failure than leaving a trailing comment uncompressed.
+            if block_start and trimmed.startswith(block_start):
                 in_block = True
             if in_block:
                 if block_end and block_end in trimmed:

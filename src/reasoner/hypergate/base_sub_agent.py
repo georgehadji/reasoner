@@ -81,7 +81,7 @@ class BaseSubAgent(ABC):
 
     async def execute(self, inp: SubAgentInput, router: ProviderRouter) -> SubAgentOutput:
         """Run the sub-agent; returns SubAgentOutput (never raises)."""
-        cache_key = self._cache_key(inp.problem)
+        cache_key = self._cache_key(inp)
         if cached := self._cache.get(cache_key):
             logger.debug("[%s] cache hit", self.AGENT_NAME)
             return cached
@@ -134,8 +134,19 @@ class BaseSubAgent(ABC):
 
     # ── Helpers ───────────────────────────────────────────────────────
 
-    def _cache_key(self, problem: str) -> str:
-        return hashlib.sha256(f"{self.AGENT_NAME}:{problem}".encode()).hexdigest()
+    def _cache_key(self, inp: SubAgentInput) -> str:
+        # inp.context is part of the user prompt (see _llm_call), so it must be
+        # part of the key. Keyed on the problem alone, TieBreaker -- whose only
+        # job is to arbitrate the Phase-1 signals carried in context -- returned
+        # a verdict computed from a *different* set of signals for the same
+        # problem text. Latent today only because HyperGateAgent (and with it
+        # every sub-agent instance and its per-instance _cache) is rebuilt per
+        # request; making the key complete keeps that an optimisation choice
+        # rather than the thing correctness rests on.
+        ctx = json.dumps(inp.context, sort_keys=True, default=str) if inp.context else ""
+        return hashlib.sha256(
+            json.dumps([self.AGENT_NAME, inp.problem, ctx]).encode()
+        ).hexdigest()
 
     async def _llm_call(
         self, inp: SubAgentInput, router: ProviderRouter

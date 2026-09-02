@@ -222,6 +222,18 @@ def extract_json_any(text: str) -> Any:
             except (json.JSONDecodeError, JSONDepthExceededError):
                 pass
 
+    # Repair truncated JSON (token-limit cutoffs) BEFORE the array fallback.
+    # Ordering is load-bearing: a response cut mid-object still contains whole
+    # inner arrays, so trying arrays first returned that inner array and threw
+    # away every named key of the outer object — the opposite of the
+    # prefer-objects rule above. Repair is a no-op on already-balanced text.
+    repaired = _repair_truncated_json(text)
+    if repaired:
+        try:
+            return safe_json_loads(_sanitize_json_escapes(_strip_trailing_commas(repaired)), max_depth=100)
+        except (json.JSONDecodeError, JSONDepthExceededError):
+            pass
+
     # Fallback to array extraction only if no object found
     if start_arr != -1:
         arr = _extract_balanced_structure(text, start_arr, "[", "]")
@@ -230,14 +242,6 @@ def extract_json_any(text: str) -> Any:
                 return safe_json_loads(_sanitize_json_escapes(_strip_trailing_commas(arr)), max_depth=100)
             except (json.JSONDecodeError, JSONDepthExceededError):
                 pass
-
-    # Try to repair truncated JSON (token-limit cutoffs) before falling back
-    repaired = _repair_truncated_json(text)
-    if repaired:
-        try:
-            return safe_json_loads(_sanitize_json_escapes(_strip_trailing_commas(repaired)), max_depth=100)
-        except (json.JSONDecodeError, JSONDepthExceededError):
-            pass
 
     # Fallback for objects with unescaped quotes
     reconstructed = _extract_json_dict_fallback(text)
@@ -264,10 +268,25 @@ def _sanitize_json_escapes(text: str) -> str:
     return text
 
 
+_TRAILING_COMMA_RE = re.compile(r',\s*([}\]])')
+_JSON_STRING_RE = re.compile(r'"(?:[^"\\]|\\.)*"')
+
+
 def _strip_trailing_commas(text: str) -> str:
-    """Remove trailing commas before closing braces/brackets — LLMs emit these often."""
-    # Match comma followed by optional whitespace and a closing brace/bracket
-    return re.sub(r',\s*([}\]])', r'\1', text)
+    """Remove trailing commas before closing braces/brackets — LLMs emit these often.
+
+    Applied ONLY outside string literals. A comma inside a value — ``"items =
+    [1, 2, ]"``, ``"pick A, B, or C, } closes it"`` — is the model's data, not
+    JSON syntax, and rewriting it silently corrupted the answer.
+    """
+    out: list[str] = []
+    pos = 0
+    for m in _JSON_STRING_RE.finditer(text):
+        out.append(_TRAILING_COMMA_RE.sub(r'\1', text[pos:m.start()]))
+        out.append(m.group(0))
+        pos = m.end()
+    out.append(_TRAILING_COMMA_RE.sub(r'\1', text[pos:]))
+    return "".join(out)
 
 
 def _extract_balanced_structure(text: str, start: int, open_char: str, close_char: str) -> str | None:
