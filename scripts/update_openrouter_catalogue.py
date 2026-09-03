@@ -74,6 +74,22 @@ def _trim(entry: dict[str, Any]) -> dict[str, Any] | None:
         },
         "supported_parameters": entry.get("supported_parameters") or [],
     }
+
+    # Per-model reasoning capability: which effort levels the model actually
+    # accepts, its default, and whether reasoning can be disabled. Upstream
+    # omits the key entirely for non-reasoning models, so the absence is
+    # meaningful and is preserved rather than defaulted to {}.
+    #
+    # Without this the gateway's per-phase effort was sent to every model
+    # unconditionally: 54 routed models advertise a restricted list (e.g.
+    # google/gemini-3.8-flash accepts only high/medium/low, while the
+    # classification and fusion phases ask for "minimal"), so an unsupported
+    # level was being sent on every such call. See
+    # infrastructure/llm/reasoning_effort.py for the clamp this feeds.
+    reasoning = entry.get("reasoning")
+    if isinstance(reasoning, dict):
+        trimmed["reasoning"] = reasoning
+
     return trimmed
 
 

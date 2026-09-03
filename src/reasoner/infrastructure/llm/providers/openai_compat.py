@@ -177,7 +177,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         # every streaming call fall back to the model's default effort —
         # silently spending more tokens than the phase config asked for.
         if self.extra_body:
-            kwargs["extra_body"] = self.extra_body
+            kwargs["extra_body"] = self._effective_extra_body()
 
         async with self.client.chat.completions.create(**kwargs) as response:
             async for chunk in response:
@@ -207,6 +207,19 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         "claude-opus", "claude-fable",
         "pareto-code",
     )
+
+    def _effective_extra_body(self) -> dict[str, Any]:
+        """``extra_body`` with ``reasoning.effort`` clamped to this model.
+
+        The per-phase effort is chosen by ``LLMExecutor`` before routing, so it
+        cannot account for the model the router actually lands on. This is the
+        first point where the served model is known for certain. Same shape of
+        per-model correction as :meth:`_supports_temperature`, applied to the
+        other reasoning knob.
+        """
+        from reasoner.infrastructure.llm.reasoning_effort import clamp_extra_body
+
+        return clamp_extra_body(self.model, self.extra_body) or {}
 
     def _supports_temperature(self) -> bool:
         """True when the model accepts a custom ``temperature`` parameter."""
@@ -271,7 +284,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             kwargs["temperature"] = temperature
 
         if self.extra_body:
-            kwargs["extra_body"] = self.extra_body
+            kwargs["extra_body"] = self._effective_extra_body()
         response_format = _json_response_format(self.model, system_prompt, user_prompt)
         if response_format is not None:
             kwargs["response_format"] = response_format
@@ -335,7 +348,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             kwargs["temperature"] = temperature
 
         if self.extra_body:
-            kwargs["extra_body"] = self.extra_body
+            kwargs["extra_body"] = self._effective_extra_body()
 
         response = await self.client.chat.completions.create(**kwargs)
         if not response.choices:
