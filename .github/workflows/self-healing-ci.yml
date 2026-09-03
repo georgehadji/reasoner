@@ -347,7 +347,7 @@ jobs:
           pip install -r requirements-dev.txt
       
       - name: Download Introspection Report
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: introspection-report
           path: healing/
