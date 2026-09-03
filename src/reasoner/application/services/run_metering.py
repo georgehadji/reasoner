@@ -1,8 +1,9 @@
 """Metering wrapper shared by every inbound adapter that runs a pipeline.
 
-A run is billed post-paid, from the ``total_cost_usd`` on its terminal ``done``
-frame, so metering is naturally a *wrapper around the stream* rather than a step
-before or after it.
+A run is billed post-paid, from the ``total_cost_usd`` carried on its
+``phase_complete`` frames and finalised on the terminal ``done`` frame, so
+metering is naturally a *wrapper around the stream* rather than a step before or
+after it.
 
 Keeping it here rather than in the HTTP layer is what stops a second adapter --
 the sync endpoint, an MCP tool -- from quietly running pipelines for free: an
@@ -93,8 +94,19 @@ class RunContext:
     reserved_credits: int = 0
 
 
+#: Frame types that carry a ``total_cost_usd``. ``done`` is the final figure;
+#: ``phase_complete`` carries the running total so an abandoned run is billed
+#: for what it actually spent rather than released in full.
+COST_BEARING_FRAME_TYPES = frozenset({"done", "phase_complete"})
+
+
 def extract_run_cost(frame: str) -> float | None:
-    """Pull ``total_cost_usd`` out of a terminal ``done`` SSE frame.
+    """Pull ``total_cost_usd`` out of a cost-bearing SSE frame.
+
+    ``done`` carries the final cost; ``phase_complete`` carries the running
+    total after each phase. Reading both is what lets a run abandoned
+    mid-stream settle its incurred spend instead of releasing the whole
+    reservation.
 
     Returns None for every other frame, including keep-alive comments and
     malformed payloads: a parsing problem must never break the stream the
@@ -106,7 +118,7 @@ def extract_run_cost(frame: str) -> float | None:
         event = json.loads(frame[len(SSE_DATA_PREFIX):])
     except (ValueError, TypeError):
         return None
-    if not isinstance(event, dict) or event.get("type") != "done":
+    if not isinstance(event, dict) or event.get("type") not in COST_BEARING_FRAME_TYPES:
         return None
     cost = event.get("total_cost_usd")
     if isinstance(cost, bool) or not isinstance(cost, (int, float)):
@@ -127,11 +139,16 @@ async def metered(
     has been delivered, so a ledger outage is reconciled later rather than
     surfaced to a caller who can do nothing about it.
 
-    Known gap: cost is only observable on that terminal frame, so a run
-    abandoned *before* it reports 0 and has its whole reservation released --
-    the LLM spend already incurred goes unbilled to the ledger, bounded only
-    by the per-worker `infrastructure.llm.spend_tracker` monthly ceiling.
-    Closing it needs a running cost on the intermediate frames.
+    A run abandoned mid-stream is billed for the spend it already incurred.
+    ``phase_complete`` frames carry a running ``total_cost_usd``, so the last
+    one seen before the client hung up is settled and only the remainder of the
+    reservation is released. Policy decision, 2026-09-03: the user pays for
+    tokens actually spent, because the providers bill us for them whether or
+    not anyone read the answer.
+
+    A run that genuinely cost nothing -- a cache hit, or an abort before the
+    first phase completed -- still releases the whole reservation, because
+    ``cost_usd`` stays 0.0 and :func:`_true_up` skips the settle.
     """
     cost_usd = 0.0
     has_error = False
@@ -229,6 +246,7 @@ __all__ = [
     "RunContext",
     "RunObserver",
     "SettlementSink",
+    "COST_BEARING_FRAME_TYPES",
     "extract_run_cost",
     "metered",
     "reserve_run_budget",

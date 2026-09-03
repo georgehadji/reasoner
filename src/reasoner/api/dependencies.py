@@ -658,12 +658,33 @@ async def check_quota(
     service = _get_quota_service()
     try:
         result = await service.check(str(user.id), user_tier)
-    except Exception:
+    except Exception as exc:
         # BUG-FIX: Use emergency conservative quota instead of fail open.
         # Previously any DB error granted unlimited quota (-1 remaining),
         # creating a trivial bypass for quota enforcement.
+        #
+        # This branch is still a fail-open, just a bounded one, and that is a
+        # deliberate availability choice rather than an oversight. What was an
+        # oversight is that it was SILENT: on 2026-09-01 a PostgreSQL defect
+        # had get_quota raising on every call, and a total quota outage was
+        # indistinguishable from every user having quota. The only trace was
+        # this warning. Emit a metric and log at error level so the condition
+        # is alertable; whether the policy itself should change to deny, or to
+        # a hard low ceiling, is a separate open decision.
         logger = logging.getLogger(__name__)
-        logger.warning("Quota check failed due to DB error, using emergency limits")
+        logger.error(
+            "Quota check failed (%s: %s) — falling back to the emergency "
+            "allowance. Quota is NOT being enforced for this request.",
+            type(exc).__name__,
+            exc,
+            exc_info=True,
+        )
+        try:
+            from reasoner.metrics import REASONER_QUOTA_CHECK_FAILURES
+
+            REASONER_QUOTA_CHECK_FAILURES.labels(reason=type(exc).__name__).inc()
+        except Exception:  # pragma: no cover - metrics must never break auth
+            pass
         return QuotaResult(allowed=True, remaining=10)
 
     if not result.allowed:

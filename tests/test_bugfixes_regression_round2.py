@@ -152,6 +152,71 @@ class TestQuotaCheckFailClosed:
         assert result.allowed is True
         assert result.remaining == 10  # Emergency limit, not -1 (unlimited)
 
+    @pytest.mark.asyncio
+    async def test_quota_db_error_increments_the_alertable_metric(self, monkeypatch, caplog):
+        """The emergency allowance above is a deliberate, bounded fail-open --
+        but it makes a total quota outage indistinguishable from every user
+        having quota. A PostgreSQL defect proved this in production: get_quota
+        raised on every call, and the only trace was a logger.warning nobody
+        reads. This pins that the fallback is now loud: a Prometheus counter
+        and an error-level log, not a silent path."""
+        from reasoner.api.dependencies import check_quota
+        from reasoner.domain.saas import User
+        from reasoner.metrics import REASONER_QUOTA_CHECK_FAILURES
+
+        user = User(id=uuid4(), email="test@example.com", display_name="Test", scopes=["read"])
+        before = REASONER_QUOTA_CHECK_FAILURES.labels(reason="RuntimeError")._value.get()
+
+        def broken_quota_service(*args, **kwargs):
+            raise RuntimeError("Simulated DB failure")
+
+        from reasoner.api import dependencies as deps_module
+        mock_service = MagicMock()
+        mock_service.check = broken_quota_service
+        monkeypatch.setattr(deps_module, "_quota_service", mock_service)
+
+        import logging
+
+        with caplog.at_level(logging.WARNING):
+            await check_quota(user=user)
+
+        after = REASONER_QUOTA_CHECK_FAILURES.labels(reason="RuntimeError")._value.get()
+        assert after == before + 1
+
+        error_records = [r for r in caplog.records if r.levelno >= logging.ERROR]
+        assert error_records, "the fallback must log at error, not warning -- that is the whole fix"
+        assert "Quota is NOT being enforced" in error_records[0].message
+
+    @pytest.mark.asyncio
+    async def test_a_broken_metrics_call_does_not_break_the_emergency_allowance(self, monkeypatch):
+        """Alerting must never become a second way for quota enforcement to
+        break. If the metrics client itself raises, the fallback still has to
+        return the emergency allowance rather than propagating a 500."""
+        from reasoner.api.dependencies import check_quota
+        from reasoner.domain.saas import User
+
+        user = User(id=uuid4(), email="test@example.com", display_name="Test", scopes=["read"])
+
+        def broken_quota_service(*args, **kwargs):
+            raise RuntimeError("Simulated DB failure")
+
+        from reasoner.api import dependencies as deps_module
+        mock_service = MagicMock()
+        mock_service.check = broken_quota_service
+        monkeypatch.setattr(deps_module, "_quota_service", mock_service)
+
+        class _ExplodingCounter:
+            def labels(self, **kwargs):
+                raise RuntimeError("metrics backend down")
+
+        import reasoner.metrics as metrics_module
+
+        monkeypatch.setattr(metrics_module, "REASONER_QUOTA_CHECK_FAILURES", _ExplodingCounter())
+
+        result = await check_quota(user=user)
+        assert result.allowed is True
+        assert result.remaining == 10
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # BUG-021: check_preset_access() always bypasses tier checks
