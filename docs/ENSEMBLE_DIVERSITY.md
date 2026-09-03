@@ -5,7 +5,9 @@ Shevlane, Day — Mantic Technologies; ICML 2026 Workshop on Forecasting as a Ne
 Frontier of Intelligence, arXiv:2606.29661v1) onto Reasoner's routing architecture,
 and separates the parts that transfer from the parts that do not.
 
-Status: analysis only. Nothing in this document has been implemented.
+Status: **D0 is implemented** — the Delphi routing defect in §4 is fixed. Everything
+else here is analysis only. The §4 defect description is deliberately kept in the
+present tense of its discovery, because it is the evidence for the fix.
 Code references verified against `main` @ `3ebeb5e` (2026-09-03).
 
 Companion build plan: [plans/ensemble-diversity-measurement.md](plans/ensemble-diversity-measurement.md).
@@ -141,8 +143,33 @@ lists the perspective, debate and generator roles but **not** `expert_*`. Rule 4
 two generator roles resolve to the identical underlying model") is written for exactly
 this failure and never fires here.
 
-**This is fixable independently of anything else in this note**, and is the single
-highest-value change it identifies. See plan workstream **D0**.
+### 4.1 Fixed (D0)
+
+Both Delphi presets now route four distinct models, and `expert_1..4` were added to
+`_GENERATOR_ROLES` so rule 4 covers the panel it was written for.
+
+| Slot | `delphi-budget` | `delphi-premium` |
+|---|---|---|
+| `expert_1` | `gpt-oss-120b` 🇺🇸 OpenAI | `gpt-5.6-terra` 🇺🇸 OpenAI |
+| `expert_2` | `ministral-3b` 🇪🇺 Mistral | `gemini-pro-real` 🇺🇸 Google |
+| `expert_3` | `mimo-v2.5` 🇨🇳 Xiaomi | `qwen3-max-thinking` 🇨🇳 Qwen |
+| `expert_4` | `llama-4-scout` 🇺🇸 Meta | `mistral-large-3` 🇪🇺 Mistral |
+
+Both panels span 3 blocs and 4 labs, with ≤2 slots per bloc.
+
+**The cost objection did not survive measurement.** Per `PRICING_DB` (the billing
+source of truth — several registry price comments disagree with it and are wrong),
+against the single model each panel previously collapsed onto:
+
+| | input | output |
+|---|---|---|
+| `delphi-budget` vs 4× `qwen3.5-flash` | +49% | **−14%** |
+| `delphi-premium` vs 4× `claude-sonnet` | **−34%** | **−26%** |
+
+Premium is strictly cheaper. Budget is output-cheaper and input-dearer, and round-1
+generation is output-dominated, so the net is roughly neutral — no budget-tier
+exemption was needed. Regression coverage:
+`tests/unit/test_delphi_expert_routing.py`.
 
 ---
 
@@ -182,7 +209,7 @@ therefore logs both.
 
 | # | Implication | Confidence | Cost |
 |---|---|---|---|
-| 1 | **Route Delphi's four experts to four distinct models** and add `expert_*` to `_GENERATOR_ROLES` | **VERIFIED** defect; fix is mechanical | Low |
+| 1 | ~~Route Delphi's four experts to four distinct models~~ — **shipped (§4.1)** | **VERIFIED** defect, now fixed | Done |
 | 2 | **Measure pairwise divergence on our own traffic** rather than importing the paper's rankings | INFERENCE — the paper's own weaknesses (§2) argue for this | Medium |
 | 3 | **Treat solo-quality ranking as a known bias** in `UtilityScorer`; diversity is pairwise and belongs in the constraint layer, not the utility scalar | INFERENCE, backed by the decomposition | Low (design) |
 | 4 | Re-examine the geopolitical bloc partition once measured data exists | HYPOTHESIS — see §4 caveat below | Deferred |

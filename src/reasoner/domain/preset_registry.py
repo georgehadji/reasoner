@@ -389,6 +389,27 @@ _REGISTRY: dict[str, dict] = {
         "stress_testing": "glm-5.3-flash",
         "verifier":       "gemini-2.5-flash-lite",   # Google 🇺🇸 — 3.3% HHEM hallucination (3rd best measured), $0.10/$0.40
         "post_synthesis_verify": "sonar",  # added v3.5
+        # ── Delphi expert panel (D0 — docs/ENSEMBLE_DIVERSITY.md §4) ──
+        # The four round-1 "independent forecasters" must be four DIFFERENT
+        # models. expert_1..4 were declared in _KNOWN_ROUTING_ROLES but routed
+        # by no preset, so ProviderRouter.resolve() fell through to primary_id
+        # and the whole panel was four temperature samples of ONE model — while
+        # the aggregation phase computed a median, IQR and "outlier expert" over
+        # what was really sampling noise. Keep these four slots distinct, and
+        # distinct from every other slot here (test_preset_model_uniqueness).
+        # 3 blocs / 4 labs, <=2 per bloc — BlocDiversityConstraint rules 2-4.
+        # Prices per M are PRICING_DB (what actually bills), NOT the registry
+        # comments — the two disagree for several models. llama-3.3-70b was the
+        # first pick for slot 4 and was dropped over it: comment $0.13/$0.40,
+        # PRICING_DB $0.71/$0.71 (~7x qwen3.5-flash on input).
+        #   gpt-oss-120b   🇺🇸 OpenAI   $0.037/$0.170  cheapest open-weight on OR
+        #   ministral-3b   🇪🇺 Mistral  $0.100/$0.100  the panel's only EU voice
+        #   mimo-v2.5      🇨🇳 Xiaomi   $0.140/$0.280  CN lab free (not scoring/fusion)
+        #   llama-4-scout  🇺🇸 Meta     $0.110/$0.340  != synthesis's llama-4-maverick
+        "expert_1":       "gpt-oss-120b",
+        "expert_2":       "ministral-3b",
+        "expert_3":       "mimo-v2.5",
+        "expert_4":       "llama-4-scout",
         },
         "tags": ["budget", "collaborative", "forecasting"],
     },
@@ -405,6 +426,25 @@ _REGISTRY: dict[str, dict] = {
         "stress_testing": "grok-4.6",             # xAI 🇺🇸 — AA Intel 60.9 vs 37.6 for 4.3, $2/$6, 500K ctx
         "verifier":       "grok-4.3",           # xAI 🇺🇸 — record 78% non-hallucination (AA Omniscience), 1M ctx, same price
         "post_synthesis_verify": "sonar-pro",  # added v3.5
+        # ── Delphi expert panel (D0 — docs/ENSEMBLE_DIVERSITY.md §4) ──
+        # The four round-1 "independent forecasters" must be four DIFFERENT
+        # models. expert_1..4 were declared in _KNOWN_ROUTING_ROLES but routed
+        # by no preset, so ProviderRouter.resolve() fell through to primary_id
+        # and the whole panel was four temperature samples of ONE model — while
+        # the aggregation phase computed a median, IQR and "outlier expert" over
+        # what was really sampling noise. Keep these four slots distinct, and
+        # distinct from every other slot here (test_preset_model_uniqueness).
+        # 3 blocs / 4 labs, <=2 per bloc — BlocDiversityConstraint rules 2-4.
+        # Prices per M are PRICING_DB (what actually bills), NOT the registry
+        # comments — gpt-5.6-terra's comment says $1/$6; PRICING_DB governs.
+        #   gpt-5.6-terra       🇺🇸 OpenAI   $2/$12
+        #   gemini-pro-real     🇺🇸 Google   $2/$12   != deep_read's 3.7-flash
+        #   qwen3-max-thinking  🇨🇳 Qwen     $0.78/$3.90  dedicated reasoning
+        #   mistral-large-3     🇪🇺 Mistral  $0.50/$1.50  cheapest EU anchor
+        "expert_1":       "gpt-5.6-terra",
+        "expert_2":       "gemini-pro-real",
+        "expert_3":       "qwen3-max-thinking",
+        "expert_4":       "mistral-large-3",
         },
         "tags": ["premium", "collaborative", "forecasting"],
     },

@@ -24,6 +24,11 @@ _GENERATOR_ROLES = frozenset({
     "empirical", "financial", "environmental", "ethical",
     "technical", "practical",
     "opening", "generator",
+    # Delphi round-1 panel. Omitted until D0 (docs/ENSEMBLE_DIVERSITY.md §4):
+    # the four "independent forecasters" all resolved to primary_id, and rule 4
+    # — written for exactly this — could not see them. tests/unit/
+    # test_preset_temperature_compat.py already counted these as generators.
+    "expert_1", "expert_2", "expert_3", "expert_4",
 })
 
 

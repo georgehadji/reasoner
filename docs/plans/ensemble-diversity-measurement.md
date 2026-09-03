@@ -60,7 +60,7 @@ Non-negotiable, because they are the reason we are measuring rather than importi
 
 ---
 
-## D0 — Fix Delphi expert routing *(prerequisite, and valuable alone)*
+## D0 — Fix Delphi expert routing — **SHIPPED**
 
 **The defect.** All four Delphi "independent forecasters" resolve to the preset primary.
 Full evidence in [ENSEMBLE_DIVERSITY §4](../ENSEMBLE_DIVERSITY.md). Summary:
@@ -81,25 +81,44 @@ defaults to `shadow`, so static routing governs.
    generator roles resolve to the identical underlying model") fire on Delphi, which is
    what it was written for. Note Rule 3 caps a bloc at 2 generator roles — with four
    experts this forces a genuine cross-bloc panel.
-3. Check the same class of gap elsewhere: any role reachable via `call_llm(role=...)` but
-   absent from every preset silently collapses onto primary. Audit `_KNOWN_ROUTING_ROLES`
-   against the union of preset routing keys and add a test that fails on any unrouted role.
+3. ~~Add a test that fails on any role in `_KNOWN_ROUTING_ROLES` unrouted by every
+   preset.~~ **Dropped — the premise was wrong.** 37 of the 86 known roles are routed
+   by no preset (`hypergate_*`, `subagent_*`, `classification`, `decomposition`,
+   `perspective`, the `article_*`/`sot_*`/`pot_*` families), and falling through to
+   `primary_id` is the intended behaviour for them. Being unrouted is not the defect.
+   The defect is narrower: **a role whose prompt asserts independence from its sibling
+   roles must resolve to a distinct model.** Delphi's panel is the case that matters;
+   the test asserts that invariant instead, and its docstring records why the blanket
+   rule was rejected.
 
-**Tests** (`tests/unit/test_delphi_expert_routing.py`)
-- `delphi-budget` and `delphi-premium` resolve `expert_1..4` to 4 distinct underlying
-  models via `resolved_model_of` (catches alias collisions, per Rule 4's intent).
-- `BlocDiversityConstraint` returns a hard violation when two experts share a model.
-- Regression: every role appearing in a `call_llm(role=...)` call site is routed by at
-  least one preset for its method, or is explicitly allow-listed as
-  intentionally-primary.
+**As built.** Both presets span 3 blocs / 4 labs, ≤2 slots per bloc, every slot a
+distinct served model (`test_preset_model_uniqueness` requires distinctness against
+`primary_id` and every other slot in the same preset, so the four picks had to avoid
+eight models already in use):
 
-**Risk.** Cost. Four distinct models on budget Delphi may exceed the ~$0.02/run target.
-Mitigation: pick four cheap cross-bloc models; verify against `estimate_service.py`
-before merge. If the budget tier cannot absorb it, route experts distinctly on premium
-only and document budget Delphi as single-model — **explicitly**, in the preset comment,
-rather than by silent fallback.
+| Slot | `delphi-budget` | `delphi-premium` |
+|---|---|---|
+| `expert_1` | `gpt-oss-120b` 🇺🇸 OpenAI | `gpt-5.6-terra` 🇺🇸 OpenAI |
+| `expert_2` | `ministral-3b` 🇪🇺 Mistral | `gemini-pro-real` 🇺🇸 Google |
+| `expert_3` | `mimo-v2.5` 🇨🇳 Xiaomi | `qwen3-max-thinking` 🇨🇳 Qwen |
+| `expert_4` | `llama-4-scout` 🇺🇸 Meta | `mistral-large-3` 🇪🇺 Mistral |
 
-**This workstream is independently shippable and should not wait for D1+.**
+**Tests** — `tests/unit/test_delphi_expert_routing.py`, 10 cases: every expert slot is
+routed; the four resolve to distinct served models; the panel spans ≥2 blocs with ≤2
+per bloc; `expert_*` are in `_GENERATOR_ROLES`; rule 4 emits a hard violation on a
+duplicated expert; a valid cross-bloc panel passes clean.
+
+**Cost — the risk did not materialise.** Measured against `PRICING_DB`, not the
+registry comments (they disagree, and `PRICING_DB` is what bills):
+`delphi-premium` is **−34% input / −26% output** versus the 4× `claude-sonnet` it
+collapsed onto; `delphi-budget` is **+49% input / −14% output** versus 4×
+`qwen3.5-flash`, and round-1 generation is output-dominated, so the net is roughly
+neutral. No budget-tier exemption was needed.
+
+Two registry price comments were found wrong while costing this and are flagged in
+the preset: `llama-3.3-70b` (comment $0.13/$0.40, `PRICING_DB` $0.71/$0.71 — dropped
+as a candidate because of it) and `gpt-5.6-terra` (comment $1/$6, `PRICING_DB`
+$2/$12). Neither is fixed here; costing any new slot should read `PRICING_DB`.
 
 ---
 
@@ -263,7 +282,7 @@ survived measurement. Amending before D6 would replace one unverified claim with
 
 | WS | Depends on | Effort | Ship independently? |
 |---|---|---|---|
-| D0 | — | S | **Yes — do this first** |
+| D0 | — | S | **Shipped** |
 | D1 | — | S | Yes (pure, no wiring) |
 | D2 | D1 | S | Yes |
 | D3a | D0, D2 | M | Yes |
@@ -278,7 +297,7 @@ survived measurement. Amending before D6 would replace one unverified claim with
 
 | Risk | Severity | Mitigation |
 |---|---|---|
-| D0 raises budget-Delphi cost past target | Medium | Cost-check before merge; premium-only fallback, documented explicitly |
+| ~~D0 raises budget-Delphi cost past target~~ | Closed | Measured: premium −34%/−26%, budget +49% input / −14% output, net ≈ neutral |
 | Insufficient data forever — Delphi is a low-traffic method | **Medium-High** | D3b probe is the volume source; if Delphi traffic is negligible, D6 may never reach significance. **Accept this outcome rather than lowering `MIN_PAIRS`** |
 | Divergence measured on Delphi estimates does not generalise to critique scoring | Medium | Store `source` on every observation; never pool `delphi_round1` and `shadow_scorer` pairs without checking they agree |
 | Probe cost is unattributed | Medium | Route through `run_metering`; default rate 0.0 |
