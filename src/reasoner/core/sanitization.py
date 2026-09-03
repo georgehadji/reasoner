@@ -225,7 +225,9 @@ def sanitize_for_prompt(text: str) -> tuple[str, list[str]]:
     return result.sanitized, warnings
 
 
-def neutralize_for_replay(text: str) -> tuple[str, list[str]]:
+def neutralize_for_replay(
+    text: str, max_length: int = DEFAULT_SANITIZER_MAX_LENGTH
+) -> tuple[str, list[str]]:
     """Sanitise text that is being *replayed* into a prompt, not accepted as a
     fresh instruction. Never raises, never blocks, never rewrites wording.
 
@@ -253,6 +255,12 @@ def neutralize_for_replay(text: str) -> tuple[str, list[str]]:
 
     Returns (sanitised_text, warnings). ``warnings`` is non-empty when something
     was changed or flagged.
+
+    ``max_length`` is the truncation ceiling. It defaults to the shared
+    sanitiser limit, which is right for a prior-turn synthesis, and is raised by
+    callers whose channel is legitimately larger -- attachment text, where
+    truncating a document to 10 000 characters would silently drop content the
+    pipeline is supposed to read.
     """
     if not text or not text.strip():
         return "", []
@@ -274,7 +282,7 @@ def neutralize_for_replay(text: str) -> tuple[str, list[str]]:
         warnings.append("Potential prompt injection pattern in replayed text")
 
     sanitizer = InputSanitizer(
-        max_length=DEFAULT_SANITIZER_MAX_LENGTH,
+        max_length=max_length,
         allow_html=True,
         block_injection=False,
     )
@@ -360,19 +368,23 @@ def sanitize_for_logging(text: str, max_length: int = 200) -> str:
     """
     Sanitize text for logging (removes sensitive patterns).
     """
-    # Broader regex for secrets (SEC-025)
-    sanitized = re.sub(
-        r"(api[_-]?key|token|secret|password|bearer|authorization)[\s=:]+[^\s&]{4,}",
-        r"\1=***REDACTED***",
-        text,
-        flags=re.IGNORECASE,
-    )
-
-    # Catch JWT-like patterns
+    # Catch JWT-like patterns first so the auth-scheme pass below can't
+    # swallow the JWT into a generic ***REDACTED*** before this sees it.
     sanitized = re.sub(
         r"eyJ[A-Za-z0-9_-]*\.eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*",
         "***JWT_REDACTED***",
+        text,
+    )
+
+    # Broader regex for secrets (SEC-025). The optional second token covers
+    # "Authorization: Bearer <token>": without it, [^\s&]{4,} stops at the
+    # scheme word "Bearer" and leaves the actual credential unredacted.
+    sanitized = re.sub(
+        r"(api[_-]?key|token|secret|password|bearer|authorization)[\s=:]+"
+        r"[^\s&]{4,}(?:\s+(?!\*\*\*)[^\s&]{4,})?",
+        r"\1=***REDACTED***",
         sanitized,
+        flags=re.IGNORECASE,
     )
 
     # Truncate if too long

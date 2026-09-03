@@ -52,17 +52,27 @@ class QuotaService:
         from datetime import datetime
         now = datetime.now(UTC)
         current_period_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        if quota.period_start < current_period_start:
+        # period_start is nullable and no INSERT path sets it, so a row that has
+        # never been reset arrives as None. Treat it as a stale period rather
+        # than comparing None to a datetime.
+        if quota.period_start is None or quota.period_start < current_period_start:
             await self._repository.reset_monthly(user_id)
             quota = await self._repository.get_quota(user_id)
 
-        remaining = max(0, quota.max_queries - quota.used_queries)
+        # The entitlement tier is a ceiling over the persisted row, not a
+        # synonym for it: invoice.payment_failed demotes a subscription to
+        # past_due (tier -> FREE) without re-syncing max_queries, so the row
+        # can still say 500. -1 on the row means unlimited, not a negative cap.
+        row_max = limit if quota.max_queries < 0 else quota.max_queries
+        effective_max = min(limit, row_max)
+
+        remaining = max(0, effective_max - quota.used_queries)
         if remaining <= 0:
             return QuotaResult(
                 allowed=False,
                 remaining=0,
                 retry_after=self._seconds_until_month_end(),
-                reason=f"Quota exceeded: {quota.used_queries}/{quota.max_queries} queries used this period.",
+                reason=f"Quota exceeded: {quota.used_queries}/{effective_max} queries used this period.",
             )
 
         return QuotaResult(allowed=True, remaining=remaining)
@@ -80,5 +90,6 @@ class QuotaService:
         """Rough estimate for Retry-After header."""
         from datetime import datetime, timedelta
         now = datetime.now(UTC)
-        next_month = (now.replace(day=1) + timedelta(days=32)).replace(day=1)
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        next_month = (month_start + timedelta(days=32)).replace(day=1)
         return int((next_month - now).total_seconds())

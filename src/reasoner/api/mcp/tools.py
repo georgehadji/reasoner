@@ -255,16 +255,24 @@ def register_tools(mcp) -> None:
     @mcp.tool(
         annotations=ToolAnnotations(title="Preview routing", readOnlyHint=True),
     )
-    async def reasoner_gate(problem: str, preset: str = "auto-budget") -> dict[str, Any]:
-        """Preview how a problem would be routed, without running or paying for it.
+    async def reasoner_gate(
+        problem: str, ctx: Context, preset: str = "auto-budget"
+    ) -> dict[str, Any]:
+        """Preview how a problem would be routed, without running the pipeline.
 
         Returns action (direct/web_search/pipeline), method, confidence, and
         alternatives. Call this first when unsure whether reasoner_run is
         warranted -- it shares HyperGate's own cache, so a following
         reasoner_run on the same problem does not re-pay the routing cost.
+
+        Authenticated like reasoner_run: HyperGate is five concurrent LLM
+        calls, so this spends real provider budget even though it runs no
+        pipeline. reasoner_estimate and reasoner_presets stay open because
+        they spend nothing.
         """
         from reasoner.application.services.gate_service import decide_route
 
+        await resolve_caller(ctx)
         return await decide_route(problem, preset)
 
     @mcp.tool(

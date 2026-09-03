@@ -17,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -57,13 +57,13 @@ jobs:
           # rename.
           # 2251: W6 deleted harness_guard.py's hand-maintained ~150-entry
           # _MODEL_LABS dict in favour of ModelRegistryPort.vendor_of() -- -2.
-          # 2249: paying for W5. tests/architecture/test_layer_boundaries.py
+          # 2244: paying for W5. tests/architecture/test_layer_boundaries.py
           # pins api/__init__.py at 1104 lines with the rule "do not raise a cap
           # without shrinking the corresponding module first", so the cache-port
           # wiring moved to infrastructure/valkey/cache_adapter.py and three dead
           # stdlib imports (secrets, json, datetime/timezone) went with it -- -4
           # F401 there, +2 elsewhere in the moved block.
-          python scripts/ruff_ratchet.py --max 2249
+          python scripts/ruff_ratchet.py --max 2244
 
       - name: Security scan (bandit)
         run: |
@@ -123,7 +123,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
@@ -137,6 +137,17 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+      # ui-next has had 23 vitest files and no job running them: the `npm test`
+      # in the sdk job below caches a different lockfile, and quality.yml's
+      # Playwright a11y spec is continue-on-error. So these 211 assertions,
+      # four of them security suites, have never gated a merge.
+      #
+      # Here rather than in quality.yml: that workflow is path-filtered to
+      # ui-next/** and advisory, and a backend change can break a frontend
+      # contract test without touching a single ui-next file.
+      - name: Test
+        run: npm test
 
       - name: Design token guard (no raw Tailwind palette colors)
         run: |
@@ -157,7 +168,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm

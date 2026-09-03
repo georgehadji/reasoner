@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from uuid import UUID
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -35,7 +36,7 @@ def repo(mock_pool):
 @pytest.mark.asyncio
 async def test_get_quota_existing_user(repo, mock_pool):
     mock_pool.fetchrow.return_value = {
-        "user_id": "11111111-1111-1111-1111-111111111111",
+        "user_id": UUID("11111111-1111-1111-1111-111111111111"),
         "tier": "free",
         "used_queries": 5,
         "max_queries": 20,
@@ -53,7 +54,7 @@ async def test_get_quota_creates_default_for_new_user(repo, mock_pool):
     mock_pool.fetchrow.side_effect = [
         None,  # First call: no row
         {
-            "user_id": "22222222-2222-2222-2222-222222222222",
+            "user_id": UUID("22222222-2222-2222-2222-222222222222"),
             "tier": "free",
             "used_queries": 0,
             "max_queries": 20,

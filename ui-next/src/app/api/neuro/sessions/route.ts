@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
-import { getApiBaseUrl, validateUpstreamUrl, neuroKeyHeader } from '@/lib/security-server';
+import {
+  getApiBaseUrl,
+  validateUpstreamUrl,
+  neuroKeyHeader,
+  sanitizeResponseHeaders,
+} from '@/lib/security-server';
 import { API } from '@/lib/config';
 
 export async function GET(request: Request) {
@@ -12,15 +17,24 @@ export async function GET(request: Request) {
     });
 
     const resp = await fetch(upstream.toString(), {
-      headers: {
-        cookie: request.headers.get('cookie') || '',
-        ...neuroKeyHeader(),
-      },
+      // No cookie forwarding. sanitizeRequestHeaders' allowlist deliberately
+      // omits `cookie`, and these two routes were the only ones bypassing it.
+      // The Neuro backend authenticates on X-Neuro-Key alone (neuro/server.py
+      // require_neuro_key, which reads request.headers) and touches no cookie
+      // anywhere, so the browser's session and CSRF cookies were being handed
+      // to a component that never reads them.
+      headers: neuroKeyHeader(),
     });
 
+    // Every other proxy route returns sanitizeResponseHeaders(resp). These two
+    // returned `resp.headers` raw, which forwarded hop-by-hop headers the proxy
+    // must terminate (transfer-encoding, connection) and, worse, omitted the
+    // `Cache-Control: no-store, private` that helper sets. A session list is
+    // per-user data; without no-store an intermediary may cache one user's
+    // sessions and serve them to the next.
     return new Response(resp.body, {
       status: resp.status,
-      headers: resp.headers,
+      headers: sanitizeResponseHeaders(resp),
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Proxy error';

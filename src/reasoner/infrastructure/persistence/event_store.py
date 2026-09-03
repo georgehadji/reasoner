@@ -7,6 +7,7 @@ Supports aggregate reconstruction and temporal queries.
 
 from __future__ import annotations
 
+import inspect
 import json
 import logging
 import sqlite3
@@ -141,9 +142,12 @@ class EventStore:
             OSError: If database file is inaccessible
         """
         def _save_events_sync():
+            # Acquired OUTSIDE the try: every except branch below calls
+            # conn.rollback(), so a failure to open the connection raised
+            # UnboundLocalError from the handler and destroyed the real
+            # sqlite3.Error this method documents itself as raising.
+            conn = self._get_connection()
             try:
-                conn = self._get_connection()
-
                 for event in events:
                     # Serialize event payload
                     payload = json.dumps({
@@ -285,7 +289,13 @@ class EventStore:
         updates = []
         values = []
 
-        updates.append("current_version = ?")
+        # MAX(), not plain assignment: two writers append to the same
+        # aggregate concurrently (the request coroutine's _persist_event and
+        # the event bus' persist_all_events subscriber), so the last INSERT to
+        # win the lock is not the one carrying the highest version. Assigning
+        # unconditionally let current_version regress below the aggregate's
+        # true head, which get_aggregate_state()/list_pipelines() then report.
+        updates.append("current_version = MAX(current_version, ?)")
         values.append(event.version)
 
         updates.append("updated_at = datetime('now')")
@@ -846,9 +856,32 @@ def get_event_store(db_path: str | Path | None = None) -> Any:
     return _event_store
 
 
-def reset_event_store() -> None:
-    """Reset global event store (for testing)."""
+async def close_event_store() -> None:
+    """Close the global event store, awaiting the close when it is async.
+
+    get_event_store() returns either backend: EventStore.close() is sync, but
+    PostgreSQLEventStore.close() is a coroutine that awaits both the write and
+    read asyncpg pools. Calling it without awaiting discards the coroutine and
+    leaks both pools, with only a RuntimeWarning to show for it. Dispatch on
+    awaitability rather than on the class, so a third backend cannot silently
+    reintroduce the same leak.
+    """
     global _event_store
-    if _event_store:
-        _event_store.close()
-    _event_store = None
+    if _event_store is None:
+        return
+    try:
+        result = _event_store.close()
+        if inspect.isawaitable(result):
+            await result
+    finally:
+        _event_store = None
+
+
+async def reset_event_store() -> None:
+    """Reset global event store (for testing).
+
+    Async because the Postgres backend's close() is. This had no call sites
+    when it was made async, so nothing needed updating -- but a sync caller
+    that forgot to await would leak exactly what this exists to release.
+    """
+    await close_event_store()
