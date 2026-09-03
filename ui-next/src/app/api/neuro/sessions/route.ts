@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
-import { getApiBaseUrl, validateUpstreamUrl, neuroKeyHeader } from '@/lib/security-server';
+import {
+  getApiBaseUrl,
+  validateUpstreamUrl,
+  neuroKeyHeader,
+  sanitizeResponseHeaders,
+} from '@/lib/security-server';
 import { API } from '@/lib/config';
 
 export async function GET(request: Request) {
@@ -18,9 +23,15 @@ export async function GET(request: Request) {
       },
     });
 
+    // Every other proxy route returns sanitizeResponseHeaders(resp). These two
+    // returned `resp.headers` raw, which forwarded hop-by-hop headers the proxy
+    // must terminate (transfer-encoding, connection) and, worse, omitted the
+    // `Cache-Control: no-store, private` that helper sets. A session list is
+    // per-user data; without no-store an intermediary may cache one user's
+    // sessions and serve them to the next.
     return new Response(resp.body, {
       status: resp.status,
-      headers: resp.headers,
+      headers: sanitizeResponseHeaders(resp),
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Proxy error';
