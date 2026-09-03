@@ -7,16 +7,22 @@ import {
 } from '@/lib/security-server';
 import { API } from '@/lib/config';
 
-export async function GET(request: Request) {
+// No parameter: this route reads nothing off the request. It previously took
+// `request` only to forward the browser's cookie header upstream, which the
+// Neuro backend never reads.
+export async function GET() {
   try {
     const apiBase = validateUpstreamUrl(getApiBaseUrl());
     const upstream = new URL(`${apiBase}${API.NEURO_HEALTH}`);
 
     const resp = await fetch(upstream.toString(), {
-      headers: {
-        cookie: request.headers.get('cookie') || '',
-        ...neuroKeyHeader(),
-      },
+      // No cookie forwarding. sanitizeRequestHeaders' allowlist deliberately
+      // omits `cookie`, and these two routes were the only ones bypassing it.
+      // The Neuro backend authenticates on X-Neuro-Key alone (neuro/server.py
+      // require_neuro_key, which reads request.headers) and touches no cookie
+      // anywhere, so the browser's session and CSRF cookies were being handed
+      // to a component that never reads them.
+      headers: neuroKeyHeader(),
     });
 
     if (resp.status === 404) {

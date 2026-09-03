@@ -51,6 +51,16 @@ export async function saveConversation(data: Conversation): Promise<string> {
     kind: data.kind || 'pipeline',
     response_content: data.response_content,
     images: data.images,
+    // These two are declared on Conversation but were missing from this
+    // literal, so they were dropped on every save. pipeline_id is the
+    // load-bearing one: chat/page.tsx sets it on a finished run, and
+    // Sidebar.tsx gates the Resume button on `conv.pipeline_id`, reading a
+    // conversation back out of here -- so the button could never appear for a
+    // persisted run and resume-after-reload was dead. `widgets` has no writer
+    // today; it is restored because omitting a declared field from an explicit
+    // literal is the same latent bug waiting for its first writer.
+    widgets: data.widgets,
+    pipeline_id: data.pipeline_id,
     prompt_meta: data.prompt_meta,
   };
   await db.put(STORE_NAME, record);

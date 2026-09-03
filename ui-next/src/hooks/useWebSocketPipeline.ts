@@ -174,6 +174,15 @@ export function useWebSocketPipeline() {
   useEffect(() => {
     return () => {
       clearReconnect();
+      // Null these BEFORE close(). close() fires onclose asynchronously, and
+      // onclose reconnects whenever pipelineIdRef still matches the socket's
+      // pipeline. Clearing the timer first is not enough: onclose runs after
+      // this cleanup has finished and schedules a fresh timer into a ref
+      // nobody will ever clear again, which then reconnects an unmounted hook
+      // and setStates on it, up to WS.maxReconnectAttempts times.
+      // disconnect() above already orders it this way; unmount did not.
+      pipelineIdRef.current = null;
+      onEventRef.current = null;
       if (wsRef.current) {
         wsRef.current.close();
         wsRef.current = null;

@@ -28,7 +28,11 @@ const upstreamHeaders = {
 };
 
 function stubUpstream(status = 200, body = '{"entries":[],"total":0}') {
-  const fetchMock = vi.fn(
+  // The arg list goes in the generic, not in unused parameters: a zero-arg
+  // mock makes `mock.calls[0]` an empty tuple, so reading the init argument is
+  // a tsc error, and naming the parameters `_input`/`_init` instead trips
+  // no-unused-vars because this config has no leading-underscore exemption.
+  const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(
     async () =>
       // A plain object rather than a real Response: constructing a Response
       // with `transfer-encoding` set is refused by undici's header guard.
@@ -85,5 +89,33 @@ describe.each([
     // two assertions above while breaking every real client.
     expect(res.headers.get('x-upstream-marker')).toBe('kept');
     expect(res.headers.get('content-type')).toContain('application/json');
+  }, 20_000);
+});
+
+describe.each([
+  ['sessions', './sessions/route', 'http://localhost:3000/api/neuro/sessions'],
+  ['health', './health/route', 'http://localhost:3000/api/neuro/health'],
+])('/api/neuro/%s upstream request headers', (_name, modulePath, url) => {
+  it('does not forward the browser cookie jar upstream', async () => {
+    const fetchMock = stubUpstream();
+    const { GET } = await import(modulePath);
+
+    // health's GET takes no parameter at all now, sessions' still reads
+    // searchParams. Passing the Request to both is safe: an extra argument to a
+    // zero-arity function is ignored, and the assertion below is about what
+    // reaches `fetch`, not about what the handler accepts.
+    await GET(
+      new Request(url, {
+        headers: { cookie: 'sb-access-token=secret; csrf_token=abc' },
+      }),
+    );
+
+    // sanitizeRequestHeaders' allowlist deliberately omits `cookie`, and these
+    // two routes were the only ones bypassing it. The Neuro backend
+    // authenticates on X-Neuro-Key alone (neuro/server.py require_neuro_key)
+    // and reads no cookie anywhere, so this only ever leaked the user's
+    // session and CSRF cookies to a component with no use for them.
+    const sent = new Headers(fetchMock.mock.calls[0]?.[1]?.headers as HeadersInit);
+    expect(sent.get('cookie')).toBeNull();
   }, 20_000);
 });
