@@ -27,6 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "src"))
 
 from reasoner.domain.preset_registry import _REGISTRY as PRESETS  # noqa: E402
 from reasoner.infrastructure.llm.registry import (  # noqa: E402
+    DEPRECATED_ALIASES,
     _MODEL_WHITELIST,
     _vendor_of,
     resolved_model_of,
@@ -52,22 +53,11 @@ _IMPLIED_VENDOR: tuple[tuple[str, str], ...] = (
     ("seedream", "bytedance-seed"),
 )
 
-# Aliases whose NAME misstates the version or tier they serve. Every one is a
-# deliberate back-compat or cost redirection, documented at its registry entry.
-# They may exist; a preset may not route them. Removing an entry from this set
-# requires either fixing the alias name or deleting the alias.
-_DEPRECATED_MISLEADING: frozenset[str] = frozenset({
-    "deepseek-v3",             # serves deepseek/deepseek-v4-flash
-    "deepseek-v4-flash-0424",  # a "pin" that pins nothing
-    "qwen3-turbo",             # serves qwen/qwen3.5-flash-02-23
-    "qwen3-max",               # serves qwen/qwen3.7-plus (the real one is qwen3-max-real)
-    "qwen3-plus",              # serves qwen/qwen3.7-plus
-    "qwen3.5-plus",            # serves qwen/qwen3.7-plus
-    "qwen3.6-plus",            # serves qwen/qwen3.7-plus
-    "mimo-v2-flash",           # serves xiaomi/mimo-v2.5
-    "mimo-v2-pro",             # serves xiaomi/mimo-v2.5-pro
-    "gemini-3.1-flash-lite",   # duplicate of gemini-flash-lite-real
-})
+# The canonical list lives in the registry (infrastructure owns alias facts) so
+# PresetService can warn on it at runtime; this test only pins its properties.
+# Removing an entry requires either fixing the alias name or deleting the alias
+# -- and deleting one is a breaking API change, see the registry's own comment.
+_DEPRECATED_MISLEADING: frozenset[str] = frozenset(DEPRECATED_ALIASES)
 
 _CATALOGUE = Path(__file__).resolve().parents[2] / "src" / "reasoner" / "domain" / "openrouter_models.json"
 
@@ -130,8 +120,12 @@ def test_every_preset_routed_model_exists_in_the_catalogue():
     """A routed alias pointing at a withdrawn model fails only at call time.
 
     Checked against domain/openrouter_models.json -- the copy that pricing.py
-    and capability_registry.py actually load. The stale duplicate at the repo
-    root is ~74 models behind and must not be used for this.
+    and image_model_catalogue.py actually load, and now the only one any code
+    reads. A stale 346-entry duplicate used to sit at the repo root (a local
+    scratch dump per docs/openrouter-catalogue-2026-08.md); auditing against it
+    reported 124 false "dead model" hits, so it was deleted. An equally stale
+    copy remains under docs/ as a dated archive -- see
+    tests/unit/test_catalogue_source.py.
     """
     if not _CATALOGUE.exists():
         pytest.skip("catalogue snapshot missing")
@@ -150,3 +144,63 @@ def test_every_preset_routed_model_exists_in_the_catalogue():
         "presets route aliases whose served model is absent from the catalogue "
         f"snapshot (verify upstream before trusting): {missing}"
     )
+
+
+# ── Phase 1 of the deprecation: observe, do not break ──────────────────────
+# `routing` is a public request field (api/schemas.py), so a caller may still
+# name a deprecated alias. It must keep working -- and it must be visible that
+# they did, so a later decision to delete rests on evidence rather than hope.
+
+
+@pytest.mark.unit
+def test_caller_supplied_deprecated_alias_is_warned_about(caplog):
+    from reasoner.application.services.preset_service import PresetService
+
+    with caplog.at_level("WARNING", logger="reasoner.application.services.preset_service"):
+        PresetService().build_router(
+            "multi-perspective-budget",
+            custom_routing={"primary": "claude-sonnet", "constructive": "deepseek-v3"},
+        )
+
+    warned = [r.getMessage() for r in caplog.records if "Deprecated model alias" in r.getMessage()]
+    assert warned, f"no deprecation warning; saw {[r.getMessage() for r in caplog.records]}"
+    msg = warned[0]
+    assert "deepseek-v3" in msg and "constructive" in msg
+    assert "deepseek-v4-flash" in msg, "warning must name the honest replacement"
+
+
+@pytest.mark.unit
+def test_deprecated_alias_still_routes(caplog):
+    """Warning only. The alias resolves exactly as before -- no behaviour change."""
+    from reasoner.application.services.preset_service import PresetService
+
+    _, router = PresetService().build_router(
+        "multi-perspective-budget",
+        custom_routing={"primary": "claude-sonnet", "constructive": "deepseek-v3"},
+    )
+    assert router.resolve("constructive").model == resolved_model_of("deepseek-v3")
+
+
+@pytest.mark.unit
+def test_honest_alias_produces_no_warning(caplog):
+    from reasoner.application.services.preset_service import PresetService
+
+    with caplog.at_level("WARNING", logger="reasoner.application.services.preset_service"):
+        PresetService().build_router(
+            "multi-perspective-budget",
+            custom_routing={"primary": "claude-sonnet", "constructive": "deepseek-v4-flash"},
+        )
+    assert not [r for r in caplog.records if "Deprecated model alias" in r.getMessage()]
+
+
+@pytest.mark.unit
+def test_every_deprecated_alias_names_a_resolvable_replacement():
+    for alias, replacement in DEPRECATED_ALIASES.items():
+        assert replacement in _MODEL_WHITELIST, (
+            f"{alias} points at replacement {replacement!r}, which is not registered"
+        )
+        assert resolved_model_of(alias) == resolved_model_of(replacement), (
+            f"{alias} serves {resolved_model_of(alias)} but its stated replacement "
+            f"{replacement} serves {resolved_model_of(replacement)} -- the warning "
+            f"would send callers to a different model"
+        )

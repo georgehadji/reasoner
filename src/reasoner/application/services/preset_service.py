@@ -57,9 +57,22 @@ class PresetService:
         """Build a ProviderRouter from a preset or custom routing."""
         registry = get_model_registry_port()
         if custom_routing:
-            for model_id in custom_routing.values():
+            # Phase 1 of the alias deprecation (docs/ENSEMBLE_DIVERSITY.md):
+            # observe, do not break. `routing` is a public request field, so a
+            # caller may still name an alias whose own name misstates the model
+            # it serves. Warn with the honest replacement and route it anyway;
+            # deletion waits on evidence that nobody sends these.
+            deprecated = registry.deprecated_aliases()
+            for role, model_id in custom_routing.items():
                 if not registry.contains(model_id):
                     raise ValueError(f"Unknown model ID: {model_id}")
+                replacement = deprecated.get(model_id)
+                if replacement:
+                    logger.warning(
+                        "Deprecated model alias %r in custom routing for role %r: "
+                        "it serves %s, not what its name says. Use %r instead.",
+                        model_id, role, registry.resolved_model_of(model_id), replacement,
+                    )
             filtered = self.filter_routing(custom_routing, "claude-sonnet")
             router = build_custom_router(filtered)
             return preset_name, router

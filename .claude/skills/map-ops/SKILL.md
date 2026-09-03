@@ -115,7 +115,6 @@ folders:
 | `Caddyfile`, `Caddyfile.prod` | Edge and TLS. |
 | `.env.example` | Every supported environment variable with sample values. |
 | `CLAUDE.md`, `AGENTS.md`, `README.md`, `CONTRIBUTING.md`, `CHANGELOG.md`, `LICENSE`, `AUTHORS` | Project documentation. |
-| `openrouter_models.json`, `openrouter_models_formatted.txt` | Bundled catalogue snapshot used by pricing and capability inference. |
 
 **Also at root:** many historical audit reports, plans, transcripts, and scratch scripts (`*_report.md`, `check_*.py`, `find_*.py`, `temp_*.py`, root-level `test_*.py`, `pytest_full_output*.txt`, `todo.md` / `todo.txt`, `*.log`). Not load-bearing — do not treat them as current specs, and do not add more.
 

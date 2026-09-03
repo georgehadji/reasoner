@@ -667,6 +667,28 @@ _VENDOR_BLOC: dict[str, str] = {
 }
 
 
+DEPRECATED_ALIASES: dict[str, str] = {
+    # alias -> the alias naming the model it actually serves.
+    # Every one of these is a deliberate back-compat or cost redirection whose
+    # NAME misstates the version or tier it resolves to. They keep working:
+    # ``routing`` is a public request field (api/schemas.py), an unknown model
+    # id raises ValueError in PresetService.build_router, and older saved states
+    # may still name them -- so deleting one is a breaking API change. No preset
+    # routes them; PresetService warns when a caller does. See
+    # docs/ENSEMBLE_DIVERSITY.md and tests/unit/test_model_alias_honesty.py.
+    "deepseek-v3": "deepseek-v4-flash",
+    "deepseek-v4-flash-0424": "deepseek-v4-flash",
+    "qwen3-turbo": "qwen3.5-flash",
+    "qwen3-max": "qwen3.7-plus",
+    "qwen3-plus": "qwen3.7-plus",
+    "qwen3.5-plus": "qwen3.7-plus",
+    "qwen3.6-plus": "qwen3.7-plus",
+    "mimo-v2-flash": "mimo-v2.5",
+    "mimo-v2-pro": "mimo-v2.5-pro",
+    "gemini-3.1-flash-lite": "gemini-flash-lite-real",
+}
+
+
 def _vendor_of(model_id: str) -> str:
     """Resolve a whitelist model ID to its underlying OpenRouter vendor prefix.
 
@@ -810,3 +832,7 @@ class RegistryAdapter:
     def resolved_model_of(self, model_id: str) -> str:
         """Delegate to :func:`resolved_model_of` — see ``ModelRegistryPort.resolved_model_of``."""
         return resolved_model_of(model_id)
+
+    def deprecated_aliases(self) -> dict[str, str]:
+        """Delegate to :data:`DEPRECATED_ALIASES` — see the port for semantics."""
+        return dict(DEPRECATED_ALIASES)

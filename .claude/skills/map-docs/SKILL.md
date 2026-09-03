@@ -50,7 +50,7 @@ folders:
 
 ## Model and routing references (dated — check the date before trusting)
 
-`model-capability-per-phase-2026-08.md`, `preset-phase-model-matrix.md`, `multi-perspective-model-characteristics.md`, `phase-thinking-and-temperature-2026-08.md`, `openrouter-catalogue-2026-08.md`, `openrouter_recommendations.md`, `openrouter_final_recommendations.md`, `OPENROUTER_MIGRATION.md`, `OPENROUTER_IMPLEMENTATION_SUMMARY.md`, `MODEL_REPLACEMENT_GEMINI_FLASH_LITE.md`, plus raw `openrouter_models.json` and `openrouter_models_formatted.txt` snapshots.
+`model-capability-per-phase-2026-08.md`, `preset-phase-model-matrix.md`, `multi-perspective-model-characteristics.md`, `phase-thinking-and-temperature-2026-08.md`, `openrouter-catalogue-2026-08.md`, `openrouter_recommendations.md`, `openrouter_final_recommendations.md`, `OPENROUTER_MIGRATION.md`, `OPENROUTER_IMPLEMENTATION_SUMMARY.md`, `MODEL_REPLACEMENT_GEMINI_FLASH_LITE.md`, plus raw `openrouter_models.json` and `openrouter_models_formatted.txt` snapshots — **archive only, and stale**: 346 entries against the live catalogue's 420, missing `anthropic/claude-sonnet-5` among others. The only catalogue any code may load is `src/reasoner/domain/openrouter_models.json` (enforced by `tests/unit/test_catalogue_source.py`); auditing against these copies reports live models as dead.
 
 ## audits/ and security/
 
