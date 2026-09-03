@@ -16,4 +16,11 @@ pytest>=8.0.0,<9.0.0
 pytest-asyncio>=0.23.0,<0.25.0
 pytest-timeout>=2.0.0,<3.0.0
 pytest-xdist>=3.0.0,<4.0.0
+# Randomises test order every run. Added because the T1 order-dependence
+# sweep could not run without it: pytest.ini pins --dist loadscope, so a
+# worker-count change reshuffles which modules share a worker but never
+# reorders tests inside a module -- the exact blind spot the
+# _SHARED_CACHE_PORT leak lived in. A failure here is a real isolation
+# defect; reproduce it with the -p randomly seed printed in the header.
+pytest-randomly>=3.15.0,<4.0.0
 hypothesis>=6.100.0,<7.0.0
