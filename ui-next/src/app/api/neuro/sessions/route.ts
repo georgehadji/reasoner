@@ -17,10 +17,13 @@ export async function GET(request: Request) {
     });
 
     const resp = await fetch(upstream.toString(), {
-      headers: {
-        cookie: request.headers.get('cookie') || '',
-        ...neuroKeyHeader(),
-      },
+      // No cookie forwarding. sanitizeRequestHeaders' allowlist deliberately
+      // omits `cookie`, and these two routes were the only ones bypassing it.
+      // The Neuro backend authenticates on X-Neuro-Key alone (neuro/server.py
+      // require_neuro_key, which reads request.headers) and touches no cookie
+      // anywhere, so the browser's session and CSRF cookies were being handed
+      // to a component that never reads them.
+      headers: neuroKeyHeader(),
     });
 
     // Every other proxy route returns sanitizeResponseHeaders(resp). These two
