@@ -63,7 +63,11 @@ jobs:
           # wiring moved to infrastructure/valkey/cache_adapter.py and three dead
           # stdlib imports (secrets, json, datetime/timezone) went with it -- -4
           # F401 there, +2 elsewhere in the moved block.
-          python scripts/ruff_ratchet.py --max 2244
+          # 2243: removing two delisted models (kwaipilot/kat-coder-air-v2.5,
+          # arcee-ai/virtuoso-large) took one E501 comment line with them, and
+          # three over-long registry comments added alongside the new models were
+          # reflowed under 100 -- -4 against this branch, -1 against main.
+          python scripts/ruff_ratchet.py --max 2243
 
       - name: Security scan (bandit)
         run: |

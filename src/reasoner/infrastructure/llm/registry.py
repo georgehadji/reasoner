@@ -29,6 +29,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ═══════════════════════════════════════════════════════════════
     # Anthropic
     # ═══════════════════════════════════════════════════════════════
+    "claude-fable-5.1":  {"model": "anthropic/claude-fable-5.1"},    # $10/$50 per M, 1M ctx
     "claude-fable-5":    {"model": "anthropic/claude-fable-5"},      # ultra-premium creative/synthesis — $10/$50 per M, 1M ctx
     "claude-opus":       {"model": "anthropic/claude-opus-5"},       # v3.7: was opus-4.8 -> opus-5, same $5/$25 per M, 1M ctx, strict upgrade
     "claude-opus-4.8":   {"model": "anthropic/claude-opus-4.8"},     # legacy pin, kept for reproducibility — $5/$25 per M, 1M ctx
@@ -109,7 +110,8 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "gemini-flash-lite-real":  {"model": "google/gemini-3.1-flash-lite"},      # true Google Flash Lite — $0.25/$1.50, 1M ctx
     "gemini-2.5-flash-lite":   {"model": "google/gemini-2.5-flash-lite"},      # cheapest Google — $0.10/$0.40, 1M ctx
     "gemini-2.5-flash":        {"model": "google/gemini-2.5-flash"},           # $0.30/$2.50 per M, 1M ctx
-    "gemini-3.7-flash":        {"model": "google/gemini-3.7-flash"},           # newest Google flash — $0.375/$1.875 per M, 1M ctx (half the price of 3.6-flash)
+    "gemini-3.8-flash":        {"model": "google/gemini-3.8-flash"},  # $0.375/$1.875 per M, 1M ctx
+    "gemini-3.7-flash":        {"model": "google/gemini-3.7-flash"},           # $0.375/$1.875 per M, 1M ctx (half the price of 3.6-flash)
     "gemini-3.6-flash":        {"model": "google/gemini-3.6-flash"},           # $0.75/$3.75 per M, 1M ctx (repriced down from $1.50/$7.50)
     "gemini-3.5-flash-lite":   {"model": "google/gemini-3.5-flash-lite"},      # $0.30/$2.50 per M, 1M ctx
     # ── Auto-updating (always latest) ──
@@ -204,7 +206,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # Qwen (Alibaba) — 3.5 -> 3.8 series
     # ═══════════════════════════════════════════════════════════════
     # ── 3.8 (latest) ──
-    "qwen3.8-max":         {"model": "qwen/qwen3.8-max"},        # newest flagship
+    "qwen3.8-max":         {"model": "qwen/qwen3.8-max"},        # $0.002/$0.006 per M, 1M ctx
     # ── 3.7 (Jun 2026) ──
     "qwen3.7-max":         {"model": "qwen/qwen3.7-max"},        # flagship agent — $1.475/$4.425 per M, 1M ctx
     "qwen3.7-plus":        {"model": "qwen/qwen3.7-plus"},       # best VFM — $0.32/$1.28 per M, 1M ctx
@@ -302,7 +304,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ═══════════════════════════════════════════════════════════════
     # arcee-maestro-reasoning removed — no longer on OpenRouter
     "arcee-trinity-large-thinking": {"model": "arcee-ai/trinity-large-thinking"},
-    "arcee-virtuoso-large":         {"model": "arcee-ai/virtuoso-large"},
+    # arcee-virtuoso-large removed 2026-09-03 - delisted from OpenRouter
     # arcee-coder-large removed — arcee-ai/coder-large dead, no replacement on OpenRouter
     # ═══════════════════════════════════════════════════════════════
     # Xiaomi — MiMo series (v2.5, Apr 2026)
@@ -407,7 +409,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ═══════════════════════════════════════════════════════════════
     # KwaiPilot (Kuaishou — coding specialists)
     # ═══════════════════════════════════════════════════════════════
-    "kat-coder-air-v2.5": {"model": "kwaipilot/kat-coder-air-v2.5"}, # $0.15/$0.60 per M, lightweight fast coder
+    # kat-coder-air-v2.5 removed 2026-09-03 - delisted; pro-v2 / pro-v2.5 remain
     "kat-coder-pro-v2":   {"model": "kwaipilot/kat-coder-pro-v2"},   # $0.30/$1.20 per M, professional-grade coder
     "kat-coder-pro-v2.5": {"model": "kwaipilot/kat-coder-pro-v2.5"}, # $0.74/$2.96 per M, flagship reasoning & coding
     # ═══════════════════════════════════════════════════════════════

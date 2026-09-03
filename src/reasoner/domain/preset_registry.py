@@ -811,7 +811,7 @@ _REGISTRY: dict[str, dict] = {
         # codex-class but intermittently returns empty content on larger prompts (observed
         # live), so the quality gate handles it only as a final fallback, never as a primary.
         "cascading_routing": {
-            "coding_generate": ["qwen3-coder-flash", "kat-coder-pro-v2.5", "laguna-xs-2.1", "kat-coder-air-v2.5", "codestral-2508", "grok-build-0.1", "deepseek-v4-flash"],
+            "coding_generate": ["qwen3-coder-flash", "kat-coder-pro-v2.5", "laguna-xs-2.1", "codestral-2508", "grok-build-0.1", "deepseek-v4-flash"],
             "coding_review": ["deepseek-v4-flash", "kat-coder-pro-v2.5", "mimo-v2.5-pro", "codestral-2508", "gpt-5.1-codex-mini"],
         },
         "tags": ["budget", "coding", "software-development"],
