@@ -357,24 +357,20 @@ async def get_search_client_for_method(
 
     for backend in chain:
         if backend == "perplexity" or backend == "perplexity_deep":
-            # Try Tavily/Brave when API keys are set.
-            if settings.TAVILY_API_KEY and settings.TAVILY_SEARCH_ENABLED:
-                from reasoner.infrastructure.search.tavily_adapter import TavilyAdapter
-                return TavilyAdapter(), source_type
-            if settings.BRAVE_SEARCH_API_KEY and settings.BRAVE_SEARCH_ENABLED:
-                from reasoner.infrastructure.search.brave_adapter import BraveSearchAdapter
-                return BraveSearchAdapter(), source_type
-            # Fall back to Perplexity
+            # This entry means Perplexity. Tavily and Brave have their own chain
+            # entries and are reached on their own turn, so trying them here
+            # inverted the declared order: every chain that lists "perplexity"
+            # first (multi_perspective and research, both tiers) silently
+            # preferred whichever fallback key happened to be set.
+            #
+            # NB "perplexity_deep" resolves to the same client as "perplexity" —
+            # PerplexitySearchClient pins build_provider("sonar"), so the deep
+            # tier is not currently any deeper. Fixing that belongs with the
+            # client, not with this chain walk.
             if settings.OPENROUTER_API_KEY:
-                from reasoner.infrastructure.search.discovery import get_search_client
                 return await get_search_client(source_type=source_type)
 
-        elif backend == "brave":
-            if settings.BRAVE_SEARCH_API_KEY and settings.BRAVE_SEARCH_ENABLED:
-                from reasoner.infrastructure.search.brave_adapter import BraveSearchAdapter
-                return BraveSearchAdapter(), source_type
-
-        elif backend == "brave_llm":
+        elif backend == "brave" or backend == "brave_llm":
             if settings.BRAVE_SEARCH_API_KEY and settings.BRAVE_SEARCH_ENABLED:
                 from reasoner.infrastructure.search.brave_adapter import BraveSearchAdapter
                 return BraveSearchAdapter(), source_type
@@ -385,12 +381,19 @@ async def get_search_client_for_method(
                 return TavilyAdapter(), source_type
 
         elif backend == "openrouter_web":
-            # Handled directly by the router/streaming layer — no adapter needed.
-            # Return None to signal "use inline web_search parameter".
-            return None, source_type
+            # No adapter exists for this entry: OpenRouter's server-side
+            # web_search injects results into the model's context rather than
+            # returning them, so there is nothing for a SearchClient to hand
+            # back. This previously returned ``(None, source_type)``, but all 14
+            # call sites unpack ``client, _ = await ...`` and then call
+            # ``client.search(...)`` — so any chain reaching it raised
+            # AttributeError on None. Both "direct" chains *start* with this
+            # entry, so it is the first thing tried, not a rare edge; it is
+            # unreached today only because no flow passes method="direct".
+            # Skip to the next declared backend.
+            continue
 
     # Ultimate fallback: existing Perplexity/get_search_client
-    from reasoner.infrastructure.search.discovery import get_search_client
     return await get_search_client(source_type=source_type)
 
 
