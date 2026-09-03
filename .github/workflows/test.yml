@@ -63,11 +63,15 @@ jobs:
           # wiring moved to infrastructure/valkey/cache_adapter.py and three dead
           # stdlib imports (secrets, json, datetime/timezone) went with it -- -4
           # F401 there, +2 elsewhere in the moved block.
-          # 2243: removing two delisted models (kwaipilot/kat-coder-air-v2.5,
-          # arcee-ai/virtuoso-large) took one E501 comment line with them, and
-          # three over-long registry comments added alongside the new models were
-          # reflowed under 100 -- -4 against this branch, -1 against main.
-          python scripts/ruff_ratchet.py --max 2243
+          # Two independent passes each took this from 2244 to 2243, and they
+          # merged: (a) #55 removed two delisted models (kwaipilot/kat-coder-air-v2.5,
+          # arcee-ai/virtuoso-large), taking one E501 comment line, and reflowed
+          # three over-long registry comments added with the new models; (b) the
+          # alias-honesty pass rewrote the deepseek-v3 / mimo-v2-flash comments to
+          # say what those aliases actually serve, dropping one long line. The
+          # value below is re-measured on the merged tree, not carried from either
+          # side: the two -1s do compose, so the merge lands at 2242, not 2243.
+          python scripts/ruff_ratchet.py --max 2242
 
       - name: Security scan (bandit)
         run: |

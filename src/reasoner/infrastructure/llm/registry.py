@@ -50,13 +50,13 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "gpt-5-mini":       {"model": "openai/gpt-5-mini"},          # $0.25/$2 per M, 400K ctx
     "gpt-5-nano":       {"model": "openai/gpt-5-nano"},          # $0.05/$0.40 per M — cheapest OpenAI, ideal Phase 0
     # ── 5.6 (Jul 2026) — tri-tier Sol/Terra/Luna naming, newest OpenAI gen ──
-    "gpt-5.6-sol":      {"model": "openai/gpt-5.6-sol"},         # flagship — $5/$30 per M, 1.05M ctx
-    "gpt-5.6-terra":    {"model": "openai/gpt-5.6-terra"},       # balanced mid-tier — $1/$6 per M, 1.05M ctx
+    "gpt-5.6-sol":      {"model": "openai/gpt-5.6-sol"},         # flagship — $2/$10 per M, 1.05M ctx
+    "gpt-5.6-terra":    {"model": "openai/gpt-5.6-terra"},       # balanced mid-tier — $2/$12 per M, 1.05M ctx
     "gpt-5.6-luna":     {"model": "openai/gpt-5.6-luna"},        # fast/cheap — $0.20/$1.20 per M, 1.05M ctx, AA Intel 51.2 — default synthesis voice
     # -pro siblings are priced identically to the base tiers on OpenRouter, so they
     # are a free capability upgrade wherever the base tier is already being used.
-    "gpt-5.6-sol-pro":   {"model": "openai/gpt-5.6-sol-pro"},    # $5/$30 per M, 1.05M ctx
-    "gpt-5.6-terra-pro": {"model": "openai/gpt-5.6-terra-pro"},  # $1/$6 per M, 1.05M ctx
+    "gpt-5.6-sol-pro":   {"model": "openai/gpt-5.6-sol-pro"},    # $2/$10 per M, 1.05M ctx
+    "gpt-5.6-terra-pro": {"model": "openai/gpt-5.6-terra-pro"},  # $2/$12 per M, 1.05M ctx
     "gpt-5.6-luna-pro":  {"model": "openai/gpt-5.6-luna-pro"},   # $0.20/$1.20 per M, 1.05M ctx
     # ── Previous (5.4, Mar 2026) ──
     "gpt-5.4":          {"model": "openai/gpt-5.4"},             # $2.50/$15 per M, AI^2 Intel 51.4
@@ -191,16 +191,26 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "deepseek-v4-flash": {
         # The 0731 dated pin was retired upstream: api.deepseek.com now accepts
         # only deepseek-v4-pro / deepseek-v4-flash and 400s on any dated suffix.
-        "model": "deepseek/deepseek-v4-flash",        # $0.0615/$0.1229, 1M ctx
+        "model": "deepseek/deepseek-v4-flash",        # $0.0886/$0.1772, 1M ctx
         "extra_body": {"reasoning": {"effort": "high"}},
     },
     "deepseek-v4-flash-0424": {
-        "model": "deepseek/deepseek-v4-flash",        # legacy pin, kept for reproducibility — $0.14/$0.28, 1M ctx
+        # NOT a pin any more, despite the name: it resolves to the same served
+        # model as "deepseek-v4-flash", so it reproduces nothing, and the
+        # $0.14/$0.28 it used to claim is not what bills (PRICING_DB:
+        # $0.0886/$0.1772). DeepSeek's own API 400s on dated suffixes; note
+        # OpenRouter does still list deepseek/deepseek-v4-flash-0731, so
+        # "retired upstream" is true of the vendor API, not of the catalogue.
+        # Deprecated: route "deepseek-v4-flash" instead.
+        "model": "deepseek/deepseek-v4-flash",        # 1M ctx
         "extra_body": {"reasoning": {"effort": "high"}},
     },
-    # Re-pointed to v4-flash: v3.2 deprecated, DeepSeek API no longer accepts it.
+    # DEPRECATED — the name lies: this serves v4-flash, not any v3. v3.2 was
+    # deprecated upstream and the alias was re-pointed (Jun 2026) rather than
+    # removed. Kept only so older saved states / user configs still resolve;
+    # no preset routes it any more. Route "deepseek-v4-flash" directly.
     "deepseek-v3": {
-        "model": "deepseek/deepseek-v4-flash",        # was v3.2 ($0.12/$0.50) — re-pointed Jun 2026
+        "model": "deepseek/deepseek-v4-flash",
     },
     # ═══════════════════════════════════════════════════════════════
     # Qwen (Alibaba) — 3.5 -> 3.8 series
@@ -212,6 +222,11 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "qwen3.7-plus":        {"model": "qwen/qwen3.7-plus"},       # best VFM — $0.32/$1.28 per M, 1M ctx
     "qwen3.7-flash":       {"model": "qwen/qwen3.7-flash"},      # cheapest Qwen — $0.03/$0.13 per M, 1M ctx, vision
     # ── 3.7 value aliases (intentionally route to 3.7-plus for cost) ──
+    # FIVE keys below collapse onto qwen/qwen3.7-plus — not obvious from any
+    # single line. Deliberate, but every one of them names a version or tier
+    # it does not serve, so none is routed by a preset; route "qwen3.7-plus"
+    # directly. Note "qwen3-max" is NOT the real max: that is
+    # "qwen3-max-real", and "qwen3-max-thinking" is a third, distinct model.
     "qwen3-max":           {"model": "qwen/qwen3.7-plus"},       # "max" alias -> 3.7-plus ($0.32/$1.28)
     "qwen3-max-real":      {"model": "qwen/qwen3-max"},          # literal qwen3-max — $0.78/$3.90 per M, 262K ctx (older arch, costlier than the alias above)
     "qwen3.6-plus":        {"model": "qwen/qwen3.7-plus"},       # alias -> 3.7-plus (cheaper AND stronger than real 3.6-plus)
@@ -249,7 +264,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "qwen3-30b-a3b":       {"model": "qwen/qwen3-30b-a3b"},        # $0.12/$0.50 per M, 131K ctx, compact MoE
     # ── Qwen3 Max Thinking — dedicated reasoning (Jan 2026) ──
     "qwen3-max-thinking":  {"model": "qwen/qwen3-max-thinking"},   # $0.78/$3.90 per M, 262K ctx — deep multi-step reasoning
-    # ── Turbo (dead — replaced with 3.5-flash) ──
+    # ── Turbo (DEPRECATED — the name lies: serves 3.5-flash, not any turbo) ──
     # extra_body: reasoning.exclude — see the gemini-flash-lite alias above.
     "qwen3-turbo":         {"model": "qwen/qwen3.5-flash-02-23", "extra_body": {"reasoning": {"exclude": True}}},  # was qwen/qwen-turbo (DEAD) -> qwen3.5-flash
     # ── Coder series ──
@@ -273,7 +288,10 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "llama-4-maverick": {"model": "meta-llama/llama-4-maverick"},  # $0.15/$0.60 per M, 1M ctx
     "muse-spark-1.1":   {"model": "meta/muse-spark-1.1"},          # small multimodal/general model
     "muse-spark-1.2-contributor": {"model": "meta/muse-spark-1.2-contributor"},  # $0.10/$0.20 per M, 1M ctx — discounted "contributor" tier; Meta may train on prompts/completions sent to it
-    "llama-3.3-70b":    {"model": "meta-llama/llama-3.3-70b-instruct"},  # $0.13/$0.40 per M, 131K ctx — workhorse open-weight
+    # Price was $0.13/$0.40 here until 2026-09-03 — ~5x under. Catalogue and
+    # PRICING_DB both say $0.71/$0.71; live openrouter.ai is unreachable from
+    # CI/dev, so re-verify there before costing anything against this figure.
+    "llama-3.3-70b":    {"model": "meta-llama/llama-3.3-70b-instruct"},  # $0.71/$0.71 per M, 131K ctx
     # ═══════════════════════════════════════════════════════════════
     # Laguna (Poolside)
     # ═══════════════════════════════════════════════════════════════
@@ -311,7 +329,10 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ═══════════════════════════════════════════════════════════════
     "mimo-v2.5-pro":  {"model": "xiaomi/mimo-v2.5-pro"},   # flagship agent — $0.435/$0.87 per M, 1M ctx
     "mimo-v2.5":      {"model": "xiaomi/mimo-v2.5"},       # omnimodal value — $0.14/$0.28 per M, 1M ctx
-    # Legacy aliases (presets may reference these)
+    # DEPRECATED legacy aliases — both names lie about the version, and
+    # "-flash" names a tier Xiaomi does not ship here. No preset routes them
+    # any more (repointed to mimo-v2.5 / mimo-v2.5-pro, identical served
+    # models); kept only so older saved states still resolve.
     "mimo-v2-pro":    {"model": "xiaomi/mimo-v2.5-pro"},
     "mimo-v2-flash":  {"model": "xiaomi/mimo-v2.5"},
     # ═══════════════════════════════════════════════════════════════
@@ -389,7 +410,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "nemotron-3-super-free":      {"model": "nvidia/nemotron-3-super-120b-a12b:free"},    # FREE — 120B/12B MoE, 1M ctx
     "nemotron-nano-omni-free":    {"model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"}, # FREE — 30B/3B, multimodal reasoning
     "nemotron-nano-30b":          {"model": "nvidia/nemotron-3-nano-30b-a3b"},            # $0.05/$0.20 per M — was the paid fallback for the delisted :free tier
-    "nemotron-3-ultra":           {"model": "nvidia/nemotron-3-ultra-550b-a55b"},         # paid fallback for nemotron-3-ultra-free — $0.60/$3.60 per M, 512K ctx
+    "nemotron-3-ultra":           {"model": "nvidia/nemotron-3-ultra-550b-a55b"},         # paid fallback for nemotron-3-ultra-free — $0.50/$2.20 per M, 512K ctx
     # nemotron-nano-30b-free / nemotron-nano-9b-v2-free removed 2026-08-26 — both
     # :free tiers left the OpenRouter catalogue. Neither was routed by a preset.
     # The 30B keeps its paid sibling above; the 9B has no paid tier on OpenRouter.
@@ -650,6 +671,36 @@ _VENDOR_BLOC: dict[str, str] = {
 }
 
 
+DEPRECATED_ALIASES: dict[str, str | None] = {
+    # alias -> an alias naming the model it actually serves AND behaving
+    # identically, or None when no such drop-in exists.
+    #
+    # Every key's NAME misstates the version or tier it resolves to. They keep
+    # working: ``routing`` is a public request field (api/schemas.py), an
+    # unknown model id raises ValueError in PresetService.build_router, and
+    # older saved states may still name them -- so deleting one is a breaking
+    # API change.
+    #
+    # A replacement must match the WHOLE registry entry, not just the served
+    # model string. deepseek-v3 is the reason: it serves deepseek/deepseek-v4-flash
+    # exactly as "deepseek-v4-flash" does, but that alias also carries
+    # extra_body reasoning.effort=high and this one does not. Repointing a
+    # preset from one to the other silently bills reasoning tokens at output
+    # rate. It is therefore None, not a rename -- and test_model_alias_honesty
+    # compares full entries so the distinction cannot rot.
+    "deepseek-v3": None,  # serves v4-flash, but WITHOUT reasoning.effort=high
+    "deepseek-v4-flash-0424": "deepseek-v4-flash",
+    "qwen3-turbo": "qwen3.5-flash",
+    "qwen3-max": "qwen3.7-plus",
+    "qwen3-plus": "qwen3.7-plus",
+    "qwen3.5-plus": "qwen3.7-plus",
+    "qwen3.6-plus": "qwen3.7-plus",
+    "mimo-v2-flash": "mimo-v2.5",
+    "mimo-v2-pro": "mimo-v2.5-pro",
+    "gemini-3.1-flash-lite": "gemini-flash-lite-real",
+}
+
+
 def _vendor_of(model_id: str) -> str:
     """Resolve a whitelist model ID to its underlying OpenRouter vendor prefix.
 
@@ -793,3 +844,7 @@ class RegistryAdapter:
     def resolved_model_of(self, model_id: str) -> str:
         """Delegate to :func:`resolved_model_of` — see ``ModelRegistryPort.resolved_model_of``."""
         return resolved_model_of(model_id)
+
+    def deprecated_aliases(self) -> dict[str, str | None]:
+        """Delegate to :data:`DEPRECATED_ALIASES` — see the port for semantics."""
+        return dict(DEPRECATED_ALIASES)

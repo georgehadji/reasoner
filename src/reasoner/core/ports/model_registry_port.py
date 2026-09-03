@@ -56,6 +56,22 @@ class ModelRegistryPort(Protocol):
         """Return the full ``vendor/model`` string *model_id* resolves to."""
         ...
 
+    def deprecated_aliases(self) -> dict[str, str | None]:
+        """Map each deprecated alias to a drop-in replacement, or None.
+
+        A deprecated alias still resolves — ``routing`` is a public request
+        field and callers may still name one — but its own name misstates the
+        version or tier it resolves to.
+
+        The value is an alias that serves the same model *and behaves
+        identically*, so a caller can swap to it safely. It is ``None`` when no
+        such alias exists: some entries share a served model with an
+        honestly-named alias that differs in ``extra_body`` (reasoning effort,
+        say), and swapping there would change cost and latency, not just the
+        name.
+        """
+        ...
+
 
 # ── Dependency injection for application → infrastructure boundary ────────
 # Mirrors core/search.py's set_build_provider() precedent: the concrete
