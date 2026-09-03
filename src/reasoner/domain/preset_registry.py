@@ -436,7 +436,7 @@ _REGISTRY: dict[str, dict] = {
         # distinct from every other slot here (test_preset_model_uniqueness).
         # 3 blocs / 4 labs, <=2 per bloc — BlocDiversityConstraint rules 2-4.
         # Prices per M are PRICING_DB (what actually bills), NOT the registry
-        # comments — gpt-5.6-terra's comment says $1/$6; PRICING_DB governs.
+        # comments. (gpt-5.6-terra's own comment said $1/$6 and has been fixed.)
         #   gpt-5.6-terra       🇺🇸 OpenAI   $2/$12
         #   gemini-pro-real     🇺🇸 Google   $2/$12   != deep_read's 3.7-flash
         #   qwen3-max-thinking  🇨🇳 Qwen     $0.78/$3.90  dedicated reasoning

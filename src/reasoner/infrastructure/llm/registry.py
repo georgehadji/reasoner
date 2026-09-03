@@ -50,12 +50,12 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "gpt-5-nano":       {"model": "openai/gpt-5-nano"},          # $0.05/$0.40 per M — cheapest OpenAI, ideal Phase 0
     # ── 5.6 (Jul 2026) — tri-tier Sol/Terra/Luna naming, newest OpenAI gen ──
     "gpt-5.6-sol":      {"model": "openai/gpt-5.6-sol"},         # flagship — $5/$30 per M, 1.05M ctx
-    "gpt-5.6-terra":    {"model": "openai/gpt-5.6-terra"},       # balanced mid-tier — $1/$6 per M, 1.05M ctx
+    "gpt-5.6-terra":    {"model": "openai/gpt-5.6-terra"},       # balanced mid-tier — $2/$12 per M, 1.05M ctx
     "gpt-5.6-luna":     {"model": "openai/gpt-5.6-luna"},        # fast/cheap — $0.20/$1.20 per M, 1.05M ctx, AA Intel 51.2 — default synthesis voice
     # -pro siblings are priced identically to the base tiers on OpenRouter, so they
     # are a free capability upgrade wherever the base tier is already being used.
     "gpt-5.6-sol-pro":   {"model": "openai/gpt-5.6-sol-pro"},    # $5/$30 per M, 1.05M ctx
-    "gpt-5.6-terra-pro": {"model": "openai/gpt-5.6-terra-pro"},  # $1/$6 per M, 1.05M ctx
+    "gpt-5.6-terra-pro": {"model": "openai/gpt-5.6-terra-pro"},  # $2/$12 per M, 1.05M ctx
     "gpt-5.6-luna-pro":  {"model": "openai/gpt-5.6-luna-pro"},   # $0.20/$1.20 per M, 1.05M ctx
     # ── Previous (5.4, Mar 2026) ──
     "gpt-5.4":          {"model": "openai/gpt-5.4"},             # $2.50/$15 per M, AI^2 Intel 51.4
@@ -284,7 +284,10 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "llama-4-maverick": {"model": "meta-llama/llama-4-maverick"},  # $0.15/$0.60 per M, 1M ctx
     "muse-spark-1.1":   {"model": "meta/muse-spark-1.1"},          # small multimodal/general model
     "muse-spark-1.2-contributor": {"model": "meta/muse-spark-1.2-contributor"},  # $0.10/$0.20 per M, 1M ctx — discounted "contributor" tier; Meta may train on prompts/completions sent to it
-    "llama-3.3-70b":    {"model": "meta-llama/llama-3.3-70b-instruct"},  # $0.13/$0.40 per M, 131K ctx — workhorse open-weight
+    # Price was $0.13/$0.40 here until 2026-09-03 — ~5x under. Catalogue and
+    # PRICING_DB both say $0.71/$0.71; live openrouter.ai is unreachable from
+    # CI/dev, so re-verify there before costing anything against this figure.
+    "llama-3.3-70b":    {"model": "meta-llama/llama-3.3-70b-instruct"},  # $0.71/$0.71 per M, 131K ctx
     # ═══════════════════════════════════════════════════════════════
     # Laguna (Poolside)
     # ═══════════════════════════════════════════════════════════════
