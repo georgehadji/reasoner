@@ -291,6 +291,21 @@ class Settings:
     TAVILY_API_KEY: str = os.getenv("TAVILY_API_KEY", "")
     TAVILY_SEARCH_ENABLED: bool = os.getenv("TAVILY_SEARCH_ENABLED", "true").lower() == "true"
     TAVILY_EXTRACT_ENABLED: bool = os.getenv("TAVILY_EXTRACT_ENABLED", "true").lower() == "true"
+    # Despite the name, this does NOT enable OpenRouter's `openrouter:web_search`
+    # server tool — nothing in this codebase sends that tool. It selects which of
+    # two lanes serves a HyperGate `web_search` decision (api/execution/pipeline.py):
+    #   true  -> a single grounded answer from PERPLEXITY_SEARCH_TIER below,
+    #            authored by the model (api/execution/direct.py)
+    #   false -> a rendered list of raw search-backend results
+    #            (SearchService.stream_web_search_results)
+    # The name is kept rather than corrected because it is a published env var.
+    #
+    # The server tool was measured against this lane on 2026-09-03 and rejected:
+    # 2-6x the cost for an order of magnitude fewer citations (sonar $0.0051 /
+    # 13 sources vs gpt-5-nano+exa $0.0107 / 0), and its results enter the model
+    # context server-side, bypassing the `<<<EXTERNAL_CONTENT>>>` wrapping in
+    # phases/_shared.py:build_web_sources_block that CLAUDE.md lists as a
+    # load-bearing propagation-resistance invariant.
     OPENROUTER_WEB_SEARCH_ENABLED: bool = os.getenv("OPENROUTER_WEB_SEARCH_ENABLED", "true").lower() == "true"
     PERPLEXITY_SEARCH_TIER: str = os.getenv("PERPLEXITY_SEARCH_TIER", "sonar-pro")
     # Nemotron Rerank VL: free NVIDIA reranker via OpenRouter chat completions + logprobs.
