@@ -27,7 +27,7 @@ _REGISTRY: dict[str, dict] = {
             "perspective_analysis": "qwen3.6-flash",   # was qwen3-turbo (DEAD) → stronger reasoning
             "synthesis": "llama-4-maverick",  # 🇺🇸 Meta — $0.200/$0.800 per M, 1048K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
             # ── Per-perspective echo-chamber-resistant diversity (4 labs, 3 blocs: 2🇨🇳 + 1🇺🇸 + 1🇫🇷) ──
-            "constructive":  "deepseek-v3",           # 🇨🇳 DeepSeek — v3 alias now routes to v4-flash (API deprecated v3.2)
+            "constructive":  "deepseek-v4-flash",     # 🇨🇳 DeepSeek — was "deepseek-v3", which serves v4-flash anyway
             "destructive":   "hermes-4-70b",      # 🇺🇸 Nous Research — critic-specialized ($0.13/$0.40) (was ring-2.6-1t 🇨🇳, cross-bloc echo resistance)
             "systemic":      "qwen3-30b-a3b",  # 🇨🇳 Qwen — $0.130/$0.520 per M, 131K ctx (was hy3; one model per phase)
             "minimalist":    "mistral-small-3.2-24b",     # 🇫🇷 Mistral — $0.075/$0.20
@@ -45,7 +45,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "multi-perspective",
         "primary_id": "qwen3.5-flash",
         "routing": {
-            "perspective_cot": "mimo-v2-flash",  # 🇨🇳 Xiaomi — $0.140/$0.280 per M, 1050K ctx (was qwen3.5-flash; one model per phase)
+            "perspective_cot": "mimo-v2.5",  # 🇨🇳 Xiaomi — $0.140/$0.280 per M, 1050K ctx (was qwen3.5-flash; one model per phase)
             "perspective_analysis": "qwen3.6-flash",   # was qwen3.5-9b → stronger reasoning, 1M ctx
             "synthesis": "llama-4-maverick",  # 🇺🇸 Meta — $0.200/$0.800 per M, 1048K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
             # ── Per-perspective cross-bloc diversity (2🇨🇳 + 1🇺🇸 + 1🇫🇷, ultra-cheap) ──
@@ -455,7 +455,7 @@ _REGISTRY: dict[str, dict] = {
             "synthesis": "llama-4-maverick",  # 🇺🇸 Meta — $0.200/$0.800 per M, 1048K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (budget, v3.4) ──
         "cove_answer":    "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
-        "cove_revise":    "mimo-v2-flash",  # 🇨🇳 Xiaomi — $0.140/$0.280 per M, 1050K ctx (was deepseek-v4-flash; one model per phase)
+        "cove_revise":    "mimo-v2.5",  # 🇨🇳 Xiaomi — $0.140/$0.280 per M, 1050K ctx (was deepseek-v4-flash; one model per phase)
         "cove_verify":    "seed-2.0-mini",  # 🇨🇳 ByteDance — $0.100/$0.400 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
         "fusion":         "hy3",  # 🇨🇳 Tencent — $0.132/$0.528 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
         "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — $0.03/$0.13 (-54% vs 3.5-flash), newer gen, 1M ctx, vision
@@ -527,7 +527,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "glm-5.3-flash",
         "tot_backtrack":  "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
-        "tot_decompose":  "mimo-v2-flash",  # 🇨🇳 Xiaomi — $0.140/$0.280 per M, 1050K ctx (was deepseek-v4-flash; one model per phase)
+        "tot_decompose":  "mimo-v2.5",  # 🇨🇳 Xiaomi — $0.140/$0.280 per M, 1050K ctx (was deepseek-v4-flash; one model per phase)
         "tot_evaluate":   "seed-2.0-mini",  # 🇨🇳 ByteDance — $0.100/$0.400 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
         "verifier":       "gemini-2.5-flash-lite",   # Google 🇺🇸 — 3.3% HHEM hallucination (3rd best measured), $0.10/$0.40
         "post_synthesis_verify": "sonar",  # added v3.5
@@ -594,7 +594,7 @@ _REGISTRY: dict[str, dict] = {
         "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — $0.03/$0.13 (-54% vs 3.5-flash), newer gen, 1M ctx, vision
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "sd_adapt":       "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
-        "sd_implement":   "mimo-v2-flash",  # 🇨🇳 Xiaomi — $0.140/$0.280 per M, 1050K ctx (was deepseek-v4-flash; one model per phase)
+        "sd_implement":   "mimo-v2.5",  # 🇨🇳 Xiaomi — $0.140/$0.280 per M, 1050K ctx (was deepseek-v4-flash; one model per phase)
         "sd_select":      "seed-2.0-mini",  # 🇨🇳 ByteDance — $0.100/$0.400 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
         "stress_testing": "glm-5.3-flash",
         "verifier":       "gemini-2.5-flash-lite",   # Google 🇺🇸 — 3.3% HHEM hallucination (3rd best measured), $0.10/$0.40
@@ -633,7 +633,7 @@ _REGISTRY: dict[str, dict] = {
         "stress_testing":             "glm-5.3-flash",
         "subagent_critique_bias":     "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
         "subagent_critique_counter":  "qwen3.7-flash",  # 🇨🇳 Qwen — $0.030/$0.130 per M, 1000K ctx (was deepseek-v4-flash; one model per phase)
-        "subagent_critique_evidence": "mimo-v2-flash",  # 🇨🇳 Xiaomi — $0.140/$0.280 per M, 1050K ctx (was deepseek-v4-flash; one model per phase)
+        "subagent_critique_evidence": "mimo-v2.5",  # 🇨🇳 Xiaomi — $0.140/$0.280 per M, 1050K ctx (was deepseek-v4-flash; one model per phase)
         "subagent_critique_logic":    "seed-2.0-mini",  # 🇨🇳 ByteDance — $0.100/$0.400 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
         "subagent_decomposition":     "qwen3-30b-a3b",  # 🇨🇳 Qwen — $0.130/$0.520 per M, 131K ctx (was deepseek-v4-flash; one model per phase)
         "verifier":                   "qwen3.7-plus",  # cross-lab from DeepSeek scoring

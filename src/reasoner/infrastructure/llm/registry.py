@@ -193,12 +193,20 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
         "extra_body": {"reasoning": {"effort": "high"}},
     },
     "deepseek-v4-flash-0424": {
-        "model": "deepseek/deepseek-v4-flash",        # legacy pin, kept for reproducibility — $0.14/$0.28, 1M ctx
+        # NOT a pin any more, despite the name. The dated suffix was retired
+        # upstream, so this resolves to the same served model as
+        # "deepseek-v4-flash" — it reproduces nothing, and the $0.14/$0.28 it
+        # used to claim is not what bills (PRICING_DB: $0.0615/$0.1229).
+        # Deprecated: route "deepseek-v4-flash" instead.
+        "model": "deepseek/deepseek-v4-flash",        # 1M ctx
         "extra_body": {"reasoning": {"effort": "high"}},
     },
-    # Re-pointed to v4-flash: v3.2 deprecated, DeepSeek API no longer accepts it.
+    # DEPRECATED — the name lies: this serves v4-flash, not any v3. v3.2 was
+    # deprecated upstream and the alias was re-pointed (Jun 2026) rather than
+    # removed. Kept only so older saved states / user configs still resolve;
+    # no preset routes it any more. Route "deepseek-v4-flash" directly.
     "deepseek-v3": {
-        "model": "deepseek/deepseek-v4-flash",        # was v3.2 ($0.12/$0.50) — re-pointed Jun 2026
+        "model": "deepseek/deepseek-v4-flash",
     },
     # ═══════════════════════════════════════════════════════════════
     # Qwen (Alibaba) — 3.5 -> 3.8 series
@@ -210,6 +218,11 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "qwen3.7-plus":        {"model": "qwen/qwen3.7-plus"},       # best VFM — $0.32/$1.28 per M, 1M ctx
     "qwen3.7-flash":       {"model": "qwen/qwen3.7-flash"},      # cheapest Qwen — $0.03/$0.13 per M, 1M ctx, vision
     # ── 3.7 value aliases (intentionally route to 3.7-plus for cost) ──
+    # FIVE keys below collapse onto qwen/qwen3.7-plus — not obvious from any
+    # single line. Deliberate, but every one of them names a version or tier
+    # it does not serve, so none is routed by a preset; route "qwen3.7-plus"
+    # directly. Note "qwen3-max" is NOT the real max: that is
+    # "qwen3-max-real", and "qwen3-max-thinking" is a third, distinct model.
     "qwen3-max":           {"model": "qwen/qwen3.7-plus"},       # "max" alias -> 3.7-plus ($0.32/$1.28)
     "qwen3-max-real":      {"model": "qwen/qwen3-max"},          # literal qwen3-max — $0.78/$3.90 per M, 262K ctx (older arch, costlier than the alias above)
     "qwen3.6-plus":        {"model": "qwen/qwen3.7-plus"},       # alias -> 3.7-plus (cheaper AND stronger than real 3.6-plus)
@@ -247,7 +260,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "qwen3-30b-a3b":       {"model": "qwen/qwen3-30b-a3b"},        # $0.12/$0.50 per M, 131K ctx, compact MoE
     # ── Qwen3 Max Thinking — dedicated reasoning (Jan 2026) ──
     "qwen3-max-thinking":  {"model": "qwen/qwen3-max-thinking"},   # $0.78/$3.90 per M, 262K ctx — deep multi-step reasoning
-    # ── Turbo (dead — replaced with 3.5-flash) ──
+    # ── Turbo (DEPRECATED — the name lies: serves 3.5-flash, not any turbo) ──
     # extra_body: reasoning.exclude — see the gemini-flash-lite alias above.
     "qwen3-turbo":         {"model": "qwen/qwen3.5-flash-02-23", "extra_body": {"reasoning": {"exclude": True}}},  # was qwen/qwen-turbo (DEAD) -> qwen3.5-flash
     # ── Coder series ──
@@ -309,7 +322,10 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ═══════════════════════════════════════════════════════════════
     "mimo-v2.5-pro":  {"model": "xiaomi/mimo-v2.5-pro"},   # flagship agent — $0.435/$0.87 per M, 1M ctx
     "mimo-v2.5":      {"model": "xiaomi/mimo-v2.5"},       # omnimodal value — $0.14/$0.28 per M, 1M ctx
-    # Legacy aliases (presets may reference these)
+    # DEPRECATED legacy aliases — both names lie about the version, and
+    # "-flash" names a tier Xiaomi does not ship here. No preset routes them
+    # any more (repointed to mimo-v2.5 / mimo-v2.5-pro, identical served
+    # models); kept only so older saved states still resolve.
     "mimo-v2-pro":    {"model": "xiaomi/mimo-v2.5-pro"},
     "mimo-v2-flash":  {"model": "xiaomi/mimo-v2.5"},
     # ═══════════════════════════════════════════════════════════════

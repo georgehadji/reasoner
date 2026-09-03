@@ -63,7 +63,10 @@ jobs:
           # wiring moved to infrastructure/valkey/cache_adapter.py and three dead
           # stdlib imports (secrets, json, datetime/timezone) went with it -- -4
           # F401 there, +2 elsewhere in the moved block.
-          python scripts/ruff_ratchet.py --max 2244
+          # 2243: alias-honesty pass. Rewriting the deepseek-v3 / mimo-v2-flash
+          # registry comments to say what those aliases actually serve dropped
+          # one long line. Two-way ratchet, so MAX moves down with it.
+          python scripts/ruff_ratchet.py --max 2243
 
       - name: Security scan (bandit)
         run: |
