@@ -66,12 +66,20 @@ class PresetService:
             for role, model_id in custom_routing.items():
                 if not registry.contains(model_id):
                     raise ValueError(f"Unknown model ID: {model_id}")
-                replacement = deprecated.get(model_id)
-                if replacement:
+                if model_id in deprecated:
+                    replacement = deprecated[model_id]
+                    advice = (
+                        f"Use {replacement!r} instead."
+                        if replacement
+                        else "No drop-in replacement exists: the honestly-named "
+                             "alias for this model differs in more than its name "
+                             "(e.g. reasoning effort), so swapping would change "
+                             "cost and latency, not just the label."
+                    )
                     logger.warning(
                         "Deprecated model alias %r in custom routing for role %r: "
-                        "it serves %s, not what its name says. Use %r instead.",
-                        model_id, role, registry.resolved_model_of(model_id), replacement,
+                        "it serves %s, not what its name says. %s",
+                        model_id, role, registry.resolved_model_of(model_id), advice,
                     )
             filtered = self.filter_routing(custom_routing, "claude-sonnet")
             router = build_custom_router(filtered)

@@ -98,7 +98,7 @@ eight models already in use):
 
 | Slot | `delphi-budget` | `delphi-premium` |
 |---|---|---|
-| `expert_1` | `gpt-oss-120b` 🇺🇸 OpenAI | `gpt-5.6-terra` 🇺🇸 OpenAI |
+| `expert_1` | `gpt-oss-120b` 🇺🇸 OpenAI | `nemotron-3-ultra` 🇺🇸 NVIDIA |
 | `expert_2` | `ministral-3b` 🇪🇺 Mistral | `gemini-pro-real` 🇺🇸 Google |
 | `expert_3` | `mimo-v2.5` 🇨🇳 Xiaomi | `qwen3-max-thinking` 🇨🇳 Qwen |
 | `expert_4` | `llama-4-scout` 🇺🇸 Meta | `mistral-large-3` 🇪🇺 Mistral |
@@ -115,10 +115,12 @@ collapsed onto; `delphi-budget` is **+49% input / −14% output** versus 4×
 `qwen3.5-flash`, and round-1 generation is output-dominated, so the net is roughly
 neutral. No budget-tier exemption was needed.
 
-Two registry price comments were found wrong while costing this and are flagged in
-the preset: `llama-3.3-70b` (comment $0.13/$0.40, `PRICING_DB` $0.71/$0.71 — dropped
-as a candidate because of it) and `gpt-5.6-terra` (comment $1/$6, `PRICING_DB`
-$2/$12). Neither is fixed here; costing any new slot should read `PRICING_DB`.
+Registry price comments found wrong while costing this were fixed in a follow-up:
+`llama-3.3-70b` ($0.13/$0.40 → $0.71/$0.71 — dropped as a candidate because of it),
+`gpt-5.6-terra`/`-terra-pro` ($1/$6 → $2/$12), `gpt-5.6-sol`/`-sol-pro` ($5/$30 →
+$2/$10), `nemotron-3-ultra` ($0.60/$3.60 → $0.50/$2.20) and DeepSeek v4-flash
+($0.0615/$0.1229 → $0.0886/$0.1772). ~18 more remain: cost any new slot from
+`PRICING_DB`, and note `glm-5.2` is the case where `PRICING_DB` itself is disputed.
 
 ---
 

@@ -150,12 +150,16 @@ Both Delphi presets now route four distinct models, and `expert_1..4` were added
 
 | Slot | `delphi-budget` | `delphi-premium` |
 |---|---|---|
-| `expert_1` | `gpt-oss-120b` 🇺🇸 OpenAI | `gpt-5.6-terra` 🇺🇸 OpenAI |
+| `expert_1` | `gpt-oss-120b` 🇺🇸 OpenAI | `nemotron-3-ultra` 🇺🇸 NVIDIA |
 | `expert_2` | `ministral-3b` 🇪🇺 Mistral | `gemini-pro-real` 🇺🇸 Google |
 | `expert_3` | `mimo-v2.5` 🇨🇳 Xiaomi | `qwen3-max-thinking` 🇨🇳 Qwen |
 | `expert_4` | `llama-4-scout` 🇺🇸 Meta | `mistral-large-3` 🇪🇺 Mistral |
 
-Both panels span 3 blocs and 4 labs, with ≤2 slots per bloc.
+Both panels span 3 blocs and 4 labs, with ≤2 slots per bloc, and every slot honours a
+tuned temperature — `expert_*` is the `generate` family, whose `_SAMPLED` constraint is
+`requires_temperature=True`, so a fixed-temperature model there would be dropped and
+silently substituted by ACR. Premium's `expert_1` was `gpt-5.6-terra` until review
+caught exactly that.
 
 **The cost objection did not survive measurement.** Per `PRICING_DB` (the billing
 source of truth — several registry price comments disagree with it and are wrong),

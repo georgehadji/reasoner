@@ -95,13 +95,35 @@ def test_no_alias_implies_the_wrong_vendor():
     )
 
 
+# A deprecated alias may be routed ONLY where no behaviour-neutral rename
+# exists. Each entry must say why, and be justified at its preset call site.
+_ROUTED_WITHOUT_DROP_IN: frozenset[str] = frozenset({
+    # multi-perspective-budget.constructive. "deepseek-v4-flash" serves the same
+    # model but adds reasoning.effort=high; swapping bills reasoning tokens at
+    # output rate on Phase 2 of the default budget preset.
+    "deepseek-v3",
+})
+
+
 @pytest.mark.unit
-def test_presets_do_not_route_known_misleading_aliases():
-    """A preset must name what will actually run."""
-    routed = sorted(_preset_aliases() & _DEPRECATED_MISLEADING)
+def test_presets_do_not_route_a_deprecated_alias_that_has_a_drop_in():
+    """Where an honest, behaviour-identical name exists, the preset must use it."""
+    replaceable = {a for a, r in DEPRECATED_ALIASES.items() if r is not None}
+    routed = sorted(_preset_aliases() & replaceable)
     assert not routed, (
-        f"presets route deprecated/misleading aliases {routed}; use the alias "
-        f"that names the served model instead (same model, honest name)"
+        f"presets route deprecated aliases {routed} that have behaviour-identical "
+        f"replacements; use the alias naming the served model instead"
+    )
+
+
+@pytest.mark.unit
+def test_routing_a_deprecated_alias_without_a_drop_in_is_declared():
+    """None must not become a loophole for routing any misleading name."""
+    no_drop_in = {a for a, r in DEPRECATED_ALIASES.items() if r is None}
+    undeclared = sorted((_preset_aliases() & no_drop_in) - _ROUTED_WITHOUT_DROP_IN)
+    assert not undeclared, (
+        f"presets route deprecated aliases {undeclared} with no drop-in and no "
+        f"entry in _ROUTED_WITHOUT_DROP_IN explaining why that is acceptable"
     )
 
 
@@ -194,13 +216,43 @@ def test_honest_alias_produces_no_warning(caplog):
 
 
 @pytest.mark.unit
-def test_every_deprecated_alias_names_a_resolvable_replacement():
+def test_every_stated_replacement_is_a_true_drop_in():
+    """Equality on the WHOLE registry entry, not just the served model string.
+
+    An earlier version of this guard compared ``resolved_model_of()`` only, and
+    so reported deepseek-v3 -> deepseek-v4-flash as safe. Both serve
+    deepseek/deepseek-v4-flash, but the replacement also carries
+    ``extra_body={"reasoning": {"effort": "high"}}``. Repointing a preset
+    across that difference silently bills reasoning tokens at output rate --
+    which is what happened to Phase 2 of multi-perspective-budget before this
+    test was tightened. A replacement that is not a true drop-in must be None.
+    """
     for alias, replacement in DEPRECATED_ALIASES.items():
+        assert alias in _MODEL_WHITELIST, f"{alias} is not registered"
+        if replacement is None:
+            continue
         assert replacement in _MODEL_WHITELIST, (
             f"{alias} points at replacement {replacement!r}, which is not registered"
         )
-        assert resolved_model_of(alias) == resolved_model_of(replacement), (
-            f"{alias} serves {resolved_model_of(alias)} but its stated replacement "
-            f"{replacement} serves {resolved_model_of(replacement)} -- the warning "
-            f"would send callers to a different model"
+        assert _MODEL_WHITELIST[alias] == _MODEL_WHITELIST[replacement], (
+            f"{alias} and its stated replacement {replacement} differ beyond the "
+            f"name: {_MODEL_WHITELIST[alias]} vs {_MODEL_WHITELIST[replacement]}. "
+            f"Swapping is not behaviour-neutral, so the replacement must be None."
+        )
+
+
+@pytest.mark.unit
+def test_aliases_without_a_drop_in_are_not_silently_equivalent():
+    """Guard the guard: None must mean 'differs', never 'nobody checked'."""
+    for alias, replacement in DEPRECATED_ALIASES.items():
+        if replacement is not None:
+            continue
+        twins = [
+            other
+            for other in _MODEL_WHITELIST
+            if other != alias and _MODEL_WHITELIST[other] == _MODEL_WHITELIST[alias]
+        ]
+        assert not twins, (
+            f"{alias} is marked as having no drop-in, but {twins} are entry-identical "
+            f"to it -- name one of them as the replacement"
         )

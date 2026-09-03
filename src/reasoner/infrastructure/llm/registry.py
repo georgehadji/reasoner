@@ -49,12 +49,12 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "gpt-5-mini":       {"model": "openai/gpt-5-mini"},          # $0.25/$2 per M, 400K ctx
     "gpt-5-nano":       {"model": "openai/gpt-5-nano"},          # $0.05/$0.40 per M — cheapest OpenAI, ideal Phase 0
     # ── 5.6 (Jul 2026) — tri-tier Sol/Terra/Luna naming, newest OpenAI gen ──
-    "gpt-5.6-sol":      {"model": "openai/gpt-5.6-sol"},         # flagship — $5/$30 per M, 1.05M ctx
+    "gpt-5.6-sol":      {"model": "openai/gpt-5.6-sol"},         # flagship — $2/$10 per M, 1.05M ctx
     "gpt-5.6-terra":    {"model": "openai/gpt-5.6-terra"},       # balanced mid-tier — $2/$12 per M, 1.05M ctx
     "gpt-5.6-luna":     {"model": "openai/gpt-5.6-luna"},        # fast/cheap — $0.20/$1.20 per M, 1.05M ctx, AA Intel 51.2 — default synthesis voice
     # -pro siblings are priced identically to the base tiers on OpenRouter, so they
     # are a free capability upgrade wherever the base tier is already being used.
-    "gpt-5.6-sol-pro":   {"model": "openai/gpt-5.6-sol-pro"},    # $5/$30 per M, 1.05M ctx
+    "gpt-5.6-sol-pro":   {"model": "openai/gpt-5.6-sol-pro"},    # $2/$10 per M, 1.05M ctx
     "gpt-5.6-terra-pro": {"model": "openai/gpt-5.6-terra-pro"},  # $2/$12 per M, 1.05M ctx
     "gpt-5.6-luna-pro":  {"model": "openai/gpt-5.6-luna-pro"},   # $0.20/$1.20 per M, 1.05M ctx
     # ── Previous (5.4, Mar 2026) ──
@@ -189,14 +189,16 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "deepseek-v4-flash": {
         # The 0731 dated pin was retired upstream: api.deepseek.com now accepts
         # only deepseek-v4-pro / deepseek-v4-flash and 400s on any dated suffix.
-        "model": "deepseek/deepseek-v4-flash",        # $0.0615/$0.1229, 1M ctx
+        "model": "deepseek/deepseek-v4-flash",        # $0.0886/$0.1772, 1M ctx
         "extra_body": {"reasoning": {"effort": "high"}},
     },
     "deepseek-v4-flash-0424": {
-        # NOT a pin any more, despite the name. The dated suffix was retired
-        # upstream, so this resolves to the same served model as
-        # "deepseek-v4-flash" — it reproduces nothing, and the $0.14/$0.28 it
-        # used to claim is not what bills (PRICING_DB: $0.0615/$0.1229).
+        # NOT a pin any more, despite the name: it resolves to the same served
+        # model as "deepseek-v4-flash", so it reproduces nothing, and the
+        # $0.14/$0.28 it used to claim is not what bills (PRICING_DB:
+        # $0.0886/$0.1772). DeepSeek's own API 400s on dated suffixes; note
+        # OpenRouter does still list deepseek/deepseek-v4-flash-0731, so
+        # "retired upstream" is true of the vendor API, not of the catalogue.
         # Deprecated: route "deepseek-v4-flash" instead.
         "model": "deepseek/deepseek-v4-flash",        # 1M ctx
         "extra_body": {"reasoning": {"effort": "high"}},
@@ -406,7 +408,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "nemotron-3-super-free":      {"model": "nvidia/nemotron-3-super-120b-a12b:free"},    # FREE — 120B/12B MoE, 1M ctx
     "nemotron-nano-omni-free":    {"model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"}, # FREE — 30B/3B, multimodal reasoning
     "nemotron-nano-30b":          {"model": "nvidia/nemotron-3-nano-30b-a3b"},            # $0.05/$0.20 per M — was the paid fallback for the delisted :free tier
-    "nemotron-3-ultra":           {"model": "nvidia/nemotron-3-ultra-550b-a55b"},         # paid fallback for nemotron-3-ultra-free — $0.60/$3.60 per M, 512K ctx
+    "nemotron-3-ultra":           {"model": "nvidia/nemotron-3-ultra-550b-a55b"},         # paid fallback for nemotron-3-ultra-free — $0.50/$2.20 per M, 512K ctx
     # nemotron-nano-30b-free / nemotron-nano-9b-v2-free removed 2026-08-26 — both
     # :free tiers left the OpenRouter catalogue. Neither was routed by a preset.
     # The 30B keeps its paid sibling above; the 9B has no paid tier on OpenRouter.
@@ -667,16 +669,24 @@ _VENDOR_BLOC: dict[str, str] = {
 }
 
 
-DEPRECATED_ALIASES: dict[str, str] = {
-    # alias -> the alias naming the model it actually serves.
-    # Every one of these is a deliberate back-compat or cost redirection whose
-    # NAME misstates the version or tier it resolves to. They keep working:
-    # ``routing`` is a public request field (api/schemas.py), an unknown model
-    # id raises ValueError in PresetService.build_router, and older saved states
-    # may still name them -- so deleting one is a breaking API change. No preset
-    # routes them; PresetService warns when a caller does. See
-    # docs/ENSEMBLE_DIVERSITY.md and tests/unit/test_model_alias_honesty.py.
-    "deepseek-v3": "deepseek-v4-flash",
+DEPRECATED_ALIASES: dict[str, str | None] = {
+    # alias -> an alias naming the model it actually serves AND behaving
+    # identically, or None when no such drop-in exists.
+    #
+    # Every key's NAME misstates the version or tier it resolves to. They keep
+    # working: ``routing`` is a public request field (api/schemas.py), an
+    # unknown model id raises ValueError in PresetService.build_router, and
+    # older saved states may still name them -- so deleting one is a breaking
+    # API change.
+    #
+    # A replacement must match the WHOLE registry entry, not just the served
+    # model string. deepseek-v3 is the reason: it serves deepseek/deepseek-v4-flash
+    # exactly as "deepseek-v4-flash" does, but that alias also carries
+    # extra_body reasoning.effort=high and this one does not. Repointing a
+    # preset from one to the other silently bills reasoning tokens at output
+    # rate. It is therefore None, not a rename -- and test_model_alias_honesty
+    # compares full entries so the distinction cannot rot.
+    "deepseek-v3": None,  # serves v4-flash, but WITHOUT reasoning.effort=high
     "deepseek-v4-flash-0424": "deepseek-v4-flash",
     "qwen3-turbo": "qwen3.5-flash",
     "qwen3-max": "qwen3.7-plus",
@@ -833,6 +843,6 @@ class RegistryAdapter:
         """Delegate to :func:`resolved_model_of` — see ``ModelRegistryPort.resolved_model_of``."""
         return resolved_model_of(model_id)
 
-    def deprecated_aliases(self) -> dict[str, str]:
+    def deprecated_aliases(self) -> dict[str, str | None]:
         """Delegate to :data:`DEPRECATED_ALIASES` — see the port for semantics."""
         return dict(DEPRECATED_ALIASES)

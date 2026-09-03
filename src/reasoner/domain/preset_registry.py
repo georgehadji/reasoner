@@ -27,7 +27,12 @@ _REGISTRY: dict[str, dict] = {
             "perspective_analysis": "qwen3.6-flash",   # was qwen3-turbo (DEAD) → stronger reasoning
             "synthesis": "llama-4-maverick",  # 🇺🇸 Meta — $0.200/$0.800 per M, 1048K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
             # ── Per-perspective echo-chamber-resistant diversity (4 labs, 3 blocs: 2🇨🇳 + 1🇺🇸 + 1🇫🇷) ──
-            "constructive":  "deepseek-v4-flash",     # 🇨🇳 DeepSeek — was "deepseek-v3", which serves v4-flash anyway
+            # NOT repointable to "deepseek-v4-flash" despite serving the same
+            # model: that alias carries extra_body reasoning.effort=high and
+            # this one does not. Swapping would silently bill reasoning tokens
+            # at output rate on Phase 2 of the default budget preset. The name
+            # is wrong (it serves v4-flash); no honest equivalent exists yet.
+            "constructive":  "deepseek-v3",           # 🇨🇳 DeepSeek — serves v4-flash, no reasoning effort
             "destructive":   "hermes-4-70b",      # 🇺🇸 Nous Research — critic-specialized ($0.13/$0.40) (was ring-2.6-1t 🇨🇳, cross-bloc echo resistance)
             "systemic":      "qwen3-30b-a3b",  # 🇨🇳 Qwen — $0.130/$0.520 per M, 131K ctx (was hy3; one model per phase)
             "minimalist":    "mistral-small-3.2-24b",     # 🇫🇷 Mistral — $0.075/$0.20
@@ -436,12 +441,16 @@ _REGISTRY: dict[str, dict] = {
         # distinct from every other slot here (test_preset_model_uniqueness).
         # 3 blocs / 4 labs, <=2 per bloc — BlocDiversityConstraint rules 2-4.
         # Prices per M are PRICING_DB (what actually bills), NOT the registry
-        # comments. (gpt-5.6-terra's own comment said $1/$6 and has been fixed.)
-        #   gpt-5.6-terra       🇺🇸 OpenAI   $2/$12
+        # comments. expert_1 was gpt-5.6-terra until it was caught as a FIXED-
+        # temperature model: expert_* is the `generate` family, whose _SAMPLED
+        # constraint is requires_temperature=True, so under ACR_ENABLED=true
+        # find_candidates drops it and ACR substitutes silently -- the
+        # documented four-lab panel would not be what actually runs.
+        #   nemotron-3-ultra    🇺🇸 NVIDIA   $0.50/$2.20  honours temperature
         #   gemini-pro-real     🇺🇸 Google   $2/$12   != deep_read's 3.7-flash
         #   qwen3-max-thinking  🇨🇳 Qwen     $0.78/$3.90  dedicated reasoning
         #   mistral-large-3     🇪🇺 Mistral  $0.50/$1.50  cheapest EU anchor
-        "expert_1":       "gpt-5.6-terra",
+        "expert_1":       "nemotron-3-ultra",
         "expert_2":       "gemini-pro-real",
         "expert_3":       "qwen3-max-thinking",
         "expert_4":       "mistral-large-3",

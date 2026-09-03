@@ -163,3 +163,33 @@ def test_constraint_accepts_a_cross_bloc_panel():
     assert not [v for v in violations if v.severity == "hard"], (
         f"valid cross-bloc panel rejected: {[v.reason for v in violations]}"
     )
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("preset_id", _DELPHI)
+def test_delphi_experts_honour_temperature(preset_id):
+    """expert_* is the `generate` family, whose _SAMPLED constraint requires it.
+
+    role_requirements maps expert_1..4 to "generate", whose constraints are
+    _SAMPLED = TaskConstraints(requires_temperature=True) -- "a fixed-temperature
+    model cannot do the job, so exclude it". A fixed-temperature model in one of
+    these slots is therefore dropped by capability_registry.find_candidates when
+    ACR_ENABLED=true, and ACR substitutes something else: the panel documented in
+    the preset silently stops being the panel that runs.
+
+    delphi-premium shipped with gpt-5.6-terra in expert_1 until this was caught.
+    ACR_ENABLED defaults to false, so it was latent, not live.
+    """
+    from reasoner.infrastructure.llm.registry import honours_tuned_temperature
+
+    routing = PRESETS[preset_id].get("routing", {})
+    fixed = [
+        (role, routing[role])
+        for role in EXPERT_ROLES
+        if routing.get(role) and not honours_tuned_temperature(routing[role])
+    ]
+    assert not fixed, (
+        f"{preset_id}: expert slots on fixed-temperature models {fixed}; "
+        f"the generate family requires temperature control, so ACR would drop "
+        f"and silently replace them"
+    )
