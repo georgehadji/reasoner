@@ -1,9 +1,12 @@
 """Metering is the only thing standing between an agent and free pipelines.
 
-These tests pin the four behaviours that matter and that a refactor could
+These tests pin the five behaviours that matter and that a refactor could
 plausibly break: a completed run settles exactly once at the frame's own cost,
-an abandoned run still settles the work already done, a ledger outage never
-reaches the caller, and an unauthenticated run is never charged to anyone.
+a client that hangs up *after* the done frame still settles it, a client that
+abandons the run *before* done settles what the run actually spent (policy
+decision, 2026-09-03: the user pays for tokens already spent, since the
+providers bill us for them regardless), a ledger outage never reaches the
+caller, and an unauthenticated run is never charged to anyone.
 """
 
 from __future__ import annotations
@@ -11,6 +14,7 @@ from __future__ import annotations
 import pytest
 
 from reasoner.application.services.run_metering import (
+    COST_BEARING_FRAME_TYPES,
     RunContext,
     extract_run_cost,
     metered,
@@ -22,6 +26,9 @@ pytestmark = pytest.mark.unit
 
 DONE = 'data: {"type": "done", "total_cost_usd": 0.0191, "errors": []}'
 PHASE = 'data: {"type": "phase_complete", "phase": 2}'
+# A phase_complete frame carrying the running cost, as pipeline.py:596 emits.
+PHASE_1 = 'data: {"type": "phase_complete", "phase": 1, "total_cost_usd": 0.004}'
+PHASE_2 = 'data: {"type": "phase_complete", "phase": 2, "total_cost_usd": 0.009}'
 
 
 class RecordingSink:
@@ -95,8 +102,13 @@ def user_ctx(**overrides) -> RunContext:
     [
         ('data: {"type": "done", "total_cost_usd": 0.0123}', 0.0123),
         ('data: {"type": "done", "total_cost_usd": 2}', 2.0),
-        # Only the terminal frame carries a settleable cost.
-        ('data: {"type": "phase_complete", "total_cost_usd": 0.5}', None),
+        # phase_complete is cost-bearing too: it is what lets an abandoned
+        # run settle what it actually spent instead of releasing in full.
+        ('data: {"type": "phase_complete", "total_cost_usd": 0.5}', 0.5),
+        # Frame types that carry no cost, even if one were smuggled in.
+        ('data: {"type": "phase_error", "total_cost_usd": 0.5}', None),
+        ('data: {"type": "cancelled", "total_cost_usd": 0.5}', None),
+        ('data: {"type": "connecting"}', None),
         # Free and refunded-to-zero runs must not produce a charge.
         ('data: {"type": "done", "total_cost_usd": 0}', None),
         ('data: {"type": "done", "total_cost_usd": -1}', None),
@@ -109,8 +121,15 @@ def user_ctx(**overrides) -> RunContext:
         ('{"type": "done", "total_cost_usd": 0.5}', None),
     ],
 )
-def test_cost_comes_only_from_a_terminal_done_frame(frame: str, expected):
+def test_cost_comes_only_from_a_cost_bearing_frame(frame: str, expected):
     assert extract_run_cost(frame) == expected
+
+
+def test_cost_bearing_frame_types_is_exactly_done_and_phase_complete():
+    # Pins the set itself, not just extract_run_cost's behaviour on a sample:
+    # a third type added here without a corresponding emitter is a silent
+    # billing hole, and one removed here is a silent double-release.
+    assert COST_BEARING_FRAME_TYPES == frozenset({"done", "phase_complete"})
 
 
 # ── metered ─────────────────────────────────────────────────────────
@@ -254,8 +273,8 @@ async def test_a_reserved_run_releases_the_reservation_and_settles_actual_cost()
 
 @pytest.mark.asyncio
 async def test_a_reserved_run_that_cost_nothing_still_releases_the_reservation():
-    """A cache hit or an aborted run must return the whole hold, not just
-    the part matching the (zero) actual cost."""
+    """A cache hit or an abandoned run with no reported spend returns the
+    whole hold, not just the part matching the (zero) actual cost."""
     sink = RecordingSink()
     ctx = user_ctx(reserved_credits=20)
 
@@ -265,6 +284,52 @@ async def test_a_reserved_run_that_cost_nothing_still_releases_the_reservation()
         {"user_id": "user-42", "credits": 20, "reference_id": "run-1:release"}
     ]
     assert sink.calls == []  # no settle call for zero cost
+
+
+@pytest.mark.asyncio
+async def test_a_run_abandoned_mid_stream_is_billed_for_what_it_spent():
+    """The policy this closes (2026-09-03): a run abandoned before the
+    terminal ``done`` frame is billed for tokens already spent, not released
+    in full. The provider charges us for those tokens whether or not the
+    client stayed connected to read the answer.
+
+    The client disconnects after phase 2, never seeing a ``done`` frame --
+    generator.aclose() is exactly what an ASGI server does when a request
+    disconnects mid-stream, so this reproduces the real abandonment path
+    rather than asserting on cost accounting in the abstract.
+    """
+    sink = RecordingSink()
+    ctx = user_ctx(reserved_credits=20)
+    stream = metered(frames(PHASE_1, PHASE_2), ctx, sink)
+
+    seen = [await stream.__anext__(), await stream.__anext__()]
+    await stream.aclose()
+
+    assert seen == [PHASE_1, PHASE_2]
+    # True-up releases the whole hold and settles the actual cost as two
+    # entries (see _true_up's docstring), the same shape the completed-run
+    # case uses -- the fix is which cost reaches this call, not the shape.
+    assert sink.release_calls == [
+        {"user_id": "user-42", "credits": 20, "reference_id": "run-1:release"}
+    ]
+    assert sink.calls == [
+        {"user_id": "user-42", "cost_usd": 0.009, "reference_id": "run-1", "preset": "auto-budget"}
+    ]
+
+
+@pytest.mark.asyncio
+async def test_the_running_cost_used_on_abandonment_is_the_latest_seen():
+    """Guards against billing a superseded figure: if a later phase reports a
+    lower running total (a refund folded into the state, a correction), the
+    charge must track the most recent frame, not accumulate or use the first."""
+    sink = RecordingSink()
+    ctx = user_ctx(reserved_credits=20)
+
+    await _drain(metered(frames(PHASE_2, PHASE_1), ctx, sink))
+
+    assert sink.calls == [
+        {"user_id": "user-42", "cost_usd": 0.004, "reference_id": "run-1", "preset": "auto-budget"}
+    ]
 
 
 @pytest.mark.asyncio

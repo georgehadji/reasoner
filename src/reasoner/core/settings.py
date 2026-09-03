@@ -93,6 +93,18 @@ class Settings:
 
     # ── Document Semantic Retrieval (Phase 4, opt-in) ──
     DOCUMENT_SEMANTIC_RETRIEVAL_ENABLED: bool = os.getenv("DOCUMENT_SEMANTIC_RETRIEVAL_ENABLED", "false").lower() in ("1", "true", "yes")
+
+    # Off by default, and it must stay off until someone has diffed a full
+    # preset run with it on against one with it off. Turning it on switches
+    # the CLI and headless paths from PipelineWorkflowServices.run_phase's bare
+    # `await step.fn(...)` fallback onto the real WorkflowRunner: retries,
+    # per-phase timeouts, the quality gate and PHASE_* events, none of which
+    # have ever executed on this path. Code that has never run is not known to
+    # work, so this is a behaviour change behind a switch, not a bug fix.
+    # See docs/plans/backend-defect-remediation.md B1 for the staging.
+    WORKFLOW_RUNNER_ENABLED: bool = (
+        os.getenv("WORKFLOW_RUNNER_ENABLED", "false").lower() in ("1", "true", "yes")
+    )
     DOCUMENT_CHUNK_SIZE: int = int(os.getenv("DOCUMENT_CHUNK_SIZE", "1000"))
     DOCUMENT_CHUNK_OVERLAP: int = int(os.getenv("DOCUMENT_CHUNK_OVERLAP", "200"))
     DOCUMENT_MAX_CHUNKS_PER_FILE: int = int(os.getenv("DOCUMENT_MAX_CHUNKS_PER_FILE", "500"))

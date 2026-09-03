@@ -304,6 +304,80 @@ class TestWorkflowRunnerWiring:
         assert state.phase_tokens, "no per-phase token attribution was recorded"
 
 
+class TestWorkflowRunnerFlag:
+    """WORKFLOW_RUNNER_ENABLED gates the D2 wiring above rather than applying
+    it outright, because switching it on turns on a retry/timeout/quality
+    layer that has never executed, for every CLI and headless run at once.
+    These prove the FLAG actually controls the wiring, not that the wired
+    runner works end to end -- that needs A2 (the missing EventType members)
+    first, which is why TestWorkflowRunnerWiring above stays xfail.
+
+    WorkflowRunner.run is stubbed so these never reach run_phase, sidestepping
+    the exact TypeError TestWorkflowRunnerWiring documents. That is a
+    deliberate scope boundary: this class asks "did pipeline.py rebind the
+    services object", not "does the runner's phase execution work".
+    """
+
+    @pytest.mark.asyncio
+    async def test_disabled_by_default(self):
+        from reasoner.core.settings import settings
+
+        assert settings.WORKFLOW_RUNNER_ENABLED is False
+
+    @pytest.mark.asyncio
+    @pytest.mark.timeout(60)
+    async def test_flag_off_leaves_the_dead_local_pattern(
+        self, mock_router_call, mock_subagents_off, monkeypatch
+    ):
+        """No-regression anchor: proves the CURRENT (buggy) behaviour this
+        flag intentionally preserves by default, so a future change to the
+        default is a visible, deliberate diff against this assertion."""
+        from reasoner.application.flows.runner import WorkflowRunner
+
+        captured: dict = {}
+
+        async def _spy(self, strategy, state, config=None):
+            captured["services_runner"] = self.services._runner
+            return state
+
+        monkeypatch.setattr(WorkflowRunner, "run", _spy)
+
+        store = _RecordingEventStore()
+        await _run_handler(store)
+
+        assert "services_runner" in captured, "WorkflowRunner.run was never called"
+        assert captured["services_runner"] is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.timeout(60)
+    async def test_flag_on_wires_the_runner_into_its_own_services(
+        self, mock_router_call, mock_subagents_off, monkeypatch
+    ):
+        """The behaviour this PR adds: with the flag on, the services object
+        the runner hands to the strategy is one built WITH that runner, so
+        PipelineWorkflowServices.run_phase delegates instead of taking its
+        bare `await step.fn(...)` fallback."""
+        from reasoner.application.flows.runner import WorkflowRunner
+        from reasoner.core.settings import settings
+
+        monkeypatch.setattr(settings, "WORKFLOW_RUNNER_ENABLED", True)
+
+        captured: dict = {}
+
+        async def _spy(self, strategy, state, config=None):
+            captured["runner"] = self
+            captured["services_runner"] = self.services._runner
+            return state
+
+        monkeypatch.setattr(WorkflowRunner, "run", _spy)
+
+        store = _RecordingEventStore()
+        await _run_handler(store)
+
+        assert "services_runner" in captured, "WorkflowRunner.run was never called"
+        assert captured["services_runner"] is captured["runner"]
+
+
 class TestNoRegression:
     """The handler still produces a usable state and a well-formed event stream."""
 
