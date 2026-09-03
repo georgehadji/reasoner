@@ -159,13 +159,19 @@ class TestQuotaCheckFailClosed:
         having quota. A PostgreSQL defect proved this in production: get_quota
         raised on every call, and the only trace was a logger.warning nobody
         reads. This pins that the fallback is now loud: a Prometheus counter
-        and an error-level log, not a silent path."""
+        and an error-level log, not a silent path.
+
+        Spies on .labels()/.inc() rather than reading prometheus_client's
+        private ._value: that attribute only exists on a real Counter, and
+        prometheus_client is an optional dependency (not in requirements.txt)
+        that degrades to metrics.py's _NoOpMetric when absent -- which is
+        exactly CI's own state. Spying on the public contract is correct
+        under both, not just the one this machine happens to have installed.
+        """
         from reasoner.api.dependencies import check_quota
         from reasoner.domain.saas import User
-        from reasoner.metrics import REASONER_QUOTA_CHECK_FAILURES
 
         user = User(id=uuid4(), email="test@example.com", display_name="Test", scopes=["read"])
-        before = REASONER_QUOTA_CHECK_FAILURES.labels(reason="RuntimeError")._value.get()
 
         def broken_quota_service(*args, **kwargs):
             raise RuntimeError("Simulated DB failure")
@@ -175,13 +181,26 @@ class TestQuotaCheckFailClosed:
         mock_service.check = broken_quota_service
         monkeypatch.setattr(deps_module, "_quota_service", mock_service)
 
+        inc_calls: list[str] = []
+
+        class _SpyMetric:
+            def labels(self, *, reason: str):
+                inc_calls.append(reason)
+                return self
+
+            def inc(self):
+                pass
+
+        import reasoner.metrics as metrics_module
+
+        monkeypatch.setattr(metrics_module, "REASONER_QUOTA_CHECK_FAILURES", _SpyMetric())
+
         import logging
 
         with caplog.at_level(logging.WARNING):
             await check_quota(user=user)
 
-        after = REASONER_QUOTA_CHECK_FAILURES.labels(reason="RuntimeError")._value.get()
-        assert after == before + 1
+        assert inc_calls == ["RuntimeError"]
 
         error_records = [r for r in caplog.records if r.levelno >= logging.ERROR]
         assert error_records, "the fallback must log at error, not warning -- that is the whole fix"

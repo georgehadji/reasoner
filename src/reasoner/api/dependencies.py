@@ -683,8 +683,8 @@ async def check_quota(
             from reasoner.metrics import REASONER_QUOTA_CHECK_FAILURES
 
             REASONER_QUOTA_CHECK_FAILURES.labels(reason=type(exc).__name__).inc()
-        except Exception:  # pragma: no cover - metrics must never break auth
-            pass
+        except Exception as metrics_exc:  # metrics must never break auth
+            logger.debug("Quota-failure metric could not be recorded: %s", metrics_exc)
         return QuotaResult(allowed=True, remaining=10)
 
     if not result.allowed:
