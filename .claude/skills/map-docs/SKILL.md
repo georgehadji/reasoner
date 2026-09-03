@@ -64,6 +64,8 @@ folders:
 | `MIND_VIRUS_IMPLEMENTATION_PLAN.md` | Build plan for the above, with a STATUS section recording what actually shipped and three deviations found during implementation — notably that 0/49 presets clear any propagation-resistance floor, so that constraint is observability, not a gate. Read before touching `harden_system_prompt`, `build_memory_context`, or the resistance table. |
 | `SYCOPHANCY_MITIGATION.md` | Research note on sycophancy resistance (Ibrahim et al., arXiv:2605.07912v3), same shape as the mind-virus pair. Untracked WIP from a parallel workstream at time of writing. |
 | `plans/sycophancy-mitigation.md` | Its build plan (S1–S9 + W10). Touches `phases/_shared.py`, which the propagation-resistance work also changed — check for overlap before implementing. |
+| `ENSEMBLE_DIVERSITY.md` | Research note on ensemble diversity in model routing (Aitchison et al., arXiv:2606.29661v1), same shape as the mind-virus and sycophancy pairs. Records a **verified defect**: Delphi's four "independent experts" all resolve to the preset primary because no preset routes `expert_1..4`. Read before changing routing diversity rules or ADR-004. |
+| `plans/ensemble-diversity-measurement.md` | Its build plan (D0–D8). D0 (fix Delphi expert routing) is independently shippable; the rest builds measured pairwise divergence behind `RoutingConstraintPort`, shipped soft as observability. |
 | `AUDIT_REPORT.md`, `architecture-audit-2026-06-02.md`, `architecture-audit-finale-2026-06-02.md` | Earlier audits. |
 | `bug_hunt_report.md` | Precision bug hunt. |
 
