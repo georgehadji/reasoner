@@ -57,7 +57,7 @@ jobs:
       monitor_gap: ${{ steps.profile.outputs.monitor_gap }}
     
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -117,7 +117,7 @@ jobs:
       github.event.inputs.healing_loop == 'loop1_static'
     
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -199,7 +199,7 @@ jobs:
       github.event.inputs.healing_loop == 'loop2_runtime'
     
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -333,7 +333,7 @@ jobs:
       github.event.inputs.healing_loop == 'loop3_evolutionary'
     
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -468,7 +468,7 @@ jobs:
     if: always()
     
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       
       - name: Set up Python
         uses: actions/setup-python@v7
