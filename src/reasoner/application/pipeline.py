@@ -489,23 +489,38 @@ class ReasonerPipeline:
             from reasoner.application.flows.services import PipelineWorkflowServices
 
             strategy = self.flow_factory.get_strategy(method)
-            # KNOWN DEFECT — do not "tidy" this without reading
-            # docs/reports/defect-hunt-2026-09-01/T5-orchestration.md (D2).
-            # `runner.run()` hands the strategy *its own* services — the
-            # runner-less one built on the next line up — so every phase takes
-            # PipelineWorkflowServices.run_phase's bare `await step.fn(...)`
-            # fallback and the whole WorkflowRunner (retries, per-phase
-            # timeouts, quality gate, PHASE_* events, `_current_phase_key` and
-            # therefore phase_tokens/phase_durations) is bypassed on this
-            # non-SSE path. `services` below is consequently unused.
-            # Wiring it up is NOT a one-line change: WorkflowRunner.run_phase
-            # and _handle_phase_error construct PhaseStarted(phase_number=…),
-            # PhaseFailed(is_fatal=…) and EventType.PHASE_QUALITY_CHECKED /
-            # PHASE_RETRIED, none of which exist — the first phase would raise
-            # TypeError. See the report for the full diff.
-            runner = WorkflowRunner(PipelineWorkflowServices(self))
-            services = PipelineWorkflowServices(self, runner=runner)
+            # The non-SSE path bypassed WorkflowRunner entirely. runner.run()
+            # hands the strategy `self.services`, and those services were built
+            # without a runner, so PipelineWorkflowServices.run_phase took its
+            # bare `await step.fn(...)` fallback for every phase. Retries,
+            # per-phase timeouts, the quality gate, PHASE_* events,
+            # `_current_phase_key` and therefore phase_tokens/phase_durations
+            # have never executed on any CLI or headless run.
+            # See docs/reports/defect-hunt-2026-09-01/T5-orchestration.md (D2).
+            #
+            # WORKFLOW_RUNNER_ENABLED gates the fix instead of applying it
+            # outright, because switching on a layer that has never run, for
+            # every CLI and headless run at once, is a behaviour change rather
+            # than a bug fix. Default off. Flip it only after diffing a full
+            # preset run both ways.
+            #
+            # Prerequisite before flipping: WorkflowRunner.run_phase and
+            # _handle_phase_error construct PhaseStarted(phase_number=...),
+            # PhaseFailed(is_fatal=...) and EventType.PHASE_QUALITY_CHECKED /
+            # PHASE_RETRIED. None of those members exist yet, so the first
+            # phase raises TypeError with this on. Item A2 lands first.
+            from reasoner.core.settings import settings as _settings
 
+            runner = WorkflowRunner(PipelineWorkflowServices(self))
+            if _settings.WORKFLOW_RUNNER_ENABLED:
+                # The construction is circular by nature: the runner needs
+                # services, and the services need the runner so that
+                # run_phase() delegates instead of taking its bare `await
+                # step.fn(...)` fallback. WorkflowRunner.run() passes
+                # `self.services` to the strategy and takes no services
+                # argument, so the knot is tied by rebinding the attribute
+                # after both objects exist.
+                runner.services = PipelineWorkflowServices(self, runner=runner)
             await runner.run(strategy, state)
         else:
             # Legacy path (should be empty now)
