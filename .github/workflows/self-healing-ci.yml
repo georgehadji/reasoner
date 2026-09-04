@@ -45,7 +45,10 @@ env:
   JWT_SECRET_KEY: 'ci-test-secret-key-not-for-production-use-only'
   # ProviderRouter.from_model_ids() requires a key to be *present* to build a
   # provider; the smoke suite only instantiates, it never issues a call.
-  OPENROUTER_API_KEY: 'ci-dummy-key-no-calls-are-made'
+  # Value carries "placeholder" deliberately: scripts/scan-secrets.py flags any
+  # api_key-shaped assignment and skips ones marked this way, which is the
+  # convention for a literal non-secret rather than a reason to widen the scanner.
+  OPENROUTER_API_KEY: 'ci-placeholder-no-calls-are-made'
 
 jobs:
   # ─────────────────────────────────────────────────────────────────────
