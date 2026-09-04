@@ -136,7 +136,7 @@ jobs:
           python healing/introspection_engine.py
           
       - name: Upload Introspection Report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: introspection-report
           path: healing/introspection_report.*
@@ -147,7 +147,7 @@ jobs:
           python healing/test_generation_engine.py
 
       - name: Upload Generated Tests
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: generated-tests
           path: healing/generated_tests/
@@ -180,7 +180,7 @@ jobs:
           fi
           
       - name: Upload Coverage Report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: htmlcov/
@@ -452,7 +452,7 @@ jobs:
           cat healing/optimization_proposals.md
       
       - name: Upload Evolutionary Reports
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: evolutionary-reports
           path: healing/*.md
@@ -544,14 +544,14 @@ jobs:
           cat healing/healing_summary.json
       
       - name: Upload Healing Summary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: healing-summary
           path: healing/healing_summary.json
           retention-days: 90
 
       - name: Upload Heartbeat Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ci-heartbeat
           path: healing/heartbeat/latest.txt
