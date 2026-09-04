@@ -43,6 +43,9 @@ env:
   CSRF_ENFORCE_BACKEND: 'false'
   # Provide a dummy JWT secret so test collection doesn't raise RuntimeError.
   JWT_SECRET_KEY: 'ci-test-secret-key-not-for-production-use-only'
+  # ProviderRouter.from_model_ids() requires a key to be *present* to build a
+  # provider; the smoke suite only instantiates, it never issues a call.
+  OPENROUTER_API_KEY: 'ci-dummy-key-no-calls-are-made'
 
 jobs:
   # ─────────────────────────────────────────────────────────────────────
@@ -96,7 +99,7 @@ jobs:
           fi
           
           # Check monitoring gap
-          if [ -f "health_check.py" ] && [ -f "circuit_breaker.py" ]; then
+          if [ -f "src/reasoner/api/routes/health.py" ] && [ -f "src/reasoner/infrastructure/circuit_breaker.py" ]; then
             echo "Monitoring Gap: PARTIAL"
             echo "monitor_gap=PARTIAL" >> $GITHUB_OUTPUT
           else
@@ -133,7 +136,7 @@ jobs:
       
       - name: Run Introspection Engine (Phase 1.1)
         run: |
-          python healing/introspection_engine.py
+          python src/reasoner/healing/introspection_engine.py
           
       - name: Upload Introspection Report
         uses: actions/upload-artifact@v7
@@ -144,7 +147,7 @@ jobs:
       
       - name: Run Test Generation (Phase 1.2)
         run: |
-          python healing/test_generation_engine.py
+          python src/reasoner/healing/test_generation_engine.py
 
       - name: Upload Generated Tests
         uses: actions/upload-artifact@v7
@@ -224,10 +227,11 @@ jobs:
       - name: Verify Health Check Implementation
         run: |
           python -c "
-          from health_check import get_health_checker, ProviderHealthChecker
-          hc = get_health_checker()
-          print('✓ Health checker module loaded')
-          print(f'✓ Health checker type: {type(hc).__name__}')
+          from reasoner.api.routes.health import router
+          routes = [r.path for r in router.routes]
+          assert '/api/health' in routes, routes
+          print('✓ Health route module loaded')
+          print(f'✓ Health routes: {routes}')
           "
       
       - name: Generate Deployment Smoke Tests (Phase 2.3)
@@ -255,16 +259,15 @@ jobs:
               
               def test_import_core_modules(self):
                   """Verify all core modules can be imported"""
-                  from pipeline import ARAPipeline
+                  from pipeline import ReasonerPipeline
                   from llm import ProviderRouter
                   from models import PipelineState
                   assert True
               
               def test_health_check_endpoint(self):
-                  """Verify health check is available"""
-                  from health_check import get_health_checker
-                  hc = get_health_checker()
-                  assert hc is not None
+                  """Verify the health route is available"""
+                  from reasoner.api.routes.health import router
+                  assert "/api/health" in [r.path for r in router.routes]
               
               def test_circuit_breaker_available(self):
                   """Verify circuit breaker is available"""
@@ -275,11 +278,11 @@ jobs:
               @pytest.mark.asyncio
               async def test_pipeline_instantiation(self):
                   """Verify pipeline can be instantiated"""
-                  from pipeline import ARAPipeline
+                  from pipeline import ReasonerPipeline
                   from llm import ProviderRouter
                   
                   router = ProviderRouter.from_model_ids(primary_id="deepseek-v3")
-                  pipeline = ARAPipeline(router=router, top_k=2)
+                  pipeline = ReasonerPipeline(router=router, top_k=2)
                   assert pipeline is not None
               
               def test_no_p0_issues(self):
@@ -300,24 +303,21 @@ jobs:
           
       - name: Run Deployment Smoke Tests
         run: |
-          cd healing/smoke_tests
-          python -m pytest test_deployment_smoke.py -v --tb=short
+          python -m pytest healing/smoke_tests/test_deployment_smoke.py -v --tb=short
           
       - name: Verify Resilience Patterns
         run: |
+          # retry_utils was removed in the package reorg and has no replacement --
+          # retry lives on the providers now (BaseLLMProvider.max_retries /
+          # complete_with_retry), not behind a get_retry_config() lookup. The
+          # circuit-breaker assertions below still describe real behaviour.
           python -c "
           from circuit_breaker import get_circuit_breaker, CircuitOpenError
-          from retry_utils import get_retry_config
-          
-          # Verify circuit breaker config
           cb = get_circuit_breaker('default')
-          assert cb.config.failure_threshold == 5
-          assert cb.config.timeout_seconds == 30.0
+          assert cb.config.failure_threshold == 5, cb.config.failure_threshold
+          assert cb.config.timeout_seconds == 30.0, cb.config.timeout_seconds
           print('✓ Circuit breaker properly configured')
-          
-          # Verify retry config exists
-          retry_config = get_retry_config('default')
-          print(f'✓ Retry config available: {retry_config}')
+          print(f'✓ CircuitOpenError available: {CircuitOpenError.__name__}')
           "
 
   # ─────────────────────────────────────────────────────────────────────
