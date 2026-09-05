@@ -101,7 +101,11 @@ src/reasoner/domain/history/pipeline_owners.json
 # This was src/reasoner/healing/generated_tests/, which was where the engines
 # wrongly wrote after the src/ layout moved them a directory deeper. Nothing
 # under <repo>/healing/ is tracked.
-healing/
+#
+# Leading slash is load-bearing: a bare `healing/` matches a directory of that
+# name at ANY depth, which would also ignore the src/reasoner/healing/ source
+# package -- silently swallowing any new module added there.
+/healing/
 
 # Scratch dir for manual/ad-hoc test scripts
 .tmp_manual_temp/
