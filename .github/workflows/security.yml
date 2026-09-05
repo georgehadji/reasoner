@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: '3.12'
+          python-version: '3.14'
       # bandit pinned: scripts/bandit_ratchet.py compares an exact finding
       # count, and an unpinned linter makes that number drift with the tool
       # rather than with the code. 1.9.4 is what CI already resolved to.
@@ -43,7 +43,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: '22'
+          node-version: '26'
       - run: cd ui-next && npm audit --audit-level high
 
   # SBOM + known-vulnerability scan of the dependency tree and Dockerfiles.
@@ -101,7 +101,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: '3.12'
+          python-version: '3.14'
       - run: pip install pip-tools
       - name: Verify requirements.lock.txt exists and is current
         run: |

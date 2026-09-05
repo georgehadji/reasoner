@@ -30,7 +30,7 @@ on:
           - loop3_evolutionary
 
 env:
-  PYTHON_VERSION: '3.12'
+  PYTHON_VERSION: '3.14'
   PIP_CACHE_DIR: ${{ github.workspace }}/.cache/pip
   # BUG-001: Add source and legacy dirs to Python path so all `python -c`
   # verification steps resolve correctly from the repo root during CI runs.
