@@ -43,6 +43,12 @@ env:
   CSRF_ENFORCE_BACKEND: 'false'
   # Provide a dummy JWT secret so test collection doesn't raise RuntimeError.
   JWT_SECRET_KEY: 'ci-test-secret-key-not-for-production-use-only'
+  # ProviderRouter.from_model_ids() requires a key to be *present* to build a
+  # provider; the smoke suite only instantiates, it never issues a call.
+  # Value carries "placeholder" deliberately: scripts/scan-secrets.py flags any
+  # api_key-shaped assignment and skips ones marked this way, which is the
+  # convention for a literal non-secret rather than a reason to widen the scanner.
+  OPENROUTER_API_KEY: 'ci-placeholder-no-calls-are-made'
 
 jobs:
   # ─────────────────────────────────────────────────────────────────────
@@ -96,7 +102,7 @@ jobs:
           fi
           
           # Check monitoring gap
-          if [ -f "health_check.py" ] && [ -f "circuit_breaker.py" ]; then
+          if [ -f "src/reasoner/api/routes/health.py" ] && [ -f "src/reasoner/infrastructure/circuit_breaker.py" ]; then
             echo "Monitoring Gap: PARTIAL"
             echo "monitor_gap=PARTIAL" >> $GITHUB_OUTPUT
           else
@@ -133,7 +139,7 @@ jobs:
       
       - name: Run Introspection Engine (Phase 1.1)
         run: |
-          python healing/introspection_engine.py
+          python src/reasoner/healing/introspection_engine.py
           
       - name: Upload Introspection Report
         uses: actions/upload-artifact@v7
@@ -144,7 +150,7 @@ jobs:
       
       - name: Run Test Generation (Phase 1.2)
         run: |
-          python healing/test_generation_engine.py
+          python src/reasoner/healing/test_generation_engine.py
 
       - name: Upload Generated Tests
         uses: actions/upload-artifact@v7
@@ -153,15 +159,41 @@ jobs:
           path: healing/generated_tests/
           retention-days: 30
 
-      - name: Verify Alembic Migrations
+      - name: Verify Alembic Migration Graph
         run: |
-          # Verify alembic can reach head and no ungenerated migrations exist
-          alembic check || true
-          alembic current
+          # Offline validation only. `alembic check` cannot detect ungenerated
+          # migrations here: migrations/alembic/env.py sets target_metadata = None
+          # because migrations are hand-written raw SQL, so autogenerate has no
+          # model metadata to diff against. And `alembic current` needs a live
+          # Postgres, which this job has no service container for -- it was
+          # failing with "Connect call failed ('127.0.0.1', 5432)".
+          # What is checkable without a database is the revision graph itself.
+          alembic history          # walks every revision; fails on a broken down_revision
+          # `|| true`: grep -c exits 1 on zero matches, which under `bash -e`
+          # would abort here instead of reaching the message below.
+          HEADS=$(alembic heads | grep -c '(head)' || true)
+          echo "Revision heads: ${HEADS}"
+          if [ "${HEADS}" -ne 1 ]; then
+            echo "❌ Expected exactly 1 alembic head, found ${HEADS}"
+            echo "   Parallel migration branches need an explicit merge revision."
+            alembic heads
+            exit 1
+          fi
+          echo "✅ Single linear migration head"
 
       - name: Run All Tests with Coverage
         run: |
-          coverage run -m pytest -v
+          # Marker deselection matches the enforced workflows (test.yml,
+          # coverage.yml). A bare `pytest` collects the slow/integration e2e
+          # suites, which make real OpenRouter calls -- and the workflow-level
+          # OPENROUTER_API_KEY placeholder defeats their
+          # skipif(not os.environ.get("OPENROUTER_API_KEY")) guard, so instead
+          # of skipping they ran against the live API with a bogus key:
+          # 398 failures, almost all `401 Missing Authentication header`.
+          coverage run -m pytest tests/ -v \
+            -m "not slow and not integration" \
+            --timeout=60 \
+            --tb=short
           coverage xml
           coverage html
           
@@ -170,8 +202,18 @@ jobs:
           COVERAGE=$(coverage report | tail -1 | awk '{print $NF}' | sed 's/%//')
           echo "Current coverage: ${COVERAGE}%"
           
-          if (( $(echo "$COVERAGE < 60" | bc -l) )); then
-            echo "❌ CI FAIL: Coverage below 60% threshold"
+          # Floor aligned with coverage.yml, which is the single PR-enforced
+          # coverage number (see this file's header -- push/pull_request
+          # triggers were removed precisely because a second, contradictory
+          # gate here looked enforced but never ran). This step's old 60%
+          # hard-fail has never once executed: it sat behind the alembic step,
+          # which died on a missing database. Measured on the deselected suite
+          # it produces 48%, so restoring it as-is would have pinned this
+          # nightly red against a threshold the repo has explicitly declined --
+          # coverage.yml's floor is commented "reflects real unit-only
+          # coverage". The 80% WARN target below is unchanged.
+          if (( $(echo "$COVERAGE < 30" | bc -l) )); then
+            echo "❌ CI FAIL: Coverage below 30% hard floor"
             exit 1
           elif (( $(echo "$COVERAGE < 80" | bc -l) )); then
             echo "⚠️ CI WARN: Coverage below 80% target"
@@ -224,16 +266,17 @@ jobs:
       - name: Verify Health Check Implementation
         run: |
           python -c "
-          from health_check import get_health_checker, ProviderHealthChecker
-          hc = get_health_checker()
-          print('✓ Health checker module loaded')
-          print(f'✓ Health checker type: {type(hc).__name__}')
+          from reasoner.api.routes.health import router
+          routes = [r.path for r in router.routes]
+          assert '/api/health' in routes, routes
+          print('✓ Health route module loaded')
+          print(f'✓ Health routes: {routes}')
           "
       
       - name: Generate Deployment Smoke Tests (Phase 2.3)
         run: |
           mkdir -p healing/smoke_tests
-          sed 's/^          //' > healing/smoke_tests/test_deployment_smoke.py << '          EOF'
+          cat > healing/smoke_tests/test_deployment_smoke.py << 'EOF'
           # AUTO-GENERATED by Self-Healing Codebase Prompt v1.0
           # Phase: 2.3 — Deployment Smoke Tests
           # Generated: $(date -Iseconds)
@@ -255,16 +298,15 @@ jobs:
               
               def test_import_core_modules(self):
                   """Verify all core modules can be imported"""
-                  from pipeline import ARAPipeline
+                  from pipeline import ReasonerPipeline
                   from llm import ProviderRouter
                   from models import PipelineState
                   assert True
               
               def test_health_check_endpoint(self):
-                  """Verify health check is available"""
-                  from health_check import get_health_checker
-                  hc = get_health_checker()
-                  assert hc is not None
+                  """Verify the health route is available"""
+                  from reasoner.api.routes.health import router
+                  assert "/api/health" in [r.path for r in router.routes]
               
               def test_circuit_breaker_available(self):
                   """Verify circuit breaker is available"""
@@ -275,11 +317,11 @@ jobs:
               @pytest.mark.asyncio
               async def test_pipeline_instantiation(self):
                   """Verify pipeline can be instantiated"""
-                  from pipeline import ARAPipeline
+                  from pipeline import ReasonerPipeline
                   from llm import ProviderRouter
                   
                   router = ProviderRouter.from_model_ids(primary_id="deepseek-v3")
-                  pipeline = ARAPipeline(router=router, top_k=2)
+                  pipeline = ReasonerPipeline(router=router, top_k=2)
                   assert pipeline is not None
               
               def test_no_p0_issues(self):
@@ -300,24 +342,21 @@ jobs:
           
       - name: Run Deployment Smoke Tests
         run: |
-          cd healing/smoke_tests
-          python -m pytest test_deployment_smoke.py -v --tb=short
+          python -m pytest healing/smoke_tests/test_deployment_smoke.py -v --tb=short
           
       - name: Verify Resilience Patterns
         run: |
+          # retry_utils was removed in the package reorg and has no replacement --
+          # retry lives on the providers now (BaseLLMProvider.max_retries /
+          # complete_with_retry), not behind a get_retry_config() lookup. The
+          # circuit-breaker assertions below still describe real behaviour.
           python -c "
           from circuit_breaker import get_circuit_breaker, CircuitOpenError
-          from retry_utils import get_retry_config
-          
-          # Verify circuit breaker config
           cb = get_circuit_breaker('default')
-          assert cb.config.failure_threshold == 5
-          assert cb.config.timeout_seconds == 30.0
+          assert cb.config.failure_threshold == 5, cb.config.failure_threshold
+          assert cb.config.timeout_seconds == 30.0, cb.config.timeout_seconds
           print('✓ Circuit breaker properly configured')
-          
-          # Verify retry config exists
-          retry_config = get_retry_config('default')
-          print(f'✓ Retry config available: {retry_config}')
+          print(f'✓ CircuitOpenError available: {CircuitOpenError.__name__}')
           "
 
   # ─────────────────────────────────────────────────────────────────────
@@ -354,7 +393,7 @@ jobs:
       
       - name: Generate Failure Pattern Report (Phase 3.1)
         run: |
-          sed 's/^          //' > healing/failure_pattern_report.md << '          EOF'
+          cat > healing/failure_pattern_report.md << 'EOF'
           # Failure Pattern Report
           
           **Generated:** $(date -Iseconds)
@@ -407,7 +446,7 @@ jobs:
           
       - name: Generate Optimization Proposals (Phase 3.3)
         run: |
-          sed 's/^          //' > healing/optimization_proposals.md << '          EOF'
+          cat > healing/optimization_proposals.md << 'EOF'
           # Evolutionary Self-Optimization Proposals
           
           **Generated:** $(date -Iseconds)

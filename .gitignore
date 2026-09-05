@@ -91,10 +91,21 @@ src/reasoner/infrastructure/.upload_hash_index.json
 # _save_pipeline_owner(). Recreated on demand; a missing file reads as None.
 src/reasoner/domain/history/pipeline_owners.json
 
-# Self-healing generated tests — regenerable output of
-# healing/test_generation_engine.py. Not collected by pytest (testpaths=tests)
-# and already omitted from coverage.
-src/reasoner/healing/generated_tests/
+# Self-healing engine output — regenerable artifacts written to <repo>/healing/
+# by src/reasoner/healing/{introspection,test_generation}_engine.py and by the
+# generator steps in .github/workflows/self-healing-ci.yml (smoke_tests/,
+# failure_pattern_report.md, spec_drift_report.md, healing_summary.json).
+# Generated tests are not collected by pytest (testpaths=tests) and are already
+# omitted from coverage.
+#
+# This was src/reasoner/healing/generated_tests/, which was where the engines
+# wrongly wrote after the src/ layout moved them a directory deeper. Nothing
+# under <repo>/healing/ is tracked.
+#
+# Leading slash is load-bearing: a bare `healing/` matches a directory of that
+# name at ANY depth, which would also ignore the src/reasoner/healing/ source
+# package -- silently swallowing any new module added there.
+/healing/
 
 # Scratch dir for manual/ad-hoc test scripts
 .tmp_manual_temp/
