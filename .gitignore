@@ -45,8 +45,17 @@ logs/
 
 # Cache
 .cache/
-.node_modules
 jspm_packages/
+
+# Installed npm packages. This read `.node_modules` -- a leading dot that never
+# matched anything, and the only node_modules rule in this file, so the repo-root
+# node_modules/ was tracked: 349 files committed in e9e1ffc (2026-04-27).
+# ui-next/.gitignore:4 and sdk/typescript/.gitignore:1 already cover theirs.
+#
+# Left unanchored, unlike /healing/ below: every directory named node_modules is
+# installed output wherever it appears, and no source package shares the name, so
+# a future subproject that forgets its own .gitignore is covered too.
+node_modules/
 
 # Local config
 config/
