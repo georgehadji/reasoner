@@ -9,8 +9,9 @@ import os
 
 import pytest
 
+from reasoner.application.services.preset_service import PresetService
 from reasoner.pipeline import ReasonerPipeline
-from reasoner.presets import PRESETS, get_preset
+from reasoner.presets import PRESETS
 
 pytestmark = [
     pytest.mark.slow,
@@ -46,8 +47,7 @@ class TestRealPipelineMethods:
     @pytest.mark.asyncio
     @pytest.mark.timeout(180)
     async def test_method_runs_to_completion(self, method, preset_id):
-        preset = get_preset(preset_id)
-        router = preset.build_router()
+        _, router = PresetService().build_router(preset_id)
         pipeline = ReasonerPipeline(
             router=router,
             preset_name=preset_id,
@@ -92,8 +92,7 @@ class TestRealPipelineMethods:
     @pytest.mark.asyncio
     @pytest.mark.timeout(180)
     async def test_method_tracks_tokens(self, method, preset_id):
-        preset = get_preset(preset_id)
-        router = preset.build_router()
+        _, router = PresetService().build_router(preset_id)
         pipeline = ReasonerPipeline(
             router=router,
             preset_name=preset_id,
@@ -111,8 +110,7 @@ class TestRealPipelineMethods:
 class TestRealPresetRouterBuilding:
     @pytest.mark.parametrize("preset_id", sorted(PRESETS.keys()))
     def test_all_presets_build_router(self, preset_id):
-        preset = get_preset(preset_id)
-        router = preset.build_router()
+        _, router = PresetService().build_router(preset_id)
         desc = router.describe()
         assert "[primary]" in desc
         assert desc["[primary]"]
@@ -121,8 +119,7 @@ class TestRealPresetRouterBuilding:
     @pytest.mark.asyncio
     @pytest.mark.timeout(60)
     async def test_all_presets_can_make_real_call(self, preset_id):
-        preset = get_preset(preset_id)
-        router = preset.build_router()
+        _, router = PresetService().build_router(preset_id)
         response, metadata = await router.call(
             role="classification",
             system_prompt="You are a helpful assistant. Reply with valid JSON only.",

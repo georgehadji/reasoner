@@ -12,6 +12,7 @@ import os
 
 import pytest
 
+from reasoner.application.services.preset_service import PresetService
 from reasoner.llm import _REGISTRY, ProviderRouter
 from reasoner.models import PipelineState
 from reasoner.pipeline import ReasonerPipeline
@@ -35,7 +36,7 @@ class TestPresetToLLMRelationship:
     @pytest.mark.parametrize("preset_id", sorted(PRESETS.keys()))
     def test_preset_builds_valid_router(self, preset_id):
         preset = get_preset(preset_id)
-        router = preset.build_router()
+        _, router = PresetService().build_router(preset_id)
         assert isinstance(router, ProviderRouter)
         desc = router.describe()
         assert desc["[primary]"]
@@ -49,8 +50,7 @@ class TestPresetToLLMRelationship:
     @pytest.mark.asyncio
     @pytest.mark.timeout(60)
     async def test_preset_router_makes_real_call(self, preset_id):
-        preset = get_preset(preset_id)
-        router = preset.build_router()
+        _, router = PresetService().build_router(preset_id)
         response, metadata = await router.call(
             role="classification",
             system_prompt='Reply with JSON: {"task_type": "factual"}',
@@ -70,8 +70,7 @@ class TestPipelineToModelsRelationship:
     @pytest.mark.asyncio
     @pytest.mark.timeout(180)
     async def test_state_serializes_after_real_run(self):
-        preset = get_preset("multi-perspective-budget")
-        router = preset.build_router()
+        _, router = PresetService().build_router("multi-perspective-budget")
         pipeline = ReasonerPipeline(
             router=router,
             preset_name="multi-perspective-budget",
