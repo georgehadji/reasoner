@@ -114,3 +114,22 @@ async def test_stream_no_retry_after_partial_yield() -> None:
 
     assert p.calls == 1, "must not retry after partial yield"
     assert chunks == ["A"]
+
+
+def test_degraded_response_is_falsy():
+    """A failure object must not read as success to a naive caller.
+
+    router.call returns ``str | DegradedLLMResponse``, and a dataclass instance
+    is truthy by default, so ``if not response:`` used to pass straight over a
+    total provider failure. The production path uses isinstance checks and was
+    never fooled; the e2e suite's ``assert response`` was.
+    """
+    from reasoner.infrastructure.llm.ports import DegradedLLMResponse
+
+    degraded = DegradedLLMResponse(text="", error="all providers down")
+    assert not degraded
+    assert bool(degraded) is False
+    # isinstance-based detection must keep working unchanged
+    assert isinstance(degraded, DegradedLLMResponse)
+    assert degraded.degraded is True
+    assert degraded.error == "all providers down"

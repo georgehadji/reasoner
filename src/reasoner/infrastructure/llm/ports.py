@@ -81,6 +81,28 @@ class DegradedLLMResponse:
     degraded: bool = True
     error: str = ""
 
+    def __bool__(self) -> bool:
+        """Always false: this object is a failure, and must not read as success.
+
+        ``router.call`` returns ``tuple[str | DegradedLLMResponse, dict]``, so a
+        caller cannot tell the two apart without an explicit ``isinstance``
+        check. The production path does check (``LLMExecutor`` at both call
+        sites, plus headless, main, HyperGate and the subagent base), but a
+        dataclass instance is truthy by default, so any *new* caller written as
+        ``if not response:`` silently treats a total provider failure as a
+        successful reply.
+
+        Not hypothetical: the e2e suite's
+        ``test_all_presets_can_make_real_call`` does exactly that. Its
+        ``assert response`` passed on a degraded object and it failed one line
+        later on empty metadata, which reads like a metadata bug rather than
+        the empty completion it actually was.
+
+        Returning False makes the naive spelling correct instead of wrong.
+        Explicit ``isinstance`` checks are unaffected.
+        """
+        return False
+
     @property
     def tokens_total(self) -> int:
         """Total tokens used."""
