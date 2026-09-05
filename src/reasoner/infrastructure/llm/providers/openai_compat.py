@@ -175,10 +175,11 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             "stream": True,
         }
         # Mirror complete(): direct OpenAI endpoints need max_completion_tokens.
+        budget = self._effective_max_tokens(max_tokens)
         if self._uses_completion_tokens():
-            kwargs["max_completion_tokens"] = max_tokens
+            kwargs["max_completion_tokens"] = budget
         else:
-            kwargs["max_tokens"] = max_tokens
+            kwargs["max_tokens"] = budget
         # Honour the fixed-temperature denylist here too — streaming previously
         # sent temperature unconditionally, which 400s on those models.
         if self._supports_temperature() and temperature != 1.0:
@@ -237,6 +238,21 @@ class OpenAICompatibleProvider(BaseLLMProvider):
 
         return clamp_extra_body(self.model, self.extra_body) or {}
 
+    def _effective_max_tokens(self, max_tokens: int) -> int:
+        """``max_tokens`` raised to leave room for content after reasoning.
+
+        Reasoning tokens are billed as output tokens and are taken first, so a
+        budget sized for the visible reply alone yields an empty one. Same kind
+        of per-model correction as :meth:`_effective_extra_body`, applied to the
+        budget rather than the effort — and applied here because this is the
+        first point at which the served model is known for certain.
+        """
+        from reasoner.infrastructure.llm.reasoning_effort import floor_max_tokens
+
+        reasoning = self._effective_extra_body().get("reasoning")
+        effort = reasoning.get("effort") if isinstance(reasoning, dict) else None
+        return floor_max_tokens(self.model, max_tokens, effort)
+
     def _supports_temperature(self) -> bool:
         """True when the model accepts a custom ``temperature`` parameter."""
         m = self.model.lower()
@@ -290,10 +306,11 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         }
         # Direct OpenAI endpoints use max_completion_tokens; everything else
         # (including OpenRouter-routed OpenAI models) accepts max_tokens.
+        budget = self._effective_max_tokens(max_tokens)
         if self._uses_completion_tokens():
-            kwargs["max_completion_tokens"] = max_tokens
+            kwargs["max_completion_tokens"] = budget
         else:
-            kwargs["max_tokens"] = max_tokens
+            kwargs["max_tokens"] = budget
         # Send temperature only to models that accept it, and only when it
         # differs from the model default (1.0) to avoid wasted tokens/errors.
         if self._supports_temperature() and temperature != 1.0:
@@ -361,10 +378,11 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             ),
             "tools": tools,
         }
+        budget = self._effective_max_tokens(max_tokens)
         if self._uses_completion_tokens():
-            kwargs["max_completion_tokens"] = max_tokens
+            kwargs["max_completion_tokens"] = budget
         else:
-            kwargs["max_tokens"] = max_tokens
+            kwargs["max_tokens"] = budget
 
         if self._supports_temperature() and temperature != 1.0:
             kwargs["temperature"] = temperature

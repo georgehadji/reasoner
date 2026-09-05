@@ -97,6 +97,82 @@ def clamp_effort_for_model(served_model: str, desired: str) -> str:
     return clamp_effort(desired, supported)
 
 
+# Share of the output budget each effort level spends on reasoning, per
+# https://openrouter.ai/docs/guides/best-practices/reasoning-tokens
+# ("max/xhigh ~95%, high ~80%, medium ~50%, low ~20%, minimal ~10%").
+_REASONING_SHARE: dict[str, float] = {
+    "max": 0.95, "xhigh": 0.95, "high": 0.80,
+    "medium": 0.50, "low": 0.20, "minimal": 0.10, "none": 0.0,
+}
+
+# Content tokens a reply must still be able to reach after reasoning takes its
+# cut. Sized for the smallest thing any phase asks for — a classification
+# verdict is a short JSON object — not for a synthesis.
+MIN_CONTENT_TOKENS = 256
+
+
+def reasoning_is_mandatory(served_model: str) -> bool:
+    """True when ``served_model`` always spends output tokens on reasoning.
+
+    Keyed on ``mandatory`` alone, deliberately. ``default_enabled`` looks like
+    the same signal and is not: ``anthropic/claude-sonnet-5`` carries
+    ``default_enabled: true`` yet a live classification call against it reports
+    ``reasoning_tokens: 0``. Since Sonnet is the primary of 19 presets, keying
+    on ``default_enabled`` would inflate the budget of most traffic in the
+    system to buy headroom nothing consumes. 103 of the 472 catalogued models
+    are ``mandatory``; those are the ones that take a cut unbidden.
+    """
+    entry = MODEL_CATALOGUE.get(served_model)
+    if not entry:
+        return False
+    reasoning = entry.get("reasoning")
+    if not isinstance(reasoning, dict):
+        return False
+    return bool(reasoning.get("mandatory"))
+
+
+def floor_max_tokens(served_model: str, max_tokens: int, effort: str | None) -> int:
+    """Raise ``max_tokens`` until content still fits after the reasoning cut.
+
+    OpenRouter counts reasoning tokens as output tokens, and documents that
+    "max_tokens must be strictly higher than the reasoning budget to ensure
+    there are tokens available for the final response after thinking". When it
+    is not, the call does not fail — it returns 200 with empty content, having
+    billed for the reasoning.
+
+    How much reasoning a model does varies with the prompt, so this is a
+    probabilistic failure rather than a fixed cliff, and that is what makes it
+    nasty: the same model and budget can succeed all day and then return empty
+    on a harder input. ``openai/gpt-5`` is the primary of five premium presets
+    and so serves their classification role at a 256-token budget. Measured
+    against the live endpoint:
+
+        classification prompt, max_tokens=256   content len 0     (10 test failures)
+        classification prompt, max_tokens=4000  content len 92    valid JSON
+        a simpler prompt,      max_tokens=256   content len 40, 128 reasoning tokens
+
+    Raising a ceiling is not the same as spending to it — a model stops when it
+    is done, so this costs nothing on replies that already fitted. The call it
+    changes is the one now billing full reasoning for zero usable output.
+
+    Returns ``max_tokens`` unchanged for models that do not always reason, and
+    never lowers a budget the caller chose.
+    """
+    if max_tokens <= 0 or not reasoning_is_mandatory(served_model):
+        return max_tokens
+
+    if not effort:
+        reasoning = (MODEL_CATALOGUE.get(served_model) or {}).get("reasoning")
+        effort = reasoning.get("default_effort") if isinstance(reasoning, dict) else None
+
+    # Unknown effort: assume the middle of the ladder rather than the cheapest,
+    # so an unrecognised level fails toward a usable reply.
+    share = _REASONING_SHARE.get(effort or "", 0.50)
+    if share >= 1.0:
+        return max_tokens
+    return max(max_tokens, int(MIN_CONTENT_TOKENS / (1.0 - share)))
+
+
 def clamp_extra_body(served_model: str, extra_body: dict | None) -> dict | None:
     """Return ``extra_body`` with ``reasoning.effort`` clamped for the model.
 
