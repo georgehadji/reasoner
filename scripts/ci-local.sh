@@ -52,7 +52,10 @@ if want python; then
     gate "bandit" bandit -r src/ -t B307,B308,B102 -f txt -q
     gate "mypy-strict-auth_legacy" mypy --strict src/reasoner/infrastructure/auth_legacy.py --ignore-missing-imports
     gate "mypy-ratchet" python scripts/mypy_ratchet.py --max 423
+    # -n/--dist used to come from pytest.ini addopts; it is set per invocation
+    # now. --dist loadscope must accompany -n: see requirements-dev.txt.
     gate "pytest" python -m pytest tests/ -m "not slow and not integration" \
+        -n auto --dist loadscope \
         --tb=short --timeout=60 -q -p no:cacheprovider
 fi
 
@@ -77,6 +80,7 @@ fi
 # ── coverage (coverage.yml) — explicit only, not part of "all" (slow) ──
 if [ "$FILTER" = "coverage" ]; then
     gate "pytest-cov" python -m pytest tests/ -m "not slow and not integration" \
+        -n auto --dist loadscope \
         --cov=src/reasoner --cov-report=xml --tb=short -q
     gate "coverage-floor" python -c "
 import sys, xml.etree.ElementTree as ET
