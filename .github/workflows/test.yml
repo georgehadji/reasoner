@@ -105,8 +105,12 @@ jobs:
 
       - name: Run tests
         run: |
+          # -n/--dist used to come from pytest.ini addopts, which also forced
+          # them onto the slow/integration lane and killed its workers.
+          # --dist loadscope must accompany -n: see requirements-dev.txt.
           pytest tests/ -v \
             -m "not slow and not integration" \
+            -n auto --dist loadscope \
             --tb=short \
             --timeout=60 \
             -q

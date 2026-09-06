@@ -27,8 +27,12 @@ jobs:
 
       - name: Run tests with coverage
         run: |
+          # -n/--dist used to come from pytest.ini addopts; it is set per
+          # invocation now. --dist loadscope must accompany -n: see
+          # requirements-dev.txt.
           pytest tests/ \
             -m "not slow and not integration" \
+            -n auto --dist loadscope \
             --cov=src/reasoner \
             --cov-report=xml \
             --cov-report=term-missing \
