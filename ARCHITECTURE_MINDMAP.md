@@ -19,7 +19,7 @@
 | **LLM Routing** | OpenRouter primary (350+ models), 12+ direct provider adapters, Ollama local |
 | **Reasoning Methods** | 31 (multi-perspective, debate, jury, research, scientific, socratic, pre-mortem, bayesian, dialectical, analogical, delphi, cove, sot, tot, pot, self-discover, writing) |
 | **Presets** | 49+ declarative presets (budget, balanced, premium, experimental tiers per method) |
-| **Models Supported** | 224+ directly registered (350+ via OpenRouter: Anthropic, OpenAI, Google, xAI, Perplexity, Mistral, DeepSeek, Qwen, Kimi, GLM, MiniMax, plus local Ollama) |
+| **Models Supported** | 216+ directly registered (350+ via OpenRouter: Anthropic, OpenAI, Google, xAI, Perplexity, Mistral, DeepSeek, Qwen, Kimi, GLM, MiniMax, plus local Ollama) |
 | **Web Search** | SearXNG (self-hosted Docker) + Perplexity Sonar |
 | **Memory** | Neuro L1/L2/L3 tiered cache with embedding search + Cohere rerank |
 | **Security** | Input sanitization, prompt-injection defense, rate limiting, scoped auth, CSRF, circuit breaker |

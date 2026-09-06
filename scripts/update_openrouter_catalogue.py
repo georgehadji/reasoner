@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -119,6 +120,92 @@ def _model_ids(catalogue: dict[str, Any]) -> set[str]:
     return {m["id"] for m in catalogue.get("data", [])}
 
 
+ENDPOINTS_URL = "https://openrouter.ai/api/v1/models/{model_id}/endpoints"
+
+
+def check_endpoints() -> int:
+    """Report every registry-routed model with no healthy serving endpoint.
+
+    Distinct from ``--check``, which compares model *ids* against
+    /api/v1/models. A model can be listed there and still be unservable: on
+    2026-09-06 ``nousresearch/hermes-4-70b`` was listed, its only endpoint was
+    Nebius at ``status: -5``, and a live call returned
+
+        404 {"error":{"message":"Provider returned error",
+             "metadata":{"raw":"{\\"detail\\":\\"The model `NousResearch/Hermes-4-70B`
+             does not exist\\"}"}}}
+
+    It was multi-perspective-budget's destructive generator, so Phase 2 lost a
+    perspective on every run of the default budget preset while the pipeline
+    reported success.
+
+    Ids absent from /api/v1/models 404 here, which catches the other half:
+    seven ``~<vendor>/<family>-latest`` aliases that answered
+    ``HTTP 400 ... is not a valid model ID`` on every call. No preset routed
+    them, so the preset-scoped alias-honesty test could not see them either.
+
+    Only a 404 fails the run. A negative endpoint ``status`` is reported as
+    SUSPECT and does not, because the codes are undocumented and a negative one
+    does not imply dead. Two were verified by live call on 2026-09-06:
+
+        -5  nousresearch/hermes-4-70b (sole endpoint Nebius)  404, dead
+        -2  nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free  200, "ok"
+
+    Treating every negative status as fatal would have condemned a working
+    model. Two data points are not a specification, so the negative-status
+    branch prints and a human decides.
+
+    Needs no API key. Costs one request per distinct served id (211 as of
+    2026-09-06), so this belongs on the schedule, not on every PR.
+    """
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+    os.environ.setdefault("CSRF_ENFORCE_BACKEND", "false")
+    from reasoner.infrastructure.llm.registry import _REGISTRY
+
+    served = sorted(
+        {
+            cfg["model"].lstrip("~")
+            for cfg in _REGISTRY.values()
+            if isinstance(cfg, dict) and "model" in cfg and "/" in cfg["model"]
+        }
+    )
+
+    dead: list[tuple[str, str]] = []
+    suspect: list[tuple[str, str]] = []
+    with httpx.Client(timeout=REQUEST_TIMEOUT) as client:
+        for model_id in served:
+            try:
+                response = client.get(ENDPOINTS_URL.format(model_id=model_id))
+            except httpx.HTTPError as exc:  # network flake, not a verdict
+                print(f"? {model_id}: {type(exc).__name__}: {exc}", file=sys.stderr)
+                continue
+            if response.status_code == 404:
+                dead.append((model_id, "not in /api/v1/models (404)"))
+                continue
+            if response.status_code != 200:
+                print(f"? {model_id}: HTTP {response.status_code}", file=sys.stderr)
+                continue
+            endpoints = response.json().get("data", {}).get("endpoints", [])
+            if not endpoints:
+                # Meta-routers (openrouter/*) legitimately list none and serve
+                # fine, so an empty list is not evidence of death.
+                continue
+            if not any((e.get("status") or 0) >= 0 for e in endpoints):
+                providers = ", ".join(
+                    f"{e.get('provider_name')}={e.get('status')}" for e in endpoints
+                )
+                suspect.append((model_id, f"every endpoint negative ({providers})"))
+
+    for model_id, why in suspect:
+        print(f"SUSPECT {model_id}: {why} -- confirm with a real call before removing")
+    for model_id, why in dead:
+        print(f"DEAD {model_id}: {why}")
+    if dead:
+        return 1
+    print(f"all {len(served)} routed models resolve; {len(suspect)} to eyeball")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -126,7 +213,19 @@ def main() -> int:
         action="store_true",
         help="Do not write; exit 1 if the bundled catalogue differs from upstream.",
     )
+    parser.add_argument(
+        "--check-endpoints",
+        action="store_true",
+        help=(
+            "Do not write; exit 1 if any model the registry routes has no healthy "
+            "serving endpoint. Answers a different question from --check: a model "
+            "can be listed in /api/v1/models and still be unservable."
+        ),
+    )
     args = parser.parse_args()
+
+    if args.check_endpoints:
+        return check_endpoints()
 
     catalogue = fetch_catalogue()
     live_ids = _model_ids(catalogue)

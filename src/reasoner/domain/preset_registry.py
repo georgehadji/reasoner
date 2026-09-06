@@ -33,7 +33,12 @@ _REGISTRY: dict[str, dict] = {
             # at output rate on Phase 2 of the default budget preset. The name
             # is wrong (it serves v4-flash); no honest equivalent exists yet.
             "constructive":  "deepseek-v3",           # 🇨🇳 DeepSeek — serves v4-flash, no reasoning effort
-            "destructive":   "hermes-4-70b",      # 🇺🇸 Nous Research — critic-specialized ($0.13/$0.40) (was ring-2.6-1t 🇨🇳, cross-bloc echo resistance)
+            # 🇺🇸 OpenAI open-weights — $0.04/$0.17 per M (was hermes-4-70b 🇺🇸
+            # $0.13/$0.40, whose only endpoint went dead; before that
+            # ring-2.6-1t 🇨🇳). Stays US: this is the preset's only non-CN/EU
+            # generator, so a CN replacement would drop Phase 2 below the
+            # Budget floor of three labs.
+            "destructive":   "gpt-oss-120b",
             "systemic":      "qwen3-30b-a3b",  # 🇨🇳 Qwen — $0.130/$0.520 per M, 131K ctx (was hy3; one model per phase)
             "minimalist":    "mistral-small-3.2-24b",     # 🇫🇷 Mistral — $0.075/$0.20
         # ── Reasoning model assignments (budget, v3.4) ──
