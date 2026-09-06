@@ -12,6 +12,7 @@ import os
 
 import pytest
 
+from reasoner.application.services.preset_service import PresetService
 from reasoner.llm import _REGISTRY, ProviderRouter
 from reasoner.models import PipelineState
 from reasoner.pipeline import ReasonerPipeline
@@ -35,7 +36,7 @@ class TestPresetToLLMRelationship:
     @pytest.mark.parametrize("preset_id", sorted(PRESETS.keys()))
     def test_preset_builds_valid_router(self, preset_id):
         preset = get_preset(preset_id)
-        router = preset.build_router()
+        _, router = PresetService().build_router(preset_id)
         assert isinstance(router, ProviderRouter)
         desc = router.describe()
         assert desc["[primary]"]
@@ -49,8 +50,7 @@ class TestPresetToLLMRelationship:
     @pytest.mark.asyncio
     @pytest.mark.timeout(60)
     async def test_preset_router_makes_real_call(self, preset_id):
-        preset = get_preset(preset_id)
-        router = preset.build_router()
+        _, router = PresetService().build_router(preset_id)
         response, metadata = await router.call(
             role="classification",
             system_prompt='Reply with JSON: {"task_type": "factual"}',
@@ -60,18 +60,42 @@ class TestPresetToLLMRelationship:
         )
         assert response
         assert metadata.get("model")
-        # Verify the primary model in metadata matches the preset
-        assert metadata["model"] == router.get("classification").model
+        # The reported model must be one this router could legitimately have
+        # used for the role, not specifically the primary. Asserting the
+        # primary asserts that a fallback never fires, which made this test
+        # fail on a healthy system: in a 98-test paid run, gpt-5 failed
+        # transiently and the router fell back, exactly as designed.
+        #
+        #     AssertionError: assert 'z-ai/glm-5.3' == 'openai/gpt-5'
+        #
+        # Re-running that single test passed on openai/gpt-5 with no fallback,
+        # so the failure was not reproducible and the assertion was the defect.
+        assigned = router.get("classification")
+        acceptable = {assigned.model}
+        fallback = router._resolve_fallback("classification", assigned)
+        if fallback:
+            acceptable.add(fallback.model)
+        assert metadata["model"] in acceptable, (
+            f"{metadata['model']} is neither the primary nor its fallback {acceptable}"
+        )
 
 
 class TestPipelineToModelsRelationship:
     """pipeline.py → models.py: state round-trips and fields populate correctly."""
 
     @pytest.mark.asyncio
-    @pytest.mark.timeout(180)
+    # 300, not 180: an instrumented multi-perspective-budget run took
+    # 192.56s end to end, and a premium preset with a fallback hop is longer.
+    # The old marker was under measured reality, so this timed out on a
+    # healthy system. pytest-timeout's marker beats the CLI --timeout flag,
+    # so raising --timeout on the command line does not help; at
+    # --timeout=900 the run still died at ELAPSED_SECONDS=218 RC=1.
+    # Not raised globally: a timeout that never fires is not a guard. 300 is
+    # ~1.5x measured, which still catches a hang. Single-call tests stay at
+    # 60 (slowest call measured: 36.02s).
+    @pytest.mark.timeout(300)
     async def test_state_serializes_after_real_run(self):
-        preset = get_preset("multi-perspective-budget")
-        router = preset.build_router()
+        _, router = PresetService().build_router("multi-perspective-budget")
         pipeline = ReasonerPipeline(
             router=router,
             preset_name="multi-perspective-budget",

@@ -53,7 +53,16 @@ async def client():
 class TestRealAPIRunStream:
     @pytest.mark.parametrize("method, preset_id", METHOD_PRESETS)
     @pytest.mark.asyncio
-    @pytest.mark.timeout(180)
+    # 300, not 180: an instrumented multi-perspective-budget run took
+    # 192.56s end to end, and a premium preset with a fallback hop is longer.
+    # The old marker was under measured reality, so this timed out on a
+    # healthy system. pytest-timeout's marker beats the CLI --timeout flag,
+    # so raising --timeout on the command line does not help; at
+    # --timeout=900 the run still died at ELAPSED_SECONDS=218 RC=1.
+    # Not raised globally: a timeout that never fires is not a guard. 300 is
+    # ~1.5x measured, which still catches a hang. Single-call tests stay at
+    # 60 (slowest call measured: 36.02s).
+    @pytest.mark.timeout(300)
     async def test_api_run_stream_completes(self, client, method, preset_id):
         payload = {
             "problem": SIMPLE_PROBLEM,

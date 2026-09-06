@@ -9,8 +9,9 @@ import os
 
 import pytest
 
+from reasoner.application.services.preset_service import PresetService
 from reasoner.pipeline import ReasonerPipeline
-from reasoner.presets import PRESETS, get_preset
+from reasoner.presets import PRESETS
 
 pytestmark = [
     pytest.mark.slow,
@@ -44,10 +45,18 @@ METHOD_PRESETS = [
 class TestRealPipelineMethods:
     @pytest.mark.parametrize("method, preset_id", METHOD_PRESETS)
     @pytest.mark.asyncio
-    @pytest.mark.timeout(180)
+    # 300, not 180: an instrumented multi-perspective-budget run took
+    # 192.56s end to end, and a premium preset with a fallback hop is longer.
+    # The old marker was under measured reality, so this timed out on a
+    # healthy system. pytest-timeout's marker beats the CLI --timeout flag,
+    # so raising --timeout on the command line does not help; at
+    # --timeout=900 the run still died at ELAPSED_SECONDS=218 RC=1.
+    # Not raised globally: a timeout that never fires is not a guard. 300 is
+    # ~1.5x measured, which still catches a hang. Single-call tests stay at
+    # 60 (slowest call measured: 36.02s).
+    @pytest.mark.timeout(300)
     async def test_method_runs_to_completion(self, method, preset_id):
-        preset = get_preset(preset_id)
-        router = preset.build_router()
+        _, router = PresetService().build_router(preset_id)
         pipeline = ReasonerPipeline(
             router=router,
             preset_name=preset_id,
@@ -90,10 +99,9 @@ class TestRealPipelineMethods:
 
     @pytest.mark.parametrize("method, preset_id", METHOD_PRESETS)
     @pytest.mark.asyncio
-    @pytest.mark.timeout(180)
+    @pytest.mark.timeout(300)  # full pipeline; see test_method_runs_to_completion
     async def test_method_tracks_tokens(self, method, preset_id):
-        preset = get_preset(preset_id)
-        router = preset.build_router()
+        _, router = PresetService().build_router(preset_id)
         pipeline = ReasonerPipeline(
             router=router,
             preset_name=preset_id,
@@ -111,8 +119,7 @@ class TestRealPipelineMethods:
 class TestRealPresetRouterBuilding:
     @pytest.mark.parametrize("preset_id", sorted(PRESETS.keys()))
     def test_all_presets_build_router(self, preset_id):
-        preset = get_preset(preset_id)
-        router = preset.build_router()
+        _, router = PresetService().build_router(preset_id)
         desc = router.describe()
         assert "[primary]" in desc
         assert desc["[primary]"]
@@ -121,8 +128,7 @@ class TestRealPresetRouterBuilding:
     @pytest.mark.asyncio
     @pytest.mark.timeout(60)
     async def test_all_presets_can_make_real_call(self, preset_id):
-        preset = get_preset(preset_id)
-        router = preset.build_router()
+        _, router = PresetService().build_router(preset_id)
         response, metadata = await router.call(
             role="classification",
             system_prompt="You are a helpful assistant. Reply with valid JSON only.",
