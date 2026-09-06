@@ -47,12 +47,16 @@ def main():
     # Check 3: Handlers
     def check_handlers():
         from reasoner.application.handlers import get_handler_registry
-        from reasoner.infrastructure.llm.ports import BaseLLMProvider, LLMResponse
+        # base.BaseLLMProvider, not ports.BaseLLMProvider: the router this
+        # provider ends up inside calls complete_with_retry(), which only the
+        # base one defines. The ports version constructed fine, so this check
+        # reported healthy on a router that could not serve a single call.
+        from reasoner.infrastructure.llm.base import BaseLLMProvider
 
         class DummyProvider(BaseLLMProvider):
-            async def _complete_impl(self, messages, config):
-                return LLMResponse(content="test", model_used="test")
-            async def _complete_stream_impl(self, messages, config):
+            async def complete(self, system_prompt, user_prompt, max_tokens=2048, temperature=0.7):
+                return "test"
+            async def stream_complete(self, system_prompt, user_prompt, max_tokens=2048, temperature=0.7):
                 yield "test"
             @property
             def provider_name(self):

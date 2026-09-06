@@ -26,6 +26,11 @@ from reasoner.core.constants import (
     DEFAULT_MAX_TOKENS,
     DEFAULT_TEMPERATURE,
 )
+from reasoner.infrastructure.llm.exceptions import (
+    LLMError,
+    RateLimitError,
+    is_retryable,
+)
 
 
 class MessageRole(str, Enum):
@@ -312,12 +317,6 @@ class BaseLLMProvider(ABC):
         import asyncio
         import time
 
-        from reasoner.infrastructure.llm.exceptions import (
-            LLMError,
-            RateLimitError,
-            is_retryable,
-        )
-
         config = config or LLMConfig()
         last_error: Exception | None = None
 
@@ -413,45 +412,11 @@ class BaseLLMProvider(ABC):
 # ─────────────────────────────────────────────────────────────────────
 # EXCEPTIONS
 # ─────────────────────────────────────────────────────────────────────
-
-class LLMError(Exception):
-    """Base exception for LLM errors."""
-    retryable = False
-
-
-class AuthenticationError(LLMError):
-    """Authentication failed (invalid API key)."""
-    retryable = False
-
-
-class RateLimitError(LLMError):
-    """Rate limit exceeded."""
-    retryable = True
-
-
-class ModelNotFoundError(LLMError):
-    """Model not found."""
-    retryable = False
-
-
-class ProviderTimeoutError(LLMError):
-    """Request timed out."""
-    retryable = True
-
-
-class ProviderUnavailableError(LLMError):
-    """Provider service unavailable."""
-    retryable = True
-
-
-def is_retryable(error: Exception) -> bool:
-    """Check if an error is retryable."""
-    if isinstance(error, LLMError):
-        return error.retryable
-
-    # Network errors are generally retryable
-    retryable_types = (
-        ConnectionError,
-        TimeoutError,
-    )
-    return isinstance(error, retryable_types)
+#
+# A third LLMError hierarchy used to live here, alongside AuthenticationError,
+# RateLimitError, ModelNotFoundError, ProviderTimeoutError,
+# ProviderUnavailableError and is_retryable. Nothing imported any of them,
+# including this module: BaseLLMProvider.complete did a function-local import
+# of the exceptions.py versions that shadowed them, so `raise LLMError(...)`
+# above has always raised the exceptions.py one. They are now imported at
+# module scope, and the dead copies are gone. Import from .exceptions.

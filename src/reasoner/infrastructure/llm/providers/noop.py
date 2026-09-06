@@ -4,37 +4,55 @@ No-op / Dummy LLM Provider
 Fallback provider used when no API keys are configured and the system
 needs a valid BaseLLMProvider instance to inject into handlers.
 Always returns a canned response indicating missing configuration.
+
+Base class matters here. There are two unrelated ``BaseLLMProvider``
+classes in this package with incompatible interfaces:
+
+    base.BaseLLMProvider   complete(system_prompt, user_prompt, ...) -> str
+    ports.BaseLLMProvider  complete(messages, config) -> LLMResponse
+
+``ProviderRouter`` calls ``complete_with_retry``, which only the ``base``
+one has. This module used to subclass the ``ports`` one, so the no-API-key
+path in ``api/__init__.py`` built a router that raised
+``AttributeError: 'NoopProvider' object has no attribute
+'complete_with_retry'`` on the first call, instead of returning the canned
+message it exists to return.
 """
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncIterator
 
-from reasoner.infrastructure.llm.exceptions import LLMError
-from reasoner.infrastructure.llm.ports import BaseLLMProvider, LLMConfig, LLMResponse, Message
+from reasoner.infrastructure.llm.base import BaseLLMProvider, LLMError
+
+_MESSAGE = "Dummy provider - configure API keys"
 
 
 class NoopProvider(BaseLLMProvider):
     """Provider that returns a dummy response when no real provider is available.
 
     Used as a graceful-failure fallback in ``get_architecture_components()``
-    when the model registry contains no usable models.
+    and in ``api/__init__.py`` when the model registry contains no usable
+    models.
     """
 
-    async def _complete_impl(
-        self, messages: list[Message], config: LLMConfig
-    ) -> LLMResponse:
-        return LLMResponse(
-            content="Dummy provider - configure API keys",
-            model_used="dummy",
-            tokens_prompt=0,
-            tokens_completion=0,
-        )
+    async def complete(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        max_tokens: int = 2048,
+        temperature: float = 0.7,
+    ) -> str:
+        return _MESSAGE
 
-    async def _complete_stream_impl(
-        self, messages: list[Message], config: LLMConfig
-    ) -> AsyncGenerator[str, None]:
-        yield "Dummy provider"
+    async def stream_complete(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        max_tokens: int = 2048,
+        temperature: float = 0.7,
+    ) -> AsyncIterator[str]:
+        yield _MESSAGE
 
     @property
     def provider_name(self) -> str:
