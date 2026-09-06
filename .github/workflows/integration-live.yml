@@ -40,7 +40,7 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - run: pip install -r requirements-dev.txt
@@ -83,8 +83,12 @@ jobs:
           # No --timeout: the per-test markers own that, and pytest-timeout's
           # marker beats the CLI flag anyway. Full-pipeline tests are at 300s.
           #
-          # Inputs go through env, not ${{ }} interpolation into the script, so
-          # a -k expression cannot become shell.
+          # Inputs reach the script through env: above, never by template
+          # interpolation into this block, so a -k expression cannot become
+          # a command. (Do not write an empty GitHub expression in a comment
+          # here either -- the runner parses expressions inside run: blocks
+          # regardless of shell comments, and an empty one invalidates the
+          # whole workflow file.)
           if [ -n "${PRESET_FILTER}" ]; then
             set -- -k "${PRESET_FILTER}"
           else
@@ -99,7 +103,7 @@ jobs:
 
       - name: Upload results
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: integration-live-results
           path: integration-live.xml

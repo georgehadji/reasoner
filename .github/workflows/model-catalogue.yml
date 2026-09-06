@@ -32,7 +32,16 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-      - run: pip install httpx
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+        # Before any step that runs code, not after. --check alone would need
+        # only httpx, but --check-endpoints imports the model registry (which
+        # pulls in openai and pydantic) and the alias-honesty step needs pytest.
+        # With `pip install httpx` here instead, --check-endpoints died on
+        # `ModuleNotFoundError: No module named 'openai'` and its
+        # continue-on-error reported the step as success, so the guard never
+        # ran and the job stayed green. requirements-dev.txt opens with
+        # "-r requirements.txt", so this one install covers everything.
 
       - name: Bundled catalogue matches live OpenRouter
         run: python scripts/update_openrouter_catalogue.py --check
@@ -61,12 +70,6 @@ jobs:
         continue-on-error: true
 
       - name: Nothing routes a model the catalogue does not contain
-        run: |
-          # pytest is in requirements-dev.txt, not requirements.txt: the latter
-          # is what the Dockerfile installs into the production image, so the
-          # test stack is deliberately kept out of it. requirements-dev.txt
-          # opens with "-r requirements.txt", so this installs both.
-          pip install -r requirements-dev.txt
-          python -m pytest tests/unit/test_model_alias_honesty.py -v -p no:randomly
+        run: python -m pytest tests/unit/test_model_alias_honesty.py -v -p no:randomly
         env:
           CSRF_ENFORCE_BACKEND: 'false'
