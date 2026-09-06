@@ -153,8 +153,24 @@ pip install -r requirements.txt                             # install deps
 python -m pytest tests/ -v                                  # all tests
 python -m pytest tests/ -v -m "not slow and not integration"
 pytest tests/ --cov=src/reasoner --cov-report=html
-pytest -n auto                                              # parallel
+pytest -n auto --dist loadscope                             # parallel
 ```
+
+`pytest.ini` sets no `-n`. Parallelism is named per invocation (`test.yml`,
+`coverage.yml`, `self-healing-ci.yml`, both gates in `scripts/ci-local.sh`)
+because `addopts` applied it to the integration lane too, where eight
+concurrent pipelines killed the xdist controller. Keep `--dist loadscope`
+alongside every `-n`: it pins which modules share a worker, which is what the
+order-dependence sweep relies on (see the pytest-randomly note in
+`requirements-dev.txt`).
+
+**The `slow`/`integration` lane makes real, billed OpenRouter calls** and is
+deselected by every enforced workflow, so it rots unless someone runs it. Run
+it deliberately via the `integration-live` workflow (`workflow_dispatch`,
+optional `-k` filter). The marker selects 477 tests; the 98-test real-call
+subset took 482.94s at `-n 4` on 2026-09-06, so use the filter unless you
+mean the whole lane. It fails fast if the `OPENROUTER_API_KEY` secret is
+missing rather than skipping every test and reporting green.
 
 ### CLI
 
