@@ -33,7 +33,12 @@ _REGISTRY: dict[str, dict] = {
             # at output rate on Phase 2 of the default budget preset. The name
             # is wrong (it serves v4-flash); no honest equivalent exists yet.
             "constructive":  "deepseek-v3",           # 🇨🇳 DeepSeek — serves v4-flash, no reasoning effort
-            "destructive":   "hermes-4-70b",      # 🇺🇸 Nous Research — critic-specialized ($0.13/$0.40) (was ring-2.6-1t 🇨🇳, cross-bloc echo resistance)
+            # 🇺🇸 OpenAI open-weights — $0.04/$0.17 per M (was hermes-4-70b 🇺🇸
+            # $0.13/$0.40, whose only endpoint went dead; before that
+            # ring-2.6-1t 🇨🇳). Stays US: this is the preset's only non-CN/EU
+            # generator, so a CN replacement would drop Phase 2 below the
+            # Budget floor of three labs.
+            "destructive":   "gpt-oss-120b",
             "systemic":      "qwen3-30b-a3b",  # 🇨🇳 Qwen — $0.130/$0.520 per M, 131K ctx (was hy3; one model per phase)
             "minimalist":    "mistral-small-3.2-24b",     # 🇫🇷 Mistral — $0.075/$0.20
         # ── Reasoning model assignments (budget, v3.4) ──
@@ -89,6 +94,16 @@ _REGISTRY: dict[str, dict] = {
         "verifier":       "grok-4.3",           # xAI 🇺🇸 — record 78% non-hallucination (AA Omniscience), 1M ctx, same price
         "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
+        # gpt-5 is this preset's primary_id, so it also serves every role
+        # with no explicit routing entry -- classification among them. It
+        # had no fallback at all, so _resolve_fallback returned None and a
+        # single empty completion degraded the phase with nowhere to go.
+        # "primary" is the dual-purpose key (role fallback + primary_id
+        # catch-all). glm-5.3 is CN, cross-bloc from US OpenAI as the
+        # routing philosophy requires, and premium-tier.
+        "fallback_routing": {
+            "primary": "glm-5.3",  # CN Zhipu -- cross-bloc from gpt-5
+        },
         "tags": ["premium", "balanced", "multilingual"],
     },
     "debate-budget": {
@@ -127,6 +142,16 @@ _REGISTRY: dict[str, dict] = {
         "stress_testing": "grok-4.6",             # xAI 🇺🇸 — AA Intel 60.9 vs 37.6 for 4.3, $2/$6, 500K ctx
         "verifier":       "grok-4.3",           # xAI 🇺🇸 — record 78% non-hallucination (AA Omniscience), 1M ctx, same price
         "post_synthesis_verify": "sonar-pro",  # added v3.5
+        },
+        # gpt-5 is this preset's primary_id, so it also serves every role
+        # with no explicit routing entry -- classification among them. It
+        # had no fallback at all, so _resolve_fallback returned None and a
+        # single empty completion degraded the phase with nowhere to go.
+        # "primary" is the dual-purpose key (role fallback + primary_id
+        # catch-all). glm-5.3 is CN, cross-bloc from US OpenAI as the
+        # routing philosophy requires, and premium-tier.
+        "fallback_routing": {
+            "primary": "glm-5.3",  # CN Zhipu -- cross-bloc from gpt-5
         },
         "tags": ["premium", "argumentative", "robust"],
     },
@@ -669,6 +694,16 @@ _REGISTRY: dict[str, dict] = {
         "verifier":                   "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc from 🇺🇸 synthesis
         "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
+        # gpt-5 is this preset's primary_id, so it also serves every role
+        # with no explicit routing entry -- classification among them. It
+        # had no fallback at all, so _resolve_fallback returned None and a
+        # single empty completion degraded the phase with nowhere to go.
+        # "primary" is the dual-purpose key (role fallback + primary_id
+        # catch-all). glm-5.3 is CN, cross-bloc from US OpenAI as the
+        # routing philosophy requires, and premium-tier.
+        "fallback_routing": {
+            "primary": "glm-5.3",  # CN Zhipu -- cross-bloc from gpt-5
+        },
         "tags": ["premium", "multi-agent", "delegation"],
     },
     "writing-budget": {
@@ -883,6 +918,16 @@ _REGISTRY: dict[str, dict] = {
         "verifier":        "glm-5.2",           # 🇨🇳 Zhipu — cross-bloc verification, $0.476/$1.496 live (comment said $0.95/$3.00)
         "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
+        # gpt-5 is this preset's primary_id, so it also serves every role
+        # with no explicit routing entry -- classification among them. It
+        # had no fallback at all, so _resolve_fallback returned None and a
+        # single empty completion degraded the phase with nowhere to go.
+        # "primary" is the dual-purpose key (role fallback + primary_id
+        # catch-all). glm-5.3 is CN, cross-bloc from US OpenAI as the
+        # routing philosophy requires, and premium-tier.
+        "fallback_routing": {
+            "primary": "glm-5.3",  # CN Zhipu -- cross-bloc from gpt-5
+        },
         "tags": ["premium", "coding", "software-development"],
     },
     "cross-language-budget": {
@@ -1061,6 +1106,16 @@ _REGISTRY: dict[str, dict] = {
         "stress_testing": "grok-4.6",            # xAI 🇺🇸 — AA Intel 60.9 vs 37.6 for 4.3, $2/$6, 500K ctx
         "verifier":       "deepseek-v4-pro",     # DeepSeek 🇨🇳 — strong structured verification
         "post_synthesis_verify": "sonar-pro",  # added v3.5
+        },
+        # gpt-5 is this preset's primary_id, so it also serves every role
+        # with no explicit routing entry -- classification among them. It
+        # had no fallback at all, so _resolve_fallback returned None and a
+        # single empty completion degraded the phase with nowhere to go.
+        # "primary" is the dual-purpose key (role fallback + primary_id
+        # catch-all). glm-5.3 is CN, cross-bloc from US OpenAI as the
+        # routing philosophy requires, and premium-tier.
+        "fallback_routing": {
+            "primary": "glm-5.3",  # CN Zhipu -- cross-bloc from gpt-5
         },
         "tags": ["premium", "iterative", "critique"],
     },

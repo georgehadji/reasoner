@@ -114,3 +114,93 @@ async def test_stream_no_retry_after_partial_yield() -> None:
 
     assert p.calls == 1, "must not retry after partial yield"
     assert chunks == ["A"]
+
+
+def test_degraded_response_is_falsy():
+    """A failure object must not read as success to a naive caller.
+
+    router.call returns ``str | DegradedLLMResponse``, and a dataclass instance
+    is truthy by default, so ``if not response:`` used to pass straight over a
+    total provider failure. The production path uses isinstance checks and was
+    never fooled; the e2e suite's ``assert response`` was.
+    """
+    from reasoner.infrastructure.llm.ports import DegradedLLMResponse
+
+    degraded = DegradedLLMResponse(text="", error="all providers down")
+    assert not degraded
+    assert bool(degraded) is False
+    # isinstance-based detection must keep working unchanged
+    assert isinstance(degraded, DegradedLLMResponse)
+    assert degraded.degraded is True
+    assert degraded.error == "all providers down"
+
+
+# ── The two BaseLLMProvider / LLMError pairs must not be confusable ──
+
+def test_package_exports_the_error_the_router_actually_catches():
+    """The package export must be the class ProviderRouter._execute_call catches.
+
+    Two unrelated LLMError classes live here: base.LLMError (a ReasonerError)
+    and exceptions.LLMError (an InfrastructureError). Neither is a subclass of
+    the other. The router catches the base one, so exporting the exceptions one
+    handed callers an error that walks straight past the fallback chain, which
+    is the same defect as the raw SDK exceptions fixed in 4af087e.
+    """
+    from reasoner.infrastructure.llm import LLMError as exported
+    from reasoner.infrastructure.llm.base import LLMError as caught_by_router
+    from reasoner.infrastructure.llm.exceptions import LLMError as other
+
+    assert exported is caught_by_router
+    assert not issubclass(other, caught_by_router), (
+        "if these ever become related, this test is no longer load-bearing"
+    )
+
+
+def test_package_exports_the_provider_base_the_router_can_call():
+    """The exported BaseLLMProvider must be the one ProviderRouter can drive.
+
+    ports.BaseLLMProvider is a different interface (complete(messages, config)
+    -> LLMResponse) with no complete_with_retry(), which is what the router
+    calls. Exporting it produced routers that raised AttributeError on their
+    first call.
+    """
+    from reasoner.infrastructure.llm import BaseLLMProvider as exported
+    from reasoner.infrastructure.llm.base import BaseLLMProvider as router_expects
+
+    assert exported is router_expects
+    assert hasattr(exported, "complete_with_retry")
+
+
+def test_noop_provider_serves_a_router_instead_of_raising():
+    """The no-API-key path must return its canned message, not AttributeError.
+
+    api/__init__.py falls back to NoopProvider when no provider is available
+    and feeds it to ProviderRouter. NoopProvider subclassed ports, so every
+    call raised:
+
+        AttributeError: 'NoopProvider' object has no attribute 'complete_with_retry'
+    """
+    from reasoner.infrastructure.llm.providers.noop import NoopProvider
+    from reasoner.infrastructure.llm.router import ProviderRouter
+
+    router = ProviderRouter(primary=NoopProvider(model="dummy"))
+    response, metadata = asyncio.run(
+        router.call(
+            role="classification",
+            system_prompt="s",
+            user_prompt="u",
+            max_tokens=32,
+            temperature=0.1,
+        )
+    )
+    assert response == "Dummy provider - configure API keys"
+    assert metadata["model"] == "dummy"
+
+
+def test_ports_no_longer_shadows_the_exception_hierarchy():
+    """ports.py's own dead LLMError tree is gone; it re-exports exceptions'."""
+    from reasoner.infrastructure.llm import exceptions, ports
+
+    assert ports.LLMError is exceptions.LLMError
+    assert not hasattr(ports, "AuthenticationError")
+    assert not hasattr(ports, "ProviderUnavailableError")

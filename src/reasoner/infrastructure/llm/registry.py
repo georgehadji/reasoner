@@ -35,9 +35,13 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "claude-opus-4.8":   {"model": "anthropic/claude-opus-4.8"},     # legacy pin, kept for reproducibility — $5/$25 per M, 1M ctx
     MODEL_CLAUDE_SONNET: {"model": "anthropic/claude-sonnet-5"},     # v3.6: current as of Jun 2026 — $2/$10 per M, 1M ctx
     "claude-haiku":      {"model": "anthropic/claude-haiku-4.5"},    # $1/$5 per M, 200K ctx
-    # ── Auto-updating (always latest) ──
-    "claude-opus-latest":   {"model": "~anthropic/claude-opus-latest"},    # always -> latest Opus ($5/$25, 1M ctx today)
-    "claude-sonnet-latest": {"model": "~anthropic/claude-sonnet-latest"},  # always -> latest Sonnet ($2/$10, 1M ctx today)
+    # ── Auto-updating aliases removed 2026-09-06 ──
+    # OpenRouter does not serve "<vendor>/<family>-latest" ids. Every one of
+    # them answered `HTTP 400 ... is not a valid model ID` on a live call, and
+    # none appears in /api/v1/models. They were invisible to
+    # test_model_alias_honesty because that test checks preset-routed models
+    # and no preset routed these -- they were reachable only by a caller
+    # naming one directly, which got a 400. Pin a concrete id instead.
     # ═══════════════════════════════════════════════════════════════
     # OpenAI — GPT series
     # ═══════════════════════════════════════════════════════════════
@@ -66,9 +70,6 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ── Open Source (via OpenRouter) ──
     "gpt-oss-120b":     {"model": "openai/gpt-oss-120b"},        # $0.039/$0.18 per M, 131K ctx — ultra-cheap open-weight
     "gpt-oss-20b":      {"model": "openai/gpt-oss-20b"},         # $0.029/$0.14 per M, 131K ctx — cheapest text on OR
-    # ── Auto-updating (always latest) ──
-    "gpt-latest":       {"model": "~openai/gpt-latest"},         # always -> latest GPT family
-    "gpt-mini-latest":  {"model": "~openai/gpt-mini-latest"},    # always -> latest GPT Mini family
     # ── Codex (coding-optimized) ──
     "gpt-5.3-codex":    {"model": "openai/gpt-5.3-codex"},
     "gpt-5.2-codex":    {"model": "openai/gpt-5.2-codex"},
@@ -114,9 +115,6 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "gemini-3.7-flash":        {"model": "google/gemini-3.7-flash"},           # $0.375/$1.875 per M, 1M ctx (half the price of 3.6-flash)
     "gemini-3.6-flash":        {"model": "google/gemini-3.6-flash"},           # $0.75/$3.75 per M, 1M ctx (repriced down from $1.50/$7.50)
     "gemini-3.5-flash-lite":   {"model": "google/gemini-3.5-flash-lite"},      # $0.30/$2.50 per M, 1M ctx
-    # ── Auto-updating (always latest) ──
-    "gemini-pro-latest":       {"model": "~google/gemini-pro-latest"},         # always -> latest Gemini Pro
-    "gemini-flash-latest":     {"model": "~google/gemini-flash-latest"},       # always -> latest Gemini Flash
     # ── Legacy ──
     "gemini-3.1-flash-lite":   {"model": "google/gemini-3.1-flash-lite"},      # -> gemini-flash-lite-real
     "gemma-3-12b":             {"model": "google/gemma-3-12b-it"},              # was keyed "google/gemma-2-9b-it" — wrong version, and the only key carrying a vendor prefix
@@ -134,7 +132,6 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # mirrors upstream, and that is not a signal to reinstate the alias.
     "grok-4.3":               {"model": "x-ai/grok-4.3"},               # 1M ctx, $1.25/$2.50, τ²-Bench 97.7%, configurable reasoning effort
     "grok-build-0.1":         {"model": "x-ai/grok-build-0.1"},         # fast agentic coding, 256K ctx, $1.00/$2.00
-    "grok-latest":            {"model": "~x-ai/grok-latest"},           # always -> latest Grok ($2/$6, 500K ctx today)
     # ═══════════════════════════════════════════════════════════════
     # Perplexity
     # ═══════════════════════════════════════════════════════════════
@@ -216,7 +213,11 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # Qwen (Alibaba) — 3.5 -> 3.8 series
     # ═══════════════════════════════════════════════════════════════
     # ── 3.8 (latest) ──
-    "qwen3.8-max":         {"model": "qwen/qwen3.8-max"},        # $0.002/$0.006 per M, 1M ctx
+    # Upstream delisted the undated "qwen/qwen3.8-max" and replaced it with the
+    # pinned 0902 build; the old id 404s. Reasoning is MANDATORY here and
+    # defaults to "xhigh" (~95% of the output budget), so a caller passing a
+    # small max_tokens gets empty content back — see reasoning_effort.py.
+    "qwen3.8-max":         {"model": "qwen/qwen3.8-max-0902"},   # $2.00/$6.00 per M, 1M ctx
     # ── 3.7 (Jun 2026) ──
     "qwen3.7-max":         {"model": "qwen/qwen3.7-max"},        # flagship agent — $1.475/$4.425 per M, 1M ctx
     "qwen3.7-plus":        {"model": "qwen/qwen3.7-plus"},       # best VFM — $0.32/$1.28 per M, 1M ctx
@@ -391,7 +392,12 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # Nous Research — Hermes series
     # ═══════════════════════════════════════════════════════════════
     "hermes-4-405b":     {"model": "nousresearch/hermes-4-405b"},   # $1.00/$3.00 per M, 131K ctx — powerful critic
-    "hermes-4-70b":      {"model": "nousresearch/hermes-4-70b"},    # $0.13/$0.40 per M, 131K ctx
+    # hermes-4-70b removed 2026-09-06: its only endpoint was Nebius, which
+    # reports status -5 and answers `The model NousResearch/Hermes-4-70B does
+    # not exist`. Still listed in /api/v1/models, so a catalogue-membership
+    # check cannot see it -- listed and unservable are different questions.
+    # It was multi-perspective-budget's destructive generator; that role moved
+    # to gpt-oss-120b. hermes-4-405b below is healthy and stays.
     # ═══════════════════════════════════════════════════════════════
     # Thinking Machines
     # ═══════════════════════════════════════════════════════════════

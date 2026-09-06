@@ -1,0 +1,72 @@
+name: model-catalogue
+
+# Is the bundled OpenRouter catalogue still true?
+#
+# tests/unit/test_model_alias_honesty.py already asserts that every model the
+# registry and the presets route exists in src/reasoner/domain/openrouter_models.json.
+# That guard is only as good as the file it reads, and nothing kept the file fresh:
+# on 2026-09-06 the bundled snapshot was three days old and still listed
+# "qwen/qwen3.8-max", which upstream had delisted in favour of the pinned
+# "qwen/qwen3.8-max-0902". Registry and catalogue agreed, the test passed, and
+# coding-premium's scoring role 404'd on every real run.
+#
+# So this job checks the input the other guard trusts. It runs on a schedule
+# because a delisting is an upstream event: no PR causes it, and no PR should be
+# red-X'd for it.
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'src/reasoner/domain/openrouter_models.json'
+      - 'src/reasoner/infrastructure/llm/registry.py'
+      - 'scripts/update_openrouter_catalogue.py'
+      - '.github/workflows/model-catalogue.yml'
+
+jobs:
+  catalogue:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: pip install httpx
+
+      - name: Bundled catalogue matches live OpenRouter
+        run: python scripts/update_openrouter_catalogue.py --check
+        # The script needs no API key — https://openrouter.ai/api/v1/models is
+        # public. Output is a +/- diff of model ids; refresh with the same script
+        # minus --check, then re-run the alias-honesty tests.
+        #
+        # Advisory: a delisting upstream must page someone, not block an unrelated
+        # PR. The blocking half of this contract is the alias-honesty suite, which
+        # fails the moment a *routed* model goes missing from the refreshed file.
+        continue-on-error: true
+
+      - name: Every routed model still has a serving endpoint
+        run: python scripts/update_openrouter_catalogue.py --check-endpoints
+        # A different question from the step above. That one asks whether the
+        # bundled catalogue matches /api/v1/models; this one asks whether the
+        # models we route can actually be served. nousresearch/hermes-4-70b was
+        # listed in the catalogue and answered `The model NousResearch/Hermes-4-70B
+        # does not exist` on every call, because its only endpoint (Nebius) sat
+        # at status -5. It was multi-perspective-budget's destructive generator.
+        #
+        # One request per routed model, no API key, ~195 requests. That cost is
+        # why this runs on the schedule and not on every PR. Advisory for the
+        # same reason as the drift check: a provider going down is an upstream
+        # event that must page someone, not red-X an unrelated PR.
+        continue-on-error: true
+
+      - name: Nothing routes a model the catalogue does not contain
+        run: |
+          # pytest is in requirements-dev.txt, not requirements.txt: the latter
+          # is what the Dockerfile installs into the production image, so the
+          # test stack is deliberately kept out of it. requirements-dev.txt
+          # opens with "-r requirements.txt", so this installs both.
+          pip install -r requirements-dev.txt
+          python -m pytest tests/unit/test_model_alias_honesty.py -v -p no:randomly
+        env:
+          CSRF_ENFORCE_BACKEND: 'false'

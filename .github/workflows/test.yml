@@ -71,7 +71,12 @@ jobs:
           # say what those aliases actually serve, dropping one long line. The
           # value below is re-measured on the merged tree, not carried from either
           # side: the two -1s do compose, so the merge lands at 2242, not 2243.
-          python scripts/ruff_ratchet.py --max 2242
+          # 2236: removing eight dead registry aliases (seven ~*-latest ids that
+          # answered `is not a valid model ID`, plus hermes-4-70b whose only
+          # endpoint was down) took six E501 comment lines with them. Paydown
+          # from deleting code, not a rename. scripts/ci-local.sh carried 2243
+          # while this file said 2242; both are 2236 now.
+          python scripts/ruff_ratchet.py --max 2236
 
       - name: Security scan (bandit)
         run: |

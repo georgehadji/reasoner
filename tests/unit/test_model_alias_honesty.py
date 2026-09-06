@@ -256,3 +256,69 @@ def test_aliases_without_a_drop_in_are_not_silently_equivalent():
             f"{alias} is marked as having no drop-in, but {twins} are entry-identical "
             f"to it -- name one of them as the replacement"
         )
+
+
+# ── Registry-only entries rot unseen: the checks above are preset-scoped ──
+
+def test_no_registry_alias_points_at_a_latest_floating_id():
+    """OpenRouter serves no "<vendor>/<family>-latest" id.
+
+    Seven aliases pointed at one. Every one answered, on a live call:
+
+        HTTP 400  "openai/gpt-latest is not a valid model ID"
+
+    They survived because every check here is preset-scoped and no preset
+    routed them: they were reachable only by a caller naming one directly,
+    e.g. `main.py --model gpt-latest` or an agent request, which got the 400.
+
+    The `~` prefix marked them as deliberately floating. The idea does not
+    exist upstream, so pin a concrete id instead of reintroducing one.
+    """
+    from reasoner.infrastructure.llm.registry import _REGISTRY
+
+    floating = {
+        alias: cfg["model"]
+        for alias, cfg in _REGISTRY.items()
+        if isinstance(cfg, dict) and cfg.get("model", "").lstrip("~").endswith("-latest")
+    }
+    assert not floating, (
+        f"these resolve to ids OpenRouter rejects with HTTP 400: {floating}"
+    )
+
+
+def test_every_registry_served_id_is_in_the_catalogue():
+    """Widens the preset-scoped catalogue check to every registry entry.
+
+    ``test_every_preset_routed_model_exists_in_the_catalogue`` only sees models
+    some preset routes, so a registry-only alias can point at an id that does
+    not exist and nothing fails. That is how the seven ``-latest`` ids lived.
+
+    This will not catch a model that is listed and unservable (hermes-4-70b was
+    in the catalogue with a dead sole endpoint) -- membership and health are
+    different questions. The health half runs on a schedule, in
+    scripts/update_openrouter_catalogue.py --check-endpoints, because it costs
+    one HTTP request per routed model.
+    """
+    import json
+    from pathlib import Path
+
+    from reasoner.infrastructure.llm.registry import _REGISTRY
+
+    catalogue_path = (
+        Path(__file__).resolve().parents[2]
+        / "src" / "reasoner" / "domain" / "openrouter_models.json"
+    )
+    with catalogue_path.open(encoding="utf-8") as fh:
+        known = {m["id"] for m in json.load(fh)["data"]}
+
+    missing = sorted(
+        {
+            cfg["model"].lstrip("~")
+            for cfg in _REGISTRY.values()
+            if isinstance(cfg, dict) and "/" in cfg.get("model", "")
+        }
+        - known
+    )
+    # Local providers (ollama/*) are served off-gateway and are absent by design.
+    missing = [m for m in missing if not m.startswith("ollama/")]
+    assert not missing, f"registry serves ids absent from the bundled catalogue: {missing}"
