@@ -126,3 +126,19 @@ spec/.gate-enabled
 !.claude/skills/build/
 !.claude/skills/build/**
 
+
+# --- vendored agent-skill installs (npx skills add / npx impeccable install) ---
+# These land as near-identical copies under every detected harness. The impeccable
+# engine alone is a 14.6 MB binary written four times; the whole set is ~64 MB of
+# duplication. skills-lock.json plus the two install commands reproduce all of it,
+# so the lock file is tracked and the copies are not.
+/.agents/
+/.codex/
+/.qwen/
+/.claude/skills/impeccable/
+/.claude/skills/humanizer/
+/.claude/agents/impeccable-*.md
+/.gemini/skills/
+/.github/skills/
+/.github/agents/
+/.github/hooks/
