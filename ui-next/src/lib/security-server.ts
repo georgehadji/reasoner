@@ -445,6 +445,11 @@ const RATE_LIMITS: Record<string, { limit: number; windowMs: number }> = {
   'provenance-inspect': { limit: 30, windowMs: SECURITY_CONSTANTS.rateLimitWindowMs },
   'provenance-scrub': { limit: 30, windowMs: SECURITY_CONSTANTS.rateLimitWindowMs },
   'provenance-rewrite': { limit: 30, windowMs: SECURITY_CONSTANTS.rateLimitWindowMs },
+  // Each checkout creates a Stripe/PayPal session upstream, so an unbounded
+  // caller burns a third-party quota, not just ours. Tighter than `default`
+  // for that reason; a real user clicks upgrade a handful of times at most.
+  'billing-checkout': { limit: 10, windowMs: SECURITY_CONSTANTS.rateLimitWindowMs },
+  'billing-portal': { limit: 10, windowMs: SECURITY_CONSTANTS.rateLimitWindowMs },
   default: { limit: 30, windowMs: SECURITY_CONSTANTS.rateLimitWindowMs },
 };
 

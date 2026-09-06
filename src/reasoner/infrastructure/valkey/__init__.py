@@ -10,6 +10,7 @@ in core/ports/:
 
 from reasoner.infrastructure.valkey.cache_adapter import (
     ValkeyCacheAdapter,
+    close_shared_cache_port,
     inject_shared_cache_port,
 )
 from reasoner.infrastructure.valkey.client import (

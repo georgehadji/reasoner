@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import re
 from typing import TYPE_CHECKING, Any
 
@@ -222,6 +223,18 @@ def extract_json_any(text: str) -> Any:
             except (json.JSONDecodeError, JSONDepthExceededError):
                 pass
 
+    # Repair truncated JSON (token-limit cutoffs) BEFORE the array fallback.
+    # Ordering is load-bearing: a response cut mid-object still contains whole
+    # inner arrays, so trying arrays first returned that inner array and threw
+    # away every named key of the outer object — the opposite of the
+    # prefer-objects rule above. Repair is a no-op on already-balanced text.
+    repaired = _repair_truncated_json(text)
+    if repaired:
+        try:
+            return safe_json_loads(_sanitize_json_escapes(_strip_trailing_commas(repaired)), max_depth=100)
+        except (json.JSONDecodeError, JSONDepthExceededError):
+            pass
+
     # Fallback to array extraction only if no object found
     if start_arr != -1:
         arr = _extract_balanced_structure(text, start_arr, "[", "]")
@@ -230,14 +243,6 @@ def extract_json_any(text: str) -> Any:
                 return safe_json_loads(_sanitize_json_escapes(_strip_trailing_commas(arr)), max_depth=100)
             except (json.JSONDecodeError, JSONDepthExceededError):
                 pass
-
-    # Try to repair truncated JSON (token-limit cutoffs) before falling back
-    repaired = _repair_truncated_json(text)
-    if repaired:
-        try:
-            return safe_json_loads(_sanitize_json_escapes(_strip_trailing_commas(repaired)), max_depth=100)
-        except (json.JSONDecodeError, JSONDepthExceededError):
-            pass
 
     # Fallback for objects with unescaped quotes
     reconstructed = _extract_json_dict_fallback(text)
@@ -264,10 +269,25 @@ def _sanitize_json_escapes(text: str) -> str:
     return text
 
 
+_TRAILING_COMMA_RE = re.compile(r',\s*([}\]])')
+_JSON_STRING_RE = re.compile(r'"(?:[^"\\]|\\.)*"')
+
+
 def _strip_trailing_commas(text: str) -> str:
-    """Remove trailing commas before closing braces/brackets — LLMs emit these often."""
-    # Match comma followed by optional whitespace and a closing brace/bracket
-    return re.sub(r',\s*([}\]])', r'\1', text)
+    """Remove trailing commas before closing braces/brackets — LLMs emit these often.
+
+    Applied ONLY outside string literals. A comma inside a value — ``"items =
+    [1, 2, ]"``, ``"pick A, B, or C, } closes it"`` — is the model's data, not
+    JSON syntax, and rewriting it silently corrupted the answer.
+    """
+    out: list[str] = []
+    pos = 0
+    for m in _JSON_STRING_RE.finditer(text):
+        out.append(_TRAILING_COMMA_RE.sub(r'\1', text[pos:m.start()]))
+        out.append(m.group(0))
+        pos = m.end()
+    out.append(_TRAILING_COMMA_RE.sub(r'\1', text[pos:]))
+    return "".join(out)
 
 
 def _extract_balanced_structure(text: str, start: int, open_char: str, close_char: str) -> str | None:
@@ -338,9 +358,15 @@ def _extract_json_dict_fallback(text: str) -> dict[str, Any] | None:
                     result[key] = int(bare)
                 except ValueError:
                     try:
-                        result[key] = float(bare)
+                        num = float(bare)
                     except ValueError:
                         result[key] = bare
+                    else:
+                        # float() accepts "NaN"/"Infinity"; JSON does not, and
+                        # this fallback reconstructs dicts without json, so the
+                        # parse_constant guard in safe_json_loads never sees it.
+                        # Keep the raw token rather than a non-finite float.
+                        result[key] = bare if not math.isfinite(num) else num
     return result if result else None
 
 
@@ -615,11 +641,19 @@ def strip_json_fences(text: str) -> str:
 
 
 def safe_float(value: Any, default: float = 0.0, min_val: float = 0.0, max_val: float = 10.0) -> float:
-    """Safely coerce a value to float within bounds."""
+    """Safely coerce a value to float within bounds.
+
+    Non-finite input returns *default*, not a bound. Every comparison against
+    NaN is False, so clamping it would return max_val -- a malformed score
+    reading as a perfect one. Checked before the clamp, not after.
+    """
     try:
-        return max(min_val, min(max_val, float(value)))
+        num = float(value)
     except (TypeError, ValueError):
         return default
+    if not math.isfinite(num):
+        return default
+    return max(min_val, min(max_val, num))
 
 
 def safe_list(value: Any) -> list[str]:

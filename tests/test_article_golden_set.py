@@ -385,7 +385,21 @@ class TestGoldenSetPromptBuilders:
         state = _build_state(tc)
         prompt = article_prompts.article_verify_prompt(state, use_sonar=True)
         assert isinstance(prompt, str) and len(prompt) > 50
-        assert "sources_block" not in prompt or len(prompt) > 0  # sonar skips source injection
+
+        # This line used to read:
+        #   assert "sources_block" not in prompt or len(prompt) > 0
+        # Both sides were tautologies. "sources_block" is the local variable's
+        # name inside article_verify_prompt, never text it emits, and the
+        # assertion above already established len(prompt) > 50. Assert the
+        # header the sonar branch actually suppresses.
+        assert "Available Sources:" not in prompt
+
+    @pytest.mark.parametrize("tc", GOLDEN_SET, ids=lambda tc: tc.id)
+    def test_verify_prompt_keeps_sources_without_sonar(self, tc: ArticleTestCase):
+        """The other half: only the sonar branch drops the sources block."""
+        state = _build_state(tc)
+        prompt = article_prompts.article_verify_prompt(state, use_sonar=False)
+        assert "Available Sources:" in prompt
 
 
 class TestGoldenSetInvariants:

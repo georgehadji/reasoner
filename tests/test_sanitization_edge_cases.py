@@ -168,14 +168,19 @@ class TestSanitizeForLoggingEdgeCases:
         assert "REDACTED" in cleaned
 
     def test_authorization_header(self):
-        """Authorization header: 'Authorization:' keyword should be redacted.
-        Note: the current regex captures 'Authorization: Bearer' but the token
-        after it remains unredacted (regex doesn't handle Bearer <token>).
-        """
+        """Authorization header: the credential after the 'Bearer' scheme
+        word must be redacted too, not just the 'Authorization:' keyword."""
         text = "Authorization: Bearer sk-totally-real-key-12345"
         cleaned = sanitize_for_logging(text)
         assert "REDACTED" in cleaned
-        assert "Authorization" not in cleaned or "Authorization" in cleaned
+        assert "sk-totally-real-key-12345" not in cleaned
+
+    def test_authorization_header_jwt_still_labeled(self):
+        """A JWT-shaped bearer token still gets the more specific JWT marker."""
+        text = "Authorization: Bearer eyJhbGciOiJIUzI1NiIs.eyJzdWIiOiIxMjM0NTY3ODkwIiw.name"
+        cleaned = sanitize_for_logging(text)
+        assert "eyJhbGci" not in cleaned
+        assert "JWT_REDACTED" in cleaned
 
     def test_short_secret_below_length_threshold(self):
         """Secrets shorter than 4 chars after the pattern should not match."""

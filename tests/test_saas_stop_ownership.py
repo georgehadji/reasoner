@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -9,6 +11,26 @@ from fastapi.testclient import TestClient
 from reasoner.api.run_state import RunStateStore
 from reasoner.infrastructure.auth import set_auth_adapter
 from reasoner.infrastructure.auth.local_adapter import LocalAuthAdapter
+
+
+
+def _run(coro):
+    """Run *coro* on this thread's event loop, creating one if absent.
+
+    ``asyncio.get_event_loop()`` raises RuntimeError on 3.12 once anything in the
+    same xdist worker has left the thread without a current loop -- pytest-asyncio
+    unsets it after each async test, so whether these four sync tests pass came
+    down to which files the worker happened to schedule first. Creating a loop on
+    demand keeps the previous behaviour (one ambient loop, reused) instead of
+    asyncio.run(), which would build and close a fresh loop per call and rebind
+    any loop-affine primitive the store holds before TestClient touches it.
+    """
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    return loop.run_until_complete(coro)
 
 
 @pytest.fixture
@@ -105,9 +127,7 @@ def test_stop_specific_run_requires_auth_when_owned(
 ):
     """User B cannot cancel User A's run."""
     client, store, sign_csrf = stop_client
-    import asyncio
-
-    asyncio.get_event_loop().run_until_complete(
+    _run(
         store.add("run-a", user_id="11111111-1111-1111-1111-111111111111")
     )
 
@@ -128,9 +148,7 @@ def test_stop_specific_run_owner_can_cancel(
 ):
     """User A can cancel their own run."""
     client, store, sign_csrf = stop_client
-    import asyncio
-
-    asyncio.get_event_loop().run_until_complete(
+    _run(
         store.add("run-a", user_id="11111111-1111-1111-1111-111111111111")
     )
 
@@ -151,9 +169,7 @@ def test_stop_anonymous_run_requires_auth(
 ):
     """Any authenticated user can cancel an anonymous (no owner) run."""
     client, store, sign_csrf = stop_client
-    import asyncio
-
-    asyncio.get_event_loop().run_until_complete(store.add("run-anon"))
+    _run(store.add("run-anon"))
 
     csrf = sign_csrf("test-csrf")
     resp = client.post(
@@ -189,9 +205,7 @@ def test_stop_nonexistent_run_returns_not_found(
 def test_global_stop_requires_auth(stop_client):
     """Global stop (no run_id) requires authentication."""
     client, store, sign_csrf = stop_client
-    import asyncio
-
-    asyncio.get_event_loop().run_until_complete(store.add("run-1"))
+    _run(store.add("run-1"))
 
     csrf = sign_csrf("test-csrf")
     resp = client.post(

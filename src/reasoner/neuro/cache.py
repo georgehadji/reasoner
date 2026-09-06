@@ -81,6 +81,13 @@ class L1Cache:
         bundle_id = hashlib.sha256(content.encode()).hexdigest()[:12]
         bundle = {"id": bundle_id, "content": content, "source": source,
                   "embedding": embedding, "created_at": time.time()}
+        # bundle_id is a digest of the content, and one id maps to one file --
+        # so re-adding identical content must replace, not append. Appending
+        # put two entries in self.bundles behind a single file: search()
+        # returned the same memory twice (burning top_k slots), and evicting
+        # either copy unlinked the file while the other stayed "present" in
+        # memory, so the entry vanished on the next _load().
+        self.bundles = [b for b in self.bundles if b.get("id") != bundle_id]
         self.bundles.append(bundle)
         if len(self.bundles) > self.config.l1_max_bundles:
             self.bundles.sort(key=lambda b: b.get("created_at", 0))

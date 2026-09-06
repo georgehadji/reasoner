@@ -4,10 +4,25 @@ import {
   validateUpstreamUrl,
   sanitizeRequestHeaders,
   sanitizeResponseHeaders,
+  rateLimit,
 } from '@/lib/security-server';
 
 export async function POST(req: NextRequest) {
   try {
+    // CSRF is already enforced for this route by the proxy middleware
+    // (src/proxy.ts), whose matcher covers /api/:path* and which rejects any
+    // POST without a matching double-submit token. What was missing is the
+    // rate limit every other mutating route carries: each call creates a
+    // checkout session with Stripe or PayPal, so an unbounded caller spends a
+    // third-party quota.
+    const limit = rateLimit(req, 'billing-checkout');
+    if (!limit.allowed) {
+      return new NextResponse('Too Many Requests', {
+        status: 429,
+        headers: { 'Retry-After': String(limit.retryAfter) },
+      });
+    }
+
     const apiBase = validateUpstreamUrl(getApiBaseUrl());
     const { searchParams } = new URL(req.url);
     

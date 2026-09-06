@@ -10,7 +10,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from uuid import UUID
 
 import asyncpg
 
@@ -69,7 +68,9 @@ class PostgresQuotaRepository(QuotaRepository):
             )
 
         return UsageQuota(
-            user_id=UUID(row["user_id"]),
+            # asyncpg returns a uuid.UUID for a UUID column, so re-wrapping it
+            # raises AttributeError. credit_repo_postgres.py had this right.
+            user_id=row["user_id"],
             tier=SubscriptionTier(row["tier"]),
             used_queries=row["used_queries"],
             max_queries=row["max_queries"],

@@ -47,6 +47,32 @@ from reasoner.domain.pipeline_state import PipelineState
 from reasoner.infrastructure.llm.router import ProviderRouter
 
 
+def _completion_payload(state: PipelineState, *, started_at: float) -> dict[str, Any]:
+    """Build the PIPELINE_COMPLETED payload from a finished PipelineState.
+
+    Every field here previously read an attribute PipelineMeta does not define
+    (``total_tokens``, ``total_duration``) or handed on the ``FinalSolution``
+    container where consumers expect the synthesis *text*:
+    ``PipelineAggregate._apply_pipeline_completed`` stores ``solution`` verbatim
+    and ``ResumePipelineCommandHandler`` returns it to the caller as
+    ``previous_synthesis``. Result: every persisted run recorded 0 tokens, 0
+    seconds, and a non-string synthesis.
+    """
+    import time as _time
+
+    fs = getattr(state, "final_solution", None)
+    tokens = sum(
+        t.get("input", 0) + t.get("output", 0)
+        for t in (state.phase_tokens or {}).values()
+    )
+    return {
+        "solution": {"core_solution": getattr(fs, "core_solution", "") or "" if fs else ""},
+        "total_tokens": {"total": tokens},
+        "total_duration_seconds": max(_time.monotonic() - started_at, 0.0),
+        "phases_completed": len(state.phase_results or []),
+    }
+
+
 class PipelineExecutionPort(Protocol):
     """Interface for pipeline execution — application layer depends on this port,
     not on api-layer implementations. The api layer provides the concrete
@@ -100,6 +126,9 @@ class RunPipelineCommandHandler:
         it must reach PipelineExecutionPort.execute_run()/ReasonerPipeline
         below, both of which already know how to consume it.
         """
+        import time as _time
+        _started_at = _time.monotonic()
+
         # Create aggregate
         aggregate = PipelineAggregate(aggregate_id=command.command_id)
 
@@ -189,10 +218,7 @@ class RunPipelineCommandHandler:
                 EventType.PIPELINE_COMPLETED,
                 aggregate_id=command.command_id,
                 version=aggregate.version + 1,
-                solution={"core_solution": getattr(state.core, "final_solution", "") if hasattr(state, "core") else ""},
-                total_tokens={"total": getattr(state.meta, "total_tokens", 0)} if hasattr(state, "meta") else {},
-                total_duration_seconds=getattr(state.meta, "total_duration", 0) if hasattr(state, "meta") else 0,
-                phases_completed=len(getattr(state.meta, "phase_results", []) if hasattr(state, "meta") else []),
+                **_completion_payload(state, started_at=_started_at),
             )
             aggregate.record_event(completion_event)
 

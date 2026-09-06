@@ -648,11 +648,23 @@ class ProviderRouter:
             try:
                 semaphore = _get_llm_semaphore(provider.model)
                 async with semaphore:
-                    async for chunk in provider.stream_complete_with_retry(
-                        system_prompt, user_prompt, max_tokens, temperature
-                    ):
-                        delivered = True
-                        yield chunk
+                    # stream_complete() reads self.extra_body, so the call-level
+                    # dict (LLMExecutor's per-phase reasoning effort, web_search
+                    # injection) has to be merged in the same save/restore way
+                    # _call_with_circuit does it. Without this the streaming path
+                    # silently ran at the model's default reasoning effort.
+                    _saved = getattr(provider, "extra_body", None)
+                    if extra_body is not None and hasattr(provider, "extra_body"):
+                        provider.extra_body = {**(_saved or {}), **extra_body}
+                    try:
+                        async for chunk in provider.stream_complete_with_retry(
+                            system_prompt, user_prompt, max_tokens, temperature
+                        ):
+                            delivered = True
+                            yield chunk
+                    finally:
+                        if extra_body is not None and hasattr(provider, "extra_body"):
+                            provider.extra_body = _saved
                 await circuit.record_success()
             except asyncio.CancelledError:
                 raise
@@ -706,7 +718,12 @@ class ProviderRouter:
                         max_tokens=max_tokens, temperature=temperature, extra_body=extra_body,
                     )
                     if direct:
-                        yield direct
+                        # _try_direct_fallback returns (text, metadata); this
+                        # generator's contract is str | DegradedLLMResponse, so
+                        # yielding the tuple hands the consumer a Python tuple
+                        # where a chunk belongs (executor.execute_stream then
+                        # "".join()s it -> TypeError).
+                        yield direct[0]
                         return
                 yield DegradedLLMResponse(
                     text="",

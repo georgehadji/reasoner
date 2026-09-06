@@ -489,9 +489,38 @@ class ReasonerPipeline:
             from reasoner.application.flows.services import PipelineWorkflowServices
 
             strategy = self.flow_factory.get_strategy(method)
-            runner = WorkflowRunner(PipelineWorkflowServices(self))
-            services = PipelineWorkflowServices(self, runner=runner)
+            # The non-SSE path bypassed WorkflowRunner entirely. runner.run()
+            # hands the strategy `self.services`, and those services were built
+            # without a runner, so PipelineWorkflowServices.run_phase took its
+            # bare `await step.fn(...)` fallback for every phase. Retries,
+            # per-phase timeouts, the quality gate, PHASE_* events,
+            # `_current_phase_key` and therefore phase_tokens/phase_durations
+            # have never executed on any CLI or headless run.
+            # See docs/reports/defect-hunt-2026-09-01/T5-orchestration.md (D2).
+            #
+            # WORKFLOW_RUNNER_ENABLED gates the fix instead of applying it
+            # outright, because switching on a layer that has never run, for
+            # every CLI and headless run at once, is a behaviour change rather
+            # than a bug fix. Default off. Flip it only after diffing a full
+            # preset run both ways.
+            #
+            # Prerequisite before flipping: WorkflowRunner.run_phase and
+            # _handle_phase_error construct PhaseStarted(phase_number=...),
+            # PhaseFailed(is_fatal=...) and EventType.PHASE_QUALITY_CHECKED /
+            # PHASE_RETRIED. None of those members exist yet, so the first
+            # phase raises TypeError with this on. Item A2 lands first.
+            from reasoner.core.settings import settings as _settings
 
+            runner = WorkflowRunner(PipelineWorkflowServices(self))
+            if _settings.WORKFLOW_RUNNER_ENABLED:
+                # The construction is circular by nature: the runner needs
+                # services, and the services need the runner so that
+                # run_phase() delegates instead of taking its bare `await
+                # step.fn(...)` fallback. WorkflowRunner.run() passes
+                # `self.services` to the strategy and takes no services
+                # argument, so the knot is tied by rebinding the attribute
+                # after both objects exist.
+                runner.services = PipelineWorkflowServices(self, runner=runner)
             await runner.run(strategy, state)
         else:
             # Legacy path (should be empty now)
@@ -513,7 +542,12 @@ class ReasonerPipeline:
             await self._phase_cross_language_translate_out(state)
 
         # ── Publish Pipeline Completed Event ──
-        total_tokens = sum(t.get("total", 0) for t in state.phase_tokens.values())
+        # phase_tokens entries are {"input": N, "output": M} — no "total" key
+        # (see LLMExecutor._accumulate_tokens and subagents/base), so summing
+        # "total" reported 0 for every run that ever completed.
+        total_tokens = sum(
+            t.get("input", 0) + t.get("output", 0) for t in state.phase_tokens.values()
+        )
         done_evt = make_event(
             EventType.PIPELINE_COMPLETED,
             aggregate_id=state.conversation_id or "unknown",

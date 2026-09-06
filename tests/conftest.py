@@ -27,6 +27,7 @@ import pytest
 
 from reasoner.application.event_bus.bus import reset_event_bus
 from reasoner.core.ports.model_registry_port import set_model_registry_port
+from reasoner.core.ports.shared_cache_port import set_shared_cache_port
 from reasoner.core.rerank import reset_rerank_circuit
 from reasoner.infrastructure.llm.registry import RegistryAdapter
 from reasoner.infrastructure.rate_limiter import reset_rate_limiter_state
@@ -59,6 +60,16 @@ async def auto_clean_state():
     # they assert on. Same shape as the rerank circuit above: sync and
     # loop-independent, so it runs outside the loop branches below.
     reset_rate_limiter_state()
+
+    # api/__init__.py's lifespan injects a real SharedCachePort on startup
+    # and (as of this fix) clears it on shutdown -- but any test that starts
+    # the app without a matching clean shutdown, or that ran before this
+    # fix landed, can still leave a real adapter injected. A test whose
+    # fake gate has no .router attribute then breaks only when this global
+    # happens to be non-None, which depends on xdist worker assignment and
+    # collection order, not on the test's own logic. Same shape as the
+    # rerank circuit and rate limiter above.
+    set_shared_cache_port(None)
 
     # Ensure event loop is running for async resets
     if asyncio.get_event_loop().is_running():

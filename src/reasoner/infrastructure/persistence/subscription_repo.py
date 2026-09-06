@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import asyncpg
 
@@ -205,7 +205,8 @@ class PostgresSubscriptionRepository:
             return None
         return Subscription(
             id=uuid4(),  # ephemeral id for domain object
-            user_id=UUID(row["user_id"]),
+            # asyncpg returns a uuid.UUID for a UUID column; re-wrapping raises.
+            user_id=row["user_id"],
             tier=SubscriptionTier(row["tier"]),
             status=SubscriptionStatus(row["status"]),
             stripe_subscription_id=row["stripe_sub_id"],

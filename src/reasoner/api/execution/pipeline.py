@@ -591,6 +591,13 @@ class PipelineExecutionService:
                     "phase": num,
                     "name": name,
                     "data": data,
+                    # Running total, so a run abandoned before the terminal
+                    # `done` frame can still be billed for what it actually
+                    # spent. run_metering.extract_run_cost reads this; without
+                    # it, cost was observable only on `done` and a client that
+                    # hung up mid-run had its whole reservation released while
+                    # the provider spend had already been incurred.
+                    "total_cost_usd": round(getattr(state, "total_cost_usd", 0.0) or 0.0, 6),
                 }
                 _tracked_broadcast(run_id, phase_complete_payload)
                 await sse_emit(phase_complete_payload)

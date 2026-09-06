@@ -10,6 +10,7 @@ does not crash when asyncpg is missing or broken.
 
 from reasoner.infrastructure.persistence.event_store import (
     EventStore,
+    close_event_store,
     get_event_store,
     reset_event_store,
 )
@@ -24,6 +25,7 @@ __all__ = [
     # SQLite
     'EventStore',
     'get_event_store',
+    'close_event_store',
     'reset_event_store',
     # PostgreSQL (lazy)
     'PostgreSQLEventStore',

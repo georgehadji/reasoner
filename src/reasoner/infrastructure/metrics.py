@@ -236,6 +236,18 @@ DEAD_LETTER_EVENTS = Counter(
     ["event_type"],
 )
 
+# Quota-check failures (E-policy). check_quota fails open on any backend
+# error, returning a small emergency allowance. That is a deliberate
+# availability choice, but it made a total quota outage indistinguishable from
+# every user simply having quota: the PostgreSQL defect found on 2026-09-01 had
+# get_quota raising on every call for an unknown length of time, and the only
+# trace was a logger.warning nobody reads. Alert on this being non-zero.
+REASONER_QUOTA_CHECK_FAILURES = Counter(
+    "reasoner_quota_check_failures_total",
+    "Quota checks that fell back to the emergency allowance after a backend error",
+    ["reason"],
+)
+
 # Run cost gauge (P1.9 — current pipeline run USD cost)
 REASONER_RUN_COST_USD = Gauge(
     "reasoner_run_cost_usd",

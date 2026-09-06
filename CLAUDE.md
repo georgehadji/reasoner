@@ -14,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Architecture Style
 
-Hexagonal DDD + CQRS + Event Sourcing + WorkflowStrategy composition (`application/pipeline.py`'s `ReasonerPipeline` composes via a `flow_factory`/`LLMExecutor`, not mixins). `PipelineState` (~60 fields, `domain/pipeline_state.py`) is the primary state model. `PipelineAggregate` provides event-sourced replay (verified working: snapshot + full-history replay both exercised, `infrastructure/persistence/snapshots.py`).
+Hexagonal DDD + CQRS + Event Sourcing + WorkflowStrategy composition (`application/pipeline.py`'s `ReasonerPipeline` composes via a `flow_factory`/`LLMExecutor`, not mixins). `PipelineState` (~60 fields, `domain/pipeline_state.py`) is the primary state model. `PipelineAggregate` provides event-sourced replay (`infrastructure/persistence/snapshots.py`). This line previously read "verified working: snapshot + full-history replay both exercised". That was false and had no test behind it: `create_snapshot` wrote a `{state, version, timestamp}` wrapper that `_deserialize_state` splatted into `PipelineStateData`, which shares none of those field names, so every snapshot load raised `TypeError`. Fixed 2026-09-01 with `tests/unit/test_snapshot_replay_sqlite.py` covering both paths. Treat "verified" in this file as a claim needing a named test, not a note of intent.
 
 **Dependency Rule:** Domain has no outer dependencies → Application depends on Domain/Core only → Infrastructure implements Core ports → API/Interface depends on Application.
 

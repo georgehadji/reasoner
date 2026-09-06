@@ -230,7 +230,11 @@ def test_stream_complete_forwards_extra_body_and_temperature_rules() -> None:
             return _gen()
 
     class _FakeCompletions:
-        def create(self, **kwargs):
+        # `async def` on purpose: openai's AsyncCompletions.create is a coroutine
+        # function, and the awaited result is the async context manager. A sync
+        # stub here hid a missing `await` in stream_complete() that made every
+        # real streaming call raise TypeError.
+        async def create(self, **kwargs):
             captured.update(kwargs)
             return _FakeStream()
 

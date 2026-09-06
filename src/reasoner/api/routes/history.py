@@ -53,19 +53,34 @@ async def get_tagged_history(
     }
 
 
+def _load_owned_entry(entry_id: str, user: User) -> tuple[Path, dict]:
+    """Resolve *entry_id* to a file this user owns, or raise 404.
+
+    Fails closed on a missing owner. The previous ``if data.get("user_id")
+    and data.get("user_id") != ...`` guard was a no-op whenever the stored
+    owner was falsy, and every anonymous run persists exactly that
+    (``HistoryEntry.user_id`` defaults to None), so any authenticated caller
+    could read and delete anonymous callers' entries. Same posture as
+    ``routes/pipelines._check_pipeline_ownership``: no ownership record means
+    no access.
+    """
+    safe_id = Path(entry_id).name
+    path = _history_module.HISTORY_DIR / f"{safe_id}.json"
+    if not path.exists() or not str(path.resolve()).startswith(str(_history_module.HISTORY_DIR.resolve())):
+        raise HTTPException(status_code=404, detail="Entry not found")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if data.get("user_id") != str(user.id):
+        raise HTTPException(status_code=404, detail="Entry not found")
+    return path, data
+
+
 @router.get("/api/history/{entry_id}")
 async def get_history_entry(
     entry_id: str,
     user: User = Depends(get_current_user),
 ):
     """Get a specific history entry (must belong to the authenticated user)."""
-    safe_id = Path(entry_id).name
-    path = _history_module.HISTORY_DIR / f"{safe_id}.json"
-    if not path.exists() or not str(path.resolve()).startswith(str(_history_module.HISTORY_DIR.resolve())):
-        raise HTTPException(status_code=404, detail="Entry not found")
-    data = json.loads(path.read_text(encoding="utf-8"))
-    if data.get("user_id") and data.get("user_id") != str(user.id):
-        raise HTTPException(status_code=404, detail="Entry not found")
+    _path, data = _load_owned_entry(entry_id, user)
     return data
 
 
@@ -76,14 +91,8 @@ async def delete_history_entry(
     csrf_checked=Depends(require_csrf),
 ):
     """Delete a history entry (must belong to the authenticated user)."""
-    safe_id = Path(entry_id).name
-    path = _history_module.HISTORY_DIR / f"{safe_id}.json"
     try:
-        if not path.exists() or not str(path.resolve()).startswith(str(_history_module.HISTORY_DIR.resolve())):
-            raise HTTPException(status_code=404, detail="Entry not found")
-        data = json.loads(path.read_text(encoding="utf-8"))
-        if data.get("user_id") and data.get("user_id") != str(user.id):
-            raise HTTPException(status_code=404, detail="Entry not found")
+        path, _data = _load_owned_entry(entry_id, user)
         path.unlink(missing_ok=True)
         return {"status": "deleted"}
     except HTTPException:
