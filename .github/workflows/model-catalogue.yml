@@ -47,7 +47,11 @@ jobs:
 
       - name: Nothing routes a model the catalogue does not contain
         run: |
-          pip install -r requirements.txt
+          # pytest is in requirements-dev.txt, not requirements.txt: the latter
+          # is what the Dockerfile installs into the production image, so the
+          # test stack is deliberately kept out of it. requirements-dev.txt
+          # opens with "-r requirements.txt", so this installs both.
+          pip install -r requirements-dev.txt
           python -m pytest tests/unit/test_model_alias_honesty.py -v -p no:randomly
         env:
           CSRF_ENFORCE_BACKEND: 'false'
