@@ -1,0 +1,105 @@
+name: integration-live
+
+# The slow/integration lane, on demand.
+#
+# test.yml and coverage.yml both run -m "not slow and not integration", and the
+# files additionally carry skipif(not OPENROUTER_API_KEY). Nothing has ever
+# executed them in CI, so everything inside them drifted unobserved: the
+# PresetService.build_router() call signature had been broken since the method
+# moved, and the timeout markers said 180s against a 192.56s reality. Both went
+# unnoticed for as long as they existed.
+#
+# Running them always is the wrong fix -- they make real, billed OpenRouter
+# calls. `-m "slow and integration"` selects 477 tests. The 98-test subset in
+# test_e2e_real_pipeline.py + test_e2e_real_relationships.py took 482.94s at
+# -n 4; the whole lane costs considerably more in both time and money, so
+# reach for preset_filter unless you mean it. The fix is to make running them
+# a button, not to run them on every push.
+#
+# Dispatch-only on purpose. No schedule, no pull_request: nothing here should
+# spend money without someone asking it to.
+on:
+  workflow_dispatch:
+    inputs:
+      preset_filter:
+        description: >-
+          Optional -k expression to narrow the run (e.g. "premium" or
+          "multi-perspective-budget"). Empty runs all 477 selected tests
+          against the live API, which bills real money. For reference, the
+          98-test real-call subset took 482.94s at -n 4 on 2026-09-06.
+        required: false
+        default: ''
+      workers:
+        description: 'Parallel workers. 8 killed the xdist controller; 4 is the tested value.'
+        required: false
+        default: '4'
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements-dev.txt
+
+      - name: Refuse to run without a real key
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          # Without this the lane is worse than useless. Every file here carries
+          # skipif(not os.environ.get("OPENROUTER_API_KEY")), so an unset secret
+          # skips all 477 tests and the job reports green having proved nothing --
+          # the same shape as the alias-honesty test passing against a stale
+          # catalogue. Fail loudly instead.
+          #
+          # Do NOT paper over this with a placeholder value. self-healing-ci.yml
+          # did exactly that: the placeholder defeated the skipif guard, the
+          # tests ran against the live API with a bogus key, and 398 failed with
+          # `401 Missing Authentication header`.
+          if [ -z "${OPENROUTER_API_KEY}" ]; then
+            echo "::error::OPENROUTER_API_KEY is not set as a repository secret."
+            echo "::error::This lane makes real billed calls and cannot run without one."
+            echo "::error::Add it under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          echo "key present (${#OPENROUTER_API_KEY} chars)"
+
+      - name: Run the slow/integration lane
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          PYTHONPATH: src
+          CSRF_ENFORCE_BACKEND: 'false'
+          PRESET_FILTER: ${{ inputs.preset_filter }}
+          WORKERS: ${{ inputs.workers }}
+        run: |
+          # -n/--dist are named here rather than inherited: pytest.ini used to
+          # force -n auto on every invocation, and eight concurrent full
+          # pipelines took the controller down with
+          # `INTERNALERROR> KeyError: <WorkerController gw7>`.
+          #
+          # No --timeout: the per-test markers own that, and pytest-timeout's
+          # marker beats the CLI flag anyway. Full-pipeline tests are at 300s.
+          #
+          # Inputs go through env, not ${{ }} interpolation into the script, so
+          # a -k expression cannot become shell.
+          if [ -n "${PRESET_FILTER}" ]; then
+            set -- -k "${PRESET_FILTER}"
+          else
+            set --
+          fi
+          pytest tests/ -v \
+            -m "slow and integration" \
+            -n "${WORKERS}" --dist loadscope \
+            --tb=short \
+            --junitxml=integration-live.xml \
+            "$@"
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: integration-live-results
+          path: integration-live.xml
