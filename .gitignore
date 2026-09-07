@@ -162,3 +162,7 @@ spec/.gate-enabled
 /.github/skills/
 /.github/agents/
 /.github/hooks/
+
+# scripts/gate.py's proof markers -- one run's evidence that a CI gate
+# actually executed, not a build artifact anything reads afterward.
+/.gates/

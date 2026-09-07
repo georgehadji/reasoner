@@ -97,6 +97,15 @@ jobs:
           # the honest count now; whoever wants the three back can bisect them.
           python scripts/mypy_ratchet.py --max 423
 
+      - name: Silent-failure ratchet (bare except-Exception swallows)
+        run: |
+          # docs/plans/root-cause-remediation-2026-09-07.md P5. Counts
+          # `except Exception` blocks whose body is a bare `pass` or `return`
+          # with no log, no re-raise, no degradation record -- the D11 class
+          # of bug (NEMOTRON_RERANK_MODEL 404ing silently on every call).
+          # Ratcheted, same two-way pattern as ruff_ratchet.py.
+          python scripts/silent_failure_ratchet.py --max 117
+
       - name: Run tests
         run: |
           # -n/--dist used to come from pytest.ini addopts, which also forced
