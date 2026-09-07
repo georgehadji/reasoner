@@ -54,6 +54,16 @@ REASONER_LLM_ERRORS_TOTAL = Counter(
     ["provider"],
 )
 
+# P5 (docs/plans/root-cause-remediation-2026-09-07.md): every site that
+# swallows an exception and continues with a fallback increments this, via
+# core.degrade.degraded(). `site` is a stable dotted name with bounded
+# cardinality -- never a model id, user input or exception text.
+REASONER_DEGRADATION_TOTAL = Counter(
+    "reasoner_degradation_total",
+    "Failures swallowed in favour of a fallback value",
+    ["site"],
+)
+
 STRIPE_WEBHOOK_SIG_FAILURES = Counter(
     "stripe_webhook_signature_failures_total",
     "Stripe webhook signature verification failures",

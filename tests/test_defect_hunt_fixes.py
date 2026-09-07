@@ -137,23 +137,66 @@ def test_degraded_response_is_falsy():
 
 # ── The two BaseLLMProvider / LLMError pairs must not be confusable ──
 
-def test_package_exports_the_error_the_router_actually_catches():
-    """The package export must be the class ProviderRouter._execute_call catches.
+def test_one_error_tree_reaches_the_router():
+    """Every LLMError spelling must resolve to something the router catches.
 
-    Two unrelated LLMError classes live here: base.LLMError (a ReasonerError)
-    and exceptions.LLMError (an InfrastructureError). Neither is a subclass of
-    the other. The router catches the base one, so exporting the exceptions one
-    handed callers an error that walks straight past the fallback chain, which
-    is the same defect as the raw SDK exceptions fixed in 4af087e.
+    Two unrelated LLMError classes used to live here: base.LLMError (a
+    ReasonerError) and exceptions.LLMError (an InfrastructureError), neither a
+    subclass of the other. The router caught the base one, so an
+    exceptions.LLMError raised from a provider walked straight past the
+    fallback chain -- the same defect as the raw SDK exceptions fixed in
+    4af087e.
+
+    P2 (docs/plans/root-cause-remediation-2026-09-07.md) collapsed them: the
+    infrastructure module is now an alias shim, and base.LLMError descends from
+    core.exceptions.ProviderError, which is what the router catches.
     """
+    from reasoner.core.exceptions import ProviderError
     from reasoner.infrastructure.llm import LLMError as exported
-    from reasoner.infrastructure.llm.base import LLMError as caught_by_router
-    from reasoner.infrastructure.llm.exceptions import LLMError as other
+    from reasoner.infrastructure.llm.base import LLMError as base_error
+    from reasoner.infrastructure.llm.exceptions import LLMError as legacy
 
-    assert exported is caught_by_router
-    assert not issubclass(other, caught_by_router), (
-        "if these ever become related, this test is no longer load-bearing"
+    assert exported is base_error
+    assert legacy is base_error, "the deprecated module must alias, not redefine"
+    assert issubclass(base_error, ProviderError), (
+        "the router catches ProviderError; an LLMError outside that tree "
+        "escapes the fallback chain entirely"
     )
+
+
+def test_deprecated_exceptions_module_warns_on_import():
+    """The compat shim must announce itself, so the aliases can be deleted."""
+    import importlib
+    import sys
+
+    sys.modules.pop("reasoner.infrastructure.llm.exceptions", None)
+    with pytest.warns(DeprecationWarning, match="reasoner.core.exceptions"):
+        importlib.import_module("reasoner.infrastructure.llm.exceptions")
+
+
+def test_every_provider_error_subclass_reaches_the_router():
+    """Each leaf the adapters can raise must be caught by the router's except.
+
+    ProviderCreditsExhaustedError is the one this is really about: it lived in
+    the infrastructure tree, so a 402 escaped ProviderRouter._execute_call and
+    was caught only by the `except Exception` in flows/runner.py (D5).
+    """
+    from reasoner.core.exceptions import (
+        AuthenticationError,
+        ModelNotFoundError,
+        ProviderCreditsExhaustedError,
+        ProviderError,
+        ProviderTimeoutError,
+        ProviderUnavailableError,
+        RateLimitError,
+    )
+
+    for cls in (
+        AuthenticationError, RateLimitError, ModelNotFoundError,
+        ProviderTimeoutError, ProviderUnavailableError,
+        ProviderCreditsExhaustedError,
+    ):
+        assert issubclass(cls, ProviderError), cls.__name__
 
 
 def test_package_exports_the_provider_base_the_router_can_call():
@@ -169,6 +212,9 @@ def test_package_exports_the_provider_base_the_router_can_call():
 
     assert exported is router_expects
     assert hasattr(exported, "complete_with_retry")
+    # P2 deleted the other one outright, so the trap can no longer be sprung.
+    import reasoner.infrastructure.llm.ports as ports
+    assert not hasattr(ports, "BaseLLMProvider")
 
 
 def test_noop_provider_serves_a_router_instead_of_raising():
@@ -197,10 +243,19 @@ def test_noop_provider_serves_a_router_instead_of_raising():
     assert metadata["model"] == "dummy"
 
 
-def test_ports_no_longer_shadows_the_exception_hierarchy():
-    """ports.py's own dead LLMError tree is gone; it re-exports exceptions'."""
-    from reasoner.infrastructure.llm import exceptions, ports
+def test_ports_defines_neither_errors_nor_a_second_provider_base():
+    """ports.py holds data types and one Protocol. Nothing else.
 
-    assert ports.LLMError is exceptions.LLMError
-    assert not hasattr(ports, "AuthenticationError")
-    assert not hasattr(ports, "ProviderUnavailableError")
+    It used to carry a third LLMError tree (dead: nothing imported it, not even
+    this module) and a second BaseLLMProvider with an incompatible interface
+    and no complete_with_retry(). Both are deleted in P2; what a caller needs
+    from here is Message/LLMConfig/LLMResponse/DegradedLLMResponse.
+    """
+    from reasoner.infrastructure.llm import ports
+
+    for gone in ("BaseLLMProvider", "LLMError", "AuthenticationError",
+                 "ProviderUnavailableError", "is_retryable"):
+        assert not hasattr(ports, gone), f"ports.{gone} is back"
+    for kept in ("Message", "LLMConfig", "LLMResponse", "DegradedLLMResponse",
+                 "LLMProvider"):
+        assert hasattr(ports, kept), f"ports.{kept} went missing"

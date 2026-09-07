@@ -15,17 +15,65 @@ from reasoner.core.constants import (
     DEFAULT_MAX_TOKENS,
     DEFAULT_TEMPERATURE,
 )
-from reasoner.exceptions import (
-    ReasonerError,
+from reasoner.core.exceptions import (
+    AuthenticationError,
+    ModelNotFoundError,
+    ProviderCreditsExhaustedError,
+    ProviderError,
+    ProviderUnavailableError,
+    RateLimitError,
     is_retryable,
 )
 
 logger = logging.getLogger(__name__)
 
 
-class LLMError(ReasonerError):
-    """Raised when an LLM call fails after all retries."""
+class LLMError(ProviderError):
+    """Raised when an LLM call fails after all retries.
+
+    Descends from ``core.exceptions.ProviderError`` (P2,
+    docs/plans/root-cause-remediation-2026-09-07.md). It used to descend
+    straight from ``ReasonerError``, making it a *sibling* of the whole
+    ``ProviderError`` tree rather than a member: ``ProviderUnavailableError``
+    raised by ``providers/openai_compat.py`` was not an ``LLMError``, so the
+    router -- which caught ``LLMError`` alone -- never saw it.
+
+    This is now the residual case only: "the adapter could not classify this
+    failure any more precisely". Adapters should raise a specific
+    ``ProviderError`` subclass wherever the SDK gives them enough to name one.
+    """
     retryable = False
+
+
+def translate_http_status(status: int | None, detail: str, model: str) -> ProviderError | None:
+    """Map an HTTP status onto the domain error tree, or None if unmapped.
+
+    The status-to-class table lives here, once, because both adapter families
+    need it: ``providers/openai_compat.py`` (OpenRouter lane) and
+    ``providers/direct.py`` (Anthropic/OpenAI/Google/httpx lanes). Each keeps
+    its own ``_translate`` for the SDK-specific cases the status code cannot
+    express, and calls this for the part that is just HTTP.
+
+    Returning None rather than a default keeps the choice of residual class
+    with the caller.
+    """
+    if status is None:
+        return None
+    if status == 402:
+        logger.warning(
+            "Credit exhausted for %s: %s. The pipeline will return partial results.",
+            model, detail,
+        )
+        return ProviderCreditsExhaustedError(detail)
+    if status == 429:
+        return RateLimitError(detail, provider=model)
+    if status in (401, 403):
+        return AuthenticationError(detail, provider=model)
+    if status == 404:
+        return ModelNotFoundError(detail, model=model)
+    if status >= 500:
+        return ProviderUnavailableError(detail)
+    return None
 
 
 def _type_name(obj: object) -> str:
@@ -182,21 +230,22 @@ class BaseLLMProvider(ABC):
                     system_prompt, user_prompt, max_tokens, temperature
                 )
             except Exception as exc:
-                # 402 = credit exhaustion — convert to ProviderCreditsExhaustedError
-                # for graceful degradation upstream instead of crashing the pipeline.
-                status_code = getattr(exc, 'status_code', None)
-                if status_code == 402:
-                    from reasoner.infrastructure.llm.exceptions import ProviderCreditsExhaustedError
-                    logger.warning(
-                        "Credit exhausted for %s: %s. The pipeline will return partial results.",
-                        getattr(self, 'model', 'unknown'), exc,
-                    )
-                    raise ProviderCreditsExhaustedError(
-                        f"API credit limit reached for {getattr(self, 'model', 'unknown')}: {exc}"
-                    ) from exc
                 last_error = exc
-                # Don't retry non-retryable errors
-                if not is_retryable(exc):
+                # A ProviderError has already been classified by the adapter's
+                # _translate() at the SDK boundary, and the router owns what
+                # happens to it next (fallback to a cross-lab equivalent, which
+                # beats sleeping on a model that just rate-limited us). Retrying
+                # here as well is the dual-layer retry problem complete_once()
+                # exists to avoid.
+                #
+                # This preserves today's behaviour rather than changing it:
+                # every adapter already wrapped its SDK exceptions into the
+                # non-retryable LLMError before this loop saw them, so the
+                # retry never fired for them. Translating into accurate classes
+                # (RateLimitError.retryable is True) would have switched it on
+                # as a side effect. Changing the retry topology is a separate
+                # decision, not part of P2.
+                if isinstance(exc, ProviderError) or not is_retryable(exc):
                     raise
                 if attempt < self.max_retries:
                     await asyncio.sleep(min(2 ** attempt, 4) + random.uniform(0, 0.5))

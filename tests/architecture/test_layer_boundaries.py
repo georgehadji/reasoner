@@ -32,6 +32,10 @@ ALLOWED_LINEAGE: dict[str, list[str]] = {
         "reasoner.api",
     ],
     "core/protocol.py": ["reasoner.infrastructure.llm.router"],
+    # core/degrade.py: lazy inline import of the Prometheus counter inside
+    # degraded(), for the same reason as core/search.py above -- the metric is
+    # an optional dependency and must not be a module-scope core->infra edge.
+    "core/degrade.py": ["reasoner.infrastructure.metrics"],
 
     # application/handlers/handlers.py:263 — `import reasoner.api as api`, lazy
     # inside a function. Tracked upward-dependency debt, mirrored in
@@ -170,3 +174,108 @@ def test_streaming_size() -> None:
         pytest.skip("api/streaming.py not found")
     lines = len(path.read_text(encoding="utf-8").splitlines())
     assert lines <= 337, f"api/streaming.py is {lines} lines (pinned cap: 337)"
+
+
+# ─────────────────────────────────────────────────────────────────────
+# P2: the domain owns the error vocabulary
+# ─────────────────────────────────────────────────────────────────────
+#
+# docs/plans/root-cause-remediation-2026-09-07.md P2 step 6 asks for an
+# import-linter contract forbidding `class .*Error` under infrastructure/.
+# import-linter reasons about imports between modules; it has no notion of a
+# class definition, so it cannot express this. An AST sweep can, and it runs in
+# the normal suite instead of needing new CI wiring.
+#
+# Why the rule: infrastructure/llm/ grew four unrelated exception trees, each
+# added by someone who did not find the previous one. Two of them were outside
+# the type ProviderRouter caught, so those failures walked past the fallback
+# chain; one declared `.retryable` that `core.exceptions.is_retryable` never
+# read, because it read `.retryable` on ReasonerError subclasses only. Adapters
+# translate into the domain's vocabulary at the boundary; they do not mint
+# their own.
+
+# Exact set, ratchet-style: a new entry fails this test, and deleting one means
+# deleting its line. Every entry is pre-existing debt with a stated reason.
+ALLOWED_INFRASTRUCTURE_ERRORS: dict[str, str] = {
+    # The residual "adapter could not classify this any further" case. Now a
+    # core.exceptions.ProviderError subclass, so it is inside the tree the
+    # router catches. Scheduled to move into core/ with the compat aliases.
+    "infrastructure/llm/base.py::LLMError":
+        "residual ProviderError; moves to core/ when the aliases are deleted",
+    # Raised by the NoopProvider when it is used in a path that needed a real
+    # model. A configuration fault, not a provider fault.
+    "infrastructure/llm/providers/noop.py::NoopProviderError":
+        "no-API-key sentinel; subclasses LLMError",
+    # Control-flow signal for the breaker, not a provider failure: it means the
+    # call was never attempted.
+    "infrastructure/circuit_breaker.py::CircuitOpenError":
+        "breaker control flow; predates the port split",
+    # Legacy auth adapter, superseded by api/auth_deps.py.
+    "infrastructure/auth_legacy.py::AuthenticationError":
+        "legacy adapter, scheduled for deletion",
+    "infrastructure/auth_legacy.py::AuthorizationError":
+        "legacy adapter, scheduled for deletion",
+    # Non-LLM adapters with no domain vocabulary to translate into yet.
+    "infrastructure/llm/image_generation.py::ImageGenerationError":
+        "image lane has no domain error tree yet",
+    "infrastructure/watermark/data_url.py::DataUrlError":
+        "ValueError subclass, local input validation",
+    "infrastructure/widgets_legacy.py::SafeExpressionError":
+        "legacy widget sandbox, scheduled for deletion",
+    # Defined only in the ImportError branch, as a stand-in for
+    # asyncpg.PostgresError when asyncpg is absent. Without it the `except`
+    # clauses would have to name bare Exception and would swallow KeyError,
+    # TypeError and ValueError from the same try blocks.
+    "infrastructure/persistence/postgres_store.py::_AsyncpgError":
+        "optional-dependency sentinel; narrows an except clause, never raised",
+}
+
+
+def _infrastructure_error_classes() -> dict[str, str]:
+    """Every `class *Error`/`*Exception` defined under infrastructure/."""
+    found: dict[str, str] = {}
+    for path in sorted((BASE / "infrastructure").rglob("*.py")):
+        rel = path.relative_to(BASE).as_posix()
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef) and (
+                node.name.endswith("Error") or node.name.endswith("Exception")
+            ):
+                found[f"{rel}::{node.name}"] = node.name
+    return found
+
+
+def test_infrastructure_defines_no_new_exception_classes():
+    """Adapters translate into core.exceptions; they do not define errors."""
+    found = _infrastructure_error_classes()
+
+    new = sorted(set(found) - set(ALLOWED_INFRASTRUCTURE_ERRORS))
+    assert not new, (
+        "New exception class(es) defined under infrastructure/:\n  "
+        + "\n  ".join(new)
+        + "\n\nRaise a subclass of reasoner.core.exceptions.ProviderError (or the "
+        "appropriate domain error) instead, translated at the adapter boundary — "
+        "see providers/openai_compat.py::_translate. If this genuinely cannot be "
+        "a domain error, add it to ALLOWED_INFRASTRUCTURE_ERRORS with the reason."
+    )
+
+    gone = sorted(set(ALLOWED_INFRASTRUCTURE_ERRORS) - set(found))
+    assert not gone, (
+        "Allowlisted infrastructure error(s) no longer exist — delete these "
+        f"lines from ALLOWED_INFRASTRUCTURE_ERRORS: {gone}"
+    )
+
+
+def test_every_provider_facing_error_is_reachable_from_provider_error():
+    """The router catches ProviderError; adapters must raise inside that tree.
+
+    LLMError and NoopProviderError are the two error classes an adapter can
+    still raise. Both must be ProviderError subclasses or the fallback chain
+    does not fire for them.
+    """
+    from reasoner.core.exceptions import ProviderError
+    from reasoner.infrastructure.llm.base import LLMError
+    from reasoner.infrastructure.llm.providers.noop import NoopProviderError
+
+    assert issubclass(LLMError, ProviderError)
+    assert issubclass(NoopProviderError, ProviderError)

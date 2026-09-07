@@ -15,7 +15,9 @@ Exception Hierarchy:
     │   ├── RateLimitError
     │   ├── ModelNotFoundError
     │   ├── ProviderTimeoutError
-    │   └── ProviderUnavailableError
+    │   ├── ProviderUnavailableError
+    │   ├── ProviderCreditsExhaustedError
+    │   └── LLMError                       (infrastructure.llm.base — see below)
     └── PipelineError
         ├── PhaseError
         └── ConfigurationError
@@ -115,8 +117,20 @@ class JSONValidationError(ParseError):
 # ─────────────────────────────────────────────────────────────────────
 
 class ProviderError(ReasonerError):
-    """Base exception for LLM provider errors."""
-    pass
+    """Base exception for LLM provider errors.
+
+    This is the single type ``ProviderRouter._execute_call`` catches, so every
+    adapter must translate its SDK's exceptions into this tree at the boundary
+    (``providers/openai_compat.py::_translate``,
+    ``providers/direct.py::_translate``) and raise nothing else. An untranslated
+    exception walks straight past the fallback chain: observed live when an
+    OpenRouter 404 dropped the destructive perspective from a run with no
+    fallback attempted.
+
+    Infrastructure must not define its own error classes; see
+    ``tests/architecture/test_layer_boundaries.py``.
+    """
+    retryable = False
 
 
 class AuthenticationError(ProviderError):
@@ -175,6 +189,22 @@ class ProviderUnavailableError(ProviderError):
     This error IS retryable - may be a temporary outage.
     """
     retryable = True
+
+
+class ProviderCreditsExhaustedError(ProviderError):
+    """
+    The account behind the API key is out of credit (HTTP 402).
+
+    NOT retryable: no amount of waiting adds funds. The pipeline degrades and
+    returns partial results rather than crashing.
+
+    Was ``infrastructure/llm/exceptions.py::ProviderCreditsExhaustedError``,
+    which descended from a second, unrelated ``LLMError`` and so escaped both
+    ``ProviderRouter._execute_call`` and ``is_retryable`` -- the latter read
+    ``.retryable`` on ``ReasonerError`` subclasses only, so the ``False``
+    declared there was never consulted. The two agreed by accident.
+    """
+    retryable = False
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -257,6 +287,23 @@ def is_retryable(error: Exception) -> bool:
     return False
 
 
+def is_run_fatal(error: Exception) -> bool:
+    """True when continuing the run cannot produce a better outcome.
+
+    Deliberately narrower than ``not is_retryable(error)``. A 404 on one model
+    is not retryable, but the next phase routes to a different model and may
+    well succeed, so the run should carry on. An exhausted credit balance or a
+    rejected API key fails every subsequent call identically: carrying on only
+    spends wall-clock producing a synthesis over missing phases and reporting
+    it as a success.
+
+    P5 step 5 (docs/plans/root-cause-remediation-2026-09-07.md), unblocked by
+    P2 -- before the trees were merged, ProviderCreditsExhaustedError was not a
+    ProviderError and could not be recognised here at all.
+    """
+    return isinstance(error, (ProviderCreditsExhaustedError, AuthenticationError))
+
+
 def error_code_for_exception(error: Exception) -> str:
     """Map an exception to its canonical ErrorCode string (WI-12).
 
@@ -272,6 +319,8 @@ def error_code_for_exception(error: Exception) -> str:
         return ErrorCode.PROVIDER_TIMEOUT.value
     elif isinstance(error, ProviderUnavailableError):
         return ErrorCode.PROVIDER_UNAVAILABLE.value
+    elif isinstance(error, ProviderCreditsExhaustedError):
+        return ErrorCode.QUOTA_EXCEEDED.value
     elif isinstance(error, ParseError):
         return ErrorCode.PARSE_ERROR.value
     elif isinstance(error, PipelineError):
@@ -316,6 +365,8 @@ def classify_error(error: Exception) -> str:
         return "timeout"
     elif isinstance(error, ProviderUnavailableError):
         return "unavailable"
+    elif isinstance(error, ProviderCreditsExhaustedError):
+        return "credits_exhausted"
     elif isinstance(error, ParseError):
         return "parse"
     elif isinstance(error, PipelineError):

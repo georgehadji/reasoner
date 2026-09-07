@@ -1,71 +1,56 @@
-"""
-Infrastructure Exceptions
+"""Deprecated: the LLM error taxonomy now lives in ``reasoner.core.exceptions``.
 
-Common exceptions used across infrastructure adapters.
+P2, docs/plans/root-cause-remediation-2026-09-07.md. This module was the second
+of four unrelated exception trees in one adapter layer. Its ``LLMError``
+descended from ``InfrastructureError(Exception)``, so it was not a
+``ReasonerError``: ``core.exceptions.is_retryable`` never consulted the
+``.retryable`` these classes declared, and ``ProviderRouter`` never caught them.
+
+The domain owns the error vocabulary; adapters translate into it at the
+boundary (``providers/openai_compat.py::_translate``,
+``providers/direct.py::_translate``). Every name below is now an alias for the
+domain class of the same meaning, kept for one release. Import from
+``reasoner.core.exceptions`` instead.
+
+``SearchError`` and ``MemoryError`` are gone rather than aliased: nothing ever
+imported them, and the second shadowed a builtin.
 """
 
 from __future__ import annotations
 
+import warnings
 
-class InfrastructureError(Exception):
-    """Base exception for infrastructure errors."""
-    retryable = False
+from reasoner.core.exceptions import (
+    AuthenticationError,
+    ModelNotFoundError,
+    ProviderCreditsExhaustedError,
+    ProviderTimeoutError,
+    ProviderUnavailableError,
+    RateLimitError,
+    ReasonerError,
+    is_retryable,
+)
+from reasoner.infrastructure.llm.base import LLMError
 
+warnings.warn(
+    "reasoner.infrastructure.llm.exceptions is deprecated; import from "
+    "reasoner.core.exceptions instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
-class LLMError(InfrastructureError):
-    """Base exception for LLM errors."""
-    retryable = False
+# InfrastructureError had exactly one role: a base for LLMError. The domain
+# base takes that role now.
+InfrastructureError = ReasonerError
 
-
-class AuthenticationError(LLMError):
-    """Authentication failed (invalid API key)."""
-    retryable = False
-
-
-class RateLimitError(LLMError):
-    """Rate limit exceeded."""
-    retryable = True
-
-
-class ModelNotFoundError(LLMError):
-    """Model not found."""
-    retryable = False
-
-
-class ProviderTimeoutError(LLMError):
-    """Request timed out."""
-    retryable = True
-
-
-class ProviderUnavailableError(LLMError):
-    """Provider service unavailable."""
-    retryable = True
-
-
-class ProviderCreditsExhaustedError(LLMError):
-    """API credit limit reached (HTTP 402). Not retryable — add credits and retry."""
-    retryable = False
-
-
-class SearchError(InfrastructureError):
-    """Base exception for search errors."""
-    retryable = True
-
-
-class MemoryError(InfrastructureError):
-    """Base exception for memory/storage errors."""
-    retryable = True
-
-
-def is_retryable(error: Exception) -> bool:
-    """Check if an error is retryable."""
-    if isinstance(error, InfrastructureError):
-        return error.retryable
-
-    # Network errors are generally retryable
-    retryable_types = (
-        ConnectionError,
-        TimeoutError,
-        OSError,
-    )
-    return isinstance(error, retryable_types)
+__all__ = [
+    "AuthenticationError",
+    "InfrastructureError",
+    "LLMError",
+    "ModelNotFoundError",
+    "ProviderCreditsExhaustedError",
+    "ProviderTimeoutError",
+    "ProviderUnavailableError",
+    "RateLimitError",
+    "is_retryable",
+]

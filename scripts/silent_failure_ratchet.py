@@ -23,12 +23,19 @@ PipelineState.degradations) or through an existing signal-carrying mechanism
 (DegradedLLMResponse, NoopExecutor, the circuit breaker) instead of a bare
 pass/return, and lower MAX by the number of sites converted in the same change.
 
+Two things are deliberately NOT counted, both added when the first sites were
+converted: lines inside multi-line string literals (core/degrade.py's docstring
+shows the very pattern this counts, so documenting the fix raised the number),
+and bodies that call ``degraded(...)`` (a converted site still reads
+``return ...``, so without the exemption the ratchet punished the fix).
+
 Usage: python scripts/silent_failure_ratchet.py --max N
 """
 
 from __future__ import annotations
 
 import argparse
+import ast
 import re
 import sys
 from pathlib import Path
@@ -37,14 +44,51 @@ SRC = Path(__file__).resolve().parent.parent / "src" / "reasoner"
 
 _EXCEPT_RE = re.compile(r"^\s*except\s+Exception\b.*:\s*(#.*)?$")
 _SWALLOW_RE = re.compile(r"^(pass|return\b.*)$")
+# ``return degraded("site", fallback, exc=exc, state=state)`` is the sanctioned
+# replacement this script exists to drive sites towards -- it logs, increments
+# reasoner_degradation_total and records to PipelineState.degradations. Without
+# this exemption a converted site still matched the bare-return pattern and the
+# count did not move, so the ratchet punished the fix.
+_SIGNALLED_RE = re.compile(r"\bdegraded\s*\(")
+
+
+def _multiline_string_lines(source: str) -> set[int]:
+    """1-based line numbers occupied by multi-line string literals.
+
+    Without this, the docstring in core/degrade.py -- which shows the very
+    pattern this script asks callers to adopt --
+
+        except Exception as exc:
+            return degraded("rerank.nemotron", documents, exc=exc, state=state)
+
+    counts as a swallow site, so documenting the fix raises the number the fix
+    is supposed to lower. Single-line strings cannot contain a matching
+    two-line pattern, so only multi-line literals are excluded.
+    """
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return set()
+    spans: set[int] = set()
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and node.end_lineno
+            and node.end_lineno > node.lineno
+        ):
+            spans.update(range(node.lineno, node.end_lineno + 1))
+    return spans
 
 
 def find_swallow_sites(root: Path = SRC) -> list[tuple[Path, int]]:
     sites: list[tuple[Path, int]] = []
     for path in sorted(root.rglob("*.py")):
-        lines = path.read_text(encoding="utf-8").splitlines()
+        source = path.read_text(encoding="utf-8")
+        lines = source.splitlines()
+        in_string = _multiline_string_lines(source)
         for i, line in enumerate(lines):
-            if not _EXCEPT_RE.match(line):
+            if not _EXCEPT_RE.match(line) or (i + 1) in in_string:
                 continue
             # First non-blank line after the `except` header, ignoring
             # comment-only lines — that is the body's first real statement.
@@ -52,7 +96,7 @@ def find_swallow_sites(root: Path = SRC) -> list[tuple[Path, int]]:
                 candidate = lines[j].strip()
                 if not candidate or candidate.startswith("#"):
                     continue
-                if _SWALLOW_RE.match(candidate):
+                if _SWALLOW_RE.match(candidate) and not _SIGNALLED_RE.search(candidate):
                     sites.append((path, i + 1))
                 break
     return sites

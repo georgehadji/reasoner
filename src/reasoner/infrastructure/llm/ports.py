@@ -20,16 +20,8 @@ from enum import Enum
 from typing import Any, Protocol, runtime_checkable
 
 from reasoner.core.constants import (
-    DEFAULT_BACKOFF_BASE,
-    DEFAULT_BACKOFF_DELAY,
-    DEFAULT_MAX_RETRIES,
     DEFAULT_MAX_TOKENS,
     DEFAULT_TEMPERATURE,
-)
-from reasoner.infrastructure.llm.exceptions import (
-    LLMError,
-    RateLimitError,
-    is_retryable,
 )
 
 
@@ -212,9 +204,8 @@ class LLMProvider(Protocol):
             LLMResponse with generated content and metadata
         
         Raises:
-            LLMError: If the call fails after retries
-            RateLimitError: If rate limited
-            AuthenticationError: If authentication fails
+            ProviderError: any provider failure, translated at the adapter
+                boundary (see reasoner.core.exceptions).
         """
         ...
 
@@ -252,171 +243,23 @@ class LLMProvider(Protocol):
         ...
 
 
-class BaseLLMProvider(ABC):
-    """
-    Base class for LLM providers with common functionality.
-    
-    Provides:
-    - Retry logic with exponential backoff
-    - Health tracking
-    - Common error handling
-    
-    Subclasses must implement:
-    - _complete_impl(): The actual API call
-    - _complete_stream_impl(): Streaming API call
-    """
-
-    def __init__(
-        self,
-        model: str,
-        max_retries: int = DEFAULT_MAX_RETRIES,
-        base_delay_seconds: float = DEFAULT_BACKOFF_DELAY,
-    ):
-        self._model = model
-        self.max_retries = max_retries
-        self.base_delay_seconds = base_delay_seconds
-        self._health = ProviderHealth.UNKNOWN
-        self._latency_ms = 0.0
-        self._request_count = 0
-        self._error_count = 0
-
-    @abstractmethod
-    async def _complete_impl(
-        self,
-        messages: list[Message],
-        config: LLMConfig,
-    ) -> LLMResponse:
-        """
-        Implement the actual API call.
-        
-        Subclasses must override this with provider-specific logic.
-        """
-        ...
-
-    @abstractmethod
-    async def _complete_stream_impl(
-        self,
-        messages: list[Message],
-        config: LLMConfig,
-    ) -> Any:
-        """
-        Implement the streaming API call.
-        
-        Subclasses must override this with provider-specific logic.
-        """
-        ...
-
-    async def complete(
-        self,
-        messages: list[Message],
-        config: LLMConfig | None = None,
-    ) -> LLMResponse:
-        """
-        Complete with automatic retry logic.
-        """
-        import asyncio
-        import time
-
-        config = config or LLMConfig()
-        last_error: Exception | None = None
-
-        for attempt in range(self.max_retries + 1):
-            start_time = time.perf_counter()
-
-            try:
-                response = await self._complete_impl(messages, config)
-
-                # Update health on success
-                self._health = ProviderHealth.HEALTHY
-                self._latency_ms = (time.perf_counter() - start_time) * 1000
-                self._request_count += 1
-
-                return response
-
-            except asyncio.CancelledError:
-                raise
-            except Exception as exc:
-                last_error = exc
-                self._error_count += 1
-
-                # Update health on error
-                if isinstance(exc, RateLimitError):
-                    self._health = ProviderHealth.DEGRADED
-                else:
-                    self._health = ProviderHealth.UNHEALTHY
-
-                # Don't retry non-retryable errors
-                if not is_retryable(exc):
-                    raise
-
-                # Don't retry if we've exhausted retries
-                if attempt >= self.max_retries:
-                    raise
-
-                # Exponential backoff
-                delay = self.base_delay_seconds * (DEFAULT_BACKOFF_BASE ** attempt)
-                await asyncio.sleep(delay)
-
-        raise LLMError(
-            f"{self.provider_name}({self.model}) failed "
-            f"after {self.max_retries + 1} attempts: {last_error}"
-        ) from last_error
-
-    async def complete_stream(
-        self,
-        messages: list[Message],
-        config: LLMConfig | None = None,
-    ) -> Any:
-        """
-        Stream with error handling.
-        """
-        config = config or LLMConfig()
-
-        try:
-            async for chunk in self._complete_stream_impl(messages, config):
-                yield chunk
-                self._health = ProviderHealth.HEALTHY
-        except Exception:
-            self._health = ProviderHealth.UNHEALTHY
-            raise
-
-    def get_info(self) -> ProviderInfo:
-        """Get provider information."""
-        return ProviderInfo(
-            name=self.provider_name,
-            model=self.model,
-            health=self._health,
-            latency_ms=self._latency_ms,
-            metadata={
-                'request_count': self._request_count,
-                'error_count': self._error_count,
-                'success_rate': (
-                    self._request_count / (self._request_count + self._error_count)
-                    if (self._request_count + self._error_count) > 0
-                    else 0.0
-                ),
-            },
-        )
-
-    @property
-    def model(self) -> str:
-        return self._model
-
-    @property
-    @abstractmethod
-    def provider_name(self) -> str:
-        """Provider name (e.g., 'anthropic', 'openai')."""
-        ...
-
-
 # ─────────────────────────────────────────────────────────────────────
-# EXCEPTIONS
+# NO EXCEPTIONS, AND NO BaseLLMProvider, LIVE HERE
 # ─────────────────────────────────────────────────────────────────────
 #
-# A third LLMError hierarchy used to live here, alongside AuthenticationError,
+# This module once held a third LLMError tree (AuthenticationError,
 # RateLimitError, ModelNotFoundError, ProviderTimeoutError,
-# ProviderUnavailableError and is_retryable. Nothing imported any of them,
-# including this module: BaseLLMProvider.complete did a function-local import
-# of the exceptions.py versions that shadowed them, so `raise LLMError(...)`
-# above has always raised the exceptions.py one. They are now imported at
-# module scope, and the dead copies are gone. Import from .exceptions.
+# ProviderUnavailableError, is_retryable). Nothing imported any of them,
+# including this module itself, so they were deleted.
+#
+# It also held a second BaseLLMProvider with an incompatible interface --
+# complete(messages, config) -> LLMResponse, and no complete_with_retry(),
+# which is the method ProviderRouter calls. Anything built on it produced a
+# router that raised AttributeError on its first call, and NoopProvider plus
+# two test dummies had already been built on it. Deleted in P2
+# (docs/plans/root-cause-remediation-2026-09-07.md). The one base class is
+# base.BaseLLMProvider; the error vocabulary is core.exceptions.
+#
+# What remains here is the data the router and the application layer pass
+# around -- Message, LLMConfig, LLMResponse, DegradedLLMResponse, ProviderInfo
+# -- plus the LLMProvider Protocol.

@@ -1,27 +1,26 @@
 # LLM Adapters (legacy direct-provider adapters removed — all routing goes through OpenRouter)
 #
-# This package holds two unrelated provider interfaces, and the names collide.
-# What is exported here is the pair ProviderRouter and the registry deal in:
+# One provider base class and one error tree, since P2
+# (docs/plans/root-cause-remediation-2026-09-07.md):
 #
-#     base.BaseLLMProvider   complete(system_prompt, user_prompt, ...) -> str
-#     base.LLMError          caught by ProviderRouter._execute_call
+#     base.BaseLLMProvider          complete(system_prompt, user_prompt, ...) -> str
+#     core.exceptions.ProviderError caught by ProviderRouter._execute_call
 #
-# The other pair lives in ports.py and is a different interface, not a
-# subclass:
+# base.LLMError is the residual leaf of that tree, for failures an adapter
+# could not classify further; everything else is translated at the adapter
+# boundary (providers/openai_compat.py::_translate, providers/direct.py::
+# _translate).
 #
-#     ports.BaseLLMProvider     complete(messages, config) -> LLMResponse
-#     exceptions.LLMError       InfrastructureError, NOT a base.LLMError
+# This package used to hold a second BaseLLMProvider in ports.py with an
+# incompatible interface and no complete_with_retry(), plus three more LLMError
+# classes in ports.py, exceptions.py and base.py, none a subclass of the
+# others. Both traps had been sprung: NoopProvider and two dummy providers
+# subclassed the ports base, and an infrastructure LLMError raised from a
+# provider was not caught by the fallback chain. The duplicates are deleted;
+# infrastructure/llm/exceptions.py is a deprecated alias shim.
 #
-# Exporting the ports/exceptions ones from here was a trap. A provider built
-# on ports.BaseLLMProvider has no complete_with_retry(), so a router holding
-# one raises AttributeError on its first call; and an exceptions.LLMError
-# raised from a provider is not caught by the fallback chain, which is the
-# same defect as the raw SDK exceptions fixed in 4af087e. Both traps had
-# already been sprung: NoopProvider and two dummy providers subclassed the
-# ports one.
-#
-# LLMConfig, LLMResponse and Message below belong to the ports interface and
-# have no base equivalent; import them from .ports when writing to it.
+# LLMConfig, LLMResponse and Message below are the data types ports.py still
+# owns; import them from .ports when writing to the LLMProvider Protocol.
 
 from reasoner.infrastructure.llm.base import BaseLLMProvider, LLMError
 from reasoner.infrastructure.llm.executor import LLMExecutor

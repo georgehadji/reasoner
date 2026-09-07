@@ -11,8 +11,8 @@ from reasoner.application.event_bus.bus import get_event_bus
 from reasoner.application.flows.base import PhaseStep, WorkflowServices, WorkflowStrategy
 from reasoner.core.constants import get_phase_retry_budget, get_phase_timeout
 from reasoner.core.events.domain_events import EventType, make_event
+from reasoner.core.exceptions import classify_error, is_retryable, is_run_fatal
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.exceptions import classify_error, is_retryable
 from reasoner.quality import PhaseMonitor, reset_phase_state
 
 logger = logging.getLogger(__name__)
@@ -138,9 +138,20 @@ class WorkflowRunner:
             except Exception as exc:
                 err_type = classify_error(exc)
                 err_msg = f"{type(exc).__name__}: {str(exc)}"
-                is_fatal = not is_retryable(exc) or critical
+                run_fatal = is_run_fatal(exc)
+                is_fatal = run_fatal or not is_retryable(exc) or critical
 
                 await self._handle_phase_error(state, name, err_msg, is_fatal=is_fatal)
+
+                # P5 step 5: a non-critical phase failing normally just breaks,
+                # and the run synthesises over the missing phase. That is the
+                # right call for a bad model or a malformed response. It is the
+                # wrong call when the credit balance is empty or the key was
+                # rejected: every remaining phase fails the same way, so the
+                # run spends its whole budget of wall-clock to produce a
+                # synthesis over nothing and still reports success.
+                if run_fatal:
+                    return False
 
                 if not is_retryable(exc) or attempt >= max_retries:
                     if critical: return False

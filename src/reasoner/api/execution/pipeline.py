@@ -35,7 +35,7 @@ from reasoner.core.exceptions import ErrorCode, error_code_for_exception
 from reasoner.core.logging_utils import set_correlation_id
 from reasoner.domain.models import TaskType
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.exceptions import classify_error, is_retryable
+from reasoner.core.exceptions import classify_error, is_retryable, is_run_fatal
 from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.infrastructure.persistence.pipeline_ownership_repo import get_pipeline_ownership_repo
 from reasoner.infrastructure.redis.run_state import _run_state_manager as _run_store
@@ -464,7 +464,17 @@ class PipelineExecutionService:
                         phase_errored = True
                         emitter.emit("PHASE_FAILED", phase_name=name,
                                       error=err_msg)
-                        phase_fatal = err_type == "auth" or name in get_critical_phases(phases, step_metadata)
+                        # is_run_fatal covers credits-exhausted as well as auth:
+                        # both fail every remaining phase identically, so
+                        # continuing only produces a synthesis over missing
+                        # phases (P5 step 5). err_type == "auth" stays because
+                        # it also matches third-party auth errors by class name,
+                        # which are not in our tree.
+                        phase_fatal = (
+                            is_run_fatal(exc)
+                            or err_type == "auth"
+                            or name in get_critical_phases(phases, step_metadata)
+                        )
                         break
 
                     # Phase executed successfully — run quality check
@@ -660,6 +670,10 @@ class PipelineExecutionService:
             done_payload = {
                 "type": "done",
                 "errors": state.errors,
+                # Failures the run survived by falling back (P5). Distinct from
+                # errors: nothing here stopped a phase, but the answer was
+                # produced with less than the full machinery.
+                "degradations": list(getattr(state, "degradations", []) or []),
                 "total_tokens": {"input": total_input, "output": total_output, "total": total_tokens},
                 "duration": time.monotonic() - run_start,
                 "total_cost_usd": getattr(state, 'total_cost_usd', 0.0),

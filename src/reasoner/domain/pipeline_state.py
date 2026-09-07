@@ -141,6 +141,12 @@ class PipelineCore:
     stress_results: list[StressTestResult] = field(default_factory=list)
     final_solution: FinalSolution | None = None
     errors: list[str] = field(default_factory=list)
+    # Sites that swallowed a failure and continued with a fallback value.
+    # `errors` is for failures the run reports as errors; this is for the ones
+    # it survived silently -- P5, docs/plans/root-cause-remediation-2026-09-07.md.
+    # Written only through core.degrade.degraded(); read via .get()-style access
+    # on resumed state so older --resume files still load.
+    degradations: list[str] = field(default_factory=list)
     attachments: list[dict[str, Any]] = field(default_factory=list)
     # ORCHESTRATED method fields (populated only when preset is orchestrated)
     generation_candidates: list[GenerationCandidate] = field(default_factory=list)
@@ -248,7 +254,7 @@ class PipelineState:
             'language', 'output_language', 'pivot_active', 'language_sensitive',
             'complexity', 'decomposition', 'candidates', 'scores',
             'review_hypotheses', 'top_candidates', 'stress_results',
-            'final_solution', 'errors',
+            'final_solution', 'errors', 'degradations',
             'attachments', 'generation_candidates', 'critic_scores',
             'verification_results', 'meta_evaluation',
         }
@@ -364,6 +370,7 @@ class PipelineState:
     stress_results = PipelineField("core")
     final_solution = PipelineField("core")
     errors = PipelineField("core")
+    degradations = PipelineField("core")
     attachments = PipelineField("core")
     generation_candidates = PipelineField("core")
     critic_scores = PipelineField("core")

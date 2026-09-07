@@ -12,7 +12,32 @@ from typing import Any
 
 from reasoner.core.constants import DEFAULT_MAX_TOKENS, DEFAULT_TEMPERATURE
 from reasoner.core.constants_limits import TIMEOUTS
-from reasoner.infrastructure.llm.base import BaseLLMProvider, LLMError
+from reasoner.core.exceptions import ProviderError
+from reasoner.infrastructure.llm.base import (
+    BaseLLMProvider,
+    LLMError,
+    translate_http_status,
+)
+
+
+def _translate(model: str, prefix: str, exc: Exception) -> ProviderError:
+    """Anti-corruption boundary for the direct-provider lanes (P2).
+
+    These four lanes wrap four different SDKs -- anthropic, openai, google-genai
+    and raw httpx -- so the only thing they reliably share is an HTTP status,
+    exposed either as ``exc.status_code`` (the two SDKs that subclass their own
+    APIError) or ``exc.response.status_code`` (httpx.HTTPStatusError). Whatever
+    the status cannot classify stays an ``LLMError``, which is still a
+    ``ProviderError`` and so still reaches the router's fallback chain.
+
+    Before this, every failure here became a bare LLMError, so a 402 through a
+    direct lane was indistinguishable from a malformed response.
+    """
+    status = getattr(exc, "status_code", None)
+    if status is None:
+        status = getattr(getattr(exc, "response", None), "status_code", None)
+    detail = f"{prefix}: {exc}"
+    return translate_http_status(status, detail, model) or LLMError(detail)
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +92,7 @@ class AnthropicDirectProvider(BaseLLMProvider):
         except ImportError as exc:
             raise LLMError("anthropic SDK not installed. pip install anthropic") from exc
         except Exception as e:
-            raise LLMError(f"Anthropic direct API failed: {e}") from e
+            raise _translate(self.model, "Anthropic direct API failed", e) from e
 
     async def stream_complete(
         self,
@@ -125,7 +150,7 @@ class OpenAIDirectProvider(BaseLLMProvider):
                 response = await client.chat.completions.create(**kwargs)
             return response.choices[0].message.content or ""
         except Exception as e:
-            raise LLMError(f"OpenAI direct API failed: {e}") from e
+            raise _translate(self.model, "OpenAI direct API failed", e) from e
 
     async def stream_complete(
         self,
@@ -172,7 +197,7 @@ class GoogleDirectProvider(BaseLLMProvider):
         except ImportError as exc:
             raise LLMError("google-genai SDK not installed. pip install google-genai") from exc
         except Exception as e:
-            raise LLMError(f"Google direct API failed: {e}") from e
+            raise _translate(self.model, "Google direct API failed", e) from e
 
     async def stream_complete(
         self,
@@ -228,7 +253,7 @@ class OpenAICompatibleDirectProvider(BaseLLMProvider):
                 data = resp.json()
                 return data["choices"][0]["message"]["content"] or ""
         except Exception as e:
-            raise LLMError(f"{self.model} direct API failed: {e}") from e
+            raise _translate(self.model, f"{self.model} direct API failed", e) from e
 
     async def stream_complete(self, *args, **kwargs) -> Any:
         raise NotImplementedError("Streaming not supported for fallback providers")

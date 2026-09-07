@@ -75,7 +75,12 @@ jobs:
           # nex-n2-pro) as drop-ins for their misleadingly-named :free
           # counterparts. Same long single-line-dict-plus-comment convention
           # as every other registry.py entry -- +2 E501.
-          python scripts/ruff_ratchet.py --max 2285
+          # 2283: P2 (docs/plans/root-cause-remediation-2026-09-07.md) deleted
+          # infrastructure/llm/ports.py's second BaseLLMProvider -- ~155 lines
+          # of a duplicate retry/health implementation nothing in src/ used --
+          # and collapsed infrastructure/llm/exceptions.py from a rival error
+          # tree into alias imports. -2 net against the lines _translate adds.
+          python scripts/ruff_ratchet.py --max 2283
 
       - name: Security scan (bandit)
         run: |
@@ -109,7 +114,14 @@ jobs:
           # with no log, no re-raise, no degradation record -- the D11 class
           # of bug (NEMOTRON_RERANK_MODEL 404ing silently on every call).
           # Ratcheted, same two-way pattern as ruff_ratchet.py.
-          python scripts/silent_failure_ratchet.py --max 117
+          # 114: P5 steps 1/2 landed core/degrade.py, PipelineState.degradations
+          # and reasoner_degradation_total, then routed three sites through it:
+          # synthesis promotion rules (their absence leaves a run overclaiming
+          # VERIFIED), PoT execution evidence, and the dialectical antithesis
+          # search. The script also stopped counting two things it should never
+          # have counted -- the pattern shown inside core/degrade.py's own
+          # docstring, and `return degraded(...)` itself, which is the fix.
+          python scripts/silent_failure_ratchet.py --max 114
 
       - name: Run tests
         run: |

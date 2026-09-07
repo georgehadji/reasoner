@@ -42,7 +42,7 @@ pytest tests/ --cov=src/reasoner --cov-report=html
 | `tests/conftest.py` | `auto_clean_state` — autouse cleanup between tests. |
 | `tests/integration/conftest.py` | `base_url`, `test_timeout`, `csrf_token`, `api_client` — live-server integration harness. |
 | `tests/utils/factories.py` | `create_message`, `create_llm_config`, `create_llm_response`, `create_pipeline_state`, `create_solution_candidate`, `create_critique_score`, `create_decomposition`, `create_final_solution`, `create_pipeline_started_event`, `create_phase_completed_event`. |
-| `tests/utils/mocks.py` | `MockLLMProvider`, `MockEventStore`, `MockAuthStore`, `MockNLI`, `MockLLM`, `create_mock_redis`. |
+| `tests/utils/mocks.py` | `MockEventStore`, `MockAuthStore`, `MockNLI`, `MockLLM`, `create_mock_redis`. (`MockLLMProvider` was deleted with `ports.BaseLLMProvider` in P2 — it had no callers; subclass `llm.base.BaseLLMProvider` for a provider double.) |
 | `tests/utils/async_helpers.py` | `async_run`, `await_all`, `create_future`. |
 
 ## Subdirectories
