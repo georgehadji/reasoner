@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -206,6 +207,119 @@ def check_endpoints() -> int:
     return 0
 
 
+REGISTRY_PATH = (
+    Path(__file__).resolve().parent.parent
+    / "src" / "reasoner" / "infrastructure" / "llm" / "registry.py"
+)
+
+_MODEL_ID_RE = re.compile(r'"model":\s*"([^"]+)"')
+_EXISTING_SYNCED_FIELD_RE = re.compile(r',\s*"(?:price_in|price_out|context)":\s*-?[0-9.]+')
+_ENTRY_OPEN_RE = re.compile(r'^    (?:"[^"]+"|[A-Z][A-Z0-9_]*):\s*\{\s*$')
+_ENTRY_CLOSE_RE = re.compile(r'^    \},?\s*$')
+
+
+def _entry_spans(lines: list[str]) -> list[tuple[int, int]]:
+    """One (start, end) index pair per whitelist entry, inclusive.
+
+    A single-line entry is (i, i). A multi-line entry (an inline extra_body
+    dict, or any entry whose key: { opens with nothing else on the line) runs
+    from its opening `    "key": {` to the matching `    },` at the same
+    4-space indent -- the convention every entry in this section already
+    follows, single- or multi-line.
+    """
+    spans: list[tuple[int, int]] = []
+    i = 0
+    while i < len(lines):
+        if _ENTRY_OPEN_RE.match(lines[i]):
+            start = i
+            j = i + 1
+            while j < len(lines) and not _ENTRY_CLOSE_RE.match(lines[j]):
+                j += 1
+            spans.append((start, min(j, len(lines) - 1)))
+            i = j + 1
+        else:
+            if _MODEL_ID_RE.search(lines[i]):
+                spans.append((i, i))
+            i += 1
+    return spans
+
+
+def sync_whitelist(catalogue: dict[str, Any]) -> int:
+    """Rewrite registry.py's whitelist entries with price_in/price_out/context
+    fields derived from the catalogue, replacing whatever a prior sync left
+    there (idempotent: re-running with unchanged catalogue prices is a no-op).
+
+    docs/plans/root-cause-remediation-2026-09-07.md P4 step 1. A price in a
+    freeform comment (D9) cannot be tested; a structured field can --
+    tests/unit/test_whitelist_matches_catalogue.py is the test. Comments are
+    left untouched on purpose: they carry reasons, bloc-diversity flags and
+    budget-pin notes a blind regex cannot tell apart from a price figure
+    without risking corrupting them.
+
+    Skips any entry whose span carries a `"base"` key (Ollama, and the one
+    NVIDIA-direct NIM pin): those route to a different provider entirely, so
+    an OpenRouter catalogue price would misrepresent what actually bills.
+    Fails without writing anything if any other synced entry's model id is
+    absent from the catalogue.
+    """
+    by_id = {m["id"]: m for m in catalogue.get("data", [])}
+    lines = REGISTRY_PATH.read_text(encoding="utf-8").splitlines(keepends=True)
+    new_lines = list(lines)
+
+    errors: list[str] = []
+    updated = 0
+
+    for start, end in _entry_spans(lines):
+        span_text = "".join(lines[start:end + 1])
+        match = _MODEL_ID_RE.search(span_text)
+        if not match or '"base":' in span_text:
+            continue
+
+        model_id = match.group(1).lstrip("~")
+        entry = by_id.get(model_id)
+        if entry is None:
+            errors.append(f"{start + 1}: {model_id!r} routed but absent from the catalogue")
+            continue
+
+        fields: list[str] = []
+        pricing = entry.get("pricing") or {}
+        prompt_price = float(pricing["prompt"]) if "prompt" in pricing else None
+        completion_price = float(pricing["completion"]) if "completion" in pricing else None
+        # OpenRouter uses -1 for variable/pass-through pricing on router aliases
+        # (e.g. openrouter/pareto-code): the real price depends on whichever
+        # underlying model gets picked per call, so there is no fixed per-token
+        # rate to sync. round(-1 * 1e6, 6) would otherwise write a nonsense
+        # -1000000.0 "price".
+        if prompt_price is not None and completion_price is not None and prompt_price >= 0 and completion_price >= 0:
+            fields.append(f'"price_in": {round(prompt_price * 1_000_000, 6)}')
+            fields.append(f'"price_out": {round(completion_price * 1_000_000, 6)}')
+        if context := entry.get("context_length"):
+            fields.append(f'"context": {context}')
+        if not fields:
+            continue
+
+        # The "model" key's own line, wherever it falls in the span.
+        line_idx = next(i for i in range(start, end + 1) if _MODEL_ID_RE.search(lines[i]))
+        line = lines[line_idx]
+        line_match = _MODEL_ID_RE.search(line)
+        cleaned = _EXISTING_SYNCED_FIELD_RE.sub("", line)
+        insert_at = cleaned.index(line_match.group(0)) + len(line_match.group(0))
+        new_line = cleaned[:insert_at] + ", " + ", ".join(fields) + cleaned[insert_at:]
+        if new_line != line:
+            updated += 1
+        new_lines[line_idx] = new_line
+
+    if errors:
+        for e in errors:
+            print(f"{REGISTRY_PATH.name}:{e}", file=sys.stderr)
+        print(f"\nFAIL: {len(errors)} routed model(s) absent from the catalogue.", file=sys.stderr)
+        return 1
+
+    REGISTRY_PATH.write_text("".join(new_lines), encoding="utf-8")
+    print(f"synced {updated} entries")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -222,10 +336,27 @@ def main() -> int:
             "can be listed in /api/v1/models and still be unservable."
         ),
     )
+    parser.add_argument(
+        "--sync-whitelist",
+        action="store_true",
+        help=(
+            "Rewrite registry.py's price_in/price_out/context fields from the "
+            "bundled catalogue (not a live fetch -- keeps it offline and "
+            "reproducible). Fails without writing if a routed model id is "
+            "absent from the catalogue."
+        ),
+    )
     args = parser.parse_args()
 
     if args.check_endpoints:
         return check_endpoints()
+
+    if args.sync_whitelist:
+        if not OUTPUT_PATH.exists():
+            print(f"MISSING: {OUTPUT_PATH}", file=sys.stderr)
+            return 1
+        with OUTPUT_PATH.open("r", encoding="utf-8") as fh:
+            return sync_whitelist(json.load(fh))
 
     catalogue = fetch_catalogue()
     live_ids = _model_ids(catalogue)

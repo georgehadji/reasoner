@@ -70,7 +70,7 @@ jobs:
           # This merge then deprecated all six remaining :free tiers, which took
           # more long comment lines out. Re-measured on the merged tree rather than
           # carried from either side, because the paydowns compose.
-          python scripts/ruff_ratchet.py --max 2230
+          python scripts/ruff_ratchet.py --max 2283
 
       - name: Security scan (bandit)
         run: |

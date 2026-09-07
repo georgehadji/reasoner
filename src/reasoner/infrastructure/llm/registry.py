@@ -39,12 +39,12 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ═══════════════════════════════════════════════════════════════
     # Anthropic
     # ═══════════════════════════════════════════════════════════════
-    "claude-fable-5.1":  {"model": "anthropic/claude-fable-5.1"},    # $10/$50 per M, 1M ctx
-    "claude-fable-5":    {"model": "anthropic/claude-fable-5"},      # ultra-premium creative/synthesis — $10/$50 per M, 1M ctx
-    "claude-opus":       {"model": "anthropic/claude-opus-5"},       # v3.7: was opus-4.8 -> opus-5, same $5/$25 per M, 1M ctx, strict upgrade
-    "claude-opus-4.8":   {"model": "anthropic/claude-opus-4.8"},     # legacy pin, kept for reproducibility — $5/$25 per M, 1M ctx
-    MODEL_CLAUDE_SONNET: {"model": "anthropic/claude-sonnet-5"},     # v3.6: current as of Jun 2026 — $2/$10 per M, 1M ctx
-    "claude-haiku":      {"model": "anthropic/claude-haiku-4.5"},    # $1/$5 per M, 200K ctx
+    "claude-fable-5.1":  {"model": "anthropic/claude-fable-5.1", "price_in": 10.0, "price_out": 50.0, "context": 1000000},    # $10/$50 per M, 1M ctx
+    "claude-fable-5":    {"model": "anthropic/claude-fable-5", "price_in": 10.0, "price_out": 50.0, "context": 1000000},      # ultra-premium creative/synthesis — $10/$50 per M, 1M ctx
+    "claude-opus":       {"model": "anthropic/claude-opus-5", "price_in": 5.0, "price_out": 25.0, "context": 1000000},       # v3.7: was opus-4.8 -> opus-5, same $5/$25 per M, 1M ctx, strict upgrade
+    "claude-opus-4.8":   {"model": "anthropic/claude-opus-4.8", "price_in": 5.0, "price_out": 25.0, "context": 1000000},     # legacy pin, kept for reproducibility — $5/$25 per M, 1M ctx
+    MODEL_CLAUDE_SONNET: {"model": "anthropic/claude-sonnet-5", "price_in": 2.0, "price_out": 10.0, "context": 1000000},     # v3.6: current as of Jun 2026 — $2/$10 per M, 1M ctx
+    "claude-haiku":      {"model": "anthropic/claude-haiku-4.5", "price_in": 1.0, "price_out": 5.0, "context": 200000},    # $1/$5 per M, 200K ctx
     # ── Auto-updating aliases removed 2026-09-06 ──
     # OpenRouter does not serve "<vendor>/<family>-latest" ids. Every one of
     # them answered `HTTP 400 ... is not a valid model ID` on a live call, and
@@ -56,45 +56,45 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # OpenAI — GPT series
     # ═══════════════════════════════════════════════════════════════
     # ── Current (5.5, Apr 2026) ──
-    "gpt-5.5":          {"model": "openai/gpt-5.5"},             # frontier — $5/$30 per M, AI^2 Intel 54.8, 1M ctx
-    "gpt-5.5-pro":      {"model": "openai/gpt-5.5-pro"},         # max reasoning — $30/$180 per M, 1M ctx
+    "gpt-5.5":          {"model": "openai/gpt-5.5", "price_in": 5.0, "price_out": 30.0, "context": 1050000},             # frontier — $5/$30 per M, AI^2 Intel 54.8, 1M ctx
+    "gpt-5.5-pro":      {"model": "openai/gpt-5.5-pro", "price_in": 30.0, "price_out": 180.0, "context": 1050000},         # max reasoning — $30/$180 per M, 1M ctx
     # ── GPT-5 base (Mar 2026) — DISTINCT from 5.5 ──
-    "gpt-5":            {"model": "openai/gpt-5"},               # $1.25/$10 per M, 400K ctx
-    "gpt-5-pro":        {"model": "openai/gpt-5-pro"},           # $15/$120 per M, 400K ctx
-    "gpt-5-mini":       {"model": "openai/gpt-5-mini"},          # $0.25/$2 per M, 400K ctx
-    "gpt-5-nano":       {"model": "openai/gpt-5-nano"},          # $0.05/$0.40 per M — cheapest OpenAI, ideal Phase 0
+    "gpt-5":            {"model": "openai/gpt-5", "price_in": 1.25, "price_out": 10.0, "context": 400000},               # $1.25/$10 per M, 400K ctx
+    "gpt-5-pro":        {"model": "openai/gpt-5-pro", "price_in": 15.0, "price_out": 120.0, "context": 400000},           # $15/$120 per M, 400K ctx
+    "gpt-5-mini":       {"model": "openai/gpt-5-mini", "price_in": 0.25, "price_out": 2.0, "context": 400000},          # $0.25/$2 per M, 400K ctx
+    "gpt-5-nano":       {"model": "openai/gpt-5-nano", "price_in": 0.05, "price_out": 0.4, "context": 400000},          # $0.05/$0.40 per M — cheapest OpenAI, ideal Phase 0
     # ── 5.6 (Jul 2026) — tri-tier Sol/Terra/Luna naming, newest OpenAI gen ──
-    "gpt-5.6-sol":      {"model": "openai/gpt-5.6-sol"},         # flagship — $2/$10 per M, 1.05M ctx
-    "gpt-5.6-terra":    {"model": "openai/gpt-5.6-terra"},       # balanced mid-tier — $2/$12 per M, 1.05M ctx
-    "gpt-5.6-luna":     {"model": "openai/gpt-5.6-luna"},        # fast/cheap — $0.20/$1.20 per M, 1.05M ctx, AA Intel 51.2 — default synthesis voice
+    "gpt-5.6-sol":      {"model": "openai/gpt-5.6-sol", "price_in": 2.0, "price_out": 10.0, "context": 1050000},         # flagship — $2/$10 per M, 1.05M ctx
+    "gpt-5.6-terra":    {"model": "openai/gpt-5.6-terra", "price_in": 2.0, "price_out": 12.0, "context": 1050000},       # balanced mid-tier — $2/$12 per M, 1.05M ctx
+    "gpt-5.6-luna":     {"model": "openai/gpt-5.6-luna", "price_in": 0.2, "price_out": 1.2, "context": 1050000},        # fast/cheap — $0.20/$1.20 per M, 1.05M ctx, AA Intel 51.2 — default synthesis voice
     # -pro siblings are priced identically to the base tiers on OpenRouter, so they
     # are a free capability upgrade wherever the base tier is already being used.
-    "gpt-5.6-sol-pro":   {"model": "openai/gpt-5.6-sol-pro"},    # $2/$10 per M, 1.05M ctx
-    "gpt-5.6-terra-pro": {"model": "openai/gpt-5.6-terra-pro"},  # $2/$12 per M, 1.05M ctx
-    "gpt-5.6-luna-pro":  {"model": "openai/gpt-5.6-luna-pro"},   # $0.20/$1.20 per M, 1.05M ctx
+    "gpt-5.6-sol-pro":   {"model": "openai/gpt-5.6-sol-pro", "price_in": 2.0, "price_out": 10.0, "context": 1050000},    # $2/$10 per M, 1.05M ctx
+    "gpt-5.6-terra-pro": {"model": "openai/gpt-5.6-terra-pro", "price_in": 2.0, "price_out": 12.0, "context": 1050000},  # $2/$12 per M, 1.05M ctx
+    "gpt-5.6-luna-pro":  {"model": "openai/gpt-5.6-luna-pro", "price_in": 0.2, "price_out": 1.2, "context": 1050000},   # $0.20/$1.20 per M, 1.05M ctx
     # ── Previous (5.4, Mar 2026) ──
-    "gpt-5.4":          {"model": "openai/gpt-5.4"},             # $2.50/$15 per M, AI^2 Intel 51.4
-    "gpt-5.4-pro":      {"model": "openai/gpt-5.4-pro"},         # max reasoning — $30/$180 per M, 1.05M ctx
-    "gpt-5.4-mini":     {"model": "openai/gpt-5.4-mini"},        # $0.75/$4.50 per M
-    "gpt-5.4-nano":     {"model": "openai/gpt-5.4-nano"},        # $0.20/$1.25 per M
+    "gpt-5.4":          {"model": "openai/gpt-5.4", "price_in": 2.5, "price_out": 15.0, "context": 1050000},             # $2.50/$15 per M, AI^2 Intel 51.4
+    "gpt-5.4-pro":      {"model": "openai/gpt-5.4-pro", "price_in": 30.0, "price_out": 180.0, "context": 1050000},         # max reasoning — $30/$180 per M, 1.05M ctx
+    "gpt-5.4-mini":     {"model": "openai/gpt-5.4-mini", "price_in": 0.75, "price_out": 4.5, "context": 400000},        # $0.75/$4.50 per M
+    "gpt-5.4-nano":     {"model": "openai/gpt-5.4-nano", "price_in": 0.2, "price_out": 1.25, "context": 400000},        # $0.20/$1.25 per M
     # ── Open Source (via OpenRouter) ──
-    "gpt-oss-120b":     {"model": "openai/gpt-oss-120b"},        # $0.039/$0.18 per M, 131K ctx — ultra-cheap open-weight
-    "gpt-oss-20b":      {"model": "openai/gpt-oss-20b"},         # $0.029/$0.14 per M, 131K ctx — cheapest text on OR
+    "gpt-oss-120b":     {"model": "openai/gpt-oss-120b", "price_in": 0.037, "price_out": 0.17, "context": 131072},        # $0.039/$0.18 per M, 131K ctx — ultra-cheap open-weight
+    "gpt-oss-20b":      {"model": "openai/gpt-oss-20b", "price_in": 0.03, "price_out": 0.13, "context": 131072},         # $0.029/$0.14 per M, 131K ctx — cheapest text on OR
     # ── Codex (coding-optimized) ──
-    "gpt-5.3-codex":    {"model": "openai/gpt-5.3-codex"},
-    "gpt-5.2-codex":    {"model": "openai/gpt-5.2-codex"},
-    "gpt-5.1-codex":    {"model": "openai/gpt-5.1-codex"},
-    "gpt-5.1-codex-max": {"model": "openai/gpt-5.1-codex-max"},
-    "gpt-5.1-codex-mini": {"model": "openai/gpt-5.1-codex-mini"},
+    "gpt-5.3-codex":    {"model": "openai/gpt-5.3-codex", "price_in": 1.75, "price_out": 14.0, "context": 400000},
+    "gpt-5.2-codex":    {"model": "openai/gpt-5.2-codex", "price_in": 1.75, "price_out": 14.0, "context": 400000},
+    "gpt-5.1-codex":    {"model": "openai/gpt-5.1-codex", "price_in": 1.25, "price_out": 10.0, "context": 400000},
+    "gpt-5.1-codex-max": {"model": "openai/gpt-5.1-codex-max", "price_in": 1.25, "price_out": 10.0, "context": 400000},
+    "gpt-5.1-codex-mini": {"model": "openai/gpt-5.1-codex-mini", "price_in": 0.25, "price_out": 2.0, "context": 400000},
     # ── Legacy / Budget ──
-    MODEL_GPT4O_MINI:   {"model": "openai/gpt-4o-mini"},         # budget synthesis — proven, cheap, reliable
+    MODEL_GPT4O_MINI:   {"model": "openai/gpt-4o-mini", "price_in": 0.15, "price_out": 0.6, "context": 128000},         # budget synthesis — proven, cheap, reliable
     # o-series reasoning — no temperature support; can't use for low-temp phases
-    "o3":               {"model": "openai/o3"},                  # $2/$8 per M, 200K ctx
-    "o3-pro":           {"model": "openai/o3-pro"},               # max reasoning — $20/$80 per M, 200K ctx
-    "o3-mini":          {"model": "openai/o3-mini"},
-    "o3-mini-high":     {"model": "openai/o3-mini-high"},        # $1.10/$4.40 per M — high-effort variant
-    "o4-mini":          {"model": "openai/o4-mini"},             # $1.10/$4.40 per M — cheaper than o3, same reasoning class
-    "o4-mini-high":     {"model": "openai/o4-mini-high"},        # $1.10/$4.40 per M — high-effort variant
+    "o3":               {"model": "openai/o3", "price_in": 2.0, "price_out": 8.0, "context": 200000},                  # $2/$8 per M, 200K ctx
+    "o3-pro":           {"model": "openai/o3-pro", "price_in": 20.0, "price_out": 80.0, "context": 200000},               # max reasoning — $20/$80 per M, 200K ctx
+    "o3-mini":          {"model": "openai/o3-mini", "price_in": 1.1, "price_out": 4.4, "context": 200000},
+    "o3-mini-high":     {"model": "openai/o3-mini-high", "price_in": 1.1, "price_out": 4.4, "context": 200000},        # $1.10/$4.40 per M — high-effort variant
+    "o4-mini":          {"model": "openai/o4-mini", "price_in": 1.1, "price_out": 4.4, "context": 200000},             # $1.10/$4.40 per M — cheaper than o3, same reasoning class
+    "o4-mini-high":     {"model": "openai/o4-mini-high", "price_in": 1.1, "price_out": 4.4, "context": 200000},        # $1.10/$4.40 per M — high-effort variant
     # ═══════════════════════════════════════════════════════════════
     # Google — Gemini series
     # ═══════════════════════════════════════════════════════════════
@@ -117,55 +117,55 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # Real Google models live under gemini-3.6-flash / gemini-2.5-flash and the
     # entries immediately below.
     # ── Real Google models ──
-    "gemini-pro-real":         {"model": "google/gemini-3.1-pro-preview"},     # true Google Pro — $2/$12 per M, 1M ctx
-    "gemini-flash-lite-real":  {"model": "google/gemini-3.1-flash-lite"},      # true Google Flash Lite — $0.25/$1.50, 1M ctx
-    "gemini-2.5-flash-lite":   {"model": "google/gemini-2.5-flash-lite"},      # cheapest Google — $0.10/$0.40, 1M ctx
-    "gemini-2.5-flash":        {"model": "google/gemini-2.5-flash"},           # $0.30/$2.50 per M, 1M ctx
-    "gemini-3.8-flash":        {"model": "google/gemini-3.8-flash"},  # $0.375/$1.875 per M, 1M ctx
-    "gemini-3.7-flash":        {"model": "google/gemini-3.7-flash"},           # $0.375/$1.875 per M, 1M ctx (half the price of 3.6-flash)
-    "gemini-3.6-flash":        {"model": "google/gemini-3.6-flash"},           # $0.75/$3.75 per M, 1M ctx (repriced down from $1.50/$7.50)
-    "gemini-3.5-flash-lite":   {"model": "google/gemini-3.5-flash-lite"},      # $0.30/$2.50 per M, 1M ctx
+    "gemini-pro-real":         {"model": "google/gemini-3.1-pro-preview", "price_in": 2.0, "price_out": 12.0, "context": 1048576},     # true Google Pro — $2/$12 per M, 1M ctx
+    "gemini-flash-lite-real":  {"model": "google/gemini-3.1-flash-lite", "price_in": 0.25, "price_out": 1.5, "context": 1048576},      # true Google Flash Lite — $0.25/$1.50, 1M ctx
+    "gemini-2.5-flash-lite":   {"model": "google/gemini-2.5-flash-lite", "price_in": 0.1, "price_out": 0.4, "context": 1048576},      # cheapest Google — $0.10/$0.40, 1M ctx
+    "gemini-2.5-flash":        {"model": "google/gemini-2.5-flash", "price_in": 0.3, "price_out": 2.5, "context": 1048576},           # $0.30/$2.50 per M, 1M ctx
+    "gemini-3.8-flash":        {"model": "google/gemini-3.8-flash", "price_in": 0.75, "price_out": 3.75, "context": 1048576},  # $0.375/$1.875 per M, 1M ctx
+    "gemini-3.7-flash":        {"model": "google/gemini-3.7-flash", "price_in": 0.75, "price_out": 3.75, "context": 1048576},           # $0.375/$1.875 per M, 1M ctx (half the price of 3.6-flash)
+    "gemini-3.6-flash":        {"model": "google/gemini-3.6-flash", "price_in": 0.75, "price_out": 3.75, "context": 1048576},           # $0.75/$3.75 per M, 1M ctx (repriced down from $1.50/$7.50)
+    "gemini-3.5-flash-lite":   {"model": "google/gemini-3.5-flash-lite", "price_in": 0.3, "price_out": 2.5, "context": 1048576},      # $0.30/$2.50 per M, 1M ctx
     # ── Legacy ──
-    "gemini-3.1-flash-lite":   {"model": "google/gemini-3.1-flash-lite"},      # -> gemini-flash-lite-real
-    "gemma-3-12b":             {"model": "google/gemma-3-12b-it"},              # was keyed "google/gemma-2-9b-it" — wrong version, and the only key carrying a vendor prefix
-    "gemma-4-26b":             {"model": "google/gemma-4-26b-a4b-it"},
-    "gemma-4-31b":             {"model": "google/gemma-4-31b-it"},
+    "gemini-3.1-flash-lite":   {"model": "google/gemini-3.1-flash-lite", "price_in": 0.25, "price_out": 1.5, "context": 1048576},      # -> gemini-flash-lite-real
+    "gemma-3-12b":             {"model": "google/gemma-3-12b-it", "price_in": 0.05, "price_out": 0.15, "context": 131072},              # was keyed "google/gemma-2-9b-it" — wrong version, and the only key carrying a vendor prefix
+    "gemma-4-26b":             {"model": "google/gemma-4-26b-a4b-it", "price_in": 0.07, "price_out": 0.34, "context": 262144},
+    "gemma-4-31b":             {"model": "google/gemma-4-31b-it", "price_in": 0.09, "price_out": 0.34, "context": 262144},
     # ═══════════════════════════════════════════════════════════════
     # xAI — Grok series
     # ═══════════════════════════════════════════════════════════════
-    "grok-4.6":               {"model": "x-ai/grok-4.6"},               # newest Grok — 500K ctx, $2/$6 per M (same price as 4.5, strict upgrade)
-    "grok-4.5":               {"model": "x-ai/grok-4.5"},               # 500K ctx, $2/$6 per M, frontier reasoning, structured outputs (updated Jul 2026)
+    "grok-4.6":               {"model": "x-ai/grok-4.6", "price_in": 2.0, "price_out": 6.0, "context": 500000},               # newest Grok — 500K ctx, $2/$6 per M (same price as 4.5, strict upgrade)
+    "grok-4.5":               {"model": "x-ai/grok-4.5", "price_in": 2.0, "price_out": 6.0, "context": 500000},               # 500K ctx, $2/$6 per M, frontier reasoning, structured outputs (updated Jul 2026)
     # grok-4.20 / grok-4.20-multi-agent removed 2026-08-20 (still live upstream,
     # deliberately not routable here). The 18 verifier slots they held now use
     # grok-4.3 — same $1.25/$2.50, 1M ctx instead of 2M. Do not re-add from the
     # catalogue snapshot: openrouter_models.json still lists them because it
     # mirrors upstream, and that is not a signal to reinstate the alias.
-    "grok-4.3":               {"model": "x-ai/grok-4.3"},               # 1M ctx, $1.25/$2.50, τ²-Bench 97.7%, configurable reasoning effort
-    "grok-build-0.1":         {"model": "x-ai/grok-build-0.1"},         # fast agentic coding, 256K ctx, $1.00/$2.00
+    "grok-4.3":               {"model": "x-ai/grok-4.3", "price_in": 1.25, "price_out": 2.5, "context": 1000000},               # 1M ctx, $1.25/$2.50, τ²-Bench 97.7%, configurable reasoning effort
+    "grok-build-0.1":         {"model": "x-ai/grok-build-0.1", "price_in": 1.0, "price_out": 2.0, "context": 256000},         # fast agentic coding, 256K ctx, $1.00/$2.00
     # ═══════════════════════════════════════════════════════════════
     # Perplexity
     # ═══════════════════════════════════════════════════════════════
-    "sonar-pro":          {"model": "perplexity/sonar-pro",        "extra_body": {"web_search_options": {"search_context_size": "high"}, "search_domain_filter": ["-reddit.com","-facebook.com","-pinterest.com","-quora.com"], "search_recency_filter": "year", "return_sources": True}},
-    "sonar-pro-search":   {"model": "perplexity/sonar-pro-search",  "extra_body": {"web_search_options": {"search_context_size": "high"}, "search_domain_filter": ["-reddit.com","-facebook.com","-pinterest.com","-quora.com"], "search_recency_filter": "year", "return_sources": True}},
-    "sonar":              {"model": "perplexity/sonar",              "extra_body": {"web_search_options": {"search_context_size": "low"}, "search_domain_filter": ["-reddit.com","-facebook.com","-pinterest.com","-quora.com"], "search_recency_filter": "year", "return_sources": True}},
-    "sonar-reasoning-pro":  {"model": "perplexity/sonar-reasoning-pro",  "extra_body": {"web_search_options": {"search_context_size": "high"}, "search_domain_filter": ["-reddit.com","-facebook.com","-pinterest.com","-quora.com"], "search_recency_filter": "month", "return_sources": True, "return_images": True, "return_related_questions": True}},
-    "sonar-deep-research":  {"model": "perplexity/sonar-deep-research",  "extra_body": {"reasoning_effort": "high", "search_domain_filter": ["-reddit.com","-facebook.com","-pinterest.com","-quora.com"], "search_recency_filter": "month", "return_sources": True, "return_images": True, "return_related_questions": True}},
+    "sonar-pro":          {"model": "perplexity/sonar-pro", "price_in": 3.0, "price_out": 15.0, "context": 200000,        "extra_body": {"web_search_options": {"search_context_size": "high"}, "search_domain_filter": ["-reddit.com","-facebook.com","-pinterest.com","-quora.com"], "search_recency_filter": "year", "return_sources": True}},
+    "sonar-pro-search":   {"model": "perplexity/sonar-pro-search", "price_in": 3.0, "price_out": 15.0, "context": 200000,  "extra_body": {"web_search_options": {"search_context_size": "high"}, "search_domain_filter": ["-reddit.com","-facebook.com","-pinterest.com","-quora.com"], "search_recency_filter": "year", "return_sources": True}},
+    "sonar":              {"model": "perplexity/sonar", "price_in": 1.0, "price_out": 1.0, "context": 127072,              "extra_body": {"web_search_options": {"search_context_size": "low"}, "search_domain_filter": ["-reddit.com","-facebook.com","-pinterest.com","-quora.com"], "search_recency_filter": "year", "return_sources": True}},
+    "sonar-reasoning-pro":  {"model": "perplexity/sonar-reasoning-pro", "price_in": 2.0, "price_out": 8.0, "context": 128000,  "extra_body": {"web_search_options": {"search_context_size": "high"}, "search_domain_filter": ["-reddit.com","-facebook.com","-pinterest.com","-quora.com"], "search_recency_filter": "month", "return_sources": True, "return_images": True, "return_related_questions": True}},
+    "sonar-deep-research":  {"model": "perplexity/sonar-deep-research", "price_in": 2.0, "price_out": 8.0, "context": 128000,  "extra_body": {"reasoning_effort": "high", "search_domain_filter": ["-reddit.com","-facebook.com","-pinterest.com","-quora.com"], "search_recency_filter": "month", "return_sources": True, "return_images": True, "return_related_questions": True}},
     # ═══════════════════════════════════════════════════════════════
     # Mistral
     # ═══════════════════════════════════════════════════════════════
-    "mistral-large-3":    {"model": "mistralai/mistral-large-2512"},  # $0.50/$1.50 per M, 262K ctx — cheapest EU-bloc frontier anchor
-    "mistral-medium":     {"model": "mistralai/mistral-medium-3.1"},
-    "mistral-medium-3-5": {"model": "mistralai/mistral-medium-3-5"},    # $1.50/$7.50 per M, 262K ctx — newer mid tier
-    "mistral-small":      {"model": "mistralai/mistral-small-2603"},    # v3.3: $0.15/$0.60 per M, 262K ctx
-    "mistral-small-2603": {"model": "mistralai/mistral-small-2603"},    # explicit alias for preset pinning
-    "codestral":          {"model": "mistralai/codestral-2508"},        # v3.5: was 2501 (dead) -> 2508
-    "codestral-2508":     {"model": "mistralai/codestral-2508"},
+    "mistral-large-3":    {"model": "mistralai/mistral-large-2512", "price_in": 0.5, "price_out": 1.5, "context": 262144},  # $0.50/$1.50 per M, 262K ctx — cheapest EU-bloc frontier anchor
+    "mistral-medium":     {"model": "mistralai/mistral-medium-3.1", "price_in": 0.4, "price_out": 2.0, "context": 131072},
+    "mistral-medium-3-5": {"model": "mistralai/mistral-medium-3-5", "price_in": 1.5, "price_out": 7.5, "context": 262144},    # $1.50/$7.50 per M, 262K ctx — newer mid tier
+    "mistral-small":      {"model": "mistralai/mistral-small-2603", "price_in": 0.15, "price_out": 0.6, "context": 262144},    # v3.3: $0.15/$0.60 per M, 262K ctx
+    "mistral-small-2603": {"model": "mistralai/mistral-small-2603", "price_in": 0.15, "price_out": 0.6, "context": 262144},    # explicit alias for preset pinning
+    "codestral":          {"model": "mistralai/codestral-2508", "price_in": 0.3, "price_out": 0.9, "context": 256000},        # v3.5: was 2501 (dead) -> 2508
+    "codestral-2508":     {"model": "mistralai/codestral-2508", "price_in": 0.3, "price_out": 0.9, "context": 256000},
     # Was keyed "ministral-8b", which named neither the right family nor the
     # right size — the real Ministral 3 8B is a different model and is not in
     # this registry.
-    "mistral-small-3.2-24b": {"model": "mistralai/mistral-small-3.2-24b-instruct"},
-    "ministral-3b":       {"model": "mistralai/ministral-3b-2512"},   # $0.10/$0.10 flat, 131K ctx — real Ministral tier
-    "ministral-14b":      {"model": "mistralai/ministral-14b-2512"},  # $0.20/$0.20 flat, 262K ctx — real Ministral tier
+    "mistral-small-3.2-24b": {"model": "mistralai/mistral-small-3.2-24b-instruct", "price_in": 0.075, "price_out": 0.2, "context": 131072},
+    "ministral-3b":       {"model": "mistralai/ministral-3b-2512", "price_in": 0.1, "price_out": 0.1, "context": 131072},   # $0.10/$0.10 flat, 131K ctx — real Ministral tier
+    "ministral-14b":      {"model": "mistralai/ministral-14b-2512", "price_in": 0.2, "price_out": 0.2, "context": 262144},  # $0.20/$0.20 flat, 262K ctx — real Ministral tier
     # devstral, devstral-medium, devstral-small removed — no longer on OpenRouter
     # ═══════════════════════════════════════════════════════════════
     # DeepSeek — V3.2 + V4 family
@@ -192,13 +192,13 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # primary_id to route around it. Restoring the plain shape restores the
     # documented fallback instead of routing around its absence.
     "deepseek-v4-pro": {
-        "model": "deepseek/deepseek-v4-pro",
+        "model": "deepseek/deepseek-v4-pro", "price_in": 0.819366, "price_out": 1.638732, "context": 1048576,
         "extra_body": {"reasoning": {"effort": "high"}},
     },
     "deepseek-v4-flash": {
         # The 0731 dated pin was retired upstream: api.deepseek.com now accepts
         # only deepseek-v4-pro / deepseek-v4-flash and 400s on any dated suffix.
-        "model": "deepseek/deepseek-v4-flash",        # $0.0886/$0.1772, 1M ctx
+        "model": "deepseek/deepseek-v4-flash", "price_in": 0.08358, "price_out": 0.16716, "context": 1048576,        # $0.0886/$0.1772, 1M ctx
         "extra_body": {"reasoning": {"effort": "high"}},
     },
     "deepseek-v4-flash-0424": {
@@ -209,7 +209,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
         # OpenRouter does still list deepseek/deepseek-v4-flash-0731, so
         # "retired upstream" is true of the vendor API, not of the catalogue.
         # Deprecated: route "deepseek-v4-flash" instead.
-        "model": "deepseek/deepseek-v4-flash",        # 1M ctx
+        "model": "deepseek/deepseek-v4-flash", "price_in": 0.08358, "price_out": 0.16716, "context": 1048576,        # 1M ctx
         "extra_body": {"reasoning": {"effort": "high"}},
     },
     # DEPRECATED — the name lies: this serves v4-flash, not any v3. v3.2 was
@@ -217,7 +217,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # removed. Kept only so older saved states / user configs still resolve;
     # no preset routes it any more. Route "deepseek-v4-flash" directly.
     "deepseek-v3": {
-        "model": "deepseek/deepseek-v4-flash",
+        "model": "deepseek/deepseek-v4-flash", "price_in": 0.08358, "price_out": 0.16716, "context": 1048576,
     },
     # ═══════════════════════════════════════════════════════════════
     # Qwen (Alibaba) — 3.5 -> 3.8 series
@@ -227,28 +227,28 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # pinned 0902 build; the old id 404s. Reasoning is MANDATORY here and
     # defaults to "xhigh" (~95% of the output budget), so a caller passing a
     # small max_tokens gets empty content back — see reasoning_effort.py.
-    "qwen3.8-max":         {"model": "qwen/qwen3.8-max-0902"},   # $2.00/$6.00 per M, 1M ctx
+    "qwen3.8-max":         {"model": "qwen/qwen3.8-max-0902", "price_in": 2.0, "price_out": 6.0, "context": 1000000},   # $2.00/$6.00 per M, 1M ctx
     # ── 3.7 (Jun 2026) ──
-    "qwen3.7-max":         {"model": "qwen/qwen3.7-max"},        # flagship agent — $1.475/$4.425 per M, 1M ctx
-    "qwen3.7-plus":        {"model": "qwen/qwen3.7-plus"},       # best VFM — $0.32/$1.28 per M, 1M ctx
-    "qwen3.7-flash":       {"model": "qwen/qwen3.7-flash"},      # cheapest Qwen — $0.03/$0.13 per M, 1M ctx, vision
+    "qwen3.7-max":         {"model": "qwen/qwen3.7-max", "price_in": 1.475, "price_out": 4.425, "context": 1000000},        # flagship agent — $1.475/$4.425 per M, 1M ctx
+    "qwen3.7-plus":        {"model": "qwen/qwen3.7-plus", "price_in": 0.32, "price_out": 1.28, "context": 1000000},       # best VFM — $0.32/$1.28 per M, 1M ctx
+    "qwen3.7-flash":       {"model": "qwen/qwen3.7-flash", "price_in": 0.03, "price_out": 0.13, "context": 1000000},      # cheapest Qwen — $0.03/$0.13 per M, 1M ctx, vision
     # ── 3.7 value aliases (intentionally route to 3.7-plus for cost) ──
     # FIVE keys below collapse onto qwen/qwen3.7-plus — not obvious from any
     # single line. Deliberate, but every one of them names a version or tier
     # it does not serve, so none is routed by a preset; route "qwen3.7-plus"
     # directly. Note "qwen3-max" is NOT the real max: that is
     # "qwen3-max-real", and "qwen3-max-thinking" is a third, distinct model.
-    "qwen3-max":           {"model": "qwen/qwen3.7-plus"},       # "max" alias -> 3.7-plus ($0.32/$1.28)
-    "qwen3-max-real":      {"model": "qwen/qwen3-max"},          # literal qwen3-max — $0.78/$3.90 per M, 262K ctx (older arch, costlier than the alias above)
-    "qwen3.6-plus":        {"model": "qwen/qwen3.7-plus"},       # alias -> 3.7-plus (cheaper AND stronger than real 3.6-plus)
-    "qwen3-plus":          {"model": "qwen/qwen3.7-plus"},       # generic "plus" -> best plus
-    "qwen3.5-plus":        {"model": "qwen/qwen3.7-plus"},       # 3.5-plus legacy -> 3.7-plus
+    "qwen3-max":           {"model": "qwen/qwen3.7-plus", "price_in": 0.32, "price_out": 1.28, "context": 1000000},       # "max" alias -> 3.7-plus ($0.32/$1.28)
+    "qwen3-max-real":      {"model": "qwen/qwen3-max", "price_in": 0.78, "price_out": 3.9, "context": 262144},          # literal qwen3-max — $0.78/$3.90 per M, 262K ctx (older arch, costlier than the alias above)
+    "qwen3.6-plus":        {"model": "qwen/qwen3.7-plus", "price_in": 0.32, "price_out": 1.28, "context": 1000000},       # alias -> 3.7-plus (cheaper AND stronger than real 3.6-plus)
+    "qwen3-plus":          {"model": "qwen/qwen3.7-plus", "price_in": 0.32, "price_out": 1.28, "context": 1000000},       # generic "plus" -> best plus
+    "qwen3.5-plus":        {"model": "qwen/qwen3.7-plus", "price_in": 0.32, "price_out": 1.28, "context": 1000000},       # 3.5-plus legacy -> 3.7-plus
     # ── 3.6 (mid 2026) ──
-    "qwen3.6-plus-real":   {"model": "qwen/qwen3.6-plus"},       # real 3.6-plus — $0.325/$1.95 per M, 1M ctx
-    "qwen3.6-flash":       {"model": "qwen/qwen3.6-flash"},      # $0.1875/$1.125 per M, 1M ctx
-    "qwen3.6-35b-a3b":     {"model": "qwen/qwen3.6-35b-a3b"},    # $0.14/$1.00 per M, 262K ctx, open-weight
-    "qwen3.6-27b":         {"model": "qwen/qwen3.6-27b"},        # $0.2885/$3.17 per M, 262K ctx, dense
-    "qwen3.6-max-preview": {"model": "qwen/qwen3.6-max-preview"}, # $1.04/$6.24 per M, 262K ctx, ~1T MoE preview
+    "qwen3.6-plus-real":   {"model": "qwen/qwen3.6-plus", "price_in": 0.325, "price_out": 1.95, "context": 1000000},       # real 3.6-plus — $0.325/$1.95 per M, 1M ctx
+    "qwen3.6-flash":       {"model": "qwen/qwen3.6-flash", "price_in": 0.1875, "price_out": 1.125, "context": 1000000},      # $0.1875/$1.125 per M, 1M ctx
+    "qwen3.6-35b-a3b":     {"model": "qwen/qwen3.6-35b-a3b", "price_in": 0.1, "price_out": 0.9, "context": 262144},    # $0.14/$1.00 per M, 262K ctx, open-weight
+    "qwen3.6-27b":         {"model": "qwen/qwen3.6-27b", "price_in": 0.3, "price_out": 2.0, "context": 262144},        # $0.2885/$3.17 per M, 262K ctx, dense
+    "qwen3.6-max-preview": {"model": "qwen/qwen3.6-max-preview", "price_in": 1.027, "price_out": 6.162, "context": 262144}, # $1.04/$6.24 per M, 262K ctx, ~1T MoE preview
     # ── 3.5 (early-mid 2026) ──
     # extra_body: reasoning.exclude — this alias serves several JSON-contract
     # article roles (article_sot_skeleton, article_critic) whose prompts demand
@@ -264,52 +264,52 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # (This rationale previously lived on the "gemini-flash-lite" alias, which
     # named Google and served this same Qwen model. That alias is gone; this is
     # now the single definition.)
-    "qwen3.5-flash":       {"model": "qwen/qwen3.5-flash-02-23", "extra_body": {"reasoning": {"exclude": True}}}, # budget primary — $0.065/$0.26 per M, 1M ctx, fast & reliable
-    "qwen3.5-9b":          {"model": "qwen/qwen3.5-9b"},          # $0.10/$0.15 per M, 262K ctx
-    "qwen3.5-27b":         {"model": "qwen/qwen3.5-27b"},         # $0.195/$1.56 per M, 262K ctx, dense
-    "qwen3.5-35b-a3b":     {"model": "qwen/qwen3.5-35b-a3b"},     # $0.14/$1.00 per M, 262K ctx, MoE
-    "qwen3.5-122b-a10b":   {"model": "qwen/qwen3.5-122b-a10b"},   # $0.26/$2.08 per M, 262K ctx, MoE
-    "qwen3.5-397b-a17b":   {"model": "qwen/qwen3.5-397b-a17b"},   # $0.385/$2.45 per M, 256K ctx, MoE
+    "qwen3.5-flash":       {"model": "qwen/qwen3.5-flash-02-23", "price_in": 0.065, "price_out": 0.26, "context": 1000000, "extra_body": {"reasoning": {"exclude": True}}}, # budget primary — $0.065/$0.26 per M, 1M ctx, fast & reliable
+    "qwen3.5-9b":          {"model": "qwen/qwen3.5-9b", "price_in": 0.1, "price_out": 0.15, "context": 262144},          # $0.10/$0.15 per M, 262K ctx
+    "qwen3.5-27b":         {"model": "qwen/qwen3.5-27b", "price_in": 0.195, "price_out": 1.56, "context": 262144},         # $0.195/$1.56 per M, 262K ctx, dense
+    "qwen3.5-35b-a3b":     {"model": "qwen/qwen3.5-35b-a3b", "price_in": 0.3125, "price_out": 1.25, "context": 262144},     # $0.14/$1.00 per M, 262K ctx, MoE
+    "qwen3.5-122b-a10b":   {"model": "qwen/qwen3.5-122b-a10b", "price_in": 0.29, "price_out": 2.4, "context": 262144},   # $0.26/$2.08 per M, 262K ctx, MoE
+    "qwen3.5-397b-a17b":   {"model": "qwen/qwen3.5-397b-a17b", "price_in": 0.55, "price_out": 3.5, "context": 262144},   # $0.385/$2.45 per M, 256K ctx, MoE
     # ── Qwen3 large open-weight ──
-    "qwen3-235b-a22b":     {"model": "qwen/qwen3-235b-a22b"},      # $0.455/$1.82 per M, 131K ctx, large MoE
-    "qwen3-30b-a3b":       {"model": "qwen/qwen3-30b-a3b"},        # $0.12/$0.50 per M, 131K ctx, compact MoE
+    "qwen3-235b-a22b":     {"model": "qwen/qwen3-235b-a22b", "price_in": 0.455, "price_out": 1.82, "context": 131072},      # $0.455/$1.82 per M, 131K ctx, large MoE
+    "qwen3-30b-a3b":       {"model": "qwen/qwen3-30b-a3b", "price_in": 0.12, "price_out": 0.5, "context": 131072},        # $0.12/$0.50 per M, 131K ctx, compact MoE
     # ── Qwen3 Max Thinking — dedicated reasoning (Jan 2026) ──
-    "qwen3-max-thinking":  {"model": "qwen/qwen3-max-thinking"},   # $0.78/$3.90 per M, 262K ctx — deep multi-step reasoning
+    "qwen3-max-thinking":  {"model": "qwen/qwen3-max-thinking", "price_in": 0.78, "price_out": 3.9, "context": 262144},   # $0.78/$3.90 per M, 262K ctx — deep multi-step reasoning
     # ── Turbo (DEPRECATED — the name lies: serves 3.5-flash, not any turbo) ──
     # extra_body: reasoning.exclude — see the gemini-flash-lite alias above.
-    "qwen3-turbo":         {"model": "qwen/qwen3.5-flash-02-23", "extra_body": {"reasoning": {"exclude": True}}},  # was qwen/qwen-turbo (DEAD) -> qwen3.5-flash
+    "qwen3-turbo":         {"model": "qwen/qwen3.5-flash-02-23", "price_in": 0.065, "price_out": 0.26, "context": 1000000, "extra_body": {"reasoning": {"exclude": True}}},  # was qwen/qwen-turbo (DEAD) -> qwen3.5-flash
     # ── Coder series ──
-    "qwen3-coder":            {"model": "qwen/qwen3-coder-plus"},        # proprietary — $0.65/$3.25 per M, 1M ctx
-    "qwen3-coder-flash":      {"model": "qwen/qwen3-coder-flash"},       # $0.195/$0.975 per M, 1M ctx
-    "qwen3-coder-next":       {"model": "qwen/qwen3-coder-next"},        # open-weight — $0.11/$0.80 per M, 262K ctx
-    "qwen3-coder-30b-a3b":    {"model": "qwen/qwen3-coder-30b-a3b-instruct"}, # cheapest coder — $0.07/$0.27 per M, 160K ctx
+    "qwen3-coder":            {"model": "qwen/qwen3-coder-plus", "price_in": 0.65, "price_out": 3.25, "context": 1000000},        # proprietary — $0.65/$3.25 per M, 1M ctx
+    "qwen3-coder-flash":      {"model": "qwen/qwen3-coder-flash", "price_in": 0.195, "price_out": 0.975, "context": 1000000},       # $0.195/$0.975 per M, 1M ctx
+    "qwen3-coder-next":       {"model": "qwen/qwen3-coder-next", "price_in": 0.12, "price_out": 0.8, "context": 262144},        # open-weight — $0.11/$0.80 per M, 262K ctx
+    "qwen3-coder-30b-a3b":    {"model": "qwen/qwen3-coder-30b-a3b-instruct", "price_in": 0.07, "price_out": 0.28, "context": 262144}, # cheapest coder — $0.07/$0.27 per M, 160K ctx
     # ═══════════════════════════════════════════════════════════════
     # Kimi (Moonshot AI)
     # ═══════════════════════════════════════════════════════════════
-    "kimi-k2":          {"model": "moonshotai/kimi-k2"},           # $0.57/$2.30 per M, 131K ctx
-    "kimi-k2-5":        {"model": "moonshotai/kimi-k2.5"},
-    "kimi-k2-6":        {"model": "moonshotai/kimi-k2.6"},
-    "kimi-k2-7-code":   {"model": "moonshotai/kimi-k2.7-code"},
-    "kimi-k3":          {"model": "moonshotai/kimi-k3"},           # 1M ctx, advanced agentic reasoning — $3/$15 per M, priciest CN model on OpenRouter
-    "kimi-k2-thinking":  {"model": "moonshotai/kimi-k2-thinking"},    # Nov 2025, older than k2.5+ but the only dedicated reasoning-mode Kimi — $0.60/$2.50 per M, 262K ctx
+    "kimi-k2":          {"model": "moonshotai/kimi-k2", "price_in": 0.57, "price_out": 2.3, "context": 131072},           # $0.57/$2.30 per M, 131K ctx
+    "kimi-k2-5":        {"model": "moonshotai/kimi-k2.5", "price_in": 0.45, "price_out": 2.25, "context": 262144},
+    "kimi-k2-6":        {"model": "moonshotai/kimi-k2.6", "price_in": 0.95, "price_out": 4.0, "context": 262144},
+    "kimi-k2-7-code":   {"model": "moonshotai/kimi-k2.7-code", "price_in": 0.66, "price_out": 3.4, "context": 262144},
+    "kimi-k3":          {"model": "moonshotai/kimi-k3", "price_in": 3.0, "price_out": 15.0, "context": 1048576},           # 1M ctx, advanced agentic reasoning — $3/$15 per M, priciest CN model on OpenRouter
+    "kimi-k2-thinking":  {"model": "moonshotai/kimi-k2-thinking", "price_in": 0.6, "price_out": 2.5, "context": 262144},    # Nov 2025, older than k2.5+ but the only dedicated reasoning-mode Kimi — $0.60/$2.50 per M, 262K ctx
     # ═══════════════════════════════════════════════════════════════
     # Meta LLaMA
     # ═══════════════════════════════════════════════════════════════
-    "llama-4-scout":    {"model": "meta-llama/llama-4-scout"},     # $0.10/$0.30 per M, 10M ctx — best long-context VFM
-    "llama-4-maverick": {"model": "meta-llama/llama-4-maverick"},  # $0.15/$0.60 per M, 1M ctx
-    "muse-spark-1.1":   {"model": "meta/muse-spark-1.1"},          # small multimodal/general model
-    "muse-spark-1.2-contributor": {"model": "meta/muse-spark-1.2-contributor"},  # $0.10/$0.20 per M, 1M ctx — discounted "contributor" tier; Meta may train on prompts/completions sent to it
+    "llama-4-scout":    {"model": "meta-llama/llama-4-scout", "price_in": 0.1, "price_out": 0.3, "context": 1310720},     # $0.10/$0.30 per M, 10M ctx — best long-context VFM
+    "llama-4-maverick": {"model": "meta-llama/llama-4-maverick", "price_in": 0.2, "price_out": 0.696, "context": 1048576},  # $0.15/$0.60 per M, 1M ctx
+    "muse-spark-1.1":   {"model": "meta/muse-spark-1.1", "price_in": 1.25, "price_out": 4.25, "context": 1048576},          # small multimodal/general model
+    "muse-spark-1.2-contributor": {"model": "meta/muse-spark-1.2-contributor", "price_in": 0.1, "price_out": 0.2, "context": 1048576},  # $0.10/$0.20 per M, 1M ctx — discounted "contributor" tier; Meta may train on prompts/completions sent to it
     # Price was $0.13/$0.40 here until 2026-09-03 — ~5x under. Catalogue and
     # PRICING_DB both say $0.71/$0.71; live openrouter.ai is unreachable from
     # CI/dev, so re-verify there before costing anything against this figure.
-    "llama-3.3-70b":    {"model": "meta-llama/llama-3.3-70b-instruct"},  # $0.71/$0.71 per M, 131K ctx
+    "llama-3.3-70b":    {"model": "meta-llama/llama-3.3-70b-instruct", "price_in": 0.1, "price_out": 0.32, "context": 131072},  # $0.71/$0.71 per M, 131K ctx
     # ═══════════════════════════════════════════════════════════════
     # Laguna (Poolside)
     # ═══════════════════════════════════════════════════════════════
     # laguna-xs-free / laguna-m-free removed 2026-09-07 — see the :free policy note
     # at the top of _MODEL_WHITELIST. Paid siblings below cover both tiers.
-    MODEL_LAGUNA_XS_21:   {"model": "poolside/laguna-xs-2.1"},  # $0.06/$0.12 per M, 262K ctx — Poolside coding agent (Jul '26)
-    "laguna-s-2.1":       {"model": "poolside/laguna-s-2.1"},   # $0.09/$0.18 per M, 1M ctx — new S tier, between XS and M
+    MODEL_LAGUNA_XS_21:   {"model": "poolside/laguna-xs-2.1", "price_in": 0.06, "price_out": 0.12, "context": 262144},  # $0.06/$0.12 per M, 262K ctx — Poolside coding agent (Jul '26)
+    "laguna-s-2.1":       {"model": "poolside/laguna-s-2.1", "price_in": 0.09, "price_out": 0.18, "context": 1048576},   # $0.09/$0.18 per M, 1M ctx — new S tier, between XS and M
     # ═══════════════════════════════════════════════════════════════
     # GLM (Zhipu AI / z-ai)
     # ═══════════════════════════════════════════════════════════════
@@ -317,54 +317,54 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # The bundled catalogue snapshot says $1.19/$3.74 and docs/openrouter-catalogue-2026-08.md
     # says $0.308/$0.968 — three different figures. Re-run scripts/update_openrouter_catalogue.py
     # before trusting PRICING_DB for this model.
-    "glm-5.2":          {"model": "z-ai/glm-5.2"},                # $0.476/$1.496 per M, 1M ctx — AA Intel 52.6, cheapest frontier-class CN model
+    "glm-5.2":          {"model": "z-ai/glm-5.2", "price_in": 0.966, "price_out": 3.036, "context": 1048576},                # $0.476/$1.496 per M, 1M ctx — AA Intel 52.6, cheapest frontier-class CN model
     # NB: z-ai/glm-5.2:batch is *more* expensive ($0.70/$2.20) and caps at 512K ctx.
     # Do not add it as a "cheaper batch tier" — for this model the batch lane is a trap.
-    "glm-5.3":          {"model": "z-ai/glm-5.3"},                # $1.40/$4.40 per M, 1M ctx — newest Zhipu gen, ~3x the price of 5.2 (verify against the catalogue before moving budget presets onto it)
-    "glm-5.3-flash":    {"model": "z-ai/glm-5.3-flash"},          # $0.075/$0.25 per M, 1.31M ctx — took over stress_testing from the dead ring-2.6-1t (same bloc, same input price, cheaper output)
+    "glm-5.3":          {"model": "z-ai/glm-5.3", "price_in": 1.4, "price_out": 4.4, "context": 1310720},                # $1.40/$4.40 per M, 1M ctx — newest Zhipu gen, ~3x the price of 5.2 (verify against the catalogue before moving budget presets onto it)
+    "glm-5.3-flash":    {"model": "z-ai/glm-5.3-flash", "price_in": 0.075, "price_out": 0.25, "context": 1310720},          # $0.075/$0.25 per M, 1.31M ctx — took over stress_testing from the dead ring-2.6-1t (same bloc, same input price, cheaper output)
     # ═══════════════════════════════════════════════════════════════
     # OpenRouter native
     # ═══════════════════════════════════════════════════════════════
     # elephant-alpha removed — no longer on OpenRouter
     # owl-alpha removed — openrouter/owl-alpha dead, no replacement on OpenRouter
-    "pareto-code":      {"model": "openrouter/pareto-code"},
+    "pareto-code":      {"model": "openrouter/pareto-code", "context": 2000000},
     # ═══════════════════════════════════════════════════════════════
     # Arcee AI
     # ═══════════════════════════════════════════════════════════════
     # arcee-maestro-reasoning removed — no longer on OpenRouter
-    "arcee-trinity-large-thinking": {"model": "arcee-ai/trinity-large-thinking"},
+    "arcee-trinity-large-thinking": {"model": "arcee-ai/trinity-large-thinking", "price_in": 0.25, "price_out": 0.8, "context": 262144},
     # arcee-virtuoso-large removed 2026-09-03 - delisted from OpenRouter
     # arcee-coder-large removed — arcee-ai/coder-large dead, no replacement on OpenRouter
     # ═══════════════════════════════════════════════════════════════
     # Xiaomi — MiMo series (v2.5, Apr 2026)
     # ═══════════════════════════════════════════════════════════════
-    "mimo-v2.5-pro":  {"model": "xiaomi/mimo-v2.5-pro"},   # flagship agent — $0.435/$0.87 per M, 1M ctx
-    "mimo-v2.5":      {"model": "xiaomi/mimo-v2.5"},       # omnimodal value — $0.14/$0.28 per M, 1M ctx
+    "mimo-v2.5-pro":  {"model": "xiaomi/mimo-v2.5-pro", "price_in": 0.435, "price_out": 0.87, "context": 1050000},   # flagship agent — $0.435/$0.87 per M, 1M ctx
+    "mimo-v2.5":      {"model": "xiaomi/mimo-v2.5", "price_in": 0.14, "price_out": 0.28, "context": 1050000},       # omnimodal value — $0.14/$0.28 per M, 1M ctx
     # DEPRECATED legacy aliases — both names lie about the version, and
     # "-flash" names a tier Xiaomi does not ship here. No preset routes them
     # any more (repointed to mimo-v2.5 / mimo-v2.5-pro, identical served
     # models); kept only so older saved states still resolve.
-    "mimo-v2-pro":    {"model": "xiaomi/mimo-v2.5-pro"},
-    "mimo-v2-flash":  {"model": "xiaomi/mimo-v2.5"},
+    "mimo-v2-pro":    {"model": "xiaomi/mimo-v2.5-pro", "price_in": 0.435, "price_out": 0.87, "context": 1050000},
+    "mimo-v2-flash":  {"model": "xiaomi/mimo-v2.5", "price_in": 0.14, "price_out": 0.28, "context": 1050000},
     # ═══════════════════════════════════════════════════════════════
     # MiniMax — M-series
     # ═══════════════════════════════════════════════════════════════
-    "minimax-m3":        {"model": "minimax/minimax-m3"},        # latest, 1M ctx, multimodal, $0.30/$1.20 per M
-    "minimax-m2.7":      {"model": "minimax/minimax-m2.7"},      # agentic, reasoning mandatory, $0.25/$1.00
-    "minimax-m2.5":      {"model": "minimax/minimax-m2.5"},      # coding expert, reasoning mandatory, $0.15/$0.90
-    "minimax-m2.1":      {"model": "minimax/minimax-m2.1"},      # lightweight coding, 10B active, $0.29/$0.95
-    "minimax-m2":        {"model": "minimax/minimax-m2"},        # 230B/10B MoE, $0.255/$1.00
-    "minimax-m1":        {"model": "minimax/minimax-m1"},        # 1M ctx, lightning attention, $0.40/$2.20
-    "minimax-01-legacy": {"model": "minimax/minimax-01"},        # old 456B MiniMax-01 (Jan 2025) — preserved for reference
+    "minimax-m3":        {"model": "minimax/minimax-m3", "price_in": 0.3, "price_out": 1.2, "context": 1048576},        # latest, 1M ctx, multimodal, $0.30/$1.20 per M
+    "minimax-m2.7":      {"model": "minimax/minimax-m2.7", "price_in": 0.3, "price_out": 1.2, "context": 204800},      # agentic, reasoning mandatory, $0.25/$1.00
+    "minimax-m2.5":      {"model": "minimax/minimax-m2.5", "price_in": 0.27, "price_out": 1.08, "context": 204800},      # coding expert, reasoning mandatory, $0.15/$0.90
+    "minimax-m2.1":      {"model": "minimax/minimax-m2.1", "price_in": 0.3, "price_out": 1.2, "context": 204800},      # lightweight coding, 10B active, $0.29/$0.95
+    "minimax-m2":        {"model": "minimax/minimax-m2", "price_in": 0.255, "price_out": 1.02, "context": 204800},        # 230B/10B MoE, $0.255/$1.00
+    "minimax-m1":        {"model": "minimax/minimax-m1", "price_in": 0.55, "price_out": 2.2, "context": 1000000},        # 1M ctx, lightning attention, $0.40/$2.20
+    "minimax-01-legacy": {"model": "minimax/minimax-01", "price_in": 0.2, "price_out": 1.1, "context": 1000192},        # old 456B MiniMax-01 (Jan 2025) — preserved for reference
     # ═══════════════════════════════════════════════════════════════
     # Thinking Machines Lab
     # ═══════════════════════════════════════════════════════════════
-    "inkling-small":    {"model": "thinkingmachines/inkling-small"},  # 276B/12B MoE multimodal — $0.50/$1.20 per M, 512K ctx
+    "inkling-small":    {"model": "thinkingmachines/inkling-small", "price_in": 0.45, "price_out": 1.2, "context": 1048576},  # 276B/12B MoE multimodal — $0.50/$1.20 per M, 512K ctx
     # ═══════════════════════════════════════════════════════════════
     # Tencent
     # ═══════════════════════════════════════════════════════════════
-    "hy3":               {"model": "tencent/hy3"},               # 295B MoE (21B active, 192 experts, top-8), 262K ctx, $0.132/$0.528 per M, configurable reasoning effort (none/low/high CoT), anti-hallucination — answers grounded, flags missing evidence
-    "hy3-preview":      {"model": "tencent/hy3-preview"},
+    "hy3":               {"model": "tencent/hy3", "price_in": 0.0825, "price_out": 0.33, "context": 262144},               # 295B MoE (21B active, 192 experts, top-8), 262K ctx, $0.132/$0.528 per M, configurable reasoning effort (none/low/high CoT), anti-hallucination — answers grounded, flags missing evidence
+    "hy3-preview":      {"model": "tencent/hy3-preview", "price_in": 0.18, "price_out": 0.6, "context": 262144},
     # ── Hunyuan-MT v2: translation specialists, NOT general reasoning models ──
     # 8K context (vs 262K for hy3) rules them out of every pipeline phase that
     # carries accumulated state — decomposition, synthesis, stress-testing. The
@@ -372,17 +372,17 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # min_context_tokens role requirements exclude these automatically; the
     # constraint is recorded here so nobody hand-pins them into a long-context
     # role and only discovers the truncation at runtime.
-    "hy-mt2-30b":       {"model": "tencent/hy-mt2-30b-a3b"},     # 30B/3B MoE MT — $0.074/$0.295 per M, 8K ctx
-    "hy-mt2-1.8b":      {"model": "tencent/hy-mt2-1.8b"},        # 1.8B dense MT — $0.044/$0.177 per M, 8K ctx, cheapest translation lane
+    "hy-mt2-30b":       {"model": "tencent/hy-mt2-30b-a3b", "price_in": 0.074, "price_out": 0.295, "context": 8192},     # 30B/3B MoE MT — $0.074/$0.295 per M, 8K ctx
+    "hy-mt2-1.8b":      {"model": "tencent/hy-mt2-1.8b", "price_in": 0.044, "price_out": 0.177, "context": 8192},        # 1.8B dense MT — $0.044/$0.177 per M, 8K ctx, cheapest translation lane
     # ═══════════════════════════════════════════════════════════════
     # ByteDance Seed
     # ═══════════════════════════════════════════════════════════════
-    "seed-2.0-mini":    {"model": "bytedance-seed/seed-2.0-mini"},  # $0.10/$0.40 per M, 262K ctx
-    "seed-2.0-lite":    {"model": "bytedance-seed/seed-2.0-lite"},  # $0.25/$2.00 per M, 262K ctx — mid tier, same gen
+    "seed-2.0-mini":    {"model": "bytedance-seed/seed-2.0-mini", "price_in": 0.1, "price_out": 0.4, "context": 262144},  # $0.10/$0.40 per M, 262K ctx
+    "seed-2.0-lite":    {"model": "bytedance-seed/seed-2.0-lite", "price_in": 0.25, "price_out": 2.0, "context": 262144},  # $0.25/$2.00 per M, 262K ctx — mid tier, same gen
     # ═══════════════════════════════════════════════════════════════
     # inclusionAI (Ant Group)
     # ═══════════════════════════════════════════════════════════════
-    "ling-3.0-flash-free": {"model": "inclusionai/ling-3.0-flash"},  # v3.8: :free tier died (as predicted) -> paid, $0.021/$0.063 per M, 262K ctx
+    "ling-3.0-flash-free": {"model": "inclusionai/ling-3.0-flash", "price_in": 0.021, "price_out": 0.063, "context": 262144},  # v3.8: :free tier died (as predicted) -> paid, $0.021/$0.063 per M, 262K ctx
     # The whole inclusionAI 2.6 line was delisted by 2026-08-26: ring-2.6-1t and
     # ling-2.6-1t 404 ("no longer available as a free model") and ling-2.6-flash
     # left the OpenRouter catalogue entirely. Not a billing issue — other paid
@@ -392,16 +392,16 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ═══════════════════════════════════════════════════════════════
     # StepFun — ultra-cheap multimodal MoE
     # ═══════════════════════════════════════════════════════════════
-    "stepfun/step-3.7-flash":   {"model": "stepfun/step-3.7-flash"},  # $0.20/$1.15 per M — 196B MoE, 11B active
-    "stepfun-3.7-flash":        {"model": "stepfun/step-3.7-flash"},  # hyphenated alias (presets use this form)
+    "stepfun/step-3.7-flash":   {"model": "stepfun/step-3.7-flash", "price_in": 0.2, "price_out": 1.15, "context": 262144},  # $0.20/$1.15 per M — 196B MoE, 11B active
+    "stepfun-3.7-flash":        {"model": "stepfun/step-3.7-flash", "price_in": 0.2, "price_out": 1.15, "context": 262144},  # hyphenated alias (presets use this form)
     # ═══════════════════════════════════════════════════════════════
     # Nex AGI — MoE
     # ═══════════════════════════════════════════════════════════════
-    "nex-n2-pro-free":   {"model": "nex-agi/nex-n2-pro"},           # v3.5: :free tier dead -> paid, $0.25/$1.00 per M
+    "nex-n2-pro-free":   {"model": "nex-agi/nex-n2-pro", "price_in": 0.25, "price_out": 1.0, "context": 262144},           # v3.5: :free tier dead -> paid, $0.25/$1.00 per M
     # ═══════════════════════════════════════════════════════════════
     # Nous Research — Hermes series
     # ═══════════════════════════════════════════════════════════════
-    "hermes-4-405b":     {"model": "nousresearch/hermes-4-405b"},   # $1.00/$3.00 per M, 131K ctx — powerful critic
+    "hermes-4-405b":     {"model": "nousresearch/hermes-4-405b", "price_in": 1.0, "price_out": 3.0, "context": 131072},   # $1.00/$3.00 per M, 131K ctx — powerful critic
     # hermes-4-70b removed 2026-09-06: its only endpoint was Nebius, which
     # reports status -5 and answers `The model NousResearch/Hermes-4-70B does
     # not exist`. Still listed in /api/v1/models, so a catalogue-membership
@@ -411,12 +411,12 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ═══════════════════════════════════════════════════════════════
     # Thinking Machines
     # ═══════════════════════════════════════════════════════════════
-    "inkling":          {"model": "thinkingmachines/inkling"},      # $1/$4.05 per M, 1M ctx, 41B active/975B MoE
+    "inkling":          {"model": "thinkingmachines/inkling", "price_in": 1.0, "price_out": 4.05, "context": 1048576},      # $1/$4.05 per M, 1M ctx, 41B active/975B MoE
     # ═══════════════════════════════════════════════════════════════
     # Morph — coding specialists
     # ═══════════════════════════════════════════════════════════════
-    "morph-v3-large":    {"model": "morph/morph-v3-large"},         # $0.90/$1.90 per M, 262K ctx
-    "morph-v3-fast":     {"model": "morph/morph-v3-fast"},          # $0.80/$1.20 per M, 81K ctx
+    "morph-v3-large":    {"model": "morph/morph-v3-large", "price_in": 0.9, "price_out": 1.9, "context": 262144},         # $0.90/$1.90 per M, 262K ctx
+    "morph-v3-fast":     {"model": "morph/morph-v3-fast", "price_in": 0.8, "price_out": 1.2, "context": 81920},          # $0.80/$1.20 per M, 81K ctx
     # ═══════════════════════════════════════════════════════════════
     # NVIDIA Nemotron (via OpenRouter)
     # ═══════════════════════════════════════════════════════════════
@@ -426,8 +426,8 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # 2026-09-07 — see the :free policy note at the top of _MODEL_WHITELIST. nemotron-nano-omni-free
     # was the model whose endpoints all read status -2 while real calls returned 200,
     # which made --check-endpoints print a SUSPECT line every day with nothing to decide.
-    "nemotron-nano-30b":          {"model": "nvidia/nemotron-3-nano-30b-a3b"},            # $0.05/$0.20 per M — was the paid fallback for the delisted :free tier
-    "nemotron-3-ultra":           {"model": "nvidia/nemotron-3-ultra-550b-a55b"},         # $0.625/$3.125 per M, 512K ctx — the paid 550B tier
+    "nemotron-nano-30b":          {"model": "nvidia/nemotron-3-nano-30b-a3b", "price_in": 0.05, "price_out": 0.2, "context": 262144},            # $0.05/$0.20 per M — was the paid fallback for the delisted :free tier
+    "nemotron-3-ultra":           {"model": "nvidia/nemotron-3-ultra-550b-a55b", "price_in": 0.625, "price_out": 3.125, "context": 262144},         # $0.625/$3.125 per M, 512K ctx — the paid 550B tier
     # nemotron-nano-30b-free / nemotron-nano-9b-v2-free removed 2026-08-26 — both
     # :free tiers left the OpenRouter catalogue. Neither was routed by a preset.
     # The 30B keeps its paid sibling above; the 9B has no paid tier on OpenRouter.
@@ -442,21 +442,21 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ═══════════════════════════════════════════════════════════════
     # Sakana AI
     # ═══════════════════════════════════════════════════════════════
-    "sakana-fugu-ultra": {"model": "sakana/fugu-ultra"},           # 1M ctx multimodal reasoning
-    "sakana-namazu":     {"model": "sakana/sakana-namazu"},         # Japanese earthquake/disaster warning & robust analysis
+    "sakana-fugu-ultra": {"model": "sakana/fugu-ultra", "price_in": 5.0, "price_out": 30.0, "context": 1000000},           # 1M ctx multimodal reasoning
+    "sakana-namazu":     {"model": "sakana/sakana-namazu", "price_in": 0.95, "price_out": 4.0, "context": 262144},         # Japanese earthquake/disaster warning & robust analysis
     # ═══════════════════════════════════════════════════════════════
     # KwaiPilot (Kuaishou — coding specialists)
     # ═══════════════════════════════════════════════════════════════
     # kat-coder-air-v2.5 removed 2026-09-03 - delisted; pro-v2 / pro-v2.5 remain
-    "kat-coder-pro-v2":   {"model": "kwaipilot/kat-coder-pro-v2"},   # $0.30/$1.20 per M, professional-grade coder
-    "kat-coder-pro-v2.5": {"model": "kwaipilot/kat-coder-pro-v2.5"}, # $0.74/$2.96 per M, flagship reasoning & coding
+    "kat-coder-pro-v2":   {"model": "kwaipilot/kat-coder-pro-v2", "price_in": 0.3, "price_out": 1.2, "context": 262144},   # $0.30/$1.20 per M, professional-grade coder
+    "kat-coder-pro-v2.5": {"model": "kwaipilot/kat-coder-pro-v2.5", "price_in": 0.74, "price_out": 2.96, "context": 262144}, # $0.74/$2.96 per M, flagship reasoning & coding
     # ═══════════════════════════════════════════════════════════════
     # Cohere
     # ═══════════════════════════════════════════════════════════════
-    "cohere-command-a":            {"model": "cohere/command-a"},                # Cohere agentic model
-    "cohere-command-r-08-2024":      {"model": "cohere/command-r-08-2024"},        # enterprise command-r
-    "cohere-command-r-plus-08-2024": {"model": "cohere/command-r-plus-08-2024"},   # heavy enterprise command-r-plus
-    "cohere-command-r7b":          {"model": "cohere/command-r7b-12-2024"},      # fast compact r7b
+    "cohere-command-a":            {"model": "cohere/command-a", "price_in": 2.5, "price_out": 10.0, "context": 256000},                # Cohere agentic model
+    "cohere-command-r-08-2024":      {"model": "cohere/command-r-08-2024", "price_in": 0.15, "price_out": 0.6, "context": 128000},        # enterprise command-r
+    "cohere-command-r-plus-08-2024": {"model": "cohere/command-r-plus-08-2024", "price_in": 2.5, "price_out": 10.0, "context": 128000},   # heavy enterprise command-r-plus
+    "cohere-command-r7b":          {"model": "cohere/command-r7b-12-2024", "price_in": 0.0375, "price_out": 0.15, "context": 128000},      # fast compact r7b
     # cohere-north-mini-code-free removed 2026-09-07 — see the :free policy note at the top of _MODEL_WHITELIST.
     # ═══════════════════════════════════════════════════════════════
     # Image generation models (OpenRouter multimodal image output)
@@ -470,68 +470,68 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # scripts/update_openrouter_catalogue.py now fetches both.
     #
     # ── Hybrid chat+image (token-priced, work through OpenRouterProvider) ──
-    "gemini-flash-image":             {"model": "google/gemini-2.5-flash-image",      "extra_body": {"include_images": True}},
+    "gemini-flash-image":             {"model": "google/gemini-2.5-flash-image", "price_in": 0.3, "price_out": 2.5, "context": 32768,      "extra_body": {"include_images": True}},
     # v3.8: -preview pins promoted to the GA ids, which OpenRouter now serves at the
     # same price with a larger context (65K -> 131K) than the preview endpoints.
-    "gemini-pro-image":               {"model": "google/gemini-3-pro-image",          "extra_body": {"include_images": True}},  # $2/$12 per M, 131K ctx
-    "gemini-3.1-flash-image-preview": {"model": "google/gemini-3.1-flash-image",      "extra_body": {"include_images": True}},  # $0.50/$3 per M, 131K ctx
+    "gemini-pro-image":               {"model": "google/gemini-3-pro-image", "price_in": 2.0, "price_out": 12.0, "context": 131072,          "extra_body": {"include_images": True}},  # $2/$12 per M, 131K ctx
+    "gemini-3.1-flash-image-preview": {"model": "google/gemini-3.1-flash-image", "price_in": 0.5, "price_out": 3.0, "context": 131072,      "extra_body": {"include_images": True}},  # $0.50/$3 per M, 131K ctx
     # The alias above points at the GA id; this is the preview BUILD, still served
     # separately. Declared so the registry covers every id GET /api/v1/images/models
     # returns (48 of 48). Same price as GA — reach for it only to reproduce a run
     # that was pinned to the preview.
     "gemini-3.1-flash-image-preview-build": {
-        "model": "google/gemini-3.1-flash-image-preview",
+        "model": "google/gemini-3.1-flash-image-preview", "price_in": 0.5, "price_out": 3.0, "context": 65536,
         "extra_body": {"include_images": True},
     },
-    MODEL_GEMINI_31_FLASH_LITE_IMAGE: {"model": "google/gemini-3.1-flash-lite-image", "extra_body": {"include_images": True}},
-    "gpt-5-image":                    {"model": "openai/gpt-5-image",       "extra_body": {"include_images": True}},
-    "gpt-5-image-mini":               {"model": "openai/gpt-5-image-mini",  "extra_body": {"include_images": True}},
-    "gpt-5.4-image-2":                {"model": "openai/gpt-5.4-image-2",   "extra_body": {"include_images": True}},
+    MODEL_GEMINI_31_FLASH_LITE_IMAGE: {"model": "google/gemini-3.1-flash-lite-image", "price_in": 0.25, "price_out": 1.5, "context": 65536, "extra_body": {"include_images": True}},
+    "gpt-5-image":                    {"model": "openai/gpt-5-image", "price_in": 10.0, "price_out": 10.0, "context": 400000,       "extra_body": {"include_images": True}},
+    "gpt-5-image-mini":               {"model": "openai/gpt-5-image-mini", "price_in": 2.5, "price_out": 2.0, "context": 400000,  "extra_body": {"include_images": True}},
+    "gpt-5.4-image-2":                {"model": "openai/gpt-5.4-image-2", "price_in": 8.0, "price_out": 15.0, "context": 272000,   "extra_body": {"include_images": True}},
     # ── Pure image generators (priced per image, not per token) ──
     # These have no prompt/completion pricing at all; cost is `image` /
     # `image_output`. Do not reason about their cost from the per-M columns above.
     # 🇺🇸 Meta — $0.0031/image, the cheapest image model in the catalogue.
-    "muse-image": {"model": "meta/muse-image", "extra_body": {"include_images": True}},
-    "qwen-image-3":                   {"model": "qwen/qwen-image-3",        "extra_body": {"include_images": True}},  # $0.003/image, 65K ctx
-    "qwen-image-3-pro":               {"model": "qwen/qwen-image-3-pro",    "extra_body": {"include_images": True}},  # $0.003/image, higher per-token image rate
-    "seedream-5-pro":                 {"model": "bytedance-seed/seedream-5-0-pro",  "extra_body": {"include_images": True}},  # 🇨🇳 ByteDance — $0.003/image
-    "seedream-5-lite":                {"model": "bytedance-seed/seedream-5-0-lite", "extra_body": {"include_images": True}},  # 🇨🇳 ByteDance — cheapest Seedream tier
-    "seedream-4.5":                   {"model": "bytedance-seed/seedream-4.5",      "extra_body": {"include_images": True}},  # 🇨🇳 ByteDance — IMAGE_GEN_FALLBACKS budget pin
-    "grok-imagine-image-2":           {"model": "x-ai/grok-imagine-image-2.0",      "extra_body": {"include_images": True}},  # 🇺🇸 xAI — $0.01/image, priciest per image
-    "grok-imagine":                   {"model": "x-ai/grok-imagine-image-quality",  "extra_body": {"include_images": True}},  # 🇺🇸 xAI — quality tier, IMAGE_GEN_PRESETS budget pin
-    "riverflow-v2-fast-preview":      {"model": "sourceful/riverflow-v2-fast",      "extra_body": {"include_images": True}},  # 🇺🇸 Sourceful — preview pin promoted to GA id
-    "flux.2-pro":                     {"model": "black-forest-labs/flux.2-pro",     "extra_body": {"include_images": True}},  # 🇩🇪 Black Forest Labs — IMAGE_GEN_FALLBACKS budget pin
-    "recraft-v4.1-utility":           {"model": "recraft/recraft-v4.1-utility",     "extra_body": {"include_images": True}},  # 🇺🇸 Recraft — IMAGE_GEN_FALLBACKS budget pin
-    "krea-2-large":                   {"model": "krea/krea-2-large",         "extra_body": {"include_images": True}},  # 🇺🇸 Krea — highest-fidelity Krea tier
-    "krea-2-medium":                  {"model": "krea/krea-2-medium",        "extra_body": {"include_images": True}},  # 🇺🇸 Krea — half the image-token rate of large
-    "krea-2-medium-turbo":            {"model": "krea/krea-2-medium-turbo",  "extra_body": {"include_images": True}},  # 🇺🇸 Krea — cheapest of the three, latency-optimised
+    "muse-image": {"model": "meta/muse-image", "price_in": 0.0, "price_out": 0.0, "context": 65536, "extra_body": {"include_images": True}},
+    "qwen-image-3":                   {"model": "qwen/qwen-image-3", "price_in": 0.0, "price_out": 0.0, "context": 65536,        "extra_body": {"include_images": True}},  # $0.003/image, 65K ctx
+    "qwen-image-3-pro":               {"model": "qwen/qwen-image-3-pro", "price_in": 0.0, "price_out": 0.0, "context": 65536,    "extra_body": {"include_images": True}},  # $0.003/image, higher per-token image rate
+    "seedream-5-pro":                 {"model": "bytedance-seed/seedream-5-0-pro", "price_in": 0.0, "price_out": 0.0,  "extra_body": {"include_images": True}},  # 🇨🇳 ByteDance — $0.003/image
+    "seedream-5-lite":                {"model": "bytedance-seed/seedream-5-0-lite", "price_in": 0.0, "price_out": 0.0, "extra_body": {"include_images": True}},  # 🇨🇳 ByteDance — cheapest Seedream tier
+    "seedream-4.5":                   {"model": "bytedance-seed/seedream-4.5", "price_in": 0.0, "price_out": 0.0, "context": 4096,      "extra_body": {"include_images": True}},  # 🇨🇳 ByteDance — IMAGE_GEN_FALLBACKS budget pin
+    "grok-imagine-image-2":           {"model": "x-ai/grok-imagine-image-2.0", "price_in": 0.0, "price_out": 0.0, "context": 65536,      "extra_body": {"include_images": True}},  # 🇺🇸 xAI — $0.01/image, priciest per image
+    "grok-imagine":                   {"model": "x-ai/grok-imagine-image-quality", "price_in": 0.0, "price_out": 0.0, "context": 65536,  "extra_body": {"include_images": True}},  # 🇺🇸 xAI — quality tier, IMAGE_GEN_PRESETS budget pin
+    "riverflow-v2-fast-preview":      {"model": "sourceful/riverflow-v2-fast", "price_in": 0.0, "price_out": 0.0, "context": 8192,      "extra_body": {"include_images": True}},  # 🇺🇸 Sourceful — preview pin promoted to GA id
+    "flux.2-pro":                     {"model": "black-forest-labs/flux.2-pro", "price_in": 0.0, "price_out": 0.0, "context": 46864,     "extra_body": {"include_images": True}},  # 🇩🇪 Black Forest Labs — IMAGE_GEN_FALLBACKS budget pin
+    "recraft-v4.1-utility":           {"model": "recraft/recraft-v4.1-utility", "price_in": 0.0, "price_out": 0.0, "context": 65536,     "extra_body": {"include_images": True}},  # 🇺🇸 Recraft — IMAGE_GEN_FALLBACKS budget pin
+    "krea-2-large":                   {"model": "krea/krea-2-large", "price_in": 0.0, "price_out": 0.0, "context": 65536,         "extra_body": {"include_images": True}},  # 🇺🇸 Krea — highest-fidelity Krea tier
+    "krea-2-medium":                  {"model": "krea/krea-2-medium", "price_in": 0.0, "price_out": 0.0, "context": 65536,        "extra_body": {"include_images": True}},  # 🇺🇸 Krea — half the image-token rate of large
+    "krea-2-medium-turbo":            {"model": "krea/krea-2-medium-turbo", "price_in": 0.0, "price_out": 0.0, "context": 65536,  "extra_body": {"include_images": True}},  # 🇺🇸 Krea — cheapest of the three, latency-optimised
     # ── Remaining 2026-08 catalogue image models (previously undeclared) ──
-    "gpt-image-1":                    {"model": "openai/gpt-image-1",              "extra_body": {"include_images": True}},
-    "gpt-image-1-mini":               {"model": "openai/gpt-image-1-mini",         "extra_body": {"include_images": True}},
-    "gpt-image-2":                    {"model": "openai/gpt-image-2",              "extra_body": {"include_images": True}},
-    "mai-image-2.5":                  {"model": "microsoft/mai-image-2.5",         "extra_body": {"include_images": True}},  # 🇺🇸 Microsoft
-    "mai-image-2.5-pro":              {"model": "microsoft/mai-image-2.5-pro",     "extra_body": {"include_images": True}},  # 🇺🇸 Microsoft
-    "gemini-3-pro-image-preview":     {"model": "google/gemini-3-pro-image-preview",     "extra_body": {"include_images": True}},  # legacy preview id, GA is gemini-pro-image
-    "flux.2-flex":                    {"model": "black-forest-labs/flux.2-flex",   "extra_body": {"include_images": True}},  # 🇩🇪 Black Forest Labs
-    "flux.2-max":                     {"model": "black-forest-labs/flux.2-max",    "extra_body": {"include_images": True}},  # 🇩🇪 Black Forest Labs
-    "flux.2-klein-4b":                {"model": "black-forest-labs/flux.2-klein-4b", "extra_body": {"include_images": True}},  # 🇩🇪 Black Forest Labs
-    "recraft-v3":                     {"model": "recraft/recraft-v3",              "extra_body": {"include_images": True}},  # 🇺🇸 Recraft
-    "recraft-v4":                     {"model": "recraft/recraft-v4",              "extra_body": {"include_images": True}},  # 🇺🇸 Recraft
-    "recraft-v4-pro":                 {"model": "recraft/recraft-v4-pro",          "extra_body": {"include_images": True}},  # 🇺🇸 Recraft
-    "recraft-v4-vector":              {"model": "recraft/recraft-v4-vector",       "extra_body": {"include_images": True}},  # 🇺🇸 Recraft — SVG output
-    "recraft-v4-pro-vector":          {"model": "recraft/recraft-v4-pro-vector",   "extra_body": {"include_images": True}},  # 🇺🇸 Recraft — SVG output
-    "recraft-v4.1":                   {"model": "recraft/recraft-v4.1",            "extra_body": {"include_images": True}},  # 🇺🇸 Recraft
-    "recraft-v4.1-pro":               {"model": "recraft/recraft-v4.1-pro",        "extra_body": {"include_images": True}},  # 🇺🇸 Recraft
-    "recraft-v4.1-vector":            {"model": "recraft/recraft-v4.1-vector",     "extra_body": {"include_images": True}},  # 🇺🇸 Recraft — SVG output
-    "recraft-v4.1-pro-vector":        {"model": "recraft/recraft-v4.1-pro-vector", "extra_body": {"include_images": True}},  # 🇺🇸 Recraft — SVG output
-    "recraft-v4.1-utility-pro":       {"model": "recraft/recraft-v4.1-utility-pro", "extra_body": {"include_images": True}},  # 🇺🇸 Recraft
-    "recraft-v4-styles":              {"model": "recraft/recraft-v4-styles",            "extra_body": {"include_images": True}},  # 🇺🇸 Recraft — from $0.035, 65K ctx
-    "recraft-v4-styles-pro":          {"model": "recraft/recraft-v4-styles-pro",        "extra_body": {"include_images": True}},  # 🇺🇸 Recraft — from $0.10, 65K ctx
-    "recraft-v4-styles-vector":       {"model": "recraft/recraft-v4-styles-vector",     "extra_body": {"include_images": True}},  # 🇺🇸 Recraft — SVG output, from $0.05, 65K ctx
-    "recraft-v4-styles-pro-vector":   {"model": "recraft/recraft-v4-styles-pro-vector", "extra_body": {"include_images": True}},  # 🇺🇸 Recraft — SVG output, from $0.12, 65K ctx
-    "riverflow-v2-pro":               {"model": "sourceful/riverflow-v2-pro",      "extra_body": {"include_images": True}},  # 🇺🇸 Sourceful
-    "riverflow-v2.5-fast":            {"model": "sourceful/riverflow-v2.5-fast",   "extra_body": {"include_images": True}},  # 🇺🇸 Sourceful
-    "riverflow-v2.5-pro":             {"model": "sourceful/riverflow-v2.5-pro",    "extra_body": {"include_images": True}},  # 🇺🇸 Sourceful
+    "gpt-image-1":                    {"model": "openai/gpt-image-1", "price_in": 10.0, "price_out": 10.0, "context": 400000,              "extra_body": {"include_images": True}},
+    "gpt-image-1-mini":               {"model": "openai/gpt-image-1-mini", "price_in": 2.5, "price_out": 2.5, "context": 400000,         "extra_body": {"include_images": True}},
+    "gpt-image-2":                    {"model": "openai/gpt-image-2", "price_in": 8.0, "price_out": 8.0, "context": 400000,              "extra_body": {"include_images": True}},
+    "mai-image-2.5":                  {"model": "microsoft/mai-image-2.5", "price_in": 5.0, "price_out": 0.0, "context": 4096,         "extra_body": {"include_images": True}},  # 🇺🇸 Microsoft
+    "mai-image-2.5-pro":              {"model": "microsoft/mai-image-2.5-pro", "price_in": 5.0, "price_out": 0.0, "context": 4096,     "extra_body": {"include_images": True}},  # 🇺🇸 Microsoft
+    "gemini-3-pro-image-preview":     {"model": "google/gemini-3-pro-image-preview", "price_in": 2.0, "price_out": 12.0, "context": 65536,     "extra_body": {"include_images": True}},  # legacy preview id, GA is gemini-pro-image
+    "flux.2-flex":                    {"model": "black-forest-labs/flux.2-flex", "price_in": 0.0, "price_out": 0.0, "context": 67344,   "extra_body": {"include_images": True}},  # 🇩🇪 Black Forest Labs
+    "flux.2-max":                     {"model": "black-forest-labs/flux.2-max", "price_in": 0.0, "price_out": 0.0, "context": 46864,    "extra_body": {"include_images": True}},  # 🇩🇪 Black Forest Labs
+    "flux.2-klein-4b":                {"model": "black-forest-labs/flux.2-klein-4b", "price_in": 0.0, "price_out": 0.0, "context": 40960, "extra_body": {"include_images": True}},  # 🇩🇪 Black Forest Labs
+    "recraft-v3":                     {"model": "recraft/recraft-v3", "price_in": 0.0, "price_out": 0.0, "context": 65536,              "extra_body": {"include_images": True}},  # 🇺🇸 Recraft
+    "recraft-v4":                     {"model": "recraft/recraft-v4", "price_in": 0.0, "price_out": 0.0, "context": 65536,              "extra_body": {"include_images": True}},  # 🇺🇸 Recraft
+    "recraft-v4-pro":                 {"model": "recraft/recraft-v4-pro", "price_in": 0.0, "price_out": 0.0, "context": 65536,          "extra_body": {"include_images": True}},  # 🇺🇸 Recraft
+    "recraft-v4-vector":              {"model": "recraft/recraft-v4-vector", "price_in": 0.0, "price_out": 0.0, "context": 65536,       "extra_body": {"include_images": True}},  # 🇺🇸 Recraft — SVG output
+    "recraft-v4-pro-vector":          {"model": "recraft/recraft-v4-pro-vector", "price_in": 0.0, "price_out": 0.0, "context": 65536,   "extra_body": {"include_images": True}},  # 🇺🇸 Recraft — SVG output
+    "recraft-v4.1":                   {"model": "recraft/recraft-v4.1", "price_in": 0.0, "price_out": 0.0, "context": 65536,            "extra_body": {"include_images": True}},  # 🇺🇸 Recraft
+    "recraft-v4.1-pro":               {"model": "recraft/recraft-v4.1-pro", "price_in": 0.0, "price_out": 0.0, "context": 65536,        "extra_body": {"include_images": True}},  # 🇺🇸 Recraft
+    "recraft-v4.1-vector":            {"model": "recraft/recraft-v4.1-vector", "price_in": 0.0, "price_out": 0.0, "context": 65536,     "extra_body": {"include_images": True}},  # 🇺🇸 Recraft — SVG output
+    "recraft-v4.1-pro-vector":        {"model": "recraft/recraft-v4.1-pro-vector", "price_in": 0.0, "price_out": 0.0, "context": 65536, "extra_body": {"include_images": True}},  # 🇺🇸 Recraft — SVG output
+    "recraft-v4.1-utility-pro":       {"model": "recraft/recraft-v4.1-utility-pro", "price_in": 0.0, "price_out": 0.0, "context": 65536, "extra_body": {"include_images": True}},  # 🇺🇸 Recraft
+    "recraft-v4-styles":              {"model": "recraft/recraft-v4-styles", "price_in": 0.0, "price_out": 0.0, "context": 65536,            "extra_body": {"include_images": True}},  # 🇺🇸 Recraft — from $0.035, 65K ctx
+    "recraft-v4-styles-pro":          {"model": "recraft/recraft-v4-styles-pro", "price_in": 0.0, "price_out": 0.0, "context": 65536,        "extra_body": {"include_images": True}},  # 🇺🇸 Recraft — from $0.10, 65K ctx
+    "recraft-v4-styles-vector":       {"model": "recraft/recraft-v4-styles-vector", "price_in": 0.0, "price_out": 0.0, "context": 65536,     "extra_body": {"include_images": True}},  # 🇺🇸 Recraft — SVG output, from $0.05, 65K ctx
+    "recraft-v4-styles-pro-vector":   {"model": "recraft/recraft-v4-styles-pro-vector", "price_in": 0.0, "price_out": 0.0, "context": 65536, "extra_body": {"include_images": True}},  # 🇺🇸 Recraft — SVG output, from $0.12, 65K ctx
+    "riverflow-v2-pro":               {"model": "sourceful/riverflow-v2-pro", "price_in": 0.0, "price_out": 0.0, "context": 8192,      "extra_body": {"include_images": True}},  # 🇺🇸 Sourceful
+    "riverflow-v2.5-fast":            {"model": "sourceful/riverflow-v2.5-fast", "price_in": 0.0, "price_out": 0.0, "context": 32768,   "extra_body": {"include_images": True}},  # 🇺🇸 Sourceful
+    "riverflow-v2.5-pro":             {"model": "sourceful/riverflow-v2.5-pro", "price_in": 0.0, "price_out": 0.0, "context": 32768,    "extra_body": {"include_images": True}},  # 🇺🇸 Sourceful
     # google/gemini-3.1-flash-image-preview NOT declared separately — its alias
     # slot ("gemini-3.1-flash-image-preview") already points at the promoted GA
     # id (google/gemini-3.1-flash-image) above; adding it here would collide.

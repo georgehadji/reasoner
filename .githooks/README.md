@@ -10,6 +10,7 @@ git config core.hooksPath .githooks
 | Hook | Runs | Mirrors |
 |---|---|---|
 | `pre-commit` | `scripts/scan-secrets.py` | was `.git/hooks/pre-commit` |
+| `post-commit` | `scripts/update_mindmap_meta.py` (stages the regenerated files for the *next* commit; never amends) | was `.git/hooks/post-commit` — see D12, `docs/plans/root-cause-remediation-2026-09-07.md` P4 step 3 |
 | `pre-push` | `scripts/ci-local.sh` (full suite) | `.github/workflows/{test,pr-architecture}.yml` |
 
 Bypass a single run with `--no-verify` on the `git commit`/`git push` command.

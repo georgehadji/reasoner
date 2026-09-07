@@ -1,0 +1,20 @@
+#!/bin/sh
+# Tracked post-commit hook -- resurrects the generator that used to live at
+# .git/hooks/post-commit and stopped running the day core.hooksPath moved to
+# .githooks/ (D12, docs/plans/root-cause-remediation-2026-09-07.md P4 step 3).
+# Activate once per clone:
+#   git config core.hooksPath .githooks
+#
+# Convenience only, not the guarantee: this staging a regenerated file is a
+# courtesy for the next commit, never the current one -- it never amends. The
+# real enforcement is generated-docs-drift in .github/workflows/pr-architecture.yml,
+# which fails CI if these files are stale regardless of whether this hook ran.
+# update_mindmap_meta.py's own _stage() runs `git add` on what it rewrites, so
+# this hook only needs to invoke it.
+
+SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$SCRIPT_DIR" || exit 0
+
+python scripts/update_mindmap_meta.py >/dev/null 2>&1 || true
+
+exit 0

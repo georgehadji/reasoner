@@ -25,6 +25,22 @@ try:
     def _ensure_dotenv() -> None:
         global _dotenv_loaded
         if not _dotenv_loaded:
+            # docs/plans/root-cause-remediation-2026-09-07.md P3 step 1: every
+            # field below is a plain class attribute computed once, right here,
+            # at this module's first import -- not a pydantic-settings model
+            # rebuilt per instance, so a per-test fixture that runs after
+            # collection is already too late to isolate anything. tests/conftest.py
+            # sets this before importing any reasoner module (which is the
+            # trigger that reaches this function), so pytest never sees the
+            # developer's .env at all: test_deprecated_alias_still_routes (D7)
+            # took the DeepSeek-direct branch in build_provider() only because
+            # a developer's own DEEPSEEK_API_KEY in .env silently became this
+            # class's baked-in default. A developer who deliberately wants
+            # .env honoured locally (e.g. running the slow/integration lane by
+            # hand) can `export REASONER_SKIP_DOTENV=0` first.
+            if os.getenv("REASONER_SKIP_DOTENV", "").lower() in ("1", "true", "yes"):
+                _dotenv_loaded = True
+                return
             # Load .env first, then .env.local as fallback (Next.js convention).
             # Also check ui-next/.env.local so the backend can share the frontend key.
             # .env uses override=True so it wins over stale shell env vars.
