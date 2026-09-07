@@ -382,7 +382,8 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ═══════════════════════════════════════════════════════════════
     # inclusionAI (Ant Group)
     # ═══════════════════════════════════════════════════════════════
-    "ling-3.0-flash-free": {"model": "inclusionai/ling-3.0-flash", "price_in": 0.021, "price_out": 0.063, "context": 262144},  # v3.8: :free tier died (as predicted) -> paid, $0.021/$0.063 per M, 262K ctx
+    "ling-3.0-flash-free": {"model": "inclusionai/ling-3.0-flash", "price_in": 0.021, "price_out": 0.063, "context": 262144},  # v3.8: :free tier died (as predicted) -> paid, $0.021/$0.063 per M, 262K ctx. Deprecated (P4 step 4): honest name below.
+    "ling-3.0-flash":      {"model": "inclusionai/ling-3.0-flash", "price_in": 0.021, "price_out": 0.063, "context": 262144},  # honest name, same entry as ling-3.0-flash-free above -- see DEPRECATED_ALIASES
     # The whole inclusionAI 2.6 line was delisted by 2026-08-26: ring-2.6-1t and
     # ling-2.6-1t 404 ("no longer available as a free model") and ling-2.6-flash
     # left the OpenRouter catalogue entirely. Not a billing issue — other paid
@@ -397,7 +398,8 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ═══════════════════════════════════════════════════════════════
     # Nex AGI — MoE
     # ═══════════════════════════════════════════════════════════════
-    "nex-n2-pro-free":   {"model": "nex-agi/nex-n2-pro", "price_in": 0.25, "price_out": 1.0, "context": 262144},           # v3.5: :free tier dead -> paid, $0.25/$1.00 per M
+    "nex-n2-pro-free":   {"model": "nex-agi/nex-n2-pro", "price_in": 0.25, "price_out": 1.0, "context": 262144},           # v3.5: :free tier dead -> paid, $0.25/$1.00 per M. Deprecated (P4 step 4): honest name below.
+    "nex-n2-pro":        {"model": "nex-agi/nex-n2-pro", "price_in": 0.25, "price_out": 1.0, "context": 262144},           # honest name, same entry as nex-n2-pro-free above -- see DEPRECATED_ALIASES
     # ═══════════════════════════════════════════════════════════════
     # Nous Research — Hermes series
     # ═══════════════════════════════════════════════════════════════
@@ -715,6 +717,11 @@ DEPRECATED_ALIASES: dict[str, str | None] = {
     "mimo-v2-flash": "mimo-v2.5",
     "mimo-v2-pro": "mimo-v2.5-pro",
     "gemini-3.1-flash-lite": "gemini-flash-lite-real",
+    # P4 step 4 (docs/plans/root-cause-remediation-2026-09-07.md): both names
+    # claim a :free tier they do not serve -- see the NO :free TIERS note atop
+    # this file. The honest aliases below are true drop-ins (identical entry).
+    "ling-3.0-flash-free": "ling-3.0-flash",
+    "nex-n2-pro-free": "nex-n2-pro",
 }
 
 

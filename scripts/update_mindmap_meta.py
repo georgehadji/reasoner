@@ -23,6 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 ARCHITECTURE_MINDMAP = ROOT / "ARCHITECTURE_MINDMAP.md"
 CODEBASE_MINDMAP = ROOT / "docs" / "CODEBASE_MINDMAP.md"
 CODEMAPS_DIR = ROOT / "docs" / "CODEMAPS"
+CLAUDE_MD = ROOT / "CLAUDE.md"
 
 
 # ── Live counts ──────────────────────────────────────────────────────────────
@@ -293,6 +294,37 @@ def _count_test_files() -> int:
     return len(list(tests_dir.glob("*.py"))) if tests_dir.exists() else 0
 
 
+def _count_distinct_preset_methods() -> int:
+    """Distinct ``method`` values across every preset -- CLAUDE.md's own "24 distinct" claim.
+
+    Not the same number as ``_count_methods()`` above (31, the count of prompt
+    modules under ``phases/``): CLAUDE.md §5 already documents that these two
+    numbers measure different things and must not be confused. Wiring the
+    phase-module count into the "Reasoning Methods (N distinct...)" heading
+    would silently make that documented distinction false.
+    """
+    try:
+        import importlib
+        sys.path.insert(0, str(ROOT / "src"))
+        mod = importlib.import_module("reasoner.presets")
+        presets = getattr(mod, "PRESETS", None) or {}
+        return len({p.method for p in presets.values()})
+    except Exception:
+        return 0
+
+
+def _count_test_py_recursive() -> int:
+    """Every ``test_*.py`` file under ``tests/``, any depth.
+
+    Distinct from ``_count_test_files()`` above (a shallow, all-``*.py`` count
+    feeding the marketing-facing ``capabilities.generated.ts``): CLAUDE.md's
+    own claim is "N test_*.py files, recursive", so its generated marker must
+    count exactly that, not a proxy.
+    """
+    tests_dir = ROOT / "tests"
+    return len(list(tests_dir.rglob("test_*.py"))) if tests_dir.exists() else 0
+
+
 # ── Patching helpers ──────────────────────────────────────────────────────────
 
 def _patch(text: str, pattern: str, replacement: str, label: str = "") -> str:
@@ -300,6 +332,26 @@ def _patch(text: str, pattern: str, replacement: str, label: str = "") -> str:
     if n == 0 and label:
         print(f"  [mindmap] WARNING: pattern not found in {label} — {pattern!r}", file=sys.stderr)
     return new
+
+
+_GEN_MARKER_RE = re.compile(r"<!-- gen:(\w+) -->[^<]*<!-- /gen -->")
+
+
+def _patch_gen_markers(text: str, values: dict[str, int]) -> str:
+    """Replace every ``<!-- gen:NAME -->old<!-- /gen -->`` with the live value.
+
+    Generic across repeat occurrences of the same marker name (CLAUDE.md
+    states some counts more than once), unlike ``_patch()`` above, which
+    replaces one regex match. A marker whose name isn't in ``values`` is left
+    untouched rather than erased, so adding a new gen:* site here needs no
+    corresponding key in every caller.
+    """
+    def _sub(m: re.Match[str]) -> str:
+        name = m.group(1)
+        if name not in values:
+            return m.group(0)
+        return f"<!-- gen:{name} -->{values[name]}<!-- /gen -->"
+    return _GEN_MARKER_RE.sub(_sub, text)
 
 
 def _stage(path: Path) -> None:
@@ -380,6 +432,43 @@ def _update_codemaps(today: str, py: int) -> int:
             _stage(md)
             updated += 1
     return updated
+
+
+def _update_claude_md(models: int, presets: int) -> bool:
+    """P4 step 5: patch CLAUDE.md's ``<!-- gen:* -->`` markers from live counts.
+
+    Prose stays hand-written; only the number inside each marker is derived.
+    D8 found six of these hand-maintained counts wrong by up to 300% because
+    nothing regenerated them -- this closes that the same way
+    ARCHITECTURE_MINDMAP.md's counts are closed, just with inline markers
+    instead of whole-line patterns, since these numbers sit inside prose
+    sentences and table cells rather than a dedicated metadata line.
+
+    Takes ``models``/``presets`` (not ``methods``) from the caller because
+    CLAUDE.md's "24 distinct" reasoning-methods claim and
+    ``main()``'s ``methods`` (31, phase-module files) are different metrics --
+    see ``_count_distinct_preset_methods()``.
+    """
+    if not CLAUDE_MD.exists():
+        return False
+    text = orig = CLAUDE_MD.read_text(encoding="utf-8")
+    reasoning_models = _count_reasoning_models()
+    values = {
+        "models": models,
+        "reasoning_models": reasoning_models,
+        "image_models": models - reasoning_models,
+        "catalogue": _count_routable_models(),
+        "presets": presets,
+        "methods": _count_distinct_preset_methods(),
+        "test_files": _count_test_py_recursive(),
+        "adapters": _count_provider_adapters(),
+    }
+    text = _patch_gen_markers(text, values)
+    if text == orig:
+        return False
+    CLAUDE_MD.write_text(text, encoding="utf-8")
+    _stage(CLAUDE_MD)
+    return True
 
 
 CAPABILITIES_TS = ROOT / "ui-next" / "src" / "lib" / "capabilities.generated.ts"
@@ -480,6 +569,9 @@ def main() -> None:
 
     if _update_capabilities_ts(today, presets, methods):
         changed.append("ui-next/src/lib/capabilities.generated.ts")
+
+    if _update_claude_md(models, presets):
+        changed.append("CLAUDE.md")
 
     if changed:
         print(

@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 1. Project Overview
 
-**Reasoner** (Adaptive Reasoning Architecture) is a production-grade AI reasoning orchestrator that decomposes complex problems into structured multi-phase pipelines, leverages 210 directly registered model aliases (162 for reasoning, 48 for image generation) drawn from a 472-model OpenRouter catalogue, from diverse training ecosystems in parallel, applies independent critique, stress-tests solutions, and synthesizes actionable recommendations with epistemic labeling (`VERIFIED` / `HYPOTHESIS` / `UNKNOWN`).
+**Reasoner** (Adaptive Reasoning Architecture) is a production-grade AI reasoning orchestrator that decomposes complex problems into structured multi-phase pipelines, leverages <!-- gen:models -->212<!-- /gen --> directly registered model aliases (<!-- gen:reasoning_models -->164<!-- /gen --> for reasoning, <!-- gen:image_models -->48<!-- /gen --> for image generation) drawn from a <!-- gen:catalogue -->472<!-- /gen -->-model OpenRouter catalogue, from diverse training ecosystems in parallel, applies independent critique, stress-tests solutions, and synthesizes actionable recommendations with epistemic labeling (`VERIFIED` / `HYPOTHESIS` / `UNKNOWN`).
 
 - **Version:** 2.2 (Python package 2.1.0) | **Python:** 3.12+ | **Frontend:** Next.js 16 / React 19 / TypeScript 5
 
@@ -27,7 +27,7 @@ Hexagonal DDD + CQRS + Event Sourcing + WorkflowStrategy composition (`applicati
 | Layer | Technology |
 |-------|------------|
 | Runtime | Python 3.12+, FastAPI 0.109+, uvicorn, Pydantic v2, httpx |
-| LLM Routing | OpenRouter (primary, 472 catalogued models); 8 direct adapters (Anthropic, OpenAI and Google as dedicated clients; Mistral, DeepSeek, xAI, Perplexity and Qwen through the OpenAI-compatible table in `providers/direct.py`). Kimi, GLM and MiniMax route via OpenRouter, not directly. Ollama is local and is handled in `registry.build_provider()`, not in the direct-adapter table |
+| LLM Routing | OpenRouter (primary, <!-- gen:catalogue -->472<!-- /gen --> catalogued models); <!-- gen:adapters -->8<!-- /gen --> direct adapters (Anthropic, OpenAI and Google as dedicated clients; Mistral, DeepSeek, xAI, Perplexity and Qwen through the OpenAI-compatible table in `providers/direct.py`). Kimi, GLM and MiniMax route via OpenRouter, not directly. Ollama is local and is handled in `registry.build_provider()`, not in the direct-adapter table |
 | Search | Perplexity Sonar, Brave Search API, Tavily |
 | Database | SQLite (event store), PostgreSQL (asyncpg), aiosqlite |
 | Memory | Neuro L1/L2/L3 tiered cache with embedding search |
@@ -49,7 +49,7 @@ Every folder has a **map skill** in `.claude/skills/` listing what the folder co
 | Endpoints, SSE streaming, auth deps, middleware, CSRF, billing routes, MCP tools | `src/reasoner/api/` | `map-api` |
 | Pipeline behavior, reasoning flows and phase logic, CQRS handlers, event bus, services (routing, billing, metering, serializers, renderers) | `src/reasoner/application/` | `map-application` |
 | Constants, token budgets, settings/env, hexagonal ports, domain events, aggregates, JSON parsing, sanitization | `src/reasoner/core/` | `map-core` |
-| `PipelineState` fields, the 49 presets, pricing, credits, SaaS entities, ACR value objects, watermark domain | `src/reasoner/domain/` | `map-domain` |
+| `PipelineState` fields, the <!-- gen:presets -->49<!-- /gen --> presets, pricing, credits, SaaS entities, ACR value objects, watermark domain | `src/reasoner/domain/` | `map-domain` |
 | Adding a model or provider, routing and fallback, event stores and repos, Valkey/Redis, search adapters, code sandbox, widgets, websocket | `src/reasoner/infrastructure/` | `map-infrastructure` |
 | Routing decision (DIRECT / WEB_SEARCH / PIPELINE), method classification, fast-path regexes | `src/reasoner/hypergate/` | `map-hypergate` |
 | Writing or editing any prompt; per-method prompt modules; Verbalized Sampling stages | `src/reasoner/phases/` | `map-phases` |
@@ -103,10 +103,10 @@ src/reasoner/
 ├── domain/                 # Business entities and declarative routing configs
 │   ├── pipeline_state.py   # PipelineState (~60 fields) — canonical state model
 │   ├── preset_core.py      # PipelinePreset, build_auto_preset(), _KNOWN_ROUTING_ROLES
-│   └── preset_registry.py  # 49 preset configs with model routing and fallbacks
+│   └── preset_registry.py  # <!-- gen:presets -->49<!-- /gen --> preset configs with model routing and fallbacks
 ├── infrastructure/         # Adapters implementing Core ports
 │   ├── llm/
-│   │   ├── registry.py     # _MODEL_WHITELIST (210 aliases), _REGISTRY, build_provider()
+│   │   ├── registry.py     # _MODEL_WHITELIST (<!-- gen:models -->212<!-- /gen --> aliases), _REGISTRY, build_provider()
 │   │   ├── router.py       # ProviderRouter: role-based routing, fallback chain
 │   │   └── providers/      # OpenAICompatibleProvider, OpenRouterProvider, etc.
 │   ├── persistence/        # EventStore (SQLite), snapshots, postgres_store
@@ -129,7 +129,7 @@ ui-next/src/
 ├── lib/                    # api-client, db (IndexedDB), types, utils, security, markdown
 └── stores/                 # app-store.ts (Zustand global state with persistence)
 
-tests/                      # pytest suite (316 test_*.py files, recursive)
+tests/                      # pytest suite (<!-- gen:test_files -->317<!-- /gen --> test_*.py files, recursive)
 scripts/
 └── update_mindmap_meta.py  # Patches live counts into ARCHITECTURE_MINDMAP.md (run manually — see §10)
 ```
@@ -219,7 +219,7 @@ HyperGate → Phase 0: Classification (task type, language)
           → Phase 5: Synthesis (VERIFIED/HYPOTHESIS/UNKNOWN + Action Blueprint)
 ```
 
-### Reasoning Methods (24 distinct, + Verbalized Sampling sub-phases)
+### Reasoning Methods (<!-- gen:methods -->24<!-- /gen --> distinct, + Verbalized Sampling sub-phases)
 
 | Method | Description |
 |--------|-------------|

@@ -60,7 +60,7 @@ _REGISTRY: dict[str, dict] = {
             "synthesis": "llama-4-maverick",  # 🇺🇸 Meta — $0.200/$0.800 per M, 1048K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
             # ── Per-perspective cross-bloc diversity (2🇨🇳 + 1🇺🇸 + 1🇫🇷, ultra-cheap) ──
             "constructive":  "stepfun-3.7-flash",    # 🇨🇳 StepFun — $0.20/$1.15
-            "destructive":   "ling-3.0-flash-free",  # 🇨🇳 inclusionAI — $0.021/$0.063 (was ling-2.6-flash-free; OpenRouter delisted the 2.6 line)
+            "destructive":   "ling-3.0-flash",  # 🇨🇳 inclusionAI — $0.021/$0.063 (was ling-2.6-flash-free; OpenRouter delisted the 2.6 line. Renamed off ling-3.0-flash-free 2026-09-07: that name claimed a :free tier it never served)
             "systemic":      "gpt-oss-20b",          # 🇺🇸 OpenAI open-weight — $0.029/$0.14 (was qwen3.6-flash, added US bloc)
             "minimalist":    "mistral-small-3.2-24b",         # 🇫🇷 Mistral — $0.075/$0.20
         # ── Reasoning model assignments (budget, v3.4) ──

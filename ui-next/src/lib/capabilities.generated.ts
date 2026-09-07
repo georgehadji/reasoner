@@ -8,7 +8,7 @@
 export const CAPABILITIES = {
   methods: 31,
   presets: 49,
-  directModels: 162,
+  directModels: 164,
   routableModels: 472,
   providerAdapters: 8,
   testFiles: 259,

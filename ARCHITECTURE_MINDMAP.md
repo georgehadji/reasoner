@@ -13,13 +13,13 @@
 | Attribute | Value |
 |-----------|-------|
 | **Architecture Style** | Hexagonal DDD + CQRS + Event Sourcing + Workflow Strategy Composition |
-| **Backend** | Python 3.12+, FastAPI 0.109+, Pydantic v2, ~529 source files |
+| **Backend** | Python 3.12+, FastAPI 0.109+, Pydantic v2, ~530 source files |
 | **Frontend** | Next.js 16 (App Router), React 19, TypeScript 5, Tailwind CSS v4 |
 | **State Model** | `PipelineState` (~60 fields) + `PipelineAggregate` (event-sourced) |
 | **LLM Routing** | OpenRouter primary (350+ models), 12+ direct provider adapters, Ollama local |
 | **Reasoning Methods** | 31 (multi-perspective, debate, jury, research, scientific, socratic, pre-mortem, bayesian, dialectical, analogical, delphi, cove, sot, tot, pot, self-discover, writing) |
 | **Presets** | 49+ declarative presets (budget, balanced, premium, experimental tiers per method) |
-| **Models Supported** | 210+ directly registered (350+ via OpenRouter: Anthropic, OpenAI, Google, xAI, Perplexity, Mistral, DeepSeek, Qwen, Kimi, GLM, MiniMax, plus local Ollama) |
+| **Models Supported** | 212+ directly registered (350+ via OpenRouter: Anthropic, OpenAI, Google, xAI, Perplexity, Mistral, DeepSeek, Qwen, Kimi, GLM, MiniMax, plus local Ollama) |
 | **Web Search** | SearXNG (self-hosted Docker) + Perplexity Sonar |
 | **Memory** | Neuro L1/L2/L3 tiered cache with embedding search + Cohere rerank |
 | **Security** | Input sanitization, prompt-injection defense, rate limiting, scoped auth, CSRF, circuit breaker |

@@ -22,6 +22,8 @@ from collections import defaultdict
 from dataclasses import dataclass, field, replace
 from typing import Any
 
+from reasoner.core.ports.clock import Clock, SystemClock
+
 logger = logging.getLogger(__name__)
 
 import valkey.asyncio as aioredis
@@ -72,8 +74,9 @@ class RateLimiter:
     # MAX_RATE_LIMIT_BUCKETS is now imported at the top
     _MAX_BUCKETS: int = MAX_RATE_LIMIT_BUCKETS
 
-    def __init__(self, config: RateLimitConfig | None = None):
+    def __init__(self, config: RateLimitConfig | None = None, clock: Clock | None = None):
         self.config = config or RateLimitConfig()
+        self._clock: Clock = clock or SystemClock()
         self._redis_client: aioredis.Redis | None = None
         self._redis_script: Any = None
         self._redis_available: bool = False
@@ -180,7 +183,7 @@ class RateLimiter:
             # with tokens=0.0, causing the first request from every client to be rejected.
             self._in_memory_get_bucket(client_id)
             bucket = self._buckets[client_id]
-            now = time.monotonic()
+            now = self._clock.monotonic()
 
             # Refill tokens (in-memory logic)
             elapsed = now - bucket.last_update
@@ -212,14 +215,14 @@ class RateLimiter:
             }
 
             if bucket.requests_minute >= rpm:
-                info["retry_after"] = 60 - (time.monotonic() - bucket.minute_window_start)
+                info["retry_after"] = 60 - (self._clock.monotonic() - bucket.minute_window_start)
                 info["reason"] = "per_minute_limit_fallback"
                 if _METRICS_AVAILABLE:
                     REASONER_RATE_LIMIT_REJECTED.labels(tier="fallback").inc()
                 return False, info
 
             if bucket.requests_hour >= rph:
-                info["retry_after"] = 3600 - (time.monotonic() - bucket.hour_window_start)
+                info["retry_after"] = 3600 - (self._clock.monotonic() - bucket.hour_window_start)
                 info["reason"] = "per_hour_limit_fallback"
                 if _METRICS_AVAILABLE:
                     REASONER_RATE_LIMIT_REJECTED.labels(tier="fallback").inc()
@@ -481,12 +484,20 @@ class RateLimiter:
                 oldest = next(iter(self._buckets))
                 del self._buckets[oldest]
             bucket = ClientBucket()
+            # ClientBucket's dataclass defaults stamp the real wall clock via
+            # default_factory=time.monotonic, bypassing an injected FakeClock.
+            # Re-stamp from self._clock so a test-supplied clock governs a
+            # freshly created bucket too, not just refills on an existing one.
+            now = self._clock.monotonic()
+            bucket.last_update = now
+            bucket.minute_window_start = now
+            bucket.hour_window_start = now
             bucket.tokens = self.config.burst_size # Start with full burst
             self._buckets[client_id] = bucket
         return self._buckets[client_id]
 
     def _in_memory_refill_tokens(self, bucket: ClientBucket, multiplier: float = 1.0) -> None:
-        now = time.monotonic()
+        now = self._clock.monotonic()
         elapsed = now - bucket.last_update
         refill_rate = (self.config.requests_per_minute * multiplier) / 60.0
         max_tokens = self.config.burst_size * multiplier
@@ -494,7 +505,7 @@ class RateLimiter:
         bucket.last_update = now
 
     def _in_memory_reset_windows_if_needed(self, bucket: ClientBucket) -> None:
-        now = time.monotonic()
+        now = self._clock.monotonic()
         elapsed_minutes = int((now - bucket.minute_window_start) // 60)
         if elapsed_minutes > 0:
             bucket.requests_minute = 0

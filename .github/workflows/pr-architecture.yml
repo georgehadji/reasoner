@@ -43,7 +43,7 @@ jobs:
         # which is not drift.
         run: |
           python scripts/update_mindmap_meta.py
-          DRIFT=$(git diff -- ARCHITECTURE_MINDMAP.md docs/CODEMAPS ui-next/src/lib/capabilities.generated.ts \
+          DRIFT=$(git diff -- ARCHITECTURE_MINDMAP.md docs/CODEMAPS ui-next/src/lib/capabilities.generated.ts CLAUDE.md \
             | grep -E '^[+-]' \
             | grep -Ev '^(\+\+\+|---)' \
             | grep -Ev '^[+-].*(Last Updated|Generated:|generatedAt).*[0-9]{4}-[0-9]{2}-[0-9]{2}')

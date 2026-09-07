@@ -70,7 +70,12 @@ jobs:
           # This merge then deprecated all six remaining :free tiers, which took
           # more long comment lines out. Re-measured on the merged tree rather than
           # carried from either side, because the paydowns compose.
-          python scripts/ruff_ratchet.py --max 2283
+          # 2285: P4 step 4 (docs/plans/root-cause-remediation-2026-09-07.md)
+          # added two honestly-named whitelist entries (ling-3.0-flash,
+          # nex-n2-pro) as drop-ins for their misleadingly-named :free
+          # counterparts. Same long single-line-dict-plus-comment convention
+          # as every other registry.py entry -- +2 E501.
+          python scripts/ruff_ratchet.py --max 2285
 
       - name: Security scan (bandit)
         run: |
