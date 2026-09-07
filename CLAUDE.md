@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 1. Project Overview
 
-**Reasoner** (Adaptive Reasoning Architecture) is a production-grade AI reasoning orchestrator that decomposes complex problems into structured multi-phase pipelines, leverages 28 directly registered LLM models (350+ via OpenRouter) from diverse training ecosystems in parallel, applies independent critique, stress-tests solutions, and synthesizes actionable recommendations with epistemic labeling (`VERIFIED` / `HYPOTHESIS` / `UNKNOWN`).
+**Reasoner** (Adaptive Reasoning Architecture) is a production-grade AI reasoning orchestrator that decomposes complex problems into structured multi-phase pipelines, leverages 210 directly registered model aliases (162 for reasoning, 48 for image generation) drawn from a 472-model OpenRouter catalogue, from diverse training ecosystems in parallel, applies independent critique, stress-tests solutions, and synthesizes actionable recommendations with epistemic labeling (`VERIFIED` / `HYPOTHESIS` / `UNKNOWN`).
 
 - **Version:** 2.2 (Python package 2.1.0) | **Python:** 3.12+ | **Frontend:** Next.js 16 / React 19 / TypeScript 5
 
@@ -27,7 +27,7 @@ Hexagonal DDD + CQRS + Event Sourcing + WorkflowStrategy composition (`applicati
 | Layer | Technology |
 |-------|------------|
 | Runtime | Python 3.12+, FastAPI 0.109+, uvicorn, Pydantic v2, httpx |
-| LLM Routing | OpenRouter (primary, 350+ models); 12 direct adapters (Anthropic, OpenAI, Google, Perplexity, DeepSeek, Mistral, xAI, Qwen, Kimi, GLM, MiniMax, Ollama) |
+| LLM Routing | OpenRouter (primary, 472 catalogued models); 8 direct adapters (Anthropic, OpenAI and Google as dedicated clients; Mistral, DeepSeek, xAI, Perplexity and Qwen through the OpenAI-compatible table in `providers/direct.py`). Kimi, GLM and MiniMax route via OpenRouter, not directly. Ollama is local and is handled in `registry.build_provider()`, not in the direct-adapter table |
 | Search | Perplexity Sonar, Brave Search API, Tavily |
 | Database | SQLite (event store), PostgreSQL (asyncpg), aiosqlite |
 | Memory | Neuro L1/L2/L3 tiered cache with embedding search |
@@ -49,7 +49,7 @@ Every folder has a **map skill** in `.claude/skills/` listing what the folder co
 | Endpoints, SSE streaming, auth deps, middleware, CSRF, billing routes, MCP tools | `src/reasoner/api/` | `map-api` |
 | Pipeline behavior, reasoning flows and phase logic, CQRS handlers, event bus, services (routing, billing, metering, serializers, renderers) | `src/reasoner/application/` | `map-application` |
 | Constants, token budgets, settings/env, hexagonal ports, domain events, aggregates, JSON parsing, sanitization | `src/reasoner/core/` | `map-core` |
-| `PipelineState` fields, the 48 presets, pricing, credits, SaaS entities, ACR value objects, watermark domain | `src/reasoner/domain/` | `map-domain` |
+| `PipelineState` fields, the 49 presets, pricing, credits, SaaS entities, ACR value objects, watermark domain | `src/reasoner/domain/` | `map-domain` |
 | Adding a model or provider, routing and fallback, event stores and repos, Valkey/Redis, search adapters, code sandbox, widgets, websocket | `src/reasoner/infrastructure/` | `map-infrastructure` |
 | Routing decision (DIRECT / WEB_SEARCH / PIPELINE), method classification, fast-path regexes | `src/reasoner/hypergate/` | `map-hypergate` |
 | Writing or editing any prompt; per-method prompt modules; Verbalized Sampling stages | `src/reasoner/phases/` | `map-phases` |
@@ -103,10 +103,10 @@ src/reasoner/
 ├── domain/                 # Business entities and declarative routing configs
 │   ├── pipeline_state.py   # PipelineState (~60 fields) — canonical state model
 │   ├── preset_core.py      # PipelinePreset, build_auto_preset(), _KNOWN_ROUTING_ROLES
-│   └── preset_registry.py  # 48 preset configs with model routing and fallbacks
+│   └── preset_registry.py  # 49 preset configs with model routing and fallbacks
 ├── infrastructure/         # Adapters implementing Core ports
 │   ├── llm/
-│   │   ├── registry.py     # _MODEL_WHITELIST (28 models), _REGISTRY, build_provider()
+│   │   ├── registry.py     # _MODEL_WHITELIST (210 aliases), _REGISTRY, build_provider()
 │   │   ├── router.py       # ProviderRouter: role-based routing, fallback chain
 │   │   └── providers/      # OpenAICompatibleProvider, OpenRouterProvider, etc.
 │   ├── persistence/        # EventStore (SQLite), snapshots, postgres_store
@@ -115,7 +115,7 @@ src/reasoner/
 │   ├── hyperagent.py       # HyperGateAgent orchestrator + fast-path regexes
 │   ├── base_sub_agent.py   # Abstract base with LRU caching
 │   └── sub_agents/         # language, complexity, direct, web_detector, method, tiebreaker
-├── phases/                 # 31 prompt modules: _shared, _universal + 29 method modules
+├── phases/                 # 31 method modules + 4 shared helpers (_prism, _shared, _universal, _vs_shared)
 ├── subagents/              # Phase sub-agents (enhancement, decomposition, critique, synthesis, search)
 ├── neuro/                  # Long-term memory: L1/L2/L3 tiered cache, compression, sessions
 ├── healing/                # Self-healing: introspection_engine, test_generation_engine
@@ -129,7 +129,7 @@ ui-next/src/
 ├── lib/                    # api-client, db (IndexedDB), types, utils, security, markdown
 └── stores/                 # app-store.ts (Zustand global state with persistence)
 
-tests/                      # pytest suite (~197 test files)
+tests/                      # pytest suite (316 test_*.py files, recursive)
 scripts/
 └── update_mindmap_meta.py  # Patches live counts into ARCHITECTURE_MINDMAP.md (run manually — see §10)
 ```
@@ -219,7 +219,7 @@ HyperGate → Phase 0: Classification (task type, language)
           → Phase 5: Synthesis (VERIFIED/HYPOTHESIS/UNKNOWN + Action Blueprint)
 ```
 
-### Reasoning Methods (19 top-level + Verbalized Sampling sub-phases)
+### Reasoning Methods (24 distinct, + Verbalized Sampling sub-phases)
 
 | Method | Description |
 |--------|-------------|
@@ -242,8 +242,20 @@ HyperGate → Phase 0: Classification (task type, language)
 | **Writing** | Creative writing with hallucination guards |
 | **Brainstorming** | Divergent idea generation |
 | **Coding** | Code-focused structured reasoning |
+| **Article** | Long-form article generation |
+| **Cross-Language** | Reasoning that crosses natural-language boundaries |
+| **Iterative-Critique** | Repeated critique-and-revise passes |
+| **Subagent** | Delegation to intra-phase sub-agents |
+| **Image-Gen** | Image generation routing (not text reasoning) |
 
-### Presets (48)
+The 19 rows above the divider are the text-reasoning methods usually described
+as the product. The five below are also distinct `method` values in
+`preset_registry.py`, which is why the count is 24 and not 19. Counts here are
+derived from `{p["method"] for p in PRESETS.values()}`; the 31 reported by
+`scripts/update_mindmap_meta.py` is a different measure, the number of prompt
+modules in `phases/`.
+
+### Presets (49)
 
 Every method has **Budget** (~$0.02/run) and **Premium** (~$0.15–$0.30/run) tiers. The UI orders Budget → Balanced → Premium, defaulting to the first (cheapest) method/preset.
 
