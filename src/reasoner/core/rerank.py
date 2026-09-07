@@ -279,7 +279,7 @@ async def rerank_via_nemotron(
     model: str | None = None,
     api_base: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Rerank documents using NVIDIA Nemotron Rerank VL (free, via OpenRouter).
+    """Rerank documents using an NVIDIA Nemotron model via OpenRouter.
 
     Unlike Cohere's dedicated /rerank endpoint, Nemotron uses the chat completions
     API with logprobs. Each document is scored in a separate request, run in parallel
@@ -313,6 +313,14 @@ async def rerank_via_nemotron(
         return documents
 
     model_id = model or settings.NEMOTRON_RERANK_MODEL
+    if not model_id:
+        # No model configured. The former default was a :free id that OpenRouter
+        # does not serve, so this path scored every document against a 404 and
+        # returned the input unchanged anyway. Skipping is the same result without
+        # one request per document. Set NEMOTRON_RERANK_MODEL to a paid id to
+        # re-enable it.
+        logger.debug("Nemotron rerank skipped: NEMOTRON_RERANK_MODEL is unset.")
+        return documents
     base = api_base or settings.RERANK_API_BASE
     concurrency = settings.NEMOTRON_RERANK_CONCURRENCY
 

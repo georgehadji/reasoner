@@ -67,7 +67,7 @@ jobs:
           # arcee-ai/virtuoso-large) took one E501 comment line with them, and
           # three over-long registry comments added alongside the new models were
           # reflowed under 100 -- -4 against this branch, -1 against main.
-          python scripts/ruff_ratchet.py --max 2243
+          python scripts/ruff_ratchet.py --max 2237
 
       - name: Security scan (bandit)
         run: |

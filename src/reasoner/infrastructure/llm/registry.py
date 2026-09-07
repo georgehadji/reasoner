@@ -14,9 +14,7 @@ from reasoner.core.constants import (
     MODEL_CLAUDE_SONNET,
     MODEL_GEMINI_31_FLASH_LITE_IMAGE,
     MODEL_GPT4O_MINI,
-    MODEL_LAGUNA_M_FREE,
     MODEL_LAGUNA_XS_21,
-    MODEL_LAGUNA_XS_FREE,
     NVIDIA_BASE_URL,
 )
 from reasoner.infrastructure.llm.providers.openai_compat import (
@@ -25,6 +23,18 @@ from reasoner.infrastructure.llm.providers.openai_compat import (
 )
 
 # Whitelist of supported models.  Everything except Ollama routes through OpenRouter.
+#
+# NO :free TIERS.  Deprecated 2026-09-07 by owner decision.  A `:free` OpenRouter
+# id is not a cheaper version of the paid one: it is a separate endpoint with its
+# own capacity, its own retention terms, and no availability commitment, and it is
+# withdrawn without notice.  Six of them have already been deleted here as dead
+# (minimax-m2.5-free, nemotron-nano-30b-free, nemotron-nano-9b-v2-free,
+# llama-nemotron-rerank-vl-1b-v2:free, laguna-xs.2:free, laguna-m.1:free), each
+# after it started failing in production.  Do not add another.  If a model is worth
+# routing, route its paid id.
+#
+# Note that `ling-3.0-flash-free` and `nex-n2-pro-free` are NOT free tiers despite
+# their names -- both map to paid ids -- so this rule does not touch them.
 _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ═══════════════════════════════════════════════════════════════
     # Anthropic
@@ -277,8 +287,8 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ═══════════════════════════════════════════════════════════════
     # Laguna (Poolside)
     # ═══════════════════════════════════════════════════════════════
-    MODEL_LAGUNA_XS_FREE: {"model": "poolside/laguna-xs-2.1:free"},  # was laguna-xs.2:free (dead) -> vendor rebumped to xs-2.1:free
-    MODEL_LAGUNA_M_FREE:  {"model": "poolside/laguna-s-2.1:free"},   # was laguna-m.1:free (dead) -> M tier discontinued, vendor replaced with S tier free
+    # laguna-xs-free / laguna-m-free removed 2026-09-07 — see the :free policy note
+    # at the top of _MODEL_WHITELIST. Paid siblings below cover both tiers.
     MODEL_LAGUNA_XS_21:   {"model": "poolside/laguna-xs-2.1"},  # $0.06/$0.12 per M, 262K ctx — Poolside coding agent (Jul '26)
     "laguna-s-2.1":       {"model": "poolside/laguna-s-2.1"},   # $0.09/$0.18 per M, 1M ctx — new S tier, between XS and M
     # ═══════════════════════════════════════════════════════════════
@@ -385,11 +395,12 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     # ═══════════════════════════════════════════════════════════════
     # nvidia-nemotron-nano-8b removed — no longer on OpenRouter
     # nvidia/llama-nemotron-rerank-vl-1b-v2:free removed — dead endpoint
-    "nemotron-3-ultra-free":      {"model": "nvidia/nemotron-3-ultra-550b-a55b:free"},    # FREE — 550B/55B MoE, 1M ctx, frontier reasoning
-    "nemotron-3-super-free":      {"model": "nvidia/nemotron-3-super-120b-a12b:free"},    # FREE — 120B/12B MoE, 1M ctx
-    "nemotron-nano-omni-free":    {"model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"}, # FREE — 30B/3B, multimodal reasoning
+    # nemotron-3-ultra-free / nemotron-3-super-free / nemotron-nano-omni-free removed
+    # 2026-09-07 — see the :free policy note at the top of _MODEL_WHITELIST. nemotron-nano-omni-free
+    # was the model whose endpoints all read status -2 while real calls returned 200,
+    # which made --check-endpoints print a SUSPECT line every day with nothing to decide.
     "nemotron-nano-30b":          {"model": "nvidia/nemotron-3-nano-30b-a3b"},            # $0.05/$0.20 per M — was the paid fallback for the delisted :free tier
-    "nemotron-3-ultra":           {"model": "nvidia/nemotron-3-ultra-550b-a55b"},         # paid fallback for nemotron-3-ultra-free — $0.60/$3.60 per M, 512K ctx
+    "nemotron-3-ultra":           {"model": "nvidia/nemotron-3-ultra-550b-a55b"},         # $0.60/$3.60 per M, 512K ctx — the paid 550B tier
     # nemotron-nano-30b-free / nemotron-nano-9b-v2-free removed 2026-08-26 — both
     # :free tiers left the OpenRouter catalogue. Neither was routed by a preset.
     # The 30B keeps its paid sibling above; the 9B has no paid tier on OpenRouter.
@@ -419,7 +430,7 @@ _MODEL_WHITELIST: dict[str, dict[str, Any]] = {
     "cohere-command-r-08-2024":      {"model": "cohere/command-r-08-2024"},        # enterprise command-r
     "cohere-command-r-plus-08-2024": {"model": "cohere/command-r-plus-08-2024"},   # heavy enterprise command-r-plus
     "cohere-command-r7b":          {"model": "cohere/command-r7b-12-2024"},      # fast compact r7b
-    "cohere-north-mini-code-free": {"model": "cohere/north-mini-code:free"},     # FREE coding assistant
+    # cohere-north-mini-code-free removed 2026-09-07 — see the :free policy note at the top of _MODEL_WHITELIST.
     # ═══════════════════════════════════════════════════════════════
     # Image generation models (OpenRouter multimodal image output)
     # ═══════════════════════════════════════════════════════════════

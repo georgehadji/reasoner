@@ -320,10 +320,19 @@ class Settings:
     # load-bearing propagation-resistance invariant.
     OPENROUTER_WEB_SEARCH_ENABLED: bool = os.getenv("OPENROUTER_WEB_SEARCH_ENABLED", "true").lower() == "true"
     PERPLEXITY_SEARCH_TIER: str = os.getenv("PERPLEXITY_SEARCH_TIER", "sonar-pro")
-    # Nemotron Rerank VL: free NVIDIA reranker via OpenRouter chat completions + logprobs.
+    # Nemotron reranker via OpenRouter chat completions + logprobs.
     # Used as fallback when Cohere rerank fails, or as primary when NEMOTRON_RERANK_ENABLED=true.
+    #
+    # Default is empty as of 2026-09-07. It used to be
+    # "nvidia/llama-nemotron-rerank-vl-1b-v2:free", which is both a :free tier (now
+    # deprecated repo-wide, see _MODEL_WHITELIST) and absent from OpenRouter entirely:
+    # the bundled catalogue has 463 models and not one rerank id. That default made the
+    # Cohere-failure fallback issue one doomed request per document before returning the
+    # input unchanged. No paid rerank model exists on OpenRouter to swap in, so this is
+    # left unset rather than repointed at a general chat model, which would bill for
+    # worse ranking. Set it explicitly if a rerank id appears upstream.
     NEMOTRON_RERANK_ENABLED: bool = os.getenv("NEMOTRON_RERANK_ENABLED", "false").lower() in ("1", "true", "yes")
-    NEMOTRON_RERANK_MODEL: str = os.getenv("NEMOTRON_RERANK_MODEL", "nvidia/llama-nemotron-rerank-vl-1b-v2:free")
+    NEMOTRON_RERANK_MODEL: str = os.getenv("NEMOTRON_RERANK_MODEL", "")
     NEMOTRON_RERANK_CONCURRENCY: int = int(os.getenv("NEMOTRON_RERANK_CONCURRENCY", "5"))
     # When true, applies semantic cross-encoder reranking after BM25+freshness sort and before LLM vetting.
     # Adds ~1-2s latency but meaningfully improves context quality for research/article methods.
