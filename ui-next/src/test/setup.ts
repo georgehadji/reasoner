@@ -83,3 +83,50 @@ Object.defineProperty(window, 'scrollTo', {
   writable: true,
   value: vi.fn(),
 });
+
+// Mock localStorage / sessionStorage
+//
+// Node 25 enabled the Web Storage API by default, and Node 26 makes
+// `globalThis.localStorage` evaluate to `undefined` (plus a warning) unless
+// `--localstorage-file` is passed. jsdom sees the global already defined and so
+// does not install its own, which leaves `createJSONStorage(() => localStorage)`
+// in app-store.ts holding `undefined`:
+//
+//   TypeError: Cannot read properties of undefined (reading 'setItem')
+//
+// Supplying our own is version-independent — identical behaviour on Node 22,
+// where jsdom would have provided one, and on Node 26, where nothing does. The
+// alternative, NODE_OPTIONS=--no-webstorage, only fixes CI and leaves anyone
+// developing on Node 25+ with the same failure.
+//
+// Upstream: https://github.com/vitest-dev/vitest/issues/8757
+function createMemoryStorage(): Storage {
+  const store = new Map<string, string>();
+  return {
+    get length() {
+      return store.size;
+    },
+    clear: () => store.clear(),
+    getItem: (key: string) => store.get(String(key)) ?? null,
+    key: (index: number) => Array.from(store.keys())[index] ?? null,
+    removeItem: (key: string) => {
+      store.delete(String(key));
+    },
+    setItem: (key: string, value: string) => {
+      store.set(String(key), String(value));
+    },
+  } as Storage;
+}
+
+for (const name of ['localStorage', 'sessionStorage'] as const) {
+  // Defined on both: vitest copies jsdom's window keys onto globalThis, but a
+  // global Node already owns is left alone, so the two can disagree.
+  const storage = createMemoryStorage();
+  for (const target of [window, globalThis]) {
+    Object.defineProperty(target, name, {
+      writable: true,
+      configurable: true,
+      value: storage,
+    });
+  }
+}

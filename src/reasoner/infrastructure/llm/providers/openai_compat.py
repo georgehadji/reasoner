@@ -26,6 +26,7 @@ from reasoner.core.constants import (
 from reasoner.exceptions import ProviderUnavailableError
 from reasoner.infrastructure.llm.base import (
     BaseLLMProvider,
+    LLMError,
     config_signature,
     secret_digest,
 )
@@ -33,6 +34,29 @@ from reasoner.infrastructure.llm.caching import build_messages, extract_cache_us
 from reasoner.infrastructure.llm.utils import _json_response_format
 
 logger = logging.getLogger(__name__)
+
+
+def _as_llm_error(model: str, exc: openai.APIError) -> LLMError:
+    """Convert an OpenAI SDK error into this layer's own error type.
+
+    ProviderRouter._execute_call recovers from exactly ``TimeoutError`` and
+    ``LLMError``; anything else propagates past the fallback chain to the phase.
+    Nothing here used to translate, so every SDK error escaped it. Observed on a
+    live run: OpenRouter routed ``nousresearch/hermes-4-70b`` to Nebius, which
+    answered ``404 ... The model NousResearch/Hermes-4-70B does not exist``, and
+    the destructive perspective was dropped from the run with no fallback
+    attempted, silently reducing cross-lab diversity from four voices to three.
+
+    ``openai.APITimeoutError`` is not a builtin ``TimeoutError`` (it descends
+    from ``APIConnectionError``), so SDK timeouts escaped the router's timeout
+    branch for the same reason and are covered here too.
+
+    The sibling adapter ``providers/direct.py`` already wraps its SDK
+    exceptions this way; this makes the OpenRouter lane consistent with it.
+    """
+    status = getattr(exc, "status_code", None)
+    label = f"HTTP {status}" if status else type(exc).__name__
+    return LLMError(f"{model} call failed ({label}): {exc}")
 
 
 class OpenAICompatibleProvider(BaseLLMProvider):
@@ -175,10 +199,11 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             "stream": True,
         }
         # Mirror complete(): direct OpenAI endpoints need max_completion_tokens.
+        budget = self._effective_max_tokens(max_tokens)
         if self._uses_completion_tokens():
-            kwargs["max_completion_tokens"] = max_tokens
+            kwargs["max_completion_tokens"] = budget
         else:
-            kwargs["max_tokens"] = max_tokens
+            kwargs["max_tokens"] = budget
         # Honour the fixed-temperature denylist here too — streaming previously
         # sent temperature unconditionally, which 400s on those models.
         if self._supports_temperature() and temperature != 1.0:
@@ -195,7 +220,11 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         # is streamed. Every real streaming call failed; the pre-existing unit
         # test stubbed `create` as a *sync* function returning an async context
         # manager, which is not the SDK's shape, so it never saw this.
-        async with await self.client.chat.completions.create(**kwargs) as response:
+        try:
+            stream = await self.client.chat.completions.create(**kwargs)
+        except openai.APIError as exc:
+            raise _as_llm_error(self.model, exc) from exc
+        async with stream as response:
             async for chunk in response:
                 if not chunk.choices:
                     continue
@@ -236,6 +265,21 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         from reasoner.infrastructure.llm.reasoning_effort import clamp_extra_body
 
         return clamp_extra_body(self.model, self.extra_body) or {}
+
+    def _effective_max_tokens(self, max_tokens: int) -> int:
+        """``max_tokens`` raised to leave room for content after reasoning.
+
+        Reasoning tokens are billed as output tokens and are taken first, so a
+        budget sized for the visible reply alone yields an empty one. Same kind
+        of per-model correction as :meth:`_effective_extra_body`, applied to the
+        budget rather than the effort — and applied here because this is the
+        first point at which the served model is known for certain.
+        """
+        from reasoner.infrastructure.llm.reasoning_effort import floor_max_tokens
+
+        reasoning = self._effective_extra_body().get("reasoning")
+        effort = reasoning.get("effort") if isinstance(reasoning, dict) else None
+        return floor_max_tokens(self.model, max_tokens, effort)
 
     def _supports_temperature(self) -> bool:
         """True when the model accepts a custom ``temperature`` parameter."""
@@ -290,10 +334,11 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         }
         # Direct OpenAI endpoints use max_completion_tokens; everything else
         # (including OpenRouter-routed OpenAI models) accepts max_tokens.
+        budget = self._effective_max_tokens(max_tokens)
         if self._uses_completion_tokens():
-            kwargs["max_completion_tokens"] = max_tokens
+            kwargs["max_completion_tokens"] = budget
         else:
-            kwargs["max_tokens"] = max_tokens
+            kwargs["max_tokens"] = budget
         # Send temperature only to models that accept it, and only when it
         # differs from the model default (1.0) to avoid wasted tokens/errors.
         if self._supports_temperature() and temperature != 1.0:
@@ -305,28 +350,33 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         if response_format is not None:
             kwargs["response_format"] = response_format
 
+        # Outer layer translates SDK errors so the router's fallback chain can
+        # see them; the inner block keeps the existing response_format retry.
         try:
-            response = await self.client.chat.completions.create(**kwargs)
-        except Exception as exc:
-            # Safe fallback: if Perplexity rejects the structured output envelope, retry once
-            # without response_format instead of failing the whole phase.
-            if response_format is not None:
-                message = str(exc).lower()
-                if (
-                    getattr(exc, "status_code", None) == 400
-                    or "response_format" in message
-                    or "json_schema" in message
-                ):
-                    logger.warning(
-                        "Structured outputs rejected by model '%s' — retrying without response_format",
-                        self.model,
-                    )
-                    kwargs.pop("response_format", None)
-                    response = await self.client.chat.completions.create(**kwargs)
+            try:
+                response = await self.client.chat.completions.create(**kwargs)
+            except Exception as exc:
+                # Safe fallback: if Perplexity rejects the structured output envelope, retry once
+                # without response_format instead of failing the whole phase.
+                if response_format is not None:
+                    message = str(exc).lower()
+                    if (
+                        getattr(exc, "status_code", None) == 400
+                        or "response_format" in message
+                        or "json_schema" in message
+                    ):
+                        logger.warning(
+                            "Structured outputs rejected by model '%s' — retrying without response_format",
+                            self.model,
+                        )
+                        kwargs.pop("response_format", None)
+                        response = await self.client.chat.completions.create(**kwargs)
+                    else:
+                        raise
                 else:
                     raise
-            else:
-                raise
+        except openai.APIError as exc:
+            raise _as_llm_error(self.model, exc) from exc
         if not response.choices:
             raise ProviderUnavailableError(
                 f"Provider returned empty choices (model={self.model}; possible content filtering)"
@@ -361,10 +411,11 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             ),
             "tools": tools,
         }
+        budget = self._effective_max_tokens(max_tokens)
         if self._uses_completion_tokens():
-            kwargs["max_completion_tokens"] = max_tokens
+            kwargs["max_completion_tokens"] = budget
         else:
-            kwargs["max_tokens"] = max_tokens
+            kwargs["max_tokens"] = budget
 
         if self._supports_temperature() and temperature != 1.0:
             kwargs["temperature"] = temperature
@@ -372,7 +423,10 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         if self.extra_body:
             kwargs["extra_body"] = self._effective_extra_body()
 
-        response = await self.client.chat.completions.create(**kwargs)
+        try:
+            response = await self.client.chat.completions.create(**kwargs)
+        except openai.APIError as exc:
+            raise _as_llm_error(self.model, exc) from exc
         if not response.choices:
             raise ProviderUnavailableError(
                 f"Provider returned empty choices (model={self.model}; possible content filtering)"

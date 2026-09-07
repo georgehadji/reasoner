@@ -324,7 +324,13 @@ def main():
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
 
-    project_root = Path(__file__).parent.parent
+    # Repo root, not src/reasoner. This is used purely as an IO root -- to find
+    # the introspection report and to write healing/generated_tests/ -- so
+    # unlike introspection_engine.py it needs no separate scan target. Before
+    # the src/ layout, parent.parent was the repo root; it now yields
+    # src/reasoner, which put both under the source tree and left the
+    # workflow's `path: healing/generated_tests/` upload empty.
+    project_root = Path(__file__).resolve().parents[3]
     introspection_report = project_root / "healing" / "introspection_report.json"
 
     if not introspection_report.exists():

@@ -709,15 +709,22 @@ def main():
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
 
-    # Determine project root
-    project_root = Path(__file__).parent.parent
+    # Two distinct roots. Before the src/ layout this file was at
+    # <repo>/healing/, so Path(__file__).parent.parent was the repo root and
+    # served as both scan target and output location. It now yields
+    # src/reasoner, so reports were being written inside the source tree and
+    # the workflow's `path: healing/introspection_report.*` upload found
+    # nothing -- which in turn failed Loop 3 with "Artifact not found for
+    # name: introspection-report".
+    scan_root = Path(__file__).resolve().parent.parent   # src/reasoner
+    repo_root = Path(__file__).resolve().parents[3]      # <repo>
 
     # Run introspection
-    introspector = CodebaseIntrospector(str(project_root))
+    introspector = CodebaseIntrospector(str(scan_root))
     report = introspector.scan()
 
     # Save JSON report
-    json_path = project_root / "healing" / "introspection_report.json"
+    json_path = repo_root / "healing" / "introspection_report.json"
     json_path.parent.mkdir(exist_ok=True)
 
     # Convert to dict for JSON serialization
@@ -745,7 +752,7 @@ def main():
 
     # Save Markdown report
     md_report = generate_markdown_report(report)
-    md_path = project_root / "healing" / "introspection_report.md"
+    md_path = repo_root / "healing" / "introspection_report.md"
     with open(md_path, 'w', encoding='utf-8') as f:
         f.write(md_report)
     logger.info(f"Markdown report saved to {md_path}")

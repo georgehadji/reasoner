@@ -21,10 +21,10 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
 import reasoner.api as api
+from reasoner.application.services.preset_service import PresetService
 from reasoner.core.settings import settings
 from reasoner.models import PipelineState
 from reasoner.pipeline import ReasonerPipeline
-from reasoner.presets import get_preset
 
 # ─────────────────────────────────────────────────────────────────────
 # Fake Router Helpers
@@ -509,8 +509,7 @@ class TestRealLanguageConsistency:
         ("Üçüncü çeyrekte yol haritamızı nasıl önceliklendirmeliyiz?", "Turkish"),
     ])
     async def test_real_synthesis_responds_in_detected_language(self, preset_id, problem, expected_lang):
-        preset = get_preset(preset_id)
-        router = preset.build_router()
+        _, router = PresetService().build_router(preset_id)
         pipeline = ReasonerPipeline(router=router, preset_name=preset_id, verbose=False)
         state = await pipeline.run(problem)
 
@@ -528,8 +527,7 @@ class TestRealPromptEnhancement:
     @pytest.mark.asyncio
     @pytest.mark.timeout(180)
     async def test_real_enhancement_opt_in_produces_longer_prompt(self, preset_id):
-        preset = get_preset(preset_id)
-        router = preset.build_router()
+        _, router = PresetService().build_router(preset_id)
         problem = "product roadmap"
 
         pipeline_no_enhance = ReasonerPipeline(router=router, preset_name=preset_id, enhance_prompt=False, verbose=False)
@@ -553,8 +551,7 @@ class TestRealTokenAndModelTracking:
     @pytest.mark.asyncio
     @pytest.mark.timeout(180)
     async def test_real_run_tracks_nonzero_tokens(self, preset_id):
-        preset = get_preset(preset_id)
-        router = preset.build_router()
+        _, router = PresetService().build_router(preset_id)
         pipeline = ReasonerPipeline(router=router, preset_name=preset_id, verbose=False)
         state = await pipeline.run("What is the capital of France?")
 
@@ -564,8 +561,7 @@ class TestRealTokenAndModelTracking:
     @pytest.mark.asyncio
     @pytest.mark.timeout(180)
     async def test_real_run_tracks_models_per_role(self, preset_id):
-        preset = get_preset(preset_id)
-        router = preset.build_router()
+        _, router = PresetService().build_router(preset_id)
         pipeline = ReasonerPipeline(router=router, preset_name=preset_id, verbose=False)
         state = await pipeline.run("What is the capital of France?")
 

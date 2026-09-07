@@ -64,7 +64,6 @@ The root of the Reasoner project, containing configurations for environment, doc
 - **`docker-compose.yml`**: Code or resource asset facilitating system functionality.
 - **`docker-entrypoint.sh`**: Code or resource asset facilitating system functionality.
 - **`entities.json`**: Code or resource asset facilitating system functionality.
-- **`extract_image_models.py`**: Code or resource asset facilitating system functionality.
 - **`find_cache.py`**: Code or resource asset facilitating system functionality.
 - **`find_event.py`**: Code or resource asset facilitating system functionality.
 - **`find_greek.py`**: Code or resource asset facilitating system functionality.
@@ -82,8 +81,6 @@ The root of the Reasoner project, containing configurations for environment, doc
 - **`mempalace.yaml`**: Code or resource asset facilitating system functionality.
 - **`meta-orchestration-assessment.md`**: ﻿# Meta-Orchestration Assessment — Reasoner (Reasoner Pipeline v2.2)
 - **`meta-review-babeltele.md`**: Meta-Review of the BabelTele Audit
-- **`openrouter_models.json`**: Code or resource asset facilitating system functionality.
-- **`openrouter_models_formatted.txt`**: Code or resource asset facilitating system functionality.
 - **`optimization_plan.md`**: Reasoner Pipeline Optimization Plan — v2.2
 - **`package-lock.json`**: Code or resource asset facilitating system functionality.
 - **`package.json`**: Code or resource asset facilitating system functionality.

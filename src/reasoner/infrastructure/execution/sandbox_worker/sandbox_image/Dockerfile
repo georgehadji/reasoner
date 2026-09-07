@@ -4,7 +4,7 @@
 # API or the sandbox worker itself; docker_runner.py launches one of these
 # per execution request and removes it (--rm) when the job finishes.
 
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 # No package manager access is needed at runtime (--network none in
 # docker_runner.py prevents any install anyway) — strip apt metadata to

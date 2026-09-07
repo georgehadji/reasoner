@@ -27,8 +27,18 @@ _REGISTRY: dict[str, dict] = {
             "perspective_analysis": "qwen3.6-flash",   # was qwen3-turbo (DEAD) → stronger reasoning
             "synthesis": "llama-4-maverick",  # 🇺🇸 Meta — $0.200/$0.800 per M, 1048K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
             # ── Per-perspective echo-chamber-resistant diversity (4 labs, 3 blocs: 2🇨🇳 + 1🇺🇸 + 1🇫🇷) ──
-            "constructive":  "deepseek-v3",           # 🇨🇳 DeepSeek — v3 alias now routes to v4-flash (API deprecated v3.2)
-            "destructive":   "hermes-4-70b",      # 🇺🇸 Nous Research — critic-specialized ($0.13/$0.40) (was ring-2.6-1t 🇨🇳, cross-bloc echo resistance)
+            # NOT repointable to "deepseek-v4-flash" despite serving the same
+            # model: that alias carries extra_body reasoning.effort=high and
+            # this one does not. Swapping would silently bill reasoning tokens
+            # at output rate on Phase 2 of the default budget preset. The name
+            # is wrong (it serves v4-flash); no honest equivalent exists yet.
+            "constructive":  "deepseek-v3",           # 🇨🇳 DeepSeek — serves v4-flash, no reasoning effort
+            # 🇺🇸 OpenAI open-weights — $0.04/$0.17 per M (was hermes-4-70b 🇺🇸
+            # $0.13/$0.40, whose only endpoint went dead; before that
+            # ring-2.6-1t 🇨🇳). Stays US: this is the preset's only non-CN/EU
+            # generator, so a CN replacement would drop Phase 2 below the
+            # Budget floor of three labs.
+            "destructive":   "gpt-oss-120b",
             "systemic":      "qwen3-30b-a3b",  # 🇨🇳 Qwen — $0.130/$0.520 per M, 131K ctx (was hy3; one model per phase)
             "minimalist":    "mistral-small-3.2-24b",     # 🇫🇷 Mistral — $0.075/$0.20
         # ── Reasoning model assignments (budget, v3.4) ──
@@ -45,7 +55,7 @@ _REGISTRY: dict[str, dict] = {
         "method": "multi-perspective",
         "primary_id": "qwen3.5-flash",
         "routing": {
-            "perspective_cot": "mimo-v2-flash",  # 🇨🇳 Xiaomi — $0.140/$0.280 per M, 1050K ctx (was qwen3.5-flash; one model per phase)
+            "perspective_cot": "mimo-v2.5",  # 🇨🇳 Xiaomi — $0.140/$0.280 per M, 1050K ctx (was qwen3.5-flash; one model per phase)
             "perspective_analysis": "qwen3.6-flash",   # was qwen3.5-9b → stronger reasoning, 1M ctx
             "synthesis": "llama-4-maverick",  # 🇺🇸 Meta — $0.200/$0.800 per M, 1048K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
             # ── Per-perspective cross-bloc diversity (2🇨🇳 + 1🇺🇸 + 1🇫🇷, ultra-cheap) ──
@@ -83,6 +93,16 @@ _REGISTRY: dict[str, dict] = {
         "stress_testing": "grok-4.6",             # xAI 🇺🇸 — AA Intel 60.9 vs 37.6 for 4.3, $2/$6, 500K ctx
         "verifier":       "grok-4.3",           # xAI 🇺🇸 — record 78% non-hallucination (AA Omniscience), 1M ctx, same price
         "post_synthesis_verify": "sonar-pro",  # added v3.5
+        },
+        # gpt-5 is this preset's primary_id, so it also serves every role
+        # with no explicit routing entry -- classification among them. It
+        # had no fallback at all, so _resolve_fallback returned None and a
+        # single empty completion degraded the phase with nowhere to go.
+        # "primary" is the dual-purpose key (role fallback + primary_id
+        # catch-all). glm-5.3 is CN, cross-bloc from US OpenAI as the
+        # routing philosophy requires, and premium-tier.
+        "fallback_routing": {
+            "primary": "glm-5.3",  # CN Zhipu -- cross-bloc from gpt-5
         },
         "tags": ["premium", "balanced", "multilingual"],
     },
@@ -122,6 +142,16 @@ _REGISTRY: dict[str, dict] = {
         "stress_testing": "grok-4.6",             # xAI 🇺🇸 — AA Intel 60.9 vs 37.6 for 4.3, $2/$6, 500K ctx
         "verifier":       "grok-4.3",           # xAI 🇺🇸 — record 78% non-hallucination (AA Omniscience), 1M ctx, same price
         "post_synthesis_verify": "sonar-pro",  # added v3.5
+        },
+        # gpt-5 is this preset's primary_id, so it also serves every role
+        # with no explicit routing entry -- classification among them. It
+        # had no fallback at all, so _resolve_fallback returned None and a
+        # single empty completion degraded the phase with nowhere to go.
+        # "primary" is the dual-purpose key (role fallback + primary_id
+        # catch-all). glm-5.3 is CN, cross-bloc from US OpenAI as the
+        # routing philosophy requires, and premium-tier.
+        "fallback_routing": {
+            "primary": "glm-5.3",  # CN Zhipu -- cross-bloc from gpt-5
         },
         "tags": ["premium", "argumentative", "robust"],
     },
@@ -389,6 +419,27 @@ _REGISTRY: dict[str, dict] = {
         "stress_testing": "glm-5.3-flash",
         "verifier":       "gemini-2.5-flash-lite",   # Google 🇺🇸 — 3.3% HHEM hallucination (3rd best measured), $0.10/$0.40
         "post_synthesis_verify": "sonar",  # added v3.5
+        # ── Delphi expert panel (D0 — docs/ENSEMBLE_DIVERSITY.md §4) ──
+        # The four round-1 "independent forecasters" must be four DIFFERENT
+        # models. expert_1..4 were declared in _KNOWN_ROUTING_ROLES but routed
+        # by no preset, so ProviderRouter.resolve() fell through to primary_id
+        # and the whole panel was four temperature samples of ONE model — while
+        # the aggregation phase computed a median, IQR and "outlier expert" over
+        # what was really sampling noise. Keep these four slots distinct, and
+        # distinct from every other slot here (test_preset_model_uniqueness).
+        # 3 blocs / 4 labs, <=2 per bloc — BlocDiversityConstraint rules 2-4.
+        # Prices per M are PRICING_DB (what actually bills), NOT the registry
+        # comments — the two disagree for several models. llama-3.3-70b was the
+        # first pick for slot 4 and was dropped over it: comment $0.13/$0.40,
+        # PRICING_DB $0.71/$0.71 (~7x qwen3.5-flash on input).
+        #   gpt-oss-120b   🇺🇸 OpenAI   $0.037/$0.170  cheapest open-weight on OR
+        #   ministral-3b   🇪🇺 Mistral  $0.100/$0.100  the panel's only EU voice
+        #   mimo-v2.5      🇨🇳 Xiaomi   $0.140/$0.280  CN lab free (not scoring/fusion)
+        #   llama-4-scout  🇺🇸 Meta     $0.110/$0.340  != synthesis's llama-4-maverick
+        "expert_1":       "gpt-oss-120b",
+        "expert_2":       "ministral-3b",
+        "expert_3":       "mimo-v2.5",
+        "expert_4":       "llama-4-scout",
         },
         "tags": ["budget", "collaborative", "forecasting"],
     },
@@ -405,6 +456,29 @@ _REGISTRY: dict[str, dict] = {
         "stress_testing": "grok-4.6",             # xAI 🇺🇸 — AA Intel 60.9 vs 37.6 for 4.3, $2/$6, 500K ctx
         "verifier":       "grok-4.3",           # xAI 🇺🇸 — record 78% non-hallucination (AA Omniscience), 1M ctx, same price
         "post_synthesis_verify": "sonar-pro",  # added v3.5
+        # ── Delphi expert panel (D0 — docs/ENSEMBLE_DIVERSITY.md §4) ──
+        # The four round-1 "independent forecasters" must be four DIFFERENT
+        # models. expert_1..4 were declared in _KNOWN_ROUTING_ROLES but routed
+        # by no preset, so ProviderRouter.resolve() fell through to primary_id
+        # and the whole panel was four temperature samples of ONE model — while
+        # the aggregation phase computed a median, IQR and "outlier expert" over
+        # what was really sampling noise. Keep these four slots distinct, and
+        # distinct from every other slot here (test_preset_model_uniqueness).
+        # 3 blocs / 4 labs, <=2 per bloc — BlocDiversityConstraint rules 2-4.
+        # Prices per M are PRICING_DB (what actually bills), NOT the registry
+        # comments. expert_1 was gpt-5.6-terra until it was caught as a FIXED-
+        # temperature model: expert_* is the `generate` family, whose _SAMPLED
+        # constraint is requires_temperature=True, so under ACR_ENABLED=true
+        # find_candidates drops it and ACR substitutes silently -- the
+        # documented four-lab panel would not be what actually runs.
+        #   nemotron-3-ultra    🇺🇸 NVIDIA   $0.50/$2.20  honours temperature
+        #   gemini-pro-real     🇺🇸 Google   $2/$12   != deep_read's 3.7-flash
+        #   qwen3-max-thinking  🇨🇳 Qwen     $0.78/$3.90  dedicated reasoning
+        #   mistral-large-3     🇪🇺 Mistral  $0.50/$1.50  cheapest EU anchor
+        "expert_1":       "nemotron-3-ultra",
+        "expert_2":       "gemini-pro-real",
+        "expert_3":       "qwen3-max-thinking",
+        "expert_4":       "mistral-large-3",
         },
         "tags": ["premium", "collaborative", "forecasting"],
     },
@@ -415,7 +489,7 @@ _REGISTRY: dict[str, dict] = {
             "synthesis": "llama-4-maverick",  # 🇺🇸 Meta — $0.200/$0.800 per M, 1048K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (budget, v3.4) ──
         "cove_answer":    "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
-        "cove_revise":    "mimo-v2-flash",  # 🇨🇳 Xiaomi — $0.140/$0.280 per M, 1050K ctx (was deepseek-v4-flash; one model per phase)
+        "cove_revise":    "mimo-v2.5",  # 🇨🇳 Xiaomi — $0.140/$0.280 per M, 1050K ctx (was deepseek-v4-flash; one model per phase)
         "cove_verify":    "seed-2.0-mini",  # 🇨🇳 ByteDance — $0.100/$0.400 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
         "fusion":         "hy3",  # 🇨🇳 Tencent — $0.132/$0.528 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
         "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — $0.03/$0.13 (-54% vs 3.5-flash), newer gen, 1M ctx, vision
@@ -487,7 +561,7 @@ _REGISTRY: dict[str, dict] = {
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "stress_testing": "glm-5.3-flash",
         "tot_backtrack":  "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
-        "tot_decompose":  "mimo-v2-flash",  # 🇨🇳 Xiaomi — $0.140/$0.280 per M, 1050K ctx (was deepseek-v4-flash; one model per phase)
+        "tot_decompose":  "mimo-v2.5",  # 🇨🇳 Xiaomi — $0.140/$0.280 per M, 1050K ctx (was deepseek-v4-flash; one model per phase)
         "tot_evaluate":   "seed-2.0-mini",  # 🇨🇳 ByteDance — $0.100/$0.400 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
         "verifier":       "gemini-2.5-flash-lite",   # Google 🇺🇸 — 3.3% HHEM hallucination (3rd best measured), $0.10/$0.40
         "post_synthesis_verify": "sonar",  # added v3.5
@@ -554,7 +628,7 @@ _REGISTRY: dict[str, dict] = {
         "meta_evaluator": "qwen3.7-flash",           # Qwen 🇨🇳 — $0.03/$0.13 (-54% vs 3.5-flash), newer gen, 1M ctx, vision
         "scoring":        "deepseek-v4-flash",        # 🇨🇳 DeepSeek — cross-bloc critic of 🇺🇸 synthesis
         "sd_adapt":       "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
-        "sd_implement":   "mimo-v2-flash",  # 🇨🇳 Xiaomi — $0.140/$0.280 per M, 1050K ctx (was deepseek-v4-flash; one model per phase)
+        "sd_implement":   "mimo-v2.5",  # 🇨🇳 Xiaomi — $0.140/$0.280 per M, 1050K ctx (was deepseek-v4-flash; one model per phase)
         "sd_select":      "seed-2.0-mini",  # 🇨🇳 ByteDance — $0.100/$0.400 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
         "stress_testing": "glm-5.3-flash",
         "verifier":       "gemini-2.5-flash-lite",   # Google 🇺🇸 — 3.3% HHEM hallucination (3rd best measured), $0.10/$0.40
@@ -593,7 +667,7 @@ _REGISTRY: dict[str, dict] = {
         "stress_testing":             "glm-5.3-flash",
         "subagent_critique_bias":     "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
         "subagent_critique_counter":  "qwen3.7-flash",  # 🇨🇳 Qwen — $0.030/$0.130 per M, 1000K ctx (was deepseek-v4-flash; one model per phase)
-        "subagent_critique_evidence": "mimo-v2-flash",  # 🇨🇳 Xiaomi — $0.140/$0.280 per M, 1050K ctx (was deepseek-v4-flash; one model per phase)
+        "subagent_critique_evidence": "mimo-v2.5",  # 🇨🇳 Xiaomi — $0.140/$0.280 per M, 1050K ctx (was deepseek-v4-flash; one model per phase)
         "subagent_critique_logic":    "seed-2.0-mini",  # 🇨🇳 ByteDance — $0.100/$0.400 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
         "subagent_decomposition":     "qwen3-30b-a3b",  # 🇨🇳 Qwen — $0.130/$0.520 per M, 131K ctx (was deepseek-v4-flash; one model per phase)
         "verifier":                   "qwen3.7-plus",  # cross-lab from DeepSeek scoring
@@ -619,6 +693,16 @@ _REGISTRY: dict[str, dict] = {
         "subagent_decomposition":     "gpt-5.6-terra",  # 🇺🇸 OpenAI — $2.000/$12.000 per M, 1050K ctx (was claude-sonnet; one model per phase)
         "verifier":                   "qwen3-max-thinking",  # 🇨🇳 Qwen — cross-bloc from 🇺🇸 synthesis
         "post_synthesis_verify": "sonar-pro",  # added v3.5
+        },
+        # gpt-5 is this preset's primary_id, so it also serves every role
+        # with no explicit routing entry -- classification among them. It
+        # had no fallback at all, so _resolve_fallback returned None and a
+        # single empty completion degraded the phase with nowhere to go.
+        # "primary" is the dual-purpose key (role fallback + primary_id
+        # catch-all). glm-5.3 is CN, cross-bloc from US OpenAI as the
+        # routing philosophy requires, and premium-tier.
+        "fallback_routing": {
+            "primary": "glm-5.3",  # CN Zhipu -- cross-bloc from gpt-5
         },
         "tags": ["premium", "multi-agent", "delegation"],
     },
@@ -834,6 +918,16 @@ _REGISTRY: dict[str, dict] = {
         "verifier":        "glm-5.2",           # 🇨🇳 Zhipu — cross-bloc verification, $0.476/$1.496 live (comment said $0.95/$3.00)
         "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
+        # gpt-5 is this preset's primary_id, so it also serves every role
+        # with no explicit routing entry -- classification among them. It
+        # had no fallback at all, so _resolve_fallback returned None and a
+        # single empty completion degraded the phase with nowhere to go.
+        # "primary" is the dual-purpose key (role fallback + primary_id
+        # catch-all). glm-5.3 is CN, cross-bloc from US OpenAI as the
+        # routing philosophy requires, and premium-tier.
+        "fallback_routing": {
+            "primary": "glm-5.3",  # CN Zhipu -- cross-bloc from gpt-5
+        },
         "tags": ["premium", "coding", "software-development"],
     },
     "cross-language-budget": {
@@ -1012,6 +1106,16 @@ _REGISTRY: dict[str, dict] = {
         "stress_testing": "grok-4.6",            # xAI 🇺🇸 — AA Intel 60.9 vs 37.6 for 4.3, $2/$6, 500K ctx
         "verifier":       "deepseek-v4-pro",     # DeepSeek 🇨🇳 — strong structured verification
         "post_synthesis_verify": "sonar-pro",  # added v3.5
+        },
+        # gpt-5 is this preset's primary_id, so it also serves every role
+        # with no explicit routing entry -- classification among them. It
+        # had no fallback at all, so _resolve_fallback returned None and a
+        # single empty completion degraded the phase with nowhere to go.
+        # "primary" is the dual-purpose key (role fallback + primary_id
+        # catch-all). glm-5.3 is CN, cross-bloc from US OpenAI as the
+        # routing philosophy requires, and premium-tier.
+        "fallback_routing": {
+            "primary": "glm-5.3",  # CN Zhipu -- cross-bloc from gpt-5
         },
         "tags": ["premium", "iterative", "critique"],
     },

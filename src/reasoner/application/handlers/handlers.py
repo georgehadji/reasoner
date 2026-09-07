@@ -575,7 +575,11 @@ def get_handler_registry(
     global _handler_registry
     if _handler_registry is None:
         if llm_router is None:
-            from reasoner.infrastructure.llm.ports import BaseLLMProvider, LLMResponse
+            # base.BaseLLMProvider, not ports.BaseLLMProvider: ProviderRouter
+            # calls complete_with_retry(), which only the base one defines.
+            # Subclassing the ports one built a router that raised
+            # AttributeError on its first call.
+            from reasoner.infrastructure.llm.base import BaseLLMProvider
             from reasoner.infrastructure.llm.router import ProviderRouter
 
             class _DummyProvider(BaseLLMProvider):
@@ -586,16 +590,15 @@ def get_handler_registry(
                 def provider_name(self) -> str:
                     return "dummy"
 
-                async def _complete_impl(self, messages, config):
-                    return LLMResponse(
-                        content="Dummy provider — configure API keys.",
-                        model_used="dummy",
-                        tokens_prompt=0,
-                    )
+                async def complete(
+                    self, system_prompt, user_prompt, max_tokens=2048, temperature=0.7
+                ) -> str:
+                    return "Dummy provider — configure API keys."
 
-                async def _complete_stream_impl(self, messages, config):
+                async def stream_complete(
+                    self, system_prompt, user_prompt, max_tokens=2048, temperature=0.7
+                ):
                     yield "Dummy provider — configure API keys."
-                    return
 
             llm_router = ProviderRouter(primary=_DummyProvider())
         if pipeline_executor is None:

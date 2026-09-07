@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 env:
-  PYTHON_VERSION: '3.12'
+  PYTHON_VERSION: '3.14'
   PYTHONPATH: src
 
 jobs:
@@ -15,7 +15,7 @@ jobs:
     name: pytest (unit + integration)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v7
         with:
@@ -63,11 +63,14 @@ jobs:
           # wiring moved to infrastructure/valkey/cache_adapter.py and three dead
           # stdlib imports (secrets, json, datetime/timezone) went with it -- -4
           # F401 there, +2 elsewhere in the moved block.
-          # 2243: removing two delisted models (kwaipilot/kat-coder-air-v2.5,
-          # arcee-ai/virtuoso-large) took one E501 comment line with them, and
-          # three over-long registry comments added alongside the new models were
-          # reflowed under 100 -- -4 against this branch, -1 against main.
-          python scripts/ruff_ratchet.py --max 2237
+          # 2236 on main: removing eight dead registry aliases (seven ~*-latest ids
+          # that answered `is not a valid model ID`, plus hermes-4-70b whose only
+          # endpoint was down) took six E501 comment lines with them. Before that,
+          # two independent passes each took 2244 to 2243 and composed to 2242.
+          # This merge then deprecated all six remaining :free tiers, which took
+          # more long comment lines out. Re-measured on the merged tree rather than
+          # carried from either side, because the paydowns compose.
+          python scripts/ruff_ratchet.py --max 2230
 
       - name: Security scan (bandit)
         run: |
@@ -96,8 +99,12 @@ jobs:
 
       - name: Run tests
         run: |
+          # -n/--dist used to come from pytest.ini addopts, which also forced
+          # them onto the slow/integration lane and killed its workers.
+          # --dist loadscope must accompany -n: see requirements-dev.txt.
           pytest tests/ -v \
             -m "not slow and not integration" \
+            -n auto --dist loadscope \
             --tb=short \
             --timeout=60 \
             -q
@@ -125,11 +132,11 @@ jobs:
       run:
         working-directory: ui-next
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v7
         with:
-          node-version: '22'
+          node-version: '26'
           cache: npm
           cache-dependency-path: ui-next/package-lock.json
 
@@ -170,11 +177,11 @@ jobs:
       run:
         working-directory: sdk/typescript
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v7
         with:
-          node-version: '22'
+          node-version: '26'
           cache: npm
           cache-dependency-path: sdk/typescript/package-lock.json
 

@@ -6,8 +6,8 @@ import pytest
 # Add src to sys.path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+from reasoner.application.services.preset_service import PresetService
 from reasoner.pipeline import ReasonerPipeline
-from reasoner.presets import get_preset
 
 # Real-pipeline audit: every case runs pipeline.run() against live providers and
 # writes test_audit_results.log. Requires a funded OPENROUTER_API_KEY + network,
@@ -44,8 +44,7 @@ async def test_method_execution(preset_name, problem):
     with open("test_audit_results.log", "a", encoding="utf-8") as f:
         f.write(output)
 
-    preset = get_preset(preset_name)
-    router = preset.build_router()
+    _, router = PresetService().build_router(preset_name)
 
     pipeline = ReasonerPipeline(
         router=router,
