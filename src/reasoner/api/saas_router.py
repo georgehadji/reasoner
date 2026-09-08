@@ -8,6 +8,7 @@ from growing uncontrollably.
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -19,6 +20,7 @@ from reasoner.api.dependencies import (
 )
 from reasoner.api.middleware import _anonymize_ip
 from reasoner.application.services.quota_service import TIER_LIMITS
+from reasoner.core.degrade import degraded
 from reasoner.core.settings import settings
 from reasoner.domain.saas import SubscriptionTier, User
 from reasoner.rate_limiter import RateLimitConfig, get_rate_limiter
@@ -234,16 +236,27 @@ async def delete_account(
 
     deleted = {"db": True, "uploads": 0, "history": 0, "vectors": 0, "cache": 0}
 
+    # Phase 3 is best-effort by design -- the user row is already gone and the
+    # transaction has committed -- but "best-effort" was returning
+    # {"status": "deleted"} with a clean 200 whether any of it ran or not. This
+    # is GDPR Article 17: the caller is being told their data is erased.
+    # Whatever could not be erased is recorded here and returned to them.
+    _record = SimpleNamespace(degradations=[])
+
     # Phase 3: External side-effects (best-effort, AFTER transaction commits)
     # Uploads
+    # Bound before the try: the vector-store block below iterates user_uploads,
+    # so a failure here raised NameError there and was swallowed by that
+    # block's own handler -- one failure silently costing two erasure phases.
+    user_uploads: list = []
     try:
         from reasoner.uploader import delete_file, list_uploads
         user_uploads = list_uploads(user_id=str(user.id))
         for upload in user_uploads:
             if delete_file(upload["file_id"]):
                 deleted["uploads"] += 1
-    except Exception:
-        pass
+    except Exception as exc:
+        degraded("saas.delete_account.uploads", None, exc=exc, state=_record)
 
     # History files
     try:
@@ -256,10 +269,16 @@ async def delete_account(
                 if data.get("user_id") == str(user.id):
                     f.unlink(missing_ok=True)
                     deleted["history"] += 1
-            except Exception:
-                pass
-    except Exception:
-        pass
+            except Exception as exc:
+                # An unreadable history file cannot be attributed to a user, so
+                # it cannot be certified as erased either. Skipping it quietly
+                # is how this endpoint leaves the caller's transcripts on disk
+                # and still reports success.
+                degraded(
+                    "saas.delete_account.history_file", None, exc=exc, state=_record
+                )
+    except Exception as exc:
+        degraded("saas.delete_account.history", None, exc=exc, state=_record)
 
     # Vector store (best-effort)
     try:
@@ -269,10 +288,12 @@ async def delete_account(
             try:
                 store.delete_index(upload["file_id"])
                 deleted["vectors"] += 1
-            except Exception:
-                pass
-    except Exception:
-        pass
+            except Exception as exc:
+                degraded(
+                    "saas.delete_account.vector_index", None, exc=exc, state=_record
+                )
+    except Exception as exc:
+        degraded("saas.delete_account.vectors", None, exc=exc, state=_record)
 
     # Redis cache keys (best-effort)
     try:
@@ -283,7 +304,15 @@ async def delete_account(
         if keys:
             await redis.delete(*keys)
             deleted["cache"] = len(keys)
-    except Exception:
-        pass
+    except Exception as exc:
+        degraded("saas.delete_account.cache", None, exc=exc, state=_record)
 
-    return {"status": "deleted", "user_id": str(user.id), "deleted": deleted}
+    return {
+        "status": "deleted",
+        "user_id": str(user.id),
+        "deleted": deleted,
+        # Empty on a clean run. Non-empty means the account row is gone but
+        # some external store still holds this user's data -- which the caller
+        # has a right to know, and an operator has to finish by hand.
+        "failed": list(_record.degradations),
+    }

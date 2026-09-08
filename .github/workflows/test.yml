@@ -154,7 +154,18 @@ jobs:
           # left counted on purpose: they are all `health_check` returning
           # False, where the exception IS the answer, and they are the only
           # four such sites left in the whole count.
-          python scripts/silent_failure_ratchet.py --max 106
+          # 100: all six in saas_router.delete_account -- GDPR Article 17
+          # erasure. Phase 3 (uploads, history files, vector indexes, Redis
+          # keys) runs after the DB transaction commits and every failure in
+          # it was a bare pass, so the endpoint returned
+          # {"status": "deleted"} with a clean 200 whether any of those stores
+          # was actually cleared or not. It now returns a "failed" list, so a
+          # caller told their data is erased can see what still holds it.
+          # The uploads block also left user_uploads unbound on failure, and
+          # the vector-store block iterates it -- so one failure raised
+          # NameError there and was swallowed by that block's own handler,
+          # costing two erasure phases for the price of one.
+          python scripts/silent_failure_ratchet.py --max 100
 
       - name: Run tests
         run: |
