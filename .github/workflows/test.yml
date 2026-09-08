@@ -130,7 +130,20 @@ jobs:
           # `error=None`, which the base class reads as a valid low-confidence
           # answer -- a routing failure indistinguishable from a routing
           # opinion, and no log anywhere.
-          python scripts/silent_failure_ratchet.py --max 113
+          # 110: three of infrastructure/llm/executor.py's seven swallows.
+          # The cost-estimate one is the D11 shape again -- a pricing lookup
+          # that raises leaves cost_usd at 0, so total_cost_usd stops growing,
+          # the spend ceilings never fire, and the run reports $0.00, which is
+          # what a cache hit also looks like. The other two are inside
+          # _halt_on_cap: which ceiling was hit, and the SPEND_CAP_EXCEEDED
+          # event that billing reads. The four left counted are all
+          # Prometheus-emit failures (CACHE_HITS, CACHE_MISSES, the run-cost
+          # gauge, the cap counter). A metrics backend being unreachable does
+          # not change what the run does, and routing it through a WARNING
+          # helper that itself increments a metric spends the signal. They
+          # stay counted rather than being quietly converted to the DEBUG line
+          # this script's own docstring names as the D11 failure.
+          python scripts/silent_failure_ratchet.py --max 110
 
       - name: Run tests
         run: |

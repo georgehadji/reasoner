@@ -28,6 +28,7 @@ from reasoner.core.constants import (
     TRUNCATION_RETRY_MAX_TOKENS,
     get_token_budget,
 )
+from reasoner.core.degrade import degraded
 
 # New imports for event emission
 from reasoner.core.events.domain_events import PipelineEventType, make_event
@@ -499,8 +500,18 @@ class LLMExecutor:
                     estimated = calculate_model_cost(model, input_tokens, output_tokens)
                     if estimated > 0:
                         cost_usd = estimated
-                except Exception:
-                    pass
+                except Exception as exc:
+                    # Leaving cost at 0 is not neutral: total_cost_usd stops
+                    # growing, so the spend ceilings a few lines below never
+                    # fire, and the run reports $0.00 -- which is exactly what
+                    # a cache hit looks like.
+                    degraded(
+                        "executor.cost_estimate",
+                        None,
+                        exc=exc,
+                        state=state,
+                        detail=f"model={model}",
+                    )
 
             if cost_usd > 0:
                 state.total_cost_usd += cost_usd
@@ -757,8 +768,10 @@ class LLMExecutor:
         state._spend_cap_exceeded = True
         try:
             state.spend_cap_hit = cap_type
-        except Exception:
-            pass
+        except Exception as exc:
+            # The run still halts -- _spend_cap_exceeded is already set above --
+            # but nothing downstream can say which ceiling stopped it.
+            degraded("executor.spend_cap_record", None, exc=exc, state=state)
 
         logger.warning(
             "%s spend cap of $%.2f exceeded for %s (tier=%s, spent $%.2f). Halting further LLM calls.",
@@ -786,8 +799,11 @@ class LLMExecutor:
                 },
             )
             await get_event_bus().publish(evt)
-        except Exception:
-            pass
+        except Exception as exc:
+            # This event is how billing and observability learn a caller was
+            # cut off mid-run. Dropped silently, the halt exists only in this
+            # process's own logs.
+            degraded("executor.spend_cap_event", None, exc=exc, state=state)
 
         try:
             from reasoner.infrastructure.metrics import REASONER_SPEND_CAP_EXCEEDED_TOTAL

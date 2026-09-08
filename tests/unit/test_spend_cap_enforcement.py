@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 import pytest
 
 from reasoner.domain.pipeline_state import PipelineState
@@ -183,3 +185,83 @@ class TestFallbackBehaviour:
         await executor._enforce_spend_caps(state, 0.01)
 
         assert getattr(state, "_spend_cap_exceeded", False) is False
+
+
+class _StubRouter:
+    """Answers every call successfully, and returns no cost."""
+
+    async def call(self, **kwargs):
+        return "an answer", {
+            "model": "unpriced/model",
+            "input_tokens": 100,
+            "output_tokens": 50,
+        }
+
+
+class _NullBus:
+    async def publish(self, event):
+        return None
+
+
+class TestDegradationsLeaveEvidence:
+    """P5, docs/plans/root-cause-remediation-2026-09-07.md.
+
+    Both of these used to be ``except Exception: pass``.
+    """
+
+    @pytest.mark.asyncio
+    async def test_a_pricing_lookup_failure_is_recorded_not_swallowed(
+        self, no_global_cap, monkeypatch, caplog
+    ) -> None:
+        """A run that cannot price itself must not look like a free one.
+
+        With the estimate swallowed, cost_usd stays 0, so total_cost_usd never
+        grows, the spend ceilings never fire, and the run reports $0.00 --
+        which is also what a cache hit reports.
+        """
+        from reasoner.domain import pricing
+
+        def _boom(*args, **kwargs):
+            raise KeyError("no pricing row for this model")
+
+        monkeypatch.setattr(pricing, "calculate_model_cost", _boom)
+
+        executor = LLMExecutor(
+            router=_StubRouter(),
+            phase_configs={},
+            token_cache=None,
+            caching_enabled=False,
+            event_publisher=_NullBus(),
+        )
+        state = _state()
+
+        with caplog.at_level(logging.WARNING, logger="reasoner.core.degrade"):
+            raw, _metadata = await executor.execute("primary", "sys", "user", state)
+
+        assert raw == "an answer", "the phase still gets its answer"
+        assert state.total_cost_usd == 0.0, "no cost could be derived"
+        assert any("executor.cost_estimate" in d for d in state.degradations), (
+            f"expected a recorded degradation, got: {state.degradations}"
+        )
+        assert any(
+            "site=executor.cost_estimate" in r.getMessage() for r in caplog.records
+        ), f"expected a WARNING, got: {[r.getMessage() for r in caplog.records]}"
+
+    @pytest.mark.asyncio
+    async def test_a_dropped_spend_cap_event_is_recorded(self, executor, monkeypatch) -> None:
+        """SPEND_CAP_EXCEEDED is how billing learns a caller was cut off."""
+        from reasoner.application.event_bus import bus as bus_module
+
+        def _down():
+            raise RuntimeError("event bus down")
+
+        monkeypatch.setattr(bus_module, "get_event_bus", _down)
+        state = _state(billing_subject="u1")
+
+        await executor._halt_on_cap(state, "per_run", 0.05, 0.06, "u1")
+
+        assert state._spend_cap_exceeded is True, "the halt itself must still happen"
+        assert state.spend_cap_hit == "per_run"
+        assert any("executor.spend_cap_event" in d for d in state.degradations), (
+            f"expected a recorded degradation, got: {state.degradations}"
+        )

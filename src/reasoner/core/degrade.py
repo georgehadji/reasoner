@@ -53,7 +53,9 @@ def degraded[T](
         exc: The exception being swallowed.
         state: Optional PipelineState. When present, the degradation is
             appended to ``state.degradations`` so the run can report it.
-        detail: Optional extra context for the log line only.
+        detail: Optional extra context. It is appended to the log line and,
+            when ``state`` is given, to the recorded degradation -- so it is
+            read by whoever reads the run's output, not only by an operator.
 
     Returns:
         ``fallback``, unchanged, so this can be used as ``return degraded(...)``.
