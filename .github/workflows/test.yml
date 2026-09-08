@@ -165,7 +165,16 @@ jobs:
           # the vector-store block iterates it -- so one failure raised
           # NameError there and was swallowed by that block's own handler,
           # costing two erasure phases for the price of one.
-          python scripts/silent_failure_ratchet.py --max 100
+          # 95: PhaseSpan's five, core/observability/phase_span.py. Every
+          # Langfuse enrichment -- the model name, token counts, phase cost,
+          # fallback count, and the span.update() that closes the span --
+          # was a bare pass. A span with no cost_usd is not a free phase but
+          # every dashboard summing that field reads it as one, and a failed
+          # span.update() leaves the span open in Langfuse, which reads as a
+          # phase still running. Same commit fixes the span's own input:
+          # start_time was time.monotonic() (seconds since boot) next to a
+          # time.time() end_time, so no span ever had a usable start.
+          python scripts/silent_failure_ratchet.py --max 95
 
       - name: Run tests
         run: |
