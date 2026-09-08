@@ -17,8 +17,8 @@ uvicorn[standard]>=0.52.4,<0.53.0
 python-multipart>=0.0.6,<0.1.0
 
 # LLM Providers
-anthropic>=1.2.0,<1.3.0
-openai>=3.6.0,<4.0.0
+anthropic>=1.4.0,<1.5.0
+openai>=3.8.0,<4.0.0
 google-genai>=2.20.0,<3.0.0
 
 # HTTP Client
@@ -35,7 +35,7 @@ pydantic>=2.13.5,<3.0.0
 python-dotenv>=1.0.0,<2.0.0
 
 # File Processing
-pypdf>=6.16.2,<7.0.0
+pypdf>=6.17.0,<7.0.0
 python-docx>=1.1.0,<2.0.0
 pymupdf>=1.23.0,<2.0.0
 python-magic>=0.4.27,<0.5.0
@@ -55,7 +55,7 @@ asyncpg>=0.31.0,<0.32.0
 aiosqlite>=0.22.1,<0.23.0
 
 # Migrations
-alembic>=1.13.0,<2.0.0
+alembic>=1.19.2,<2.0.0
 sqlalchemy[asyncio]>=2.0.0,<3.0.0
 
 # System monitoring (optional, for memory limits)
@@ -71,4 +71,4 @@ aiocircuitbreaker>=2.0.0,<3.0.0 # For circuit breaking
 
 # Production WSGI
 gunicorn>=26.2.0,<27.0.0
-import-linter>=2.14,<3.0.0
+import-linter>=2.15,<3.0.0
