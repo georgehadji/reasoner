@@ -26,6 +26,7 @@ Utility automation scripts for running servers, executing specialized tests, ver
 - **`re_extract_e1.py`**: The new run_stream implementation
 - **`ruff_ratchet.py`**: Ratchet for `ruff check src/` violation count.
 - **`run_3more_tests.py`**: Run 3 additional method API tests sequentially.
+- **`run_all_presets.py`**: Run every budget preset sequentially. Makes real, billed OpenRouter calls.
 - **`run_batch4.py`**: Code or resource asset facilitating system functionality.
 - **`run_method_tests.py`**: Run 4 method API tests sequentially.
 - **`scan-secrets.py`**: Secret scanner — detect API keys and tokens in source code.

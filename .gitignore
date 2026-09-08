@@ -141,6 +141,13 @@ spec/.gate-enabled
 /harden-hooks-windows.sh
 /adopt-into-existing.sh
 /website-production-prompt-system.md
+
+# claudex hook runtime logs (root and ui-next). Never useful in history.
+**/.claude/claudex/
+
+# Studio-template scaffolding. The root-level copy is ignored above; this one
+# was moved into docs/ and escaped that rule. It is not Reasoner documentation.
+/docs/website-production-prompt-system.md
 # The generic build/ rule above is for compiled output. The studio pipeline ships a
 # skill named build/ which must be tracked.
 !.claude/skills/build/
