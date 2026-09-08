@@ -129,7 +129,7 @@ ui-next/src/
 ├── lib/                    # api-client, db (IndexedDB), types, utils, security, markdown
 └── stores/                 # app-store.ts (Zustand global state with persistence)
 
-tests/                      # pytest suite (<!-- gen:test_files -->324<!-- /gen --> test_*.py files, recursive)
+tests/                      # pytest suite (<!-- gen:test_files -->325<!-- /gen --> test_*.py files, recursive)
 scripts/
 └── update_mindmap_meta.py  # Patches live counts into ARCHITECTURE_MINDMAP.md (run manually — see §10)
 ```
