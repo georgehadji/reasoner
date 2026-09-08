@@ -213,7 +213,19 @@ jobs:
           # which is what a server that has not finished binding looks like,
           # but narrowed to OSError so a bug in the poll is no longer eaten
           # for the full 30s and then reported as "the server never started".
-          python scripts/silent_failure_ratchet.py --max 76
+          # 70: the code sandbox's six. subprocess_executor's setrlimit
+          # swallow dropped the only memory cap on the untrusted code it was
+          # about to exec, and could not log because preexec_fn runs in the
+          # forked child -- it now writes to fd 2, which the parent captures
+          # as ExecutionResult.stderr. Its tempdir cleanup was a try around a
+          # call that already had ignore_errors=True, so the handler caught
+          # nothing while a failed removal left the executed script on disk.
+          # docker_runner's _force_kill swallowed a failed `docker rm -f`,
+          # which is the runaway container still holding CPU and memory, and
+          # check_docker_health returned the same silent False for "docker is
+          # not installed", "the image was never built" and "we broke this
+          # function" -- while production gates code execution on it.
+          python scripts/silent_failure_ratchet.py --max 70
 
       - name: Run tests
         run: |

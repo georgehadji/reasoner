@@ -117,8 +117,21 @@ class SubprocessExecutor:
                 def _set_limits():
                     try:
                         resource.setrlimit(resource.RLIMIT_AS, (mem_bytes, mem_bytes))
-                    except Exception:
-                        pass
+                    except (OSError, ValueError) as exc:
+                        # This is the only memory cap on the untrusted code
+                        # about to be exec'd, so losing it silently means the
+                        # run looks identical to a capped one.
+                        #
+                        # It cannot be logged: preexec_fn runs in the forked
+                        # child before exec, where the logging lock may still
+                        # be held by a thread that no longer exists here.
+                        # os.write to fd 2 is async-signal-safe, and fd 2 is
+                        # the pipe the parent reads as stderr -- so this lands
+                        # in ExecutionResult.stderr.
+                        os.write(
+                            2,
+                            f"[sandbox] memory limit not applied: {exc}\n".encode(),
+                        )
                 preexec_fn = _set_limits
 
             # 5. Execute with timeout
@@ -151,7 +164,10 @@ class SubprocessExecutor:
                     try:
                         proc.kill()
                         await proc.wait()
-                    except Exception:
+                    except ProcessLookupError:
+                        # Exited on its own between the timeout and the kill.
+                        # Anything else here means the runaway process is
+                        # still alive and must not be reported as reaped.
                         pass
                     elapsed = int((time.monotonic() - t0) * 1000)
                     return ExecutionResult(
@@ -204,10 +220,16 @@ class SubprocessExecutor:
             # 6. Clean up tempdir
             if tmpdir and tmpdir.exists():
                 import shutil
-                try:
-                    shutil.rmtree(tmpdir, ignore_errors=True)
-                except Exception:
-                    pass
+                # ignore_errors already swallows everything rmtree can raise,
+                # so the try around it never caught anything -- but a failed
+                # removal leaves the untrusted script on disk, which is worth
+                # knowing about. Windows file locks make this a real case.
+                shutil.rmtree(tmpdir, ignore_errors=True)
+                if tmpdir.exists():
+                    logger.warning(
+                        "Sandbox tempdir not removed, untrusted code left on disk: %s",
+                        tmpdir,
+                    )
 
     async def health_check(self) -> bool:
         """Always unhealthy — this executor runs code on the API host with

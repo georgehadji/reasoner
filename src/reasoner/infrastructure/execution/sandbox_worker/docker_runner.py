@@ -16,6 +16,7 @@ import logging
 import time
 import uuid
 
+from reasoner.core.degrade import degraded
 from reasoner.core.ports.code_executor import ExecutionLimits, ExecutionResult
 from reasoner.infrastructure.execution.runners import get_runner
 from reasoner.infrastructure.execution.runners.python_runner import PYTHON_SANDBOX_IMAGE
@@ -179,12 +180,21 @@ async def _force_kill(job_id: str, proc: asyncio.subprocess.Process) -> None:
             stderr=asyncio.subprocess.DEVNULL,
         )
         await rm.wait()
-    except Exception:
-        pass
+        if rm.returncode != 0:
+            logger.warning(
+                "Container %s may still be running: docker rm -f exited %s",
+                job_id, rm.returncode,
+            )
+    except OSError as exc:
+        # Could not even launch `docker rm`. The container that ran past its
+        # timeout is then still holding CPU and memory with nobody watching.
+        logger.warning("Could not remove container %s: %s", job_id, exc)
     try:
         proc.kill()
         await proc.wait()
-    except Exception:
+    except ProcessLookupError:
+        # The docker CLI process exited on its own; the container above is
+        # what actually needed killing.
         pass
 
 
@@ -202,5 +212,9 @@ async def check_docker_health() -> bool:
         )
         await asyncio.wait_for(proc.wait(), timeout=5.0)
         return proc.returncode == 0
-    except Exception:
-        return False
+    except Exception as exc:
+        # Failing closed is right -- production gates code execution on this.
+        # But "docker is not installed", "the image was never built" and "we
+        # broke this function" all arrived as the same silent False, so the
+        # feature could be off for weeks with no way to tell which.
+        return degraded("sandbox.docker_health", False, exc=exc)
