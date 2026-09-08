@@ -29,6 +29,12 @@ shows the very pattern this counts, so documenting the fix raised the number),
 and bodies that call ``degraded(...)`` (a converted site still reads
 ``return ...``, so without the exemption the ratchet punished the fix).
 
+One thing that WAS wrongly not counted, fixed later: a swallow with a trailing
+comment (``pass  # best-effort``) did not match the body pattern, so 7 sites
+were invisible to a script whose entire job is honest accounting. The count
+went up when that was fixed. A number that only ever falls is not a
+measurement.
+
 Usage: python scripts/silent_failure_ratchet.py --max N
 """
 
@@ -43,7 +49,12 @@ from pathlib import Path
 SRC = Path(__file__).resolve().parent.parent / "src" / "reasoner"
 
 _EXCEPT_RE = re.compile(r"^\s*except\s+Exception\b.*:\s*(#.*)?$")
-_SWALLOW_RE = re.compile(r"^(pass|return\b.*)$")
+# The trailing-comment group is load-bearing: without it ``pass  # best-effort``
+# escaped the count entirely, and a swallow that explains itself in a comment is
+# still a swallow -- arguably the more deliberate kind. Fixing this raised the
+# real count by 6 sites that had never been counted, plus the one in
+# event_emission_service.py converted in the same change.
+_SWALLOW_RE = re.compile(r"^(pass|return\b.*?)(\s+#.*)?$")
 # ``return degraded("site", fallback, exc=exc, state=state)`` is the sanctioned
 # replacement this script exists to drive sites towards -- it logs, increments
 # reasoner_degradation_total and records to PipelineState.degradations. Without

@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 from reasoner.core.constants import HYPERGATE_MAX_TOKENS_WEB
+from reasoner.core.degrade import degraded
 from reasoner.hypergate.base_sub_agent import BaseSubAgent
 
 _SYSTEM = (
@@ -46,5 +47,9 @@ class WebSearchDetectorSubAgent(BaseSubAgent):
                 "confidence": min(1.0, max(0.0, float(data.get("confidence", 0.5)))),
                 "rationale": str(data.get("rationale", "")),
             }
-        except Exception:
-            return {"needs_search": False, "confidence": 0.0, "rationale": "parse error"}
+        except Exception as exc:
+            return degraded(
+                "hypergate.web_detector.parse",
+                {"needs_search": False, "confidence": 0.0, "rationale": "parse error"},
+                exc=exc,
+            )

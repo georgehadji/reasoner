@@ -14,6 +14,7 @@ from __future__ import annotations
 from typing import Any
 
 from reasoner.core.constants import HYPERGATE_MAX_TOKENS_IMAGE_MODEL
+from reasoner.core.degrade import degraded
 from reasoner.hypergate.base_sub_agent import BaseSubAgent
 
 _SYSTEM = (
@@ -70,10 +71,14 @@ class ImageModelSelector(BaseSubAgent):
                 "confidence": min(1.0, max(0.0, float(data.get("confidence", 0.5)))),
                 "rationale": str(data.get("rationale", "")),
             }
-        except Exception:
-            return {
-                "family": "general",
-                "tier_hint": "budget",
-                "confidence": 0.0,
-                "rationale": "",
-            }
+        except Exception as exc:
+            return degraded(
+                "hypergate.image_model.parse",
+                {
+                    "family": "general",
+                    "tier_hint": "budget",
+                    "confidence": 0.0,
+                    "rationale": "",
+                },
+                exc=exc,
+            )

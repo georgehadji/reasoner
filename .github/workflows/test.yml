@@ -121,7 +121,16 @@ jobs:
           # search. The script also stopped counting two things it should never
           # have counted -- the pattern shown inside core/degrade.py's own
           # docstring, and `return degraded(...)` itself, which is the fix.
-          python scripts/silent_failure_ratchet.py --max 114
+          # 113: the body pattern did not match a swallow with a trailing
+          # comment (`pass  # best-effort`), so 7 sites had never been counted
+          # at all. Fixing that raised the real count to 121; converting the 7
+          # HyperGate _parse_result swallows and event_emission_service's
+          # dropped-event pass brings it to 113. The HyperGate ones matter
+          # because a malformed-JSON reply there returns `confidence: 0.0` with
+          # `error=None`, which the base class reads as a valid low-confidence
+          # answer -- a routing failure indistinguishable from a routing
+          # opinion, and no log anywhere.
+          python scripts/silent_failure_ratchet.py --max 113
 
       - name: Run tests
         run: |
