@@ -199,3 +199,70 @@ class TestSpendTracker:
         # Roll into the next month: last month's total must stop counting.
         monkeypatch.setattr(spend_tracker, "current_period", lambda: "2099-01")
         assert spend_tracker.get("a") == 0.0
+
+
+class TestGuardFailsLoud:
+    """P5, docs/plans/root-cause-remediation-2026-09-07.md.
+
+    Three lazy imports back the preflight guard, and all three failed open:
+    no prices means the per-run ceiling is skipped, no routing means the
+    estimate is 0.0 (under every ceiling), and no preset tier means FREE
+    (below every required rank). Each returned its fallback silently, so a
+    spend guard that had stopped guarding looked exactly like one with
+    nothing to refuse.
+    """
+
+    def _break_import(self, monkeypatch, module_name: str):
+        """Make `import <module_name>` raise, the way a broken module does."""
+        import builtins
+
+        real_import = builtins.__import__
+
+        def _fake(name, *args, **kwargs):
+            if name == module_name:
+                raise ImportError(f"{module_name} is broken")
+            return real_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", _fake)
+
+    def test_unloadable_prices_are_recorded(self, monkeypatch, caplog):
+        import logging
+        import sys
+
+        monkeypatch.delitem(sys.modules, "reasoner.domain.pricing", raising=False)
+        self._break_import(monkeypatch, "reasoner.domain.pricing")
+
+        with caplog.at_level(logging.WARNING):
+            assert svc.pricing_data_available() is False
+
+        assert any("spend_limit.pricing_data_available" in r.message for r in caplog.records), (
+            f"skipping the per-run ceiling was not reported: {[r.message for r in caplog.records]}"
+        )
+
+    def test_unresolvable_routing_is_recorded_not_priced_at_zero(self, monkeypatch, caplog):
+        import logging
+        import sys
+
+        monkeypatch.delitem(sys.modules, "reasoner.presets", raising=False)
+        self._break_import(monkeypatch, "reasoner.presets")
+
+        with caplog.at_level(logging.WARNING):
+            assert svc.estimate_run_cost("debate-premium") == 0.0
+
+        assert any("spend_limit.preset_routing" in r.message for r in caplog.records), (
+            f"a $0.00 estimate was returned with no trace: {[r.message for r in caplog.records]}"
+        )
+
+    def test_unresolvable_tier_is_recorded_not_silently_free(self, monkeypatch, caplog):
+        import logging
+        import sys
+
+        monkeypatch.delitem(sys.modules, "reasoner.domain.preset_core", raising=False)
+        self._break_import(monkeypatch, "reasoner.domain.preset_core")
+
+        with caplog.at_level(logging.WARNING):
+            assert svc._required_tier("debate-premium") is SubscriptionTier.FREE
+
+        assert any("spend_limit.required_tier" in r.message for r in caplog.records), (
+            f"the tier gate stopped checking silently: {[r.message for r in caplog.records]}"
+        )

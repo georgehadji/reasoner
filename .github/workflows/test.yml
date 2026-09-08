@@ -184,7 +184,15 @@ jobs:
           # hid its own total failure behind the swallow this ratchet counts.
           # tests/test_quota_redis_fallback.py now covers the live class, whose
           # failure paths test_saas_cached_quota.py did not reach.
-          python scripts/silent_failure_ratchet.py --max 91
+          # 88: spend_limit_service.py's three, all lazy imports behind the
+          # preflight spend guard, and all three failed open. No prices means
+          # pricing_data_available() returns False, which the caller reads as
+          # permission to skip the per-run ceiling. No routing means
+          # estimate_run_cost returns 0.0, and 0.0 is under every ceiling. No
+          # preset tier means FREE, which is below every required rank, so the
+          # tier refusal cannot fire. A guard that had stopped guarding was
+          # indistinguishable from one with nothing to refuse.
+          python scripts/silent_failure_ratchet.py --max 88
 
       - name: Run tests
         run: |
