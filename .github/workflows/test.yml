@@ -235,7 +235,17 @@ jobs:
           # that is the only thing writing the cache: a serializer change
           # could have turned caching off for good and looked like a cold
           # cache. Split into three, each naming its own site.
-          python scripts/silent_failure_ratchet.py --max 67
+          # 64: application/orchestrator.py's three. Provenance is not
+          # free: a Neuro chunk written without model attribution cannot be
+          # revoked by lineage, so it is dropped on recall rather than
+          # replayed -- losing it silently means losing the memory write
+          # silently, one recall later. The propagation-shape observer is the
+          # only reading taken where a synthesis becomes something future
+          # runs read back (docs/MIND_VIRUS_MITIGATION.md), and a detector
+          # that had stopped scoring reported the same nothing as clean
+          # traffic. The spend-cap short-circuit skipped its check entirely,
+          # so a cap that could not be read looked like no cap set.
+          python scripts/silent_failure_ratchet.py --max 64
 
       - name: Run tests
         run: |
