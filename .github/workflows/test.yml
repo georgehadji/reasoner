@@ -225,7 +225,17 @@ jobs:
           # check_docker_health returned the same silent False for "docker is
           # not installed", "the image was never built" and "we broke this
           # function" -- while production gates code execution on it.
-          python scripts/silent_failure_ratchet.py --max 70
+          # 67: api/streaming.py's three. The disconnect probe is the only
+          # thing that cancels a run whose client has gone away, so while it
+          # was broken the pipeline kept generating -- and billing -- for
+          # nobody; it now reports once per stream rather than every ten
+          # chunks. The follow-up learn() is the conversation's own memory.
+          # The cached-run collector wrapped parse, collect and write in one
+          # handler, so a parse failure also skipped the `done` detection
+          # that is the only thing writing the cache: a serializer change
+          # could have turned caching off for good and looked like a cold
+          # cache. Split into three, each naming its own site.
+          python scripts/silent_failure_ratchet.py --max 67
 
       - name: Run tests
         run: |
