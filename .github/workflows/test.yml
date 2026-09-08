@@ -174,7 +174,17 @@ jobs:
           # phase still running. Same commit fixes the span's own input:
           # start_time was time.monotonic() (seconds since boot) next to a
           # time.time() end_time, so no span ever had a usable start.
-          python scripts/silent_failure_ratchet.py --max 95
+          # 91: the four in infrastructure/cached_quota_repo.py, removed by
+          # deleting the module. It was a second CachedQuotaRepository that no
+          # module in src/ imported -- api/dependencies.py wires the one in
+          # infrastructure/persistence/ -- and its cache had never once worked:
+          # it called UsageQuota.model_dump_json() on what is a
+          # @dataclass(frozen=True), so every write raised AttributeError into
+          # `except Exception: pass` and nothing was ever stored. A cache that
+          # hid its own total failure behind the swallow this ratchet counts.
+          # tests/test_quota_redis_fallback.py now covers the live class, whose
+          # failure paths test_saas_cached_quota.py did not reach.
+          python scripts/silent_failure_ratchet.py --max 91
 
       - name: Run tests
         run: |

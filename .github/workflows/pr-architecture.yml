@@ -84,4 +84,4 @@ jobs:
           # not `grep -c '\->'` — a prose comment containing "->" would inflate a
           # naive grep count. Two-way ratchet: MAX must move in lockstep with the
           # real count, in either direction. Do not raise without a tracking issue.
-          PYTHONPATH=src python scripts/count_importlinter_exceptions.py --max 60
+          PYTHONPATH=src python scripts/count_importlinter_exceptions.py --max 59
