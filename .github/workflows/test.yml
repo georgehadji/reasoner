@@ -245,7 +245,19 @@ jobs:
           # that had stopped scoring reported the same nothing as clean
           # traffic. The spend-cap short-circuit skipped its check entirely,
           # so a cap that could not be read looked like no cap set.
-          python scripts/silent_failure_ratchet.py --max 64
+          # 58: widgets_legacy.py's three and image_generation.py's three.
+          # _has_yahooquery/_has_yfinance had lost the import they were meant
+          # to test, leaving `try: return True` -- so every machine reported
+          # both libraries present, get_stock_data's Demo Mode branch was
+          # unreachable, and a missing dependency surfaced as an ImportError
+          # from inside the quote lookup. They use importlib.util.find_spec
+          # now and need no handler at all. search_web returned [] for a dead
+          # backend, which is what a topic with no news returns too.
+          # image_generation's two base64 probes exist to decide whether text
+          # is base64, so there the exception is the answer -- narrowed to
+          # ValueError rather than signalled. Its outermost guard kept
+          # str(exc), which is often empty, and dropped the traceback.
+          python scripts/silent_failure_ratchet.py --max 58
 
       - name: Run tests
         run: |

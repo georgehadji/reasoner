@@ -142,7 +142,11 @@ def _looks_like_base64_image(value: str) -> bool:
     compact = re.sub(r"\s+", "", cleaned)
     try:
         decoded = base64.b64decode(compact, validate=True)
-    except Exception:
+    except ValueError:
+        # binascii.Error subclasses ValueError. Here the exception IS the
+        # answer -- this function exists to decide whether the text is base64
+        # -- so nothing is being hidden. Narrowed only so a real bug in the
+        # lines above cannot arrive as "not an image".
         return False
     # Common image signatures: PNG, JPEG, GIF, WEBP
     return decoded.startswith(
@@ -188,7 +192,8 @@ def _normalize_explicit_base64_image(value: str) -> str | None:
         return None
     try:
         decoded = base64.b64decode(cleaned, validate=True)
-    except Exception:
+    except ValueError:
+        # As above: deciding whether this is base64 is the whole job.
         return None
     if not decoded.startswith((b"\x89PNG\r\n\x1a\n", b"\xff\xd8\xff", b"GIF87a", b"GIF89a", b"RIFF")):
         return None
@@ -1074,4 +1079,8 @@ async def _generate_image_guarded(
             reference_images=reference_images,
         )
     except Exception as exc:
+        # str(exc) is all the caller gets, and at the outermost image-gen
+        # boundary that is often a bare "" or a provider's opaque code. Keep
+        # the traceback where the operator can reach it.
+        logger.exception("Image generation failed for model '%s'", model_alias)
         return {"success": False, "error": str(exc)}
