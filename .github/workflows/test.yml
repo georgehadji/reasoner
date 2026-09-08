@@ -143,7 +143,18 @@ jobs:
           # helper that itself increments a metric spends the signal. They
           # stay counted rather than being quietly converted to the DEBUG line
           # this script's own docstring names as the D11 failure.
-          python scripts/silent_failure_ratchet.py --max 110
+          # 106: neuro/sessions.py's four readers. Every caller checks
+          # .exists() before reading, so an exception there is a real read
+          # failure on a file that is present -- and the [] it returned is
+          # indistinguishable from a session with no history, which
+          # get_recent_context() then injects as bootstrap context.
+          # _count_entries also cached the 0 from a failed read, pinning that
+          # file at zero exchanges for the process lifetime; it no longer
+          # caches a count it could not measure. neuro/providers.py's four are
+          # left counted on purpose: they are all `health_check` returning
+          # False, where the exception IS the answer, and they are the only
+          # four such sites left in the whole count.
+          python scripts/silent_failure_ratchet.py --max 106
 
       - name: Run tests
         run: |
