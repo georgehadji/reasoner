@@ -71,7 +71,11 @@ def _port_in_use(port: int) -> tuple[bool, int | None]:
             result = s.connect_ex(("127.0.0.1", port))
             if result != 0:
                 return False, None
-    except Exception:
+    except OSError as exc:
+        # Reported as "the port is free", which is what the caller acts on:
+        # it starts the server, the bind fails, and the error the reader gets
+        # is about binding rather than about the probe that never ran.
+        print(f"[WARN]  Could not probe port {port}: {exc}")
         return False, None
 
     # Port is in use — try to find the owning PID
@@ -91,8 +95,11 @@ def _port_in_use(port: int) -> tuple[bool, int | None]:
                         except ValueError:
                             pass
                     break
-        except Exception:
-            pass
+        except (OSError, subprocess.SubprocessError) as exc:
+            # Without a PID the caller prints "zombie socket", so a failed
+            # lookup does not just lose detail -- it tells the reader there is
+            # no process to stop when there is one.
+            print(f"[WARN]  Could not identify the owner of port {port} (netstat: {exc})")
     else:
         try:
             output = subprocess.check_output(
@@ -102,8 +109,11 @@ def _port_in_use(port: int) -> tuple[bool, int | None]:
             pids = [int(p) for p in output.strip().split() if p.strip().isdigit()]
             if pids:
                 pid = pids[0]
-        except Exception:
-            pass
+        except (OSError, subprocess.SubprocessError, ValueError) as exc:
+            # Same as the netstat branch: no PID reads downstream as
+            # "zombie socket". lsof is absent on plenty of minimal images,
+            # which is exactly the case that used to vanish here.
+            print(f"[WARN]  Could not identify the owner of port {port} (lsof: {exc})")
     return True, pid
 
 
@@ -151,8 +161,12 @@ def _try_free_port(port: int, pid: int | None) -> bool:
                     try:
                         p.kill()
                         killed_any = True
-                    except Exception:
-                        pass
+                    except psutil.NoSuchProcess:
+                        # terminate() landed after the wait gave up. The
+                        # process is gone, which is the outcome asked for.
+                        killed_any = True
+                    except psutil.Error as exc:
+                        print(f"[WARN]  Could not kill PID {conn.pid} holding port {port}: {exc}")
         if killed_any:
             time.sleep(0.5)
             in_use, _ = _port_in_use(port)
@@ -199,7 +213,14 @@ def _wait_for_health(
         except urllib.error.HTTPError as exc:
             if 200 <= exc.code < 500:
                 return True
-        except Exception:
+        except OSError:
+            # Connection refused is what a server that has not finished
+            # binding looks like, so this is the expected state for most of
+            # the poll rather than a failure worth reporting.
+            # urllib.error.URLError and the socket timeouts are all OSError,
+            # so nothing that means "still starting" escapes -- but a bug in
+            # this loop no longer gets eaten for the full timeout and
+            # reported as if the server never came up.
             pass
         time.sleep(0.5)
     return False

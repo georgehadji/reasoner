@@ -203,7 +203,17 @@ jobs:
           # the same swallow written `except (json.JSONDecodeError, Exception)`,
           # which this regex never matched -- fixed in the same change, so the
           # count moves by seven and not eight.
-          python scripts/silent_failure_ratchet.py --max 81
+          # 76: start_all.py's five. Three of them turned a failed *check*
+          # into a confident answer: _port_in_use returned "the port is free"
+          # when the probe itself raised, and both PID lookups left pid at
+          # None -- which the caller prints as "zombie socket", telling the
+          # reader there is no process to stop when there is one. Those now
+          # catch the errors those calls actually raise and print what
+          # failed. The health poll keeps passing on connection-refused,
+          # which is what a server that has not finished binding looks like,
+          # but narrowed to OSError so a bug in the poll is no longer eaten
+          # for the full 30s and then reported as "the server never started".
+          python scripts/silent_failure_ratchet.py --max 76
 
       - name: Run tests
         run: |
