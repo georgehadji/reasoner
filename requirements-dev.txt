@@ -22,5 +22,5 @@ pytest-xdist>=3.8.0,<4.0.0
 # reorders tests inside a module -- the exact blind spot the
 # _SHARED_CACHE_PORT leak lived in. A failure here is a real isolation
 # defect; reproduce it with the -p randomly seed printed in the header.
-pytest-randomly>=4.1.0,<5.0.0
+pytest-randomly>=5.0.0,<6.0.0
 hypothesis>=6.167.1,<7.0.0
