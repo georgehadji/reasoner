@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from reasoner.infrastructure.benchmarks.suites import BenchmarkResult, BenchmarkSuite
+from reasoner.infrastructure.benchmarks.suites import (
+    BenchmarkResult,
+    BenchmarkSuite,
+    report_failed_samples,
+)
 
 _WRITING_PROMPTS = [
     "Explain quantum computing to a 10-year-old in 3 paragraphs.",
@@ -22,6 +26,8 @@ class WritingSuite(BenchmarkSuite):
     async def run(self, judge_provider, calls_per_suite: int = 10) -> BenchmarkResult:
         total = min(calls_per_suite, len(_WRITING_PROMPTS))
         good = 0
+        failed = 0
+        last_exc: BaseException | None = None
         for i in range(total):
             try:
                 response = await judge_provider.complete(
@@ -31,8 +37,10 @@ class WritingSuite(BenchmarkSuite):
                 )
                 if response and len(response.split()) >= 30:
                     good += 1
-            except Exception:
-                pass
+            except Exception as exc:
+                failed += 1
+                last_exc = exc
+        report_failed_samples(self, failed, total, last_exc)
         return BenchmarkResult(
             suite_name=self.suite_name, dimension=self.dimension,
             score=good / total if total > 0 else 0.0, sample_count=total,

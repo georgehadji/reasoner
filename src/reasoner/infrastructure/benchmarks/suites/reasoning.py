@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from reasoner.infrastructure.benchmarks.suites import BenchmarkResult, BenchmarkSuite
+from reasoner.infrastructure.benchmarks.suites import (
+    BenchmarkResult,
+    BenchmarkSuite,
+    report_failed_samples,
+)
 
 _REASONING_PROMPTS = [
     "If all A are B, and some B are C, can we conclude that some A are C? Explain step by step.",
@@ -31,6 +35,8 @@ class ReasoningSuite(BenchmarkSuite):
     ) -> BenchmarkResult:
         correct = 0
         total = min(calls_per_suite, len(_REASONING_PROMPTS))
+        failed = 0
+        last_exc: BaseException | None = None
         for i in range(total):
             prompt = _REASONING_PROMPTS[i]
             try:
@@ -43,8 +49,10 @@ class ReasoningSuite(BenchmarkSuite):
                 # Simple heuristic: longer responses = more reasoning effort
                 if response and len(response) > 100:
                     correct += 1
-            except Exception:
-                pass
+            except Exception as exc:
+                failed += 1
+                last_exc = exc
+        report_failed_samples(self, failed, total, last_exc)
         score = correct / total if total > 0 else 0.0
         return BenchmarkResult(
             suite_name=self.suite_name,

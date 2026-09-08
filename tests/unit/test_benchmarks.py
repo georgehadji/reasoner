@@ -224,3 +224,70 @@ class TestBenchmarkEngine:
                          "long_context", "multilingual", "consistency",
                          "critical_thinking"]:
             assert expected in names
+
+
+class _DeadProvider:
+    """A judge whose every call fails, the way an outage looks to a suite."""
+
+    model = "dead-model"
+
+    async def complete(self, system_prompt: str, user_prompt: str,
+                       max_tokens: int = 100, temperature: float = 0.0) -> str:
+        raise ConnectionError("judge provider unreachable")
+
+
+class TestFailedSamplesAreReported:
+    """P5, docs/plans/root-cause-remediation-2026-09-07.md.
+
+    Every suite scored a raised call exactly like a returned wrong answer:
+    the handler was ``except Exception: pass`` and the denominator stayed at
+    the attempted count. A suite whose judge was down reported 0.0 over its
+    full sample count, which ``engine.benchmark_model`` writes into the
+    capability registry that routing reads. The score is still 0.0 -- what
+    changed is that the run now says why.
+    """
+
+    @pytest.mark.parametrize("factory_path,attempted", [
+        ("reasoning.ReasoningSuite", 5),
+        ("coding.CodingSuite", 5),
+        ("writing.WritingSuite", 5),
+        ("json_fidelity.JsonFidelitySuite", 5),
+        ("long_context.LongContextSuite", 5),
+        ("multilingual.MultilingualSuite", 5),
+        ("consistency.ConsistencySuite", 5),
+        ("critical_thinking.CriticalThinkingSuite", 5),
+    ])
+    @pytest.mark.asyncio
+    async def test_every_suite_reports_a_dead_judge(self, factory_path, attempted, caplog):
+        import importlib
+        import logging
+
+        module_name, class_name = factory_path.split(".")
+        module = importlib.import_module(
+            f"reasoner.infrastructure.benchmarks.suites.{module_name}"
+        )
+        suite = getattr(module, class_name)()
+
+        with caplog.at_level(logging.WARNING):
+            result = await suite.run(_DeadProvider(), calls_per_suite=attempted)
+
+        assert result.score == 0.0
+        expected_site = f"benchmarks.{suite.suite_name}"
+        assert any(expected_site in r.message for r in caplog.records), (
+            f"{suite.suite_name} scored 0.0 with no trace of the outage: "
+            f"{[r.message for r in caplog.records]}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_a_healthy_run_reports_nothing(self, caplog):
+        """The reporter must stay quiet when every sample lands."""
+        import logging
+
+        from reasoner.infrastructure.benchmarks.suites.reasoning import ReasoningSuite
+
+        with caplog.at_level(logging.WARNING):
+            await ReasoningSuite().run(MockProvider(), calls_per_suite=5)
+
+        assert not [r for r in caplog.records if "benchmarks." in r.message], (
+            f"a clean run reported a degradation: {[r.message for r in caplog.records]}"
+        )

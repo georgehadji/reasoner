@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from reasoner.infrastructure.benchmarks.suites import BenchmarkResult, BenchmarkSuite
+from reasoner.infrastructure.benchmarks.suites import (
+    BenchmarkResult,
+    BenchmarkSuite,
+    report_failed_samples,
+)
 
 _CONSISTENCY_PROMPT = "What is the capital of Australia? Answer in one word."
 
@@ -15,6 +19,8 @@ class ConsistencySuite(BenchmarkSuite):
 
     async def run(self, judge_provider, calls_per_suite: int = 10) -> BenchmarkResult:
         responses: list[str] = []
+        failed = 0
+        last_exc: BaseException | None = None
         for _ in range(calls_per_suite):
             try:
                 response = await judge_provider.complete(
@@ -24,8 +30,10 @@ class ConsistencySuite(BenchmarkSuite):
                 )
                 if response:
                     responses.append(response.strip().lower())
-            except Exception:
-                pass
+            except Exception as exc:
+                failed += 1
+                last_exc = exc
+        report_failed_samples(self, failed, calls_per_suite, last_exc)
 
         if not responses:
             return BenchmarkResult(

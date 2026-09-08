@@ -192,7 +192,18 @@ jobs:
           # preset tier means FREE, which is below every required rank, so the
           # tier refusal cannot fire. A guard that had stopped guarding was
           # indistinguishable from one with nothing to refuse.
-          python scripts/silent_failure_ratchet.py --max 88
+          # 81: the seven benchmark suites in infrastructure/benchmarks/
+          # suites/. Each divides its passing samples by the number attempted,
+          # so a judge call that raised scored exactly like one that returned a
+          # wrong answer: a suite whose provider was down reported 0.0 over its
+          # full sample count. engine.benchmark_model writes that straight into
+          # the capability registry routing reads, so an outage was recorded as
+          # a measured incapability. The handlers now count the failure and one
+          # report_failed_samples() per suite names it. json_fidelity.py's was
+          # the same swallow written `except (json.JSONDecodeError, Exception)`,
+          # which this regex never matched -- fixed in the same change, so the
+          # count moves by seven and not eight.
+          python scripts/silent_failure_ratchet.py --max 81
 
       - name: Run tests
         run: |

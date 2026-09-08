@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from reasoner.infrastructure.benchmarks.suites import BenchmarkResult, BenchmarkSuite
+from reasoner.infrastructure.benchmarks.suites import (
+    BenchmarkResult,
+    BenchmarkSuite,
+    report_failed_samples,
+)
 
 _CODING_PROMPTS = [
     "Write a Python function that merges two sorted lists into one sorted list.",
@@ -27,6 +31,8 @@ class CodingSuite(BenchmarkSuite):
     async def run(self, judge_provider, calls_per_suite: int = 10) -> BenchmarkResult:
         total = min(calls_per_suite, len(_CODING_PROMPTS))
         valid = 0
+        failed = 0
+        last_exc: BaseException | None = None
         for i in range(total):
             try:
                 response = await judge_provider.complete(
@@ -37,8 +43,10 @@ class CodingSuite(BenchmarkSuite):
                 )
                 if response and ("def " in response or "function" in response or "SELECT" in response):
                     valid += 1
-            except Exception:
-                pass
+            except Exception as exc:
+                failed += 1
+                last_exc = exc
+        report_failed_samples(self, failed, total, last_exc)
         return BenchmarkResult(
             suite_name=self.suite_name,
             dimension=self.dimension,
