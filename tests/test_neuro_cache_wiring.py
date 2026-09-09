@@ -4,6 +4,7 @@ either half of that wiring is removed again -- the failure mode is silent,
 so it needs a test rather than a runtime assertion.
 """
 
+import asyncio
 import hashlib
 import json
 import time
@@ -36,6 +37,46 @@ class _FakeReasoning(_FakeEmbedding):
 
 
 NEURO_KEY = "test-neuro-internal-key"
+
+
+class _LoopProbe:
+    """Counts event-loop heartbeats that land while a deliberately slowed
+    blocking call is in flight.
+
+    The slowed call brackets itself (see block()), so what is asserted is a
+    count of loop iterations rather than a wall-clock window. The earlier
+    version stamped each tick with time.monotonic() and kept only those
+    falling inside a fixed fraction of the slow window; on Windows under
+    `-n auto --dist loadscope` a nominal 10ms heartbeat overshoots far enough
+    that no tick qualifies, so the list came back empty and the test failed
+    for a scheduling reason instead of the defect it guards.
+    """
+
+    def __init__(self) -> None:
+        self.ticks = 0
+        self.blocks: list[int] = []
+
+    async def heartbeat(self, interval: float = 0.01) -> None:
+        """Tick until cancelled, so the heartbeat can never run out mid-block
+        and leave a slowed call unobserved."""
+        while True:
+            await asyncio.sleep(interval)
+            self.ticks += 1
+
+    def block(self, seconds: float) -> None:
+        """Stand in for one slow write/read: sleep, then record how many
+        heartbeats the loop managed while we slept. Zero means the loop was
+        starved -- the call ran on the loop thread instead of a worker."""
+        start = self.ticks
+        time.sleep(seconds)
+        self.blocks.append(self.ticks - start)
+
+    def assert_loop_stayed_responsive(self, message: str) -> None:
+        """Every slowed call must have let the loop through, not just one of
+        them. `any()` is not enough: a starved session-start write followed by
+        a correctly offloaded exchange write would pass it."""
+        assert self.blocks, "the slowed call never ran -- the monkeypatch missed its target"
+        assert all(n > 0 for n in self.blocks), f"{message} (heartbeats per slowed call: {self.blocks})"
 
 
 @pytest.fixture
@@ -481,7 +522,6 @@ def test_steady_state_learn_does_not_block_the_event_loop(tmp_path, monkeypatch)
     SessionManager._start_session()'s own separate sync write -- a distinct,
     narrower, not-yet-fixed defect -- doesn't confound the measurement).
     """
-    import asyncio
     import builtins
 
     import reasoner.neuro.server as ns
@@ -494,6 +534,7 @@ def test_steady_state_learn_does_not_block_the_event_loop(tmp_path, monkeypatch)
     svc = ns.NeuroService(cfg)
 
     slow_seconds = 0.2
+    probe = _LoopProbe()
     real_open = builtins.open
 
     def slow_open(path, mode="r", *a, **k):
@@ -502,7 +543,7 @@ def test_steady_state_learn_does_not_block_the_event_loop(tmp_path, monkeypatch)
             real_write = f.write
 
             def patched_write(data):
-                time.sleep(slow_seconds)
+                probe.block(slow_seconds)
                 return real_write(data)
 
             f.write = patched_write
@@ -513,27 +554,16 @@ def test_steady_state_learn_does_not_block_the_event_loop(tmp_path, monkeypatch)
         # steady-state per-message write is under test.
         await svc.learn(prompt="warmup", response="r", agent_id="conv1", owner="alice")
 
-        ticks = []
-
-        async def heartbeat():
-            for _ in range(30):
-                await asyncio.sleep(0.01)
-                ticks.append(time.monotonic())
-
         monkeypatch.setattr(builtins, "open", slow_open)
         try:
-            t0 = time.monotonic()
-            hb = asyncio.create_task(heartbeat())
+            hb = asyncio.create_task(probe.heartbeat())
             await svc.learn(prompt="steady-state", response="r", agent_id="conv1", owner="alice")
-            await asyncio.sleep(0.05)
             hb.cancel()
         finally:
             monkeypatch.setattr(builtins, "open", real_open)
 
-        return [t for t in ticks if t - t0 < slow_seconds * 0.8]
-
-    ticks_during_write = asyncio.run(scenario())
-    assert ticks_during_write, (
+    asyncio.run(scenario())
+    probe.assert_loop_stayed_responsive(
         "event loop was starved during a steady-state learn() write -- "
         "NeuroService.ingest() is calling the sync SessionManager.ingest() again"
     )
@@ -549,7 +579,6 @@ def test_new_session_start_does_not_block_the_event_loop(tmp_path, monkeypatch):
     so a session's *first* message (new session, or a max_hot_entries
     rollover) still froze the event loop, just less often than every message.
     """
-    import asyncio
     import builtins
 
     import reasoner.neuro.server as ns
@@ -562,6 +591,7 @@ def test_new_session_start_does_not_block_the_event_loop(tmp_path, monkeypatch):
     svc = ns.NeuroService(cfg)
 
     slow_seconds = 0.2
+    probe = _LoopProbe()
     real_open = builtins.open
 
     def slow_open(path, mode="r", *a, **k):
@@ -570,36 +600,25 @@ def test_new_session_start_does_not_block_the_event_loop(tmp_path, monkeypatch):
             real_write = f.write
 
             def patched_write(data):
-                time.sleep(slow_seconds)
+                probe.block(slow_seconds)
                 return real_write(data)
 
             f.write = patched_write
         return f
 
     async def scenario():
-        ticks = []
-
-        async def heartbeat():
-            for _ in range(30):
-                await asyncio.sleep(0.01)
-                ticks.append(time.monotonic())
-
         monkeypatch.setattr(builtins, "open", slow_open)
         try:
-            t0 = time.monotonic()
-            hb = asyncio.create_task(heartbeat())
+            hb = asyncio.create_task(probe.heartbeat())
             # No prior learn() call -- this is a brand-new session, so
             # ingest_async() must call _start_session() before the write.
             await svc.learn(prompt="first message", response="r", agent_id="conv1", owner="alice")
-            await asyncio.sleep(0.05)
             hb.cancel()
         finally:
             monkeypatch.setattr(builtins, "open", real_open)
 
-        return [t for t in ticks if t - t0 < slow_seconds * 0.8]
-
-    ticks_during_write = asyncio.run(scenario())
-    assert ticks_during_write, (
+    asyncio.run(scenario())
+    probe.assert_loop_stayed_responsive(
         "event loop was starved while starting a new session -- "
         "SessionManager._start_session() is being called synchronously from ingest_async() again"
     )
@@ -614,7 +633,6 @@ def test_first_touch_of_a_new_tenant_does_not_block_the_event_loop(tmp_path, mon
     *first* recall/learn/audit for any not-yet-cached agent_id froze the
     whole worker's event loop for the read duration, not just this tenant's.
     """
-    import asyncio
     import pathlib
 
     import reasoner.neuro.server as ns
@@ -657,38 +675,27 @@ def test_first_touch_of_a_new_tenant_does_not_block_the_event_loop(tmp_path, mon
         )
     )
 
-    slow_seconds = 0.05
+    slow_seconds = 0.15
+    probe = _LoopProbe()
     real_read_text = pathlib.Path.read_text
 
     def slow_read_text(self, *a, **k):
-        time.sleep(slow_seconds)
+        probe.block(slow_seconds)
         return real_read_text(self, *a, **k)
 
     async def scenario():
-        ticks = []
-
-        async def heartbeat():
-            for _ in range(40):
-                await asyncio.sleep(0.01)
-                ticks.append(time.monotonic())
-
         monkeypatch.setattr(pathlib.Path, "read_text", slow_read_text)
         try:
-            t0 = time.monotonic()
-            hb = asyncio.create_task(heartbeat())
+            hb = asyncio.create_task(probe.heartbeat())
             # First touch of this agent_id: TenantManager.get() must build
             # L1Cache/L2Index (7 slowed reads total) before this returns.
             await svc.recall("anything", agent_id=agent_id, owner=owner, max_results=5)
-            await asyncio.sleep(0.05)
             hb.cancel()
         finally:
             monkeypatch.setattr(pathlib.Path, "read_text", real_read_text)
 
-        window = slow_seconds * 7 * 0.5
-        return [t for t in ticks if t - t0 < window]
-
-    ticks_during_load = asyncio.run(scenario())
-    assert ticks_during_load, (
+    asyncio.run(scenario())
+    probe.assert_loop_stayed_responsive(
         "event loop was starved while a new tenant's L1/L2 caches loaded -- "
         "TenantManager.get() is constructing L1Cache/L2Index synchronously again"
     )
@@ -741,7 +748,6 @@ def test_concurrent_learns_do_not_lose_l2_index_entries(tmp_path, monkeypatch):
     reached add() first) is forced to finish last, so it deterministically
     clobbers the rest -- proving the mechanism, not just its probability.
     """
-    import asyncio
     import pathlib
 
     import reasoner.neuro.server as ns
