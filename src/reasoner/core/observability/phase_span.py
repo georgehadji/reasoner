@@ -17,10 +17,10 @@ from __future__ import annotations
 import contextlib
 import importlib
 import logging
-import time
 from typing import Any
 
 from reasoner.core.degrade import degraded
+from reasoner.core.ports.clock import Clock, SystemClock
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +33,7 @@ async def PhaseSpan(
     phase_number: int | float,
     router: Any = None,
     state: Any = None,
+    clock: Clock | None = None,
 ):
     """Context manager wrapping a phase execution in a Langfuse span.
 
@@ -48,15 +49,19 @@ async def PhaseSpan(
         phase_number: Phase step number.
         router: Optional ProviderRouter for model/fallback metadata.
         state: Optional PipelineState for token/cost enrichment on exit.
+        clock: Optional Clock (core/ports/clock.py). Defaults to the OS clock;
+            a test supplies a fake so the recorded duration is exact rather
+            than whatever the platform timer happened to resolve.
     """
     span: Any = None
     _langfuse: Any = None
-    t0 = time.monotonic()
+    _clock: Clock = clock or SystemClock()
+    t0 = _clock.monotonic()
     # t0 is monotonic, which is right for duration and meaningless as a
     # timestamp: it counts from an arbitrary origin. It was going into the
     # span's own input next to a wall-clock end_time, so every Langfuse span
     # recorded a start seconds-since-boot and an end in epoch seconds.
-    t0_wall = time.time()
+    t0_wall = _clock.time()
 
     try:
         langfuse_subscriber = importlib.import_module(
@@ -110,7 +115,7 @@ async def PhaseSpan(
         error = str(exc)[:200]
         raise
     finally:
-        duration = time.monotonic() - t0
+        duration = _clock.monotonic() - t0
 
         if span is not None and _langfuse is not None:
             try:
@@ -174,7 +179,7 @@ async def PhaseSpan(
                             state=state,
                         )
 
-                span.update(output=output, end_time=time.time())
+                span.update(output=output, end_time=_clock.time())
             except Exception as exc:
                 # The span was opened and is now never closed: it stays in
                 # Langfuse with no duration, no cost and no error, which reads

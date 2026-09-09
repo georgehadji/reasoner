@@ -33,17 +33,65 @@ class TestPhaseSpan:
                 pass
 
     @pytest.mark.asyncio
-    async def test_phase_span_latency_tracking(self):
-        """PhaseSpan should record reasonable duration (≥ 0)."""
-        import asyncio
+    async def test_phase_span_latency_tracking(self, fake_langfuse):
+        """The duration PhaseSpan records is its own subtraction, driven by a fake clock.
 
+        This measured ``asyncio.sleep(0.01)`` on the test's own loop clock and
+        asserted the sleep had slept -- a fact about the OS timer rather than
+        about PhaseSpan, and one that is false on Windows, where the default
+        timer granularity (~15.6ms) lets both reads land in the same tick and
+        return an identical value. It also never looked at the duration
+        PhaseSpan reports, which is the only number that reaches Langfuse.
+        """
         from reasoner.core.observability.phase_span import PhaseSpan
 
-        t0 = asyncio.get_running_loop().time()
-        async with PhaseSpan("test-run-id", phase_name="Research", phase_number=3):
-            await asyncio.sleep(0.01)
-        elapsed = asyncio.get_running_loop().time() - t0
-        assert elapsed >= 0.01, f"Duration too short: {elapsed}"
+        clock = _FakeClock()
+        async with PhaseSpan(
+            "test-run-id", phase_name="Research", phase_number=3, clock=clock
+        ):
+            clock.advance(0.25)
+
+        recorded = fake_langfuse.span_obj.updates[0]["output"]["duration_seconds"]
+        assert recorded == 0.25, f"expected the elapsed 0.25s, got {recorded}"
+
+    @pytest.mark.asyncio
+    async def test_phase_span_duration_is_never_negative(self, fake_langfuse):
+        """A clock that does not move must still yield a sane duration, not a negative.
+
+        Guards the mixed-clock class of bug that
+        test_span_records_a_wall_clock_start_and_the_state_enrichment covers on
+        the timestamp side: subtracting two reads of different clocks can go
+        backwards, and a negative duration is silently plausible to Langfuse.
+        """
+        from reasoner.core.observability.phase_span import PhaseSpan
+
+        async with PhaseSpan(
+            "test-run-id", phase_name="Research", phase_number=3, clock=_FakeClock()
+        ):
+            pass
+
+        assert fake_langfuse.span_obj.updates[0]["output"]["duration_seconds"] == 0.0
+
+
+class _FakeClock:
+    """Deterministic Clock double (core/ports/clock.py): time only moves when a
+    test moves it. A duration measured against the real clock is a measurement
+    of the platform's timer resolution, not of the code under test.
+    """
+
+    def __init__(self, start: float = 0.0) -> None:
+        self._now = start
+
+    def advance(self, seconds: float) -> None:
+        self._now += seconds
+
+    def monotonic(self) -> float:
+        return self._now
+
+    def time(self) -> float:
+        # Epoch-shaped, so a test asserting start_time/end_time are on the same
+        # clock still sees two wall-clock-looking numbers.
+        return 1_700_000_000.0 + self._now
 
 
 class _FakeSpan:
