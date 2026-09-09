@@ -25,6 +25,7 @@ folders:
 | `fix_importlinter.py` | Helper for updating that exception list. |
 | `ruff_ratchet.py` | Ratchet for `ruff check src/` violation count. |
 | `mypy_ratchet.py` | Ratchet for `mypy src/reasoner` violation count. |
+| `silent_failure_ratchet.py` | Ratchet for `except Exception` handlers that leave no signal (no raise, no `degraded()`, body only pass/return/sub-WARNING logging). AST-based; `tests/unit/test_silent_failure_detector.py` pins what it counts. |
 | `package_coverage_gate.py` | Per-package coverage floor read from `coverage.xml`. |
 | `check_skill_maps.py` | Compares the folders each `.claude/skills/map-*` skill declares against `.map-manifest.json` and reports which map a new or deleted file made stale. `--update` re-baselines. Wired into `.githooks/pre-commit` as a warning. |
 | `scan-secrets.py` | Secret scanner for API keys and tokens in source. |

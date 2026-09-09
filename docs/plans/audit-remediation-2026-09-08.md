@@ -91,6 +91,26 @@ Count moves 58 → 80. C-1 and H-2 are both in the list, which is the point: the
 two defects the audit found by hand are the two the fixed detector finds by
 itself.
 
+> **Landed 2026-09-09: the real number is 105, not 80.** The prediction above was
+> measured with an ad-hoc script that implemented only the third of the detector's
+> three blind spots. The AST pass finds **47** uncounted sites, not 22, and drops
+> none. The two the prediction missed:
+>
+> - `except (asyncio.CancelledError, Exception): pass` — a tuple. The regex
+>   required `Exception` as the first token after `except`, so every tuple form
+>   was invisible (`api/phase_executor.py:107`, `core/parsing.py:680`).
+> - `except Exception: return []` written on one line. The scan read the body
+>   from the *next* line (`application/flows/debate.py:41`).
+>
+> The third, quiet-log-then-return, was under-counted too: the prediction looked
+> for handlers whose body is *only* logging, but the commonest shape by far is
+> `logger.debug(...)` followed by `return False`, which is D11 exactly
+> (`infrastructure/valkey/state_adapter.py:28`, `application/orchestrator.py:421`).
+>
+> MAX is set to the measured 105 in `test.yml:260` and `ci-local.sh:57`. The 25
+> additional sites are new work for R2/R3, not new defects — they were always
+> there and were never counted.
+
 ### Safety
 
 The ratchet is exact-equality in both directions, so raising MAX in the same
@@ -99,11 +119,12 @@ behaviour. Rollback is reverting one file.
 
 ### Verification
 
-`python scripts/silent_failure_ratchet.py --max 80` passes on the tree the
+`python scripts/silent_failure_ratchet.py --max 105` passes on the tree the
 change lands on. Adding `except Exception: logger.debug("x")` anywhere under
-`src/` turns it red. A unit test in `tests/unit/` asserting the detector
-classifies each of the four shapes (pass, return, debug-fallthrough,
-warning-fallthrough) the way this section says.
+`src/` turns it red. `tests/unit/test_silent_failure_detector.py` pins six
+counted shapes and six uncounted ones against a temporary tree, so a later
+simplification of the detector fails there rather than by quietly lowering a
+number nobody re-derives.
 
 ---
 

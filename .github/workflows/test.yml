@@ -110,10 +110,31 @@ jobs:
       - name: Silent-failure ratchet (bare except-Exception swallows)
         run: |
           # docs/plans/root-cause-remediation-2026-09-07.md P5. Counts
-          # `except Exception` blocks whose body is a bare `pass` or `return`
-          # with no log, no re-raise, no degradation record -- the D11 class
-          # of bug (NEMOTRON_RERANK_MODEL 404ing silently on every call).
+          # `except Exception` handlers that leave no signal at all: no raise,
+          # no degraded() call, and a body of nothing but pass/return and
+          # sub-WARNING logging -- the D11 class of bug (NEMOTRON_RERANK_MODEL
+          # 404ing silently on every call, its only trace a DEBUG line).
           # Ratcheted, same two-way pattern as ruff_ratchet.py.
+          #
+          # The number below RISES at 105 and that is not a regression. Every
+          # entry under it records debt being paid down; this one records the
+          # detector learning to see debt that was always there.
+          #
+          # 105: the line regex became an AST pass. It had three blind spots,
+          # and the audit (docs/plans/implementation_audit_report.md H-1) found
+          # the third by hand after C-1 -- infrastructure/llm/executor.py:756,
+          # the handler wrapping spend-cap enforcement -- sat uncounted at
+          # every MAX above. (a) A tuple: `except (asyncio.CancelledError,
+          # Exception): pass` never matched, because the regex wanted
+          # Exception as the first token after `except`. (b) A one-line
+          # handler: `except Exception: return []` put the body on the header
+          # line, and the scan read the line after it. (c) D11's own shape:
+          # `logger.debug(...)` then `return False`, where the scan tested
+          # only the first statement, saw a call, and stopped. 47 sites, none
+          # dropped. tests/unit/test_silent_failure_detector.py pins the six
+          # counted shapes and the six uncounted ones so the next
+          # simplification of this detector fails there instead of quietly
+          # lowering a number nobody re-derives.
           # 114: P5 steps 1/2 landed core/degrade.py, PipelineState.degradations
           # and reasoner_degradation_total, then routed three sites through it:
           # synthesis promotion rules (their absence leaves a run overclaiming
@@ -257,7 +278,7 @@ jobs:
           # is base64, so there the exception is the answer -- narrowed to
           # ValueError rather than signalled. Its outermost guard kept
           # str(exc), which is often empty, and dropped the traceback.
-          python scripts/silent_failure_ratchet.py --max 58
+          python scripts/silent_failure_ratchet.py --max 105
 
       - name: Run tests
         run: |
