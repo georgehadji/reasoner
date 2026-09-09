@@ -49,12 +49,12 @@ pytest tests/ --cov=src/reasoner --cov-report=html
 
 | Directory | Files |
 |-----------|-------|
-| `architecture/` (7) | `test_layer_boundaries.py`, `test_domain_modules.py`, `test_models_split.py`, `test_event_emission.py`, `test_integration_events.py`, `test_sse_events.py`, `test_regression_bugs.py` — hexagonal boundary and event-contract enforcement. |
+| `architecture/` (8) | `test_layer_boundaries.py`, `test_domain_modules.py`, `test_models_split.py`, `test_event_emission.py`, `test_integration_events.py`, `test_sse_events.py`, `test_regression_bugs.py` — hexagonal boundary and event-contract enforcement — plus `test_unreachable_after_try.py`, which flags any statement following a `try` that every branch already leaves (the shape that hid the per-phase quality gate; coverage cannot see it because the enclosing loop still runs). |
 | `integration/` (7) | `test_preset_pipeline.py`, `test_provenance_api.py`, `test_call_telemetry_store.py`, `test_sandbox_escape.py`, plus `conftest.py` and `sse_utils.py`. |
 | `unit/` (42) | ACR (`test_adaptive_routing`, `test_utility_scorer`, `test_constraints`, `test_capability_registry`, `test_online_learning`, `test_benchmarks`, `test_call_telemetry`, `test_acr_coverage`), watermark (`test_watermark_layer_a`, `_rules`, `_spans`, `_properties`, `_image_png/jpeg/webp/isobmff`, `_image_facade`, `_generated_images`), presets (`test_preset_bloc_diversity`, `test_preset_model_uniqueness`, `test_delphi_expert_routing` — the Delphi panel must be 4 distinct cross-bloc models, see docs/ENSEMBLE_DIVERSITY.md §4, `test_model_alias_honesty` — an alias must not name a vendor/version it does not serve, presets must not route the deprecated ones, and a caller who does gets a warning naming the replacement, `test_catalogue_source` — only src/reasoner/domain/openrouter_models.json may be loaded (a stale root copy once caused 124 false "dead model" hits), `test_pricing_resolver`), spend (`test_spend_limits`, `test_spend_cap_enforcement`), Prism (`test_prism_classifier`, `test_prism_research`), language (`test_language_pivot`, `test_language_probe`), plus numbered regressions `test_regression_BUG001-003`, and `test_silent_failure_detector` (the shapes the silent-failure ratchet counts and the ones it deliberately does not). |
 | `utils/` (4) | Shared factories, mocks, async helpers (not tests). |
 
-## Top-level groups (238 files)
+## Top-level groups (239 files)
 
 | Prefix | Count | Covers |
 |--------|------:|--------|
@@ -64,6 +64,7 @@ pytest tests/ --cov=src/reasoner --cov-report=html
 | `test_arch_*` | 9 | Architectural risks: dead letter, fallback masking, streaming closure, pipeline-state resilience, system-prompt drift, worker mode, mixin migration, registry consistency, integration methods. |
 | `test_article_*` | 8 | Article pipeline: adapters, parsing, router, presets, follow-up scoping, golden set, regressions. |
 | `test_pipeline_*` | 8 | Flow and DAG, field descriptor, state split, resume, ownership repo, service contract, fixes. |
+| `test_phase_*` | 3 | `test_phase_span` (PhaseSpan drives an injected Clock, so latency assertions do not depend on the OS timer), `test_phase_subagents_base`, and `test_phase_quality_gate` — drives `PipelineExecutionService.execute_run` with a phase that fails its quality check once, proving the per-phase gate, the retry and `reset_phase_state` actually execute. |
 | `test_e2e_*` | 7 | Budget presets (real + mock), comprehensive, real API, real pipeline, relationships, article discovery. |
 | `test_event_*` | 7 | Event bus (backpressure, isolation), event store (concurrency, GDPR ownership), emission service, event types. |
 | `test_neuro_*` | 6 | Agent-id isolation, cache wiring, CLI, fallback providers, Perplexity provider, safe indexing. |

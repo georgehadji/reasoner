@@ -392,8 +392,6 @@ class PipelineExecutionService:
                         if cancel_event.is_set():
                             await sse_emit({"type": "cancelled", "message": "Pipeline stopped by user"})
                             return
-                        # Success — break the retry loop
-                        break
                     except TimeoutError:
                         logger.error("Phase %s (%s) timed out after %ss", num, name, phase_timeout)
                         err_msg = f"Phase timeout: {name} exceeded {phase_timeout}s"
@@ -477,47 +475,51 @@ class PipelineExecutionService:
                         )
                         break
 
-                    # Phase executed successfully — run quality check
-                    quality_result = await phase_monitor.evaluate(name, state, attempt=retry_attempt + 1)
-                    quality_payload = {
-                        "type": "phase_quality",
-                        "phase": num,
-                        "name": name,
-                        "score": quality_result.score,
-                        "passed": quality_result.passed,
-                        "reason": quality_result.reason,
-                        "attempt": retry_attempt + 1,
-                    }
-                    await sse_emit(quality_payload)
-                    _tracked_broadcast(run_id, quality_payload)
+                    else:
+                        # `else`, not the end of the `try` body: an exception raised by
+                        # the gate itself is a gate bug, and folding it into the handlers
+                        # above would report it to the client as a phase failure.
+                        # Phase executed successfully — run quality check
+                        quality_result = await phase_monitor.evaluate(name, state, attempt=retry_attempt + 1)
+                        quality_payload = {
+                            "type": "phase_quality",
+                            "phase": num,
+                            "name": name,
+                            "score": quality_result.score,
+                            "passed": quality_result.passed,
+                            "reason": quality_result.reason,
+                            "attempt": retry_attempt + 1,
+                        }
+                        await sse_emit(quality_payload)
+                        _tracked_broadcast(run_id, quality_payload)
 
-                    # Record quality score in state history for downstream context
-                    state.quality_history.append({
-                        "phase": name,
-                        "attempt": retry_attempt + 1,
-                        "score": quality_result.score,
-                        "passed": quality_result.passed,
-                    })
+                        # Record quality score in state history for downstream context
+                        state.quality_history.append({
+                            "phase": name,
+                            "attempt": retry_attempt + 1,
+                            "score": quality_result.score,
+                            "passed": quality_result.passed,
+                        })
 
-                    if quality_result.passed or retry_attempt >= max_retries:
-                        break
+                        if quality_result.passed or retry_attempt >= max_retries:
+                            break
 
-                    # Quality failed and budget remains — inject hints and emit retry event
-                    if quality_result.suggestions:
-                        state.quality_hints[name] = " ".join(quality_result.suggestions)
+                        # Quality failed and budget remains — inject hints and emit retry event
+                        if quality_result.suggestions:
+                            state.quality_hints[name] = " ".join(quality_result.suggestions)
 
-                    retry_payload = {
-                        "type": "phase_retry",
-                        "phase": num,
-                        "name": name,
-                        "attempt": retry_attempt + 1,
-                        "max_attempts": max_retries + 1,
-                        "reason": quality_result.reason,
-                    }
-                    await sse_emit(retry_payload)
-                    _tracked_broadcast(run_id, retry_payload)
+                        retry_payload = {
+                            "type": "phase_retry",
+                            "phase": num,
+                            "name": name,
+                            "attempt": retry_attempt + 1,
+                            "max_attempts": max_retries + 1,
+                            "reason": quality_result.reason,
+                        }
+                        await sse_emit(retry_payload)
+                        _tracked_broadcast(run_id, retry_payload)
 
-                    reset_phase_state(name, state)
+                        reset_phase_state(name, state)
 
                 # Clear quality hints for this phase regardless of outcome
                 state.quality_hints.pop(name, None)
