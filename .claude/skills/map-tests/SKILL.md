@@ -79,6 +79,7 @@ pytest tests/ --cov=src/reasoner --cov-report=html
 | `test_mind_virus_resistance` | 1 | Propagation resistance (docs/MIND_VIRUS_MITIGATION.md): prompt hardening, external-content wrapping, Neuro recall rendering, resistance routing, shape detection. Two tests fail closed on invariants that hold by *omission* — recalled memory never entering a system prompt, and Phase-2 generators staying blind to each other. Read the linked section before relaxing either. |
 | `test_code_execution_safety`, `test_container_sandbox`, `test_sandbox_worker` | 3 | Sandbox execution and escape hardening. |
 | `test_synthesis_*`, `test_perspective*`, `test_multi_perspective_budget`, `test_mixins_*`, `test_methods*` | 11 | Phase behavior per reasoning method. |
+| `test_iterative_critique_score_shapes` | 1 | `scores` names a list of per-perspective objects in `perspective_phases` and an object of dimensions in `iterative_critique_phases`; the second reader used to crash on the first shape, outside the try/except meant to absorb it. |
 | Singletons | ~60 | One file each: `test_hypergate`, `test_headless`, `test_mcp_tools`, `test_sdk_contract`, `test_cqrs_parity`, `test_idempotency`, `test_run_metering`, `test_credits`, `test_presets`, `test_preset_validation`, `test_models`, `test_parsing*`, `test_aggregates`, `test_domain_events`, `test_load`, `test_acceptance`, `test_codebase_audit`, `test_site_capabilities_sync`, and similar. |
 
 ## Key gotchas

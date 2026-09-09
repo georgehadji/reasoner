@@ -80,7 +80,25 @@ def _safe_float(v: Any) -> float:
         return 0.0
 
 
-def _parse_critic_dimensions(scores: dict) -> CriticDimensionScore:
+def _parse_critic_dimensions(scores: Any) -> CriticDimensionScore:
+    """Defensive shape cast, in the same spirit as ``_safe_float`` above.
+
+    ``scores`` here is the critic's per-dimension mapping. The same key name in
+    the multi-perspective critique (``perspective_phases.run_critique_phase``)
+    carries a *list* of per-perspective objects, so a model that returns that
+    shape crashed this phase with ``AttributeError: 'list' object has no
+    attribute 'get'``. The read at the call site sits outside the try/except
+    that exists to turn a malformed critic response into a REVISE round, so the
+    whole phase went down instead.
+    """
+    if not isinstance(scores, dict):
+        logger.warning(
+            "Critic returned %s for 'scores', expected an object of dimensions "
+            "(factuality/reasoning/completeness/clarity); scoring this round 0 "
+            "so the verdict drives the retry",
+            type(scores).__name__,
+        )
+        scores = {}
     return CriticDimensionScore(
         factuality=_safe_float(scores.get("factuality", 0)),
         reasoning=_safe_float(scores.get("reasoning", 0)),

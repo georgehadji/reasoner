@@ -217,7 +217,15 @@ async def test_stress_test_filters_truncated_output():
         "classification": json.dumps({"task_type": "analytical"}),
         "decomposition": json.dumps({"causal_chain": [], "assumptions": [], "failure_modes": []}),
         "constructive": json.dumps({"core_analysis": "ok", "key_insights": []}),
-        "scoring": json.dumps({"scores": []}),
+        "scoring": json.dumps({"scores": [
+            # Non-empty because the per-phase quality gate now runs on this path
+            # and fails "Critique & Pruning" on an empty scores list. The test is
+            # about stress-test filtering, so the critique only has to be well-formed enough for the
+            # run to reach it.
+            {"perspective": "constructive", "logical_consistency": 8.0,
+             "evidence_support": 7.5, "failure_resilience": 7.0,
+             "feasibility": 8.5, "bias_flags": [], "steel_man": "strongest form"},
+        ]}),
         "stress_testing": json.dumps({
             "stress_tests": [
                 {"scenario": "constraint_violation", "survival_rate": 0.7, "failure_mode": "truncated output due to length limits"},

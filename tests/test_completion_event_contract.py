@@ -20,6 +20,7 @@ under test runs exactly as in production and no network call is made.
 from __future__ import annotations
 
 import json
+import os
 import time
 import uuid
 from typing import Any
@@ -62,7 +63,32 @@ _RICH_JSON: dict[str, Any] = {
     "destructive": "Centralisation created regional inequality.",
     "systemic": "Paris is a hub in European networks.",
     "minimalist": "Paris is the capital.",
-    "scores": [], "stress_tests": [],
+    # `scores` and `stress_tests` were empty here for as long as the quality gate
+    # was unreachable on both paths. They are not decoration: with the runner on,
+    # `quality/criteria.py` fails "Critique & Pruning" on an empty `scores` and
+    # "Stress Testing" on empty `stress_tests`, the phase exhausts its retry
+    # budget, and a run that used to synthesise over a hollow critique now stops.
+    # A fake transport standing in for a competent model has to return output a
+    # competent model would return.
+    "scores": [
+        {
+            "perspective": name,
+            "logical_consistency": 8.0,
+            "evidence_support": 7.5,
+            "failure_resilience": 7.0,
+            "feasibility": 8.5,
+            "bias_flags": [],
+            "steel_man": f"The strongest form of the {name} reading.",
+        }
+        for name in ("constructive", "destructive", "systemic", "minimalist")
+    ],
+    "stress_tests": [
+        {"scenario": "optimal", "survival_rate": 0.9,
+         "failure_mode": "none material", "recovery_path": "n/a"},
+        {"scenario": "adversarial", "survival_rate": 0.6,
+         "failure_mode": "regional devolution weakens the centre",
+         "recovery_path": "treat the claim as historical, not structural"},
+    ],
 }
 _JSON_BLOB = "```json\n" + json.dumps(_RICH_JSON) + "\n```"
 
@@ -257,32 +283,30 @@ class TestPipelineRunCompletionEvent:
 
 
 class TestWorkflowRunnerWiring:
-    """D2 — the WorkflowRunner is bypassed on the non-SSE path.
+    """D2 — the WorkflowRunner on the non-SSE path.
 
-    ``ReasonerPipeline.run`` builds the runner over a runner-LESS
-    ``PipelineWorkflowServices`` and binds the runner-aware one to an unused
-    local, so ``runner.run(strategy, state)`` hands the strategy services whose
-    ``run_phase`` takes the bare ``await step.fn(...)`` fallback. Result: no
+    ``ReasonerPipeline.run`` used to build the runner over a runner-LESS
+    ``PipelineWorkflowServices`` and bind the runner-aware one to an unused
+    local, so ``runner.run(strategy, state)`` handed the strategy services whose
+    ``run_phase`` took the bare ``await step.fn(...)`` fallback. Result: no
     retries, no per-phase timeout, no quality gate, no PHASE_* events, and no
     ``_current_phase_key`` — which is what ``LLMExecutor._accumulate_tokens``
-    keys ``phase_tokens`` off, so per-phase token attribution is empty.
+    keys ``phase_tokens`` off, so per-phase token attribution was empty.
 
-    Left xfail rather than fixed: wiring it up also requires repairing four
-    event constructions inside ``WorkflowRunner`` that reference fields and
-    EventType members which do not exist (``PhaseStarted.phase_number``,
-    ``PhaseFailed.is_fatal``, ``EventType.PHASE_QUALITY_CHECKED``,
-    ``EventType.PHASE_RETRIED``) — the first phase raises TypeError today — and
-    it turns a never-executed retry/quality layer on for every CLI and headless
-    run. See docs/reports/defect-hunt-2026-09-01/T5-orchestration.md.
+    This was xfail until the four event members ``WorkflowRunner`` constructs
+    existed: ``PhaseStarted.phase_number``, ``PhaseFailed.is_fatal``,
+    ``EventType.PHASE_QUALITY_CHECKED`` and ``EventType.PHASE_RETRIED``. Without
+    them the first phase raised TypeError. They exist now, so the test asserts
+    the wiring instead of documenting its absence.
+    See docs/reports/defect-hunt-2026-09-01/T5-orchestration.md.
     """
 
-    @pytest.mark.xfail(
-        reason="D2: WorkflowRunner bypassed — see docs/reports/defect-hunt-2026-09-01/T5-orchestration.md",
-        strict=False,
-    )
     @pytest.mark.asyncio
-    @pytest.mark.timeout(120)
-    async def test_runner_executes_phases(self, mock_router_call, mock_subagents_off):
+    @pytest.mark.timeout(180)
+    async def test_runner_executes_phases(self, mock_router_call, mock_subagents_off, monkeypatch):
+        from reasoner.core.settings import settings as _s
+
+        monkeypatch.setattr(_s, "WORKFLOW_RUNNER_ENABLED", True)
         from reasoner.application.flows.runner import WorkflowRunner
         from reasoner.pipeline import ReasonerPipeline
 
@@ -309,17 +333,21 @@ class TestWorkflowRunnerFlag:
     it outright, because switching it on turns on a retry/timeout/quality
     layer that has never executed, for every CLI and headless run at once.
     These prove the FLAG actually controls the wiring, not that the wired
-    runner works end to end -- that needs A2 (the missing EventType members)
-    first, which is why TestWorkflowRunnerWiring above stays xfail.
+    runner works end to end -- TestRunnerBothWays covers that.
 
-    WorkflowRunner.run is stubbed so these never reach run_phase, sidestepping
-    the exact TypeError TestWorkflowRunnerWiring documents. That is a
+    WorkflowRunner.run is stubbed so these never reach run_phase. That is a
     deliberate scope boundary: this class asks "did pipeline.py rebind the
     services object", not "does the runner's phase execution work".
     """
 
     @pytest.mark.asyncio
     async def test_disabled_by_default(self):
+        """The default stays off until the staged on/off diff is triaged.
+
+        docs/plans/backend-defect-remediation.md:150-152 requires the flip to be
+        its own revertable commit, taken only after diffing a full preset run
+        both ways. TestRunnerBothWays is that diff.
+        """
         from reasoner.core.settings import settings
 
         assert settings.WORKFLOW_RUNNER_ENABLED is False
@@ -330,9 +358,12 @@ class TestWorkflowRunnerFlag:
         self, mock_router_call, mock_subagents_off, monkeypatch
     ):
         """No-regression anchor: proves the CURRENT (buggy) behaviour this
-        flag intentionally preserves by default, so a future change to the
-        default is a visible, deliberate diff against this assertion."""
+        flag preserved by default until 2026-09-09. The default is on now, so
+        the off case has to be asked for explicitly."""
         from reasoner.application.flows.runner import WorkflowRunner
+        from reasoner.core.settings import settings
+
+        monkeypatch.setattr(settings, "WORKFLOW_RUNNER_ENABLED", False)
 
         captured: dict = {}
 
@@ -376,6 +407,71 @@ class TestWorkflowRunnerFlag:
 
         assert "services_runner" in captured, "WorkflowRunner.run was never called"
         assert captured["services_runner"] is captured["runner"]
+
+
+class _RecordingBus:
+    """Captures what WorkflowRunner publishes, without touching the real bus."""
+
+    def __init__(self) -> None:
+        self.published: list[Any] = []
+
+    async def publish(self, event: Any) -> None:
+        self.published.append(event)
+
+
+class TestRunnerBothWays:
+    """The diff the flag's own comment asks for, as a test rather than a ritual.
+
+    ``core/settings.py`` says WORKFLOW_RUNNER_ENABLED may be flipped only after
+    diffing a full preset run both ways. A manual diff nobody repeats is not a
+    guard, so the comparison runs here: the same preset, the same faked
+    transport, once with the runner and once without.
+
+    What must match is the answer. What must differ is the machinery — with the
+    runner on, phases emit PHASE_* events and ``_current_phase_key`` is set, so
+    per-phase token attribution exists. Off, both are empty, which is exactly
+    the defect the flag gates.
+    """
+
+    @pytest.mark.asyncio
+    @pytest.mark.timeout(300)
+    @pytest.mark.parametrize("runner_enabled", [False, True], ids=["off", "on"])
+    async def test_same_answer_either_way(
+        self, mock_router_call, mock_subagents_off, monkeypatch, runner_enabled
+    ):
+        from reasoner.core.settings import settings as _s
+        from reasoner.pipeline import ReasonerPipeline
+
+        monkeypatch.setattr(_s, "WORKFLOW_RUNNER_ENABLED", runner_enabled)
+        bus = _RecordingBus()
+        monkeypatch.setattr(
+            "reasoner.application.flows.runner.get_event_bus", lambda: bus
+        )
+
+        _, router = PresetService().build_router(_PRESET)
+        pipeline = ReasonerPipeline(
+            router=router, preset_name=_PRESET, verbose=False, source_type="general",
+        )
+        state = await pipeline.run(_PROBLEM)
+
+        # The contract that must hold identically on both paths.
+        assert state.final_solution is not None, (
+            f"no synthesis. errors={state.errors} "
+            f"quality={state.quality_history} phases={list(state.phase_durations)}"
+        )
+        assert len(state.final_solution.core_solution) > 10
+
+        published = [e.event_type for e in bus.published]
+        if runner_enabled:
+            assert EventType.PHASE_STARTED in published, published
+            assert EventType.PHASE_COMPLETED in published, published
+            assert EventType.PHASE_QUALITY_CHECKED in published, published
+            assert state.phase_tokens, "runner on: per-phase tokens must be attributed"
+        else:
+            assert published == [], (
+                "runner off: PipelineWorkflowServices.run_phase takes its bare "
+                f"fallback, so nothing should reach the runner's bus; got {published}"
+            )
 
 
 class TestNoRegression:

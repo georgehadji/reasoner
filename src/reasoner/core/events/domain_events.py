@@ -18,6 +18,8 @@ class PipelineEventType(str, Enum):
     PHASE_STARTED = "phase_started"
     PHASE_COMPLETED = "phase_completed"
     PHASE_FAILED = "phase_failed"
+    PHASE_QUALITY_CHECKED = "phase_quality_checked"
+    PHASE_RETRIED = "phase_retried"
     PIPELINE_COMPLETED = "pipeline_completed"
     PIPELINE_FAILED = "pipeline_failed"
     PERSPECTIVE_GENERATED = "perspective_generated"
@@ -157,6 +159,10 @@ class PipelineStarted(DomainEvent):
 class PhaseStarted(DomainEvent):
     """Phase execution started."""
     phase_name: str = ""
+    # Ordering key, and a float because flows insert half-steps (2.5, 3.5).
+    # Both runners pass it; without the field they raised TypeError, which
+    # EventEmissionService caught and reported as a degradation on every phase.
+    phase_number: float = 0.0
     config: dict[str, Any] = field(default_factory=dict)
 
 
@@ -176,6 +182,31 @@ class PhaseFailed(DomainEvent):
     phase_name: str = ""
     error: str = ""
     retry_count: int = 0
+    # Whether the failure ends the run. A critical phase, an unretryable error
+    # and a run-fatal one (empty credits, rejected key) all stop it; a
+    # non-critical phase failing lets the run synthesise over the gap.
+    is_fatal: bool = False
+
+
+@dataclass(frozen=True)
+class PhaseQualityChecked(DomainEvent):
+    """A phase's output was scored by the quality monitor."""
+    phase_name: str = ""
+    score: float = 0.0
+    passed: bool = False
+    reason: str = ""
+
+
+@dataclass(frozen=True)
+class PhaseRetried(DomainEvent):
+    """A phase is being re-run because its output failed the quality gate.
+
+    Distinct from RETRY_ATTEMPTED, which covers transport-level retries against
+    a provider. This one is about the answer, not the connection.
+    """
+    phase_name: str = ""
+    attempt: int = 0
+    reason: str = ""
 
 
 @dataclass(frozen=True)
@@ -435,6 +466,8 @@ PIPELINE_EVENT_CLASSES: dict[PipelineEventType, type[DomainEvent]] = {
     PipelineEventType.PHASE_STARTED: PhaseStarted,
     PipelineEventType.PHASE_COMPLETED: PhaseCompleted,
     PipelineEventType.PHASE_FAILED: PhaseFailed,
+    PipelineEventType.PHASE_QUALITY_CHECKED: PhaseQualityChecked,
+    PipelineEventType.PHASE_RETRIED: PhaseRetried,
     PipelineEventType.PIPELINE_COMPLETED: PipelineCompleted,
     PipelineEventType.PIPELINE_FAILED: PipelineFailed,
     PipelineEventType.CONTEXT_FETCHED: ContextFetched,
