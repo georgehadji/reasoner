@@ -186,6 +186,70 @@ retrying. That is the point, and it is also why A-2 lands before B, not during.
 **Fitness function:** the parametrized both-ways suite; a test asserting the
 flag's default is `true` once flipped, so nobody silently reverts it.
 
+**Landed 2026-09-09.** The prediction above was confirmed on the first run.
+The staged diff (`WORKFLOW_RUNNER_ENABLED` off vs on over the full fast lane)
+produced **0 failures off, 9 on**. Triage found three distinct causes, and two
+of them were product defects rather than test noise:
+
+1. *Mock fidelity.* `test_e2e_budget_presets_mock.py`'s shared payload
+   documents itself as "a superset of what any phase parser looks for" and had
+   neither `scores` nor `stress_tests`. Nothing noticed because the gate never
+   ran. Fixed by making the payload true to its own docstring.
+2. **The gate contradicted the phases' own skip contracts.**
+   `run_critique_phase` returns early on "No candidates to critique"
+   (`perspective_phases.py:243`) and `run_stress_test_phase` on "No top
+   candidates to stress test" (`:297`), while `_check_critique` /
+   `_check_stress_testing` scored the resulting empty state as a failure. Every
+   research-shaped flow — no Perspectives phase in front of the critique — hit
+   its retry budget and ended with no synthesis. Fixed in
+   `quality/criteria.py`; `tests/unit/test_phase_quality.py` pins both.
+3. **`scores` means two different shapes in two flows.**
+   `perspective_phases.run_critique_phase` reads it as a *list* of
+   per-perspective objects; `iterative_critique_phases.run_critic_phase` reads
+   it as an *object* of dimensions, and the read sits outside the try/except
+   that exists to turn a malformed critic response into a REVISE round. A model
+   returning the first shape crashed the phase with `AttributeError: 'list'
+   object has no attribute 'get'`. Fixed defensively with a WARNING;
+   `tests/test_iterative_critique_score_shapes.py` pins it. **The name
+   collision itself is unresolved** — a candidate for Phase C, where the answer
+   is a typed critic response rather than a shared dict key.
+
+Worth naming: (2) and (3) were both invisible for as long as the gate was off.
+Neither is caused by turning it on; turning it on is what made them observable.
+
+### A-3. The quality gate's LLM judge has never run — new, found by A-2
+
+Not in the audit; found by turning the gate on. `quality/monitor.py:218` calls
+`self._router.complete(model_id=..., messages=..., system=...)`. `ProviderRouter`
+has **no** `complete` method — the API is `call(role, system_prompt,
+user_prompt, ...)`. Every judge invocation raises `AttributeError`, is caught at
+`monitor.py:176-177`, and returns the rule result:
+
+> `LLM judge failed for phase 'Critique & Pruning': 'ProviderRouter' object has
+> no attribute 'complete' — using rule result`
+
+So `QUALITY_JUDGE_MODELS` and `QUALITY_JUDGE_THRESHOLDS` (`constants_limits.py`,
+budget vs premium) select a judge that is never consulted, and the gate is
+rules-only on both paths. It is logged at WARNING, so it is not a silent failure
+by the ratchet's definition — but nothing was reading the log, because until
+A-1 and A-2 the gate never ran at all.
+
+**Deliberately not fixed inside A-2.** Repairing the call turns on *another*
+never-executed path, one that can overturn a rule failure and let a phase pass.
+That needs its own failing-first test and its own both-ways diff, exactly like
+A-2. Treat the WARNING as expected noise until A-3 lands.
+
+1. A test that fails today: a phase whose rule check fails and whose judge
+   would pass it must come back passed.
+2. Route through `ProviderRouter.call` with the judge role, or give the router
+   the `complete` the monitor was written against — decide which is the real
+   contract rather than adapting whichever is easier to type.
+3. Assert the tier split actually reaches the provider: budget and premium
+   presets must send different judge models.
+
+**Fitness function:** a test asserting no `PhaseMonitor.evaluate` call logs the
+fallback warning during a full mocked run.
+
 ---
 
 ## Phase B — One execution engine
@@ -485,8 +549,9 @@ separate 8 from >9: the rubric's top band names properties, and *observable*,
 ## Sequencing
 
 ```
-A-1 ──┐                                    (independent; do first; ~one day)
+A-1 ──┐                                    (LANDED 0a305b7)
 A-2 ──┴──► B ──► H-2                       (B needs A-2 proven, not merely landed)
+A-3 ──┘                                    (found by A-2; gate is rules-only until it lands)
    │
    ├────► C ──► C-3 defers to the P5 plan's R2/R3
    │       └──► H-3

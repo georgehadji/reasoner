@@ -340,17 +340,22 @@ class TestWorkflowRunnerFlag:
     services object", not "does the runner's phase execution work".
     """
 
+    @pytest.mark.skipif(
+        "WORKFLOW_RUNNER_ENABLED" in os.environ,
+        reason="asserts the built-in default; an env override is a deliberate choice",
+    )
     @pytest.mark.asyncio
-    async def test_disabled_by_default(self):
-        """The default stays off until the staged on/off diff is triaged.
+    async def test_enabled_by_default(self):
+        """Pinned so a revert to the bypassed path is a visible diff, not drift.
 
-        docs/plans/backend-defect-remediation.md:150-152 requires the flip to be
-        its own revertable commit, taken only after diffing a full preset run
-        both ways. TestRunnerBothWays is that diff.
+        This asserted ``is False`` while the four event members WorkflowRunner
+        constructs were missing, so the first phase raised TypeError. They
+        exist, TestRunnerBothWays covers both settings, and the default flipped
+        on 2026-09-09.
         """
         from reasoner.core.settings import settings
 
-        assert settings.WORKFLOW_RUNNER_ENABLED is False
+        assert settings.WORKFLOW_RUNNER_ENABLED is True
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(60)

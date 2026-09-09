@@ -110,16 +110,27 @@ class Settings:
     # ── Document Semantic Retrieval (Phase 4, opt-in) ──
     DOCUMENT_SEMANTIC_RETRIEVAL_ENABLED: bool = os.getenv("DOCUMENT_SEMANTIC_RETRIEVAL_ENABLED", "false").lower() in ("1", "true", "yes")
 
-    # Off by default, and it must stay off until someone has diffed a full
-    # preset run with it on against one with it off. Turning it on switches
-    # the CLI and headless paths from PipelineWorkflowServices.run_phase's bare
-    # `await step.fn(...)` fallback onto the real WorkflowRunner: retries,
-    # per-phase timeouts, the quality gate and PHASE_* events, none of which
-    # have ever executed on this path. Code that has never run is not known to
-    # work, so this is a behaviour change behind a switch, not a bug fix.
+    # On since 2026-09-09. It routes the CLI and headless paths through the real
+    # WorkflowRunner instead of PipelineWorkflowServices.run_phase's bare
+    # `await step.fn(...)` fallback, which means retries, per-phase timeouts,
+    # the quality gate, PHASE_* events and `_current_phase_key` (and therefore
+    # per-phase token attribution) execute there for the first time.
+    #
+    # It stayed off because switching on a layer that has never run is a
+    # behaviour change, and because WorkflowRunner constructed four event
+    # members that did not exist -- PhaseStarted.phase_number,
+    # PhaseFailed.is_fatal, EventType.PHASE_QUALITY_CHECKED and PHASE_RETRIED --
+    # so the first phase raised TypeError. Those exist now, and the diff the
+    # old comment asked for is a test rather than a ritual:
+    # tests/test_completion_event_contract.py::TestRunnerBothWays runs the same
+    # preset over the same faked transport with the flag off and on.
+    #
+    # Consequence worth expecting: a phase whose output fails
+    # quality/criteria.py now retries and can end the run, where before it was
+    # synthesised over in silence. That is the point of the gate.
     # See docs/plans/backend-defect-remediation.md B1 for the staging.
     WORKFLOW_RUNNER_ENABLED: bool = (
-        os.getenv("WORKFLOW_RUNNER_ENABLED", "false").lower() in ("1", "true", "yes")
+        os.getenv("WORKFLOW_RUNNER_ENABLED", "true").lower() in ("1", "true", "yes")
     )
     DOCUMENT_CHUNK_SIZE: int = int(os.getenv("DOCUMENT_CHUNK_SIZE", "1000"))
     DOCUMENT_CHUNK_OVERLAP: int = int(os.getenv("DOCUMENT_CHUNK_OVERLAP", "200"))
