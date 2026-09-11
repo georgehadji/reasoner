@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from reasoner.application.flows.base import PhaseStep, WorkflowServices, WorkflowStrategy
+from reasoner.application.flows.base import PhaseStep, WorkflowStrategy
 from reasoner.application.flows.perspective_phases import run_critique_phase
 from reasoner.application.flows.research_phases import run_research_web_search_phase
 from reasoner.application.flows.synthesis_phase import run_synthesis_phase
@@ -24,14 +24,3 @@ class ResearchFlow(WorkflowStrategy):
             PhaseStep(3, "Critique & Pruning", run_critique_phase, _ser_3, critical=True),
             PhaseStep(5, "Synthesis", run_synthesis_phase, _ser_5),
         ]
-
-    async def execute(
-        self,
-        state: PipelineState,
-        services: WorkflowServices,
-    ) -> PipelineState:
-        for step in self.get_phases(state):
-            success = await services.run_phase(step, state)
-            if not success and step.critical:
-                break
-        return state

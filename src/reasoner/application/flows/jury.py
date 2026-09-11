@@ -65,12 +65,3 @@ class JuryFlow(WorkflowStrategy):
             PhaseStep(4.5, "Weighted Ranking", run_jury_weighted_ranking_phase, _ser_4),
             PhaseStep(5, "Synthesis", run_synthesis_phase, _ser_5)
         ]
-
-    async def execute(
-        self,
-        state: PipelineState,
-        services: WorkflowServices,
-    ) -> PipelineState:
-        for step in self.get_phases(state):
-            await services.run_phase(step, state)
-        return state

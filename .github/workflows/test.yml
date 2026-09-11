@@ -80,7 +80,13 @@ jobs:
           # of a duplicate retry/health implementation nothing in src/ used --
           # and collapsed infrastructure/llm/exceptions.py from a rival error
           # tree into alias imports. -2 net against the lines _translate adds.
-          python scripts/ruff_ratchet.py --max 2283
+          # 2274: Phase B-1a (docs/plans/architecture-score-9-remediation-2026-09-09.md)
+          # deleted the 21 WorkflowStrategy.execute() overrides and the Protocol
+          # member they satisfied -- one phase loop now lives in
+          # WorkflowRunner.run -- taking their unused imports with them. Dropping
+          # `from typing import Any` left a blank line inside four import blocks,
+          # which is -4 I001 on top of the -5 the deleted bodies carried.
+          python scripts/ruff_ratchet.py --max 2274
 
       - name: Security scan (bandit)
         run: |

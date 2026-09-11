@@ -18,6 +18,34 @@ from reasoner.quality import PhaseMonitor, reset_phase_state
 logger = logging.getLogger(__name__)
 
 
+def resolve_phases(strategy: WorkflowStrategy, state: PipelineState) -> list[PhaseStep]:
+    """The list of phases a run executes — for every driver, not one of them.
+
+    Both drivers built this themselves and disagreed on the result. The SSE
+    driver appended the Layer B egress rewrite and the CLI did not, so watermark
+    egress rewriting has never applied to a CLI, headless or MCP run. Resolving
+    the list in one place is what makes "one execution engine" true rather than
+    "two engines that currently agree".
+    """
+    phases = list(strategy.get_phases(state))
+
+    # Layer B (optional, off by default): appended once here rather than in
+    # every flow's get_phases() (docs/plans/watermark-removal-integration.md §5.5).
+    from reasoner.application.services.egress_policy import resolve_egress_policy
+    if phases and resolve_egress_policy().layer_b_enabled:
+        from reasoner.application.flows.egress_rewrite_phase import run_egress_rewrite_phase
+        from reasoner.application.services.serializers import _ser_egress_rewrite
+        phases.append(
+            PhaseStep(
+                phases[-1].num + 0.5,
+                "Egress Rewrite",
+                run_egress_rewrite_phase,
+                _ser_egress_rewrite,
+            )
+        )
+    return phases
+
+
 class WorkflowRunner:
     """
     Executes a WorkflowStrategy with full lifecycle management:
@@ -42,8 +70,31 @@ class WorkflowRunner:
         state: PipelineState,
         config: Any = None
     ) -> PipelineState:
-        """Run the strategy to completion."""
-        return await strategy.execute(state, self.services)
+        """Template Method: the one phase loop every flow shares.
+
+        This used to delegate to ``strategy.execute()``, and all 21 strategies
+        implemented that as the same four lines -- except two, which is the
+        whole problem. Work held in an ``execute()`` override ran on the CLI
+        only, because the SSE driver builds its own list from ``get_phases()``
+        and never called ``execute()``. ``ArticleFlow`` had already found that
+        out and moved its work into phases (``article_phases.py:79-86``,
+        ``:378-384``); ``writing.py`` (augmentation) and ``delphi.py`` (the
+        converged dissent skip) still had it. Seven more strategies dropped the
+        ``step.critical`` check entirely, so ``jury.py:63``'s critical Critic
+        Pool was fatal on the web and non-fatal on the CLI.
+
+        Strategies now supply steps and nothing else.
+        """
+        for step in resolve_phases(strategy, state):
+            # Through services, not self.run_phase: PipelineWorkflowServices
+            # takes its bare `await step.fn(...)` fallback when it was built
+            # without a runner, which is what WORKFLOW_RUNNER_ENABLED switches.
+            # Calling self.run_phase here would execute the runner's retry and
+            # quality layer even with the flag off.
+            success = await self.services.run_phase(step, state)
+            if not success and step.critical:
+                break
+        return state
 
     async def run_phase(
         self,

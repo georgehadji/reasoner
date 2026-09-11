@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
 
 import reasoner.phases as phases
 from reasoner.application.flows.base import PhaseStep, WorkflowServices, WorkflowStrategy
@@ -70,16 +69,3 @@ class BrainstormingFlow(WorkflowStrategy):
             PhaseStep(4, "Deep Development", run_brainstorm_develop_phase, _ser_4),
             PhaseStep(5, "Synthesis", run_brainstorm_synthesis_phase, _ser_synthesis),
         ]
-
-    async def execute(
-        self,
-        state: PipelineState,
-        services: WorkflowServices,
-        config: Any = None
-    ) -> PipelineState:
-        for step in self.get_phases(state):
-            success = await services.run_phase(step, state)
-            if not success and step.critical:
-                break
-
-        return state

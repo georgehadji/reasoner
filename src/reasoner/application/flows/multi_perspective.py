@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from reasoner.application.flows.base import PhaseStep, WorkflowServices, WorkflowStrategy
+from reasoner.application.flows.base import PhaseStep, WorkflowStrategy
 from reasoner.application.flows.perspective_phases import (
     run_critique_phase,
     run_multi_perspective_research_phase,
@@ -35,14 +35,3 @@ class MultiPerspectiveFlow(WorkflowStrategy):
 
         phases.append(PhaseStep(5, "Synthesis", run_synthesis_phase, _ser_5))
         return phases
-
-    async def execute(
-        self,
-        state: PipelineState,
-        services: WorkflowServices,
-    ) -> PipelineState:
-        for step in self.get_phases(state):
-            success = await services.run_phase(step, state)
-            if not success and step.critical:
-                break
-        return state

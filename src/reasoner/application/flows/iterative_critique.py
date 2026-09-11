@@ -69,8 +69,3 @@ class IterativeCritiqueFlow(WorkflowStrategy):
                 state.adversarial_convergence_reason = reason
                 services.log("IC", f"Debate converged at round {round_num}", state)
                 break
-
-    async def execute(self, state: PipelineState, services: WorkflowServices) -> PipelineState:
-        for step in self.get_phases(state):
-            await services.run_phase(step, state)
-        return state

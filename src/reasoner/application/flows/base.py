@@ -51,15 +51,12 @@ class WorkflowServices(Protocol):
 
 @runtime_checkable
 class WorkflowStrategy(Protocol):
-    """Protocol for reasoning workflow strategies."""
+    """Protocol for reasoning workflow strategies.
 
-    async def execute(
-        self,
-        state: PipelineState,
-        services: WorkflowServices,
-    ) -> PipelineState:
-        """Execute the reasoning workflow."""
-        ...
+    Steps only. The loop that runs them lives in ``WorkflowRunner.run``; a
+    strategy that supplies its own would be reachable from the CLI and not
+    from the web, which is exactly the split this Protocol used to permit.
+    """
 
     def get_phases(self, state: PipelineState) -> list[PhaseStep]:
         """Return the list of phases for this strategy."""

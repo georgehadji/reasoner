@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from reasoner.application.flows.base import PhaseStep, WorkflowServices, WorkflowStrategy
+from reasoner.application.flows.base import PhaseStep, WorkflowStrategy
 from reasoner.application.flows.cognitive_phases import (
     run_cove_answer_phase,
     run_cove_draft_phase,
@@ -37,10 +37,6 @@ class CoVEFlow(WorkflowStrategy):
             PhaseStep(5, "Final Revision", run_cove_revise_phase, _ser_5),
             PhaseStep(6, "Synthesis", run_synthesis_phase, _ser_5)
         ]
-    async def execute(self, state: PipelineState, services: WorkflowServices) -> PipelineState:
-        for step in self.get_phases(state):
-            await services.run_phase(step, state)
-        return state
 
 class SoTFlow(WorkflowStrategy):
     """Skeleton-of-Thought (SoT) reasoning workflow."""
@@ -51,10 +47,6 @@ class SoTFlow(WorkflowStrategy):
             PhaseStep(4, "Assemble", run_sot_assemble_phase, _ser_4),
             PhaseStep(5, "Synthesis", run_synthesis_phase, _ser_5)
         ]
-    async def execute(self, state: PipelineState, services: WorkflowServices) -> PipelineState:
-        for step in self.get_phases(state):
-            await services.run_phase(step, state)
-        return state
 
 class ToTFlow(WorkflowStrategy):
     """Tree-of-Thought (ToT) reasoning workflow."""
@@ -66,10 +58,6 @@ class ToTFlow(WorkflowStrategy):
             PhaseStep(5, "Backtrack", run_tot_backtrack_phase, _ser_5),
             PhaseStep(6, "Synthesis", run_synthesis_phase, _ser_5)
         ]
-    async def execute(self, state: PipelineState, services: WorkflowServices) -> PipelineState:
-        for step in self.get_phases(state):
-            await services.run_phase(step, state)
-        return state
 
 class PoTFlow(WorkflowStrategy):
     """Program-of-Thought (PoT) reasoning workflow."""
@@ -80,10 +68,6 @@ class PoTFlow(WorkflowStrategy):
             PhaseStep(4, "Interpret", run_pot_interpret_phase, _ser_4),
             PhaseStep(5, "Synthesis", run_synthesis_phase, _ser_5)
         ]
-    async def execute(self, state: PipelineState, services: WorkflowServices) -> PipelineState:
-        for step in self.get_phases(state):
-            await services.run_phase(step, state)
-        return state
 
 class SelfDiscoverFlow(WorkflowStrategy):
     """Self-Discover reasoning workflow."""
@@ -94,7 +78,3 @@ class SelfDiscoverFlow(WorkflowStrategy):
             PhaseStep(4, "Implement", run_sd_implement_phase, _ser_4),
             PhaseStep(5, "Synthesis", run_synthesis_phase, _ser_5)
         ]
-    async def execute(self, state: PipelineState, services: WorkflowServices) -> PipelineState:
-        for step in self.get_phases(state):
-            await services.run_phase(step, state)
-        return state

@@ -295,36 +295,23 @@ class PipelineExecutionService:
             method = state.method or pipeline._get_method_from_preset()
             strategy = flow_factory.get_strategy(method)
 
-            phases: list[tuple[int, str, Any, Any]] = []
+            # Wrap the step function so that it accepts only (state)
+            # and calls the strategy function with (state, _services)
+            def make_wrapper(fn):
+                async def wrapper(state: PipelineState):
+                    await fn(state, _services)
+                return wrapper
+
+            phases: list[tuple[float, str, Any, Any]] = []
             step_metadata: dict[str, dict[str, Any]] = {}
             if strategy:
-                for step in strategy.get_phases(state):
-
-                    # Wrap the step function so that it accepts only (state)
-                    # and calls the strategy function with (state, _services)
-                    def make_wrapper(fn):
-                        async def wrapper(state: PipelineState):
-                            await fn(state, _services)
-                        return wrapper
-
+                # resolve_phases, not strategy.get_phases: the Layer B egress step
+                # was appended here and nowhere else, so it never applied to a CLI,
+                # headless or MCP run. One resolver now answers for both drivers.
+                from reasoner.application.flows.runner import resolve_phases
+                for step in resolve_phases(strategy, state):
                     phases.append((step.num, step.name, make_wrapper(step.fn), step.serializer))
                     step_metadata[step.name] = {"critical": step.critical}
-
-                # Layer B (optional, off by default): appended once here rather than
-                # in every flow's get_phases() -- this loop is the single real driver
-                # for every method (docs/plans/watermark-removal-integration.md §5.5).
-                from reasoner.application.services.egress_policy import resolve_egress_policy
-                if resolve_egress_policy().layer_b_enabled and phases:
-                    from reasoner.application.flows.base import PhaseStep
-                    from reasoner.application.flows.egress_rewrite_phase import (
-                        run_egress_rewrite_phase,
-                    )
-                    from reasoner.application.services.serializers import _ser_egress_rewrite
-                    egress_step = PhaseStep(
-                        phases[-1][0] + 0.5, "Egress Rewrite", run_egress_rewrite_phase, _ser_egress_rewrite
-                    )
-                    phases.append((egress_step.num, egress_step.name, make_wrapper(egress_step.fn), egress_step.serializer))
-                    step_metadata[egress_step.name] = {"critical": False}
             else:
                 logger.error(f"No strategy found for method: {method}")
 
