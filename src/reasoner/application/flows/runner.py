@@ -5,10 +5,17 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import Callable
+from contextlib import AbstractAsyncContextManager, nullcontext
 from typing import Any
 
 from reasoner.application.event_bus.bus import get_event_bus
-from reasoner.application.flows.base import PhaseStep, WorkflowServices, WorkflowStrategy
+from reasoner.application.flows.base import (
+    PhaseObserver,
+    PhaseStep,
+    WorkflowServices,
+    WorkflowStrategy,
+)
 from reasoner.core.constants import get_phase_retry_budget, get_phase_timeout
 from reasoner.core.events.domain_events import EventType, make_event
 from reasoner.core.exceptions import classify_error, is_retryable, is_run_fatal
@@ -16,6 +23,9 @@ from reasoner.domain.pipeline_state import PipelineState
 from reasoner.quality import PhaseMonitor, reset_phase_state
 
 logger = logging.getLogger(__name__)
+
+# Wraps one attempt at a phase body. PhaseSpan is the only implementation.
+_SpanFactory = Callable[[PhaseStep, PipelineState], AbstractAsyncContextManager[Any]]
 
 
 def resolve_phases(strategy: WorkflowStrategy, state: PipelineState) -> list[PhaseStep]:
@@ -58,11 +68,20 @@ class WorkflowRunner:
     def __init__(
         self,
         services: WorkflowServices,
-        monitor: PhaseMonitor | None = None
+        monitor: PhaseMonitor | None = None,
+        observer: PhaseObserver | None = None,
+        span_factory: _SpanFactory | None = None,
     ):
         self.services = services
         self.monitor = monitor or PhaseMonitor(services.router)
         self.bus = get_event_bus()
+        # A driver's own in-order side effects (SSE frames, WebSocket fan-out,
+        # event-store writes). See PhaseObserver for why these are not bus
+        # subscribers.
+        self.observer = observer
+        # Wraps one attempt at the phase body. The SSE driver passes PhaseSpan,
+        # which needs a run_id the runner has no business knowing.
+        self.span_factory = span_factory or (lambda step, state: nullcontext())
 
     async def run(
         self,
@@ -106,16 +125,15 @@ class WorkflowRunner:
         Execute a single PhaseStep with retries, quality checks, and events.
         Returns True if successful, False if fatal error occurred.
 
-        Note: the SSE streaming path (api/execution/pipeline.py) has its own
-        phase execution loop because it needs SSE keepalive, WebSocket broadcast,
-        and PhaseSpan observability — concerns that don't apply to the CLI
-        WorkflowStrategy path. These are intentionally separate execution
-        contexts, not duplicate code.
+        Driver-specific side effects — SSE frames, WebSocket fan-out,
+        event-store writes, Langfuse spans — arrive through ``observer`` and
+        ``span_factory`` rather than through a second copy of this loop.
         """
         num = step.num
         name = step.name
         fn = step.fn
         critical = step.critical
+        obs = self.observer
 
         phase_key = f"Phase {num}: {name}"
         state._current_phase_key = phase_key
@@ -125,6 +143,9 @@ class WorkflowRunner:
             logger.info("Spend cap exceeded — skipping phase %s", phase_key)
             state.phase_tokens[phase_key] = {"input": 0, "output": 0}
             return True
+
+        if obs is not None:
+            await obs.on_phase_start(step, state)
 
         start_evt = make_event(
             EventType.PHASE_STARTED,
@@ -139,12 +160,26 @@ class WorkflowRunner:
         phase_start_time = time.monotonic()
 
         success = False
+        quality_result = None
         for attempt in range(max_retries + 1):
             try:
                 timeout = get_phase_timeout(name)
-                await asyncio.wait_for(fn(state, self.services, **kwargs), timeout=timeout)
+                async with self.span_factory(step, state):
+                    await asyncio.wait_for(fn(state, self.services, **kwargs), timeout=timeout)
 
                 quality_result = await self.monitor.evaluate(name, state, attempt=attempt + 1)
+
+                # Recorded here rather than by a driver: the hints a later phase
+                # reads from quality_history were only ever written by the SSE
+                # loop, so a CLI run's downstream phases saw an empty history.
+                state.quality_history.append({
+                    "phase": name,
+                    "attempt": attempt + 1,
+                    "score": quality_result.score,
+                    "passed": quality_result.passed,
+                })
+                if obs is not None:
+                    await obs.on_phase_quality(step, state, quality_result, attempt + 1)
 
                 quality_evt = make_event(
                     EventType.PHASE_QUALITY_CHECKED,
@@ -166,6 +201,10 @@ class WorkflowRunner:
                         state.quality_hints[name] = " ".join(quality_result.suggestions)
 
                     self.services.log(name, f"Quality check failed (score: {quality_result.score}). Retrying...", state)
+                    if obs is not None:
+                        await obs.on_phase_retry(
+                            step, state, quality_result, attempt + 1, max_retries + 1
+                        )
                     reset_phase_state(name, state)
 
                     retry_evt = make_event(
@@ -180,9 +219,9 @@ class WorkflowRunner:
                 else:
                     self.services.log(name, f"Quality check failed after {max_retries} retries.", state)
 
-            except TimeoutError:
+            except TimeoutError as exc:
                 err_msg = f"Phase timeout: {name} exceeded {timeout}s"
-                await self._handle_phase_error(state, name, err_msg, is_fatal=critical)
+                await self._handle_phase_error(step, state, err_msg, is_fatal=critical, exc=exc)
                 if critical: return False
                 break
 
@@ -192,7 +231,7 @@ class WorkflowRunner:
                 run_fatal = is_run_fatal(exc)
                 is_fatal = run_fatal or not is_retryable(exc) or critical
 
-                await self._handle_phase_error(state, name, err_msg, is_fatal=is_fatal)
+                await self._handle_phase_error(step, state, err_msg, is_fatal=is_fatal, exc=exc)
 
                 # P5 step 5: a non-critical phase failing normally just breaks,
                 # and the run synthesises over the missing phase. That is the
@@ -224,13 +263,26 @@ class WorkflowRunner:
                 tokens=state.phase_tokens.get(phase_key, {"input": 0, "output": 0})
             )
             await self.bus.publish(complete_evt)
+            if obs is not None:
+                await obs.on_phase_complete(step, state, duration, quality_result)
             return True
 
         return not critical
 
-    async def _handle_phase_error(self, state: PipelineState, name: str, message: str, is_fatal: bool):
+    async def _handle_phase_error(
+        self,
+        step: PhaseStep,
+        state: PipelineState,
+        message: str,
+        is_fatal: bool,
+        exc: BaseException | None = None,
+    ) -> None:
+        name = step.name
         state.errors.append(message)
         self.services.log(name, f"ERROR: {message}", state)
+
+        if self.observer is not None:
+            await self.observer.on_phase_error(step, state, exc, message, is_fatal)
 
         fail_evt = make_event(
             EventType.PHASE_FAILED,

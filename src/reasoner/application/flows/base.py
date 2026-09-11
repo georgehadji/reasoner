@@ -50,6 +50,44 @@ class WorkflowServices(Protocol):
     async def run_phase(self, step: PhaseStep, state: PipelineState, **kwargs: Any) -> bool: ...
 
 @runtime_checkable
+class PhaseObserver(Protocol):
+    """Side effects a driver wants around each phase, in the order they happen.
+
+    ``WorkflowRunner.run_phase`` awaits every hook inline. That is the point:
+    the EventBus runs handlers concurrently, and queues them once started, so
+    it is the right channel for projections and the wrong one for an SSE
+    stream whose frame order is the contract the browser reads. The runner
+    still publishes its ``PHASE_*`` domain events either way.
+
+    ``result`` is the ``PhaseQualityResult`` from the phase's quality gate, or
+    None on a phase that never got that far.
+    """
+
+    async def on_phase_start(self, step: PhaseStep, state: PipelineState) -> None: ...
+
+    async def on_phase_quality(
+        self, step: PhaseStep, state: PipelineState, result: Any, attempt: int
+    ) -> None: ...
+
+    async def on_phase_retry(
+        self, step: PhaseStep, state: PipelineState, result: Any, attempt: int, max_attempts: int
+    ) -> None: ...
+
+    async def on_phase_error(
+        self,
+        step: PhaseStep,
+        state: PipelineState,
+        exc: BaseException | None,
+        message: str,
+        fatal: bool,
+    ) -> None: ...
+
+    async def on_phase_complete(
+        self, step: PhaseStep, state: PipelineState, duration: float, result: Any
+    ) -> None: ...
+
+
+@runtime_checkable
 class WorkflowStrategy(Protocol):
     """Protocol for reasoning workflow strategies.
 

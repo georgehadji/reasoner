@@ -50,7 +50,7 @@ want() { [ "$FILTER" = "all" ] || [ "$FILTER" = "$1" ]; }
 if want python; then
     # Keep in step with .github/workflows/test.yml -- this drifted apart twice
     # already (2243 here vs 2242 there), so the local gate disagreed with CI.
-    gate "ruff"   python scripts/ruff_ratchet.py --max 2274
+    gate "ruff"   python scripts/ruff_ratchet.py --max 2273
     gate "bandit" bandit -r src/ -t B307,B308,B102 -f txt -q
     gate "mypy-strict-auth_legacy" mypy --strict src/reasoner/infrastructure/auth_legacy.py --ignore-missing-imports
     gate "mypy-ratchet" python scripts/mypy_ratchet.py --max 423
