@@ -27,7 +27,7 @@ folders:
 | `idempotency_http.py` | `register_run_or_error` — HTTP translation of the app-layer idempotency guard for `client_run_id`. |
 | `metrics.py` | Prometheus scrape endpoint + `QueryTimer`. Metric *definitions* live in `reasoner/metrics.py`. |
 | `middleware.py` | `SecurityHeadersMiddleware`, `AuditMiddleware` (IP anonymization, URL sanitizing), `MemoryLimitMiddleware`, `RequestTimeoutMiddleware`. |
-| `phase_executor.py` | Phase→router-role hints, `get_phase_start_models`, `get_critical_phases`, `run_phase_with_keepalive`. |
+| `phase_executor.py` | Phase→router-role hints, `get_phase_start_models`, `run_phase_with_keepalive`. Phase fatality is `PhaseStep.critical` alone — the `_LEGACY_CRITICAL` name set that used to live here made four phases fatal on the web only. |
 | `run_observability.py` | `CreditSink` + `PrometheusObserver` — concrete bindings for `run_metering.metered()` protocols. |
 | `run_state.py` | Shim → RunStateStore. |
 | `saas_router.py` | `/me`, quota status, data export, account deletion, auth-event logging. |

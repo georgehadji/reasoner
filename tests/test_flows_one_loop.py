@@ -123,6 +123,34 @@ async def test_jury_critical_phase_stops_the_run():
     assert services.phases_run == ["Evidence Search", "Generation Pool", "Critic Pool"]
 
 
+def test_fatality_comes_only_from_phasestep_critical():
+    """The SSE driver OR'd a hard-coded name set into step.critical.
+
+    `_LEGACY_CRITICAL` in api/phase_executor.py made Perspectives, Opening
+    Statements, Generation Pool and Deep Research fatal on the web and
+    non-fatal on the CLI, and named five more phases no strategy produces.
+    The four live ones are now critical=True where they are declared.
+    """
+    from reasoner.api import phase_executor
+    from reasoner.application.flows.debate import DebateFlow
+    from reasoner.application.flows.multi_perspective import MultiPerspectiveFlow
+    from reasoner.application.flows.research import ResearchFlow
+
+    assert not hasattr(phase_executor, "_LEGACY_CRITICAL")
+    assert not hasattr(phase_executor, "get_critical_phases")
+
+    state = PipelineState(problem="q")
+    expected = {
+        MultiPerspectiveFlow: "Perspectives",
+        DebateFlow: "Opening Statements",
+        ResearchFlow: "Deep Research",
+        JuryFlow: "Generation Pool",
+    }
+    for flow_cls, phase_name in expected.items():
+        steps = {s.name: s.critical for s in flow_cls().get_phases(state)}
+        assert steps[phase_name] is True, f"{flow_cls.__name__}: {phase_name} not critical"
+
+
 def test_resolve_phases_appends_egress_rewrite_for_every_driver(monkeypatch):
     """This step was appended by the SSE driver alone, so CLI runs never got it."""
     import reasoner.application.services.egress_policy as policy
