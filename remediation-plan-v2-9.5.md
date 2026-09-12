@@ -18,7 +18,7 @@ The gaps:
 | # | Gap | Current state | Points to recover | Priority |
 |---|---|---|---|---|
 | G1 | PipelineState God Object (1245 lines, event I/O still on domain) | R6 partially resolved | ~0.4 | **P0** |
-| G2 | PhaseOutput not applied to 6+ parallel phase sites — shared-mutation hazard | C1 partial | ~0.3 | **P0** |
+| ~~G2~~ | ~~PhaseOutput not applied to 6+ parallel phase sites — shared-mutation hazard~~ **Withdrawn 2026-09-12 — see §1.4** | C1 closed (ADR-006) | 0 | — |
 | G3 | import-linter has 46 exceptions — architectural enforcement is symbolic | C2 partial | ~0.3 | **P1** |
 | G4 | 3 residual `get_event_loop()` in `subprocess_executor.py` | A1 nearly done | ~0.1 | **P2** |
 | G5 | `application→api` import in `handlers.py:109` (permitted, not clean) | A3 1 residual | ~0.1 | **P2** |
@@ -88,9 +88,31 @@ domain/pipeline_state.py         — add PipelineField descriptor,
 wc -l src/reasoner/domain/pipeline_state.py  # ≤ 800
 ```
 
-#### 1.4 — Apply PhaseOutput to all parallel phase sites
+#### 1.4 — ~~Apply PhaseOutput to all parallel phase sites~~ · **SUPERSEDED 2026-09-12**
 
-**Current:** Only `perspective_phases.py` and `pipeline_flow.py` use `PhaseOutput`. Six other parallel sites mutate `PipelineState` directly — concurrent-write hazard remains.
+> **Superseded by [ADR-006](docs/adr/006-mutable-pipeline-state.md).** `PhaseOutput` and its
+> `apply_to()` reducer have been deleted. Two reasons this item could not be executed as
+> written:
+>
+> 1. **Its premise does not hold.** The stated hazard is "concurrent mutation". `asyncio`
+>    runs one event loop on one thread; two coroutines never execute Python bytecode
+>    simultaneously, and in every site listed below the appends happen **after**
+>    `asyncio.gather` returns. There is no data race to remove. `[INFERENCE]` The real
+>    hazard in this shape is *interleaving* — a coroutine that awaits partway through a
+>    multi-field update — which a delta type would not fix either, and which none of these
+>    sites exhibit.
+> 2. **`PhaseOutput` could not express most of these sites.** It carried only `core`
+>    fields. `debate_phases`, `delphi_phases`, `jury_phases` and `coding_phases` write
+>    `method_state`; they had no representable delta.
+>
+> **What replaces it:** the convention in ADR-006 — parallel phases accumulate into locals
+> and write to `state` once, after joining. That is already what the listed sites do. The
+> convention is now stated rather than implied, and it additionally protects Phase-2
+> generator blindness (`CLAUDE.md` §5).
+>
+> The original text follows for the record.
+
+**Current (as written, 2026):** Only `perspective_phases.py` and `pipeline_flow.py` use `PhaseOutput`. Six other parallel sites mutate `PipelineState` directly — concurrent-write hazard remains.
 
 **Sites to fix:**
 
@@ -292,7 +314,7 @@ Phase 1 (domain slimming)
   ├── 1.1 (event emission) ──── independent
   ├── 1.2 (to_context_dict) ─── after 1.1 (shared file)
   ├── 1.3 (boilerplate) ──────── independent
-  └── 1.4 (PhaseOutput) ─────── after 1.1 (event emission refactored)
+  └── 1.4 (PhaseOutput) ─────── SUPERSEDED 2026-09-12 (ADR-006); no longer blocks 2.1
         │
         └── Phase 2 (enforcement)
               ├── 2.1 (reduce exceptions) ─── after 1.1, 1.2, 1.4 (leaks removed)
@@ -354,7 +376,7 @@ Every PR:
 
 1. PipelineState ≤ 800 lines, zero I/O, zero event-bus references, zero serialization — pure data + pure derivations only.
 2. Zero cross-layer import violations — import-linter enforced in CI with ≤ 15 documented exceptions (all ports/adapters).
-3. All parallel phase sites use PhaseOutput delta pattern — no shared-mutation hazard.
+3. All parallel phase sites accumulate into locals and write to `state` once, after joining — stated in ADR-006. (Amended 2026-09-12: was "use PhaseOutput delta pattern"; that type is retired.)
 4. Streaming is decomposed — single execution model, no bypass flag, handler owns logic, api adapts.
 5. Production correctness: Redis-mandatory startup probe, PostgreSQL event store with migration path, shared httpx pools with bounded concurrency.
 6. Every phase observable: span with model, tokens, latency, fallback, cost. E2e trace test automates verification.

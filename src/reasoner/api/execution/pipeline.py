@@ -12,7 +12,6 @@ from reasoner.api.execution.direct import _stream_direct_answer
 from reasoner.api.execution.web_search import _stream_web_search_results
 from reasoner.api.history import HISTORY_DIR, HistoryEntry, _save_history_entry
 from reasoner.api.phase_executor import (
-    get_critical_phases,
     get_phase_start_models,
     run_phase_with_keepalive,
 )
@@ -315,8 +314,6 @@ class PipelineExecutionService:
             else:
                 logger.error(f"No strategy found for method: {method}")
 
-            # CRITICAL_PHASES computed via get_critical_phases(phases, step_metadata)
-
             # _PHASE_ROLE_HINTS moved to api/phase_executor.py
 
     # _get_phase_start_models moved to get_phase_start_models(phase_name, router)
@@ -409,7 +406,7 @@ class PipelineExecutionService:
                         phase_errored = True
                         emitter.emit("PHASE_FAILED", phase_name=name,
                                       error=err_msg)
-                        phase_fatal = name in get_critical_phases(phases, step_metadata)
+                        phase_fatal = step_metadata.get(name, {}).get("critical", False)
                         break
                     except Exception as exc:
                         logger.error("Phase %s (%s) failed: %s", num, name, exc, exc_info=True)
@@ -458,7 +455,7 @@ class PipelineExecutionService:
                         phase_fatal = (
                             is_run_fatal(exc)
                             or err_type == "auth"
-                            or name in get_critical_phases(phases, step_metadata)
+                            or step_metadata.get(name, {}).get("critical", False)
                         )
                         break
 

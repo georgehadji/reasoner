@@ -26,7 +26,7 @@ class MultiPerspectiveFlow(WorkflowStrategy):
     def get_phases(self, state: PipelineState) -> list[PhaseStep]:
         phases = [
             PhaseStep(1.5, "Evidence Search", run_multi_perspective_research_phase, _ser_2),
-            PhaseStep(2, "Perspectives", run_perspectives_phase, _ser_2),
+            PhaseStep(2, "Perspectives", run_perspectives_phase, _ser_2, critical=True),
             PhaseStep(3, "Critique & Pruning", run_critique_phase, _ser_3, critical=True),
         ]
 

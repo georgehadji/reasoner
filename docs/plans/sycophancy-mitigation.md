@@ -50,7 +50,7 @@ that it extends.
 |---|---|---|
 | New typed phase output | Value Object, all fields defaulted | `ReviewHypothesis` — [core_types.py:112](../../src/reasoner/domain/core_types.py:112) |
 | Safe LLM→domain conversion | Defensive builder, skip-not-throw | `_parse_review_hypotheses` — [parsing.py:694](../../src/reasoner/core/parsing.py:694) |
-| Phase result reduction | Delta + reducer | `PhaseOutput.apply_to` — [pipeline_state.py:191](../../src/reasoner/domain/pipeline_state.py:191) |
+| Phase result reduction | Accumulate locally, mutate `state` once after the join | `run_perspectives_phase` — [perspective_phases.py:179](../../src/reasoner/application/flows/perspective_phases.py:179). Amended 2026-09-12: was "Delta + reducer — `PhaseOutput.apply_to`", now retired ([ADR-006](../adr/006-mutable-pipeline-state.md)) |
 | Per-request behaviour decision | Frozen policy object resolved once | `EgressPolicy` / `resolve_egress_policy` — [egress_policy.py](../../src/reasoner/application/services/egress_policy.py) |
 | Prompt variant selection | Frozen profile dataclass + pure selector | `DirectProfile` / `select_direct_profile` — [direct.py:16](../../src/reasoner/phases/direct.py:16) |
 | Adding a reasoning route | Strategy + registry | `WorkflowFactory` — [factory.py:33](../../src/reasoner/application/flows/factory.py:33) |
@@ -198,13 +198,16 @@ Design notes:
 premises: list[PremiseClaim] = field(default_factory=list)
 ```
 
-Registered in three places, following the existing mechanics:
+Registered in two places, following the existing mechanics:
 
 1. `_CORE_FIELDS` in `PipelineState.__init__` (line ~250) — so flat-kwargs construction
    keeps working.
 2. `PipelineField("core")` descriptor (line ~362 block) — so `state.premises` resolves.
-3. `PhaseOutput.premises: list[PremiseClaim] | None = None` plus the matching
-   `state.core.premises.extend(...)` branch in `apply_to`.
+
+> **Amended 2026-09-12.** This list previously had a third entry: add
+> `PhaseOutput.premises` plus a matching `apply_to` branch. `PhaseOutput` has been
+> retired — see [ADR-006](../adr/006-mutable-pipeline-state.md). There is no delta type
+> and no reducer; the phase writes `state.core.premises` directly.
 
 It is a `core` field, not `method_state`, because premise auditing is method-agnostic —
 every flow that reaches synthesis can carry it, and the `.get()`-only rule for
@@ -331,7 +334,8 @@ re-run recorded in the PR description.
 ### W2 — Premise audit  *(implements S2; the structural fix)*
 
 **Layer:** domain + core + application + phases.
-**Pattern:** Value Object + defensive parser + `PhaseOutput` delta + new `PhaseStep`.
+**Pattern:** Value Object + defensive parser + direct state write + new `PhaseStep`.
+(Amended 2026-09-12: was "`PhaseOutput` delta". See [ADR-006](../adr/006-mutable-pipeline-state.md).)
 **Depends on:** §2.1, §2.2, §2.3. **Blocks:** W3, W9.
 **Flag:** `SYCOPHANCY_PREMISE_AUDIT_ENABLED` (default `true` after bake).
 
@@ -397,7 +401,15 @@ filters on `label`). Those keep working unchanged — the new keys are additive 
 #### 2c. Wiring
 
 - `flows/decomposition_phase.py` (and the fusion equivalent): after `extract_json`, call
-  `_parse_premises` and return `PhaseOutput(premises=...)`.
+  `_parse_premises` and write `state.core.premises.extend(...)` **directly**.
+
+  > **Amended 2026-09-12.** This step previously read "return `PhaseOutput(premises=...)`".
+  > Written that way it would have shipped a silent data-loss bug: every phase executor
+  > discards a phase function's return value, so the premises would never have reached
+  > `PipelineState` — the identical defect
+  > [tests/test_perspectives_reach_state.py](../../tests/test_perspectives_reach_state.py)
+  > was written to prevent for Phase 2. The phase contract returns `None` and mutates
+  > `state`. See [ADR-006](../adr/006-mutable-pipeline-state.md).
 - `perspective_prompt(state, "destructive")` gains a `[USER PREMISES]` block listing
   user-origin claims, with the instruction:
 

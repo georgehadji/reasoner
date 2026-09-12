@@ -25,6 +25,7 @@ Phased engineering and remediation roadmaps describing exact development steps f
 - **`landing-fx-implementation.md`**: Plan — Landing FX: Inverted Band, CSS Depth, and Dead-Weight Removal
 - **`language-bias-mitigation.md`**: Language-Induced Bias Mitigation — Implementation Plan
 - **`perplexity-sonar-enhancements.md`**: Perplexity Sonar Enhancement Plan
+- **`phaseoutput-retirement-2026-09-12.md`**: Retire `PhaseOutput` — close the half-built immutability migration
 - **`pipeline-ownership-authz-hardening.md`**: Plan: Pipeline Ownership Authorization Hardening
 - **`pre-existing-fixes.md`**: Pre-Existing Issues — Remediation Plan
 - **`security-remediation-plan.md`**: Security Remediation Plan
