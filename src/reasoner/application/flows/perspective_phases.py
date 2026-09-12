@@ -176,13 +176,21 @@ async def run_perspectives_phase(
     def _perspective_name(p) -> str:
         return p.name if hasattr(p, 'name') else str(p)
 
-    from reasoner.domain.pipeline_state import PhaseOutput
-    # mutated_in_place=True: every executor (SSE path, runner, services fallback)
-    # calls the phase function and drops its return, so the delta has to be
-    # written to `state` here or the candidates are lost and Phase 3 skips.
-    # apply_to() no-ops on this flag. Its only caller was the DAG runner in
-    # flows/pipeline_flow.py, deleted as dead code, so nothing re-applies today.
-    output = PhaseOutput(candidates=[], errors=[], mutated_in_place=True)
+    # Accumulate locally and write to `state` once, after the loop. Two reasons,
+    # both load-bearing:
+    #   1. Every executor (SSE path, runner, services fallback) drops the phase
+    #      function's return value, so results have to be written to `state`
+    #      here or the candidates are lost and Phase 3 skips silently — see
+    #      tests/test_perspectives_reach_state.py.
+    #   2. Phase-2 generators must not see each other (CLAUDE.md section 5;
+    #      tests/test_mind_virus_resistance.py::TestPhaseTwoGeneratorsAreBlind).
+    #      The deferred write is the structural half of that guarantee, and it
+    #      matters most on the sequential branch below, which builds each prompt
+    #      after the previous candidate already exists.
+    # Do not append to `state.candidates` inside either loop.
+    # See docs/adr/006-mutable-pipeline-state.md.
+    new_candidates: list[SolutionCandidate] = []
+    new_errors: list[str] = []
 
     if parallel:
         tasks = [_get_perspective(_perspective_name(p)) for p in perspectives]
@@ -192,28 +200,28 @@ async def run_perspectives_phase(
             if isinstance(r, Exception):
                 msg = f"Perspective '{p_name}' failed: {r}"
                 services.log("PHASE-2", msg, state)
-                output.errors.append(msg)
+                new_errors.append(msg)
             elif not r.content or not r.content.strip():
                 msg = f"Perspective '{p_name}' returned empty content — skipping"
                 services.log("PHASE-2", msg, state)
-                output.errors.append(msg)
+                new_errors.append(msg)
             else:
                 if _is_perspective_hallucinated(r):
                     services.log("PHASE-2", f"Filtering hallucinated perspective '{p_name}'; regenerating once.", state)
                     try:
                         replacement = await _get_perspective(p_name)
                         if replacement.content and replacement.content.strip():
-                            output.candidates.append(replacement)
+                            new_candidates.append(replacement)
                         else:
                             msg = f"Regeneration for '{p_name}' also empty — skipping"
                             services.log("PHASE-2", msg, state)
-                            output.errors.append(msg)
+                            new_errors.append(msg)
                     except Exception as exc:
                         msg = f"Regeneration failed for '{p_name}': {exc}"
                         services.log("PHASE-2", msg, state)
-                        output.errors.append(msg)
+                        new_errors.append(msg)
                 else:
-                    output.candidates.append(r)
+                    new_candidates.append(r)
     else:
         for p in perspectives:
             p_name = _perspective_name(p)
@@ -221,7 +229,7 @@ async def run_perspectives_phase(
                 candidate = await _get_perspective(p_name)
                 if not candidate.content or not candidate.content.strip():
                     services.log("PHASE-2", f"Perspective '{p_name}' returned empty content — skipping", state)
-                    output.errors.append(f"Perspective '{p_name}' returned empty content")
+                    new_errors.append(f"Perspective '{p_name}' returned empty content")
                     continue
                 if _is_perspective_hallucinated(candidate):
                     services.log("PHASE-2", f"Filtering hallucinated perspective '{p_name}'; regenerating once.", state)
@@ -229,15 +237,14 @@ async def run_perspectives_phase(
                     if not candidate.content or not candidate.content.strip():
                         services.log("PHASE-2", f"Regeneration for '{p_name}' also empty — skipping", state)
                         continue
-                output.candidates.append(candidate)
+                new_candidates.append(candidate)
             except Exception as e:
                 msg = f"Perspective '{p_name}' failed: {e}"
                 services.log("PHASE-2", msg, state)
-                output.errors.append(msg)
+                new_errors.append(msg)
 
-    state.candidates.extend(output.candidates)
-    state.errors.extend(output.errors)
-    return output
+    state.candidates.extend(new_candidates)
+    state.errors.extend(new_errors)
 
 async def run_critique_phase(state: PipelineState, services: WorkflowServices) -> None:
     services.log("PHASE-3", "Running adversarial critique and scoring...", state)

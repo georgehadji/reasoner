@@ -194,50 +194,6 @@ class PipelineRemainder:
 
 
 @dataclass
-class PhaseOutput:
-    """A typed delta returned by a phase function, to be reduced into PipelineState safely."""
-    candidates: list[SolutionCandidate] | None = None
-    scores: list[CritiqueScore] | None = None
-    review_hypotheses: list[ReviewHypothesis] | None = None
-    top_candidates: list[SolutionCandidate] | None = None
-    stress_results: list[StressTestResult] | None = None
-    final_solution: FinalSolution | None = None
-    errors: list[str] | None = None
-    generation_candidates: list[GenerationCandidate] | None = None
-    critic_scores: list[CriticScore] | None = None
-    verification_results: list[VerificationResult] | None = None
-    meta_evaluation: MetaEvaluation | None = None
-    # Flag to indicate short-term sequential mutation (Phase C3)
-    mutated_in_place: bool = False
-
-    def apply_to(self, state: PipelineState) -> None:
-        """Sequential reducer that applies the delta to the state."""
-        if self.mutated_in_place:
-            return  # State was already mutated directly by the phase
-        if self.candidates is not None:
-            state.core.candidates.extend(self.candidates)
-        if self.scores is not None:
-            state.core.scores.extend(self.scores)
-        if self.review_hypotheses is not None:
-            state.core.review_hypotheses.extend(self.review_hypotheses)
-        if self.top_candidates is not None:
-            state.core.top_candidates.extend(self.top_candidates)
-        if self.stress_results is not None:
-            state.core.stress_results.extend(self.stress_results)
-        if self.final_solution is not None:
-            state.core.final_solution = self.final_solution
-        if self.errors is not None:
-            state.core.errors.extend(self.errors)
-        if self.generation_candidates is not None:
-            state.core.generation_candidates.extend(self.generation_candidates)
-        if self.critic_scores is not None:
-            state.core.critic_scores.extend(self.critic_scores)
-        if self.verification_results is not None:
-            state.core.verification_results.extend(self.verification_results)
-        if self.meta_evaluation is not None:
-            state.core.meta_evaluation = self.meta_evaluation
-
-@dataclass
 class PipelineState:
     """Complete pipeline state — passed between phases."""
     core: PipelineCore = field(default_factory=PipelineCore)

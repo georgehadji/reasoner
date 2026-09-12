@@ -11,6 +11,7 @@ Architecture Decision Records detailing key technical design decisions made thro
 - **`003-hypergate-pre-router.md`**: ADR-003: HyperGate Pre-Router
 - **`004-cross-lab-routing.md`**: ADR-004: Cross-Lab LLM Routing
 - **`005-neuro-memory-tiering.md`**: ADR-005: Neuro Memory Tiering
+- **`006-mutable-pipeline-state.md`**: ADR-006: `PipelineState` is Intentionally Mutable
 
 ## Subfolders
 *No subfolders in this directory.*

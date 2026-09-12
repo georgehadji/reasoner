@@ -104,14 +104,22 @@
 
 #### C1 — Make PipelineState transition-safe
 
-| Item | Status | Evidence |
-|------|--------|----------|
-| `PhaseOutput` typed delta | ✅ Exists | `domain/pipeline_state.py:130` — `@dataclass` with `apply_to()` method |
-| Used in parallel perspectives | ✅ | `perspective_phases.py:101` creates `PhaseOutput(candidates=[], ...)` |
-| Used in pipeline flow reducer | ✅ | `pipeline_flow.py:66–105` checks for `PhaseOutput` instances |
-| All parallel phases transition-safe | 🔶 Partial | Only `perspective_phases` and `pipeline_flow` use `PhaseOutput`; other parallel sites (cognitive, debate, delphi, jury, etc.) still mutate state directly |
+> **Updated 2026-09-12 — C1 is CLOSED, by retiring the approach rather than completing it.**
+> See [ADR-006](docs/adr/006-mutable-pipeline-state.md). The rows below are kept as the
+> historical record; the Reality column states what was actually true when they were written.
 
-**Verdict: PARTIALLY DONE** — the pattern exists but is only applied to perspective phases and the pipeline flow dispatcher. Most other parallel phase sites still mutate `PipelineState` in place.
+| Item | Claimed | Reality |
+|------|--------|----------|
+| `PhaseOutput` typed delta | ✅ Exists | Existed, but its reducer `apply_to()` had **no production caller** — only the dead `execute_phases_dag`. Deleted 2026-09-12. |
+| Used in parallel perspectives | ✅ | Used as a **local accumulator**, not a delta: the one construction site passed `mutated_in_place=True`, which made `apply_to()` a no-op, and wrote to `state` by hand. |
+| Used in pipeline flow reducer | ✅ | `execute_phases_dag` was a dead third phase executor with no production caller. Deleted in `78e6e48`. |
+| All parallel phases transition-safe | 🔶 Partial | No phase was ever transition-safe by this mechanism. Every phase mutated `state` in place; perspectives merely routed through an extra object first. |
+
+**Verdict: CLOSED AS REJECTED** — the delta/reducer approach was never reachable in
+production and could not be completed as designed (`PhaseOutput` covered only `core`
+fields, and applying returns would have changed the timeout/partial-write contract).
+Parallel-write safety is now stated as a convention — accumulate locally, write once after
+joining — and recorded in ADR-006.
 
 #### C2 — Enforce boundaries automatically
 
@@ -231,7 +239,7 @@
 | **A3** — layer-boundary leaks | Med | ✅ 95% | 1 permitted violation in handlers.py |
 | **B1** — Redis cancellation | CRITICAL | ✅ DONE | Full implementation with fallback, atomic Lua ops |
 | **B2** — PostgreSQL event store | CRITICAL | ✅ DONE | With migration script, circuit breakers, pool |
-| **C1** — PipelineState transition safety | HIGH | 🔶 40% | PhaseOutput pattern exists but applied narrowly |
+| **C1** — PipelineState transition safety | HIGH | ✅ CLOSED (rejected) | PhaseOutput retired 2026-09-12; reducer had no production caller. ADR-006 |
 | **C2** — import-linter | Med | 🔶 60% | Exists but 46 exceptions gut enforcement |
 | **C3** — I/O off PipelineState | HIGH | ❌ 30% | save/load gone, but event emission + serialization remain |
 | **D1** — CQRS SSE path | HIGH | ✅ DONE | RunPipelineCommandHandler drives SSE pipeline |
@@ -262,7 +270,7 @@
 |------|-------------|
 | **A1 residual** | 3 `get_event_loop()` calls in `subprocess_executor.py` — replace with `time.monotonic()` |
 | **A3 residual** | `handlers.py:109` — `application→api` import (permitted by linter but still a boundary leak) |
-| **C1 scope** | `PhaseOutput` pattern only covers perspectives + pipeline flow; 6+ other parallel sites still mutate in place |
+| ~~**C1 scope**~~ | Closed 2026-09-12. `PhaseOutput` retired (ADR-006). In-place mutation is the declared model; parallel sites must accumulate locally and write once after joining |
 | **C2 enforcement** | 46 import-linter exceptions weaken the contract; CI workflow existence unverified |
 | **C3 event/serialization** | `wire_event_bus()`, `_emit()`, `to_context_dict()` remain on `PipelineState` (1245 lines still) |
 | **PipelineState line count** | Target < 800; current 1245 |
