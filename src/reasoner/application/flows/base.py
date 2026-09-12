@@ -19,14 +19,12 @@ class PhaseStep:
         fn: Callable,
         serializer: Callable,
         critical: bool = False,
-        depends_on: list[str] = None
     ):
         self.num = num
         self.name = name
         self.fn = fn
         self.serializer = serializer
         self.critical = critical
-        self.depends_on = depends_on or []
 
 @runtime_checkable
 class WorkflowServices(Protocol):

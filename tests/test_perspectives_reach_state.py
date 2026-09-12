@@ -7,7 +7,8 @@ executor calls the phase function and discards the return:
   - application/flows/runner.py:94 `await asyncio.wait_for(fn(...))`
   - application/flows/services.py:60 `await step.fn(state, self)`
 
-Only the DAG runner (flows/pipeline_flow.py:106) ever called apply_to(). So on
+Only the DAG runner in flows/pipeline_flow.py ever called apply_to(), and that
+runner has since been deleted as dead code. So on
 the SSE path — the one real /api/run traffic takes — state.candidates stayed
 empty even though Phase 2 had spent tokens on every perspective. Phase 3 then
 hit its `if not state.candidates: return` guard and skipped silently with 0

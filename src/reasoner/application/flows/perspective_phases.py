@@ -180,7 +180,8 @@ async def run_perspectives_phase(
     # mutated_in_place=True: every executor (SSE path, runner, services fallback)
     # calls the phase function and drops its return, so the delta has to be
     # written to `state` here or the candidates are lost and Phase 3 skips.
-    # apply_to() no-ops on this flag, so the DAG runner cannot double-apply.
+    # apply_to() no-ops on this flag. Its only caller was the DAG runner in
+    # flows/pipeline_flow.py, deleted as dead code, so nothing re-applies today.
     output = PhaseOutput(candidates=[], errors=[], mutated_in_place=True)
 
     if parallel:
