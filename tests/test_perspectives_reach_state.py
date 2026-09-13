@@ -3,18 +3,24 @@
 run_perspectives_phase() built a PhaseOutput delta and returned it, but every
 executor calls the phase function and discards the return:
 
-  - api/execution/pipeline.py:241  `await fn(state, _services)`   (SSE path)
-  - application/flows/runner.py:94 `await asyncio.wait_for(fn(...))`
-  - application/flows/services.py:60 `await step.fn(state, self)`
+  - api/execution/pipeline.py:301  `await fn(state, _services)`   (SSE path)
+  - application/flows/runner.py:168 `await asyncio.wait_for(fn(...))`
+  - application/flows/services.py:99 `await step.fn(state, self)`
 
-Only the DAG runner (flows/pipeline_flow.py:106) ever called apply_to(). So on
-the SSE path — the one real /api/run traffic takes — state.candidates stayed
-empty even though Phase 2 had spent tokens on every perspective. Phase 3 then
-hit its `if not state.candidates: return` guard and skipped silently with 0
-tokens, and the UI rendered "No content for this phase".
+Only the DAG runner in flows/pipeline_flow.py ever called apply_to(), and it had
+no production caller. So on the SSE path — the one real /api/run traffic takes —
+state.candidates stayed empty even though Phase 2 had spent tokens on every
+perspective. Phase 3 then hit its `if not state.candidates: return` guard and
+skipped silently with 0 tokens, and the UI rendered "No content for this phase".
 
 Every sibling phase (run_critique_phase, run_stress_test_phase) mutates state
 directly; Phase 2 was the odd one out.
+
+Both the DAG runner and PhaseOutput itself have since been deleted as dead code
+(see docs/adr/006-mutable-pipeline-state.md). The phase now accumulates into
+plain locals and extends state.candidates/state.errors once, after the loop.
+These tests assert *outcomes*, never the mechanism, which is exactly why they
+survived that refactor unchanged — keep them that way.
 """
 
 import json

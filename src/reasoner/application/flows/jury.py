@@ -59,7 +59,7 @@ class JuryFlow(WorkflowStrategy):
     def get_phases(self, state: PipelineState) -> list[PhaseStep]:
         return [
             PhaseStep(1.5, "Evidence Search", run_jury_evidence_search_phase, _ser_2),
-            PhaseStep(2, "Generation Pool", run_jury_generate_phase, _ser_2),
+            PhaseStep(2, "Generation Pool", run_jury_generate_phase, _ser_2, critical=True),
             PhaseStep(3, "Critic Pool", run_jury_critique_phase, _ser_3, critical=True),
             PhaseStep(4, "Verification & Meta", run_jury_verify_and_meta_eval_phase, _ser_4),
             PhaseStep(4.5, "Weighted Ranking", run_jury_weighted_ranking_phase, _ser_4),

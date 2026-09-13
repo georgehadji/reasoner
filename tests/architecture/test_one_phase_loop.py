@@ -67,7 +67,7 @@ def test_get_phases_has_exactly_one_caller():
             ):
                 callers.append(f"{path.relative_to(SRC).as_posix()}:{node.lineno}")
 
-    assert callers == ["application/flows/runner.py:30"], (
+    assert callers == ["application/flows/runner.py:40"], (
         "resolve_phases() must be the only caller of get_phases(); any other "
         "caller is a second phase list that can drift from it. Found: " + str(callers)
     )

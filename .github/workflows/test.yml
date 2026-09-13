@@ -86,7 +86,9 @@ jobs:
           # WorkflowRunner.run -- taking their unused imports with them. Dropping
           # `from typing import Any` left a blank line inside four import blocks,
           # which is -4 I001 on top of the -5 the deleted bodies carried.
-          python scripts/ruff_ratchet.py --max 2274
+          # 2273: Phase B-1b wrapped _handle_phase_error's signature over
+          # several lines to take the PhaseStep and the exception.
+          python scripts/ruff_ratchet.py --max 2273
 
       - name: Security scan (bandit)
         run: |

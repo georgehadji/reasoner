@@ -33,11 +33,12 @@ Reasoner treats complex problem-solving not as a simple chatbot interaction but 
      - Perspective generators span ≥2 blocs, ≤2 models per bloc (echo-chamber resistance)
    - Failing to enforce bloc diversity = echo chamber masquerading as ensemble
 
-3. **Immutable State Flow**
-   - `PipelineState` is append-only between phases; no backward mutation
-   - Phase results collected in `phase_results[]` array
-   - Sequential reducers (`PhaseOutput.apply_to()`) transform state deterministically
-   - Enables event-sourced replay, audit trails, reproducibility
+3. **Explicit Mutable State Flow**
+   - `PipelineState` is a mutable object threaded through every phase as `(state, services)`
+   - Phases mutate `state` in place and return `None`; executors discard return values
+   - Parallel phases accumulate locally and write to `state` once, after joining
+   - Phase results also collected in `phase_results[]` for replay and audit trails
+   - See [ADR-006](docs/adr/006-mutable-pipeline-state.md)
 
 4. **Event-Sourced Execution**
    - All transitions, fallbacks, cost tracking emit `DomainEvent` objects
@@ -1084,30 +1085,27 @@ class EventStore:
         """Reconstruct state from events"""
 ```
 
-### Phase Reducer Pattern
+### Phase State-Update Pattern
+
+A `PhaseOutput` delta type and an `apply_to()` reducer were proposed and partially built,
+then **retired on 2026-09-12** — the reducer never had a production caller. See
+[ADR-006](docs/adr/006-mutable-pipeline-state.md). The actual pattern:
 
 ```python
-class PhaseOutput:
-    """Delta applied to PipelineState"""
-    candidates: SolutionCandidate[] (opt)
-    scores: CritiqueScore[] (opt)
-    top_candidates: SolutionCandidate[] (opt)
-    final_solution: FinalSolution (opt)
-    phase_logs: str
-    phase_tokens: int
-    phase_duration: float
-    phase_model: str
-    
-    def apply_to(self, state: PipelineState) -> PipelineState:
-        """Deterministic reducer: apply delta, return new state"""
-        new_state = state.copy(deep=True)
-        if self.candidates:
-            new_state.core.candidates = self.candidates
-        if self.scores:
-            new_state.core.scores = self.scores
-        # ... apply all deltas
-        new_state.meta.phase_logs[phase] = self.phase_logs
-        return new_state
+async def run_perspectives_phase(state: PipelineState, services: WorkflowServices) -> None:
+    """Phases mutate `state` in place and return None."""
+    # Accumulate locally. Parallel generators must not observe each other through
+    # `state` while any of them is still being prompted (CLAUDE.md section 5).
+    new_candidates: list[SolutionCandidate] = []
+    new_errors: list[str] = []
+
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    for r in results:
+        ...  # append to new_candidates / new_errors
+
+    # Single deferred write, after the join.
+    state.candidates.extend(new_candidates)
+    state.errors.extend(new_errors)
 ```
 
 ### Workflow Strategy Pattern
@@ -1397,14 +1395,24 @@ class ConversationState:
 
 ## 10. KEY INVARIANTS & SAFETY GUARANTEES
 
-### Immutability Invariant
+### State Update Invariant
 
-**Rule**: No mutation of PipelineState except via PhaseOutput reducers
+**Rule**: `PipelineState` is mutable and is mutated in place by phases. Parallel phases
+accumulate into locals and write to `state` **once, after joining** — never from inside a
+`gather` or a generator loop.
 
 **Enforcement**:
-- State marked as `frozen=True` (Pydantic)
-- Phase results use `.copy(deep=True)` before modification
+- `tests/test_perspectives_reach_state.py` — phase output must actually reach `PipelineState`
+- `tests/test_mind_virus_resistance.py::TestPhaseTwoGeneratorsAreBlind` — the deferred
+  write is what keeps Phase-2 generators from observing each other through `state`
 - Event log tracks all state transitions
+
+> **Corrected 2026-09-12.** This section previously claimed "No mutation of PipelineState
+> except via PhaseOutput reducers", enforced by `frozen=True` (Pydantic) and
+> `.copy(deep=True)`. None of that was ever true: `PipelineState` is a mutable
+> `@dataclass`, not a frozen Pydantic model; no phase deep-copies it; and the
+> `PhaseOutput` reducer had no production caller and has been retired. See
+> [ADR-006](docs/adr/006-mutable-pipeline-state.md).
 
 **Benefit**:
 - Deterministic replay
@@ -1538,7 +1546,7 @@ PHASE_TOKEN_BUDGETS = {
 }
 
 # Phase enforces early termination if exceeded
-async def run_phase(phase_id: int, budget: int) -> PhaseOutput:
+async def run_phase(phase_id: int, budget: int) -> None:
     tokens_used = 0
     while tokens_used < budget:
         # ... run sub-agents
