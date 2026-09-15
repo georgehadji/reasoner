@@ -50,13 +50,48 @@ def test_no_strategy_defines_execute():
     )
 
 
+def test_only_the_runner_executes_a_phase_function():
+    """Reading `step.fn` to await it is what "one execution engine" means.
+
+    `api/execution/pipeline.py` held a second phase loop with its own retries,
+    timeouts, quality gate and fatality rule, so every question about how a
+    phase runs had two answers. It is gone; the SSE-specific parts of it are a
+    `PhaseObserver` on the runner.
+
+    The one survivor is not a rival loop: `flows/services.py` holds the single
+    bare `await step.fn(...)` that `PipelineWorkflowServices` falls back to
+    when it was built without a runner, which is what
+    `WORKFLOW_RUNNER_ENABLED=false` selects. It retires with that flag.
+    (`flows/pipeline_flow.execute_phases_dag` was the third; 78e6e48 deleted
+    it as dead.)
+
+    Only reads count -- `PhaseStep.__init__`'s `self.fn = fn` is the field
+    itself.
+    """
+    readers = set()
+    for path in sorted(SRC.rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Attribute)
+                and node.attr == "fn"
+                and isinstance(node.ctx, ast.Load)
+            ):
+                readers.add(path.relative_to(SRC).as_posix())
+
+    assert sorted(readers) == [
+        "application/flows/runner.py",
+        "application/flows/services.py",
+    ], f"a second thing executes phases: {sorted(readers)}"
+
+
 def test_get_phases_has_exactly_one_caller():
     """One resolver builds the phase list, so the drivers cannot disagree.
 
     They did disagree: the SSE driver appended the Layer B egress rewrite and
     the CLI did not, so that phase never applied to a CLI, headless or MCP run.
     """
-    callers = []
+    callers = set()
     for path in sorted(SRC.rglob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
@@ -65,9 +100,9 @@ def test_get_phases_has_exactly_one_caller():
                 and isinstance(node.func, ast.Attribute)
                 and node.func.attr == "get_phases"
             ):
-                callers.append(f"{path.relative_to(SRC).as_posix()}:{node.lineno}")
+                callers.add(path.relative_to(SRC).as_posix())
 
-    assert callers == ["application/flows/runner.py:40"], (
+    assert sorted(callers) == ["application/flows/runner.py"], (
         "resolve_phases() must be the only caller of get_phases(); any other "
         "caller is a second phase list that can drift from it. Found: " + str(callers)
     )

@@ -1,23 +1,20 @@
 
+import asyncio
+import contextlib
 import hashlib
 import logging
 import time
 import uuid
 from collections.abc import Awaitable, Callable
 from datetime import UTC
-from typing import Any
 
 from reasoner.api.execution.cancel import StreamingConnectionContext
 from reasoner.api.execution.direct import _stream_direct_answer
+from reasoner.api.execution.sse_observer import keepalive_ticker
 from reasoner.api.execution.web_search import _stream_web_search_results
 from reasoner.api.history import HISTORY_DIR, HistoryEntry, _save_history_entry
-from reasoner.api.phase_executor import (
-    get_phase_start_models,
-    run_phase_with_keepalive,
-)
 from reasoner.api.schemas import RunRequest
 from reasoner.api.sse_utils import _persist_event
-from reasoner.api.streaming import _get_phase_subagents
 from reasoner.application.commands import RunPipelineCommand
 from reasoner.application.orchestrator import PipelineOrchestrator
 from reasoner.application.services.adaptive_routing import build_adaptive_routing_service
@@ -28,18 +25,17 @@ from reasoner.application.services.spend_limit_service import (
     check_run_allowed,
     resolve_user_tier,
 )
-from reasoner.core.constants import TRUNCATION, get_phase_retry_budget, get_phase_timeout
+from reasoner.core.constants import TRUNCATION
 from reasoner.core.events.domain_events import EventType, make_event
-from reasoner.core.exceptions import ErrorCode, error_code_for_exception
+from reasoner.core.exceptions import classify_error, error_code_for_exception
 from reasoner.core.logging_utils import set_correlation_id
 from reasoner.domain.models import TaskType
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.core.exceptions import classify_error, is_retryable, is_run_fatal
 from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.infrastructure.persistence.pipeline_ownership_repo import get_pipeline_ownership_repo
 from reasoner.infrastructure.redis.run_state import _run_state_manager as _run_store
 from reasoner.presets import get_method_from_preset
-from reasoner.quality import PhaseMonitor, reset_phase_state
+from reasoner.quality import PhaseMonitor
 
 logger = logging.getLogger(__name__)
 
@@ -93,9 +89,17 @@ class PipelineExecutionService:
         def _tracked_broadcast(run_id: str, payload: dict) -> None:
             conn_context.tracked_broadcast(payload)
 
+        # Keepalive comments used to be punctuated from inside one phase by
+        # run_phase_with_keepalive, so a run that idled anywhere else -- in
+        # preflight, in neuro recall, between phases -- sent nothing and a
+        # proxy was free to drop the connection. The ticker covers the whole
+        # run instead, and only fires when the stream has actually gone quiet.
+        sse_emit, _keepalive = keepalive_ticker(sse_emit)
+
         # Yield a "connecting" event immediately so the UI has content to render
         # while the preflight (HyperGate LLM calls) completes.
         await sse_emit({"type": "connecting", "message": "Running system check…"})
+        keepalive_task = asyncio.ensure_future(_keepalive())
         try:
             # Resolve the caller's plan up front — the spend ceilings it implies
             # gate the run below and bound every LLM call inside it.
@@ -273,349 +277,76 @@ class PipelineExecutionService:
                     logger.warning("Prompt enhancement failed, using original: %s", exc)
                     state.enhanced_problem = state.problem
 
-            # ── Context Vetting Serializer ───────────────────────────────────
-            def _ser_context_vetting(state: PipelineState) -> dict:
-                vetted = getattr(state, "vetted_context", None) or getattr(state, "web_discovery_results", None) or []
-                return {
-                    "context_quality": getattr(state, "context_quality", "unknown"),
-                    "vetted_context": vetted[:10],
-                    "tokens": state.phase_tokens.get("Phase 1.25: Context Vetting", {"input": 0, "output": 0}),
-                }
-
-            from reasoner.application.flows.search_phases import run_context_vetting_phase
-            from reasoner.application.flows.services import PipelineWorkflowServices
-            _services = PipelineWorkflowServices(pipeline)
-
-            async def _run_context_vetting(state: PipelineState):
-                await run_context_vetting_phase(state, _services, source_type=req.source_type)
-
             from reasoner.application.flows.factory import WorkflowFactory
+            from reasoner.application.flows.runner import WorkflowRunner
+            from reasoner.application.flows.services import PipelineWorkflowServices
+
             flow_factory = WorkflowFactory()
             method = state.method or pipeline._get_method_from_preset()
             strategy = flow_factory.get_strategy(method)
 
-            # Wrap the step function so that it accepts only (state)
-            # and calls the strategy function with (state, _services)
-            def make_wrapper(fn):
-                async def wrapper(state: PipelineState):
-                    await fn(state, _services)
-                return wrapper
-
-            phases: list[tuple[float, str, Any, Any]] = []
-            step_metadata: dict[str, dict[str, Any]] = {}
-            if strategy:
-                # resolve_phases, not strategy.get_phases: the Layer B egress step
-                # was appended here and nowhere else, so it never applied to a CLI,
-                # headless or MCP run. One resolver now answers for both drivers.
-                from reasoner.application.flows.runner import resolve_phases
-                for step in resolve_phases(strategy, state):
-                    phases.append((step.num, step.name, make_wrapper(step.fn), step.serializer))
-                    step_metadata[step.name] = {"critical": step.critical}
-            else:
-                logger.error(f"No strategy found for method: {method}")
-
-            # _PHASE_ROLE_HINTS moved to api/phase_executor.py
-
-    # _get_phase_start_models moved to get_phase_start_models(phase_name, router)
-
-    # _run_phase_cancellable removed (unused)
-
-            # _run_phase_with_keepalive moved to run_phase_with_keepalive(coro_fn, state, cancel_event, ...)
-            phase_monitor = PhaseMonitor(router, preset_name=req.preset)
             run_start = time.monotonic()
-            for num, name, fn, serializer in phases:
-                if cancel_event.is_set():
+            if strategy is None:
+                logger.error(f"No strategy found for method: {method}")
+            else:
+                # One engine. This used to be a second phase loop -- its own
+                # retries, timeouts, quality gate and fatality rule -- kept here
+                # only so SSE frames could be emitted between the steps. The
+                # frames are now an observer; WorkflowRunner runs the phases for
+                # this driver exactly as it does for the CLI.
+                from reasoner.api.execution.sse_observer import SseRunObserver
+                from reasoner.core.observability.phase_span import PhaseSpan
+
+                observer = SseRunObserver(
+                    run_id=run_id,
+                    sse_emit=sse_emit,
+                    broadcast=_tracked_broadcast,
+                    router=router,
+                    emitter=emitter,
+                    preset_name=req.preset or "",
+                    event_version=event_version,
+                )
+
+                def _span(step, st):
+                    return PhaseSpan(
+                        run_id,
+                        phase_name=step.name,
+                        phase_number=step.num,
+                        router=router,
+                        state=st,
+                    )
+
+                runner = WorkflowRunner(
+                    PipelineWorkflowServices(pipeline),
+                    monitor=PhaseMonitor(router, preset_name=req.preset),
+                    observer=observer,
+                    span_factory=_span,
+                )
+                # Circular by nature: the runner needs services, and the services
+                # need the runner so run_phase() delegates instead of taking its
+                # bare `await step.fn(...)` fallback.
+                runner.services = PipelineWorkflowServices(pipeline, runner=runner)
+
+                # Cancellation is a driver concern, so it stays out of the
+                # runner: a watcher cancels the run task, which propagates into
+                # whichever phase coroutine is in flight.
+                run_task = asyncio.ensure_future(runner.run(strategy, state))
+                cancel_watch = asyncio.ensure_future(cancel_event.wait())
+                done, _ = await asyncio.wait(
+                    {run_task, cancel_watch}, return_when=asyncio.FIRST_COMPLETED
+                )
+                if cancel_watch in done:
+                    run_task.cancel()
+                    with contextlib.suppress(asyncio.CancelledError, Exception):
+                        await run_task
                     await sse_emit({"type": "cancelled", "message": "Pipeline stopped by user"})
                     return
+                cancel_watch.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await cancel_watch
+                await run_task
 
-                # Disconnect detection (B-13): request.is_disconnected() calls
-                # _receive() which blocks indefinitely during SSE streaming (POST
-                # body already consumed, client sends no further data).  The ASGI
-                # spec provides no non-blocking disconnect poll.
-                #
-                # Cleanup is instead handled by the finally block which cancels
-                # all tracked broadcast tasks and removes the run from the store.
-                # When the streaming response generator is garbage-collected
-                # (client disconnect), aclose() propagates GeneratorExit into
-                # run_stream(), triggering the existing finally block.
-
-                # Silent no-ops (e.g. writing pipeline skips generic decomposition/vetting)
-                if getattr(fn, "_is_silent_noop", False):  # v3.1: relaxed from identity check
-                    await fn(state)
-                    continue
-
-                phase_key = f"Phase {num}: {name}"
-                state._current_phase_key = phase_key
-                phase_start_models = get_phase_start_models(name, router)
-                start_payload: dict[str, Any] = {"type": "phase_start", "phase": num, "name": name}
-                if phase_start_models:
-                    start_payload["models"] = phase_start_models
-                _tracked_broadcast(run_id, start_payload)
-                await sse_emit(start_payload)
-
-                # Emit domain event for phase start
-                emitter.emit("PHASE_STARTED", phase_name=name,
-                              phase_number=num)
-
-                max_retries = get_phase_retry_budget(name)
-                quality_result = None
-                phase_errored = False
-                phase_fatal = False
-                phase_start = time.monotonic()
-                # state.errors is cumulative across the run; remember the mark so
-                # phase_complete can report only what *this* phase appended.
-                errors_before_phase = len(state.errors)
-
-                for retry_attempt in range(max_retries + 1):
-                    try:
-                        phase_timeout = get_phase_timeout(name)
-                        from reasoner.core.observability.phase_span import PhaseSpan
-                        async with PhaseSpan(run_id, phase_name=name, phase_number=num, router=router, state=state):
-                            async for _ka in run_phase_with_keepalive(fn, state, cancel_event, timeout_seconds=phase_timeout):
-                                await sse_emit(_ka)
-                        if cancel_event.is_set():
-                            await sse_emit({"type": "cancelled", "message": "Pipeline stopped by user"})
-                            return
-                    except TimeoutError:
-                        logger.error("Phase %s (%s) timed out after %ss", num, name, phase_timeout)
-                        err_msg = f"Phase timeout: {name} exceeded {phase_timeout}s"
-                        state.errors.append(err_msg)
-                        err_payload = {
-                            "type": "error",
-                            "error_type": "timeout",
-                            "error_code": ErrorCode.PROVIDER_TIMEOUT.value,
-                            "message": err_msg,
-                            "retryable": True,
-                            "retry_after": 5,
-                            "phase": num,
-                            "phase_name": name,
-                        }
-                        _tracked_broadcast(run_id, err_payload)
-                        await sse_emit(err_payload)
-                        _tracked_broadcast(run_id, {"type": "phase_error", "phase": num, "error": err_msg, "error_code": ErrorCode.PROVIDER_TIMEOUT.value})
-                        await sse_emit({"type": "phase_error", "phase": num, "error": err_msg, "error_code": ErrorCode.PROVIDER_TIMEOUT.value})
-                        fail_evt = make_event(
-                            EventType.PHASE_FAILED,
-                            aggregate_id=run_id,
-                            version=event_version,
-                            phase_name=name,
-                            error=err_msg,
-                        )
-                        await _persist_event(fail_evt)
-                        event_version += 1
-                        phase_errored = True
-                        emitter.emit("PHASE_FAILED", phase_name=name,
-                                      error=err_msg)
-                        phase_fatal = step_metadata.get(name, {}).get("critical", False)
-                        break
-                    except Exception as exc:
-                        logger.error("Phase %s (%s) failed: %s", num, name, exc, exc_info=True)
-                        err_type = classify_error(exc)
-                        if err_type == "auth":
-                            err_msg = (
-                                "OpenRouter API key is missing or invalid. "
-                                "Please set OPENROUTER_API_KEY in your .env or ui-next/.env.local file."
-                            )
-                        else:
-                            err_msg = f"{type(exc).__name__}: {str(exc)[:120]}"
-                        state.errors.append(err_msg)
-                        error_code = error_code_for_exception(exc)
-                        err_payload = {
-                            "type": "error",
-                            "error_type": err_type,
-                            "error_code": error_code,
-                            "message": err_msg,
-                            "retryable": is_retryable(exc),
-                            "retry_after": getattr(exc, 'retry_after', None),
-                            "phase": num,
-                            "phase_name": name,
-                        }
-                        _tracked_broadcast(run_id, err_payload)
-                        await sse_emit(err_payload)
-                        _tracked_broadcast(run_id, {"type": "phase_error", "phase": num, "error": err_msg, "error_code": error_code})
-                        await sse_emit({"type": "phase_error", "phase": num, "error": err_msg, "error_code": error_code})
-                        fail_evt = make_event(
-                            EventType.PHASE_FAILED,
-                            aggregate_id=run_id,
-                            version=event_version,
-                            phase_name=name,
-                            error=err_msg,
-                        )
-                        await _persist_event(fail_evt)
-                        event_version += 1
-                        phase_errored = True
-                        emitter.emit("PHASE_FAILED", phase_name=name,
-                                      error=err_msg)
-                        # is_run_fatal covers credits-exhausted as well as auth:
-                        # both fail every remaining phase identically, so
-                        # continuing only produces a synthesis over missing
-                        # phases (P5 step 5). err_type == "auth" stays because
-                        # it also matches third-party auth errors by class name,
-                        # which are not in our tree.
-                        phase_fatal = (
-                            is_run_fatal(exc)
-                            or err_type == "auth"
-                            or step_metadata.get(name, {}).get("critical", False)
-                        )
-                        break
-
-                    else:
-                        # `else`, not the end of the `try` body: an exception raised by
-                        # the gate itself is a gate bug, and folding it into the handlers
-                        # above would report it to the client as a phase failure.
-                        # Phase executed successfully — run quality check
-                        quality_result = await phase_monitor.evaluate(name, state, attempt=retry_attempt + 1)
-                        quality_payload = {
-                            "type": "phase_quality",
-                            "phase": num,
-                            "name": name,
-                            "score": quality_result.score,
-                            "passed": quality_result.passed,
-                            "reason": quality_result.reason,
-                            "attempt": retry_attempt + 1,
-                        }
-                        await sse_emit(quality_payload)
-                        _tracked_broadcast(run_id, quality_payload)
-
-                        # Record quality score in state history for downstream context
-                        state.quality_history.append({
-                            "phase": name,
-                            "attempt": retry_attempt + 1,
-                            "score": quality_result.score,
-                            "passed": quality_result.passed,
-                        })
-
-                        if quality_result.passed or retry_attempt >= max_retries:
-                            break
-
-                        # Quality failed and budget remains — inject hints and emit retry event
-                        if quality_result.suggestions:
-                            state.quality_hints[name] = " ".join(quality_result.suggestions)
-
-                        retry_payload = {
-                            "type": "phase_retry",
-                            "phase": num,
-                            "name": name,
-                            "attempt": retry_attempt + 1,
-                            "max_attempts": max_retries + 1,
-                            "reason": quality_result.reason,
-                        }
-                        await sse_emit(retry_payload)
-                        _tracked_broadcast(run_id, retry_payload)
-
-                        reset_phase_state(name, state)
-
-                # Clear quality hints for this phase regardless of outcome
-                state.quality_hints.pop(name, None)
-
-                if phase_fatal:
-                    break
-                if phase_errored:
-                    continue
-
-                duration = time.monotonic() - phase_start
-                # Observe phase duration metric
-                try:
-                    from reasoner.metrics import PHASE_DURATION
-                    PHASE_DURATION.labels(
-                        phase=name,
-                        method=req.preset or "unknown",
-                        preset=req.preset or "unknown",
-                    ).observe(duration)
-                except Exception:
-                    pass
-                for ev in emitter.pop_pending_events():
-                    await sse_emit(ev)
-                state.phase_durations[phase_key] = duration
-                if name == "Synthesis":
-                    core = ""
-                    if state.final_solution and hasattr(state.final_solution, "core_solution"):
-                        core = state.final_solution.core_solution or ""
-                    if isinstance(core, dict):
-                        core = core.get("core_solution", core.get("synthesis", "")) or ""
-                    if core and isinstance(core, str):
-                        import re
-                        sentences = re.split(r'(?<=[.!?])\s+', core)
-                        for sentence in sentences:
-                            if cancel_event and cancel_event.is_set():
-                                break
-                            await sse_emit({"type": "text_chunk", "text": sentence})
-                data = serializer(state)
-                if isinstance(data, dict):
-                    data["tokens"] = state.phase_tokens.get(phase_key, {"input": 0, "output": 0})
-                    data["duration"] = duration
-                    # Surface what this phase recorded. Without this, a phase whose
-                    # work all failed still serializes to an empty payload and the
-                    # UI can only say "No content for this phase" — the failure is
-                    # invisible to the user and to us.
-                    phase_errors = state.errors[errors_before_phase:]
-                    if phase_errors:
-                        data["errors"] = phase_errors
-                        # Explicit alongside `errors` rather than left for the UI to
-                        # infer from array length: a phase that appended to
-                        # state.errors and recovered (e.g. article_phases.py's
-                        # outline/critic parse-error fallback to {}) still emits
-                        # `phase_complete`, so without this it renders identically
-                        # to a clean pass — confirmed on the 2026-08-28 article run
-                        # where two such phases showed green while the drafts and
-                        # revisions built on their empty output. See
-                        # docs/plans/article-flow-truncation-remediation.md W7.
-                        data["status"] = "degraded"
-                    phase_models = state.cost_state._phase_models_by_key.get(phase_key, [])
-                    if phase_models:
-                        data["models"] = phase_models
-                    subagent_outputs = _get_phase_subagents(state, name)
-                    if subagent_outputs:
-                        data["subagents"] = [
-                            {
-                                "name": s.get("agent_name", "unknown"),
-                                "model": s.get("model", "unknown"),
-                                "tokens_in": s.get("tokens_in", 0),
-                                "tokens_out": s.get("tokens_out", 0),
-                                "duration_ms": s.get("duration_ms", 0),
-                                "error": s.get("error"),
-                            }
-                            for s in subagent_outputs
-                        ]
-                    if quality_result:
-                        data["quality"] = {
-                            "score": quality_result.score,
-                            "passed": quality_result.passed,
-                        }
-                phase_complete_payload = {
-                    "type": "phase_complete",
-                    "phase": num,
-                    "name": name,
-                    "data": data,
-                    # Running total, so a run abandoned before the terminal
-                    # `done` frame can still be billed for what it actually
-                    # spent. run_metering.extract_run_cost reads this; without
-                    # it, cost was observable only on `done` and a client that
-                    # hung up mid-run had its whole reservation released while
-                    # the provider spend had already been incurred.
-                    "total_cost_usd": round(getattr(state, "total_cost_usd", 0.0) or 0.0, 6),
-                }
-                _tracked_broadcast(run_id, phase_complete_payload)
-                await sse_emit(phase_complete_payload)
-
-                # Emit domain event for phase completion
-                emitter.emit("PHASE_COMPLETED", phase_name=name,
-                              duration_seconds=duration,
-                              tokens=state.phase_tokens.get(phase_key,
-                                  {"input": 0, "output": 0}))
-
-                complete_evt = make_event(
-                    EventType.PHASE_COMPLETED,
-                    aggregate_id=run_id,
-                    version=event_version,
-                    phase_name=name,
-                    result={"data": data},
-                    tokens=state.phase_tokens.get(phase_key, {"input": 0, "output": 0}),
-                    model_used=",".join(state.cost_state._phase_models_by_key.get(phase_key, [])) or "unknown",
-                    duration_seconds=duration,
-                )
-                await _persist_event(complete_evt)
-                event_version += 1
+                event_version = observer.event_version
 
             token_source = state.detailed_token_usage if state.detailed_token_usage else state.phase_tokens
             total_input = sum(t.get("input", 0) for t in token_source.values())
@@ -714,6 +445,9 @@ class PipelineExecutionService:
             _tracked_broadcast(run_id, {"type": "done", "errors": [err_msg]})
             await sse_emit({"type": "done", "errors": [err_msg]})
         finally:
+            keepalive_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await keepalive_task
             # Cancel all pending broadcast tasks for this run (B-13)
             await conn_context.cleanup()
             await _run_store.remove(run_id)

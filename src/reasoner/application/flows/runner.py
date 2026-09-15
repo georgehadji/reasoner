@@ -159,7 +159,7 @@ class WorkflowRunner:
         max_retries = get_phase_retry_budget(name)
         phase_start_time = time.monotonic()
 
-        success = False
+        errored = False
         quality_result = None
         for attempt in range(max_retries + 1):
             try:
@@ -193,7 +193,6 @@ class WorkflowRunner:
                 await self.bus.publish(quality_evt)
 
                 if quality_result.passed:
-                    success = True
                     break
 
                 if attempt < max_retries:
@@ -220,12 +219,14 @@ class WorkflowRunner:
                     self.services.log(name, f"Quality check failed after {max_retries} retries.", state)
 
             except TimeoutError as exc:
+                errored = True
                 err_msg = f"Phase timeout: {name} exceeded {timeout}s"
                 await self._handle_phase_error(step, state, err_msg, is_fatal=critical, exc=exc)
                 if critical: return False
                 break
 
             except Exception as exc:
+                errored = True
                 err_type = classify_error(exc)
                 err_msg = f"{type(exc).__name__}: {str(exc)}"
                 run_fatal = is_run_fatal(exc)
@@ -250,24 +251,35 @@ class WorkflowRunner:
                 self.services.log(name, f"Error: {err_msg}. Retrying...", state)
                 await asyncio.sleep(1)
 
-        if success:
-            duration = time.monotonic() - phase_start_time
-            state.phase_durations[phase_key] = duration
+        # A hint is advice for the *next* attempt at this phase. Left in place it
+        # is handed to whichever phase happens to share the name later in a
+        # resumed or multi-pass run.
+        state.quality_hints.pop(name, None)
 
-            complete_evt = make_event(
-                EventType.PHASE_COMPLETED,
-                aggregate_id=state.conversation_id or "unknown",
-                version=1,
-                phase_name=name,
-                duration_seconds=duration,
-                tokens=state.phase_tokens.get(phase_key, {"input": 0, "output": 0})
-            )
-            await self.bus.publish(complete_evt)
-            if obs is not None:
-                await obs.on_phase_complete(step, state, duration, quality_result)
-            return True
+        if errored:
+            return not critical
 
-        return not critical
+        # Reached either because the gate passed, or because it failed after
+        # spending the whole retry budget. Both are completions: the phase ran,
+        # produced output and cost money, and the SSE driver emitted
+        # phase_complete for both. `critical` governs execution failure, not a
+        # score -- abandoning the run over a low score discards an answer the
+        # caller has already paid most of the way for.
+        duration = time.monotonic() - phase_start_time
+        state.phase_durations[phase_key] = duration
+
+        complete_evt = make_event(
+            EventType.PHASE_COMPLETED,
+            aggregate_id=state.conversation_id or "unknown",
+            version=1,
+            phase_name=name,
+            duration_seconds=duration,
+            tokens=state.phase_tokens.get(phase_key, {"input": 0, "output": 0})
+        )
+        await self.bus.publish(complete_evt)
+        if obs is not None:
+            await obs.on_phase_complete(step, state, duration, quality_result)
+        return True
 
     async def _handle_phase_error(
         self,

@@ -88,7 +88,11 @@ jobs:
           # which is -4 I001 on top of the -5 the deleted bodies carried.
           # 2273: Phase B-1b wrapped _handle_phase_error's signature over
           # several lines to take the PhaseStep and the exception.
-          python scripts/ruff_ratchet.py --max 2273
+          # 2258: Phase B-1 (docs/plans/architecture-score-9-remediation-2026-09-09.md)
+          # deleted the second phase loop in api/execution/pipeline.py -- ~340
+          # lines of retries, timeouts, quality gate and error frames that
+          # WorkflowRunner already does -- plus run_phase_with_keepalive.
+          python scripts/ruff_ratchet.py --max 2258
 
       - name: Security scan (bandit)
         run: |
@@ -286,7 +290,11 @@ jobs:
           # is base64, so there the exception is the answer -- narrowed to
           # ValueError rather than signalled. Its outermost guard kept
           # str(exc), which is often empty, and dropped the traceback.
-          python scripts/silent_failure_ratchet.py --max 105
+          # 102: Phase B-1 deleted run_phase_with_keepalive (three handlers in
+          # its task-cancellation cleanup) and the SSE loop's PHASE_DURATION
+          # metric guard. The metric guard moved verbatim into
+          # execution/sse_observer._observe_duration, so the net is -3, not -4.
+          python scripts/silent_failure_ratchet.py --max 102
 
       - name: Run tests
         run: |

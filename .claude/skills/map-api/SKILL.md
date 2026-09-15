@@ -27,7 +27,7 @@ folders:
 | `idempotency_http.py` | `register_run_or_error` — HTTP translation of the app-layer idempotency guard for `client_run_id`. |
 | `metrics.py` | Prometheus scrape endpoint + `QueryTimer`. Metric *definitions* live in `reasoner/metrics.py`. |
 | `middleware.py` | `SecurityHeadersMiddleware`, `AuditMiddleware` (IP anonymization, URL sanitizing), `MemoryLimitMiddleware`, `RequestTimeoutMiddleware`. |
-| `phase_executor.py` | Phase→router-role hints, `get_phase_start_models`, `run_phase_with_keepalive`. Phase fatality is `PhaseStep.critical` alone — the `_LEGACY_CRITICAL` name set that used to live here made four phases fatal on the web only. |
+| `phase_executor.py` | Phase→router-role hints and `get_phase_start_models`. Nothing else: `_LEGACY_CRITICAL` (fatality) and `run_phase_with_keepalive` both left in Phase B-1 — fatality is `PhaseStep.critical` alone, keepalives come from `execution/sse_observer.keepalive_ticker`. |
 | `run_observability.py` | `CreditSink` + `PrometheusObserver` — concrete bindings for `run_metering.metered()` protocols. |
 | `run_state.py` | Shim → RunStateStore. |
 | `saas_router.py` | `/me`, quota status, data export, account deletion, auth-event logging. |
@@ -43,7 +43,8 @@ folders:
 |------|--------------|
 | `cancel.py` | `StreamingConnectionContext` — cancellation + WS broadcast wiring. |
 | `direct.py` | HyperGate DIRECT/WEB_SEARCH streaming path with model fallback (`_stream_direct_answer`). |
-| `pipeline.py` (35KB) | `PipelineExecutionService` — the imperative shell driving a full pipeline run for streaming. |
+| `pipeline.py` | `PipelineExecutionService` — preflight, then hand the run to `WorkflowRunner`, then postflight. It no longer executes phases itself; that second loop was deleted in Phase B-1. |
+| `sse_observer.py` | `SseRunObserver` (the `PhaseObserver` that turns a phase into SSE frames, WS broadcasts and event-store writes) and `keepalive_ticker`. |
 | `web_search.py` | `_stream_web_search_results`. |
 
 ## routes/

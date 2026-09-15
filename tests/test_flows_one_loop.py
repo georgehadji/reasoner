@@ -159,7 +159,9 @@ async def test_observer_sees_phase_hooks_in_order(monkeypatch):
     monkeypatch.setattr(
         runner.monitor,
         "evaluate",
-        lambda name, state, attempt=1: _async(PhaseQualityResult(passed=True, score=9.0, reason="ok")),
+        lambda name, state, attempt=1: _async(
+            PhaseQualityResult(passed=True, score=9.0, reason="ok")
+        ),
     )
 
     step = PhaseStep(2, "Perspectives", _ok_phase, lambda s: {})
@@ -170,6 +172,45 @@ async def test_observer_sees_phase_hooks_in_order(monkeypatch):
         "quality:Perspectives:1:True",
         "complete:Perspectives",
     ]
+
+
+@pytest.mark.asyncio
+async def test_a_critical_phase_that_only_scores_low_still_completes(monkeypatch):
+    """`critical` means the phase broke, not that it scored badly.
+
+    The SSE driver emitted `phase_complete` for a phase that ran and then
+    failed its quality gate, and carried on to the next phase. Routing the web
+    through WorkflowRunner briefly changed that: a critical phase whose gate
+    failed aborted the whole run, so a thin "Perspectives" threw away a run the
+    caller had already paid three quarters of. Two test files caught it
+    (test_api_phase_errors, test_multi_perspective_budget); this one names it.
+    """
+    from reasoner.quality.criteria import PhaseQualityResult
+
+    async def _thin_phase(state, services, **kwargs):
+        pass
+
+    services = _Services()
+    observer = _RecordingObserver()
+    runner = WorkflowRunner(services, observer=observer)
+    monkeypatch.setattr(
+        runner.monitor,
+        "evaluate",
+        lambda name, state, attempt=1: _async(
+            PhaseQualityResult(passed=False, score=2.0, reason="too thin", suggestions=["more"])
+        ),
+    )
+    monkeypatch.setattr("reasoner.application.flows.runner.reset_phase_state", lambda n, s: None)
+
+    step = PhaseStep(2, "Perspectives", _thin_phase, lambda s: {}, critical=True)
+    state = PipelineState(problem="q")
+
+    # True: the run continues. "Perspectives" has a retry budget of 1.
+    assert await runner.run_phase(step, state) is True
+    assert observer.calls[-1] == "complete:Perspectives"
+    assert [c for c in observer.calls if c.startswith("retry:")] == ["retry:Perspectives:1/2"]
+    # A hint is advice for the next attempt at this phase, not for the run.
+    assert "Perspectives" not in state.quality_hints
 
 
 @pytest.mark.asyncio

@@ -100,7 +100,14 @@ def harness(monkeypatch):
 
     class _PipelineService:
         def create_pipeline(self, **kw):
-            return SimpleNamespace(_get_method_from_preset=lambda: "multi-perspective")
+            # PipelineWorkflowServices is no longer stubbed: execute_run hands
+            # the real one to WorkflowRunner, so the fake pipeline has to carry
+            # what that adapter reads off it.
+            return SimpleNamespace(
+                _get_method_from_preset=lambda: "multi-perspective",
+                router=router,
+                _log=lambda phase, message, state: None,
+            )
 
     class _RunStore:
         async def add(self, run_id, user_id=None):
@@ -117,7 +124,10 @@ def harness(monkeypatch):
     monkeypatch.setattr(mod, "PipelineOrchestrator", _Orchestrator)
     monkeypatch.setattr(mod, "PipelineService", _PipelineService)
     monkeypatch.setattr(mod, "PhaseMonitor", _fake_monitor)
-    monkeypatch.setattr(mod, "reset_phase_state", lambda name, state: calls.reset.append(name))
+    monkeypatch.setattr(
+        "reasoner.application.flows.runner.reset_phase_state",
+        lambda name, state: calls.reset.append(name),
+    )
     monkeypatch.setattr(mod, "check_run_allowed", lambda *a, **kw: None)
     monkeypatch.setattr(mod, "apply_spend_limits", lambda *a, **kw: None)
     monkeypatch.setattr(mod, "_save_history_entry", lambda entry: None)
@@ -130,16 +140,13 @@ def harness(monkeypatch):
 
     monkeypatch.setattr(mod, "resolve_user_tier", _tier)
     monkeypatch.setattr(mod, "_persist_event", _persist)
+    monkeypatch.setattr("reasoner.api.execution.sse_observer._persist_event", _persist)
     monkeypatch.setattr(
         mod, "get_pipeline_ownership_repo",
         lambda: SimpleNamespace(set_owner=lambda *a, **kw: asyncio.sleep(0)),
     )
 
     monkeypatch.setattr("reasoner.application.flows.factory.WorkflowFactory", _Factory)
-    monkeypatch.setattr(
-        "reasoner.application.flows.services.PipelineWorkflowServices",
-        lambda pipeline: SimpleNamespace(pipeline=pipeline),
-    )
     monkeypatch.setattr("reasoner.core.memory.TaggedMemory", lambda *a, **kw: MagicMock())
     # Layer B appends an "Egress Rewrite" step to every flow when enabled, which
     # would put a second phase through the gate and make these counts depend on a
