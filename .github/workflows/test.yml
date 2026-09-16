@@ -92,7 +92,11 @@ jobs:
           # deleted the second phase loop in api/execution/pipeline.py -- ~340
           # lines of retries, timeouts, quality gate and error frames that
           # WorkflowRunner already does -- plus run_phase_with_keepalive.
-          python scripts/ruff_ratchet.py --max 2258
+          # 2246: Phase B-2 decomposed execute_run (417 -> 72 lines) into named
+          # collaborators and moved the run-level SSE frames and event-store
+          # writes into RunStream beside the per-phase ones, which took their
+          # long payload literals out of the god-method with them.
+          python scripts/ruff_ratchet.py --max 2246
 
       - name: Security scan (bandit)
         run: |

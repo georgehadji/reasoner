@@ -35,6 +35,9 @@ CONTRACT_DIR = REPO_ROOT / "sdk" / "contract"
 OPENAPI_SNAPSHOT = CONTRACT_DIR / "openapi-digest.json"
 EVENTS_CONTRACT = CONTRACT_DIR / "events.json"
 PIPELINE_EXECUTION = REPO_ROOT / "src" / "reasoner" / "api" / "execution" / "pipeline.py"
+#: The terminal `done` frame moved here in Phase B-1 when the SSE driver's
+#: phase loop was replaced by a PhaseObserver on WorkflowRunner.
+SSE_OBSERVER = REPO_ROOT / "src" / "reasoner" / "api" / "execution" / "sse_observer.py"
 
 #: Endpoints the TypeScript SDK calls. Adding a method there adds a line here.
 SDK_ENDPOINTS: list[tuple[str, str]] = [
@@ -262,13 +265,13 @@ def events_contract() -> dict[str, Any]:
 def _done_payload_keys() -> set[str]:
     """Read the literal keys of the terminal ``done`` frame from its source.
 
-    The frame is built inline inside the streaming coroutine, which cannot be
-    called without driving a whole pipeline, so the keys are read off the dict
-    literal instead. If that literal is ever restructured this raises rather
+    The frame is built inside ``RunStream.done``, which cannot be called
+    without driving a whole pipeline, so the keys are read off the dict literal
+    instead. If that literal is ever restructured this raises rather
     than silently passing — which is the intended outcome, since a restructured
     done frame is exactly the change that needs a human to check the SDK.
     """
-    tree = ast.parse(PIPELINE_EXECUTION.read_text(encoding="utf-8"))
+    tree = ast.parse(SSE_OBSERVER.read_text(encoding="utf-8"))
 
     for node in ast.walk(tree):
         if not isinstance(node, ast.Assign) or not isinstance(node.value, ast.Dict):
@@ -283,7 +286,7 @@ def _done_payload_keys() -> set[str]:
         }
 
     raise AssertionError(
-        f"No `done_payload = {{...}}` dict literal found in {PIPELINE_EXECUTION}. "
+        f"No `done_payload = {{...}}` dict literal found in {SSE_OBSERVER}. "
         f"If the terminal SSE frame is now built differently, verify that "
         f"sdk/contract/events.json still describes it and update this test."
     )
