@@ -32,6 +32,7 @@ ignore_imports=
     reasoner.infrastructure.auth.supabase_adapter -> reasoner.application.ports.auth_port
     reasoner.infrastructure.billing.paypal_adapter -> reasoner.application.ports.billing_port
     reasoner.infrastructure.billing.stripe_adapter -> reasoner.application.ports.billing_port
+    reasoner.infrastructure.email.resend_adapter -> reasoner.application.ports.email_port
     reasoner.infrastructure.llm.executor -> reasoner.application.event_bus.bus
     reasoner.infrastructure.persistence.cached_quota_repo -> reasoner.application.ports.quota_repository
     reasoner.infrastructure.persistence.postgres_store -> reasoner.application.event_bus.bus
@@ -39,19 +40,6 @@ ignore_imports=
     reasoner.infrastructure.persistence.pipeline_ownership_repo -> reasoner.application.ports.pipeline_ownership_port
     reasoner.infrastructure.websocket.manager -> reasoner.application.ports.auth_port
     reasoner.infrastructure.websocket.manager -> reasoner.application.ports.pipeline_ownership_port
-    reasoner.application.event_bus.bus -> reasoner.infrastructure.persistence.event_store
-    reasoner.application.handlers.handlers -> reasoner.infrastructure.llm.router
-    reasoner.application.handlers.handlers -> reasoner.infrastructure.widgets
-    reasoner.application.orchestrator -> reasoner.infrastructure.llm.router
-    reasoner.application.orchestrator -> reasoner.infrastructure.persistence.event_store
-    reasoner.application.services.pipeline_service -> reasoner.infrastructure.llm.router
-    reasoner.application.services.preset_service -> reasoner.infrastructure.llm.router
-    reasoner.application.services.scorecard_service -> reasoner.infrastructure.persistence.telemetry_store
-    reasoner.application.services.data_eraser -> reasoner.infrastructure.persistence.event_store
-    reasoner.application.services.billing_service -> reasoner.infrastructure.persistence.subscription_repo
-    reasoner.application.flows.services -> reasoner.infrastructure.execution.noop_executor
-    reasoner.application.flows.services -> reasoner.infrastructure.execution.subprocess_executor
-    reasoner.application.flows.research_phases -> reasoner.infrastructure.prism.file_search
     # ── infrastructure → application (renderer family + event-bus + webhooks) ──
     reasoner.infrastructure.renderer -> reasoner.application.services.renderers.*
     reasoner.infrastructure.persistence.snapshots -> reasoner.application.event_bus
@@ -98,3 +86,89 @@ ignore_imports=
     # ── domain → application (deprecated lazy compat delegations) ──
     reasoner.domain.pipeline_state -> reasoner.application.services.pipeline_service
     # core→infra imports eliminated via DI (set_build_provider)
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Contract 2 exists because contract 1 cannot express the Phase D decision.
+#
+# Contract 1 is a `layers` contract, and `reasoner.application` is listed
+# ABOVE `reasoner.infrastructure` in it. A layers contract only forbids a
+# lower layer importing a higher one, so `application -> infrastructure` has
+# always been legal there -- the 52 such imports below broke nothing, and the
+# 13 of them that were also listed in contract 1's ignore_imports were inert.
+#
+# The architecture decision (docs/plans/architecture-score-9-remediation,
+# Phase D) is stricter than that: application may depend on `core/ports` but
+# not on infrastructure concretes. Nothing enforced it, which is why the
+# count grew to 52 without anyone noticing.
+#
+# So the decision gets its own contract, seeded with exactly today's edges.
+# `scripts/count_importlinter_exceptions.py --contract 2` ratchets the number
+# two ways, so it can only fall. Every entry removed here is one dependency
+# inverted through a port.
+#
+# allow_indirect_imports: this is about who *imports* infrastructure, not who
+# transitively reaches it. An indirect chain is contract 1's business.
+# ─────────────────────────────────────────────────────────────────────────
+[importlinter:contract:2]
+name = Application does not import infrastructure concretes
+type = forbidden
+source_modules =
+    reasoner.application
+forbidden_modules =
+    reasoner.infrastructure
+allow_indirect_imports = True
+unmatched_ignore_imports_alerting = warn
+ignore_imports =
+    reasoner.application.event_bus.bus -> reasoner.infrastructure.email.resend_adapter
+    reasoner.application.event_bus.bus -> reasoner.infrastructure.observability.langfuse_subscriber
+    reasoner.application.event_bus.bus -> reasoner.infrastructure.persistence.event_store
+    reasoner.application.flows.article_phases -> reasoner.infrastructure.search.discovery
+    reasoner.application.flows.brainstorming -> reasoner.infrastructure.search.discovery
+    reasoner.application.flows.coding_phases -> reasoner.infrastructure.search.discovery
+    reasoner.application.flows.debate -> reasoner.infrastructure.search.discovery
+    reasoner.application.flows.dialectical_phases -> reasoner.infrastructure.search.discovery
+    reasoner.application.flows.egress_rewrite_phase -> reasoner.infrastructure.watermark.rewriter
+    reasoner.application.flows.jury -> reasoner.infrastructure.search.discovery
+    reasoner.application.flows.perspective_phases -> reasoner.infrastructure.search.discovery
+    reasoner.application.flows.research_phases -> reasoner.infrastructure.prism.file_search
+    reasoner.application.flows.research_phases -> reasoner.infrastructure.search.discovery
+    reasoner.application.flows.search_phases -> reasoner.infrastructure.search.discovery
+    reasoner.application.flows.search_phases -> reasoner.infrastructure.search.tavily_adapter
+    reasoner.application.flows.services -> reasoner.infrastructure.execution.container_sandbox
+    reasoner.application.flows.services -> reasoner.infrastructure.execution.noop_executor
+    reasoner.application.flows.services -> reasoner.infrastructure.execution.subprocess_executor
+    reasoner.application.flows.writing_phases -> reasoner.infrastructure.search.discovery
+    reasoner.application.handlers.handlers -> reasoner.infrastructure.llm.base
+    reasoner.application.handlers.handlers -> reasoner.infrastructure.llm.router
+    reasoner.application.handlers.handlers -> reasoner.infrastructure.widgets
+    reasoner.application.orchestrator -> reasoner.infrastructure.llm.router
+    reasoner.application.orchestrator -> reasoner.infrastructure.metrics
+    reasoner.application.pipeline -> reasoner.infrastructure.llm.executor
+    reasoner.application.pipeline -> reasoner.infrastructure.llm.router
+    reasoner.application.pipeline -> reasoner.infrastructure.translation
+    reasoner.application.services.adaptive_routing -> reasoner.infrastructure.llm.capability_registry
+    reasoner.application.services.anonymous_trial_policy -> reasoner.infrastructure.valkey.client
+    reasoner.application.services.billing_service -> reasoner.infrastructure.persistence.cached_subscription_repo
+    reasoner.application.services.billing_service -> reasoner.infrastructure.persistence.subscription_repo
+    reasoner.application.services.constraint_resolver -> reasoner.infrastructure.llm.constraints.bloc_diversity
+    reasoner.application.services.constraint_resolver -> reasoner.infrastructure.llm.constraints.budget_ceiling
+    reasoner.application.services.constraint_resolver -> reasoner.infrastructure.llm.constraints.circuit_state
+    reasoner.application.services.constraint_resolver -> reasoner.infrastructure.llm.constraints.concurrency
+    reasoner.application.services.constraint_resolver -> reasoner.infrastructure.llm.constraints.no_repeat_lab
+    reasoner.application.services.data_eraser -> reasoner.infrastructure.persistence.event_store
+    reasoner.application.services.estimate_service -> reasoner.infrastructure.llm.pricing_resolver
+    reasoner.application.services.gate_service -> reasoner.infrastructure.llm.router
+    reasoner.application.services.gate_service -> reasoner.infrastructure.metrics
+    reasoner.application.services.health_service -> reasoner.infrastructure.metrics
+    reasoner.application.services.health_service -> reasoner.infrastructure.valkey.client
+    reasoner.application.services.idempotency -> reasoner.infrastructure.redis.run_state
+    reasoner.application.services.pipeline_service -> reasoner.infrastructure.llm.router
+    reasoner.application.services.preset_service -> reasoner.infrastructure.llm.router
+    reasoner.application.services.scorecard_service -> reasoner.infrastructure.persistence.telemetry_store
+    reasoner.application.services.spend_limit_service -> reasoner.infrastructure.llm.pricing_resolver
+    reasoner.application.services.spend_limit_service -> reasoner.infrastructure.llm.spend_tracker
+    reasoner.application.services.spend_limit_service -> reasoner.infrastructure.persistence.cached_subscription_repo
+    reasoner.application.services.spend_limit_service -> reasoner.infrastructure.persistence.subscription_repo
+    reasoner.application.services.watermark_service -> reasoner.infrastructure.watermark.pixel.noop
+    reasoner.application.services.ws_ticket -> reasoner.infrastructure.valkey.client

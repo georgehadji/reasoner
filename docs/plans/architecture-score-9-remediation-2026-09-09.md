@@ -372,6 +372,60 @@ than *missing abstractions*. This is wiring, per the thesis.
 **Fitness function:** the `application → infrastructure` count becomes its own
 tracked number in the two-way import ratchet, so it can only fall.
 
+### Landed 2026-09-16/17, and three corrections to the text above
+
+**The contract had never been green.** One import broke it:
+`reasoner.core.degrade -> reasoner.infrastructure.metrics`. The comment above it
+claimed the function-local placement was what kept `core` off `infrastructure`;
+import-linter reads the static graph, so it was the same edge. Inverted through
+`core/ports/metrics_port.py`, which `infrastructure/metrics.py` fills at import.
+`tests/architecture/test_core_has_no_infrastructure_import.py`.
+
+**D-4 landed as three, not four.** `data_eraser -> api.cache` matched no import
+at all, and two entries were `TYPE_CHECKING`-only under
+`exclude_type_checking_imports = True`. The fourth, the `:29`/`:56` renderer
+"duplicate", is not one: `renderers` matches the package and `renderers.*` its
+submodules, and import-linter reports both as used. Deleting either re-breaks
+the contract.
+
+**The gate was not looking at 52 modules.** Ten directories under `src/reasoner`
+had no `__init__.py` -- `api/execution`, `api/routes` (21 modules), `healing`,
+`infrastructure/redis`, `infrastructure/search`, `core/observability`,
+`documents`, `infrastructure/email`, `infrastructure/observability`, `utils`.
+PEP 420 namespace packages import fine at runtime but grimp only walks regular
+packages, so `lint-imports` reported "Analyzed 489 files" against a 541-file
+tree. Adding the ten `__init__.py` files surfaced one real violation
+(`infrastructure.email.resend_adapter -> application.ports.email_port`, now a
+declared exception beside its auth and billing siblings).
+`tests/architecture/test_every_package_is_governed.py` is the gate on the gate.
+Note for anyone reproducing this: grimp's on-disk cache does **not** invalidate
+when a new `__init__.py` appears, because the importing files' mtimes do not
+change. Both CI and `ci-local.sh` already pass `--no-cache`; a bare
+`lint-imports` will report a stale green.
+
+**D-1's premise was wrong, and it is why contract 2 now exists.** This section
+says "the 59 `application -> infrastructure` imports". There are 52, and *none
+of them violated anything*: `.importlinter` contract 1 lists
+`reasoner.application` **above** `reasoner.infrastructure`, and a `layers`
+contract only forbids a lower layer importing a higher one. So the direction was
+legal, the 13 entries listing it in `ignore_imports` were inert (deleted; the
+contract-1 ratchet drops 57 -> 44), and D-1/D-2/D-3 as written would have
+reduced no measured number.
+
+The fitness function is therefore built first, not last: `.importlinter`
+contract 2 (`forbidden`, `allow_indirect_imports = True`) seeded with exactly
+today's 52 edges, ratcheted two ways by
+`scripts/count_importlinter_exceptions.py --contract 2 --max 52`. Every entry
+removed from it is one dependency genuinely inverted through a port. D-1, D-2
+and D-3 are now measurable; they were not before.
+
+**Still open in Phase D:** D-1 (9 `flows/*.py -> infrastructure.search.discovery`
+imports; note the port that exists, `SearchServicePort`, is the *client*
+protocol, while what the flows import is the *factory*
+`get_search_client_for_method`, so this needs a factory hook plus composition-root
+wiring at `api/__init__.py` / `main.py` / `headless.py`, not a one-line swap --
+an unfilled hook would silently disable web search), D-2, D-3, D-5, D-6.
+
 ---
 
 ## Phase E — Composition root; kill the service locator

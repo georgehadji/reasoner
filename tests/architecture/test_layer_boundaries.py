@@ -1,5 +1,20 @@
 """Architectural fitness functions — enforce dependency direction.
 
+The decision, stated once (Phase D of
+docs/plans/architecture-score-9-remediation-2026-09-09.md): N-tier for the
+outer ring, strict hexagonal for the inner ring. `domain/` and `core/` are a
+dependency-free functional core; `application/` may depend on `core/ports` but
+not on `infrastructure/` concretes; `infrastructure/` and `api/` are adapters.
+
+There are three enforcement points for that one rule and they must not drift:
+this file (AST, module-level imports), `.importlinter` contract 1 (layers, the
+static graph including function-local imports), and `.importlinter` contract 2
+(application -> infrastructure, ratcheted by
+`scripts/count_importlinter_exceptions.py --contract 2`). Contract 1 alone
+cannot express the rule: it lists `reasoner.application` above
+`reasoner.infrastructure`, and a layers contract only forbids a lower layer
+importing a higher one, so `application -> infrastructure` is legal there.
+
 Layer rules:
   core/    -> must NOT import from infrastructure/, api/, or application/
   domain/  -> must NOT import from infrastructure/ or api/
@@ -32,10 +47,13 @@ ALLOWED_LINEAGE: dict[str, list[str]] = {
         "reasoner.api",
     ],
     "core/protocol.py": ["reasoner.infrastructure.llm.router"],
-    # core/degrade.py: lazy inline import of the Prometheus counter inside
-    # degraded(), for the same reason as core/search.py above -- the metric is
-    # an optional dependency and must not be a module-scope core->infra edge.
-    "core/degrade.py": ["reasoner.infrastructure.metrics"],
+    # core/degrade.py had an entry here for a lazy inline import of the
+    # Prometheus counter. It is gone: the "lazy import keeps core off
+    # infrastructure" reasoning was wrong (import-linter reads the static
+    # graph, so a function-local import is the same edge, and that one line was
+    # what kept the Layered Architecture contract broken). The edge is inverted
+    # through core/ports/metrics_port.py now -- see
+    # tests/architecture/test_core_has_no_infrastructure_import.py.
 
     # application/handlers/handlers.py:263 — `import reasoner.api as api`, lazy
     # inside a function. Tracked upward-dependency debt, mirrored in

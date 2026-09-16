@@ -5,7 +5,11 @@ counts ASCII "->" anywhere in the file — including inside prose comments —
 rather than only real ignore_imports entries. Parses via configparser so a
 comment containing "->" can never inflate the count.
 
-Usage: python scripts/count_importlinter_exceptions.py [--max N]
+Usage: python scripts/count_importlinter_exceptions.py [--contract N] [--max N]
+--contract selects which contract's list to count (default 1, the layers
+contract). Contract 2 is the Phase D "application does not import
+infrastructure concretes" forbidden contract; it carries its own budget
+because it measures a different thing and falls at a different rate.
 Exits 0 and prints the count if --max is omitted.
 With --max N: ratchets both ways — fails if COUNT > N (new debt added
 without raising the budget) or COUNT < N (debt was paid down but MAX
@@ -22,10 +26,13 @@ from pathlib import Path
 CONFIG_PATH = Path(__file__).resolve().parent.parent / ".importlinter"
 
 
-def count_exceptions(config_path: Path = CONFIG_PATH) -> int:
+def count_exceptions(contract: int = 1, config_path: Path = CONFIG_PATH) -> int:
     parser = configparser.ConfigParser()
     parser.read(config_path, encoding="utf-8")
-    raw = parser.get("importlinter:contract:1", "ignore_imports", fallback="")
+    section = f"importlinter:contract:{contract}"
+    if not parser.has_section(section):
+        raise SystemExit(f"No such contract in {config_path.name}: {section}")
+    raw = parser.get(section, "ignore_imports", fallback="")
     return sum(
         1
         for line in raw.splitlines()
@@ -35,11 +42,12 @@ def count_exceptions(config_path: Path = CONFIG_PATH) -> int:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
+    ap.add_argument("--contract", type=int, default=1)
     ap.add_argument("--max", type=int, default=None)
     args = ap.parse_args()
 
-    count = count_exceptions()
-    print(f"Import-linter exceptions: {count}")
+    count = count_exceptions(args.contract)
+    print(f"Import-linter contract {args.contract} exceptions: {count}")
 
     if args.max is None:
         return 0
