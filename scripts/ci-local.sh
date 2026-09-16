@@ -67,7 +67,7 @@ if want arch; then
     gate "workflow-lint" bash -c '! grep -rEln "\$\{\{[[:space:]]*\}\}" .github/workflows/'
     gate "import-linter"  lint-imports --no-cache
     gate "registry-guard" python scripts/check_no_registry_bypass.py
-    gate "exception-count" python scripts/count_importlinter_exceptions.py --max 59
+    gate "exception-count" python scripts/count_importlinter_exceptions.py --max 56
 fi
 
 # ── frontend (test.yml: tsc job) ───────────────────────────────────────

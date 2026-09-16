@@ -32,6 +32,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from reasoner.core.ports.metrics_port import count_degradation
+
 logger = logging.getLogger(__name__)
 
 
@@ -66,17 +68,12 @@ def degraded[T](
 
     logger.warning("degradation site=%s %s", site, reason)
 
-    # Lazy, function-local: reasoner.core must not depend on
-    # reasoner.infrastructure at module scope (tests/architecture/
-    # test_layer_boundaries.py), and prometheus_client is an optional
-    # dependency that degrades to a no-op metric when absent. Same shape as
-    # the lazy imports in core/search.py.
-    try:
-        from reasoner.infrastructure.metrics import REASONER_DEGRADATION_TOTAL
-
-        REASONER_DEGRADATION_TOTAL.labels(site=site).inc()
-    except Exception:  # pragma: no cover - metrics must never break a caller
-        logger.debug("degradation metric unavailable for site=%s", site)
+    # Through a core-owned hook, not a function-local import of
+    # infrastructure.metrics. import-linter reads the static graph, so the
+    # lazy import that used to sit here was the one edge breaking the Layered
+    # Architecture contract. infrastructure.metrics fills the hook in when it
+    # is imported; see core/ports/metrics_port.py.
+    count_degradation(site)
 
     degradations = getattr(state, "degradations", None)
     if isinstance(degradations, list):

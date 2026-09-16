@@ -63,7 +63,6 @@ ignore_imports=
     reasoner.infrastructure.persistence.billing_deadletter_repo -> reasoner.application.ports.billing_deadletter_port
     # ── application → api (handler renders via api serializer) ──
     reasoner.application.handlers.handlers -> reasoner.api
-    reasoner.application.services.data_eraser -> reasoner.api.cache
     # ── infrastructure → api (Linux-grimp resolves server_check chain here) ──
     reasoner.infrastructure.server_check -> reasoner.api
     # ── hypergate → infrastructure (router/ports — needs DI to remove) ──
@@ -86,8 +85,7 @@ ignore_imports=
     reasoner.token_cache -> reasoner.infrastructure.token_cache
     reasoner.metrics -> reasoner.infrastructure.metrics
     reasoner.presets -> reasoner.infrastructure.llm.router
-    # ── core → infrastructure / application (protocol + models shim) ──
-    reasoner.core.protocol -> reasoner.infrastructure.llm.router
+    # ── core → application (models shim) ──
     reasoner.models -> reasoner.application.services.pipeline_service
     # ── domain → core (TYPE_CHECKING + preset/model constants) ──
     reasoner.domain.preset_core -> reasoner.core.constants_models
@@ -97,7 +95,6 @@ ignore_imports=
     # would always be unset at call time. Retire this by making preset
     # construction lazy, then injecting.
     reasoner.domain.preset_core -> reasoner.core.ports.model_registry_port
-    reasoner.domain.pipeline_state -> reasoner.core.protocol
     # ── domain → application (deprecated lazy compat delegations) ──
     reasoner.domain.pipeline_state -> reasoner.application.services.pipeline_service
     # core→infra imports eliminated via DI (set_build_provider)

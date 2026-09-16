@@ -84,4 +84,10 @@ jobs:
           # not `grep -c '\->'` — a prose comment containing "->" would inflate a
           # naive grep count. Two-way ratchet: MAX must move in lockstep with the
           # real count, in either direction. Do not raise without a tracking issue.
-          PYTHONPATH=src python scripts/count_importlinter_exceptions.py --max 59
+          # 56: Phase D-4 removed three exceptions that matched nothing in the
+          # source at all -- data_eraser -> api.cache (no such import), and two
+          # TYPE_CHECKING-only edges that exclude_type_checking_imports already
+          # drops. The plan named a fourth, the renderer "duplicate": it is not
+          # one. `renderers` and `renderers.*` match the package and its
+          # submodules respectively, and import-linter reports both as used.
+          PYTHONPATH=src python scripts/count_importlinter_exceptions.py --max 56
