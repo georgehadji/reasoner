@@ -7,6 +7,7 @@ import json
 
 import pytest
 
+from reasoner.application.flows.search_phases import _enrich_query
 from reasoner.models import PipelineState
 from reasoner.pipeline import ReasonerPipeline
 
@@ -378,9 +379,9 @@ def test_should_include_result_rejects_huggingface_vocab():
 
 
 def test_enrich_query_adds_disambiguation_for_agi():
-    enriched = ReasonerPipeline._enrich_query("AGI timeline", "When will AGI arrive? artificial general intelligence")
+    enriched = _enrich_query("AGI timeline", "When will AGI arrive? artificial general intelligence")
     assert "artificial general intelligence" in enriched
 
 
 def test_enrich_query_leaves_unrelated_queries_unchanged():
-    assert ReasonerPipeline._enrich_query("climate change", "What causes climate change?") == "climate change"
+    assert _enrich_query("climate change", "What causes climate change?") == "climate change"

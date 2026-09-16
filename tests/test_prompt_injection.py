@@ -12,6 +12,8 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from pydantic import ValidationError
 
+from reasoner.application.flows.search_phases import run_deep_read_phase
+from reasoner.application.flows.services import PipelineWorkflowServices
 from reasoner.core.settings import settings
 from reasoner.models import PipelineState
 from reasoner.phases import (
@@ -22,6 +24,11 @@ from reasoner.phases import (
     shallow_read_prompt,
 )
 from reasoner.sanitization import sanitize_for_prompt
+
+
+def _svc(pipeline):
+    """The WorkflowServices a phase function takes, bound to this pipeline."""
+    return PipelineWorkflowServices(pipeline)
 
 
 @pytest.fixture(autouse=True)
@@ -168,7 +175,7 @@ class TestPipelineExternalContentSanitization:
 
         with patch("reasoner.scraper.scrape_urls", new_callable=AsyncMock) as mock_scrape:
             mock_scrape.return_value = scraped_blocked
-            await pipeline._phase_deep_read(state)
+            await run_deep_read_phase(state, _svc(pipeline), domain=pipeline.domain)
 
         # Because sanitize_for_prompt raises on blocked content, the LLM call is skipped
         # and the pipeline falls back gracefully.
@@ -219,7 +226,7 @@ class TestPipelineExternalContentSanitization:
 
         with patch("reasoner.scraper.scrape_urls", new_callable=AsyncMock) as mock_scrape:
             mock_scrape.return_value = scraped_clean
-            await pipeline._phase_deep_read(state)
+            await run_deep_read_phase(state, _svc(pipeline), domain=pipeline.domain)
 
         deep_read_calls = [c for c in router.calls if "Page Content" in c[2]]
         assert len(deep_read_calls) == 1
@@ -269,7 +276,7 @@ class TestPipelineExternalContentSanitization:
 
         with patch("reasoner.scraper.scrape_urls", new_callable=AsyncMock) as mock_scrape:
             mock_scrape.return_value = scraped
-            await pipeline._phase_deep_read(state)
+            await run_deep_read_phase(state, _svc(pipeline), domain=pipeline.domain)
 
         shallow_calls = [c for c in router.calls if "We could not fetch" in c[2]]
         assert len(shallow_calls) == 1

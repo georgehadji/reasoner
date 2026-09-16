@@ -5,6 +5,13 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from reasoner.application.flows.jury_phases import (
+    run_jury_critique_phase,
+    run_jury_generate_phase,
+    run_jury_verify_and_meta_eval_phase,
+    run_jury_weighted_ranking_phase,
+)
+from reasoner.application.flows.services import PipelineWorkflowServices
 from reasoner.models import (
     CritiqueScore,
     GenerationCandidate,
@@ -12,6 +19,11 @@ from reasoner.models import (
     PipelineState,
 )
 from reasoner.pipeline import ReasonerPipeline
+
+
+def _svc(pipeline):
+    """The WorkflowServices a phase function takes, bound to this pipeline."""
+    return PipelineWorkflowServices(pipeline)
 
 
 class FakeRouter:
@@ -51,7 +63,7 @@ async def test_jury_generate_populates_candidates(pipeline, state):
         }),
         {}
     ))
-    await pipeline._phase_jury_generate(state)
+    await run_jury_generate_phase(state, _svc(pipeline))
     assert len(state.generation_candidates) > 0
 
 
@@ -71,7 +83,7 @@ async def test_jury_critique_populates_scores(pipeline, state):
         generator_id="g1", model_used="fake", solution="S", confidence=0.8,
         key_claims=[], approach_summary="A"
     )]
-    await pipeline._phase_jury_critique(state)
+    await run_jury_critique_phase(state, _svc(pipeline), batch_critique=pipeline.batch_critique_jury)
     assert len(state.critic_scores) > 0
 
 
@@ -81,7 +93,7 @@ async def test_jury_verify_populates_results(pipeline, state):
         (json.dumps({"verifications": [{"claim": "C1", "verdict": "SUPPORTED", "confidence": 0.9}]}), {}),
         (json.dumps({"critic_reliability": {}, "bias_analysis": {}, "agreement_rate": 0.8}), {}),
     ])
-    await pipeline._phase_jury_verify_and_meta_eval(state)
+    await run_jury_verify_and_meta_eval_phase(state, _svc(pipeline))
     assert len(state.verification_results) == 1
     assert state.verification_results[0].claim == "C1"
     assert state.meta_evaluation is not None
@@ -100,5 +112,5 @@ async def test_jury_ranking_populates_ranking(pipeline, state):
     )]
     state.candidates = [type("C", (), {"perspective": PerspectiveType.CONSTRUCTIVE})()]
     state.meta_evaluation = type("ME", (), {"critic_reliability": {}})()
-    await pipeline._phase_jury_weighted_ranking(state)
+    await run_jury_weighted_ranking_phase(state, _svc(pipeline))
     assert isinstance(state.jury_weighted_ranking, list)

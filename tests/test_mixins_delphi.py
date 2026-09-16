@@ -5,8 +5,21 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from reasoner.application.flows.delphi_phases import (
+    run_delphi_aggregation_phase,
+    run_delphi_convergence_phase,
+    run_delphi_dissent_phase,
+    run_delphi_round1_phase,
+    run_delphi_round2_phase,
+)
+from reasoner.application.flows.services import PipelineWorkflowServices
 from reasoner.models import PipelineState
 from reasoner.pipeline import ReasonerPipeline
+
+
+def _svc(pipeline):
+    """The WorkflowServices a phase function takes, bound to this pipeline."""
+    return PipelineWorkflowServices(pipeline)
 
 
 class FakeRouter:
@@ -40,7 +53,7 @@ async def test_delphi_round1_populates_estimates(pipeline, state):
         json.dumps({"estimate_value": 42, "reasoning": "R1"}),
         {}
     ))
-    await pipeline._phase_delphi_round1(state)
+    await run_delphi_round1_phase(state, _svc(pipeline))
     assert "round_1_estimates" in state.delphi_state
     assert len(state.delphi_state["round_1_estimates"]) > 0
 
@@ -51,7 +64,7 @@ async def test_delphi_aggregation_populates_stats(pipeline, state):
         {"expert_id": "e1", "estimate_value": 40},
         {"expert_id": "e2", "estimate_value": 44},
     ]
-    await pipeline._phase_delphi_aggregation(state)
+    await run_delphi_aggregation_phase(state, _svc(pipeline))
     assert "aggregated_stats" in state.delphi_state
     assert state.delphi_state["aggregated_stats"]["median"] == 42.0
 
@@ -63,7 +76,7 @@ async def test_delphi_round2_refines(pipeline, state):
         {}
     ))
     state.delphi_state["round_1_estimates"] = [{"expert_id": "e1"}]
-    await pipeline._phase_delphi_round2(state)
+    await run_delphi_round2_phase(state, _svc(pipeline))
     assert "round_2_estimates" in state.delphi_state
 
 
@@ -73,7 +86,7 @@ async def test_delphi_convergence_sets_final(pipeline, state):
         json.dumps({"converged": True, "final_answer": "Answer", "dissenters": []}),
         {}
     ))
-    await pipeline._phase_delphi_convergence(state)
+    await run_delphi_convergence_phase(state, _svc(pipeline))
     assert state.delphi_state["converged"] is True
     assert state.delphi_state["consensus"]["final_answer"] == "Answer"
 
@@ -84,5 +97,5 @@ async def test_delphi_dissent_records_analysis(pipeline, state):
         json.dumps({"dissent_analysis": "Minor wording differences."}),
         {}
     ))
-    await pipeline._phase_delphi_dissent(state)
+    await run_delphi_dissent_phase(state, _svc(pipeline))
     assert "dissent" in state.delphi_state

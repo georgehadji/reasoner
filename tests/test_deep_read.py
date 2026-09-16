@@ -8,10 +8,20 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from reasoner.application.flows.search_phases import (
+    run_deep_read_phase,
+    validate_evidence_coverage,
+)
+from reasoner.application.flows.services import PipelineWorkflowServices
 from reasoner.core.settings import settings
 from reasoner.models import PipelineState
 from reasoner.pipeline import ReasonerPipeline
 from reasoner.scraper import scrape_urls  # noqa: F401  — ensures module is loadable
+
+
+def _svc(pipeline):
+    """The WorkflowServices a phase function takes, bound to this pipeline."""
+    return PipelineWorkflowServices(pipeline)
 
 
 @pytest.fixture(autouse=True)
@@ -93,7 +103,7 @@ async def test_deep_read_extracts_summary_on_scrape_success(pipeline):
 
     with patch("reasoner.scraper.scrape_urls", new_callable=AsyncMock) as mock_scrape:
         mock_scrape.return_value = scraped
-        await pipeline._phase_deep_read(state)
+        await run_deep_read_phase(state, _svc(pipeline), domain=pipeline.domain)
 
     assert len(state.vetted_context) == 1
     result = state.vetted_context[0]
@@ -136,7 +146,7 @@ async def test_deep_read_fallback_on_scrape_failure(pipeline):
 
     with patch("reasoner.scraper.scrape_urls", new_callable=AsyncMock) as mock_scrape:
         mock_scrape.return_value = scraped
-        await pipeline._phase_deep_read(state)
+        await run_deep_read_phase(state, _svc(pipeline), domain=pipeline.domain)
 
     result = state.vetted_context[0]
     assert result["summary"] == "Likely contains expert survey data."
@@ -167,7 +177,7 @@ async def test_deep_read_legacy_mode_without_llm(pipeline):
     with patch("reasoner.scraper.scrape_urls", new_callable=AsyncMock) as mock_scrape:
         mock_scrape.return_value = scraped
         with patch.object(settings, "REASONER_DEEP_READ_LLM", False):
-            await pipeline._phase_deep_read(state)
+            await run_deep_read_phase(state, _svc(pipeline), domain=pipeline.domain)
 
     result = state.vetted_context[0]
     assert result["summary"] == "Raw markdown content."
@@ -246,7 +256,7 @@ async def test_validation_warns_when_uncertain_assumptions_lack_evidence():
 
     # _validate_evidence_coverage is called inside run() after deep read;
     # we can exercise it directly here.
-    pipeline._validate_evidence_coverage(state)
+    validate_evidence_coverage(state, _svc(pipeline))
 
     # It should have logged a warning; we verify by checking state.phase_logs
     assert any("No extracted evidence" in entry for entry in state.phase_logs)
@@ -277,6 +287,6 @@ async def test_validation_passes_when_evidence_exists():
         {"url": "https://example.com", "summary": "Experts define AGI as human-level performance."}
     ]
 
-    pipeline._validate_evidence_coverage(state)
+    validate_evidence_coverage(state, _svc(pipeline))
 
     assert not any("No extracted evidence" in entry for entry in state.phase_logs)

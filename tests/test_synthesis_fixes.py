@@ -8,8 +8,16 @@ import json
 
 import pytest
 
+from reasoner.application.flows.perspective_phases import run_perspectives_phase
+from reasoner.application.flows.services import PipelineWorkflowServices
+from reasoner.application.flows.synthesis_phase import run_synthesis_phase
 from reasoner.models import CritiqueScore, PerspectiveType, PipelineState
 from reasoner.pipeline import TOKEN_OPTIMIZATION, ReasonerPipeline
+
+
+def _svc(pipeline):
+    """The WorkflowServices a phase function takes, bound to this pipeline."""
+    return PipelineWorkflowServices(pipeline)
 
 
 @pytest.fixture(autouse=True)
@@ -73,7 +81,7 @@ async def test_synthesis_reconstructs_prose_when_solution_tag_missing():
     # Bypass earlier phases
     state.task_type = "analytical"
     state.decomposition = {"causal_chain": [], "assumptions": [], "failure_modes": []}
-    await pipeline._phase_synthesis(state)
+    await run_synthesis_phase(state, _svc(pipeline))
 
     assert state.final_solution is not None
     cs = state.final_solution.core_solution
@@ -106,7 +114,7 @@ We should act now because evidence shows X [Bad Source](https://example.com/not-
     state.task_type = "analytical"
     state.decomposition = {"causal_chain": [], "assumptions": [], "failure_modes": []}
     state.vetted_context = [{"url": "https://allowed.com", "summary": "ok"}]
-    await pipeline._phase_synthesis(state)
+    await run_synthesis_phase(state, _svc(pipeline))
 
     assert any(
         "Citation integrity warning" in entry and "example.com/not-in-context" in entry
@@ -139,7 +147,7 @@ Test solution.
     state = PipelineState(problem="Test")
     state.task_type = "analytical"
     state.decomposition = {"causal_chain": [], "assumptions": [], "failure_modes": []}
-    await pipeline._phase_synthesis(state)
+    await run_synthesis_phase(state, _svc(pipeline))
 
     bp = state.final_solution.action_blueprint
     assert len(bp) == 1
@@ -199,7 +207,7 @@ async def test_perspective_filter_regenerates_hallucinated_greek_text():
     state.language = "English"
     pipeline.perspectives = ["constructive"]
 
-    await pipeline._phase_2_perspectives(state)
+    await run_perspectives_phase(state, _svc(pipeline), perspectives=pipeline.perspectives)
 
     assert len(state.candidates) == 1
     assert "Greek" not in state.candidates[0].content

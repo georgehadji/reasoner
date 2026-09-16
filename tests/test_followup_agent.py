@@ -58,11 +58,10 @@ async def test_followup_budget_uses_kimi_for_persona_roles():
     )
 
     with patch("reasoner.llm.ProviderRouter.from_model_ids", side_effect=_capture_router_call):
-        with patch("reasoner.pipeline.ReasonerPipeline._phase_synthesis", return_value=None):
-            events = []
-            async for line in run_stream(req, initial_state=state):
-                if line.startswith("data:"):
-                    events.append(json.loads(line.removeprefix("data: ").strip()))
+        events = []
+        async for line in run_stream(req, initial_state=state):
+            if line.startswith("data:"):
+                events.append(json.loads(line.removeprefix("data: ").strip()))
 
     routing = _capture_router_call.last_routing
     assert routing.get("synthesis") == "kimi-k2-5"
@@ -87,11 +86,10 @@ async def test_followup_premium_uses_grok_for_persona_roles():
     )
 
     with patch("reasoner.llm.ProviderRouter.from_model_ids", side_effect=_capture_router_call):
-        with patch("reasoner.pipeline.ReasonerPipeline._phase_synthesis", return_value=None):
-            events = []
-            async for line in run_stream(req, initial_state=state):
-                if line.startswith("data:"):
-                    events.append(json.loads(line.removeprefix("data: ").strip()))
+        events = []
+        async for line in run_stream(req, initial_state=state):
+            if line.startswith("data:"):
+                events.append(json.loads(line.removeprefix("data: ").strip()))
 
     routing = _capture_router_call.last_routing
     assert routing.get("synthesis") == "grok-4.3"
@@ -121,11 +119,10 @@ async def test_initial_run_does_not_override_routing():
     req = RunRequest(problem="test initial run", preset="multi-perspective-budget")
 
     with patch("reasoner.llm.ProviderRouter.from_model_ids", side_effect=_capture_router_call):
-        with patch("reasoner.pipeline.ReasonerPipeline._phase_synthesis", return_value=None):
-            events = []
-            async for line in run_stream(req, initial_state=None):
-                if line.startswith("data:"):
-                    events.append(json.loads(line.removeprefix("data: ").strip()))
+        events = []
+        async for line in run_stream(req, initial_state=None):
+            if line.startswith("data:"):
+                events.append(json.loads(line.removeprefix("data: ").strip()))
 
     routing = _capture_router_call.last_routing
     assert routing.get("synthesis") == preset.routing.get("synthesis")

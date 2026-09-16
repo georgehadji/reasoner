@@ -85,6 +85,58 @@ def test_only_the_runner_executes_a_phase_function():
     ], f"a second thing executes phases: {sorted(readers)}"
 
 
+def test_reasoner_pipeline_holds_no_phase_delegators():
+    """A phase belongs to its flow module, not to a method that forwards to it.
+
+    The mixin-cleanup refactor (c7f3104) moved phase logic to standalone
+    `(state, services)` functions but left 33 two-line delegators on
+    `ReasonerPipeline` because its callers were never migrated -- so the tests
+    and `api/routes/context.py` went on calling bound methods, and the class
+    stayed the apparent owner of phases it no longer implemented. Phase B-3
+    migrated the callers and deleted the delegators.
+
+    A delegator here is a method whose entire body is a local import of a flow
+    function plus a call to it.
+    """
+    pipeline = SRC / "application" / "pipeline.py"
+    tree = ast.parse(pipeline.read_text(encoding="utf-8"))
+
+    offenders = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ClassDef):
+            continue
+        for item in node.body:
+            if not isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            body = [s for s in item.body if not _is_docstring(s)]
+            if len(body) != 2:
+                continue
+            imp, call = body
+            if not (
+                isinstance(imp, ast.ImportFrom)
+                and (imp.module or "").startswith("reasoner.application.flows")
+            ):
+                continue
+            inner = call.value if isinstance(call, (ast.Expr, ast.Return)) else None
+            if isinstance(inner, ast.Await):
+                inner = inner.value
+            if isinstance(inner, ast.Call):
+                offenders.append(f"{item.lineno} {node.name}.{item.name}")
+
+    assert not offenders, (
+        "ReasonerPipeline must not forward to flow functions; call them "
+        "directly with a PipelineWorkflowServices. Found:\n  " + "\n  ".join(offenders)
+    )
+
+
+def _is_docstring(stmt: ast.stmt) -> bool:
+    return (
+        isinstance(stmt, ast.Expr)
+        and isinstance(stmt.value, ast.Constant)
+        and isinstance(stmt.value.value, str)
+    )
+
+
 def test_get_phases_has_exactly_one_caller():
     """One resolver builds the phase list, so the drivers cannot disagree.
 

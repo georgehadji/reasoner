@@ -96,7 +96,9 @@ jobs:
           # collaborators and moved the run-level SSE frames and event-store
           # writes into RunStream beside the per-phase ones, which took their
           # long payload literals out of the god-method with them.
-          python scripts/ruff_ratchet.py --max 2246
+          # 2245: Phase B-3 deleted the 33 back-compat phase delegators on
+          # ReasonerPipeline and migrated their callers to the flow functions.
+          python scripts/ruff_ratchet.py --max 2245
 
       - name: Security scan (bandit)
         run: |
