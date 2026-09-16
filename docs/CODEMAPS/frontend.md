@@ -1,4 +1,4 @@
-<!-- Generated: 2026-09-16 | Files scanned: 531 | Token estimate: ~800 -->
+<!-- Generated: 2026-09-16 | Files scanned: 532 | Token estimate: ~800 -->
 
 # Frontend Structure — Reasoner (Next.js 16 / React 19 / TypeScript 5)
 
