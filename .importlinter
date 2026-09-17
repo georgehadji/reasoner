@@ -11,11 +11,29 @@ type = layers
 # a Windows-only "unused" edge never fails the build — it only surfaces in
 # the log, letting stale exceptions be spotted and cleaned up over time.
 unmatched_ignore_imports_alerting = warn
+# D-5: healing, documents, neuro, phases and utils were ungoverned -- absent
+# from this list, so no import of theirs violated anything. Placed by measured
+# direction, not by intuition:
+#   healing   - imports application/infrastructure/core/domain, imported by
+#               nothing. Top.
+#   documents - imported by api and application, imports infrastructure/neuro,
+#               so it sits between them. infrastructure -> documents is the one
+#               back-edge and is declared below.
+#   neuro     - imported by api, application, infrastructure and documents;
+#               imports only core and utils, plus one reach into api.
+#   phases    - prompt modules. Imported by api, application and subagents;
+#               imports core, domain and hypergate, so it goes above hypergate
+#               and below subagents.
+#   utils     - imports nothing in the package. Bottom, below domain.
 layers =
+    reasoner.healing
     reasoner.api
     reasoner.application
+    reasoner.documents
     reasoner.infrastructure
+    reasoner.neuro
     reasoner.subagents
+    reasoner.phases
     reasoner.hypergate
     reasoner.presets
     reasoner.clients
@@ -25,6 +43,7 @@ layers =
     reasoner.core
     reasoner.security
     reasoner.domain
+    reasoner.utils
 ignore_imports=
     reasoner.infrastructure.renderer -> reasoner.application.services.renderers
     reasoner.infrastructure.auth -> reasoner.application.ports.auth_port
@@ -67,7 +86,27 @@ ignore_imports=
     # ── quality → infrastructure ──
     reasoner.quality.monitor -> reasoner.infrastructure.llm.router
     reasoner.quality.monitor -> reasoner.infrastructure.llm.ports
+    # ── D-5 back-edges, surfaced the moment these packages entered `layers` ──
+    # neuro/server.py:587 reaches api.dependencies for get_optional_user. The
+    # lazy import there is cycle-avoidance, not layering: reasoner.api imports
+    # this module. It must stay a real FastAPI dependency (resolving
+    # get_optional_user by hand leaves Depends(security) unset and every caller
+    # looks anonymous), so the fix is to inject the dependency, the same shape
+    # as D-3's RunCancellationPort. Until then it is declared, not hidden.
+    reasoner.neuro.server -> reasoner.api.dependencies
+    # reasoner/documents/ and reasoner/infrastructure/documents/ are two
+    # different packages, and the second imports the first. documents sits
+    # above infrastructure because api and application both import it; these
+    # two are the back-edge.
+    reasoner.infrastructure.uploader -> reasoner.documents.vector_store
+    reasoner.infrastructure.documents.index_queue -> reasoner.documents.vector_store
     # ── backward-compat shim packages (pure re-exports from infrastructure) ──
+    # This one is load-bearing beyond compatibility: six phases/vs_*.py modules
+    # import the shim, so excepting it is what keeps `phases -> infrastructure`
+    # off the report. phases genuinely depends on infrastructure through it. The
+    # real fix is to move the verbalized-sampling constants into core and have
+    # phases read them there; tracked with Phase G's shim sweep.
+    reasoner.reasoner_verbalized_sampling -> reasoner.infrastructure.verbalized_sampling
     reasoner.clients -> reasoner.infrastructure.clients
     reasoner.scraper -> reasoner.infrastructure.scraper
     reasoner.token_cache -> reasoner.infrastructure.token_cache
