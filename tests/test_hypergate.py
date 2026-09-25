@@ -280,7 +280,7 @@ async def test_hypergate_routes_to_web_search():
 
 @pytest.mark.asyncio
 async def test_time_bound_factual_question_is_not_answered_directly():
-    """The factual fast path must not answer a question that names a time.
+    """The factual fast path must not answer a question whose answer depends on when it is asked.
 
     "What is the EUR to USD exchange rate right now?" matched `what is` and was
     under 60 chars, so it went to a direct answer from a model with a frozen
@@ -314,10 +314,24 @@ async def test_time_bound_factual_question_is_not_answered_directly():
     assert decision.action == "web_search"
     assert calls  # reached the sub-agents, not the factual fast path
 
-    router, calls = counted(make_router(_j()))
-    decision = await HyperGateAgent(router).decide("What is the capital of France?")
-    assert decision.action == "direct"  # timeless lookups keep the fast path
-    assert calls == []
+    # Who holds an office now is time-bound with no time word in it.
+    for question in ("Who is the president of the USA?", "Ποιος είναι ο πρωθυπουργός της Ελλάδας;"):
+        router, calls = counted(_make_phase1_router(
+            is_direct=False, dir_conf=0.05,
+            needs_search=True, web_conf=0.91,
+            cpx="simple", cpx_conf=0.8,
+            method_conf=0.3,
+        ))
+        decision = await HyperGateAgent(router).decide(question)
+        assert decision.action == "web_search", question
+        assert calls, question
+
+    # Timeless lookups, including past-tense office questions, keep the fast path.
+    for question in ("What is the capital of France?", "Who was the first president of the USA?"):
+        router, calls = counted(make_router(_j()))
+        decision = await HyperGateAgent(router).decide(question)
+        assert decision.action == "direct", question
+        assert calls == [], question
 
 
 @pytest.mark.asyncio

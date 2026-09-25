@@ -87,6 +87,18 @@ _TEMPORAL_MARKER = re.compile(
     r"|this\s+(week|month|year)|τώρα|σήμερα|χθες|φέτος|τρέχ\w*|πρόσφατ\w*|τελευταί\w*)\b",
     re.I,
 )
+# "Who is the president of X?" names no time but asks who holds an office now,
+# which the model can only answer as of its cutoff. Past tense ("who was the
+# first president") is not matched and keeps the fast path.
+_INCUMBENT_ROLE = re.compile(
+    r"\b(who\s+is|who'?s)\s+(the\s+)?(president|prime\s+minister|premier|chancellor|ceo"
+    r"|chair(man|woman|person)?|head|leader|king|queen|monarch|pope|governor|mayor"
+    r"|coach|manager|owner|champion)\b"
+    r"|\b(ποιος|ποια)\s+είναι\s+(ο\s+|η\s+)?(πρόεδρος|πρωθυπουργός|καγκελάριος"
+    r"|διευθύνων|επικεφαλής|αρχηγός|ηγέτης|βασιλιάς|βασίλισσα|πάπας|δήμαρχος"
+    r"|προπονητής|ιδιοκτήτης|πρωταθλητής)",
+    re.I,
+)
 
 # Abstract concept patterns that should NEVER be treated as simple factual lookups.
 # When these concepts appear, the query needs multi-phase reasoning even if it looks
@@ -229,9 +241,9 @@ class HyperGateAgent:
 
         # Fast-path: simple factual lookups (e.g., "What is X?")
         # Skip if the question contains deep/abstract concepts that need multi-phase
-        # reasoning, or names a time (see _TEMPORAL_MARKER).
+        # reasoning, or depends on when it is asked (_TEMPORAL_MARKER, _INCUMBENT_ROLE).
         is_deep_concept = any(p.search(problem) for p in _DEEP_CONCEPT_PATTERNS)
-        is_time_bound = _TEMPORAL_MARKER.search(problem) is not None
+        is_time_bound = bool(_TEMPORAL_MARKER.search(problem) or _INCUMBENT_ROLE.search(problem))
         if (
             any(p.search(problem) for p in _FACTUAL_PATTERNS)
             and len(problem) < 60
