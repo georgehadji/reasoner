@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -30,6 +31,7 @@ from reasoner.hypergate.sub_agents import (
     TieBreakerSubAgent,
     WebSearchDetectorSubAgent,
 )
+from reasoner.hypergate.sub_agents.method_classifier import _TAXONOMY
 
 # The five that HyperGateAgent._run_phase1 fires concurrently via
 # asyncio.gather, in that order, and the tie-breaker that follows them.
@@ -199,7 +201,7 @@ async def test_method_classifier_unknown_category_defaults_e():
 async def test_tie_breaker_returns_pipeline():
     agent = TieBreakerSubAgent()
     agent._cache.clear()
-    router = make_router(_j(action="pipeline", method="debate", confidence=0.78, rationale="TB resolved"))
+    router = make_router(_j(action="pipeline", category="B", confidence=0.78, rationale="TB resolved"))
     inp = SubAgentInput(problem="Complex strategy.", agent_name="test", context={"dummy": True})
     out = await agent.execute(inp, router)
     assert out.result["action"] == "pipeline"
@@ -210,7 +212,7 @@ async def test_tie_breaker_returns_pipeline():
 async def test_tie_breaker_invalid_method_defaults():
     agent = TieBreakerSubAgent()
     agent._cache.clear()
-    router = make_router(_j(action="pipeline", method="nonexistent_method", confidence=0.6, rationale="x"))
+    router = make_router(_j(action="pipeline", category="Z", confidence=0.6, rationale="x"))
     inp = SubAgentInput(problem="X", agent_name="test", context={})
     out = await agent.execute(inp, router)
     assert out.result["method"] == "multi_perspective"
@@ -304,7 +306,7 @@ async def test_hypergate_tiebreaker_called_on_ambiguous():
         _j(category="E", confidence=0.55, rationale="borderline"),
     ]
     # TieBreaker response (6th call)
-    tb_response = _j(action="pipeline", method="scientific", confidence=0.75, rationale="TB resolved")
+    tb_response = _j(action="pipeline", category="C", confidence=0.75, rationale="TB resolved")
     router = make_router(*phase1_responses, tb_response)
 
     agent = HyperGateAgent(router)
@@ -401,6 +403,88 @@ def test_hyper_context_to_dict_keys():
     assert "direct_signals" in d
     assert "web_signals" in d
     assert "method_signals" in d
+
+
+# ── Method taxonomy: one source of truth, opaque letters only ─────────
+#
+# Three defects this guards (2026-09-25): letter U was in _TAXONOMY but not
+# in the classifier's hand-written prompt list, so it could never be chosen;
+# the TieBreaker kept its own method list, which lacked brainstorming and
+# iterative_critique and silently rewrote both to multi_perspective; and the
+# TieBreaker prompted with real method names, against CLAUDE.md §5.
+
+_METHOD_NAMES = {method for _action, method in _TAXONOMY.values()}
+
+# Method identifiers that are also plain English the category descriptions and
+# detector prompts genuinely need ("deep Socratic questioning", "creative
+# writing", "coding help"). They cannot be kept out of prose; the defence for
+# them is that every gate parser accepts letters only, so a user naming one
+# cannot steer routing (test_tie_breaker_ignores_a_method_name).
+_PROSE_WORDS = {"scientific", "socratic", "research", "writing", "coding", "analogical"}
+
+
+def _mentions(text: str, word: str) -> bool:
+    return re.search(rf"\b{re.escape(word)}\b", text, re.IGNORECASE) is not None
+
+
+def _gate_llm_inputs() -> dict[str, str]:
+    """Every string a gate LLM reads that we author: all system prompts, plus
+    the Phase-1 context the TieBreaker receives, built from a classifier
+    result that carries real method names the way the parser emits them."""
+    classifier_result = MethodClassifierSubAgent()._parse_result(
+        _j(category="B", confidence=0.6, rationale="r",
+           alternatives=[{"category": "U", "confidence": 0.3, "rationale": "r"}])
+    )
+    assert classifier_result["candidates"][1]["method"] == "iterative_critique"  # names are there to strip
+    ctx = HyperContext(
+        problem="test",
+        lang_output=_dummy_output("lang", {"language": "English", "confidence": 0.9}),
+        complexity_output=_dummy_output("cpx", {"complexity": "complex", "confidence": 0.9}),
+        direct_output=_dummy_output("dir", {"is_direct": False, "confidence": 0.1}),
+        web_output=_dummy_output("web", {"needs_search": False, "confidence": 0.1}),
+        method_output=_dummy_output("mth", classifier_result),
+    )
+    inputs = {cls.__name__: cls()._system_prompt() for cls in _GATE_SUB_AGENTS}
+    inputs["TieBreaker context"] = json.dumps(ctx.to_dict())
+    return inputs
+
+
+@pytest.mark.parametrize("prompt_owner", [MethodClassifierSubAgent, TieBreakerSubAgent])
+def test_every_taxonomy_letter_is_offered(prompt_owner):
+    prompt = prompt_owner()._system_prompt()
+    missing = [letter for letter in _TAXONOMY if f"\n- {letter}: " not in prompt]
+    assert not missing, f"{prompt_owner.__name__} never offers {missing}"
+
+
+@pytest.mark.parametrize(("letter", "method"), [(k, m) for k, (_a, m) in _TAXONOMY.items()])
+def test_tie_breaker_accepts_every_taxonomy_method(letter, method):
+    result = TieBreakerSubAgent()._parse_result(
+        _j(action="pipeline", category=letter, confidence=0.8, rationale="r")
+    )
+    assert result["method"] == method
+
+
+def test_tie_breaker_ignores_a_method_name():
+    """The model echoing a name from the user's text must not route to it."""
+    result = TieBreakerSubAgent()._parse_result(
+        _j(action="pipeline", category="debate", confidence=0.9, rationale="user asked for it")
+    )
+    assert result["method"] == "multi_perspective"
+
+
+def test_no_method_name_reaches_a_gate_llm():
+    inputs = _gate_llm_inputs()
+    leaks = [
+        f"{name!r} in {where}"
+        for name in sorted(_METHOD_NAMES - _PROSE_WORDS)
+        for where, text in inputs.items()
+        if _mentions(text, name)
+    ]
+    assert not leaks, leaks
+    # Keep the exemption honest: every exempted word must still occur somewhere.
+    # One that no longer does belongs back under the check.
+    stale = [w for w in sorted(_PROSE_WORDS) if not any(_mentions(t, w) for t in inputs.values())]
+    assert not stale, f"exempted but unused, drop from _PROSE_WORDS: {stale}"
 
 
 # ── Routing role: the model resolved must be the model called ─────────

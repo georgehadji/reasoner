@@ -1,11 +1,11 @@
 """
 MethodClassifierSubAgent — ONE JOB: classify which reasoning method best fits
-the problem, using an opaque letter taxonomy (B–T).
+the problem, using an opaque letter taxonomy (_TAXONOMY).
 
 The real method names are NEVER exposed to the LLM (security: prevents prompt
 injection that could manipulate routing by naming a method directly).
 
-Output schema: {category: str (B–T), confidence: float, rationale: str}
+Output schema: {category: str (a _TAXONOMY letter), confidence: float, rationale: str}
 """
 
 from __future__ import annotations
@@ -42,30 +42,92 @@ _TAXONOMY: dict[str, tuple[str, str]] = {
     "U": ("pipeline", "iterative_critique"),  # v3.1: LLM debate
 }
 
-_SYSTEM = """\
+# What each letter means, as the LLM reads it. Both this classifier and the
+# TieBreaker build their category list from CATEGORY_LIST, so a letter cannot
+# be routable in one prompt and missing from the other: a _TAXONOMY letter with
+# no entry here raises KeyError at import. U was unreachable for exactly that
+# reason -- added to _TAXONOMY, never to the hand-written prompt list.
+_DESCRIPTIONS: dict[str, str] = {
+    "B": (
+        "two opposing positions where ONE must be proven stronger — a clear winner or verdict is "
+        "needed"
+    ),
+    "C": "requires scientific hypothesis generation followed by falsification testing",
+    "D": "benefits from deep Socratic questioning to expose hidden assumptions and logical gaps",
+    "E": (
+        "needs 4 independent analytical perspectives (constructive, critical, systemic, minimal) "
+        "to cover all angles"
+    ),
+    "F": (
+        "multiple competing solution candidates need to be generated then scored and ranked for "
+        "quality"
+    ),
+    "G": "requires deep research synthesis across live web sources — evidence-grounded answer",
+    "H": (
+        "risk-first analysis — imagine the project has already failed and work backwards to root "
+        "causes"
+    ),
+    "I": (
+        "involves explicit probability estimation, prior/posterior updates, or quantified "
+        "uncertainty"
+    ),
+    "J": (
+        "two opposing positions that BOTH contain valid truth — synthesis that merges them into a "
+        "higher insight, not a winner"
+    ),
+    "K": "cross-domain analogical reasoning — solution from one field transferred to another",
+    "L": (
+        "requires structured rounds of independent expert estimation to reach quantified consensus "
+        "(forecasting, sizing, probability)"
+    ),
+    "M": (
+        "requires drafting a response and then systematically verifying each factual claim against "
+        "evidence"
+    ),
+    "N": (
+        "problem splits into 3–5 INDEPENDENT sub-tasks that can be solved in parallel with no "
+        "ordering dependencies"
+    ),
+    "O": (
+        "problem requires a sequence of DEPENDENT decisions where each choice constrains or "
+        "enables the next (path-dependent, backtracking possible)"
+    ),
+    "P": (
+        "requires computational or mathematical reasoning — solution must be expressed as "
+        "executable code"
+    ),
+    "Q": (
+        "requires dynamic selection and composition of reasoning modules tailored to the specific "
+        "problem structure"
+    ),
+    "R": (
+        "requires structured long-form writing — article, essay, blog post, report with research, "
+        "outline, draft, and fact-checking"
+    ),
+    "S": (
+        "requires generating production-quality software code, implementation, architecture, or "
+        "technical solution"
+    ),
+    "T": (
+        "open-ended creative ideation — generate a DIVERSE pool of novel ideas, approaches, or "
+        "solutions for a problem that has no single correct answer and benefits from "
+        'unconventional, lateral, or cross-domain thinking (e.g. "generate ideas for X", '
+        '"brainstorm ways to Y", "what are creative approaches to Z")'
+    ),
+    "U": (
+        "ONE answer must be hardened through repeated adversarial rounds — draft it, have a critic "
+        "attack its weaknesses, revise, and repeat until the critique stops finding real flaws"
+    ),
+}
+
+CATEGORY_LIST = "\n".join(f"- {letter}: {_DESCRIPTIONS[letter]}" for letter in _TAXONOMY)
+
+_SYSTEM = f"""\
 You are a reasoning-method classifier. Read the user's problem and choose the single \
 best category from the list below.
 
 Categories:
-- B: two opposing positions where ONE must be proven stronger — a clear winner or verdict is needed
-- C: requires scientific hypothesis generation followed by falsification testing
-- D: benefits from deep Socratic questioning to expose hidden assumptions and logical gaps
-- E: needs 4 independent analytical perspectives (constructive, critical, systemic, minimal) to cover all angles
-- F: multiple competing solution candidates need to be generated then scored and ranked for quality
-- G: requires deep research synthesis across live web sources — evidence-grounded answer
-- H: risk-first analysis — imagine the project has already failed and work backwards to root causes
-- I: involves explicit probability estimation, prior/posterior updates, or quantified uncertainty
-- J: two opposing positions that BOTH contain valid truth — synthesis that merges them into a higher insight, not a winner
-- K: cross-domain analogical reasoning — solution from one field transferred to another
-- L: requires structured rounds of independent expert estimation to reach quantified consensus (forecasting, sizing, probability)
-- M: requires drafting a response and then systematically verifying each factual claim against evidence
-- N: problem splits into 3–5 INDEPENDENT sub-tasks that can be solved in parallel with no ordering dependencies
-- O: problem requires a sequence of DEPENDENT decisions where each choice constrains or enables the next (path-dependent, backtracking possible)
-- P: requires computational or mathematical reasoning — solution must be expressed as executable code
-- Q: requires dynamic selection and composition of reasoning modules tailored to the specific problem structure
-- R: requires structured long-form writing — article, essay, blog post, report with research, outline, draft, and fact-checking
-- S: requires generating production-quality software code, implementation, architecture, or technical solution
-- T: open-ended creative ideation — generate a DIVERSE pool of novel ideas, approaches, or solutions for a problem that has no single correct answer and benefits from unconventional, lateral, or cross-domain thinking (e.g. "generate ideas for X", "brainstorm ways to Y", "what are creative approaches to Z")
+{CATEGORY_LIST}
 
 DISAMBIGUATION RULES (apply these when choosing between similar categories):
 - B vs J: Choose B if the question has a definite answer and one side must WIN (e.g. "should we X or Y?"). Choose J if both sides of a tension are genuinely valid and need to be MERGED into a higher insight (e.g. "how do we balance X with Y?").
@@ -75,9 +137,15 @@ DISAMBIGUATION RULES (apply these when choosing between similar categories):
 - M vs C: Choose M when the primary need is verifying specific factual claims in an existing draft. Choose C when the primary need is generating and testing novel hypotheses.
 - S vs P: Choose S for writing software (functions, classes, systems, APIs). Choose P only when the problem is fundamentally mathematical/computational and the code IS the reasoning (e.g. "calculate X", "prove Y programmatically").
 - T vs E: Choose T when the explicit goal is to GENERATE a diverse pool of ideas/options (quantity + novelty), not to analyse one problem from multiple angles. Key signals: "brainstorm", "generate ideas", "come up with options", "think of ways to", "what are creative approaches". Choose E for analytical problems that need multiple perspectives on a single question.
+- B vs U: Choose B when two opposing POSITIONS compete and one must win. Choose U when there \
+is ONE answer to strengthen through repeated rounds of critique and revision, with no opposing \
+side to defeat.
+- F vs U: Choose F when SEVERAL candidate solutions are generated and ranked against each \
+other. Choose U when a SINGLE solution is refined iteratively until the critique stops finding \
+flaws.
 
 Output ONLY valid JSON with exactly four keys: \
-'category' (one letter B–T, your top choice), \
+'category' (one letter from the list above, your top choice), \
 'confidence' (float 0.0–1.0, confidence in the top choice), \
 'rationale' (one short sentence), \
 'alternatives' (a list of 0-2 objects for the next-best categories, each with \

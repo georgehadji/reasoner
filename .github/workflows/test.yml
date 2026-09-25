@@ -98,7 +98,10 @@ jobs:
           # long payload literals out of the god-method with them.
           # 2245: Phase B-3 deleted the 33 back-compat phase delegators on
           # ReasonerPipeline and migrated their callers to the flow functions.
-          python scripts/ruff_ratchet.py --max 2245
+          # 2234: HyperGate's method categories moved out of one long prompt
+          # string into a wrapped _DESCRIPTIONS table that the classifier and
+          # the TieBreaker both render, taking 11 E501 with them.
+          python scripts/ruff_ratchet.py --max 2234
 
       - name: Security scan (bandit)
         run: |

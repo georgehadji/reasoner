@@ -200,7 +200,7 @@ cd ui-next && npx playwright test
 
 ### HyperGate Pre-Router
 
-Every request passes through `HyperGateAgent` before any pipeline. Five sub-agents run **in parallel** with fail-safe fallback. Real method names are never exposed to LLMs; only opaque letters (B–Q) appear in sub-agent prompts.
+Every request passes through `HyperGateAgent` before any pipeline. Five sub-agents run **in parallel** with fail-safe fallback. Real method names are never exposed to LLMs: only the opaque letters of `method_classifier._TAXONOMY` appear in sub-agent prompts and in the TieBreaker's context. Both prompts render their category list from that one table, so adding a method means adding a letter and its description there, never a name.
 
 ```
 Problem → [LanguageDetector | ComplexityEstimator | DirectDetector | WebSearchDetector | MethodClassifier]
