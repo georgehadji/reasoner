@@ -36,6 +36,17 @@ them from the `jev_route` lines: `source` says who routed, `reason` why jev was
 or wasn't used, and `agree_route` whether jev's declined verdict matched the
 LLMs'.
 
+`JEV_MODE` also governs the **iterative-critique critic**
+(`application/flows/iterative_critique_phases.py`). In `active`, jev scores each
+round's answer on the critic's four dimensions; if every one reaches the
+critic prompt's own ACCEPT bar (`ACCEPT_SCORE` in `phases/iterative_critique.py`,
+8/10) the round is accepted and the LLM critic is skipped, otherwise the LLM
+critic runs as before and writes the flaws the next revision needs. Rounds whose
+problem + answer exceed 8000 characters skip jev rather than truncate. Logged
+as `jev_ic {...}`; `agree_accept` (shadow mode) says whether jev's accept call
+matched the LLM critic's verdict. This sends model-written answers, not just the
+user's problem, to TypeSafe.
+
 ## Search
 
 | Variable | Default | Description |

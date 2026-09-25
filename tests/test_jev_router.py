@@ -161,7 +161,9 @@ def test_inject_only_for_a_jev_mode_with_a_key(monkeypatch, mode, key, injected)
 
 def test_an_unknown_mode_reads_as_off(monkeypatch):
     monkeypatch.setattr(settings, "JEV_MODE", "actve")
-    assert jev_router.mode() == "off"
+    from reasoner.core.ports.decision_port import jev_mode
+
+    assert jev_mode() == "off"
 
 
 # ── interpret(): jev's own rule ───────────────────────────────────────

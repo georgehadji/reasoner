@@ -9,12 +9,18 @@ Pattern: generator produces answer → critic finds flaws → generator revises 
 
 from __future__ import annotations
 
+import asyncio
+import hashlib
+import json
 import logging
+import time
 from dataclasses import dataclass, field
 from typing import Any
 
 import reasoner.phases.iterative_critique as ic_phases
 from reasoner.application.flows.base import WorkflowServices
+from reasoner.core.constants import JEV_CRITIC_TIMEOUT_SECONDS, JEV_MAX_STATE_CHARS
+from reasoner.core.ports.decision_port import get_decision_port, jev_mode
 from reasoner.domain.core_types import CriticDimensionScore
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.parsing import extract_json
@@ -139,9 +145,136 @@ async def run_generator_phase(state: PipelineState, services: WorkflowServices,
         return previous_answer or "Error: could not parse generator output"
 
 
+@dataclass(frozen=True)
+class _JevScores:
+    score: CriticDimensionScore
+    model: str
+    cost_usd: float | None
+    latency_ms: int
+
+
+def _accepts(score: CriticDimensionScore) -> bool:
+    """The critic prompt's own ACCEPT rule: every dimension at ACCEPT_SCORE or above."""
+    dims = (score.factuality, score.reasoning, score.completeness, score.helpfulness)
+    return all(d >= ic_phases.ACCEPT_SCORE for d in dims)
+
+
+async def _jev_scores(problem: str, answer: str, round_num: int) -> _JevScores | None:
+    """Score *answer* on the critic's four dimensions with jev. Never raises.
+
+    None -- the LLM critic decides -- when jev is off or has no port, when it
+    fails or times out, or when problem + answer exceed JEV_MAX_STATE_CHARS.
+    That last one skips rather than truncates: completeness judged on a
+    cut-off answer is not a judgment of the answer.
+
+    Jev is exempt from the presets' synthesis-bloc != scoring-bloc rule by the
+    product owner's decision (2026-09-25). It is not a preset role, so the
+    routing validator never sees it.
+    """
+    port = get_decision_port()
+    if port is None or jev_mode() == "off":
+        return None
+    if len(problem) + len(answer) > JEV_MAX_STATE_CHARS:
+        logger.info("jev_ic skipped round=%d: state over %d chars", round_num, JEV_MAX_STATE_CHARS)
+        return None
+    started = time.perf_counter()
+    try:
+        result = await asyncio.wait_for(
+            port.decide({"problem": problem, "answer": answer}, ic_phases.JEV_CRITIC_QUESTIONS),
+            timeout=JEV_CRITIC_TIMEOUT_SECONDS,
+        )
+        # Level position p (0..5, fractional between levels) stands for 2*p on 0-10.
+        dims = {d: 2.0 * float(result.answers[d]["score"]) for d in ic_phases.JEV_CRITIC_QUESTIONS}
+    except Exception as exc:
+        logger.warning("jev_ic failed round=%d: %s: %s", round_num, type(exc).__name__, exc)
+        return None
+    return _JevScores(
+        score=CriticDimensionScore(
+            factuality=dims["factuality"],
+            reasoning=dims["reasoning"],
+            completeness=dims["completeness"],
+            helpfulness=dims["clarity"],  # the same mapping _parse_critic_dimensions uses
+        ),
+        model=result.model,
+        cost_usd=result.cost_usd,
+        latency_ms=round((time.perf_counter() - started) * 1000),
+    )
+
+
+def _log_jev_ic(
+    state: PipelineState, round_num: int, mode: str, jev: _JevScores | None,
+    llm: AdversarialRound | None,
+) -> None:
+    """One `jev_ic {...}` line per round jev was asked about. Never raises."""
+    if jev is None:
+        return
+    try:
+        def _dims(s: CriticDimensionScore | None) -> dict[str, float] | None:
+            if s is None:
+                return None
+            return {"factuality": s.factuality, "reasoning": s.reasoning,
+                    "completeness": s.completeness, "clarity": s.helpfulness}
+
+        record = {
+            "problem_sha": hashlib.sha256(state.problem.encode()).hexdigest()[:16],
+            "round": round_num,
+            "mode": mode,
+            "source": "jev" if llm is None else "llm",
+            "jev_scores": _dims(jev.score),
+            "jev_accepts": _accepts(jev.score),
+            "llm_verdict": llm.verdict if llm else None,
+            "llm_scores": _dims(llm.critic_score) if llm else None,
+            # Would jev's call have matched the LLM critic's? Only when both ran.
+            "agree_accept": (_accepts(jev.score) == (llm.verdict == "ACCEPT")) if llm else None,
+            "latency_ms": jev.latency_ms,
+            "model": jev.model,
+            "cost_usd": jev.cost_usd,
+        }
+        logger.info("jev_ic %s", json.dumps(record, sort_keys=True, default=str))
+    except Exception as exc:
+        logger.debug("jev_ic log failed: %s", exc)
+
+
 async def run_critic_phase(state: PipelineState, services: WorkflowServices,
                             answer: str, round_num: int) -> AdversarialRound:
-    """Run the critic model — evaluate the current answer."""
+    """Evaluate the current answer.
+
+    JEV_MODE=active: jev scores the four dimensions first. If every one clears
+    ACCEPT_SCORE, the round is ACCEPT and the LLM critic does not run -- the
+    loop ends, as it would on an LLM ACCEPT. Otherwise the LLM critic runs as
+    before: a REVISE round needs its flaws, which the generator's revision and
+    the stalemate check read, and jev writes no text.
+    JEV_MODE=shadow: both run concurrently; the LLM's round is used, both logged.
+    JEV_MODE=off (or no port): the LLM critic only.
+    """
+    mode = jev_mode()
+    if mode == "shadow":
+        jev, llm_round = await asyncio.gather(
+            _jev_scores(state.problem, answer, round_num),
+            _llm_critic_round(state, services, answer, round_num),
+        )
+        _log_jev_ic(state, round_num, mode, jev, llm_round)
+        return llm_round
+
+    jev = await _jev_scores(state.problem, answer, round_num) if mode == "active" else None
+    if jev is not None and _accepts(jev.score):
+        services.log("IC", f"Critic (jev) accepts round {round_num}", state)
+        _log_jev_ic(state, round_num, mode, jev, None)
+        return AdversarialRound(
+            round_number=round_num,
+            answer=answer,
+            critic_model=jev.model,
+            critic_score=jev.score,
+            verdict="ACCEPT",
+        )
+    llm_round = await _llm_critic_round(state, services, answer, round_num)
+    _log_jev_ic(state, round_num, mode, jev, llm_round)
+    return llm_round
+
+
+async def _llm_critic_round(state: PipelineState, services: WorkflowServices,
+                            answer: str, round_num: int) -> AdversarialRound:
+    """The LLM critic: scores, flaws and a verdict."""
     services.log("IC", f"Critic evaluating round {round_num}", state)
 
     result = await services.call_llm(

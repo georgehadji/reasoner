@@ -61,3 +61,16 @@ def set_decision_port(port: DecisionPort | None) -> None:
 def get_decision_port() -> DecisionPort | None:
     """Return the injected port, or None. Callers MUST treat None as "off"."""
     return _DECISION_PORT
+
+
+# One switch for every jev call site (HyperGate routing, the iterative-critique
+# critic): "active" lets jev decide, "shadow" runs it beside the LLM and logs
+# both, "off" never calls it. See settings.JEV_MODE.
+JEV_MODES = ("off", "shadow", "active")
+
+
+def jev_mode() -> str:
+    """settings.JEV_MODE, or "off" for anything unrecognised -- a typo fails safe."""
+    from reasoner.core.settings import settings  # lazy: settings validates env on import
+
+    return settings.JEV_MODE if settings.JEV_MODE in JEV_MODES else "off"

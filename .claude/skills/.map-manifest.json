@@ -1023,6 +1023,7 @@
       "tests/test_followup_context.py",
       "tests/test_headless.py",
       "tests/test_hypergate.py",
+      "tests/test_ic_jev_critic.py",
       "tests/test_idempotency.py",
       "tests/test_image_generation.py",
       "tests/test_image_generation_routes.py",

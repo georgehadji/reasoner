@@ -114,6 +114,10 @@ JEV_SHADOW_TIMEOUT_SECONDS: float = 5.0
 # sub-agents, which then spend their own time inside the 12s gate budget. 3.0s
 # clears a cold connection; a jev that slow is better abandoned for the LLMs.
 JEV_ACTIVE_TIMEOUT_SECONDS: float = 3.0
+# The iterative-critique critic runs inside a pipeline phase measured in
+# minutes, not inside the gate's 12s budget, so it can afford a cold connection:
+# a first call timed out at 3.0s on 2026-09-25 while warm ones took ~0.5s.
+JEV_CRITIC_TIMEOUT_SECONDS: float = 5.0
 # Bounds what one call costs and how much of a very long problem leaves for a
 # third party; the first 8000 characters carry the routing signal.
 JEV_MAX_STATE_CHARS: int = 8000

@@ -49,8 +49,7 @@ from reasoner.core.constants import (
     JEV_MAX_STATE_CHARS,
     JEV_SHADOW_TIMEOUT_SECONDS,
 )
-from reasoner.core.ports.decision_port import DecisionPort, get_decision_port
-from reasoner.core.settings import settings
+from reasoner.core.ports.decision_port import DecisionPort, get_decision_port, jev_mode
 from reasoner.hypergate.gate_agent import GateDecision
 from reasoner.hypergate.sub_agents.method_classifier import (
     _DESCRIPTIONS,
@@ -59,14 +58,6 @@ from reasoner.hypergate.sub_agents.method_classifier import (
 )
 
 logger = logging.getLogger(__name__)
-
-MODES = ("off", "shadow", "active")
-
-
-def mode() -> str:
-    """The configured mode; anything unrecognised is "off", so a typo fails safe."""
-    return settings.JEV_MODE if settings.JEV_MODE in MODES else "off"
-
 
 _COMPLEXITY_LEVELS = ("simple", "medium", "complex")
 
@@ -239,7 +230,7 @@ async def route(problem: str) -> JevAttempt:
     HyperGateAgent.decide then runs the LLM sub-agents as if jev were absent.
     """
     port = get_decision_port()
-    if port is None or mode() != "active":
+    if port is None or jev_mode() != "active":
         return _OFF
     started = time.perf_counter()
 
@@ -352,7 +343,7 @@ def schedule(problem: str, decision: GateDecision) -> None:
     injected -- in active mode jev has already been asked, inside decide().
     """
     port = get_decision_port()
-    if port is None or mode() != "shadow":
+    if port is None or jev_mode() != "shadow":
         return
     task = asyncio.get_running_loop().create_task(run_shadow(port, problem, decision))
     _PENDING.add(task)
