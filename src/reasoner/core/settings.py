@@ -512,6 +512,18 @@ class Settings:
     # Cross-lingual probe: off by default; enable for premium canary presets.
     LANGUAGE_PROBE_ENABLED: bool = os.getenv("LANGUAGE_PROBE_ENABLED", "false").lower() in ("1", "true", "yes")
 
+    # ── Jev shadow (TypeSafe System One model, via OpenRouter) ──
+    # Off by default. When on, every fresh HyperGate decision is also put to jev
+    # and both verdicts are logged side by side (hypergate/jev_shadow.py);
+    # routing never changes. Turning it on sends each problem's text to TypeSafe
+    # through OpenRouter -- a new sub-processor, so it is an explicit opt-in.
+    JEV_SHADOW_ENABLED: bool = (
+        os.getenv("JEV_SHADOW_ENABLED", "false").lower() in ("1", "true", "yes")
+    )
+    # Pinned, not jev-latest: a shadow comparison is only meaningful against a
+    # fixed model. The served id is a dated snapshot and is logged per call.
+    JEV_MODEL: str = os.getenv("JEV_MODEL", "typesafe/jev-1.13")
+
     # ── Trusted Proxies ──
     TRUSTED_PROXIES: list[str] = [
         p.strip() for p in os.getenv("TRUSTED_PROXIES", "").split(",") if p.strip()

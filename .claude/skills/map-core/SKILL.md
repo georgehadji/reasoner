@@ -60,6 +60,7 @@ folders:
 | `shared_cache_port.py` | `SharedCachePort` — KV cache with TTL. |
 | `telemetry_port.py` | `TelemetryStorePort`, `CallTelemetryPort`. |
 | `translation_port.py` | `TranslationPort`, `TranslationResult`. |
+| `decision_port.py` | `DecisionPort`, `DecisionResult` — typed decisions from a System One model (TypeSafe's jev): state + choice/score/noul questions in, probabilities out; not an `LLMPort`. Optional like `SharedCachePort`: `get_decision_port()` returning None means off. |
 | `watermark_port.py` | `ImageMarkScrubberPort`, `PixelScrubberPort` + report/finding types. |
 
 ## events/, aggregates/, observability/

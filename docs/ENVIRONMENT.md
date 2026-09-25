@@ -16,6 +16,21 @@
 | `MOONSHOT_API_KEY` | — | Moonshot Kimi access |
 | `ZHIPUAI_API_KEY` | — | ZhipuAI GLM access |
 
+## Jev shadow (HyperGate)
+
+Runs TypeSafe's jev, a System One decision model, beside every fresh HyperGate
+decision and logs both verdicts as one `jev_shadow {...}` JSON line. **It never
+changes a route.** Uses `OPENROUTER_API_KEY` (OpenRouter's `/api/v1/systemone`
+endpoint); no TypeSafe account or key. See `src/reasoner/hypergate/jev_shadow.py`.
+
+**Turning it on sends each problem's text to TypeSafe via OpenRouter** — a new
+sub-processor. The log line carries a hash of the problem, never its text.
+
+| Variable | Default | Description |
+|---|---|---|
+| `JEV_SHADOW_ENABLED` | `false` | Opt in to the shadow. Needs `OPENROUTER_API_KEY`; without it the shadow stays off and startup logs a warning |
+| `JEV_MODEL` | `typesafe/jev-1.13` | Pinned model id. The served id is a dated snapshot and is logged per call |
+
 ## Search
 
 | Variable | Default | Description |

@@ -22,7 +22,7 @@ from reasoner.core.constants import (
 from reasoner.core.ports.model_registry_port import get_model_registry_port
 from reasoner.core.ports.shared_cache_port import get_shared_cache_port
 from reasoner.domain.preset_core import build_auto_preset
-from reasoner.hypergate import GateDecision, HyperGateAgent
+from reasoner.hypergate import GateDecision, HyperGateAgent, jev_shadow
 from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.presets import get_preset_price_tier
 
@@ -230,6 +230,10 @@ async def run_gate_cached(gate: HyperGateAgent, problem: str) -> GateDecision:
             logger.debug("HyperGate cache lookup failed (%s): %s", key[:40], exc)
 
     decision = await gate.decide(problem)
+    # Off unless a DecisionPort is injected; background, never awaited, never
+    # changes `decision`. Cache hits above skip it: they repeat a problem the
+    # shadow has already seen.
+    jev_shadow.schedule(problem, decision)
 
     if cache is not None and _is_cacheable(decision):
         try:

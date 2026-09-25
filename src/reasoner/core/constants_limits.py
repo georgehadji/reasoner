@@ -106,6 +106,13 @@ HYPERGATE_CACHE_SIZE: int = 512            # LRU size (per sub-agent, in BaseSub
 # Set HYPERGATE_CACHE_ENABLED=False to bypass the lookup without a deploy.
 HYPERGATE_CACHE_ENABLED: bool = True
 HYPERGATE_CACHE_TTL_SECONDS: int = 3600  # 1-hour TTL for top-level routing decisions
+# Jev shadow (hypergate/jev_shadow.py). It runs off the request path, so the
+# timeout bounds how long a stray task lives, not user latency. 5 questions in
+# one call measured 534-629ms on 2026-09-25. The state cap bounds what one call
+# can cost and how much of a very long problem leaves for a third party; the
+# first 8000 characters carry the routing signal.
+JEV_SHADOW_TIMEOUT_SECONDS: float = 5.0
+JEV_SHADOW_MAX_STATE_CHARS: int = 8000
 HYPERGATE_MAX_TOKENS_LANGUAGE: int = 80
 HYPERGATE_MAX_TOKENS_COMPLEXITY: int = 80
 HYPERGATE_MAX_TOKENS_DIRECT: int = 100
