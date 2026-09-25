@@ -7,7 +7,7 @@ folders:
 
 # src/reasoner/hypergate — Folder Map
 
-**Purpose:** Every request passes through HyperGate before any pipeline runs. Five focused sub-agents run in parallel, each with one narrow job and its own tiny prompt; `HyperGateAgent` synthesises their outputs into a `GateDecision` with no extra LLM call, escalating to `TieBreaker` only on conflict or low confidence. Real method names are never shown to an LLM — sub-agent prompts use an opaque letter taxonomy (B–T).
+**Purpose:** Every request passes through HyperGate before any pipeline runs. Five focused sub-agents run in parallel, each with one narrow job and its own tiny prompt; `HyperGateAgent` synthesises their outputs into a `GateDecision` with no extra LLM call, escalating to `TieBreaker` only on conflict or low confidence. Real method names are never shown to an LLM — sub-agent prompts use an opaque letter taxonomy (`_TAXONOMY`, B–U), rendered for both the classifier and the TieBreaker from one table.
 
 ## Files
 
@@ -28,7 +28,7 @@ folders:
 | `complexity_estimator.py` | simple / medium / complex reasoning-depth estimate. |
 | `direct_detector.py` | Can this be answered without a pipeline? Holds `_CREATIVE_PATTERNS`. |
 | `web_detector.py` | Does this need real-time/recent info only web search can give? |
-| `method_classifier.py` (8.5KB) | Picks the reasoning method using the opaque B–T letter taxonomy. |
+| `method_classifier.py` (8.5KB) | Picks the reasoning method using the opaque B–U letter taxonomy. Owns `_TAXONOMY` + `_DESCRIPTIONS` → `CATEGORY_LIST`, the single source the TieBreaker also renders. |
 | `tie_breaker.py` | Resolves conflicts / all-low-confidence; sees the full `HyperContext`; validates action + method. |
 | `image_model_selector.py` | On-demand only (image endpoint): maps an image prompt to capability family + cost tier. Not part of the parallel five. |
 

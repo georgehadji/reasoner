@@ -5,6 +5,10 @@ conflict or all return low confidence.
 Receives the full HyperContext (as JSON in SubAgentInput.context) and produces
 a definitive routing decision.
 
+The LLM sees and answers with the MethodClassifier's opaque letters, never real
+method names (CLAUDE.md §5); resolve() maps the letter back. The result's
+"method" is the real name, for code downstream.
+
 Output schema: {action: str, method: str|null, confidence: float, rationale: str}
 """
 
@@ -15,6 +19,7 @@ from typing import Any
 from reasoner.core.constants import HYPERGATE_MAX_TOKENS_TIEBREAK
 from reasoner.core.degrade import degraded
 from reasoner.hypergate.base_sub_agent import BaseSubAgent
+from reasoner.hypergate.sub_agents.method_classifier import CATEGORY_LIST, MethodClassifierSubAgent
 
 _SYSTEM = (
     "You are a routing arbitrator. Four specialized analyzers have already examined the user's "
@@ -23,24 +28,17 @@ _SYSTEM = (
     "- 'direct': answer the user immediately without a reasoning pipeline\n"
     "- 'web_search': perform a live web search and return results\n"
     "- 'pipeline': run a structured multi-phase reasoning pipeline\n\n"
-    "If action is 'pipeline', also specify the best method from this list:\n"
-    "debate, scientific, socratic, multi_perspective, jury, research, "
-    "pre_mortem, bayesian, dialectical, analogical, delphi, "
-    "cove, sot, tot, pot, self_discover, writing, coding\n\n"
+    "If action is 'pipeline', also choose the best reasoning category from this list:\n"
+    f"{CATEGORY_LIST}\n\n"
     "Output ONLY valid JSON with exactly four keys: "
     "'action' (direct|web_search|pipeline), "
-    "'method' (method name or null), "
+    "'category' (one letter from the list above, or null unless action is 'pipeline'), "
     "'confidence' (float 0.0–1.0), "
     "'rationale' (one sentence explaining the tie-break). "
     "No markdown, no extra text."
 )
 
 _VALID_ACTIONS = {"direct", "web_search", "pipeline"}
-_VALID_METHODS = {
-    "debate", "scientific", "socratic", "multi_perspective", "jury",
-    "research", "pre_mortem", "bayesian", "dialectical", "analogical", "delphi",
-    "cove", "sot", "tot", "pot", "self_discover", "writing", "coding",
-}
 
 
 class TieBreakerSubAgent(BaseSubAgent):
@@ -57,14 +55,13 @@ class TieBreakerSubAgent(BaseSubAgent):
             action = str(data.get("action", "pipeline")).lower()
             if action not in _VALID_ACTIONS:
                 action = "pipeline"
-            method_raw = data.get("method")
-            method: str | None = str(method_raw).lower() if method_raw else None
-            if method and method not in _VALID_METHODS:
-                method = "multi_perspective"
-            if action == "pipeline" and not method:
-                method = "multi_perspective"
-            if action != "pipeline":
-                method = None
+            # resolve() falls back to E (multi_perspective) on a missing or
+            # unknown letter -- including a method *name*, which is what a user
+            # naming a method in the problem text would get echoed back.
+            category = str(data.get("category") or "").strip()
+            method: str | None = (
+                MethodClassifierSubAgent.resolve(category)[1] if action == "pipeline" else None
+            )
             return {
                 "action": action,
                 "method": method,
