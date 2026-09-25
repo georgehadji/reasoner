@@ -207,7 +207,7 @@ async def lifespan(app: FastAPI):
         from reasoner.infrastructure.valkey import inject_shared_cache_port
         await inject_shared_cache_port()
         from reasoner.infrastructure.decision import inject_decision_port
-        inject_decision_port()  # jev shadow; a no-op unless JEV_SHADOW_ENABLED
+        inject_decision_port()  # jev in HyperGate (JEV_MODE); a no-op when off
         logger.info("Core→infra dependencies injected: build_provider, model_registry_port")
     except Exception as exc:
         logger.warning("Failed to inject core→infra deps: %s", exc)

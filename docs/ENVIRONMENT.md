@@ -16,20 +16,25 @@
 | `MOONSHOT_API_KEY` | — | Moonshot Kimi access |
 | `ZHIPUAI_API_KEY` | — | ZhipuAI GLM access |
 
-## Jev shadow (HyperGate)
+## Jev (HyperGate routing)
 
-Runs TypeSafe's jev, a System One decision model, beside every fresh HyperGate
-decision and logs both verdicts as one `jev_shadow {...}` JSON line. **It never
-changes a route.** Uses `OPENROUTER_API_KEY` (OpenRouter's `/api/v1/systemone`
-endpoint); no TypeSafe account or key. See `src/reasoner/hypergate/jev_shadow.py`.
+TypeSafe's jev, a System One decision model, answers HyperGate's routing
+questions (direct? web search? how complex? which method?) in one ~0.5s call.
+Uses `OPENROUTER_API_KEY` (OpenRouter's `/api/v1/systemone` endpoint); no
+TypeSafe account or key. See `src/reasoner/hypergate/jev_router.py`.
 
-**Turning it on sends each problem's text to TypeSafe via OpenRouter** — a new
-sub-processor. The log line carries a hash of the problem, never its text.
+**Any mode but `off` sends each problem's text to TypeSafe via OpenRouter** — a
+sub-processor. Log lines carry a hash of the problem, never its text.
 
 | Variable | Default | Description |
 |---|---|---|
-| `JEV_SHADOW_ENABLED` | `false` | Opt in to the shadow. Needs `OPENROUTER_API_KEY`; without it the shadow stays off and startup logs a warning |
+| `JEV_MODE` | `active` | `active`: jev routes; HyperGate's LLM sub-agents run only when jev fails, times out, or answers below the confidence gate (`JEV_ACCEPT_*` in `core/constants_limits.py`). Each decision is logged as `jev_route {...}`. `shadow`: the LLM sub-agents route and jev is logged beside them as `jev_shadow {...}`. `off`: jev is never called — **the kill switch**. Anything else reads as `off`. Needs `OPENROUTER_API_KEY`; without it jev stays off and startup logs a warning |
 | `JEV_MODEL` | `typesafe/jev-1.13` | Pinned model id. The served id is a dated snapshot and is logged per call |
+
+The confidence gate's thresholds are initial values, not measured ones. Tune
+them from the `jev_route` lines: `source` says who routed, `reason` why jev was
+or wasn't used, and `agree_route` whether jev's declined verdict matched the
+LLMs'.
 
 ## Search
 

@@ -20,7 +20,7 @@ from reasoner.application.services.gate_service import (
     _HYPERGATE_ROLE_MODELS,
     run_gate_cached,
 )
-from reasoner.hypergate import HyperGateAgent, jev_shadow
+from reasoner.hypergate import HyperGateAgent, jev_router
 from reasoner.hypergate.gate_agent import GateDecision
 from reasoner.hypergate.models import HyperContext, SubAgentInput, SubAgentOutput
 from reasoner.hypergate.sub_agents import (
@@ -446,8 +446,8 @@ def _gate_llm_inputs() -> dict[str, str]:
     )
     inputs = {cls.__name__: cls()._system_prompt() for cls in _GATE_SUB_AGENTS}
     inputs["TieBreaker context"] = json.dumps(ctx.to_dict())
-    # The jev shadow sends these to a third-party model on every fresh decision.
-    inputs["jev_shadow.QUESTIONS"] = json.dumps(jev_shadow.QUESTIONS, ensure_ascii=False)
+    # Jev (active or shadow) sends these to a third-party model on every fresh decision.
+    inputs["jev_router.QUESTIONS"] = json.dumps(jev_router.QUESTIONS, ensure_ascii=False)
     return inputs
 
 

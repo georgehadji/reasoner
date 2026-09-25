@@ -44,9 +44,9 @@ class DecisionPort(Protocol):
 
 # ── Dependency injection ─────────────────────────────────────────────────
 # Mirrors shared_cache_port: the getter returns None when nothing has been
-# injected, and None means the feature is off. The only consumer today is the
-# HyperGate shadow (hypergate/jev_shadow.py), which must never be the reason a
-# request fails or slows down, so an absent port is the normal, safe state.
+# injected, and None means the feature is off. The only consumer today is
+# HyperGate (hypergate/jev_router.py), whose LLM sub-agents route whenever there
+# is no port, so an absent port is a normal, safe state -- never an error.
 _DECISION_PORT: DecisionPort | None = None
 
 

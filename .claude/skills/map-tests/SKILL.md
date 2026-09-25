@@ -80,7 +80,7 @@ pytest tests/ --cov=src/reasoner --cov-report=html
 | `test_code_execution_safety`, `test_container_sandbox`, `test_sandbox_worker` | 3 | Sandbox execution and escape hardening. |
 | `test_synthesis_*`, `test_perspective*`, `test_multi_perspective_budget`, `test_mixins_*`, `test_methods*` | 11 | Phase behavior per reasoning method. |
 | `test_iterative_critique_score_shapes` | 1 | `scores` names a list of per-perspective objects in `perspective_phases` and an object of dimensions in `iterative_critique_phases`; the second reader used to crash on the first shape, outside the try/except meant to absorb it. |
-| `test_jev_shadow` | 1 | Jev shadow beside HyperGate, offline: adapter contract (`httpx.MockTransport`), jev's routing rule, never raises/blocks/alters the gate decision, off with no injected port, logs a hash not the text. Its method-name leak check lives in `test_hypergate`. |
+| `test_jev_router` | 1 | Jev in HyperGate, offline: adapter contract (`httpx.MockTransport`), jev's routing rule, the confidence gate, every fallback reason, an accepted verdict making zero LLM calls and a declined one running the full Phase-1 fan-out (call-counting router), shadow never altering the decision, logs a hash not the text. Its method-name leak check lives in `test_hypergate`. `conftest.py` pins `JEV_MODE=off` for the rest of the suite. |
 | Singletons | ~60 | One file each: `test_hypergate`, `test_headless`, `test_mcp_tools`, `test_sdk_contract`, `test_cqrs_parity`, `test_idempotency`, `test_run_metering`, `test_credits`, `test_presets`, `test_preset_validation`, `test_models`, `test_parsing*`, `test_aggregates`, `test_domain_events`, `test_load`, `test_acceptance`, `test_codebase_audit`, `test_site_capabilities_sync`, and similar. |
 
 ## Key gotchas

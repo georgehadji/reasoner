@@ -53,7 +53,7 @@ folders:
 
 | File | Role |
 |------|------|
-| `systemone_adapter.py` | `SystemOneAdapter` (implements `DecisionPort`): TypeSafe's jev via OpenRouter's `POST /api/v1/systemone` on `OPENROUTER_API_KEY` — not in `GET /api/v1/models`. Rejects a partial answer set. `inject_decision_port()` installs it only when `JEV_SHADOW_ENABLED` and a key exist. |
+| `systemone_adapter.py` | `SystemOneAdapter` (implements `DecisionPort`): TypeSafe's jev via OpenRouter's `POST /api/v1/systemone` on `OPENROUTER_API_KEY` — not in `GET /api/v1/models`. Rejects a partial answer set. `inject_decision_port()` installs it only when `JEV_MODE` is `active`/`shadow` and a key exists; called from the API lifespan, `main.py` and `headless.py`. |
 | `__init__.py` | Re-exports `SystemOneAdapter`, `inject_decision_port`. |
 
 ## learning/ and benchmarks/ (ACR Phases 6–7)

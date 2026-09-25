@@ -17,7 +17,7 @@ folders:
 | `base_sub_agent.py` | `BaseSubAgent` — abstract base every sub-agent extends: one narrow system prompt, own model, LRU caching, fail-safe fallback. |
 | `gate_agent.py` | `GateAgent` + `GateDecision` — older single-call lightweight gate (taxonomy + system prompt + `_extract_json`). Kept alongside HyperGate. |
 | `hyperagent.py` (20KB) | `HyperGateAgent` — parallel Phase-1 fan-out, synthesis, TieBreaker escalation, `_WRITING_INTENT` / `_is_creative_writing` fast paths, `_failed_output` fallback. |
-| `jev_shadow.py` | Off-path shadow: puts the Phase-1 questions to jev in one call beside every fresh decision (`gate_service.run_gate_cached` → `schedule()`), logs both verdicts as `jev_shadow {...}`. Never routes, raises, or blocks; a no-op with no `DecisionPort`. Method question reuses the classifier's letters, `_DESCRIPTIONS` and `_DISAMBIGUATION`. |
+| `jev_router.py` | Jev (TypeSafe System One) as the router, `JEV_MODE`: **active** (default) — `route()` runs in `decide()` after the regex fast paths; a verdict clearing the `JEV_ACCEPT_*` gate is the decision, otherwise the LLM sub-agents run unchanged (logged `jev_route {...}`). **shadow** — `schedule()` from `gate_service.run_gate_cached`, logged `jev_shadow {...}`. **off**. Never raises; a no-op with no `DecisionPort`. Method question reuses the classifier's letters, `_DESCRIPTIONS`, `_DISAMBIGUATION`. |
 | `models.py` | Frozen dataclasses for the sub-agent protocol: `SubAgentInput`, `SubAgentOutput`, `HyperContext`. |
 
 ## sub_agents/

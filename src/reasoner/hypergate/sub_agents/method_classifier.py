@@ -122,7 +122,7 @@ _DESCRIPTIONS: dict[str, str] = {
 
 CATEGORY_LIST = "\n".join(f"- {letter}: {_DESCRIPTIONS[letter]}" for letter in _TAXONOMY)
 
-# Shared with hypergate/jev_shadow.py, which asks the same question of a
+# Shared with hypergate/jev_router.py, which asks the same question of a
 # System One model and needs the same tie-breaking guidance.
 _DISAMBIGUATION = """\
 DISAMBIGUATION RULES (apply these when choosing between similar categories):

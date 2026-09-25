@@ -32,6 +32,11 @@ os.environ.setdefault("CSRF_ENFORCE_BACKEND", "false")
 # test sharing that xdist worker.
 os.environ.setdefault("OPENROUTER_API_KEY", "sk-or-test-dummy-openrouter-key-placeholder")
 os.environ.setdefault("RATE_LIMITER_REDIS_FAILURE_MODE", "fail_open")
+# JEV_MODE defaults to "active" in settings, and the placeholder key above
+# looks real -- so without this, any test that starts the app lifespan would
+# install a live jev adapter and send real requests to OpenRouter. Tests that
+# exercise jev inject a fake DecisionPort and set the mode themselves.
+os.environ.setdefault("JEV_MODE", "off")
 
 import asyncio
 

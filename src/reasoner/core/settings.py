@@ -512,14 +512,16 @@ class Settings:
     # Cross-lingual probe: off by default; enable for premium canary presets.
     LANGUAGE_PROBE_ENABLED: bool = os.getenv("LANGUAGE_PROBE_ENABLED", "false").lower() in ("1", "true", "yes")
 
-    # ── Jev shadow (TypeSafe System One model, via OpenRouter) ──
-    # Off by default. When on, every fresh HyperGate decision is also put to jev
-    # and both verdicts are logged side by side (hypergate/jev_shadow.py);
-    # routing never changes. Turning it on sends each problem's text to TypeSafe
-    # through OpenRouter -- a new sub-processor, so it is an explicit opt-in.
-    JEV_SHADOW_ENABLED: bool = (
-        os.getenv("JEV_SHADOW_ENABLED", "false").lower() in ("1", "true", "yes")
-    )
+    # ── Jev (TypeSafe System One model, via OpenRouter) in HyperGate ──
+    # hypergate/jev_router.py. Any mode but "off" sends each problem's text to
+    # TypeSafe through OpenRouter -- a sub-processor.
+    #   active  jev routes; HyperGate's LLM sub-agents run only when jev fails,
+    #           times out, or answers below the confidence gate (the default,
+    #           switched on 2026-09-25 by the product owner)
+    #   shadow  the LLM sub-agents route; jev runs beside them, logged only
+    #   off     jev is never called. The kill switch: JEV_MODE=off
+    # Anything else reads as "off", so a typo fails safe.
+    JEV_MODE: str = os.getenv("JEV_MODE", "active").strip().lower()
     # Pinned, not jev-latest: a shadow comparison is only meaningful against a
     # fixed model. The served id is a dated snapshot and is logged per call.
     JEV_MODEL: str = os.getenv("JEV_MODEL", "typesafe/jev-1.13")

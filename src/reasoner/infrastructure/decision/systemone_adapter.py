@@ -88,24 +88,26 @@ class SystemOneAdapter:
 
 
 def inject_decision_port() -> None:
-    """Install the jev adapter as the DecisionPort, if and only if the shadow
-    is switched on and there is a key to call it with.
+    """Install the jev adapter as the DecisionPort when JEV_MODE uses jev
+    ("active" or "shadow") and there is a key to call it with.
 
     Lives here rather than in the API lifespan for the reason
     inject_shared_cache_port does: api/__init__.py is under a pinned line-count
     cap whose rule is to shrink the module before growing it.
 
     Never raises. Not injecting is the off state, not a failure: with no port,
-    hypergate/jev_shadow.schedule() is a no-op.
+    hypergate/jev_router.py never calls jev and HyperGate's LLM sub-agents route.
     """
     from reasoner.core.constants import JEV_SHADOW_TIMEOUT_SECONDS
     from reasoner.core.ports.decision_port import set_decision_port
     from reasoner.core.settings import settings
 
-    if not settings.JEV_SHADOW_ENABLED:
+    if settings.JEV_MODE not in ("active", "shadow"):
         return
     if not settings.OPENROUTER_API_KEY:
-        logger.warning("JEV_SHADOW_ENABLED but OPENROUTER_API_KEY is unset; jev shadow stays off")
+        logger.warning(
+            "JEV_MODE=%s but OPENROUTER_API_KEY is unset; jev stays off", settings.JEV_MODE
+        )
         return
     try:
         set_decision_port(
@@ -118,10 +120,12 @@ def inject_decision_port() -> None:
             )
         )
     except Exception as exc:
-        logger.warning("Jev shadow unavailable, staying off: %s", exc)
+        logger.warning("Jev unavailable, staying off: %s", exc)
         return
     logger.info(
-        "Jev shadow ON (model=%s): HyperGate decisions are also sent to TypeSafe via "
-        "OpenRouter and logged as 'jev_shadow'; routing unchanged",
+        "Jev ON (mode=%s, model=%s): HyperGate problems are sent to TypeSafe via OpenRouter%s",
+        settings.JEV_MODE,
         settings.JEV_MODEL,
+        "; jev routes, LLM sub-agents are the fallback" if settings.JEV_MODE == "active"
+        else "; logged beside the LLM sub-agents, routing unchanged",
     )
