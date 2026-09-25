@@ -14,7 +14,6 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPBearer
-from pydantic import BaseModel
 
 from reasoner.core.constants import (
     CORS_MAX_AGE_SECONDS,
@@ -207,6 +206,8 @@ async def lifespan(app: FastAPI):
         set_model_registry_port(RegistryAdapter())
         from reasoner.infrastructure.valkey import inject_shared_cache_port
         await inject_shared_cache_port()
+        from reasoner.infrastructure.decision import inject_decision_port
+        inject_decision_port()  # jev in HyperGate (JEV_MODE); a no-op when off
         logger.info("Core→infra dependencies injected: build_provider, model_registry_port")
     except Exception as exc:
         logger.warning("Failed to inject core→infra deps: %s", exc)
@@ -887,7 +888,6 @@ async def stop_pipeline(
     """
     # Detect whether we're in a real FastAPI call or a direct function call.
     # In direct calls, Depends() objects are passed through instead of resolved.
-    from fastapi import params
     is_authenticated = isinstance(user, User)
 
     # If a specific run_id is provided, cancel only that run.

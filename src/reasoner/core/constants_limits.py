@@ -106,6 +106,32 @@ HYPERGATE_CACHE_SIZE: int = 512            # LRU size (per sub-agent, in BaseSub
 # Set HYPERGATE_CACHE_ENABLED=False to bypass the lookup without a deploy.
 HYPERGATE_CACHE_ENABLED: bool = True
 HYPERGATE_CACHE_TTL_SECONDS: int = 3600  # 1-hour TTL for top-level routing decisions
+# Jev in HyperGate (hypergate/jev_router.py). Warm calls measured 465-629ms on
+# 2026-09-25; the first call on a fresh connection took 2987ms.
+# Shadow runs off the request path, so its timeout only bounds a stray task.
+JEV_SHADOW_TIMEOUT_SECONDS: float = 5.0
+# Active is ON the request path, and a timeout falls back to the LLM
+# sub-agents, which then spend their own time inside the 12s gate budget. 3.0s
+# clears a cold connection; a jev that slow is better abandoned for the LLMs.
+JEV_ACTIVE_TIMEOUT_SECONDS: float = 3.0
+# The iterative-critique critic runs inside a pipeline phase measured in
+# minutes, not inside the gate's 12s budget, so it can afford a cold connection:
+# a first call timed out at 3.0s on 2026-09-25 while warm ones took ~0.5s.
+JEV_CRITIC_TIMEOUT_SECONDS: float = 5.0
+# Bounds what one call costs and how much of a very long problem leaves for a
+# third party; the first 8000 characters carry the routing signal.
+JEV_MAX_STATE_CHARS: int = 8000
+# Confidence gate for active mode: below these, jev's verdict is not used and
+# the LLM sub-agents decide. INITIAL VALUES, NOT MEASURED -- nothing yet says
+# how jev's probabilities track its accuracy here. Every decision is logged as
+# `jev_route {...}` with its probabilities so these can be set from data.
+# Direct and search are the high-cost mistakes (skipping reasoning, or skipping
+# a live lookup), so they sit higher. 0.85 on search also covers the gate's
+# web-vs-research overlap, which the LLM path resolves at web_conf >= 0.85.
+JEV_ACCEPT_DIRECT: float = 0.80
+JEV_ACCEPT_SEARCH: float = 0.85
+# Probability of the top method letter.
+JEV_ACCEPT_METHOD: float = 0.60
 HYPERGATE_MAX_TOKENS_LANGUAGE: int = 80
 HYPERGATE_MAX_TOKENS_COMPLEXITY: int = 80
 HYPERGATE_MAX_TOKENS_DIRECT: int = 100

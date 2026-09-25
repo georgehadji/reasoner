@@ -49,6 +49,13 @@ folders:
 | `concurrency.py` | Avoid models near their concurrency limit. |
 | `propagation_resistance.py` | Terminal roles (synthesis, verify) must meet a measured propagation-resistance floor. Ships soft — 0/49 presets clear any floor, since the published evidence base covers ~7 model families. |
 
+## decision/ — typed-decision models (System One)
+
+| File | Role |
+|------|------|
+| `systemone_adapter.py` | `SystemOneAdapter` (implements `DecisionPort`): TypeSafe's jev via OpenRouter's `POST /api/v1/systemone` on `OPENROUTER_API_KEY` — not in `GET /api/v1/models`. Rejects a partial answer set. `inject_decision_port()` installs it only when `JEV_MODE` is `active`/`shadow` and a key exists; called from the API lifespan, `main.py` and `headless.py`. |
+| `__init__.py` | Re-exports `SystemOneAdapter`, `inject_decision_port`. |
+
 ## learning/ and benchmarks/ (ACR Phases 6–7)
 
 | File | What it does |

@@ -22,6 +22,7 @@ from reasoner.core.constants import (
     HYPERGATE_METHOD_THRESHOLD,
     HYPERGATE_WEB_THRESHOLD,
 )
+from reasoner.hypergate import jev_router
 from reasoner.hypergate.gate_agent import GateDecision
 from reasoner.hypergate.models import HyperContext, SubAgentInput, SubAgentOutput
 from reasoner.hypergate.sub_agents import (
@@ -234,12 +235,29 @@ class HyperGateAgent:
             )
             return decision
 
+        # JEV_MODE=active: one typed call to jev, after the free regex fast paths
+        # above and before the four LLM calls below. An accepted verdict is the
+        # decision; anything else -- off, failure, timeout, below the confidence
+        # gate -- falls through to the LLM sub-agents unchanged. Never raises.
+        attempt = await jev_router.route(problem)
+        if attempt.decision is not None:
+            jev_router.log_route(problem, attempt, attempt.decision)
+            logger.info(
+                "HyperGateAgent jev hash=%s action=%s method=%s confidence=%.2f",
+                problem_hash[:16],
+                attempt.decision.action,
+                attempt.decision.method,
+                attempt.decision.confidence,
+            )
+            return attempt.decision
+
         ctx = await self._run_phase1(problem)
         decision = self._synthesize(ctx)
 
         if decision is None:
             decision = await self._run_tiebreaker(ctx)
 
+        jev_router.log_route(problem, attempt, decision)
         logger.info(
             "HyperGateAgent hash=%s action=%s method=%s confidence=%.2f",
             problem_hash[:16],

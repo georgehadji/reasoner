@@ -122,13 +122,9 @@ _DESCRIPTIONS: dict[str, str] = {
 
 CATEGORY_LIST = "\n".join(f"- {letter}: {_DESCRIPTIONS[letter]}" for letter in _TAXONOMY)
 
-_SYSTEM = f"""\
-You are a reasoning-method classifier. Read the user's problem and choose the single \
-best category from the list below.
-
-Categories:
-{CATEGORY_LIST}
-
+# Shared with hypergate/jev_router.py, which asks the same question of a
+# System One model and needs the same tie-breaking guidance.
+_DISAMBIGUATION = """\
 DISAMBIGUATION RULES (apply these when choosing between similar categories):
 - B vs J: Choose B if the question has a definite answer and one side must WIN (e.g. "should we X or Y?"). Choose J if both sides of a tension are genuinely valid and need to be MERGED into a higher insight (e.g. "how do we balance X with Y?").
 - E vs F: Choose E for open-ended analysis needing diverse viewpoints. Choose F when there are competing candidate solutions that need quality scoring and ranking.
@@ -142,7 +138,16 @@ is ONE answer to strengthen through repeated rounds of critique and revision, wi
 side to defeat.
 - F vs U: Choose F when SEVERAL candidate solutions are generated and ranked against each \
 other. Choose U when a SINGLE solution is refined iteratively until the critique stops finding \
-flaws.
+flaws."""
+
+_SYSTEM = f"""\
+You are a reasoning-method classifier. Read the user's problem and choose the single \
+best category from the list below.
+
+Categories:
+{CATEGORY_LIST}
+
+{_DISAMBIGUATION}
 
 Output ONLY valid JSON with exactly four keys: \
 'category' (one letter from the list above, your top choice), \
