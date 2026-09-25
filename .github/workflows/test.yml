@@ -104,7 +104,7 @@ jobs:
           # 2232: the jev shadow's startup wiring moved into
           # infrastructure/decision.inject_decision_port; paying for its two
           # lines in api/__init__.py (pinned line cap) deleted two dead imports.
-          python scripts/ruff_ratchet.py --max 2232
+          python scripts/ruff_ratchet.py --max 2231
 
       - name: Security scan (bandit)
         run: |

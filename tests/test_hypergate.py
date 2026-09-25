@@ -279,6 +279,48 @@ async def test_hypergate_routes_to_web_search():
 
 
 @pytest.mark.asyncio
+async def test_time_bound_factual_question_is_not_answered_directly():
+    """The factual fast path must not answer a question that names a time.
+
+    "What is the EUR to USD exchange rate right now?" matched `what is` and was
+    under 60 chars, so it went to a direct answer from a model with a frozen
+    cutoff. It now takes the realtime fast path; a time-bound factual question
+    no realtime pattern knows falls through to the sub-agents instead.
+    """
+    def counted(router):
+        calls = []
+        inner = router.call
+
+        async def call(*args, **kwargs):
+            calls.append(args)
+            return await inner(*args, **kwargs)
+
+        router.call = call
+        return router, calls
+
+    router, calls = counted(make_router(_j()))
+    decision = await HyperGateAgent(router).decide("What is the EUR to USD exchange rate right now?")
+    assert decision.action == "web_search"
+    assert decision.reasoning.startswith("Detected real-time")
+    assert calls == []
+
+    router, calls = counted(_make_phase1_router(
+        is_direct=False, dir_conf=0.05,
+        needs_search=True, web_conf=0.91,
+        cpx="simple", cpx_conf=0.8,
+        method_conf=0.3,
+    ))
+    decision = await HyperGateAgent(router).decide("Who is the CEO of OpenAI currently?")
+    assert decision.action == "web_search"
+    assert calls  # reached the sub-agents, not the factual fast path
+
+    router, calls = counted(make_router(_j()))
+    decision = await HyperGateAgent(router).decide("What is the capital of France?")
+    assert decision.action == "direct"  # timeless lookups keep the fast path
+    assert calls == []
+
+
+@pytest.mark.asyncio
 async def test_hypergate_routes_to_pipeline():
     """Complex problem → MethodClassifier wins → action=pipeline."""
     router = _make_phase1_router(
