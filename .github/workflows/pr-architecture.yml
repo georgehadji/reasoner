@@ -51,10 +51,16 @@ jobs:
         # which is not drift.
         run: |
           python scripts/update_mindmap_meta.py
-          DRIFT=$(git diff -- ARCHITECTURE_MINDMAP.md docs/CODEMAPS ui-next/src/lib/capabilities.generated.ts CLAUDE.md \
+          # `git diff HEAD`, not `git diff`: the generator `git add`s what it
+          # writes (_stage, from its post-commit-hook days), so an index diff
+          # was always empty. `|| true`: grep exits 1 when it prints nothing,
+          # and under the runner's `bash -e` that killed the step on a clean
+          # tree. Together they meant this gate failed every run and could
+          # never report real drift. Only a non-empty DRIFT fails, below.
+          DRIFT=$(git diff HEAD -- ARCHITECTURE_MINDMAP.md docs/CODEMAPS ui-next/src/lib/capabilities.generated.ts CLAUDE.md \
             | grep -E '^[+-]' \
             | grep -Ev '^(\+\+\+|---)' \
-            | grep -Ev '^[+-].*(Last Updated|Generated:|generatedAt).*[0-9]{4}-[0-9]{2}-[0-9]{2}')
+            | grep -Ev '^[+-].*(Last Updated|Generated:|generatedAt).*[0-9]{4}-[0-9]{2}-[0-9]{2}' || true)
           if [ -n "$DRIFT" ]; then
             echo "$DRIFT"
             echo "FAIL: generated docs are stale -- run" \
