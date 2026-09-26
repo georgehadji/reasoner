@@ -158,7 +158,6 @@ def _build_fake_router(language="English", enhanced_problem: str | None = None):
         "critic_1": _make_critique_response(),
         "verifier": json.dumps({"verifications": []}),
         "meta_evaluator": json.dumps({"critic_reliability": {}, "meta_insight": ""}),
-        "recovery_path": json.dumps({"recovery_plan": "", "root_causes": []}),
     }
     return FakeRouter(base)
 

@@ -90,47 +90,9 @@ async def test_stress_test_filters_language_hallucinations():
         assert "parsing" not in st.failure_mode.lower()
 
 
-# ─────────────────────────────────────────────────────────────────────
-# Bug 3: Recovery Path Leakage
-# ─────────────────────────────────────────────────────────────────────
-
-@pytest.mark.asyncio
-async def test_recovery_path_does_not_pollute_errors():
-    """Normal recovery path findings must not appear in state.errors."""
-    router = FakeRouter({
-        "classification": json.dumps({"task_type": "analytical"}),
-        "decomposition": json.dumps({"causal_chain": [], "assumptions": [], "failure_modes": []}),
-        "constructive": json.dumps({"core_analysis": "ok", "key_insights": []}),
-        "destructive": json.dumps({"core_analysis": "ok", "key_insights": []}),
-        "systemic": json.dumps({"core_analysis": "ok", "key_insights": []}),
-        "minimalist": json.dumps({"core_analysis": "ok", "key_insights": []}),
-        "scoring": json.dumps({
-            "scores": [
-                {
-                    "perspective": "constructive",
-                    "logical_consistency": 9,
-                    "evidence_support": 9,
-                    "failure_resilience": 9,
-                    "feasibility": 9,
-                    "total": 36,
-                    "bias_flags": [],
-                    "steel_man": "",
-                    "confidence_vs_accuracy_penalty": 10.0,  # triggers recovery path
-                }
-            ]
-        }),
-        "recovery_path": json.dumps({"verification_findings": ["claim X is unsupported"]}),
-        "stress_testing": json.dumps({"stress_tests": []}),
-        "synthesis": json.dumps({"core_solution": "done"}),
-    })
-
-    pipeline = ReasonerPipeline(router=router, preset_name="multi-perspective-budget", verbose=False)
-    state = await pipeline.run("test problem")
-
-    # Errors should NOT contain recovery path diagnostics
-    recovery_errors = [e for e in state.errors if "Recovery Path: Issues found" in e]
-    assert not recovery_errors, f"Recovery path leaked into errors: {recovery_errors}"
-
+# Bug 3 (recovery-path findings leaking into state.errors) went with the
+# recovery path itself: RecoveryService only logged its findings, so it was
+# deleted rather than guarded.
 
 # ─────────────────────────────────────────────────────────────────────
 # Bug 4: Sources Format Coercion

@@ -319,18 +319,6 @@ def iterative_preplan_prompt(state: PipelineState) -> str:
         f'Output JSON: {{"iterations": [{{"queries": ["<q1>", "<q2>"], "reasoning": "<why>"}}, {{"queries": ["<q3>"], "reasoning": "<why>"}}]}}'
     )
 
-CROSS_VERIFICATION_SYSTEM = "You are an analytical assistant. Identify specific factual errors, unsupported claims, or logical inconsistencies in a proposed solution. Be precise and cite exact problems. Output ONLY valid JSON."
-
-def cross_verification_prompt(state: PipelineState, candidate_solution: dict) -> str:
-    return (
-        f'{get_language_instruction(state)}\n\n'
-        f'Original Problem: {_wrap_user_input(state.problem)}\n\n'
-        f'Candidate Solution to Verify:\n{json.dumps(candidate_solution, indent=2)}\n\n'
-        f'Identify any claims made with high confidence that are factually incorrect, '
-        f'logically unsound, or unsubstantiated. Be specific.\n\n'
-        f'Output JSON: {{"verified": <true|false>, "verification_findings": ["<issue1>", "<issue2>"], "summary": "<one sentence>"}}'
-    )
-
 DEEP_READ_SYSTEM = "You are an analytical assistant. Extract and summarize key information from web pages. Provide a structured summary of the page content relevant to the user's problem. Output ONLY valid JSON."
 
 SHALLOW_READ_SYSTEM = "You are an analytical assistant. Infer the content of a web page from its title and snippet. Provide a brief summary. Output ONLY valid JSON."
