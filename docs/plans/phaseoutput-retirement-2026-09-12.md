@@ -261,9 +261,20 @@ In `docs/plans/sycophancy-mitigation.md`:
   `_parse_premises` and write `state.core.premises.extend(...)` directly; the phase
   contract returns `None` and every executor discards returns (ADR-006)."
 
-### P-5 · Fitness function — stop the next one · **DEFERRED, not done**
+### P-5 · Fitness function — stop the next one · **ADVISORY since 2026-09-26, not yet blocking**
 
-> **Status 2026-09-12: deliberately deferred.** P-1 through P-4 and P-6 are implemented and
+> **Status 2026-09-26: piloting.** `scripts/vulture_ratchet.py --max 391` runs in
+> `test.yml` with `continue-on-error: true` and in `scripts/ci-local.sh` as `advisory`.
+> vulture is pinned (`vulture==2.16`) in `requirements-dev.txt`. The count is every
+> finding at vulture's default confidence *except* `unused variable`, most of which are
+> FastAPI `Depends(...)` parameters (427 of the raw 818). A synthetic zero-caller function
+> added under `src/` took the count to 392 and was named in the output.
+> `[UNKNOWN]` The count on CI's Python 3.14 (391 was measured on 3.12), and the
+> false-positive rate among the 391. **To finish:** from 2026-10-03, once the CI count
+> matches, delete `continue-on-error` and change `advisory` to `gate`. Until then the gap
+> below still stands: nothing *blocks* the next zero-caller abstraction, but CI reports it.
+>
+> **Status 2026-09-12 (superseded): deliberately deferred.** P-1 through P-4 and P-6 are implemented and
 > verified. This step is not. Two reasons, both stated so it cannot lapse quietly:
 >
 > - `vulture` is not installed and this checkout has no virtualenv — baselining it would

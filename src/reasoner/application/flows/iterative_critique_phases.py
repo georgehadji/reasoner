@@ -20,6 +20,7 @@ from typing import Any
 import reasoner.phases.iterative_critique as ic_phases
 from reasoner.application.flows.base import WorkflowServices
 from reasoner.core.constants import JEV_CRITIC_TIMEOUT_SECONDS, JEV_MAX_STATE_CHARS
+from reasoner.core.degrade import degraded
 from reasoner.core.ports.decision_port import get_decision_port, jev_mode
 from reasoner.domain.core_types import CriticDimensionScore
 from reasoner.domain.pipeline_state import PipelineState
@@ -232,7 +233,7 @@ def _log_jev_ic(
         }
         logger.info("jev_ic %s", json.dumps(record, sort_keys=True, default=str))
     except Exception as exc:
-        logger.debug("jev_ic log failed: %s", exc)
+        degraded("jev.ic_log", None, exc=exc)
 
 
 async def run_critic_phase(state: PipelineState, services: WorkflowServices,

@@ -49,6 +49,7 @@ from reasoner.core.constants import (
     JEV_MAX_STATE_CHARS,
     JEV_SHADOW_TIMEOUT_SECONDS,
 )
+from reasoner.core.degrade import degraded
 from reasoner.core.ports.decision_port import DecisionPort, get_decision_port, jev_mode
 from reasoner.hypergate.gate_agent import GateDecision
 from reasoner.hypergate.sub_agents.method_classifier import (
@@ -247,7 +248,12 @@ async def route(problem: str) -> JevAttempt:
     except TimeoutError:
         return JevAttempt(reason="timeout", latency_ms=_elapsed())
     except Exception as exc:
-        return JevAttempt(reason=f"error: {type(exc).__name__}", latency_ms=_elapsed())
+        # The LLM sub-agents take over either way; this keeps the cause.
+        return degraded(
+            "jev.route",
+            JevAttempt(reason=f"error: {type(exc).__name__}", latency_ms=_elapsed()),
+            exc=exc,
+        )
     return JevAttempt(
         reason="accepted" if decision is not None else "below_gate",
         decision=decision,
@@ -291,7 +297,7 @@ def log_route(problem: str, attempt: JevAttempt, final: GateDecision) -> None:
         }
         logger.info("jev_route %s", json.dumps(record, sort_keys=True, default=str))
     except Exception as exc:
-        logger.debug("jev_route log failed: %s", exc)
+        degraded("jev.route_log", None, exc=exc)
 
 
 # ── Shadow mode ─────────────────────────────────────────────────────────
