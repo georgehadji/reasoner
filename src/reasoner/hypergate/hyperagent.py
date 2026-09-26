@@ -52,8 +52,8 @@ _CREATIVE_PATTERNS: list[re.Pattern[str]] = [
 # Checked before factual and writing patterns so temporal queries are never mislabeled.
 _REALTIME_PATTERNS: list[re.Pattern[str]] = [
     # Price / market data with explicit temporal marker
-    re.compile(r"\bprice\b.{0,30}\b(now|today|right now|currently|live)\b", re.I),
-    re.compile(r"\b(now|today|right now|currently|live)\b.{0,30}\bprice\b", re.I),
+    re.compile(r"\b(price|rate)\b.{0,30}\b(now|today|right now|currently|live)\b", re.I),
+    re.compile(r"\b(now|today|right now|currently|live)\b.{0,30}\b(price|rate)\b", re.I),
     re.compile(r"\b(current|live|real.?time)\s+(price|rate|exchange rate|value|cost)\b", re.I),
     # News and recent events
     re.compile(r"\b(latest|breaking|today'?s?|current)\s+(news|headline|update|development)\b", re.I),
@@ -78,6 +78,27 @@ _FACTUAL_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"\b(τι\s+είναι|ποιο\s+είναι|ποιος\s+είναι|πού\s+είναι|πότε\s+είναι|πόσα|πόσες|πόσους|ορίζω|εξήγησε)\s+(το\s+|η\s+|ο\s+)?\w+", re.I),
     re.compile(r"\b(πρωτεύουσα\s+της|πρόεδρος\s+της|εφεύρε)\s+\w+", re.I),
 ]
+
+# A knowledge model's answer is frozen at its cutoff, so a factual question that
+# names a time ("... right now", "currently", "latest") is never a safe direct
+# answer. Such questions skip the factual fast path and are routed downstream.
+_TEMPORAL_MARKER = re.compile(
+    r"\b(now|today|tonight|yesterday|currently|current|latest|recent|recently|live"
+    r"|this\s+(week|month|year)|τώρα|σήμερα|χθες|φέτος|τρέχ\w*|πρόσφατ\w*|τελευταί\w*)\b",
+    re.I,
+)
+# "Who is the president of X?" names no time but asks who holds an office now,
+# which the model can only answer as of its cutoff. Past tense ("who was the
+# first president") is not matched and keeps the fast path.
+_INCUMBENT_ROLE = re.compile(
+    r"\b(who\s+is|who'?s)\s+(the\s+)?(president|prime\s+minister|premier|chancellor|ceo"
+    r"|chair(man|woman|person)?|head|leader|king|queen|monarch|pope|governor|mayor"
+    r"|coach|manager|owner|champion)\b"
+    r"|\b(ποιος|ποια)\s+είναι\s+(ο\s+|η\s+)?(πρόεδρος|πρωθυπουργός|καγκελάριος"
+    r"|διευθύνων|επικεφαλής|αρχηγός|ηγέτης|βασιλιάς|βασίλισσα|πάπας|δήμαρχος"
+    r"|προπονητής|ιδιοκτήτης|πρωταθλητής)",
+    re.I,
+)
 
 # Abstract concept patterns that should NEVER be treated as simple factual lookups.
 # When these concepts appear, the query needs multi-phase reasoning even if it looks
@@ -219,9 +240,16 @@ class HyperGateAgent:
             return decision
 
         # Fast-path: simple factual lookups (e.g., "What is X?")
-        # Skip if the question contains deep/abstract concepts that need multi-phase reasoning.
+        # Skip if the question contains deep/abstract concepts that need multi-phase
+        # reasoning, or depends on when it is asked (_TEMPORAL_MARKER, _INCUMBENT_ROLE).
         is_deep_concept = any(p.search(problem) for p in _DEEP_CONCEPT_PATTERNS)
-        if any(p.search(problem) for p in _FACTUAL_PATTERNS) and len(problem) < 60 and not is_deep_concept:
+        is_time_bound = bool(_TEMPORAL_MARKER.search(problem) or _INCUMBENT_ROLE.search(problem))
+        if (
+            any(p.search(problem) for p in _FACTUAL_PATTERNS)
+            and len(problem) < 60
+            and not is_deep_concept
+            and not is_time_bound
+        ):
             decision = GateDecision(
                 action="direct",
                 method=None,
