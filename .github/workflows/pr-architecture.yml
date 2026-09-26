@@ -2,7 +2,7 @@ name: PR Architecture Checks
 
 on:
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "studio-adopt" ]
 
 jobs:
   workflow-lint:
@@ -11,17 +11,21 @@ jobs:
       - uses: actions/checkout@v7
       - name: No empty GitHub Actions expressions
         # docs/plans/root-cause-remediation-2026-09-07.md P1 step 6 / D13:
-        # `${{ }}` inside a shell comment in integration-live.yml invalidated
-        # the whole workflow file, and both `yaml.safe_load` and
-        # `check-jsonschema` called it valid -- neither parses the `${{ }}`
-        # expression syntax, so this is the only check that catches it.
+        # an empty expression (dollar, two braces, nothing inside) in a shell
+        # comment in integration-live.yml invalidated the whole workflow file,
+        # and both `yaml.safe_load` and `check-jsonschema` called it valid --
+        # neither parses expression syntax, so this is the only check that
+        # catches it. Nothing in this file spells the expression out: a
+        # backslash does not escape Actions syntax, and the literal in the
+        # messages below once made this very file invalid (every run failed
+        # in 0s with no jobs).
         run: |
           if grep -rEln '\$\{\{[[:space:]]*\}\}' .github/workflows/; then
-            echo "FAIL: empty \${{ }} expression found above -- GitHub Actions" \
-                 "treats this as invalid syntax and refuses to run the whole file."
+            echo "FAIL: empty expression (dollar, two braces, nothing inside) found" \
+                 "above -- GitHub Actions refuses to run the whole file."
             exit 1
           fi
-          echo "PASS: no empty \${{ }} expressions in .github/workflows/"
+          echo "PASS: no empty expressions in .github/workflows/"
 
   generated-docs-drift:
     runs-on: ubuntu-latest
