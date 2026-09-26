@@ -716,7 +716,9 @@
       "scripts/update_mindmap_meta.py",
       "scripts/update_openrouter_catalogue.py",
       "scripts/validate_presets.py",
-      "scripts/verify_swaps.py"
+      "scripts/verify_swaps.py",
+      "scripts/vulture_ratchet.py",
+      "scripts/vulture_whitelist.py"
     ],
     "sdk": [
       "sdk/CONTEXT.md",

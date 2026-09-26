@@ -2,7 +2,7 @@ name: PR Architecture Checks
 
 on:
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "studio-adopt" ]
 
 jobs:
   workflow-lint:
@@ -11,17 +11,21 @@ jobs:
       - uses: actions/checkout@v7
       - name: No empty GitHub Actions expressions
         # docs/plans/root-cause-remediation-2026-09-07.md P1 step 6 / D13:
-        # `${{ }}` inside a shell comment in integration-live.yml invalidated
-        # the whole workflow file, and both `yaml.safe_load` and
-        # `check-jsonschema` called it valid -- neither parses the `${{ }}`
-        # expression syntax, so this is the only check that catches it.
+        # an empty expression (dollar, two braces, nothing inside) in a shell
+        # comment in integration-live.yml invalidated the whole workflow file,
+        # and both `yaml.safe_load` and `check-jsonschema` called it valid --
+        # neither parses expression syntax, so this is the only check that
+        # catches it. Nothing in this file spells the expression out: a
+        # backslash does not escape Actions syntax, and the literal in the
+        # messages below once made this very file invalid (every run failed
+        # in 0s with no jobs).
         run: |
           if grep -rEln '\$\{\{[[:space:]]*\}\}' .github/workflows/; then
-            echo "FAIL: empty \${{ }} expression found above -- GitHub Actions" \
-                 "treats this as invalid syntax and refuses to run the whole file."
+            echo "FAIL: empty expression (dollar, two braces, nothing inside) found" \
+                 "above -- GitHub Actions refuses to run the whole file."
             exit 1
           fi
-          echo "PASS: no empty \${{ }} expressions in .github/workflows/"
+          echo "PASS: no empty expressions in .github/workflows/"
 
   generated-docs-drift:
     runs-on: ubuntu-latest
@@ -31,6 +35,10 @@ jobs:
         uses: actions/setup-python@v7
         with:
           python-version: '3.14'
+      - name: Install project dependencies
+        # The generator counts models and presets by importing reasoner. Without
+        # these it read 0 for both and every PR "drifted" to 0.
+        run: pip install -r requirements.txt
       - name: Regenerate and diff
         # docs/plans/root-cause-remediation-2026-09-07.md P1 step 5 / D12: the
         # post-commit hook that regenerated these files lived in .git/hooks/,
@@ -43,10 +51,16 @@ jobs:
         # which is not drift.
         run: |
           python scripts/update_mindmap_meta.py
-          DRIFT=$(git diff -- ARCHITECTURE_MINDMAP.md docs/CODEMAPS ui-next/src/lib/capabilities.generated.ts CLAUDE.md \
+          # `git diff HEAD`, not `git diff`: the generator `git add`s what it
+          # writes (_stage, from its post-commit-hook days), so an index diff
+          # was always empty. `|| true`: grep exits 1 when it prints nothing,
+          # and under the runner's `bash -e` that killed the step on a clean
+          # tree. Together they meant this gate failed every run and could
+          # never report real drift. Only a non-empty DRIFT fails, below.
+          DRIFT=$(git diff HEAD -- ARCHITECTURE_MINDMAP.md docs/CODEMAPS ui-next/src/lib/capabilities.generated.ts CLAUDE.md \
             | grep -E '^[+-]' \
             | grep -Ev '^(\+\+\+|---)' \
-            | grep -Ev '^[+-].*(Last Updated|Generated:|generatedAt).*[0-9]{4}-[0-9]{2}-[0-9]{2}')
+            | grep -Ev '^[+-].*(Last Updated|Generated:|generatedAt).*[0-9]{4}-[0-9]{2}-[0-9]{2}' || true)
           if [ -n "$DRIFT" ]; then
             echo "$DRIFT"
             echo "FAIL: generated docs are stale -- run" \

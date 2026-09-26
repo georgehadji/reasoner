@@ -24,3 +24,9 @@ pytest-xdist>=3.8.0,<4.0.0
 # defect; reproduce it with the -p randomly seed printed in the header.
 pytest-randomly>=4.1.0,<5.0.0
 hypothesis>=6.167.1,<7.0.0
+
+# Static analysis
+# Pinned exactly, not ranged: scripts/vulture_ratchet.py compares an exact
+# finding count, and a floating version would move it with the tool rather
+# than with the code (the drift mypy_ratchet.py blames on unpinned mypy).
+vulture==2.16

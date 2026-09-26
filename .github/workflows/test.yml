@@ -4,7 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    # studio-adopt is the integration branch every PR lands on; main trails it.
+    branches: [main, studio-adopt]
 
 env:
   PYTHON_VERSION: '3.14'
@@ -307,6 +308,16 @@ jobs:
           # metric guard. The metric guard moved verbatim into
           # execution/sse_observer._observe_duration, so the net is -3, not -4.
           python scripts/silent_failure_ratchet.py --max 102
+
+      - name: Dead-code ratchet (vulture, ADVISORY)
+        # P-5 (docs/plans/phaseoutput-retirement-2026-09-12.md): advisory for
+        # one week, because the false-positive rate is unmeasured and 391 was
+        # counted on Python 3.12 while this job runs 3.14. Make it blocking by
+        # deleting continue-on-error, from 2026-10-03 on, once the counts
+        # agree -- and in ci-local.sh, move it from `advisory` to `gate`.
+        continue-on-error: true
+        run: |
+          python scripts/vulture_ratchet.py --max 391
 
       - name: Run tests
         run: |
