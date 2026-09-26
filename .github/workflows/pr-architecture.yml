@@ -35,6 +35,10 @@ jobs:
         uses: actions/setup-python@v7
         with:
           python-version: '3.14'
+      - name: Install project dependencies
+        # The generator counts models and presets by importing reasoner. Without
+        # these it read 0 for both and every PR "drifted" to 0.
+        run: pip install -r requirements.txt
       - name: Regenerate and diff
         # docs/plans/root-cause-remediation-2026-09-07.md P1 step 5 / D12: the
         # post-commit hook that regenerated these files lived in .git/hooks/,
