@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import ast
 import asyncio
+import importlib.util
 import logging
 import math
 import operator
@@ -19,6 +20,7 @@ from reasoner.core.constants import (
     OPENMETEO_GEOCODING_URL,
     TIMEOUTS,
 )
+from reasoner.core.degrade import degraded
 
 logger = logging.getLogger(__name__)
 
@@ -312,18 +314,17 @@ async def get_weather_data(location: str) -> dict[str, Any]:
 # STOCK WIDGET
 # ─────────────────────────────────────────────────────────────────────
 
+# Both of these lost the import they were meant to test at some point, leaving
+# `try: return True`. They therefore reported every machine as having both
+# libraries, which made the "Demo Mode" branch below unreachable and turned a
+# missing dependency into an ImportError from inside get_stock_data instead of
+# the message that names it. find_spec answers the question without importing.
 def _has_yahooquery() -> bool:
-    try:
-        return True
-    except Exception:
-        return False
+    return importlib.util.find_spec("yahooquery") is not None
 
 
 def _has_yfinance() -> bool:
-    try:
-        return True
-    except Exception:
-        return False
+    return importlib.util.find_spec("yfinance") is not None
 
 
 def get_stock_data(symbol: str) -> dict[str, Any]:
@@ -443,8 +444,10 @@ async def search_web(query: str, engines: list[str] = None) -> list[dict[str, An
     try:
         client, _ = await get_search_client()
         return await client.search(query, num_results=10)
-    except Exception:
-        return []
+    except Exception as exc:
+        # An empty list is what "this query has no results" looks like too, so
+        # a search backend that is down renders as a topic with nothing in it.
+        return degraded("widgets.search_web", [], exc=exc)
 
 
 async def get_discover_content(topic: str = "tech", mode: str = "normal") -> dict[str, Any]:

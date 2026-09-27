@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 1. Project Overview
 
-**Reasoner** (Adaptive Reasoning Architecture) is a production-grade AI reasoning orchestrator that decomposes complex problems into structured multi-phase pipelines, leverages 28 directly registered LLM models (350+ via OpenRouter) from diverse training ecosystems in parallel, applies independent critique, stress-tests solutions, and synthesizes actionable recommendations with epistemic labeling (`VERIFIED` / `HYPOTHESIS` / `UNKNOWN`).
+**Reasoner** (Adaptive Reasoning Architecture) is a production-grade AI reasoning orchestrator that decomposes complex problems into structured multi-phase pipelines, leverages <!-- gen:models -->212<!-- /gen --> directly registered model aliases (<!-- gen:reasoning_models -->164<!-- /gen --> for reasoning, <!-- gen:image_models -->48<!-- /gen --> for image generation) drawn from a <!-- gen:catalogue -->472<!-- /gen -->-model OpenRouter catalogue, from diverse training ecosystems in parallel, applies independent critique, stress-tests solutions, and synthesizes actionable recommendations with epistemic labeling (`VERIFIED` / `HYPOTHESIS` / `UNKNOWN`).
 
 - **Version:** 2.2 (Python package 2.1.0) | **Python:** 3.12+ | **Frontend:** Next.js 16 / React 19 / TypeScript 5
 
@@ -16,7 +16,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Hexagonal DDD + CQRS + Event Sourcing + WorkflowStrategy composition (`application/pipeline.py`'s `ReasonerPipeline` composes via a `flow_factory`/`LLMExecutor`, not mixins). `PipelineState` (~60 fields, `domain/pipeline_state.py`) is the primary state model. `PipelineAggregate` provides event-sourced replay (`infrastructure/persistence/snapshots.py`). This line previously read "verified working: snapshot + full-history replay both exercised". That was false and had no test behind it: `create_snapshot` wrote a `{state, version, timestamp}` wrapper that `_deserialize_state` splatted into `PipelineStateData`, which shares none of those field names, so every snapshot load raised `TypeError`. Fixed 2026-09-01 with `tests/unit/test_snapshot_replay_sqlite.py` covering both paths. Treat "verified" in this file as a claim needing a named test, not a note of intent.
 
-**Dependency Rule:** Domain has no outer dependencies → Application depends on Domain/Core only → Infrastructure implements Core ports → API/Interface depends on Application.
+**Dependency Rule (the Phase D decision, stated verbatim in three places):** N-tier for the outer ring, strict hexagonal for the inner ring. `domain/` and `core/` are a dependency-free functional core; `application/` may depend on `core/ports` but **not** on `infrastructure/` concretes; `infrastructure/` and `api/` are adapters.
+
+The three enforcement points must not drift apart: `.importlinter` contract 1 (layers), `.importlinter` contract 2 (`application -> infrastructure`, ratcheted separately because contract 1 lists `application` *above* `infrastructure` and so permits that direction), and `tests/architecture/test_layer_boundaries.py` (AST, module-level imports). Contract 2 opened at 52 declared exceptions on 2026-09-17 and only falls.
 
 **Known violations (last verified 2026-08):** one accepted exception — `domain/preset_core.py` imports `core/ports/model_registry_port.py` for preset key-preflight derivation (`.importlinter` `ignore_imports`, documented). `PRESETS` builds at module import (`presets.py:25`), so DI can't reach it there; retire by making preset construction lazy, then injecting. Prior violations closed: `domain/preset_core.py`'s infra import (fixed pre-2026-08); `application/orchestrator.py`, `application/services/preset_service.py`, `application/services/pricing_service.py` importing `infrastructure.llm.registry` directly (fixed 2026-08 — now consume `core/ports/model_registry_port.py`, injected via `set_model_registry_port()` at `api/__init__.py`/`main.py`/`headless.py`). `application/flows/__init__.py` importing `api.serializers` — never existed, was a doc error. `api/streaming.py` bypassing CQRS — inaccurate as stated: it does route through `RunPipelineCommandHandler`; the handler's legacy non-streaming branch (`sse_emit=None`) is a separate, rarely-used code path, not a bypass.
 
@@ -27,7 +29,7 @@ Hexagonal DDD + CQRS + Event Sourcing + WorkflowStrategy composition (`applicati
 | Layer | Technology |
 |-------|------------|
 | Runtime | Python 3.12+, FastAPI 0.109+, uvicorn, Pydantic v2, httpx |
-| LLM Routing | OpenRouter (primary, 350+ models); 12 direct adapters (Anthropic, OpenAI, Google, Perplexity, DeepSeek, Mistral, xAI, Qwen, Kimi, GLM, MiniMax, Ollama) |
+| LLM Routing | OpenRouter (primary, <!-- gen:catalogue -->472<!-- /gen --> catalogued models); <!-- gen:adapters -->8<!-- /gen --> direct adapters (Anthropic, OpenAI and Google as dedicated clients; Mistral, DeepSeek, xAI, Perplexity and Qwen through the OpenAI-compatible table in `providers/direct.py`). Kimi, GLM and MiniMax route via OpenRouter, not directly. Ollama is local and is handled in `registry.build_provider()`, not in the direct-adapter table |
 | Search | Perplexity Sonar, Brave Search API, Tavily |
 | Database | SQLite (event store), PostgreSQL (asyncpg), aiosqlite |
 | Memory | Neuro L1/L2/L3 tiered cache with embedding search |
@@ -49,7 +51,7 @@ Every folder has a **map skill** in `.claude/skills/` listing what the folder co
 | Endpoints, SSE streaming, auth deps, middleware, CSRF, billing routes, MCP tools | `src/reasoner/api/` | `map-api` |
 | Pipeline behavior, reasoning flows and phase logic, CQRS handlers, event bus, services (routing, billing, metering, serializers, renderers) | `src/reasoner/application/` | `map-application` |
 | Constants, token budgets, settings/env, hexagonal ports, domain events, aggregates, JSON parsing, sanitization | `src/reasoner/core/` | `map-core` |
-| `PipelineState` fields, the 48 presets, pricing, credits, SaaS entities, ACR value objects, watermark domain | `src/reasoner/domain/` | `map-domain` |
+| `PipelineState` fields, the <!-- gen:presets -->49<!-- /gen --> presets, pricing, credits, SaaS entities, ACR value objects, watermark domain | `src/reasoner/domain/` | `map-domain` |
 | Adding a model or provider, routing and fallback, event stores and repos, Valkey/Redis, search adapters, code sandbox, widgets, websocket | `src/reasoner/infrastructure/` | `map-infrastructure` |
 | Routing decision (DIRECT / WEB_SEARCH / PIPELINE), method classification, fast-path regexes | `src/reasoner/hypergate/` | `map-hypergate` |
 | Writing or editing any prompt; per-method prompt modules; Verbalized Sampling stages | `src/reasoner/phases/` | `map-phases` |
@@ -103,10 +105,10 @@ src/reasoner/
 ├── domain/                 # Business entities and declarative routing configs
 │   ├── pipeline_state.py   # PipelineState (~60 fields) — canonical state model
 │   ├── preset_core.py      # PipelinePreset, build_auto_preset(), _KNOWN_ROUTING_ROLES
-│   └── preset_registry.py  # 48 preset configs with model routing and fallbacks
+│   └── preset_registry.py  # <!-- gen:presets -->49<!-- /gen --> preset configs with model routing and fallbacks
 ├── infrastructure/         # Adapters implementing Core ports
 │   ├── llm/
-│   │   ├── registry.py     # _MODEL_WHITELIST (28 models), _REGISTRY, build_provider()
+│   │   ├── registry.py     # _MODEL_WHITELIST (<!-- gen:models -->212<!-- /gen --> aliases), _REGISTRY, build_provider()
 │   │   ├── router.py       # ProviderRouter: role-based routing, fallback chain
 │   │   └── providers/      # OpenAICompatibleProvider, OpenRouterProvider, etc.
 │   ├── persistence/        # EventStore (SQLite), snapshots, postgres_store
@@ -115,7 +117,7 @@ src/reasoner/
 │   ├── hyperagent.py       # HyperGateAgent orchestrator + fast-path regexes
 │   ├── base_sub_agent.py   # Abstract base with LRU caching
 │   └── sub_agents/         # language, complexity, direct, web_detector, method, tiebreaker
-├── phases/                 # 31 prompt modules: _shared, _universal + 29 method modules
+├── phases/                 # 31 method modules + 4 shared helpers (_prism, _shared, _universal, _vs_shared)
 ├── subagents/              # Phase sub-agents (enhancement, decomposition, critique, synthesis, search)
 ├── neuro/                  # Long-term memory: L1/L2/L3 tiered cache, compression, sessions
 ├── healing/                # Self-healing: introspection_engine, test_generation_engine
@@ -129,7 +131,7 @@ ui-next/src/
 ├── lib/                    # api-client, db (IndexedDB), types, utils, security, markdown
 └── stores/                 # app-store.ts (Zustand global state with persistence)
 
-tests/                      # pytest suite (~197 test files)
+tests/                      # pytest suite (<!-- gen:test_files -->330<!-- /gen --> test_*.py files, recursive)
 scripts/
 └── update_mindmap_meta.py  # Patches live counts into ARCHITECTURE_MINDMAP.md (run manually — see §10)
 ```
@@ -219,7 +221,7 @@ HyperGate → Phase 0: Classification (task type, language)
           → Phase 5: Synthesis (VERIFIED/HYPOTHESIS/UNKNOWN + Action Blueprint)
 ```
 
-### Reasoning Methods (19 top-level + Verbalized Sampling sub-phases)
+### Reasoning Methods (<!-- gen:methods -->24<!-- /gen --> distinct, + Verbalized Sampling sub-phases)
 
 | Method | Description |
 |--------|-------------|
@@ -242,8 +244,20 @@ HyperGate → Phase 0: Classification (task type, language)
 | **Writing** | Creative writing with hallucination guards |
 | **Brainstorming** | Divergent idea generation |
 | **Coding** | Code-focused structured reasoning |
+| **Article** | Long-form article generation |
+| **Cross-Language** | Reasoning that crosses natural-language boundaries |
+| **Iterative-Critique** | Repeated critique-and-revise passes |
+| **Subagent** | Delegation to intra-phase sub-agents |
+| **Image-Gen** | Image generation routing (not text reasoning) |
 
-### Presets (48)
+The 19 rows above the divider are the text-reasoning methods usually described
+as the product. The five below are also distinct `method` values in
+`preset_registry.py`, which is why the count is 24 and not 19. Counts here are
+derived from `{p["method"] for p in PRESETS.values()}`; the 31 reported by
+`scripts/update_mindmap_meta.py` is a different measure, the number of prompt
+modules in `phases/`.
+
+### Presets (49)
 
 Every method has **Budget** (~$0.02/run) and **Premium** (~$0.15–$0.30/run) tiers. The UI orders Budget → Balanced → Premium, defaulting to the first (cheapest) method/preset.
 

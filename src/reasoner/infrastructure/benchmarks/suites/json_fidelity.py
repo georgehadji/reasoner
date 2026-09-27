@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import json
 
-from reasoner.infrastructure.benchmarks.suites import BenchmarkResult, BenchmarkSuite
+from reasoner.infrastructure.benchmarks.suites import (
+    BenchmarkResult,
+    BenchmarkSuite,
+    report_failed_samples,
+)
 
 _JSON_PROMPTS = [
     'Return a JSON object with keys: "name", "age", "city" for a person named Alice, 30, in Paris.',
@@ -24,6 +28,8 @@ class JsonFidelitySuite(BenchmarkSuite):
     async def run(self, judge_provider, calls_per_suite: int = 10) -> BenchmarkResult:
         total = min(calls_per_suite, len(_JSON_PROMPTS))
         valid = 0
+        failed = 0
+        last_exc: BaseException | None = None
         for i in range(total):
             try:
                 response = await judge_provider.complete(
@@ -35,8 +41,14 @@ class JsonFidelitySuite(BenchmarkSuite):
                 cleaned = response.strip().removeprefix("```json").removesuffix("```").strip()
                 json.loads(cleaned)
                 valid += 1
-            except (json.JSONDecodeError, Exception):
-                pass
+            # JSONDecodeError is an Exception subclass, so the tuple only ever
+            # meant `except Exception` -- and this handler also catches the
+            # AttributeError from .strip() on a None response, which is a
+            # transport failure and not a fidelity result.
+            except Exception as exc:
+                failed += 1
+                last_exc = exc
+        report_failed_samples(self, failed, total, last_exc)
         return BenchmarkResult(
             suite_name=self.suite_name, dimension=self.dimension,
             score=valid / total if total > 0 else 0.0, sample_count=total,

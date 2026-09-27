@@ -63,7 +63,7 @@ class TestProviderApiErrorsReachTheFallbackChain:
     """A provider HTTP error must be recoverable, not fatal to the phase.
 
     ProviderRouter._execute_call recovers from exactly ``TimeoutError`` and
-    ``LLMError``. ``providers/openai_compat.py`` used to re-raise the raw
+    ``ProviderError``. ``providers/openai_compat.py`` used to re-raise the raw
     OpenAI SDK exception, so every provider HTTP error walked straight past the
     fallback chain into the phase. Observed live: OpenRouter routed
     ``nousresearch/hermes-4-70b`` to Nebius, which answered
@@ -84,16 +84,53 @@ class TestProviderApiErrorsReachTheFallbackChain:
         """The conversion the router's recovery depends on."""
         import openai
 
-        from reasoner.infrastructure.llm.base import LLMError
-        from reasoner.infrastructure.llm.providers.openai_compat import _as_llm_error
+        from reasoner.core.exceptions import ModelNotFoundError, ProviderError
+        from reasoner.infrastructure.llm.providers.openai_compat import _translate
 
-        converted = _as_llm_error(
+        converted = _translate(
             "nousresearch/hermes-4-70b",
             self._api_error(openai.NotFoundError, 404),
         )
-        assert isinstance(converted, LLMError)
+        assert isinstance(converted, ProviderError), (
+            "ProviderError is what the router's except clause names"
+        )
+        # P2: the boundary names the failure, so nothing downstream re-reads
+        # status_code to work out what happened.
+        assert isinstance(converted, ModelNotFoundError)
+        assert converted.retryable is False
         assert "hermes-4-70b" in str(converted)
         assert "404" in str(converted)
+
+    @pytest.mark.parametrize(
+        "status, expected_name, retryable",
+        [
+            (401, "AuthenticationError", False),
+            (402, "ProviderCreditsExhaustedError", False),
+            (403, "AuthenticationError", False),
+            (404, "ModelNotFoundError", False),
+            (429, "RateLimitError", True),
+            (500, "ProviderUnavailableError", True),
+            (503, "ProviderUnavailableError", True),
+        ],
+    )
+    def test_each_status_translates_to_its_domain_class(
+        self, status, expected_name, retryable
+    ):
+        """The status-to-class table, asserted per row (P2 verification).
+
+        402 is the row that matters most: ProviderCreditsExhaustedError used to
+        live in the infrastructure tree, outside both the router's except clause
+        and core.is_retryable's ``.retryable`` read.
+        """
+        import openai
+
+        from reasoner.core.exceptions import ProviderError, is_retryable
+        from reasoner.infrastructure.llm.providers.openai_compat import _translate
+
+        converted = _translate("some/model", self._api_error(openai.APIStatusError, status))
+        assert isinstance(converted, ProviderError)
+        assert type(converted).__name__ == expected_name
+        assert is_retryable(converted) is retryable
 
     def test_sdk_timeout_is_covered_too(self):
         """openai.APITimeoutError is not a builtin TimeoutError.
@@ -104,8 +141,8 @@ class TestProviderApiErrorsReachTheFallbackChain:
         import httpx
         import openai
 
-        from reasoner.infrastructure.llm.base import LLMError
-        from reasoner.infrastructure.llm.providers.openai_compat import _as_llm_error
+        from reasoner.core.exceptions import ProviderTimeoutError
+        from reasoner.infrastructure.llm.providers.openai_compat import _translate
 
         assert not issubclass(openai.APITimeoutError, TimeoutError), (
             "if the SDK ever makes this a builtin TimeoutError, the router's "
@@ -114,7 +151,7 @@ class TestProviderApiErrorsReachTheFallbackChain:
         exc = openai.APITimeoutError(
             request=httpx.Request("POST", "https://openrouter.ai/api/v1/chat/completions")
         )
-        assert isinstance(_as_llm_error("some/model", exc), LLMError)
+        assert isinstance(_translate("some/model", exc), ProviderTimeoutError)
 
     @pytest.mark.asyncio
     async def test_a_404_on_the_primary_falls_back_instead_of_raising(self):
@@ -122,7 +159,7 @@ class TestProviderApiErrorsReachTheFallbackChain:
         import openai
 
         from reasoner.core.settings import settings
-        from reasoner.infrastructure.llm.providers.openai_compat import _as_llm_error
+        from reasoner.infrastructure.llm.providers.openai_compat import _translate
 
         primary = FakeProvider("nousresearch/hermes-4-70b")
         fallback = FakeProvider("anthropic/claude-sonnet-5")
@@ -133,7 +170,7 @@ class TestProviderApiErrorsReachTheFallbackChain:
         async def _circuit(provider, *args, **kwargs):
             attempted.append(provider.model)
             if provider is primary:
-                raise _as_llm_error(
+                raise _translate(
                     provider.model, self._api_error(openai.NotFoundError, 404)
                 )
             return "fallback answered"
@@ -164,7 +201,7 @@ class TestProviderApiErrorsReachTheFallbackChain:
         """
         import openai
 
-        from reasoner.infrastructure.llm.base import LLMError
+        from reasoner.core.exceptions import ProviderError
         from reasoner.infrastructure.llm.providers.openai_compat import (
             OpenAICompatibleProvider,
         )
@@ -179,7 +216,7 @@ class TestProviderApiErrorsReachTheFallbackChain:
         with patch.object(
             provider.client.chat.completions, "create", side_effect=_raise_404
         ):
-            with pytest.raises(LLMError) as caught:
+            with pytest.raises(ProviderError) as caught:
                 await provider.complete("sys", "user", max_tokens=64)
 
         assert "hermes-4-70b" in str(caught.value)

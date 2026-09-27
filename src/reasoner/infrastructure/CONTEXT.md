@@ -8,7 +8,6 @@ Platform and infrastructure adapters implementing the abstract application ports
 ## Files
 - **`__init__.py`**: Infrastructure Layer
 - **`auth_legacy.py`**: Default scope sets for common roles
-- **`cached_quota_repo.py`**: Redis-backed quota repository with graceful DB fallback.
 - **`circuit_breaker.py`**: Reasoner Pipeline - Circuit Breaker Pattern
 - **`clients.py`**: Shared HTTP clients with connection pooling.
 - **`metrics.py`**: Prometheus metrics for Reasoner.

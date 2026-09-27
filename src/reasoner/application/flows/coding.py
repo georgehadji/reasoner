@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
-
-from reasoner.application.flows.base import PhaseStep, WorkflowServices, WorkflowStrategy
+from reasoner.application.flows.base import PhaseStep, WorkflowStrategy
 from reasoner.application.flows.coding_phases import (
     run_coding_assemble_phase,
     run_coding_cve_search_phase,
@@ -44,16 +42,3 @@ class CodingFlow(WorkflowStrategy):
             PhaseStep(4, "Test Generation", run_coding_tests_phase, _ser_4),
             PhaseStep(5, "Final Assembly", run_coding_assemble_phase, _ser_5),
         ]
-
-    async def execute(
-        self,
-        state: PipelineState,
-        services: WorkflowServices,
-        config: Any = None
-    ) -> PipelineState:
-        for step in self.get_phases(state):
-            success = await services.run_phase(step, state)
-            if not success and step.critical:
-                break
-
-        return state

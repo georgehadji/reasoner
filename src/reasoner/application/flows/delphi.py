@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
-
-from reasoner.application.flows.base import PhaseStep, WorkflowServices, WorkflowStrategy
+from reasoner.application.flows.base import PhaseStep, WorkflowStrategy
 from reasoner.application.flows.delphi_phases import (
     run_delphi_aggregation_phase,
     run_delphi_convergence_phase,
@@ -32,20 +30,3 @@ class DelphiFlow(WorkflowStrategy):
         phases.append(PhaseStep(5.5, "Dissent Capture", run_delphi_dissent_phase, _ser_5))
         phases.append(PhaseStep(6, "Synthesis", run_synthesis_phase, _ser_synthesis))
         return phases
-
-    async def execute(
-        self,
-        state: PipelineState,
-        services: WorkflowServices,
-        config: Any = None
-    ) -> PipelineState:
-        for step in self.get_phases(state):
-            # Special case for dissent: we can skip it here too if we want to be explicit
-            if step.name == "Dissent Capture" and state.delphi_state.get("converged", False):
-                continue
-
-            success = await services.run_phase(step, state)
-            if not success and step.critical:
-                break
-
-        return state

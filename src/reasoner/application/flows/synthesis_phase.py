@@ -11,6 +11,7 @@ from reasoner.core.constants import (
     DEFAULT_MAX_TOKENS,
     get_token_budget,
 )
+from reasoner.core.degrade import degraded
 from reasoner.domain.core_types import (
     FinalSolution,
     MetaCognitiveAudit,
@@ -119,8 +120,12 @@ async def run_synthesis_phase(state: PipelineState, services: WorkflowServices) 
     try:
         from reasoner.application.services.evidence_service import apply_promotion_rules
         evidence_bundles = apply_promotion_rules(evidence_bundles)
-    except Exception:
-        pass
+    except Exception as exc:
+        # Silence here is the worst possible outcome for this particular call:
+        # promotion rules are what cap a model-sourced VERIFIED claim down to
+        # HYPOTHESIS. Skipping them leaves the run overclaiming its own
+        # epistemic status, which is the one thing the labels exist to prevent.
+        degraded("synthesis.promotion_rules", None, exc=exc, state=state)
 
     # Safely handle meta audit
     meta_audit_data = json_data.get("meta_audit", {})

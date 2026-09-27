@@ -13,6 +13,7 @@ from __future__ import annotations
 from typing import Any
 
 from reasoner.core.constants import HYPERGATE_MAX_TOKENS_METHOD
+from reasoner.core.degrade import degraded
 from reasoner.hypergate.base_sub_agent import BaseSubAgent
 
 # Opaque taxonomy — letters only, no real method names visible to LLM.
@@ -137,15 +138,19 @@ class MethodClassifierSubAgent(BaseSubAgent):
                 "rationale": rationale,
                 "candidates": candidates[:3],
             }
-        except Exception:
-            return {
-                "category": "E",
-                "action": "pipeline",
-                "method": "multi_perspective",
-                "confidence": 0.0,
-                "rationale": "parse error",
-                "candidates": [],
-            }
+        except Exception as exc:
+            return degraded(
+                "hypergate.method_classifier.parse",
+                {
+                    "category": "E",
+                    "action": "pipeline",
+                    "method": "multi_perspective",
+                    "confidence": 0.0,
+                    "rationale": "parse error",
+                    "candidates": [],
+                },
+                exc=exc,
+            )
 
     @staticmethod
     def resolve(category: str) -> tuple[str, str]:

@@ -340,6 +340,7 @@ def export_to_json(state: PipelineState, path: str) -> None:
         "stress_results":      _serialize(state.stress_results),
         "final_solution":      _serialize(state.final_solution),
         "errors":              state.errors,
+        "degradations":        list(getattr(state, "degradations", []) or []),
         "phase_logs":          state.phase_logs,
     }
 

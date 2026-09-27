@@ -25,6 +25,22 @@ try:
     def _ensure_dotenv() -> None:
         global _dotenv_loaded
         if not _dotenv_loaded:
+            # docs/plans/root-cause-remediation-2026-09-07.md P3 step 1: every
+            # field below is a plain class attribute computed once, right here,
+            # at this module's first import -- not a pydantic-settings model
+            # rebuilt per instance, so a per-test fixture that runs after
+            # collection is already too late to isolate anything. tests/conftest.py
+            # sets this before importing any reasoner module (which is the
+            # trigger that reaches this function), so pytest never sees the
+            # developer's .env at all: test_deprecated_alias_still_routes (D7)
+            # took the DeepSeek-direct branch in build_provider() only because
+            # a developer's own DEEPSEEK_API_KEY in .env silently became this
+            # class's baked-in default. A developer who deliberately wants
+            # .env honoured locally (e.g. running the slow/integration lane by
+            # hand) can `export REASONER_SKIP_DOTENV=0` first.
+            if os.getenv("REASONER_SKIP_DOTENV", "").lower() in ("1", "true", "yes"):
+                _dotenv_loaded = True
+                return
             # Load .env first, then .env.local as fallback (Next.js convention).
             # Also check ui-next/.env.local so the backend can share the frontend key.
             # .env uses override=True so it wins over stale shell env vars.
@@ -94,16 +110,27 @@ class Settings:
     # ── Document Semantic Retrieval (Phase 4, opt-in) ──
     DOCUMENT_SEMANTIC_RETRIEVAL_ENABLED: bool = os.getenv("DOCUMENT_SEMANTIC_RETRIEVAL_ENABLED", "false").lower() in ("1", "true", "yes")
 
-    # Off by default, and it must stay off until someone has diffed a full
-    # preset run with it on against one with it off. Turning it on switches
-    # the CLI and headless paths from PipelineWorkflowServices.run_phase's bare
-    # `await step.fn(...)` fallback onto the real WorkflowRunner: retries,
-    # per-phase timeouts, the quality gate and PHASE_* events, none of which
-    # have ever executed on this path. Code that has never run is not known to
-    # work, so this is a behaviour change behind a switch, not a bug fix.
+    # On since 2026-09-09. It routes the CLI and headless paths through the real
+    # WorkflowRunner instead of PipelineWorkflowServices.run_phase's bare
+    # `await step.fn(...)` fallback, which means retries, per-phase timeouts,
+    # the quality gate, PHASE_* events and `_current_phase_key` (and therefore
+    # per-phase token attribution) execute there for the first time.
+    #
+    # It stayed off because switching on a layer that has never run is a
+    # behaviour change, and because WorkflowRunner constructed four event
+    # members that did not exist -- PhaseStarted.phase_number,
+    # PhaseFailed.is_fatal, EventType.PHASE_QUALITY_CHECKED and PHASE_RETRIED --
+    # so the first phase raised TypeError. Those exist now, and the diff the
+    # old comment asked for is a test rather than a ritual:
+    # tests/test_completion_event_contract.py::TestRunnerBothWays runs the same
+    # preset over the same faked transport with the flag off and on.
+    #
+    # Consequence worth expecting: a phase whose output fails
+    # quality/criteria.py now retries and can end the run, where before it was
+    # synthesised over in silence. That is the point of the gate.
     # See docs/plans/backend-defect-remediation.md B1 for the staging.
     WORKFLOW_RUNNER_ENABLED: bool = (
-        os.getenv("WORKFLOW_RUNNER_ENABLED", "false").lower() in ("1", "true", "yes")
+        os.getenv("WORKFLOW_RUNNER_ENABLED", "true").lower() in ("1", "true", "yes")
     )
     DOCUMENT_CHUNK_SIZE: int = int(os.getenv("DOCUMENT_CHUNK_SIZE", "1000"))
     DOCUMENT_CHUNK_OVERLAP: int = int(os.getenv("DOCUMENT_CHUNK_OVERLAP", "200"))
@@ -320,10 +347,19 @@ class Settings:
     # load-bearing propagation-resistance invariant.
     OPENROUTER_WEB_SEARCH_ENABLED: bool = os.getenv("OPENROUTER_WEB_SEARCH_ENABLED", "true").lower() == "true"
     PERPLEXITY_SEARCH_TIER: str = os.getenv("PERPLEXITY_SEARCH_TIER", "sonar-pro")
-    # Nemotron Rerank VL: free NVIDIA reranker via OpenRouter chat completions + logprobs.
+    # Nemotron reranker via OpenRouter chat completions + logprobs.
     # Used as fallback when Cohere rerank fails, or as primary when NEMOTRON_RERANK_ENABLED=true.
+    #
+    # Default is empty as of 2026-09-07. It used to be
+    # "nvidia/llama-nemotron-rerank-vl-1b-v2:free", which is both a :free tier (now
+    # deprecated repo-wide, see _MODEL_WHITELIST) and absent from OpenRouter entirely:
+    # the bundled catalogue has 463 models and not one rerank id. That default made the
+    # Cohere-failure fallback issue one doomed request per document before returning the
+    # input unchanged. No paid rerank model exists on OpenRouter to swap in, so this is
+    # left unset rather than repointed at a general chat model, which would bill for
+    # worse ranking. Set it explicitly if a rerank id appears upstream.
     NEMOTRON_RERANK_ENABLED: bool = os.getenv("NEMOTRON_RERANK_ENABLED", "false").lower() in ("1", "true", "yes")
-    NEMOTRON_RERANK_MODEL: str = os.getenv("NEMOTRON_RERANK_MODEL", "nvidia/llama-nemotron-rerank-vl-1b-v2:free")
+    NEMOTRON_RERANK_MODEL: str = os.getenv("NEMOTRON_RERANK_MODEL", "")
     NEMOTRON_RERANK_CONCURRENCY: int = int(os.getenv("NEMOTRON_RERANK_CONCURRENCY", "5"))
     # When true, applies semantic cross-encoder reranking after BM25+freshness sort and before LLM vetting.
     # Adds ~1-2s latency but meaningfully improves context quality for research/article methods.

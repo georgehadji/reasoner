@@ -45,6 +45,26 @@ def _user(scopes: set[str] | None = None) -> User:
     return User(id=uuid4(), email="t3@example.com", scopes=scopes or set())
 
 
+class _FakeClock:
+    """Deterministic Clock double (core/ports/clock.py): monotonic() never
+    advances unless told to. See D6 below -- a token bucket cannot be tested
+    against a real clock without also asserting something about the machine
+    running the test.
+    """
+
+    def __init__(self, start: float = 0.0) -> None:
+        self._now = start
+
+    def monotonic(self) -> float:
+        return self._now
+
+    def time(self) -> float:
+        return self._now
+
+    def advance(self, seconds: float) -> None:
+        self._now += seconds
+
+
 # ─────────────────────────────────────────────────────────────────────
 # D1 — POST /api/gate spends LLM budget with no rate limit
 # ─────────────────────────────────────────────────────────────────────
@@ -63,7 +83,24 @@ class TestGateRouteIsRateLimited:
         assert resp.status_code == 200
         assert resp.json()["token"]
 
-    def test_unauthenticated_flood_is_eventually_refused(self, client):
+    def test_unauthenticated_flood_is_eventually_refused(self, client, monkeypatch):
+        """D6 (docs/plans/root-cause-remediation-2026-09-07.md P3 step 3).
+
+        The original version of this test sent 80 real requests and relied on
+        them arriving faster than the in-memory token bucket refills (1
+        token/sec at the default rate). On a slow enough test run that holds;
+        on a fast one -- 80 requests in under 10s -- the bucket refills as
+        fast as it drains and no 429 is reachable no matter how many requests
+        are sent. Freezing the limiter's clock at zero elapsed time removes
+        refill from the picture entirely: exhausting the configured burst
+        capacity is then a property of the bucket's arithmetic, not of how
+        fast this machine happens to answer HTTP.
+        """
+        from reasoner.api.dependencies import _get_rate_limiter_instance
+
+        limiter = _get_rate_limiter_instance()
+        monkeypatch.setattr(limiter, "_clock", _FakeClock())
+
         token = client.post("/api/csrf").json()["token"]
         calls = 0
 
@@ -72,12 +109,12 @@ class TestGateRouteIsRateLimited:
             calls += 1
             return {"action": "pipeline", "method": "debate", "confidence": 0.9}
 
-        limit = settings.RATE_LIMIT_PER_MINUTE + settings.RATE_LIMIT_BURST
+        burst = settings.RATE_LIMIT_BURST
         statuses = []
         with patch(
             "reasoner.api.routes.gate.decide_route", new=AsyncMock(side_effect=_counting_decide)
         ):
-            for i in range(limit + 10):
+            for i in range(burst + 5):
                 resp = client.post(
                     "/api/gate",
                     json={"problem": f"unique gate probe number {i}", "preset": "auto-budget"},
@@ -88,8 +125,54 @@ class TestGateRouteIsRateLimited:
                     break
 
         assert 429 in statuses, (
-            f"/api/gate accepted {len(statuses)} anonymous requests and invoked "
+            f"/api/gate accepted {len(statuses)} anonymous requests with a frozen "
+            f"clock (refill is impossible with zero elapsed time) and invoked "
             f"HyperGate {calls} times without ever refusing — no rate limit is applied"
+        )
+        # Deterministic, not just eventual: with no refill the burst capacity
+        # exhausts on exactly the (burst + 1)th request, every run.
+        assert len(statuses) == burst + 1, (
+            f"expected exactly {burst + 1} requests before refusal (burst={burst}), "
+            f"got {len(statuses)}: {statuses}"
+        )
+
+    def test_gate_route_declares_rate_limit_dependency(self):
+        """Static wiring check: is check_rate_limit actually on this route.
+
+        This is what the flood test above is really probing for, at the cost
+        of a real HTTP round trip per request. Inspecting the route's
+        declared dependencies gets the same assurance without sending a
+        single request, so it can't flake on timing at all.
+
+        ``app.include_router()`` on the FastAPI/Starlette version installed
+        here wraps each included router in a private ``_IncludedRouter``
+        that does not expose the child ``APIRoute`` objects directly on
+        ``app.routes`` -- they sit one level down, on
+        ``included.original_router.routes``. _flatten_routes() unwraps both
+        that and the older plain-``Mount``-style ``.routes`` nesting, so this
+        does not depend on which shape the installed version produces.
+        """
+        from reasoner.api.dependencies import check_rate_limit
+
+        def _flatten_routes(routes):
+            for r in routes:
+                original = getattr(r, "original_router", None)
+                if original is not None:
+                    yield from _flatten_routes(getattr(original, "routes", []))
+                    continue
+                nested = getattr(r, "routes", None)
+                if nested:
+                    yield from _flatten_routes(nested)
+                    continue
+                yield r
+
+        route = next(
+            r for r in _flatten_routes(app.routes)
+            if getattr(r, "path", None) == "/api/gate"
+        )
+        declared = {dep.call for dep in route.dependant.dependencies}
+        assert check_rate_limit in declared, (
+            "/api/gate no longer declares check_rate_limit as a dependency"
         )
 
 

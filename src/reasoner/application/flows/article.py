@@ -19,9 +19,6 @@ from reasoner.application.flows.article_phases import (
     run_article_structural_review_phase,
     run_article_style_copy_edit_phase,
 )
-from reasoner.application.flows.augmentation import (
-    run_augmentation,
-)
 from reasoner.application.flows.base import PhaseStep, WorkflowServices, WorkflowStrategy
 from reasoner.application.flows.synthesis_phase import run_synthesis_phase
 from reasoner.application.services.serializers import _ser_2, _ser_3, _ser_4, _ser_5
@@ -180,22 +177,3 @@ class ArticleFlow(WorkflowStrategy):
             PhaseStep(7.5, "Surface Signals",           bridge(adapter_surface_signals),    _ser_5),
             PhaseStep(8,   "Synthesis",                 bridge(adapter_synthesis),          _ser_5),
         ]
-
-    async def execute(
-        self,
-        state: PipelineState,
-        services: WorkflowServices,
-    ) -> PipelineState:
-        # Augmentation and the audit-failure retry used to live here. They now
-        # sit inside run_article_retrieve_sources_phase and
-        # run_article_final_audit_phase (article_phases.py), because this method
-        # is only ever reached by the CLI: the SSE driver at
-        # api/execution/pipeline.py builds a flat list from get_phases() and
-        # calls the phase functions itself, so everything held here was dead for
-        # every user of the website. What is left is the same loop every other
-        # flow uses.
-        for step in self.get_phases(state):
-            success = await services.run_phase(step, state)
-            if not success and step.critical:
-                break
-        return state

@@ -7,6 +7,7 @@ import logging
 
 import reasoner.phases as phases
 from reasoner.application.flows.base import WorkflowServices
+from reasoner.core.degrade import degraded
 from reasoner.domain.core_types import SolutionCandidate
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.models import PerspectiveType
@@ -316,8 +317,11 @@ async def run_pot_execute_phase(state: PipelineState, services: WorkflowServices
                     state.final_solution.evidence,
                     f"pot_exec:{result.exit_code}:{result.duration_ms}ms",
                 )
-        except Exception:
-            pass
+        except Exception as exc:
+            # The execution record is the evidence behind a PoT claim. Losing
+            # it leaves the claim asserted rather than demonstrated, with no
+            # trace that the demonstration was dropped.
+            degraded("pot.attach_execution_evidence", None, exc=exc, state=state)
     else:
         # Fallback — use LLM to simulate execution (original path)
         services.log("PoT", "No code executor available; using LLM simulation.", state)

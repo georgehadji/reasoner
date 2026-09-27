@@ -16,6 +16,7 @@ from reasoner.core.constants import (
     PIPELINE_ABSOLUTE_TIMEOUT_SECONDS,
     SSE_FLUSH_INTERVAL,
 )
+from reasoner.core.degrade import degraded
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.presets import (
     get_preset_price_tier,
@@ -162,6 +163,7 @@ async def run_stream(
 
     # Phase 2.2: Poll for SSE client disconnect every 10 iterations
     _disconnect_check_counter = 0
+    _disconnect_probe_failed = False
     while True:
         chunk = await queue.get()
         if chunk is None:
@@ -185,8 +187,13 @@ async def run_stream(
                     # cancel() is enough: the task drops its queue reference
                     # and is collected once it unwinds.
                     break
-            except Exception:
-                pass
+            except Exception as exc:
+                if not _disconnect_probe_failed:
+                    # The only thing that cancels a run whose client is gone:
+                    # while it is broken the pipeline bills for nobody. Once
+                    # per stream -- this runs every ten chunks.
+                    _disconnect_probe_failed = True
+                    degraded("streaming.disconnect_probe", None, exc=exc)
 
 
 async def run_followup_stream(
@@ -245,8 +252,10 @@ async def run_followup_stream(
                     "type": "followup",
                 },
             )
-    except Exception:
-        pass
+    except Exception as exc:
+        # The conversation's own memory: a failed learn() leaves the next
+        # turn recalling a gap that nobody downstream can see.
+        degraded("streaming.followup_learn", None, exc=exc, state=state)
 
 
 async def run_stream_cached(
@@ -287,6 +296,7 @@ async def run_stream_cached(
 
     MAX_COLLECTED_EVENTS = 200  # cap in-memory buffer (v3.4)
     collected: list[dict] = []
+    _collect_failed = False
     gen = run_stream(
         req,
         request=request,
@@ -301,12 +311,22 @@ async def run_stream_cached(
             if chunk.startswith("data: "):
                 try:
                     ev = json.loads(chunk[6:])
-                    if len(collected) < MAX_COLLECTED_EVENTS:
-                        collected.append(ev)
-                    if ev.get("type") == "done" and not req.no_cache:
+                except json.JSONDecodeError as exc:
+                    # Our own serializers produced this line, and the old
+                    # handler also skipped the `done` below -- the only thing
+                    # that writes the cache. A serializer change could turn
+                    # caching off for good and look like a cold cache.
+                    if not _collect_failed:
+                        _collect_failed = True
+                        degraded("streaming.cache_collect", None, exc=exc)
+                    continue
+                if len(collected) < MAX_COLLECTED_EVENTS:
+                    collected.append(ev)
+                if ev.get("type") == "done" and not req.no_cache:
+                    try:
                         await _save_cache(key, collected)
-                except Exception:
-                    pass
+                    except Exception as exc:
+                        degraded("streaming.cache_save", None, exc=exc)
     finally:
         await gen.aclose()
 

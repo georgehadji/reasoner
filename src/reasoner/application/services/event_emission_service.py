@@ -19,6 +19,7 @@ import logging
 from contextvars import ContextVar
 from typing import Any
 
+from reasoner.core.degrade import degraded
 from reasoner.core.events.domain_events import make_event
 
 logger = logging.getLogger(__name__)
@@ -122,17 +123,35 @@ class EventEmissionService:
                 version=1,
                 **event_kwargs,
             )
+            publish = bus.publish(event)
+        except Exception as exc:
+            degraded("events.emit.build", None, exc=exc, detail=f"event_type={event_type}")
+            return
+
+        try:
             # Fire-and-forget: create a task for the bus.publish
-            task = asyncio.create_task(bus.publish(event))
-            task.add_done_callback(
-                lambda t: logger.error(
-                    "Event publish failed: %s", t.exception()
-                )
-                if not t.cancelled() and t.exception()
-                else None
+            task = asyncio.create_task(publish)
+        except RuntimeError as exc:
+            # No running loop — a synchronous caller. Every event of such a run
+            # was dropped with no trace, and the already-created bus.publish
+            # coroutine leaked as an un-awaited-coroutine RuntimeWarning at GC
+            # time, attributed to this line rather than to the caller.
+            close = getattr(publish, "close", None)
+            if callable(close):
+                close()
+            degraded(
+                "events.emit.no_running_loop",
+                None,
+                exc=exc,
+                detail=f"event_type={event_type}",
             )
-        except Exception:
-            pass  # Never let event publishing crash the pipeline
+            return
+
+        task.add_done_callback(
+            lambda t: logger.error("Event publish failed: %s", t.exception())
+            if not t.cancelled() and t.exception()
+            else None
+        )
 
     # ── Pending Events Buffer ───────────────────────────────────────
 

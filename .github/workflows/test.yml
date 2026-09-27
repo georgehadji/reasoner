@@ -63,20 +63,42 @@ jobs:
           # wiring moved to infrastructure/valkey/cache_adapter.py and three dead
           # stdlib imports (secrets, json, datetime/timezone) went with it -- -4
           # F401 there, +2 elsewhere in the moved block.
-          # Two independent passes each took this from 2244 to 2243, and they
-          # merged: (a) #55 removed two delisted models (kwaipilot/kat-coder-air-v2.5,
-          # arcee-ai/virtuoso-large), taking one E501 comment line, and reflowed
-          # three over-long registry comments added with the new models; (b) the
-          # alias-honesty pass rewrote the deepseek-v3 / mimo-v2-flash comments to
-          # say what those aliases actually serve, dropping one long line. The
-          # value below is re-measured on the merged tree, not carried from either
-          # side: the two -1s do compose, so the merge lands at 2242, not 2243.
-          # 2236: removing eight dead registry aliases (seven ~*-latest ids that
-          # answered `is not a valid model ID`, plus hermes-4-70b whose only
-          # endpoint was down) took six E501 comment lines with them. Paydown
-          # from deleting code, not a rename. scripts/ci-local.sh carried 2243
-          # while this file said 2242; both are 2236 now.
-          python scripts/ruff_ratchet.py --max 2236
+          # 2236 on main: removing eight dead registry aliases (seven ~*-latest ids
+          # that answered `is not a valid model ID`, plus hermes-4-70b whose only
+          # endpoint was down) took six E501 comment lines with them. Before that,
+          # two independent passes each took 2244 to 2243 and composed to 2242.
+          # This merge then deprecated all six remaining :free tiers, which took
+          # more long comment lines out. Re-measured on the merged tree rather than
+          # carried from either side, because the paydowns compose.
+          # 2285: P4 step 4 (docs/plans/root-cause-remediation-2026-09-07.md)
+          # added two honestly-named whitelist entries (ling-3.0-flash,
+          # nex-n2-pro) as drop-ins for their misleadingly-named :free
+          # counterparts. Same long single-line-dict-plus-comment convention
+          # as every other registry.py entry -- +2 E501.
+          # 2283: P2 (docs/plans/root-cause-remediation-2026-09-07.md) deleted
+          # infrastructure/llm/ports.py's second BaseLLMProvider -- ~155 lines
+          # of a duplicate retry/health implementation nothing in src/ used --
+          # and collapsed infrastructure/llm/exceptions.py from a rival error
+          # tree into alias imports. -2 net against the lines _translate adds.
+          # 2274: Phase B-1a (docs/plans/architecture-score-9-remediation-2026-09-09.md)
+          # deleted the 21 WorkflowStrategy.execute() overrides and the Protocol
+          # member they satisfied -- one phase loop now lives in
+          # WorkflowRunner.run -- taking their unused imports with them. Dropping
+          # `from typing import Any` left a blank line inside four import blocks,
+          # which is -4 I001 on top of the -5 the deleted bodies carried.
+          # 2273: Phase B-1b wrapped _handle_phase_error's signature over
+          # several lines to take the PhaseStep and the exception.
+          # 2258: Phase B-1 (docs/plans/architecture-score-9-remediation-2026-09-09.md)
+          # deleted the second phase loop in api/execution/pipeline.py -- ~340
+          # lines of retries, timeouts, quality gate and error frames that
+          # WorkflowRunner already does -- plus run_phase_with_keepalive.
+          # 2246: Phase B-2 decomposed execute_run (417 -> 72 lines) into named
+          # collaborators and moved the run-level SSE frames and event-store
+          # writes into RunStream beside the per-phase ones, which took their
+          # long payload literals out of the god-method with them.
+          # 2245: Phase B-3 deleted the 33 back-compat phase delegators on
+          # ReasonerPipeline and migrated their callers to the flow functions.
+          python scripts/ruff_ratchet.py --max 2245
 
       - name: Security scan (bandit)
         run: |
@@ -102,6 +124,183 @@ jobs:
           # moving MAX -- the same drift the ruff ratchet hit at 2260. This is
           # the honest count now; whoever wants the three back can bisect them.
           python scripts/mypy_ratchet.py --max 423
+
+      - name: Silent-failure ratchet (bare except-Exception swallows)
+        run: |
+          # docs/plans/root-cause-remediation-2026-09-07.md P5. Counts
+          # `except Exception` handlers that leave no signal at all: no raise,
+          # no degraded() call, and a body of nothing but pass/return and
+          # sub-WARNING logging -- the D11 class of bug (NEMOTRON_RERANK_MODEL
+          # 404ing silently on every call, its only trace a DEBUG line).
+          # Ratcheted, same two-way pattern as ruff_ratchet.py.
+          #
+          # The number below RISES at 105 and that is not a regression. Every
+          # entry under it records debt being paid down; this one records the
+          # detector learning to see debt that was always there.
+          #
+          # 105: the line regex became an AST pass. It had three blind spots,
+          # and the audit (docs/plans/implementation_audit_report.md H-1) found
+          # the third by hand after C-1 -- infrastructure/llm/executor.py:756,
+          # the handler wrapping spend-cap enforcement -- sat uncounted at
+          # every MAX above. (a) A tuple: `except (asyncio.CancelledError,
+          # Exception): pass` never matched, because the regex wanted
+          # Exception as the first token after `except`. (b) A one-line
+          # handler: `except Exception: return []` put the body on the header
+          # line, and the scan read the line after it. (c) D11's own shape:
+          # `logger.debug(...)` then `return False`, where the scan tested
+          # only the first statement, saw a call, and stopped. 47 sites, none
+          # dropped. tests/unit/test_silent_failure_detector.py pins the six
+          # counted shapes and the six uncounted ones so the next
+          # simplification of this detector fails there instead of quietly
+          # lowering a number nobody re-derives.
+          # 114: P5 steps 1/2 landed core/degrade.py, PipelineState.degradations
+          # and reasoner_degradation_total, then routed three sites through it:
+          # synthesis promotion rules (their absence leaves a run overclaiming
+          # VERIFIED), PoT execution evidence, and the dialectical antithesis
+          # search. The script also stopped counting two things it should never
+          # have counted -- the pattern shown inside core/degrade.py's own
+          # docstring, and `return degraded(...)` itself, which is the fix.
+          # 113: the body pattern did not match a swallow with a trailing
+          # comment (`pass  # best-effort`), so 7 sites had never been counted
+          # at all. Fixing that raised the real count to 121; converting the 7
+          # HyperGate _parse_result swallows and event_emission_service's
+          # dropped-event pass brings it to 113. The HyperGate ones matter
+          # because a malformed-JSON reply there returns `confidence: 0.0` with
+          # `error=None`, which the base class reads as a valid low-confidence
+          # answer -- a routing failure indistinguishable from a routing
+          # opinion, and no log anywhere.
+          # 110: three of infrastructure/llm/executor.py's seven swallows.
+          # The cost-estimate one is the D11 shape again -- a pricing lookup
+          # that raises leaves cost_usd at 0, so total_cost_usd stops growing,
+          # the spend ceilings never fire, and the run reports $0.00, which is
+          # what a cache hit also looks like. The other two are inside
+          # _halt_on_cap: which ceiling was hit, and the SPEND_CAP_EXCEEDED
+          # event that billing reads. The four left counted are all
+          # Prometheus-emit failures (CACHE_HITS, CACHE_MISSES, the run-cost
+          # gauge, the cap counter). A metrics backend being unreachable does
+          # not change what the run does, and routing it through a WARNING
+          # helper that itself increments a metric spends the signal. They
+          # stay counted rather than being quietly converted to the DEBUG line
+          # this script's own docstring names as the D11 failure.
+          # 106: neuro/sessions.py's four readers. Every caller checks
+          # .exists() before reading, so an exception there is a real read
+          # failure on a file that is present -- and the [] it returned is
+          # indistinguishable from a session with no history, which
+          # get_recent_context() then injects as bootstrap context.
+          # _count_entries also cached the 0 from a failed read, pinning that
+          # file at zero exchanges for the process lifetime; it no longer
+          # caches a count it could not measure. neuro/providers.py's four are
+          # left counted on purpose: they are all `health_check` returning
+          # False, where the exception IS the answer, and they are the only
+          # four such sites left in the whole count.
+          # 100: all six in saas_router.delete_account -- GDPR Article 17
+          # erasure. Phase 3 (uploads, history files, vector indexes, Redis
+          # keys) runs after the DB transaction commits and every failure in
+          # it was a bare pass, so the endpoint returned
+          # {"status": "deleted"} with a clean 200 whether any of those stores
+          # was actually cleared or not. It now returns a "failed" list, so a
+          # caller told their data is erased can see what still holds it.
+          # The uploads block also left user_uploads unbound on failure, and
+          # the vector-store block iterates it -- so one failure raised
+          # NameError there and was swallowed by that block's own handler,
+          # costing two erasure phases for the price of one.
+          # 95: PhaseSpan's five, core/observability/phase_span.py. Every
+          # Langfuse enrichment -- the model name, token counts, phase cost,
+          # fallback count, and the span.update() that closes the span --
+          # was a bare pass. A span with no cost_usd is not a free phase but
+          # every dashboard summing that field reads it as one, and a failed
+          # span.update() leaves the span open in Langfuse, which reads as a
+          # phase still running. Same commit fixes the span's own input:
+          # start_time was time.monotonic() (seconds since boot) next to a
+          # time.time() end_time, so no span ever had a usable start.
+          # 91: the four in infrastructure/cached_quota_repo.py, removed by
+          # deleting the module. It was a second CachedQuotaRepository that no
+          # module in src/ imported -- api/dependencies.py wires the one in
+          # infrastructure/persistence/ -- and its cache had never once worked:
+          # it called UsageQuota.model_dump_json() on what is a
+          # @dataclass(frozen=True), so every write raised AttributeError into
+          # `except Exception: pass` and nothing was ever stored. A cache that
+          # hid its own total failure behind the swallow this ratchet counts.
+          # tests/test_quota_redis_fallback.py now covers the live class, whose
+          # failure paths test_saas_cached_quota.py did not reach.
+          # 88: spend_limit_service.py's three, all lazy imports behind the
+          # preflight spend guard, and all three failed open. No prices means
+          # pricing_data_available() returns False, which the caller reads as
+          # permission to skip the per-run ceiling. No routing means
+          # estimate_run_cost returns 0.0, and 0.0 is under every ceiling. No
+          # preset tier means FREE, which is below every required rank, so the
+          # tier refusal cannot fire. A guard that had stopped guarding was
+          # indistinguishable from one with nothing to refuse.
+          # 81: the seven benchmark suites in infrastructure/benchmarks/
+          # suites/. Each divides its passing samples by the number attempted,
+          # so a judge call that raised scored exactly like one that returned a
+          # wrong answer: a suite whose provider was down reported 0.0 over its
+          # full sample count. engine.benchmark_model writes that straight into
+          # the capability registry routing reads, so an outage was recorded as
+          # a measured incapability. The handlers now count the failure and one
+          # report_failed_samples() per suite names it. json_fidelity.py's was
+          # the same swallow written `except (json.JSONDecodeError, Exception)`,
+          # which this regex never matched -- fixed in the same change, so the
+          # count moves by seven and not eight.
+          # 76: start_all.py's five. Three of them turned a failed *check*
+          # into a confident answer: _port_in_use returned "the port is free"
+          # when the probe itself raised, and both PID lookups left pid at
+          # None -- which the caller prints as "zombie socket", telling the
+          # reader there is no process to stop when there is one. Those now
+          # catch the errors those calls actually raise and print what
+          # failed. The health poll keeps passing on connection-refused,
+          # which is what a server that has not finished binding looks like,
+          # but narrowed to OSError so a bug in the poll is no longer eaten
+          # for the full 30s and then reported as "the server never started".
+          # 70: the code sandbox's six. subprocess_executor's setrlimit
+          # swallow dropped the only memory cap on the untrusted code it was
+          # about to exec, and could not log because preexec_fn runs in the
+          # forked child -- it now writes to fd 2, which the parent captures
+          # as ExecutionResult.stderr. Its tempdir cleanup was a try around a
+          # call that already had ignore_errors=True, so the handler caught
+          # nothing while a failed removal left the executed script on disk.
+          # docker_runner's _force_kill swallowed a failed `docker rm -f`,
+          # which is the runaway container still holding CPU and memory, and
+          # check_docker_health returned the same silent False for "docker is
+          # not installed", "the image was never built" and "we broke this
+          # function" -- while production gates code execution on it.
+          # 67: api/streaming.py's three. The disconnect probe is the only
+          # thing that cancels a run whose client has gone away, so while it
+          # was broken the pipeline kept generating -- and billing -- for
+          # nobody; it now reports once per stream rather than every ten
+          # chunks. The follow-up learn() is the conversation's own memory.
+          # The cached-run collector wrapped parse, collect and write in one
+          # handler, so a parse failure also skipped the `done` detection
+          # that is the only thing writing the cache: a serializer change
+          # could have turned caching off for good and looked like a cold
+          # cache. Split into three, each naming its own site.
+          # 64: application/orchestrator.py's three. Provenance is not
+          # free: a Neuro chunk written without model attribution cannot be
+          # revoked by lineage, so it is dropped on recall rather than
+          # replayed -- losing it silently means losing the memory write
+          # silently, one recall later. The propagation-shape observer is the
+          # only reading taken where a synthesis becomes something future
+          # runs read back (docs/MIND_VIRUS_MITIGATION.md), and a detector
+          # that had stopped scoring reported the same nothing as clean
+          # traffic. The spend-cap short-circuit skipped its check entirely,
+          # so a cap that could not be read looked like no cap set.
+          # 58: widgets_legacy.py's three and image_generation.py's three.
+          # _has_yahooquery/_has_yfinance had lost the import they were meant
+          # to test, leaving `try: return True` -- so every machine reported
+          # both libraries present, get_stock_data's Demo Mode branch was
+          # unreachable, and a missing dependency surfaced as an ImportError
+          # from inside the quote lookup. They use importlib.util.find_spec
+          # now and need no handler at all. search_web returned [] for a dead
+          # backend, which is what a topic with no news returns too.
+          # image_generation's two base64 probes exist to decide whether text
+          # is base64, so there the exception is the answer -- narrowed to
+          # ValueError rather than signalled. Its outermost guard kept
+          # str(exc), which is often empty, and dropped the traceback.
+          # 102: Phase B-1 deleted run_phase_with_keepalive (three handlers in
+          # its task-cancellation cleanup) and the SSE loop's PHASE_DURATION
+          # metric guard. The metric guard moved verbatim into
+          # execution/sse_observer._observe_duration, so the net is -3, not -4.
+          python scripts/silent_failure_ratchet.py --max 102
 
       - name: Run tests
         run: |

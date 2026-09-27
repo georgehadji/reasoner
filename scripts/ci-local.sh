@@ -48,12 +48,13 @@ want() { [ "$FILTER" = "all" ] || [ "$FILTER" = "$1" ]; }
 
 # ── python (test.yml: pytest job) ──────────────────────────────────────
 if want python; then
-    # Keep in step with .github/workflows/test.yml -- this drifted to 2243 while
-# that file said 2242, so the local gate disagreed with CI.
-gate "ruff"   python scripts/ruff_ratchet.py --max 2236
+    # Keep in step with .github/workflows/test.yml -- this drifted apart twice
+    # already (2243 here vs 2242 there), so the local gate disagreed with CI.
+    gate "ruff"   python scripts/ruff_ratchet.py --max 2245
     gate "bandit" bandit -r src/ -t B307,B308,B102 -f txt -q
     gate "mypy-strict-auth_legacy" mypy --strict src/reasoner/infrastructure/auth_legacy.py --ignore-missing-imports
     gate "mypy-ratchet" python scripts/mypy_ratchet.py --max 423
+    gate "silent-failure-ratchet" python scripts/silent_failure_ratchet.py --max 102
     # -n/--dist used to come from pytest.ini addopts; it is set per invocation
     # now. --dist loadscope must accompany -n: see requirements-dev.txt.
     gate "pytest" python -m pytest tests/ -m "not slow and not integration" \
@@ -63,9 +64,11 @@ fi
 
 # ── architecture (pr-architecture.yml) ─────────────────────────────────
 if want arch; then
+    gate "workflow-lint" bash -c '! grep -rEln "\$\{\{[[:space:]]*\}\}" .github/workflows/'
     gate "import-linter"  lint-imports --no-cache
     gate "registry-guard" python scripts/check_no_registry_bypass.py
-    gate "exception-count" python scripts/count_importlinter_exceptions.py --max 60
+    gate "exception-count" python scripts/count_importlinter_exceptions.py --contract 1 --max 44
+    gate "app-infra-count" python scripts/count_importlinter_exceptions.py --contract 2 --max 52
 fi
 
 # ── frontend (test.yml: tsc job) ───────────────────────────────────────

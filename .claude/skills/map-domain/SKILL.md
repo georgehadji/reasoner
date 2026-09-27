@@ -14,7 +14,7 @@ folders:
 | File | What it does |
 |------|--------------|
 | `__init__.py` | Package exports. |
-| `pipeline_state.py` (31KB) | **The canonical state model.** `PipelineState` (~60 fields) plus sub-containers `MethodState`, `CostTrackingState`, `ConversationState`, `PipelineCore`, `PipelineMeta`, `PipelineRemainder`, `PhaseOutput`, `PipelineField`. |
+| `pipeline_state.py` (31KB) | **The canonical state model.** `PipelineState` (~60 fields) plus sub-containers `MethodState`, `CostTrackingState`, `ConversationState`, `PipelineCore`, `PipelineMeta`, `PipelineRemainder`, and the `PipelineField` descriptor. Mutated in place by phases — there is no delta type or reducer (ADR-006). |
 | `core_types.py` | Phase-level dataclasses: `SubProblem`, `Assumption`, `Decomposition`, `SolutionCandidate`, `CritiqueScore`, `ReviewHypothesis`, `EvidenceBundle`, `PlanContract`, `StressTestResult`, `ScenarioType`. |
 | `models.py` | Small enums/registries: `TaskType`, `ClaimLabel`, `PerspectiveType`, `PerspectiveRegistry`. |
 | `preset_core.py` (12KB) | `PipelinePreset` dataclass, validation, `build_auto_preset`, `get_method_from_preset`, `get_preset_tier`, `get_preset_price_tier`. |

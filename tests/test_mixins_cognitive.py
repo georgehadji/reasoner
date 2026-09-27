@@ -5,8 +5,29 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from reasoner.application.flows.cognitive_phases import (
+    run_cove_answer_phase,
+    run_cove_draft_phase,
+    run_cove_revise_phase,
+    run_cove_verify_phase,
+    run_pot_execute_phase,
+    run_pot_generate_phase,
+    run_pot_interpret_phase,
+    run_sd_implement_phase,
+    run_sd_select_phase,
+    run_sot_assemble_phase,
+    run_sot_skeleton_phase,
+    run_tot_backtrack_phase,
+    run_tot_decompose_phase,
+)
+from reasoner.application.flows.services import PipelineWorkflowServices
 from reasoner.models import PipelineState
 from reasoner.pipeline import ReasonerPipeline
+
+
+def _svc(pipeline):
+    """The WorkflowServices a phase function takes, bound to this pipeline."""
+    return PipelineWorkflowServices(pipeline)
 
 
 class FakeRouter:
@@ -41,7 +62,7 @@ async def test_cove_draft_populates_state(pipeline, state):
     pipeline._call_llm_cached = AsyncMock(return_value=(
         json.dumps({"draft_answer": "Draft", "claims": ["C1"]}), {}
     ))
-    await pipeline._phase_cove_draft(state)
+    await run_cove_draft_phase(state, _svc(pipeline))
     assert state.cove_state["draft_answer"] == "Draft"
 
 
@@ -50,7 +71,7 @@ async def test_cove_verify_populates_questions(pipeline, state):
     pipeline._call_llm_cached = AsyncMock(return_value=(
         json.dumps({"verification_questions": ["Q1"]}), {}
     ))
-    await pipeline._phase_cove_verify(state)
+    await run_cove_verify_phase(state, _svc(pipeline))
     assert state.cove_state["verification_questions"] == ["Q1"]
 
 
@@ -59,7 +80,7 @@ async def test_cove_answer_populates_answers(pipeline, state):
     pipeline._call_llm_cached = AsyncMock(return_value=(
         json.dumps({"answers": ["A1"]}), {}
     ))
-    await pipeline._phase_cove_answer(state)
+    await run_cove_answer_phase(state, _svc(pipeline))
     assert state.cove_state["verification_answers"] == ["A1"]
 
 
@@ -68,7 +89,7 @@ async def test_cove_revise_populates_revised(pipeline, state):
     pipeline._call_llm_cached = AsyncMock(return_value=(
         json.dumps({"revised_answer": "Revised", "changes_made": ["M1"]}), {}
     ))
-    await pipeline._phase_cove_revise(state)
+    await run_cove_revise_phase(state, _svc(pipeline))
     assert state.cove_state["revised_answer"] == "Revised"
 
 
@@ -79,7 +100,7 @@ async def test_sot_skeleton_populates_sub_problems(pipeline, state):
     pipeline._call_llm_cached = AsyncMock(return_value=(
         json.dumps({"sub_problems": [{"id": "sp1", "description": "Sub"}]}), {}
     ))
-    await pipeline._phase_sot_skeleton(state)
+    await run_sot_skeleton_phase(state, _svc(pipeline))
     assert len(state.sot_state["sub_problems"]) == 1
 
 
@@ -90,7 +111,7 @@ async def test_sot_assemble_populates_answer(pipeline, state):
     ))
     state.sot_state["sub_problems"] = [{"id": "sp1"}]
     state.sot_state["solutions"] = [{"sub_problem_id": "sp1", "solution": "Sol"}]
-    await pipeline._phase_sot_assemble(state)
+    await run_sot_assemble_phase(state, _svc(pipeline))
     assert state.sot_state["assembled_answer"] == "Assembled"
 
 
@@ -101,7 +122,7 @@ async def test_tot_decompose_populates_decision_points(pipeline, state):
     pipeline._call_llm_cached = AsyncMock(return_value=(
         json.dumps({"decision_points": [{"id": "dp1"}]}), {}
     ))
-    await pipeline._phase_tot_decompose(state)
+    await run_tot_decompose_phase(state, _svc(pipeline))
     assert len(state.tot_state["decision_points"]) == 1
 
 
@@ -110,7 +131,7 @@ async def test_tot_backtrack_sets_decision(pipeline, state):
     pipeline._call_llm_cached = AsyncMock(return_value=(
         json.dumps({"decision": "terminate", "final_path": []}), {}
     ))
-    await pipeline._phase_tot_backtrack(state)
+    await run_tot_backtrack_phase(state, _svc(pipeline))
     assert state.tot_state["backtrack_decision"] == "terminate"
 
 
@@ -121,7 +142,7 @@ async def test_pot_generate_populates_code(pipeline, state):
     pipeline._call_llm_cached = AsyncMock(return_value=(
         json.dumps({"code": "print(42)", "explanation": "Exp"}), {}
     ))
-    await pipeline._phase_pot_generate(state)
+    await run_pot_generate_phase(state, _svc(pipeline))
     assert state.pot_state["code"] == "print(42)"
 
 
@@ -138,7 +159,7 @@ async def test_pot_execute_populates_output(pipeline, state, monkeypatch):
         lambda self: setattr(self, "code_executor", fake_executor),
     )
     state.pot_state["code"] = "print(42)"
-    await pipeline._phase_pot_execute(state)
+    await run_pot_execute_phase(state, _svc(pipeline))
     assert state.pot_state["execution_output"] == "42"
 
 
@@ -148,7 +169,7 @@ async def test_pot_interpret_populates_answer(pipeline, state):
     pipeline._call_llm_cached = AsyncMock(return_value=(
         json.dumps({"interpretation": "The answer is 42", "answer": "42", "caveats": []}), {}
     ))
-    await pipeline._phase_pot_interpret(state)
+    await run_pot_interpret_phase(state, _svc(pipeline))
     assert state.pot_state["computed_answer"] == "42"
 
 
@@ -159,7 +180,7 @@ async def test_sd_select_populates_modules(pipeline, state):
     pipeline._call_llm_cached = AsyncMock(return_value=(
         json.dumps({"selected_modules": ["M1"], "composition_strategy": "seq"}), {}
     ))
-    await pipeline._phase_sd_select(state)
+    await run_sd_select_phase(state, _svc(pipeline))
     assert state.self_discover_state["selected_modules"] == ["M1"]
 
 
@@ -168,5 +189,5 @@ async def test_sd_implement_populates_final(pipeline, state):
     pipeline._call_llm_cached = AsyncMock(return_value=(
         json.dumps({"module_outputs": [{"output": "O1"}], "final_answer": "Final"}), {}
     ))
-    await pipeline._phase_sd_implement(state)
+    await run_sd_implement_phase(state, _svc(pipeline))
     assert state.self_discover_state["final_answer"] == "Final"

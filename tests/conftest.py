@@ -1,5 +1,17 @@
 import os
 
+# docs/plans/root-cause-remediation-2026-09-07.md P3 step 1. core/settings.py's
+# ~90 fields are plain class attributes computed once at that module's first
+# import, not a pydantic-settings model rebuilt per test -- so the only way to
+# keep a developer's own .env out of the suite is to stop it from ever loading,
+# before anything below imports a reasoner module and triggers that first
+# import. D7 (test_deprecated_alias_still_routes) failed on any machine whose
+# .env set DEEPSEEK_API_KEY, because build_provider() then took the
+# DeepSeek-direct branch. setdefault, not assignment: a developer who runs the
+# slow/integration lane by hand and deliberately wants real .env credentials
+# can `export REASONER_SKIP_DOTENV=0` first.
+os.environ.setdefault("REASONER_SKIP_DOTENV", "1")
+
 # Mirror the env the CI test job sets (.github/workflows/test.yml) so a local
 # `pytest tests/` behaves the same as CI. Without JWT_SECRET_KEY in particular,
 # ~9 test modules fail at COLLECTION -- LocalAuthAdapter validates the key's

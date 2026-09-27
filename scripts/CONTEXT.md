@@ -11,7 +11,7 @@ Utility automation scripts for running servers, executing specialized tests, ver
 - **`check_skill_maps.py`**: Detect drift between .claude/skills/map-*/SKILL.md and the folders they map.
 - **`ci-local.sh`**: Code or resource asset facilitating system functionality.
 - **`cleanup_streaming.py`**: Remove _stream_direct_answer
-- **`count_importlinter_exceptions.py`**: Semantic counter for `.importlinter`'s `ignore_imports` exception list.
+- **`count_importlinter_exceptions.py`**: Semantic counter for one `.importlinter` contract's `ignore_imports` list. `--contract 1` is the layers contract, `--contract 2` the Phase D `application -> infrastructure` contract; each has its own two-way ratchet.
 - **`extract_e1.py`**: direct.py
 - **`extract_run_stream.py`**: Extract the full body of run_stream
 - **`fix_importlinter.py`**: Example line: - reasoner.core.search -> reasoner.infrastructure.llm.registry (l.44)
@@ -26,6 +26,7 @@ Utility automation scripts for running servers, executing specialized tests, ver
 - **`re_extract_e1.py`**: The new run_stream implementation
 - **`ruff_ratchet.py`**: Ratchet for `ruff check src/` violation count.
 - **`run_3more_tests.py`**: Run 3 additional method API tests sequentially.
+- **`run_all_presets.py`**: Run every budget preset sequentially. Makes real, billed OpenRouter calls.
 - **`run_batch4.py`**: Code or resource asset facilitating system functionality.
 - **`run_method_tests.py`**: Run 4 method API tests sequentially.
 - **`scan-secrets.py`**: Secret scanner — detect API keys and tokens in source code.

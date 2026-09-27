@@ -17,6 +17,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
+from reasoner.core.degrade import degraded
 from reasoner.domain.saas import SubscriptionStatus, SubscriptionTier
 from reasoner.domain.spend_limits import (
     UNLIMITED,
@@ -64,8 +65,12 @@ def pricing_data_available() -> bool:
         from reasoner.domain.pricing import PRICING_DB
 
         return len(PRICING_DB) > 1
-    except Exception:
-        return False
+    except Exception as exc:
+        # Reported as "prices are not loaded", which is also what a genuinely
+        # absent openrouter_models.json looks like. The caller reads it as
+        # permission to skip the per-run ceiling entirely, so an import that
+        # breaks for any other reason silently unbinds that cap.
+        return degraded("spend_limit.pricing_data_available", False, exc=exc)
 
 
 def global_ceiling() -> TierSpendLimits:
@@ -170,8 +175,11 @@ def _preset_routing(preset_id: str) -> dict[str, str]:
         from reasoner.presets import PRESETS
 
         preset = PRESETS.get(preset_id)
-    except Exception:
-        return {}
+    except Exception as exc:
+        # No routing makes estimate_run_cost return 0.0, and 0.0 is under
+        # every per-run ceiling, so this failure reads downstream as "this
+        # run is free" rather than "this run could not be priced".
+        return degraded("spend_limit.preset_routing", {}, exc=exc)
 
     if preset is None:
         return {}
@@ -257,8 +265,13 @@ def _required_tier(preset_id: str) -> SubscriptionTier:
         from reasoner.domain.preset_core import get_preset_tier
 
         return get_preset_tier(preset_id)
-    except Exception:
-        return SubscriptionTier.FREE
+    except Exception as exc:
+        # FREE is the lowest rank, so preflight's tier refusal can never
+        # fire while this is failing: every preset looks available on every
+        # plan. api/dependencies.py holds the primary entitlement gate, so
+        # this is the second line, not the only one -- but a second line
+        # that has silently stopped checking is worse than none.
+        return degraded("spend_limit.required_tier", SubscriptionTier.FREE, exc=exc)
 
 
 # ── Subscription repository singleton ──

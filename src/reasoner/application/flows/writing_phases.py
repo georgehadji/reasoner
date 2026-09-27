@@ -52,6 +52,15 @@ def _normalize_sources_cited(
 
 async def run_writing_source_retrieval_phase(state: PipelineState, services: WorkflowServices) -> None:
     """Retrieve sources to ground article writing."""
+    # Pre-draft augmentation runs here rather than in WritingFlow.execute(), for
+    # the same reason ArticleFlow moved its own (article_phases.py:79-86): only
+    # the CLI ever called execute(), so on the web this pass never happened at
+    # all. Guarded on the key it produces, because a quality-gate retry of this
+    # phase would otherwise pay for it a second time.
+    if "pre_research_insights" not in state.writing_state:
+        from reasoner.application.flows.augmentation import run_augmentation
+        await run_augmentation(state, services.call_llm, services.log)
+
     services.log("WRITING", "Retrieving sources for article...", state)
     try:
         raw_plan, meta = await services.call_llm(

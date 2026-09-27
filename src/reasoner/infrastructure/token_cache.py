@@ -22,6 +22,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from reasoner.core.ports.clock import Clock, SystemClock
+
 logger = logging.getLogger(__name__)
 
 
@@ -89,12 +91,14 @@ class TokenAwareCache:
         cache_dir: Path | None = None,
         semantic_threshold: float = 0.85,  # 85% similarity for cache hit
         max_entries: int = 1000,
+        clock: Clock | None = None,
     ):
         self.max_tokens = max_tokens
         self.ttl_seconds = ttl_seconds
         self.cache_dir = cache_dir
         self.semantic_threshold = semantic_threshold
         self.max_entries = max_entries
+        self._clock: Clock = clock or SystemClock()
 
         self._entries: OrderedDict[str, CacheEntry] = OrderedDict()
         self._lru_max_entries: int = 512  # LRU cap — oldest evicted on overflow
@@ -184,7 +188,7 @@ class TokenAwareCache:
                 entry = self._entries[key]
 
                 # Check TTL — use wall-clock time so TTL survives disk reload
-                if time.time() - entry.created_at > entry.ttl_seconds:
+                if self._clock.time() - entry.created_at > entry.ttl_seconds:
                     await self._evict(key)
                     self._stats.misses += 1
                     return None
@@ -192,7 +196,7 @@ class TokenAwareCache:
                 # Exact prompt match — LRU promote
                 if entry.prompt_hash == prompt_hash:
                     entry.access_count += 1
-                    entry.last_accessed = time.time()
+                    entry.last_accessed = self._clock.time()
                     self._entries.move_to_end(key)  # LRU promotion
                     self._stats.hits += 1
                     self._stats.total_tokens_saved += entry.tokens_used
@@ -209,7 +213,7 @@ class TokenAwareCache:
                 if entry.prompt_hash == prompt_hash:
                     entry.access_count += 1
                     self._entries.move_to_end(ck)  # LRU promotion
-                    entry.last_accessed = time.time()
+                    entry.last_accessed = self._clock.time()
                     self._stats.hits += 1
                     self._stats.total_tokens_saved += entry.tokens_used
                     return entry.response
@@ -217,7 +221,7 @@ class TokenAwareCache:
                 # Jaccard semantic similarity on raw prompts
                 if entry.raw_prompt and self._jaccard_similarity(prompt, entry.raw_prompt) >= semantic_threshold:
                     entry.access_count += 1
-                    entry.last_accessed = time.time()
+                    entry.last_accessed = self._clock.time()
                     self._stats.hits += 1
                     self._stats.total_tokens_saved += entry.tokens_used
                     return entry.response
@@ -256,8 +260,8 @@ class TokenAwareCache:
                 prompt_hash=self._compute_prompt_hash(prompt),
                 response=response,
                 tokens_used=tokens_used,
-                created_at=time.time(),
-                last_accessed=time.time(),
+                created_at=self._clock.time(),
+                last_accessed=self._clock.time(),
                 ttl_seconds=ttl_seconds or self.ttl_seconds,
                 raw_prompt=prompt,
             )
@@ -313,7 +317,7 @@ class TokenAwareCache:
 
     async def _cleanup_expired(self) -> int:
         """Evict all TTL-expired entries from memory and disk. Returns count removed."""
-        now = time.time()
+        now = self._clock.time()
         expired = [
             key for key, entry in self._entries.items()
             if now - entry.created_at > entry.ttl_seconds
@@ -400,7 +404,7 @@ class TokenAwareCache:
                 entry = CacheEntry(**data)
 
                 # Skip expired entries — use wall-clock time for cross-process TTL
-                if time.time() - entry.created_at > entry.ttl_seconds:
+                if self._clock.time() - entry.created_at > entry.ttl_seconds:
                     f.unlink()
                     continue
 

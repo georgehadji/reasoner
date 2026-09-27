@@ -159,6 +159,14 @@ async def run_delphi_convergence_phase(state: PipelineState, services: WorkflowS
         state.delphi_state["consensus"] = data
 
 async def run_delphi_dissent_phase(state: PipelineState, services: WorkflowServices) -> None:
+    # The skip used to live in DelphiFlow.execute(), which only the CLI called,
+    # so the web path paid for this LLM call on every run including converged
+    # ones. delphi.py already documented the intent -- "the phase itself can
+    # skip if converged" -- it just was not implemented here.
+    if state.delphi_state.get("converged", False):
+        services.log("DELPHI", "Panel converged — skipping dissent capture.", state)
+        return
+
     services.log("DELPHI", "Capturing minority dissent...", state)
     stats = state.delphi_state.get("aggregated_stats", {})
     outlier = stats.get("outlier_expert", "expert_1")

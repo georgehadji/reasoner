@@ -123,6 +123,33 @@ _RICH_JSON = {
     "decision": "Paris is the capital.",
     "article": "Paris is the capital of France.",
     "final_article": "Paris is the capital of France.",
+    # The docstring above calls this payload "a superset of what any phase
+    # parser looks for". It was not: `scores` and `stress_tests` were absent,
+    # which nothing noticed because the per-phase quality gate never executed on
+    # this path (WORKFLOW_RUNNER_ENABLED was off). With the gate on,
+    # quality/criteria.py fails "Critique & Pruning" on an empty `scores` and
+    # "Stress Testing" on empty `stress_tests`, the phase burns its retry budget
+    # and the run ends with no synthesis. A fake standing in for a competent
+    # model has to return what a competent model returns.
+    "scores": [
+        {
+            "perspective": name,
+            "logical_consistency": 8.0,
+            "evidence_support": 7.5,
+            "failure_resilience": 7.0,
+            "feasibility": 8.5,
+            "bias_flags": [],
+            "steel_man": f"The strongest form of the {name} reading.",
+        }
+        for name in ("constructive", "destructive", "systemic", "minimalist")
+    ],
+    "stress_tests": [
+        {"scenario": "optimal", "survival_rate": 0.9,
+         "failure_mode": "none material", "recovery_path": "n/a"},
+        {"scenario": "adversarial", "survival_rate": 0.6,
+         "failure_mode": "regional devolution weakens the centre",
+         "recovery_path": "treat the claim as historical, not structural"},
+    ],
 }
 
 _JSON_BLOB = json.dumps(_RICH_JSON)

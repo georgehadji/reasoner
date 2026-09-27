@@ -141,8 +141,35 @@ spec/.gate-enabled
 /harden-hooks-windows.sh
 /adopt-into-existing.sh
 /website-production-prompt-system.md
+
+# claudex hook runtime logs (root and ui-next). Never useful in history.
+**/.claude/claudex/
+
+# Studio-template scaffolding. The root-level copy is ignored above; this one
+# was moved into docs/ and escaped that rule. It is not Reasoner documentation.
+/docs/website-production-prompt-system.md
 # The generic build/ rule above is for compiled output. The studio pipeline ships a
 # skill named build/ which must be tracked.
 !.claude/skills/build/
 !.claude/skills/build/**
 
+
+# --- vendored agent-skill installs (npx skills add / npx impeccable install) ---
+# These land as near-identical copies under every detected harness. The impeccable
+# engine alone is a 14.6 MB binary written four times; the whole set is ~64 MB of
+# duplication. skills-lock.json plus the two install commands reproduce all of it,
+# so the lock file is tracked and the copies are not.
+/.agents/
+/.codex/
+/.qwen/
+/.claude/skills/impeccable/
+/.claude/skills/humanizer/
+/.claude/agents/impeccable-*.md
+/.gemini/skills/
+/.github/skills/
+/.github/agents/
+/.github/hooks/
+
+# scripts/gate.py's proof markers -- one run's evidence that a CI gate
+# actually executed, not a build artifact anything reads afterward.
+/.gates/

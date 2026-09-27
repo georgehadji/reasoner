@@ -41,12 +41,37 @@ def test_backward_compat_value_comparison() -> None:
 
 
 def test_event_classes_populated() -> None:
-    """All 4 registries have correct entries."""
-    assert len(PIPELINE_EVENT_CLASSES) == 24
+    """All 4 registries have correct entries.
+
+    Hard numbers on purpose: adding an event type should be a deliberate diff.
+    Pipeline went 24 -> 26 on 2026-09-09 with PHASE_QUALITY_CHECKED and
+    PHASE_RETRIED, which WorkflowRunner had been constructing for months
+    against members that did not exist.
+    """
+    assert len(PIPELINE_EVENT_CLASSES) == 26
     assert len(WIDGET_EVENT_CLASSES) == 3
     assert len(MEMORY_EVENT_CLASSES) == 2
     assert len(SAAS_EVENT_CLASSES) == 12
-    assert len(EVENT_CLASSES) == 41
+    assert len(EVENT_CLASSES) == 43
+
+
+def test_every_event_type_has_a_class() -> None:
+    """A member with no registry entry degrades to bare DomainEvent.
+
+    ``make_event`` falls back to ``DomainEvent`` for an unregistered type, and
+    ``DomainEvent`` carries none of the payload fields — so every keyword the
+    caller passed raises TypeError, which is precisely how PHASE_QUALITY_CHECKED
+    and PHASE_RETRIED went unnoticed. Counting is not enough; the mapping has to
+    be total.
+    """
+    for enum_cls, registry in (
+        (PipelineEventType, PIPELINE_EVENT_CLASSES),
+        (WidgetEventType, WIDGET_EVENT_CLASSES),
+        (MemoryEventType, MEMORY_EVENT_CLASSES),
+        (SaaSEventType, SAAS_EVENT_CLASSES),
+    ):
+        missing = [m.name for m in enum_cls if m not in registry]
+        assert missing == [], f"{enum_cls.__name__} members with no class: {missing}"
 
 
 def test_make_event_with_sub_type() -> None:
@@ -123,8 +148,11 @@ async def test_saas_only_subscription() -> None:
 
 
 def test_all_event_types_map() -> None:
-    """ALL_EVENT_TYPES contains all enum values."""
-    assert len(ALL_EVENT_TYPES) == 41
+    """ALL_EVENT_TYPES contains all enum values.
+
+    41 -> 43 on 2026-09-09: PHASE_QUALITY_CHECKED and PHASE_RETRIED.
+    """
+    assert len(ALL_EVENT_TYPES) == 43
     assert ALL_EVENT_TYPES["pipeline_started"] == PipelineEventType.PIPELINE_STARTED
     assert ALL_EVENT_TYPES["widget_detected"] == WidgetEventType.WIDGET_DETECTED
     assert ALL_EVENT_TYPES["memory_stored"] == MemoryEventType.MEMORY_STORED

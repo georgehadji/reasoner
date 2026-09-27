@@ -6,6 +6,7 @@ import logging
 
 import reasoner.phases as phases
 from reasoner.application.flows.base import WorkflowServices
+from reasoner.core.degrade import degraded
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.infrastructure.search.discovery import get_search_client_for_method
 from reasoner.parsing import ParseError, extract_json
@@ -152,8 +153,11 @@ async def run_pre_mortem_case_study_phase(state: PipelineState, services: Workfl
                 # Add "failure case study" or "postmortem" to find real incidents
                 failure_q = f"{q} failure case study OR postmortem OR lessons learned"
                 return await client.search(failure_q, num_results=5)
-            except Exception:
-                return []
+            except Exception as exc:
+                # Each dropped query narrows the antithesis to whatever the
+                # other queries happened to find. Silently returning [] made a
+                # thin antithesis indistinguishable from a well-searched one.
+                return degraded("dialectical.antithesis_search", [], exc=exc, state=state)
 
         results = await _asyncio.gather(*[_search(q) for q in queries], return_exceptions=True)
         flattened = []

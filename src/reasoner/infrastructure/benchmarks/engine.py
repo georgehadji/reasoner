@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from reasoner.core.degrade import degraded
 from reasoner.infrastructure.benchmarks.runner import BENCHMARK_BUDGET, BenchmarkRunner
 
 logger = logging.getLogger(__name__)
@@ -87,12 +88,50 @@ class BenchmarkEngine:
 
         # Build capability scores from results
         scores: dict[str, float] = {}
+        measured_samples = 0
+        unmeasured: list[str] = []
         for result in run.suite_results:
             dim = result.get("dimension", result.get("suite_name", "unknown"))
+            samples = result.get("sample_count", 0)
+            if samples <= 0:
+                # runner.run_suite returns score=0.0 with sample_count=0 for a
+                # suite that never ran. Filing that 0.0 as a measurement is the
+                # defect: UtilityScorer._capability_match weights it exactly
+                # like a model that genuinely failed every prompt, so an
+                # outage in one suite demotes the model for that dimension
+                # until someone re-benchmarks it.
+                unmeasured.append(dim)
+                continue
             scores[dim] = result.get("score", 0.0)
+            measured_samples += samples
 
-        # Store to registry
-        if self.registry and scores:
+        if unmeasured:
+            # update_capabilities replaces the whole profile, so simply
+            # omitting a dimension would erase last week's real measurement
+            # for it. Carry the previous value instead, and say so.
+            previous = self.registry.get_profile(model_id) if self.registry else None
+            prev_scores = (
+                previous.capabilities.scores
+                if previous is not None and previous.capabilities is not None
+                else {}
+            )
+            carried = [dim for dim in unmeasured if dim in prev_scores]
+            for dim in carried:
+                scores[dim] = prev_scores[dim]
+            degraded(
+                "benchmarks.capability_profile",
+                None,
+                exc=RuntimeError("benchmark suite produced no samples"),
+                detail=(
+                    f"{model_id}: unmeasured {sorted(unmeasured)}, "
+                    f"carried forward {sorted(carried)}"
+                ),
+            )
+
+        # Store to registry. `measured_samples`, not `scores`: a run where
+        # every suite died would otherwise stamp a fresh measured_at onto
+        # numbers that are entirely carried forward.
+        if self.registry and measured_samples:
             import time
 
             from reasoner.domain.model_capabilities import ModelCapabilities
@@ -100,7 +139,7 @@ class BenchmarkEngine:
                 scores=scores,
                 source="benchmark",
                 measured_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                sample_count=sum(r.get("sample_count", 0) for r in run.suite_results),
+                sample_count=measured_samples,
             )
             try:
                 self.registry.update_capabilities(model_id, caps)
@@ -112,6 +151,9 @@ class BenchmarkEngine:
             "model_id": model_id,
             "suites_run": len(run.suite_results),
             "scores": scores,
+            # Which dimensions in `scores` are not from this run. Without it a
+            # caller cannot tell a carried-forward number from a fresh one.
+            "unmeasured": sorted(unmeasured),
             "cost_usd": run.total_cost_usd,
             "duration_seconds": run.duration_seconds,
         }

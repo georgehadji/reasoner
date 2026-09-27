@@ -23,6 +23,7 @@ from reasoner.application.ports.service_protocols import (
     TelemetryStoreProtocol,
 )
 from reasoner.core.constants import DEFAULT_CLI_PRESET, GATE_TIMEOUT_SECONDS
+from reasoner.core.degrade import degraded
 from reasoner.core.ports.model_registry_port import get_model_registry_port
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.hypergate import HyperGateAgent
@@ -44,15 +45,18 @@ def _synthesis_model_of(state: PipelineState) -> str:
 
     Reads the canonical per-phase model map on cost_state. Returns "" rather than
     raising — provenance is metadata, and a missing model id must not cost the
-    run its memory write.
+    run its memory write. It is not free, though: a chunk written without model
+    attribution cannot be revoked by lineage, so it is dropped on recall rather
+    than replayed. Losing provenance silently means losing the memory write
+    silently, one recall later.
     """
     try:
         by_key = getattr(state.cost_state, "_phase_models_by_key", {}) or {}
         for key in ("synthesis", "phase5_synthesis", "final_synthesis"):
             if models := by_key.get(key):
                 return str(models[-1])
-    except Exception:  # pragma: no cover - provenance is never load-bearing
-        pass
+    except Exception as exc:  # pragma: no cover
+        return degraded("orchestrator.synthesis_provenance", "", exc=exc, state=state)
     return ""
 
 
@@ -80,8 +84,12 @@ def _observe_propagation_shape(text: str, run_id: str | None) -> None:
         from reasoner.infrastructure.metrics import count_propagation_pattern
 
         count_propagation_pattern("synthesis_learn", len(signal.structural_hits))
-    except Exception:  # pragma: no cover - observability is never load-bearing
-        pass
+    except Exception as exc:  # pragma: no cover
+        # Emit-only, so this cannot fail the run -- but it is the only reading
+        # taken at the boundary where a synthesis becomes something future runs
+        # read back. A detector that has stopped scoring reports the same
+        # nothing as traffic that is clean.
+        degraded("orchestrator.propagation_signal", None, exc=exc)
 
 
 @dataclass
@@ -223,8 +231,10 @@ class PipelineOrchestrator:
                     effective_preset_name=effective_preset_name,
                     problem=getattr(req, "problem", ""),
                 )
-        except Exception:
-            pass
+        except Exception as exc:
+            # Failing here skips the cap check and runs the pipeline anyway, so
+            # a cap that cannot be read is indistinguishable from no cap set.
+            degraded("orchestrator.spend_cap_preflight", None, exc=exc)
 
         # E4: Attach a fallback-event buffer to the router at construction time.
         # Even if execute() is not called (streaming/main paths), events are captured.

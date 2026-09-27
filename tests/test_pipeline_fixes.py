@@ -7,6 +7,7 @@ import json
 
 import pytest
 
+from reasoner.application.flows.search_phases import _enrich_query
 from reasoner.models import PipelineState
 from reasoner.pipeline import ReasonerPipeline
 
@@ -67,7 +68,15 @@ async def test_stress_test_filters_language_hallucinations():
         "destructive": json.dumps({"core_analysis": "ok", "key_insights": []}),
         "systemic": json.dumps({"core_analysis": "ok", "key_insights": []}),
         "minimalist": json.dumps({"core_analysis": "ok", "key_insights": []}),
-        "scoring": json.dumps({"scores": []}),
+        "scoring": json.dumps({"scores": [
+            # Non-empty because the per-phase quality gate now runs on this path
+            # and fails "Critique & Pruning" on an empty scores list. The test is
+            # about source coercion in synthesis, so the critique only has to be well-formed enough for the
+            # run to reach it.
+            {"perspective": "constructive", "logical_consistency": 8.0,
+             "evidence_support": 7.5, "failure_resilience": 7.0,
+             "feasibility": 8.5, "bias_flags": [], "steel_man": "strongest form"},
+        ]}),
         "stress_testing": fake_response,
         "synthesis": json.dumps({"core_solution": "done"}),
     })
@@ -137,7 +146,15 @@ async def test_synthesis_coerces_string_sources():
         "destructive": json.dumps({"core_analysis": "ok", "key_insights": []}),
         "systemic": json.dumps({"core_analysis": "ok", "key_insights": []}),
         "minimalist": json.dumps({"core_analysis": "ok", "key_insights": []}),
-        "scoring": json.dumps({"scores": []}),
+        "scoring": json.dumps({"scores": [
+            # Non-empty because the per-phase quality gate now runs on this path
+            # and fails "Critique & Pruning" on an empty scores list. The test is
+            # about source coercion in synthesis, so the critique only has to be well-formed enough for the
+            # run to reach it.
+            {"perspective": "constructive", "logical_consistency": 8.0,
+             "evidence_support": 7.5, "failure_resilience": 7.0,
+             "feasibility": 8.5, "bias_flags": [], "steel_man": "strongest form"},
+        ]}),
         "stress_testing": json.dumps({"stress_tests": []}),
         "synthesis": json.dumps({
             "core_solution": "done",
@@ -362,9 +379,9 @@ def test_should_include_result_rejects_huggingface_vocab():
 
 
 def test_enrich_query_adds_disambiguation_for_agi():
-    enriched = ReasonerPipeline._enrich_query("AGI timeline", "When will AGI arrive? artificial general intelligence")
+    enriched = _enrich_query("AGI timeline", "When will AGI arrive? artificial general intelligence")
     assert "artificial general intelligence" in enriched
 
 
 def test_enrich_query_leaves_unrelated_queries_unchanged():
-    assert ReasonerPipeline._enrich_query("climate change", "What causes climate change?") == "climate change"
+    assert _enrich_query("climate change", "What causes climate change?") == "climate change"

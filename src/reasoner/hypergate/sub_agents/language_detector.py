@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 from reasoner.core.constants import HYPERGATE_MAX_TOKENS_LANGUAGE
+from reasoner.core.degrade import degraded
 from reasoner.hypergate.base_sub_agent import BaseSubAgent
 
 _SYSTEM = (
@@ -35,5 +36,9 @@ class LanguageDetectorSubAgent(BaseSubAgent):
                 "language": str(data.get("language", "English")),
                 "confidence": min(1.0, max(0.0, float(data.get("confidence", 0.5)))),
             }
-        except Exception:
-            return {"language": "English", "confidence": 0.0}
+        except Exception as exc:
+            return degraded(
+                "hypergate.language_detector.parse",
+                {"language": "English", "confidence": 0.0},
+                exc=exc,
+            )

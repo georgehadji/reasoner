@@ -71,20 +71,9 @@ class DebateFlow(WorkflowStrategy):
     def get_phases(self, state: PipelineState) -> list[PhaseStep]:
         return [
             PhaseStep(1.5, "Evidence Search", run_debate_evidence_search_phase, _ser_2),
-            PhaseStep(2, "Opening Statements", run_debate_opening_phase, _ser_2),
+            PhaseStep(2, "Opening Statements", run_debate_opening_phase, _ser_2, critical=True),
             PhaseStep(3, "Rebuttals", run_debate_rebuttal_phase, _ser_3),
             PhaseStep(4, "Cross-Examination", run_debate_cross_examine_phase, _ser_4),
             PhaseStep(4.5, "Judging", run_debate_judge_phase, _ser_3),
             PhaseStep(5, "Synthesis", run_synthesis_phase, _ser_5),
         ]
-
-    async def execute(
-        self,
-        state: PipelineState,
-        services: WorkflowServices,
-    ) -> PipelineState:
-        for step in self.get_phases(state):
-            success = await services.run_phase(step, state)
-            if not success and step.critical:
-                break
-        return state

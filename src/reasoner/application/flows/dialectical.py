@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
-
-from reasoner.application.flows.base import PhaseStep, WorkflowServices, WorkflowStrategy
+from reasoner.application.flows.base import PhaseStep, WorkflowStrategy
 from reasoner.application.flows.dialectical_phases import (
     run_analogical_abstraction_phase,
     run_analogical_domain_search_phase,
@@ -48,13 +46,6 @@ class ScientificFlow(WorkflowStrategy):
             PhaseStep(5, "Synthesis", run_synthesis_phase, _ser_synthesis),
         ]
 
-    async def execute(self, state: PipelineState, services: WorkflowServices, config: Any = None) -> PipelineState:
-        for step in self.get_phases(state):
-            success = await services.run_phase(step, state)
-            if not success and step.critical:
-                break
-        return state
-
 class SocraticFlow(WorkflowStrategy):
     """Socratic reasoning workflow."""
     def get_phases(self, state: PipelineState) -> list[PhaseStep]:
@@ -63,13 +54,6 @@ class SocraticFlow(WorkflowStrategy):
             PhaseStep(3, "Dialectic Answers", run_socratic_answer_phase, _ser_3),
             PhaseStep(4, "Synthesis", run_synthesis_phase, _ser_synthesis),
         ]
-
-    async def execute(self, state: PipelineState, services: WorkflowServices, config: Any = None) -> PipelineState:
-        for step in self.get_phases(state):
-            success = await services.run_phase(step, state)
-            if not success and step.critical:
-                break
-        return state
 
 class PreMortemFlow(WorkflowStrategy):
     """Pre-Mortem reasoning workflow."""
@@ -83,13 +67,6 @@ class PreMortemFlow(WorkflowStrategy):
             PhaseStep(6, "Synthesis", run_synthesis_phase, _ser_synthesis),
         ]
 
-    async def execute(self, state: PipelineState, services: WorkflowServices, config: Any = None) -> PipelineState:
-        for step in self.get_phases(state):
-            success = await services.run_phase(step, state)
-            if not success and step.critical:
-                break
-        return state
-
 class BayesianFlow(WorkflowStrategy):
     """Bayesian reasoning workflow."""
     def get_phases(self, state: PipelineState) -> list[PhaseStep]:
@@ -102,13 +79,6 @@ class BayesianFlow(WorkflowStrategy):
             PhaseStep(6, "Synthesis", run_synthesis_phase, _ser_synthesis),
         ]
 
-    async def execute(self, state: PipelineState, services: WorkflowServices, config: Any = None) -> PipelineState:
-        for step in self.get_phases(state):
-            success = await services.run_phase(step, state)
-            if not success and step.critical:
-                break
-        return state
-
 class DialecticalFlow(WorkflowStrategy):
     """Dialectical reasoning workflow."""
     def get_phases(self, state: PipelineState) -> list[PhaseStep]:
@@ -119,13 +89,6 @@ class DialecticalFlow(WorkflowStrategy):
             PhaseStep(5, "Aufhebung", run_dialectical_aufhebung_phase, _ser_5),
             PhaseStep(6, "Synthesis", run_synthesis_phase, _ser_synthesis),
         ]
-
-    async def execute(self, state: PipelineState, services: WorkflowServices, config: Any = None) -> PipelineState:
-        for step in self.get_phases(state):
-            success = await services.run_phase(step, state)
-            if not success and step.critical:
-                break
-        return state
 
 class AnalogicalFlow(WorkflowStrategy):
     """Analogical reasoning workflow."""
@@ -138,10 +101,3 @@ class AnalogicalFlow(WorkflowStrategy):
             PhaseStep(5, "Transfer", run_analogical_transfer_phase, _ser_5),
             PhaseStep(6, "Synthesis", run_synthesis_phase, _ser_synthesis),
         ]
-
-    async def execute(self, state: PipelineState, services: WorkflowServices, config: Any = None) -> PipelineState:
-        for step in self.get_phases(state):
-            success = await services.run_phase(step, state)
-            if not success and step.critical:
-                break
-        return state

@@ -83,6 +83,14 @@ def _check_perspectives(state: PipelineState) -> PhaseQualityResult:
 
 
 def _check_critique(state: PipelineState) -> PhaseQualityResult:
+    if not state.candidates:
+        # run_critique_phase returns early with "No candidates to critique"
+        # (application/flows/perspective_phases.py:243). Research flows reach
+        # this phase without a Perspectives phase in front of it, so empty
+        # scores here are the phase honouring its own contract. Failing it
+        # ended those runs with no synthesis the moment the quality gate began
+        # executing -- see docs/plans/architecture-score-9-remediation-2026-09-09.md A-2.
+        return _ok(score=8.0)
     if not state.scores:
         return _fail(
             "Critique produced no scores.",
@@ -108,6 +116,10 @@ def _check_critique(state: PipelineState) -> PhaseQualityResult:
 
 
 def _check_stress_testing(state: PipelineState) -> PhaseQualityResult:
+    if not state.top_candidates:
+        # Same skip contract, one phase later: run_stress_test_phase returns
+        # early with "No top candidates to stress test" (perspective_phases.py:297).
+        return _ok(score=8.0)
     if not state.stress_results:
         return _fail(
             "Stress testing produced no results.",

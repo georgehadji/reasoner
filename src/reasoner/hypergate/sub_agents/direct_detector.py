@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 from reasoner.core.constants import HYPERGATE_MAX_TOKENS_DIRECT
+from reasoner.core.degrade import degraded
 from reasoner.hypergate.base_sub_agent import BaseSubAgent
 
 _CREATIVE_PATTERNS = [
@@ -52,5 +53,9 @@ class DirectDetectorSubAgent(BaseSubAgent):
                 "confidence": min(1.0, max(0.0, float(data.get("confidence", 0.5)))),
                 "rationale": str(data.get("rationale", "")),
             }
-        except Exception:
-            return {"is_direct": False, "confidence": 0.0, "rationale": "parse error"}
+        except Exception as exc:
+            return degraded(
+                "hypergate.direct_detector.parse",
+                {"is_direct": False, "confidence": 0.0, "rationale": "parse error"},
+                exc=exc,
+            )

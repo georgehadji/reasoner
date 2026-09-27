@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, TypeVar
 
+from reasoner.core.ports.clock import Clock, SystemClock
 from reasoner.logging_utils import llm_logger
 
 try:
@@ -84,13 +85,15 @@ class CircuitBreaker:
         self,
         name: str,
         config: CircuitBreakerConfig | None = None,
+        clock: Clock | None = None,
     ):
         self.name = name
         self.config = config or CircuitBreakerConfig()
+        self._clock: Clock = clock or SystemClock()
         self._state = CircuitState.CLOSED
         self._stats = CircuitBreakerStats()
         self._lock = asyncio.Lock()
-        self._last_state_change = time.monotonic()
+        self._last_state_change = self._clock.monotonic()
 
     def _update_metrics(self) -> None:
         """Export circuit state to Prometheus gauges."""
@@ -120,11 +123,11 @@ class CircuitBreaker:
 
         if self._state == CircuitState.OPEN:
             # Check if timeout has passed to transition to half-open
-            elapsed = time.monotonic() - self._last_state_change
+            elapsed = self._clock.monotonic() - self._last_state_change
             if elapsed >= self.config.timeout_seconds:
                 # Atomic transition: OPEN → HALF_OPEN
                 self._state = CircuitState.HALF_OPEN
-                self._last_state_change = time.monotonic()
+                self._last_state_change = self._clock.monotonic()
                 self._stats.half_open_current_calls = 0  # Reset counter for new half-open period
                 llm_logger.info(
                     f"Circuit '{self.name}' transitioning to HALF_OPEN",
@@ -211,7 +214,7 @@ class CircuitBreaker:
             self._stats.successful_calls += 1
             self._stats.consecutive_successes += 1
             self._stats.consecutive_failures = 0
-            self._stats.last_success_time = time.monotonic()
+            self._stats.last_success_time = self._clock.monotonic()
 
             if self._state == CircuitState.HALF_OPEN:
                 # Slot release is handled by _release_call() in the caller's
@@ -222,7 +225,7 @@ class CircuitBreaker:
                     self._state = CircuitState.CLOSED
                     self._stats.consecutive_successes = 0
                     self._stats.half_open_current_calls = 0  # Reset counter when closing
-                    self._last_state_change = time.monotonic()
+                    self._last_state_change = self._clock.monotonic()
                     self._update_metrics()
                     llm_logger.info(
                         f"Circuit '{self.name}' CLOSED after recovery",
@@ -235,13 +238,13 @@ class CircuitBreaker:
             self._stats.failed_calls += 1
             self._stats.consecutive_failures += 1
             self._stats.consecutive_successes = 0
-            self._stats.last_failure_time = time.monotonic()
+            self._stats.last_failure_time = self._clock.monotonic()
 
             if self._state == CircuitState.HALF_OPEN:
                 # Any failure in half-open goes back to open
                 self._state = CircuitState.OPEN
                 self._stats.half_open_current_calls = 0  # Reset counter when opening
-                self._last_state_change = time.monotonic()
+                self._last_state_change = self._clock.monotonic()
                 self._update_metrics()
                 llm_logger.warning(
                     f"Circuit '{self.name}' reopened after half-open failure",
@@ -251,7 +254,7 @@ class CircuitBreaker:
                 if self._stats.consecutive_failures >= self.config.failure_threshold:
                     self._state = CircuitState.OPEN
                     self._stats.half_open_current_calls = 0  # Reset counter when opening
-                    self._last_state_change = time.monotonic()
+                    self._last_state_change = self._clock.monotonic()
                     self._update_metrics()
                     llm_logger.warning(
                         f"Circuit '{self.name}' opened after {self._stats.consecutive_failures} failures",
@@ -276,7 +279,7 @@ class CircuitBreaker:
         async with self._lock:
             self._state = CircuitState.CLOSED
             self._stats = CircuitBreakerStats()
-            self._last_state_change = time.monotonic()
+            self._last_state_change = self._clock.monotonic()
         llm_logger.info(
             f"Circuit '{self.name}' manually reset",
             extra={"circuit": self.name, "state": "closed"},

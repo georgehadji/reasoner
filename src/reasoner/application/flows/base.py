@@ -19,14 +19,12 @@ class PhaseStep:
         fn: Callable,
         serializer: Callable,
         critical: bool = False,
-        depends_on: list[str] = None
     ):
         self.num = num
         self.name = name
         self.fn = fn
         self.serializer = serializer
         self.critical = critical
-        self.depends_on = depends_on or []
 
 @runtime_checkable
 class WorkflowServices(Protocol):
@@ -50,16 +48,51 @@ class WorkflowServices(Protocol):
     async def run_phase(self, step: PhaseStep, state: PipelineState, **kwargs: Any) -> bool: ...
 
 @runtime_checkable
-class WorkflowStrategy(Protocol):
-    """Protocol for reasoning workflow strategies."""
+class PhaseObserver(Protocol):
+    """Side effects a driver wants around each phase, in the order they happen.
 
-    async def execute(
+    ``WorkflowRunner.run_phase`` awaits every hook inline. That is the point:
+    the EventBus runs handlers concurrently, and queues them once started, so
+    it is the right channel for projections and the wrong one for an SSE
+    stream whose frame order is the contract the browser reads. The runner
+    still publishes its ``PHASE_*`` domain events either way.
+
+    ``result`` is the ``PhaseQualityResult`` from the phase's quality gate, or
+    None on a phase that never got that far.
+    """
+
+    async def on_phase_start(self, step: PhaseStep, state: PipelineState) -> None: ...
+
+    async def on_phase_quality(
+        self, step: PhaseStep, state: PipelineState, result: Any, attempt: int
+    ) -> None: ...
+
+    async def on_phase_retry(
+        self, step: PhaseStep, state: PipelineState, result: Any, attempt: int, max_attempts: int
+    ) -> None: ...
+
+    async def on_phase_error(
         self,
+        step: PhaseStep,
         state: PipelineState,
-        services: WorkflowServices,
-    ) -> PipelineState:
-        """Execute the reasoning workflow."""
-        ...
+        exc: BaseException | None,
+        message: str,
+        fatal: bool,
+    ) -> None: ...
+
+    async def on_phase_complete(
+        self, step: PhaseStep, state: PipelineState, duration: float, result: Any
+    ) -> None: ...
+
+
+@runtime_checkable
+class WorkflowStrategy(Protocol):
+    """Protocol for reasoning workflow strategies.
+
+    Steps only. The loop that runs them lives in ``WorkflowRunner.run``; a
+    strategy that supplies its own would be reachable from the CLI and not
+    from the web, which is exactly the split this Protocol used to permit.
+    """
 
     def get_phases(self, state: PipelineState) -> list[PhaseStep]:
         """Return the list of phases for this strategy."""

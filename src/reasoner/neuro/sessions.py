@@ -21,6 +21,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+from reasoner.core.degrade import degraded
+
 log = logging.getLogger("neuro.sessions")
 
 
@@ -256,8 +258,12 @@ class SessionManager:
                         "tier": "warm",
                     }
                 )
-            except Exception:
-                pass
+            except Exception as exc:
+                # An unreadable warm file drops that session out of the
+                # listing entirely, with nothing to say it was ever there.
+                degraded(
+                    "neuro.sessions.warm_listing", None, exc=exc, detail=f"file={f.name}"
+                )
         return sessions
 
     def search_hot(self, query: str, max_results: int = 10) -> list[dict]:
@@ -517,8 +523,13 @@ class SessionManager:
                             count += 1
                     except json.JSONDecodeError:
                         pass
-        except Exception:
-            pass
+        except Exception as exc:
+            # Deliberately not cached. `count` is 0 only because the read
+            # failed, and caching that would pin this file at zero exchanges
+            # for the rest of the process -- a transient error made permanent.
+            return degraded(
+                "neuro.sessions.count_entries", 0, exc=exc, detail=f"file={path.name}"
+            )
         self._counts_cache[key] = count
         return count
 
@@ -531,8 +542,15 @@ class SessionManager:
                         entries.append(json.loads(line))
                     except json.JSONDecodeError:
                         pass
-        except Exception:
-            pass
+        except Exception as exc:
+            # Every caller checks .exists() before reading, so this is a real
+            # read failure on a file that is there -- not an absent session.
+            # The empty list it returns is indistinguishable from a session
+            # that genuinely has no history, and get_recent_context() feeds
+            # that straight into bootstrap context injection.
+            return degraded(
+                "neuro.sessions.read_jsonl", entries, exc=exc, detail=f"file={path.name}"
+            )
         return entries
 
     def _read_jsonl_gz(self, path: Path) -> list[dict]:
@@ -544,8 +562,13 @@ class SessionManager:
                         entries.append(json.loads(line))
                     except json.JSONDecodeError:
                         pass
-        except Exception:
-            pass
+        except Exception as exc:
+            # Same as _read_jsonl, plus the failure mode that motivated it: a
+            # truncated or corrupt .gz raises here, and returning [] reports
+            # the archived session as empty rather than as unreadable.
+            return degraded(
+                "neuro.sessions.read_jsonl_gz", entries, exc=exc, detail=f"file={path.name}"
+            )
         return entries
 
     @staticmethod

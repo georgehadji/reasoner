@@ -55,8 +55,6 @@ MODEL_MINIMAX_M1: str = "minimax-m1"
 # minimax-m2.5-free removed — dead endpoint
 
 # Poolside (temperature-supporting, non-OpenAI, cross-lab diversity)
-MODEL_LAGUNA_XS_FREE: str = "laguna-xs-free"
-MODEL_LAGUNA_M_FREE: str = "laguna-m-free"
 MODEL_LAGUNA_XS_21: str = "laguna-xs-2.1"
 
 # Xiaomi — MiMo series (v2.5, Apr 2026)
@@ -75,7 +73,6 @@ MODEL_MISTRAL_SMALL: str = "mistral-small"
 # v3.2 — new ultra-VFM models
 MODEL_STEPFUN_37_FLASH: str = "stepfun-3.7-flash"
 MODEL_NEX_N2_PRO_FREE: str = "nex-n2-pro-free"
-MODEL_NEMOTRON_3_ULTRA_FREE: str = "nemotron-3-ultra-free"
 
 # ── Google Gemini (real models, not aliased) ──
 MODEL_GEMINI_PRO_REAL: str = "gemini-pro-real"
@@ -83,8 +80,6 @@ MODEL_GEMINI_FLASH_LITE_REAL: str = "gemini-flash-lite-real"
 MODEL_GEMINI_25_FLASH_LITE: str = "gemini-2.5-flash-lite"
 MODEL_GEMINI_PRO_LATEST: str = "gemini-pro-latest"
 MODEL_GEMINI_FLASH_LATEST: str = "gemini-flash-latest"
-MODEL_NEMOTRON_3_SUPER_FREE: str = "nemotron-3-super-free"
-MODEL_NEMOTRON_NANO_OMNI_FREE: str = "nemotron-nano-omni-free"
 MODEL_LLAMA_NEMOTRON_SUPER_49B: str = "llama-nemotron-super-49b"
 
 # ── Additional model aliases used across the codebase ──

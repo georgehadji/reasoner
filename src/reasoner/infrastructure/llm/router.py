@@ -20,6 +20,7 @@ from reasoner.core.constants import (
     ROLE_TIMEOUTS,
     TIMEOUTS,
 )
+from reasoner.core.exceptions import ProviderError
 from reasoner.infrastructure.llm.base import BaseLLMProvider, LLMError
 from reasoner.infrastructure.llm.ports import DegradedLLMResponse
 from reasoner.infrastructure.llm.registry import build_provider
@@ -545,7 +546,7 @@ class ProviderRouter:
         extra_body: dict[str, Any] | None = None,
     ) -> tuple[str | DegradedLLMResponse, dict[str, Any]] | AsyncIterator[str | DegradedLLMResponse]:
         """
-        Call LLM for role. On LLMError or timeout, tries a fallback provider:
+        Call LLM for role. On ProviderError or timeout, tries a fallback provider:
           1. Explicit fallback from fallback_table (if defined and different)
           2. Primary (if role was using a non-primary model)
           3. Re-raises original error if no fallback available
@@ -598,7 +599,14 @@ class ProviderRouter:
                         text="", error=f"{assigned.model} timed out — no fallback",
                         metadata={"model": assigned.model},
                     ), {}
-            except LLMError as exc:
+            # P2 (docs/plans/root-cause-remediation-2026-09-07.md): ProviderError,
+            # not LLMError. LLMError was one leaf of a four-tree taxonomy, so
+            # sibling provider failures -- ProviderUnavailableError from the
+            # empty-choices guard, ProviderCreditsExhaustedError from a 402 --
+            # walked straight past this fallback chain and were caught only by
+            # the `except Exception` in flows/runner.py. LLMError now descends
+            # from ProviderError, so this is strictly wider than it was.
+            except ProviderError as exc:
                 if is_fallback:
                     logger.error(
                         "Role '%s' fallback '%s' failed (%s); trying direct fallback...",
@@ -673,16 +681,16 @@ class ProviderRouter:
                 failure = exc
             except Exception as exc:
                 # Deliberately broad. A provider is only *contractually* bound
-                # to raise LLMError once its retry budget is exhausted;
+                # to raise a ProviderError once its retry budget is exhausted;
                 # stream_complete_with_retry re-raises the raw transport error
                 # (httpx.ReadError, ConnectionError, ...) whenever it declines
                 # to retry — after a partial yield, or for a non-retryable
-                # failure. Catching LLMError alone let those escape the router
+                # failure. Catching ProviderError alone lets those escape the router
                 # entirely: no circuit.record_failure(), so a flapping provider
                 # never tripped the breaker; no fallback; and the consumer got
                 # a raw exception instead of a DegradedLLMResponse frame.
                 failure = exc
-                if not isinstance(exc, LLMError):
+                if not isinstance(exc, ProviderError):
                     logger.error(
                         "Role '%s' provider '%s' raised %s mid-stream",
                         role, provider.model, type(exc).__name__, exc_info=True,

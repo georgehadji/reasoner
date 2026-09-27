@@ -44,7 +44,10 @@ jobs:
         # "-r requirements.txt", so this one install covers everything.
 
       - name: Bundled catalogue matches live OpenRouter
-        run: python scripts/update_openrouter_catalogue.py --check
+        run: |
+          python scripts/gate.py --name catalogue \
+            --expect-stdout 'up to date' \
+            -- python scripts/update_openrouter_catalogue.py --check
         # The script needs no API key — https://openrouter.ai/api/v1/models is
         # public. Output is a +/- diff of model ids; refresh with the same script
         # minus --check, then re-run the alias-honesty tests.
@@ -52,10 +55,19 @@ jobs:
         # Advisory: a delisting upstream must page someone, not block an unrelated
         # PR. The blocking half of this contract is the alias-honesty suite, which
         # fails the moment a *routed* model goes missing from the refreshed file.
+        #
+        # Wrapped in gate.py (P1, docs/plans/root-cause-remediation-2026-09-07.md):
+        # continue-on-error alone cannot distinguish "ran, found no drift" from
+        # "crashed before printing anything" (D1). --expect-stdout requires the
+        # command to have actually said something about drift; the verify step
+        # below requires the marker to exist at all.
         continue-on-error: true
 
       - name: Every routed model still has a serving endpoint
-        run: python scripts/update_openrouter_catalogue.py --check-endpoints
+        run: |
+          python scripts/gate.py --name endpoints \
+            --expect-stdout 'routed models resolve|endpoint' \
+            -- python scripts/update_openrouter_catalogue.py --check-endpoints
         # A different question from the step above. That one asks whether the
         # bundled catalogue matches /api/v1/models; this one asks whether the
         # models we route can actually be served. nousresearch/hermes-4-70b was
@@ -66,10 +78,19 @@ jobs:
         # One request per routed model, no API key, ~195 requests. That cost is
         # why this runs on the schedule and not on every PR. Advisory for the
         # same reason as the drift check: a provider going down is an upstream
-        # event that must page someone, not red-X an unrelated PR.
+        # event that must page someone, not red-X an unrelated PR. This is the
+        # exact step D1 broke: ModuleNotFoundError before any print, silently
+        # reported success. gate.py's marker now proves it ran and printed the
+        # expected shape of output, not just that the workflow step exited 0.
         continue-on-error: true
 
       - name: Nothing routes a model the catalogue does not contain
-        run: python -m pytest tests/unit/test_model_alias_honesty.py -v -p no:randomly
+        run: |
+          python scripts/gate.py --name alias-honesty \
+            -- python -m pytest tests/unit/test_model_alias_honesty.py -v -p no:randomly
         env:
           CSRF_ENFORCE_BACKEND: 'false'
+
+      - name: Verify all gates ran
+        if: always()
+        run: python scripts/verify_gates.py --expect catalogue,endpoints,alias-honesty

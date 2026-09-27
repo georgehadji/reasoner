@@ -31,6 +31,10 @@ class MockRegistry:
 
     def __init__(self):
         self.updated = []
+        self.profiles = {}
+
+    def get_profile(self, model_id):
+        return self.profiles.get(model_id)
 
     def update_capabilities(self, model_id, capabilities):
         self.updated.append((model_id, capabilities))
@@ -224,3 +228,175 @@ class TestBenchmarkEngine:
                          "long_context", "multilingual", "consistency",
                          "critical_thinking"]:
             assert expected in names
+
+
+class _DeadProvider:
+    """A judge whose every call fails, the way an outage looks to a suite."""
+
+    model = "dead-model"
+
+    async def complete(self, system_prompt: str, user_prompt: str,
+                       max_tokens: int = 100, temperature: float = 0.0) -> str:
+        raise ConnectionError("judge provider unreachable")
+
+
+class TestFailedSamplesAreReported:
+    """P5, docs/plans/root-cause-remediation-2026-09-07.md.
+
+    Every suite scored a raised call exactly like a returned wrong answer:
+    the handler was ``except Exception: pass`` and the denominator stayed at
+    the attempted count. A suite whose judge was down reported 0.0 over its
+    full sample count, which ``engine.benchmark_model`` writes into the
+    capability registry that routing reads. The score is still 0.0 -- what
+    changed is that the run now says why.
+    """
+
+    @pytest.mark.parametrize("factory_path,attempted", [
+        ("reasoning.ReasoningSuite", 5),
+        ("coding.CodingSuite", 5),
+        ("writing.WritingSuite", 5),
+        ("json_fidelity.JsonFidelitySuite", 5),
+        ("long_context.LongContextSuite", 5),
+        ("multilingual.MultilingualSuite", 5),
+        ("consistency.ConsistencySuite", 5),
+        ("critical_thinking.CriticalThinkingSuite", 5),
+    ])
+    @pytest.mark.asyncio
+    async def test_every_suite_reports_a_dead_judge(self, factory_path, attempted, caplog):
+        import importlib
+        import logging
+
+        module_name, class_name = factory_path.split(".")
+        module = importlib.import_module(
+            f"reasoner.infrastructure.benchmarks.suites.{module_name}"
+        )
+        suite = getattr(module, class_name)()
+
+        with caplog.at_level(logging.WARNING):
+            result = await suite.run(_DeadProvider(), calls_per_suite=attempted)
+
+        assert result.score == 0.0
+        expected_site = f"benchmarks.{suite.suite_name}"
+        assert any(expected_site in r.message for r in caplog.records), (
+            f"{suite.suite_name} scored 0.0 with no trace of the outage: "
+            f"{[r.message for r in caplog.records]}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_a_healthy_run_reports_nothing(self, caplog):
+        """The reporter must stay quiet when every sample lands."""
+        import logging
+
+        from reasoner.infrastructure.benchmarks.suites.reasoning import ReasoningSuite
+
+        with caplog.at_level(logging.WARNING):
+            await ReasoningSuite().run(MockProvider(), calls_per_suite=5)
+
+        assert not [r for r in caplog.records if "benchmarks." in r.message], (
+            f"a clean run reported a degradation: {[r.message for r in caplog.records]}"
+        )
+
+
+class _ExplodingSuite:
+    """A suite that dies before producing any sample.
+
+    This is what ``runner.run_suite`` catches: it returns score=0.0 with
+    sample_count=0 and an ``error`` key, which is the existing "no measurement"
+    signal in this codebase.
+    """
+
+    suite_name = "reasoning"
+    dimension = "reasoning"
+
+    async def run(self, judge_provider, calls_per_suite: int = 10):
+        raise ConnectionError("suite never reached the judge")
+
+
+class TestZeroSampleDimensionsAreNotMeasurements:
+    """P5, docs/plans/root-cause-remediation-2026-09-07.md.
+
+    ``benchmark_model`` built its capability scores with
+    ``result.get("score", 0.0)`` and no look at ``sample_count``. A suite that
+    never ran therefore reached the capability registry as a hard 0.0 for its
+    dimension, indistinguishable from a model that failed every prompt, and
+    ``UtilityScorer._capability_match`` weights the two identically.
+    """
+
+    @pytest.mark.asyncio
+    async def test_a_dead_suite_does_not_land_as_a_zero(self):
+        from reasoner.infrastructure.benchmarks.suites.coding import CodingSuite
+
+        registry = MockRegistry()
+        engine = BenchmarkEngine(registry=registry)
+
+        result = await engine.benchmark_model(
+            "test-model", MockProvider(), suites=[_ExplodingSuite(), CodingSuite()],
+        )
+
+        assert result["scores"].get("reasoning") != 0.0, (
+            "an outage was filed as a measured score of 0.0"
+        )
+        assert result["unmeasured"] == ["reasoning"]
+        assert "coding" in result["scores"], "the healthy suite must still be stored"
+
+        _model_id, caps = registry.updated[0]
+        assert "reasoning" not in caps.scores
+        assert caps.sample_count > 0, "the healthy suite's samples were lost"
+
+    @pytest.mark.asyncio
+    async def test_an_unmeasured_dimension_keeps_its_last_real_score(self):
+        """update_capabilities replaces the profile, so omitting is erasing."""
+        from reasoner.domain.model_capabilities import (
+            ModelCapabilities,
+            ModelConstraints,
+            ModelProfile,
+        )
+        from reasoner.infrastructure.benchmarks.suites.coding import CodingSuite
+
+        registry = MockRegistry()
+        registry.profiles["test-model"] = ModelProfile(
+            model_id="test-model",
+            constraints=ModelConstraints(),
+            capabilities=ModelCapabilities(
+                scores={"reasoning": 0.9}, source="benchmark", sample_count=5,
+            ),
+        )
+        engine = BenchmarkEngine(registry=registry)
+
+        await engine.benchmark_model(
+            "test-model", MockProvider(), suites=[_ExplodingSuite(), CodingSuite()],
+        )
+
+        _model_id, caps = registry.updated[0]
+        assert caps.scores["reasoning"] == 0.9, (
+            f"last week's measurement was erased: {caps.scores}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_a_run_that_measured_nothing_does_not_touch_the_profile(self):
+        registry = MockRegistry()
+        engine = BenchmarkEngine(registry=registry)
+
+        await engine.benchmark_model(
+            "test-model", MockProvider(), suites=[_ExplodingSuite()],
+        )
+
+        assert registry.updated == [], (
+            "a run with no samples stamped a fresh measured_at onto the profile"
+        )
+
+    @pytest.mark.asyncio
+    async def test_the_gap_is_reported(self, caplog):
+        import logging
+
+        from reasoner.infrastructure.benchmarks.suites.coding import CodingSuite
+
+        engine = BenchmarkEngine(registry=MockRegistry())
+        with caplog.at_level(logging.WARNING):
+            await engine.benchmark_model(
+                "test-model", MockProvider(), suites=[_ExplodingSuite(), CodingSuite()],
+            )
+
+        assert any(
+            "benchmarks.capability_profile" in r.message for r in caplog.records
+        ), f"the incomplete profile was not reported: {[r.message for r in caplog.records]}"

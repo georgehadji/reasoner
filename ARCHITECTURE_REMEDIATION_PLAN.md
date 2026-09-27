@@ -112,7 +112,13 @@ The two CRITICAL deployment bugs. These are correctness, not aesthetics.
 
 Prerequisite for the CQRS activation in Phase D. Immutability first.
 
-#### C1 — Make `PipelineState` transition-safe (R6, part 1)
+#### C1 — ~~Make `PipelineState` transition-safe (R6, part 1)~~ · **HISTORICAL**
+
+> **2026-09-12.** The `StateTransition` / `PhaseOutput` discipline proposed below was
+> introduced, never completed, and has now been retired — its reducer never had a
+> production caller. See [ADR-006](docs/adr/006-mutable-pipeline-state.md) for the decision
+> and [docs/plans/phaseoutput-retirement-2026-09-12.md](docs/plans/phaseoutput-retirement-2026-09-12.md)
+> for the evidence. Kept below as the historical record of the attempt.
 - **File:** `domain/pipeline_state.py` (1654 lines)
 - **Problem:** Mutated in place by ~30 phase functions via `set_*`; shared by reference across `asyncio.gather` perspectives → interleave risk.
 - **Action (incremental, not full immutability yet):**

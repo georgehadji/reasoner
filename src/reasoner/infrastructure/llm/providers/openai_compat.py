@@ -23,12 +23,17 @@ from reasoner.core.constants import (
 from reasoner.core.constants import (
     OPENROUTER_BASE_URL as _OPENROUTER_BASE_URL,
 )
-from reasoner.exceptions import ProviderUnavailableError
+from reasoner.core.exceptions import (
+    ProviderError,
+    ProviderTimeoutError,
+    ProviderUnavailableError,
+)
 from reasoner.infrastructure.llm.base import (
     BaseLLMProvider,
     LLMError,
     config_signature,
     secret_digest,
+    translate_http_status,
 )
 from reasoner.infrastructure.llm.caching import build_messages, extract_cache_usage
 from reasoner.infrastructure.llm.utils import _json_response_format
@@ -36,27 +41,47 @@ from reasoner.infrastructure.llm.utils import _json_response_format
 logger = logging.getLogger(__name__)
 
 
-def _as_llm_error(model: str, exc: openai.APIError) -> LLMError:
-    """Convert an OpenAI SDK error into this layer's own error type.
+def _translate(model: str, exc: openai.APIError) -> ProviderError:
+    """Translate an OpenAI-SDK exception into the domain's error vocabulary.
 
-    ProviderRouter._execute_call recovers from exactly ``TimeoutError`` and
-    ``LLMError``; anything else propagates past the fallback chain to the phase.
-    Nothing here used to translate, so every SDK error escaped it. Observed on a
-    live run: OpenRouter routed ``nousresearch/hermes-4-70b`` to Nebius, which
-    answered ``404 ... The model NousResearch/Hermes-4-70B does not exist``, and
-    the destructive perspective was dropped from the run with no fallback
-    attempted, silently reducing cross-lab diversity from four voices to three.
+    This is the anti-corruption boundary for the OpenRouter lane (P2,
+    docs/plans/root-cause-remediation-2026-09-07.md). The domain owns the
+    vocabulary; an adapter translates into it here and nowhere else, so no
+    caller downstream ever inspects ``status_code`` again.
+
+    ProviderRouter._execute_call recovers from ``ProviderError`` and
+    ``TimeoutError``; anything else propagates past the fallback chain to the
+    phase. Nothing here used to translate at all, so every SDK error escaped
+    it. Observed on a live run: OpenRouter routed ``nousresearch/hermes-4-70b``
+    to Nebius, which answered ``404 ... The model NousResearch/Hermes-4-70B
+    does not exist``, and the destructive perspective was dropped from the run
+    with no fallback attempted, silently reducing cross-lab diversity from four
+    voices to three.
 
     ``openai.APITimeoutError`` is not a builtin ``TimeoutError`` (it descends
     from ``APIConnectionError``), so SDK timeouts escaped the router's timeout
     branch for the same reason and are covered here too.
 
-    The sibling adapter ``providers/direct.py`` already wraps its SDK
-    exceptions this way; this makes the OpenRouter lane consistent with it.
+    The 402 mapping used to live in ``base.complete_with_retry``, which read
+    ``getattr(exc, "status_code")``. That branch had been dead since this
+    function started wrapping SDK errors: the wrapper carried no status_code,
+    so a credit exhaustion reached the pipeline as an unclassified LLMError.
+    Translating at the boundary is what makes the mapping reachable again.
     """
     status = getattr(exc, "status_code", None)
     label = f"HTTP {status}" if status else type(exc).__name__
-    return LLMError(f"{model} call failed ({label}): {exc}")
+    detail = f"{model} call failed ({label}): {exc}"
+
+    by_status = translate_http_status(status, detail, model)
+    if by_status is not None:
+        return by_status
+    if isinstance(exc, openai.APITimeoutError):
+        return ProviderTimeoutError(detail)
+    if isinstance(exc, openai.APIConnectionError):
+        return ProviderUnavailableError(detail)
+    # Residual: the SDK gave us nothing to classify on. Still a ProviderError,
+    # so the router's fallback chain still fires.
+    return LLMError(detail)
 
 
 class OpenAICompatibleProvider(BaseLLMProvider):
@@ -223,7 +248,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         try:
             stream = await self.client.chat.completions.create(**kwargs)
         except openai.APIError as exc:
-            raise _as_llm_error(self.model, exc) from exc
+            raise _translate(self.model, exc) from exc
         async with stream as response:
             async for chunk in response:
                 if not chunk.choices:
@@ -376,7 +401,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                 else:
                     raise
         except openai.APIError as exc:
-            raise _as_llm_error(self.model, exc) from exc
+            raise _translate(self.model, exc) from exc
         if not response.choices:
             raise ProviderUnavailableError(
                 f"Provider returned empty choices (model={self.model}; possible content filtering)"
@@ -426,7 +451,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         try:
             response = await self.client.chat.completions.create(**kwargs)
         except openai.APIError as exc:
-            raise _as_llm_error(self.model, exc) from exc
+            raise _translate(self.model, exc) from exc
         if not response.choices:
             raise ProviderUnavailableError(
                 f"Provider returned empty choices (model={self.model}; possible content filtering)"

@@ -6,51 +6,13 @@ import asyncio
 from typing import Any
 from unittest.mock import MagicMock
 
-from reasoner.infrastructure.llm.ports import (
-    BaseLLMProvider,
-    LLMConfig,
-    LLMResponse,
-    Message,
-)
-
-
-class MockLLMProvider(BaseLLMProvider):
-    """Mock LLM provider that returns configurable responses."""
-
-    def __init__(
-        self,
-        response_text: str = "Mock response",
-        model: str = "mock-model",
-        fail_after: int = 0,
-        fail_with: Exception | None = None,
-    ):
-        super().__init__(model=model)
-        self.response_text = response_text
-        self.fail_after = fail_after
-        self.fail_with = fail_with
-        self.call_count = 0
-        self.last_messages: list[Message] = []
-        self.last_config: LLMConfig | None = None
-
-    async def _complete_impl(
-        self,
-        messages: list[Message],
-        config: LLMConfig | None = None,
-    ) -> LLMResponse:
-        self.call_count += 1
-        self.last_messages = messages
-        self.last_config = config
-
-        if self.fail_after > 0 and self.call_count >= self.fail_after:
-            raise self.fail_with or RuntimeError("Mock failure")
-
-        return LLMResponse(
-            content=self.response_text,
-            model_used=self.model,
-            tokens_prompt=sum(len(m.content) for m in messages) // 4,
-            tokens_completion=len(self.response_text) // 4,
-            finish_reason="stop",
-        )
+# MockLLMProvider lived here and subclassed ports.BaseLLMProvider -- the second
+# provider base, whose complete(messages, config) -> LLMResponse interface the
+# router cannot drive. It had no users anywhere in the suite, so P2
+# (docs/plans/root-cause-remediation-2026-09-07.md) deleted it along with that
+# base class rather than porting a dummy nobody called. A test that needs a
+# provider double should subclass reasoner.infrastructure.llm.base.BaseLLMProvider,
+# which is the one ProviderRouter actually calls.
 
 
 class MockEventStore:

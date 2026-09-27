@@ -133,14 +133,32 @@ def test_critique_pass():
 
 
 def test_critique_fail_no_scores():
-    state = _State(scores=[], top_candidates=[_candidate("x")])
+    state = _State(
+        candidates=[_candidate("a" * 60)], scores=[], top_candidates=[_candidate("x")]
+    )
     assert not evaluate_rules("Critique & Pruning", state).passed
 
 
 def test_critique_fail_bad_scores():
-    state = _State(scores=[_score(15.0)], top_candidates=[_candidate("x")])
+    state = _State(
+        candidates=[_candidate("a" * 60)],
+        scores=[_score(15.0)],
+        top_candidates=[_candidate("x")],
+    )
     result = evaluate_rules("Critique & Pruning", state)
     assert not result.passed
+
+
+def test_critique_passes_when_there_was_nothing_to_critique():
+    """The skip contract, not a loophole.
+
+    run_critique_phase returns early when state.candidates is empty, so a
+    research flow that has no Perspectives phase in front of it reaches the
+    gate with scores=[] having done exactly what it was asked. Scoring that as
+    a failure ended research-budget runs with no synthesis as soon as the gate
+    started executing.
+    """
+    assert evaluate_rules("Critique & Pruning", _State(candidates=[])).passed
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -153,13 +171,18 @@ def test_stress_pass():
 
 
 def test_stress_fail_empty():
-    state = _State(stress_results=[])
+    state = _State(top_candidates=[_candidate("x")], stress_results=[])
     assert not evaluate_rules("Stress Testing", state).passed
 
 
 def test_stress_fail_bad_rate():
-    state = _State(stress_results=[_stress(1.5)])
+    state = _State(top_candidates=[_candidate("x")], stress_results=[_stress(1.5)])
     assert not evaluate_rules("Stress Testing", state).passed
+
+
+def test_stress_passes_when_there_was_nothing_to_stress_test():
+    """run_stress_test_phase returns early on empty top_candidates."""
+    assert evaluate_rules("Stress Testing", _State(top_candidates=[])).passed
 
 
 # ─────────────────────────────────────────────────────────────────────────────
