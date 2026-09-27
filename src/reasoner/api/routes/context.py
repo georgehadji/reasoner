@@ -13,8 +13,25 @@ from reasoner.api.dependencies import (
     require_auth_if_legacy_disabled,
 )
 from reasoner.api.schemas import ContextAnalysisRequest
+from reasoner.application.flows.jury_phases import (
+    run_jury_critique_phase,
+    run_jury_generate_phase,
+    run_jury_verify_and_meta_eval_phase,
+)
+from reasoner.application.flows.perspective_phases import (
+    run_critique_phase,
+    run_perspectives_phase,
+    run_stress_test_phase,
+)
+from reasoner.application.flows.services import PipelineWorkflowServices
+from reasoner.application.flows.synthesis_phase import run_synthesis_phase
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.domain.saas import User
+
+
+def _svc(pipeline):
+    """The WorkflowServices a phase function takes, bound to this pipeline."""
+    return PipelineWorkflowServices(pipeline)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -100,19 +117,27 @@ async def run_with_context(
         state.web_discovery_results = req.context
         state.vetted_context = req.context
 
-        # Run the appropriate method pipeline
+        # Run the appropriate method pipeline.
+        #
+        # This is a hand-rolled phase sequence, not WorkflowRunner: the endpoint
+        # supplies its own vetted context and wants four phases, not a whole
+        # method. It therefore gets no retries, no quality gate, no PHASE_*
+        # events and no spend ceiling -- a pre-existing gap, listed here rather
+        # than silently carried, since routing it through the runner changes
+        # what a billed call costs.
+        services = _svc(pipeline)
         if req.method == "jury":
-            await pipeline._phase_jury_generate(state)
-            await pipeline._phase_jury_critique(state)
-            await pipeline._phase_jury_verify_and_meta_eval(state)
+            await run_jury_generate_phase(state, services)
+            await run_jury_critique_phase(
+                state, services, batch_critique=pipeline.batch_critique_jury
+            )
+            await run_jury_verify_and_meta_eval_phase(state, services)
         else:
-            # Multi-perspective
-            await pipeline._phase_2_perspectives(state)
-            await pipeline._phase_3_critique(state)
-            await pipeline._phase_4_stress_test(state)
+            await run_perspectives_phase(state, services, perspectives=pipeline.perspectives)
+            await run_critique_phase(state, services)
+            await run_stress_test_phase(state, services)
 
-        # Run synthesis
-        await pipeline._phase_synthesis(state)
+        await run_synthesis_phase(state, services)
 
         # Return the final solution
         if state.final_solution:

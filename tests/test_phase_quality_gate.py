@@ -139,7 +139,7 @@ def harness(monkeypatch):
         return None
 
     monkeypatch.setattr(mod, "resolve_user_tier", _tier)
-    monkeypatch.setattr(mod, "_persist_event", _persist)
+    # Event persistence lives in RunStream now, not in the execution module.
     monkeypatch.setattr("reasoner.api.execution.sse_observer._persist_event", _persist)
     monkeypatch.setattr(
         mod, "get_pipeline_ownership_repo",
@@ -160,6 +160,11 @@ def harness(monkeypatch):
 
 
 async def _run(mod_calls) -> list[dict]:
+    events, _state = await _run_returning_state(mod_calls)
+    return events
+
+
+async def _run_returning_state(mod_calls) -> tuple[list[dict], object]:
     from reasoner.api.execution.pipeline import PipelineExecutionService
 
     events: list[dict] = []
@@ -174,12 +179,36 @@ async def _run(mod_calls) -> list[dict]:
         problem="Does the quality gate run?",
         preset="multi-perspective-budget",
     )
-    await PipelineExecutionService().execute_run(
+    state = await PipelineExecutionService().execute_run(
         command, MagicMock(), sse_emit, user_id=None, initial_state=PipelineState(
             problem="Does the quality gate run?", preset_name="multi-perspective-budget"
         ),
     )
-    return events
+    return events, state
+
+
+@pytest.mark.asyncio
+async def test_execute_run_returns_the_state_it_built(harness):
+    """The streaming path's return value, which nothing asserted until now.
+
+    `execute_run` is annotated `-> PipelineState` and every path returned None:
+    four bare `return`s and a fall-through. RunPipelineCommandHandler assigns
+    that to `state` and passes it straight to `_completion_payload`, which
+    reads `state.phase_tokens`. So every finished web run raised
+    AttributeError in the handler *after* the client already had its `done`
+    frame -- recording PIPELINE_FAILED instead of PIPELINE_COMPLETED and
+    emitting a spurious trailing `error` frame.
+
+    tests/test_completion_event_contract.py drives handler.handle() without
+    sse_emit, so it exercises the non-streaming branch and never saw this.
+    This test rides the harness above because that is what drives execute_run
+    end to end.
+    """
+    _events, state = await _run_returning_state(harness)
+
+    assert state is not None, "execute_run returned None; the handler cannot complete the run"
+    assert isinstance(state, PipelineState)
+    assert state.problem == "Does the quality gate run?"
 
 
 @pytest.mark.asyncio

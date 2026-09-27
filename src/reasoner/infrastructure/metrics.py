@@ -7,6 +7,8 @@ Critical Enhancements:
 
 from __future__ import annotations
 
+from reasoner.core.ports.metrics_port import set_degradation_counter
+
 try:
     from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
     _PROMETHEUS_AVAILABLE = True
@@ -307,3 +309,14 @@ HYPERGATE_BUDGET_EXCEEDED_TOTAL = Counter(
     "reasoner_hypergate_budget_exceeded_total",
     "Gate decisions that exceeded the total request budget and fell back to pipeline",
 )
+
+
+# ── Fill core's degradation hook ──────────────────────────────────────────
+# core.degrade.degraded() used to reach REASONER_DEGRADATION_TOTAL through a
+# function-local `from reasoner.infrastructure.metrics import ...`. That was
+# the single import breaking the Layered Architecture contract: import-linter
+# reads the static graph, so a lazy import is still a `core -> infrastructure`
+# edge. Registering from this side is the sanctioned direction, and needs no
+# wiring at a composition root -- a process that never imports this module has
+# no registry to scrape anyway.
+set_degradation_counter(lambda site: REASONER_DEGRADATION_TOTAL.labels(site=site).inc())

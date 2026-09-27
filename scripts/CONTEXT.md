@@ -11,7 +11,7 @@ Utility automation scripts for running servers, executing specialized tests, ver
 - **`check_skill_maps.py`**: Detect drift between .claude/skills/map-*/SKILL.md and the folders they map.
 - **`ci-local.sh`**: Code or resource asset facilitating system functionality.
 - **`cleanup_streaming.py`**: Remove _stream_direct_answer
-- **`count_importlinter_exceptions.py`**: Semantic counter for `.importlinter`'s `ignore_imports` exception list.
+- **`count_importlinter_exceptions.py`**: Semantic counter for one `.importlinter` contract's `ignore_imports` list. `--contract 1` is the layers contract, `--contract 2` the Phase D `application -> infrastructure` contract; each has its own two-way ratchet.
 - **`extract_e1.py`**: direct.py
 - **`extract_run_stream.py`**: Extract the full body of run_stream
 - **`fix_importlinter.py`**: Example line: - reasoner.core.search -> reasoner.infrastructure.llm.registry (l.44)

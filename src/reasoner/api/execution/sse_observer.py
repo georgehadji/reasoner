@@ -48,36 +48,159 @@ _AUTH_HINT = (
 )
 
 
-class SseRunObserver:
-    """Emits one run's SSE frames, WS broadcasts and phase events."""
+class RunStream:
+    """One run's outbound surface: SSE frames, WS fan-out, event-store writes.
+
+    The run-level frames and the per-phase ones (SseRunObserver) go to the same
+    three places and share one aggregate version sequence, so they share one
+    object. Keeping them apart meant `execute_run` handing `event_version` to
+    the observer and reading it back out afterwards to number the terminal
+    event.
+    """
 
     def __init__(
         self,
         run_id: str,
         sse_emit: Callable[[dict | str], Awaitable[None]],
-        broadcast: Callable[[str, dict], None],
-        router: Any,
-        emitter: Any,
-        preset_name: str,
-        event_version: int = 1,
+        broadcast: Callable[[dict], None],
     ) -> None:
         self.run_id = run_id
-        self.sse_emit = sse_emit
         self.broadcast = broadcast
+        self.event_version = 1
+        # Wrapped here so every caller gets the idle detection, including the
+        # frames emitted before the phases start and after they finish.
+        self.emit, self.keepalive = keepalive_ticker(sse_emit)
+
+    async def both(self, payload: dict) -> None:
+        """A client-visible frame goes to the SSE stream and the WS fan-out."""
+        self.broadcast(payload)
+        await self.emit(payload)
+
+    async def persist(self, event_type: EventType, **fields: Any) -> None:
+        await _persist_event(
+            make_event(event_type, aggregate_id=self.run_id, version=self.event_version, **fields)
+        )
+        self.event_version += 1
+
+    # ── run-level frames ─────────────────────────────────────────────
+
+    async def started(
+        self,
+        *,
+        problem: str,
+        preset: str,
+        method: str,
+        auto_selected_method: str | None,
+        options: dict,
+        emitter: Any,
+    ) -> None:
+        payload: dict[str, Any] = {"type": "start", "preset": preset}
+        if auto_selected_method:
+            payload["auto_selected_method"] = auto_selected_method
+        await self.both(payload)
+
+        await self.persist(
+            EventType.PIPELINE_STARTED,
+            problem=problem,
+            preset=preset,
+            method=method,
+            options=options,
+        )
+        emitter.emit("PIPELINE_STARTED", problem=problem, preset=preset, method=method)
+
+    async def rejected(self, rejection: Any) -> None:
+        """The caller's plan cannot pay for the preset preflight settled on."""
+        await self.emit({
+            "type": "error",
+            "error": rejection.reason,
+            "code": (
+                "PRESET_TIER_REQUIRED"
+                if rejection.cap_type == "preset_tier"
+                else "SPEND_LIMIT_EXCEEDED"
+            ),
+            "data": {
+                "cap_type": rejection.cap_type,
+                "cap_usd": round(rejection.cap_usd, 4),
+                "estimated_usd": round(rejection.estimated_usd, 4),
+                "tier": rejection.tier.value,
+                "required_tier": (
+                    rejection.required_tier.value if rejection.required_tier else None
+                ),
+                "upgrade_url": "/pricing",
+            },
+        })
+
+    async def done(self, state: PipelineState, tokens: dict, duration: float) -> None:
+        # Kept as a named literal: tests/test_sdk_contract.py reads these keys
+        # off the source, because the frame cannot be produced without driving a
+        # whole pipeline and the TypeScript SDK reads every one of them.
+        done_payload = {
+            "type": "done",
+            "errors": state.errors,
+            # Failures the run survived by falling back (P5). Distinct from
+            # errors: nothing here stopped a phase, but the answer was produced
+            # with less than the full machinery.
+            "degradations": list(getattr(state, "degradations", []) or []),
+            "total_tokens": tokens,
+            "duration": duration,
+            "total_cost_usd": getattr(state, "total_cost_usd", 0.0),
+            "phase_costs": getattr(state, "phase_costs", {}),
+        }
+        await self.both(done_payload)
+        await self.persist(
+            EventType.PIPELINE_COMPLETED,
+            solution={
+                "core_solution": (
+                    getattr(state.final_solution, "core_solution", "")
+                    if state.final_solution else ""
+                )
+            },
+            total_tokens={"input": tokens["input"], "output": tokens["output"]},
+            total_duration_seconds=duration,
+            phases_completed=len(state.phase_durations),
+        )
+
+    async def failed(self, exc: BaseException, state: PipelineState | None) -> None:
+        """The run itself broke, as opposed to one phase inside it."""
+        message = f"Pipeline processing error: {type(exc).__name__}: {str(exc)[:120]}"
+        phase = getattr(state, "_current_phase_key", "unknown") if state else "unknown"
+
+        await self.persist(
+            EventType.PIPELINE_FAILED,
+            error=message,
+            phase_at_failure=phase,
+            phases_completed=len(state.phase_durations) if state else 0,
+        )
+        await self.both({
+            "type": "error",
+            "error_type": classify_error(exc),
+            "error_code": error_code_for_exception(exc),
+            "message": message,
+            "retryable": False,
+            "phase": None,
+            "phase_name": phase,
+        })
+        await self.both({"type": "done", "errors": [message]})
+
+
+class SseRunObserver:
+    """The per-phase half of a run's frames, as a PhaseObserver."""
+
+    def __init__(self, stream: RunStream, router: Any, emitter: Any, preset_name: str) -> None:
+        self.stream = stream
         self.router = router
         self.emitter = emitter
         self.preset_name = preset_name
-        # Continues the run-level sequence that PIPELINE_STARTED opened, and is
-        # read back by execute_run for the terminal PIPELINE_COMPLETED event.
-        self.event_version = event_version
         # state.errors is cumulative across the run. Remember the mark at each
         # phase start so phase_complete reports only what *this* phase appended.
         self._errors_before = 0
 
+    @property
+    def sse_emit(self) -> Callable[[dict | str], Awaitable[None]]:
+        return self.stream.emit
+
     async def _both(self, payload: dict) -> None:
-        """Every client-visible frame goes to the SSE stream and the WS fan-out."""
-        self.broadcast(self.run_id, payload)
-        await self.sse_emit(payload)
+        await self.stream.both(payload)
 
     # ── PhaseObserver ────────────────────────────────────────────────
 
@@ -213,10 +336,7 @@ class SseRunObserver:
     # ── helpers ──────────────────────────────────────────────────────
 
     async def _persist(self, event_type: EventType, **fields: Any) -> None:
-        await _persist_event(
-            make_event(event_type, aggregate_id=self.run_id, version=self.event_version, **fields)
-        )
-        self.event_version += 1
+        await self.stream.persist(event_type, **fields)
 
     def _observe_duration(self, name: str, duration: float) -> None:
         try:
