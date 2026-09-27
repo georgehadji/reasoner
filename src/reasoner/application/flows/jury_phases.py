@@ -4,20 +4,15 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import asdict
 from typing import Any
 
 import reasoner.phases as phases
 from reasoner.application.flows.base import WorkflowServices
-from reasoner.application.services.recovery_service import RecoveryService
-from reasoner.core.constants import TRUNCATION
-from reasoner.core.constants_limits import get_token_budget
 from reasoner.domain.core_types import (
     CriticDimensionScore,
     CriticScore,
     GenerationCandidate,
     MetaEvaluation,
-    SolutionCandidate,
     VerificationResult,
 )
 from reasoner.domain.pipeline_state import PipelineState
@@ -25,28 +20,6 @@ from reasoner.models import ClaimLabel
 from reasoner.parsing import extract_json
 
 logger = logging.getLogger(__name__)
-
-async def run_recovery_path(state: PipelineState, services: WorkflowServices, candidate_to_verify: SolutionCandidate | GenerationCandidate) -> None:
-    """Executes a cross-verification path for a potentially problematic candidate."""
-    candidate_id = candidate_to_verify.perspective if isinstance(candidate_to_verify, SolutionCandidate) else candidate_to_verify.generator_id
-    services.log("RECOVERY", f"Initiating recovery path for candidate: {candidate_id}", state)
-
-    try:
-        raw_verification, _ = await services.call_llm(
-            role="recovery_path",
-            system_prompt=phases.CROSS_VERIFICATION_SYSTEM,
-            user_prompt=phases.cross_verification_prompt(state, candidate_solution=asdict(candidate_to_verify)),
-            state=state,
-            max_tokens=get_token_budget("recovery_path")
-        )
-        verification_data = extract_json(raw_verification)
-        if verification_data.get("verification_findings"):
-            services.log("RECOVERY", f"Cross-verification found issues for candidate. Findings: {verification_data['verification_findings'][:TRUNCATION.MEMORY]}", state)
-        else:
-            services.log("RECOVERY", "Cross-verification found no issues.", state)
-    except Exception as e:
-        services.log("RECOVERY", f"Recovery Path failed for {candidate_id}: {e}", state)
-        state.errors.append(f"Recovery Path failed for {candidate_id}: {e}")
 
 def _create_generation_candidate(data: dict[str, Any] | str | list[Any], generator_id: str, model_used: str) -> GenerationCandidate:
     """Factory to safely instantiate GenerationCandidate from potentially malformed LLM response data."""
@@ -161,15 +134,6 @@ async def run_jury_critique_phase(state: PipelineState, services: WorkflowServic
                 state.errors.append(msg)
             else:
                 state.critic_scores.append(r)
-
-    # Recovery path
-    for critic_score in state.critic_scores:
-        for gen_id, scores in critic_score.candidate_scores.items():
-            if scores.confidence_vs_accuracy_penalty > 5.0:
-                candidate_to_check = next((gc for gc in state.generation_candidates if gc.generator_id == gen_id), None)
-                if candidate_to_check:
-                    services.log("JURY_CRITIQUE", f"High penalty for Jury candidate {gen_id}. Triggering recovery path.", state)
-                    await RecoveryService.run_recovery_path(state, services, candidate_to_check)
 
 async def run_jury_verify_and_meta_eval_phase(state: PipelineState, services: WorkflowServices) -> None:
     services.log("JURY", "Verifying claims and meta-evaluating critics...", state)

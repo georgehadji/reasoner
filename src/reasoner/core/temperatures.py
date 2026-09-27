@@ -41,7 +41,6 @@ PHASE_TEMPERATURES: dict[str, float] = {
     "verifier":         0.2,
     "meta_evaluator":   0.3,
     "context_vetting":  0.3,
-    "recovery_path":    0.2,
     "primary":          0.7,   # fallback for generic primary calls
     "research":         0.3,
     "deep_read":        0.2,
@@ -73,7 +72,6 @@ PHASE_REASONING_EFFORT: dict[str, str] = {
     "synthesis":        "high",      # evidence integration + epistemic labeling
     "research":         "medium",
     "deep_read":        "medium",
-    "recovery_path":    "low",
 }
 
 # Reasoning models perform poorly at very low temperature. When a reasoning

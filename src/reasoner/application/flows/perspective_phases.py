@@ -8,7 +8,6 @@ from typing import Any
 
 import reasoner.phases as phases
 from reasoner.application.flows.base import WorkflowServices
-from reasoner.application.services.recovery_service import RecoveryService
 from reasoner.core.constants import DEFAULT_MAX_TOKENS, get_token_budget
 from reasoner.domain.core_types import (
     ScenarioType,
@@ -278,14 +277,6 @@ async def run_critique_phase(state: PipelineState, services: WorkflowServices) -
                     f"(top: {top.severity} p={top.probability:.2f} — {top.claim[:80]})",
                     state,
                 )
-
-        # Recovery path check
-        for score in state.scores:
-            if score.confidence_vs_accuracy_penalty > 5.0: # Threshold for triggering recovery
-                candidate_to_check = next((c for c in state.candidates if c.perspective == score.perspective), None)
-                if candidate_to_check:
-                    services.log("PHASE-3", f"High penalty for candidate {score.perspective}. Triggering recovery path.", state)
-                    await RecoveryService.run_recovery_path(state, services, candidate_to_check)
 
         # Rank candidates by score
         score_map = {s.perspective: s.total for s in scores}

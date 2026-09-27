@@ -217,7 +217,6 @@ PHASE_TOKEN_BUDGETS: dict[str, int] = {
     "cross_verify": 1024,
     # Additional roles
     "prism_classify":         256,
-    "recovery_path":         1024,
     "search_disambiguation":  256,
     # Coding pipeline — each generate call produces a full file; 1536 (default)
     # truncates mid-JSON for any real-world module. 8192 fits most files; assemble

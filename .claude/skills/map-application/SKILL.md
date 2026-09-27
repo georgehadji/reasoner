@@ -77,7 +77,6 @@ Convention: `<method>.py` holds the strategy class (phase sequence); `<method>_p
 | `pipeline_service.py` (34KB) | `PipelineService` (create/manage `ReasonerPipeline`) + `PipelineSerializationService`. |
 | `preset_service.py` | Preset resolution, routing validation, router construction. |
 | `search_service.py` | Web discovery, search, context vetting, result cache. |
-| `recovery_service.py` | Recovery paths for problematic candidates. |
 | `serializers.py` (49KB) | SSE serialization per phase: `_ser_0` through `_ser_4` plus method-specific variants. **Largest file in the layer and the SSE contract with the frontend.** |
 | `renderers/__init__.py` | `RendererService` + `RenderStrategy` registry. |
 | `renderers/_shared.py` (15KB) | Shared terminal/JSON rendering, `MethodType`, preset-to-method constants. |
