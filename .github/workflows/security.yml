@@ -34,7 +34,10 @@ jobs:
       # report a NEW finding, because it was already red. The ratchet prints
       # every finding unchanged and fails on 149. Nothing is filtered or
       # skipped; see the script for the backlog.
-      - run: python scripts/bandit_ratchet.py --max 148
+      # 101: measured 2026-09-26 on studio-adopt, bandit 1.9.4 in CI and
+      # locally alike. The paydown from 148 happened while this workflow never
+      # ran on studio-adopt PRs, so nothing lowered MAX along the way.
+      - run: python scripts/bandit_ratchet.py --max 101
       - run: python scripts/scan-secrets.py
 
   frontend:
