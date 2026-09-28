@@ -555,6 +555,16 @@ def main() -> None:
     presets = _count_presets()
     methods = _count_methods()
 
+    # Both counts read 0 only when `reasoner` failed to import (the counters
+    # swallow the exception). Writing that 0 into CLAUDE.md and the mindmaps is
+    # how pr-architecture's drift gate, run without the project's dependencies,
+    # reported "stale docs" on every PR instead of "cannot import".
+    if not models or not presets:
+        sys.exit(
+            f"[mindmap] refusing to write: models={models}, presets={presets} -- "
+            "reasoner did not import. Install requirements.txt first."
+        )
+
     changed: list[str] = []
 
     if _update_architecture_mindmap(today, py, models, presets, methods):
