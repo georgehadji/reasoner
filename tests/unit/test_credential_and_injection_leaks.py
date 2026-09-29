@@ -123,6 +123,28 @@ def test_child_logger_records_are_redacted_via_record_factory(caplog):
     assert "REDACTED" in caplog.text
 
 
+def test_non_string_args_are_redacted_but_clean_ones_keep_their_type(caplog):
+    """`logger.warning("failed: %s", exc)` formats the exception later.
+
+    An exception (or any object) whose str() carries a secret must be
+    redacted like a string arg; an arg with nothing to hide must reach the
+    record unchanged, so %d / %r formatting and the message template hold.
+    """
+    import reasoner  # noqa: F401  (ensures install_global_redaction() ran)
+
+    child_logger = logging.getLogger("reasoner.some.other.module")
+    dsn = "postgresql://app:hunter2hunter2@db:5432/reasoner"
+    exc = ConnectionError(f"could not connect to {dsn}")
+
+    with caplog.at_level(logging.INFO):
+        child_logger.warning("connect failed: %s (attempt %d)", exc, 3)
+
+    record = caplog.records[-1]
+    assert "hunter2hunter2" not in caplog.text
+    assert "attempt 3" in caplog.text
+    assert record.args[1] == 3 and isinstance(record.args[1], int)
+
+
 # ── Defect 4: sk- / DSN regex coverage ───────────────────────────────────
 
 

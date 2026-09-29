@@ -205,21 +205,36 @@ class StructuredLogEntry:
         return json.dumps(asdict(self), default=str)
 
 
+def _redact_arg(arg: Any) -> Any:
+    """Redact one interpolation arg, leaving it untouched when nothing leaks.
+
+    Non-string args matter as much as strings: `logger.warning("failed: %s",
+    exc)` formats the exception later, and its message can carry a key or a
+    DSN. Such an arg is replaced by its redacted str() only when redaction
+    changes it, so %d / %r formatting and the message template (which Sentry
+    groups on) stay as they were for every record that holds no secret.
+    """
+    if isinstance(arg, str):
+        return redact_sensitive(arg)
+    if arg is None or isinstance(arg, (bool, int, float)):
+        return arg
+    try:
+        text = str(arg)
+    except Exception:
+        return arg
+    redacted = redact_sensitive(text)
+    return arg if redacted == text else redacted
+
+
 def _redact_record(record: logging.LogRecord) -> None:
     """Redact a record's message and interpolation args in place."""
     if isinstance(record.msg, str):
         record.msg = redact_sensitive(record.msg)
     if record.args:
         if isinstance(record.args, dict):
-            record.args = {
-                key: redact_sensitive(val) if isinstance(val, str) else val
-                for key, val in record.args.items()
-            }
+            record.args = {key: _redact_arg(val) for key, val in record.args.items()}
         else:
-            record.args = tuple(
-                redact_sensitive(arg) if isinstance(arg, str) else arg
-                for arg in record.args
-            )
+            record.args = tuple(_redact_arg(arg) for arg in record.args)
 
 
 class SafeLoggingFilter(logging.Filter):
