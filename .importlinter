@@ -101,12 +101,6 @@ ignore_imports=
     reasoner.infrastructure.uploader -> reasoner.documents.vector_store
     reasoner.infrastructure.documents.index_queue -> reasoner.documents.vector_store
     # ── backward-compat shim packages (pure re-exports from infrastructure) ──
-    # This one is load-bearing beyond compatibility: six phases/vs_*.py modules
-    # import the shim, so excepting it is what keeps `phases -> infrastructure`
-    # off the report. phases genuinely depends on infrastructure through it. The
-    # real fix is to move the verbalized-sampling constants into core and have
-    # phases read them there; tracked with Phase G's shim sweep.
-    reasoner.reasoner_verbalized_sampling -> reasoner.infrastructure.verbalized_sampling
     reasoner.clients -> reasoner.infrastructure.clients
     reasoner.scraper -> reasoner.infrastructure.scraper
     reasoner.token_cache -> reasoner.infrastructure.token_cache

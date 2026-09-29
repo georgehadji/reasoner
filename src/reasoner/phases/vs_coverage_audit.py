@@ -6,7 +6,7 @@ from typing import Any, Protocol
 
 from pydantic import BaseModel
 
-from reasoner.reasoner_verbalized_sampling import (
+from reasoner.core.verbalized_sampling import (
     VSMode,
     build_vs_prompt,
     parse_vs_response,

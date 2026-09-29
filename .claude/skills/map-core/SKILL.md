@@ -36,6 +36,7 @@ folders:
 | `memory.py` | `TaggedMemory` — lightweight tag-indexed conversation history (method/preset/outcome). |
 | `rerank.py` | Cross-encoder reranking (Cohere via OpenRouter or direct) with its own circuit breaker. |
 | `search.py` | Internal web-discovery tool for context enrichment; result filtering (off-topic, low-signal, blob/extension rejects). |
+| `verbalized_sampling.py` | VS primitives: build prompt, parse response, sample, entropy. |
 | `vs_config.py` | Verbalized Sampling config models + vertical registry. |
 | `vs_constants.py` | All VS magic numbers (`VS_K_*` sample counts per phase). |
 

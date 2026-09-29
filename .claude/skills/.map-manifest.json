@@ -245,6 +245,7 @@
       "src/reasoner/core/settings.py",
       "src/reasoner/core/sycophancy_constants.py",
       "src/reasoner/core/temperatures.py",
+      "src/reasoner/core/verbalized_sampling.py",
       "src/reasoner/core/vs_config.py",
       "src/reasoner/core/vs_constants.py"
     ]
@@ -578,7 +579,6 @@
       "src/reasoner/infrastructure/valkey/scripts/circuit_breaker.lua",
       "src/reasoner/infrastructure/valkey/scripts/rate_limit.lua",
       "src/reasoner/infrastructure/valkey/state_adapter.py",
-      "src/reasoner/infrastructure/verbalized_sampling.py",
       "src/reasoner/infrastructure/watermark/CONTEXT.md",
       "src/reasoner/infrastructure/watermark/__init__.py",
       "src/reasoner/infrastructure/watermark/data_url.py",

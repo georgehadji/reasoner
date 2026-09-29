@@ -5,8 +5,8 @@ import logging
 from abc import ABC, abstractmethod
 from collections import deque
 
+from reasoner.core.verbalized_sampling import VSCandidate, compute_verbalized_entropy
 from reasoner.phases.vs_generation import VSGenerationResult
-from reasoner.reasoner_verbalized_sampling import VSCandidate, compute_verbalized_entropy
 from reasoner.reasoner_vs_constants import LOG_VS_ENTROPY, LOG_VS_MODE_COLLAPSE
 from reasoner.vs_config import VSFeatureFlags
 

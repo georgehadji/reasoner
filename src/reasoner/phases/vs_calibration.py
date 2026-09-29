@@ -5,9 +5,9 @@ import math
 
 from pydantic import BaseModel
 
+from reasoner.core.verbalized_sampling import VSCandidate
+from reasoner.core.verbalized_sampling import compute_verbalized_entropy as _compute_entropy
 from reasoner.phases.vs_generation import VSGenerationResult
-from reasoner.reasoner_verbalized_sampling import VSCandidate
-from reasoner.reasoner_verbalized_sampling import compute_verbalized_entropy as _compute_entropy
 from reasoner.reasoner_vs_constants import (
     W_ENTROPY,
     W_NLI,
