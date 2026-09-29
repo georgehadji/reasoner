@@ -12,7 +12,10 @@
 # update_mindmap_meta.py's own _stage() runs `git add` on what it rewrites, so
 # this hook only needs to invoke it.
 
-SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+# The worktree git runs this hook for, not the hook's own location: core.hooksPath may be
+# absolute and point into another checkout, and "$0" would then run this
+# hook's work in that checkout instead.
+SCRIPT_DIR="$(git rev-parse --show-toplevel)"
 cd "$SCRIPT_DIR" || exit 0
 
 python scripts/update_mindmap_meta.py >/dev/null 2>&1 || true
