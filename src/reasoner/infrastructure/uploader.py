@@ -196,40 +196,29 @@ async def _ocr_image(content: bytes, filename: str) -> str:
         return f"[Image OCR failed: {e}]"
 
 
-def _render_pdf_pages_sync(content: bytes, max_pages: int) -> list[bytes]:
-    """Render PDF pages to PNG bytes. Runs in a thread pool — all fitz I/O is sync."""
-    import fitz
-    doc = fitz.open(stream=content, filetype="pdf")
-    try:
-        images = []
-        for page_num in range(min(max_pages, len(doc))):
-            pix = doc.load_page(page_num).get_pixmap(dpi=200)
-            images.append(pix.tobytes("png"))
-        return images
-    finally:
-        doc.close()
-
-
 async def _ocr_scanned_pdf(content: bytes, max_pages: int = 3) -> str:
-    """Render PDF pages to images and OCR them."""
-    try:
-        import fitz  # noqa: F401 — availability check only
-    except ImportError:
-        return "[Scanned PDF detected — install pymupdf for OCR: pip install pymupdf]"
+    """Render PDF pages to images and OCR them.
 
-    try:
-        page_images = await asyncio.to_thread(_render_pdf_pages_sync, content, max_pages)
-        parts: list[str] = []
-        for i, img_bytes in enumerate(page_images):
-            page_text = await _ocr_image(img_bytes, f"page_{i}.png")
-            if page_text and not page_text.startswith("["):
-                parts.append(page_text)
-        if not parts:
-            return "[Scanned PDF — no text could be extracted]"
-        return "\n\n".join(parts)
-    except Exception as e:
-        logger.error(f"Scanned PDF OCR failed: {e}")
-        return f"[Scanned PDF OCR failed: {e}]"
+    DEGRADED CAPABILITY: this previously rasterized PDF pages to PNG via
+    PyMuPDF (``fitz``) so scanned/image-only PDFs could be OCR'd. PyMuPDF is
+    AGPL-3.0/commercial-dual-licensed and was replaced by pypdf
+    (BSD-3-Clause) — see requirements.txt. pypdf has no PDF-page-rasterization
+    API, so there is no drop-in equivalent, and this function can no longer
+    render pages to images. It now always returns an explicit, user-visible
+    message instead of silently returning no text. Text-layer PDF extraction
+    (``_extract_pdf``, used for the common case) is unaffected — it already
+    ran on pypdf and continues to work unchanged.
+    """
+    logger.warning(
+        "Scanned-PDF OCR requested but unavailable: PDF page rasterization "
+        "required PyMuPDF (AGPL-3.0), which was removed in favor of pypdf "
+        "(BSD-3-Clause); pypdf cannot render PDF pages to images."
+    )
+    return (
+        "[Scanned PDF OCR unavailable — rendering PDF pages to images "
+        "requires PyMuPDF, which was removed from this project (AGPL "
+        "license); pypdf has no page-rasterization equivalent]"
+    )
 
 
 async def _extract_text_unbounded(content: bytes, filename: str, *, force_ocr: bool = False) -> str:

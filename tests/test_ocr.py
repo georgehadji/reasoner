@@ -4,7 +4,7 @@ import io
 
 # Create an authenticated client for tests
 import os
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -41,6 +41,66 @@ def _pin_auth_adapter():
     """
     set_auth_adapter(_adapter)
     yield
+
+
+def _build_minimal_pdf(text: str) -> bytes:
+    """Build a tiny single-page PDF with real, extractable text using only
+    pypdf (no reportlab / external renderer — pypdf's writer can assemble a
+    valid content stream against a standard 14 font that needs no embedding).
+    """
+    from pypdf import PdfWriter
+    from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
+
+    writer = PdfWriter()
+    page = writer.add_blank_page(width=200, height=200)
+
+    font_dict = DictionaryObject()
+    font_dict.update({
+        NameObject("/Type"): NameObject("/Font"),
+        NameObject("/Subtype"): NameObject("/Type1"),
+        NameObject("/BaseFont"): NameObject("/Helvetica"),
+    })
+    font_ref = writer._add_object(font_dict)
+
+    fonts = DictionaryObject()
+    fonts[NameObject("/F1")] = font_ref
+    resources = DictionaryObject()
+    resources[NameObject("/Font")] = fonts
+    page[NameObject("/Resources")] = resources
+
+    content = DecodedStreamObject()
+    content.set_data(f"BT /F1 18 Tf 20 100 Td ({text}) Tj ET".encode("latin-1"))
+    page[NameObject("/Contents")] = writer._add_object(content)
+
+    buf = io.BytesIO()
+    writer.write(buf)
+    return buf.getvalue()
+
+
+class TestRealPdfTextExtraction:
+    """Regression test: pypdf (not PyMuPDF/fitz) drives PDF text extraction
+    through the real production path (extract_text -> _extract_pdf ->
+    pypdf.PdfReader), using a PDF built with pypdf itself rather than a
+    fixture file or a mocked reader."""
+
+    @pytest.mark.asyncio
+    async def test_extract_text_reads_real_pdf_via_pypdf(self):
+        # >= 50 extracted chars so extract_text() returns the text-layer
+        # result directly instead of falling through to the (now-degraded)
+        # scanned-PDF OCR path.
+        pdf_text = "Hello pypdf, this is a real generated PDF with enough extractable text."
+        pdf_bytes = _build_minimal_pdf(pdf_text)
+        result = await extract_text(pdf_bytes, "generated.pdf")
+        assert pdf_text in result
+
+    @pytest.mark.asyncio
+    async def test_extract_pdf_directly_via_pypdf(self):
+        """_extract_pdf() itself (the pypdf.PdfReader call site) round-trips
+        real PDF bytes regardless of the >= 50 char OCR-fallback threshold."""
+        from reasoner.infrastructure.uploader import _extract_pdf
+        pdf_bytes = _build_minimal_pdf("Short text")
+        result = _extract_pdf(pdf_bytes)
+        assert "Short text" in result
 
 
 class TestExtractTextOCR:
@@ -117,96 +177,45 @@ class TestExtractTextOCR:
 
 
 class TestOCRScannedPDF:
-    """Unit tests for _ocr_scanned_pdf()."""
+    """Unit tests for _ocr_scanned_pdf().
+
+    PyMuPDF (fitz) was removed in favor of pypdf (BSD-3-Clause) to drop an
+    AGPL dependency from the shipped image. pypdf has no PDF-page-
+    rasterization API, so page-image OCR for scanned PDFs has no equivalent
+    and is now an explicit, always-on degradation rather than an
+    ImportError-triggered one. These tests cover that degraded contract.
+    """
 
     @pytest.mark.asyncio
-    async def test_missing_pymupdf_returns_hint(self):
-        """When fitz is unavailable, return install hint."""
-        import builtins
-        original_import = builtins.__import__
-
-        def fake_import(name, *args, **kwargs):
-            if name == "fitz":
-                raise ImportError("No module named fitz")
-            return original_import(name, *args, **kwargs)
-
-        with patch.object(builtins, "__import__", fake_import):
-            from reasoner.uploader import _ocr_scanned_pdf
-            result = await _ocr_scanned_pdf(b"fake")
-            assert "install pymupdf" in result
+    async def test_ocr_scanned_pdf_returns_explicit_degradation_message(self):
+        """Scanned-PDF OCR always returns a clear, user-visible unavailable message."""
+        from reasoner.uploader import _ocr_scanned_pdf
+        result = await _ocr_scanned_pdf(b"fake-pdf")
+        assert "Scanned PDF OCR unavailable" in result
+        assert "PyMuPDF" in result
 
     @pytest.mark.asyncio
-    async def test_ocr_scanned_pdf_success(self):
-        """Happy path: render pages and OCR them."""
-        mock_page = MagicMock()
-        mock_pix = MagicMock()
-        mock_pix.tobytes.return_value = b"png-bytes"
-        mock_page.get_pixmap.return_value = mock_pix
-        mock_doc = MagicMock()
-        mock_doc.__len__ = lambda self: 2
-        mock_doc.load_page.return_value = mock_page
+    async def test_ocr_scanned_pdf_logs_warning(self):
+        """The degradation is logged, not silent."""
+        from reasoner.uploader import _ocr_scanned_pdf
+        with patch("reasoner.infrastructure.uploader.logger") as mock_logger:
+            await _ocr_scanned_pdf(b"fake-pdf")
+            mock_logger.warning.assert_called_once()
 
+    @pytest.mark.asyncio
+    async def test_ocr_scanned_pdf_does_not_call_ocr_image(self):
+        """No page images exist to OCR, so _ocr_image must never be invoked."""
+        from reasoner.uploader import _ocr_scanned_pdf
         with patch("reasoner.infrastructure.uploader._ocr_image", new_callable=AsyncMock) as mock_ocr:
-            mock_ocr.return_value = "Page text"
-            with patch("fitz.open", return_value=mock_doc):
-                from reasoner.uploader import _ocr_scanned_pdf
-                result = await _ocr_scanned_pdf(b"fake-pdf", max_pages=3)
-                assert result == "Page text\n\nPage text"
-                assert mock_ocr.await_count == 2
+            await _ocr_scanned_pdf(b"fake-pdf")
+            mock_ocr.assert_not_awaited()
 
     @pytest.mark.asyncio
-    async def test_ocr_scanned_pdf_respects_max_pages(self):
-        """max_pages should limit the number of pages OCR'd."""
-        mock_page = MagicMock()
-        mock_pix = MagicMock()
-        mock_pix.tobytes.return_value = b"png-bytes"
-        mock_page.get_pixmap.return_value = mock_pix
-        mock_doc = MagicMock()
-        mock_doc.__len__ = lambda self: 5
-        mock_doc.load_page.return_value = mock_page
-
-        with patch("reasoner.infrastructure.uploader._ocr_image", new_callable=AsyncMock) as mock_ocr:
-            mock_ocr.return_value = "Page text"
-            with patch("fitz.open", return_value=mock_doc):
-                from reasoner.uploader import _ocr_scanned_pdf
-                result = await _ocr_scanned_pdf(b"fake-pdf", max_pages=2)
-                assert mock_ocr.await_count == 2
-
-    @pytest.mark.asyncio
-    async def test_ocr_scanned_pdf_skips_failed_pages(self):
-        """Pages returning bracket-wrapped errors should be skipped."""
-        mock_page = MagicMock()
-        mock_pix = MagicMock()
-        mock_pix.tobytes.return_value = b"png-bytes"
-        mock_page.get_pixmap.return_value = mock_pix
-        mock_doc = MagicMock()
-        mock_doc.__len__ = lambda self: 2
-        mock_doc.load_page.return_value = mock_page
-
-        with patch("reasoner.infrastructure.uploader._ocr_image", new_callable=AsyncMock) as mock_ocr:
-            mock_ocr.side_effect = ["Good text", "[OCR failed]"]
-            with patch("fitz.open", return_value=mock_doc):
-                from reasoner.uploader import _ocr_scanned_pdf
-                result = await _ocr_scanned_pdf(b"fake-pdf")
-                assert result == "Good text"
-
-    @pytest.mark.asyncio
-    async def test_ocr_scanned_pdf_all_pages_fail(self):
-        """When all pages fail, return a fallback message."""
-        mock_page = MagicMock()
-        mock_pix = MagicMock()
-        mock_pix.tobytes.return_value = b"png-bytes"
-        mock_page.get_pixmap.return_value = mock_pix
-        mock_doc = MagicMock()
-        mock_doc.__len__ = lambda self: 1
-        mock_doc.load_page.return_value = mock_page
-
-        with patch("reasoner.infrastructure.uploader._ocr_image", new_callable=AsyncMock) as mock_ocr:
-            mock_ocr.return_value = "[OCR failed]"
-            with patch("fitz.open", return_value=mock_doc):
-                from reasoner.uploader import _ocr_scanned_pdf
-                result = await _ocr_scanned_pdf(b"fake-pdf")
-                assert "no text could be extracted" in result
+    async def test_ocr_scanned_pdf_accepts_max_pages_kwarg(self):
+        """max_pages is still accepted for call-site compatibility, though unused."""
+        from reasoner.uploader import _ocr_scanned_pdf
+        result = await _ocr_scanned_pdf(b"fake-pdf", max_pages=5)
+        assert "Scanned PDF OCR unavailable" in result
 
 
 class TestSaveUploadedFileOCR:
