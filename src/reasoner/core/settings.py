@@ -512,6 +512,23 @@ class Settings:
     # Cross-lingual probe: off by default; enable for premium canary presets.
     LANGUAGE_PROBE_ENABLED: bool = os.getenv("LANGUAGE_PROBE_ENABLED", "false").lower() in ("1", "true", "yes")
 
+    # ── Jev (TypeSafe System One model, via OpenRouter) ──
+    # One switch for every jev call site: HyperGate routing
+    # (hypergate/jev_router.py) and the iterative-critique critic
+    # (application/flows/iterative_critique_phases.py). Any mode but "off" sends
+    # problem text -- and, for the critic, model-written answers -- to TypeSafe
+    # through OpenRouter, a sub-processor.
+    #   active  jev decides; the LLMs run only when jev fails, times out, or
+    #           is below its bar (the default, switched on 2026-09-25 by the
+    #           product owner)
+    #   shadow  the LLMs decide; jev runs beside them, logged only
+    #   off     jev is never called. The kill switch: JEV_MODE=off
+    # Anything else reads as "off", so a typo fails safe.
+    JEV_MODE: str = os.getenv("JEV_MODE", "active").strip().lower()
+    # Pinned, not jev-latest: a shadow comparison is only meaningful against a
+    # fixed model. The served id is a dated snapshot and is logged per call.
+    JEV_MODEL: str = os.getenv("JEV_MODEL", "typesafe/jev-1.13")
+
     # ── Trusted Proxies ──
     TRUSTED_PROXIES: list[str] = [
         p.strip() for p in os.getenv("TRUSTED_PROXIES", "").split(",") if p.strip()

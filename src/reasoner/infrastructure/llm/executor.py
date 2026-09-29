@@ -116,7 +116,15 @@ class LLMExecutor:
         - Checks cache before hitting the router (cache hit = 0 cost).
         - Accumulates token usage and cost into state after every call.
         - Stores the response in cache on a miss.
+
+        ``bypass_cache_read=True`` skips the lookup but still stores the fresh
+        response. A quality-gate retry sets it: the cached entry for its prompt
+        is the answer that just failed, and the lookup also matches on Jaccard
+        similarity, so a changed prompt alone does not guarantee a miss.
         """
+        # Popped here so it never reaches router.call as a provider kwarg.
+        bypass_cache_read = bool(kwargs.pop("bypass_cache_read", False))
+
         # ── Temperature resolution (with retry-aware strategy) ──────────
         if "temperature" not in kwargs:
             lookup = phase_key or role
@@ -201,7 +209,7 @@ class LLMExecutor:
         # Prometheus labels use `role`, not this, so metrics are unaffected.
         cache_phase = f"{role}#{hashlib.sha256(system_prompt.encode()).hexdigest()[:12]}"
 
-        if self._token_cache and self._caching_enabled and not stream:
+        if self._token_cache and self._caching_enabled and not stream and not bypass_cache_read:
             # For caching, we need a specific model_id. If cascading, we'll cache against the first model.
             # This is a simplification; a more robust cache would handle model cascades explicitly.
             model_id_for_cache = self.cascading_routing.get(role, [self.router.get(role).model])[0]

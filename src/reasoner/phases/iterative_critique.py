@@ -42,6 +42,40 @@ SYNTHESIS_SYSTEM = (
     "Output ONLY valid JSON."
 )
 
+# The critic's ACCEPT rule. Rendered into critic_evaluation_prompt below, and
+# applied in code to jev's scores (application/flows/iterative_critique_phases)
+# -- one rule, whichever model scored the round.
+ACCEPT_SCORE = 8
+
+# JEV_MODE=active/shadow: the four dimensions the LLM critic scores, restated as
+# typed questions for a System One model. Six anchored levels stand for 0, 2,
+# 4, 6, 8 and 10; the caller maps level position p to 2*p. Level 4 -- "only
+# small, non-substantive improvements remain" -- is what ACCEPT_SCORE means.
+_JEV_LEVELS = [
+    "0 unacceptable: fundamentally wrong, or does not address it at all",
+    "2 poor: major problems that change the conclusion",
+    "4 weak: several significant problems",
+    "6 adequate: moderate problems a careful reviewer would still send back",
+    "8 strong: only small, non-substantive improvements remain",
+    "10 excellent: nothing a careful expert would insist on changing",
+]
+_JEV_DIMENSIONS = {
+    "factuality": "are its factual claims correct, with no fabricated facts or figures?",
+    "reasoning": "is the logic sound -- no fallacies, unsupported leaps or hidden assumptions?",
+    "completeness": "does it cover everything the problem asks, including important edge cases?",
+    "clarity": "is it unambiguous and easy to act on?",
+}
+JEV_CRITIC_QUESTIONS: dict[str, dict] = {
+    dim: {
+        "type": "score",
+        "instructions": (
+            f"Judge the `answer` as a response to the `problem`. {dim.capitalize()}: {question}"
+        ),
+        "criteria": _JEV_LEVELS,
+    }
+    for dim, question in _JEV_DIMENSIONS.items()
+}
+
 
 def generator_initial_prompt(state: PipelineState) -> str:
     return (
@@ -69,7 +103,8 @@ def critic_evaluation_prompt(state: PipelineState, answer: str, round_num: int) 
         f'{previous_flaws}\n\n'
         f'Score dimensions: factuality, reasoning, completeness, clarity (0-10 each). '
         f'Identify 1-3 specific flaws. '
-        f'If all scores >= 8: verdict=ACCEPT. If improvable: REVISE. If wrong: REJECT.\n\n'
+        f'If all scores >= {ACCEPT_SCORE}: verdict=ACCEPT. '
+        f'If improvable: REVISE. If wrong: REJECT.\n\n'
         f'Output JSON: {{"critic_model": "<name>", '
         f'"scores": {{"factuality": N, "reasoning": N, "completeness": N, "clarity": N}}, '
         f'"flaws_identified": [{{"flaw": "...", "severity": "HIGH|MED|LOW", "evidence": "..."}}], '

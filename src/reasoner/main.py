@@ -225,6 +225,8 @@ async def main(args: argparse.Namespace) -> None:
         from reasoner.core.ports.model_registry_port import set_model_registry_port
         from reasoner.infrastructure.llm.registry import RegistryAdapter
         set_model_registry_port(RegistryAdapter())
+        from reasoner.infrastructure.decision import inject_decision_port
+        inject_decision_port()  # jev in HyperGate (JEV_MODE); a no-op when off
 
         # The CLI has no server to call, so before this the pipeline's HTTP
         # self-call to /api/neuro/recall always failed and memory was inert.

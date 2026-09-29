@@ -50,12 +50,15 @@ function collectFiles(dir: string): string[] {
 }
 
 describe('public claims', () => {
-  const files = SCAN_DIRS.flatMap((dir) => collectFiles(path.join(ROOT, dir))).filter(
-    (file) => !file.endsWith('.test.ts') && !file.endsWith('.test.tsx'),
-  );
+  // Read the tree once during collection. Reading it inside each case re-read
+  // every file once per phrase, which under parallel workers pushed single
+  // cases past the 5s test timeout.
+  const sources = SCAN_DIRS.flatMap((dir) => collectFiles(path.join(ROOT, dir)))
+    .filter((file) => !file.endsWith('.test.ts') && !file.endsWith('.test.tsx'))
+    .map((file) => ({ file, text: fs.readFileSync(file, 'utf-8') }));
 
   it.each(FORBIDDEN_PHRASES)('never reintroduces "%s"', (phrase) => {
-    const offenders = files.filter((file) => fs.readFileSync(file, 'utf-8').includes(phrase));
+    const offenders = sources.filter(({ text }) => text.includes(phrase)).map(({ file }) => file);
     expect(offenders.map((file) => path.relative(ROOT, file))).toEqual([]);
   });
 });

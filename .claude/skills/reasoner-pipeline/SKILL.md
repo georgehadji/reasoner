@@ -93,18 +93,23 @@ In `src/reasoner/domain/preset_registry.py`, add entries to `_PRESET_CONFIGS`. A
 
 Labs available: Anthropic, OpenAI, Google, xAI, Perplexity, Mistral, DeepSeek, Qwen (Alibaba), Kimi (Moonshot), GLM (Zhipu), MiniMax, NVIDIA.
 
-### 4. Register the method name in HyperGate
+### 4. Register the method in HyperGate
 
-Open `src/reasoner/hypergate/sub_agents/tie_breaker.py` and add your method's snake_case name to `_VALID_METHODS`:
+HyperGate LLMs never see method names, only opaque letters (CLAUDE.md §5). Open `src/reasoner/hypergate/sub_agents/method_classifier.py` and add **one** next free letter in **two** tables:
 
 ```python
-_VALID_METHODS = {
-    "debate", "scientific", ...
-    "your_method",   # add here
+_TAXONOMY = {
+    ...
+    "V": ("pipeline", "your_method"),   # add here
+}
+
+_DESCRIPTIONS = {
+    ...
+    "V": "what kind of problem this method fits, in plain words -- never its name",
 }
 ```
 
-Also update the system prompt string `_SYSTEM` to include your method in the list given to the LLM (the list after "specify the best method from this list:").
+That is the whole registration. `CATEGORY_LIST` renders both the classifier's and the TieBreaker's category list from these, and the TieBreaker maps the letter back through `MethodClassifierSubAgent.resolve()`. A letter in `_TAXONOMY` with no description raises `KeyError` at import. If your method is easily confused with an existing one, add a `- X vs V:` line to the DISAMBIGUATION RULES in `_SYSTEM`.
 
 ### 5. Wire the orchestrator
 
@@ -151,10 +156,9 @@ async def test_your_method_preset_valid():
     budget = next(p for p in _PRESET_CONFIGS if p["id"] == "your-method-budget")
     assert "your_method_step_1" in budget["routing"]
 
-def test_your_method_in_hypergate_valid_methods():
-    from reasoner.hypergate.sub_agents.tie_breaker import _VALID_METHODS
-    assert "your_method" in _VALID_METHODS
 ```
+
+HyperGate registration needs no test of its own: `tests/test_hypergate.py`'s taxonomy section is parametrised over `_TAXONOMY`, so it already checks your letter is offered by both prompts, resolves to your method in the TieBreaker, and that your method's name never reaches a gate LLM.
 
 Run with:
 ```bash

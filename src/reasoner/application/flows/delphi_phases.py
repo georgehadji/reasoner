@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from typing import Any
 
 import reasoner.phases as phases
 from reasoner.application.flows.base import WorkflowServices
@@ -11,6 +12,22 @@ from reasoner.domain.pipeline_state import PipelineState
 from reasoner.parsing import ParseError, extract_json
 
 logger = logging.getLogger(__name__)
+
+
+def _as_bool(value: Any) -> bool:
+    """An LLM's yes/no as a real bool.
+
+    The convergence prompt used to ask for `"converged": "<true|false>"` -- a
+    quoted string -- and the result was tested for truthiness, so a model that
+    answered "false" read as converged and the dissent phase was skipped.
+    Only an explicit yes counts: anything unrecognised is not converged, which
+    costs one dissent call rather than silently dropping the minority view.
+    """
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in ("true", "yes")
+    return False
 
 async def run_delphi_round1_phase(state: PipelineState, services: WorkflowServices) -> None:
     services.log("DELPHI", "Round 1: Independent expert estimates...", state)
@@ -155,7 +172,9 @@ async def run_delphi_convergence_phase(state: PipelineState, services: WorkflowS
             state=state
         )
         data = extract_json(raw)
-        state.delphi_state["converged"] = data.get("converged", False)
+        converged = _as_bool(data.get("converged"))
+        data["converged"] = converged  # synthesis and the UI read the dict too
+        state.delphi_state["converged"] = converged
         state.delphi_state["consensus"] = data
 
 async def run_delphi_dissent_phase(state: PipelineState, services: WorkflowServices) -> None:

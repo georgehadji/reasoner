@@ -92,6 +92,47 @@ async def test_delphi_convergence_sets_final(pipeline, state):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("returned", "converged"),
+    [
+        # The bug: the prompt asked for "<true|false>" in quotes, the code tested
+        # truthiness, and the string "false" is truthy.
+        ("false", False), ("False", False), (" false ", False),
+        ("true", True), ("True", True), ("yes", True),
+        (True, True), (False, False),
+        # Anything unrecognised is not converged: dissent runs, costing one call.
+        (None, False), ("maybe", False), (1, False),
+    ],
+)
+async def test_delphi_convergence_reads_the_answer_as_a_real_bool(pipeline, state, returned, converged):
+    pipeline._call_llm_cached = AsyncMock(return_value=(json.dumps({"converged": returned}), {}))
+    await run_delphi_convergence_phase(state, _svc(pipeline))
+    assert state.delphi_state["converged"] is converged
+    assert state.delphi_state["consensus"]["converged"] is converged
+
+
+@pytest.mark.asyncio
+async def test_delphi_a_string_false_no_longer_skips_dissent(pipeline, state):
+    pipeline._call_llm_cached = AsyncMock(return_value=(json.dumps({"converged": "false"}), {}))
+    await run_delphi_convergence_phase(state, _svc(pipeline))
+
+    pipeline._call_llm_cached = AsyncMock(return_value=(
+        json.dumps({"dissent_analysis": "Expert 3 still disagrees."}), {}
+    ))
+    await run_delphi_dissent_phase(state, _svc(pipeline))
+    assert pipeline._call_llm_cached.await_count == 1
+    assert "dissent" in state.delphi_state
+
+
+def test_delphi_convergence_prompt_asks_for_a_json_boolean(state):
+    from reasoner.phases.delphi import delphi_convergence_prompt
+
+    prompt = delphi_convergence_prompt(state)
+    assert '"converged": "<' not in prompt  # no quoted placeholder
+    assert "JSON boolean" in prompt
+
+
+@pytest.mark.asyncio
 async def test_delphi_dissent_records_analysis(pipeline, state):
     pipeline._call_llm_cached = AsyncMock(return_value=(
         json.dumps({"dissent_analysis": "Minor wording differences."}),

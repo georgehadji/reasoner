@@ -37,7 +37,6 @@ Application-specific services for rendering, routing decisions, and context form
 - **`prism_classifier.py`**: Prism query classifier — ports Prism's classifier.ts to Python.
 - **`promotion_service.py`**: 1. Run regression gate
 - **`quota_service.py`**: Quota Service — Application-layer orchestrator for usage limits.
-- **`recovery_service.py`**: Service for executing recovery paths on problematic candidates.
 - **`regression_gate.py`**: RegressionGate — pass/fail decision for harness mutation evaluation (#4b).
 - **`role_requirements.py`**: ── Shared constraint sets ────────────────────────────────────────────────────
 - **`run_metering.py`**: Code or resource asset facilitating system functionality.

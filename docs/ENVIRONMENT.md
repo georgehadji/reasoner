@@ -16,6 +16,37 @@
 | `MOONSHOT_API_KEY` | — | Moonshot Kimi access |
 | `ZHIPUAI_API_KEY` | — | ZhipuAI GLM access |
 
+## Jev (HyperGate routing)
+
+TypeSafe's jev, a System One decision model, answers HyperGate's routing
+questions (direct? web search? how complex? which method?) in one ~0.5s call.
+Uses `OPENROUTER_API_KEY` (OpenRouter's `/api/v1/systemone` endpoint); no
+TypeSafe account or key. See `src/reasoner/hypergate/jev_router.py`.
+
+**Any mode but `off` sends each problem's text to TypeSafe via OpenRouter** — a
+sub-processor. Log lines carry a hash of the problem, never its text.
+
+| Variable | Default | Description |
+|---|---|---|
+| `JEV_MODE` | `active` | `active`: jev routes; HyperGate's LLM sub-agents run only when jev fails, times out, or answers below the confidence gate (`JEV_ACCEPT_*` in `core/constants_limits.py`). Each decision is logged as `jev_route {...}`. `shadow`: the LLM sub-agents route and jev is logged beside them as `jev_shadow {...}`. `off`: jev is never called — **the kill switch**. Anything else reads as `off`. Needs `OPENROUTER_API_KEY`; without it jev stays off and startup logs a warning |
+| `JEV_MODEL` | `typesafe/jev-1.13` | Pinned model id. The served id is a dated snapshot and is logged per call |
+
+The confidence gate's thresholds are initial values, not measured ones. Tune
+them from the `jev_route` lines: `source` says who routed, `reason` why jev was
+or wasn't used, and `agree_route` whether jev's declined verdict matched the
+LLMs'.
+
+`JEV_MODE` also governs the **iterative-critique critic**
+(`application/flows/iterative_critique_phases.py`). In `active`, jev scores each
+round's answer on the critic's four dimensions; if every one reaches the
+critic prompt's own ACCEPT bar (`ACCEPT_SCORE` in `phases/iterative_critique.py`,
+8/10) the round is accepted and the LLM critic is skipped, otherwise the LLM
+critic runs as before and writes the flaws the next revision needs. Rounds whose
+problem + answer exceed 8000 characters skip jev rather than truncate. Logged
+as `jev_ic {...}`; `agree_accept` (shadow mode) says whether jev's accept call
+matched the LLM critic's verdict. This sends model-written answers, not just the
+user's problem, to TypeSafe.
+
 ## Search
 
 | Variable | Default | Description |

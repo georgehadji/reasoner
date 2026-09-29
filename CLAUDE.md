@@ -131,7 +131,7 @@ ui-next/src/
 ├── lib/                    # api-client, db (IndexedDB), types, utils, security, markdown
 └── stores/                 # app-store.ts (Zustand global state with persistence)
 
-tests/                      # pytest suite (<!-- gen:test_files -->330<!-- /gen --> test_*.py files, recursive)
+tests/                      # pytest suite (<!-- gen:test_files -->333<!-- /gen --> test_*.py files, recursive)
 scripts/
 └── update_mindmap_meta.py  # Patches live counts into ARCHITECTURE_MINDMAP.md (run manually — see §10)
 ```
@@ -200,7 +200,7 @@ cd ui-next && npx playwright test
 
 ### HyperGate Pre-Router
 
-Every request passes through `HyperGateAgent` before any pipeline. Five sub-agents run **in parallel** with fail-safe fallback. Real method names are never exposed to LLMs; only opaque letters (B–Q) appear in sub-agent prompts.
+Every request passes through `HyperGateAgent` before any pipeline. Five sub-agents run **in parallel** with fail-safe fallback. Real method names are never exposed to LLMs: only the opaque letters of `method_classifier._TAXONOMY` appear in sub-agent prompts and in the TieBreaker's context. Both prompts render their category list from that one table, so adding a method means adding a letter and its description there, never a name.
 
 ```
 Problem → [LanguageDetector | ComplexityEstimator | DirectDetector | WebSearchDetector | MethodClassifier]

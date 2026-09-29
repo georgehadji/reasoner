@@ -89,7 +89,7 @@ def delphi_convergence_prompt(state: PipelineState) -> str:
         f'Round 2 estimates:\n{json.dumps(r2, indent=2)}\n\n'
         f'Have the experts converged to a consensus? '
         f'Convergence means the estimates are close enough to support a single recommendation.\n\n'
-        f'Output JSON: {{"converged": "<true|false>", '
+        f'Output JSON: {{"converged": <true or false, a JSON boolean, not a string>, '
         f'"consensus_label": "<the converged estimate if converged>", '
         f'"remaining_disagreement": "<what experts still disagree on>", '
         f'"convergence_quality": "strong|moderate|weak"}}'

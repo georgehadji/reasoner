@@ -169,9 +169,9 @@ class WorkflowRunner:
 
                 quality_result = await self.monitor.evaluate(name, state, attempt=attempt + 1)
 
-                # Recorded here rather than by a driver: the hints a later phase
-                # reads from quality_history were only ever written by the SSE
-                # loop, so a CLI run's downstream phases saw an empty history.
+                # Recorded here rather than by a driver: it was only ever written
+                # by the SSE loop, so a CLI run's history (read into the Neuro
+                # memory metadata) came out empty.
                 state.quality_history.append({
                     "phase": name,
                     "attempt": attempt + 1,
@@ -196,8 +196,15 @@ class WorkflowRunner:
                     break
 
                 if attempt < max_retries:
-                    if quality_result.suggestions:
-                        state.quality_hints[name] = " ".join(quality_result.suggestions)
+                    # Set on every quality retry, not only when the judge had
+                    # suggestions: services.call_llm reads its presence as "this
+                    # is a retry", prepends it to the prompt, and skips the cache
+                    # that still holds the answer that just failed.
+                    state.quality_hints[name] = (
+                        " ".join(quality_result.suggestions)
+                        or quality_result.reason
+                        or "The previous attempt failed the quality check."
+                    )
 
                     self.services.log(name, f"Quality check failed (score: {quality_result.score}). Retrying...", state)
                     if obs is not None:

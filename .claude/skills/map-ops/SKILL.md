@@ -26,6 +26,8 @@ folders:
 | `ruff_ratchet.py` | Ratchet for `ruff check src/` violation count. |
 | `mypy_ratchet.py` | Ratchet for `mypy src/reasoner` violation count. |
 | `silent_failure_ratchet.py` | Ratchet for `except Exception` handlers that leave no signal (no raise, no `degraded()`, body only pass/return/sub-WARNING logging). AST-based; `tests/unit/test_silent_failure_detector.py` pins what it counts. |
+| `vulture_ratchet.py` | P-5 dead-code ratchet: `vulture src/` findings except `unused variable` (FastAPI `Depends` params). Tests are not reachability roots, so test-only callers count as dead. **Advisory** (`continue-on-error` in test.yml, `advisory` in ci-local.sh) until the pilot ends. |
+| `vulture_whitelist.py` | vulture false positives, one symbol per line with its reason. Adding one lowers the ratchet count. |
 | `package_coverage_gate.py` | Per-package coverage floor read from `coverage.xml`. |
 | `check_skill_maps.py` | Compares the folders each `.claude/skills/map-*` skill declares against `.map-manifest.json` and reports which map a new or deleted file made stale. `--update` re-baselines. Wired into `.githooks/pre-commit` as a warning. |
 | `scan-secrets.py` | Secret scanner for API keys and tokens in source. |

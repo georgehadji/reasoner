@@ -4,7 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    # studio-adopt is the integration branch every PR lands on; main trails it.
+    branches: [main, studio-adopt]
 
 env:
   PYTHON_VERSION: '3.14'
@@ -98,7 +99,17 @@ jobs:
           # long payload literals out of the god-method with them.
           # 2245: Phase B-3 deleted the 33 back-compat phase delegators on
           # ReasonerPipeline and migrated their callers to the flow functions.
-          python scripts/ruff_ratchet.py --max 2245
+          # 2234: HyperGate's method categories moved out of one long prompt
+          # string into a wrapped _DESCRIPTIONS table that the classifier and
+          # the TieBreaker both render, taking 11 E501 with them.
+          # 2232: the jev shadow's startup wiring moved into
+          # infrastructure/decision.inject_decision_port; paying for its two
+          # lines in api/__init__.py (pinned line cap) deleted two dead imports.
+          # 2216: deleting RecoveryService (its findings were only logged), its
+          # uncalled duplicate in jury_phases.py and its prompt took their long
+          # lines and four orphaned imports with them (2232 -> 2217); the
+          # HyperGate time-bound fix rewrapped one long condition (-1).
+          python scripts/ruff_ratchet.py --max 2216
 
       - name: Security scan (bandit)
         run: |
@@ -301,6 +312,16 @@ jobs:
           # metric guard. The metric guard moved verbatim into
           # execution/sse_observer._observe_duration, so the net is -3, not -4.
           python scripts/silent_failure_ratchet.py --max 102
+
+      - name: Dead-code ratchet (vulture, ADVISORY)
+        # P-5 (docs/plans/phaseoutput-retirement-2026-09-12.md): advisory for
+        # one week, because the false-positive rate is unmeasured and 391 was
+        # counted on Python 3.12 while this job runs 3.14. Make it blocking by
+        # deleting continue-on-error, from 2026-10-03 on, once the counts
+        # agree -- and in ci-local.sh, move it from `advisory` to `gate`.
+        continue-on-error: true
+        run: |
+          python scripts/vulture_ratchet.py --max 391
 
       - name: Run tests
         run: |

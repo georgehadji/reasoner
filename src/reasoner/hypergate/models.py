@@ -58,10 +58,23 @@ class HyperContext:
         return self.complexity_output.result.get("complexity", "medium")
 
     def to_dict(self) -> dict[str, Any]:
-        """Serialise for injection into TieBreakerSubAgent context."""
+        """Serialise for injection into TieBreakerSubAgent context.
+
+        This dict becomes part of an LLM prompt, so every "method" key is
+        dropped: MethodClassifier's result carries real method names (top pick
+        and each candidate) for code downstream, and the TieBreaker must see its
+        opaque "category" letters only (CLAUDE.md §5).
+        """
+        def _without_method_names(value: Any) -> Any:
+            if isinstance(value, dict):
+                return {k: _without_method_names(v) for k, v in value.items() if k != "method"}
+            if isinstance(value, list):
+                return [_without_method_names(v) for v in value]
+            return value
+
         def _safe(out: SubAgentOutput) -> dict[str, Any]:
             return {
-                "result": out.result,
+                "result": _without_method_names(out.result),
                 "confidence": out.confidence,
                 "reasoning": out.reasoning,
                 "error": out.error,
