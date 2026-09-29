@@ -75,6 +75,13 @@ services:
       # false until an operator opts in; see .env.example.
       - SANDBOX_WORKER_URL=http://sandbox-worker:8901
       - SANDBOX_WORKER_TOKEN=${SANDBOX_WORKER_TOKEN:-}
+      # Persistent data paths (fix/persistent-data-paths): the installed
+      # package dir (src/reasoner/...) is replaced on every redeploy, so
+      # these must live under a mounted volume. Reuses the ./history and
+      # ./uploads mounts below rather than adding new ones.
+      - EVENT_STORE_DB_PATH=/app/history/events.db
+      - FEEDBACK_DB_PATH=/app/history/feedback.db
+      - UPLOAD_STORAGE_DIR=/app/uploads
     env_file:
       - .env
     depends_on:

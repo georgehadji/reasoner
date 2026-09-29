@@ -87,9 +87,16 @@ except ImportError:
     DOCX_AVAILABLE = False
     logger.warning("python-docx not available - DOCX extraction disabled")
 
-# Upload storage directory
-UPLOAD_DIR = Path(__file__).parent / "uploads"
-UPLOAD_DIR.mkdir(exist_ok=True)
+# Upload storage directory. UPLOAD_STORAGE_DIR lets a deployment point this
+# at a mounted volume (the installed package dir is replaced on every
+# container redeploy). Empty keeps the historical in-package default so
+# local dev/tests are unaffected when it's unset.
+UPLOAD_DIR = (
+    Path(settings.UPLOAD_STORAGE_DIR)
+    if settings.UPLOAD_STORAGE_DIR
+    else Path(__file__).parent / "uploads"
+)
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 # Maximum file size (50MB)
 MAX_FILE_SIZE = 50 * 1024 * 1024
