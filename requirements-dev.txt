@@ -23,7 +23,7 @@ pytest-xdist>=3.8.0,<4.0.0
 # _SHARED_CACHE_PORT leak lived in. A failure here is a real isolation
 # defect; reproduce it with the -p randomly seed printed in the header.
 pytest-randomly>=5.0.0,<6.0.0
-hypothesis>=6.168.0,<7.0.0
+hypothesis>=6.168.1,<7.0.0
 
 # Static analysis
 # Pinned exactly, not ranged: scripts/vulture_ratchet.py compares an exact
