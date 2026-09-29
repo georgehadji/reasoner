@@ -306,7 +306,7 @@ Cross-lab diversity prevents echo chambers:
 
 ### Self-Healing CI/CD
 
-`.github/workflows/self-healing-ci.yml` — healing-profile → loop1-static → loop2-runtime → loop3-evolutionary → healing-verification. Coverage gates: 60% fail, 80% warn.
+`.github/workflows/self-healing-ci.yml` — healing-profile → loop1-static → loop2-runtime → loop3-evolutionary → healing-verification, nightly/manual only. The PR-enforced coverage gate is `coverage.yml`: 60% fail, 80% warn (69% measured 2026-09-29). The nightly workflow keeps its own 30% floor because it measures a different suite.
 
 ---
 
