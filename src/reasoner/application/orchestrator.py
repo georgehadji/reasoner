@@ -26,7 +26,7 @@ from reasoner.core.constants import DEFAULT_CLI_PRESET, GATE_TIMEOUT_SECONDS
 from reasoner.core.degrade import degraded
 from reasoner.core.ports.model_registry_port import get_model_registry_port
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.hypergate import HyperGateAgent
+from reasoner.hypergate import HyperGateAgent, jev_router
 from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.phases._shared import is_article_request
 from reasoner.pipeline import ReasonerPipeline
@@ -292,7 +292,9 @@ class PipelineOrchestrator:
                 # which asks this exact question a second time.
                 gate_decision_fb = await run_gate_cached(gate, req.problem)
 
-        _gate_timeout = max(GATE_TIMEOUT_SECONDS * 2, 5.0)
+        # Plus jev's reservation: in active mode it runs ahead of the LLM
+        # sub-agents inside this same deadline (jev_router.reserved_seconds).
+        _gate_timeout = max(GATE_TIMEOUT_SECONDS * 2, 5.0) + jev_router.reserved_seconds()
         _neuro_recall_timeout = settings.NEURO_RECALL_TIMEOUT_SECONDS
 
         async def _guard(coro, label: str, timeout: float) -> None:

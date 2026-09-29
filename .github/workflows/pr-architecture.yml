@@ -115,5 +115,5 @@ jobs:
           # Contract 2 is where those 13 really belong, along with the 39 sibling
           # imports that had no entry at all. It is at 52 and falls as D-1..D-3
           # invert each dependency through a port.
-          PYTHONPATH=src python scripts/count_importlinter_exceptions.py --contract 1 --max 48
+          PYTHONPATH=src python scripts/count_importlinter_exceptions.py --contract 1 --max 47
           PYTHONPATH=src python scripts/count_importlinter_exceptions.py --contract 2 --max 52

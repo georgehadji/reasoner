@@ -25,7 +25,7 @@ The main Python package containing the Reasoner framework architecture.
 - **`pricing.py`**: backward-compat shim — real module: reasoner.domain.pricing
 - **`rate_limiter.py`**: backward-compat shim — real module: reasoner.infrastructure.rate_limiter
 - **`reasoner_persuasion_defense.py`**: backward-compat shim — real module: reasoner.security.persuasion_defense
-- **`reasoner_verbalized_sampling.py`**: backward-compat shim — real module: reasoner.infrastructure.verbalized_sampling
+- **`reasoner_verbalized_sampling.py`**: backward-compat shim — real module: reasoner.core.verbalized_sampling
 - **`reasoner_vs_constants.py`**: backward-compat shim — real module: reasoner.core.vs_constants
 - **`renderer.py`**: backward-compat shim — real module: reasoner.infrastructure.renderer
 - **`sanitization.py`**: backward-compat shim — real module: reasoner.core.sanitization

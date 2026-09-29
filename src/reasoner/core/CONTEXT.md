@@ -28,6 +28,7 @@ The foundational core of the reasoning framework, containing aggregates, state-m
 - **`search.py`**: ── Dependency Injection for core → infrastructure boundary ───────
 - **`settings.py`**: Centralized environment-aware settings.
 - **`temperatures.py`**: ── Optimal temperatures per reasoning phase ────────────────────────────────
+- **`verbalized_sampling.py`**: Verbalized Sampling primitives — prompt building, response parsing, probability-weighted sampling, entropy
 - **`vs_config.py`**: Verbalized Sampling configuration models and vertical registry.
 - **`vs_constants.py`**: Verbalized Sampling constants — zero magic numbers outside this file.
 

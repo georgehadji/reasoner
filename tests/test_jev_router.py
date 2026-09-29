@@ -295,6 +295,49 @@ async def test_route_times_out_into_a_fallback(jev_mode, monkeypatch):
     assert (attempt.reason, attempt.decision) == ("timeout", None)
 
 
+@pytest.mark.parametrize(
+    ("mode", "port", "reserved"),
+    [
+        ("active", FakePort(), jev_router.JEV_ACTIVE_TIMEOUT_SECONDS),
+        ("active", None, 0.0),  # no port: route() never calls jev
+        ("shadow", FakePort(), 0.0),  # off the request path
+        ("off", FakePort(), 0.0),
+    ],
+)
+def test_reserved_seconds_is_what_route_may_hold_the_gate_for(jev_mode, mode, port, reserved):
+    jev_mode(mode, port)
+    assert jev_router.reserved_seconds() == reserved
+
+
+@pytest.mark.asyncio
+async def test_a_slow_jev_does_not_cost_the_llm_fallback_its_budget(jev_mode, monkeypatch):
+    """Review on #87: jev used its full timeout, then the LLMs ran out of gate.
+
+    jev times out after 0.2s; the LLM sub-agents then need 0.2s of their own
+    against a 0.3s gate budget. Before reserved_seconds(), /api/gate cut them
+    off at 0.3s and returned the budget fallback instead of their decision.
+    """
+    from unittest.mock import patch
+
+    from reasoner.application.services import gate_service
+
+    monkeypatch.setattr(gate_service, "HYPERGATE_TOTAL_BUDGET_SECONDS", 0.3)
+    monkeypatch.setattr(jev_router, "JEV_ACTIVE_TIMEOUT_SECONDS", 0.2)
+    jev_mode("active", FakePort(delay=5.0))
+
+    async def _jev_then_llms(problem):
+        attempt = await jev_router.route(problem)
+        assert attempt.reason == "timeout"
+        await asyncio.sleep(0.2)
+        return GateDecision(action="direct", confidence=0.9, reasoning="llm sub-agents")
+
+    with patch("reasoner.application.services.gate_service.HyperGateAgent") as mock_cls:
+        mock_cls.return_value.decide = _jev_then_llms
+        result = await gate_service.decide_route(_PROBLEM + " (slow jev)", "auto-budget")
+
+    assert (result["action"], result["reasoning"]) == ("direct", "llm sub-agents")
+
+
 @pytest.mark.asyncio
 async def test_route_caps_the_state_it_sends(jev_mode, monkeypatch):
     monkeypatch.setattr(jev_router, "JEV_MAX_STATE_CHARS", 10)

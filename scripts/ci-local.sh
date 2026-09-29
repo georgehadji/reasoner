@@ -76,7 +76,7 @@ if want arch; then
     gate "workflow-lint" bash -c '! grep -rEln "\$\{\{[[:space:]]*\}\}" .github/workflows/'
     gate "import-linter"  lint-imports --no-cache
     gate "registry-guard" python scripts/check_no_registry_bypass.py
-    gate "exception-count" python scripts/count_importlinter_exceptions.py --contract 1 --max 48
+    gate "exception-count" python scripts/count_importlinter_exceptions.py --contract 1 --max 47
     gate "app-infra-count" python scripts/count_importlinter_exceptions.py --contract 2 --max 52
 fi
 
