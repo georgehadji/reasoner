@@ -224,14 +224,31 @@ class JevAttempt:
 _OFF = JevAttempt(reason="off")
 
 
+def _active_port() -> DecisionPort | None:
+    port = get_decision_port()
+    return port if port is not None and jev_mode() == "active" else None
+
+
+def reserved_seconds() -> float:
+    """How long route() may hold the gate before the LLM sub-agents start.
+
+    route() runs ahead of the sub-agents inside whatever deadline wraps the
+    gate, so a jev that times out or answers below the gate would otherwise
+    spend up to JEV_ACTIVE_TIMEOUT_SECONDS of the fallback's budget. Every
+    deadline around HyperGateAgent.decide adds this, so jev's attempt costs
+    latency, never the fallback's chance to finish.
+    """
+    return JEV_ACTIVE_TIMEOUT_SECONDS if _active_port() is not None else 0.0
+
+
 async def route(problem: str) -> JevAttempt:
     """Active mode: ask jev and decide whether its answer is the route.
 
     Never raises. Anything but an accepted verdict leaves decision None, and
     HyperGateAgent.decide then runs the LLM sub-agents as if jev were absent.
     """
-    port = get_decision_port()
-    if port is None or jev_mode() != "active":
+    port = _active_port()
+    if port is None:
         return _OFF
     started = time.perf_counter()
 

@@ -257,7 +257,8 @@ async def decide_route(problem: str, preset: str) -> dict[str, Any]:
     the HyperGate LLM cost. Until W5 this docstring claimed that while the cache
     it named was two stub methods returning None.
 
-    The whole decision is bounded by HYPERGATE_TOTAL_BUDGET_SECONDS. Before
+    The whole decision is bounded by HYPERGATE_TOTAL_BUDGET_SECONDS, plus
+    jev_router.reserved_seconds() when jev routes ahead of the LLMs. Before
     this, /api/gate awaited gate.decide() with no ceiling at all -- measured
     30,189ms on one complex prompt (docs/plans/gate-and-registry-remediation.md
     W3). PipelineOrchestrator's preflight has its own separate timeout around
@@ -271,17 +272,16 @@ async def decide_route(problem: str, preset: str) -> dict[str, Any]:
     _effective_preset_name, router_instance = preset_service.build_router(gate_preset_name)
 
     gate = HyperGateAgent(build_hypergate_router(router_instance))
+    budget = HYPERGATE_TOTAL_BUDGET_SECONDS + jev_router.reserved_seconds()
     try:
-        decision = await asyncio.wait_for(
-            run_gate_cached(gate, problem), timeout=HYPERGATE_TOTAL_BUDGET_SECONDS
-        )
+        decision = await asyncio.wait_for(run_gate_cached(gate, problem), timeout=budget)
     except TimeoutError:
         from reasoner.infrastructure.metrics import HYPERGATE_BUDGET_EXCEEDED_TOTAL
 
         HYPERGATE_BUDGET_EXCEEDED_TOTAL.inc()
         logger.warning(
             "HyperGate exceeded total budget of %.0fs; falling back to pipeline.",
-            HYPERGATE_TOTAL_BUDGET_SECONDS,
+            budget,
         )
         # Same conservative verdict HyperGateAgent._synthesize's own Step 5
         # hard-fallback produces on total sub-agent failure -- a budget timeout
@@ -293,7 +293,7 @@ async def decide_route(problem: str, preset: str) -> dict[str, Any]:
             confidence=0.0,
             reasoning=(
                 f"HyperGate exceeded total budget of "
-                f"{HYPERGATE_TOTAL_BUDGET_SECONDS:.0f}s, fallback to pipeline"
+                f"{budget:.0f}s, fallback to pipeline"
             ),
         )
 

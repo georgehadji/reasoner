@@ -111,8 +111,10 @@ HYPERGATE_CACHE_TTL_SECONDS: int = 3600  # 1-hour TTL for top-level routing deci
 # Shadow runs off the request path, so its timeout only bounds a stray task.
 JEV_SHADOW_TIMEOUT_SECONDS: float = 5.0
 # Active is ON the request path, and a timeout falls back to the LLM
-# sub-agents, which then spend their own time inside the 12s gate budget. 3.0s
-# clears a cold connection; a jev that slow is better abandoned for the LLMs.
+# sub-agents. The deadlines around the gate add this on top of their own
+# budget (jev_router.reserved_seconds), so a slow jev delays the LLMs but never
+# shortens their time. 3.0s clears a cold connection; a jev that slow is better
+# abandoned for the LLMs.
 JEV_ACTIVE_TIMEOUT_SECONDS: float = 3.0
 # The iterative-critique critic runs inside a pipeline phase measured in
 # minutes, not inside the gate's 12s budget, so it can afford a cold connection:
