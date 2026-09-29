@@ -8,8 +8,8 @@ from typing import Any, Protocol
 
 from pydantic import BaseModel, Field, field_validator
 
-from reasoner.exceptions import ProviderError
 from reasoner.core.verbalized_sampling import VSMode, build_vs_prompt, parse_vs_response
+from reasoner.exceptions import ProviderError
 from reasoner.reasoner_vs_constants import (
     LOG_VS_CANDIDATE_RANK,
     LOG_VS_K,
