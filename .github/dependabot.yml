@@ -10,6 +10,17 @@ updates:
       python-deps:
         patterns:
           - "*"
+    # Transitives whose parents pin or cap them. Neither is in requirements.txt;
+    # scripts/lock_requirements.sh (pip-compile) resolves them into
+    # requirements.lock.txt. Dependabot edits the lockfile's pins in place
+    # without re-resolving, so it keeps proposing versions the parents forbid,
+    # and lockfile-freshness fails every such PR (#91, #98):
+    # - pydantic-core: pydantic 2.13.5 pins pydantic-core==2.46.5.
+    # - websockets: realtime 2.31.0 requires websockets<16.
+    # They move when their parents do, at the next lock regeneration.
+    ignore:
+      - dependency-name: "pydantic-core"
+      - dependency-name: "websockets"
     open-pull-requests-limit: 10
 
   # Frontend Node deps
