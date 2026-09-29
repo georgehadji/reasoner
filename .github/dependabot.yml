@@ -21,6 +21,22 @@ updates:
       npm-deps:
         patterns:
           - "*"
+    # Two majors held back on purpose. A "^5" / "^9" in package.json does not
+    # hold them: after #75 set exactly that by hand, the next grouped update
+    # (#90) rewrote them to "^7" / "^10".
+    # - typescript: typescript-eslint (via eslint-config-next) supports
+    #   TypeScript <6.1; on 7 `tsc` fails "typescript-eslint does not support
+    #   TS 7.0".
+    # - eslint: the eslint-plugin-react that eslint-config-next bundles calls
+    #   context.getFilename(), removed in ESLint 10, so `npm run lint` crashes.
+    #   eslint-config-next's own peer range allows 10; that plugin (7.37.5,
+    #   its latest release) peers eslint up to ^9.7.
+    # Lift each once typescript-eslint / eslint-config-next support it.
+    ignore:
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
     open-pull-requests-limit: 10
 
   # Docker base images — root backend image
