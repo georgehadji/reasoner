@@ -91,9 +91,11 @@ async def check_health(
             health["checks"]["postgres"] = {"status": "ok"}
             from reasoner.metrics import REASONER_POSTGRES_POOL_FREE, REASONER_POSTGRES_POOL_SIZE
             REASONER_POSTGRES_POOL_SIZE.set(_health_postgres_pool.get_size())
-            REASONER_POSTGRES_POOL_FREE.set(
-                _health_postgres_pool.get_size() - _health_postgres_pool.get_idle_size()
-            )
+            # get_idle_size() is the free-connection count; get_size() - get_idle_size()
+            # is BUSY connections. PostgresPoolExhaustion (alerts.yml) fires on
+            # `reasoner_postgres_pool_free == 0`, so the previous value inverted the
+            # alert: it fired on an idle pool and stayed silent when exhausted.
+            REASONER_POSTGRES_POOL_FREE.set(_health_postgres_pool.get_idle_size())
         except Exception as e:
             health["checks"]["postgres"] = {"status": "error", "reason": str(e)}
             _health_postgres_pool = None

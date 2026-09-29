@@ -3,6 +3,7 @@
 import pytest
 
 from reasoner.application.services.quota_service import QuotaService
+from reasoner.core.ports import metrics_port
 from reasoner.domain.saas import QuotaResult, SubscriptionTier, UsageQuota
 
 
@@ -57,3 +58,61 @@ async def test_quota_service_free_allows_when_under_limit():
     result = await service.check("u1", SubscriptionTier.FREE)
     assert result.allowed is True
     assert result.remaining == 15
+
+
+@pytest.mark.asyncio
+async def test_quota_exceeded_reaches_the_metrics_port_hook():
+    """reasoner_quota_exceeded_total (QuotaExceededSpike, alerts.yml) was
+    defined and alerted on but never incremented. QuotaService.check() must
+    call the core metrics-port hook on the denial path -- not import
+    infrastructure.metrics directly, since application/ may not depend on
+    infrastructure concretes.
+    """
+    recorded: list[str] = []
+    metrics_port.set_quota_exceeded_counter(recorded.append)
+    try:
+        repo = FakeQuotaRepository(
+            UsageQuota(user_id="u1", tier=SubscriptionTier.FREE, used_queries=20, max_queries=20)
+        )
+        service = QuotaService(repo)
+        result = await service.check("u1", SubscriptionTier.FREE)
+        assert result.allowed is False
+        assert recorded == ["free"]
+    finally:
+        metrics_port.set_quota_exceeded_counter(None)
+
+
+@pytest.mark.asyncio
+async def test_quota_exceeded_with_an_unrecognized_tier_still_records_a_metric():
+    """test_quota_tier_enforcement.py exercises the free-ceiling fallback with a
+    plain string tier (not a SubscriptionTier member). count_quota_exceeded()
+    must not assume `.value` exists.
+    """
+    recorded: list[str] = []
+    metrics_port.set_quota_exceeded_counter(recorded.append)
+    try:
+        repo = FakeQuotaRepository(
+            UsageQuota(user_id="u1", tier=SubscriptionTier.FREE, used_queries=20, max_queries=500)
+        )
+        service = QuotaService(repo)
+        result = await service.check("u1", "not-a-tier")  # type: ignore[arg-type]
+        assert result.allowed is False
+        assert recorded == ["not-a-tier"]
+    finally:
+        metrics_port.set_quota_exceeded_counter(None)
+
+
+@pytest.mark.asyncio
+async def test_quota_allowed_does_not_touch_the_metrics_port_hook():
+    recorded: list[str] = []
+    metrics_port.set_quota_exceeded_counter(recorded.append)
+    try:
+        repo = FakeQuotaRepository(
+            UsageQuota(user_id="u1", tier=SubscriptionTier.FREE, used_queries=5, max_queries=20)
+        )
+        service = QuotaService(repo)
+        result = await service.check("u1", SubscriptionTier.FREE)
+        assert result.allowed is True
+        assert recorded == []
+    finally:
+        metrics_port.set_quota_exceeded_counter(None)

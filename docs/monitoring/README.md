@@ -31,9 +31,13 @@ curl -s http://localhost:8003/api/metrics | head -20
    ```
    METRICS_ALLOWED_IPS=127.0.0.1,::1,172.16.0.0/12
    ```
-3. **Alert routing (optional):** Set these in `.env` for external notifications:
-   - `SLACK_WEBHOOK_URL` — Slack incoming webhook
-   - `PAGERDUTY_ROUTING_KEY` — PagerDuty Events API v2 key
+3. **Alert routing (optional):** Alertmanager does not expand environment
+   variables in its config, so receiver secrets are read from files instead
+   of `.env`. Write them under `./secrets` (gitignored, mounted read-only at
+   `/etc/alertmanager/secrets`) and uncomment the matching receiver in
+   `alertmanager.yml`:
+   - `secrets/slack_url` — Slack incoming webhook
+   - `secrets/pagerduty_key` — PagerDuty Events API v2 key
 
 ### Reloading
 
@@ -67,6 +71,8 @@ All rules are defined in `alerts.yml`. Current coverage:
 | `CIHealingHeartbeatStale` | warning | `ci_heartbeat_timestamp` | CI not run >25h |
 | `CircuitBreakerOpen` | critical | `reasoner_circuit_breaker_state` | Open >5m |
 | `RateLimitRejectionSpike` | warning | `reasoner_rate_limit_rejected_total` | >50/sec |
+| `BackendDown` | critical | `up{job="reasoner-backend"}` | Scrape target failing >2m |
+| `BackendMetricsAbsent` | critical | `up{job="reasoner-backend"}` | Scrape target gone entirely >5m |
 
 ## Required Metrics
 
@@ -101,4 +107,4 @@ curl http://localhost:9090/api/v1/alerts | jq '.data.alerts[] | {name: .labels.a
 | Metrics endpoint (`/api/metrics`) | ✅ Implemented |
 | Prometheus deployment | ✅ `docker-compose.observability.yml` |
 | Alertmanager deployment | ✅ `docker-compose.observability.yml` |
-| Alert routing (Slack/PagerDuty) | ✅ Configured (env-driven webhooks) |
+| Alert routing (Slack/PagerDuty) | ⚙️ Recording-only by default — uncomment a receiver in `alertmanager.yml` and supply `./secrets/*` to deliver off-box |

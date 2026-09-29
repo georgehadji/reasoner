@@ -43,3 +43,25 @@ def count_degradation(site: str) -> None:
         counter(site)
     except Exception:  # pragma: no cover - a broken metric is not a broken run
         logger.debug("degradation metric unavailable for site=%s", site)
+
+
+#: Set by `infrastructure.metrics` at import. None means "nobody is counting",
+#: which is a normal state, not a misconfiguration.
+_QUOTA_EXCEEDED_COUNTER: Callable[[str], None] | None = None
+
+
+def set_quota_exceeded_counter(counter: Callable[[str], None] | None) -> None:
+    """Install the sink for quota-exceeded counts. Accepts None so a test can reset."""
+    global _QUOTA_EXCEEDED_COUNTER
+    _QUOTA_EXCEEDED_COUNTER = counter
+
+
+def count_quota_exceeded(tier: str) -> None:
+    """Record one quota-exceeded event. Never raises: metrics must not break a caller."""
+    counter = _QUOTA_EXCEEDED_COUNTER
+    if counter is None:
+        return
+    try:
+        counter(tier)
+    except Exception:  # pragma: no cover - a broken metric is not a broken run
+        logger.debug("quota-exceeded metric unavailable for tier=%s", tier)
