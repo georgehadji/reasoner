@@ -9,7 +9,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
-from reasoner.reasoner_vs_constants import (
+from reasoner.core.vs_constants import (
     VS_K_GENERATION,
 )
 

@@ -17,7 +17,6 @@ Platform and infrastructure adapters implementing the abstract application ports
 - **`server_check.py`**: Reasoner - Server Startup Test
 - **`token_cache.py`**: Approximate: $0.000001 per token (average across providers)
 - **`uploader.py`**: Content-hash deduplication index, scoped per tenant: {user_id: {sha256: file_id}}.
-- **`verbalized_sampling.py`**: Also handle generic ``` fences if json-specific didn't match
 - **`widgets_legacy.py`**: Widgets Backend Engine
 
 ## Subfolders

@@ -53,7 +53,7 @@ folders:
 | `vs_config.py` | `core/vs_config.py` |
 | `widgets.py` | `infrastructure/widgets_legacy.py` |
 | `reasoner_persuasion_defense.py` | `security/persuasion_defense.py` |
-| `reasoner_verbalized_sampling.py` | `infrastructure/verbalized_sampling.py` |
+| `reasoner_verbalized_sampling.py` | `core/verbalized_sampling.py` |
 | `reasoner_vs_constants.py` | `core/vs_constants.py` |
 
 Several shims emit a `DeprecationWarning` on import: `circuit_breaker`, `exceptions`, `logging_utils`, `pipeline`, `rate_limiter`.

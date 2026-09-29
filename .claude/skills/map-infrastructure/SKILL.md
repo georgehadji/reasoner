@@ -161,7 +161,6 @@ folders:
 | `metrics.py` | Prometheus metric definitions (queries, quota, LLM errors, durations, pool stats). |
 | `token_cache.py` (17KB) | Semantic cache keyed by (problem hash, phase) with token-based eviction. |
 | `translation/composite.py`, `deepl_client.py`, `llm_translator.py` | `TranslationPort`: DeepL → LLM → identity fallback chain. |
-| `verbalized_sampling.py` | VS primitives: build prompt, parse response, sample, entropy. |
 | `telemetry/call_telemetry_store.py` | SQLite per-call telemetry (ACR Phase 1). |
 | `clients.py` | Shared pooled HTTP clients (neuro client lifecycle). |
 | `renderer.py` | Thin shim → `application/services/renderers`. |
