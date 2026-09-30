@@ -88,7 +88,10 @@ async def run_perspectives_phase(
 
     if perspectives is None:
         from reasoner.core import DEFAULT_PERSPECTIVES
-        perspectives = list(DEFAULT_PERSPECTIVES)
+        # getattr: WorkflowServices exposes this (see PipelineWorkflowServices
+        # .perspectives), but the port is also implemented by lighter test
+        # stand-ins that predate it and have no such attribute.
+        perspectives = getattr(services, "perspectives", None) or list(DEFAULT_PERSPECTIVES)
 
     # Warn on diversity collapse: all perspectives resolve to the same model, or
     # all to a single geopolitical bloc. Cross-bloc spread (not just cross-company)
