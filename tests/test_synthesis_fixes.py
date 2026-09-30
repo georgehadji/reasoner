@@ -215,6 +215,39 @@ async def test_perspective_filter_regenerates_hallucinated_greek_text():
     assert calls.count("constructive") == 2
 
 
+@pytest.mark.asyncio
+async def test_configured_perspectives_reach_phase_without_explicit_kwarg():
+    """pipeline.perspectives must reach Phase 2 through production wiring.
+
+    Regression: run_perspectives_phase() fell back to DEFAULT_PERSPECTIVES
+    whenever its `perspectives` kwarg was omitted — exactly what happens on the
+    real WorkflowRunner path (application/flows/runner.py calls
+    `self.services.run_phase(step, state)` with no kwargs; only the hand-rolled
+    /api/run-with-context endpoint passed `perspectives=pipeline.perspectives`
+    explicitly). Narrowing pipeline.perspectives therefore had no effect on any
+    normal run. PipelineWorkflowServices.perspectives now surfaces it and the
+    phase's getattr-tolerant default picks it up.
+    """
+    calls = []
+
+    class CountingRouter(FakeRouter):
+        async def call(self, role, system_prompt, user_prompt, **kwargs):
+            calls.append(role)
+            return json.dumps({"core_analysis": f"{role} analysis", "key_insights": []}), {"model": "fake", "input_tokens": 10, "output_tokens": 10}
+
+    router = CountingRouter({})
+    pipeline = ReasonerPipeline(router=router, preset_name="multi-perspective-budget", verbose=False)
+    state = PipelineState(problem="Should we migrate to Postgres?")
+    state.language = "English"
+    pipeline.perspectives = ["constructive", "destructive"]
+
+    # No `perspectives=` kwarg — exactly what the production WorkflowRunner path does.
+    await run_perspectives_phase(state, _svc(pipeline))
+
+    assert set(calls) == {"constructive", "destructive"}
+    assert len(state.candidates) == 2
+
+
 # ─────────────────────────────────────────────────────────────────────
 # Milestone 6: Stress-test self-referential failures are filtered
 # ─────────────────────────────────────────────────────────────────────
