@@ -22,6 +22,8 @@ from enum import Enum
 from types import MappingProxyType
 from typing import Any
 
+from reasoner.core.degrade import degraded
+
 # Context variables for log context across async calls
 _correlation_id: ContextVar[str] = ContextVar("correlation_id", default="")
 # Immutable default: a bare {} here is one dict shared by every context that
@@ -78,24 +80,29 @@ def stop_queue_logging() -> None:
 # SENSITIVE DATA REDACTION PATTERNS
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Patterns for API keys and secrets that should be redacted from logs
+# Patterns for API keys and secrets that should be redacted from logs.
+#
+# NOTE on the `sk-` family: real keys carry hyphens inside the body
+# (`sk-or-v1-…` for OpenRouter, `sk-proj-…` for current OpenAI project keys).
+# A `[a-zA-Z0-9]{20,}` class stops at the first hyphen, so those keys matched
+# nothing and were logged verbatim. The class must admit `-` and `_`.
 SENSITIVE_PATTERNS: list[tuple[re.Pattern, str]] = [
-    # OpenAI API keys
-    (re.compile(r'sk-[a-zA-Z0-9]{20,}'), 'sk-***REDACTED***'),
-    # Anthropic API keys
-    (re.compile(r'sk-ant-[a-zA-Z0-9\-]{20,}'), 'sk-ant-***REDACTED***'),
+    # Anthropic API keys (before the generic sk- rule, which would also match)
+    (re.compile(r'sk-ant-[a-zA-Z0-9_\-]{20,}'), 'sk-ant-***REDACTED***'),
+    # OpenAI / OpenRouter / DeepSeek and other sk- prefixed keys, hyphens included
+    (re.compile(r'sk-[a-zA-Z0-9][a-zA-Z0-9_\-]{19,}'), 'sk-***REDACTED***'),
     # Google API keys
     (re.compile(r'AIza[a-zA-Z0-9_\-]{35}'), 'AIza***REDACTED***'),
-    # DeepSeek API keys
-    (re.compile(r'sk-[a-f0-9]{32,}'), 'sk-***REDACTED***'),
     # Perplexity API keys
-    (re.compile(r'pplx-[a-zA-Z0-9]{20,}'), 'pplx-***REDACTED***'),
+    (re.compile(r'pplx-[a-zA-Z0-9_\-]{20,}'), 'pplx-***REDACTED***'),
     # Generic Bearer tokens
     (re.compile(r'Bearer\s+[a-zA-Z0-9_\-\.]{20,}'), 'Bearer ***REDACTED***'),
     # JWT tokens
     (re.compile(r'eyJ[a-zA-Z0-9_\-]*\.eyJ[a-zA-Z0-9_\-]*\.[a-zA-Z0-9_\-]*'), 'eyJ***REDACTED***'),
-    # Connection strings with passwords
-    (re.compile(r'(postgres|mysql|mongodb|redis)://[^:]+:[^@]+@'), r'\1://***:***@'),
+    # Connection strings with passwords. `postgresql://` is the scheme
+    # DATABASE_URL actually uses — a bare `postgres` alternative does not
+    # match it, because `://` has to follow immediately.
+    (re.compile(r'(postgresql|postgres|mysql|mongodb|rediss|redis)(\+\w+)?://[^:/@\s]+:[^@\s]+@'), r'\1://***:***@'),
     # Generic secret patterns
     (re.compile(r'(api_key|apikey|secret|password|token|credential)["\']?\s*[:=]\s*["\']?[a-zA-Z0-9_\-]{10,}', re.IGNORECASE), r'\1=***REDACTED***'),
 ]
@@ -136,7 +143,12 @@ def redact_dict(data: dict[str, Any]) -> dict[str, Any]:
     result = {}
     sensitive_keys = {
         'api_key', 'apikey', 'key', 'secret', 'password', 'token',
-        'credential', 'auth', 'authorization', 'bearer'
+        'credential', 'auth', 'authorization', 'bearer',
+        # Session cookies are bearer credentials too. Without these, redacting
+        # a request-header dict left `cookie` (and any Set-Cookie echo) in
+        # plain text — a session in the error store is as good as a password.
+        # (X-Admin-Key is already caught by the 'key' substring above.)
+        'cookie', 'set-cookie', 'session',
     }
 
     for k, v in data.items():
@@ -195,23 +207,85 @@ class StructuredLogEntry:
         return json.dumps(asdict(self), default=str)
 
 
-class SafeLoggingFilter(logging.Filter):
-    """Filter that redacts sensitive data from every log record.
+def _redact_arg(arg: Any) -> Any:
+    """Redact one interpolation arg, leaving it untouched when nothing leaks.
 
-    Install on the root logger (or any logger) so that *all* output
-    — including exception messages from third-party libraries —
-    is sanitized before reaching handlers.
+    Non-string args matter as much as strings: `logger.warning("failed: %s",
+    exc)` formats the exception later, and its message can carry a key or a
+    DSN. Such an arg is replaced by its redacted str() only when redaction
+    changes it, so %d / %r formatting and the message template (which Sentry
+    groups on) stay as they were for every record that holds no secret.
+    """
+    if isinstance(arg, str):
+        return redact_sensitive(arg)
+    if arg is None or isinstance(arg, (bool, int, float)):
+        return arg
+    try:
+        text = str(arg)
+    except Exception as exc:
+        # Unprintable: logging will hit the same error when it formats the
+        # record and report it through Handler.handleError. Raising here would
+        # turn the log call itself into a crash at the caller.
+        return degraded("logging.redact_arg", arg, exc=exc)
+    redacted = redact_sensitive(text)
+    return arg if redacted == text else redacted
+
+
+def _redact_record(record: logging.LogRecord) -> None:
+    """Redact a record's message and interpolation args in place."""
+    if isinstance(record.msg, str):
+        record.msg = redact_sensitive(record.msg)
+    if record.args:
+        if isinstance(record.args, dict):
+            record.args = {key: _redact_arg(val) for key, val in record.args.items()}
+        else:
+            record.args = tuple(_redact_arg(arg) for arg in record.args)
+
+
+class SafeLoggingFilter(logging.Filter):
+    """Filter that redacts sensitive data from log records it sees.
+
+    WARNING: attaching this to a *logger* only covers records that logger
+    creates. Records made by `logging.getLogger(__name__)` propagate to the
+    root logger's *handlers* but never run the root logger's *filters*, so
+    installing it on the root logger redacts nothing from ordinary module
+    logging. Prefer install_global_redaction(), which cannot be bypassed
+    that way. Kept for attaching to a single handler.
     """
 
     def filter(self, record: logging.LogRecord) -> bool:
-        if isinstance(record.msg, str):
-            record.msg = redact_sensitive(record.msg)
-        if record.args:
-            record.args = tuple(
-                redact_sensitive(arg) if isinstance(arg, str) else arg
-                for arg in record.args
-            )
+        _redact_record(record)
         return True
+
+
+_redaction_installed = False
+
+
+def install_global_redaction() -> None:
+    """Redact secrets from every LogRecord in the process, at creation time.
+
+    Wrapping the record factory is the only hook that covers every logger
+    regardless of hierarchy, propagation, or when handlers are attached —
+    including loggers created later by uvicorn, gunicorn, and third-party
+    libraries. A filter on the root logger does not: a filter attached to a
+    logger only runs for records that logger itself creates, and every
+    `logging.getLogger(__name__)` record in this package is created by a
+    *child* logger, which propagates straight to the root logger's handlers
+    without ever running the root logger's filters. Idempotent.
+    """
+    global _redaction_installed
+    if _redaction_installed:
+        return
+
+    previous_factory = logging.getLogRecordFactory()
+
+    def factory(*args, **kwargs):
+        record = previous_factory(*args, **kwargs)
+        _redact_record(record)
+        return record
+
+    logging.setLogRecordFactory(factory)
+    _redaction_installed = True
 
 
 def set_log_context(user_id: str | None = None, tier: str | None = None, preset: str | None = None) -> None:

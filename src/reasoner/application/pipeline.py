@@ -154,6 +154,7 @@ class ReasonerPipeline:
         actual file content. We use explicit markers so the model cannot mistake
         this for metadata or instructions.
         """
+        from reasoner.core.sanitization import neutralize_for_replay
         from reasoner.core.settings import settings
 
         # ── Semantic retrieval path (opt-in) ──
@@ -171,10 +172,25 @@ class ReasonerPipeline:
                 if chunks:
                     parts: list[str] = []
                     for i, chunk_text in enumerate(chunks, 1):
+                        # Attachment text is replayed content, not a fresh
+                        # instruction: it can legitimately contain a phrase like
+                        # "System:" (a log excerpt, a paper about prompt
+                        # injection). neutralize_for_replay strips/reports
+                        # instead of raising, unlike sanitize_for_prompt, so a
+                        # crafted upload is defanged without refusing a
+                        # legitimate one. See core/sanitization.py docstring.
+                        safe_chunk, chunk_warnings = neutralize_for_replay(
+                            chunk_text, max_length=TRUNCATION.LARGE_CONTENT
+                        )
+                        if chunk_warnings:
+                            logger.warning(
+                                "Neutralized %d pattern(s) in attachment excerpt %d",
+                                len(chunk_warnings), i,
+                            )
                         parts.append(
                             f"=== EXCERPT {i} (most relevant passage) ===\n"
                             f"[CONTENT START]\n"
-                            f"{chunk_text}\n"
+                            f"{safe_chunk}\n"
                             f"[CONTENT END]"
                         )
                     return (
@@ -195,10 +211,21 @@ class ReasonerPipeline:
             filename = att.get("filename", "unknown")
             extracted = att.get("extracted_text", "").strip()
             if extracted:
+                # Same reasoning as the semantic branch above — replayed
+                # document text must be neutralized, not blocked, before it
+                # reaches a prompt.
+                safe_extracted, extracted_warnings = neutralize_for_replay(
+                    extracted, max_length=TRUNCATION.LARGE_CONTENT
+                )
+                if extracted_warnings:
+                    logger.warning(
+                        "Neutralized %d pattern(s) in attachment '%s'",
+                        len(extracted_warnings), filename,
+                    )
                 parts.append(
                     f"=== FILE: {filename} ===\n"
                     f"[CONTENT START]\n"
-                    f"{extracted}\n"
+                    f"{safe_extracted}\n"
                     f"[CONTENT END]"
                 )
         if not parts:
