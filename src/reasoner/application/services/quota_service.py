@@ -12,6 +12,7 @@ from __future__ import annotations
 from datetime import UTC
 
 from reasoner.application.ports.quota_repository import QuotaRepository
+from reasoner.core.ports.metrics_port import count_quota_exceeded
 from reasoner.domain.saas import (
     QuotaResult,
     SubscriptionTier,
@@ -68,6 +69,15 @@ class QuotaService:
 
         remaining = max(0, effective_max - quota.used_queries)
         if remaining <= 0:
+            # reasoner_quota_exceeded_total is defined and alerted on
+            # (QuotaExceededSpike, docs/monitoring/alerts.yml) but was never
+            # incremented, so the abuse tripwire could never fire. Reached
+            # through the core metrics-port hook, not a direct
+            # infrastructure import -- application/ may not depend on
+            # infrastructure concretes (same pattern as core/degrade.py).
+            # `tier` is typed as SubscriptionTier but, like the TIER_LIMITS
+            # lookup above, tolerates a plain str from an untrusted caller.
+            count_quota_exceeded(getattr(tier, "value", tier))
             return QuotaResult(
                 allowed=False,
                 remaining=0,
