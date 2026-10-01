@@ -31,17 +31,33 @@ class FakePostgresPool:
         return self._idle
 
 
+class RecordingGauge:
+    """Stands in for the gauge so the test holds without prometheus_client.
+
+    CI installs no prometheus_client, so reasoner.metrics hands out a no-op
+    metric there and a real Gauge's private ``_value`` does not exist.
+    """
+
+    def __init__(self) -> None:
+        self.values: list[float] = []
+
+    def set(self, value: float) -> None:
+        self.values.append(value)
+
+
 @pytest.mark.asyncio
 async def test_postgres_pool_free_gauge_reports_idle_not_busy(monkeypatch):
+    from reasoner import metrics
     from reasoner.core.settings import settings
-    from reasoner.metrics import REASONER_POSTGRES_POOL_FREE
 
     # size=10, idle=3 -> 7 connections are busy. The gauge must read the
     # free count (3), never the busy count (7).
+    gauge = RecordingGauge()
+    monkeypatch.setattr(metrics, "REASONER_POSTGRES_POOL_FREE", gauge)
     fake_pool = FakePostgresPool(size=10, idle=3)
     monkeypatch.setattr(health_service, "_health_postgres_pool", fake_pool)
     monkeypatch.setattr(settings, "DATABASE_URL", "postgresql+asyncpg://fake/db")
 
     await health_service.check_health()
 
-    assert REASONER_POSTGRES_POOL_FREE._value.get() == 3
+    assert gauge.values == [3]
