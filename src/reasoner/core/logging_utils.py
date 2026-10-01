@@ -22,6 +22,8 @@ from enum import Enum
 from types import MappingProxyType
 from typing import Any
 
+from reasoner.core.degrade import degraded
+
 # Context variables for log context across async calls
 _correlation_id: ContextVar[str] = ContextVar("correlation_id", default="")
 # Immutable default: a bare {} here is one dict shared by every context that
@@ -220,8 +222,11 @@ def _redact_arg(arg: Any) -> Any:
         return arg
     try:
         text = str(arg)
-    except Exception:
-        return arg
+    except Exception as exc:
+        # Unprintable: logging will hit the same error when it formats the
+        # record and report it through Handler.handleError. Raising here would
+        # turn the log call itself into a crash at the caller.
+        return degraded("logging.redact_arg", arg, exc=exc)
     redacted = redact_sensitive(text)
     return arg if redacted == text else redacted
 
