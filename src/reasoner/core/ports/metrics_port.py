@@ -63,5 +63,8 @@ def count_quota_exceeded(tier: str) -> None:
         return
     try:
         counter(tier)
-    except Exception:  # pragma: no cover - a broken metric is not a broken run
-        logger.debug("quota-exceeded metric unavailable for tier=%s", tier)
+    except Exception:
+        # A broken metric is not a broken run, but it must not be silent either:
+        # QuotaExceededSpike alerts on this counter, so a DEBUG line here would
+        # hide the alert going dark.
+        logger.warning("quota-exceeded metric failed for tier=%s", tier, exc_info=True)
