@@ -38,6 +38,13 @@ COPY asgi.py .
 COPY main.py .
 COPY start_all.py .
 
+# Copy Alembic config + migrations: docker-entrypoint.sh runs
+# `alembic upgrade head` under `set -e` on every boot, and alembic.ini's
+# script_location (migrations/alembic) has to exist in the image or that
+# fails before gunicorn ever starts.
+COPY alembic.ini .
+COPY migrations/ migrations/
+
 # Create directories for volumes and set ownership
 RUN mkdir -p cache history uploads && chown -R appuser:appuser /app
 
@@ -49,9 +56,15 @@ USER appuser
 
 EXPOSE 8000
 
-# Health check
+# Health check. gunicorn is started with --certfile/--keyfile (TLS) whenever
+# SSL_CERTFILE and SSL_KEYFILE are set (see docker-entrypoint.sh), so the
+# scheme here has to follow the same env vars or an HTTP probe against a
+# TLS-only port fails every check and the container is never "healthy".
+# When TLS is on, verify against the internal CA docker-compose.yml mounts
+# at /certs/ca.crt; only skip verification if that CA isn't present (e.g. a
+# non-compose deployment terminating TLS some other way).
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')" || exit 1
+    CMD python -c "import os,ssl,urllib.request; scheme='https' if os.environ.get('SSL_CERTFILE') and os.environ.get('SSL_KEYFILE') else 'http'; ctx=(ssl.create_default_context(cafile='/certs/ca.crt') if os.path.exists('/certs/ca.crt') else ssl._create_unverified_context()) if scheme=='https' else None; urllib.request.urlopen(scheme+'://localhost:8000/api/health', context=ctx)" || exit 1
 
 # Use entrypoint to support env-driven worker count and memory-leak prevention
 ENTRYPOINT ["./docker-entrypoint.sh"]

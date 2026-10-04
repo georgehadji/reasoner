@@ -74,6 +74,7 @@ folders:
 | `alembic/versions/df9629e72f17_baseline.py` | Baseline of the whole schema. |
 | `alembic/versions/20260501_*_add_paypal_and_rename_external_cols.py` | PayPal support, provider-specific column names. |
 | `alembic/versions/20260502_*_add_oauth_columns.py` | `auth_provider` and `avatar_url` on users. |
+| `alembic/versions/20260929_*_add_account_deletion_log.py` | `account_deletion_log` table (mirrors `005_account_deletion_log.sql`, which Alembic never runs). Current head. |
 
 ## sdk/ — published TypeScript client
 

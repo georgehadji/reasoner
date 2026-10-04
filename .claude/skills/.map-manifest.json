@@ -678,6 +678,7 @@
       "migrations/alembic/script.py.mako",
       "migrations/alembic/versions/20260501_003029_add_paypal_and_rename_external_cols.py",
       "migrations/alembic/versions/20260502_001500_add_oauth_columns.py",
+      "migrations/alembic/versions/20260929_000000_add_account_deletion_log.py",
       "migrations/alembic/versions/CONTEXT.md",
       "migrations/alembic/versions/df9629e72f17_baseline.py"
     ],
@@ -998,6 +999,7 @@
       "tests/test_decompose_json_guard.py",
       "tests/test_deep_read.py",
       "tests/test_defect_hunt_fixes.py",
+      "tests/test_deploy_boot_blockers.py",
       "tests/test_document_tenant_safety.py",
       "tests/test_document_vector_store.py",
       "tests/test_domain_events.py",

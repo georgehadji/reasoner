@@ -241,7 +241,7 @@ async def lifespan(app: FastAPI):
     from reasoner.application.services.compaction_service import run_nightly_compaction_loop
     if settings.DATABASE_URL:
         from reasoner.infrastructure.persistence.postgres_store import PostgreSQLEventStore
-        _compaction_store = PostgreSQLEventStore(settings.DATABASE_URL, pool_size=5)
+        _compaction_store = PostgreSQLEventStore(settings.asyncpg_dsn, pool_size=5)
         await _compaction_store.initialize()
     else:
         from reasoner.infrastructure.persistence.event_store import get_event_store
