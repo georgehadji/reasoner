@@ -7,8 +7,10 @@ import asyncio
 import hashlib
 import logging
 import secrets
+import shutil
 import time
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -21,6 +23,7 @@ from reasoner.neuro.compression import smart_compress
 from reasoner.neuro.config import (
     NeuroConfig,
     PersonaConfig,
+    _safe_agent_id,
     get_agent_data_dir,
     get_persona,
     load_config,
@@ -213,6 +216,22 @@ class TenantManager:
     def active_tenants(self) -> list[str]:
         return list(self._tenants.keys())
 
+    async def evict_prefix(self, prefix: str) -> list[str]:
+        """Drop every in-memory tenant whose key starts with *prefix*.
+
+        `_tenants` is keyed by the raw tenant_key() string (not the sanitized
+        disk name), so a plain prefix match against those keys is exact.
+        Without this, a tenant already loaded into memory keeps answering
+        recall() from its in-memory L1 cache for up to IDLE_TTL_SECONDS after
+        its on-disk directory has been removed -- used by GDPR erasure.
+        """
+        async with self._lock:
+            matched = [k for k in self._tenants if k.startswith(prefix)]
+            for k in matched:
+                del self._tenants[k]
+                self._last_access.pop(k, None)
+            return matched
+
 
 # ─────────────────────────────────────────────
 #  Prompts
@@ -261,6 +280,17 @@ def require_neuro_key(request: Request) -> None:
         raise HTTPException(status_code=403, detail="Neuro access required")
 
 
+def _owned_prefix(owner: str) -> str:
+    """The tenant_key prefix common to every agent_id belonging to *owner*.
+
+    tenant_key(owner, agent_id) is always f"{_owned_prefix(owner)}{agent_id or
+    'default'}" for a signed-in owner, so this prefix identifies every tenant
+    -- in-memory or on disk -- that belongs to them, without knowing their
+    agent_ids in advance. Used by NeuroService.erase_owner (GDPR erasure).
+    """
+    return f"u-{owner}-"
+
+
 def tenant_key(owner: str | None, agent_id: str | None) -> str | None:
     """Scope a caller-supplied agent_id to the identity that owns it.
 
@@ -283,7 +313,7 @@ def tenant_key(owner: str | None, agent_id: str | None) -> str | None:
     """
     if not owner:
         return f"a-{agent_id}" if agent_id else None
-    return f"u-{owner}-{agent_id or 'default'}"
+    return f"{_owned_prefix(owner)}{agent_id or 'default'}"
 
 
 class NeuroService:
@@ -341,6 +371,70 @@ class NeuroService:
             ),
             owner=owner,
         )
+
+    async def erase_owner(self, owner: str) -> dict:
+        """Permanently delete every Neuro tenant belonging to *owner* (GDPR Art. 17).
+
+        tenant_key scopes each (owner, agent_id) pair to its own tenant, so a
+        signed-in user's memory is not one directory but one per conversation
+        they have ever had. This removes all of them: the live in-memory
+        tenant (L1 cache, hot sessions) and the on-disk tenant directory (L1
+        disk persistence, L2 index, L3/warm+cold session archives) for every
+        agent_id this owner has used.
+
+        Returns {"erased": bool, "dirs_removed": int, "tenants_evicted": int,
+        "error": str | None}. "erased" is True only when no trace of this
+        owner's data remains afterward, including the case where none ever
+        existed. Best-effort per directory: one failure is recorded in
+        "error" but does not stop the others from being attempted.
+        """
+        prefix = _owned_prefix(owner)
+        evicted = await self.tenants.evict_prefix(prefix)
+
+        result: dict = {
+            "erased": True,
+            "dirs_removed": 0,
+            "tenants_evicted": len(evicted),
+            "error": None,
+        }
+
+        agents_dir = Path(self.config.data_dir) / "agents"
+        if not agents_dir.exists():
+            return result
+
+        safe_prefix = _safe_agent_id(prefix)
+        if not safe_prefix:
+            result["erased"] = False
+            result["error"] = "could not derive a storage prefix for this owner"
+            return result
+
+        try:
+            entries = await asyncio.to_thread(lambda: list(agents_dir.iterdir()))
+        except OSError as exc:
+            result["erased"] = False
+            result["error"] = f"failed to list neuro agents directory: {exc}"
+            return result
+
+        errors: list[str] = []
+        for entry in entries:
+            # Only ever remove a directory literally inside <data_dir>/agents/
+            # whose name matches this owner's sanitized prefix -- a
+            # misconfigured data_dir or a sanitizer edge case must not turn
+            # erasure into rm -rf.
+            if not entry.is_dir() or entry.parent != agents_dir:
+                continue
+            if not entry.name.startswith(safe_prefix):
+                continue
+            try:
+                await asyncio.to_thread(shutil.rmtree, entry)
+                result["dirs_removed"] += 1
+            except OSError as exc:
+                errors.append(f"{entry.name}: {exc}")
+
+        if errors:
+            result["erased"] = False
+            result["error"] = "; ".join(errors)
+        return result
 
     # ── Full request/response surface (shared with the router) ────────────
     async def health(self) -> NeuroHealthResponse:
