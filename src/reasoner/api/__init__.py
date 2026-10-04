@@ -459,6 +459,7 @@ def _filter_routing(routing: dict[str, str], primary_id: str) -> dict[str, str]:
 # Redis-backed with in-memory fallback (Critical Enhancement 9.1–9.3, 9.7).
 from reasoner.api.auth_deps import optional_auth, require_csrf
 from reasoner.api.dependencies import (
+    check_preset_access_if_authenticated,
     check_quota_if_authenticated,
     check_rate_limit,
     get_current_user,
@@ -537,6 +538,19 @@ def _extract_run_cost(chunk: str) -> float | None:
     return extract_run_cost(chunk)
 
 
+async def _run_tier_label(user: User | None) -> str:
+    """Tier label for the run's log context and Prometheus query counter.
+
+    resolve_user_tier() reads through a webhook-invalidated cache, so this adds
+    no DB round-trip per run beyond a cache miss.
+    """
+    if user is None:
+        return "anonymous"
+    from reasoner.application.services.spend_limit_service import resolve_user_tier
+
+    return (await resolve_user_tier(str(user.id))).value
+
+
 async def _run_stream_with_metrics(
     req: RunRequest,
     request: Request,
@@ -561,7 +575,7 @@ async def _run_stream_with_metrics(
     """
     from reasoner.logging_utils import set_log_context
 
-    tier = "anonymous" if user is None else "free"
+    tier = await _run_tier_label(user)
     preset = req.preset or "auto-budget"
     set_log_context(user_id=str(user.id) if user else None, tier=tier, preset=preset)
 
@@ -625,7 +639,7 @@ async def _run_followup_stream_with_metrics(
     from reasoner.application.services.run_metering import RunContext, metered
     from reasoner.logging_utils import set_log_context
 
-    tier = "anonymous" if user is None else "free"
+    tier = await _run_tier_label(user)
     preset = req.preset or "auto-budget"
     user_id = str(user.id) if user else None
     set_log_context(user_id=user_id, tier=tier, preset=preset)
@@ -706,6 +720,7 @@ async def run_pipeline(
 
     reference_id = req.client_run_id or f"run:{uuid.uuid4()}"
     preset = req.preset or "auto-budget"
+    await check_preset_access_if_authenticated(preset, user)
 
     if user is None:
         # No account to reserve credits against -- capped separately so
@@ -726,7 +741,6 @@ async def run_pipeline(
         reference_id=reference_id,
     )
 
-    # TODO(#502): use actual user tier from subscription DB
     return StreamingResponse(
         _run_stream_with_metrics(
             req, request, user, preset_service, pipeline_service,
@@ -766,6 +780,9 @@ async def run_followup_pipeline(
     from reasoner.api.dependencies import reserve_or_402
     from reasoner.api.idempotency_http import register_run_or_error
 
+    preset = req.preset or "auto-budget"
+    await check_preset_access_if_authenticated(preset, user)
+
     if user is None:
         from reasoner.api.client_ip import get_client_ip
         from reasoner.application.services.anonymous_trial_policy import (
@@ -773,14 +790,14 @@ async def run_followup_pipeline(
         )
         from reasoner.application.services.estimate_service import estimate_cost
 
-        estimate = await estimate_cost(req.question, req.preset or "auto-budget")
+        estimate = await estimate_cost(req.question, preset)
         await enforce_anonymous_trial_cap(get_client_ip(request), estimate["estimated_cost_usd"])
 
     await register_run_or_error(req.client_run_id)
     reference_id = req.client_run_id or f"followup:{uuid.uuid4()}"
     reserved_credits = await reserve_or_402(
         user_id=str(user.id) if user else None,
-        preset=req.preset or "auto-budget",
+        preset=preset,
         problem=req.question,
         reference_id=reference_id,
     )

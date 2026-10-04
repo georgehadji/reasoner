@@ -20,9 +20,10 @@ from reasoner.api.dependencies import (
 )
 from reasoner.api.middleware import _anonymize_ip
 from reasoner.application.services.quota_service import TIER_LIMITS
+from reasoner.application.services.spend_limit_service import resolve_user_tier
 from reasoner.core.degrade import degraded
 from reasoner.core.settings import settings
-from reasoner.domain.saas import SubscriptionTier, User
+from reasoner.domain.saas import User
 from reasoner.rate_limiter import RateLimitConfig, get_rate_limiter
 
 router = APIRouter(prefix="/api", tags=["saas"])
@@ -108,13 +109,13 @@ async def get_me_optional(user: User | None = Depends(get_optional_user)):
 @router.get("/quota")
 async def get_quota_status(user: User = Depends(get_current_user)):
     """Return current usage and remaining quota."""
+    user_tier = await resolve_user_tier(str(user.id))
     service = _get_quota_service()
-    result = await service.check(str(user.id), SubscriptionTier.FREE)
-    # TODO(#502): use actual user tier
-    used = (TIER_LIMITS[SubscriptionTier.FREE] - result.remaining) if result.remaining >= 0 else 0
+    result = await service.check(str(user.id), user_tier)
+    used = (TIER_LIMITS[user_tier] - result.remaining) if result.remaining >= 0 else 0
     return {
         "used": used,
-        "max": TIER_LIMITS[SubscriptionTier.FREE],
+        "max": TIER_LIMITS[user_tier],
         "remaining": result.remaining,
         "reset_date": (datetime.now(UTC).replace(day=1) + timedelta(days=32)).replace(day=1).isoformat(),
     }

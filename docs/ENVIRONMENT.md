@@ -80,6 +80,7 @@ user's problem, to TypeSafe.
 | `ADMIN_API_KEY` | — | Admin endpoint key |
 | `AUTH_PERSISTENCE_ENABLED` | `false` | Persist auth keys to DB |
 | `AUTH_DB_PATH` | `src/reasoner/auth_keys.db` | SQLite auth DB path |
+| `PRESET_TIER_ENFORCEMENT_ENABLED` | `false` | Return 403 when a caller's subscription tier is below the preset's required tier (premium presets need Pro). Off = every authenticated caller may use every preset |
 
 ## CSRF & Security
 

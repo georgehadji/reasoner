@@ -95,6 +95,12 @@ class Settings:
     # Mounts the MCP Streamable-HTTP transport at /mcp. Off by default: most
     # installs use stdio (mcp_server.py) instead. Requires the mcp extra.
     ENABLE_MCP_HTTP: bool = os.getenv("ENABLE_MCP_HTTP", "false").lower() in ("1", "true", "yes")
+    # Gate premium presets on the caller's subscription tier. Off by default:
+    # premium presets have historically been open to all users (SEC-017), so turning
+    # this on is a pricing decision. Turn it on once you charge for the Pro tier.
+    PRESET_TIER_ENFORCEMENT_ENABLED: bool = (
+        os.getenv("PRESET_TIER_ENFORCEMENT_ENABLED", "false").lower() in ("1", "true", "yes")
+    )
 
     # ── Cohere Rerank (via OpenRouter) ──
     COHERE_RERANK_ENABLED: bool = os.getenv("COHERE_RERANK_ENABLED", "true").lower() in ("1", "true", "yes")
