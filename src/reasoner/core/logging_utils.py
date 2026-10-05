@@ -88,21 +88,27 @@ def stop_queue_logging() -> None:
 # nothing and were logged verbatim. The class must admit `-` and `_`.
 SENSITIVE_PATTERNS: list[tuple[re.Pattern, str]] = [
     # Anthropic API keys (before the generic sk- rule, which would also match)
-    (re.compile(r'sk-ant-[a-zA-Z0-9_\-]{20,}'), 'sk-ant-***REDACTED***'),
-    # OpenAI / OpenRouter / DeepSeek and other sk- prefixed keys, hyphens included
-    (re.compile(r'sk-[a-zA-Z0-9][a-zA-Z0-9_\-]{19,}'), 'sk-***REDACTED***'),
+    (re.compile(r'(?<![A-Za-z0-9])sk-ant-[a-zA-Z0-9_\-]{20,}'), 'sk-ant-***REDACTED***'),
+    # OpenAI / OpenRouter / DeepSeek and other sk- prefixed keys, hyphens included.
+    # The left boundary matters: without it `sk-` matches inside ordinary
+    # hyphenated words ("task-decomposition-subagent", "risk-assessment-...")
+    # and turns role/phase slugs in log lines into "ta" + "sk-***REDACTED***".
+    (re.compile(r'(?<![A-Za-z0-9])sk-[a-zA-Z0-9][a-zA-Z0-9_\-]{19,}'), 'sk-***REDACTED***'),
     # Google API keys
     (re.compile(r'AIza[a-zA-Z0-9_\-]{35}'), 'AIza***REDACTED***'),
     # Perplexity API keys
-    (re.compile(r'pplx-[a-zA-Z0-9_\-]{20,}'), 'pplx-***REDACTED***'),
+    (re.compile(r'(?<![A-Za-z0-9])pplx-[a-zA-Z0-9_\-]{20,}'), 'pplx-***REDACTED***'),
     # Generic Bearer tokens
     (re.compile(r'Bearer\s+[a-zA-Z0-9_\-\.]{20,}'), 'Bearer ***REDACTED***'),
     # JWT tokens
     (re.compile(r'eyJ[a-zA-Z0-9_\-]*\.eyJ[a-zA-Z0-9_\-]*\.[a-zA-Z0-9_\-]*'), 'eyJ***REDACTED***'),
-    # Connection strings with passwords. `postgresql://` is the scheme
-    # DATABASE_URL actually uses — a bare `postgres` alternative does not
-    # match it, because `://` has to follow immediately.
-    (re.compile(r'(postgresql|postgres|mysql|mongodb|rediss|redis)(\+\w+)?://[^:/@\s]+:[^@\s]+@'), r'\1://***:***@'),
+    # URLs with userinfo (`scheme://user:password@host`): database DSNs
+    # (`postgresql://` is what DATABASE_URL uses; `+asyncpg` style driver
+    # suffixes are part of the scheme) and http(s)/socks proxy URLs alike. The
+    # password runs to the LAST `@` before any `/`, so a password that itself
+    # contains `@` does not leave its tail behind; stopping at `/` keeps an
+    # innocent `https://host:8080/path@x` from matching.
+    (re.compile(r'([a-zA-Z][a-zA-Z0-9+.\-]*)://[^:/@\s]+:[^\s/]*@'), r'\1://***:***@'),
     # Generic secret patterns
     (re.compile(r'(api_key|apikey|secret|password|token|credential)["\']?\s*[:=]\s*["\']?[a-zA-Z0-9_\-]{10,}', re.IGNORECASE), r'\1=***REDACTED***'),
 ]
@@ -231,15 +237,46 @@ def _redact_arg(arg: Any) -> Any:
     return arg if redacted == text else redacted
 
 
+def _redact_traceback(record: logging.LogRecord) -> None:
+    """Pre-format and redact a record's traceback and stack text.
+
+    `logger.exception(...)` carries the exception in `exc_info`, which the
+    Formatter renders at emit time, long after `msg`/`args` were redacted: an
+    exception message holding a key or a DSN was printed in full. Formatter
+    honours a pre-set `exc_text`, so the redacted rendering is stored there.
+    Fails closed: if rendering or redaction itself raises, the traceback is
+    replaced by a placeholder rather than emitted raw, and the failure is
+    reported through `degraded()`. This runs inside the record factory, so it
+    must never raise into the caller's log call.
+    """
+    try:
+        if record.exc_info and not record.exc_text:
+            record.exc_text = logging.Formatter().formatException(record.exc_info)
+        if isinstance(record.exc_text, str):
+            record.exc_text = redact_sensitive(record.exc_text)
+        if isinstance(record.stack_info, str):
+            record.stack_info = redact_sensitive(record.stack_info)
+    except Exception as exc:
+        record.exc_text = "[traceback withheld: redaction failed]"
+        record.stack_info = None
+        degraded("logging.redact_traceback", None, exc=exc)
+
+
 def _redact_record(record: logging.LogRecord) -> None:
-    """Redact a record's message and interpolation args in place."""
+    """Redact a record's message, interpolation args and traceback in place."""
     if isinstance(record.msg, str):
         record.msg = redact_sensitive(record.msg)
     if record.args:
-        if isinstance(record.args, dict):
+        if isinstance(record.args, Mapping):
+            # Any Mapping, not just dict: logging keeps a lone mapping arg
+            # as-is (`logger.info("%(k)s", headers)`), and Starlette Headers or
+            # a MappingProxyType there used to be iterated as a tuple of keys,
+            # which broke the record when it was later formatted. A plain dict
+            # of redacted values serves `%(key)s` lookups just as well.
             record.args = {key: _redact_arg(val) for key, val in record.args.items()}
         else:
             record.args = tuple(_redact_arg(arg) for arg in record.args)
+    _redact_traceback(record)
 
 
 class SafeLoggingFilter(logging.Filter):

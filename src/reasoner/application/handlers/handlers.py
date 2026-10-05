@@ -231,16 +231,25 @@ class RunPipelineCommandHandler:
             await self.event_bus.publish(completion_event)
 
         except Exception as e:
-            logger.error(f"Pipeline execution failed: {e}")
+            from reasoner.core.logging_utils import get_correlation_id, redact_sensitive
+
+            correlation_id = get_correlation_id()
+            logger.error("Pipeline execution failed (correlation_id=%s): %s", correlation_id, e)
             if sse_emit:
-                await sse_emit({"type": "error", "error": str(e)})
+                # str(e) can carry a provider key or DSN echoed back in an
+                # upstream error body; the client gets a generic message and the
+                # correlation id to quote, the details stay in the server log.
+                await sse_emit({
+                    "type": "error", "code": "INTERNAL_ERROR",
+                    "error": f"Internal error (correlation_id={correlation_id}). See server logs.",
+                })
 
             # Record failure event
             failure_event = make_event(
                 EventType.PIPELINE_FAILED,
                 aggregate_id=command.command_id,
                 version=aggregate.version + 1,
-                error=str(e),
+                error=redact_sensitive(str(e)),
                 phase_at_failure=aggregate.get_last_phase() or "",
                 phases_completed=len(aggregate.state_data.phase_results) if hasattr(aggregate, "state_data") else 0,
             )

@@ -32,7 +32,6 @@ from .sse_utils import _event
 logger = logging.getLogger(__name__)
 
 
-
 def _get_phase_subagents(state: PipelineState, phase_name: str) -> list[dict[str, Any]]:
     """Return subagent outputs for a given phase name."""
     mapping = {
@@ -67,7 +66,6 @@ async def _emit_widget_event(
     })
 
 
-
 async def run_stream(
     req: RunRequest,
     initial_state: PipelineState | None = None,
@@ -97,11 +95,12 @@ async def run_stream(
 
     queue = asyncio.Queue(maxsize=256)
 
+    error_sent = False  # RunPipelineCommandHandler already reports its own failures
+
     async def sse_emit(event: dict | str) -> None:
-        if isinstance(event, dict):
-            await queue.put(_event(event))
-        else:
-            await queue.put(event)
+        nonlocal error_sent
+        error_sent = error_sent or (isinstance(event, dict) and event.get("type") == "error")
+        await queue.put(_event(event) if isinstance(event, dict) else event)
 
     async def run_task():
         try:
@@ -121,10 +120,11 @@ async def run_stream(
         except Exception:
             correlation_id = get_correlation_id()  # never reaches api/error_handler.py
             logger.exception("Unhandled pipeline stream error (correlation_id=%s)", correlation_id)
-            await sse_emit({
-                "type": "error", "code": "INTERNAL_ERROR",
-                "error": f"Internal error (correlation_id={correlation_id}). See server logs.",
-            })
+            if not error_sent:
+                await sse_emit({
+                    "type": "error", "code": "INTERNAL_ERROR",
+                    "error": f"Internal error (correlation_id={correlation_id}). See server logs.",
+                })
         finally:
             await queue.put(None)
 

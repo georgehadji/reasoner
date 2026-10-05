@@ -17,7 +17,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from reasoner.logging_utils import get_correlation_id, redact_dict
+from reasoner.logging_utils import get_correlation_id, redact_dict, redact_sensitive
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +72,13 @@ def _log_error(
     extra: dict[str, Any] | None = None,
 ) -> None:
     """Log an error to structured logger and ErrorStore."""
+    # `message` is usually str(exc) and `traceback` the formatted stack, and
+    # either can carry a key or a DSN an upstream client echoed back. Both go
+    # to the durable ErrorStore and to Sentry, which the logging record factory
+    # does not cover, so redact them here once for every sink below.
+    message = redact_sensitive(message)
+    if traceback:
+        traceback = redact_sensitive(traceback)
     correlation_id = get_correlation_id()
     user_id = _extract_user_id(request) if request else None
     path = request.url.path if request else None

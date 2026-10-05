@@ -77,6 +77,15 @@ class AttachmentRef(BaseModel):
 
     model_config = {"extra": "forbid"}
 
+    @field_validator("filename")
+    @classmethod
+    def validate_filename(cls, v: str) -> str:
+        # The name is printed on its own line next to the document body in
+        # prompts; a newline in it would let a caller forge a section header.
+        from reasoner.sanitization import sanitize_filename_for_prompt
+
+        return sanitize_filename_for_prompt(v)
+
     @field_validator("extracted_text")
     @classmethod
     def validate_extracted_text(cls, v: str) -> str:

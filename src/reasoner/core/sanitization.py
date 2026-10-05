@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import html
 import re
+import unicodedata
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -290,6 +291,32 @@ def neutralize_for_replay(
     if result.blocked:  # only reachable if the text was whitespace-only
         return "", warnings
     return result.sanitized, [*warnings, *result.warnings]
+
+
+MAX_PROMPT_FILENAME_CHARS = 120
+
+
+def sanitize_filename_for_prompt(name: object, max_length: int = MAX_PROMPT_FILENAME_CHARS) -> str:
+    """Make an uploaded file's name safe to print on one prompt line.
+
+    A filename is caller-controlled text that gets interpolated next to the
+    document body. A newline in it lets a name like ``"x
+=== SYSTEM ===
+..."``
+    start a forged section of its own. Every control, format and line/paragraph
+    separator character (categories C* and Zl/Zp, which covers ``
+``, ````,
+    NUL, U+2028/9 and zero-width carriers) becomes a space, runs of whitespace
+    collapse, and the result is length-bounded. Never raises; an empty result
+    is ``"unknown"``.
+    """
+    text = name if isinstance(name, str) else ("" if name is None else str(name))
+    cleaned = "".join(
+        " " if unicodedata.category(ch)[0] == "C" or unicodedata.category(ch) in ("Zl", "Zp") else ch
+        for ch in text
+    )
+    cleaned = " ".join(cleaned.split())[:max_length].strip()
+    return cleaned or "unknown"
 
 
 _SENTENCEPIECE_SPACE = chr(0x2581)  # SentencePiece's leading-space marker
