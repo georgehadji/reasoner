@@ -13,6 +13,7 @@ from reasoner.api import app
 from reasoner.core.settings import settings
 from reasoner.infrastructure.auth import set_auth_adapter
 from reasoner.infrastructure.auth.local_adapter import LocalAuthAdapter
+from reasoner.infrastructure.uploader import SCANNED_PDF_OCR_UNAVAILABLE
 from reasoner.uploader import (
     extract_text,
     save_uploaded_file,
@@ -103,6 +104,38 @@ class TestRealPdfTextExtraction:
         assert "Short text" in result
 
 
+class TestShortPdfKeepsPypdfText:
+    """A short text-layer PDF (< 50 chars) or force_ocr must not have its
+    pypdf text discarded in favour of the 'OCR unavailable' notice."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("force_ocr", [False, True])
+    async def test_short_real_pdf_returns_pypdf_text(self, force_ocr):
+        pdf_bytes = _build_minimal_pdf("Short text")  # ~10 chars, below threshold
+        result = await extract_text(pdf_bytes, "short.pdf", force_ocr=force_ocr)
+        assert "Short text" in result
+        assert result != SCANNED_PDF_OCR_UNAVAILABLE
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("force_ocr", [False, True])
+    async def test_pdf_without_text_returns_unavailable_notice(self, force_ocr):
+        from pypdf import PdfWriter
+
+        writer = PdfWriter()
+        writer.add_blank_page(width=100, height=100)
+        buf = io.BytesIO()
+        writer.write(buf)
+        result = await extract_text(buf.getvalue(), "blank.pdf", force_ocr=force_ocr)
+        assert result == SCANNED_PDF_OCR_UNAVAILABLE
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("force_ocr", [False, True])
+    async def test_corrupt_pdf_keeps_real_error(self, force_ocr):
+        result = await extract_text(b"not a pdf at all", "bad.pdf", force_ocr=force_ocr)
+        assert result.startswith("[PDF extraction failed:")
+        assert result != SCANNED_PDF_OCR_UNAVAILABLE
+
+
 class TestExtractTextOCR:
     """Unit tests for OCR dispatch in extract_text()."""
 
@@ -191,8 +224,11 @@ class TestOCRScannedPDF:
         """Scanned-PDF OCR always returns a clear, user-visible unavailable message."""
         from reasoner.uploader import _ocr_scanned_pdf
         result = await _ocr_scanned_pdf(b"fake-pdf")
-        assert "Scanned PDF OCR unavailable" in result
-        assert "PyMuPDF" in result
+        assert result == SCANNED_PDF_OCR_UNAVAILABLE
+        assert "unavailable" in result
+        # Neutral: no build/licensing detail in user-visible, indexable content.
+        assert "PyMuPDF" not in result
+        assert "AGPL" not in result
 
     @pytest.mark.asyncio
     async def test_ocr_scanned_pdf_logs_warning(self):
@@ -215,7 +251,7 @@ class TestOCRScannedPDF:
         """max_pages is still accepted for call-site compatibility, though unused."""
         from reasoner.uploader import _ocr_scanned_pdf
         result = await _ocr_scanned_pdf(b"fake-pdf", max_pages=5)
-        assert "Scanned PDF OCR unavailable" in result
+        assert result == SCANNED_PDF_OCR_UNAVAILABLE
 
 
 class TestSaveUploadedFileOCR:
@@ -250,6 +286,23 @@ class TestSaveUploadedFileOCR:
             assert len(results) == 2
             assert all(r["text"] == "OCR result" for r in results)
             assert mock_extract.await_count == 2
+
+
+class TestUnavailableNoticeNotIndexed:
+    @pytest.mark.asyncio
+    async def test_bare_unavailable_notice_is_not_indexed(self, tmp_path):
+        with patch("reasoner.infrastructure.uploader.UPLOAD_DIR", tmp_path),              patch("reasoner.infrastructure.uploader._MAGIC_AVAILABLE", False),              patch.object(settings, "UPLOAD_REQUIRE_MIME_VALIDATION", False),              patch.object(settings, "DOCUMENT_SEMANTIC_RETRIEVAL_ENABLED", True),              patch("reasoner.infrastructure.documents.index_queue.enqueue_index_job") as enqueue,              patch("reasoner.infrastructure.uploader.extract_text", new_callable=AsyncMock) as mock_extract:
+            mock_extract.return_value = SCANNED_PDF_OCR_UNAVAILABLE
+            result = await save_uploaded_file(b"%PDF-fake", "scan.pdf")
+            assert result["success"] is True
+            enqueue.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_real_text_is_still_indexed(self, tmp_path):
+        with patch("reasoner.infrastructure.uploader.UPLOAD_DIR", tmp_path),              patch("reasoner.infrastructure.uploader._MAGIC_AVAILABLE", False),              patch.object(settings, "UPLOAD_REQUIRE_MIME_VALIDATION", False),              patch.object(settings, "DOCUMENT_SEMANTIC_RETRIEVAL_ENABLED", True),              patch("reasoner.infrastructure.documents.index_queue.enqueue_index_job") as enqueue,              patch("reasoner.infrastructure.uploader.extract_text", new_callable=AsyncMock) as mock_extract:
+            mock_extract.return_value = "real content"
+            await save_uploaded_file(b"%PDF-fake", "doc.pdf")
+            enqueue.assert_called_once()
 
 
 class TestUploadEndpointOCR:

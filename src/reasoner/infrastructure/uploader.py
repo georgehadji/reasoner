@@ -196,6 +196,14 @@ async def _ocr_image(content: bytes, filename: str) -> str:
         return f"[Image OCR failed: {e}]"
 
 
+# Returned (and compared against) when a PDF has no usable text layer and page
+# OCR cannot run. Neutral on purpose: it is user-visible and may be stored as
+# document content, so it must not leak build/licensing details.
+SCANNED_PDF_OCR_UNAVAILABLE = (
+    "[Scanned PDF: no text layer could be extracted and OCR is unavailable]"
+)
+
+
 async def _ocr_scanned_pdf(content: bytes, max_pages: int = 3) -> str:
     """Render PDF pages to images and OCR them.
 
@@ -204,21 +212,35 @@ async def _ocr_scanned_pdf(content: bytes, max_pages: int = 3) -> str:
     AGPL-3.0/commercial-dual-licensed and was replaced by pypdf
     (BSD-3-Clause) — see requirements.txt. pypdf has no PDF-page-rasterization
     API, so there is no drop-in equivalent, and this function can no longer
-    render pages to images. It now always returns an explicit, user-visible
-    message instead of silently returning no text. Text-layer PDF extraction
-    (``_extract_pdf``, used for the common case) is unaffected — it already
-    ran on pypdf and continues to work unchanged.
+    render pages to images. It now always returns ``SCANNED_PDF_OCR_UNAVAILABLE``
+    (callers fall back to any pypdf text they already have) instead of silently
+    returning no text. Text-layer PDF extraction (``_extract_pdf``, used for the
+    common case) is unaffected.
     """
     logger.warning(
         "Scanned-PDF OCR requested but unavailable: PDF page rasterization "
         "required PyMuPDF (AGPL-3.0), which was removed in favor of pypdf "
         "(BSD-3-Clause); pypdf cannot render PDF pages to images."
     )
-    return (
-        "[Scanned PDF OCR unavailable — rendering PDF pages to images "
-        "requires PyMuPDF, which was removed from this project (AGPL "
-        "license); pypdf has no page-rasterization equivalent]"
-    )
+    return SCANNED_PDF_OCR_UNAVAILABLE
+
+
+async def _pdf_text_or_ocr(content: bytes, force_ocr: bool) -> str:
+    """pypdf text layer, falling back to OCR when it is short or OCR is forced.
+
+    The pypdf text is never discarded: when OCR is unavailable, any text pypdf
+    did extract is returned in preference to the unavailable notice, and a real
+    pypdf error is returned as-is rather than being masked by that notice.
+    """
+    text = _extract_pdf(content)
+    if text.startswith("[PDF extraction"):  # error from _extract_pdf: keep it
+        return text
+    if not force_ocr and len(text.strip()) >= 50:
+        return text
+    ocr_text = await _ocr_scanned_pdf(content)
+    if ocr_text != SCANNED_PDF_OCR_UNAVAILABLE:
+        return ocr_text
+    return text if text.strip() else ocr_text
 
 
 async def _extract_text_unbounded(content: bytes, filename: str, *, force_ocr: bool = False) -> str:
@@ -241,10 +263,7 @@ async def _extract_text_unbounded(content: bytes, filename: str, *, force_ocr: b
         case ".md":
             return _extract_md(content)
         case ".pdf":
-            text = _extract_pdf(content)
-            if not force_ocr and len(text.strip()) >= 50:
-                return text
-            return await _ocr_scanned_pdf(content)
+            return await _pdf_text_or_ocr(content, force_ocr)
         case ".docx":
             return _extract_docx(content)
         case ".png" | ".jpg" | ".jpeg" | ".webp":
@@ -447,7 +466,8 @@ async def save_uploaded_file(
         # spawn unbounded concurrent indexing tasks (security-remediation-
         # plan.md Phase 4 item 4). A full queue drops the job and logs; the
         # upload above has already succeeded either way.
-        if file_id and text_content and len(text_content) > 0:
+        # A bare "OCR unavailable" notice is not document content: don't index it.
+        if file_id and text_content and text_content != SCANNED_PDF_OCR_UNAVAILABLE:
             try:
                 if settings.DOCUMENT_SEMANTIC_RETRIEVAL_ENABLED:
                     from reasoner.infrastructure.documents.index_queue import enqueue_index_job
