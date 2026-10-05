@@ -150,33 +150,50 @@ container user before the first start:
 
 ```bash
 mkdir -p history uploads cache
-uid=$(docker compose run --rm --no-deps backend id -u)   # the container user's uid
+# The image entrypoint runs migrations and starts gunicorn, so override it to ask for the uid.
+uid=$(docker compose run --rm --no-deps --entrypoint id backend -u)
 sudo chown -R "$uid" history uploads cache
 ```
 
 Use whatever `id -u` prints; do not assume a fixed number.
 
 **Migrating an existing deployment.** Before this change those files lived
-inside the container image (`/app/src/reasoner/`, see below) and were lost on every recreate. They are
-**not** moved automatically. Copy them out of the running container first,
-then recreate:
+inside the container (under `/app/src/reasoner/`) and were lost on every
+recreate. They are **not** moved automatically. Copy them out of the existing
+container before you recreate it. The SQLite files run in WAL mode, so stop the
+backend first (a stopped container still supports `docker compose cp`); copying
+a live database can miss recent writes held in the `-wal` file:
 
 ```bash
-# event store (used when DATABASE_URL is not set) and its legacy ownership file
-docker compose cp backend:/app/src/reasoner/infrastructure/events.db history/events.db
-docker compose cp backend:/app/src/reasoner/events.db history/ownership-events.db
+docker compose stop backend
+
+# Pick ONE events.db source, depending on the event-store backend:
+#   Postgres (ENVIRONMENT=production + DATABASE_URL, the default in this compose file):
+#     the only SQLite events file in use is the ownership repo's own, src/reasoner/events.db
+docker compose cp backend:/app/src/reasoner/events.db history/events.db
+#   SQLite backend (EVENT_STORE_BACKEND=sqlite): the event store and ownership
+#     records share infrastructure/events.db
+# docker compose cp backend:/app/src/reasoner/infrastructure/events.db history/events.db
+
 docker compose cp backend:/app/src/reasoner/feedback.db history/feedback.db
 docker compose cp backend:/app/src/reasoner/auth_keys.db history/auth_keys.db
 docker compose cp backend:/app/src/reasoner/infrastructure/uploads/. uploads/
 sudo chown -R "$uid" history uploads
 ```
 
-Skip any file that does not exist. `ownership-events.db` is only for
-reference: with a Postgres `DATABASE_URL` the ownership repository used the
-in-package `events.db`, and after this change it uses `EVENT_STORE_DB_PATH`
-(`history/events.db`), so merge it by hand if you need those rows. Paths can be overridden with
-`EVENT_STORE_DB_PATH`, `FEEDBACK_DB_PATH`, `AUTH_DB_PATH` and
-`UPLOAD_STORAGE_DIR` in `.env`.
+Skip any file that does not exist. Both `events.db` candidates were created by
+the same schema code (`EventStoreConnection.init_db`, which includes the
+`pipeline_owners` table), so either one can be used as `history/events.db`
+directly. After this change both the event store and the pipeline ownership
+repository read `EVENT_STORE_DB_PATH` (`history/events.db`), so the two old
+files now map to one path. In the Postgres case only `src/reasoner/events.db`
+has data worth keeping (ownership records). In the SQLite case the ownership
+records live in `infrastructure/events.db` together with the events, and
+`src/reasoner/events.db` is normally unused. If you somehow have rows in both,
+copy one as above and merge the other with the `sqlite3` CLI, for example
+`ATTACH 'other.db' AS o; INSERT OR IGNORE INTO pipeline_owners SELECT * FROM o.pipeline_owners;`.
+Paths can be overridden with `EVENT_STORE_DB_PATH`, `FEEDBACK_DB_PATH`,
+`AUTH_DB_PATH` and `UPLOAD_STORAGE_DIR` in `.env`.
 
 ---
 

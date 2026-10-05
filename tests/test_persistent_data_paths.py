@@ -175,3 +175,19 @@ class _StubConn:
 
     def init_db(self):
         pass
+
+
+def test_auth_store_creates_missing_parent_dir(tmp_path):
+    import asyncio
+
+    from reasoner.infrastructure.persistence.auth_store import AuthStore
+
+    target = tmp_path / "nope" / "nested" / "auth_keys.db"
+
+    async def _open() -> None:
+        conn = await AuthStore(target)._get_conn()
+        await conn.close()
+
+    asyncio.run(_open())
+
+    assert target.exists()

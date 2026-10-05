@@ -63,6 +63,8 @@ class AuthStore:
 
     async def _get_conn(self) -> aiosqlite.Connection:
         """Return a connection with schema guaranteed."""
+        # AUTH_DB_PATH may name a directory that does not exist yet.
+        Path(self._db_path).parent.mkdir(parents=True, exist_ok=True)
         conn = await aiosqlite.connect(self._db_path)
         # Without this, rows come back as plain tuples and _row_to_dict's
         # dict(row) raises ValueError on every read.
