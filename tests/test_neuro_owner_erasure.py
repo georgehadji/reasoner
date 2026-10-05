@@ -22,6 +22,11 @@ import reasoner.neuro.server as ns
 from reasoner.neuro.config import NeuroConfig, _apply_defaults, _safe_agent_id
 from reasoner.neuro.server import LearnRequest, tenant_key
 
+# Owners are str(user.id) -- always a canonical UUID. erase_owner refuses
+# anything else (see its docstring), so the fixtures use real UUIDs.
+USER_X = "aaaaaaaa-1111-4111-8111-111111111111"
+USER_Y = "bbbbbbbb-2222-4222-8222-222222222222"
+
 
 class _FakeEmbedding:
     active_label = "fake"
@@ -63,16 +68,16 @@ async def _learn(
 async def test_erase_owner_removes_their_tenants_and_leaves_others(service, tmp_path):
     # user-x has two conversations, user-y has one -- exercising the "one
     # tenant per (owner, agent_id) pair, not one directory per user" case.
-    await _learn(service, "user-x", "conv1", "x's secret plan A", "response A")
-    await _learn(service, "user-x", "conv2", "x's secret plan B", "response B")
-    await _learn(service, "user-y", "conv1", "y's unrelated chat", "y's response")
+    await _learn(service, USER_X, "conv1", "x's secret plan A", "response A")
+    await _learn(service, USER_X, "conv2", "x's secret plan B", "response B")
+    await _learn(service, USER_Y, "conv1", "y's unrelated chat", "y's response")
 
     agents_dir = Path(tmp_path) / "agents"
     before = {p.name for p in agents_dir.iterdir()}
-    assert sum(1 for n in before if n.startswith("u-user-x-")) == 2
-    assert sum(1 for n in before if n.startswith("u-user-y-")) == 1
+    assert sum(1 for n in before if n.startswith(f"u-{USER_X}-")) == 2
+    assert sum(1 for n in before if n.startswith(f"u-{USER_Y}-")) == 1
 
-    result = await service.erase_owner("user-x")
+    result = await service.erase_owner(USER_X)
 
     assert result["erased"] is True
     assert result["dirs_removed"] == 2
@@ -80,19 +85,19 @@ async def test_erase_owner_removes_their_tenants_and_leaves_others(service, tmp_
     assert result["error"] is None
 
     after = {p.name for p in agents_dir.iterdir()}
-    assert not any(n.startswith("u-user-x-") for n in after), f"user-x data survived: {after}"
-    assert any(n.startswith("u-user-y-") for n in after), "user-y's data was wrongly removed"
+    assert not any(n.startswith(f"u-{USER_X}-") for n in after), f"user-x data survived: {after}"
+    assert any(n.startswith(f"u-{USER_Y}-") for n in after), "user-y's data was wrongly removed"
 
     # In-process cache: x's tenants must be gone, y's must still be live.
-    assert not any(k.startswith("u-user-x-") for k in service.tenants.active_tenants)
-    assert tenant_key("user-y", "conv1") in service.tenants.active_tenants
+    assert not any(k.startswith(f"u-{USER_X}-") for k in service.tenants.active_tenants)
+    assert tenant_key(USER_Y, "conv1") in service.tenants.active_tenants
 
     # x's memory is actually unrecoverable, not just relocated.
-    x_recall = await service.recall("x's secret plan A", agent_id="conv1", owner="user-x")
+    x_recall = await service.recall("x's secret plan A", agent_id="conv1", owner=USER_X)
     assert x_recall == [], f"user-x memory is still recallable after erasure: {x_recall}"
 
     # y is unaffected end to end.
-    y_recall = await service.recall("y's unrelated chat", agent_id="conv1", owner="user-y")
+    y_recall = await service.recall("y's unrelated chat", agent_id="conv1", owner=USER_Y)
     assert any("y's unrelated chat" in c["content"] for c in y_recall), (
         "erasing user-x must not touch user-y's memory"
     )
@@ -103,7 +108,7 @@ async def test_erase_owner_with_no_data_is_still_a_success(service):
     """A user who never used Neuro has nothing to remove -- that is a
     successful erasure, not a failure (mirrors get_agent_data_dir's existing
     'nothing stored' contract)."""
-    result = await service.erase_owner("never-had-any-data")
+    result = await service.erase_owner("cccccccc-3333-4333-8333-333333333333")
     assert result == {
         "erased": True,
         "dirs_removed": 0,
@@ -117,15 +122,15 @@ async def test_erase_owner_never_touches_anonymous_tenants(service, tmp_path):
     """Anonymous (owner=None) tenants use the 'a-' prefix and are not owned
     by any signed-in identity; erasing a real owner must not sweep them up."""
     await _learn(service, None, "shared-conv-id", "anonymous chat", "anon response")
-    await _learn(service, "user-x", "shared-conv-id", "x's chat", "x response")
+    await _learn(service, USER_X, "shared-conv-id", "x's chat", "x response")
 
-    result = await service.erase_owner("user-x")
+    result = await service.erase_owner(USER_X)
     assert result["dirs_removed"] == 1
 
     agents_dir = Path(tmp_path) / "agents"
     remaining = {p.name for p in agents_dir.iterdir()}
     assert any(n.startswith("a-") for n in remaining), "anonymous tenant was wrongly removed"
-    assert not any(n.startswith("u-user-x-") for n in remaining)
+    assert not any(n.startswith(f"u-{USER_X}-") for n in remaining)
 
 
 def test_erase_owner_prefix_matches_the_storage_sanitizer(tmp_path):
@@ -137,3 +142,168 @@ def test_erase_owner_prefix_matches_the_storage_sanitizer(tmp_path):
     owner = "018f3c9a-7b2e-4d1f-9c8a-1a2b3c4d5e6f"
     full_key = tenant_key(owner, "some-conversation")
     assert _safe_agent_id(full_key).startswith(_safe_agent_id(_owned_prefix(owner)))
+
+
+# ── Review follow-up: races, tombstone, owner validation, symlinks ──────────
+
+
+def _agent_dirs(tmp_path) -> set[str]:
+    agents = Path(tmp_path) / "agents"
+    return {p.name for p in agents.iterdir()} if agents.exists() else set()
+
+
+@pytest.mark.asyncio
+async def test_tenant_recreated_after_first_eviction_is_evicted_again(service, monkeypatch):
+    """A tenant re-created between the eviction and the delete (concurrent
+    recall/learn loading from still-present files) must not survive erasure
+    and keep serving erased data from memory."""
+    await _learn(service, USER_X, "conv1", "x's secret", "x response")
+    key = tenant_key(USER_X, "conv1")
+
+    real_evict = service.tenants.evict_prefix
+    calls = 0
+
+    async def evict_then_resurrect(prefix):
+        nonlocal calls
+        calls += 1
+        evicted = await real_evict(prefix)
+        if calls == 1:
+            # Simulate the racing request: tenant back in memory, built from
+            # files the delete loop has not removed yet.
+            service.tenants._tenants[key] = {"l1": object(), "l2": object()}
+            service.tenants._last_access[key] = 0.0
+        return evicted
+
+    monkeypatch.setattr(service.tenants, "evict_prefix", evict_then_resurrect)
+
+    result = await service.erase_owner(USER_X)
+
+    assert result["erased"] is True
+    assert calls == 2, "eviction must run again after the delete loop"
+    assert key not in service.tenants.active_tenants
+
+
+@pytest.mark.asyncio
+async def test_recall_during_erasure_waits_and_finds_nothing(service, tmp_path, monkeypatch):
+    """get() for an owner being erased must wait for the erasure instead of
+    re-creating the tenant from disk files that are not yet deleted."""
+    import asyncio
+
+    await _learn(service, USER_X, "conv1", "x's secret plan", "x response")
+
+    in_delete = asyncio.Event()
+    release = asyncio.Event()
+    real_remove = service._remove_owner_dirs
+
+    async def paused_remove(prefix, result):
+        in_delete.set()
+        await release.wait()
+        return await real_remove(prefix, result)
+
+    monkeypatch.setattr(service, "_remove_owner_dirs", paused_remove)
+
+    erase = asyncio.create_task(service.erase_owner(USER_X))
+    await in_delete.wait()
+    recall = asyncio.create_task(
+        service.recall("x's secret plan", agent_id="conv1", owner=USER_X)
+    )
+    await asyncio.sleep(0.05)
+    assert not recall.done(), "recall must wait while the owner is being erased"
+
+    release.set()
+    result = await erase
+    chunks = await asyncio.wait_for(recall, timeout=5)
+
+    assert result["erased"] is True
+    assert chunks == [], f"erased memory was served: {chunks}"
+
+
+@pytest.mark.asyncio
+async def test_learn_for_just_erased_owner_is_dropped_with_warning(service, tmp_path, caplog):
+    """A pipeline run already in flight when the user is erased finishes and
+    calls learn(owner=...): that write must not re-create their tenant."""
+    await _learn(service, USER_X, "conv1", "before", "r")
+    await service.erase_owner(USER_X)
+    assert not any(n.startswith(f"u-{USER_X}-") for n in _agent_dirs(tmp_path))
+
+    with caplog.at_level("WARNING", logger="neuro.api"):
+        resp = await service.ingest(
+            LearnRequest(prompt="late", response="late run output", agent_id="conv1", metadata={}),
+            owner=USER_X,
+        )
+
+    assert resp.status == "dropped_erased"
+    assert not any(n.startswith(f"u-{USER_X}-") for n in _agent_dirs(tmp_path))
+    assert tenant_key(USER_X, "conv1") not in service.tenants.active_tenants
+    assert any("erased owner" in r.getMessage() for r in caplog.records)
+
+    # Other owners are unaffected.
+    await _learn(service, USER_Y, "conv1", "y chat", "y response")
+    assert any(n.startswith(f"u-{USER_Y}-") for n in _agent_dirs(tmp_path))
+
+
+@pytest.mark.asyncio
+async def test_erase_tombstone_expires(service, tmp_path):
+    await service.erase_owner(USER_X)
+    prefix = f"u-{USER_X}-"
+    assert service.tenants.is_erased(f"{prefix}conv1")
+
+    service.tenants._erased_until[prefix] -= service.tenants.IDLE_TTL_SECONDS + 1
+
+    assert not service.tenants.is_erased(f"{prefix}conv1")
+    await _learn(service, USER_X, "conv1", "back again", "ok")
+    assert any(n.startswith(prefix) for n in _agent_dirs(tmp_path))
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "bad_owner",
+    ["", "user", "user-x", "alice-bob", "../x", "a/b", USER_X.upper(), USER_X + "-extra"],
+)
+async def test_erase_owner_rejects_non_canonical_owner(service, tmp_path, bad_owner):
+    """tenant_key("alice","bob-x") == tenant_key("alice-bob","x"): a free-form
+    owner makes the prefix ambiguous, so erasing "user" would delete
+    "user-x"'s data. Refuse anything that is not a canonical UUID."""
+    await _learn(service, "user-x", "conv", "other owner's data", "r")
+    before = _agent_dirs(tmp_path)
+
+    result = await service.erase_owner(bad_owner)
+
+    assert result["erased"] is False
+    assert result["error"]
+    assert result["dirs_removed"] == 0
+    assert _agent_dirs(tmp_path) == before, "a rejected erasure must not delete anything"
+    assert tenant_key("user-x", "conv") in service.tenants.active_tenants
+
+
+@pytest.mark.asyncio
+async def test_erase_owner_does_not_touch_owner_differing_in_last_char(service, tmp_path):
+    other = USER_X[:-1] + "2"
+    await _learn(service, USER_X, "conv", "x", "r")
+    await _learn(service, other, "conv", "other", "r")
+
+    result = await service.erase_owner(USER_X)
+
+    assert result["erased"] is True and result["dirs_removed"] == 1
+    assert _agent_dirs(tmp_path) == {f"u-{other}-conv"}
+
+
+@pytest.mark.asyncio
+async def test_erase_owner_unlinks_symlinked_tenant_dir(service, tmp_path):
+    agents = Path(tmp_path) / "agents"
+    agents.mkdir(parents=True, exist_ok=True)
+    target = Path(tmp_path) / "elsewhere"
+    target.mkdir()
+    (target / "keep.txt").write_text("not ours")
+    link = agents / f"u-{USER_X}-linked"
+    try:
+        link.symlink_to(target, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks not permitted on this platform")
+
+    result = await service.erase_owner(USER_X)
+
+    assert result["erased"] is True and result["error"] is None
+    assert result["dirs_removed"] == 1
+    assert not link.is_symlink()
+    assert (target / "keep.txt").exists(), "the symlink target must not be followed"

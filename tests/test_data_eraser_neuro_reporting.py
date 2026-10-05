@@ -90,22 +90,38 @@ async def test_aggregates_failure_still_takes_priority_over_neuro_status():
 
 
 @pytest.mark.asyncio
-async def test_default_neuro_erase_reaches_the_process_wide_neuro_service(monkeypatch):
-    """Without an injected erase_neuro_fn, production wiring must call the
-    real NeuroService.erase_owner (lazy import), not silently no-op."""
-    import reasoner.neuro.server as ns
+async def test_default_neuro_erase_goes_through_the_injected_memory_port(monkeypatch):
+    """Without an injected erase_neuro_fn, production wiring must call
+    erase_owner on the registered MemoryPort, not silently no-op and not build
+    a second NeuroService."""
+    import reasoner.core.ports.memory_port as mp
 
     calls: list[str] = []
 
-    class _FakeNeuroService:
+    class _FakePort:
         async def erase_owner(self, owner: str) -> dict:
             calls.append(owner)
             return {"erased": True, "dirs_removed": 0, "tenants_evicted": 0, "error": None}
 
-    monkeypatch.setattr(ns, "get_neuro_service", lambda: _FakeNeuroService())
+    monkeypatch.setattr(mp, "_MEMORY_PORT", _FakePort())
 
     eraser = UserDataEraser(_FakeEventStore([]))
     receipt = await eraser.erase("user-z")
 
     assert calls == ["user-z"]
     assert receipt["neuro_memory_erased"] is True
+
+
+@pytest.mark.asyncio
+async def test_no_memory_port_reports_partial_not_completed(monkeypatch):
+    """Neuro failed to start: the eraser must say it could not erase or verify
+    long-term memory rather than report success (or construct its own service)."""
+    import reasoner.core.ports.memory_port as mp
+
+    monkeypatch.setattr(mp, "_MEMORY_PORT", None)
+
+    receipt = await UserDataEraser(_FakeEventStore(["p1"])).erase("user-z")
+
+    assert receipt["status"] == "partial"
+    assert receipt["neuro_memory_erased"] is False
+    assert "memory port is not registered" in receipt["neuro_error"]

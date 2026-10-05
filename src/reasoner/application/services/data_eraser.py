@@ -34,9 +34,9 @@ class UserDataEraser:
     ) -> None:
         self._event_store = event_store
         self._clear_cache_fn = clear_cache_fn
-        # Injectable for tests; production default (lazy import, see erase())
-        # calls the process-wide NeuroService so pipeline and erasure share
-        # one view of tenant state.
+        # Injectable for tests; the production default goes through the
+        # injected MemoryPort (see erase()) so pipeline and erasure share one
+        # view of tenant state without application/ importing neuro.
         self._erase_neuro_fn = erase_neuro_fn
 
     async def erase(self, user_id: str) -> dict:
@@ -87,9 +87,15 @@ class UserDataEraser:
         try:
             erase_neuro = self._erase_neuro_fn
             if erase_neuro is None:
-                from reasoner.neuro.server import get_neuro_service
+                from reasoner.core.ports.memory_port import get_memory_port
 
-                erase_neuro = get_neuro_service().erase_owner
+                port = get_memory_port()
+                if port is None:
+                    raise RuntimeError(
+                        "memory port is not registered (neuro unavailable); "
+                        "long-term memory could not be erased or verified"
+                    )
+                erase_neuro = port.erase_owner
 
             neuro_result = await erase_neuro(str(user_id))
             neuro_erased = bool(neuro_result.get("erased"))
