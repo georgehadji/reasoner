@@ -422,13 +422,13 @@ def build_synthesis_context(state: PipelineState) -> str:
     citations = prism.get("citations", []) if prism else []
     if citations:
         parts.append("[SOURCED EVIDENCE]")
-        # Snippets are scraped pages, search results and uploaded-file chunks:
-        # all untrusted, and the uploaded ones are caller-controlled outright.
-        entries = [
-            f"[{i}] {c['title']} — {c['url']}\n    {c['snippet']}"
-            for i, c in enumerate(citations, 1)
-        ]
-        parts.append(_wrap_external_content("\n".join(entries)))
+        # Not wrapped here: synthesis_prompt() wraps this whole block (it is
+        # appended to `sources_info`) as external content, and a second wrap
+        # inside it would have the marker stripper turn the inner markers into
+        # "[delimiter removed]" noise. Uploaded-file snippets are neutralized
+        # where they are collected (prism_research._action_uploads_search).
+        for i, c in enumerate(citations, 1):
+            parts.append(f"[{i}] {c['title']} — {c['url']}\n    {c['snippet']}")
         parts.append(
             "\nWhen making a claim supported by the above sources, "
             "append [N] inline. Include a ## Sources section at the end."

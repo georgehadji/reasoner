@@ -300,15 +300,12 @@ def sanitize_filename_for_prompt(name: object, max_length: int = MAX_PROMPT_FILE
     """Make an uploaded file's name safe to print on one prompt line.
 
     A filename is caller-controlled text that gets interpolated next to the
-    document body. A newline in it lets a name like ``"x
-=== SYSTEM ===
-..."``
-    start a forged section of its own. Every control, format and line/paragraph
-    separator character (categories C* and Zl/Zp, which covers ``
-``, ````,
-    NUL, U+2028/9 and zero-width carriers) becomes a space, runs of whitespace
-    collapse, and the result is length-bounded. Never raises; an empty result
-    is ``"unknown"``.
+    document body. A line break in it lets a name forge a section header of its
+    own (a newline followed by "=== SYSTEM ===", say). Every control, format
+    and line/paragraph separator character (Unicode categories C* and Zl/Zp:
+    LF, CR, NUL, U+2028/U+2029, zero-width carriers) becomes a space, runs of
+    whitespace collapse, and the result is length-bounded. Never raises; an
+    empty result is "unknown".
     """
     text = name if isinstance(name, str) else ("" if name is None else str(name))
     cleaned = "".join(

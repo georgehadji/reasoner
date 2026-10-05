@@ -94,12 +94,12 @@ async def run_stream(
     )
 
     queue = asyncio.Queue(maxsize=256)
-
-    error_sent = False  # RunPipelineCommandHandler already reports its own failures
+    error_sent = False  # a pipeline-level error frame (no "phase" key) has gone out
 
     async def sse_emit(event: dict | str) -> None:
         nonlocal error_sent
-        error_sent = error_sent or (isinstance(event, dict) and event.get("type") == "error")
+        error_sent = error_sent or (isinstance(event, dict) and event.get("type") == "error"
+                                    and event.get("phase") is None)
         await queue.put(_event(event) if isinstance(event, dict) else event)
 
     async def run_task():

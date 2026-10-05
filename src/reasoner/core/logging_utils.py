@@ -101,14 +101,30 @@ SENSITIVE_PATTERNS: list[tuple[re.Pattern, str]] = [
     # Generic Bearer tokens
     (re.compile(r'Bearer\s+[a-zA-Z0-9_\-\.]{20,}'), 'Bearer ***REDACTED***'),
     # JWT tokens
-    (re.compile(r'eyJ[a-zA-Z0-9_\-]*\.eyJ[a-zA-Z0-9_\-]*\.[a-zA-Z0-9_\-]*'), 'eyJ***REDACTED***'),
+    # (left boundary for the same quadratic-scan reason as the userinfo rule)
+    (
+        re.compile(r'(?<![A-Za-z0-9_\-])eyJ[a-zA-Z0-9_\-]*\.eyJ[a-zA-Z0-9_\-]*\.[a-zA-Z0-9_\-]*'),
+        'eyJ***REDACTED***',
+    ),
     # URLs with userinfo (`scheme://user:password@host`): database DSNs
     # (`postgresql://` is what DATABASE_URL uses; `+asyncpg` style driver
     # suffixes are part of the scheme) and http(s)/socks proxy URLs alike. The
     # password runs to the LAST `@` before any `/`, so a password that itself
     # contains `@` does not leave its tail behind; stopping at `/` keeps an
-    # innocent `https://host:8080/path@x` from matching.
-    (re.compile(r'([a-zA-Z][a-zA-Z0-9+.\-]*)://[^:/@\s]+:[^\s/]*@'), r'\1://***:***@'),
+    # innocent `https://host:8080/path@x` from matching. The username may be
+    # empty (`redis://:secret@host`, the canonical Redis/Valkey form).
+    #
+    # The lookbehind is a performance requirement, not a nicety: without a left
+    # anchor the scheme class `[a-zA-Z0-9+.\-]*` is tried from every offset of a
+    # long alphanumeric run and re-scans it each time, which is quadratic (8 000
+    # characters took 7 s) on a pattern that runs on every log record.
+    (
+        re.compile(r'(?<![A-Za-z0-9+.\-])([a-zA-Z][a-zA-Z0-9+.\-]*)://[^:/@\s]*:[^\s/]*@'),
+        r'\1://***:***@',
+    ),
+    # A token used as the username (`https://<token>@github.com/...`). Limited
+    # to http(s) so `ssh://git@host` and ordinary text are left alone.
+    (re.compile(r'(?<![A-Za-z0-9+.\-])(https?)://[^:/@\s]+@'), r'\1://***@'),
     # Generic secret patterns
     (re.compile(r'(api_key|apikey|secret|password|token|credential)["\']?\s*[:=]\s*["\']?[a-zA-Z0-9_\-]{10,}', re.IGNORECASE), r'\1=***REDACTED***'),
 ]

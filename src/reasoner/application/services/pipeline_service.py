@@ -72,7 +72,7 @@ class PipelineService:
             Context dictionary optimized for token efficiency.
         """
         from reasoner.core.constants import TRUNCATION
-        from reasoner.core.sanitization import sanitize_filename_for_prompt
+        from reasoner.core.sanitization import neutralize_for_replay, sanitize_filename_for_prompt
         from reasoner.domain.models import ClaimLabel
 
         summary = state.to_summary()
@@ -85,15 +85,17 @@ class PipelineService:
 
         if summary["attachments"]:
             # Uploaded text is caller-controlled. AttachmentRef neutralizes it at
-            # the API boundary; here it is delimited as external content so the
-            # model sees it as data, and the filename (interpolated next to it)
-            # is reduced to one clean line so it cannot forge a section.
+            # the API boundary, but state can also arrive from a resumed file,
+            # so it is neutralized again here, and the filename (printed next to
+            # it) is reduced to one clean line. No delimiter is added: the one
+            # consumer, synthesis_prompt(), wraps the whole context dict as
+            # external content, and a nested wrap would be stripped to noise.
             context["attachments"] = [
                 {
                     "filename": sanitize_filename_for_prompt(a.get("filename", "unknown")),
-                    "extracted_text": _wrap_attachment_text(
-                        (a.get("extracted_text", "") or "")[:TRUNCATION.LARGE_CONTENT]
-                    ),
+                    "extracted_text": neutralize_for_replay(
+                        a.get("extracted_text", "") or "", max_length=TRUNCATION.LARGE_CONTENT
+                    )[0],
                 }
                 for a in summary["attachments"]
             ]
@@ -749,15 +751,6 @@ class PipelineSerializationService:
         return PipelineState(**data)
 
 # ── Helper Functions (shared by PipelineService.to_context_dict) ──
-
-
-def _wrap_attachment_text(text: str) -> str:
-    """Delimit uploaded text as external content; empty stays empty."""
-    if not text.strip():
-        return ""
-    from reasoner.phases._shared import _wrap_external_content
-
-    return _wrap_external_content(text)
 
 
 def _get_decomposition_summary(summary: dict[str, Any]) -> dict[str, Any]:

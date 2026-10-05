@@ -19,6 +19,7 @@ from reasoner.application.flows.base import (
 from reasoner.core.constants import get_phase_retry_budget, get_phase_timeout
 from reasoner.core.events.domain_events import EventType, make_event
 from reasoner.core.exceptions import classify_error, is_retryable, is_run_fatal
+from reasoner.core.logging_utils import redact_sensitive
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.quality import PhaseMonitor, reset_phase_state
 
@@ -297,6 +298,11 @@ class WorkflowRunner:
         exc: BaseException | None = None,
     ) -> None:
         name = step.name
+        # `message` is usually "{Type}: {str(exc)}", and an upstream error body
+        # can echo a key or DSN. It fans out to state.errors (returned in the
+        # `done` frame), the log, the SSE/WS observer and the event bus, so it
+        # is redacted once here.
+        message = redact_sensitive(message)
         state.errors.append(message)
         self.services.log(name, f"ERROR: {message}", state)
 
