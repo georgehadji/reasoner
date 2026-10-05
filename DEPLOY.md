@@ -140,6 +140,46 @@ Caddy automatically obtains and renews Let's Encrypt certificates.
 
 ---
 
+## Step 2b — Persistent Data Directories
+
+The backend keeps SQLite data (events, feedback, auth keys) in `./history` and
+uploaded files in `./uploads`, both bind-mounted from the host. Bind mounts
+hide the image's own `chown`, and the container user is a system uid, so the
+host directories must be writable by that uid. Create them and give them to the
+container user before the first start:
+
+```bash
+mkdir -p history uploads cache
+uid=$(docker compose run --rm --no-deps backend id -u)   # the container user's uid
+sudo chown -R "$uid" history uploads cache
+```
+
+Use whatever `id -u` prints; do not assume a fixed number.
+
+**Migrating an existing deployment.** Before this change those files lived
+inside the container image (`/app/src/reasoner/`, see below) and were lost on every recreate. They are
+**not** moved automatically. Copy them out of the running container first,
+then recreate:
+
+```bash
+# event store (used when DATABASE_URL is not set) and its legacy ownership file
+docker compose cp backend:/app/src/reasoner/infrastructure/events.db history/events.db
+docker compose cp backend:/app/src/reasoner/events.db history/ownership-events.db
+docker compose cp backend:/app/src/reasoner/feedback.db history/feedback.db
+docker compose cp backend:/app/src/reasoner/auth_keys.db history/auth_keys.db
+docker compose cp backend:/app/src/reasoner/infrastructure/uploads/. uploads/
+sudo chown -R "$uid" history uploads
+```
+
+Skip any file that does not exist. `ownership-events.db` is only for
+reference: with a Postgres `DATABASE_URL` the ownership repository used the
+in-package `events.db`, and after this change it uses `EVENT_STORE_DB_PATH`
+(`history/events.db`), so merge it by hand if you need those rows. Paths can be overridden with
+`EVENT_STORE_DB_PATH`, `FEEDBACK_DB_PATH`, `AUTH_DB_PATH` and
+`UPLOAD_STORAGE_DIR` in `.env`.
+
+---
+
 ## Step 3 — Deploy
 
 ```bash
@@ -261,7 +301,7 @@ docker compose down
 docker compose up -d --build
 ```
 
-Persistent data (Postgres, Redis, Caddy certs) is stored in Docker volumes and survives rebuilds.
+Persistent data (Postgres, Redis, Caddy certs) is stored in Docker volumes and survives rebuilds. SQLite data and uploads live in the `./history` and `./uploads` bind mounts (see Step 2b).
 
 ---
 

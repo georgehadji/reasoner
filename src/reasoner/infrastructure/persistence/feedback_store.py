@@ -92,6 +92,8 @@ class FeedbackStore:
     def _get_connection(self) -> sqlite3.Connection:
         """Get or create database connection."""
         if self._connection is None:
+            # FEEDBACK_DB_PATH may name a directory that does not exist yet.
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
             self._connection = sqlite3.connect(
                 str(self.db_path),
                 check_same_thread=False,

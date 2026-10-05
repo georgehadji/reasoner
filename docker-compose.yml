@@ -79,9 +79,14 @@ services:
       # package dir (src/reasoner/...) is replaced on every redeploy, so
       # these must live under a mounted volume. Reuses the ./history and
       # ./uploads mounts below rather than adding new ones.
-      - EVENT_STORE_DB_PATH=/app/history/events.db
-      - FEEDBACK_DB_PATH=/app/history/feedback.db
-      - UPLOAD_STORAGE_DIR=/app/uploads
+      # `${VAR:-default}` so a value set in .env still wins (an empty value,
+      # as in .env.example, falls back to the default).
+      - EVENT_STORE_DB_PATH=${EVENT_STORE_DB_PATH:-/app/history/events.db}
+      - FEEDBACK_DB_PATH=${FEEDBACK_DB_PATH:-/app/history/feedback.db}
+      - UPLOAD_STORAGE_DIR=${UPLOAD_STORAGE_DIR:-/app/uploads}
+      # AUTH_PERSISTENCE_ENABLED=true above: without this the auth DB lands in
+      # the package dir and API keys are lost on every redeploy.
+      - AUTH_DB_PATH=${AUTH_DB_PATH:-/app/history/auth_keys.db}
     env_file:
       - .env
     depends_on:

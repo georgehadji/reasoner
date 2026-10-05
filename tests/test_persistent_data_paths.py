@@ -89,3 +89,89 @@ def test_upload_dir_honors_upload_storage_dir_setting(tmp_path, monkeypatch):
         # import reasoner.infrastructure.uploader see the historical default.
         monkeypatch.setattr(settings, "UPLOAD_STORAGE_DIR", "")
         importlib.reload(uploader_module)
+
+
+# ── configured path in a directory that does not exist yet ──
+# sqlite3.connect() will not create parent directories, so a bind-mounted
+# /app/history that is empty (or a nested path) used to fail with
+# OperationalError: unable to open database file.
+
+
+def test_event_store_creates_missing_parent_dir(tmp_path, monkeypatch):
+    target = tmp_path / "nope" / "nested" / "events.db"
+    monkeypatch.setattr(settings, "EVENT_STORE_DB_PATH", str(target))
+
+    EventStore()
+
+    assert target.exists()
+
+
+def test_pipeline_ownership_repo_creates_missing_parent_dir(tmp_path, monkeypatch):
+    target = tmp_path / "nope" / "nested" / "events.db"
+    monkeypatch.setattr(settings, "EVENT_STORE_DB_PATH", str(target))
+
+    PipelineOwnershipRepository()
+
+    assert target.exists()
+
+
+def test_feedback_store_creates_missing_parent_dir(tmp_path, monkeypatch):
+    target = tmp_path / "nope" / "nested" / "feedback.db"
+    monkeypatch.setattr(settings, "FEEDBACK_DB_PATH", str(target))
+
+    FeedbackStore(jsonl_path=tmp_path / "unused.jsonl")
+
+    assert target.exists()
+
+
+def test_event_store_memory_db_still_works():
+    store = EventStore(db_path=":memory:")
+
+    assert store.db_path.name == ":memory:"
+
+
+# ── unset setting keeps the historical in-package default ──
+
+
+def test_event_store_falls_back_to_in_package_default_when_unset(monkeypatch):
+    from pathlib import Path
+
+    from reasoner.infrastructure.persistence import event_store as event_store_module
+
+    monkeypatch.setattr(settings, "EVENT_STORE_DB_PATH", "")
+    monkeypatch.setattr(
+        event_store_module, "EventStoreConnection", lambda p: _StubConn(p)
+    )
+
+    store = EventStore()
+
+    assert store.db_path == Path(event_store_module.__file__).parent.parent / "events.db"
+
+
+def test_pipeline_ownership_repo_falls_back_to_in_package_default_when_unset(
+    monkeypatch,
+):
+    from pathlib import Path
+
+    from reasoner.infrastructure.persistence import (
+        pipeline_ownership_repo as repo_module,
+    )
+
+    monkeypatch.setattr(settings, "EVENT_STORE_DB_PATH", "")
+    monkeypatch.setattr(repo_module, "EventStoreConnection", lambda p: _StubConn(p))
+
+    repo = PipelineOwnershipRepository()
+
+    assert repo._conn.db_path == (
+        Path(repo_module.__file__).parent.parent.parent / "events.db"
+    )
+
+
+class _StubConn:
+    """Records the path without opening (or creating) the real in-package file."""
+
+    def __init__(self, db_path):
+        self.db_path = db_path
+
+    def init_db(self):
+        pass

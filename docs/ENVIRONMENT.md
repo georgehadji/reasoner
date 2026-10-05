@@ -81,7 +81,7 @@ user's problem, to TypeSafe.
 | `RATE_LIMIT_BURST` | `10` | Burst allowance |
 | `ADMIN_API_KEY` | — | Admin endpoint key |
 | `AUTH_PERSISTENCE_ENABLED` | `false` | Persist auth keys to DB |
-| `AUTH_DB_PATH` | `src/reasoner/auth_keys.db` | SQLite auth DB path |
+| `AUTH_DB_PATH` | `src/reasoner/auth_keys.db` | SQLite auth DB path. `docker-compose.yml` sets `/app/history/auth_keys.db` (a mounted volume); the in-package default is lost on redeploy |
 
 ## CSRF & Security
 
