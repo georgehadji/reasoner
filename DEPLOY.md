@@ -257,7 +257,7 @@ docker compose up -d --build frontend
 docker stats
 
 # Backup database
-docker compose exec postgres pg_dump -U postgres reasoner > backup.sql
+docker compose exec -T postgres pg_dump -U postgres reasoner > backup.sql   # -T: no TTY, else CRLF corrupts the dump
 
 # Restore database
 cat backup.sql | docker compose exec -T postgres psql -U postgres -d reasoner
