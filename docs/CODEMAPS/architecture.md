@@ -1,4 +1,4 @@
-<!-- Generated: 2026-09-30 | Files scanned: 545 | Token estimate: ~800 -->
+<!-- Generated: 2026-10-05 | Files scanned: 545 | Token estimate: ~800 -->
 
 # Architecture — Reasoner (v3.0 Post-Refactor)
 
