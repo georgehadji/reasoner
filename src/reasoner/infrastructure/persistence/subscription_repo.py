@@ -21,28 +21,55 @@ class PostgresSubscriptionRepository:
     """Atomic subscription storage in PostgreSQL."""
 
     _pool: asyncpg.Pool | None = None
-    _pool_lock: asyncio.Lock | None = None
+    # Shared pool-creation task. Callers await it through asyncio.shield, so a
+    # caller that times out (the tier lookup is bounded at ~1s) abandons its wait
+    # without cancelling the connect: the pool still completes in the background
+    # and the next call finds it ready, instead of every request cancelling pool
+    # creation and the tier staying FREE for as long as the first connect is slow.
+    _pool_task: asyncio.Task | None = None
 
     def __init__(self, dsn: str, pool_size: int = 10):
         self._dsn = dsn
         self._pool_size = pool_size
 
+    async def _create_pool(self) -> asyncpg.Pool:
+        return await asyncpg.create_pool(
+            self._dsn,
+            min_size=1,
+            max_size=self._pool_size,
+        )
+
     async def _get_pool(self) -> asyncpg.Pool:
-        # Lazy initialize the class-level lock
-        if PostgresSubscriptionRepository._pool_lock is None:
-            PostgresSubscriptionRepository._pool_lock = asyncio.Lock()
+        cls = PostgresSubscriptionRepository
+        if cls._pool is not None:
+            return cls._pool
 
-        if PostgresSubscriptionRepository._pool is not None:
-            return PostgresSubscriptionRepository._pool
+        task = cls._pool_task
+        loop = asyncio.get_running_loop()
+        # A finished-and-failed task (or one from a dead loop) is replaced so the
+        # next call retries; an in-flight one is shared.
+        if task is None or task.get_loop() is not loop or (
+            task.done() and (task.cancelled() or task.exception() is not None)
+        ):
+            task = loop.create_task(self._create_pool())
+            task.add_done_callback(cls._on_pool_task_done)
+            cls._pool_task = task
 
-        async with PostgresSubscriptionRepository._pool_lock:
-            if PostgresSubscriptionRepository._pool is None:
-                PostgresSubscriptionRepository._pool = await asyncpg.create_pool(
-                    self._dsn,
-                    min_size=1,
-                    max_size=self._pool_size,
-                )
-            return PostgresSubscriptionRepository._pool
+        pool = await asyncio.shield(task)
+        cls._pool = pool
+        return pool
+
+    @staticmethod
+    def _on_pool_task_done(task: asyncio.Task) -> None:
+        # Runs even when every waiter timed out, so a late success still lands
+        # and a late failure is logged rather than "never retrieved".
+        if task.cancelled():
+            return
+        exc = task.exception()
+        if exc is not None:
+            logger.warning("Subscription pool creation failed: %s", exc)
+            return
+        PostgresSubscriptionRepository._pool = task.result()
 
     async def upsert_subscription(self, sub: Subscription) -> None:
         """Idempotently update subscription in Postgres.

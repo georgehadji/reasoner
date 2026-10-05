@@ -487,3 +487,180 @@ class TestAgentRouteTierLabel:
             ):
                 pass
         assert captured == {"ctx_tier": tier.value, "observer_tier": tier.value}
+
+
+@pytest.fixture(autouse=True)
+def _clear_tier_fallback_cache():
+    from reasoner.application.services import spend_limit_service as svc
+
+    getattr(svc, "_fallback_until", {}).clear()
+    yield
+    getattr(svc, "_fallback_until", {}).clear()
+
+
+class _SlowRepo:
+    """Subscription repo whose lookup outlasts the timeout; counts calls."""
+
+    def __init__(self, delay: float, result=None):
+        self.delay = delay
+        self.result = result
+        self.calls = 0
+
+    async def get_subscription_by_user(self, _uid):
+        self.calls += 1
+        await asyncio.sleep(self.delay)
+        return self.result
+
+
+class TestFallbackCacheAndLookupBudget:
+    @pytest.mark.asyncio
+    async def test_timeout_fallback_is_remembered_so_outage_costs_one_wait(
+        self, user, monkeypatch
+    ):
+        from reasoner.application.services import spend_limit_service as svc
+
+        repo = _SlowRepo(delay=30)
+        monkeypatch.setattr(svc, "TIER_LOOKUP_TIMEOUT_S", 0.05)
+        monkeypatch.setattr(svc, "_get_subscription_repo", lambda: repo)
+
+        assert await svc.resolve_user_tier(str(user.id)) is FREE
+        assert repo.calls == 1
+        # Within the window: answered from memory, no second wait, no second call.
+        loop = asyncio.get_running_loop()
+        started = loop.time()
+        assert await svc.resolve_user_tier(str(user.id)) is FREE
+        assert loop.time() - started < 0.04
+        assert repo.calls == 1
+
+    @pytest.mark.asyncio
+    async def test_fallback_memory_expires(self, user, monkeypatch):
+        from reasoner.application.services import spend_limit_service as svc
+
+        repo = _SlowRepo(delay=30)
+        monkeypatch.setattr(svc, "TIER_LOOKUP_TIMEOUT_S", 0.02)
+        monkeypatch.setattr(svc, "FALLBACK_CACHE_TTL_S", 0.0)
+        monkeypatch.setattr(svc, "_get_subscription_repo", lambda: repo)
+
+        await svc.resolve_user_tier(str(user.id))
+        await svc.resolve_user_tier(str(user.id))
+        assert repo.calls == 2
+
+    @pytest.mark.asyncio
+    async def test_a_real_answer_is_never_negative_cached(self, user, monkeypatch):
+        from reasoner.application.services import spend_limit_service as svc
+
+        repo = _SlowRepo(delay=0, result=None)
+        monkeypatch.setattr(svc, "_get_subscription_repo", lambda: repo)
+        await svc.resolve_user_tier(str(user.id))
+        await svc.resolve_user_tier(str(user.id))
+        assert repo.calls == 2  # "no subscription" is an answer, not a fallback
+
+    @pytest.mark.asyncio
+    async def test_run_gate_budget_outlasts_request_budget_and_bypasses_memory(
+        self, user, monkeypatch
+    ):
+        from reasoner.application.services import spend_limit_service as svc
+        from reasoner.domain.saas import Subscription, SubscriptionStatus
+
+        sub = Subscription(
+            id=uuid4(), user_id=user.id, tier=PRO, status=SubscriptionStatus.ACTIVE,
+        )
+        repo = _SlowRepo(delay=0.2, result=sub)
+        monkeypatch.setattr(svc, "TIER_LOOKUP_TIMEOUT_S", 0.05)
+        monkeypatch.setattr(svc, "_get_subscription_repo", lambda: repo)
+
+        # Request path gives up and remembers FREE ...
+        assert await svc.resolve_user_tier(str(user.id)) is FREE
+        # ... but the run gate, with a longer budget and no memory, still sees PRO.
+        got = await svc.resolve_user_tier(
+            str(user.id), timeout=2.0, use_fallback_cache=False
+        )
+        assert got is PRO
+
+    def test_run_gate_call_site_uses_the_longer_budget(self):
+        import inspect
+
+        from reasoner.api.execution import pipeline
+        from reasoner.application.services import spend_limit_service as svc
+
+        assert svc.RUN_TIER_LOOKUP_TIMEOUT_S > svc.TIER_LOOKUP_TIMEOUT_S
+        src = inspect.getsource(pipeline)
+        assert "timeout=RUN_TIER_LOOKUP_TIMEOUT_S" in src
+        assert "use_fallback_cache=False" in src
+
+
+class TestSubscriptionPoolSurvivesTimeout:
+    """A first connect slower than the tier-lookup timeout must not be cancelled
+    (it used to be, leaving every user FREE for as long as connect stayed slow)."""
+
+    @pytest.fixture
+    def repo_cls(self, monkeypatch):
+        from reasoner.infrastructure.persistence import subscription_repo as mod
+
+        cls = mod.PostgresSubscriptionRepository
+        monkeypatch.setattr(cls, "_pool", None)
+        monkeypatch.setattr(cls, "_pool_task", None, raising=False)
+        return mod, cls
+
+    @pytest.mark.asyncio
+    async def test_slow_first_connect_completes_in_background(self, repo_cls, monkeypatch):
+        mod, cls = repo_cls
+        sentinel = object()
+        calls = {"n": 0, "cancelled": False}
+
+        async def slow_create_pool(*args, **kwargs):
+            calls["n"] += 1
+            try:
+                await asyncio.sleep(0.2)
+            except asyncio.CancelledError:
+                calls["cancelled"] = True
+                raise
+            return sentinel
+
+        monkeypatch.setattr(mod.asyncpg, "create_pool", slow_create_pool)
+        repo = cls("postgresql://x")
+
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(repo._get_pool(), timeout=0.05)
+        assert calls["cancelled"] is False
+
+        await asyncio.sleep(0.3)  # connect finishes in the background
+        assert cls._pool is sentinel
+        assert await repo._get_pool() is sentinel
+        assert calls["n"] == 1
+
+    @pytest.mark.asyncio
+    async def test_concurrent_callers_share_one_connect(self, repo_cls, monkeypatch):
+        mod, cls = repo_cls
+        sentinel = object()
+        calls = {"n": 0}
+
+        async def create_pool(*args, **kwargs):
+            calls["n"] += 1
+            await asyncio.sleep(0.05)
+            return sentinel
+
+        monkeypatch.setattr(mod.asyncpg, "create_pool", create_pool)
+        repo = cls("postgresql://x")
+        pools = await asyncio.gather(*(repo._get_pool() for _ in range(5)))
+        assert all(p is sentinel for p in pools)
+        assert calls["n"] == 1
+
+    @pytest.mark.asyncio
+    async def test_failed_connect_is_retried(self, repo_cls, monkeypatch):
+        mod, cls = repo_cls
+        sentinel = object()
+        attempts = {"n": 0}
+
+        async def flaky_create_pool(*args, **kwargs):
+            attempts["n"] += 1
+            if attempts["n"] == 1:
+                raise OSError("connection refused")
+            return sentinel
+
+        monkeypatch.setattr(mod.asyncpg, "create_pool", flaky_create_pool)
+        repo = cls("postgresql://x")
+        with pytest.raises(OSError):
+            await repo._get_pool()
+        assert await repo._get_pool() is sentinel
+        assert attempts["n"] == 2

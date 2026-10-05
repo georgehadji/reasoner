@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from dataclasses import dataclass
 
 from reasoner.core.degrade import degraded
@@ -57,6 +58,38 @@ _TIER_RANK: dict[SubscriptionTier, int] = {
 # Upper bound on one subscription lookup. A cold cache plus a slow or unreachable
 # Postgres would otherwise block for the asyncpg connect timeout on every request.
 TIER_LOOKUP_TIMEOUT_S = 1.0
+
+# Budget for the one lookup that decides whether a run the caller already paid
+# a credit reservation for may proceed (api/execution/pipeline.py). Longer than
+# the request-path budget: refusing a paying user's premium run because the DB
+# answered in 2s is worse than making that run wait.
+RUN_TIER_LOOKUP_TIMEOUT_S = 5.0
+
+# How long a FREE fallback (timeout or error) is remembered per user. Without it
+# an unreachable subscription store costs every request a full timeout wait.
+FALLBACK_CACHE_TTL_S = 5.0
+_FALLBACK_CACHE_MAX = 1024
+_fallback_until: dict[str, float] = {}
+
+
+def _fallback_active(user_id: str) -> bool:
+    expiry = _fallback_until.get(user_id)
+    if expiry is None:
+        return False
+    if expiry <= time.monotonic():
+        _fallback_until.pop(user_id, None)
+        return False
+    return True
+
+
+def _remember_fallback(user_id: str) -> None:
+    now = time.monotonic()
+    if len(_fallback_until) >= _FALLBACK_CACHE_MAX:
+        for uid in [u for u, t in _fallback_until.items() if t <= now]:
+            del _fallback_until[uid]
+        if len(_fallback_until) >= _FALLBACK_CACHE_MAX:
+            _fallback_until.clear()
+    _fallback_until[user_id] = now + FALLBACK_CACHE_TTL_S
 
 
 def tier_satisfies(user_tier: SubscriptionTier, required_tier: SubscriptionTier) -> bool:
@@ -105,30 +138,47 @@ def resolve_spend_limits(tier: SubscriptionTier | str | None) -> TierSpendLimits
     return limits_for_tier(tier).tightest(global_ceiling())
 
 
-async def resolve_user_tier(user_id: str | None) -> SubscriptionTier:
+async def resolve_user_tier(
+    user_id: str | None,
+    *,
+    timeout: float | None = None,
+    use_fallback_cache: bool = True,
+) -> SubscriptionTier:
     """Resolve the tier a user is entitled to from their subscription.
 
     Falls back to FREE on every uncertain path — no user, no subscription, a
     status that does not entitle, or a lookup failure — so an outage can
     never hand out a paid tier. The repository returns the newest row without
     filtering on status, so the status check has to happen here.
+
+    The lookup is bounded by *timeout* (default TIER_LOOKUP_TIMEOUT_S). A
+    timeout or error is remembered for FALLBACK_CACHE_TTL_S so an outage costs
+    one wait per window, not one per request; a caller that makes a final
+    decision (the run gate) passes ``use_fallback_cache=False`` to bypass and
+    not write that memory.
     """
     if not user_id:
         return SubscriptionTier.FREE
+    if use_fallback_cache and _fallback_active(user_id):
+        return SubscriptionTier.FREE
 
+    budget = TIER_LOOKUP_TIMEOUT_S if timeout is None else timeout
     try:
         repo = _get_subscription_repo()
         subscription = await asyncio.wait_for(
-            repo.get_subscription_by_user(user_id), timeout=TIER_LOOKUP_TIMEOUT_S
+            repo.get_subscription_by_user(user_id), timeout=budget
         )
     except TimeoutError:
         logger.warning(
-            "Subscription lookup timed out after %.1fs; defaulting to FREE tier",
-            TIER_LOOKUP_TIMEOUT_S,
+            "Subscription lookup timed out after %.1fs; defaulting to FREE tier", budget
         )
+        if use_fallback_cache:
+            _remember_fallback(user_id)
         return SubscriptionTier.FREE
     except Exception:
         logger.warning("Subscription lookup failed; defaulting to FREE tier", exc_info=True)
+        if use_fallback_cache:
+            _remember_fallback(user_id)
         return SubscriptionTier.FREE
 
     if subscription is None or subscription.status not in _ENTITLED_STATUSES:
@@ -334,6 +384,7 @@ def _reset_subscription_repo() -> None:
     """Reset the repository singleton (used by tests)."""
     global _subscription_repo
     _subscription_repo = None
+    _fallback_until.clear()
 
 
 __all__ = [

@@ -132,7 +132,7 @@ def harness(monkeypatch):
     monkeypatch.setattr(mod, "apply_spend_limits", lambda *a, **kw: None)
     monkeypatch.setattr(mod, "_save_history_entry", lambda entry: None)
 
-    async def _tier(user_id):
+    async def _tier(user_id, **kwargs):
         return SimpleNamespace(value="free")
 
     async def _persist(evt):
