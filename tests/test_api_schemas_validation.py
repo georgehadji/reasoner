@@ -97,6 +97,16 @@ class TestFollowupRequestValidation:
         )
         assert req.agent_model == model
 
+    def test_image_generation_agent_model_rejected(self):
+        with pytest.raises(ValidationError, match="image generator"):
+            FollowupRequest(
+                question="Tell me more",
+                conversation_id="c",
+                history=[],
+                previous_synthesis="x",
+                agent_model="gpt-image-2",
+            )
+
     def test_empty_question_rejected(self):
         with pytest.raises(ValidationError):
             FollowupRequest(

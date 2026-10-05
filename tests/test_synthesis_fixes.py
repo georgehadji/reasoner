@@ -308,6 +308,24 @@ async def test_diversity_warning_is_computed_over_active_perspectives_only():
     assert any("diversity collapsed" in w["message"] for w in warnings)
 
 
+@pytest.mark.asyncio
+async def test_single_active_perspective_does_not_warn_diversity_collapse():
+    from types import SimpleNamespace
+
+    calls = []
+    router = _recording_router(calls)
+    router.routing_table = {"constructive": SimpleNamespace(model="anthropic/a")}
+    pipeline = ReasonerPipeline(router=router, preset_name="multi-perspective-budget", verbose=False)
+    state = PipelineState(problem="Should we migrate to Postgres?")
+    state.language = "English"
+    pipeline.perspectives = ["constructive"]
+
+    await run_perspectives_phase(state, _svc(pipeline))
+
+    assert calls == ["constructive"]
+    assert not [e for e in state.pending_events if e.get("type") == "phase_warning"]
+
+
 # ─────────────────────────────────────────────────────────────────────
 # Milestone 6: Stress-test self-referential failures are filtered
 # ─────────────────────────────────────────────────────────────────────

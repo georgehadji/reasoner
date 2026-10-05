@@ -129,12 +129,14 @@ async def run_perspectives_phase(
         return "OTHER"
 
     _active_blocs = {_bloc(m) for m in _active_models if m} - {"OTHER"}
-    if len(_active_models) < 2:
+    # One active perspective cannot "collapse" onto itself: nothing to compare.
+    _can_compare = len(perspectives) >= 2
+    if _can_compare and len(_active_models) < 2:
         state.pending_events.append({
             "type": "phase_warning",
             "message": "All perspectives using the same model — diversity collapsed. Add API keys spanning blocs (e.g. Anthropic/OpenAI 🇺🇸, DeepSeek/Qwen 🇨🇳, Mistral 🇪🇺) to restore cross-bloc reasoning.",
         })
-    elif len(_active_blocs) < 2:
+    elif _can_compare and len(_active_blocs) < 2:
         state.pending_events.append({
             "type": "phase_warning",
             "message": "All perspectives resolve to a single geopolitical bloc — creator-ideology bias is not mitigated. Add API keys from a different bloc (🇺🇸/🇨🇳/🇪🇺) for cross-bloc diversity.",

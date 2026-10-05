@@ -226,8 +226,13 @@ class FollowupRequest(BaseModel):
             return v
         from reasoner.core.ports.model_registry_port import get_model_registry_port
 
-        if not get_model_registry_port().contains(v):
+        entry = get_model_registry_port().entry(v)
+        if entry is None:
             raise ValueError(f"Unknown agent_model: {v}")
+        # Image generators share _REGISTRY with text models but cannot serve
+        # the synthesis/fusion roles; the registry marks them include_images.
+        if (entry.get("extra_body") or {}).get("include_images"):
+            raise ValueError(f"agent_model must be a text model, not an image generator: {v}")
         return v
 
     @field_validator("question")
