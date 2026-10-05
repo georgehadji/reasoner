@@ -41,7 +41,6 @@ from reasoner.core.settings import settings
 from reasoner.domain.api_keys import looks_like_api_key
 from reasoner.domain.saas import QuotaResult, SubscriptionTier, User
 from reasoner.infrastructure.auth import get_auth_adapter
-from reasoner.presets import get_preset_tier
 from reasoner.rate_limiter import RateLimitConfig, get_rate_limiter
 
 # ── Rate Limiter Singleton ──
@@ -315,22 +314,22 @@ async def require_auth_if_legacy_disabled(
     return user
 
 
-# Tier ranking for "at least this tier" comparisons. SubscriptionTier is a plain
-# str Enum with no inherent order.
-_TIER_RANK: dict[SubscriptionTier, int] = {
-    SubscriptionTier.FREE: 0,
-    SubscriptionTier.PRO: 1,
-    SubscriptionTier.ENTERPRISE: 2,
-}
+async def resolve_request_tier(request: Request | None, user: User) -> SubscriptionTier:
+    """The caller's entitled tier, resolved at most once per request.
 
-
-def tier_satisfies(user_tier: SubscriptionTier, required_tier: SubscriptionTier) -> bool:
-    """Whether *user_tier* meets or exceeds *required_tier*.
-
-    Unknown tiers rank 0 (FREE) so an unrecognised value can never satisfy a paid
-    requirement.
+    The rate limiter, quota check, preset gate and run metering all need the tier
+    and run on the same request; each lookup is bounded but not free (a cold cache
+    plus a slow Postgres costs up to the lookup timeout), so the first result is
+    kept on request.state. Falls back to FREE on every uncertain path.
     """
-    return _TIER_RANK.get(user_tier, 0) >= _TIER_RANK.get(required_tier, 0)
+    state = getattr(request, "state", None)
+    cached = getattr(state, "subscription_tier_cache", None)
+    if isinstance(cached, tuple) and cached[0] == str(user.id):
+        return cached[1]
+    tier = await _resolve_user_tier(str(user.id))
+    if state is not None:
+        state.subscription_tier_cache = (str(user.id), tier)
+    return tier
 
 
 def require_tier(min_tier: SubscriptionTier):
@@ -344,13 +343,15 @@ def require_tier(min_tier: SubscriptionTier):
     """
     from fastapi import HTTPException
 
-    async def checker(user: User = Depends(get_current_user)) -> User:
+    async def checker(
+        request: Request, user: User = Depends(get_current_user)
+    ) -> User:
         # Resolves the caller's entitled tier from their subscription.
         # _resolve_user_tier() falls back to FREE on every uncertain path, so a
         # subscription-store outage denies paid access rather than granting it.
         if not settings.PRESET_TIER_ENFORCEMENT_ENABLED:
             return user
-        user_tier = await _resolve_user_tier(str(user.id))
+        user_tier = await resolve_request_tier(request, user)
         if not tier_satisfies(user_tier, min_tier):
             raise HTTPException(
                 status_code=403,
@@ -377,7 +378,7 @@ async def check_rate_limit(
     if user is not None:
         # Authenticated user — use user_id as bucket key with tier multiplier
         client_id = f"user:{user.id}"
-        user_tier = await _resolve_user_tier(str(user.id))
+        user_tier = await resolve_request_tier(request, user)
         try:
             allowed, info = await rate_limiter.is_allowed_for_user(client_id, tier=user_tier.value)
         except Exception as exc:
@@ -655,6 +656,8 @@ def get_event_store(request: Request):
 # both paths share one definition of what entitles a user to a tier.
 from reasoner.application.services.spend_limit_service import (  # noqa: E402
     _reset_subscription_repo,
+    required_tier_for,
+    tier_satisfies,
 )
 from reasoner.application.services.spend_limit_service import (
     resolve_user_tier as _resolve_user_tier,
@@ -670,12 +673,13 @@ def _reset_quota_service() -> None:
 
 async def check_quota(
     user: User = Depends(get_current_user),
+    request: Request | None = None,
 ) -> QuotaResult:
     """
     FastAPI dependency: check if user has remaining quota.
     Raises HTTPException 429 if exceeded.
     """
-    user_tier = await _resolve_user_tier(str(user.id))
+    user_tier = await resolve_request_tier(request, user)
 
     service = _get_quota_service()
     try:
@@ -730,24 +734,29 @@ async def check_quota(
 async def check_preset_access(
     preset: str,
     user: User = Depends(get_current_user),
+    request: Request | None = None,
 ) -> None:
     """
-    FastAPI dependency: enforce preset tier requirements.
-    Raises HTTPException 403 if preset requires higher tier.
+    Early HTTP 403 for a preset the caller's plan cannot run (opt-in).
+
+    This is NOT the entitlement gate: premium presets are already refused at
+    runtime by check_run_allowed() (spend_limit_service), whatever this flag says.
+    Enabling it only moves that refusal ahead of credit reservation, as a plain
+    403 instead of an SSE PRESET_TIER_REQUIRED frame after the reservation. Tier
+    logic is shared with the runtime gate (required_tier_for / tier_satisfies).
     """
     from fastapi import HTTPException
 
     # Off by default -- see PRESET_TIER_ENFORCEMENT_ENABLED. Previously this raised
-    # 403 for *every* caller in production (paying users included) and enforced
-    # nothing anywhere else, so neither tier got the intended behaviour.
+    # 403 for *every* caller in production (paying users included).
     if not settings.PRESET_TIER_ENFORCEMENT_ENABLED:
         return
 
-    required_tier = get_preset_tier(preset)
+    required_tier = required_tier_for(preset)
     if required_tier == SubscriptionTier.FREE:
         return
 
-    user_tier = await _resolve_user_tier(str(user.id))
+    user_tier = await resolve_request_tier(request, user)
     if not tier_satisfies(user_tier, required_tier):
         raise HTTPException(
             status_code=403,
@@ -761,6 +770,7 @@ async def check_preset_access(
 async def check_preset_access_if_authenticated(
     preset: str,
     user: User | None,
+    request: Request | None = None,
 ) -> None:
     """Enforce preset tier requirements for authenticated callers.
 
@@ -773,13 +783,14 @@ async def check_preset_access_if_authenticated(
     """
     if user is None:
         return
-    await check_preset_access(preset, user)
+    await check_preset_access(preset, user, request)
 
 
 async def check_quota_if_authenticated(
     user: User | None = Depends(get_optional_user),
+    request: Request = None,  # type: ignore[assignment]  # injected by FastAPI
 ) -> QuotaResult | None:
     """Only check quota if user is authenticated."""
     if user is None:
         return None
-    return await check_quota(user)
+    return await check_quota(user, request)

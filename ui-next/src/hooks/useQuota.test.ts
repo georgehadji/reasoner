@@ -41,4 +41,18 @@ describe('useQuota', () => {
     await waitFor(() => expect(result.current.quota).toEqual(mockQuota));
     expect(result.current.loading).toBe(false);
   });
+
+  it('passes the unlimited signal through (max null, never a numeric cap)', async () => {
+    const mockQuota = { used: 0, max: null, unlimited: true, remaining: -1, reset_date: '2026-11-01' };
+    (apiFetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(mockQuota),
+    });
+
+    const { result } = renderHook(() => useQuota());
+
+    await waitFor(() => expect(result.current.quota).toEqual(mockQuota));
+    expect(result.current.quota?.unlimited).toBe(true);
+    expect(result.current.quota?.max).toBeNull();
+  });
 });

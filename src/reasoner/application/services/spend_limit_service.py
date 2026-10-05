@@ -14,6 +14,7 @@ layer on top of the tier defaults, and the stricter of the two binds.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass
 
@@ -44,12 +45,28 @@ class SpendRejection:
     required_tier: SubscriptionTier | None = None
 
 
-# Tier ordering, for "is the caller's plan at least X" comparisons.
+# Tier ordering, for "is the caller's plan at least X" comparisons. The single
+# ranking shared by the runtime gate (check_run_allowed) and the early HTTP gate
+# in api/dependencies.py.
 _TIER_RANK: dict[SubscriptionTier, int] = {
     SubscriptionTier.FREE: 0,
     SubscriptionTier.PRO: 1,
     SubscriptionTier.ENTERPRISE: 2,
 }
+
+# Upper bound on one subscription lookup. A cold cache plus a slow or unreachable
+# Postgres would otherwise block for the asyncpg connect timeout on every request.
+TIER_LOOKUP_TIMEOUT_S = 1.0
+
+
+def tier_satisfies(user_tier: SubscriptionTier, required_tier: SubscriptionTier) -> bool:
+    """Whether *user_tier* meets or exceeds *required_tier*.
+
+    Fails closed on both sides: an unrecognised user tier ranks as FREE, and an
+    unrecognised *required* tier ranks above ENTERPRISE so nobody satisfies it.
+    """
+    required_rank = _TIER_RANK.get(required_tier, len(_TIER_RANK))
+    return _TIER_RANK.get(user_tier, 0) >= required_rank
 
 
 def pricing_data_available() -> bool:
@@ -101,7 +118,15 @@ async def resolve_user_tier(user_id: str | None) -> SubscriptionTier:
 
     try:
         repo = _get_subscription_repo()
-        subscription = await repo.get_subscription_by_user(user_id)
+        subscription = await asyncio.wait_for(
+            repo.get_subscription_by_user(user_id), timeout=TIER_LOOKUP_TIMEOUT_S
+        )
+    except TimeoutError:
+        logger.warning(
+            "Subscription lookup timed out after %.1fs; defaulting to FREE tier",
+            TIER_LOOKUP_TIMEOUT_S,
+        )
+        return SubscriptionTier.FREE
     except Exception:
         logger.warning("Subscription lookup failed; defaulting to FREE tier", exc_info=True)
         return SubscriptionTier.FREE
@@ -209,8 +234,8 @@ def check_run_allowed(
       * the subject has already spent their month, so the next run has
         nowhere to go.
     """
-    required = _required_tier(preset_id)
-    if _TIER_RANK.get(tier, 0) < _TIER_RANK.get(required, 0):
+    required = required_tier_for(preset_id)
+    if not tier_satisfies(tier, required):
         return SpendRejection(
             reason=(
                 f"Preset '{preset_id}' requires the {required.value} plan; "
@@ -259,8 +284,12 @@ def check_run_allowed(
     return None
 
 
-def _required_tier(preset_id: str) -> SubscriptionTier:
-    """Minimum plan a preset is available on; FREE when it cannot be resolved."""
+def required_tier_for(preset_id: str) -> SubscriptionTier:
+    """Minimum plan a preset is available on; FREE when it cannot be resolved.
+
+    Shared by the runtime gate (check_run_allowed) and the early HTTP gate in
+    api/dependencies.py, so both agree on what a preset costs in plan terms.
+    """
     try:
         from reasoner.domain.preset_core import get_preset_tier
 
@@ -268,9 +297,9 @@ def _required_tier(preset_id: str) -> SubscriptionTier:
     except Exception as exc:
         # FREE is the lowest rank, so preflight's tier refusal can never
         # fire while this is failing: every preset looks available on every
-        # plan. api/dependencies.py holds the primary entitlement gate, so
-        # this is the second line, not the only one -- but a second line
-        # that has silently stopped checking is worse than none.
+        # plan. check_run_allowed is the only entitlement gate that always
+        # runs (the early HTTP gate in api/dependencies.py is opt-in), so a
+        # lookup that has silently stopped checking is worse than none.
         return degraded("spend_limit.required_tier", SubscriptionTier.FREE, exc=exc)
 
 
@@ -313,6 +342,8 @@ __all__ = [
     "global_ceiling",
     "resolve_spend_limits",
     "resolve_user_tier",
+    "required_tier_for",
+    "tier_satisfies",
     "apply_spend_limits",
     "estimate_run_cost",
     "check_run_allowed",

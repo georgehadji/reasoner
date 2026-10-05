@@ -119,7 +119,8 @@ function DashboardContent() {
     }
   };
 
-  const percent = quota && quota.max > 0 ? Math.min((quota.used / quota.max) * 100, 100) : 0;
+  const isUnlimited = !!quota && (quota.unlimited || quota.max == null);
+  const percent = quota && !isUnlimited && quota.max! > 0 ? Math.min((quota.used / quota.max!) * 100, 100) : 0;
   // --warn is reserved for epistemic labels — the near-limit tier escalates
   // from --accent to full ink instead, so it still reads as "more urgent"
   // without a hue change.
@@ -164,11 +165,13 @@ function DashboardContent() {
           <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-6">
             <p className="text-[length:var(--text-sm)] text-[var(--text-muted)]">Queries This Month</p>
             <p className="mt-1 text-[length:var(--text-2xl)] font-bold text-[var(--text)]">
-              {quota?.used ?? 0} / {quota?.max ?? 20}
+              {isUnlimited ? 'Unlimited' : `${quota?.used ?? 0} / ${quota?.max ?? 20}`}
             </p>
-            <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-[var(--surface-3)]">
-              <div className={`h-full rounded-full ${barColor} transition-all`} style={{ width: `${percent}%` }} />
-            </div>
+            {!isUnlimited && (
+              <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-[var(--surface-3)]">
+                <div className={`h-full rounded-full ${barColor} transition-all`} style={{ width: `${percent}%` }} />
+              </div>
+            )}
           </div>
         )}
 
@@ -177,7 +180,7 @@ function DashboardContent() {
         ) : (
           <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-6">
             <p className="text-[length:var(--text-sm)] text-[var(--text-muted)]">Remaining</p>
-            <p className="mt-1 text-[length:var(--text-2xl)] font-bold text-[var(--text)]">{quota?.remaining ?? '-'}</p>
+            <p className="mt-1 text-[length:var(--text-2xl)] font-bold text-[var(--text)]">{isUnlimited ? 'Unlimited' : (quota?.remaining ?? '-')}</p>
           </div>
         )}
 

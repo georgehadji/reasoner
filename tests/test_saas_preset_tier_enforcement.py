@@ -15,6 +15,9 @@ in test_api_auth_deps.py).
 
 from __future__ import annotations
 
+import asyncio
+from enum import Enum
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 from uuid import UUID, uuid4
 
@@ -39,6 +42,11 @@ def user() -> User:
     return User(id=UUID("11111111-1111-1111-1111-111111111111"), email="u@example.com")
 
 
+def _req():
+    """A bare request stand-in: the tier memo only needs ``.state``."""
+    return SimpleNamespace(state=SimpleNamespace())
+
+
 def _as_tier(tier):
     return patch("reasoner.api.dependencies._resolve_user_tier", AsyncMock(return_value=tier))
 
@@ -60,6 +68,37 @@ def test_tier_ordering():
     assert not tier_satisfies(PRO, ENT)
 
 
+class _Platinum(str, Enum):
+    """A tier value the ranking has never heard of."""
+
+    PLATINUM = "platinum"
+
+
+def test_unknown_required_tier_fails_closed():
+    """An unrecognised required tier must not be satisfiable, even by ENTERPRISE."""
+    assert not tier_satisfies(ENT, _Platinum.PLATINUM)
+    assert not tier_satisfies(FREE, _Platinum.PLATINUM)
+
+
+def test_auto_premium_alias_requires_pro():
+    """auto-premium is not a registered preset (it resolves to one after admission);
+    the early gate must treat it as PRO, matching what it resolves to at runtime."""
+    from reasoner.application.services.spend_limit_service import required_tier_for
+
+    assert required_tier_for("auto-premium") is PRO
+    assert required_tier_for("auto-budget") is FREE
+    assert required_tier_for("no-such-preset") is FREE
+
+
+def test_runtime_gate_refuses_unknown_required_tier(monkeypatch):
+    """check_run_allowed shares tier_satisfies, so it fails closed too."""
+    from reasoner.application.services import spend_limit_service as svc
+
+    monkeypatch.setattr(svc, "required_tier_for", lambda _preset: _Platinum.PLATINUM)
+    rejection = svc.check_run_allowed("whatever", ENT)
+    assert rejection is not None and rejection.cap_type == "preset_tier"
+
+
 class TestEnforcementOff:
     """Default: nothing is gated, including under ENVIRONMENT=production."""
 
@@ -77,7 +116,7 @@ class TestEnforcementOff:
         monkeypatch.setattr(settings, "PRESET_TIER_ENFORCEMENT_ENABLED", False)
         monkeypatch.setattr(settings, "ENVIRONMENT", "production")
         checker = require_tier(PRO)
-        assert await checker(user) is user
+        assert await checker(_req(), user) is user
 
 
 @pytest.mark.usefixtures("enforcement_on")
@@ -105,7 +144,7 @@ class TestEnforcementOn:
     async def test_pro_user_blocked_from_enterprise_preset(self, user):
         with (
             _as_tier(PRO),
-            patch("reasoner.api.dependencies.get_preset_tier", return_value=ENT),
+            patch("reasoner.api.dependencies.required_tier_for", return_value=ENT),
             pytest.raises(HTTPException) as exc,
         ):
             await check_preset_access("fake-enterprise-preset", user)
@@ -113,7 +152,7 @@ class TestEnforcementOn:
 
     @pytest.mark.asyncio
     async def test_enterprise_user_allowed_enterprise_preset(self, user):
-        with _as_tier(ENT), patch("reasoner.api.dependencies.get_preset_tier", return_value=ENT):
+        with _as_tier(ENT), patch("reasoner.api.dependencies.required_tier_for", return_value=ENT):
             assert await check_preset_access("fake-enterprise-preset", user) is None
 
     @pytest.mark.asyncio
@@ -142,6 +181,12 @@ class TestEnforcementOn:
         assert exc.value.status_code == 403
 
     @pytest.mark.asyncio
+    async def test_free_user_blocked_from_auto_premium(self, user):
+        with _as_tier(FREE), pytest.raises(HTTPException) as exc:
+            await check_preset_access("auto-premium", user)
+        assert exc.value.status_code == 403
+
+    @pytest.mark.asyncio
     async def test_anonymous_caller_is_not_checked(self):
         with _as_tier(FREE) as resolve:
             assert await check_preset_access_if_authenticated("debate-premium", None) is None
@@ -151,10 +196,74 @@ class TestEnforcementOn:
     async def test_require_tier_blocks_and_allows(self, user):
         checker = require_tier(PRO)
         with _as_tier(FREE), pytest.raises(HTTPException) as exc:
-            await checker(user)
+            await checker(_req(), user)
         assert exc.value.status_code == 403
         with _as_tier(PRO):
-            assert await checker(user) is user
+            assert await checker(_req(), user) is user
+
+
+class TestTierResolutionIsBoundedAndMemoised:
+    """The tier is needed by the rate limiter, quota, gate and run label on one
+    request; each lookup can block on a cold cache + slow Postgres."""
+
+    @pytest.mark.asyncio
+    async def test_resolved_once_per_request(self, user):
+        from reasoner.api.dependencies import resolve_request_tier
+
+        request = _req()
+        with _as_tier(PRO) as resolve:
+            assert await resolve_request_tier(request, user) is PRO
+            assert await resolve_request_tier(request, user) is PRO
+            assert await resolve_request_tier(request, user) is PRO
+        assert resolve.await_count == 1
+
+    @pytest.mark.asyncio
+    async def test_memo_is_not_shared_across_requests_or_users(self, user):
+        from reasoner.api.dependencies import resolve_request_tier
+
+        other = User(id=uuid4(), email="o@example.com")
+        request = _req()
+        with _as_tier(PRO) as resolve:
+            await resolve_request_tier(request, user)
+            await resolve_request_tier(request, other)
+            await resolve_request_tier(_req(), user)
+        assert resolve.await_count == 3
+
+    @pytest.mark.asyncio
+    async def test_gate_and_quota_share_one_lookup(self, enforcement_on, user):
+        from reasoner.api.dependencies import check_quota
+
+        request = _req()
+        service = AsyncMock()
+        service.check.return_value = QuotaResult(allowed=True, remaining=5)
+        with (
+            _as_tier(PRO) as resolve,
+            patch("reasoner.api.dependencies._get_quota_service", return_value=service),
+        ):
+            await check_quota(user, request)
+            await check_preset_access("debate-premium", user, request)
+            await check_preset_access_if_authenticated("debate-premium", user, request)
+        assert resolve.await_count == 1
+
+    @pytest.mark.asyncio
+    async def test_slow_lookup_times_out_to_free_with_warning(self, user, monkeypatch, caplog):
+        import logging
+
+        from reasoner.application.services import spend_limit_service as svc
+
+        class _Hang:
+            async def get_subscription_by_user(self, _uid):
+                await asyncio.sleep(30)
+
+        monkeypatch.setattr(svc, "TIER_LOOKUP_TIMEOUT_S", 0.05)
+        monkeypatch.setattr(svc, "_get_subscription_repo", lambda: _Hang())
+        with caplog.at_level(logging.WARNING, logger=svc.logger.name):
+            tier = await asyncio.wait_for(svc.resolve_user_tier(str(user.id)), timeout=5)
+        assert tier is FREE
+        assert any(
+            r.levelno >= logging.WARNING and "timed out" in r.getMessage()
+            for r in caplog.records
+        )
 
 
 class TestPresetGateOnRunRoutes:
@@ -215,7 +324,7 @@ class TestPresetGateOnRunRoutes:
     async def test_free_user_not_blocked_when_off(self, monkeypatch, path, body):
         monkeypatch.setattr(settings, "PRESET_TIER_ENFORCEMENT_ENABLED", False)
         response = await self._post(path, body, FREE)
-        assert response.status_code != 403, response.text
+        assert response.status_code == 200, response.text
 
     @pytest.mark.asyncio
     async def test_pro_user_allowed_premium_when_on(self, monkeypatch):
@@ -223,7 +332,27 @@ class TestPresetGateOnRunRoutes:
         response = await self._post(
             "/api/run", {"problem": "x", "preset": "debate-premium", "no_cache": True}, PRO
         )
-        assert response.status_code != 403, response.text
+        assert response.status_code == 200, response.text
+
+    @pytest.mark.asyncio
+    async def test_403_does_not_lock_the_client_run_id(self, monkeypatch):
+        """The gate runs before register_run_or_error, so a refused run's
+        client_run_id stays usable (it used to be locked for an hour)."""
+        monkeypatch.setattr(settings, "PRESET_TIER_ENFORCEMENT_ENABLED", True)
+        body = {
+            "problem": "x", "preset": "debate-premium", "no_cache": True,
+            "client_run_id": "run-gated-1",
+        }
+        with patch(
+            "reasoner.api.idempotency_http.register_run_or_error", AsyncMock()
+        ) as register:
+            response = await self._post("/api/run", body, FREE)
+            assert response.status_code == 403, response.text
+            register.assert_not_awaited()
+
+            response = await self._post("/api/run", body, PRO)
+            assert response.status_code == 200, response.text
+            register.assert_awaited_once_with("run-gated-1")
 
 
 class TestQuotaEndpointUsesRealTier:
@@ -233,7 +362,7 @@ class TestQuotaEndpointUsesRealTier:
     @pytest.mark.parametrize("tier,expected_max,remaining,expected_used", [
         (FREE, 20, 15, 5),
         (PRO, 500, 400, 100),
-        (ENT, -1, -1, 0),
+        (ENT, None, -1, 0),
     ])
     async def test_quota_reports_tier_limit(self, tier, expected_max, remaining, expected_used):
         import reasoner.api as api
@@ -244,7 +373,7 @@ class TestQuotaEndpointUsesRealTier:
         api.app.dependency_overrides[get_current_user] = lambda: User(id=uuid4(), email="q@t.local")
         try:
             with (
-                patch("reasoner.api.saas_router.resolve_user_tier", AsyncMock(return_value=tier)),
+                _as_tier(tier),
                 patch("reasoner.api.saas_router._get_quota_service", return_value=service),
             ):
                 async with AsyncClient(
@@ -257,6 +386,8 @@ class TestQuotaEndpointUsesRealTier:
         assert response.status_code == 200, response.text
         data = response.json()
         assert data["max"] == expected_max
+        # Unlimited is an explicit signal, never the internal -1 sentinel as a limit.
+        assert data["unlimited"] is (tier is ENT)
         assert data["used"] == expected_used
         assert service.check.await_args.args[1] == tier
 
@@ -280,10 +411,7 @@ class TestQueryMetricTierLabel:
             yield 'data: {"type":"done"}\n\n'
 
         with (
-            patch(
-                "reasoner.application.services.spend_limit_service.resolve_user_tier",
-                AsyncMock(return_value=tier),
-            ),
+            _as_tier(tier),
             patch("reasoner.application.services.run_metering.metered", fake_metered),
             patch("reasoner.api.run_stream_cached", fake_stream),
             patch("reasoner.api.run_followup_stream", fake_stream),
@@ -326,3 +454,36 @@ class TestQueryMetricTierLabel:
         req = RunRequest(problem="x", preset="debate-budget")
         got = await self._captured_tier("run", req, None, PRO)
         assert got["ctx_tier"] == "anonymous"
+
+
+class TestAgentRouteTierLabel:
+    """The agent HTTP routes hardcoded tier="free" in the run context and observer."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("tier", [FREE, PRO, ENT])
+    async def test_agent_stream_carries_resolved_tier(self, user, tier):
+        from reasoner.api.routes import agent
+
+        captured = {}
+
+        async def fake_metered(stream, ctx, sink, observer):
+            captured["ctx_tier"] = ctx.tier
+            captured["observer_tier"] = observer._tier
+            async for chunk in stream:
+                yield chunk
+
+        async def fake_stream(*args, **kwargs):
+            yield 'data: {"type":"done"}\n\n'
+
+        with (
+            _as_tier(tier),
+            patch.object(agent, "metered", fake_metered),
+            patch("reasoner.api.streaming.run_stream_cached", fake_stream),
+        ):
+            async for _ in agent._metered_agent_stream(
+                SimpleNamespace(), _req(), user, None, None,
+                preset="debate-budget", interface="agent_http",
+                reference_id="r", reserved_credits=0,
+            ):
+                pass
+        assert captured == {"ctx_tier": tier.value, "observer_tier": tier.value}
