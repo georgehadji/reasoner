@@ -12,6 +12,13 @@ from reasoner.presets import build_auto_preset, build_custom_router, get_preset
 
 logger = logging.getLogger(__name__)
 
+# Routing roles a follow-up's agent_model is forced onto. "fusion" replaced the
+# separate classification/decomposition roles; the legacy names are kept so a
+# preset still declaring them is covered, but without fusion a configured agent
+# model never reached that phase (application/pipeline.py calls
+# call_llm(role="fusion", ...)).
+_AGENT_MODEL_ROLES = ("synthesis", "fusion", "classification", "decomposition")
+
 
 class PresetService:
     """Encapsulates all preset-related logic: resolution, filtering, router building."""
@@ -101,11 +108,7 @@ class PresetService:
 
         filtered_routing = self.filter_routing(preset.routing, preset.primary_id)
         if agent_model:
-            # "fusion" replaced the separate classification/decomposition roles; the
-            # legacy names are kept so a preset still declaring them is covered, but
-            # without fusion a follow-up's configured agent model never reached
-            # that phase (application/pipeline.py calls call_llm(role="fusion", ...)).
-            for role in ("synthesis", "fusion", "classification", "decomposition"):
+            for role in _AGENT_MODEL_ROLES:
                 filtered_routing[role] = agent_model
 
         method = preset_method or (preset_name.rsplit("-", 1)[0] if "-" in preset_name else preset_name)
@@ -135,11 +138,7 @@ class PresetService:
         preset = get_preset(effective_preset_name)
         filtered_routing = self.filter_routing(preset.routing, preset.primary_id)
         if agent_model:
-            # "fusion" replaced the separate classification/decomposition roles; the
-            # legacy names are kept so a preset still declaring them is covered, but
-            # without fusion a follow-up's configured agent model never reached
-            # that phase (application/pipeline.py calls call_llm(role="fusion", ...)).
-            for role in ("synthesis", "fusion", "classification", "decomposition"):
+            for role in _AGENT_MODEL_ROLES:
                 filtered_routing[role] = agent_model
 
         router = ProviderRouter.from_model_ids(

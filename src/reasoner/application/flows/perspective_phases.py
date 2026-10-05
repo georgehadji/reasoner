@@ -93,11 +93,20 @@ async def run_perspectives_phase(
         # stand-ins that predate it and have no such attribute.
         perspectives = getattr(services, "perspectives", None) or list(DEFAULT_PERSPECTIVES)
 
+    def _perspective_name(p) -> str:
+        return p.name if hasattr(p, 'name') else str(p)
+
+    # A duplicated entry would run the same generator twice (double spend, and
+    # two identical candidates masquerading as independent perspectives).
+    perspectives = list({_perspective_name(p): p for p in perspectives}.values())
+
     # Warn on diversity collapse: all perspectives resolve to the same model, or
     # all to a single geopolitical bloc. Cross-bloc spread (not just cross-company)
     # is what mitigates creator ideology (Buyl et al. npj AI 2026) — so we surface
     # both failure modes and recommend keys across blocs, not one ecosystem.
-    _perspective_roles = {"constructive", "destructive", "systemic", "minimalist"}
+    # Computed over the roles actually active, not all four: a narrowed set
+    # would otherwise be judged against models it never calls.
+    _perspective_roles = {_perspective_name(p) for p in perspectives}
     _active_models = {
         getattr(services.router.routing_table.get(r, services.router.primary), "model", "")
         for r in _perspective_roles
@@ -174,9 +183,6 @@ async def run_perspectives_phase(
             key_insights=key_insights,
             model_used="",
         )
-
-    def _perspective_name(p) -> str:
-        return p.name if hasattr(p, 'name') else str(p)
 
     # Accumulate locally and write to `state` once, after the loop. Two reasons,
     # both load-bearing:

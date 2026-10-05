@@ -216,6 +216,20 @@ class FollowupRequest(BaseModel):
 
     model_config = {"extra": "forbid"}
 
+    @field_validator("agent_model")
+    @classmethod
+    def validate_agent_model(cls, v: str | None) -> str | None:
+        # agent_model is forced onto the synthesis/fusion routing roles. An
+        # unknown id would otherwise raise ValueError from build_provider during
+        # preflight (a 500-class failure) rather than a 422 at the boundary.
+        if not v:
+            return v
+        from reasoner.core.ports.model_registry_port import get_model_registry_port
+
+        if not get_model_registry_port().contains(v):
+            raise ValueError(f"Unknown agent_model: {v}")
+        return v
+
     @field_validator("question")
     @classmethod
     def validate_question(cls, v: str) -> str:
