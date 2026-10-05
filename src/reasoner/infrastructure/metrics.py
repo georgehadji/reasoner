@@ -111,15 +111,10 @@ REASONER_ACTIVE_USERS = Gauge(
 )
 
 # Connection pool metrics (Critical Enhancement 7.6)
-REASONER_POSTGRES_POOL_SIZE = Gauge(
-    "reasoner_postgres_pool_size",
-    "Current Postgres connection pool size",
-)
-
-REASONER_POSTGRES_POOL_FREE = Gauge(
-    "reasoner_postgres_pool_free",
-    "Free connections in Postgres pool",
-)
+# No reasoner_postgres_pool_{size,free} here: the only pool the app could report
+# was the health probe's private 1-2 connection pool, which says nothing about
+# the serving pools (one inside each Postgres repository). Re-add them only
+# once a single owner can report real serving-pool occupancy.
 
 REASONER_REDIS_POOL_SIZE = Gauge(
     "reasoner_redis_pool_size",

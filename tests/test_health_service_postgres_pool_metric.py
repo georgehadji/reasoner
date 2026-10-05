@@ -1,10 +1,13 @@
-"""Regression test for the inverted Postgres pool-free gauge.
+"""Regression test: the health probe's pool must not feed the pool gauges.
 
-health_service.check_health() used to set REASONER_POSTGRES_POOL_FREE to
-``get_size() - get_idle_size()``, which in asyncpg is the number of BUSY
-connections, not free ones. The critical PostgresPoolExhaustion alert
-(``reasoner_postgres_pool_free == 0``, docs/monitoring/alerts.yml) therefore
-fired on an idle pool and stayed silent when the pool was actually exhausted.
+health_service.check_health() opens its own private asyncpg pool
+(min_size=1, max_size=2) just to run ``SELECT 1``, and used to publish that
+pool's size/idle count as reasoner_postgres_pool_size / _free. That pool is not
+a serving pool (the app's real pools sit inside each Postgres repository at
+DB_POOL_SIZE connections), so the gauge read ~1 forever: PostgresPoolLow
+(`< 2`) fired permanently and PostgresPoolExhaustion (`== 0`) could never fire
+on real saturation. The gauges and both alerts were removed rather than left
+reporting a number unrelated to load.
 """
 
 from __future__ import annotations
@@ -46,18 +49,29 @@ class RecordingGauge:
 
 
 @pytest.mark.asyncio
-async def test_postgres_pool_free_gauge_reports_idle_not_busy(monkeypatch):
+async def test_health_probe_pool_does_not_write_pool_gauges(monkeypatch):
     from reasoner import metrics
     from reasoner.core.settings import settings
 
-    # size=10, idle=3 -> 7 connections are busy. The gauge must read the
-    # free count (3), never the busy count (7).
-    gauge = RecordingGauge()
-    monkeypatch.setattr(metrics, "REASONER_POSTGRES_POOL_FREE", gauge)
-    fake_pool = FakePostgresPool(size=10, idle=3)
-    monkeypatch.setattr(health_service, "_health_postgres_pool", fake_pool)
+    # raising=False: the gauges no longer exist on the metrics module. On the
+    # pre-fix code health_service imports them from here, so these recorders
+    # are what it would write to, and the assertion below catches it.
+    free, size = RecordingGauge(), RecordingGauge()
+    monkeypatch.setattr(metrics, "REASONER_POSTGRES_POOL_FREE", free, raising=False)
+    monkeypatch.setattr(metrics, "REASONER_POSTGRES_POOL_SIZE", size, raising=False)
+    monkeypatch.setattr(health_service, "_health_postgres_pool", FakePostgresPool(size=2, idle=1))
     monkeypatch.setattr(settings, "DATABASE_URL", "postgresql+asyncpg://fake/db")
 
-    await health_service.check_health()
+    health = await health_service.check_health()
 
-    assert gauge.values == [3]
+    assert health["checks"]["postgres"] == {"status": "ok"}
+    assert free.values == []
+    assert size.values == []
+
+
+def test_postgres_pool_gauges_are_not_defined():
+    """Nothing can alert on a gauge that nothing owns."""
+    import reasoner.infrastructure.metrics as metrics_mod
+
+    assert not hasattr(metrics_mod, "REASONER_POSTGRES_POOL_FREE")
+    assert not hasattr(metrics_mod, "REASONER_POSTGRES_POOL_SIZE")

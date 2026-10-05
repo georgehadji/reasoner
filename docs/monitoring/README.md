@@ -60,8 +60,6 @@ All rules are defined in `alerts.yml`. Current coverage:
 | `QuotaExceededSpike` | warning | `reasoner_quota_exceeded_total` | >10 quota-exceeds/sec |
 | `HighLatency` | warning | `reasoner_query_duration_seconds_bucket` | P95 >60s |
 | `PhaseLatencySpike` | warning | `reasoner_phase_duration_seconds_bucket` | P95 >120s |
-| `PostgresPoolExhaustion` | critical | `reasoner_postgres_pool_free` | Pool exhausted |
-| `PostgresPoolLow` | warning | `reasoner_postgres_pool_free` | <2 free connections |
 | `WebhookProcessingFailures` | warning | `reasoner_webhook_processing_failures_total` | Any webhook failure |
 | `WebhookProcessingCritical` | critical | `reasoner_webhook_processing_failures_total` | >5/sec |
 | `DeadLetterEventsAccumulating` | warning | `reasoner_dead_letter_events_total` | Events in dead-letter |
@@ -74,6 +72,13 @@ All rules are defined in `alerts.yml`. Current coverage:
 | `BackendDown` | critical | `up{job="reasoner-backend"}` | Scrape target failing >2m |
 | `BackendMetricsAbsent` | critical | `up{job="reasoner-backend"}` | Scrape target gone entirely >5m |
 
+There are deliberately no Postgres connection-pool alerts. The only pool the
+app reported on was the health probe's private 1-2 connection pool, not a
+serving pool, so `reasoner_postgres_pool_free` carried no information about
+load and was removed along with `PostgresPoolExhaustion`/`PostgresPoolLow`.
+Re-add them once a gauge reports real serving-pool occupancy (each Postgres
+repository owns its own `DB_POOL_SIZE`-connection pool).
+
 ## Required Metrics
 
 Before these alerts can fire, the application must export the following metrics:
@@ -81,7 +86,6 @@ Before these alerts can fire, the application must export the following metrics:
 - `reasoner_queries_total` — Counter with labels `tier`, `preset`, `status`
 - `reasoner_quota_exceeded_total` — Counter with label `tier`
 - `reasoner_query_duration_seconds_bucket` — Histogram with label `preset`
-- `reasoner_postgres_pool_free` — Gauge
 - `reasoner_webhook_processing_failures_total` — Counter (NEW — Phase 0.1)
 - `reasoner_dead_letter_events_total` — Counter (NEW — Phase 0.3)
 - `reasoner_memory_usage_mb` — Gauge (NEW — Phase 2.10)

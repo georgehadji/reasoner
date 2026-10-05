@@ -50,23 +50,10 @@ groups:
           description: "P95 phase duration is {{ $value | printf \"%.1f\" }}s"
 
       # ── Postgres Pool ────────────────────────────────────────────────────────
-      - alert: PostgresPoolExhaustion
-        expr: reasoner_postgres_pool_free == 0
-        for: 1m
-        labels:
-          severity: critical
-        annotations:
-          summary: "Postgres connection pool exhausted"
-          description: "All {{ $value }} Postgres connections are in use"
-
-      - alert: PostgresPoolLow
-        expr: reasoner_postgres_pool_free < 2
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Postgres pool running low"
-          description: "Only {{ $value }} free connections remaining in pool"
+      # No pool alerts: reasoner_postgres_pool_free was fed from the health
+      # probe's own 1-2 connection pool, not a serving pool, so any threshold
+      # on it was meaningless. Add them back with a gauge that reports real
+      # serving-pool occupancy.
 
       # ── Webhook Failures (Phase 0.1) ─────────────────────────────────────────
       - alert: WebhookProcessingFailures

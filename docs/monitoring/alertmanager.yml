@@ -78,11 +78,13 @@ receivers:
     #   - routing_key_file: /etc/alertmanager/secrets/pagerduty_key
     #     severity: "critical"
 
-inhibit_rules:
-  # A critical alert already says the thing is broken; don't also page the
-  # warning-level version of the same alert.
-  - source_matchers:
-      - severity = "critical"
-    target_matchers:
-      - severity = "warning"
-    equal: ["alertname", "service"]
+# No inhibit_rules. The one that used to live here inhibited severity=warning
+# when a severity=critical alert shared `alertname` and `service`. Critical and
+# warning tiers are separate rules with different names (HighErrorRate vs
+# CriticalErrorRate, MemoryWarning vs MemoryCritical), so requiring equal
+# `alertname` across the two severities could never match and the rule
+# suppressed nothing. Add one back only on labels the paired alerts genuinely
+# share, and only where suppression is wanted (every alert from the backend
+# target carries the same `service`, so inhibiting on it alone would hide all
+# warnings whenever any critical fires).
+inhibit_rules: []

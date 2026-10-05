@@ -60,59 +60,75 @@ async def test_quota_service_free_allows_when_under_limit():
     assert result.remaining == 15
 
 
+@pytest.fixture
+def quota_exceeded_sink(monkeypatch):
+    """Install a recording quota-exceeded hook; monkeypatch restores the previous one."""
+    recorded: list[str] = []
+    monkeypatch.setattr(metrics_port, "_QUOTA_EXCEEDED_COUNTER", recorded.append)
+    return recorded
+
+
 @pytest.mark.asyncio
-async def test_quota_exceeded_reaches_the_metrics_port_hook():
-    """reasoner_quota_exceeded_total (QuotaExceededSpike, alerts.yml) was
-    defined and alerted on but never incremented. QuotaService.check() must
-    call the core metrics-port hook on the denial path -- not import
-    infrastructure.metrics directly, since application/ may not depend on
-    infrastructure concretes.
+async def test_check_does_not_count_a_denial_it_only_reports(quota_exceeded_sink):
+    """GET /quota calls QuotaService.check() as a read-only status query (with a
+    fixed tier). check() therefore must not emit reasoner_quota_exceeded_total;
+    only the point of rejection (api.dependencies.check_quota) counts.
     """
-    recorded: list[str] = []
-    metrics_port.set_quota_exceeded_counter(recorded.append)
-    try:
-        repo = FakeQuotaRepository(
-            UsageQuota(user_id="u1", tier=SubscriptionTier.FREE, used_queries=20, max_queries=20)
-        )
-        service = QuotaService(repo)
-        result = await service.check("u1", SubscriptionTier.FREE)
-        assert result.allowed is False
-        assert recorded == ["free"]
-    finally:
-        metrics_port.set_quota_exceeded_counter(None)
+    repo = FakeQuotaRepository(
+        UsageQuota(user_id="u1", tier=SubscriptionTier.FREE, used_queries=20, max_queries=20)
+    )
+    service = QuotaService(repo)
+    result = await service.check("u1", SubscriptionTier.FREE)
+    assert result.allowed is False
+    assert quota_exceeded_sink == []
 
 
 @pytest.mark.asyncio
-async def test_quota_exceeded_with_an_unrecognized_tier_still_records_a_metric():
-    """test_quota_tier_enforcement.py exercises the free-ceiling fallback with a
-    plain string tier (not a SubscriptionTier member). count_quota_exceeded()
-    must not assume `.value` exists.
-    """
-    recorded: list[str] = []
-    metrics_port.set_quota_exceeded_counter(recorded.append)
-    try:
-        repo = FakeQuotaRepository(
-            UsageQuota(user_id="u1", tier=SubscriptionTier.FREE, used_queries=20, max_queries=500)
-        )
-        service = QuotaService(repo)
-        result = await service.check("u1", "not-a-tier")  # type: ignore[arg-type]
-        assert result.allowed is False
-        assert recorded == ["not-a-tier"]
-    finally:
-        metrics_port.set_quota_exceeded_counter(None)
+async def test_quota_allowed_does_not_touch_the_metrics_port_hook(quota_exceeded_sink):
+    repo = FakeQuotaRepository(
+        UsageQuota(user_id="u1", tier=SubscriptionTier.FREE, used_queries=5, max_queries=20)
+    )
+    service = QuotaService(repo)
+    result = await service.check("u1", SubscriptionTier.FREE)
+    assert result.allowed is True
+    assert quota_exceeded_sink == []
+
+
+def _check_quota_with(monkeypatch, tier, result):
+    """Run api.dependencies.check_quota with a stubbed tier and QuotaService result."""
+    from unittest.mock import AsyncMock, MagicMock
+    from uuid import uuid4
+
+    from reasoner.api import dependencies
+    from reasoner.domain.saas import User
+
+    async def _resolve(_user_id: str):
+        return tier
+
+    service = MagicMock()
+    service.check = AsyncMock(return_value=result)
+    monkeypatch.setattr(dependencies, "_resolve_user_tier", _resolve)
+    monkeypatch.setattr(dependencies, "_get_quota_service", lambda: service)
+    user = User(id=uuid4(), email="t@example.com", display_name="T", scopes=["read"])
+    return dependencies.check_quota(user)
 
 
 @pytest.mark.asyncio
-async def test_quota_allowed_does_not_touch_the_metrics_port_hook():
-    recorded: list[str] = []
-    metrics_port.set_quota_exceeded_counter(recorded.append)
-    try:
-        repo = FakeQuotaRepository(
-            UsageQuota(user_id="u1", tier=SubscriptionTier.FREE, used_queries=5, max_queries=20)
-        )
-        service = QuotaService(repo)
-        result = await service.check("u1", SubscriptionTier.FREE)
-        assert result.allowed is True
-        assert recorded == []
-    finally:
-        metrics_port.set_quota_exceeded_counter(None)
+async def test_check_quota_counts_a_real_rejection_with_the_resolved_tier(
+    monkeypatch, quota_exceeded_sink
+):
+    """The 429 path records the metric once, labelled with the user's real tier."""
+    from fastapi import HTTPException
+
+    denied = QuotaResult(allowed=False, remaining=0, retry_after=60, reason="used up")
+    with pytest.raises(HTTPException) as exc:
+        await _check_quota_with(monkeypatch, SubscriptionTier.PRO, denied)
+    assert exc.value.status_code == 429
+    assert quota_exceeded_sink == ["pro"]
+
+
+@pytest.mark.asyncio
+async def test_check_quota_does_not_count_an_allowed_request(monkeypatch, quota_exceeded_sink):
+    allowed = QuotaResult(allowed=True, remaining=5)
+    await _check_quota_with(monkeypatch, SubscriptionTier.FREE, allowed)
+    assert quota_exceeded_sink == []
