@@ -19,7 +19,6 @@ DATABASE_URL = os.environ.get(
 )
 
 
-
 def split_sslmode(url: str) -> tuple[str, dict]:
     """Move a libpq-style ``sslmode`` query param into asyncpg ``connect_args``.
 

@@ -203,6 +203,34 @@ def test_each_service_cert_carries_only_its_own_san(tmp_path):
             assert f"DNS:{other}" not in text, f"{service}.crt carries {other}'s SAN"
 
 
+@needs_openssl
+def test_cert_generator_recovers_when_ca_key_exists_but_ca_crt_is_missing(tmp_path):
+    """A run that died between `genrsa` and `req -x509` leaves ca.key alone.
+
+    Guarding on ca.key only would skip CA creation on every later run and then
+    fail signing for good; the CA must be rebuilt when either file is missing.
+    """
+    _run(["openssl", "genrsa", "-out", "ca.key", "2048"], tmp_path)
+    assert not (tmp_path / "ca.crt").exists()
+
+    _generate_with_compose_script(tmp_path)
+
+    assert (tmp_path / "ca.crt").exists()
+    for service in ("backend", "frontend", "postgres", "valkey"):
+        assert (tmp_path / f"{service}.crt").exists()
+
+
+@needs_openssl
+def test_cert_generator_is_rerunnable_and_keeps_an_existing_ca(tmp_path):
+    """A second run on an existing volume succeeds and reuses the CA."""
+    _generate_with_compose_script(tmp_path)
+    ca_before = (tmp_path / "ca.crt").read_bytes()
+
+    _generate_with_compose_script(tmp_path)
+
+    assert (tmp_path / "ca.crt").read_bytes() == ca_before
+
+
 # ── key ownership ───────────────────────────────────────────────────────────
 
 

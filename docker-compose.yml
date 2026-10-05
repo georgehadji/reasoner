@@ -8,7 +8,9 @@ services:
         set -e
         apk add --no-cache openssl
         mkdir -p /certs
-        if [ ! -f /certs/ca.key ]; then
+        # Regenerate the CA when EITHER file is missing: a run that died between
+        # genrsa and req would otherwise leave ca.key alone and fail every later run.
+        if [ ! -f /certs/ca.key ] || [ ! -f /certs/ca.crt ]; then
           openssl genrsa -out /certs/ca.key 4096
           # keyUsage is not in the stock openssl.cnf. Python 3.13+ (the backend
           # image's healthcheck) verifies with VERIFY_X509_STRICT, which rejects
