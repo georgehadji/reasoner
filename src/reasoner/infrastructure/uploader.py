@@ -196,6 +196,35 @@ async def _ocr_image(content: bytes, filename: str) -> str:
         return f"[Image OCR failed: {e}]"
 
 
+# Prefixes of the bracketed placeholder strings this module returns in place of
+# extracted text (errors, unavailable features, timeouts, the scanned-PDF notice).
+_EXTRACTION_NOTICE_PREFIXES = (
+    "[PDF extraction",
+    "[DOCX extraction",
+    "[Image description failed",
+    "[Image OCR failed",
+    "[Unsupported file type",
+    "[Document extraction timed out",
+    "[Scanned PDF:",
+)
+_MAX_EXTRACTION_NOTICE_LEN = 500
+
+
+def is_extraction_notice(text: str) -> bool:
+    """True when ``text`` is only a placeholder from this module, not content.
+
+    Deliberately narrow: the whole text must be one short bracketed message
+    starting with a known prefix, so a real document that merely mentions one
+    of these phrases is never treated as a notice.
+    """
+    stripped = text.strip()
+    return (
+        len(stripped) <= _MAX_EXTRACTION_NOTICE_LEN
+        and stripped.endswith("]")
+        and stripped.startswith(_EXTRACTION_NOTICE_PREFIXES)
+    )
+
+
 # Returned (and compared against) when a PDF has no usable text layer and page
 # OCR cannot run. Neutral on purpose: it is user-visible and may be stored as
 # document content, so it must not leak build/licensing details.
@@ -466,8 +495,9 @@ async def save_uploaded_file(
         # spawn unbounded concurrent indexing tasks (security-remediation-
         # plan.md Phase 4 item 4). A full queue drops the job and logs; the
         # upload above has already succeeded either way.
-        # A bare "OCR unavailable" notice is not document content: don't index it.
-        if file_id and text_content and text_content != SCANNED_PDF_OCR_UNAVAILABLE:
+        # Extraction error / "OCR unavailable" placeholders are not document
+        # content: don't index them.
+        if file_id and text_content and not is_extraction_notice(text_content):
             try:
                 if settings.DOCUMENT_SEMANTIC_RETRIEVAL_ENABLED:
                     from reasoner.infrastructure.documents.index_queue import enqueue_index_job

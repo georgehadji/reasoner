@@ -288,21 +288,60 @@ class TestSaveUploadedFileOCR:
             assert mock_extract.await_count == 2
 
 
-class TestUnavailableNoticeNotIndexed:
-    @pytest.mark.asyncio
-    async def test_bare_unavailable_notice_is_not_indexed(self, tmp_path):
-        with patch("reasoner.infrastructure.uploader.UPLOAD_DIR", tmp_path),              patch("reasoner.infrastructure.uploader._MAGIC_AVAILABLE", False),              patch.object(settings, "UPLOAD_REQUIRE_MIME_VALIDATION", False),              patch.object(settings, "DOCUMENT_SEMANTIC_RETRIEVAL_ENABLED", True),              patch("reasoner.infrastructure.documents.index_queue.enqueue_index_job") as enqueue,              patch("reasoner.infrastructure.uploader.extract_text", new_callable=AsyncMock) as mock_extract:
-            mock_extract.return_value = SCANNED_PDF_OCR_UNAVAILABLE
-            result = await save_uploaded_file(b"%PDF-fake", "scan.pdf")
-            assert result["success"] is True
-            enqueue.assert_not_called()
+class TestExtractionNoticeNotIndexed:
+    """Placeholder/error results are returned to the caller but not indexed."""
+
+    @staticmethod
+    async def _upload_and_count_index_jobs(tmp_path, extracted, filename="doc.pdf"):
+        with (
+            patch("reasoner.infrastructure.uploader.UPLOAD_DIR", tmp_path),
+            patch("reasoner.infrastructure.uploader._MAGIC_AVAILABLE", False),
+            patch.object(settings, "UPLOAD_REQUIRE_MIME_VALIDATION", False),
+            patch.object(settings, "DOCUMENT_SEMANTIC_RETRIEVAL_ENABLED", True),
+            patch(
+                "reasoner.infrastructure.documents.index_queue.enqueue_index_job"
+            ) as enqueue,
+            patch(
+                "reasoner.infrastructure.uploader.extract_text",
+                new_callable=AsyncMock,
+            ) as mock_extract,
+        ):
+            mock_extract.return_value = extracted
+            result = await save_uploaded_file(b"%PDF-fake", filename)
+        assert result["success"] is True
+        assert result["text"] == extracted  # still returned to the caller
+        return enqueue.call_count
 
     @pytest.mark.asyncio
-    async def test_real_text_is_still_indexed(self, tmp_path):
-        with patch("reasoner.infrastructure.uploader.UPLOAD_DIR", tmp_path),              patch("reasoner.infrastructure.uploader._MAGIC_AVAILABLE", False),              patch.object(settings, "UPLOAD_REQUIRE_MIME_VALIDATION", False),              patch.object(settings, "DOCUMENT_SEMANTIC_RETRIEVAL_ENABLED", True),              patch("reasoner.infrastructure.documents.index_queue.enqueue_index_job") as enqueue,              patch("reasoner.infrastructure.uploader.extract_text", new_callable=AsyncMock) as mock_extract:
-            mock_extract.return_value = "real content"
-            await save_uploaded_file(b"%PDF-fake", "doc.pdf")
-            enqueue.assert_called_once()
+    @pytest.mark.parametrize(
+        "notice",
+        [
+            SCANNED_PDF_OCR_UNAVAILABLE,
+            "[PDF extraction failed: Stream has ended unexpectedly]",
+            "[PDF extraction not available - install pypdf]",
+            "[DOCX extraction failed: bad zip]",
+            "[DOCX extraction not available - install python-docx]",
+            "[Image OCR failed: boom]",
+            "[Image description failed: boom]",
+            "[Unsupported file type: .xyz]",
+            "[Document extraction timed out]",
+        ],
+    )
+    async def test_notice_is_not_indexed(self, tmp_path, notice):
+        assert await self._upload_and_count_index_jobs(tmp_path, notice) == 0
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "real content",
+            # Mentions an error phrase but is a real document, not a notice.
+            "[PDF extraction failed: x] " + "A real document body. " * 40,
+            "Notes on why we saw [PDF extraction failed: x] in production.",
+        ],
+    )
+    async def test_real_text_is_still_indexed(self, tmp_path, text):
+        assert await self._upload_and_count_index_jobs(tmp_path, text) == 1
 
 
 class TestUploadEndpointOCR:
