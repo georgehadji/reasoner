@@ -320,6 +320,14 @@ async def lifespan(app: FastAPI):
         logger.warning("Resilient wrapper close failed: %s", exc)
 
     try:
+        from reasoner.infrastructure.persistence.subscription_repo import (
+            PostgresSubscriptionRepository,
+        )
+        await PostgresSubscriptionRepository.close()
+    except Exception as exc:
+        logger.warning("Subscription pool close failed: %s", exc)
+
+    try:
         # Close health-check Postgres pool
         if _health_postgres_pool is not None:
             await _health_postgres_pool.close()

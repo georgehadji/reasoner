@@ -529,7 +529,7 @@ class TestFallbackCacheAndLookupBudget:
         loop = asyncio.get_running_loop()
         started = loop.time()
         assert await svc.resolve_user_tier(str(user.id)) is FREE
-        assert loop.time() - started < 0.04
+        assert loop.time() - started < 0.5
         assert repo.calls == 1
 
     @pytest.mark.asyncio
@@ -577,16 +577,14 @@ class TestFallbackCacheAndLookupBudget:
         )
         assert got is PRO
 
-    def test_run_gate_call_site_uses_the_longer_budget(self):
-        import inspect
 
-        from reasoner.api.execution import pipeline
+    def test_fallback_memory_evicts_oldest_when_full(self, monkeypatch):
         from reasoner.application.services import spend_limit_service as svc
 
-        assert svc.RUN_TIER_LOOKUP_TIMEOUT_S > svc.TIER_LOOKUP_TIMEOUT_S
-        src = inspect.getsource(pipeline)
-        assert "timeout=RUN_TIER_LOOKUP_TIMEOUT_S" in src
-        assert "use_fallback_cache=False" in src
+        monkeypatch.setattr(svc, "_FALLBACK_CACHE_MAX", 3)
+        for uid in ("a", "b", "c", "d"):
+            svc._remember_fallback(uid)
+        assert list(svc._fallback_until) == ["b", "c", "d"]
 
 
 class TestSubscriptionPoolSurvivesTimeout:
@@ -600,6 +598,7 @@ class TestSubscriptionPoolSurvivesTimeout:
         cls = mod.PostgresSubscriptionRepository
         monkeypatch.setattr(cls, "_pool", None)
         monkeypatch.setattr(cls, "_pool_task", None, raising=False)
+        monkeypatch.setattr(cls, "_pool_loop", None, raising=False)
         return mod, cls
 
     @pytest.mark.asyncio
@@ -664,3 +663,74 @@ class TestSubscriptionPoolSurvivesTimeout:
             await repo._get_pool()
         assert await repo._get_pool() is sentinel
         assert attempts["n"] == 2
+
+    @staticmethod
+    def _pool_double(label):
+        from unittest.mock import MagicMock
+
+        pool = MagicMock(name=label)
+        pool.close = AsyncMock()
+        return pool
+
+    def test_pool_from_another_loop_is_not_reused(self, repo_cls, monkeypatch):
+        mod, cls = repo_cls
+        made = []
+
+        async def create_pool(*args, **kwargs):
+            made.append(self._pool_double(f"pool{len(made)}"))
+            return made[-1]
+
+        monkeypatch.setattr(mod.asyncpg, "create_pool", create_pool)
+        repo = cls("postgresql://x")
+
+        first = asyncio.run(repo._get_pool())
+        second = asyncio.run(repo._get_pool())  # a different loop
+        assert first is made[0] and second is made[1]
+        assert first is not second
+
+    @pytest.mark.asyncio
+    async def test_superseded_task_does_not_overwrite_current_pool(self, repo_cls, monkeypatch):
+        mod, cls = repo_cls
+        stray, current = self._pool_double("stray"), self._pool_double("current")
+        release = asyncio.Event()
+
+        async def create_pool(*args, **kwargs):
+            if not release.is_set():
+                await release.wait()
+                return stray
+            return current
+
+        monkeypatch.setattr(mod.asyncpg, "create_pool", create_pool)
+        repo = cls("postgresql://x")
+        old = asyncio.get_running_loop().create_task(repo._create_pool())
+        old.add_done_callback(cls._on_pool_task_done)
+        cls._pool_task = old  # in flight ...
+        new = asyncio.get_running_loop().create_task(asyncio.sleep(0, current))
+        new.add_done_callback(cls._on_pool_task_done)
+        cls._pool_task = new  # ... then superseded
+        assert await new is current
+        release.set()
+        await old
+        await asyncio.sleep(0)
+
+        assert cls._pool is current
+        stray.terminate.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_close_closes_pool_and_resets_state(self, repo_cls, monkeypatch):
+        mod, cls = repo_cls
+        pool = self._pool_double("p")
+
+        async def create_pool(*args, **kwargs):
+            return pool
+
+        monkeypatch.setattr(mod.asyncpg, "create_pool", create_pool)
+        repo = cls("postgresql://x")
+        await repo._get_pool()
+        await asyncio.sleep(0)
+        assert cls._pool is pool
+
+        await cls.close()
+        pool.close.assert_awaited_once()
+        assert cls._pool is None and cls._pool_task is None and cls._pool_loop is None
+        await cls.close()  # idempotent

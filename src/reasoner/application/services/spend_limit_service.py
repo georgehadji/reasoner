@@ -87,8 +87,8 @@ def _remember_fallback(user_id: str) -> None:
     if len(_fallback_until) >= _FALLBACK_CACHE_MAX:
         for uid in [u for u, t in _fallback_until.items() if t <= now]:
             del _fallback_until[uid]
-        if len(_fallback_until) >= _FALLBACK_CACHE_MAX:
-            _fallback_until.clear()
+        while len(_fallback_until) >= _FALLBACK_CACHE_MAX:
+            del _fallback_until[next(iter(_fallback_until))]  # oldest first
     _fallback_until[user_id] = now + FALLBACK_CACHE_TTL_S
 
 
