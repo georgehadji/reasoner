@@ -151,7 +151,8 @@ container user before the first start:
 ```bash
 mkdir -p history uploads cache
 # The image entrypoint runs migrations and starts gunicorn, so override it to ask for the uid.
-uid=$(docker compose run --rm --no-deps --entrypoint id backend -u)
+# -T: no TTY, otherwise the captured value ends in a carriage return and chown rejects it.
+uid=$(docker compose run --rm -T --no-deps --entrypoint id backend -u)
 sudo chown -R "$uid" history uploads cache
 ```
 
