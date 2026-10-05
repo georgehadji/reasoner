@@ -270,7 +270,15 @@ class TenantManager:
         self._erasing[prefix] = asyncio.Event()
 
     def end_erase(self, prefix: str) -> None:
-        """Finish an erasure: start the write tombstone and release waiters."""
+        """Finish an erasure: start the write tombstone and release waiters.
+
+        Called from erase_owner's finally, so the tombstone starts whether the
+        erasure succeeded, failed or was cancelled. That is deliberate: after
+        a failed or half-finished erasure some of the owner's data is still on
+        disk, and letting new writes land in that state would add to data the
+        user asked to be erased. Blocking costs only that owner's Neuro writes
+        for IDLE_TTL_SECONDS, and a retry of the erasure is never blocked by it.
+        """
         self._erased_until[prefix] = time.monotonic() + self.IDLE_TTL_SECONDS
         self._erasing.pop(prefix).set()
 
@@ -563,7 +571,20 @@ class NeuroService:
         config, embedder, tenants = self.config, self.embedder, self.tenants
         start = time.perf_counter()
         persona = get_persona(config, req.persona, req.agent_id)
-        tenant = await tenants.get(tenant_key(owner, req.agent_id))
+        key = tenant_key(owner, req.agent_id)
+        if tenants.is_erased(key):
+            # Nothing to recall for an owner being / just erased, and get()
+            # would re-create their empty tenant directories.
+            return RecallResponse(
+                chunks=[],
+                total_found=0,
+                latency_ms=0.0,
+                cache_hits={},
+                agent_id=req.agent_id,
+                persona=persona.name,
+                provider_used=embedder.active_label,
+            )
+        tenant = await tenants.get(key)
         l1, l2 = tenant["l1"], tenant["l2"]
         sessions = tenant["sessions"]
 
@@ -672,17 +693,25 @@ class NeuroService:
                 provider_used=reasoner.active_label,
             )
 
+    @staticmethod
+    def _dropped_for_erased_owner(key: str | None, req: LearnRequest) -> LearnResponse:
+        log.warning("Dropping learn for erased owner (tenant %s)", key)
+        return LearnResponse(
+            status="dropped_erased", session_id="", entry_number=0, agent_id=req.agent_id
+        )
+
     async def ingest(self, req: LearnRequest, owner: str | None = None) -> LearnResponse:
         embedder, tenants = self.embedder, self.tenants
         key = tenant_key(owner, req.agent_id)
+        # The owner may be erased moments ago (GDPR Art. 17); a run that was
+        # already in flight must not write their memory back. Checked again
+        # after every await that could span an erasure: get() (waits out one in
+        # progress) and embed() (slow provider call).
         if tenants.is_erased(key):
-            # The owner was erased moments ago (GDPR Art. 17); a run that was
-            # already in flight must not write their memory back.
-            log.warning("Dropping learn for erased owner (tenant %s)", key)
-            return LearnResponse(
-                status="dropped_erased", session_id="", entry_number=0, agent_id=req.agent_id
-            )
+            return self._dropped_for_erased_owner(key, req)
         tenant = await tenants.get(key)
+        if tenants.is_erased(key):
+            return self._dropped_for_erased_owner(key, req)
         # ingest_async(), not ingest(): this runs inside an async request
         # handler, and SessionManager's own docstring says as much -- the
         # sync ingest() has no await points, so its open()/write()/flush()
@@ -713,6 +742,8 @@ class NeuroService:
             content = f"User: {req.prompt}\nAssistant: {req.response}"
             embedding = await embedder.embed(content)
             source = f"session:{result['session_id']}"
+            if tenants.is_erased(key):
+                return self._dropped_for_erased_owner(key, req)
             async with tenant["index_lock"]:
                 await tenant["l1"].add(content, source=source, embedding=embedding)
                 await tenant["l2"].add(
@@ -741,7 +772,10 @@ class NeuroService:
         owner: str | None = None,
     ) -> dict:
         """List recent session entries for browsing memory."""
-        tenant = await self.tenants.get(tenant_key(owner, agent_id))
+        key = tenant_key(owner, agent_id)
+        if self.tenants.is_erased(key):
+            return {"entries": [], "total": 0}
+        tenant = await self.tenants.get(key)
         # Reads every hot session file on disk -- offload, same reason as
         # the tenant construction and health() fixes above.
         entries = await asyncio.to_thread(tenant["sessions"].list_recent_entries, limit, offset)

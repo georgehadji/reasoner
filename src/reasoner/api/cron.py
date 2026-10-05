@@ -37,6 +37,7 @@ async def run_neuro_maintenance() -> dict:
         from pathlib import Path
 
         from reasoner.neuro.config import NeuroConfig, load_config
+        from reasoner.neuro.server import get_neuro_service
         from reasoner.neuro.sessions import SessionConfig, SessionManager
 
         config = load_config() or NeuroConfig()
@@ -45,10 +46,18 @@ async def run_neuro_maintenance() -> dict:
         if not agents_dir.exists():
             logger.info("Neuro maintenance: no agents directory (%s), skipping", agents_dir)
         else:
+            tenants = get_neuro_service().tenants
             for agent_dir in sorted(agents_dir.iterdir()):
                 if not agent_dir.is_dir():
                     continue
                 agent_id = agent_dir.name
+                # This loop opens its own SessionManager, outside the tenant
+                # manager's erase guard: archiving would write warm summaries
+                # into the directory of an owner being (or just) erased.
+                # Per-process, like the guard itself.
+                if tenants.is_erased(agent_id):
+                    logger.info("Neuro maintenance: skipping erased tenant %s", agent_id)
+                    continue
                 try:
                     sessions = SessionManager(agent_dir, SessionConfig())
 

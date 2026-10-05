@@ -184,9 +184,10 @@ async def test_tenant_recreated_after_first_eviction_is_evicted_again(service, m
 
 
 @pytest.mark.asyncio
-async def test_recall_during_erasure_waits_and_finds_nothing(service, tmp_path, monkeypatch):
+async def test_get_during_erasure_waits_and_finds_nothing(service, tmp_path, monkeypatch):
     """get() for an owner being erased must wait for the erasure instead of
-    re-creating the tenant from disk files that are not yet deleted."""
+    re-creating the tenant from disk files that are not yet deleted. (recall
+    itself short-circuits to empty for such an owner, see below.)"""
     import asyncio
 
     await _learn(service, USER_X, "conv1", "x's secret plan", "x response")
@@ -204,18 +205,17 @@ async def test_recall_during_erasure_waits_and_finds_nothing(service, tmp_path, 
 
     erase = asyncio.create_task(service.erase_owner(USER_X))
     await in_delete.wait()
-    recall = asyncio.create_task(
-        service.recall("x's secret plan", agent_id="conv1", owner=USER_X)
-    )
+    getter = asyncio.create_task(service.tenants.get(tenant_key(USER_X, "conv1")))
     await asyncio.sleep(0.05)
-    assert not recall.done(), "recall must wait while the owner is being erased"
+    assert not getter.done(), "get() must wait while the owner is being erased"
 
     release.set()
     result = await erase
-    chunks = await asyncio.wait_for(recall, timeout=5)
+    tenant = await asyncio.wait_for(getter, timeout=5)
 
     assert result["erased"] is True
-    assert chunks == [], f"erased memory was served: {chunks}"
+    assert tenant["l1"].search is not None
+    assert tenant["sessions"].search_hot("x's secret plan", max_results=3) == []
 
 
 @pytest.mark.asyncio
@@ -307,3 +307,141 @@ async def test_erase_owner_unlinks_symlinked_tenant_dir(service, tmp_path):
     assert result["dirs_removed"] == 1
     assert not link.is_symlink()
     assert (target / "keep.txt").exists(), "the symlink target must not be followed"
+
+
+class _SlowEmbedding(_FakeEmbedding):
+    """embed() parks until released, so a test can erase while ingest awaits it."""
+
+    def __init__(self):
+        import asyncio
+
+        self.entered = asyncio.Event()
+        self.release = asyncio.Event()
+
+    async def embed(self, text: str) -> list[float]:
+        self.entered.set()
+        await self.release.wait()
+        return await super().embed(text)
+
+
+@pytest.mark.asyncio
+async def test_learn_erased_while_embedding_is_dropped_before_indexing(service, tmp_path):
+    """The tombstone is also checked after the slow embed(): an erasure that
+    completes while ingest awaits the embedding must stop the L1/L2 write."""
+    import asyncio
+
+    slow = _SlowEmbedding()
+    service.embedder = slow
+    task = asyncio.create_task(
+        service.ingest(
+            LearnRequest(prompt="p", response="r", agent_id="conv1", metadata={}), owner=USER_X
+        )
+    )
+    await asyncio.wait_for(slow.entered.wait(), timeout=5)
+
+    result = await service.erase_owner(USER_X)
+    assert result["erased"] is True
+    slow.release.set()
+    resp = await asyncio.wait_for(task, timeout=5)
+
+    assert resp.status == "dropped_erased"
+    assert not any(n.startswith(f"u-{USER_X}-") for n in _agent_dirs(tmp_path)), (
+        "L1/L2 write re-created the erased owner's directory"
+    )
+
+
+@pytest.mark.asyncio
+async def test_failed_erasure_still_blocks_writes(service, tmp_path, monkeypatch):
+    """Deliberate: after a failed erasure data is still on disk, so new writes
+    stay blocked for the tombstone window rather than adding to it."""
+    await _learn(service, USER_X, "conv1", "x data", "r")
+
+    async def failing_remove(prefix, result):
+        return ["u-x-conv1: permission denied"]
+
+    monkeypatch.setattr(service, "_remove_owner_dirs", failing_remove)
+    result = await service.erase_owner(USER_X)
+
+    assert result["erased"] is False
+    resp = await service.ingest(
+        LearnRequest(prompt="p", response="r", agent_id="conv1", metadata={}), owner=USER_X
+    )
+    assert resp.status == "dropped_erased"
+
+
+@pytest.mark.asyncio
+async def test_cancelled_erasure_releases_waiters_and_keeps_tombstone(service, monkeypatch):
+    import asyncio
+
+    started = asyncio.Event()
+
+    async def hang(prefix, result):
+        started.set()
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr(service, "_remove_owner_dirs", hang)
+    erase = asyncio.create_task(service.erase_owner(USER_X))
+    await started.wait()
+    getter = asyncio.create_task(service.tenants.get(tenant_key(USER_X, "conv1")))
+    await asyncio.sleep(0.05)
+    assert not getter.done()
+
+    erase.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await erase
+
+    await asyncio.wait_for(getter, timeout=5)  # not stuck behind a dead erase
+    assert not service.tenants._erasing
+    assert service.tenants.is_erased(tenant_key(USER_X, "conv1"))
+
+
+@pytest.mark.asyncio
+async def test_recall_and_list_after_erasure_return_empty_without_recreating_dirs(
+    service, tmp_path
+):
+    await _learn(service, USER_X, "conv1", "x data", "r")
+    await service.erase_owner(USER_X)
+
+    assert await service.recall("x data", agent_id="conv1", owner=USER_X) == []
+    assert await service.list_sessions(agent_id="conv1", owner=USER_X) == {
+        "entries": [],
+        "total": 0,
+    }
+    assert not any(n.startswith(f"u-{USER_X}-") for n in _agent_dirs(tmp_path))
+
+
+@pytest.mark.asyncio
+async def test_neuro_maintenance_skips_erased_tenant_dirs(service, tmp_path, monkeypatch):
+    """api/cron.py opens its own SessionManager per agents/* directory; it must
+    not archive (write warm summaries into) an erased owner's directory."""
+    import reasoner.neuro.config as ncfg
+    import reasoner.neuro.sessions as nsess
+    from reasoner.api.cron import run_neuro_maintenance
+
+    agents = Path(tmp_path) / "agents"
+    erased_dir = agents / f"u-{USER_X}-conv1"
+    live_dir = agents / f"u-{USER_Y}-conv1"
+    erased_dir.mkdir(parents=True)
+    live_dir.mkdir(parents=True)
+    await service.erase_owner(USER_X)  # tombstones; recreate the dir afterwards
+    erased_dir.mkdir(parents=True)
+
+    touched: list[str] = []
+
+    class _RecordingSessions:
+        def __init__(self, path, cfg):
+            touched.append(Path(path).name)
+
+        async def archive_hot_sessions(self):
+            return []
+
+        def archive_warm_to_cold(self):
+            return []
+
+    monkeypatch.setattr(ncfg, "load_config", lambda: service.config)
+    monkeypatch.setattr(ns, "get_neuro_service", lambda: service)
+    monkeypatch.setattr(nsess, "SessionManager", _RecordingSessions)
+
+    await run_neuro_maintenance()
+
+    assert touched == [f"u-{USER_Y}-conv1"]
