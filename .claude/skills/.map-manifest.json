@@ -1000,6 +1000,7 @@
       "tests/test_deep_read.py",
       "tests/test_defect_hunt_fixes.py",
       "tests/test_deploy_boot_blockers.py",
+      "tests/test_deploy_review_followups.py",
       "tests/test_document_tenant_safety.py",
       "tests/test_document_vector_store.py",
       "tests/test_domain_events.py",

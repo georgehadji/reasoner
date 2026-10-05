@@ -47,6 +47,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute("""
-        DROP TABLE IF EXISTS account_deletion_log;
-    """)
+    # Deliberately a no-op. This table is the GDPR Article 17 audit trail, so
+    # a downgrade must never destroy it. It may also predate this revision
+    # (created by hand from migrations/005_account_deletion_log.sql), in which
+    # case this revision does not own it. Dropping it is a manual decision.
+    pass
