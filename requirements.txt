@@ -2,7 +2,7 @@
 # Python 3.10+
 
 # Web Framework
-fastapi>=0.137.2,<0.145.0
+fastapi>=0.142.2,<0.145.0
 # starlette is a direct dependency (imported in websocket/manager.py, api/middleware.py,
 # api/error_handler.py), not just fastapi's transitive pin. Pinned explicitly >=1.3.1 because
 # fastapi's own metadata floor (starlette>=0.46.0, no ceiling) is not high enough to force this
@@ -17,22 +17,22 @@ uvicorn[standard]>=0.54.0,<0.55.0
 python-multipart>=0.0.6,<0.1.0
 
 # LLM Providers
-anthropic>=1.8.0,<1.9.0
-openai>=3.19.2,<4.0.0
-google-genai>=2.25.0,<3.0.0
+anthropic>=1.11.0,<1.12.0
+openai>=3.24.0,<4.0.0
+google-genai>=2.28.0,<3.0.0
 
 # HTTP Client
 httpx>=0.27.0,<0.29.0
-supabase>=2.0.0,<3.0.0
-PyJWT>=2.15.0,<3.0.0
+supabase>=2.32.0,<3.0.0
+PyJWT>=2.15.1,<3.0.0
 valkey>=6.0.0,<7.0.0
-stripe>=15.6.0,<16.0.0
+stripe>=16.0.0,<17.0.0
 
 # Data Validation
 pydantic>=2.13.5,<3.0.0
 
 # Utilities
-python-dotenv>=1.0.0,<2.0.0
+python-dotenv>=1.2.4,<2.0.0
 
 # File Processing
 pypdf>=6.19.0,<7.0.0
@@ -56,11 +56,11 @@ aiosqlite>=0.22.1,<0.23.0
 
 # Migrations
 alembic>=1.20.0,<2.0.0
-sqlalchemy[asyncio]>=2.1.1,<3.0.0
+sqlalchemy[asyncio]>=2.1.3,<3.0.0
 
 # System monitoring (optional, for memory limits)
 psutil>=5.9.0,<8.0.0
-cryptography>=50.0.1
+cryptography>=50.0.2
 tenacity>=9.1.4,<10.0.0 # For retries
 aiocircuitbreaker>=2.0.0,<3.0.0 # For circuit breaking
 
