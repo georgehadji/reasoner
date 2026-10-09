@@ -267,7 +267,6 @@ from enum import Enum
 from pathlib import Path
 
 from reasoner.core.constants import TRUNCATION
-from reasoner.core.logging_utils import redacted_errors
 from reasoner.domain.core_types import (
     Assumption,
     CriticDimensionScore,
@@ -306,6 +305,8 @@ class PipelineSerializationService:
             if hasattr(obj, '__dataclass_fields__'):
                 return {k: serialize(v) for k, v in asdict(obj).items()}
             return obj
+
+        from reasoner.core.logging_utils import redacted_errors
 
         data = serialize(asdict(state))
         # --save-state writes this to disk; keys echoed in exception text must not.
