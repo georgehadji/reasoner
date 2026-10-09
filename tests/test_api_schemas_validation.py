@@ -74,6 +74,39 @@ class TestFollowupRequestValidation:
         assert req.question == "Tell me more"
         assert req.conversation_id == "conv-123"
 
+    def test_unknown_agent_model_rejected(self):
+        with pytest.raises(ValidationError, match="Unknown agent_model"):
+            FollowupRequest(
+                question="Tell me more",
+                conversation_id="c",
+                history=[],
+                previous_synthesis="x",
+                agent_model="definitely-not-a-model",
+            )
+
+    def test_registered_agent_model_accepted(self):
+        from reasoner.presets import FOLLOWUP_AGENT_MODELS
+
+        model = FOLLOWUP_AGENT_MODELS["budget"]
+        req = FollowupRequest(
+            question="Tell me more",
+            conversation_id="c",
+            history=[],
+            previous_synthesis="x",
+            agent_model=model,
+        )
+        assert req.agent_model == model
+
+    def test_image_generation_agent_model_rejected(self):
+        with pytest.raises(ValidationError, match="image generator"):
+            FollowupRequest(
+                question="Tell me more",
+                conversation_id="c",
+                history=[],
+                previous_synthesis="x",
+                agent_model="gpt-image-2",
+            )
+
     def test_empty_question_rejected(self):
         with pytest.raises(ValidationError):
             FollowupRequest(
