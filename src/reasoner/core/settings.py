@@ -381,6 +381,20 @@ class Settings:
     EVENT_RETENTION_DAYS: int = int(os.getenv("EVENT_RETENTION_DAYS", "365"))
     DB_POOL_SIZE: int = int(os.getenv("DB_POOL_SIZE", "50"))
 
+    # ── Persistent Data Paths ──
+    # feedback.db (feedback_store.py), events.db (event_store.py /
+    # pipeline_ownership_repo.py) and the upload directory (uploader.py)
+    # each default to a path computed from Path(__file__), which lands
+    # inside the installed package directory (src/reasoner/...). That's
+    # fine for local dev, but a container redeploy replaces the package
+    # directory wholesale, so anything written there is lost. Empty string
+    # (the default) preserves each store's historical in-package default —
+    # no behaviour change for local dev/tests when these are unset.
+    # docker-compose.yml sets them to paths under its mounted volumes.
+    FEEDBACK_DB_PATH: str = os.getenv("FEEDBACK_DB_PATH", "")
+    EVENT_STORE_DB_PATH: str = os.getenv("EVENT_STORE_DB_PATH", "")
+    UPLOAD_STORAGE_DIR: str = os.getenv("UPLOAD_STORAGE_DIR", "")
+
     @property
     def internal_api_base_url(self) -> str:
         """Base URL for internal self-calls (e.g., Neuro endpoints from streaming)."""
