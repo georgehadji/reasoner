@@ -4,6 +4,9 @@
 .env.production
 .env.*.local
 
+# Alertmanager receiver secrets (docs/monitoring/alertmanager.yml file-based secrets)
+/secrets/
+
 # Python
 __pycache__/
 *.py[cod]

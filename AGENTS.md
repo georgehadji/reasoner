@@ -34,7 +34,7 @@ It is not a chatbot. It is a **reasoning orchestrator** that treats reasoning as
 | Cache / Sessions | Redis (quota caching, rate limiting, session store) |
 | Auth | Supabase JWT + local JWT fallback, token-based scoped auth |
 | Billing | Stripe (checkout, webhooks, pro/enterprise tiers), PayPal webhooks |
-| File Processing | pypdf, python-docx, pymupdf, python-magic |
+| File Processing | pypdf, python-docx, python-magic |
 | Web Scraping | lxml |
 | Financial Data | yfinance, yahooquery |
 | Math | asteval (BSD) |
