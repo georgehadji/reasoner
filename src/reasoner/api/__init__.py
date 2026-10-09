@@ -319,13 +319,7 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.warning("Resilient wrapper close failed: %s", exc)
 
-    try:
-        from reasoner.infrastructure.persistence.subscription_repo import (
-            PostgresSubscriptionRepository,
-        )
-        await PostgresSubscriptionRepository.close()
-    except Exception as exc:
-        logger.warning("Subscription pool close failed: %s", exc)
+    await close_tier_lookup()
 
     try:
         # Close health-check Postgres pool
@@ -470,12 +464,14 @@ from reasoner.api.dependencies import (
     check_preset_access_if_authenticated,
     check_quota_if_authenticated,
     check_rate_limit,
+    close_tier_lookup,
     get_current_user,
     get_optional_user,
     get_pipeline_service,
     get_preset_service,
     get_search_service,
     require_credits_if_authenticated,
+    run_tier_label,
 )
 from reasoner.api.schemas import (
     FollowupRequest,
@@ -534,31 +530,6 @@ async def get_csrf_token():
     return {"token": generate_signed_csrf_token()}
 
 
-def _extract_run_cost(chunk: str) -> float | None:
-    """Pull ``total_cost_usd`` out of a terminal ``done`` SSE frame.
-
-    Returns None for every other frame. Malformed frames are ignored rather
-    than raised: a parsing problem must never break the stream the user is
-    reading.
-    """
-    from reasoner.application.services.run_metering import extract_run_cost
-
-    return extract_run_cost(chunk)
-
-
-async def _run_tier_label(user: User | None, request: Request | None = None) -> str:
-    """Tier label for the run's log context and Prometheus query counter.
-
-    Reuses the tier already resolved for this request (rate limit / quota), so a
-    run does not repeat the subscription lookup.
-    """
-    if user is None:
-        return "anonymous"
-    from reasoner.api.dependencies import resolve_request_tier
-
-    return (await resolve_request_tier(request, user)).value
-
-
 async def _run_stream_with_metrics(
     req: RunRequest,
     request: Request,
@@ -583,7 +554,7 @@ async def _run_stream_with_metrics(
     """
     from reasoner.logging_utils import set_log_context
 
-    tier = await _run_tier_label(user, request)
+    tier = await run_tier_label(user, request)
     preset = req.preset or "auto-budget"
     set_log_context(user_id=str(user.id) if user else None, tier=tier, preset=preset)
 
@@ -647,7 +618,7 @@ async def _run_followup_stream_with_metrics(
     from reasoner.application.services.run_metering import RunContext, metered
     from reasoner.logging_utils import set_log_context
 
-    tier = await _run_tier_label(user, request)
+    tier = await run_tier_label(user, request)
     preset = req.preset or "auto-budget"
     user_id = str(user.id) if user else None
     set_log_context(user_id=user_id, tier=tier, preset=preset)

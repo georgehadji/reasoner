@@ -332,6 +332,29 @@ async def resolve_request_tier(request: Request | None, user: User) -> Subscript
     return tier
 
 
+async def run_tier_label(user: User | None, request: Request | None = None) -> str:
+    """Tier label for a run's log context and Prometheus query counter.
+
+    Reuses the tier already resolved for this request (rate limit / quota), so a
+    run does not repeat the subscription lookup.
+    """
+    if user is None:
+        return "anonymous"
+    return (await resolve_request_tier(request, user)).value
+
+
+async def close_tier_lookup() -> None:
+    """Close the subscription pool behind tier lookups (app shutdown)."""
+    try:
+        from reasoner.infrastructure.persistence.subscription_repo import (
+            PostgresSubscriptionRepository,
+        )
+
+        await PostgresSubscriptionRepository.close()
+    except Exception as exc:
+        logger.warning("Subscription pool close failed: %s", exc)
+
+
 def require_tier(min_tier: SubscriptionTier):
     """
     Factory that returns a FastAPI dependency enforcing minimum subscription tier.

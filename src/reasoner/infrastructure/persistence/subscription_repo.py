@@ -44,7 +44,9 @@ class PostgresSubscriptionRepository:
     async def _get_pool(self) -> asyncpg.Pool:
         cls = PostgresSubscriptionRepository
         loop = asyncio.get_running_loop()
-        if cls._pool is not None and cls._pool_loop is loop:
+        # _pool_loop is None when a pool was assigned directly (tests inject one);
+        # only a pool known to belong to another loop is rejected.
+        if cls._pool is not None and cls._pool_loop in (None, loop):
             return cls._pool
 
         task = cls._pool_task
