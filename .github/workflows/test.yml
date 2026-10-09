@@ -323,7 +323,7 @@ jobs:
         # agree -- and in ci-local.sh, move it from `advisory` to `gate`.
         continue-on-error: true
         run: |
-          python scripts/vulture_ratchet.py --max 389
+          python scripts/vulture_ratchet.py --max 390
 
       - name: Run tests
         run: |

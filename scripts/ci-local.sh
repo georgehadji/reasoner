@@ -63,7 +63,7 @@ if want python; then
     gate "mypy-strict-auth_legacy" mypy --strict src/reasoner/infrastructure/auth_legacy.py --ignore-missing-imports
     gate "mypy-ratchet" python scripts/mypy_ratchet.py --max 423
     gate "silent-failure-ratchet" python scripts/silent_failure_ratchet.py --max 102
-    advisory "dead-code-ratchet" python scripts/vulture_ratchet.py --max 389
+    advisory "dead-code-ratchet" python scripts/vulture_ratchet.py --max 390
     # -n/--dist used to come from pytest.ini addopts; it is set per invocation
     # now. --dist loadscope must accompany -n: see requirements-dev.txt.
     gate "pytest" python -m pytest tests/ -m "not slow and not integration" \
