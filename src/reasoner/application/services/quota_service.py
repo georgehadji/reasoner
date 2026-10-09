@@ -68,6 +68,9 @@ class QuotaService:
 
         remaining = max(0, effective_max - quota.used_queries)
         if remaining <= 0:
+            # Deliberately not counted here: check() is also a read-only status
+            # query (GET /quota). The quota-exceeded metric is recorded where the
+            # request is actually rejected, in api.dependencies.check_quota.
             return QuotaResult(
                 allowed=False,
                 remaining=0,

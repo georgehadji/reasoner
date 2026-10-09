@@ -132,7 +132,7 @@ def harness(monkeypatch):
     monkeypatch.setattr(mod, "apply_spend_limits", lambda *a, **kw: None)
     monkeypatch.setattr(mod, "_save_history_entry", lambda entry: None)
 
-    async def _tier(user_id):
+    async def _tier(user_id, **kwargs):
         return SimpleNamespace(value="free")
 
     async def _persist(evt):
@@ -240,3 +240,22 @@ async def test_quality_result_reaches_the_client(harness):
 
     complete = next(e for e in events if e.get("type") == "phase_complete")
     assert complete["data"]["quality"] == {"score": 8.0, "passed": True}
+
+
+@pytest.mark.asyncio
+async def test_run_gate_resolves_tier_with_the_long_budget_and_no_fallback_memory(harness, monkeypatch):
+    """The gate that decides a run the caller already reserved credits for must not
+    inherit the request path's 1s cap or its remembered-FREE fallback."""
+    import reasoner.api.execution.pipeline as mod
+    from reasoner.application.services.spend_limit_service import RUN_TIER_LOOKUP_TIMEOUT_S
+
+    seen = {}
+
+    async def _tier(user_id, **kwargs):
+        seen.update(kwargs)
+        return SimpleNamespace(value="free")
+
+    monkeypatch.setattr(mod, "resolve_user_tier", _tier)
+    await _run(harness)
+
+    assert seen == {"timeout": RUN_TIER_LOOKUP_TIMEOUT_S, "use_fallback_cache": False}

@@ -109,7 +109,9 @@ jobs:
           # uncalled duplicate in jury_phases.py and its prompt took their long
           # lines and four orphaned imports with them (2232 -> 2217); the
           # HyperGate time-bound fix rewrapped one long condition (-1).
-          python scripts/ruff_ratchet.py --max 2216
+          # 2215: the tier helpers moved into spend_limit_service, which merged one
+          # mid-file api/dependencies.py import into the noqa'd block (-1).
+          python scripts/ruff_ratchet.py --max 2215
 
       - name: Security scan (bandit)
         run: |
@@ -324,7 +326,7 @@ jobs:
         # agree -- and in ci-local.sh, move it from `advisory` to `gate`.
         continue-on-error: true
         run: |
-          python scripts/vulture_ratchet.py --max 391
+          python scripts/vulture_ratchet.py --max 390
 
       - name: Run tests
         run: |

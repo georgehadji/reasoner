@@ -25,14 +25,6 @@ groups:
         annotations:
           summary: "P95 latency above 60 seconds"
 
-      - alert: PostgresPoolExhaustion
-        expr: reasoner_postgres_pool_free == 0
-        for: 1m
-        labels:
-          severity: critical
-        annotations:
-          summary: "Postgres connection pool exhausted"
-
       - alert: CIHealingHeartbeatStale
         expr: time() - ci_heartbeat_timestamp > 90000  # 25 hours
         for: 1h
