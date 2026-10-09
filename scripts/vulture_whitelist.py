@@ -4,3 +4,4 @@
 # framework hook), each with the reason. `python -m vulture src/ --make-whitelist`
 # prints candidate lines in this format. Adding one lowers the count, so lower
 # --max in test.yml and ci-local.sh in the same change.
+_.validate_filename  # pydantic @field_validator on AttachmentRef.filename; called by pydantic, not by name (src/reasoner/api/schemas.py)

@@ -485,7 +485,7 @@ docker compose up -d
 - **Docstrings:** Use triple-double-quote docstrings for modules and public functions
 - **Imports:** Group stdlib, third-party, and local imports separately
 - **Linter config in pyproject.toml:** Ruff lint/format config, mypy settings, and pytest options live in `pyproject.toml` at repo root. No separate `ruff.toml`, `mypy.ini`, or `.pre-commit-config.yaml` files.
-- **Logging safety:** Use `SafeLoggingFilter` from `logging_utils.py` to prevent secrets from leaking into logs.
+- **Logging safety:** secrets are redacted from every log record by `install_global_redaction()` in `logging_utils.py`, which `reasoner/__init__.py` installs at import. Do not add a logger filter for this: a filter on the root logger never runs for records from named child loggers.
 
 ### TypeScript / Frontend
 - **Components:** PascalCase files, default export for page components
@@ -654,7 +654,7 @@ Copy `.env.example` to `.env` and fill in:
 - **Frontend proxy validation:** Next.js API routes validate upstream URLs against port allowlists and block private IPs in production
 - **Admin endpoint hardening:** Admin endpoints require BOTH a valid JWT with `admin` scope AND a correct `X-Admin-Key` header; uses `secrets.compare_digest()` for constant-time comparison
 - **Environment guard:** `ENVIRONMENT=development` explicitly logs an insecure-CORS warning on startup
-- **Safe logging:** `SafeLoggingFilter` redacts API keys and secrets from all log output
+- **Safe logging:** `install_global_redaction()` (called from `reasoner/__init__.py`) redacts API keys and secrets from all log output
 - **Horizontal Scaling Limitations:** Rate limiter, circuit breaker, and auth store are in-memory by default. For multi-worker deployments, enable `AUTH_PERSISTENCE_ENABLED=true`, set `RATE_LIMITER_MODE=redis` / `CIRCUIT_BREAKER_MODE=redis`, and place a shared rate limiter (e.g., Redis or reverse-proxy) in front of the app.
 
 ---

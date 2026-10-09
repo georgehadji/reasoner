@@ -36,7 +36,7 @@ from reasoner.core.exceptions import (
     error_code_for_exception,
     is_retryable,
 )
-from reasoner.core.logging_utils import get_correlation_id, redact_sensitive
+from reasoner.core.logging_utils import get_correlation_id, redact_sensitive, redacted_errors
 from reasoner.domain.pipeline_state import PipelineState
 
 logger = logging.getLogger(__name__)
@@ -47,6 +47,11 @@ _AUTH_HINT = (
     "OpenRouter API key is missing or invalid. "
     "Please set OPENROUTER_API_KEY in your .env or ui-next/.env.local file."
 )
+
+
+# Exception text is capped before redaction so a multi-megabyte upstream error
+# body cannot hold the event loop in the regex pass.
+_MAX_EXC_TEXT = 4096
 
 
 class RunStream:
@@ -137,7 +142,7 @@ class RunStream:
         # whole pipeline and the TypeScript SDK reads every one of them.
         done_payload = {
             "type": "done",
-            "errors": state.errors,
+            "errors": redacted_errors(state.errors),
             # Failures the run survived by falling back (P5). Distinct from
             # errors: nothing here stopped a phase, but the answer was produced
             # with less than the full machinery.
@@ -168,7 +173,7 @@ class RunStream:
         # before truncating, so the cut cannot split a key into a form the
         # patterns no longer match); the client gets the exception type and a
         # correlation id to quote, with the detail left in the server log.
-        detail = redact_sensitive(str(exc))[:120]
+        detail = redact_sensitive(str(exc)[:_MAX_EXC_TEXT])[:120]
         stored = f"Pipeline processing error: {type(exc).__name__}: {detail}"
         message = (
             f"Pipeline processing error: {type(exc).__name__} "
@@ -273,7 +278,9 @@ class SseRunObserver:
 
         # state.errors already holds the runner's message; this only changes
         # what the browser renders.
-        client_message = _AUTH_HINT if err_type == "auth" else redact_sensitive(message)
+        client_message = (
+            _AUTH_HINT if err_type == "auth" else redact_sensitive(message[:_MAX_EXC_TEXT])
+        )
 
         await self._both({
             "type": "error",
@@ -391,7 +398,7 @@ class SseRunObserver:
         # user and to us.
         phase_errors = state.errors[self._errors_before:]
         if phase_errors:
-            data["errors"] = phase_errors
+            data["errors"] = redacted_errors(phase_errors)
             # Explicit alongside `errors` rather than left for the UI to infer
             # from array length: a phase that appended to state.errors and
             # recovered (e.g. article_phases.py's outline/critic parse-error

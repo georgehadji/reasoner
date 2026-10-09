@@ -462,7 +462,7 @@ Input → CSRF Check → Auth → Rate Limit → Input Sanitization
 
 **Metrics:** Prometheus (cost, tokens, duration, active users)
 **Tracing:** Langfuse (LLM call observability)
-**Logging:** SafeLoggingFilter (redacts secrets, PII)
+**Logging:** install_global_redaction (redacts secrets, PII)
 **Errors:** Sentry (exception tracking)
 
 ### Event Bus (CQRS)

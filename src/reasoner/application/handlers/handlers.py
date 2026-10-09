@@ -24,6 +24,7 @@ from reasoner.application.queries import (
 )
 from reasoner.core.aggregates.pipeline import PipelineAggregate
 from reasoner.core.events.domain_events import EventType, make_event
+from reasoner.core.logging_utils import redacted_errors
 
 # get_event_bus imported lazily in constructors to avoid circular import with api/__init__.py
 
@@ -305,7 +306,7 @@ class ResumePipelineCommandHandler:
             "last_phase": last_phase,
             "phases_completed": [p["phase"] for p in aggregate.state_data.phase_results],
             "total_tokens": aggregate.state_data.total_tokens,
-            "errors": aggregate.state_data.errors,
+            "errors": redacted_errors(aggregate.state_data.errors),
             "problem": aggregate.state_data.problem,
             "preset": aggregate.state_data.preset,
             "method": aggregate.state_data.method,

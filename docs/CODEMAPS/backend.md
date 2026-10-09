@@ -187,7 +187,7 @@ src/reasoner/
 ├── instrumentation/           # Observability: metrics, tracing, logging
 │   ├── metrics.py             # Prometheus metrics (cost, tokens, latency, active users)
 │   ├── langfuse.py            # Langfuse tracing integration
-│   └── logging_utils.py       # SafeLoggingFilter (redacts API keys, tokens, PII)
+│   └── logging_utils.py       # install_global_redaction, redact_sensitive (redacts API keys, tokens, PII)
 │
 ├── models.py                  # Backward-compat shim → domain/pipeline_state.py
 ├── pipeline.py                # Backward-compat shim → application/pipeline.py

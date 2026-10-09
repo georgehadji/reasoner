@@ -19,6 +19,7 @@ from mcp.server.fastmcp import Context
 from mcp.types import ToolAnnotations
 
 from reasoner.api.mcp.context import resolve_caller
+from reasoner.core.logging_utils import redacted_errors
 
 # build_mcp_server() in api/mcp/__init__.py already verifies `mcp` is
 # installed before importing this module, so these top-level imports are
@@ -40,7 +41,7 @@ def _summary_to_dict(summary) -> dict[str, Any]:
     return {
         "preset": summary.preset,
         "method": summary.method,
-        "errors": list(summary.errors),
+        "errors": redacted_errors(summary.errors),
         "total_tokens": dict(summary.total_tokens),
         "total_cost_usd": summary.total_cost_usd,
         "duration_seconds": summary.duration_seconds,

@@ -267,6 +267,7 @@ from enum import Enum
 from pathlib import Path
 
 from reasoner.core.constants import TRUNCATION
+from reasoner.core.logging_utils import redacted_errors
 from reasoner.domain.core_types import (
     Assumption,
     CriticDimensionScore,
@@ -306,7 +307,12 @@ class PipelineSerializationService:
                 return {k: serialize(v) for k, v in asdict(obj).items()}
             return obj
 
-        return serialize(asdict(state))
+        data = serialize(asdict(state))
+        # --save-state writes this to disk; keys echoed in exception text must not.
+        core = data.get("core")
+        if isinstance(core, dict) and "errors" in core:
+            core["errors"] = redacted_errors(core["errors"])
+        return data
 
     @staticmethod
     def save(state: PipelineState, path: str | Path) -> None:

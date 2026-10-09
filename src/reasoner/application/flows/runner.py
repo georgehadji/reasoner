@@ -302,7 +302,7 @@ class WorkflowRunner:
         # can echo a key or DSN. It fans out to state.errors (returned in the
         # `done` frame), the log, the SSE/WS observer and the event bus, so it
         # is redacted once here.
-        message = redact_sensitive(message)
+        message = redact_sensitive(message[:4096])  # capped: a huge upstream body must not stall the loop
         state.errors.append(message)
         self.services.log(name, f"ERROR: {message}", state)
 

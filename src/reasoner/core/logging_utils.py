@@ -114,17 +114,17 @@ SENSITIVE_PATTERNS: list[tuple[re.Pattern, str]] = [
     # innocent `https://host:8080/path@x` from matching. The username may be
     # empty (`redis://:secret@host`, the canonical Redis/Valkey form).
     #
-    # The lookbehind is a performance requirement, not a nicety: without a left
-    # anchor the scheme class `[a-zA-Z0-9+.\-]*` is tried from every offset of a
-    # long alphanumeric run and re-scans it each time, which is quadratic (8 000
-    # characters took 7 s) on a pattern that runs on every log record.
+    # The scheme is bounded ({0,31}) and left-anchored: unbounded, the scheme
+    # class was re-scanned from every offset of a long alphanumeric run, which is
+    # quadratic (8 000 characters took 7 s) on a pattern that runs on every log
+    # record. (The `https?` rule below has a literal scheme and needs neither.)
     (
-        re.compile(r'(?<![A-Za-z0-9+.\-])([a-zA-Z][a-zA-Z0-9+.\-]*)://[^:/@\s]*:[^\s/]*@'),
+        re.compile(r'(?<![A-Za-z0-9])([a-zA-Z][a-zA-Z0-9+.\-]{0,31})://[^:/@\s]*:[^\s/]*@'),
         r'\1://***:***@',
     ),
     # A token used as the username (`https://<token>@github.com/...`). Limited
     # to http(s) so `ssh://git@host` and ordinary text are left alone.
-    (re.compile(r'(?<![A-Za-z0-9+.\-])(https?)://[^:/@\s]+@'), r'\1://***@'),
+    (re.compile(r'(https?)://[^:/@\s]+@'), r'\1://***@'),
     # Generic secret patterns
     (re.compile(r'(api_key|apikey|secret|password|token|credential)["\']?\s*[:=]\s*["\']?[a-zA-Z0-9_\-]{10,}', re.IGNORECASE), r'\1=***REDACTED***'),
 ]
@@ -150,6 +150,25 @@ def redact_sensitive(message: str) -> str:
         message = pattern.sub(replacement, message)
 
     return message
+
+
+def redacted_errors(errors: Any) -> list[str]:
+    """A client-safe copy of a run's error list.
+
+    ``state.errors`` is appended to directly at ~40 sites, many with
+    ``str(exc)``, and the list leaves the process through the ``done`` frame,
+    the per-phase frame, MCP and agent results, the renderers and ``--save-state``.
+    Redacting at those exits covers every producer, including future ones.
+    Never raises; a non-iterable yields an empty list.
+    """
+    if not errors:
+        return []
+    if isinstance(errors, str):
+        errors = [errors]
+    try:
+        return [redact_sensitive(e) for e in errors]
+    except TypeError:
+        return []
 
 
 def redact_dict(data: dict[str, Any]) -> dict[str, Any]:
@@ -293,22 +312,6 @@ def _redact_record(record: logging.LogRecord) -> None:
         else:
             record.args = tuple(_redact_arg(arg) for arg in record.args)
     _redact_traceback(record)
-
-
-class SafeLoggingFilter(logging.Filter):
-    """Filter that redacts sensitive data from log records it sees.
-
-    WARNING: attaching this to a *logger* only covers records that logger
-    creates. Records made by `logging.getLogger(__name__)` propagate to the
-    root logger's *handlers* but never run the root logger's *filters*, so
-    installing it on the root logger redacts nothing from ordinary module
-    logging. Prefer install_global_redaction(), which cannot be bypassed
-    that way. Kept for attaching to a single handler.
-    """
-
-    def filter(self, record: logging.LogRecord) -> bool:
-        _redact_record(record)
-        return True
 
 
 _redaction_installed = False
