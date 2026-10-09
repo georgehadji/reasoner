@@ -313,7 +313,10 @@ jobs:
           # its task-cancellation cleanup) and the SSE loop's PHASE_DURATION
           # metric guard. The metric guard moved verbatim into
           # execution/sse_observer._observe_duration, so the net is -3, not -4.
-          python scripts/silent_failure_ratchet.py --max 102
+          # 101: data_eraser's Neuro step was `try: pass / except Exception: pass`
+          # (a counted swallow that erased nothing); it now calls
+          # NeuroService.erase_owner and reports the failure in the receipt.
+          python scripts/silent_failure_ratchet.py --max 101
 
       - name: Dead-code ratchet (vulture, ADVISORY)
         # P-5 (docs/plans/phaseoutput-retirement-2026-09-12.md): advisory for
