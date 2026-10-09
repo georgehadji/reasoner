@@ -124,7 +124,7 @@ SENSITIVE_PATTERNS: list[tuple[re.Pattern, str]] = [
     ),
     # A token used as the username (`https://<token>@github.com/...`). Limited
     # to http(s) so `ssh://git@host` and ordinary text are left alone.
-    (re.compile(r'(https?)://[^:/@\s]+@'), r'\1://***@'),
+    (re.compile(r'(https?)://[^:/@\s]+@', re.IGNORECASE), r'\1://***@'),
     # Generic secret patterns
     (re.compile(r'(api_key|apikey|secret|password|token|credential)["\']?\s*[:=]\s*["\']?[a-zA-Z0-9_\-]{10,}', re.IGNORECASE), r'\1=***REDACTED***'),
 ]
@@ -150,6 +150,21 @@ def redact_sensitive(message: str) -> str:
         message = pattern.sub(replacement, message)
 
     return message
+
+
+# Exception text is capped before redaction so a multi-megabyte upstream error
+# body cannot hold the event loop in the regex pass.
+MAX_REDACT_INPUT = 4096
+
+
+def redact_capped(text: str, limit: int = MAX_REDACT_INPUT) -> str:
+    """Redact *text* and cut it to *limit* chars, in that order.
+
+    Redacting a slightly longer slice and cutting afterwards means a key or DSN
+    that straddles *limit* is matched whole; cutting first could leave
+    `postgresql://user:pw` with no `@` for the userinfo rule to match.
+    """
+    return redact_sensitive(text[: limit + 512])[:limit]
 
 
 def redacted_errors(errors: Any) -> list[str]:

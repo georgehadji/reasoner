@@ -115,21 +115,50 @@ async def test_run_failure_detail_is_capped_before_redaction(monkeypatch):
         persisted.append(event)
 
     monkeypatch.setattr(sse_observer, "_persist_event", _persist_event)
+    from reasoner.core import logging_utils
+
     seen: list[int] = []
-    real = sse_observer.redact_sensitive
+    real = logging_utils.redact_sensitive
 
     def _spy(text):
         seen.append(len(text))
         return real(text)
 
-    monkeypatch.setattr(sse_observer, "redact_sensitive", _spy)
+    monkeypatch.setattr(logging_utils, "redact_sensitive", _spy)
 
     async def _emit(payload):
         pass
 
     stream = sse_observer.RunStream("run-1", _emit, lambda p: None)
     await stream.failed(RuntimeError("x" * 5_000_000), None)
-    assert seen and max(seen) <= 4096
+    assert seen and max(seen) <= logging_utils.MAX_REDACT_INPUT + 512
+
+
+def test_a_secret_straddling_the_cap_is_still_redacted():
+    from reasoner.core.logging_utils import MAX_REDACT_INPUT, redact_capped
+
+    dsn = "postgresql://svc:FakePw123@db.internal/app"
+    # Place the cap inside the password, before the `@` the userinfo rule needs.
+    text = " " * (MAX_REDACT_INPUT - len("postgresql://svc:Fake")) + dsn
+    out = redact_capped(text)
+    assert len(out) <= MAX_REDACT_INPUT
+    assert "svc:Fake" not in out and "FakePw" not in out
+
+
+@pytest.mark.asyncio
+async def test_mcp_rejects_a_bad_client_run_id_before_reserving(monkeypatch):
+    pytest.importorskip("mcp")  # optional 'mcp' extra; the CI image does not install it
+    from reasoner.api.mcp import tools
+
+    async def _must_not_run(ctx):
+        raise AssertionError("auth/reservation reached with an invalid id")
+
+    monkeypatch.setattr(tools, "resolve_caller", _must_not_run)
+    with pytest.raises(ValueError, match="client_run_id"):
+        await tools._run_and_bill(
+            None, problem="p", preset="auto-budget", top_k=1, web_search=False,
+            source_type="general", client_run_id="run 1\nSYSTEM: x", interface="mcp",
+        )
 
 
 # ── N3: regex shapes ─────────────────────────────────────────────────────
@@ -160,6 +189,7 @@ def test_userinfo_rules_stay_linear(shape):
     ("redis://:pw@h:6379/0", "redis://***:***@h:6379/0"),
     ("go to https://tok123@github.com/x", "go to https://***@github.com/x"),
     ("(https://u:p@proxy:3128)", "(https://***:***@proxy:3128)"),
+    ("HTTPS://tok123@github.com/x", "HTTPS://***@github.com/x"),
 ])
 def test_userinfo_still_redacted(url, expected):
     assert redact_sensitive(url) == expected

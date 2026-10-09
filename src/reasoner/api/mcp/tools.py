@@ -12,6 +12,7 @@ Deliberately: keep it that way. tests/test_mcp_tools.py pins the tool list.
 
 from __future__ import annotations
 
+import re
 import uuid
 from typing import Any
 
@@ -75,7 +76,7 @@ async def _run_and_bill(
     """
     from reasoner.api.dependencies import check_quota, require_credits, reserve_or_402
     from reasoner.api.run_observability import CreditSink, PrometheusObserver
-    from reasoner.api.schemas import RunRequest
+    from reasoner.api.schemas import CLIENT_RUN_ID_PATTERN, RunRequest
     from reasoner.api.streaming import run_stream_cached
     from reasoner.application.services.agent_results import summarise
     from reasoner.application.services.idempotency import register_run
@@ -83,6 +84,12 @@ async def _run_and_bill(
     from reasoner.application.services.preset_service import PresetService
     from reasoner.application.services.run_metering import RunContext, metered
     from reasoner.application.services.spend_limit_service import resolve_user_tier
+
+    # Checked before anything is reserved: RunRequest rejects a bad id too, but
+    # only after credits are held and the id has been used as a reference.
+    client_run_id = client_run_id or None  # "" has always meant "generate one"
+    if client_run_id is not None and not re.fullmatch(CLIENT_RUN_ID_PATTERN, client_run_id):
+        raise ValueError(f"client_run_id must match {CLIENT_RUN_ID_PATTERN}")
 
     user = await resolve_caller(ctx)
     await check_quota(user)

@@ -36,7 +36,7 @@ from reasoner.core.exceptions import (
     error_code_for_exception,
     is_retryable,
 )
-from reasoner.core.logging_utils import get_correlation_id, redact_sensitive, redacted_errors
+from reasoner.core.logging_utils import get_correlation_id, redact_capped, redacted_errors
 from reasoner.domain.pipeline_state import PipelineState
 
 logger = logging.getLogger(__name__)
@@ -47,11 +47,6 @@ _AUTH_HINT = (
     "OpenRouter API key is missing or invalid. "
     "Please set OPENROUTER_API_KEY in your .env or ui-next/.env.local file."
 )
-
-
-# Exception text is capped before redaction so a multi-megabyte upstream error
-# body cannot hold the event loop in the regex pass.
-_MAX_EXC_TEXT = 4096
 
 
 class RunStream:
@@ -173,7 +168,7 @@ class RunStream:
         # before truncating, so the cut cannot split a key into a form the
         # patterns no longer match); the client gets the exception type and a
         # correlation id to quote, with the detail left in the server log.
-        detail = redact_sensitive(str(exc)[:_MAX_EXC_TEXT])[:120]
+        detail = redact_capped(str(exc))[:120]
         stored = f"Pipeline processing error: {type(exc).__name__}: {detail}"
         message = (
             f"Pipeline processing error: {type(exc).__name__} "
@@ -279,7 +274,7 @@ class SseRunObserver:
         # state.errors already holds the runner's message; this only changes
         # what the browser renders.
         client_message = (
-            _AUTH_HINT if err_type == "auth" else redact_sensitive(message[:_MAX_EXC_TEXT])
+            _AUTH_HINT if err_type == "auth" else redact_capped(message)
         )
 
         await self._both({
