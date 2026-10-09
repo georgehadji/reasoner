@@ -31,6 +31,7 @@ from reasoner.api.dependencies import (
     get_pipeline_service,
     get_preset_service,
     require_credits_if_authenticated,
+    resolve_request_tier,
 )
 from reasoner.api.idempotency_http import register_run_or_error
 from reasoner.api.run_observability import CreditSink, PrometheusObserver
@@ -116,11 +117,12 @@ async def _metered_agent_stream(
     """
     from reasoner.api.streaming import run_stream_cached
 
+    tier = (await resolve_request_tier(request, user)).value
     ctx = RunContext(
         preset=preset,
         reference_id=reference_id,
         user_id=str(user.id),
-        tier="free",
+        tier=tier,
         interface=interface,
         reserved_credits=reserved_credits,
     )
@@ -135,7 +137,7 @@ async def _metered_agent_stream(
         stream,
         ctx,
         CreditSink(),
-        PrometheusObserver(tier="free", preset=preset, interface=interface),
+        PrometheusObserver(tier=tier, preset=preset, interface=interface),
     ):
         yield chunk
 

@@ -261,7 +261,7 @@ class TestGuardFailsLoud:
         self._break_import(monkeypatch, "reasoner.domain.preset_core")
 
         with caplog.at_level(logging.WARNING):
-            assert svc._required_tier("debate-premium") is SubscriptionTier.FREE
+            assert svc.required_tier_for("debate-premium") is SubscriptionTier.FREE
 
         assert any("spend_limit.required_tier" in r.message for r in caplog.records), (
             f"the tier gate stopped checking silently: {[r.message for r in caplog.records]}"
