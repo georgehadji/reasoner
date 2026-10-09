@@ -88,13 +88,25 @@ async def run_perspectives_phase(
 
     if perspectives is None:
         from reasoner.core import DEFAULT_PERSPECTIVES
-        perspectives = list(DEFAULT_PERSPECTIVES)
+        # getattr: WorkflowServices exposes this (see PipelineWorkflowServices
+        # .perspectives), but the port is also implemented by lighter test
+        # stand-ins that predate it and have no such attribute.
+        perspectives = getattr(services, "perspectives", None) or list(DEFAULT_PERSPECTIVES)
+
+    def _perspective_name(p) -> str:
+        return p.name if hasattr(p, 'name') else str(p)
+
+    # A duplicated entry would run the same generator twice (double spend, and
+    # two identical candidates masquerading as independent perspectives).
+    perspectives = list({_perspective_name(p): p for p in perspectives}.values())
 
     # Warn on diversity collapse: all perspectives resolve to the same model, or
     # all to a single geopolitical bloc. Cross-bloc spread (not just cross-company)
     # is what mitigates creator ideology (Buyl et al. npj AI 2026) — so we surface
     # both failure modes and recommend keys across blocs, not one ecosystem.
-    _perspective_roles = {"constructive", "destructive", "systemic", "minimalist"}
+    # Computed over the roles actually active, not all four: a narrowed set
+    # would otherwise be judged against models it never calls.
+    _perspective_roles = {_perspective_name(p) for p in perspectives}
     _active_models = {
         getattr(services.router.routing_table.get(r, services.router.primary), "model", "")
         for r in _perspective_roles
@@ -117,12 +129,14 @@ async def run_perspectives_phase(
         return "OTHER"
 
     _active_blocs = {_bloc(m) for m in _active_models if m} - {"OTHER"}
-    if len(_active_models) < 2:
+    # One active perspective cannot "collapse" onto itself: nothing to compare.
+    _can_compare = len(perspectives) >= 2
+    if _can_compare and len(_active_models) < 2:
         state.pending_events.append({
             "type": "phase_warning",
             "message": "All perspectives using the same model — diversity collapsed. Add API keys spanning blocs (e.g. Anthropic/OpenAI 🇺🇸, DeepSeek/Qwen 🇨🇳, Mistral 🇪🇺) to restore cross-bloc reasoning.",
         })
-    elif len(_active_blocs) < 2:
+    elif _can_compare and len(_active_blocs) < 2:
         state.pending_events.append({
             "type": "phase_warning",
             "message": "All perspectives resolve to a single geopolitical bloc — creator-ideology bias is not mitigated. Add API keys from a different bloc (🇺🇸/🇨🇳/🇪🇺) for cross-bloc diversity.",
@@ -171,9 +185,6 @@ async def run_perspectives_phase(
             key_insights=key_insights,
             model_used="",
         )
-
-    def _perspective_name(p) -> str:
-        return p.name if hasattr(p, 'name') else str(p)
 
     # Accumulate locally and write to `state` once, after the loop. Two reasons,
     # both load-bearing:
