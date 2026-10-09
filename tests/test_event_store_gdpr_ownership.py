@@ -125,7 +125,10 @@ async def test_receipt_status_completed_on_genuine_success(store: EventStore):
     repo = PipelineOwnershipRepository(db_path=store.db_path)
     await repo.set_owner("p1", "user-a", "p1")
 
-    eraser = UserDataEraser(event_store=store)
+    async def neuro_ok(owner: str) -> dict:
+        return {"erased": True, "dirs_removed": 0, "tenants_evicted": 0, "error": None}
+
+    eraser = UserDataEraser(event_store=store, erase_neuro_fn=neuro_ok)
     receipt = await eraser.erase("user-a")
 
     assert receipt["deleted_aggregates"] == 1

@@ -7,9 +7,12 @@ import asyncio
 import hashlib
 import logging
 import secrets
+import shutil
 import time
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Literal
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -142,6 +145,17 @@ class TenantManager:
         self._tenants: dict[str, dict] = {}
         self._last_access: dict[str, float] = {}
         self._lock = asyncio.Lock()
+        # GDPR erasure state, per tenant-key prefix ("u-{owner}-"). In-process
+        # only: a second worker has its own copy, and a restart forgets both.
+        #   _erasing  -- prefixes being erased right now; get() waits on the
+        #                event so a request cannot re-create a tenant from
+        #                files the erasure has not deleted yet.
+        #   _erased_until -- prefix -> monotonic expiry. Writes for an erased
+        #                owner are dropped until then, so a run that was
+        #                already in flight when the user was erased cannot
+        #                re-create their memory when it finishes.
+        self._erasing: dict[str, asyncio.Event] = {}
+        self._erased_until: dict[str, float] = {}
 
     def _evict_stale_locked(self, now: float) -> int:
         """Evict tenants idle beyond IDLE_TTL_SECONDS. Caller must hold _lock."""
@@ -163,6 +177,15 @@ class TenantManager:
 
     async def get(self, agent_id: str | None = None) -> dict:
         key = agent_id or "default"
+        # GDPR erasure in progress for this owner: wait it out, so a request
+        # cannot re-create the tenant from disk files not yet deleted. The
+        # wait is outside the lock because erase_owner needs the lock to
+        # evict. No await sits between this check and the lock acquisition
+        # below, and asyncio.Lock is FIFO, so a get() that passed the check
+        # before an erasure began is queued ahead of the erasure's eviction and
+        # is evicted by it.
+        while (erasing := self._erasing_event(key)) is not None:
+            await erasing.wait()
         now = time.monotonic()
         async with self._lock:
             # TTL eviction pass
@@ -209,9 +232,69 @@ class TenantManager:
             self._last_access[key] = now
             return tenant
 
+    def _erasing_event(self, key: str) -> asyncio.Event | None:
+        for prefix, event in self._erasing.items():
+            if key.startswith(prefix):
+                return event
+        return None
+
     @property
     def active_tenants(self) -> list[str]:
         return list(self._tenants.keys())
+
+    async def evict_prefix(self, prefix: str) -> list[str]:
+        """Drop every in-memory tenant whose key starts with *prefix*.
+
+        `_tenants` is keyed by the raw tenant_key() string (not the sanitized
+        disk name), so a plain prefix match against those keys is exact.
+        Without this, a tenant already loaded into memory keeps answering
+        recall() from its in-memory L1 cache for up to IDLE_TTL_SECONDS after
+        its on-disk directory has been removed -- used by GDPR erasure.
+        """
+        async with self._lock:
+            matched = [k for k in self._tenants if k.startswith(prefix)]
+            for k in matched:
+                del self._tenants[k]
+                self._last_access.pop(k, None)
+            return matched
+
+    async def begin_erase(self, prefix: str) -> None:
+        """Mark *prefix* as being erased: get() for it waits until end_erase().
+
+        Concurrent erasures of the same prefix are serialized. The check and
+        the registration have no await between them, so they are atomic on the
+        event loop.
+        """
+        while prefix in self._erasing:
+            await self._erasing[prefix].wait()
+        self._erasing[prefix] = asyncio.Event()
+
+    def end_erase(self, prefix: str) -> None:
+        """Finish an erasure: start the write tombstone and release waiters.
+
+        Called from erase_owner's finally, so the tombstone starts whether the
+        erasure succeeded, failed or was cancelled. That is deliberate: after
+        a failed or half-finished erasure some of the owner's data is still on
+        disk, and letting new writes land in that state would add to data the
+        user asked to be erased. Blocking costs only that owner's Neuro writes
+        for IDLE_TTL_SECONDS, and a retry of the erasure is never blocked by it.
+        """
+        self._erased_until[prefix] = time.monotonic() + self.IDLE_TTL_SECONDS
+        self._erasing.pop(prefix).set()
+
+    def is_erased(self, key: str | None) -> bool:
+        """True while *key* belongs to an owner that was erased recently.
+
+        Covers an erasure in progress and the IDLE_TTL_SECONDS afterwards. The
+        window is per-process and in memory: it is not shared with other
+        workers and does not survive a restart.
+        """
+        if not key:
+            return False
+        now = time.monotonic()
+        for prefix in [p for p, t in self._erased_until.items() if t <= now]:
+            del self._erased_until[prefix]
+        return any(key.startswith(p) for p in (*self._erasing, *self._erased_until))
 
 
 # ─────────────────────────────────────────────
@@ -261,6 +344,25 @@ def require_neuro_key(request: Request) -> None:
         raise HTTPException(status_code=403, detail="Neuro access required")
 
 
+def _owned_prefix(owner: str) -> str:
+    """The tenant_key prefix common to every agent_id belonging to *owner*.
+
+    tenant_key(owner, agent_id) is always f"{_owned_prefix(owner)}{agent_id or
+    'default'}" for a signed-in owner, so this prefix identifies every tenant
+    -- in-memory or on disk -- that belongs to them, without knowing their
+    agent_ids in advance. Used by NeuroService.erase_owner (GDPR erasure).
+    """
+    return f"u-{owner}-"
+
+
+def _is_canonical_owner(owner: str) -> bool:
+    """True when *owner* is exactly str(UUID(owner)): lowercase, hyphenated, 36 chars."""
+    try:
+        return isinstance(owner, str) and str(UUID(owner)) == owner
+    except ValueError:
+        return False
+
+
 def tenant_key(owner: str | None, agent_id: str | None) -> str | None:
     """Scope a caller-supplied agent_id to the identity that owns it.
 
@@ -283,7 +385,7 @@ def tenant_key(owner: str | None, agent_id: str | None) -> str | None:
     """
     if not owner:
         return f"a-{agent_id}" if agent_id else None
-    return f"u-{owner}-{agent_id or 'default'}"
+    return f"{_owned_prefix(owner)}{agent_id or 'default'}"
 
 
 class NeuroService:
@@ -342,6 +444,96 @@ class NeuroService:
             owner=owner,
         )
 
+    async def erase_owner(self, owner: str) -> dict:
+        """Permanently delete every Neuro tenant belonging to *owner* (GDPR Art. 17).
+
+        tenant_key scopes each (owner, agent_id) pair to its own tenant, so a
+        signed-in user's memory is not one directory but one per conversation
+        they have ever had. This removes all of them: the live in-memory
+        tenant (L1 cache, hot sessions) and the on-disk tenant directory (L1
+        disk persistence, L2 index, L3/warm+cold session archives) for every
+        agent_id this owner has used.
+
+        *owner* must be the canonical string form of a UUID (what the API
+        passes: str(user.id)). Tenant keys are f"u-{owner}-{agent_id}" with a
+        free-form agent_id, so for arbitrary owners the prefix is ambiguous:
+        "alice" would also match "alice-bob"'s tenants. A UUID has a fixed
+        length, so no owner's prefix can be the start of another's. Anything
+        else is refused rather than risk erasing someone else's data.
+
+        Concurrency: while this runs, get() for the owner's tenants waits, and
+        eviction is repeated after the delete, so a request racing the erasure
+        cannot keep or re-create the data. For TenantManager.IDLE_TTL_SECONDS
+        afterwards, ingest() drops writes for the owner (WARNING logged), so a
+        pipeline run that was already in flight cannot re-create memory when
+        it finishes. That window is per-process, in memory only: other
+        workers and a restart do not know about it. A request that already
+        held a tenant when erasure began can still complete one write.
+
+        Returns {"erased": bool, "dirs_removed": int, "tenants_evicted": int,
+        "error": str | None}. "erased" is True only when nothing of this
+        owner's was left in this process's view of the store, including the
+        case where none ever existed. Best-effort per directory: one failure
+        is recorded in "error" but does not stop the others from being
+        attempted.
+        """
+        result: dict = {"erased": False, "dirs_removed": 0, "tenants_evicted": 0, "error": None}
+        if not _is_canonical_owner(owner):
+            result["error"] = "owner must be a canonical UUID string; refusing ambiguous erasure"
+            return result
+
+        prefix = _owned_prefix(owner)
+        tenants = self.tenants
+        await tenants.begin_erase(prefix)
+        try:
+            evicted = set(await tenants.evict_prefix(prefix))
+            errors = await self._remove_owner_dirs(prefix, result)
+            # A tenant re-created between the eviction above and the delete
+            # would otherwise keep serving erased data from memory.
+            evicted.update(await tenants.evict_prefix(prefix))
+        finally:
+            tenants.end_erase(prefix)
+
+        result["tenants_evicted"] = len(evicted)
+        if errors:
+            result["error"] = "; ".join(errors)
+        else:
+            result["erased"] = True
+        return result
+
+    async def _remove_owner_dirs(self, prefix: str, result: dict) -> list[str]:
+        """Delete every <data_dir>/agents/ entry for *prefix*; returns errors."""
+        agents_dir = Path(self.config.data_dir) / "agents"
+        if not agents_dir.exists():
+            return []
+        # prefix is "u-<uuid>-": already safe path characters, so the sanitized
+        # on-disk name starts with it unchanged.
+        try:
+            entries = await asyncio.to_thread(lambda: list(agents_dir.iterdir()))
+        except OSError as exc:
+            return [f"failed to list neuro agents directory: {exc}"]
+
+        errors: list[str] = []
+        for entry in entries:
+            # Only ever remove an entry directly inside <data_dir>/agents/
+            # whose name starts with this owner's prefix -- a misconfigured
+            # data_dir or a sanitizer edge case must not turn erasure into
+            # rm -rf. A symlink is unlinked, never followed: rmtree refuses
+            # them, and the target is not ours to delete.
+            if not entry.name.startswith(prefix):
+                continue
+            try:
+                if entry.is_symlink():
+                    await asyncio.to_thread(entry.unlink)
+                elif entry.is_dir():
+                    await asyncio.to_thread(shutil.rmtree, entry)
+                else:
+                    continue
+                result["dirs_removed"] += 1
+            except OSError as exc:
+                errors.append(f"{entry.name}: {exc}")
+        return errors
+
     # ── Full request/response surface (shared with the router) ────────────
     async def health(self) -> NeuroHealthResponse:
         config, reasoner, embedder, tenants = (
@@ -379,7 +571,20 @@ class NeuroService:
         config, embedder, tenants = self.config, self.embedder, self.tenants
         start = time.perf_counter()
         persona = get_persona(config, req.persona, req.agent_id)
-        tenant = await tenants.get(tenant_key(owner, req.agent_id))
+        key = tenant_key(owner, req.agent_id)
+        if tenants.is_erased(key):
+            # Nothing to recall for an owner being / just erased, and get()
+            # would re-create their empty tenant directories.
+            return RecallResponse(
+                chunks=[],
+                total_found=0,
+                latency_ms=0.0,
+                cache_hits={},
+                agent_id=req.agent_id,
+                persona=persona.name,
+                provider_used=embedder.active_label,
+            )
+        tenant = await tenants.get(key)
         l1, l2 = tenant["l1"], tenant["l2"]
         sessions = tenant["sessions"]
 
@@ -488,9 +693,25 @@ class NeuroService:
                 provider_used=reasoner.active_label,
             )
 
+    @staticmethod
+    def _dropped_for_erased_owner(key: str | None, req: LearnRequest) -> LearnResponse:
+        log.warning("Dropping learn for erased owner (tenant %s)", key)
+        return LearnResponse(
+            status="dropped_erased", session_id="", entry_number=0, agent_id=req.agent_id
+        )
+
     async def ingest(self, req: LearnRequest, owner: str | None = None) -> LearnResponse:
         embedder, tenants = self.embedder, self.tenants
-        tenant = await tenants.get(tenant_key(owner, req.agent_id))
+        key = tenant_key(owner, req.agent_id)
+        # The owner may be erased moments ago (GDPR Art. 17); a run that was
+        # already in flight must not write their memory back. Checked again
+        # after every await that could span an erasure: get() (waits out one in
+        # progress) and embed() (slow provider call).
+        if tenants.is_erased(key):
+            return self._dropped_for_erased_owner(key, req)
+        tenant = await tenants.get(key)
+        if tenants.is_erased(key):
+            return self._dropped_for_erased_owner(key, req)
         # ingest_async(), not ingest(): this runs inside an async request
         # handler, and SessionManager's own docstring says as much -- the
         # sync ingest() has no await points, so its open()/write()/flush()
@@ -521,6 +742,8 @@ class NeuroService:
             content = f"User: {req.prompt}\nAssistant: {req.response}"
             embedding = await embedder.embed(content)
             source = f"session:{result['session_id']}"
+            if tenants.is_erased(key):
+                return self._dropped_for_erased_owner(key, req)
             async with tenant["index_lock"]:
                 await tenant["l1"].add(content, source=source, embedding=embedding)
                 await tenant["l2"].add(
@@ -549,7 +772,10 @@ class NeuroService:
         owner: str | None = None,
     ) -> dict:
         """List recent session entries for browsing memory."""
-        tenant = await self.tenants.get(tenant_key(owner, agent_id))
+        key = tenant_key(owner, agent_id)
+        if self.tenants.is_erased(key):
+            return {"entries": [], "total": 0}
+        tenant = await self.tenants.get(key)
         # Reads every hot session file on disk -- offload, same reason as
         # the tenant construction and health() fixes above.
         entries = await asyncio.to_thread(tenant["sessions"].list_recent_entries, limit, offset)
