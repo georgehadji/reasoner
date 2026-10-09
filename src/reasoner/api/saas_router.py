@@ -17,12 +17,13 @@ from reasoner.api.dependencies import (
     _get_quota_service,
     get_current_user,
     get_optional_user,
+    resolve_request_tier,
 )
 from reasoner.api.middleware import _anonymize_ip
 from reasoner.application.services.quota_service import TIER_LIMITS
 from reasoner.core.degrade import degraded
 from reasoner.core.settings import settings
-from reasoner.domain.saas import SubscriptionTier, User
+from reasoner.domain.saas import User
 from reasoner.rate_limiter import RateLimitConfig, get_rate_limiter
 
 router = APIRouter(prefix="/api", tags=["saas"])
@@ -106,15 +107,22 @@ async def get_me_optional(user: User | None = Depends(get_optional_user)):
 
 
 @router.get("/quota")
-async def get_quota_status(user: User = Depends(get_current_user)):
-    """Return current usage and remaining quota."""
+async def get_quota_status(request: Request, user: User = Depends(get_current_user)):
+    """Return current usage and remaining quota.
+
+    An unlimited plan (ENTERPRISE) reports ``unlimited: true`` and ``max: null``;
+    the internal -1 sentinel is not exposed as a limit a client could render.
+    """
+    user_tier = await resolve_request_tier(request, user)
     service = _get_quota_service()
-    result = await service.check(str(user.id), SubscriptionTier.FREE)
-    # TODO(#502): use actual user tier
-    used = (TIER_LIMITS[SubscriptionTier.FREE] - result.remaining) if result.remaining >= 0 else 0
+    result = await service.check(str(user.id), user_tier)
+    limit = TIER_LIMITS[user_tier]
+    unlimited = limit < 0
+    used = (limit - result.remaining) if not unlimited and result.remaining >= 0 else 0
     return {
         "used": used,
-        "max": TIER_LIMITS[SubscriptionTier.FREE],
+        "max": None if unlimited else limit,
+        "unlimited": unlimited,
         "remaining": result.remaining,
         "reset_date": (datetime.now(UTC).replace(day=1) + timedelta(days=32)).replace(day=1).isoformat(),
     }

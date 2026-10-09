@@ -195,7 +195,11 @@ def get_preset_tier(preset_id: str) -> SubscriptionTier:
     from reasoner.domain.preset_registry import PRESETS
     preset = PRESETS.get(preset_id)
     if preset is None:
-        return SubscriptionTier.FREE
+        # Not a registered preset -- notably the "auto-premium" alias, which is
+        # resolved to a concrete preset only after the request is admitted. Derive
+        # from the tier suffix, same as a registered preset, so the alias is not a
+        # way around the premium gate.
+        return SubscriptionTier.PRO if preset_id.endswith("-premium") else SubscriptionTier.FREE
     # PRESETS values are raw config dicts. Honour an explicit required_tier if
     # present, else derive from the tier suffix (premium -> PRO, else FREE).
     if isinstance(preset, dict):

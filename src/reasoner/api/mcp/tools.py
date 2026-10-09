@@ -81,10 +81,12 @@ async def _run_and_bill(
     from reasoner.application.services.pipeline_service import PipelineService
     from reasoner.application.services.preset_service import PresetService
     from reasoner.application.services.run_metering import RunContext, metered
+    from reasoner.application.services.spend_limit_service import resolve_user_tier
 
     user = await resolve_caller(ctx)
     await check_quota(user)
     await require_credits(user)
+    tier = (await resolve_user_tier(str(user.id))).value
 
     reference_id = client_run_id or f"run:{uuid.uuid4()}"
     reserved_credits = await reserve_or_402(
@@ -104,7 +106,7 @@ async def _run_and_bill(
         preset=preset,
         reference_id=reference_id,
         user_id=str(user.id),
-        tier="free",
+        tier=tier,
         interface=interface,
         reserved_credits=reserved_credits,
     )
@@ -117,7 +119,7 @@ async def _run_and_bill(
 
     events: list[dict] = []
     phases_seen = 0
-    observer = PrometheusObserver(tier="free", preset=preset, interface=interface)
+    observer = PrometheusObserver(tier=tier, preset=preset, interface=interface)
     async for chunk in metered(stream, run_ctx, CreditSink(), observer):
         if not chunk.startswith("data: "):
             continue
@@ -208,10 +210,12 @@ def register_tools(mcp) -> None:
         from reasoner.api.streaming import run_followup_stream
         from reasoner.application.services.agent_results import summarise
         from reasoner.application.services.run_metering import RunContext, metered
+        from reasoner.application.services.spend_limit_service import resolve_user_tier
 
         user = await resolve_caller(ctx)
         await check_quota(user)
         await require_credits(user)
+        tier = (await resolve_user_tier(str(user.id))).value
 
         reference_id = f"followup:{uuid.uuid4()}"
         reserved_credits = await reserve_or_402(
@@ -229,7 +233,7 @@ def register_tools(mcp) -> None:
             preset=preset,
             reference_id=reference_id,
             user_id=str(user.id),
-            tier="free",
+            tier=tier,
             interface="mcp",
             reserved_credits=reserved_credits,
         )
@@ -237,7 +241,7 @@ def register_tools(mcp) -> None:
 
         events: list[dict] = []
         phases_seen = 0
-        observer = PrometheusObserver(tier="free", preset=preset, interface="mcp")
+        observer = PrometheusObserver(tier=tier, preset=preset, interface="mcp")
         async for chunk in metered(stream, run_ctx, CreditSink(), observer):
             if not chunk.startswith("data: "):
                 continue

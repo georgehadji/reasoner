@@ -53,6 +53,15 @@ class MemoryPort(Protocol):
         """
         ...
 
+    async def erase_owner(self, owner: str) -> dict[str, Any]:
+        """Permanently delete every memory tenant belonging to *owner* (GDPR Art. 17).
+
+        Returns ``{"erased": bool, "dirs_removed": int, "tenants_evicted": int,
+        "error": str | None}``. ``erased`` is True only when nothing of the
+        owner's remains in this process's view of the store.
+        """
+        ...
+
 
 # ── Dependency injection for application → neuro boundary ─────────────────
 _MEMORY_PORT: MemoryPort | None = None

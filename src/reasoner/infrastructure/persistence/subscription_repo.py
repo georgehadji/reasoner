@@ -21,28 +21,80 @@ class PostgresSubscriptionRepository:
     """Atomic subscription storage in PostgreSQL."""
 
     _pool: asyncpg.Pool | None = None
-    _pool_lock: asyncio.Lock | None = None
+    # Shared pool-creation task. Callers await it through asyncio.shield, so a
+    # caller that times out (the tier lookup is bounded at ~1s) abandons its wait
+    # without cancelling the connect: the pool still completes in the background
+    # and the next call finds it ready, instead of every request cancelling pool
+    # creation and the tier staying FREE for as long as the first connect is slow.
+    _pool_task: asyncio.Task | None = None
+    # asyncpg pools are bound to the loop that created them; remember which.
+    _pool_loop: asyncio.AbstractEventLoop | None = None
 
     def __init__(self, dsn: str, pool_size: int = 10):
         self._dsn = dsn
         self._pool_size = pool_size
 
+    async def _create_pool(self) -> asyncpg.Pool:
+        return await asyncpg.create_pool(
+            self._dsn,
+            min_size=1,
+            max_size=self._pool_size,
+        )
+
     async def _get_pool(self) -> asyncpg.Pool:
-        # Lazy initialize the class-level lock
-        if PostgresSubscriptionRepository._pool_lock is None:
-            PostgresSubscriptionRepository._pool_lock = asyncio.Lock()
+        cls = PostgresSubscriptionRepository
+        loop = asyncio.get_running_loop()
+        # _pool_loop is None when a pool was assigned directly (tests inject one);
+        # only a pool known to belong to another loop is rejected.
+        if cls._pool is not None and cls._pool_loop in (None, loop):
+            return cls._pool
 
-        if PostgresSubscriptionRepository._pool is not None:
-            return PostgresSubscriptionRepository._pool
+        task = cls._pool_task
+        # A failed task, or one from another loop, is replaced so the next call
+        # retries; an in-flight one is shared. A pool from another loop is not
+        # reused (asyncpg pools are loop-bound).
+        if task is None or task.get_loop() is not loop or (
+            task.done() and (task.cancelled() or task.exception() is not None)
+        ) or (task.done() and cls._pool_loop is not loop):
+            task = loop.create_task(self._create_pool())
+            task.add_done_callback(cls._on_pool_task_done)
+            cls._pool_task = task
 
-        async with PostgresSubscriptionRepository._pool_lock:
-            if PostgresSubscriptionRepository._pool is None:
-                PostgresSubscriptionRepository._pool = await asyncpg.create_pool(
-                    self._dsn,
-                    min_size=1,
-                    max_size=self._pool_size,
-                )
-            return PostgresSubscriptionRepository._pool
+        return await asyncio.shield(task)
+
+    @staticmethod
+    def _on_pool_task_done(task: asyncio.Task) -> None:
+        # Runs even when every waiter timed out, so a late success still lands
+        # and a late failure is logged rather than "never retrieved".
+        cls = PostgresSubscriptionRepository
+        if task.cancelled():
+            return
+        exc = task.exception()
+        if exc is not None:
+            logger.warning("Subscription pool creation failed: %s", exc)
+            return
+        if task is not cls._pool_task:
+            # Superseded while connecting: its pool must not replace the current
+            # one. This callback runs on the task's own loop, so close it here.
+            logger.warning("Discarding subscription pool from a superseded creation task")
+            task.result().terminate()
+            return
+        cls._pool = task.result()
+        cls._pool_loop = task.get_loop()
+
+    @classmethod
+    async def close(cls) -> None:
+        """Close the shared pool (app shutdown) and reset all pool state."""
+        task, pool, pool_loop = cls._pool_task, cls._pool, cls._pool_loop
+        cls._pool = cls._pool_task = cls._pool_loop = None
+        if task is not None and not task.done():
+            task.cancel()
+        if pool is None:
+            return
+        if pool_loop is asyncio.get_running_loop():
+            await pool.close()
+        else:
+            logger.warning("Subscription pool belongs to another event loop; not closing it")
 
     async def upsert_subscription(self, sub: Subscription) -> None:
         """Idempotently update subscription in Postgres.
