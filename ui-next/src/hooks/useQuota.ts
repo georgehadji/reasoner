@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiFetch } from '@/lib/api-client';
 
-interface QuotaStatus {
+export interface QuotaStatus {
   used: number;
-  max: number;
+  /** null on an unlimited plan (the backend never reports a numeric cap there). */
+  max: number | null;
+  /** true on an unlimited plan; `remaining` is then a -1 sentinel, not a count. */
+  unlimited?: boolean;
   remaining: number;
   reset_date: string;
 }

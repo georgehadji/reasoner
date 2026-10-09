@@ -134,7 +134,7 @@ class TestCheckRateLimit:
         from uuid import uuid4
 
         from reasoner.api import dependencies as deps_module
-        from reasoner.domain.saas import User
+        from reasoner.domain.saas import SubscriptionTier, User
 
         user = User(id=uuid4(), email="test@example.com", display_name="Test", scopes=["read"])
 
@@ -149,8 +149,44 @@ class TestCheckRateLimit:
         )
         mock_limiter.is_allowed = AsyncMock(side_effect=AssertionError("should not bucket by IP"))
         monkeypatch.setattr(deps_module, "_rate_limiter_instance", mock_limiter)
+        monkeypatch.setattr(
+            deps_module, "_resolve_user_tier",
+            AsyncMock(return_value=SubscriptionTier.FREE),
+        )
 
         result = await check_rate_limit(request=request, user=user, credentials=None)
 
         assert result is True
-        mock_limiter.is_allowed_for_user.assert_awaited_once_with(f"user:{user.id}", tier="default")
+        # Resolved tier, never the old hardcoded "default".
+        mock_limiter.is_allowed_for_user.assert_awaited_once_with(f"user:{user.id}", tier="free")
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("tier", ["free", "pro", "enterprise"])
+    async def test_authenticated_caller_gets_their_real_tier_bucket(self, monkeypatch, tier):
+        """Paying users were rate limited as free (tier="default" hardcoded), so
+        the pro 2x / enterprise 5x multiplier never applied."""
+        from unittest.mock import AsyncMock, MagicMock
+        from uuid import uuid4
+
+        from reasoner.api import dependencies as deps_module
+        from reasoner.domain.saas import SubscriptionTier, User
+
+        user = User(id=uuid4(), email="tier@example.com", display_name="T", scopes=["read"])
+        request = MagicMock()
+        request.headers = {"User-Agent": "test"}
+        request.client.host = "127.0.0.1"
+        request.state = MagicMock()
+
+        mock_limiter = MagicMock()
+        mock_limiter.is_allowed_for_user = AsyncMock(
+            return_value=(True, {"limit_minute": 60, "remaining_minute": 59})
+        )
+        monkeypatch.setattr(deps_module, "_rate_limiter_instance", mock_limiter)
+        monkeypatch.setattr(
+            deps_module, "_resolve_user_tier",
+            AsyncMock(return_value=SubscriptionTier(tier)),
+        )
+
+        await check_rate_limit(request=request, user=user, credentials=None)
+
+        mock_limiter.is_allowed_for_user.assert_awaited_once_with(f"user:{user.id}", tier=tier)
