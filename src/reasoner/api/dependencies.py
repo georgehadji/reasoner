@@ -737,6 +737,12 @@ async def check_quota(
         return QuotaResult(allowed=True, remaining=10)
 
     if not result.allowed:
+        from reasoner.core.ports.metrics_port import count_quota_exceeded
+
+        # Count at the point of rejection with the real resolved tier, not in
+        # QuotaService.check(), which GET /quota also calls as a status query.
+        # reasoner_quota_exceeded_total backs QuotaExceededSpike (alerts.yml).
+        count_quota_exceeded(getattr(user_tier, "value", str(user_tier)))
         raise HTTPException(
             status_code=429,
             detail={

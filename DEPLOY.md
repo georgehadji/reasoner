@@ -365,7 +365,6 @@ Reference rules are in `docs/monitoring/alerts-reference.yml`:
 - **HighErrorRate** — >10% error rate over 5min
 - **QuotaExceededSpike** — >10 quota violations/min (possible abuse)
 - **HighLatency** — P95 latency >60s
-- **PostgresPoolExhaustion** — no free connections
 
 Deploy with Prometheus + Alertmanager for automatic notifications.
 
