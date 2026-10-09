@@ -62,7 +62,15 @@ class FeedbackStore:
         jsonl_path: str | Path | None = None,
     ):
         if db_path is None:
-            db_path = Path(__file__).parent.parent.parent / "feedback.db"
+            from reasoner.core.settings import settings
+
+            # FEEDBACK_DB_PATH lets a deployment point this at a mounted
+            # volume (the installed package dir is replaced on every
+            # container redeploy). Empty keeps the historical in-package
+            # default so local dev/tests are unaffected when it's unset.
+            db_path = settings.FEEDBACK_DB_PATH or (
+                Path(__file__).parent.parent.parent / "feedback.db"
+            )
         if jsonl_path is None:
             jsonl_path = Path(__file__).parent.parent.parent.parent / "feedback" / "feedback.jsonl"
 
@@ -84,6 +92,8 @@ class FeedbackStore:
     def _get_connection(self) -> sqlite3.Connection:
         """Get or create database connection."""
         if self._connection is None:
+            # FEEDBACK_DB_PATH may name a directory that does not exist yet.
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
             self._connection = sqlite3.connect(
                 str(self.db_path),
                 check_same_thread=False,

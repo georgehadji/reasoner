@@ -39,6 +39,10 @@ class EventStoreConnection:
     def _get_connection(self) -> sqlite3.Connection:
         """Get or create database connection."""
         if self._connection is None:
+            # A configured path (EVENT_STORE_DB_PATH) may sit in a directory
+            # that does not exist yet; sqlite won't create it. For
+            # ":memory:" the parent is "." so this is a no-op.
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
             self._connection = sqlite3.connect(
                 str(self.db_path), check_same_thread=False,
             )
