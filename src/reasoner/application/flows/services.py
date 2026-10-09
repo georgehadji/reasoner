@@ -66,6 +66,19 @@ class PipelineWorkflowServices(WorkflowServices):
             from reasoner.infrastructure.execution.noop_executor import NoopExecutor
             self.code_executor = NoopExecutor()
 
+    @property
+    def perspectives(self) -> list:
+        """Perspective set configured on the pipeline (see ReasonerPipeline.__init__).
+
+        Phase 2 (run_perspectives_phase) used to default straight to
+        DEFAULT_PERSPECTIVES whenever its `perspectives` kwarg was omitted, which
+        is exactly what happens on the production WorkflowRunner path — that left
+        `pipeline.perspectives` assigned but never read, so narrowing it had no
+        effect. Exposing it here lets the phase's getattr-tolerant fallback pick
+        it up.
+        """
+        return list(getattr(self._pipeline, "perspectives", None) or [])
+
     def log(self, phase: str, message: str, state: PipelineState) -> None:
         self._pipeline._log(phase, message, state)
 
