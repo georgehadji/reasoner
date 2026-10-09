@@ -69,6 +69,8 @@ user's problem, to TypeSafe.
 |---|---|---|
 | `DATABASE_URL` | — | PostgreSQL connection string |
 | `DB_POOL_SIZE` | `10` | `asyncpg` connection pool max size |
+| `EVENT_STORE_DB_PATH` | — (in-package default) | SQLite events.db path — event store + pipeline ownership records. Point this at a mounted volume in production; the installed package dir is replaced on every redeploy |
+| `FEEDBACK_DB_PATH` | — (in-package default) | SQLite feedback.db path. Same rationale as `EVENT_STORE_DB_PATH` |
 
 ## Rate Limiting & Auth
 
@@ -79,7 +81,8 @@ user's problem, to TypeSafe.
 | `RATE_LIMIT_BURST` | `10` | Burst allowance |
 | `ADMIN_API_KEY` | — | Admin endpoint key |
 | `AUTH_PERSISTENCE_ENABLED` | `false` | Persist auth keys to DB |
-| `AUTH_DB_PATH` | `src/reasoner/auth_keys.db` | SQLite auth DB path |
+| `AUTH_DB_PATH` | `src/reasoner/auth_keys.db` | SQLite auth DB path. `docker-compose.yml` sets `/app/history/auth_keys.db` (a mounted volume); the in-package default is lost on redeploy |
+| `PRESET_TIER_ENFORCEMENT_ENABLED` | `false` | Return an early HTTP 403 (before credit reservation) when a caller's tier is below the preset's required tier. Premium presets are already refused at runtime either way, as an SSE `PRESET_TIER_REQUIRED` frame after reservation; this flag only changes when and how the refusal surfaces |
 
 ## CSRF & Security
 
@@ -117,6 +120,7 @@ All VS flags are controlled via `VSFeatureFlags` in code; env vars are not yet w
 |---|---|---|
 | `COHERE_RERANK_ENABLED` | `true` | Enable Cohere reranking |
 | `DOCUMENT_SEMANTIC_RETRIEVAL_ENABLED` | `false` | Semantic retrieval for uploads |
+| `UPLOAD_STORAGE_DIR` | — (in-package default) | Upload storage directory. Point this at a mounted volume in production; the installed package dir is replaced on every redeploy |
 | `SENTRY_TRACES_SAMPLE_RATE` | `0.1` | Sentry sampling rate |
 | `DEBUG` | `false` | Debug mode |
 | `LOG_LEVEL` | `INFO` | Logging level |

@@ -215,6 +215,117 @@ async def test_perspective_filter_regenerates_hallucinated_greek_text():
     assert calls.count("constructive") == 2
 
 
+@pytest.mark.asyncio
+async def test_configured_perspectives_reach_phase_without_explicit_kwarg():
+    """pipeline.perspectives must reach Phase 2 through production wiring.
+
+    Regression: run_perspectives_phase() fell back to DEFAULT_PERSPECTIVES
+    whenever its `perspectives` kwarg was omitted — exactly what happens on the
+    real WorkflowRunner path (application/flows/runner.py calls
+    `self.services.run_phase(step, state)` with no kwargs; only the hand-rolled
+    /api/run-with-context endpoint passed `perspectives=pipeline.perspectives`
+    explicitly). Narrowing pipeline.perspectives therefore had no effect on any
+    normal run. PipelineWorkflowServices.perspectives now surfaces it and the
+    phase's getattr-tolerant default picks it up.
+    """
+    calls = []
+
+    class CountingRouter(FakeRouter):
+        async def call(self, role, system_prompt, user_prompt, **kwargs):
+            calls.append(role)
+            return json.dumps({"core_analysis": f"{role} analysis", "key_insights": []}), {"model": "fake", "input_tokens": 10, "output_tokens": 10}
+
+    router = CountingRouter({})
+    pipeline = ReasonerPipeline(router=router, preset_name="multi-perspective-budget", verbose=False)
+    state = PipelineState(problem="Should we migrate to Postgres?")
+    state.language = "English"
+    pipeline.perspectives = ["constructive", "destructive"]
+
+    # No `perspectives=` kwarg — exactly what the production WorkflowRunner path does.
+    await run_perspectives_phase(state, _svc(pipeline))
+
+    assert set(calls) == {"constructive", "destructive"}
+    assert len(state.candidates) == 2
+
+
+def _recording_router(calls):
+    class RecordingRouter(FakeRouter):
+        async def call(self, role, system_prompt, user_prompt, **kwargs):
+            calls.append(role)
+            return json.dumps({"core_analysis": f"{role} analysis", "key_insights": []}), {"model": "fake", "input_tokens": 10, "output_tokens": 10}
+
+    return RecordingRouter({})
+
+
+@pytest.mark.asyncio
+async def test_empty_pipeline_perspectives_fall_back_to_defaults():
+    calls = []
+    pipeline = ReasonerPipeline(router=_recording_router(calls), preset_name="multi-perspective-budget", verbose=False)
+    state = PipelineState(problem="Should we migrate to Postgres?")
+    state.language = "English"
+    pipeline.perspectives = []
+
+    await run_perspectives_phase(state, _svc(pipeline))
+
+    assert set(calls) == {"constructive", "destructive", "systemic", "minimalist"}
+
+
+@pytest.mark.asyncio
+async def test_duplicate_perspectives_run_once():
+    calls = []
+    pipeline = ReasonerPipeline(router=_recording_router(calls), preset_name="multi-perspective-budget", verbose=False)
+    state = PipelineState(problem="Should we migrate to Postgres?")
+    state.language = "English"
+    pipeline.perspectives = ["constructive", "constructive", "destructive"]
+
+    await run_perspectives_phase(state, _svc(pipeline))
+
+    assert sorted(calls) == ["constructive", "destructive"]
+    assert len(state.candidates) == 2
+
+
+@pytest.mark.asyncio
+async def test_diversity_warning_is_computed_over_active_perspectives_only():
+    """Two active roles on one model must warn even if the inactive roles differ."""
+    from types import SimpleNamespace
+
+    calls = []
+    router = _recording_router(calls)
+    router.routing_table = {
+        "constructive": SimpleNamespace(model="anthropic/a"),
+        "destructive": SimpleNamespace(model="anthropic/a"),
+        "systemic": SimpleNamespace(model="deepseek/b"),
+        "minimalist": SimpleNamespace(model="mistralai/c"),
+    }
+    pipeline = ReasonerPipeline(router=router, preset_name="multi-perspective-budget", verbose=False)
+    state = PipelineState(problem="Should we migrate to Postgres?")
+    state.language = "English"
+    pipeline.perspectives = ["constructive", "destructive"]
+
+    await run_perspectives_phase(state, _svc(pipeline))
+
+    warnings = [e for e in state.pending_events if e.get("type") == "phase_warning"]
+    assert any("diversity collapsed" in w["message"] for w in warnings)
+
+
+@pytest.mark.asyncio
+async def test_single_active_perspective_does_not_warn_diversity_collapse():
+    from types import SimpleNamespace
+
+    calls = []
+    router = _recording_router(calls)
+    router.routing_table = {"constructive": SimpleNamespace(model="anthropic/a")}
+    pipeline = ReasonerPipeline(router=router, preset_name="multi-perspective-budget", verbose=False)
+    state = PipelineState(problem="Should we migrate to Postgres?")
+    state.language = "English"
+    pipeline.perspectives = ["constructive"]
+
+    await run_perspectives_phase(state, _svc(pipeline))
+
+    assert calls == ["constructive"]
+    assert not [e for e in state.pending_events if e.get("type") == "phase_warning"]
+
+
 # ─────────────────────────────────────────────────────────────────────
 # Milestone 6: Stress-test self-referential failures are filtered
 # ─────────────────────────────────────────────────────────────────────

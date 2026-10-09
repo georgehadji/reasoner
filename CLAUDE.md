@@ -131,7 +131,7 @@ ui-next/src/
 ├── lib/                    # api-client, db (IndexedDB), types, utils, security, markdown
 └── stores/                 # app-store.ts (Zustand global state with persistence)
 
-tests/                      # pytest suite (<!-- gen:test_files -->333<!-- /gen --> test_*.py files, recursive)
+tests/                      # pytest suite (<!-- gen:test_files -->341<!-- /gen --> test_*.py files, recursive)
 scripts/
 └── update_mindmap_meta.py  # Patches live counts into ARCHITECTURE_MINDMAP.md (run manually — see §10)
 ```
@@ -306,7 +306,7 @@ Cross-lab diversity prevents echo chambers:
 
 ### Self-Healing CI/CD
 
-`.github/workflows/self-healing-ci.yml` — healing-profile → loop1-static → loop2-runtime → loop3-evolutionary → healing-verification. Coverage gates: 60% fail, 80% warn.
+`.github/workflows/self-healing-ci.yml` — healing-profile → loop1-static → loop2-runtime → loop3-evolutionary → healing-verification, nightly/manual only. The PR-enforced coverage gate is `coverage.yml`: 60% fail, 80% warn (69% measured 2026-09-29). The nightly workflow keeps its own 30% floor because it measures a different suite.
 
 ---
 

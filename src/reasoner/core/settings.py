@@ -95,6 +95,13 @@ class Settings:
     # Mounts the MCP Streamable-HTTP transport at /mcp. Off by default: most
     # installs use stdio (mcp_server.py) instead. Requires the mcp extra.
     ENABLE_MCP_HTTP: bool = os.getenv("ENABLE_MCP_HTTP", "false").lower() in ("1", "true", "yes")
+    # Early HTTP 403 for a preset the caller's tier cannot run. Premium presets are
+    # already refused at runtime regardless of this flag (check_run_allowed in
+    # spend_limit_service, surfaced as an SSE PRESET_TIER_REQUIRED frame after
+    # credits are reserved); this only moves that refusal ahead of the reservation.
+    PRESET_TIER_ENFORCEMENT_ENABLED: bool = (
+        os.getenv("PRESET_TIER_ENFORCEMENT_ENABLED", "false").lower() in ("1", "true", "yes")
+    )
 
     # ── Cohere Rerank (via OpenRouter) ──
     COHERE_RERANK_ENABLED: bool = os.getenv("COHERE_RERANK_ENABLED", "true").lower() in ("1", "true", "yes")
@@ -373,6 +380,34 @@ class Settings:
     COMPACTION_RUN_HOUR_UTC: int = int(os.getenv("COMPACTION_RUN_HOUR_UTC", "3"))
     EVENT_RETENTION_DAYS: int = int(os.getenv("EVENT_RETENTION_DAYS", "365"))
     DB_POOL_SIZE: int = int(os.getenv("DB_POOL_SIZE", "50"))
+
+    # ── Persistent Data Paths ──
+    # feedback.db (feedback_store.py), events.db (event_store.py /
+    # pipeline_ownership_repo.py) and the upload directory (uploader.py)
+    # each default to a path computed from Path(__file__), which lands
+    # inside the installed package directory (src/reasoner/...). That's
+    # fine for local dev, but a container redeploy replaces the package
+    # directory wholesale, so anything written there is lost. Empty string
+    # (the default) preserves each store's historical in-package default —
+    # no behaviour change for local dev/tests when these are unset.
+    # docker-compose.yml sets them to paths under its mounted volumes.
+    FEEDBACK_DB_PATH: str = os.getenv("FEEDBACK_DB_PATH", "")
+    EVENT_STORE_DB_PATH: str = os.getenv("EVENT_STORE_DB_PATH", "")
+    UPLOAD_STORAGE_DIR: str = os.getenv("UPLOAD_STORAGE_DIR", "")
+
+    @property
+    def asyncpg_dsn(self) -> str:
+        """DATABASE_URL with the SQLAlchemy '+asyncpg' driver suffix stripped.
+
+        DATABASE_URL is an SQLAlchemy-style DSN (postgresql+asyncpg://...) so
+        SQLAlchemy's async_engine_from_config picks the asyncpg driver. The
+        asyncpg library itself parses the DSN independently when called
+        directly (asyncpg.create_pool(dsn=...)) and rejects the '+asyncpg'
+        suffix as an unknown scheme. Call sites that hand the DSN straight to
+        asyncpg -- not through SQLAlchemy -- must use this property instead
+        of settings.DATABASE_URL.
+        """
+        return self.DATABASE_URL.replace("+asyncpg", "")
 
     @property
     def internal_api_base_url(self) -> str:

@@ -21,6 +21,7 @@ from reasoner.application.services.adaptive_routing import build_adaptive_routin
 from reasoner.application.services.pipeline_service import PipelineService
 from reasoner.application.services.preset_service import PresetService
 from reasoner.application.services.spend_limit_service import (
+    RUN_TIER_LOOKUP_TIMEOUT_S,
     apply_spend_limits,
     check_run_allowed,
     resolve_user_tier,
@@ -472,7 +473,9 @@ class PipelineExecutionService:
         try:
             # Resolve the caller's plan up front -- the spend ceilings it
             # implies gate the run below and bound every LLM call inside it.
-            user_tier = await resolve_user_tier(user_id)
+            user_tier = await resolve_user_tier(
+                user_id, timeout=RUN_TIER_LOOKUP_TIMEOUT_S, use_fallback_cache=False
+            )
             preflight = await _settle_preflight(
                 orchestrator, req, initial_state, user_id, user_tier,
                 run_id, cancel_event, stream,

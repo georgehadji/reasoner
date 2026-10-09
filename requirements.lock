@@ -192,8 +192,6 @@ pyjwt==2.12.1
     # via
     #   -r requirements.txt
     #   supabase-auth
-pymupdf==1.27.2.3
-    # via -r requirements.txt
 pyparsing==3.3.2
     # via pyiceberg
 pypdf==6.10.2

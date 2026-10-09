@@ -44,7 +44,15 @@ class EventStore:
 
     def __init__(self, db_path: str | Path | None = None):
         if db_path is None:
-            db_path = Path(__file__).parent.parent / "events.db"
+            from reasoner.core.settings import settings
+
+            # EVENT_STORE_DB_PATH lets a deployment point this at a mounted
+            # volume (the installed package dir is replaced on every
+            # container redeploy). Empty keeps the historical in-package
+            # default so local dev/tests are unaffected when it's unset.
+            db_path = settings.EVENT_STORE_DB_PATH or (
+                Path(__file__).parent.parent / "events.db"
+            )
 
         self.db_path = Path(db_path)
         # Delegate connection lifecycle to dedicated module

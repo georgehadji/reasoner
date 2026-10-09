@@ -39,7 +39,17 @@ class PipelineOwnershipRepository:
 
     def __init__(self, db_path: str | Path | None = None) -> None:
         if db_path is None:
-            db_path = Path(__file__).parent.parent.parent / "events.db"
+            from reasoner.core.settings import settings
+
+            # Mirrors EventStore's own EVENT_STORE_DB_PATH fallback (see
+            # event_store.py) so a bare PipelineOwnershipRepository() lands
+            # on the same file EventStore would use, in a deployment that
+            # points it at a mounted volume. get_pipeline_ownership_repo()
+            # below still prefers the *running* EventStore's actual
+            # db_path when one is available.
+            db_path = settings.EVENT_STORE_DB_PATH or (
+                Path(__file__).parent.parent.parent / "events.db"
+            )
         self._conn = EventStoreConnection(Path(db_path))
         self._conn.init_db()
 
