@@ -70,6 +70,7 @@ async def test_done_and_phase_frames_do_not_carry_the_key(monkeypatch):
 
 
 def test_mcp_result_does_not_carry_the_key():
+    pytest.importorskip("mcp")  # optional 'mcp' extra; the CI image does not install it
     from reasoner.api.mcp.tools import _summary_to_dict
     from reasoner.application.services.agent_results import summarise
 
