@@ -7,7 +7,7 @@ Critical Enhancements:
 
 from __future__ import annotations
 
-from reasoner.core.ports.metrics_port import set_degradation_counter
+from reasoner.core.ports.metrics_port import set_degradation_counter, set_quota_exceeded_counter
 
 try:
     from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
@@ -111,15 +111,10 @@ REASONER_ACTIVE_USERS = Gauge(
 )
 
 # Connection pool metrics (Critical Enhancement 7.6)
-REASONER_POSTGRES_POOL_SIZE = Gauge(
-    "reasoner_postgres_pool_size",
-    "Current Postgres connection pool size",
-)
-
-REASONER_POSTGRES_POOL_FREE = Gauge(
-    "reasoner_postgres_pool_free",
-    "Free connections in Postgres pool",
-)
+# No reasoner_postgres_pool_{size,free} here: the only pool the app could report
+# was the health probe's private 1-2 connection pool, which says nothing about
+# the serving pools (one inside each Postgres repository). Re-add them only
+# once a single owner can report real serving-pool occupancy.
 
 REASONER_REDIS_POOL_SIZE = Gauge(
     "reasoner_redis_pool_size",
@@ -320,3 +315,10 @@ HYPERGATE_BUDGET_EXCEEDED_TOTAL = Counter(
 # wiring at a composition root -- a process that never imports this module has
 # no registry to scrape anyway.
 set_degradation_counter(lambda site: REASONER_DEGRADATION_TOTAL.labels(site=site).inc())
+
+
+# ── Fill core's quota-exceeded hook ───────────────────────────────────────
+# QuotaService.check() lives in application/, which may not depend on
+# infrastructure concretes, so it reaches this counter through the same
+# core-owned hook pattern as the degradation counter above.
+set_quota_exceeded_counter(lambda tier: REASONER_QUOTA_EXCEEDED_TOTAL.labels(tier=tier).inc())

@@ -6,6 +6,12 @@ export function UsageBadge() {
   const { quota } = useQuota();
   if (!quota) return null;
 
+  if (quota.unlimited || quota.max == null) {
+    return (
+      <div className="text-[length:var(--text-xs)] font-medium text-[var(--accent)]">Unlimited queries</div>
+    );
+  }
+
   const percent = (quota.used / quota.max) * 100;
   // --warn is reserved for epistemic labels — the near-limit tier still needs
   // a signal without it, so weight carries what colour used to: heavier ink,

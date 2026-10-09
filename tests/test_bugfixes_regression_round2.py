@@ -35,35 +35,41 @@ class TestRequireTierEnforcement:
             scopes=["read"],
         )
 
+    # The original stub 403'd every caller in production. require_tier now
+    # compares the caller's real tier, behind PRESET_TIER_ENFORCEMENT_ENABLED
+    # (full contract: tests/test_saas_preset_tier_enforcement.py).
+
     @pytest.mark.asyncio
-    async def test_require_tier_blocks_in_production(self, mock_user, monkeypatch):
-        """In production, require_tier must raise HTTPException(403)."""
-        from reasoner.api.dependencies import require_tier
+    async def test_require_tier_blocks_a_lower_tier(self, mock_user, monkeypatch):
+        """With enforcement on, a FREE caller is refused a PRO route."""
+        from reasoner.api import dependencies
         from reasoner.core.settings import settings
         from reasoner.domain.saas import SubscriptionTier
 
-        # settings.ENVIRONMENT is a pydantic-settings field cached at construction —
-        # monkeypatch.setenv() alone doesn't reach it, patch the attribute directly.
-        monkeypatch.setattr(settings, "ENVIRONMENT", "production")
+        monkeypatch.setattr(settings, "PRESET_TIER_ENFORCEMENT_ENABLED", True)
 
-        checker = require_tier(SubscriptionTier.PRO)
+        async def free(_user_id):
+            return SubscriptionTier.FREE
+
+        monkeypatch.setattr(dependencies, "_resolve_user_tier", free)
+
+        checker = dependencies.require_tier(SubscriptionTier.PRO)
         with pytest.raises(HTTPException) as exc_info:
-            await checker(user=mock_user)
+            await checker(request=None, user=mock_user)
 
         assert exc_info.value.status_code == 403
-        assert "Tier enforcement" in exc_info.value.detail
 
     @pytest.mark.asyncio
-    async def test_require_tier_allows_in_development(self, mock_user, monkeypatch):
-        """In development, require_tier should allow through (for testing)."""
+    async def test_require_tier_allows_when_enforcement_off(self, mock_user, monkeypatch):
+        """With enforcement off (the default), the user passes through."""
         from reasoner.api.dependencies import require_tier
         from reasoner.core.settings import settings
         from reasoner.domain.saas import SubscriptionTier
 
-        monkeypatch.setattr(settings, "ENVIRONMENT", "development")
+        monkeypatch.setattr(settings, "PRESET_TIER_ENFORCEMENT_ENABLED", False)
 
         checker = require_tier(SubscriptionTier.PRO)
-        result = await checker(user=mock_user)
+        result = await checker(request=None, user=mock_user)
         assert result == mock_user
 
 
@@ -254,30 +260,38 @@ class TestCheckPresetAccess:
             scopes=["read"],
         )
 
-    @pytest.mark.asyncio
-    async def test_preset_access_blocks_in_production(self, mock_user, monkeypatch):
-        """In production, check_preset_access must raise HTTPException(403)."""
-        from reasoner.api.dependencies import check_preset_access
-        from reasoner.core.settings import settings
+    # Replaced stub semantics (403 for every caller in production) with a real
+    # tier comparison behind PRESET_TIER_ENFORCEMENT_ENABLED.
 
-        monkeypatch.setattr(settings, "ENVIRONMENT", "production")
+    @pytest.mark.asyncio
+    async def test_preset_access_blocks_free_user_from_premium(self, mock_user, monkeypatch):
+        """With enforcement on, a FREE caller gets 403 for a premium preset."""
+        from reasoner.api import dependencies
+        from reasoner.core.settings import settings
+        from reasoner.domain.saas import SubscriptionTier
+
+        monkeypatch.setattr(settings, "PRESET_TIER_ENFORCEMENT_ENABLED", True)
+
+        async def free(_user_id):
+            return SubscriptionTier.FREE
+
+        monkeypatch.setattr(dependencies, "_resolve_user_tier", free)
 
         with pytest.raises(HTTPException) as exc_info:
-            await check_preset_access(preset="premium-reasoning", user=mock_user)
+            await dependencies.check_preset_access(preset="debate-premium", user=mock_user)
 
         assert exc_info.value.status_code == 403
-        assert "Preset access enforcement" in exc_info.value.detail
 
     @pytest.mark.asyncio
-    async def test_preset_access_allows_in_development(self, mock_user, monkeypatch):
-        """In development, check_preset_access should allow through."""
+    async def test_preset_access_allows_when_enforcement_off(self, mock_user, monkeypatch):
+        """With enforcement off (the default), the preset is not gated here."""
         from reasoner.api.dependencies import check_preset_access
         from reasoner.core.settings import settings
 
-        monkeypatch.setattr(settings, "ENVIRONMENT", "development")
+        monkeypatch.setattr(settings, "PRESET_TIER_ENFORCEMENT_ENABLED", False)
 
         # Should not raise
-        await check_preset_access(preset="premium-reasoning", user=mock_user)
+        await check_preset_access(preset="debate-premium", user=mock_user)
 
 
 # ──────────────────────────────────────────────────────────────────────────────

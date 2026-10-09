@@ -291,6 +291,6 @@ async def test_every_entry_records_the_resulting_balance(service: CreditService,
     ],
 )
 def test_run_cost_is_extracted_only_from_a_terminal_done_frame(chunk: str, expected):
-    from reasoner.api import _extract_run_cost
+    from reasoner.application.services.run_metering import extract_run_cost
 
-    assert _extract_run_cost(chunk) == expected
+    assert extract_run_cost(chunk) == expected

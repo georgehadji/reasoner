@@ -41,7 +41,6 @@ from reasoner.core.settings import settings
 from reasoner.domain.api_keys import looks_like_api_key
 from reasoner.domain.saas import QuotaResult, SubscriptionTier, User
 from reasoner.infrastructure.auth import get_auth_adapter
-from reasoner.presets import get_preset_tier
 from reasoner.rate_limiter import RateLimitConfig, get_rate_limiter
 
 # ── Rate Limiter Singleton ──
@@ -315,6 +314,47 @@ async def require_auth_if_legacy_disabled(
     return user
 
 
+async def resolve_request_tier(request: Request | None, user: User) -> SubscriptionTier:
+    """The caller's entitled tier, resolved at most once per request.
+
+    The rate limiter, quota check, preset gate and run metering all need the tier
+    and run on the same request; each lookup is bounded but not free (a cold cache
+    plus a slow Postgres costs up to the lookup timeout), so the first result is
+    kept on request.state. Falls back to FREE on every uncertain path.
+    """
+    state = getattr(request, "state", None)
+    cached = getattr(state, "subscription_tier_cache", None)
+    if isinstance(cached, tuple) and cached[0] == str(user.id):
+        return cached[1]
+    tier = await _resolve_user_tier(str(user.id))
+    if state is not None:
+        state.subscription_tier_cache = (str(user.id), tier)
+    return tier
+
+
+async def run_tier_label(user: User | None, request: Request | None = None) -> str:
+    """Tier label for a run's log context and Prometheus query counter.
+
+    Reuses the tier already resolved for this request (rate limit / quota), so a
+    run does not repeat the subscription lookup.
+    """
+    if user is None:
+        return "anonymous"
+    return (await resolve_request_tier(request, user)).value
+
+
+async def close_tier_lookup() -> None:
+    """Close the subscription pool behind tier lookups (app shutdown)."""
+    try:
+        from reasoner.infrastructure.persistence.subscription_repo import (
+            PostgresSubscriptionRepository,
+        )
+
+        await PostgresSubscriptionRepository.close()
+    except Exception as exc:
+        logger.warning("Subscription pool close failed: %s", exc)
+
+
 def require_tier(min_tier: SubscriptionTier):
     """
     Factory that returns a FastAPI dependency enforcing minimum subscription tier.
@@ -326,16 +366,22 @@ def require_tier(min_tier: SubscriptionTier):
     """
     from fastapi import HTTPException
 
-    async def checker(user: User = Depends(get_current_user)) -> User:
-        # BUG-FIX: Actually enforce the tier requirement instead of silently bypassing.
-        # Previously this function returned user unconditionally, allowing any tier
-        # to access endpoints protected by require_tier().
-        # TODO(#501): Replace with actual tier lookup from subscription DB.
-        # For now, fail closed in production to prevent unauthorized access.
-        if settings.ENVIRONMENT == "production":
+    async def checker(
+        request: Request, user: User = Depends(get_current_user)
+    ) -> User:
+        # Resolves the caller's entitled tier from their subscription.
+        # _resolve_user_tier() falls back to FREE on every uncertain path, so a
+        # subscription-store outage denies paid access rather than granting it.
+        if not settings.PRESET_TIER_ENFORCEMENT_ENABLED:
+            return user
+        user_tier = await resolve_request_tier(request, user)
+        if not tier_satisfies(user_tier, min_tier):
             raise HTTPException(
                 status_code=403,
-                detail=f"Tier enforcement not yet implemented. Minimum required: {min_tier.name}",
+                detail=(
+                    f"This feature requires the {min_tier.value} plan. "
+                    f"Your current plan is {user_tier.value}."
+                ),
             )
         return user
 
@@ -354,10 +400,10 @@ async def check_rate_limit(
 
     if user is not None:
         # Authenticated user — use user_id as bucket key with tier multiplier
-        # TODO(#501): fetch tier from subscription
         client_id = f"user:{user.id}"
+        user_tier = await resolve_request_tier(request, user)
         try:
-            allowed, info = await rate_limiter.is_allowed_for_user(client_id, tier="default")
+            allowed, info = await rate_limiter.is_allowed_for_user(client_id, tier=user_tier.value)
         except Exception as exc:
             # BUG-FIX: Fail closed on rate limiter errors instead of fail open.
             # Previously any exception (including programming bugs) allowed the request
@@ -633,6 +679,8 @@ def get_event_store(request: Request):
 # both paths share one definition of what entitles a user to a tier.
 from reasoner.application.services.spend_limit_service import (  # noqa: E402
     _reset_subscription_repo,
+    required_tier_for,
+    tier_satisfies,
 )
 from reasoner.application.services.spend_limit_service import (
     resolve_user_tier as _resolve_user_tier,
@@ -648,12 +696,13 @@ def _reset_quota_service() -> None:
 
 async def check_quota(
     user: User = Depends(get_current_user),
+    request: Request | None = None,
 ) -> QuotaResult:
     """
     FastAPI dependency: check if user has remaining quota.
     Raises HTTPException 429 if exceeded.
     """
-    user_tier = await _resolve_user_tier(str(user.id))
+    user_tier = await resolve_request_tier(request, user)
 
     service = _get_quota_service()
     try:
@@ -688,6 +737,12 @@ async def check_quota(
         return QuotaResult(allowed=True, remaining=10)
 
     if not result.allowed:
+        from reasoner.core.ports.metrics_port import count_quota_exceeded
+
+        # Count at the point of rejection with the real resolved tier, not in
+        # QuotaService.check(), which GET /quota also calls as a status query.
+        # reasoner_quota_exceeded_total backs QuotaExceededSpike (alerts.yml).
+        count_quota_exceeded(getattr(user_tier, "value", str(user_tier)))
         raise HTTPException(
             status_code=429,
             detail={
@@ -708,37 +763,63 @@ async def check_quota(
 async def check_preset_access(
     preset: str,
     user: User = Depends(get_current_user),
+    request: Request | None = None,
 ) -> None:
     """
-    FastAPI dependency: enforce preset tier requirements.
-    Raises HTTPException 403 if preset requires higher tier.
+    Early HTTP 403 for a preset the caller's plan cannot run (opt-in).
+
+    This is NOT the entitlement gate: premium presets are already refused at
+    runtime by check_run_allowed() (spend_limit_service), whatever this flag says.
+    Enabling it only moves that refusal ahead of credit reservation, as a plain
+    403 instead of an SSE PRESET_TIER_REQUIRED frame after the reservation. Tier
+    logic is shared with the runtime gate (required_tier_for / tier_satisfies).
     """
-    # BUG-FIX: Actually enforce preset access control instead of unconditionally
-    # bypassing. Previously any authenticated user could use any preset regardless
-    # of their subscription tier.
-    # TODO(#501): Replace with actual preset-to-tier mapping from DB.
-    # For now, fail closed in production to prevent unauthorized access.
     from fastapi import HTTPException
 
-    # Resolved but deliberately not enforced: per SEC-017 every tier may reach
-    # every preset today (see tests/test_saas_preset_tier_enforcement.py, whose
-    # cases all assert this returns None). Looking the tier up here keeps the
-    # value observable, and gives #501 a single call site to switch over to a
-    # real comparison once the preset-to-tier mapping exists.
-    required_tier = get_preset_tier(preset)
-    logger.debug("Preset %s maps to tier %s (not enforced)", preset, required_tier)
+    # Off by default -- see PRESET_TIER_ENFORCEMENT_ENABLED. Previously this raised
+    # 403 for *every* caller in production (paying users included).
+    if not settings.PRESET_TIER_ENFORCEMENT_ENABLED:
+        return
 
-    if settings.ENVIRONMENT == "production":
+    required_tier = required_tier_for(preset)
+    if required_tier == SubscriptionTier.FREE:
+        return
+
+    user_tier = await resolve_request_tier(request, user)
+    if not tier_satisfies(user_tier, required_tier):
         raise HTTPException(
             status_code=403,
-            detail=f"Preset access enforcement not yet implemented. Preset: {preset}",
+            detail=(
+                f"Preset '{preset}' requires the {required_tier.value} plan. "
+                f"Your current plan is {user_tier.value}."
+            ),
         )
+
+
+async def check_preset_access_if_authenticated(
+    preset: str,
+    user: User | None,
+    request: Request | None = None,
+) -> None:
+    """Enforce preset tier requirements for authenticated callers.
+
+    Called from the route body rather than via Depends: the preset arrives in the
+    request body, and a dependency taking the body model cannot be resolved from a
+    string annotation, so FastAPI would treat it as a query parameter.
+
+    Mirrors check_quota_if_authenticated -- anonymous access is governed by
+    ENABLE_LEGACY_API_KEY at the route, so there is no subscription to check.
+    """
+    if user is None:
+        return
+    await check_preset_access(preset, user, request)
 
 
 async def check_quota_if_authenticated(
     user: User | None = Depends(get_optional_user),
+    request: Request = None,  # type: ignore[assignment]  # injected by FastAPI
 ) -> QuotaResult | None:
     """Only check quota if user is authenticated."""
     if user is None:
         return None
-    return await check_quota(user)
+    return await check_quota(user, request)

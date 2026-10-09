@@ -31,9 +31,13 @@ curl -s http://localhost:8003/api/metrics | head -20
    ```
    METRICS_ALLOWED_IPS=127.0.0.1,::1,172.16.0.0/12
    ```
-3. **Alert routing (optional):** Set these in `.env` for external notifications:
-   - `SLACK_WEBHOOK_URL` — Slack incoming webhook
-   - `PAGERDUTY_ROUTING_KEY` — PagerDuty Events API v2 key
+3. **Alert routing (optional):** Alertmanager does not expand environment
+   variables in its config, so receiver secrets are read from files instead
+   of `.env`. Write them under `./secrets` (gitignored, mounted read-only at
+   `/etc/alertmanager/secrets`) and uncomment the matching receiver in
+   `alertmanager.yml`:
+   - `secrets/slack_url` — Slack incoming webhook
+   - `secrets/pagerduty_key` — PagerDuty Events API v2 key
 
 ### Reloading
 
@@ -56,8 +60,6 @@ All rules are defined in `alerts.yml`. Current coverage:
 | `QuotaExceededSpike` | warning | `reasoner_quota_exceeded_total` | >10 quota-exceeds/sec |
 | `HighLatency` | warning | `reasoner_query_duration_seconds_bucket` | P95 >60s |
 | `PhaseLatencySpike` | warning | `reasoner_phase_duration_seconds_bucket` | P95 >120s |
-| `PostgresPoolExhaustion` | critical | `reasoner_postgres_pool_free` | Pool exhausted |
-| `PostgresPoolLow` | warning | `reasoner_postgres_pool_free` | <2 free connections |
 | `WebhookProcessingFailures` | warning | `reasoner_webhook_processing_failures_total` | Any webhook failure |
 | `WebhookProcessingCritical` | critical | `reasoner_webhook_processing_failures_total` | >5/sec |
 | `DeadLetterEventsAccumulating` | warning | `reasoner_dead_letter_events_total` | Events in dead-letter |
@@ -67,6 +69,15 @@ All rules are defined in `alerts.yml`. Current coverage:
 | `CIHealingHeartbeatStale` | warning | `ci_heartbeat_timestamp` | CI not run >25h |
 | `CircuitBreakerOpen` | critical | `reasoner_circuit_breaker_state` | Open >5m |
 | `RateLimitRejectionSpike` | warning | `reasoner_rate_limit_rejected_total` | >50/sec |
+| `BackendDown` | critical | `up{job="reasoner-backend"}` | Scrape target failing >2m |
+| `BackendMetricsAbsent` | critical | `up{job="reasoner-backend"}` | Scrape target gone entirely >5m |
+
+There are deliberately no Postgres connection-pool alerts. The only pool the
+app reported on was the health probe's private 1-2 connection pool, not a
+serving pool, so `reasoner_postgres_pool_free` carried no information about
+load and was removed along with `PostgresPoolExhaustion`/`PostgresPoolLow`.
+Re-add them once a gauge reports real serving-pool occupancy (each Postgres
+repository owns its own `DB_POOL_SIZE`-connection pool).
 
 ## Required Metrics
 
@@ -75,7 +86,6 @@ Before these alerts can fire, the application must export the following metrics:
 - `reasoner_queries_total` — Counter with labels `tier`, `preset`, `status`
 - `reasoner_quota_exceeded_total` — Counter with label `tier`
 - `reasoner_query_duration_seconds_bucket` — Histogram with label `preset`
-- `reasoner_postgres_pool_free` — Gauge
 - `reasoner_webhook_processing_failures_total` — Counter (NEW — Phase 0.1)
 - `reasoner_dead_letter_events_total` — Counter (NEW — Phase 0.3)
 - `reasoner_memory_usage_mb` — Gauge (NEW — Phase 2.10)
@@ -101,4 +111,4 @@ curl http://localhost:9090/api/v1/alerts | jq '.data.alerts[] | {name: .labels.a
 | Metrics endpoint (`/api/metrics`) | ✅ Implemented |
 | Prometheus deployment | ✅ `docker-compose.observability.yml` |
 | Alertmanager deployment | ✅ `docker-compose.observability.yml` |
-| Alert routing (Slack/PagerDuty) | ✅ Configured (env-driven webhooks) |
+| Alert routing (Slack/PagerDuty) | ⚙️ Recording-only by default — uncomment a receiver in `alertmanager.yml` and supply `./secrets/*` to deliver off-box |
