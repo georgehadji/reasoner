@@ -50,23 +50,10 @@ groups:
           description: "P95 phase duration is {{ $value | printf \"%.1f\" }}s"
 
       # ── Postgres Pool ────────────────────────────────────────────────────────
-      - alert: PostgresPoolExhaustion
-        expr: reasoner_postgres_pool_free == 0
-        for: 1m
-        labels:
-          severity: critical
-        annotations:
-          summary: "Postgres connection pool exhausted"
-          description: "All {{ $value }} Postgres connections are in use"
-
-      - alert: PostgresPoolLow
-        expr: reasoner_postgres_pool_free < 2
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Postgres pool running low"
-          description: "Only {{ $value }} free connections remaining in pool"
+      # No pool alerts: reasoner_postgres_pool_free was fed from the health
+      # probe's own 1-2 connection pool, not a serving pool, so any threshold
+      # on it was meaningless. Add them back with a gauge that reports real
+      # serving-pool occupancy.
 
       # ── Webhook Failures (Phase 0.1) ─────────────────────────────────────────
       - alert: WebhookProcessingFailures
@@ -154,3 +141,28 @@ groups:
         annotations:
           summary: "Rate limit rejection spike"
           description: "{{ $value | printf \"%.2f\" }} requests/sec being rate-limited — possible DoS or misconfigured client"
+
+      # ── Liveness ─────────────────────────────────────────────────────────────
+      # None of the rules above reference the scrape target's own health, so a
+      # dead backend produces silence — Prometheus simply stops receiving
+      # samples and no rule notices. These are the difference between "no
+      # alerts because everything is fine" and "no alerts because nothing is
+      # running". Job name must match prometheus.yml's scrape config.
+      - alert: BackendDown
+        expr: up{job="reasoner-backend"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Reasoner backend is not responding to scrapes"
+          description: "Prometheus cannot reach the backend /api/metrics endpoint. Check `docker compose ps` and `docker compose logs backend`."
+
+      - alert: BackendMetricsAbsent
+        expr: absent(up{job="reasoner-backend"})
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Reasoner backend target has disappeared from Prometheus"
+          description: "The scrape target is gone entirely, not just failing. Check prometheus.yml and that the backend container exists."
+

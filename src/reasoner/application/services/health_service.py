@@ -89,11 +89,11 @@ async def check_health(
                 )
             await _health_postgres_pool.fetchval("SELECT 1")
             health["checks"]["postgres"] = {"status": "ok"}
-            from reasoner.metrics import REASONER_POSTGRES_POOL_FREE, REASONER_POSTGRES_POOL_SIZE
-            REASONER_POSTGRES_POOL_SIZE.set(_health_postgres_pool.get_size())
-            REASONER_POSTGRES_POOL_FREE.set(
-                _health_postgres_pool.get_size() - _health_postgres_pool.get_idle_size()
-            )
+            # Deliberately NO reasoner_postgres_pool_* gauges from this pool: it is a
+            # private probe pool (min 1, max 2), not a serving pool. The app's real
+            # pools live inside each Postgres repository (DB_POOL_SIZE connections
+            # each), so a gauge fed from here read ~1 permanently and drove
+            # PostgresPoolLow/PostgresPoolExhaustion on a number unrelated to load.
         except Exception as e:
             health["checks"]["postgres"] = {"status": "error", "reason": str(e)}
             _health_postgres_pool = None

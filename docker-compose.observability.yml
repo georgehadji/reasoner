@@ -2,10 +2,9 @@
 #
 # Usage: docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d
 #
-# Environment variables (set in .env):
-#   SLACK_WEBHOOK_URL          — Slack webhook for alert notifications
-#   PAGERDUTY_ROUTING_KEY      — PagerDuty integration key (optional)
-#   SMTP_HOST / SMTP_PORT etc. — Email alert routing (optional)
+# Alertmanager does not expand environment variables in its config, so
+# receiver secrets (Slack webhook URL, PagerDuty routing key) are read from
+# files under ./secrets (gitignored) instead — see docs/monitoring/alertmanager.yml.
 #
 # Prometheus scrapes the backend /api/metrics endpoint.
 # The endpoint is IP-restricted by METRICS_ALLOWED_IPS (see settings.py);
@@ -56,6 +55,7 @@ services:
       - "9093:9093"
     volumes:
       - ./docs/monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./secrets:/etc/alertmanager/secrets:ro
       - alertmanager_data:/alertmanager
     restart: unless-stopped
     deploy:
