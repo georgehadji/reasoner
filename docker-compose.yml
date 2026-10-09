@@ -1,22 +1,46 @@
 services:
   cert-generator:
     image: alpine:3.24.1
-    command: >
-      sh -c "apk add --no-cache openssl &&
-             mkdir -p /certs &&
-             if [ ! -f /certs/ca.key ]; then
-               openssl genrsa -out /certs/ca.key 4096 &&
-               openssl req -x509 -new -nodes -key /certs/ca.key -sha256 -days 3650 -out /certs/ca.crt -subj '/CN=Internal CA'
-             fi &&
-             for service in backend frontend postgres valkey; do
-               openssl genrsa -out /certs/$service.key 2048 &&
-               openssl req -new -key /certs/$service.key -out /certs/$service.csr -subj \"/CN=$service\" &&
-               openssl x509 -req -in /certs/$service.csr -CA /certs/ca.crt -CAkey /certs/ca.key -CAcreateserial -out /certs/$service.crt -days 365 -sha256 -extfile /certs/extfile.cnf || 
-               (echo \"subjectAltName = DNS:$service, DNS:localhost\" > /certs/extfile.cnf &&
-                openssl x509 -req -in /certs/$service.csr -CA /certs/ca.crt -CAkey /certs/ca.key -CAcreateserial -out /certs/$service.crt -days 365 -sha256 -extfile /certs/extfile.cnf)
-             done &&
-             chmod -R 644 /certs/*.crt &&
-             chmod -R 600 /certs/*.key"
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        apk add --no-cache openssl
+        mkdir -p /certs
+        # Regenerate the CA when EITHER file is missing: a run that died between
+        # genrsa and req would otherwise leave ca.key alone and fail every later run.
+        if [ ! -f /certs/ca.key ] || [ ! -f /certs/ca.crt ]; then
+          openssl genrsa -out /certs/ca.key 4096
+          # keyUsage is not in the stock openssl.cnf. Python 3.13+ (the backend
+          # image's healthcheck) verifies with VERIFY_X509_STRICT, which rejects
+          # a CA without keyUsage=keyCertSign. Stock config already adds
+          # basicConstraints=critical,CA:TRUE.
+          openssl req -x509 -new -nodes -key /certs/ca.key -sha256 -days 3650 \
+            -out /certs/ca.crt -subj '/CN=Internal CA' \
+            -addext 'keyUsage=critical,keyCertSign,cRLSign'
+        fi
+        for service in backend frontend postgres valkey; do
+          openssl genrsa -out /certs/$$service.key 2048
+          openssl req -new -key /certs/$$service.key -out /certs/$$service.csr -subj "/CN=$$service"
+          # One SAN file per service so each cert names only its own host.
+          printf 'subjectAltName = DNS:%s, DNS:localhost\n' "$$service" > /certs/$$service.ext
+          openssl x509 -req -in /certs/$$service.csr -CA /certs/ca.crt -CAkey /certs/ca.key \
+            -CAcreateserial -out /certs/$$service.crt -days 365 -sha256 -extfile /certs/$$service.ext
+        done
+        chmod 644 /certs/*.crt
+        chmod 600 /certs/*.key
+        # The /certs mount is read-only and root-owned, but each consumer reads
+        # its own key as a non-root user, so a root-owned 0600 key is unreadable
+        # and the service dies at boot. Hand each key to the uid its service runs as.
+        #   backend  appuser (uid pinned to 10001 in the Dockerfile)
+        #   postgres postgres:16-alpine runs as uid 70, and refuses a key that is
+        #            not 0600 and owned by that user (or root)
+        #   valkey   valkey/valkey runs as uid 999 after dropping root
+        # frontend's key is never read (it only trusts ca.crt), so it stays root-only.
+        chown 10001:10001 /certs/backend.key
+        chown 70:70 /certs/postgres.key
+        chown 999:999 /certs/valkey.key
     volumes:
       - internal_certs:/certs
 
@@ -36,7 +60,11 @@ services:
       frontend:
         condition: service_started
       backend:
-        condition: service_started
+        # backend's Dockerfile HEALTHCHECK doesn't pass until the server is
+        # actually accepting requests; service_started only waits for the
+        # process to launch, so caddy was proxying to a backend that was
+        # still mid-`alembic upgrade head` and returning 502s.
+        condition: service_healthy
     restart: unless-stopped
     deploy:
       resources:

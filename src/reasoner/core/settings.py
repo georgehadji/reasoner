@@ -396,6 +396,20 @@ class Settings:
     UPLOAD_STORAGE_DIR: str = os.getenv("UPLOAD_STORAGE_DIR", "")
 
     @property
+    def asyncpg_dsn(self) -> str:
+        """DATABASE_URL with the SQLAlchemy '+asyncpg' driver suffix stripped.
+
+        DATABASE_URL is an SQLAlchemy-style DSN (postgresql+asyncpg://...) so
+        SQLAlchemy's async_engine_from_config picks the asyncpg driver. The
+        asyncpg library itself parses the DSN independently when called
+        directly (asyncpg.create_pool(dsn=...)) and rejects the '+asyncpg'
+        suffix as an unknown scheme. Call sites that hand the DSN straight to
+        asyncpg -- not through SQLAlchemy -- must use this property instead
+        of settings.DATABASE_URL.
+        """
+        return self.DATABASE_URL.replace("+asyncpg", "")
+
+    @property
     def internal_api_base_url(self) -> str:
         """Base URL for internal self-calls (e.g., Neuro endpoints from streaming)."""
         return f"http://{self.SERVER_HOST}:{self.SERVER_PORT}"
