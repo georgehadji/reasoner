@@ -173,7 +173,9 @@ def test_account_deletion_log_revision_matches_raw_sql_columns():
 
 def test_pyproject_build_backend_is_importable():
     backend = tomllib.loads(_read("pyproject.toml"))["build-system"]["build-backend"]
+    assert backend == "setuptools.build_meta"
+    # The CI image ships no setuptools; the value check above still runs there.
+    pytest.importorskip("setuptools")
     module_name, _, attr = backend.partition(":")
     module = importlib.import_module(module_name)
     assert attr == "" or hasattr(module, attr)
-    assert backend == "setuptools.build_meta"
