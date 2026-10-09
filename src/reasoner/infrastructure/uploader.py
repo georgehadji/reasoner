@@ -196,40 +196,80 @@ async def _ocr_image(content: bytes, filename: str) -> str:
         return f"[Image OCR failed: {e}]"
 
 
-def _render_pdf_pages_sync(content: bytes, max_pages: int) -> list[bytes]:
-    """Render PDF pages to PNG bytes. Runs in a thread pool — all fitz I/O is sync."""
-    import fitz
-    doc = fitz.open(stream=content, filetype="pdf")
-    try:
-        images = []
-        for page_num in range(min(max_pages, len(doc))):
-            pix = doc.load_page(page_num).get_pixmap(dpi=200)
-            images.append(pix.tobytes("png"))
-        return images
-    finally:
-        doc.close()
+# Prefixes of the bracketed placeholder strings this module returns in place of
+# extracted text (errors, unavailable features, timeouts, the scanned-PDF notice).
+_EXTRACTION_NOTICE_PREFIXES = (
+    "[PDF extraction",
+    "[DOCX extraction",
+    "[Image description failed",
+    "[Image OCR failed",
+    "[Unsupported file type",
+    "[Document extraction timed out",
+    "[Scanned PDF:",
+)
+_MAX_EXTRACTION_NOTICE_LEN = 500
+
+
+def is_extraction_notice(text: str) -> bool:
+    """True when ``text`` is only a placeholder from this module, not content.
+
+    Deliberately narrow: the whole text must be one short bracketed message
+    starting with a known prefix, so a real document that merely mentions one
+    of these phrases is never treated as a notice.
+    """
+    stripped = text.strip()
+    return (
+        len(stripped) <= _MAX_EXTRACTION_NOTICE_LEN
+        and stripped.endswith("]")
+        and stripped.startswith(_EXTRACTION_NOTICE_PREFIXES)
+    )
+
+
+# Returned (and compared against) when a PDF has no usable text layer and page
+# OCR cannot run. Neutral on purpose: it is user-visible and may be stored as
+# document content, so it must not leak build/licensing details.
+SCANNED_PDF_OCR_UNAVAILABLE = (
+    "[Scanned PDF: no text layer could be extracted and OCR is unavailable]"
+)
 
 
 async def _ocr_scanned_pdf(content: bytes, max_pages: int = 3) -> str:
-    """Render PDF pages to images and OCR them."""
-    try:
-        import fitz  # noqa: F401 — availability check only
-    except ImportError:
-        return "[Scanned PDF detected — install pymupdf for OCR: pip install pymupdf]"
+    """Render PDF pages to images and OCR them.
 
-    try:
-        page_images = await asyncio.to_thread(_render_pdf_pages_sync, content, max_pages)
-        parts: list[str] = []
-        for i, img_bytes in enumerate(page_images):
-            page_text = await _ocr_image(img_bytes, f"page_{i}.png")
-            if page_text and not page_text.startswith("["):
-                parts.append(page_text)
-        if not parts:
-            return "[Scanned PDF — no text could be extracted]"
-        return "\n\n".join(parts)
-    except Exception as e:
-        logger.error(f"Scanned PDF OCR failed: {e}")
-        return f"[Scanned PDF OCR failed: {e}]"
+    DEGRADED CAPABILITY: this previously rasterized PDF pages to PNG via
+    PyMuPDF (``fitz``) so scanned/image-only PDFs could be OCR'd. PyMuPDF is
+    AGPL-3.0/commercial-dual-licensed and was replaced by pypdf
+    (BSD-3-Clause) — see requirements.txt. pypdf has no PDF-page-rasterization
+    API, so there is no drop-in equivalent, and this function can no longer
+    render pages to images. It now always returns ``SCANNED_PDF_OCR_UNAVAILABLE``
+    (callers fall back to any pypdf text they already have) instead of silently
+    returning no text. Text-layer PDF extraction (``_extract_pdf``, used for the
+    common case) is unaffected.
+    """
+    logger.warning(
+        "Scanned-PDF OCR requested but unavailable: PDF page rasterization "
+        "required PyMuPDF (AGPL-3.0), which was removed in favor of pypdf "
+        "(BSD-3-Clause); pypdf cannot render PDF pages to images."
+    )
+    return SCANNED_PDF_OCR_UNAVAILABLE
+
+
+async def _pdf_text_or_ocr(content: bytes, force_ocr: bool) -> str:
+    """pypdf text layer, falling back to OCR when it is short or OCR is forced.
+
+    The pypdf text is never discarded: when OCR is unavailable, any text pypdf
+    did extract is returned in preference to the unavailable notice, and a real
+    pypdf error is returned as-is rather than being masked by that notice.
+    """
+    text = _extract_pdf(content)
+    if text.startswith("[PDF extraction"):  # error from _extract_pdf: keep it
+        return text
+    if not force_ocr and len(text.strip()) >= 50:
+        return text
+    ocr_text = await _ocr_scanned_pdf(content)
+    if ocr_text != SCANNED_PDF_OCR_UNAVAILABLE:
+        return ocr_text
+    return text if text.strip() else ocr_text
 
 
 async def _extract_text_unbounded(content: bytes, filename: str, *, force_ocr: bool = False) -> str:
@@ -252,10 +292,7 @@ async def _extract_text_unbounded(content: bytes, filename: str, *, force_ocr: b
         case ".md":
             return _extract_md(content)
         case ".pdf":
-            text = _extract_pdf(content)
-            if not force_ocr and len(text.strip()) >= 50:
-                return text
-            return await _ocr_scanned_pdf(content)
+            return await _pdf_text_or_ocr(content, force_ocr)
         case ".docx":
             return _extract_docx(content)
         case ".png" | ".jpg" | ".jpeg" | ".webp":
@@ -458,7 +495,9 @@ async def save_uploaded_file(
         # spawn unbounded concurrent indexing tasks (security-remediation-
         # plan.md Phase 4 item 4). A full queue drops the job and logs; the
         # upload above has already succeeded either way.
-        if file_id and text_content and len(text_content) > 0:
+        # Extraction error / "OCR unavailable" placeholders are not document
+        # content: don't index them.
+        if file_id and text_content and not is_extraction_notice(text_content):
             try:
                 if settings.DOCUMENT_SEMANTIC_RETRIEVAL_ENABLED:
                     from reasoner.infrastructure.documents.index_queue import enqueue_index_job

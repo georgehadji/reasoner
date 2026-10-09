@@ -225,6 +225,25 @@ class FollowupRequest(BaseModel):
 
     model_config = {"extra": "forbid"}
 
+    @field_validator("agent_model")
+    @classmethod
+    def validate_agent_model(cls, v: str | None) -> str | None:
+        # agent_model is forced onto the synthesis/fusion routing roles. An
+        # unknown id would otherwise raise ValueError from build_provider during
+        # preflight (a 500-class failure) rather than a 422 at the boundary.
+        if not v:
+            return v
+        from reasoner.core.ports.model_registry_port import get_model_registry_port
+
+        entry = get_model_registry_port().entry(v)
+        if entry is None:
+            raise ValueError(f"Unknown agent_model: {v}")
+        # Image generators share _REGISTRY with text models but cannot serve
+        # the synthesis/fusion roles; the registry marks them include_images.
+        if (entry.get("extra_body") or {}).get("include_images"):
+            raise ValueError(f"agent_model must be a text model, not an image generator: {v}")
+        return v
+
     @field_validator("question")
     @classmethod
     def validate_question(cls, v: str) -> str:
