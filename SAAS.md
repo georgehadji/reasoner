@@ -196,7 +196,7 @@ class QuotaManager:
 ### Payment Stack
 - **Stripe** — subscriptions, one-time payments, coupons, invoicing
 - **Stripe Billing Portal** — self-service subscription management (cancel, upgrade)
-- **stripe-python** backend + **@stripe/stripe-js** + **@stripe/react-stripe-js** frontend
+- **stripe-python** backend; the frontend has no Stripe SDK, it redirects to Stripe-hosted Checkout and Billing Portal pages
 
 ### Plans to Create in Stripe Dashboard
 ```

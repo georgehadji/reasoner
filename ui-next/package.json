@@ -14,8 +14,6 @@
   },
   "dependencies": {
     "@sentry/nextjs": "^11.4.0",
-    "@stripe/react-stripe-js": "^7.0.0",
-    "@stripe/stripe-js": "^10.0.0",
     "@supabase/supabase-js": "^2.117.2",
     "clsx": "^2.1.1",
     "framer-motion": "^14.0.0",
