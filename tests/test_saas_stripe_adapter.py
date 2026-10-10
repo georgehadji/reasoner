@@ -6,6 +6,7 @@ import os
 from unittest.mock import MagicMock, patch
 
 import pytest
+import stripe
 
 from reasoner.domain.saas import SubscriptionStatus, SubscriptionTier
 from reasoner.infrastructure.billing.stripe_adapter import StripeBillingAdapter
@@ -41,9 +42,10 @@ async def test_create_checkout_session(adapter):
 
 @pytest.mark.asyncio
 async def test_create_portal_session(adapter):
-    mock_customer = MagicMock()
-    mock_customer.id = "cus_123"
-    mock_customer.metadata = {"reasoner_user_id": "user-1"}
+    # A real StripeObject: a MagicMock answers .get() and hid the stripe 15 break.
+    mock_customer = stripe.Customer.construct_from(
+        {"id": "cus_123", "metadata": {"reasoner_user_id": "user-1"}}, "sk_test_123",
+    )
 
     mock_customer_list = MagicMock()
     mock_customer_list.auto_paging_iter = lambda: iter([mock_customer])
@@ -92,8 +94,10 @@ async def test_sync_subscription_checkout_completed(adapter):
 
 @pytest.mark.asyncio
 async def test_sync_subscription_deleted(adapter):
-    mock_customer = MagicMock()
-    mock_customer.metadata = {"reasoner_user_id": "12345678-1234-5678-1234-567812345678"}
+    mock_customer = stripe.Customer.construct_from(
+        {"id": "cus_123", "metadata": {"reasoner_user_id": "12345678-1234-5678-1234-567812345678"}},
+        "sk_test_123",
+    )
 
     event = {
         "type": "customer.subscription.deleted",

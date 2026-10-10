@@ -156,9 +156,10 @@ class TestStripeAdapterRobustness:
         adapter = StripeBillingAdapter(api_key="sk_test_dummy")
         stripe_sub = {"customer": "cus_123"}
 
-        # Mock stripe.Customer.retrieve to return customer without metadata
-        fake_customer = MagicMock()
-        fake_customer.metadata = {}
+        # A real StripeObject without metadata (a MagicMock would answer .get()).
+        import stripe
+
+        fake_customer = stripe.Customer.construct_from({"id": "cus_123", "metadata": {}}, "sk_test_dummy")
         with patch("stripe.Customer.retrieve", return_value=fake_customer):
             with pytest.raises(ValueError, match="Missing reasoner_user_id"):
                 await adapter._handle_subscription_updated(stripe_sub)
@@ -171,9 +172,10 @@ class TestStripeAdapterRobustness:
         adapter = StripeBillingAdapter(api_key="sk_test_dummy")
         stripe_sub = {"id": "sub_123", "customer": "cus_123"}
 
-        # Mock stripe.Customer.retrieve to return customer without metadata
-        fake_customer = MagicMock()
-        fake_customer.metadata = {}
+        # A real StripeObject without metadata (a MagicMock would answer .get()).
+        import stripe
+
+        fake_customer = stripe.Customer.construct_from({"id": "cus_123", "metadata": {}}, "sk_test_dummy")
         with patch("stripe.Customer.retrieve", return_value=fake_customer):
             result = await adapter._handle_subscription_deleted(stripe_sub)
 

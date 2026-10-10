@@ -117,6 +117,33 @@ def test_webhook_processing_error_returns_200(client, monkeypatch):
     assert response.json()["status"] == "ok"
 
 
+def test_webhook_processes_a_real_stripe_event_object(client, monkeypatch):
+    """construct_event returns a StripeObject, which has no .get() since stripe-python 15."""
+    import stripe
+
+    from reasoner.application.services.billing_service import BillingService
+
+    event = stripe.Event.construct_from({
+        "id": "evt_real_1",
+        "object": "event",
+        "type": "invoice.paid",
+        "data": {"object": {"id": "in_1", "object": "invoice"}},
+    }, "sk_test_fake")
+    monkeypatch.setattr(stripe.Webhook, "construct_event", lambda *args, **kwargs: event)
+    seen: list = []
+
+    async def _handle(self, provider_event):
+        seen.append(provider_event)
+
+    monkeypatch.setattr(BillingService, "handle_webhook", _handle)
+
+    response = client.post("/api/billing/webhook", json={}, headers={"stripe-signature": "test"})
+
+    assert response.status_code == 200
+    assert len(seen) == 1
+    assert seen[0]["id"] == "evt_real_1" and seen[0]["type"] == "invoice.paid"
+
+
 def test_webhook_unsigned_payload_is_ignored_when_secret_missing(client, monkeypatch):
     """SEC-004: Unsigned payloads must be ignored when STRIPE_WEBHOOK_SECRET is not set."""
     import stripe

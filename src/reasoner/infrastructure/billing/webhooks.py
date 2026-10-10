@@ -11,7 +11,7 @@ import stripe
 from fastapi import Request
 
 from reasoner.infrastructure.billing.paypal_adapter import PayPalBillingAdapter
-from reasoner.infrastructure.billing.stripe_adapter import StripeBillingAdapter
+from reasoner.infrastructure.billing.stripe_adapter import StripeBillingAdapter, to_plain
 from reasoner.infrastructure.valkey.client import get_valkey_pool
 
 logger = logging.getLogger(__name__)
@@ -173,6 +173,9 @@ async def handle_stripe_webhook(request: Request) -> dict:
         # Return 200 to prevent Stripe retries, but do NOT process the event
         return {"status": "misconfigured"}
 
+    # construct_event returns a StripeObject, which has no .get() since
+    # stripe-python 15; everything below, and BillingService, expects a dict.
+    event = to_plain(event)
     event_id = event.get("id", "unknown")
     event_type = event.get("type", "unknown")
     logger.info("Stripe webhook received: %s (id=%s)", event_type, event_id)
