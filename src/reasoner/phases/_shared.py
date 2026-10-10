@@ -157,8 +157,20 @@ def _wrap_user_input(text: str) -> str:
     return f"<<<USER_INPUT>>>\n{text}\n<<<END_USER_INPUT>>>"
 
 
+_DELIMITER_FORGERY_RE = re.compile(
+    r"<<<\s*(?:END_)?(?:EXTERNAL_CONTENT|USER_INPUT)\s*>>>", re.IGNORECASE
+)
+
+
 def _wrap_external_content(text: str) -> str:
-    """Wrap external/untrusted content in explicit delimiters."""
+    """Wrap external/untrusted content in explicit delimiters.
+
+    A delimiter that the content can reproduce is no delimiter: an upload or a
+    scraped page containing the closing marker would end the block early and
+    have everything after it read as trusted text. Any copy of our own markers
+    inside the content is therefore replaced before wrapping.
+    """
+    text = _DELIMITER_FORGERY_RE.sub("[delimiter removed]", text)
     return f"<<<EXTERNAL_CONTENT>>>\n{text}\n<<<END_EXTERNAL_CONTENT>>>"
 
 
@@ -410,6 +422,11 @@ def build_synthesis_context(state: PipelineState) -> str:
     citations = prism.get("citations", []) if prism else []
     if citations:
         parts.append("[SOURCED EVIDENCE]")
+        # Not wrapped here: synthesis_prompt() wraps this whole block (it is
+        # appended to `sources_info`) as external content, and a second wrap
+        # inside it would have the marker stripper turn the inner markers into
+        # "[delimiter removed]" noise. Uploaded-file snippets are neutralized
+        # where they are collected (prism_research._action_uploads_search).
         for i, c in enumerate(citations, 1):
             parts.append(f"[{i}] {c['title']} — {c['url']}\n    {c['snippet']}")
         parts.append(

@@ -14,6 +14,7 @@ from reasoner.core.constants_limits import TRUNCATION
 from reasoner.core.ports.file_search_port import FileSearchPort
 from reasoner.core.ports.llm_port import LLMPort
 from reasoner.core.ports.search_port import SearchServicePort, SourceType
+from reasoner.core.sanitization import neutralize_for_replay
 from reasoner.core.search import _normalize_url
 from reasoner.core.settings import settings
 from reasoner.domain.pipeline_state import PipelineState
@@ -384,10 +385,23 @@ async def _action_uploads_search(
         try:
             chunks = await file_search.search_chunks(file_ids, q, top_k=5)
             for ch in chunks:
+                # Uploaded-file text is caller-controlled and ends up in the
+                # synthesis prompt via phases._shared.build_synthesis_context,
+                # which wraps it as external content. Neutralize it first:
+                # strip control/invisible characters and report (not block)
+                # injection patterns, as for every other replayed text.
+                safe_snippet, snippet_warnings = neutralize_for_replay(
+                    ch.content, max_length=500
+                )
+                if snippet_warnings:
+                    logger.warning(
+                        "Neutralized %d pattern(s) in uploaded-file excerpt",
+                        len(snippet_warnings),
+                    )
                 results.append(_Citation(
                     url=f"file://{ch.file_id}",
                     title=f"Uploaded file: {ch.file_id}",
-                    snippet=ch.content[:500],
+                    snippet=safe_snippet,
                     source_type="file",
                 ))
         except Exception as exc:

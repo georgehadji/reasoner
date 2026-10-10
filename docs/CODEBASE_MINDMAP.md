@@ -1,7 +1,7 @@
 # CODEBASE_MINDMAP.md — Reasoner (v3.0 Post-Refactor)
 
 > High-fidelity codebase reconstruction.  
-> **Last updated:** 2026-10-09  
+> **Last updated:** 2026-10-10  
 > **Python source files:** 545 | **Models:** 212 | **Presets:** 49 | **Methods:** 31 | **Phase modules:** 32
 
 ---
@@ -462,7 +462,7 @@ Input → CSRF Check → Auth → Rate Limit → Input Sanitization
 
 **Metrics:** Prometheus (cost, tokens, duration, active users)
 **Tracing:** Langfuse (LLM call observability)
-**Logging:** SafeLoggingFilter (redacts secrets, PII)
+**Logging:** install_global_redaction (redacts secrets, PII)
 **Errors:** Sentry (exception tracking)
 
 ### Event Bus (CQRS)

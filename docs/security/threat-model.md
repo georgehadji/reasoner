@@ -40,7 +40,7 @@ Trust boundaries:
 | Fake JWT token | User sessions | High | Supabase JWT verification; HMAC if local fallback | ✅ Implemented |
 | Spoofed admin requests | Admin endpoints | High | Dual auth: JWT admin scope + X-Admin-Key header; `secrets.compare_digest()` | ✅ Implemented |
 | Fake CSRF token | State-changing requests | Medium | HMAC-SHA256 signed tokens; verified in Next.js and FastAPI | ✅ Implemented |
-| API key theft via logs | LLM API keys | High | `SafeLoggingFilter` redacts keys from all log output | ✅ Implemented |
+| API key theft via logs | LLM API keys | High | `install_global_redaction()` (called from `reasoner/__init__.py`) redacts keys from every log record | ✅ Implemented |
 | Impersonated provider response | LLM responses | Low | Circuit breaker + fallback chain limits damage from bad responses | ⚠️ Partial |
 
 ### 2. Tampering
@@ -65,7 +65,7 @@ Trust boundaries:
 
 | Threat | Asset | Risk | Mitigation | Status |
 |--------|-------|------|------------|--------|
-| API key in error messages | LLM credentials | High | `SafeLoggingFilter` redacts; error messages truncated to 120 chars | ✅ Implemented |
+| API key in error messages | LLM credentials | High | `redact_sensitive()` / `redacted_errors()` redact at each client exit; error messages truncated to 120 chars | ✅ Implemented |
 | Stack traces in production | System internals | Medium | Global exception handler in `api/error_handler.py`; Sentry captures internals safely | ✅ Implemented |
 | Health endpoint leaking details | System topology | Low | Public response omits memory/DB details; admin key required for full output | ✅ Implemented |
 | CORS misconfiguration | CSRF attack surface | Medium | `CORS_ORIGINS` env var; development mode warns but doesn't block | ⚠️ Dev-only risk |

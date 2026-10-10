@@ -16,6 +16,7 @@ from collections.abc import AsyncGenerator
 from typing import Any
 
 from reasoner.api.sse_utils import _event
+from reasoner.core.logging_utils import redact_capped
 from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.phases.direct import (
     DIRECT_WEB_SEARCH_SYSTEM,
@@ -124,7 +125,7 @@ async def _stream_direct_answer(
             )
     except Exception as exc:
         logger.error("Direct answer failed: %s", exc)
-        err_msg = f"{type(exc).__name__}: {str(exc)[:120]}"
+        err_msg = redact_capped(f"{type(exc).__name__}: {exc}")[:120]
         yield _event({"type": "phase_error", "phase": 0, "error": err_msg})
         yield _event({
             "type": "done",

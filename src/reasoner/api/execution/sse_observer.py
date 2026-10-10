@@ -36,6 +36,7 @@ from reasoner.core.exceptions import (
     error_code_for_exception,
     is_retryable,
 )
+from reasoner.core.logging_utils import get_correlation_id, redact_capped, redacted_errors
 from reasoner.domain.pipeline_state import PipelineState
 
 logger = logging.getLogger(__name__)
@@ -136,7 +137,7 @@ class RunStream:
         # whole pipeline and the TypeScript SDK reads every one of them.
         done_payload = {
             "type": "done",
-            "errors": state.errors,
+            "errors": redacted_errors(state.errors),
             # Failures the run survived by falling back (P5). Distinct from
             # errors: nothing here stopped a phase, but the answer was produced
             # with less than the full machinery.
@@ -162,12 +163,22 @@ class RunStream:
 
     async def failed(self, exc: BaseException, state: PipelineState | None) -> None:
         """The run itself broke, as opposed to one phase inside it."""
-        message = f"Pipeline processing error: {type(exc).__name__}: {str(exc)[:120]}"
+        # The exception text can carry a provider key or DSN echoed back in an
+        # upstream error body. The event store keeps it redacted (redacted
+        # before truncating, so the cut cannot split a key into a form the
+        # patterns no longer match); the client gets the exception type and a
+        # correlation id to quote, with the detail left in the server log.
+        detail = redact_capped(str(exc))[:120]
+        stored = f"Pipeline processing error: {type(exc).__name__}: {detail}"
+        message = (
+            f"Pipeline processing error: {type(exc).__name__} "
+            f"(correlation_id={get_correlation_id()}). See server logs."
+        )
         phase = getattr(state, "_current_phase_key", "unknown") if state else "unknown"
 
         await self.persist(
             EventType.PIPELINE_FAILED,
-            error=message,
+            error=stored,
             phase_at_failure=phase,
             phases_completed=len(state.phase_durations) if state else 0,
         )
@@ -262,7 +273,9 @@ class SseRunObserver:
 
         # state.errors already holds the runner's message; this only changes
         # what the browser renders.
-        client_message = _AUTH_HINT if err_type == "auth" else message
+        client_message = (
+            _AUTH_HINT if err_type == "auth" else redact_capped(message)
+        )
 
         await self._both({
             "type": "error",
@@ -380,7 +393,7 @@ class SseRunObserver:
         # user and to us.
         phase_errors = state.errors[self._errors_before:]
         if phase_errors:
-            data["errors"] = phase_errors
+            data["errors"] = redacted_errors(phase_errors)
             # Explicit alongside `errors` rather than left for the UI to infer
             # from array length: a phase that appended to state.errors and
             # recovered (e.g. article_phases.py's outline/critic parse-error

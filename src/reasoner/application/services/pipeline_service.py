@@ -72,6 +72,7 @@ class PipelineService:
             Context dictionary optimized for token efficiency.
         """
         from reasoner.core.constants import TRUNCATION
+        from reasoner.core.sanitization import neutralize_for_replay, sanitize_filename_for_prompt
         from reasoner.domain.models import ClaimLabel
 
         summary = state.to_summary()
@@ -83,10 +84,18 @@ class PipelineService:
         }
 
         if summary["attachments"]:
+            # Uploaded text is caller-controlled. AttachmentRef neutralizes it at
+            # the API boundary, but state can also arrive from a resumed file,
+            # so it is neutralized again here, and the filename (printed next to
+            # it) is reduced to one clean line. No delimiter is added: the one
+            # consumer, synthesis_prompt(), wraps the whole context dict as
+            # external content, and a nested wrap would be stripped to noise.
             context["attachments"] = [
                 {
-                    "filename": a.get("filename", "unknown"),
-                    "extracted_text": (a.get("extracted_text", "") or "")[:TRUNCATION.LARGE_CONTENT],
+                    "filename": sanitize_filename_for_prompt(a.get("filename", "unknown")),
+                    "extracted_text": neutralize_for_replay(
+                        a.get("extracted_text", "") or "", max_length=TRUNCATION.LARGE_CONTENT
+                    )[0],
                 }
                 for a in summary["attachments"]
             ]
@@ -297,7 +306,14 @@ class PipelineSerializationService:
                 return {k: serialize(v) for k, v in asdict(obj).items()}
             return obj
 
-        return serialize(asdict(state))
+        from reasoner.core.logging_utils import redacted_errors
+
+        data = serialize(asdict(state))
+        # --save-state writes this to disk; keys echoed in exception text must not.
+        core = data.get("core")
+        if isinstance(core, dict) and "errors" in core:
+            core["errors"] = redacted_errors(core["errors"])
+        return data
 
     @staticmethod
     def save(state: PipelineState, path: str | Path) -> None:

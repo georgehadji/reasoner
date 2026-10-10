@@ -19,7 +19,7 @@ folders:
 
 | File | What it does |
 |------|--------------|
-| `__init__.py` | Wires `SafeLoggingFilter` at package level so every entry point (API, CLI, tests) gets secret redaction. |
+| `__init__.py` | Calls `install_global_redaction()` at package level so every entry point (API, CLI, tests) gets secret redaction. |
 | `main.py` (19KB) | **CLI entry point.** `parse_args`, `main`, `cmd_list_models`; builds `PipelineOrchestrator` + adaptive routing. Backs `python main.py --problem ... --preset ...`. |
 | `headless.py` (9.5KB) | In-process API for host apps — `ask()`, `HeadlessResult`, `shutdown()`; runs the pipeline without FastAPI/uvicorn. |
 | `start_all.py` (15KB) | Launches API (:8003) and Neuro memory server (:50001): preflight checks, port probing, health wait, process supervision. |
