@@ -40,6 +40,7 @@ from reasoner.application.services.agent_results import summarise
 from reasoner.application.services.pipeline_service import PipelineService
 from reasoner.application.services.preset_service import PresetService
 from reasoner.application.services.run_metering import RunContext, metered
+from reasoner.core.logging_utils import redacted_errors
 from reasoner.domain.saas import QuotaResult, User
 
 logger = logging.getLogger(__name__)
@@ -215,7 +216,7 @@ async def agent_run_sync(
     return RunResult(
         preset=summary.preset,
         method=summary.method,
-        errors=list(summary.errors),
+        errors=redacted_errors(summary.errors),
         total_tokens=dict(summary.total_tokens),
         total_cost_usd=summary.total_cost_usd,
         duration_seconds=summary.duration_seconds,

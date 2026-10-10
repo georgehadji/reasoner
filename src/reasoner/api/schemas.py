@@ -67,6 +67,11 @@ class SearchRequest(BaseModel):
 # already cuts each attachment to TRUNCATION.LARGE_CONTENT = 16 000 chars).
 MAX_ATTACHMENT_TEXT_CHARS = 1_000_000
 
+# The id is echoed to the client, written to logs and used as an event-store
+# aggregate id, so it is constrained to a plain token. Generators: ui-next
+# ('run-' + UUID) and the TypeScript SDK (UUID or 'run-<base36>-<base36>').
+CLIENT_RUN_ID_PATTERN = r"^[A-Za-z0-9_-]{1,64}$"
+
 
 class AttachmentRef(BaseModel):
     file_id: str
@@ -76,6 +81,15 @@ class AttachmentRef(BaseModel):
     size: int = 0
 
     model_config = {"extra": "forbid"}
+
+    @field_validator("filename")
+    @classmethod
+    def validate_filename(cls, v: str) -> str:
+        # The name is printed on its own line next to the document body in
+        # prompts; a newline in it would let a caller forge a section header.
+        from reasoner.sanitization import sanitize_filename_for_prompt
+
+        return sanitize_filename_for_prompt(v)
 
     @field_validator("extracted_text")
     @classmethod
@@ -113,7 +127,7 @@ class RunRequest(BaseModel):
         default_factory=list, max_length=settings.UPLOAD_MAX_FILES
     )
     file_ids: list[str] = []
-    client_run_id: str | None = None
+    client_run_id: str | None = Field(default=None, pattern=CLIENT_RUN_ID_PATTERN)
 
     model_config = {"extra": "forbid"}
 
@@ -212,7 +226,7 @@ class FollowupRequest(BaseModel):
         default_factory=list, max_length=settings.UPLOAD_MAX_FILES
     )
     file_ids: list[str] = []
-    client_run_id: str | None = None
+    client_run_id: str | None = Field(default=None, pattern=CLIENT_RUN_ID_PATTERN)
 
     model_config = {"extra": "forbid"}
 

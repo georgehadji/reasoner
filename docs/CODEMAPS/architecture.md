@@ -1,4 +1,4 @@
-<!-- Generated: 2026-10-09 | Files scanned: 545 | Token estimate: ~800 -->
+<!-- Generated: 2026-10-10 | Files scanned: 545 | Token estimate: ~800 -->
 
 # Architecture — Reasoner (v3.0 Post-Refactor)
 
@@ -214,9 +214,9 @@ Domain event (e.g., PhaseCompleted)
 - All LLM calls traced (if `LANGFUSE_*` keys present)
 - Critical validation in production (missing keys → warning)
 
-**Logging (SafeLoggingFilter):**
+**Logging (install_global_redaction):**
 - Redacts API keys, tokens, PII automatically
-- Applied globally via `logging.getLogger().addFilter(SafeLoggingFilter())`
+- Applied globally by wrapping the log record factory (`install_global_redaction()`, called from `reasoner/__init__.py`)
 
 **Errors (Sentry):**
 - Initialized in `api/sentry.py`

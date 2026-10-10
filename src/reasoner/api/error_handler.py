@@ -17,7 +17,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from reasoner.logging_utils import get_correlation_id
+from reasoner.logging_utils import get_correlation_id, redact_dict, redact_sensitive
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +72,13 @@ def _log_error(
     extra: dict[str, Any] | None = None,
 ) -> None:
     """Log an error to structured logger and ErrorStore."""
+    # `message` is usually str(exc) and `traceback` the formatted stack, and
+    # either can carry a key or a DSN an upstream client echoed back. Both go
+    # to the durable ErrorStore and to Sentry, which the logging record factory
+    # does not cover, so redact them here once for every sink below.
+    message = redact_sensitive(message)
+    if traceback:
+        traceback = redact_sensitive(traceback)
     correlation_id = get_correlation_id()
     user_id = _extract_user_id(request) if request else None
     path = request.url.path if request else None
@@ -191,7 +198,13 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
         message=str(exc.detail),
         request=request,
         status_code=exc.status_code,
-        extra={"headers": dict(request.headers) if level == "error" else None},
+        # Headers carry Authorization, X-Admin-Key and session cookies. These
+        # are written to the durable ErrorStore and attached to the Sentry
+        # scope, so storing them raw put live credentials in both. redact_dict()
+        # replaces the values of any credential-shaped key.
+        extra={
+            "headers": redact_dict(dict(request.headers)) if level == "error" else None
+        },
     )
 
     return _safe_json_response(exc.status_code, str(exc.detail), get_correlation_id(), request)

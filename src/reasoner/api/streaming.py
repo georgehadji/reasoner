@@ -17,6 +17,7 @@ from reasoner.core.constants import (
     SSE_FLUSH_INTERVAL,
 )
 from reasoner.core.degrade import degraded
+from reasoner.core.logging_utils import get_correlation_id
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.presets import (
     get_preset_price_tier,
@@ -29,7 +30,6 @@ from .schemas import FollowupRequest, RunRequest
 from .sse_utils import _event
 
 logger = logging.getLogger(__name__)
-
 
 
 def _get_phase_subagents(state: PipelineState, phase_name: str) -> list[dict[str, Any]]:
@@ -66,7 +66,6 @@ async def _emit_widget_event(
     })
 
 
-
 async def run_stream(
     req: RunRequest,
     initial_state: PipelineState | None = None,
@@ -95,12 +94,13 @@ async def run_stream(
     )
 
     queue = asyncio.Queue(maxsize=256)
+    error_sent = False  # a pipeline-level error frame (no "phase" key) has gone out
 
     async def sse_emit(event: dict | str) -> None:
-        if isinstance(event, dict):
-            await queue.put(_event(event))
-        else:
-            await queue.put(event)
+        nonlocal error_sent
+        error_sent = error_sent or (isinstance(event, dict) and event.get("type") == "error"
+                                    and event.get("phase") is None)
+        await queue.put(_event(event) if isinstance(event, dict) else event)
 
     async def run_task():
         try:
@@ -117,14 +117,14 @@ async def run_stream(
                 "error": f"Pipeline exceeded absolute timeout of {PIPELINE_ABSOLUTE_TIMEOUT_SECONDS}s",
                 "code": "PIPELINE_TIMEOUT",
             })
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            await sse_emit({
-                "type": "error",
-                "error": str(e),
-                "code": "INTERNAL_ERROR",
-            })
+        except Exception:
+            correlation_id = get_correlation_id()  # never reaches api/error_handler.py
+            logger.exception("Unhandled pipeline stream error (correlation_id=%s)", correlation_id)
+            if not error_sent:
+                await sse_emit({
+                    "type": "error", "code": "INTERNAL_ERROR",
+                    "error": f"Internal error (correlation_id={correlation_id}). See server logs.",
+                })
         finally:
             await queue.put(None)
 

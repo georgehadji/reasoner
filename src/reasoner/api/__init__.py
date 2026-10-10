@@ -24,8 +24,8 @@ from reasoner.core.settings import settings
 # Setup logger
 logger = logging.getLogger(__name__)
 
-# SafeLoggingFilter is installed at the package level in reasoner/__init__.py
-# so it applies to CLI, tests, and all entry points — not just the API.
+# Secret redaction (install_global_redaction) is installed at the package level
+# in reasoner/__init__.py so it applies to CLI, tests, and all entry points.
 
 # Initialize Sentry (Critical Enhancement 7.2)
 from reasoner.api.sentry import init_sentry

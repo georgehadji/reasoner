@@ -25,6 +25,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+from reasoner.core.logging_utils import redacted_errors
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.models import (
     ClaimLabel,
@@ -180,7 +181,7 @@ def _render_action_blueprint(state: PipelineState, title: str = "Action Blueprin
 
 def _render_errors(state: PipelineState) -> None:
     if state.errors:
-        err_text = "\n".join(f"• {e}" for e in state.errors)
+        err_text = "\n".join(f"• {e}" for e in redacted_errors(state.errors))
         console.print(Panel(
             err_text,
             title=f"[yellow]Pipeline Warnings ({len(state.errors)})[/yellow]",
@@ -339,7 +340,7 @@ def export_to_json(state: PipelineState, path: str) -> None:
         "scores":              _serialize(state.scores),
         "stress_results":      _serialize(state.stress_results),
         "final_solution":      _serialize(state.final_solution),
-        "errors":              state.errors,
+        "errors":              redacted_errors(state.errors),
         "degradations":        list(getattr(state, "degradations", []) or []),
         "phase_logs":          state.phase_logs,
     }
