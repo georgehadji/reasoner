@@ -98,6 +98,55 @@ SENSITIVE_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r'AIza[a-zA-Z0-9_\-]{35}'), 'AIza***REDACTED***'),
     # Perplexity API keys
     (re.compile(r'(?<![A-Za-z0-9])pplx-[a-zA-Z0-9_\-]{20,}'), 'pplx-***REDACTED***'),
+    # Prefixed keys whose body alphabet has no separator. The class is the
+    # vendor's alphabet, not `[\w-]`, so snake_case names (`hf_hub_download`,
+    # `gsk_config`) and slugs (`xai-grok-4`) stop well short of the floor.
+    #
+    # These rules put the literal first and the left-boundary check after it
+    # (`xai(?<![A-Za-z0-9]xai)-` rather than `(?<![A-Za-z0-9])xai-`). Same
+    # match, but `re` can only skip ahead to a literal prefix when the pattern
+    # starts with one: written boundary-first, each rule tries every offset
+    # and cost ~50 ms per 200 000 characters against ~1 ms, on every log record.
+    # xAI
+    (re.compile(r'xai(?<![A-Za-z0-9]xai)-[A-Za-z0-9]{20,}'), 'xai-***REDACTED***'),
+    # Groq
+    (re.compile(r'gsk(?<![A-Za-z0-9]gsk)_[A-Za-z0-9]{20,}'), 'gsk_***REDACTED***'),
+    # Hugging Face
+    (re.compile(r'hf(?<![A-Za-z0-9]hf)_[A-Za-z0-9]{20,}'), 'hf_***REDACTED***'),
+    # GitHub classic tokens: personal, OAuth, user-to-server, server, refresh
+    (re.compile(r'(gh(?<![A-Za-z0-9]gh)[pousr])_[A-Za-z0-9]{20,}'), r'\1_***REDACTED***'),
+    # GitHub fine-grained personal access tokens (the body carries an `_`)
+    (
+        re.compile(r'github(?<![A-Za-z0-9]github)_pat_[A-Za-z0-9_]{20,}'),
+        'github_pat_***REDACTED***',
+    ),
+    # Tavily, including the `tvly-dev-` / `tvly-prod-` forms
+    (re.compile(r'tvly(?<![A-Za-z0-9]tvly)-[A-Za-z0-9\-]{20,}'), 'tvly-***REDACTED***'),
+    # AWS access key IDs, long-lived (AKIA) and STS temporary (ASIA). Fixed
+    # length, so both edges are bounded: a longer uppercase run is not a key.
+    (
+        re.compile(r'(A[KS]IA)(?<![A-Za-z0-9]A[KS]IA)[A-Z0-9]{16}(?![A-Za-z0-9])'),
+        r'\1***REDACTED***',
+    ),
+    # AWS secret keys and session tokens have no prefix of their own, only the
+    # variable name. They contain `/` and `+`, which the generic rule below
+    # stops at, so without these it would redact the head and log the tail.
+    # Two case-sensitive rules, not one IGNORECASE rule: a case-folded pattern
+    # gets no literal-prefix scan either.
+    (
+        re.compile(
+            r'(aws_s(?:ecret_access_key|ession_token))'
+            r'["\']?\s*[:=]\s*["\']?[A-Za-z0-9/+=]{16,}'
+        ),
+        r'\1=***REDACTED***',
+    ),
+    (
+        re.compile(
+            r'(AWS_S(?:ECRET_ACCESS_KEY|ESSION_TOKEN))'
+            r'["\']?\s*[:=]\s*["\']?[A-Za-z0-9/+=]{16,}'
+        ),
+        r'\1=***REDACTED***',
+    ),
     # Generic Bearer tokens
     (re.compile(r'Bearer\s+[a-zA-Z0-9_\-\.]{20,}'), 'Bearer ***REDACTED***'),
     # JWT tokens
