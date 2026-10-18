@@ -17,7 +17,11 @@ from __future__ import annotations
 import json
 
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.phases._shared import _wrap_user_input, get_language_instruction
+from reasoner.phases._shared import (
+    _wrap_external_content,
+    _wrap_user_input,
+    get_language_instruction,
+)
 
 GENERATOR_INITIAL_SYSTEM = (
     "You are an expert analytical assistant engaged in an iterative refinement process. "
@@ -94,12 +98,12 @@ def critic_evaluation_prompt(state: PipelineState, answer: str, round_num: int) 
         prev = state.adversarial_rounds[-1]
         previous_flaws = (
             f"\nPrevious flaws (check if addressed):\n"
-            f"{json.dumps(prev.flaws_identified, indent=2)}"
+            f"{_wrap_external_content(json.dumps(prev.flaws_identified, indent=2))}"
         )
     return (
         f'{get_language_instruction(state)}\n\n'
         f'Problem: {_wrap_user_input(state.problem)}\n\n'
-        f'ANSWER (Round {round_num}):\n{answer}\n\n'
+        f'ANSWER (Round {round_num}):\n{_wrap_external_content(answer)}\n\n'
         f'{previous_flaws}\n\n'
         f'Score dimensions: factuality, reasoning, completeness, clarity (0-10 each). '
         f'Identify 1-3 specific flaws. '
@@ -116,8 +120,9 @@ def generator_revision_prompt(state: PipelineState, flaws, previous_answer: str,
     return (
         f'{get_language_instruction(state)}\n\n'
         f'Problem: {_wrap_user_input(state.problem)}\n\n'
-        f'YOUR PREVIOUS ANSWER:\n{previous_answer}\n\n'
-        f'CRITIC FLAWS (Round {round_num}):\n{json.dumps(flaws, indent=2)}\n\n'
+        f'YOUR PREVIOUS ANSWER:\n{_wrap_external_content(previous_answer)}\n\n'
+        f'CRITIC FLAWS (Round {round_num}):\n'
+        f'{_wrap_external_content(json.dumps(flaws, indent=2))}\n\n'
         f'For each flaw: state AGREE/DISAGREE, if AGREE explain fix, if DISAGREE provide evidence. '
         f'Then produce COMPLETE revised answer.\n\n'
         f'Output JSON: {{"flaw_responses": [{{"flaw": "...", "stance": "AGREE|DISAGREE", '
@@ -147,8 +152,8 @@ def synthesis_prompt(state: PipelineState) -> str:
         f'Debate Trail ({len(state.adversarial_rounds)} rounds, '
         f'converged: {getattr(state, "adversarial_converged", False)}, '
         f'reason: {convergence_reason}):\n'
-        f'{json.dumps(rounds_summary, indent=2)}\n\n'
-        f'Best Answer:\n{_get_best_answer(state)}\n\n'
+        f'{_wrap_external_content(json.dumps(rounds_summary, indent=2))}\n\n'
+        f'Best Answer:\n{_wrap_external_content(_get_best_answer(state))}\n\n'
         f'Produce final synthesis incorporating all improvements.\n\n'
         f'Output JSON: {{"core_solution": "<final answer>", '
         f'"convergence_round": {convergence_round}, '

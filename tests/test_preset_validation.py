@@ -88,3 +88,40 @@ def test_all_preset_model_aliases_valid():
         f"{len(invalid)} invalid model alias(es) in presets:\n  "
         + "\n  ".join(invalid)
     )
+
+
+# Methods whose quality depends on two roles disagreeing across labs.
+# Unrouted, a role resolves to primary_id (ProviderRouter.resolve), so the pair
+# silently becomes one model reviewing itself. Add a row to extend the rule.
+_ADVERSARIAL_ROLE_PAIRS = {
+    "iterative-critique": [("expert_1", "expert_2")],
+}
+
+
+def test_adversarial_roles_are_cross_bloc():
+    from reasoner.core.ports.model_registry_port import get_model_registry_port
+    from reasoner.domain.preset_registry import _REGISTRY as PRESETS
+
+    port = get_model_registry_port()
+    checked = 0
+    for preset_id, cfg in PRESETS.items():
+        for role_a, role_b in _ADVERSARIAL_ROLE_PAIRS.get(cfg.get("method"), []):
+            routing = cfg.get("routing", {})
+            # Same fallback the router applies to an unrouted role.
+            model_a = routing.get(role_a) or cfg["primary_id"]
+            model_b = routing.get(role_b) or cfg["primary_id"]
+            assert port.bloc_of(model_a) != port.bloc_of(model_b), (
+                f"{preset_id}: {role_a}={model_a} and {role_b}={model_b} are in the "
+                f"same bloc ({port.bloc_of(model_a)}); the pair cannot disagree across labs"
+            )
+            assert port.resolved_model_of(model_a) != port.resolved_model_of(model_b), (
+                f"{preset_id}: {role_a} and {role_b} resolve to the same model"
+            )
+            # Neither may be the synthesis model: it would grade its own work.
+            synth = routing.get("synthesis")
+            if synth:
+                assert synth not in (model_a, model_b), (
+                    f"{preset_id}: {synth} is both a debate role and the synthesis model"
+                )
+            checked += 1
+    assert checked >= 2, "no iterative-critique presets were checked"

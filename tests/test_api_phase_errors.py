@@ -11,6 +11,9 @@ import pytest
 from reasoner.api import RunRequest, run_stream
 
 
+_PERSPECTIVE_ROLES = {"constructive", "destructive", "systemic", "minimalist"}
+
+
 class FakeProvider:
     def __init__(self, model="fake"):
         self.model = model
@@ -42,6 +45,11 @@ class FakeRouter:
 
     async def call(self, role, system_prompt, user_prompt, **kwargs):
         self.calls.append((role, system_prompt, user_prompt))
+        if role not in self.responses and role in _PERSPECTIVE_ROLES:
+            # Perspectives that return nothing now fail Phase 2 outright (MP-1),
+            # which would stop these runs before the phases they patch.
+            reply = json.dumps({"core_analysis": f"{role} analysis", "key_insights": []})
+            return reply, {"model": "fake", "input_tokens": 10, "output_tokens": 10}
         return self.responses.get(role, "{}"), {"model": "fake", "input_tokens": 10, "output_tokens": 10}
 
     def describe(self):

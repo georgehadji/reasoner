@@ -19,6 +19,8 @@ from reasoner.application.flows.iterative_critique_phases import (
     run_synthesis_phase,
 )
 from reasoner.application.services.serializers import _ser_5
+from reasoner.core.constants import IC_MAX_CONSECUTIVE_DEGRADED
+from reasoner.core.degrade import degraded
 from reasoner.domain.pipeline_state import PipelineState
 
 
@@ -64,8 +66,33 @@ class IterativeCritiqueFlow(WorkflowStrategy):
             services.log("IC", f"Convergence: {converged} ({reason})", state)
 
             if converged:
-                state.adversarial_converged = True
                 state.adversarial_convergence_round = round_num
                 state.adversarial_convergence_reason = reason
-                services.log("IC", f"Debate converged at round {round_num}", state)
+                if reason == "critic_unavailable":
+                    # The debate stopped; it did not converge. Say so in the
+                    # state, the run's degradations and the event stream.
+                    state.adversarial_converged = False
+                    degraded(
+                        "ic.critic",
+                        None,
+                        exc=RuntimeError("critic returned unusable output"),
+                        state=state,
+                        detail=(
+                            f"{IC_MAX_CONSECUTIVE_DEGRADED} consecutive rounds, "
+                            f"stopped at round {round_num}"
+                        ),
+                    )
+                    state.pending_events.append({
+                        "type": "phase_warning",
+                        "message": (
+                            "The critic stopped returning usable output; the debate "
+                            "ended early and the answer was not independently reviewed."
+                        ),
+                    })
+                    services.log(
+                        "IC", f"Debate stopped at round {round_num}: critic unavailable", state
+                    )
+                else:
+                    state.adversarial_converged = True
+                    services.log("IC", f"Debate converged at round {round_num}", state)
                 break

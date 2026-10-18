@@ -9,6 +9,7 @@ from typing import Any
 import reasoner.phases as phases
 from reasoner.application.flows.base import WorkflowServices
 from reasoner.core.constants import DEFAULT_MAX_TOKENS, get_token_budget
+from reasoner.core.exceptions import PhaseError
 from reasoner.domain.core_types import (
     ScenarioType,
     SolutionCandidate,
@@ -255,6 +256,23 @@ async def run_perspectives_phase(
 
     state.candidates.extend(new_candidates)
     state.errors.extend(new_errors)
+
+    # Zero survivors is an execution failure, not a low score: the runner
+    # treats an exhausted quality gate as a completion, so without this raise
+    # the run would reach synthesis with nothing to synthesise from.
+    if not new_candidates:
+        raise PhaseError(
+            "All perspectives failed: " + ("; ".join(new_errors) or "no output"),
+            phase=2,
+            phase_name="Perspectives",
+        )
+    # Only when the loss was involuntary: a deliberately narrowed set of one
+    # perspective has nothing to rank by design and must not warn.
+    if len(new_candidates) == 1 and len(perspectives) >= 2:
+        state.pending_events.append({
+            "type": "phase_warning",
+            "message": "Only one perspective survived — ranking between candidates is meaningless.",
+        })
 
 async def run_critique_phase(state: PipelineState, services: WorkflowServices) -> None:
     services.log("PHASE-3", "Running adversarial critique and scoring...", state)

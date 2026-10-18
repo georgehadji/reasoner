@@ -120,3 +120,39 @@ async def test_failed_perspective_is_recorded_on_state_errors():
     assert any("destructive" in e for e in state.errors)
     # The surviving perspectives still count.
     assert state.candidates
+
+
+@pytest.mark.asyncio
+async def test_all_perspectives_failing_raises_phase_error():
+    """Zero candidates is an execution failure: the runner counts an exhausted
+    quality gate as a completion, so only a raise stops the run before synthesis."""
+    from reasoner.application.flows.perspective_phases import run_perspectives_phase
+    from reasoner.core.exceptions import PhaseError
+
+    state = _state()
+    services = _FakeServices(
+        fail_roles={"constructive", "destructive", "systemic", "minimalist"}
+    )
+
+    with pytest.raises(PhaseError) as exc:
+        await run_perspectives_phase(state, services)
+
+    assert exc.value.phase == 2
+    assert len(state.errors) == 4
+    assert not state.candidates
+
+
+@pytest.mark.asyncio
+async def test_single_surviving_perspective_warns_but_continues():
+    from reasoner.application.flows.perspective_phases import run_perspectives_phase
+
+    state = _state()
+    services = _FakeServices(fail_roles={"destructive", "systemic", "minimalist"})
+
+    await run_perspectives_phase(state, services)
+
+    assert len(state.candidates) == 1
+    assert any(
+        e.get("type") == "phase_warning" and "one perspective" in e["message"].lower()
+        for e in state.pending_events
+    )
