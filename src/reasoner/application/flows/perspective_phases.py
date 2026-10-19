@@ -8,7 +8,14 @@ from typing import Any
 
 import reasoner.phases as phases
 from reasoner.application.flows.base import WorkflowServices
-from reasoner.core.constants import DEFAULT_MAX_TOKENS, get_token_budget
+from reasoner.application.flows.search_phases import vet_results
+from reasoner.core.constants import (
+    DEFAULT_MAX_TOKENS,
+    MP_CANDIDATE_CAP,
+    MP_TOP_K,
+    get_token_budget,
+)
+from reasoner.core.degrade import degraded
 from reasoner.core.exceptions import PhaseError
 from reasoner.core.ports.model_registry_port import get_model_registry_port
 from reasoner.domain.core_types import (
@@ -51,8 +58,8 @@ async def run_multi_perspective_research_phase(state: PipelineState, services: W
 
         raw_plan, _ = await services.call_llm(
             role="primary",
-            system_prompt=phases.ARTICLE_RETRIEVAL_PLAN_SYSTEM,
-            user_prompt=phases.article_retrieval_plan_prompt(state),
+            system_prompt=phases.MP_EVIDENCE_PLAN_SYSTEM,
+            user_prompt=phases.mp_evidence_plan_prompt(state),
             state=state
         )
         plan = extract_json(raw_plan)
@@ -76,6 +83,14 @@ async def run_multi_perspective_research_phase(state: PipelineState, services: W
         state.web_discovery_results = flattened[:10]
         if flattened:
             services.log("PHASE-2", f"Found {len(flattened)} relevant sources.", state)
+            # Vet before anything downstream sees them: the perspectives read
+            # web_discovery_results and synthesis reads vetted_context, and a
+            # raw search hit is untrusted text. vet_results drops flagged
+            # sources and records context_quality.
+            await vet_results(state, state.web_discovery_results, services)
+            for r in state.vetted_context:
+                r.setdefault("summary", r.get("snippet", ""))
+            state.web_discovery_results = list(state.vetted_context)
     except Exception as e:
         services.log("PHASE-2", f"Evidence search failed: {e}", state)
 
@@ -310,7 +325,10 @@ async def run_critique_phase(state: PipelineState, services: WorkflowServices) -
     try:
         data = extract_json(raw)
         scores = _parse_critique_scores(data.get("scores", []))
+        if not scores:
+            raise ValueError("scorer returned no usable scores")
         state.scores = scores
+        state.ranking_degraded = False
 
         if with_hypotheses:
             hypotheses = _parse_review_hypotheses(data.get("review_hypotheses", []))
@@ -328,14 +346,31 @@ async def run_critique_phase(state: PipelineState, services: WorkflowServices) -
         score_map = {s.perspective: s.total for s in scores}
         state.candidates.sort(key=lambda c: score_map.get(c.perspective, 0.0), reverse=True)
         # Cap candidates to prevent unbounded memory growth (P4)
-        if len(state.candidates) > 8:
-            state.candidates = state.candidates[:8]
-        state.top_candidates = state.candidates[:2]
+        if len(state.candidates) > MP_CANDIDATE_CAP:
+            state.candidates = state.candidates[:MP_CANDIDATE_CAP]
+        state.top_candidates = state.candidates[:MP_TOP_K]
         services.log("PHASE-3", f"Top candidates selected: {[c.perspective.value for c in state.top_candidates]}", state)
     except Exception as e:
         services.log("PHASE-3", f"Scoring failed: {e}", state)
         state.errors.append(f"Scoring failed: {e}")
-        state.top_candidates = state.candidates[:2]
+        # No ranking exists: the head of the list is arbitrary, not "best".
+        # Record that, so the run's output and synthesis do not claim otherwise.
+        state.top_candidates = state.candidates[:MP_TOP_K]
+        state.ranking_degraded = True
+        degraded(
+            "mp.critique",
+            None,
+            exc=e,
+            state=state,
+            detail="candidates were not independently scored",
+        )
+        state.pending_events.append({
+            "type": "phase_warning",
+            "message": (
+                "The scorer returned nothing usable; the candidates passed on to "
+                "synthesis were not independently ranked."
+            ),
+        })
 
 def _stress_perspective(entry: dict, allowed: set[str]) -> str | None:
     """The candidate a stress entry names, "" when it names none, None to drop it.

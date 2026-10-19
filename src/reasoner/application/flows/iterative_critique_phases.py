@@ -15,6 +15,7 @@ import json
 import logging
 import time
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import Any
 
 import reasoner.phases.iterative_critique as ic_phases
@@ -35,6 +36,37 @@ logger = logging.getLogger(__name__)
 MAX_ROUNDS = 5
 MIN_SCORE_DELTA = 0.5
 STALEMATE_FLAW_REPEAT = 3
+
+
+class Verdict(StrEnum):
+    ACCEPT = "ACCEPT"
+    REVISE = "REVISE"
+    REJECT = "REJECT"
+
+
+class NextStep(StrEnum):
+    STOP = "STOP"
+    REVISE = "REVISE"          # patch the previous answer against the flaws
+    REGENERATE = "REGENERATE"  # the approach is wrong: start again, avoiding it
+
+
+_NEXT_STEP: dict[Verdict, NextStep] = {
+    Verdict.ACCEPT: NextStep.STOP,
+    Verdict.REVISE: NextStep.REVISE,
+    Verdict.REJECT: NextStep.REGENERATE,
+}
+
+
+def next_step(verdict: str) -> NextStep:
+    """What the debate does after a round with this verdict.
+
+    An unrecognised verdict is a REVISE: the long-standing behaviour for any
+    string the critic invents, and the safe one (patching never discards work).
+    """
+    try:
+        return _NEXT_STEP[Verdict(str(verdict).strip().upper())]
+    except ValueError:
+        return NextStep.REVISE
 
 
 @dataclass
@@ -176,18 +208,28 @@ def _parse_critic_dimensions(scores: Any) -> CriticDimensionScore:
 
 async def run_generator_phase(state: PipelineState, services: WorkflowServices,
                                previous_answer: str = "", flaws: list[dict] | None = None,
-                               round_num: int = 0) -> GeneratorOutput:
-    """Run the generator model — initial or revision."""
+                               round_num: int = 0,
+                               rejected: AdversarialRound | None = None) -> GeneratorOutput:
+    """Run the generator model — initial, revision, or a fresh start after a REJECT."""
     is_revision = bool(previous_answer and flaws and round_num > 0)
 
-    if is_revision:
+    if rejected is not None:
+        # The critic called the whole approach wrong. Patching it again would
+        # be the same answer with edits, so start over, told what to avoid.
+        system_prompt = ic_phases.GENERATOR_INITIAL_SYSTEM
+        user_prompt = ic_phases.generator_regenerate_prompt(
+            state, rejected.answer, rejected.flaws_identified
+        )
+        previous_answer = rejected.answer
+    elif is_revision:
         system_prompt = ic_phases.GENERATOR_REVISION_SYSTEM
         user_prompt = ic_phases.generator_revision_prompt(state, flaws, previous_answer, round_num)
     else:
         system_prompt = ic_phases.GENERATOR_INITIAL_SYSTEM
         user_prompt = ic_phases.generator_initial_prompt(state)
 
-    services.log("IC", f"Generator {'revision' if is_revision else 'initial'}, round {round_num}", state)
+    kind = "regeneration" if rejected is not None else "revision" if is_revision else "initial"
+    services.log("IC", f"Generator {kind}, round {round_num}", state)
 
     result = await services.call_llm(
         role="expert_1",

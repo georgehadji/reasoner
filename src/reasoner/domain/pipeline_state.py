@@ -147,6 +147,10 @@ class PipelineCore:
     # Written only through core.degrade.degraded(); read via .get()-style access
     # on resumed state so older --resume files still load.
     degradations: list[str] = field(default_factory=list)
+    # Multi-Perspective: the scorer returned nothing usable, so `top_candidates`
+    # is the unscored head of `candidates`, not a ranking. Synthesis must not
+    # present them as top-ranked.
+    ranking_degraded: bool = False
     attachments: list[dict[str, Any]] = field(default_factory=list)
     # ORCHESTRATED method fields (populated only when preset is orchestrated)
     generation_candidates: list[GenerationCandidate] = field(default_factory=list)
@@ -210,7 +214,7 @@ class PipelineState:
             'language', 'output_language', 'pivot_active', 'language_sensitive',
             'complexity', 'decomposition', 'candidates', 'scores',
             'review_hypotheses', 'top_candidates', 'stress_results',
-            'final_solution', 'errors', 'degradations',
+            'final_solution', 'errors', 'degradations', 'ranking_degraded',
             'attachments', 'generation_candidates', 'critic_scores',
             'verification_results', 'meta_evaluation',
         }
@@ -327,6 +331,7 @@ class PipelineState:
     final_solution = PipelineField("core")
     errors = PipelineField("core")
     degradations = PipelineField("core")
+    ranking_degraded = PipelineField("core")
     attachments = PipelineField("core")
     generation_candidates = PipelineField("core")
     critic_scores = PipelineField("core")

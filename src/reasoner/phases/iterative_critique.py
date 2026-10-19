@@ -92,6 +92,26 @@ def generator_initial_prompt(state: PipelineState) -> str:
     )
 
 
+def generator_regenerate_prompt(
+    state: PipelineState, rejected_answer: str, flaws
+) -> str:
+    """A fresh attempt after the critic REJECTed the approach.
+
+    Same task as the initial prompt, plus the rejected approach and the critic's
+    flaws framed as pitfalls: without them a fresh run tends to reproduce the
+    answer that was just rejected.
+    """
+    pitfalls = json.dumps(
+        {"rejected_approach": (rejected_answer or "")[:600], "flaws": flaws}, indent=2
+    )
+    return (
+        f'{generator_initial_prompt(state)}\n\n'
+        f'A previous attempt was REJECTED as fundamentally wrong. Take a different '
+        f'approach and avoid these pitfalls; do not reuse the rejected approach:\n'
+        f'{_wrap_external_content(pitfalls)}'
+    )
+
+
 def critic_evaluation_prompt(state: PipelineState, answer: str, round_num: int) -> str:
     previous_flaws = ""
     if round_num > 1 and state.adversarial_rounds:

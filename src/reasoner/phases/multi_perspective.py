@@ -128,6 +128,28 @@ def critique_prompt(state: PipelineState, with_hypotheses: bool = False) -> str:
         base += _vs_hypotheses_instruction()
     return base
 
+MP_EVIDENCE_PLAN_SYSTEM = (
+    "You are a research librarian preparing evidence for a multi-perspective analysis "
+    "of a decision or problem. Write search queries that surface concrete facts, base "
+    "rates, precedents and credible dissent bearing on it, not generic overviews. "
+    "Output ONLY valid JSON."
+)
+
+
+def mp_evidence_plan_prompt(state: PipelineState) -> str:
+    task_type = state.task_type
+    task_type_str = task_type.value if hasattr(task_type, "value") else str(task_type)
+    return (
+        f'{get_language_instruction(state)}\n\n'
+        f'Problem: {_wrap_user_input(state.problem[:TRUNCATION.PROMPT])}\n'
+        f'Task Type: {task_type_str}\n\n'
+        f'Write 3 distinct search queries: (1) evidence that bears on the strongest '
+        f'approach to this problem, (2) documented failures, risks or counter-evidence, '
+        f'(3) precedents or base rates for similar situations.\n\n'
+        f'Output JSON: {{"queries": ["<query 1>", "<query 2>", "<query 3>"]}}'
+    )
+
+
 STRESS_SYSTEM = "You are an analytical assistant. Simulate adversarial conditions. Be specific about real-world failure mechanics. Output ONLY valid JSON."
 
 def stress_test_prompt(state: PipelineState) -> str:
