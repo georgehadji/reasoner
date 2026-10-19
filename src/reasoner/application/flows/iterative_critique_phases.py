@@ -49,11 +49,46 @@ class AdversarialRound:
     flaws_identified: list[dict] = field(default_factory=list)
     verdict: str = ""  # ACCEPT | REVISE | REJECT
     generator_response: str = ""
+    # Kept so state files written before IC-2 still load; nothing writes it now.
+    # Round n's `answer` is the revision of round n-1, so it is the revision.
     revised_answer: str = ""
     changes_summary: str = ""
-    # True when the critic returned nothing usable and the scores/flaws below
-    # are a placeholder. Such a round must not feed plateau detection.
+    # The generator's per-flaw replies (AGREE/DISAGREE + response) to the
+    # previous round's flaws. Synthesis reads the DISAGREEs.
+    flaw_responses: list[dict] = field(default_factory=list)
+    # True when this round's critic or generator returned nothing usable and
+    # the values are a placeholder. Such a round must not feed plateau detection.
     degraded: bool = False
+
+
+@dataclass(frozen=True)
+class GeneratorOutput:
+    """What one generator call returned, kept whole instead of reduced to a string."""
+    answer: str
+    key_claims: tuple[str, ...] = ()
+    flaw_responses: tuple[dict, ...] = ()
+    changes_summary: str = ""
+    confidence: float | None = None
+    model: str = ""
+    degraded: bool = False
+
+
+def apply_generator_output(rnd: AdversarialRound, gen: GeneratorOutput) -> AdversarialRound:
+    """Copy the generator's fields onto the round its answer was critiqued in."""
+    rnd.generator_model = gen.model
+    rnd.key_claims = list(gen.key_claims)
+    rnd.flaw_responses = list(gen.flaw_responses)
+    rnd.changes_summary = gen.changes_summary
+    rnd.degraded = rnd.degraded or gen.degraded
+    return rnd
+
+
+def _as_str_list(v: Any) -> list[str]:
+    return [str(x) for x in v] if isinstance(v, list) else []
+
+
+def _as_dict_list(v: Any) -> list[dict]:
+    return [x for x in v if isinstance(x, dict)] if isinstance(v, list) else []
 
 
 def _trailing_degraded(rounds: list[AdversarialRound]) -> int:
@@ -141,7 +176,7 @@ def _parse_critic_dimensions(scores: Any) -> CriticDimensionScore:
 
 async def run_generator_phase(state: PipelineState, services: WorkflowServices,
                                previous_answer: str = "", flaws: list[dict] | None = None,
-                               round_num: int = 0) -> str:
+                               round_num: int = 0) -> GeneratorOutput:
     """Run the generator model — initial or revision."""
     is_revision = bool(previous_answer and flaws and round_num > 0)
 
@@ -162,13 +197,29 @@ async def run_generator_phase(state: PipelineState, services: WorkflowServices,
     )
     if result is None:
         raise RuntimeError("Generator LLM returned None")
-    raw, _ = result
+    raw, meta = result
+    model = (meta or {}).get("model", "")
     try:
         data = extract_json(raw)
-        return data.get("revised_answer", data.get("answer", ""))
+        answer = data.get("revised_answer") or data.get("answer") or ""
+        if not isinstance(answer, str) or not answer.strip():
+            raise ValueError("generator returned no answer text")
     except Exception as exc:
         services.log("IC_ERROR", f"Generator JSON parse failed: {exc}", state)
-        return previous_answer or "Error: could not parse generator output"
+        return GeneratorOutput(
+            answer=previous_answer or "Error: could not parse generator output",
+            model=model,
+            degraded=True,
+        )
+    confidence = data.get("confidence")
+    return GeneratorOutput(
+        answer=answer,
+        key_claims=tuple(_as_str_list(data.get("key_claims"))),
+        flaw_responses=tuple(_as_dict_list(data.get("flaw_responses"))),
+        changes_summary=str(data.get("changes_summary") or ""),
+        confidence=float(confidence) if isinstance(confidence, (int, float)) else None,
+        model=model,
+    )
 
 
 @dataclass(frozen=True)
@@ -311,7 +362,8 @@ async def _llm_critic_round(state: PipelineState, services: WorkflowServices,
     )
     if result is None:
         raise RuntimeError("Critic LLM returned None")
-    raw, _ = result
+    raw, meta = result
+    critic_model = (meta or {}).get("model", "")
     try:
         data = extract_json(raw)
     except Exception as exc:
@@ -320,6 +372,7 @@ async def _llm_critic_round(state: PipelineState, services: WorkflowServices,
         return AdversarialRound(
             round_number=round_num,
             answer=answer,
+            critic_model=critic_model,
             critic_score=CriticDimensionScore(factuality=5.0, reasoning=5.0, completeness=5.0, helpfulness=5.0),
             flaws_identified=[{"flaw": "Critic produced malformed JSON", "severity": "MEDIUM"}],
             verdict="REVISE",
@@ -330,6 +383,7 @@ async def _llm_critic_round(state: PipelineState, services: WorkflowServices,
     return AdversarialRound(
         round_number=round_num,
         answer=answer,
+        critic_model=critic_model,
         critic_score=_parse_critic_dimensions(scores),
         flaws_identified=data.get("flaws_identified", []),
         verdict=data.get("verdict", "REVISE"),

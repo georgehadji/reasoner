@@ -747,6 +747,7 @@ def _ser_4(state: PipelineState) -> dict:
                 "survival_rate": _get_v(sr, 'survival_rate', 0),
                 "failure_mode": _get_v(sr, 'failure_mode', ''),
                 "recovery_path": _get_v(sr, 'recovery_path', ''),
+                "perspective": _get_v(sr, 'perspective', ''),
             } for sr in stress
         ],
         "tokens": state.phase_tokens.get("Phase 4: Stress Testing", {"input": 0, "output": 0}),

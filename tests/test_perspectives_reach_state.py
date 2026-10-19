@@ -45,9 +45,11 @@ class _FakeRouter:
 
 
 class _FakeServices:
-    def __init__(self, fail_roles: set[str] | None = None):
+    def __init__(self, fail_roles: set[str] | None = None, served: dict[str, str] | None = None):
         self.router = _FakeRouter()
         self.fail_roles = fail_roles or set()
+        # role -> model that actually served it (what call_llm reports in metadata)
+        self.served = served or {}
         self.roles_called: list[str] = []
 
     def log(self, *args, **kwargs) -> None:
@@ -61,7 +63,9 @@ class _FakeServices:
             "core_analysis": f"Analysis from {role}.",
             "key_insights": [f"{role} insight"],
         }
-        return json.dumps(payload), {"model": "fake", "input_tokens": 10, "output_tokens": 20}
+        model = self.served.get(role, f"fake/{role}")
+        meta = {"model": model, "input_tokens": 10, "output_tokens": 20}
+        return json.dumps(payload), meta
 
 
 def _state() -> PipelineState:
@@ -156,3 +160,60 @@ async def test_single_surviving_perspective_warns_but_continues():
         e.get("type") == "phase_warning" and "one perspective" in e["message"].lower()
         for e in state.pending_events
     )
+
+
+@pytest.mark.asyncio
+async def test_model_used_records_the_serving_model():
+    from reasoner.application.flows.perspective_phases import run_perspectives_phase
+
+    state = _state()
+    services = _FakeServices(served={"constructive": "anthropic/claude-sonnet"})
+
+    await run_perspectives_phase(state, services)
+
+    by_persp = {c.perspective.value: c.model_used for c in state.candidates}
+    assert by_persp["constructive"] == "anthropic/claude-sonnet"
+    assert all(by_persp.values())
+
+
+def _warnings(state) -> list[str]:
+    return [e["message"] for e in state.pending_events if e.get("type") == "phase_warning"]
+
+
+@pytest.mark.asyncio
+async def test_fallback_collapse_is_warned_after_the_run():
+    """Routing was diverse, but two survivors were both served by one fallback model."""
+    from reasoner.application.flows.perspective_phases import run_perspectives_phase
+
+    state = _state()
+    services = _FakeServices(
+        fail_roles={"systemic", "minimalist"},
+        served={"constructive": "openai/gpt-4o", "destructive": "openai/gpt-4o"},
+    )
+
+    await run_perspectives_phase(state, services)
+
+    assert any("same model" in w for w in _warnings(state))
+
+
+@pytest.mark.asyncio
+async def test_all_us_routing_still_warns_about_a_single_bloc():
+    from reasoner.application.flows.perspective_phases import run_perspectives_phase
+
+    state = _state()
+    services = _FakeServices()
+    for role in ("constructive", "destructive", "systemic", "minimalist"):
+        services.router.routing_table[role] = SimpleNamespace(model=f"openai/model-{role}")
+
+    await run_perspectives_phase(state, services)
+
+    assert any("single geopolitical bloc" in w for w in _warnings(state))
+
+
+def test_no_local_vendor_bloc_table_in_flows():
+    """The bloc table lives in the registry; flows reach it through the port."""
+    import pathlib
+
+    flows = pathlib.Path(__file__).resolve().parent.parent / "src/reasoner/application/flows"
+    offenders = [p.name for p in flows.glob("*.py") if "_CN = {" in p.read_text(encoding="utf-8")]
+    assert not offenders, f"duplicate vendor→bloc table in: {offenders}"
