@@ -22,6 +22,8 @@ from reasoner.phases._shared import (
     _wrap_user_input,
     get_language_instruction,
 )
+from reasoner.phases._universal import SYNTHESIS_OUTPUT_FORMAT
+from reasoner.phases._universal import SYNTHESIS_SYSTEM as _UNIVERSAL_SYNTHESIS_SYSTEM
 
 GENERATOR_INITIAL_SYSTEM = (
     "You are an expert analytical assistant engaged in an iterative refinement process. "
@@ -42,8 +44,13 @@ CRITIC_SYSTEM = (
 )
 
 SYNTHESIS_SYSTEM = (
-    "You are an analytical assistant. Review the debate trail and produce the final answer. "
-    "Output ONLY valid JSON."
+    _UNIVERSAL_SYNTHESIS_SYSTEM
+    + "\n\nDEBATE SYNTHESIS: your input is the trail of an adversarial debate between a "
+    "generator and a critic from different labs. Treat the critic's flaws as claims to "
+    "weigh, not as settled facts, and give the generator's pushback its due. A flaw that "
+    "was raised and never shown to be fixed belongs in open_questions or lowers the label "
+    "of the claim it affects. A debate that stopped without the critic's acceptance has "
+    "not settled the question; say so plainly."
 )
 
 # The critic's ACCEPT rule. Rendered into critic_evaluation_prompt below, and
@@ -172,6 +179,17 @@ def synthesis_prompt(state: PipelineState) -> str:
     convergence_reason = getattr(state, "adversarial_convergence_reason", "")
     convergence_round = getattr(state, "adversarial_convergence_round", 0)
 
+    unresolved = unresolved_flaws(state)
+    unresolved_block = ""
+    if unresolved or convergence_reason != "critic_accepted":
+        unresolved_block = (
+            f'The critic did NOT accept the final answer (reason: {convergence_reason or "none"}). '
+            f'Flaws it still lists, none shown to be resolved:\n'
+            f'{_wrap_external_content(json.dumps(unresolved, indent=2))}\n'
+            f'Carry each into open_questions, or label the claim it affects HYPOTHESIS or '
+            f'UNKNOWN. Do not present the answer as settled.\n\n'
+        )
+
     msg = (
         f'{get_language_instruction(state)}\n\n'
         f'Problem: {_wrap_user_input(state.problem)}\n\n'
@@ -180,14 +198,28 @@ def synthesis_prompt(state: PipelineState) -> str:
         f'reason: {convergence_reason}):\n'
         f'{_wrap_external_content(json.dumps(rounds_summary, indent=2))}\n\n'
         f'Best Answer:\n{_wrap_external_content(_get_best_answer(state))}\n\n'
-        f'Produce final synthesis incorporating all improvements.\n\n'
-        f'Output JSON: {{"core_solution": "<final answer>", '
-        f'"convergence_round": {convergence_round}, '
-        f'"convergence_reason": "{convergence_reason}", '
-        f'"total_rounds": {len(state.adversarial_rounds)}, '
-        f'"improvement_trajectory": "<how answer evolved>"}}'
+        f'{unresolved_block}'
+        f'Produce the final synthesis incorporating all improvements '
+        f'(debate converged at round {convergence_round}).\n\n'
+        f'{SYNTHESIS_OUTPUT_FORMAT}'
     )
     return msg
+
+
+def unresolved_flaws(state: PipelineState) -> list[str]:
+    """Flaws the last real critic round raised, unless the debate ended in ACCEPT.
+
+    Degraded rounds carry a placeholder flaw, not a critic judgement, so the
+    last non-degraded round is the one that counts.
+    """
+    if getattr(state, "adversarial_convergence_reason", "") == "critic_accepted":
+        return []
+    for r in reversed(state.adversarial_rounds):
+        if getattr(r, "degraded", False):
+            continue
+        flaws = (str(f.get("flaw", "")).strip() for f in r.flaws_identified if isinstance(f, dict))
+        return [f for f in flaws if f]
+    return []
 
 
 def _get_best_answer(state: PipelineState) -> str:

@@ -149,6 +149,15 @@ CIRCUIT BREAKER:
 - If sources are missing or unreliable, flag this explicitly in the abstract or a "Data Integrity" section.
 - Do NOT synthesize confident answers from UNVERIFIED data.""" + HUMANIZATION_RULES
 
+# The reply shape finalize_solution() parses. Every method's synthesis prompt
+# ends with this, so the parser never has to guess which dialect it was given.
+SYNTHESIS_OUTPUT_FORMAT = (
+    "Use this exact format: [SOLUTION]...prose with structured headings and citations..."
+    "[/SOLUTION] ```json...``` with fields: critical_insights, action_blueprint, open_questions, "
+    "claim_labels, meta_audit, sources, layout_hints, evidence."
+)
+
+
 def synthesis_prompt(state: PipelineState) -> str:
     final_context = state.to_context_dict(phase="synthesis")
     # Preserve full candidate content when context window allows (qwen3.6-plus: 1M).
@@ -239,7 +248,7 @@ def synthesis_prompt(state: PipelineState) -> str:
                 "reader needs in order to act on the rest."
             )
 
-    return f'{get_language_instruction(state)}\n{followup}\nFinal Context:\n{_wrap_external_content(json.dumps(final_context, indent=2))}\n{_wrap_external_content(sources_info)}{quality_note}\n\n{method_hint}{premises_instruction}\n\nUse this exact format: [SOLUTION]...prose with structured headings and citations...[/SOLUTION] ```json...``` with fields: critical_insights, action_blueprint, open_questions, claim_labels, meta_audit, sources, layout_hints, evidence.'
+    return f'{get_language_instruction(state)}\n{followup}\nFinal Context:\n{_wrap_external_content(json.dumps(final_context, indent=2))}\n{_wrap_external_content(sources_info)}{quality_note}\n\n{method_hint}{premises_instruction}\n\n{SYNTHESIS_OUTPUT_FORMAT}'
 
 COT_DETECTION_SYSTEM = """You are a meticulous, skeptical, and ruthless analytical assistant. Your primary function is to shield the reasoning pipeline from low-quality, irrelevant, or misleading information. Review retrieved text for factual errors, unsubstantiated claims, obvious speculation, or low relevance to the user's core problem. Output ONLY valid JSON.
 

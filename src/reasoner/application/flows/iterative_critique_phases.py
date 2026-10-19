@@ -20,6 +20,7 @@ from typing import Any
 
 import reasoner.phases.iterative_critique as ic_phases
 from reasoner.application.flows.base import WorkflowServices
+from reasoner.application.flows.synthesis_phase import finalize_solution
 from reasoner.core.constants import (
     IC_MAX_CONSECUTIVE_DEGRADED,
     JEV_CRITIC_TIMEOUT_SECONDS,
@@ -433,7 +434,7 @@ async def _llm_critic_round(state: PipelineState, services: WorkflowServices,
 
 
 async def run_synthesis_phase(state: PipelineState, services: WorkflowServices) -> None:
-    """Produce final synthesis from the complete debate trail."""
+    """Produce the final synthesis from the debate trail, in the shared contract."""
     services.log("IC", "Synthesizing debate trail", state)
 
     result = await services.call_llm(
@@ -445,28 +446,20 @@ async def run_synthesis_phase(state: PipelineState, services: WorkflowServices) 
     if result is None:
         raise RuntimeError("Synthesis LLM returned None")
     raw, _ = result
-    try:
-        data = extract_json(raw)
-    except Exception as exc:
-        services.log("IC_ERROR", f"Synthesis JSON parse failed: {exc}", state)
-        if state.final_solution is None:
-            from reasoner.domain.core_types import FinalSolution
-            state.final_solution = FinalSolution(
-                core_solution="", critical_insights=[], action_blueprint=[],
-                open_questions=[], claim_labels=[], meta_audit=None,
-            )
-        state.final_solution.core_solution = "Synthesis parsing failed"
-        return
 
-    if state.final_solution is None:
-        from reasoner.domain.core_types import FinalSolution
-        state.final_solution = FinalSolution(
-            core_solution="",
-            critical_insights=[],
-            action_blueprint=[],
-            open_questions=[],
-            claim_labels=[],
-            meta_audit=None,
+    solution = finalize_solution(raw, state, services)
+
+    # The prompt asks the model to carry unresolved flaws into open_questions;
+    # this guarantees it, so a debate that stopped on a round limit never reads
+    # as settled whatever the model did.
+    known = {q.strip().lower() for q in solution.open_questions}
+    for flaw in ic_phases.unresolved_flaws(state):
+        question = f"Unresolved critic flaw: {flaw}"
+        if question.strip().lower() not in known and flaw.strip().lower() not in known:
+            solution.open_questions.append(question)
+    reason = getattr(state, "adversarial_convergence_reason", "")
+    if reason and reason != "critic_accepted":
+        solution.open_questions.append(
+            f"The debate ended without the critic's acceptance ({reason}); the answer is unsettled."
         )
-    state.final_solution.core_solution = data.get("core_solution", "")
-
+    state.final_solution = solution
