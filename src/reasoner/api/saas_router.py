@@ -17,12 +17,14 @@ from reasoner.api.dependencies import (
     _get_quota_service,
     get_current_user,
     get_optional_user,
+    require_key_scope,
     resolve_request_tier,
 )
 from reasoner.api.middleware import _anonymize_ip
 from reasoner.application.services.quota_service import TIER_LIMITS
 from reasoner.core.degrade import degraded
 from reasoner.core.settings import settings
+from reasoner.domain.api_keys import ACCOUNT_DELETE_SCOPE
 from reasoner.domain.saas import User
 from reasoner.rate_limiter import RateLimitConfig, get_rate_limiter
 
@@ -183,7 +185,7 @@ async def export_data(
 @router.post("/account/delete")
 async def delete_account(
     request: Request,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_key_scope(ACCOUNT_DELETE_SCOPE)),
     _: None = Depends(_check_strict_rate_limit),
 ):
     """Hard delete user and all data (GDPR Article 17).

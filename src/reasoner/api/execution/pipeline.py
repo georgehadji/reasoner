@@ -40,7 +40,18 @@ logger = logging.getLogger(__name__)
 
 
 def _request_from_command(command: RunPipelineCommand) -> RunRequest:
-    """The rest of this module predates RunPipelineCommand and reads a RunRequest."""
+    """The rest of this module predates RunPipelineCommand and reads a RunRequest.
+
+    run_stream carries the validated request in ``metadata``. Rebuilding it from
+    the command's narrow fields reset attachments, file_ids, enhance_prompt,
+    force_pipeline, no_cache, web_search and expert to defaults, so a user was
+    billed for an answer that never saw their upload
+    (docs/plans/audit-remediation-2026-10-20.md DAT-2). The rebuild below is
+    for callers that send a bare command.
+    """
+    carried = command.metadata.get("request")
+    if isinstance(carried, RunRequest):
+        return carried.model_copy(update={"client_run_id": command.command_id})
     return RunRequest(
         problem=command.problem,
         preset=command.preset,
@@ -126,7 +137,10 @@ def _seed_state(
     if not file_ids and getattr(req, "attachments", None):
         file_ids = [a.file_id for a in req.attachments if getattr(a, "file_id", None)]
     if file_ids:
-        state.method_state.set("prism", {**state.method_state.get("prism"), "file_ids": file_ids})
+        # owner_id scopes the research flow's file search to the caller's uploads.
+        state.method_state.set(
+            "prism", {**state.method_state.get("prism"), "file_ids": file_ids, "owner_id": user_id}
+        )
 
     # Inject VS runtime parameters from preset metadata before any phase runs,
     # so _phase_brainstorm_generate can read them.

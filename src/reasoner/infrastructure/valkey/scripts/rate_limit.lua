@@ -27,16 +27,15 @@ local refilled_tokens = math.floor(elapsed_time_ms * refill_rate)
 tokens = math.min(burst_capacity, tokens + refilled_tokens)
 last_refill_time_ms = current_time_ms
 
--- === Sliding Window Logic (Minute) ===
+-- === Sliding Windows ===
+-- Trim, then count BEFORE adding: a request is recorded only once it is
+-- allowed. Recording first meant a client hammering past its limit kept its
+-- own window full, so rejections extended the block indefinitely.
 local minute_key = KEYS[2]
-redis.call('ZREMRANGEBYSCORE', minute_key, 0, current_time_ms - 60000)
-redis.call('ZADD', minute_key, current_time_ms, current_time_ms .. ':' .. math.random()) -- Add current request
-local count_minute = redis.call('ZCARD', minute_key)
-
--- === Sliding Window Logic (Hour) ===
 local hour_key = KEYS[3]
+redis.call('ZREMRANGEBYSCORE', minute_key, 0, current_time_ms - 60000)
 redis.call('ZREMRANGEBYSCORE', hour_key, 0, current_time_ms - 3600000)
-redis.call('ZADD', hour_key, current_time_ms, current_time_ms .. ':' .. math.random()) -- Add current request
+local count_minute = redis.call('ZCARD', minute_key)
 local count_hour = redis.call('ZCARD', hour_key)
 
 -- === Decision ===
@@ -44,11 +43,11 @@ local allowed = 0
 local retry_after_ms = 0
 local reason = "unknown"
 
-if count_minute > requests_per_minute then
+if count_minute >= requests_per_minute then
     reason = "per_minute_limit"
     local oldest_ts = redis.call('ZRANGE', minute_key, 0, 0, 'WITHSCORES')[2]
     retry_after_ms = 60000 - (current_time_ms - tonumber(oldest_ts))
-elseif count_hour > requests_per_hour then
+elseif count_hour >= requests_per_hour then
     reason = "per_hour_limit"
     local oldest_ts = redis.call('ZRANGE', hour_key, 0, 0, 'WITHSCORES')[2]
     retry_after_ms = 3600000 - (current_time_ms - tonumber(oldest_ts))
@@ -63,10 +62,22 @@ else
     retry_after_ms = math.ceil(tokens_needed / refill_rate)
 end
 
+if allowed == 1 then
+    local member = current_time_ms .. ':' .. math.random()
+    redis.call('ZADD', minute_key, current_time_ms, member)
+    redis.call('ZADD', hour_key, current_time_ms, member)
+end
+
 -- Save updated token bucket state only if allowed or if tokens were refilled
 if allowed == 1 or refilled_tokens > 0 then
     redis.call('HMSET', KEYS[1], 'tokens', tokens, 'last_refill_time_ms', last_refill_time_ms)
 end
+
+-- Every key expires once it could no longer affect a decision, so an idle
+-- client leaves nothing behind (the keys had no TTL at all).
+redis.call('PEXPIRE', minute_key, 60000)
+redis.call('PEXPIRE', hour_key, 3600000)
+redis.call('PEXPIRE', KEYS[1], math.ceil(burst_capacity / refill_rate) + 1000)
 
 -- Return results: [allowed, tokens_remaining, retry_after_ms, reason_code]
 return {allowed, math.floor(tokens), math.max(0, math.floor(retry_after_ms)), reason}

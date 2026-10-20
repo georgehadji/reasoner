@@ -188,7 +188,9 @@ async def run_prism_research_phase(
         "academicSearch": lambda qs: _action_web_search(search_client, qs, "academic"),
         "discussionSearch": lambda qs: _action_web_search(search_client, qs, "social"),
         "scrape": lambda urls: _action_scrape(urls),
-        "uploadsSearch": lambda qs: _action_uploads_search(file_search, file_ids, qs),
+        "uploadsSearch": lambda qs: _action_uploads_search(
+            file_search, file_ids, qs, prism_state.get("owner_id") if prism_state else None
+        ),
     }
 
     services.log("RESEARCH", f"Starting Prism research ({mode} mode, max {max_iterations} iterations)", state)
@@ -365,7 +367,9 @@ async def _action_scrape(urls: list[str]) -> list[_Citation]:
             results.append(_Citation(
                 url=s.get("url", ""),
                 title=s.get("title", "Scraped content"),
-                snippet=s.get("text", "")[:500],
+                # scrape_url returns "content"; reading "text" made every
+                # snippet empty (docs/plans/audit-remediation-2026-10-20.md DAT-7).
+                snippet=s.get("content", "")[:500],
                 source_type="scraped",
             ))
     except Exception as exc:
@@ -377,13 +381,14 @@ async def _action_uploads_search(
     file_search: FileSearchPort | None,
     file_ids: list[str],
     queries: list[str],
+    user_id: str | None = None,
 ) -> list[_Citation]:
     if not file_search or not file_ids or not queries:
         return []
     results: list[_Citation] = []
     for q in queries:
         try:
-            chunks = await file_search.search_chunks(file_ids, q, top_k=5)
+            chunks = await file_search.search_chunks(file_ids, q, top_k=5, user_id=user_id)
             for ch in chunks:
                 # Uploaded-file text is caller-controlled and ends up in the
                 # synthesis prompt via phases._shared.build_synthesis_context,

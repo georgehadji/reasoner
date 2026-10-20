@@ -552,6 +552,12 @@ IMAGE_GEN_DEFAULT_RESOLUTION: str = "1024x1024"
 IMAGE_GEN_DEFAULT_WIDTH: int = 1024
 IMAGE_GEN_DEFAULT_HEIGHT: int = 1024
 IMAGE_GEN_REMOTE_TIMEOUT_SECONDS: float = 20.0
+IMAGE_GEN_MAX_DOWNLOAD_BYTES: int = 20_000_000
+
+# Server-side fetches of untrusted URLs (infrastructure/safe_fetch.py). Each
+# redirect hop is re-checked. The byte cap stops one page from filling memory.
+SAFE_FETCH_MAX_REDIRECTS: int = 3
+SCRAPE_MAX_BYTES: int = 2_000_000
 IMAGE_GEN_COMPLETION_TIMEOUT_SECONDS: float = 90.0
 IMAGE_GEN_PROMPT_MAX_TOKENS: int = 512
 IMAGE_GEN_PROMPT_TEMPERATURE: float = 0.7
@@ -683,3 +689,29 @@ MAX_EXPRESSION_LENGTH: int = 10000
 EVENT_RETENTION_DAYS: int = 365
 SNAPSHOT_RETENTION_COUNT: int = 3   # reserved — current schema supports only 1 snapshot/aggregate
 COMPACTION_BATCH_SIZE: int = 500
+
+# ═════════════════════════════════════════════════════════════════════
+# REQUEST BODY AND DOCUMENT PARSING LIMITS
+# ═════════════════════════════════════════════════════════════════════
+
+# Default cap on any request body, enforced before the app reads it
+# (api/middleware.BodySizeLimitMiddleware). Sized for the largest JSON body
+# the schemas accept: a run carrying UPLOAD_MAX_FILES attachments of mostly
+# ASCII text. Upload and data-URL routes get larger, derived caps.
+REQUEST_BODY_MAX_BYTES: int = 16 * 1024 * 1024
+# Largest single uploaded file, and a base64 data: URL of one plus its header.
+UPLOAD_MAX_FILE_BYTES: int = 50 * 1024 * 1024
+MAX_DATA_URL_CHARS: int = UPLOAD_MAX_FILE_BYTES * 4 // 3 + 256
+# Total stored upload bytes per user, checked before an upload is saved.
+UPLOAD_USER_QUOTA_BYTES: int = 1024 * 1024 * 1024
+# Address-space cap for the PDF/DOCX parse child process (Linux only).
+DOCUMENT_PARSE_MEMORY_LIMIT_BYTES: int = 1024 * 1024 * 1024
+
+# After a Redis error the rate limiter falls back (fail_closed denies) for this
+# long, then the next request re-probes Redis.
+RATE_LIMITER_REDIS_RETRY_SECONDS: float = 30.0
+
+# WebSocket replay buffers for late joiners: one per run, dropped once it has
+# had no subscriber for this long, and never more than this many at once.
+WS_REPLAY_TTL_SECONDS: float = 300.0
+WS_MAX_REPLAY_BUFFERS: int = 1000

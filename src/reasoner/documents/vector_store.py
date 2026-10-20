@@ -14,6 +14,7 @@ import math
 from pathlib import Path
 from typing import Any
 
+from reasoner.core.ports.file_search_port import FileChunk
 from reasoner.core.settings import settings
 from reasoner.uploader import UPLOAD_DIR
 
@@ -190,6 +191,30 @@ class DocumentVectorStore:
         Returns:
             List of chunk texts, ordered by relevance.
         """
+        return [text for _, _, text in await self._scored(query, file_ids, top_k, user_id)]
+
+    async def search_chunks(
+        self,
+        file_ids: list[str],
+        query: str,
+        top_k: int = 5,
+        user_id: str | None = None,
+    ) -> list[FileChunk]:
+        """FileSearchPort for the research flow, with the same owner check.
+
+        This replaced infrastructure/prism/file_search.py, which read
+        sidecars by bare file id: no owner check, and no decryption, so it
+        returned another tenant's legacy plaintext chunks and nothing for any
+        new (encrypted) upload.
+        """
+        return [
+            FileChunk(file_id=fid, content=text, score=score)
+            for score, fid, text in await self._scored(query, file_ids, top_k, user_id)
+        ]
+
+    async def _scored(
+        self, query: str, file_ids: list[str], top_k: int, user_id: str | None
+    ) -> list[tuple[float, str, str]]:
         # Sidecars contain extracted user content.  Never retrieve them for an
         # unscoped request; callers without an authenticated owner can still
         # use the pipeline's explicit attachment fallback path.
@@ -213,7 +238,7 @@ class DocumentVectorStore:
             return []
 
         # Load sidecars
-        all_chunks: list[dict[str, Any]] = []
+        all_chunks: list[tuple[str, dict[str, Any]]] = []
         for fid in authorized_file_ids:
             path = self._sidecar_path(fid)
             if not path.exists():
@@ -229,7 +254,7 @@ class DocumentVectorStore:
                     # Legacy plaintext sidecar (no "encrypted" flag) -- read
                     # unchanged, no migration required.
                     sidecar = raw
-                all_chunks.extend(sidecar.get("chunks", []))
+                all_chunks.extend((fid, chunk) for chunk in sidecar.get("chunks", []))
             except Exception as exc:
                 logger.warning("Failed to load sidecar for %s: %s", fid, exc)
 
@@ -245,16 +270,15 @@ class DocumentVectorStore:
 
         # Score all chunks
         scored = []
-        for chunk in all_chunks:
+        for fid, chunk in all_chunks:
             emb = chunk.get("embedding")
             if not emb:
                 continue
             score = _cosine_similarity(query_embedding, emb)
-            scored.append((score, chunk["text"]))
+            scored.append((score, fid, chunk["text"]))
 
         scored.sort(key=lambda x: x[0], reverse=True)
-        max_results = min(top_k, _MAX_TOTAL_RETRIEVE_CHUNKS)
-        return [text for _, text in scored[:max_results]]
+        return scored[: min(top_k, _MAX_TOTAL_RETRIEVE_CHUNKS)]
 
     def delete_index(self, file_id: str) -> bool:
         """Delete a document's vector sidecar."""

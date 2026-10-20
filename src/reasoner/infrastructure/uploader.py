@@ -10,11 +10,16 @@ import hashlib
 import json
 import logging
 import re
+import sys
 import uuid
 from pathlib import Path
 from typing import Any
 
+from reasoner.core.constants_limits import DOCUMENT_PARSE_MEMORY_LIMIT_BYTES, UPLOAD_MAX_FILE_BYTES
+from reasoner.core.degrade import degraded
 from reasoner.core.settings import settings
+from reasoner.infrastructure.documents import parse_worker
+from reasoner.infrastructure.documents.parse_worker import PARSERS
 
 # Content-hash deduplication index, scoped per tenant: {user_id: {sha256: file_id}}.
 # Anonymous uploads (user_id is None) are never written here and never
@@ -72,21 +77,6 @@ def _decrypt_bytes(data: bytes) -> bytes:
     return get_encryption_service().decrypt_bytes(data.decode("utf-8"))
 
 
-# Try to import optional dependencies
-try:
-    from pypdf import PdfReader
-    PDF_AVAILABLE = True
-except ImportError:
-    PDF_AVAILABLE = False
-    logger.warning("pypdf not available - PDF extraction disabled")
-
-try:
-    import docx
-    DOCX_AVAILABLE = True
-except ImportError:
-    DOCX_AVAILABLE = False
-    logger.warning("python-docx not available - DOCX extraction disabled")
-
 # Upload storage directory. UPLOAD_STORAGE_DIR lets a deployment point this
 # at a mounted volume (the installed package dir is replaced on every
 # container redeploy). Empty keeps the historical in-package default so
@@ -99,7 +89,7 @@ UPLOAD_DIR = (
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 # Maximum file size (50MB)
-MAX_FILE_SIZE = 50 * 1024 * 1024
+MAX_FILE_SIZE = UPLOAD_MAX_FILE_BYTES
 
 # Supported file extensions
 SUPPORTED_EXTENSIONS = {".txt", ".pdf", ".docx", ".md", ".png", ".jpg", ".jpeg", ".webp"}
@@ -107,7 +97,8 @@ IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 
 # MIME-type to extension mapping for validation
 MIME_TYPE_MAP: dict[str, set[str]] = {
-    "text/plain": {".txt"},
+    # libmagic reports Markdown as text/plain.
+    "text/plain": {".txt", ".md"},
     "text/markdown": {".md"},
     "application/pdf": {".pdf"},
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": {".docx"},
@@ -140,41 +131,37 @@ def _extract_txt(content: bytes) -> str:
     return content.decode("utf-8", errors="replace")
 
 
-def _extract_pdf(content: bytes) -> str:
-    """Extract text from PDF file."""
-    if not PDF_AVAILABLE:
-        return "[PDF extraction not available - install pypdf]"
+_PARSE_WORKER = Path(parse_worker.__file__)
 
+
+async def _parse_in_child(kind: str, content: bytes) -> str:
+    """Parse a PDF/DOCX in a child process that a timeout or cancel kills."""
     try:
-        import io
-        reader = PdfReader(io.BytesIO(content))
-        text_parts = []
-        for page in reader.pages:
-            text_parts.append(page.extract_text())
-        return "\n".join(text_parts)
-    except Exception as e:
-        logger.error(f"PDF extraction failed: {e}")
-        return f"[PDF extraction failed: {e}]"
-
-
-def _extract_docx(content: bytes) -> str:
-    """Extract text from DOCX file."""
-    if not DOCX_AVAILABLE:
-        return "[DOCX extraction not available - install python-docx]"
-
+        proc = await asyncio.create_subprocess_exec(
+            sys.executable, str(_PARSE_WORKER), kind, str(DOCUMENT_PARSE_MEMORY_LIMIT_BYTES),
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+    except NotImplementedError as exc:
+        # A Windows selector loop cannot spawn subprocesses. Dev-only: the
+        # parse still runs, off the loop, but a timeout can no longer kill it.
+        degraded("upload.parse_subprocess", None, exc=exc)
+        return await asyncio.to_thread(PARSERS[kind], content)
     try:
-        import io
-
-        from docx import Document
-        doc = Document(io.BytesIO(content))
-        text_parts = []
-        for para in doc.paragraphs:
-            if para.text.strip():
-                text_parts.append(para.text)
-        return "\n".join(text_parts)
-    except Exception as e:
-        logger.error(f"DOCX extraction failed: {e}")
-        return f"[DOCX extraction failed: {e}]"
+        out, err = await proc.communicate(content)
+    finally:
+        if proc.returncode is None:
+            proc.kill()
+            await proc.wait()
+    if proc.returncode != 0:
+        # The traceback's last line ("PdfReadError: ..."), or the exit code
+        # when the child was killed (memory cap) before it could write one.
+        lines = err.decode("utf-8", errors="replace").strip().splitlines()
+        reason = lines[-1][:300] if lines else f"parser exited with {proc.returncode}"
+        logger.warning("%s extraction failed: %s", kind.upper(), reason)
+        return f"[{kind.upper()} extraction failed: {reason}]"
+    return out.decode("utf-8", errors="replace")
 
 
 def _extract_md(content: bytes) -> str:
@@ -250,7 +237,7 @@ async def _ocr_scanned_pdf(content: bytes, max_pages: int = 3) -> str:
     API, so there is no drop-in equivalent, and this function can no longer
     render pages to images. It now always returns ``SCANNED_PDF_OCR_UNAVAILABLE``
     (callers fall back to any pypdf text they already have) instead of silently
-    returning no text. Text-layer PDF extraction (``_extract_pdf``, used for the
+    returning no text. Text-layer PDF extraction (``parse_worker.parse_pdf``, used for the
     common case) is unaffected.
     """
     logger.warning(
@@ -268,8 +255,8 @@ async def _pdf_text_or_ocr(content: bytes, force_ocr: bool) -> str:
     did extract is returned in preference to the unavailable notice, and a real
     pypdf error is returned as-is rather than being masked by that notice.
     """
-    text = _extract_pdf(content)
-    if text.startswith("[PDF extraction"):  # error from _extract_pdf: keep it
+    text = await _parse_in_child("pdf", content)
+    if text.startswith("[PDF extraction"):  # a parse error notice: keep it
         return text
     if not force_ocr and len(text.strip()) >= 50:
         return text
@@ -301,7 +288,7 @@ async def _extract_text_unbounded(content: bytes, filename: str, *, force_ocr: b
         case ".pdf":
             return await _pdf_text_or_ocr(content, force_ocr)
         case ".docx":
-            return _extract_docx(content)
+            return await _parse_in_child("docx", content)
         case ".png" | ".jpg" | ".jpeg" | ".webp":
             if force_ocr:
                 return await _ocr_image(content, filename)
@@ -396,7 +383,6 @@ async def save_uploaded_file(
                 "size": len(content),
                 "mime_type": meta.get("mime_type", "application/octet-stream"),
                 "text": text_content,
-                "path": str(UPLOAD_DIR / f"{existing_id}{_get_file_extension(filename)}"),
                 "user_id": user_id,
                 "deduplicated": True,
                 "provenance_report": None,  # scrubbed (if applicable) on the original upload
@@ -496,6 +482,8 @@ async def save_uploaded_file(
 
         # Extract text
         text_content = await extract_text(content, filename, force_ocr=force_ocr)
+        if not is_extraction_notice(text_content):
+            _text_cache_path(file_id).write_bytes(_encrypt_bytes(text_content.encode("utf-8")))
 
         # Background: index for semantic retrieval if enabled. Bounded queue,
         # not a raw asyncio.create_task() -- an upload burst can no longer
@@ -555,7 +543,6 @@ async def save_uploaded_file(
             "size": len(content),
             "mime_type": mime_type,
             "text": text_content,
-            "path": str(file_path),
             "user_id": user_id,
             "provenance_report": provenance_report,
         }
@@ -566,6 +553,27 @@ async def save_uploaded_file(
             "success": False,
             "error": str(e),
         }
+
+
+def stored_bytes(user_id: str) -> int:
+    """Bytes this user's uploads occupy on disk.
+
+    shortcut: walks the per-tenant hash index, which a deleted file's id stays
+    in (it then counts 0). Per-process file; upgrade to a DB column if uploads
+    move off the local volume.
+    """
+    total = 0
+    for file_id in _load_hash_index().get(user_id, {}).values():
+        for ext in SUPPORTED_EXTENSIONS:
+            f = UPLOAD_DIR / f"{file_id}{ext}"
+            if f.exists():
+                total += f.stat().st_size
+    return total
+
+
+def _text_cache_path(file_id: str) -> Path:
+    # ".json" keeps list_uploads from listing it as a file of its own.
+    return UPLOAD_DIR / f"{file_id}.text.json"
 
 
 def _get_upload_meta(file_id: str) -> dict | None:
@@ -601,6 +609,14 @@ async def get_file_text(file_id: str, user_id: str | None = None) -> str | None:
     if user_id is not None:
         if meta is None or meta.get("user_id") != user_id:
             return None
+
+    # The text extracted at upload. Files from before the cache are re-parsed.
+    cached = _text_cache_path(file_id)
+    if cached.exists():
+        try:
+            return _decrypt_bytes(cached.read_bytes()).decode("utf-8")
+        except Exception as exc:
+            degraded("upload.text_cache", None, exc=exc)
 
     # Look for exact file by known extensions instead of globbing
     for ext in SUPPORTED_EXTENSIONS:
@@ -650,13 +666,13 @@ def delete_file(file_id: str, user_id: str | None = None) -> bool:
             except Exception as e:
                 logger.error(f"Failed to delete file {file_id}: {e}")
 
-    # Clean up metadata sidecar
-    meta_path = UPLOAD_DIR / f"{file_id}.meta.json"
-    if meta_path.exists():
-        try:
-            meta_path.unlink()
-        except Exception as e:
-            logger.warning(f"Failed to delete metadata for {file_id}: {e}")
+    # Clean up metadata and extracted-text sidecars
+    for sidecar in (UPLOAD_DIR / f"{file_id}.meta.json", _text_cache_path(file_id)):
+        if sidecar.exists():
+            try:
+                sidecar.unlink()
+            except Exception as e:
+                logger.warning(f"Failed to delete {sidecar.name} for {file_id}: {e}")
 
     # Clean up vector sidecar if present
     if deleted:

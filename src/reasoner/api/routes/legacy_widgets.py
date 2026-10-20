@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 
 from reasoner.api.auth_deps import require_csrf
+from reasoner.api.dependencies import check_rate_limit
 from reasoner.api.schemas import CalculationRequest
 
 logger = logging.getLogger(__name__)
@@ -14,7 +16,7 @@ router = APIRouter()
 
 
 @router.get("/api/weather")
-async def get_weather(location: str = ""):
+async def get_weather(location: str = "", rate_limit_checked=Depends(check_rate_limit)):
     """Get weather data for a location (legacy endpoint)."""
     if not location:
         raise HTTPException(status_code=400, detail="Location parameter required")
@@ -29,14 +31,15 @@ async def get_weather(location: str = ""):
 
 
 @router.get("/api/stocks")
-async def get_stock(symbol: str = ""):
+async def get_stock(symbol: str = "", rate_limit_checked=Depends(check_rate_limit)):
     """Get stock data for a symbol (legacy endpoint)."""
     if not symbol:
         raise HTTPException(status_code=400, detail="Symbol parameter required")
     try:
         from reasoner.widgets import get_stock_data
 
-        stock_data = get_stock_data(symbol.upper())
+        # yahooquery/yfinance block on network I/O; off the loop.
+        stock_data = await asyncio.to_thread(get_stock_data, symbol.upper())
         return stock_data
     except Exception as e:
         logger.error(f"Stock error: {e}")
@@ -50,8 +53,6 @@ async def calculate(
 ):
     """Evaluate a mathematical expression (legacy endpoint)."""
     try:
-        import asyncio
-
         from reasoner.widgets import calculate_expression
 
         result = await asyncio.wait_for(
@@ -69,7 +70,9 @@ async def calculate(
 
 
 @router.get("/api/discover")
-async def discover(topic: str = "tech", mode: str = "normal"):
+async def discover(
+    topic: str = "tech", mode: str = "normal", rate_limit_checked=Depends(check_rate_limit)
+):
     """Get trending content for a topic (legacy endpoint)."""
     try:
         from reasoner.widgets import get_discover_content

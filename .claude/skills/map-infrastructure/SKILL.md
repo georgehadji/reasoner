@@ -123,7 +123,7 @@ folders:
 | `runners/base.py`, `runners/__init__.py`, `runners/python_runner.py` | `LanguageRunner` strategy: builds the fixed image/argv per language; code is base64-encoded into argv, never shell-interpolated. |
 | `sandbox_worker/app.py`, `__main__.py`, `docker_runner.py` | The only process with Docker access: token-guarded HTTP API, one hardened job container per request (non-root UID, read-only rootfs, pids limit, tmpfs). |
 
-## search/, scraper, uploads, prism
+## search/, scraper, uploads
 
 | File | What it does |
 |------|--------------|
@@ -131,7 +131,10 @@ folders:
 | `search/brave_adapter.py` | Brave Search (web, LLM-context, images, videos). |
 | `search/tavily_adapter.py` | Tavily search + extract. |
 | `scraper.py` | Deep read: fetch page, convert HTML to markdown. |
-| `uploader.py` (24KB) | File upload + text extraction (PDF/TXT/DOCX), encryption at rest, hash index dedupe. |
+| `safe_fetch.py` | `safe_get`: SSRF-safe GET for untrusted URLs. Pins the checked IP, re-checks every redirect hop, caps the body. Use it for any server-side fetch of a model-, web- or user-supplied URL. |
+| `uploader.py` (24KB) | File upload + text extraction (PDF/TXT/DOCX), encryption at rest, hash index dedupe, extracted-text cache. |
+| `documents/parse_worker.py` | PDF/DOCX parse run as a killable child process (memory-capped on Linux), zip-bomb pre-check. |
+| `documents/index_queue.py` | Bounded background queue for document semantic-search indexing. |
 | `prism/file_search.py` | `FileSearchPort` over Neuro embeddings and upload sidecars. |
 
 ## watermark/ (image + Layer B)

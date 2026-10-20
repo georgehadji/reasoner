@@ -12,6 +12,92 @@ from starlette.responses import JSONResponse, Response
 logger = logging.getLogger(__name__)
 
 
+class _BodyTooLargeError(Exception):
+    pass
+
+
+class BodySizeLimitMiddleware:
+    """Refuse a request body over its limit before the app has read it.
+
+    Pure ASGI rather than BaseHTTPMiddleware: it must see ``receive`` itself.
+    A declared Content-Length over the limit is refused up front. A chunked
+    or understated body is counted as it arrives; at the limit the 413 is
+    sent and the app's own reply is dropped, because a route that catches
+    every exception (the upload route does) would otherwise answer instead.
+    ``per_path`` maps a path prefix to its limit; the longest prefix wins.
+    """
+
+    def __init__(self, app, default_limit: int, per_path: dict[str, int] | None = None):
+        self.app = app
+        self.default_limit = default_limit
+        self.per_path = sorted((per_path or {}).items(), key=lambda kv: -len(kv[0]))
+
+    @staticmethod
+    def app_limits() -> dict:
+        """The app's caps. Upload matches the route's own Content-Length check;
+        data-URL routes carry base64 images of up to one upload's size (four
+        reference images for generation)."""
+        from reasoner.core.constants import (
+            MAX_DATA_URL_CHARS,
+            REQUEST_BODY_MAX_BYTES,
+            UPLOAD_MAX_FILE_BYTES,
+        )
+        from reasoner.core.settings import settings
+
+        return {
+            "default_limit": REQUEST_BODY_MAX_BYTES,
+            "per_path": {
+                "/api/upload": UPLOAD_MAX_FILE_BYTES * settings.UPLOAD_MAX_FILES + 2**20,
+                "/api/provenance/": MAX_DATA_URL_CHARS + REQUEST_BODY_MAX_BYTES,
+                "/api/generate-image": 4 * MAX_DATA_URL_CHARS + REQUEST_BODY_MAX_BYTES,
+            },
+        }
+
+    def _limit(self, path: str) -> int:
+        matches = (n for prefix, n in self.per_path if path.startswith(prefix))
+        return next(matches, self.default_limit)
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        limit = self._limit(scope["path"])
+        declared = dict(scope["headers"]).get(b"content-length")
+        if declared is not None and (not declared.isdigit() or int(declared) > limit):
+            await _too_large(scope, receive, send, limit)
+            return
+
+        received = 0
+        rejected = False
+
+        async def counted_receive():
+            nonlocal received, rejected
+            message = await receive()
+            if message["type"] == "http.request":
+                received += len(message.get("body", b""))
+                if received > limit and not rejected:
+                    rejected = True
+                    await _too_large(scope, receive, send, limit)
+                    raise _BodyTooLargeError
+            return message
+
+        async def guarded_send(message):
+            if not rejected:
+                await send(message)
+
+        try:
+            await self.app(scope, counted_receive, guarded_send)
+        except _BodyTooLargeError:
+            pass
+
+
+async def _too_large(scope, receive, send, limit: int) -> None:
+    response = JSONResponse(
+        {"detail": f"Request body too large (limit {limit} bytes)"}, status_code=413
+    )
+    await response(scope, receive, send)
+
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response: Response = await call_next(request)

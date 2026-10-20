@@ -58,6 +58,15 @@ async def _rotate_dead_letter_if_needed() -> None:
 EventHandler = Callable[[DomainEvent], Awaitable[None]]
 
 
+def _take_all(queue: asyncio.Queue) -> list:
+    """Empty a queue without waiting, marking each item done."""
+    items = []
+    while not queue.empty():
+        items.append(queue.get_nowait())
+        queue.task_done()
+    return items
+
+
 class EventBus:
     """
     In-memory event bus for domain events.
@@ -79,6 +88,12 @@ class EventBus:
         self._semaphore = asyncio.Semaphore(200)  # Max 200 concurrent handler executions
         self._dropped_event_count: int = 0
         self._dead_letter_enabled: bool = True
+        # One lane (queue + task) per subscriber. The single consumer used to
+        # run each handler, retries and backoff included, before taking the
+        # next event, so one failing subscriber stalled every other one for
+        # up to ~15s per event. A lane keeps each handler's events in order
+        # while isolating its failures.
+        self._lanes: dict[EventHandler, tuple[asyncio.Queue[DomainEvent], asyncio.Task]] = {}
 
     def subscribe(
         self,
@@ -149,44 +164,77 @@ class EventBus:
             logger.critical("Event bus worker task crashed: %s", exc, exc_info=True)
 
     async def stop(self) -> None:
-        """Stop the background queue consumer."""
+        """Drain, then stop the consumer and every subscriber lane.
+
+        Drains while still running: clearing ``_running`` first made the
+        consumer exit its loop, so ``drain()`` waited on a queue nobody read
+        and every queued event was dropped.
+        """
         if not self._running:
             return
-        self._running = False
         await self.drain(timeout=5.0)
+        self._running = False
+        tasks = [t for _, t in self._lanes.values()]
         if hasattr(self, "_worker_task"):
-            self._worker_task.cancel()
-            try:
-                await self._worker_task
-            except asyncio.CancelledError:
-                pass
+            tasks.append(self._worker_task)
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        self._lanes.clear()
 
     async def drain(self, timeout: float = 5.0) -> None:
         """Process all queued events before shutdown.
 
-        Waits up to ``timeout`` seconds for the queue to empty.
-        Events not processed within the timeout are logged to dead-letter.
+        Waits up to ``timeout`` seconds for the queue and every lane to empty.
+        Events still queued then are written to the dead-letter log.
         """
-        if self._task_queue is None or self._task_queue.empty():
+        if self._task_queue is None:
             return
+
+        async def _all_done() -> None:
+            await self._task_queue.join()
+            for queue, _ in list(self._lanes.values()):
+                await queue.join()
+
         try:
-            await asyncio.wait_for(self._task_queue.join(), timeout=timeout)
+            await asyncio.wait_for(_all_done(), timeout=timeout)
         except TimeoutError:
-            remaining = self._task_queue.qsize()
+            left = [item[0] for item in _take_all(self._task_queue)]
+            for queue, _ in self._lanes.values():
+                left += _take_all(queue)
             logger.warning(
-                "EventBus drain timed out after %.1fs with %d events remaining.",
-                timeout,
-                remaining,
+                "EventBus drain timed out after %.1fs with %d events remaining; "
+                "dead-lettered.", timeout, len(left),
             )
-            self._dropped_event_count += remaining
+            self._dropped_event_count += len(left)
+            for event in left:
+                await self._log_to_dead_letter(event, "Not processed before shutdown")
+
+    def _lane(self, handler: EventHandler) -> asyncio.Queue[DomainEvent]:
+        if handler not in self._lanes:
+            queue: asyncio.Queue[DomainEvent] = asyncio.Queue(maxsize=self._max_queue_size)
+            self._lanes[handler] = (queue, asyncio.create_task(self._lane_worker(handler, queue)))
+        return self._lanes[handler][0]
+
+    async def _lane_worker(self, handler: EventHandler, queue: asyncio.Queue[DomainEvent]) -> None:
+        while True:
+            event = await queue.get()
+            try:
+                await self._safe_execute(handler, event)
+            finally:
+                queue.task_done()
 
     async def _queue_worker(self) -> None:
-        """Background worker that consumes the event queue."""
+        """Hand each queued (event, handler) to that handler's lane, without waiting."""
         while self._running:
             try:
                 event, handler = await self._task_queue.get()
                 try:
-                    await self._safe_execute(handler, event)
+                    self._lane(handler).put_nowait(event)
+                except asyncio.QueueFull:
+                    # This subscriber is the slow one; the others keep flowing.
+                    self._dropped_event_count += 1
+                    await self._log_to_dead_letter(event, "Subscriber lane full")
                 finally:
                     self._task_queue.task_done()
             except asyncio.CancelledError:
@@ -438,6 +486,9 @@ async def track_pipeline_metrics(event: DomainEvent) -> None:
         )
 
 
+_UNPERSISTED_TEXT_FIELDS = ("system_prompt", "user_prompt", "raw_response")
+
+
 async def persist_all_events(event: DomainEvent) -> None:
     """Persist all events to the EventStore for audit trail and replay.
 
@@ -445,9 +496,22 @@ async def persist_all_events(event: DomainEvent) -> None:
     queue-based backpressure, so we call EventStore.save_events directly.
     """
     try:
+        import dataclasses
+
         from reasoner.infrastructure.persistence.event_store import get_event_store
         store = get_event_store()
-        await store.save_events([event])
+        # Stored at version 0: kept for audit, outside replay (get_events reads
+        # version > 0). Publishers stamp version=1 on everything, and these
+        # landed in the run's stream beside RunStream's own 1..n, so
+        # PipelineAggregate raised "version 1 doesn't match expected version 2"
+        # and status and resume broke for every streamed run. The aggregate's
+        # stream has one writer (docs/plans/audit-remediation-2026-10-20.md PER-2).
+        # Prompt and response bodies are not persisted. Every LLM call of every
+        # tenant appended them, often under aggregate "unknown", which erasure
+        # never reaches. Model, tokens and cost stay; live subscribers (tracing)
+        # still get the full event (PER-3).
+        stripped = {f: "" for f in _UNPERSISTED_TEXT_FIELDS if hasattr(event, f)}
+        await store.save_events([dataclasses.replace(event, version=0, **stripped)])
     except Exception as exc:
         logger.warning("EventStore persistence failed for %s: %s", event.event_type.value, exc)
 

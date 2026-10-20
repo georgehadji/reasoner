@@ -185,8 +185,6 @@ class PhaseMonitor:
         *,
         attempt: int = 1,
     ) -> PhaseQualityResult:
-        from reasoner.infrastructure.llm.ports import Message
-
         values = _build_format_values(state)
         summary = _build_summary(phase_name, values)
         criteria = _PHASE_CRITERIA.get(phase_name, "phase output must be non-empty and well-formed")
@@ -214,16 +212,18 @@ class PhaseMonitor:
                 **values,
             )
 
-        messages = [Message(role="user", content=prompt)]
-        response = await self._router.complete(
-            model_id=self._judge_model,
-            messages=messages,
-            system=_JUDGE_SYSTEM,
-            max_tokens=GATE_MAX_TOKENS,
-            temperature=GATE_TEMPERATURE,
-        )
+        # ProviderRouter has no complete(): this used to raise AttributeError,
+        # which evaluate() swallowed, so the judge never ran and every rule miss
+        # forced a full phase retry (docs/plans/audit-remediation-2026-10-20.md
+        # DAT-6). The judge runs on its own cheap model, not the preset primary.
+        from reasoner.infrastructure.llm.router import ProviderRouter
 
-        raw = (response.content or "").strip()
+        judge = ProviderRouter.from_model_ids(self._judge_model)
+        response, _meta = await judge.call(
+            "primary", _JUDGE_SYSTEM, prompt,
+            max_tokens=GATE_MAX_TOKENS, temperature=GATE_TEMPERATURE,
+        )
+        raw = (response if isinstance(response, str) else getattr(response, "text", "")).strip()
         parsed = _parse_judge_response(raw)
         if parsed is None:
             logger.warning("LLM judge returned unparseable output for %r: %r", phase_name, raw[:200])

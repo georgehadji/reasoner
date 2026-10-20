@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Annotated, Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, StringConstraints, field_validator
 
 from reasoner.core.constants import (
     DEFAULT_PRESET,
@@ -23,8 +23,13 @@ from reasoner.core.constants import (
     IMAGE_GEN_MAX_IMAGE_COUNT,
     TRUNCATION,
 )
+from reasoner.core.constants_limits import MAX_DATA_URL_CHARS
 from reasoner.core.settings import settings
 from reasoner.presets import is_valid_preset_name, resolve_preset_name
+
+# An upload id (uploader.py: uuid4 prefix). The format check keeps a path such
+# as "../x" from ever reaching the sidecar lookup.
+FileId = Annotated[str, StringConstraints(pattern=r"^[a-f0-9-]{1,36}$")]
 
 
 class SearchRequest(BaseModel):
@@ -126,7 +131,7 @@ class RunRequest(BaseModel):
     attachments: list[AttachmentRef] = Field(
         default_factory=list, max_length=settings.UPLOAD_MAX_FILES
     )
-    file_ids: list[str] = []
+    file_ids: list[FileId] = Field(default_factory=list, max_length=settings.UPLOAD_MAX_FILES)
     client_run_id: str | None = Field(default=None, pattern=CLIENT_RUN_ID_PATTERN)
 
     model_config = {"extra": "forbid"}
@@ -225,7 +230,7 @@ class FollowupRequest(BaseModel):
     attachments: list[AttachmentRef] = Field(
         default_factory=list, max_length=settings.UPLOAD_MAX_FILES
     )
-    file_ids: list[str] = []
+    file_ids: list[FileId] = Field(default_factory=list, max_length=settings.UPLOAD_MAX_FILES)
     client_run_id: str | None = Field(default=None, pattern=CLIENT_RUN_ID_PATTERN)
 
     model_config = {"extra": "forbid"}
@@ -311,7 +316,7 @@ class GenerateImageRequest(BaseModel):
     resolution: str = IMAGE_GEN_DEFAULT_RESOLUTION
     enhance: bool = True
     preview_only: bool = False
-    reference_images: list[str] = []
+    reference_images: list[Annotated[str, StringConstraints(max_length=MAX_DATA_URL_CHARS)]] = []
     # Unbounded here meant one request could fan out across the whole image
     # catalogue in parallel, each model a paid call. Asking for zero (or fewer)
     # images silently "succeeded" with no images, so the floor matters too.

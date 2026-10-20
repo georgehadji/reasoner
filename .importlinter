@@ -164,7 +164,6 @@ ignore_imports =
     reasoner.application.flows.egress_rewrite_phase -> reasoner.infrastructure.watermark.rewriter
     reasoner.application.flows.jury -> reasoner.infrastructure.search.discovery
     reasoner.application.flows.perspective_phases -> reasoner.infrastructure.search.discovery
-    reasoner.application.flows.research_phases -> reasoner.infrastructure.prism.file_search
     reasoner.application.flows.research_phases -> reasoner.infrastructure.search.discovery
     reasoner.application.flows.search_phases -> reasoner.infrastructure.search.discovery
     reasoner.application.flows.search_phases -> reasoner.infrastructure.search.tavily_adapter

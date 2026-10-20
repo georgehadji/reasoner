@@ -10,9 +10,11 @@ from the caller — those are fixed by the registered ``LanguageRunner``.
 
 from __future__ import annotations
 
+import asyncio
 import hmac
 import logging
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
@@ -20,6 +22,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from reasoner.core.ports.code_executor import ExecutionLimits
 from reasoner.infrastructure.execution.sandbox_worker.docker_runner import (
     check_docker_health,
+    remove_orphaned_containers,
     run_in_container,
 )
 
@@ -27,11 +30,24 @@ logger = logging.getLogger(__name__)
 
 _TOKEN = os.getenv("SANDBOX_WORKER_TOKEN", "")
 
+# Bulkhead: each job is a container with up to 1 CPU and 1 GB. Unbounded, a
+# burst of requests started as many containers as the host could fork.
+_MAX_CONCURRENCY = max(1, int(os.getenv("SANDBOX_MAX_CONCURRENCY", "4")))
+_slots = asyncio.Semaphore(_MAX_CONCURRENCY)
+
+
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    await remove_orphaned_containers()
+    yield
+
+
 app = FastAPI(
     title="Reasoner Sandbox Worker",
     docs_url=None,
     redoc_url=None,
     openapi_url=None,
+    lifespan=_lifespan,
 )
 
 
@@ -87,18 +103,25 @@ async def execute(
     authorization: str | None = Header(default=None),
 ) -> ExecuteResponse:
     _require_token(authorization)
+    if _slots.locked():
+        # Refuse rather than queue: a queued job's wall clock would already
+        # be running out in the caller.
+        raise HTTPException(
+            status_code=429, detail="Sandbox is at capacity", headers={"Retry-After": "1"}
+        )
 
     limits = ExecutionLimits(
         timeout_ms=request.timeout_ms,
         memory_limit_mb=request.memory_limit_mb,
         max_output_bytes=request.max_output_bytes,
     )
-    result = await run_in_container(
-        request.code,
-        language=request.language,
-        stdin=request.stdin,
-        limits=limits,
-    )
+    async with _slots:
+        result = await run_in_container(
+            request.code,
+            language=request.language,
+            stdin=request.stdin,
+            limits=limits,
+        )
     return ExecuteResponse(
         success=result.success,
         stdout=result.stdout,

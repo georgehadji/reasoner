@@ -37,8 +37,10 @@ class InputSanitizer:
         r"disregard\s+(?:all\s+)?(?:previous|prior|above)",
         r"forget\s+(?:everything|all)\s+you\s+(?:know|were\s+told)",
         r"new\s+instruction[s]?:",
-        r"system\s*:\s*",
-        r"assistant\s*:\s*",
+        # A role label starts a line or a sentence. Matching anywhere refused
+        # "file system: ext4", "ecosystem: Node" and "system:masters" as
+        # injections (docs/plans/audit-remediation-2026-10-20.md DAT-5).
+        r"(?:^|(?<=[.!?]))[ \t]*(?:system|assistant)\s*:",
         r"\[INST\]",
         r"\[/INST\]",
         r"<<SYS>>",

@@ -96,6 +96,9 @@ class RecallChunkResponse(BaseModel):
     source: str
     relevance: float
     cache_tier: str
+    # Learn-time provenance. Without the field, pydantic dropped it and every
+    # chunk failed the recall filter (DAT-4).
+    metadata: dict = Field(default_factory=dict)
 
 
 class RecallResponse(BaseModel):
@@ -421,8 +424,10 @@ class NeuroService:
             ),
             owner=owner,
         )
+        # Metadata first so it cannot overwrite the content keys.
         return [
-            {"content": c.content, "source": c.source, "relevance": c.relevance}
+            {**getattr(c, "metadata", {}), "content": c.content, "source": c.source,
+             "relevance": c.relevance}
             for c in resp.chunks
         ]
 
@@ -572,9 +577,11 @@ class NeuroService:
         start = time.perf_counter()
         persona = get_persona(config, req.persona, req.agent_id)
         key = tenant_key(owner, req.agent_id)
-        if tenants.is_erased(key):
-            # Nothing to recall for an owner being / just erased, and get()
-            # would re-create their empty tenant directories.
+        if key is None or tenants.is_erased(key):
+            # No owner and no conversation: no tenant (tenants.get(None) is the
+            # shared "default" one, which every anonymous caller could read).
+            # Nothing to recall for an owner being / just erased either, and
+            # get() would re-create their empty tenant directories.
             return RecallResponse(
                 chunks=[],
                 total_found=0,
@@ -703,6 +710,12 @@ class NeuroService:
     async def ingest(self, req: LearnRequest, owner: str | None = None) -> LearnResponse:
         embedder, tenants = self.embedder, self.tenants
         key = tenant_key(owner, req.agent_id)
+        if key is None:
+            # An anonymous run with no conversation has no tenant of its own;
+            # writing to the shared "default" one let any caller read it back.
+            return LearnResponse(
+                status="dropped_anonymous", session_id="", entry_number=0, agent_id=None
+            )
         # The owner may be erased moments ago (GDPR Art. 17); a run that was
         # already in flight must not write their memory back. Checked again
         # after every await that could span an erasure: get() (waits out one in
@@ -773,7 +786,7 @@ class NeuroService:
     ) -> dict:
         """List recent session entries for browsing memory."""
         key = tenant_key(owner, agent_id)
-        if self.tenants.is_erased(key):
+        if key is None or self.tenants.is_erased(key):
             return {"entries": [], "total": 0}
         tenant = await self.tenants.get(key)
         # Reads every hot session file on disk -- offload, same reason as

@@ -268,7 +268,7 @@ async def test_prism_uploads_search_neutralizes_chunk_text():
     from reasoner.application.flows.prism_research import _action_uploads_search
 
     class _FakeSearch:
-        async def search_chunks(self, file_ids, query, top_k=5):
+        async def search_chunks(self, file_ids, query, top_k=5, user_id=None):
             return [SimpleNamespace(file_id="f1", content="ok\x00\x07text\u200b here")]
 
     out = await _action_uploads_search(_FakeSearch(), ["f1"], ["q"])

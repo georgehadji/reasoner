@@ -21,7 +21,7 @@ import math
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from reasoner.domain.saas import SubscriptionTier
 
@@ -181,6 +181,18 @@ def allowance_steps(tier: SubscriptionTier) -> list[tuple[SubscriptionTier, int]
         if step == tier:
             break
     return steps
+
+
+def run_reference(client_run_id: str | None, kind: str = "run") -> str:
+    """Ledger reference for one run. It is never reused, whatever the caller sends.
+
+    The ledger treats a repeated reference as a replay and moves no credits.
+    ``client_run_id`` is chosen by the caller and only deduplicated for an
+    hour, so using it directly let a client resend an old id later and run
+    for free (docs/plans/audit-remediation-2026-10-20.md BIL-1). The id stays
+    as the prefix, so support can find a run by the id the client knows.
+    """
+    return f"{client_run_id or kind}:{uuid4().hex}"
 
 
 def can_afford(balance: int, cost: int) -> bool:

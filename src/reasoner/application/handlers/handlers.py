@@ -153,8 +153,10 @@ class RunPipelineCommandHandler:
         if sse_emit:
             await sse_emit({"type": "start"})
 
-        # Persist event
-        if self.event_store:
+        # Persist event. On the SSE path RunStream writes the run's stream
+        # (started, each phase, completed); a second writer here duplicated
+        # version 1 and broke replay (PER-2).
+        if self.event_store and not sse_emit:
             await self.event_store.save_events([start_event])
 
         # Publish event
@@ -226,8 +228,8 @@ class RunPipelineCommandHandler:
             if sse_emit:
                 await sse_emit({"type": "end", "data": {"synthesis": {"core_solution": "Completed"}}})
 
-            # Persist and publish
-            if self.event_store:
+            # Persist and publish (RunStream persists on the SSE path; PER-2)
+            if self.event_store and not sse_emit:
                 await self.event_store.save_events([completion_event])
             await self.event_bus.publish(completion_event)
 
@@ -257,7 +259,13 @@ class RunPipelineCommandHandler:
             aggregate.record_event(failure_event)
 
             if self.event_store:
-                await self.event_store.save_events([failure_event])
+                # On the SSE path RunStream owns the version sequence (PER-2), so
+                # the redacted record is kept outside replay at version 0. A
+                # failure raised outside the phases has no other record.
+                import dataclasses
+                await self.event_store.save_events(
+                    [failure_event if not sse_emit else dataclasses.replace(failure_event, version=0)]
+                )
             await self.event_bus.publish(failure_event)
 
             raise
@@ -551,6 +559,20 @@ class HandlerRegistry:
             "ListPresetsQuery": ListPresetsQueryHandler(),
         }
 
+    def attach_event_store(self, event_store: Any) -> None:
+        """Give a registry built without a store the real one.
+
+        run_stream builds the registry with no arguments. If that was a
+        worker's first request, the worker kept event_store=None for its
+        lifetime: status queries answered "Event store not available" and
+        resume raised AttributeError
+        (docs/plans/audit-remediation-2026-10-20.md PER-5).
+        """
+        self.event_store = event_store
+        for handler in (*self.command_handlers.values(), *self.query_handlers.values()):
+            if getattr(handler, "event_store", "absent") is None:
+                handler.event_store = event_store
+
     async def handle_command(self, command: Any) -> Any:
         """Route command to appropriate handler."""
         command_name = command.__class__.__name__
@@ -615,4 +637,6 @@ def get_handler_registry(
             pipeline_module = importlib.import_module("reasoner.api.execution.pipeline")
             pipeline_executor = pipeline_module.PipelineExecutionService()
         _handler_registry = HandlerRegistry(llm_router, event_store, pipeline_executor)
+    elif event_store is not None and _handler_registry.event_store is None:
+        _handler_registry.attach_event_store(event_store)
     return _handler_registry

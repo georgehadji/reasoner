@@ -98,7 +98,7 @@ class TestRealPdfTextExtraction:
     async def test_extract_pdf_directly_via_pypdf(self):
         """_extract_pdf() itself (the pypdf.PdfReader call site) round-trips
         real PDF bytes regardless of the >= 50 char OCR-fallback threshold."""
-        from reasoner.infrastructure.uploader import _extract_pdf
+        from reasoner.infrastructure.documents.parse_worker import parse_pdf as _extract_pdf
         pdf_bytes = _build_minimal_pdf("Short text")
         result = _extract_pdf(pdf_bytes)
         assert "Short text" in result
@@ -167,7 +167,7 @@ class TestExtractTextOCR:
     @pytest.mark.asyncio
     async def test_pdf_uses_ocr_when_forced(self):
         """PDFs with force_ocr=True should always route to OCR."""
-        with patch("reasoner.infrastructure.uploader._extract_pdf") as mock_pdf, \
+        with patch("reasoner.infrastructure.uploader._parse_in_child", new_callable=AsyncMock) as mock_pdf, \
              patch("reasoner.infrastructure.uploader._ocr_scanned_pdf", new_callable=AsyncMock) as mock_ocr:
             mock_pdf.return_value = "Plenty of text here that would normally skip OCR"
             mock_ocr.return_value = "OCR text"
@@ -179,7 +179,7 @@ class TestExtractTextOCR:
     async def test_pdf_skips_ocr_when_text_is_long(self):
         """PDFs with extracted text >= 50 chars should skip OCR."""
         long_text = "x" * 50
-        with patch("reasoner.infrastructure.uploader._extract_pdf") as mock_pdf, \
+        with patch("reasoner.infrastructure.uploader._parse_in_child", new_callable=AsyncMock) as mock_pdf, \
              patch("reasoner.infrastructure.uploader._ocr_scanned_pdf", new_callable=AsyncMock) as mock_ocr:
             mock_pdf.return_value = long_text
             result = await extract_text(b"fake-pdf", "test.pdf")
@@ -189,7 +189,7 @@ class TestExtractTextOCR:
     @pytest.mark.asyncio
     async def test_pdf_fallback_to_ocr_when_text_is_short(self):
         """PDFs with extracted text < 50 chars should trigger OCR fallback."""
-        with patch("reasoner.infrastructure.uploader._extract_pdf") as mock_pdf, \
+        with patch("reasoner.infrastructure.uploader._parse_in_child", new_callable=AsyncMock) as mock_pdf, \
              patch("reasoner.infrastructure.uploader._ocr_scanned_pdf", new_callable=AsyncMock) as mock_ocr:
             mock_pdf.return_value = "short"
             mock_ocr.return_value = "Scanned page text"
@@ -200,7 +200,7 @@ class TestExtractTextOCR:
     @pytest.mark.asyncio
     async def test_pdf_fallback_whitespace_only_counts_as_short(self):
         """PDFs returning only whitespace should trigger OCR fallback."""
-        with patch("reasoner.infrastructure.uploader._extract_pdf") as mock_pdf, \
+        with patch("reasoner.infrastructure.uploader._parse_in_child", new_callable=AsyncMock) as mock_pdf, \
              patch("reasoner.infrastructure.uploader._ocr_scanned_pdf", new_callable=AsyncMock) as mock_ocr:
             mock_pdf.return_value = "   \n\n   "
             mock_ocr.return_value = "Scanned page text"

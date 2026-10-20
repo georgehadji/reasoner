@@ -45,6 +45,21 @@ ASSIGNABLE_SCOPES: frozenset[str] = frozenset(
 
 DEFAULT_SCOPES: frozenset[str] = frozenset({"read", "preset:read", "history:read"})
 
+#: Required by routes that no key may reach, because neither scope is in
+#: ASSIGNABLE_SCOPES. Minting keys and deleting the account need an
+#: interactive login, so a leaked key cannot mint a stronger key or destroy
+#: the account.
+KEY_MANAGE_SCOPE = "key:manage"
+ACCOUNT_DELETE_SCOPE = "account:delete"
+
+
+def key_allows(granted: frozenset[str] | set[str], required: str) -> bool:
+    """Whether a key holding ``granted`` may act where ``required`` is needed.
+
+    ``write`` implies ``read``. Nothing else is implied.
+    """
+    return required in granted or (required == "read" and "write" in granted)
+
 #: Hard cap on live keys per user, to bound credential sprawl and the blast
 #: radius of a compromised account.
 MAX_KEYS_PER_USER = 20

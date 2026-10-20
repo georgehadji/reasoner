@@ -154,9 +154,17 @@ def extract_json_any(text: str) -> Any:
     if len(text) > MAX_INPUT_LENGTH:
         text = text[:MAX_INPUT_LENGTH]
 
-    text = strip_perplexity_citations(text.strip())
+    text = _strip_reasoning_tags(text.strip())
+    # Strict first. The citation, "Sources:" and artifact strippers below also
+    # match inside JSON strings, so they ran on valid output and corrupted it:
+    # {"selected": [2]} lost its [2], and a value containing "Sources:" cut off
+    # the rest of the object (docs/plans/audit-remediation-2026-10-20.md DAT-1).
+    # They now run only when the text does not parse as it stands.
+    strict = _parse_strict(text)
+    if strict is not None:
+        return strict
+    text = strip_perplexity_citations(text)
     text = strip_provider_artifacts(text)
-    text = _strip_reasoning_tags(text)
     text = strip_prose_preamble(text)
     if not text:
         return None
@@ -249,6 +257,34 @@ def extract_json_any(text: str) -> Any:
     if reconstructed:
         return reconstructed
 
+    return None
+
+
+_STRICT_FENCE_RE = re.compile(r"```(?:json)?\s*\n?([\s\S]*?)\n?```")
+
+
+def _parse_strict(text: str) -> Any:
+    """Parse JSON in *text* without altering any of its content, or return None.
+
+    Tries a fenced block, the text from its first bracket, and the balanced
+    object starting at the first ``{``. The last covers trailing prose such as
+    a "Sources:" list after the JSON.
+    """
+    candidates = []
+    fence = _STRICT_FENCE_RE.search(text)
+    if fence:
+        candidates.append(fence.group(1).strip())
+    candidates.append(strip_prose_preamble(text))
+    start_obj = text.find("{")
+    if start_obj != -1:
+        span = _extract_balanced_structure(text, start_obj, "{", "}")
+        if span is not None:
+            candidates.append(span)
+    for candidate in candidates:
+        try:
+            return safe_json_loads(candidate, max_depth=100)
+        except (json.JSONDecodeError, JSONDepthExceededError):
+            continue
     return None
 
 

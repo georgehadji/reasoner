@@ -19,4 +19,5 @@ class FileSearchPort(Protocol):
         file_ids: list[str],
         query: str,
         top_k: int = 5,
+        user_id: str | None = None,
     ) -> list[FileChunk]: ...

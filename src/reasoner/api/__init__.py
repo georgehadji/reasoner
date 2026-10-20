@@ -8,7 +8,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import asyncio
 import logging
-import uuid
 from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -60,7 +59,7 @@ from reasoner.api.error_handler import register_exception_handlers
 security = HTTPBearer(auto_error=False)
 
 # Import rate limiter and auth
-from reasoner.api.middleware import SecurityHeadersMiddleware
+from reasoner.api.middleware import BodySizeLimitMiddleware, SecurityHeadersMiddleware
 from reasoner.auth import AuthenticationError, get_auth_manager
 from reasoner.rate_limiter import RateLimitConfig, get_rate_limiter
 
@@ -239,13 +238,11 @@ async def lifespan(app: FastAPI):
 
     # Background task: nightly event store compaction (P2-A)
     from reasoner.application.services.compaction_service import run_nightly_compaction_loop
-    if settings.DATABASE_URL:
-        from reasoner.infrastructure.persistence.postgres_store import PostgreSQLEventStore
-        _compaction_store = PostgreSQLEventStore(settings.asyncpg_dsn, pool_size=5)
-        await _compaction_store.initialize()
-    else:
-        from reasoner.infrastructure.persistence.event_store import get_event_store
-        _compaction_store = get_event_store()
+    from reasoner.infrastructure.persistence.event_store import get_event_store
+    # The store the events go to. Compaction used to build its own Postgres
+    # store whenever DATABASE_URL was set, even with EVENT_STORE_BACKEND=sqlite,
+    # so it could prune a database nothing wrote to (PER-1).
+    _compaction_store = get_event_store()
     _compaction_task = asyncio.create_task(
         run_nightly_compaction_loop(_compaction_store),
         name="event_store_compaction",
@@ -486,6 +483,7 @@ from reasoner.api.streaming import (
 from reasoner.application.services.pipeline_service import PipelineService
 from reasoner.application.services.preset_service import PresetService
 from reasoner.application.services.search_service import SearchService
+from reasoner.domain.credits import run_reference
 from reasoner.domain.saas import QuotaResult, User
 from reasoner.infrastructure.redis.run_state import _run_state_manager as _run_store
 
@@ -701,7 +699,7 @@ async def run_pipeline(
 
     from reasoner.api.dependencies import reserve_or_402
 
-    reference_id = req.client_run_id or f"run:{uuid.uuid4()}"
+    reference_id = run_reference(req.client_run_id)
 
     if user is None:
         # No account to reserve credits against -- capped separately so
@@ -775,7 +773,7 @@ async def run_followup_pipeline(
         await enforce_anonymous_trial_cap(get_client_ip(request), estimate["estimated_cost_usd"])
 
     await register_run_or_error(req.client_run_id)
-    reference_id = req.client_run_id or f"followup:{uuid.uuid4()}"
+    reference_id = run_reference(req.client_run_id, "followup")
     reserved_credits = await reserve_or_402(
         user_id=str(user.id) if user else None,
         preset=preset,
@@ -1086,6 +1084,8 @@ app.add_middleware(
     timeout_seconds=REQUEST_TIMEOUT_SECONDS,
 )
 
+# Added last, so it runs first: nothing reads a body over its cap.
+app.add_middleware(BodySizeLimitMiddleware, **BodySizeLimitMiddleware.app_limits())
 
 # ─────────────────────────────────────────────────────────────────────
 # ROOT ENDPOINT

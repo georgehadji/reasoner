@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from datetime import UTC, datetime, timedelta
@@ -15,6 +16,15 @@ from reasoner.domain.saas import Subscription, SubscriptionStatus, SubscriptionT
 logger = logging.getLogger(__name__)
 
 _PAYPAL_BASE_URL = "https://api-m.{env}.paypal.com"
+
+# verify-webhook-signature request field -> delivery header carrying it.
+_VERIFY_HEADERS = {
+    "auth_algo": "paypal-auth-algo",
+    "cert_url": "paypal-cert-url",
+    "transmission_id": "paypal-transmission-id",
+    "transmission_sig": "paypal-transmission-sig",
+    "transmission_time": "paypal-transmission-time",
+}
 
 
 class PayPalBillingAdapter(BillingPort):
@@ -149,6 +159,10 @@ class PayPalBillingAdapter(BillingPort):
         return mapping.get(tier, "")
 
     def _tier_from_plan(self, plan_id: str | None) -> SubscriptionTier:
+        # Without this guard a missing plan_id matched an unset env var
+        # (None == None) and mapped to PRO.
+        if not plan_id:
+            return SubscriptionTier.FREE
         if plan_id == os.environ.get("PAYPAL_PRO_PLAN_ID"):
             return SubscriptionTier.PRO
         if plan_id == os.environ.get("PAYPAL_ENTERPRISE_PLAN_ID"):
@@ -202,12 +216,28 @@ class PayPalBillingAdapter(BillingPort):
             resp.raise_for_status()
 
     async def verify_webhook_signature(self, headers: dict, body: str) -> bool:
-        """Verify PayPal webhook signature using their certificate-based verification.
+        """Verify a webhook delivery with PayPal's verify-webhook-signature API.
 
-        For production, use PayPal's SDK verification or their /v1/notifications/verify-webhook-signature endpoint.
+        True only when PayPal answers ``SUCCESS``. A missing webhook id or
+        transmission header is False without a network call. Network and HTTP
+        errors raise, so the caller can ask PayPal to retry instead of
+        dropping a genuine event.
+
+        This replaced a check that accepted any non-empty
+        ``paypal-transmission-sig`` header, which let anyone forge
+        subscription events (docs/plans/audit-remediation-2026-10-20.md SEC-1).
         """
-        # Simplified: in production, verify the transmission ID, cert URL, auth algo,
-        # transmission time, webhook ID, and CRC32 of the event body.
-        # For now, we accept the webhook if the transmission signature is present.
-        transmission_sig = headers.get("paypal-transmission-sig", "")
-        return bool(transmission_sig)
+        webhook_id = os.environ.get("PAYPAL_WEBHOOK_ID", "")
+        values = {field: headers.get(header, "") for field, header in _VERIFY_HEADERS.items()}
+        if not webhook_id or not all(values.values()):
+            return False
+
+        token = await self._get_access_token()
+        async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, connect=10.0)) as client:
+            resp = await client.post(
+                f"{self.base_url}/v1/notifications/verify-webhook-signature",
+                headers=self._headers(token),
+                json={**values, "webhook_id": webhook_id, "webhook_event": json.loads(body)},
+            )
+            resp.raise_for_status()
+        return resp.json().get("verification_status") == "SUCCESS"
