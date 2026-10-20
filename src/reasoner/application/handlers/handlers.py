@@ -559,6 +559,20 @@ class HandlerRegistry:
             "ListPresetsQuery": ListPresetsQueryHandler(),
         }
 
+    def attach_event_store(self, event_store: Any) -> None:
+        """Give a registry built without a store the real one.
+
+        run_stream builds the registry with no arguments. If that was a
+        worker's first request, the worker kept event_store=None for its
+        lifetime: status queries answered "Event store not available" and
+        resume raised AttributeError
+        (docs/plans/audit-remediation-2026-10-20.md PER-5).
+        """
+        self.event_store = event_store
+        for handler in (*self.command_handlers.values(), *self.query_handlers.values()):
+            if getattr(handler, "event_store", "absent") is None:
+                handler.event_store = event_store
+
     async def handle_command(self, command: Any) -> Any:
         """Route command to appropriate handler."""
         command_name = command.__class__.__name__
@@ -623,4 +637,6 @@ def get_handler_registry(
             pipeline_module = importlib.import_module("reasoner.api.execution.pipeline")
             pipeline_executor = pipeline_module.PipelineExecutionService()
         _handler_registry = HandlerRegistry(llm_router, event_store, pipeline_executor)
+    elif event_store is not None and _handler_registry.event_store is None:
+        _handler_registry.attach_event_store(event_store)
     return _handler_registry
