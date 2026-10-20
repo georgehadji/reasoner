@@ -418,15 +418,19 @@ class PostgreSQLEventStore:
         elif isinstance(event, PipelineFailed):
             status = "failed"
 
-        # Upsert aggregate
+        # Upsert aggregate. Version only moves forward, and only an event that
+        # carries a status ($8) changes it. EXCLUDED.status is never NULL (an
+        # insert writes "running"), so the old COALESCE let any late phase
+        # event flip a completed run back to running at a lower version. The
+        # SQLite store already did this right (PER-4).
         await conn.execute("""
             INSERT INTO aggregates 
             (aggregate_id, aggregate_type, current_version, status, 
              problem, preset, method, metadata, created_at, updated_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7, '{}', NOW(), NOW())
             ON CONFLICT (aggregate_id) DO UPDATE SET
-                current_version = EXCLUDED.current_version,
-                status = COALESCE(EXCLUDED.status, aggregates.status),
+                current_version = GREATEST(aggregates.current_version, EXCLUDED.current_version),
+                status = COALESCE($8, aggregates.status),
                 problem = COALESCE(EXCLUDED.problem, aggregates.problem),
                 preset = COALESCE(EXCLUDED.preset, aggregates.preset),
                 method = COALESCE(EXCLUDED.method, aggregates.method),
@@ -439,6 +443,7 @@ class PostgreSQLEventStore:
             problem,
             preset,
             method,
+            status,
         )
 
     async def get_events(
