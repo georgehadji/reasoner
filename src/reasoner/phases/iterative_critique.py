@@ -141,6 +141,12 @@ def synthesis_prompt(state: PipelineState) -> str:
             "answer_snippet": r.answer[:300] if r.answer else "",
             "flaws": r.flaws_identified[:3],
             "changes": r.changes_summary or "",
+            # Flaws the generator pushed back on: synthesis should weigh them
+            # rather than treat every critic flaw as upheld.
+            "rejected_flaws": [
+                fr for fr in (r.flaw_responses or [])
+                if str(fr.get("stance", "")).upper() == "DISAGREE"
+            ],
         })
 
     convergence_reason = getattr(state, "adversarial_convergence_reason", "")
@@ -169,4 +175,4 @@ def _get_best_answer(state: PipelineState) -> str:
         return ""
     best = max(state.adversarial_rounds,
                key=lambda r: r.critic_score.total if r.critic_score else 0.0)
-    return best.revised_answer or best.answer
+    return best.answer or best.revised_answer

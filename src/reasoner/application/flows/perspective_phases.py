@@ -10,6 +10,7 @@ import reasoner.phases as phases
 from reasoner.application.flows.base import WorkflowServices
 from reasoner.core.constants import DEFAULT_MAX_TOKENS, get_token_budget
 from reasoner.core.exceptions import PhaseError
+from reasoner.core.ports.model_registry_port import get_model_registry_port
 from reasoner.domain.core_types import (
     ScenarioType,
     SolutionCandidate,
@@ -112,36 +113,29 @@ async def run_perspectives_phase(
         getattr(services.router.routing_table.get(r, services.router.primary), "model", "")
         for r in _perspective_roles
     }
-    # Bloc inferred from the resolved vendor prefix (e.g. "anthropic/…" → US).
-    _US = {"anthropic", "openai", "google", "x-ai", "perplexity", "meta-llama",
-           "poolside", "arcee-ai", "nvidia", "nousresearch", "morph"}
-    _CN = {"deepseek", "qwen", "moonshotai", "z-ai", "xiaomi", "tencent",
-           "bytedance-seed", "inclusionai", "stepfun", "minimax", "baidu"}
-    _EU = {"mistralai"}
+    # One bloc table for the whole codebase: the registry port (a local copy of
+    # the vendor sets here used to drift from infrastructure.llm.registry).
+    _port = get_model_registry_port()
 
     def _bloc(model: str) -> str:
-        vendor = model.lstrip("~").split("/", 1)[0]
-        if vendor in _US:
-            return "US"
-        if vendor in _CN:
-            return "CN"
-        if vendor in _EU:
-            return "EU"
-        return "OTHER"
+        return _port.bloc_of(model)
 
     _active_blocs = {_bloc(m) for m in _active_models if m} - {"OTHER"}
     # One active perspective cannot "collapse" onto itself: nothing to compare.
     _can_compare = len(perspectives) >= 2
+    _warned_before_run = False
     if _can_compare and len(_active_models) < 2:
         state.pending_events.append({
             "type": "phase_warning",
             "message": "All perspectives using the same model — diversity collapsed. Add API keys spanning blocs (e.g. Anthropic/OpenAI 🇺🇸, DeepSeek/Qwen 🇨🇳, Mistral 🇪🇺) to restore cross-bloc reasoning.",
         })
+        _warned_before_run = True
     elif _can_compare and len(_active_blocs) < 2:
         state.pending_events.append({
             "type": "phase_warning",
             "message": "All perspectives resolve to a single geopolitical bloc — creator-ideology bias is not mitigated. Add API keys from a different bloc (🇺🇸/🇨🇳/🇪🇺) for cross-bloc diversity.",
         })
+        _warned_before_run = True
 
     def _is_perspective_hallucinated(candidate: SolutionCandidate) -> bool:
         if state.language != "English":
@@ -157,7 +151,7 @@ async def run_perspectives_phase(
         system_prompt = f"{lang_instruction}\n\n{base_system}"
         user_prompt = phases.perspective_prompt(state, p_name)
 
-        raw, _ = await services.call_llm(
+        raw, meta = await services.call_llm(
             role=p_name,
             system_prompt=system_prompt,
             user_prompt=user_prompt,
@@ -184,7 +178,7 @@ async def run_perspectives_phase(
             perspective=p_enum,
             content=core_analysis,
             key_insights=key_insights,
-            model_used="",
+            model_used=(meta or {}).get("model", ""),
         )
 
     # Accumulate locally and write to `state` once, after the loop. Two reasons,
@@ -257,6 +251,29 @@ async def run_perspectives_phase(
     state.candidates.extend(new_candidates)
     state.errors.extend(new_errors)
 
+    # Routing can be diverse while the run is not: a fallback after a provider
+    # error lands several perspectives on one model. The pre-run check above
+    # only sees routing, so look at what actually served the candidates.
+    if not _warned_before_run and len(new_candidates) >= 2:
+        _served = {c.model_used for c in new_candidates if c.model_used}
+        if len(_served) == 1:
+            state.pending_events.append({
+                "type": "phase_warning",
+                "message": (
+                    "Perspectives were all served by the same model (fallbacks "
+                    "collapsed the routing) — diversity is lost for this run."
+                ),
+            })
+        elif len(_served) >= 2 and len({_bloc(m) for m in _served} - {"OTHER"}) < 2:
+            state.pending_events.append({
+                "type": "phase_warning",
+                "message": (
+                    "Perspectives were all served from a single geopolitical bloc "
+                    "(fallbacks collapsed the routing) — creator-ideology bias is "
+                    "not mitigated for this run."
+                ),
+            })
+
     # Zero survivors is an execution failure, not a low score: the runner
     # treats an exhausted quality gate as a completion, so without this raise
     # the run would reach synthesis with nothing to synthesise from.
@@ -320,6 +337,24 @@ async def run_critique_phase(state: PipelineState, services: WorkflowServices) -
         state.errors.append(f"Scoring failed: {e}")
         state.top_candidates = state.candidates[:2]
 
+def _stress_perspective(entry: dict, allowed: set[str]) -> str | None:
+    """The candidate a stress entry names, "" when it names none, None to drop it.
+
+    An entry naming a perspective outside the stressed candidates is noise the
+    model invented; one naming nothing is kept, since models that ignore the
+    schema still produce usable scenario results.
+    """
+    raw = entry.get("perspective")
+    if not raw or not str(raw).strip():
+        return ""
+    try:
+        persp = PerspectiveRegistry.coerce(str(raw).strip())
+    except ValueError:
+        return None
+    name = getattr(persp, "value", persp)
+    return name if name in allowed else None
+
+
 async def run_stress_test_phase(state: PipelineState, services: WorkflowServices) -> None:
     services.log("PHASE-4", "Running scenario-based stress testing...", state)
     if not state.top_candidates:
@@ -337,17 +372,20 @@ async def run_stress_test_phase(state: PipelineState, services: WorkflowServices
         # Same garbled-non-English-source hallucination as perspectives (Phase 2) —
         # only meaningful to filter when the problem itself is actually English.
         filter_hallucinations = state.language == "English"
+        allowed = {c.perspective.value for c in state.top_candidates}
         state.stress_results = [
             StressTestResult(
                 scenario=ScenarioType.coerce(st.get("scenario", "optimal")),
                 survival_rate=float(st.get("survival_rate") or 0.0),
                 failure_mode=st.get("failure_mode", ""),
                 recovery_path=st.get("recovery_path", ""),
+                perspective=persp,
             )
             for st in data.get("stress_tests", [])
             if not (filter_hallucinations and any(
                 kw in st.get("failure_mode", "").lower() for kw in _HALLUCINATION_KEYWORDS
             ))
+            and (persp := _stress_perspective(st, allowed)) is not None
         ]
     except Exception as e:
         services.log("PHASE-4", f"Stress test failed: {e}", state)

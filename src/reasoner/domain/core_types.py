@@ -221,6 +221,9 @@ class StressTestResult:
     survival_rate: float             # 0.0 - 1.0
     failure_mode: str = ""
     recovery_path: str = ""
+    # The candidate this scenario was run against ("" for results written
+    # before this field existed, or when the model named none).
+    perspective: str = ""
 
 
 @dataclass

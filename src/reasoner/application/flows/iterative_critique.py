@@ -13,6 +13,7 @@ from reasoner.application.flows.base import PhaseStep, WorkflowServices, Workflo
 from reasoner.application.flows.iterative_critique_phases import (
     MAX_ROUNDS,
     AdversarialRound,
+    apply_generator_output,
     check_convergence,
     run_critic_phase,
     run_generator_phase,
@@ -38,7 +39,6 @@ class IterativeCritiqueFlow(WorkflowStrategy):
         if not hasattr(state, 'adversarial_rounds') or state.adversarial_rounds is None:
             state.adversarial_rounds: list[AdversarialRound] = []
 
-        answer = ""
         round_num = 0
 
         while round_num < MAX_ROUNDS:
@@ -47,10 +47,10 @@ class IterativeCritiqueFlow(WorkflowStrategy):
 
             # Generator: produce or revise answer
             if round_num == 1:
-                answer = await run_generator_phase(state, services, round_num=round_num)
+                gen = await run_generator_phase(state, services, round_num=round_num)
             else:
                 prev_round = state.adversarial_rounds[-1]
-                answer = await run_generator_phase(
+                gen = await run_generator_phase(
                     state, services,
                     previous_answer=prev_round.answer,
                     flaws=prev_round.flaws_identified,
@@ -58,7 +58,8 @@ class IterativeCritiqueFlow(WorkflowStrategy):
                 )
 
             # Critic: evaluate the answer
-            critic_round = await run_critic_phase(state, services, answer, round_num)
+            critic_round = await run_critic_phase(state, services, gen.answer, round_num)
+            apply_generator_output(critic_round, gen)
             state.adversarial_rounds.append(critic_round)
 
             # Check convergence
@@ -75,7 +76,7 @@ class IterativeCritiqueFlow(WorkflowStrategy):
                     degraded(
                         "ic.critic",
                         None,
-                        exc=RuntimeError("critic returned unusable output"),
+                        exc=RuntimeError("debate rounds returned unusable output"),
                         state=state,
                         detail=(
                             f"{IC_MAX_CONSECUTIVE_DEGRADED} consecutive rounds, "
@@ -85,8 +86,8 @@ class IterativeCritiqueFlow(WorkflowStrategy):
                     state.pending_events.append({
                         "type": "phase_warning",
                         "message": (
-                            "The critic stopped returning usable output; the debate "
-                            "ended early and the answer was not independently reviewed."
+                            "The critic or generator repeatedly returned unusable output; "
+                            "the debate ended early and the answer was not independently reviewed."
                         ),
                     })
                     services.log(

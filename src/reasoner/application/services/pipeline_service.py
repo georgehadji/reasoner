@@ -203,6 +203,7 @@ class PipelineService:
                                      if use_neuro else _get_attr(sr, "failure_mode", "")),
                     "recovery_path": (_get_attr(sr, "recovery_path", "")[:TRUNCATION.SESSION_EXCERPT]
                                       if use_neuro else _get_attr(sr, "recovery_path", "")),
+                    "perspective": _get_attr(sr, "perspective", ""),
                 }
                 for sr in stress_data
             ],
@@ -647,6 +648,7 @@ class PipelineSerializationService:
                         survival_rate=float(sr.get('survival_rate') or 0),
                         failure_mode=sr.get('failure_mode', ''),
                         recovery_path=sr.get('recovery_path', ''),
+                        perspective=sr.get('perspective', ''),
                     ))
                 except (ValueError, TypeError):
                     pass  # skip malformed stress result entry
