@@ -90,12 +90,21 @@ class PostgresQuotaRepository(QuotaRepository):
                 )
 
                 if row is None:
-                    # Create default quota row
+                    # Create the default quota row. Two first-ever requests at
+                    # once both saw no row, and the second INSERT raised a
+                    # unique violation (UNIQUE(user_id)). Now the loser does
+                    # nothing and both re-read the one row under the lock
+                    # (docs/plans/audit-remediation-2026-10-20.md PER-6).
                     await conn.execute(
-                        "INSERT INTO usage_quotas (user_id, tier, max_queries) VALUES ($1, $2, $3)",
+                        "INSERT INTO usage_quotas (user_id, tier, max_queries) VALUES ($1, $2, $3) "
+                        "ON CONFLICT (user_id) DO NOTHING",
                         user_id, SubscriptionTier.FREE.value, 20,
                     )
-                    row = {"tier": SubscriptionTier.FREE.value, "used_queries": 0, "max_queries": 20}
+                    row = await conn.fetchrow(
+                        "SELECT tier, used_queries, max_queries FROM usage_quotas "
+                        "WHERE user_id = $1 FOR UPDATE",
+                        user_id,
+                    )
 
                 tier = SubscriptionTier(row["tier"])
                 used = row["used_queries"]
