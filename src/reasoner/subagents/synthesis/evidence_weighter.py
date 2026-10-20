@@ -7,6 +7,7 @@ from typing import Any
 
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.parsing import extract_json
+from reasoner.phases._shared import _wrap_external_content, _wrap_user_input
 from reasoner.subagents.base import PhaseSubAgent
 
 EVIDENCE_SYSTEM = """You are an Evidence Weighter. Your ONE JOB is to read all perspective candidates and evaluate which arguments have the STRONGEST supporting evidence.
@@ -43,9 +44,11 @@ class EvidenceWeighterSubAgent(PhaseSubAgent):
         candidates = state.candidates
         candidate_texts = []
         for c in candidates:
-            candidate_texts.append(f"--- {c.perspective.value} ---\n{c.content}")
+            body = _wrap_external_content(c.content)
+            candidate_texts.append(f"--- {c.perspective.value} ---\n{body}")
 
-        user = f"Problem: {state.problem}\n\nCandidates:\n" + "\n\n".join(candidate_texts)
+        wrapped_problem = _wrap_user_input(state.problem)
+        user = f"Problem: {wrapped_problem}\n\nCandidates:\n" + "\n\n".join(candidate_texts)
         return (EVIDENCE_SYSTEM, user)
 
     def _parse_result(self, raw: str) -> dict[str, Any]:

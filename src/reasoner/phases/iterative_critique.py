@@ -92,7 +92,7 @@ def generator_initial_prompt(state: PipelineState) -> str:
     return (
         f'{get_language_instruction(state)}\n\n'
         f'Problem: {_wrap_user_input(state.problem)}\n\n'
-        f'Decomposition:\n{json.dumps(state.decomposition, indent=2)}\n\n'
+        f'Decomposition:\n{_wrap_external_content(json.dumps(state.decomposition, indent=2))}\n\n'
         f'Produce a complete, well-reasoned solution.\n\n'
         f'Output JSON: {{"answer": "<solution>", "key_claims": [...], '
         f'"confidence": 0.0-1.0, "approach_summary": "<method>"}}'

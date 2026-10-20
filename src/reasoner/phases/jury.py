@@ -3,7 +3,11 @@ from __future__ import annotations
 import json
 
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.phases._shared import _wrap_user_input, get_language_instruction
+from reasoner.phases._shared import (
+    _wrap_external_content,
+    _wrap_user_input,
+    get_language_instruction,
+)
 
 JURY_GENERATOR_SYSTEM = ("You are an analytical assistant. You MUST produce a valid JSON object ONLY. "
                            "Do not include any introductory text, concluding remarks, or conversational markdown (e.g., ```json). "
@@ -13,7 +17,7 @@ def jury_generator_prompt(state: PipelineState, generator_id: str) -> str:
     return (
         f'{get_language_instruction(state)}\n\n'
         f'Problem: {_wrap_user_input(state.problem)}\n'
-        f'Decomposition:\n{json.dumps(state.decomposition, indent=2)}\n\n'
+        f'Decomposition:\n{_wrap_external_content(json.dumps(state.decomposition, indent=2))}\n\n'
         f'You are {generator_id}. Generate a complete, well-reasoned solution.\n\n'
         f'Output JSON: {{"generator_id": "{generator_id}", '
         f'"solution": "<full solution text>", '
@@ -30,8 +34,8 @@ def jury_critic_prompt(state: PipelineState) -> str:
     ranking_example = json.dumps(gen_ids)
     return (
         f'{get_language_instruction(state)}\n\n'
-        f'Jury Guidelines:\n{json.dumps(state.jury_guidelines)}\n\n'
-        f'Candidates:\n{json.dumps(candidates_summary, indent=2)}\n\n'
+        f'Jury Guidelines:\n{_wrap_external_content(json.dumps(state.jury_guidelines))}\n\n'
+        f'Candidates:\n{_wrap_external_content(json.dumps(candidates_summary, indent=2))}\n\n'
         f'Score each candidate on factuality, reasoning, completeness, helpfulness (0-10 each).\n\n'
         f'CONFIDENCE vs ACCURACY: Reward honest uncertainty. If a candidate states confident claims '
         f'that are factually wrong or unsubstantiated, apply a confidence_vs_accuracy_penalty (0.0-10.0) '
@@ -57,10 +61,10 @@ JURY_VERIFIER_SYSTEM = "You are an analytical assistant. Verify these claims. Ou
 
 def jury_verifier_prompt(state: PipelineState) -> str:
     all_claims = [{"claim": claim, "source": gc.generator_id} for gc in state.generation_candidates for claim in gc.key_claims]
-    return f'{get_language_instruction(state)}\n\nVerify these claims:\n{json.dumps(all_claims, indent=2)}\n\nOutput JSON: {{"verifications": [{{"claim": "...", "verdict": "VERIFIED|...", "evidence": "..."}}]}}'
+    return f'{get_language_instruction(state)}\n\nVerify these claims:\n{_wrap_external_content(json.dumps(all_claims, indent=2))}\n\nOutput JSON: {{"verifications": [{{"claim": "...", "verdict": "VERIFIED|...", "evidence": "..."}}]}}'
 
 JURY_META_EVAL_SYSTEM = "You are an analytical assistant. Assess reliability and bias. Output ONLY valid JSON."
 
 def jury_meta_eval_prompt(state: PipelineState) -> str:
     from dataclasses import asdict
-    return f'{get_language_instruction(state)}\n\nEvaluate the critics based on their scores:\n{json.dumps([asdict(cs) for cs in state.critic_scores], indent=2)}\n\nAssess critic reliability, bias, and agreement rate.\n\nOutput JSON: {{"critic_reliability": {{...}}, "meta_insight": "..."}}'
+    return f'{get_language_instruction(state)}\n\nEvaluate the critics based on their scores:\n{_wrap_external_content(json.dumps([asdict(cs) for cs in state.critic_scores], indent=2))}\n\nAssess critic reliability, bias, and agreement rate.\n\nOutput JSON: {{"critic_reliability": {{...}}, "meta_insight": "..."}}'

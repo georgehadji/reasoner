@@ -56,7 +56,7 @@ ARTICLE_COVE_REVISE_SYSTEM = (
 def article_cove_draft_prompt(state, sources_json: str) -> str:
     return (
         f'{get_language_instruction(state)}\n\n'
-        f'Topic: {state.problem}\n\n'
+        f'Topic: {_wrap_user_input(state.problem)}\n\n'
         f'Sources:\n{sources_json}\n\n'
         f'Draft atomic claims from the sources. Rules:\n'
         f'- One factual statement per claim\n'
@@ -191,7 +191,7 @@ ACADEMIC_SOT_SOLVE_SYSTEM = (
 def article_sot_skeleton_prompt(state, claims_json: str) -> str:
     return (
         f'{get_language_instruction(state)}\n\n'
-        f'Topic: {state.problem}\n\n'
+        f'Topic: {_wrap_user_input(state.problem)}\n\n'
         f'Verified Claims:\n{claims_json}\n\n'
         f'Create an article skeleton. Break into sections that can be written in parallel. '
         f'For each section, specify:\n'
@@ -237,7 +237,7 @@ def academic_sot_skeleton_prompt(state, claims_json: str) -> str:
         )
     return (
         f'{get_language_instruction(state)}\n\n'
-        f'Topic: {state.problem}\n'
+        f'Topic: {_wrap_user_input(state.problem)}\n'
         f'Document Type: {doc_type.title()}\n\n'
         f'Verified Claims:\n{claims_json}\n\n'
         f'Generate an academic skeleton following this structure:\n{sections_guide}\n\n'
@@ -254,7 +254,7 @@ def article_sot_solve_prompt(state, section: dict, claims_json: str) -> str:
     section_heading = section.get("heading", "")
     return (
         f'{get_language_instruction(state)}\n\n'
-        f'Topic: {state.problem}\n\n'
+        f'Topic: {_wrap_user_input(state.problem)}\n\n'
         f'Section: {section_heading}\n\n'
         f'Relevant Claims (use these as your evidence):\n{claims_json}\n\n'
         f'Write this section. Rules:\n'
@@ -276,7 +276,7 @@ def academic_sot_solve_prompt(state, section: dict, claims_json: str) -> str:
     return (
         f'{get_language_instruction(state)}\n\n'
         f'Document Type: {doc_type.title()}\n'
-        f'Topic: {state.problem}\n\n'
+        f'Topic: {_wrap_user_input(state.problem)}\n\n'
         f'Section: {section_heading}\n'
         f'Section purpose: {section.get("purpose", "")}\n\n'
         f'Verified Claims for this section:\n{claims_json}\n\n'

@@ -7,6 +7,7 @@ from typing import Any
 
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.parsing import extract_json
+from reasoner.phases._shared import _wrap_external_content, _wrap_user_input
 from reasoner.subagents.base import PhaseSubAgent
 
 EVIDENCE_SYSTEM = """You are an Evidence Critique Sub-Agent. Your ONE JOB is to evaluate the quality, reliability, and sufficiency of evidence supporting each candidate solution.
@@ -44,8 +45,10 @@ class EvidenceCritiqueSubAgent(PhaseSubAgent):
     def _build_prompt(self, state: PipelineState) -> tuple[str, str]:
         candidate_texts = []
         for c in state.candidates:
-            candidate_texts.append(f"--- {c.perspective.value} ---\n{c.content}")
-        user = f"Problem: {state.problem}\n\nCandidates:\n" + "\n\n".join(candidate_texts)
+            body = _wrap_external_content(c.content)
+            candidate_texts.append(f"--- {c.perspective.value} ---\n{body}")
+        wrapped_problem = _wrap_user_input(state.problem)
+        user = f"Problem: {wrapped_problem}\n\nCandidates:\n" + "\n\n".join(candidate_texts)
         return (EVIDENCE_SYSTEM, user)
 
     def _parse_result(self, raw: str) -> dict[str, Any]:

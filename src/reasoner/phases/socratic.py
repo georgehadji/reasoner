@@ -3,7 +3,11 @@ from __future__ import annotations
 import json
 
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.phases._shared import _wrap_user_input, get_language_instruction
+from reasoner.phases._shared import (
+    _wrap_external_content,
+    _wrap_user_input,
+    get_language_instruction,
+)
 
 SOCRATIC_QUESTION_SYSTEM = "You are an analytical assistant. Ask probing questions to expose contradictions. Do not answer. Output ONLY valid JSON."
 
@@ -13,4 +17,4 @@ def socratic_question_prompt(state: PipelineState) -> str:
 SOCRATIC_ANSWER_SYSTEM = "You are an analytical assistant. Answer honestly and identify where your logic breaks. Output ONLY valid JSON."
 
 def socratic_answer_prompt(state: PipelineState) -> str:
-    return f'{get_language_instruction(state)}\n\nSocratic Questions:\n{json.dumps(state.socratic_state["questions"], indent=2)}\n\nAttempt to answer, noting any contradictions (\'aporia\').\n\nOutput JSON: {{"answers": [{{"question_id": "Q1", "answer": "...", "contradiction_found": "..."}}]}}'
+    return f'{get_language_instruction(state)}\n\nSocratic Questions:\n{_wrap_external_content(json.dumps(state.socratic_state["questions"], indent=2))}\n\nAttempt to answer, noting any contradictions (\'aporia\').\n\nOutput JSON: {{"answers": [{{"question_id": "Q1", "answer": "...", "contradiction_found": "..."}}]}}'

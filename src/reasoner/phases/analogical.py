@@ -4,7 +4,11 @@ import json
 
 from reasoner.core.constants import JSON_ONLY_FOOTER
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.phases._shared import _wrap_user_input, get_language_instruction
+from reasoner.phases._shared import (
+    _wrap_external_content,
+    _wrap_user_input,
+    get_language_instruction,
+)
 
 ANALOGICAL_ABSTRACTION_SYSTEM = (
     "You are a structural abstraction expert trained in Gentner's structure-mapping theory. "
@@ -21,7 +25,7 @@ def analogical_abstraction_prompt(state: PipelineState) -> str:
     return (
         f'{get_language_instruction(state)}\n\n'
         f'Problem: {_wrap_user_input(state.problem)}\n\n'
-        f'Sub-problems:\n{json.dumps(sub_problems, indent=2)}\n\n'
+        f'Sub-problems:\n{_wrap_external_content(json.dumps(sub_problems, indent=2))}\n\n'
         f'Extract the abstract structural signature of this problem, ignoring domain-specific surface features. '
         f'Identify the deep constraints, objectives, actors, and core dynamics.\n\n'
         f'Output JSON: {{"abstract_structure": "<structural description>", '
@@ -45,7 +49,8 @@ def analogical_domain_search_prompt(state: PipelineState) -> str:
         f'Problem: {_wrap_user_input(state.problem)}\n\n'
         f'Abstract structure: {a.get("abstract_structure", "")}\n'
         f'Structural type: {a.get("structural_type", "")}\n'
-        f'Core dynamics: {json.dumps(a.get("core_dynamics", []), indent=2)}\n\n'
+        f'Core dynamics: '
+        f'{_wrap_external_content(json.dumps(a.get("core_dynamics", []), indent=2))}\n\n'
         f'Search for domains (biology, physics, engineering, military, economics, computer science, history, social systems) '
         f'where an isomorphic problem — same abstract structure — has been solved. '
         f'Rank by structural relevance, not surface similarity.\n\n'
@@ -73,9 +78,9 @@ def analogical_mapping_prompt(state: PipelineState) -> str:
         f'{get_language_instruction(state)}\n\n'
         f'Target problem: {_wrap_user_input(state.problem)}\n\n'
         f'Abstract structure: {a.get("abstract_structure", "")}\n'
-        f'Constraints: {json.dumps(a.get("constraints", []), indent=2)}\n'
-        f'Objectives: {json.dumps(a.get("objectives", []), indent=2)}\n\n'
-        f'Best source domain: {json.dumps(best_domain, indent=2)}\n\n'
+        f'Constraints: {_wrap_external_content(json.dumps(a.get("constraints", []), indent=2))}\n'
+        f'Objectives: {_wrap_external_content(json.dumps(a.get("objectives", []), indent=2))}\n\n'
+        f'Best source domain: {_wrap_external_content(json.dumps(best_domain, indent=2))}\n\n'
         f'Map each element of the source domain solution onto the target problem. '
         f'Classify each mapping as: object (entity-to-entity), relational (relation-to-relation), '
         f'or higher-order (system-level pattern). '
@@ -105,8 +110,10 @@ def analogical_transfer_prompt(state: PipelineState) -> str:
         f'{get_language_instruction(state)}\n\n'
         f'Target problem: {_wrap_user_input(state.problem)}\n\n'
         f'Source domain: {best_domain.get("domain", "")} — {best_domain.get("key_mechanism", "")}\n\n'
-        f'Analogy mappings:\n{json.dumps(a.get("analogy_mappings", []), indent=2)}\n\n'
-        f'Unmapped elements: {json.dumps(a.get("unmapped_elements", []), indent=2)}\n\n'
+        f'Analogy mappings:\n'
+        f'{_wrap_external_content(json.dumps(a.get("analogy_mappings", []), indent=2))}\n\n'
+        f'Unmapped elements: '
+        f'{_wrap_external_content(json.dumps(a.get("unmapped_elements", []), indent=2))}\n\n'
         f'Now perform the transfer: adapt the source mechanism to the target problem. '
         f'Be concrete — state the actual proposed solution, not just that "it could be applied". '
         f'Then explicitly state where the analogy breaks (unmapped elements, domain constraints that do not transfer).\n\n'

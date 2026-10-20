@@ -4,6 +4,7 @@ import json
 
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.phases._shared import (
+    _wrap_external_content,
     _wrap_user_input,
     build_memory_context,
     build_web_sources_block,
@@ -40,7 +41,7 @@ def pre_mortem_backtrack_prompt(state: PipelineState) -> str:
     return (
         f'{get_language_instruction(state)}\n\n'
         f'Original Problem: {_wrap_user_input(state.problem)}\n\n'
-        f'Post-Mortem:\n{json.dumps(failure, indent=2)}\n\n'
+        f'Post-Mortem:\n{_wrap_external_content(json.dumps(failure, indent=2))}\n\n'
         f'Trace back to the single initial decision that was the pivot point. '
         f'What seemingly reasonable choice, made early, set this failure in motion?\n\n'
         f'Output JSON: {{"pivot_decision": "<the decision>", '
@@ -57,7 +58,7 @@ def pre_mortem_signals_prompt(state: PipelineState) -> str:
         root_cause = {"pivot_decision": str(root_cause)}
     return (
         f'{get_language_instruction(state)}\n\n'
-        f'Root Cause:\n{json.dumps(root_cause, indent=2)}\n\n'
+        f'Root Cause:\n{_wrap_external_content(json.dumps(root_cause, indent=2))}\n\n'
         f'What observable signals appeared in the first 30 days after implementation '
         f'that, in hindsight, were early warnings of the coming failure?\n\n'
         f'Output JSON: {{"early_signals": ['
@@ -75,12 +76,16 @@ def pre_mortem_redesign_prompt(state: PipelineState) -> str:
     root_cause = pm.get("root_cause", {})
     if not isinstance(root_cause, dict):
         root_cause = {}
+    signals = [s.get("signal") if isinstance(s, dict) else s for s in pm.get("early_signals", [])]
     return (
         f'{get_language_instruction(state)}\n\n'
         f'Problem: {_wrap_user_input(state.problem)}\n\n'
-        f'Failure: {json.dumps(failure_narrative.get("what_happened", ""), indent=0)}\n'
-        f'Root Cause: {json.dumps(root_cause.get("pivot_decision", ""), indent=0)}\n'
-        f'Early Signals: {json.dumps([s.get("signal") if isinstance(s, dict) else s for s in pm.get("early_signals", [])], indent=0)}\n\n'
+        f'Failure: '
+        f'{_wrap_external_content(json.dumps(failure_narrative.get("what_happened", "")))}\n'
+        f'Root Cause: '
+        f'{_wrap_external_content(json.dumps(root_cause.get("pivot_decision", ""), indent=0))}\n'
+        f'Early Signals: '
+        f'{_wrap_external_content(json.dumps(signals))}\n\n'
         f'Redesign the solution to be robust against these failure modes. '
         f'Add specific safeguards, checkpoints, and rollback mechanisms.\n\n'
         f'Output JSON: {{"hardened_solution": "<redesigned approach>", '
