@@ -28,9 +28,13 @@ logger = logging.getLogger(__name__)
 
 import valkey.asyncio as aioredis
 
-from reasoner.core.constants import MAX_RATE_LIMIT_BUCKETS  # Imported MAX_RATE_LIMIT_BUCKETS
+from reasoner.core.constants import (  # Imported MAX_RATE_LIMIT_BUCKETS
+    MAX_RATE_LIMIT_BUCKETS,
+    RATE_LIMITER_REDIS_RETRY_SECONDS,
+)
+from reasoner.core.degrade import degraded
 from reasoner.core.settings import settings
-from reasoner.infrastructure.redis.client import get_redis
+from reasoner.infrastructure.valkey.client import get_valkey_pool
 
 _REDIS_RATE_LIMITER_ENABLED = settings.RATE_LIMITER_MODE.lower() == "redis"
 
@@ -80,12 +84,18 @@ class RateLimiter:
         self._redis_client: aioredis.Redis | None = None
         self._redis_script: Any = None
         self._redis_available: bool = False
+        # Cooldown re-probe (the RunStateManager._should_try_redis pattern):
+        # one Redis error used to latch _redis_available off for the life of
+        # the process, and fail_closed then denied every request.
+        self._redis_last_fail: float = 0.0
 
         is_production = settings.ENVIRONMENT == "production"
 
         if _REDIS_RATE_LIMITER_ENABLED:
             try:
-                self._redis_client = get_redis()
+                # VALKEY_URL first, like the startup probe; get_redis() read
+                # only REDIS_URL, so the two could point at different servers.
+                self._redis_client = get_valkey_pool()
                 script_dir = os.path.join(os.path.dirname(__file__), "redis", "scripts")
                 script_path = os.path.join(script_dir, "rate_limit.lua")
                 if not os.path.isfile(script_path):
@@ -122,8 +132,13 @@ class RateLimiter:
         requests_per_hour: int,
         requested_tokens: int = 1,
     ) -> tuple[bool, dict[str, Any]]:
-        if not self._redis_available or self._redis_client is None or self._redis_script is None:
+        if self._redis_client is None or self._redis_script is None:
             raise ConnectionError("Redis rate limiter not available.")
+        if (
+            not self._redis_available
+            and self._clock.monotonic() - self._redis_last_fail < RATE_LIMITER_REDIS_RETRY_SECONDS
+        ):
+            raise ConnectionError("Redis rate limiter cooling down after a failure.")
 
         current_time_ms = int(time.time() * 1000)
         token_bucket_key = f"rate_limit:{client_id}:tokens"
@@ -144,6 +159,9 @@ class RateLimiter:
                     requested_tokens,
                 ],
             )
+            if not self._redis_available:
+                logger.info("Redis rate limiter recovered")
+                self._redis_available = True
             # Result: [allowed (1/0), tokens_remaining, retry_after_ms, reason_code]
             allowed = bool(result[0])
             tokens_remaining = result[1]
@@ -160,14 +178,12 @@ class RateLimiter:
                 "reason": reason,
             }
             return allowed, info
-        except aioredis.RedisError as e:
-            print(f"[ERROR] Redis script execution failed: {e}")
-            self._redis_available = False # Mark as unavailable for this session
-            raise ConnectionError("Redis script execution failed.") from e
         except Exception as e:
-            print(f"[ERROR] Unexpected error during Redis rate limiting: {e}")
+            # Unavailable until the cooldown ends, then the next call re-probes.
             self._redis_available = False
-            raise ConnectionError("Unexpected Redis error.") from e
+            self._redis_last_fail = self._clock.monotonic()
+            degraded("rate_limiter.redis", None, exc=e)
+            raise ConnectionError("Redis script execution failed.") from e
 
     async def _in_memory_is_allowed_for_user(
         self,

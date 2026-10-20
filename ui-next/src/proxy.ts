@@ -7,6 +7,22 @@ import { TIMING } from '@/lib/config';
 
 const HSTS_VALUE = 'max-age=31536000; includeSubDomains; preload';
 
+// Routes a browser never calls, so cookie CSRF cannot apply: the cookie pair
+// does not exist and every request was a 403. Webhooks are authenticated by
+// the provider's signature upstream; agent routes by an API key, so they are
+// exempt only when they carry one.
+const WEBHOOK_PATHS = ['/api/billing/webhook', '/api/billing/paypal/webhook'];
+const BEARER_ONLY_PREFIX = '/api/agent/';
+
+export function csrfExempt(request: NextRequest): boolean {
+  const path = request.nextUrl.pathname;
+  if (WEBHOOK_PATHS.includes(path)) return true;
+  return (
+    path.startsWith(BEARER_ONLY_PREFIX) &&
+    /^Bearer\s+\S+/i.test(request.headers.get('authorization') || '')
+  );
+}
+
 export async function proxy(request: NextRequest) {
   const response = NextResponse.next();
 
@@ -24,7 +40,7 @@ export async function proxy(request: NextRequest) {
     response.headers.set('Strict-Transport-Security', HSTS_VALUE);
   }
 
-  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)) {
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method) && !csrfExempt(request)) {
     const header = request.headers.get(CSRF_HEADER) || '';
     const cookie = request.cookies.get(CSRF_COOKIE)?.value || '';
     if (!header || !cookie) {

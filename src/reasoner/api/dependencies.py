@@ -257,6 +257,9 @@ async def get_current_user(
             detail="Missing authentication credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    # check_rate_limit (via get_optional_user) may have resolved it already.
+    if (resolved := getattr(request.state, "user", None)) is not None:
+        return resolved
 
     is_api_key = looks_like_api_key(credentials.credentials)
     try:
@@ -281,6 +284,8 @@ async def get_optional_user(
     """Optional authentication — returns None if no valid credentials."""
     if not credentials:
         return None
+    if (resolved := getattr(request.state, "user", None)) is not None:
+        return resolved
     is_api_key = looks_like_api_key(credentials.credentials)
     try:
         user = await _resolve_auth_token(credentials.credentials)

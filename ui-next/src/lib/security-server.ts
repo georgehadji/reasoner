@@ -457,10 +457,22 @@ type RateLimitBucket = { count: number; resetAt: number };
 const rateLimitStore = new Map<string, RateLimitBucket>();
 let rateLimitCallCount = 0;
 
-function getClientIp(req: NextRequest): string {
+/**
+ * The rightmost X-Forwarded-For hop that is not a trusted proxy, mirroring
+ * the backend's api/client_ip.py. The leftmost entry is whatever the client
+ * sent, so trusting it let anyone pick a fresh rate-limit bucket per request.
+ * The rightmost hop was appended by the proxy in front of us.
+ */
+export function getClientIp(req: NextRequest): string {
   const forwarded = req.headers.get('x-forwarded-for');
   if (forwarded) {
-    return forwarded.split(',')[0].trim();
+    const trusted = new Set(
+      (process.env.TRUSTED_PROXIES || '').split(',').map((s) => s.trim()).filter(Boolean),
+    );
+    const hops = forwarded.split(',').map((s) => s.trim()).filter(Boolean);
+    for (let i = hops.length - 1; i >= 0; i--) {
+      if (!trusted.has(hops[i])) return hops[i];
+    }
   }
   return req.headers.get('x-real-ip') || 'unknown';
 }
