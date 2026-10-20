@@ -122,7 +122,8 @@ jobs:
           # 2206: audit persistence PR (PER-1..6) (net -1).
           # 2204: deleted domain.pricing.calculate_model_cost, dead since BIL-2 (-2).
           # 2202: audit input-limits PR (SEC-4/SEC-5/OPS-5..7/DAT-4) (net -2).
-          python scripts/ruff_ratchet.py --max 2202
+          # 2201: audit billing PR (BIL-3..9) sorted credit_service imports (net -1).
+          python scripts/ruff_ratchet.py --max 2201
 
       - name: Security scan (bandit)
         run: |
@@ -337,7 +338,7 @@ jobs:
         # agree -- and in ci-local.sh, move it from `advisory` to `gate`.
         continue-on-error: true
         run: |
-          python scripts/vulture_ratchet.py --max 390
+          python scripts/vulture_ratchet.py --max 387
 
       - name: Run tests
         run: |

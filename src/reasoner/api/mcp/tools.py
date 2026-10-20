@@ -97,12 +97,9 @@ async def _run_and_bill(
     await require_credits(user)
     tier = (await resolve_user_tier(str(user.id))).value
 
-    reference_id = run_reference(client_run_id)
-    reserved_credits = await reserve_or_402(
-        user_id=str(user.id), preset=preset, problem=problem, reference_id=reference_id,
-    )
-    await register_run(client_run_id)
-
+    # Validate, then claim the id, then reserve: the HTTP routes' order. A
+    # reservation taken before a RunRequest validation error or a register_run
+    # 503 was never released, so the caller lost the credits (BIL-7).
     req = RunRequest(
         problem=problem,
         preset=preset,
@@ -110,6 +107,11 @@ async def _run_and_bill(
         web_search=web_search,
         source_type=source_type,
         client_run_id=client_run_id,
+    )
+    await register_run(client_run_id)
+    reference_id = run_reference(client_run_id)
+    reserved_credits = await reserve_or_402(
+        user_id=str(user.id), preset=preset, problem=problem, reference_id=reference_id,
     )
     run_ctx = RunContext(
         preset=preset,
@@ -283,9 +285,23 @@ def register_tools(mcp) -> None:
         pipeline. reasoner_estimate and reasoner_presets stay open because
         they spend nothing.
         """
+        from reasoner.api.dependencies import _get_rate_limiter_instance
         from reasoner.application.services.gate_service import decide_route
+        from reasoner.application.services.spend_limit_service import resolve_user_tier
 
-        await resolve_caller(ctx)
+        user = await resolve_caller(ctx)
+        # Five LLM calls per new problem with no limit made this an open spend
+        # tap for any key holder. Same per-user bucket as the HTTP routes (BIL-7).
+        tier = (await resolve_user_tier(str(user.id))).value
+        try:
+            allowed, info = await _get_rate_limiter_instance().is_allowed_for_user(
+                f"user:{user.id}", tier=tier
+            )
+        except Exception:
+            allowed, info = False, {"retry_after": 60}  # fail closed, as check_rate_limit
+        if not allowed:
+            retry_after = int(info.get("retry_after") or 60)
+            raise ValueError(f"Rate limit exceeded; retry after {retry_after}s")
         return await decide_route(problem, preset)
 
     @mcp.tool(

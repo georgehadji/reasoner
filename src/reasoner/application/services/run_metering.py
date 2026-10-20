@@ -120,6 +120,11 @@ def extract_run_cost(frame: str) -> float | None:
         return None
     if not isinstance(event, dict) or event.get("type") not in COST_BEARING_FRAME_TYPES:
         return None
+    # A cache replay re-sends the original run's cost frames. Billing them
+    # charged the cached answer a second time (docs/plans/
+    # audit-remediation-2026-10-20.md BIL-3).
+    if event.get("cached"):
+        return None
     cost = event.get("total_cost_usd")
     if isinstance(cost, bool) or not isinstance(cost, (int, float)):
         return None

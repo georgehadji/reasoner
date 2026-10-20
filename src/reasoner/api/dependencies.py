@@ -563,6 +563,33 @@ def _reset_credit_services() -> None:
     _api_key_service = None
 
 
+# (user, period, tier) already topped up by this process. A tier change makes
+# a new key, so an upgrade grants its increment on the user's next run.
+_allowance_checked: set[tuple[str, str, str]] = set()
+
+
+async def _top_up_allowance(service, user_id: str) -> None:
+    """Grant any monthly allowance still owed before the balance is checked.
+
+    The allowance was granted only by ``GET /api/credits``. Accounts used only
+    through API keys or MCP never received one, and an upgrade mid-month
+    granted nothing (BIL-6).
+    """
+    from reasoner.application.services.credit_service import current_period_key
+
+    try:
+        tier = await _resolve_user_tier(user_id)
+        key = (user_id, current_period_key(), tier.value)
+        if key in _allowance_checked:
+            return
+        await service.ensure_monthly_allowance(user_id, tier)
+        if len(_allowance_checked) > 50_000:  # shortcut: bounded, cleared wholesale
+            _allowance_checked.clear()
+        _allowance_checked.add(key)
+    except Exception:
+        logger.warning("Monthly allowance top-up failed", exc_info=True)
+
+
 async def require_credits(user: User = Depends(get_current_user)) -> User:
     """FastAPI dependency: refuse work when the account has no credits left.
 
@@ -572,6 +599,7 @@ async def require_credits(user: User = Depends(get_current_user)) -> User:
     """
     _require_persistence("Credits")
     service = _get_credit_service()
+    await _top_up_allowance(service, str(user.id))
     try:
         balance = await service.get_balance(str(user.id))
     except Exception:

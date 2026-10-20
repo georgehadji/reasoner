@@ -17,10 +17,12 @@ from datetime import UTC, datetime
 
 from reasoner.core.ports.credit_repository import CreditRepository
 from reasoner.domain.credits import (
+    TIERED_ALLOWANCE_FROM,
     CreditBalance,
     CreditLedgerEntry,
     CreditReason,
     InsufficientCreditsError,
+    allowance_steps,
     can_afford,
     monthly_allowance,
     usd_to_credits,
@@ -85,15 +87,22 @@ class CreditService:
         tier: SubscriptionTier,
         now: datetime | None = None,
     ) -> CreditLedgerEntry | None:
-        """Grant this period's tier allowance if it has not been granted yet.
+        """Grant whatever part of this period's tier allowance is still owed.
 
-        Returns None when the allowance was already granted for the period.
+        Returns the last grant made, or None when nothing was owed.
         """
-        return await self._repository.grant_monthly_allowance(
-            user_id,
-            credits=monthly_allowance(tier),
-            period_key=current_period_key(now),
-        )
+        period = current_period_key(now)
+        if period < TIERED_ALLOWANCE_FROM:
+            return await self._repository.grant_monthly_allowance(
+                user_id, credits=monthly_allowance(tier), period_key=period,
+            )
+        last: CreditLedgerEntry | None = None
+        for step, credits in allowance_steps(tier):
+            entry = await self._repository.grant_monthly_allowance(
+                user_id, credits=credits, period_key=f"{period}:{step.value}",
+            )
+            last = entry or last
+        return last
 
     # ── Charges ────────────────────────────────────────────────────────
 

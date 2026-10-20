@@ -86,9 +86,14 @@ def test_webhook_duplicate_event_is_idempotent(client, monkeypatch):
     monkeypatch.setattr(stripe.Subscription, "retrieve", lambda sid: mock_sub)
     monkeypatch.setattr(stripe.Customer, "retrieve", lambda cid: mock_customer)
 
-    # Track how many times the subscription is synced
-    sync_calls = []
-    original_sync = app.state._sync_sub if hasattr(app.state, "_sync_sub") else None
+    # Processing must succeed here, or the handler answers 500 (BIL-4). It used
+    # to fail on the missing subscriptions DB and pass anyway on the old 200.
+    from reasoner.application.services.billing_service import BillingService
+
+    async def applied(self, ev):
+        return None
+
+    monkeypatch.setattr(BillingService, "handle_webhook", applied)
 
     # Send twice
     response1 = client.post("/api/billing/webhook", json=event, headers={"stripe-signature": "test"})
@@ -98,8 +103,13 @@ def test_webhook_duplicate_event_is_idempotent(client, monkeypatch):
     assert response2.status_code == 200
 
 
-def test_webhook_processing_error_returns_200(client, monkeypatch):
-    """Enhancement 4.3: processing errors return 200 to prevent retries."""
+def test_webhook_processing_error_asks_stripe_to_retry(client, monkeypatch):
+    """A processing error returns 500 so Stripe retries, and its claim is released.
+
+    This replaced Enhancement 4.3 (return 200 to prevent retries). Stripe's
+    retries are bounded, and with the claim kept, the event could never be
+    recovered (docs/plans/audit-remediation-2026-10-20.md BIL-4).
+    """
     import stripe
 
     event = {
@@ -113,8 +123,7 @@ def test_webhook_processing_error_returns_200(client, monkeypatch):
     monkeypatch.setattr(stripe.Subscription, "retrieve", lambda sid: (_ for _ in ()).throw(Exception("boom")))
 
     response = client.post("/api/billing/webhook", json=event, headers={"stripe-signature": "test"})
-    assert response.status_code == 200
-    assert response.json()["status"] == "ok"
+    assert response.status_code == 500
 
 
 def test_webhook_processes_a_real_stripe_event_object(client, monkeypatch):

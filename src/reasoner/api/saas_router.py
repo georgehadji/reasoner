@@ -202,33 +202,43 @@ async def delete_account(
     ua = request.headers.get("User-Agent")
 
     # Phase 1: Cancel billing subscriptions (BEFORE transaction — external side-effects).
-    sub_row = await pool.fetchrow(
-        "SELECT stripe_sub_id, paypal_sub_id FROM subscriptions WHERE user_id = $1 AND status = 'active' LIMIT 1",
+    # Every live subscription, and any failure aborts: the DELETE below cascades
+    # the local rows away, after which nothing can find the subscription and the
+    # provider keeps charging. This used to cancel one 'active' row and log
+    # failures (docs/plans/audit-remediation-2026-10-20.md BIL-8).
+    sub_rows = await pool.fetch(
+        "SELECT stripe_sub_id, paypal_sub_id FROM subscriptions "
+        "WHERE user_id = $1 AND status <> 'cancelled'",
         str(user.id),
     )
-    if sub_row:
-        if sub_row["stripe_sub_id"]:
+    from reasoner.infrastructure.billing.paypal_adapter import PayPalBillingAdapter
+    from reasoner.infrastructure.billing.stripe_adapter import StripeBillingAdapter
+
+    not_cancelled: list[str] = []
+    for row in sub_rows:
+        for sub_id, adapter_cls in (
+            (row["stripe_sub_id"], StripeBillingAdapter),
+            (row["paypal_sub_id"], PayPalBillingAdapter),
+        ):
+            if not sub_id:
+                continue
             try:
-                from reasoner.infrastructure.billing.stripe_adapter import StripeBillingAdapter
-                adapter = StripeBillingAdapter()
-                await adapter.cancel_subscription(sub_row["stripe_sub_id"])
+                await adapter_cls().cancel_subscription(sub_id)
             except Exception as exc:
                 import logging
                 logging.getLogger(__name__).warning(
-                    "Failed to cancel Stripe subscription %s for user %s: %s",
-                    sub_row["stripe_sub_id"], user.id, exc,
+                    "Failed to cancel subscription %s for user %s: %s", sub_id, user.id, exc,
                 )
-        if sub_row["paypal_sub_id"]:
-            try:
-                from reasoner.infrastructure.billing.paypal_adapter import PayPalBillingAdapter
-                adapter = PayPalBillingAdapter()
-                await adapter.cancel_subscription(sub_row["paypal_sub_id"])
-            except Exception as exc:
-                import logging
-                logging.getLogger(__name__).warning(
-                    "Failed to cancel PayPal subscription %s for user %s: %s",
-                    sub_row["paypal_sub_id"], user.id, exc,
-                )
+                not_cancelled.append(sub_id)
+    if not_cancelled:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "error": "Could not cancel your subscription, so the account was not "
+                         "deleted. Please retry, or contact support.",
+                "subscriptions": not_cancelled,
+            },
+        )
 
     # Phase 2: Atomic DB transaction — audit BEFORE delete
     async with pool.acquire() as conn:

@@ -259,3 +259,20 @@ async def test_run_gate_resolves_tier_with_the_long_budget_and_no_fallback_memor
     await _run(harness)
 
     assert seen == {"timeout": RUN_TIER_LOOKUP_TIMEOUT_S, "use_fallback_cache": False}
+
+
+@pytest.mark.asyncio
+async def test_spend_cap_stops_quality_retries(harness, monkeypatch):
+    """BIL-9: the cap was checked only at phase start, so a phase that tripped
+    it still ran its quality-gate retries and kept spending."""
+    original = _FakeMonitor.evaluate
+
+    async def evaluate(self, name, state, attempt: int = 1):
+        state._spend_cap_exceeded = True  # this attempt's calls crossed the cap
+        return await original(self, name, state, attempt)
+
+    monkeypatch.setattr(_FakeMonitor, "evaluate", evaluate)
+    await _run(harness)
+
+    assert harness.monitor.attempts == [1]
+    assert harness.phase_runs == 1, "no retry once the spend cap has tripped"

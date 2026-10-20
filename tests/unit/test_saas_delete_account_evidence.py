@@ -58,8 +58,9 @@ class _FakePool:
     def __init__(self) -> None:
         self.conn = _FakeConn()
 
-    async def fetchrow(self, sql: str, *args: object):
-        return None
+    async def fetch(self, sql: str, *args: object) -> list:
+        # delete_account reads every live subscription (BIL-8); none here.
+        return []
 
     def acquire(self) -> _AcquireCtx:
         return _AcquireCtx(self.conn)

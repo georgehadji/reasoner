@@ -155,6 +155,34 @@ def monthly_allowance(tier: SubscriptionTier) -> int:
     return TIER_MONTHLY_CREDITS.get(tier, TIER_MONTHLY_CREDITS[SubscriptionTier.FREE])
 
 
+#: First billing period granted as per-tier increments (``allowance_steps``).
+#: Earlier periods were granted once, at the full tier amount, under the bare
+#: period key. Switching keys mid-period would double-grant paid users.
+TIERED_ALLOWANCE_FROM = "2026-11"
+
+_TIER_ORDER = (SubscriptionTier.FREE, SubscriptionTier.PRO, SubscriptionTier.ENTERPRISE)
+
+
+def allowance_steps(tier: SubscriptionTier) -> list[tuple[SubscriptionTier, int]]:
+    """Per-tier increments that sum to *tier*'s allowance. Each is granted once per period.
+
+    The grant was keyed by period only, so the first grant of the month, often
+    at FREE before an upgrade, was the only one. A user who paid for PRO
+    mid-month got nothing until the next month. With one key per increment,
+    an upgrade grants exactly the difference and a downgrade grants nothing
+    (docs/plans/audit-remediation-2026-10-20.md BIL-6).
+    """
+    steps: list[tuple[SubscriptionTier, int]] = []
+    granted = 0
+    for step in _TIER_ORDER:
+        amount = monthly_allowance(step)
+        steps.append((step, max(0, amount - granted)))
+        granted = max(granted, amount)
+        if step == tier:
+            break
+    return steps
+
+
 def run_reference(client_run_id: str | None, kind: str = "run") -> str:
     """Ledger reference for one run. It is never reused, whatever the caller sends.
 
