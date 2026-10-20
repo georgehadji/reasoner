@@ -116,7 +116,8 @@ jobs:
           # 2210: method-flow PR2 rewrapped the Iterative Critique and Multi-Perspective
           # lines it touched and moved the bloc table behind the registry port (-4).
           # 2209: method-flow PR3 (-1).
-          python scripts/ruff_ratchet.py --max 2209
+          # 2208: method-flow PR4 (-1).
+          python scripts/ruff_ratchet.py --max 2208
 
       - name: Security scan (bandit)
         run: |

@@ -31,6 +31,56 @@ from reasoner.sanitization import clean_llm_artifacts_with_report
 
 logger = logging.getLogger(__name__)
 
+_CODE_SPAN_RE = re.compile(r"(```.*?```|`[^`\n]+`)", re.DOTALL)
+_MD_LINK_RE = re.compile(r"\[([^\]]+)\]\((https?://[^)\s]+)\)")
+_BARE_URL_RE = re.compile(r"https?://[^\s\)\]]+")
+_URL_TRAILING_PUNCT = ".,;:!?"
+CITATION_REMOVED = "[citation removed: not in retrieved sources]"
+
+
+def _norm_url(url: str) -> str:
+    """Compare URLs without a trailing slash or sentence punctuation."""
+    return url.strip().rstrip(_URL_TRAILING_PUNCT).rstrip("/")
+
+
+def _allowed_citation_urls(state: PipelineState) -> set[str]:
+    """Every URL this run may legitimately cite: what it retrieved, and what the user gave."""
+    urls = {r.get("url", "") for r in (state.vetted_context or [])}
+    urls.update(r.get("url", "") for r in (state.web_discovery_results or []))
+    prism = state.method_state.get("prism") if getattr(state, "method_state", None) else None
+    citations = (prism or {}).get("citations") or []
+    urls.update(c.get("url", "") for c in citations if isinstance(c, dict))
+    urls.update(_BARE_URL_RE.findall(state.problem or ""))
+    return {_norm_url(u) for u in urls if u}
+
+
+def enforce_citations(text: str, allowed_urls: set[str]) -> tuple[str, list[str]]:
+    """Unlink every URL in prose that is not in ``allowed_urls``.
+
+    A markdown link becomes its title plus a removal marker; a bare URL is
+    dropped. Code (fenced or inline) is left alone: a URL there is an example
+    in the answer, not a citation. Returns the new text and the removed URLs,
+    in order of first appearance.
+    """
+    removed: list[str] = []
+
+    def _link(m: re.Match[str]) -> str:
+        if _norm_url(m.group(2)) in allowed_urls:
+            return m.group(0)
+        removed.append(m.group(2))
+        return f"{m.group(1)} {CITATION_REMOVED}"
+
+    def _bare(m: re.Match[str]) -> str:
+        if _norm_url(m.group(0)) in allowed_urls:
+            return m.group(0)
+        removed.append(m.group(0))
+        return ""
+
+    parts = _CODE_SPAN_RE.split(text)
+    for i in range(0, len(parts), 2):  # even indexes are prose, odd are code
+        parts[i] = _BARE_URL_RE.sub(_bare, _MD_LINK_RE.sub(_link, parts[i]))
+    return "".join(parts), list(dict.fromkeys(removed))
+
 async def run_synthesis_phase(state: PipelineState, services: WorkflowServices) -> None:
     services.log("SYNTHESIS", "Synthesizing final solution...", state)
 
@@ -58,6 +108,18 @@ async def run_synthesis_phase(state: PipelineState, services: WorkflowServices) 
         max_tokens=get_token_budget("synthesis") if TOKEN_OPTIMIZATION["dynamic_budgets"] else DEFAULT_MAX_TOKENS
     )
 
+    state.final_solution = finalize_solution(raw, state, services)
+
+
+def finalize_solution(raw: str, state: PipelineState, services: WorkflowServices) -> FinalSolution:
+    """Turn a synthesis reply into a FinalSolution. Shared by every method.
+
+    The prompt differs per method; everything after the model call does not:
+    prose extraction and fallbacks, the artifact scrub, claim labels, evidence
+    with the promotion rules, blueprint sanitising, the provenance report and
+    the citation check. Writes state.meta.provenance_report; the caller
+    assigns the returned solution to state.final_solution.
+    """
     try:
         json_data = extract_json(raw) or {}
     except ParseError as exc:
@@ -89,14 +151,15 @@ async def run_synthesis_phase(state: PipelineState, services: WorkflowServices) 
 
     core_solution, core_solution_report = clean_llm_artifacts_with_report(core_solution)
 
-    # Citation integrity validator
-    allowed_urls = {r.get("url", "").rstrip("/") for r in (state.vetted_context or [])}
-    allowed_urls.update(r.get("url", "").rstrip("/") for r in (state.web_discovery_results or []))
-    found_urls = set(re.findall(r"https?://[^\s\)\]]+", core_solution))
-    for url in found_urls:
-        base = url.rstrip("/")
-        if base and base not in allowed_urls:
-            services.log("SYNTHESIS", f"Citation integrity warning: {url} not found in current context", state)
+    # Citation integrity: a link the run never retrieved is a model invention.
+    # Enforced here, before the optional Layer B egress rewrite, so the rewrite
+    # (which must not drop a citation present before it) only ever sees allowed ones.
+    allowed_urls = _allowed_citation_urls(state)
+    core_solution, removed_urls = enforce_citations(core_solution, allowed_urls)
+    for url in removed_urls:
+        services.log(
+            "SYNTHESIS", f"Citation integrity warning: {url} not found in current context", state
+        )
 
     # Safely handle claim labels
     raw_labels = json_data.get("claim_labels", {})
@@ -188,14 +251,29 @@ async def run_synthesis_phase(state: PipelineState, services: WorkflowServices) 
     open_questions, questions_changed = _scrub_strings(json_data.get("open_questions", []))
     clean_bp, blueprint_changed = _scrub_blueprint_steps(clean_bp)
 
+    all_sources = _coerce_sources(json_data.get("sources", []))
+    sources = [s for s in all_sources if not s["url"] or _norm_url(s["url"]) in allowed_urls]
+    removed_urls = list(dict.fromkeys(
+        removed_urls + [s["url"] for s in all_sources if s not in sources]
+    ))
+
     state.meta.provenance_report = {
         "core_solution": core_solution_report.to_dict() if core_solution_report else None,
         "critical_insights_removed": insights_changed,
         "action_blueprint_removed": blueprint_changed,
         "open_questions_removed": questions_changed,
+        "citations_removed": len(removed_urls),
     }
+    if removed_urls:
+        state.pending_events.append({
+            "type": "phase_warning",
+            "message": (
+                f"{len(removed_urls)} link(s) in the answer were not in the retrieved "
+                "sources and were removed."
+            ),
+        })
 
-    state.final_solution = FinalSolution(
+    return FinalSolution(
         core_solution=core_solution,
         critical_insights=critical_insights,
         action_blueprint=clean_bp,
@@ -208,7 +286,7 @@ async def run_synthesis_phase(state: PipelineState, services: WorkflowServices) 
             assumption_failure_impact=meta_audit_data.get("assumption_failure_impact", ""),
             non_obvious_insight=meta_audit_data.get("non_obvious_insight", "")
         ),
-        sources=_coerce_sources(json_data.get("sources", [])),
+        sources=sources,
         layout_hints=json_data.get("layout_hints", {}),
         evidence=evidence_bundles,
     )

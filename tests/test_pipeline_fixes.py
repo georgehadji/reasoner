@@ -129,7 +129,9 @@ async def test_synthesis_coerces_string_sources():
     })
 
     pipeline = ReasonerPipeline(router=router, preset_name="multi-perspective-budget", verbose=False)
-    state = await pipeline.run("test problem")
+    # The two URLs are in the problem text, so they count as retrieved: the
+    # citation check (MP-7) keeps links the user supplied.
+    state = await pipeline.run("test problem https://example.com https://dict.com")
 
     sources = state.final_solution.sources
     assert len(sources) == 3
