@@ -26,6 +26,10 @@ class CircuitBreakerPort(Protocol):
 
     async def record_failure(self) -> None: ...
 
+    async def release(self) -> None:
+        """Free a slot from can_execute() for a call that was cancelled."""
+        ...
+
     @property
     def config(self) -> CircuitBreakerConfig: ...
 

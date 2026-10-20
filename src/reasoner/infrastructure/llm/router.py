@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import logging
 import os
 import time
@@ -104,6 +105,20 @@ async def _try_direct_fallback(
 logger = logging.getLogger(__name__)
 
 
+def _per_call(provider: BaseLLMProvider) -> BaseLLMProvider:
+    """This call's own copy of a shared provider.
+
+    ``_dedupe`` shares one provider per model process-wide, but a call writes
+    state onto it: the merged ``extra_body`` on the way in and the ``last_*``
+    usage counters on the way out. The semaphore guarding it counts to 30, so
+    it is not a mutex, and concurrent runs read each other's reasoning effort
+    and token counts. A shallow copy shares the HTTP client and configuration
+    and keeps per-call state private
+    (docs/plans/audit-remediation-2026-10-20.md RUN-4).
+    """
+    return copy.copy(provider)
+
+
 async def _call_with_circuit(
     provider: BaseLLMProvider,
     system_prompt: str,
@@ -136,36 +151,42 @@ async def _call_with_circuit(
         raise LLMError(f"Circuit open for {provider.model}")
 
     semaphore = _get_llm_semaphore(provider.model)
-    async with semaphore:
-        # Mutate extra_body INSIDE the per-model semaphore so concurrent
-        # calls to this provider model are serialized — no concurrent
-        # caller sees mutated state. Save/restore is still needed for
-        # the try/except/finally within this critical section.
-        _saved_extra = None
-        if extra_body and hasattr(provider, "extra_body") and provider.extra_body is not None:
-            _saved_extra = dict(provider.extra_body)
-            provider.extra_body = {**provider.extra_body, **extra_body}
-        elif extra_body and hasattr(provider, "extra_body"):
-            provider.extra_body = dict(extra_body)
-        try:
-            if single_attempt:
-                coro = provider.complete_once(system_prompt, user_prompt, max_tokens, temperature)
-            else:
-                coro = provider.complete_with_retry(system_prompt, user_prompt, max_tokens, temperature)
-            result = await asyncio.wait_for(coro, timeout=effective_timeout)
-            await circuit.record_success()
-            return result
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            await circuit.record_failure()
-            raise
-        finally:
-            # Restore original extra_body
-            if _saved_extra is not None and hasattr(provider, "extra_body"):
-                provider.extra_body = _saved_extra
+    try:
+        async with semaphore:
+            # ProviderRouter passes this call's own copy (_per_call), so the
+            # merge below stays private to the call. Save/restore remains for
+            # direct callers that pass a shared provider.
+            _saved_extra = None
+            if extra_body and hasattr(provider, "extra_body") and provider.extra_body is not None:
+                _saved_extra = dict(provider.extra_body)
+                provider.extra_body = {**provider.extra_body, **extra_body}
             elif extra_body and hasattr(provider, "extra_body"):
-                provider.extra_body = {}
+                provider.extra_body = dict(extra_body)
+            try:
+                if single_attempt:
+                    coro = provider.complete_once(system_prompt, user_prompt, max_tokens, temperature)
+                else:
+                    coro = provider.complete_with_retry(system_prompt, user_prompt, max_tokens, temperature)
+                result = await asyncio.wait_for(coro, timeout=effective_timeout)
+                await circuit.record_success()
+                return result
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                await circuit.record_failure()
+                raise
+            finally:
+                # Restore original extra_body
+                if _saved_extra is not None and hasattr(provider, "extra_body"):
+                    provider.extra_body = _saved_extra
+                elif extra_body and hasattr(provider, "extra_body"):
+                    provider.extra_body = {}
+    except asyncio.CancelledError:
+        # can_execute() may hold a half-open slot. A cancelled call has no
+        # outcome to record, so give the slot back. Leaked slots wedged the
+        # model until restart (docs/plans/audit-remediation-2026-10-20.md RUN-3).
+        await circuit.release()
+        raise
 
 
 async def _call_with_tools_circuit(
@@ -187,30 +208,37 @@ async def _call_with_tools_circuit(
         raise LLMError(f"Circuit open for {provider.model}")
 
     semaphore = _get_llm_semaphore(provider.model)
-    async with semaphore:
-        # Mutate extra_body inside the per-model critical section
-        _saved_extra = None
-        if extra_body and hasattr(provider, "extra_body") and provider.extra_body is not None:
-            _saved_extra = dict(provider.extra_body)
-            provider.extra_body = {**provider.extra_body, **extra_body}
-        elif extra_body and hasattr(provider, "extra_body"):
-            provider.extra_body = dict(extra_body)
-        try:
-            coro = provider.call_with_tools_with_retry(system_prompt, user_prompt, tools, max_tokens, temperature)
-            result = await asyncio.wait_for(coro, timeout=effective_timeout)
-            await circuit.record_success()
-            return result
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            await circuit.record_failure()
-            raise
-        finally:
-            # Restore original extra_body
-            if _saved_extra is not None and hasattr(provider, "extra_body"):
-                provider.extra_body = _saved_extra
+    try:
+        async with semaphore:
+            # Mutate extra_body inside the per-model critical section
+            _saved_extra = None
+            if extra_body and hasattr(provider, "extra_body") and provider.extra_body is not None:
+                _saved_extra = dict(provider.extra_body)
+                provider.extra_body = {**provider.extra_body, **extra_body}
             elif extra_body and hasattr(provider, "extra_body"):
-                provider.extra_body = {}
+                provider.extra_body = dict(extra_body)
+            try:
+                coro = provider.call_with_tools_with_retry(system_prompt, user_prompt, tools, max_tokens, temperature)
+                result = await asyncio.wait_for(coro, timeout=effective_timeout)
+                await circuit.record_success()
+                return result
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                await circuit.record_failure()
+                raise
+            finally:
+                # Restore original extra_body
+                if _saved_extra is not None and hasattr(provider, "extra_body"):
+                    provider.extra_body = _saved_extra
+                elif extra_body and hasattr(provider, "extra_body"):
+                    provider.extra_body = {}
+    except asyncio.CancelledError:
+        # can_execute() may hold a half-open slot. A cancelled call has no
+        # outcome to record, so give the slot back. Leaked slots wedged the
+        # model until restart (docs/plans/audit-remediation-2026-10-20.md RUN-3).
+        await circuit.release()
+        raise
 
 
 # Process-wide de-duplication of equivalent provider instances (every request
@@ -560,6 +588,7 @@ class ProviderRouter:
         fallback: BaseLLMProvider | None = self._resolve_fallback(role, assigned)
 
         async def _execute_call(provider: BaseLLMProvider, is_fallback: bool = False):
+            provider = _per_call(provider)
             actual_provider = provider
             try:
                 response = await self._attempt_call_and_record(
@@ -637,6 +666,7 @@ class ProviderRouter:
                     ), {}
 
         async def _execute_stream(provider: BaseLLMProvider, is_fallback: bool = False):
+            provider = _per_call(provider)
             from reasoner.circuit_breaker import get_circuit_breaker
             circuit = get_circuit_breaker(f"llm:{provider.model}")
             if not await circuit.can_execute():
@@ -674,7 +704,10 @@ class ProviderRouter:
                         if extra_body is not None and hasattr(provider, "extra_body"):
                             provider.extra_body = _saved
                 await circuit.record_success()
-            except asyncio.CancelledError:
+            except (asyncio.CancelledError, GeneratorExit):
+                # Cancelled, or the consumer closed the stream mid-yield:
+                # no outcome to record, but the half-open slot goes back (RUN-3).
+                await circuit.release()
                 raise
             except TimeoutError as exc:
                 timed_out = True
@@ -785,6 +818,7 @@ class ProviderRouter:
         fallback: BaseLLMProvider | None = self._resolve_fallback(role, assigned)
 
         async def _execute_tool_call(provider: BaseLLMProvider, is_fallback: bool = False):
+            provider = _per_call(provider)
             try:
                 content, tool_calls = await _call_with_tools_circuit(
                     provider, system_prompt, user_prompt, tools, max_tokens, temperature,
