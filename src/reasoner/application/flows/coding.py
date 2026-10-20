@@ -36,7 +36,7 @@ class CodingFlow(WorkflowStrategy):
         return [
             PhaseStep(1.5, "Library Research", run_coding_library_search_phase, _ser_2),
             PhaseStep(2, "Spec Analysis", run_coding_spec_phase, _ser_2),
-            PhaseStep(3, "Code Generation", run_coding_generate_phase, _ser_3),
+            PhaseStep(3, "Code Generation", run_coding_generate_phase, _ser_3, critical=True),
             PhaseStep(3.4, "CVE Search", run_coding_cve_search_phase, _ser_3),
             PhaseStep(3.5, "Security Review", run_coding_review_phase, _ser_3, critical=True),
             PhaseStep(4, "Test Generation", run_coding_tests_phase, _ser_4),

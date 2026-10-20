@@ -144,6 +144,27 @@ def _strip_reasoning_tags(text: str) -> str:
 strip_reasoning_tags = _strip_reasoning_tags
 
 
+def coerce_list(value: Any) -> list[Any]:
+    """A model-written field that should be a list, as a list.
+
+    Model output is untrusted input, so ``json_data.get("x", [])`` is not
+    enough: the default applies only to a missing key, and a reply of
+    ``"x": null`` crashed the reader (docs/plans/audit-remediation-2-2026-10-20.md
+    FLOW-4). ``None`` and ``""`` become ``[]``, a list or tuple is copied, and
+    any other single value is wrapped.
+    """
+    if value is None or value == "":
+        return []
+    if isinstance(value, (list, tuple)):
+        return list(value)
+    return [value]
+
+
+def coerce_verdict(value: Any) -> str:
+    """A model-written verdict such as ``"Accept"``, normalised to ``"ACCEPT"`` (FLOW-7)."""
+    return str(value or "").strip().upper()
+
+
 def extract_json_any(text: str) -> Any:
     """
     Core extraction engine. Handles markdown fences, prose, and malformed JSON.
