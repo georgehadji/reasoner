@@ -203,6 +203,12 @@ def synthesis_prompt(state: PipelineState) -> str:
 
     followup = _followup_context(state)
     quality_note = f"\nCONTEXT QUALITY: {state.context_quality}\n" if state.context_quality and state.context_quality != "unknown" else ""
+    if getattr(state, "ranking_degraded", False):
+        quality_note += (
+            "\nRANKING NOTE: the candidates above were NOT independently scored "
+            "(the scorer failed). Do not describe any of them as top-ranked, best or "
+            "highest-scoring; weigh them on their merits and say they were unranked.\n"
+        )
 
     # W2 premise audit (docs/plans/sycophancy-mitigation.md §2c) — read straight from
     # state.decomposition rather than `final_context`, which only carries assumptions

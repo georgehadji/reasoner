@@ -13,8 +13,10 @@ from reasoner.application.flows.base import PhaseStep, WorkflowServices, Workflo
 from reasoner.application.flows.iterative_critique_phases import (
     MAX_ROUNDS,
     AdversarialRound,
+    NextStep,
     apply_generator_output,
     check_convergence,
+    next_step,
     run_critic_phase,
     run_generator_phase,
     run_synthesis_phase,
@@ -50,12 +52,17 @@ class IterativeCritiqueFlow(WorkflowStrategy):
                 gen = await run_generator_phase(state, services, round_num=round_num)
             else:
                 prev_round = state.adversarial_rounds[-1]
-                gen = await run_generator_phase(
-                    state, services,
-                    previous_answer=prev_round.answer,
-                    flaws=prev_round.flaws_identified,
-                    round_num=round_num,
-                )
+                if next_step(prev_round.verdict) is NextStep.REGENERATE:
+                    gen = await run_generator_phase(
+                        state, services, round_num=round_num, rejected=prev_round
+                    )
+                else:
+                    gen = await run_generator_phase(
+                        state, services,
+                        previous_answer=prev_round.answer,
+                        flaws=prev_round.flaws_identified,
+                        round_num=round_num,
+                    )
 
             # Critic: evaluate the answer
             critic_round = await run_critic_phase(state, services, gen.answer, round_num)
