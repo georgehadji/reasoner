@@ -43,6 +43,7 @@ class CacheEntry:
     last_accessed: float = field(default_factory=time.time)
     semantic_embedding: list[float] | None = None  # For semantic matching
     raw_prompt: str = ""  # Stored for Jaccard semantic matching
+    agent_id: str = ""  # tenant; the semantic path must not cross it (DAT-3)
 
 
 @dataclass
@@ -208,6 +209,13 @@ class TokenAwareCache:
                 entry = self._entries.get(ck)
                 if entry is None or entry.phase != phase or entry.model_id != model_id:
                     continue
+                # The exact path keys on agent_id and checks TTL; this scan did
+                # neither, so it served another tenant's or an expired answer
+                # (docs/plans/audit-remediation-2026-10-20.md DAT-3).
+                if entry.agent_id != agent_id:
+                    continue
+                if self._clock.time() - entry.created_at > entry.ttl_seconds:
+                    continue
 
                 # Exact prompt match within same problem group (fast path)
                 if entry.prompt_hash == prompt_hash:
@@ -264,6 +272,7 @@ class TokenAwareCache:
                 last_accessed=self._clock.time(),
                 ttl_seconds=ttl_seconds or self.ttl_seconds,
                 raw_prompt=prompt,
+                agent_id=agent_id,
             )
 
             # Subtract old entry's token count on overwrite to prevent counter leak

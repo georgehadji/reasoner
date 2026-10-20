@@ -77,11 +77,11 @@ class _DictCache:
     def __init__(self):
         self.store: dict[tuple, str] = {}
 
-    async def get(self, problem, phase, model_id, prompt):
-        return self.store.get((problem, phase, model_id, prompt))
+    async def get(self, problem, phase, model_id, prompt, agent_id=""):
+        return self.store.get((agent_id, problem, phase, model_id, prompt))
 
-    async def set(self, problem, phase, model_id, prompt, response, tokens_used):
-        self.store[(problem, phase, model_id, prompt)] = response
+    async def set(self, problem, phase, model_id, prompt, response, tokens_used, agent_id=""):
+        self.store[(agent_id, problem, phase, model_id, prompt)] = response
 
 
 class _Router:

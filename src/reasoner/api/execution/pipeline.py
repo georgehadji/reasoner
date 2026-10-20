@@ -40,7 +40,18 @@ logger = logging.getLogger(__name__)
 
 
 def _request_from_command(command: RunPipelineCommand) -> RunRequest:
-    """The rest of this module predates RunPipelineCommand and reads a RunRequest."""
+    """The rest of this module predates RunPipelineCommand and reads a RunRequest.
+
+    run_stream carries the validated request in ``metadata``. Rebuilding it from
+    the command's narrow fields reset attachments, file_ids, enhance_prompt,
+    force_pipeline, no_cache, web_search and expert to defaults, so a user was
+    billed for an answer that never saw their upload
+    (docs/plans/audit-remediation-2026-10-20.md DAT-2). The rebuild below is
+    for callers that send a bare command.
+    """
+    carried = command.metadata.get("request")
+    if isinstance(carried, RunRequest):
+        return carried.model_copy(update={"client_run_id": command.command_id})
     return RunRequest(
         problem=command.problem,
         preset=command.preset,
