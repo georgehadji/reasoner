@@ -117,7 +117,8 @@ jobs:
           # lines it touched and moved the bloc table behind the registry port (-4).
           # 2209: method-flow PR3 (-1).
           # 2208: method-flow PR4 (-1).
-          python scripts/ruff_ratchet.py --max 2208
+          # 2207: audit billing PR (BIL-3..9) sorted credit_service imports (net -1).
+          python scripts/ruff_ratchet.py --max 2207
 
       - name: Security scan (bandit)
         run: |
