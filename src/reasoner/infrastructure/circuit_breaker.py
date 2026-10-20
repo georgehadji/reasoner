@@ -140,7 +140,14 @@ class CircuitBreaker:
         # HALF_OPEN state - enforce concurrent call limit
         if self._state == CircuitState.HALF_OPEN:
             if self._stats.half_open_current_calls >= self.config.half_open_max_calls:
-                return False  # At capacity, reject call
+                # A probe outstanding longer than the open timeout was
+                # abandoned (its release was lost). Start a fresh probe window
+                # rather than rejecting every call until a restart (RUN-3).
+                elapsed = self._clock.monotonic() - self._last_state_change
+                if elapsed < self.config.timeout_seconds:
+                    return False  # At capacity, reject call
+                self._stats.half_open_current_calls = 0
+                self._last_state_change = self._clock.monotonic()
             # Acquire slot atomically
             self._stats.half_open_current_calls += 1
             return True
@@ -318,6 +325,16 @@ class CircuitBreaker:
         async with self._lock:
             self._release_call()
 
+    async def release(self) -> None:
+        """Give back a slot from ``can_execute()`` without recording an outcome.
+
+        For a call that was cancelled: it neither succeeded nor failed. Without
+        this, cancelled half-open probes held their slots forever and wedged the
+        model (docs/plans/audit-remediation-2026-10-20.md RUN-3).
+        """
+        async with self._lock:
+            self._release_call()
+
 
 class CircuitOpenError(Exception):
     """Raised when circuit breaker is open."""
@@ -452,6 +469,16 @@ class RedisCircuitBreaker:
         except Exception:
             llm_logger.warning(
                 f"Redis circuit breaker unavailable for {self.name} — failure recorded locally only",
+            )
+
+    async def release(self) -> None:
+        """Give back a half-open slot without recording an outcome (cancelled call)."""
+        try:
+            script = await self._get_script()
+            await script(keys=[f"cb:{self.name}"], args=["release", ""])
+        except Exception:
+            llm_logger.warning(
+                f"Redis circuit breaker unavailable for {self.name} — slot release skipped",
             )
 
     async def reset(self) -> None:

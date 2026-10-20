@@ -169,7 +169,8 @@ class TestProviderApiErrorsReachTheFallbackChain:
 
         async def _circuit(provider, *args, **kwargs):
             attempted.append(provider.model)
-            if provider is primary:
+            # By model, not identity: the router calls a per-call copy (RUN-4).
+            if provider.model == primary.model:
                 raise _translate(
                     provider.model, self._api_error(openai.NotFoundError, 404)
                 )
