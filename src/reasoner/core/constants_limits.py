@@ -683,3 +683,7 @@ MAX_EXPRESSION_LENGTH: int = 10000
 EVENT_RETENTION_DAYS: int = 365
 SNAPSHOT_RETENTION_COUNT: int = 3   # reserved — current schema supports only 1 snapshot/aggregate
 COMPACTION_BATCH_SIZE: int = 500
+
+# After a Redis error the rate limiter falls back (fail_closed denies) for this
+# long, then the next request re-probes Redis.
+RATE_LIMITER_REDIS_RETRY_SECONDS: float = 30.0
