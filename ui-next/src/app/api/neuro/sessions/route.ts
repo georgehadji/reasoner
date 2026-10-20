@@ -1,14 +1,23 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import {
   getApiBaseUrl,
   validateUpstreamUrl,
   neuroKeyHeader,
+  rateLimit,
+  sanitizeRequestHeaders,
   sanitizeResponseHeaders,
 } from '@/lib/security-server';
 import { API } from '@/lib/config';
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
+    const limit = rateLimit(request, 'neuro-sessions');
+    if (!limit.allowed) {
+      return new NextResponse('Too Many Requests', {
+        status: 429,
+        headers: { 'Retry-After': String(limit.retryAfter) },
+      });
+    }
     const { searchParams } = new URL(request.url);
     const apiBase = validateUpstreamUrl(getApiBaseUrl());
     const upstream = new URL(`${apiBase}${API.NEURO_SESSIONS}`);
@@ -23,7 +32,10 @@ export async function GET(request: Request) {
       // require_neuro_key, which reads request.headers) and touches no cookie
       // anywhere, so the browser's session and CSRF cookies were being handed
       // to a component that never reads them.
-      headers: neuroKeyHeader(),
+      // Authorization is forwarded (sanitizeRequestHeaders' allowlist, as in
+      // neuro/recall): without it the backend saw every caller as anonymous,
+      // so a signed-in user's session list came back empty.
+      headers: { ...sanitizeRequestHeaders(request.headers), ...neuroKeyHeader() },
     });
 
     // Every other proxy route returns sanitizeResponseHeaders(resp). These two
