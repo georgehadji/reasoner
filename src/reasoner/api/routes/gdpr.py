@@ -7,7 +7,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 
 from reasoner.api.auth_deps import require_csrf
-from reasoner.api.dependencies import get_current_user
+from reasoner.api.dependencies import require_key_scope
 from reasoner.domain.saas import User
 from reasoner.infrastructure.persistence.event_store import get_event_store
 
@@ -22,7 +22,7 @@ router = APIRouter(tags=["gdpr"])
     description="Permanently delete all data associated with the authenticated user.",
     dependencies=[Depends(require_csrf)],
 )
-async def erase_user_data(user: User = Depends(get_current_user)) -> dict:
+async def erase_user_data(user: User = Depends(require_key_scope("history:delete"))) -> dict:
     """Permanently erase all pipeline data, cache entries, and logs for the requesting user.
 
     This operation is **irreversible**. A confirmation parameter is required.

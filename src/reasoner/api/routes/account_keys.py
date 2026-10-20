@@ -13,11 +13,17 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from reasoner.api.auth_deps import require_csrf
-from reasoner.api.dependencies import _get_api_key_service, check_rate_limit, get_current_user
+from reasoner.api.dependencies import (
+    _get_api_key_service,
+    check_rate_limit,
+    get_current_user,
+    require_key_scope,
+)
 from reasoner.application.services.api_key_service import MAX_EXPIRY_DAYS, ApiKeyLimitError
 from reasoner.domain.api_keys import (
     ASSIGNABLE_SCOPES,
     DEFAULT_SCOPES,
+    KEY_MANAGE_SCOPE,
     MAX_KEYS_PER_USER,
     InvalidScopeError,
 )
@@ -60,7 +66,7 @@ async def list_api_keys(
 @router.post("", status_code=201, dependencies=[Depends(check_rate_limit), Depends(require_csrf)])
 async def create_api_key(
     body: CreateKeyRequest,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_key_scope(KEY_MANAGE_SCOPE)),
 ):
     """Mint a new API key.
 
@@ -92,7 +98,7 @@ async def create_api_key(
 @router.delete("/{key_id}", dependencies=[Depends(check_rate_limit), Depends(require_csrf)])
 async def revoke_api_key(
     key_id: str,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_key_scope(KEY_MANAGE_SCOPE)),
 ):
     """Revoke one of the caller's API keys."""
     try:

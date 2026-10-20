@@ -219,12 +219,14 @@ class TestDegradationsLeaveEvidence:
         grows, the spend ceilings never fire, and the run reports $0.00 --
         which is also what a cache hit reports.
         """
-        from reasoner.domain import pricing
+        # The executor estimates through pricing_resolver.call_cost_usd
+        # (one cost function for every billed path, BIL-2).
+        from reasoner.infrastructure.llm import pricing_resolver
 
         def _boom(*args, **kwargs):
             raise KeyError("no pricing row for this model")
 
-        monkeypatch.setattr(pricing, "calculate_model_cost", _boom)
+        monkeypatch.setattr(pricing_resolver, "call_cost_usd", _boom)
 
         executor = LLMExecutor(
             router=_StubRouter(),

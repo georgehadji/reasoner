@@ -1,6 +1,6 @@
 -- Circuit Breaker Lua Script (shared state across workers)
 -- KEYS[1] - Circuit breaker key (e.g., "cb:openai/gpt-4o")
--- ARGV[1] - Operation: "can_execute" | "record_success" | "record_failure"
+-- ARGV[1] - Operation: "can_execute" | "record_success" | "record_failure" | "release"
 -- ARGV[2] - current_time_ms (wall-clock Unix ms)
 --
 -- Operation-specific args:
@@ -53,8 +53,17 @@ if op == "can_execute" then
         return {0, 'OPEN'}
     elseif current_state == "HALF_OPEN" then
         if half_open_calls >= max_half_open_calls then
+            -- Probes outstanding longer than the open timeout were abandoned
+            -- (a lost release): start a fresh probe window instead of
+            -- rejecting every call until someone resets the key.
+            local last_state_change_ms = tonumber(state["last_state_change_ms"]) or 0
+            if (current_ms - last_state_change_ms) < timeout_ms then
+                refresh_ttl()
+                return {0, 'HALF_OPEN_FULL'}
+            end
+            redis.call('HSET', key, 'half_open_calls', 1, 'last_state_change_ms', current_ms)
             refresh_ttl()
-            return {0, 'HALF_OPEN_FULL'}
+            return {1, 'HALF_OPEN'}
         end
         redis.call('HINCRBY', key, 'half_open_calls', 1)
         refresh_ttl()
@@ -122,6 +131,15 @@ elseif op == "record_failure" then
 
     refresh_ttl()
     return {1, current_state}
+
+elseif op == "release" then
+    -- A cancelled call gives its half-open slot back without an outcome.
+    local state = get_state()
+    if (state["state"] or "CLOSED") == "HALF_OPEN" and (tonumber(state["half_open_calls"]) or 0) > 0 then
+        redis.call('HINCRBY', key, 'half_open_calls', -1)
+    end
+    refresh_ttl()
+    return {1, state["state"] or "CLOSED"}
 
 else
     return {0, 'UNKNOWN_OPERATION'}
