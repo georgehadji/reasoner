@@ -97,7 +97,8 @@ IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 
 # MIME-type to extension mapping for validation
 MIME_TYPE_MAP: dict[str, set[str]] = {
-    "text/plain": {".txt"},
+    # libmagic reports Markdown as text/plain.
+    "text/plain": {".txt", ".md"},
     "text/markdown": {".md"},
     "application/pdf": {".pdf"},
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": {".docx"},
@@ -377,7 +378,6 @@ async def save_uploaded_file(
                 "size": len(content),
                 "mime_type": meta.get("mime_type", "application/octet-stream"),
                 "text": text_content,
-                "path": str(UPLOAD_DIR / f"{existing_id}{_get_file_extension(filename)}"),
                 "user_id": user_id,
                 "deduplicated": True,
                 "provenance_report": None,  # scrubbed (if applicable) on the original upload
@@ -538,7 +538,6 @@ async def save_uploaded_file(
             "size": len(content),
             "mime_type": mime_type,
             "text": text_content,
-            "path": str(file_path),
             "user_id": user_id,
             "provenance_report": provenance_report,
         }
@@ -549,6 +548,22 @@ async def save_uploaded_file(
             "success": False,
             "error": str(e),
         }
+
+
+def stored_bytes(user_id: str) -> int:
+    """Bytes this user's uploads occupy on disk.
+
+    shortcut: walks the per-tenant hash index, which a deleted file's id stays
+    in (it then counts 0). Per-process file; upgrade to a DB column if uploads
+    move off the local volume.
+    """
+    total = 0
+    for file_id in _load_hash_index().get(user_id, {}).values():
+        for ext in SUPPORTED_EXTENSIONS:
+            f = UPLOAD_DIR / f"{file_id}{ext}"
+            if f.exists():
+                total += f.stat().st_size
+    return total
 
 
 def _text_cache_path(file_id: str) -> Path:

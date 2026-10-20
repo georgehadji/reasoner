@@ -696,5 +696,7 @@ REQUEST_BODY_MAX_BYTES: int = 16 * 1024 * 1024
 # Largest single uploaded file, and a base64 data: URL of one plus its header.
 UPLOAD_MAX_FILE_BYTES: int = 50 * 1024 * 1024
 MAX_DATA_URL_CHARS: int = UPLOAD_MAX_FILE_BYTES * 4 // 3 + 256
+# Total stored upload bytes per user, checked before an upload is saved.
+UPLOAD_USER_QUOTA_BYTES: int = 1024 * 1024 * 1024
 # Address-space cap for the PDF/DOCX parse child process (Linux only).
 DOCUMENT_PARSE_MEMORY_LIMIT_BYTES: int = 1024 * 1024 * 1024

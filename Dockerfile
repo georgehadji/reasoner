@@ -20,9 +20,10 @@ FROM python:3.14-slim AS runtime
 
 WORKDIR /app
 
-# Install runtime libpq dependency
+# libpq5 for asyncpg/psycopg; libmagic1 for python-magic, without which every
+# upload fails closed (UPLOAD_REQUIRE_MIME_VALIDATION defaults to true).
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq5 && \
+    libpq5 libmagic1 && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy virtual environment from builder
