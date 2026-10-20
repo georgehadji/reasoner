@@ -7,9 +7,14 @@ Supabase's auth server and returns canonical User entities.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import logging
+import time
+from collections import OrderedDict
 from uuid import UUID
+
+import jwt
 
 from reasoner.application.ports.auth_port import AuthPort
 from reasoner.auth import AuthenticationError
@@ -27,10 +32,16 @@ class SupabaseAuthAdapter(AuthPort):
     - Caching recommendation: wrap in AuthService with Redis TTL
     """
 
+    # A verified token is trusted for this long (never past its own exp).
+    # shortcut: a token revoked server-side stays valid here for up to 60s.
+    _CACHE_TTL_SECONDS = 60.0
+    _CACHE_MAX = 1024
+
     def __init__(self, supabase_url: str, supabase_service_key: str):
         from supabase import Client, create_client
 
         self._client: Client = create_client(supabase_url, supabase_service_key)
+        self._cache: OrderedDict[str, tuple[float, User]] = OrderedDict()
 
     async def authenticate(self, token: str) -> User:
         """
@@ -45,9 +56,29 @@ class SupabaseAuthAdapter(AuthPort):
         Raises:
             AuthenticationError: If token is invalid or expired.
         """
+        key = hashlib.sha256(token.encode()).hexdigest()
+        cached = self._cache.get(key)
+        if cached and cached[0] > time.time():
+            return cached[1]
+        user = await self._verify(token)
+        expires = time.time() + self._CACHE_TTL_SECONDS
         try:
-            # Supabase server-side JWT verification
-            response = self._client.auth.get_user(token)
+            # Already verified by Supabase; decoded only to bound the cache.
+            exp = jwt.decode(token, options={"verify_signature": False}).get("exp")
+            if exp:
+                expires = min(expires, float(exp))
+        except jwt.PyJWTError:
+            pass  # no readable exp: the TTL alone bounds it
+        self._cache[key] = (expires, user)
+        while len(self._cache) > self._CACHE_MAX:
+            self._cache.popitem(last=False)
+        return user
+
+    async def _verify(self, token: str) -> User:
+        try:
+            # Supabase server-side JWT verification: a blocking HTTPS call in
+            # supabase-py, so off the event loop.
+            response = await asyncio.to_thread(self._client.auth.get_user, token)
             supabase_user = response.user
 
             if supabase_user is None:
