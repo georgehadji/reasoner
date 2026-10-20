@@ -256,3 +256,60 @@ async def test_reasoner_run_is_idempotent_on_client_run_id(mcp_server, monkeypat
     assert result.isError is True
     text = result.content[0].text if result.content else ""
     assert "dup-1" in text
+
+
+async def test_a_rejected_problem_reserves_no_credits(mcp_server, monkeypatch):
+    """BIL-7: RunRequest validation ran after reserve_or_402, so a rejected
+    problem kept its reservation, which nothing released."""
+    _patch_billable_run(monkeypatch)
+    from reasoner.api import dependencies as deps
+
+    reserved: list[str] = []
+
+    async def fake_reserve(**kwargs):
+        reserved.append(kwargs["reference_id"])
+        return 20
+
+    monkeypatch.setattr(deps, "reserve_or_402", fake_reserve)
+
+    async with create_connected_server_and_client_session(mcp_server) as session:
+        # RunRequest.problem rejects this (it mentions `subprocess`).
+        result = await session.call_tool(
+            "reasoner_run", {"problem": "What does the subprocess module do?"}
+        )
+
+    assert result.isError is True
+    assert reserved == [], "credits were held for a request that never ran"
+
+
+async def test_reasoner_gate_is_rate_limited(mcp_server, monkeypatch):
+    """BIL-7: the gate is five LLM calls and had no limit at all."""
+    _patch_billable_run(monkeypatch)
+    from reasoner.api import dependencies as deps
+    from reasoner.application.services import gate_service
+
+    class _Limiter:
+        async def is_allowed_for_user(self, client_id, tier):
+            return False, {"retry_after": 30}
+
+    async def fake_tier(user_id):
+        from reasoner.domain.saas import SubscriptionTier
+        return SubscriptionTier.FREE
+
+    decided: list[str] = []
+
+    async def fake_decide(problem, preset):
+        decided.append(problem)
+        return {}
+
+    monkeypatch.setattr(deps, "_get_rate_limiter_instance", lambda: _Limiter())
+    monkeypatch.setattr(
+        "reasoner.application.services.spend_limit_service.resolve_user_tier", fake_tier
+    )
+    monkeypatch.setattr(gate_service, "decide_route", fake_decide)
+
+    async with create_connected_server_and_client_session(mcp_server) as session:
+        result = await session.call_tool("reasoner_gate", {"problem": "q"})
+
+    assert result.isError is True
+    assert decided == []
