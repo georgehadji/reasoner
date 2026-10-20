@@ -23,4 +23,4 @@ from reasoner.infrastructure.valkey.memory_state_adapter import InMemoryStateAda
 from reasoner.infrastructure.valkey.state_adapter import ValkeyStateAdapter
 
 # Deprecated aliases — import explicitly to get the warning:
-#   from reasoner.infrastructure.valkey.client import get_redis
+#   from reasoner.infrastructure.valkey.client import set_redis
