@@ -12,7 +12,9 @@ from typing import Any
 
 import httpx
 
-from reasoner.security.url_validator import is_safe_url
+from reasoner.core.constants_limits import SCRAPE_MAX_BYTES
+from reasoner.infrastructure.safe_fetch import safe_get
+from reasoner.security.url_validator import UnsafeURLError
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +44,8 @@ def _get_scraper_client() -> httpx.AsyncClient:
                         keepalive_expiry=60.0,
                     ),
                     timeout=TIMEOUTS.SCRAPER,
-                    follow_redirects=True,
+                    # safe_get follows redirects itself, re-checking each hop.
+                    follow_redirects=False,
                 )
     return _shared_scraper_client
 
@@ -163,13 +166,8 @@ async def scrape_url(url: str, max_length: int = 10000) -> dict[str, Any]:
             'Accept-Language': 'en-US,en;q=0.5',
         }
 
-        if not is_safe_url(url):
-            return {"url": url, "title": "", "content": "", "success": False, "error": "URL blocked for security"}
-
-        response = await client.get(url, headers=headers)
-        response.raise_for_status()
-
-        html = response.text
+        response, body = await safe_get(client, url, headers=headers, max_bytes=SCRAPE_MAX_BYTES)
+        html = body.decode(response.encoding or "utf-8", errors="replace")
 
         # Extract title
         title_match = re.search(r'<title[^>]*>([^<]+)</title>', html, re.IGNORECASE)
@@ -194,6 +192,9 @@ async def scrape_url(url: str, max_length: int = 10000) -> dict[str, Any]:
             "success": True,
         }
 
+    except UnsafeURLError as e:
+        logger.warning("Blocked unsafe scrape URL %s: %s", url, e)
+        return {"url": url, "title": "", "content": "", "success": False, "error": "URL blocked for security"}
     except httpx.TimeoutException:
         logger.error(f"Timeout scraping {url}")
         return {"url": url, "title": "", "content": "", "success": False, "error": "Timeout"}

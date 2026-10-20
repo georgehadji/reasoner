@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from reasoner.api import history as _history_module
 from reasoner.api.auth_deps import require_csrf
-from reasoner.api.dependencies import get_current_user
+from reasoner.api.dependencies import get_current_user, require_key_scope
 from reasoner.domain.saas import User
 
 logger = logging.getLogger(__name__)
@@ -87,7 +87,7 @@ async def get_history_entry(
 @router.delete("/api/history/{entry_id}")
 async def delete_history_entry(
     entry_id: str,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_key_scope("history:delete")),
     csrf_checked=Depends(require_csrf),
 ):
     """Delete a history entry (must belong to the authenticated user)."""
@@ -104,7 +104,7 @@ async def delete_history_entry(
 
 @router.delete("/api/history")
 async def clear_history(
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_key_scope("history:delete")),
     csrf_checked=Depends(require_csrf),
 ):
     """Clear all history for the authenticated user."""

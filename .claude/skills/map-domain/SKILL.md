@@ -24,7 +24,7 @@ folders:
 
 | File | What it does |
 |------|--------------|
-| `pricing.py` | `ModelPricing`, per-token pricing DB, OpenRouter catalogue load, `get_pricing`, `calculate_model_cost`, `format_cost`. |
+| `pricing.py` | `ModelPricing`, per-token pricing DB, OpenRouter catalogue load, `get_pricing`, `format_cost`. |
 | `credits.py` | Prepaid credit currency: `CreditBalance`, `CreditLedgerEntry`, `CreditReason`, `usd_to_credits`, `InsufficientCreditsError`, overdraft ceiling. |
 | `spend_limits.py` | Per-tier LLM spend ceilings: `TierSpendLimits`, `ANONYMOUS_SPEND_LIMITS`, `limits_for_tier`. A run's cost is unbounded by construction, so this caps it. |
 | `saas.py` | `User`, `Subscription`, `SubscriptionTier/Status`, `UsageQuota`, `QuotaResult`, `QueryAuditLog`. |

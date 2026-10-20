@@ -854,9 +854,12 @@ def get_event_store(db_path: str | Path | None = None) -> Any:
     if _event_store is None:
         from reasoner.core.settings import settings
         if settings.EVENT_STORE_BACKEND == "postgres" and settings.DATABASE_URL:
-            from reasoner.infrastructure.persistence.postgres_store import PostgreSQLEventStore
-            _event_store = PostgreSQLEventStore(
-                connection_string=settings.DATABASE_URL,
+            # The process-wide Postgres store, shared with compaction and the
+            # admin routes rather than one pool each. It initializes on first
+            # use (PostgreSQLEventStore._ready, PER-1).
+            from reasoner.infrastructure.persistence.postgres_store import get_postgres_store
+            _event_store = get_postgres_store(
+                connection_string=settings.asyncpg_dsn,
                 pool_size=settings.DB_POOL_SIZE,
             )
         else:

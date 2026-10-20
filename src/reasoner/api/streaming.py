@@ -74,7 +74,6 @@ async def run_stream(
     pipeline_service: PipelineService | None = None,
     request=None,
 ) -> AsyncGenerator[str, None]:
-    import asyncio
 
     from reasoner.application.commands import RunPipelineCommand
     from reasoner.application.handlers.handlers import get_handler_registry
@@ -94,11 +93,14 @@ async def run_stream(
 
     queue = asyncio.Queue(maxsize=256)
     error_sent = False  # a pipeline-level error frame (no "phase" key) has gone out
+    consumer_gone = False  # set when this generator stops reading; emits then drop frames
 
     async def sse_emit(event: dict | str) -> None:
         nonlocal error_sent
         error_sent = error_sent or (isinstance(event, dict) and event.get("type") == "error"
                                     and event.get("phase") is None)
+        if consumer_gone:
+            return
         await queue.put(_event(event) if isinstance(event, dict) else event)
 
     async def run_task():
@@ -125,7 +127,8 @@ async def run_stream(
                     "error": f"Internal error (correlation_id={correlation_id}). See server logs.",
                 })
         finally:
-            await queue.put(None)
+            if not consumer_gone:
+                await queue.put(None)
 
     # Emit a phase_start keepalive BEFORE any pipeline work.
     # This ensures the SSE client sees its first event immediately,
@@ -163,36 +166,33 @@ async def run_stream(
     # Phase 2.2: Poll for SSE client disconnect every 10 iterations
     _disconnect_check_counter = 0
     _disconnect_probe_failed = False
-    while True:
-        chunk = await queue.get()
-        if chunk is None:
-            break
-        yield chunk
-        _disconnect_check_counter += 1
-        if _disconnect_check_counter % 10 == 0 and request is not None:
-            try:
-                if await request.is_disconnected():
-                    logger.info("SSE client disconnected — cancelling pipeline run %s", run_id)
-                    task.cancel()
-                    # Deliberately do NOT await the task here. run_task's own
-                    # CancelledError handler and its finally both `await
-                    # queue.put(...)`, and this generator is the queue's only
-                    # consumer -- once we stop draining, awaiting the task
-                    # deadlocks against a full queue (maxsize=256), which is
-                    # exactly the backpressure state a disconnect implies.
-                    # Bare `except Exception` would also swallow a
-                    # CancelledError aimed at *this* generator (it is a
-                    # BaseException), suppressing uvicorn's shutdown unwind.
-                    # cancel() is enough: the task drops its queue reference
-                    # and is collected once it unwinds.
-                    break
-            except Exception as exc:
-                if not _disconnect_probe_failed:
-                    # The only thing that cancels a run whose client is gone:
-                    # while it is broken the pipeline bills for nobody. Once
-                    # per stream -- this runs every ten chunks.
-                    _disconnect_probe_failed = True
-                    degraded("streaming.disconnect_probe", None, exc=exc)
+    try:
+        while True:
+            chunk = await queue.get()
+            if chunk is None:
+                break
+            yield chunk
+            _disconnect_check_counter += 1
+            if _disconnect_check_counter % 10 == 0 and request is not None:
+                try:
+                    if await request.is_disconnected():
+                        logger.info("SSE client disconnected — cancelling pipeline run %s", run_id)
+                        break  # the finally below cancels the run
+                except Exception as exc:
+                    if not _disconnect_probe_failed:
+                        # The only thing that cancels a run whose client is gone:
+                        # while it is broken the pipeline bills for nobody. Once
+                        # per stream -- this runs every ten chunks.
+                        _disconnect_probe_failed = True
+                        degraded("streaming.disconnect_probe", None, exc=exc)
+    finally:
+        # Whatever ends the stream (sentinel, disconnect probe, or Starlette closing
+        # this generator) stops the run; only the probe used to (RUN-1). Not awaited:
+        # this generator is the queue's only consumer, so awaiting a task blocked on
+        # queue.put() against the full queue (maxsize=256) deadlocks. Bare `except
+        # Exception` would also swallow a CancelledError aimed at this generator.
+        consumer_gone = True
+        task.cancel()
 
 
 async def run_followup_stream(

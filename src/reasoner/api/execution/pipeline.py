@@ -279,20 +279,28 @@ async def _run_phases(
     # in flight.
     run_task = asyncio.ensure_future(runner.run(strategy, state))
     cancel_watch = asyncio.ensure_future(cancel_event.wait())
-    done, _ = await asyncio.wait({run_task, cancel_watch}, return_when=asyncio.FIRST_COMPLETED)
+    try:
+        done, _ = await asyncio.wait(
+            {run_task, cancel_watch}, return_when=asyncio.FIRST_COMPLETED
+        )
 
-    if cancel_watch in done:
-        run_task.cancel()
-        with contextlib.suppress(asyncio.CancelledError, Exception):
-            await run_task
-        await stream.emit({"type": "cancelled", "message": "Pipeline stopped by user"})
-        return False
+        if cancel_watch in done:
+            run_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await run_task
+            await stream.emit({"type": "cancelled", "message": "Pipeline stopped by user"})
+            return False
 
-    cancel_watch.cancel()
-    with contextlib.suppress(asyncio.CancelledError):
-        await cancel_watch
-    await run_task
-    return True
+        await run_task
+        return True
+    finally:
+        # asyncio.wait never cancels what it waits on. When this coroutine is
+        # itself cancelled (client disconnect, the absolute timeout), the run
+        # task used to carry on billing in the background with nobody reading
+        # (docs/plans/audit-remediation-2026-10-20.md RUN-1).
+        for task in (run_task, cancel_watch):
+            task.cancel()
+        await asyncio.gather(run_task, cancel_watch, return_exceptions=True)
 
 
 def _token_totals(state: PipelineState) -> dict[str, int]:

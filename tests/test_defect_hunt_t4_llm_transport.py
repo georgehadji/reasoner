@@ -421,17 +421,12 @@ async def test_openai_direct_still_sends_max_tokens_for_legacy_models(recording_
 # instance and are read by _build_metadata *after* the concurrency semaphore
 # has been released, so a concurrent call to the same model can overwrite them
 # in between. Reported as STATISTICAL — this is a race, not a certainty.
+#
+# Fixed 2026-10-20 (docs/plans/audit-remediation-2026-10-20.md RUN-4) without
+# changing _call_with_circuit's return type: ProviderRouter now runs each call
+# on its own shallow copy of the provider (router._per_call), so the counters
+# it reads back are that call's alone. This was a strict xfail until then.
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "CONFIRMED, unfixed: ProviderRouter._build_metadata reads the provider's "
-        "per-call counters after _call_with_circuit has released the concurrency "
-        "semaphore, and _dedupe shares one provider instance process-wide. "
-        "Fixing it changes _call_with_circuit's return type — cross-boundary, "
-        "see docs/reports/defect-hunt-2026-09-01/T4-llm-transport.md D7."
-    ),
-)
 @pytest.mark.asyncio
 async def test_concurrent_calls_do_not_crosswire_usage_metadata():
     trials = 120
