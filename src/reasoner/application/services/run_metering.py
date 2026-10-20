@@ -17,11 +17,17 @@ injected protocols, so tests exercise the whole path without a ledger.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Protocol
+
+import anyio
+
+from reasoner.core.constants_limits import SETTLE_TIMEOUT_SECONDS
+from reasoner.core.degrade import degraded
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +98,10 @@ class RunContext:
     tier: str = "anonymous"
     interface: str = "web"
     reserved_credits: int = 0
+    #: Set when :func:`metered` starts. A stream the client dropped before its
+    #: first frame never runs ``metered``'s ``finally``, so the HTTP layer reads
+    #: this to release that reservation itself.
+    started: asyncio.Event | None = None
 
 
 #: Frame types that carry a ``total_cost_usd``. ``done`` is the final figure;
@@ -155,6 +165,8 @@ async def metered(
     first phase completed -- still releases the whole reservation, because
     ``cost_usd`` stays 0.0 and :func:`_true_up` skips the settle.
     """
+    if ctx.started is not None:
+        ctx.started.set()
     cost_usd = 0.0
     has_error = False
     try:
@@ -165,18 +177,47 @@ async def metered(
         has_error = True
         raise
     finally:
-        if ctx.user_id and ctx.reserved_credits > 0:
-            await _true_up(sink, ctx, cost_usd)
-        elif ctx.user_id and cost_usd > 0:
-            # Defensive fallback for a caller that never reserved. Every
-            # production call site reserves via reserve_run_budget(); this
-            # keeps older/uninstrumented callers billed rather than free.
-            await _settle(sink, ctx, cost_usd)
+        # A client disconnect cancels this task, and Starlette's anyio scope
+        # re-delivers that cancellation at every await, so an unshielded
+        # settlement was interrupted and neither the release nor the true-up
+        # ran (docs/plans/audit-remediation-2-2026-10-20.md BIL-12).
+        with anyio.CancelScope(shield=True):
+            try:
+                with anyio.fail_after(SETTLE_TIMEOUT_SECONDS):
+                    await _finalize(sink, ctx, cost_usd)
+            except TimeoutError as exc:
+                degraded(
+                    "run_metering.settle_timeout", None, exc=exc,
+                    detail=f"run {ctx.reference_id} left unsettled (${cost_usd:.6f})",
+                )
         if observer is not None:
             try:
                 observer.observe(status="error" if has_error else "success")
             except Exception as exc:
                 logger.warning("Run observer failed for %s: %s", ctx.reference_id, exc)
+
+
+async def _finalize(sink: SettlementSink, ctx: RunContext, cost_usd: float) -> None:
+    if ctx.user_id and ctx.reserved_credits > 0:
+        await _true_up(sink, ctx, cost_usd)
+    elif ctx.user_id and cost_usd > 0:
+        # Defensive fallback for a caller that never reserved. Every
+        # production call site reserves via reserve_run_budget(); this
+        # keeps older/uninstrumented callers billed rather than free.
+        await _settle(sink, ctx, cost_usd)
+
+
+async def release_unstarted(sink: SettlementSink, ctx: RunContext) -> None:
+    """Release the reservation of a stream that never started.
+
+    A client that drops before the first frame never enters :func:`metered`,
+    so its ``finally`` never runs and the hold would stay debited forever.
+    """
+    if ctx.started is None or ctx.started.is_set():
+        return
+    if ctx.user_id and ctx.reserved_credits > 0:
+        with anyio.CancelScope(shield=True), anyio.move_on_after(SETTLE_TIMEOUT_SECONDS):
+            await _true_up(sink, ctx, 0.0)
 
 
 async def _true_up(sink: SettlementSink, ctx: RunContext, cost_usd: float) -> None:
@@ -254,5 +295,6 @@ __all__ = [
     "COST_BEARING_FRAME_TYPES",
     "extract_run_cost",
     "metered",
+    "release_unstarted",
     "reserve_run_budget",
 ]
