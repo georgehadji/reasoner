@@ -1,6 +1,6 @@
 """Shared Valkey connection pool — canonical replacement for redis/client.py.
 
-Backward-compatible: get_redis / set_redis / close_redis are kept as
+Backward-compatible: set_redis / close_redis are kept as
 deprecated aliases that delegate to the new names and emit DeprecationWarning.
 """
 
@@ -53,12 +53,6 @@ async def close_valkey_pool() -> None:
 
 
 # ── Deprecated backward-compat aliases ──────────────────────────
-
-
-def get_redis() -> aioredis.Redis:
-    """Deprecated — use get_valkey_pool()."""
-    warnings.warn("get_redis() is deprecated; use get_valkey_pool()", DeprecationWarning, stacklevel=2)
-    return get_valkey_pool()
 
 
 def set_redis(client: aioredis.Redis) -> None:

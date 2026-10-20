@@ -148,6 +148,18 @@ class LangfuseSubscriber:
         except Exception as e:
             logger.error(f"Langfuse: Failed to send generation event for pipeline {trace_id}, phase {event.phase_name}: {e}")
 
+    async def _close_trace(self, trace_id: str) -> None:
+        """Forget a finished run's trace and its phase spans, then flush.
+
+        Spans were never removed, so every phase of every run stayed in
+        _active_spans. flush() is a blocking network call: off the loop.
+        """
+        self._active_traces.pop(trace_id, None)
+        for span_id in [s for s in self._active_spans if s.startswith(f"{trace_id}-")]:
+            del self._active_spans[span_id]
+        await asyncio.to_thread(_langfuse_client.flush)
+        logger.debug(f"Langfuse: Flushed and cleaned up trace {trace_id}")
+
     async def handle_pipeline_started(self, event: Any) -> None:
         if not _is_langfuse_enabled or _langfuse_client is None: return
         trace_id = event.aggregate_id
@@ -170,9 +182,7 @@ class LangfuseSubscriber:
                     "phases_completed": event.phases_completed,
                 }
             )
-            _langfuse_client.flush()
-            del self._active_traces[trace_id]
-            logger.debug(f"Langfuse: Flushed and cleaned up trace {trace_id}")
+            await self._close_trace(trace_id)
 
     async def handle_pipeline_failed(self, event: Any) -> None:
         if not _is_langfuse_enabled or _langfuse_client is None: return
@@ -187,9 +197,7 @@ class LangfuseSubscriber:
                     "phases_completed": event.phases_completed,
                 }
             )
-            _langfuse_client.flush()
-            del self._active_traces[trace_id]
-            logger.debug(f"Langfuse: Flushed and cleaned up failed trace {trace_id}")
+            await self._close_trace(trace_id)
 
 
 _langfuse_subscriber: LangfuseSubscriber | None = None

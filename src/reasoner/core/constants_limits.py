@@ -700,3 +700,12 @@ MAX_DATA_URL_CHARS: int = UPLOAD_MAX_FILE_BYTES * 4 // 3 + 256
 UPLOAD_USER_QUOTA_BYTES: int = 1024 * 1024 * 1024
 # Address-space cap for the PDF/DOCX parse child process (Linux only).
 DOCUMENT_PARSE_MEMORY_LIMIT_BYTES: int = 1024 * 1024 * 1024
+
+# After a Redis error the rate limiter falls back (fail_closed denies) for this
+# long, then the next request re-probes Redis.
+RATE_LIMITER_REDIS_RETRY_SECONDS: float = 30.0
+
+# WebSocket replay buffers for late joiners: one per run, dropped once it has
+# had no subscriber for this long, and never more than this many at once.
+WS_REPLAY_TTL_SECONDS: float = 300.0
+WS_MAX_REPLAY_BUFFERS: int = 1000
