@@ -68,4 +68,20 @@ def get_pricing(model_id: str) -> ModelPricing:
     return pricing
 
 
-__all__ = ["get_pricing"]
+def call_cost_usd(metadata: dict) -> float:
+    """Cost of one LLM call from its metadata.
+
+    Uses the reported ``cost_usd``. When that is missing, the cost is estimated
+    from the token counts at the call's model price. Shared by the executor and
+    the DIRECT answer path, so neither bills $0 for a call that had tokens
+    (docs/plans/audit-remediation-2026-10-20.md BIL-2).
+    """
+    cost = metadata.get("cost_usd", 0.0) or 0.0
+    input_tokens = metadata.get("input_tokens", 0) or 0
+    if cost > 0 or input_tokens <= 0:
+        return cost
+    output_tokens = metadata.get("output_tokens", 0) or 0
+    return get_pricing(metadata.get("model", "unknown")).calculate_cost(input_tokens, output_tokens)
+
+
+__all__ = ["call_cost_usd", "get_pricing"]

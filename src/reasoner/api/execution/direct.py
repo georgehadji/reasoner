@@ -17,6 +17,7 @@ from typing import Any
 
 from reasoner.api.sse_utils import _event
 from reasoner.core.logging_utils import redact_capped
+from reasoner.infrastructure.llm.pricing_resolver import call_cost_usd
 from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.phases.direct import (
     DIRECT_WEB_SEARCH_SYSTEM,
@@ -138,6 +139,9 @@ async def _stream_direct_answer(
     duration = time.monotonic() - phase_start
     input_tokens = meta.get("input_tokens", 0)
     output_tokens = meta.get("output_tokens", 0)
+    # The `done` frame is what metering bills. It carried no cost, so DIRECT
+    # and WEB_SEARCH answers were charged $0 (BIL-2).
+    cost_usd = call_cost_usd(meta)
 
     yield _event({
         "type": "phase_complete",
@@ -157,5 +161,6 @@ async def _stream_direct_answer(
             "output": output_tokens,
             "total": input_tokens + output_tokens,
         },
+        "total_cost_usd": cost_usd,
         "duration": duration,
     })

@@ -552,6 +552,12 @@ IMAGE_GEN_DEFAULT_RESOLUTION: str = "1024x1024"
 IMAGE_GEN_DEFAULT_WIDTH: int = 1024
 IMAGE_GEN_DEFAULT_HEIGHT: int = 1024
 IMAGE_GEN_REMOTE_TIMEOUT_SECONDS: float = 20.0
+IMAGE_GEN_MAX_DOWNLOAD_BYTES: int = 20_000_000
+
+# Server-side fetches of untrusted URLs (infrastructure/safe_fetch.py). Each
+# redirect hop is re-checked. The byte cap stops one page from filling memory.
+SAFE_FETCH_MAX_REDIRECTS: int = 3
+SCRAPE_MAX_BYTES: int = 2_000_000
 IMAGE_GEN_COMPLETION_TIMEOUT_SECONDS: float = 90.0
 IMAGE_GEN_PROMPT_MAX_TOKENS: int = 512
 IMAGE_GEN_PROMPT_TEMPERATURE: float = 0.7

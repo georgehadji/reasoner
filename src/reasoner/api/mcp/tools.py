@@ -21,6 +21,7 @@ from mcp.types import ToolAnnotations
 
 from reasoner.api.mcp.context import resolve_caller
 from reasoner.core.logging_utils import redacted_errors
+from reasoner.domain.credits import run_reference
 
 # build_mcp_server() in api/mcp/__init__.py already verifies `mcp` is
 # installed before importing this module, so these top-level imports are
@@ -96,7 +97,7 @@ async def _run_and_bill(
     await require_credits(user)
     tier = (await resolve_user_tier(str(user.id))).value
 
-    reference_id = client_run_id or f"run:{uuid.uuid4()}"
+    reference_id = run_reference(client_run_id)
     reserved_credits = await reserve_or_402(
         user_id=str(user.id), preset=preset, problem=problem, reference_id=reference_id,
     )

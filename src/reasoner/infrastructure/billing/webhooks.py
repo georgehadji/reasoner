@@ -8,7 +8,7 @@ import logging
 import os
 
 import stripe
-from fastapi import Request
+from fastapi import HTTPException, Request
 
 from reasoner.infrastructure.billing.paypal_adapter import PayPalBillingAdapter
 from reasoner.infrastructure.billing.stripe_adapter import StripeBillingAdapter, to_plain
@@ -248,16 +248,24 @@ async def handle_paypal_webhook(request: Request) -> dict:
     event_type = event.get("event_type", "unknown")
     logger.info("PayPal webhook received: %s (id=%s)", event_type, event_id)
 
-    # Basic verification
+    if not os.environ.get("PAYPAL_WEBHOOK_ID"):
+        logger.error("PayPal webhook: PAYPAL_WEBHOOK_ID not configured. Event ignored.")
+        return {"status": "misconfigured"}
+
+    # Fail closed: only a SUCCESS answer from PayPal lets the event through.
     adapter = PayPalBillingAdapter()
-    headers = dict(request.headers)
     try:
-        verified = await adapter.verify_webhook_signature(headers, body_bytes.decode("utf-8"))
-        if not verified:
-            logger.warning("PayPal webhook: signature verification failed")
-            return {"status": "ok"}
+        verified = await adapter.verify_webhook_signature(
+            dict(request.headers), body_bytes.decode("utf-8")
+        )
     except Exception as exc:
+        # The event may be genuine and PayPal unreachable: a 5xx makes PayPal
+        # retry, where a 200 would drop it for good.
         logger.warning("PayPal webhook verification error: %s", exc)
+        raise HTTPException(status_code=503, detail="Webhook verification unavailable") from exc
+    if not verified:
+        logger.warning("PayPal webhook: signature verification failed")
+        return {"status": "ok"}
 
     # DB-backed idempotency (primary guard — survives Redis failure)
     if not await _db_claim_webhook(event_id, "paypal"):

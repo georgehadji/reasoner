@@ -8,7 +8,7 @@ import time
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from reasoner.api.auth_deps import require_csrf
-from reasoner.api.dependencies import get_current_user
+from reasoner.api.dependencies import get_current_user, require_key_scope
 from reasoner.application.queries import GetPipelineStatusQuery
 from reasoner.auth import Scope
 from reasoner.domain.saas import User
@@ -243,7 +243,7 @@ async def resume_pipeline_stream(
 @router.delete("/api/pipelines/{pipeline_id}")
 async def delete_pipeline(
     pipeline_id: str,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_key_scope("history:delete")),
     csrf_checked=Depends(require_csrf),
 ):
     """Delete pipeline and all events (GDPR compliance)."""
