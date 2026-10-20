@@ -117,7 +117,9 @@ jobs:
           # lines it touched and moved the bloc table behind the registry port (-4).
           # 2209: method-flow PR3 (-1).
           # 2208: method-flow PR4 (-1).
-          python scripts/ruff_ratchet.py --max 2208
+          # 2207: audit hotfix (SEC-1/SEC-2/BIL-1/SEC-3) dropped the uuid imports the
+          # ledger-reference change left unused (net -1).
+          python scripts/ruff_ratchet.py --max 2207
 
       - name: Security scan (bandit)
         run: |
