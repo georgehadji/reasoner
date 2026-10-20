@@ -95,6 +95,7 @@ class PostgreSQLEventStore:
 
         self._pool = None
         self._read_pool = None
+        self._init_lock = asyncio.Lock()
         self._encryption: EncryptionPort = get_encryption_service()
 
         # Initialize circuit breaker.
@@ -110,8 +111,11 @@ class PostgreSQLEventStore:
         )
 
     async def initialize(self) -> None:
-        """Initialize connection pools."""
+        """Initialize connection pools. Idempotent."""
         import asyncpg
+
+        if self._pool is not None:
+            return
 
         # Primary pool (read-write)
         self._pool = await asyncpg.create_pool(
@@ -143,6 +147,20 @@ class PostgreSQLEventStore:
         # Initialize schema
         await self._init_schema()
 
+    async def _ready(self) -> Any:
+        """The primary pool, initialized on first use.
+
+        get_event_store() built this store and nothing called initialize(), so
+        _pool stayed None and every save raised AttributeError (retried three
+        times with backoff). A Postgres deployment persisted no events (PER-1).
+        Initializing here covers every entry point: API, CLI, headless and the
+        event bus.
+        """
+        if self._pool is None:
+            async with self._init_lock:
+                await self.initialize()
+        return self._pool
+
     async def _init_schema(self) -> None:
         """Initialize database schema."""
         async with self._pool.acquire(timeout=10.0) as conn:
@@ -153,7 +171,7 @@ class PostgreSQLEventStore:
                 -- Events table (partitioned by aggregate_type)
                 CREATE TABLE IF NOT EXISTS events (
                     id BIGSERIAL,
-                    event_id UUID UNIQUE NOT NULL,
+                    event_id UUID NOT NULL,
                     event_type VARCHAR(100) NOT NULL,
                     aggregate_id VARCHAR(255) NOT NULL,
                     aggregate_type VARCHAR(50) NOT NULL DEFAULT 'pipeline',
@@ -173,6 +191,17 @@ class PostgreSQLEventStore:
                     PARTITION OF events FOR VALUES IN ('memory');
                 CREATE TABLE IF NOT EXISTS events_generic 
                     PARTITION OF events FOR VALUES IN ('generic');
+                -- Catches 'saas' and any aggregate type added later; without it
+                -- every such insert failed with "no partition found".
+                CREATE TABLE IF NOT EXISTS events_default
+                    PARTITION OF events DEFAULT;
+
+                -- Dedupe key. A unique constraint on a partitioned table must
+                -- include the partition key; the inline UNIQUE(event_id) made
+                -- Postgres reject this whole DDL, so the store never
+                -- initialized (docs/plans/audit-remediation-2026-10-20.md PER-1).
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_events_event_id_type
+                    ON events(event_id, aggregate_type);
                 
                 -- Indexes
                 CREATE INDEX IF NOT EXISTS idx_events_aggregate 
@@ -276,7 +305,7 @@ class PostgreSQLEventStore:
         Internal method for saving events, allowing external decorators to wrap it.
         """
         try:
-            async with self._pool.acquire(timeout=10.0) as conn:
+            async with (await self._ready()).acquire(timeout=10.0) as conn:
                 async with conn.transaction():
                     for event in events:
                         # Serialize and ENCRYPT payload (Phase 3: E2EE)
@@ -313,7 +342,7 @@ class PostgreSQLEventStore:
                             (event_id, event_type, aggregate_id, aggregate_type,
                              version, timestamp, payload, created_at)
                             VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-                            ON CONFLICT (event_id) DO NOTHING
+                            ON CONFLICT (event_id, aggregate_type) DO NOTHING
                         """,
                             event.event_id,
                             event.event_type.value,
@@ -418,7 +447,8 @@ class PostgreSQLEventStore:
         from_version: int = 0,
     ) -> list[DomainEvent]:
         """Get events for an aggregate."""
-        pool = self._read_pool if (self.use_read_replica and self._read_pool is not None) else self._pool
+        pool = await self._ready()
+        pool = self._read_pool if (self.use_read_replica and self._read_pool is not None) else pool
 
         async with pool.acquire(timeout=10.0) as conn:
             rows = await conn.fetch("""
@@ -548,7 +578,8 @@ class PostgreSQLEventStore:
         status: str | None = None,
     ) -> list[dict[str, Any]]:
         """List pipelines with filtering."""
-        pool = self._read_pool if self.use_read_replica else self._pool
+        pool = await self._ready()
+        pool = self._read_pool if (self.use_read_replica and self._read_pool is not None) else pool
 
         async with pool.acquire(timeout=10.0) as conn:
             query = """
@@ -592,7 +623,8 @@ class PostgreSQLEventStore:
         limit: int = 50,
     ) -> list[dict[str, Any]]:
         """Full-text search events."""
-        pool = self._read_pool if self.use_read_replica else self._pool
+        pool = await self._ready()
+        pool = self._read_pool if (self.use_read_replica and self._read_pool is not None) else pool
 
         async with pool.acquire(timeout=10.0) as conn:
             # Generate blind indexes for the search query
@@ -677,7 +709,7 @@ class PostgreSQLEventStore:
             encrypted_state = self._encryption.encrypt(state_json, compress=True)
             final_state = {"_e": encrypted_state}
 
-            async with self._pool.acquire(timeout=10.0) as conn:
+            async with (await self._ready()).acquire(timeout=10.0) as conn:
                 await conn.execute("""
                     INSERT INTO snapshots
                     (aggregate_id, version, state, snapshot_type, created_at)
@@ -701,7 +733,7 @@ class PostgreSQLEventStore:
         aggregate_id: str,
     ) -> tuple[int, dict[str, Any]] | None:
         """Get latest snapshot."""
-        async with self._pool.acquire(timeout=10.0) as conn:
+        async with (await self._ready()).acquire(timeout=10.0) as conn:
             row = await conn.fetchrow("""
                 SELECT version, state FROM snapshots 
                 WHERE aggregate_id = $1
@@ -759,7 +791,7 @@ class PostgreSQLEventStore:
             encrypted_data = self._encryption.encrypt(data_json, compress=True)
             final_data = {"_e": encrypted_data}
 
-            async with self._pool.acquire(timeout=10.0) as conn:
+            async with (await self._ready()).acquire(timeout=10.0) as conn:
                 await conn.execute("""
                     INSERT INTO read_models
                     (model_name, model_key, data, version, updated_at)
@@ -785,7 +817,8 @@ class PostgreSQLEventStore:
         model_key: str,
     ) -> dict[str, Any] | None:
         """Get denormalized read model. Decrypts data (Phase 3: E2EE)."""
-        pool = self._read_pool if self.use_read_replica else self._pool
+        pool = await self._ready()
+        pool = self._read_pool if (self.use_read_replica and self._read_pool is not None) else pool
 
         async with pool.acquire(timeout=10.0) as conn:
             row = await conn.fetchrow("""
@@ -843,7 +876,8 @@ class PostgreSQLEventStore:
 
     async def get_stats(self) -> dict[str, Any]:
         """Get event store statistics."""
-        pool = self._read_pool if self.use_read_replica else self._pool
+        pool = await self._ready()
+        pool = self._read_pool if (self.use_read_replica and self._read_pool is not None) else pool
 
         async with pool.acquire(timeout=10.0) as conn:
             # Total events
@@ -890,7 +924,7 @@ class PostgreSQLEventStore:
         logger = logging.getLogger(__name__)
 
         try:
-            async with self._pool.acquire(timeout=10.0) as conn:
+            async with (await self._ready()).acquire(timeout=10.0) as conn:
                 async with conn.transaction():
                     await conn.execute("""
                         DELETE FROM events WHERE aggregate_id = $1
@@ -952,10 +986,7 @@ class PostgreSQLEventStore:
         Returns:
             Number of event rows deleted.
         """
-        if self._pool is None:
-            raise RuntimeError("PostgreSQLEventStore not initialized")
-
-        async with self._pool.acquire(timeout=10.0) as conn:
+        async with (await self._ready()).acquire(timeout=10.0) as conn:
             result = await conn.execute(
                 """
                 WITH to_delete AS (
@@ -994,10 +1025,7 @@ class PostgreSQLEventStore:
 
     async def count_eligible_events(self, cutoff: datetime) -> int:
         """Count events eligible for pruning (dry-run support)."""
-        if self._pool is None:
-            raise RuntimeError("PostgreSQLEventStore not initialized")
-
-        async with self._pool.acquire(timeout=10.0) as conn:
+        async with (await self._ready()).acquire(timeout=10.0) as conn:
             row = await conn.fetchrow(
                 """
                 SELECT COUNT(*) AS cnt

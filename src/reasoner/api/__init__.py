@@ -239,13 +239,11 @@ async def lifespan(app: FastAPI):
 
     # Background task: nightly event store compaction (P2-A)
     from reasoner.application.services.compaction_service import run_nightly_compaction_loop
-    if settings.DATABASE_URL:
-        from reasoner.infrastructure.persistence.postgres_store import PostgreSQLEventStore
-        _compaction_store = PostgreSQLEventStore(settings.asyncpg_dsn, pool_size=5)
-        await _compaction_store.initialize()
-    else:
-        from reasoner.infrastructure.persistence.event_store import get_event_store
-        _compaction_store = get_event_store()
+    from reasoner.infrastructure.persistence.event_store import get_event_store
+    # The store the events go to. Compaction used to build its own Postgres
+    # store whenever DATABASE_URL was set, even with EVENT_STORE_BACKEND=sqlite,
+    # so it could prune a database nothing wrote to (PER-1).
+    _compaction_store = get_event_store()
     _compaction_task = asyncio.create_task(
         run_nightly_compaction_loop(_compaction_store),
         name="event_store_compaction",

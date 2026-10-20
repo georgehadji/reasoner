@@ -121,7 +121,11 @@ def test_lifespan_compaction_store_gets_asyncpg_safe_dsn():
     hand the raw settings.DATABASE_URL to PostgreSQLEventStore."""
     src = _read("src/reasoner/api/__init__.py")
     assert "PostgreSQLEventStore(settings.DATABASE_URL" not in src
-    assert "PostgreSQLEventStore(settings.asyncpg_dsn" in src
+    # Compaction now uses the one shared store from get_event_store() (PER-1),
+    # so the DSN is chosen there.
+    store_src = _read("src/reasoner/infrastructure/persistence/event_store.py")
+    assert "connection_string=settings.asyncpg_dsn" in store_src
+    assert "connection_string=settings.DATABASE_URL" not in store_src
 
 
 # ── Alembic ─────────────────────────────────────────────────────────────────

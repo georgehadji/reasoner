@@ -40,12 +40,8 @@ async def trigger_compaction(request: Request, dry_run: bool = False):
     """
     _require_admin(request)
 
-    if settings.DATABASE_URL:
-        from reasoner.infrastructure.persistence.postgres_store import get_postgres_store
-        store = get_postgres_store()
-    else:
-        from reasoner.infrastructure.persistence.event_store import get_event_store
-        store = get_event_store()
+    from reasoner.infrastructure.persistence.event_store import get_event_store
+    store = get_event_store()  # the store the events go to (PER-1)
 
     from reasoner.application.services.compaction_service import CompactionService
     service = CompactionService(store)
