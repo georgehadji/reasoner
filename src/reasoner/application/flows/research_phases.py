@@ -45,8 +45,8 @@ async def run_research_web_search_phase(
         client, _ = await get_search_client_for_method("prism", tier)
         file_search = None
         if settings.PRISM_FILE_SEARCH_ENABLED:
-            from reasoner.infrastructure.prism.file_search import PrismFileSearch
-            file_search = PrismFileSearch()
+            from reasoner.documents.vector_store import DocumentVectorStore
+            file_search = DocumentVectorStore()
         await run_prism_research_phase(
             state, services, client, mode="quality", file_search=file_search
         )
