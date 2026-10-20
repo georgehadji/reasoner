@@ -60,7 +60,7 @@ from reasoner.api.error_handler import register_exception_handlers
 security = HTTPBearer(auto_error=False)
 
 # Import rate limiter and auth
-from reasoner.api.middleware import SecurityHeadersMiddleware
+from reasoner.api.middleware import BodySizeLimitMiddleware, SecurityHeadersMiddleware
 from reasoner.auth import AuthenticationError, get_auth_manager
 from reasoner.rate_limiter import RateLimitConfig, get_rate_limiter
 
@@ -1086,23 +1086,8 @@ app.add_middleware(
     timeout_seconds=REQUEST_TIMEOUT_SECONDS,
 )
 
-# Added last, so it runs first: nothing reads a body over its cap. The upload
-# cap matches the route's own Content-Length check; data-URL routes carry
-# base64 images of up to MAX_FILE_SIZE (4 reference images for generation).
-from reasoner.api.middleware import BodySizeLimitMiddleware
-from reasoner.core.constants_limits import MAX_DATA_URL_CHARS, REQUEST_BODY_MAX_BYTES
-from reasoner.infrastructure.uploader import MAX_FILE_SIZE
-
-app.add_middleware(
-    BodySizeLimitMiddleware,
-    default_limit=REQUEST_BODY_MAX_BYTES,
-    per_path={
-        "/api/upload": MAX_FILE_SIZE * settings.UPLOAD_MAX_FILES + 1024 * 1024,
-        "/api/provenance/": MAX_DATA_URL_CHARS + REQUEST_BODY_MAX_BYTES,
-        "/api/generate-image": 4 * MAX_DATA_URL_CHARS + REQUEST_BODY_MAX_BYTES,
-    },
-)
-
+# Added last, so it runs first: nothing reads a body over its cap.
+app.add_middleware(BodySizeLimitMiddleware, **BodySizeLimitMiddleware.app_limits())
 
 # ─────────────────────────────────────────────────────────────────────
 # ROOT ENDPOINT

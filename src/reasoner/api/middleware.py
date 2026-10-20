@@ -12,7 +12,7 @@ from starlette.responses import JSONResponse, Response
 logger = logging.getLogger(__name__)
 
 
-class _BodyTooLarge(Exception):
+class _BodyTooLargeError(Exception):
     pass
 
 
@@ -32,8 +32,30 @@ class BodySizeLimitMiddleware:
         self.default_limit = default_limit
         self.per_path = sorted((per_path or {}).items(), key=lambda kv: -len(kv[0]))
 
+    @staticmethod
+    def app_limits() -> dict:
+        """The app's caps. Upload matches the route's own Content-Length check;
+        data-URL routes carry base64 images of up to one upload's size (four
+        reference images for generation)."""
+        from reasoner.core.constants import (
+            MAX_DATA_URL_CHARS,
+            REQUEST_BODY_MAX_BYTES,
+            UPLOAD_MAX_FILE_BYTES,
+        )
+        from reasoner.core.settings import settings
+
+        return {
+            "default_limit": REQUEST_BODY_MAX_BYTES,
+            "per_path": {
+                "/api/upload": UPLOAD_MAX_FILE_BYTES * settings.UPLOAD_MAX_FILES + 2**20,
+                "/api/provenance/": MAX_DATA_URL_CHARS + REQUEST_BODY_MAX_BYTES,
+                "/api/generate-image": 4 * MAX_DATA_URL_CHARS + REQUEST_BODY_MAX_BYTES,
+            },
+        }
+
     def _limit(self, path: str) -> int:
-        return next((n for prefix, n in self.per_path if path.startswith(prefix)), self.default_limit)
+        matches = (n for prefix, n in self.per_path if path.startswith(prefix))
+        return next(matches, self.default_limit)
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
@@ -56,7 +78,7 @@ class BodySizeLimitMiddleware:
                 if received > limit and not rejected:
                     rejected = True
                     await _too_large(scope, receive, send, limit)
-                    raise _BodyTooLarge
+                    raise _BodyTooLargeError
             return message
 
         async def guarded_send(message):
@@ -65,7 +87,7 @@ class BodySizeLimitMiddleware:
 
         try:
             await self.app(scope, counted_receive, guarded_send)
-        except _BodyTooLarge:
+        except _BodyTooLargeError:
             pass
 
 
