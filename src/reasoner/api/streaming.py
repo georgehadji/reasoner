@@ -287,7 +287,7 @@ async def run_stream_cached(
             )
             if not has_fatal_error and not has_phase_error:
                 for ev in cached:
-                    yield _event({**ev, "cached": True} if ev.get("type") == "start" else ev)
+                    yield _event({**ev, "cached": True})  # billed at 0 (BIL-3)
                     if ev.get("type") in ("phase_start", "phase_complete"):
                         await asyncio.sleep(SSE_FLUSH_INTERVAL)
                 return
