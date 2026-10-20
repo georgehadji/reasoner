@@ -13,14 +13,19 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from collections import deque
+import time
+from collections import OrderedDict, deque
 from dataclasses import dataclass
 from typing import Any
 
 from fastapi import WebSocket, WebSocketDisconnect
 from starlette.websockets import WebSocketState
 
-from reasoner.core.constants import DEFAULT_HEARTBEAT_INTERVAL
+from reasoner.core.constants import (
+    DEFAULT_HEARTBEAT_INTERVAL,
+    WS_MAX_REPLAY_BUFFERS,
+    WS_REPLAY_TTL_SECONDS,
+)
 from reasoner.utils.json_safe import JSONDepthExceededError, safe_json_loads
 
 try:
@@ -88,7 +93,11 @@ class WebSocketManager:
         self.connection_metadata: dict[str, dict[str, Any]] = {}
 
         # Replay buffer: {pipeline_id: deque[WebSocketMessage]}
-        self._replay_buffers: dict[str, deque[WebSocketMessage]] = {}
+        # Oldest-touched first. Popped on the last unsubscribe used to be the
+        # only cleanup, so a run nobody ever subscribed to (every SSE-only run)
+        # kept its buffer for the life of the process.
+        self._replay_buffers: OrderedDict[str, deque[WebSocketMessage]] = OrderedDict()
+        self._replay_touched: dict[str, float] = {}
 
         # Background task for heartbeats
         self._heartbeat_task: asyncio.Task | None = None
@@ -161,6 +170,7 @@ class WebSocketManager:
                         if not self.subscriptions[pipeline_id]:
                             del self.subscriptions[pipeline_id]
                             self._replay_buffers.pop(pipeline_id, None)
+                            self._replay_touched.pop(pipeline_id, None)
 
                 if connection_id in self.connection_metadata:
                     del self.connection_metadata[connection_id]
@@ -215,6 +225,18 @@ class WebSocketManager:
             if pipeline_id in self.subscriptions:
                 self.subscriptions[pipeline_id].discard(connection_id)
 
+    def _evict_replay_buffers_locked(self) -> None:
+        """Drop buffers past the cap, and idle ones no one is subscribed to."""
+        now = time.monotonic()
+        while self._replay_buffers:
+            oldest = next(iter(self._replay_buffers))
+            idle = now - self._replay_touched.get(oldest, now) > WS_REPLAY_TTL_SECONDS
+            over_cap = len(self._replay_buffers) > WS_MAX_REPLAY_BUFFERS
+            if not over_cap and not (idle and oldest not in self.subscriptions):
+                break
+            del self._replay_buffers[oldest]
+            self._replay_touched.pop(oldest, None)
+
     async def broadcast_to_pipeline(
         self,
         pipeline_id: str,
@@ -226,6 +248,9 @@ class WebSocketManager:
             if pipeline_id not in self._replay_buffers:
                 self._replay_buffers[pipeline_id] = deque(maxlen=self._max_replay_events)
             self._replay_buffers[pipeline_id].append(message)
+            self._replay_buffers.move_to_end(pipeline_id)
+            self._replay_touched[pipeline_id] = time.monotonic()
+            self._evict_replay_buffers_locked()
 
             if pipeline_id not in self.subscriptions:
                 return
