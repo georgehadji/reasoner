@@ -20,6 +20,13 @@ yourdomain.com:443 {
         Permissions-Policy "geolocation=(), microphone=(), camera=()"
     }
 
+    # Body cap at the edge. The backend caps each route itself
+    # (BodySizeLimitMiddleware); this only has to cover the largest of those,
+    # /api/upload at UPLOAD_MAX_FILES x 50MB + 1MB.
+    request_body {
+        max_size 520MB
+    }
+
     # Health check endpoint
     handle /api/health {
         reverse_proxy https://backend:8000 {

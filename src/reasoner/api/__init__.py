@@ -59,7 +59,7 @@ from reasoner.api.error_handler import register_exception_handlers
 security = HTTPBearer(auto_error=False)
 
 # Import rate limiter and auth
-from reasoner.api.middleware import SecurityHeadersMiddleware
+from reasoner.api.middleware import BodySizeLimitMiddleware, SecurityHeadersMiddleware
 from reasoner.auth import AuthenticationError, get_auth_manager
 from reasoner.rate_limiter import RateLimitConfig, get_rate_limiter
 
@@ -1084,6 +1084,8 @@ app.add_middleware(
     timeout_seconds=REQUEST_TIMEOUT_SECONDS,
 )
 
+# Added last, so it runs first: nothing reads a body over its cap.
+app.add_middleware(BodySizeLimitMiddleware, **BodySizeLimitMiddleware.app_limits())
 
 # ─────────────────────────────────────────────────────────────────────
 # ROOT ENDPOINT

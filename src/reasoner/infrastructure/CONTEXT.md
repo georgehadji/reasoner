@@ -30,7 +30,6 @@ Platform and infrastructure adapters implementing the abstract application ports
 - **`llm`**: Language model provider clients, extraction parsers, and constraint checkers.
 - **`observability`**: Telemetry exporters, structured loggers, and distributed tracing adapters.
 - **`persistence`**: Relational database adapters, SQLAlchemy models, and session management configurations.
-- **`prism`**: Adapter layer for unified formatting and syntax highlighting of parsed outputs.
 - **`redis`**: Redis cache adapters, session stores, and rate-limiting helper implementations.
 - **`search`**: Search API clients (Perplexity, Tavily, Google, Bing) executing context-vetting queries.
 - **`telemetry`**: Telemetry collectors and logging pipelines sending metrics to external monitoring backends.

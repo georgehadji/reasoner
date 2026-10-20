@@ -137,7 +137,10 @@ def _seed_state(
     if not file_ids and getattr(req, "attachments", None):
         file_ids = [a.file_id for a in req.attachments if getattr(a, "file_id", None)]
     if file_ids:
-        state.method_state.set("prism", {**state.method_state.get("prism"), "file_ids": file_ids})
+        # owner_id scopes the research flow's file search to the caller's uploads.
+        state.method_state.set(
+            "prism", {**state.method_state.get("prism"), "file_ids": file_ids, "owner_id": user_id}
+        )
 
     # Inject VS runtime parameters from preset metadata before any phase runs,
     # so _phase_brainstorm_generate can read them.

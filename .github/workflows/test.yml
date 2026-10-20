@@ -121,7 +121,8 @@ jobs:
           # ledger-reference change left unused (net -1).
           # 2206: audit persistence PR (PER-1..6) (net -1).
           # 2204: deleted domain.pricing.calculate_model_cost, dead since BIL-2 (-2).
-          python scripts/ruff_ratchet.py --max 2204
+          # 2202: audit input-limits PR (SEC-4/SEC-5/OPS-5..7/DAT-4) (net -2).
+          python scripts/ruff_ratchet.py --max 2202
 
       - name: Security scan (bandit)
         run: |

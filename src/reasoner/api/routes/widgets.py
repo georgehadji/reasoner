@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
 from reasoner.api.auth_deps import require_csrf
+from reasoner.api.dependencies import check_rate_limit
 from reasoner.api.schemas import SuggestionRequestModel
 from reasoner.application.commands import ExecuteWidgetCommand
 from reasoner.infrastructure.llm.registry import list_models
@@ -94,6 +95,7 @@ async def get_suggestions(req: SuggestionRequestModel):
 async def execute_widget(
     req: ExecuteWidgetRequest,
     csrf_checked=Depends(require_csrf),
+    rate_limit_checked=Depends(check_rate_limit),
 ) -> dict[str, Any]:
     """Execute widget using new architecture.
 

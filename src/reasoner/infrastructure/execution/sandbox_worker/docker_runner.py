@@ -12,9 +12,13 @@ Hardened per security-remediation-plan.md Phase 1 item 2:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
+import os
+import socket
 import time
 import uuid
+from collections.abc import Awaitable, Callable
 
 from reasoner.core.degrade import degraded
 from reasoner.core.ports.code_executor import ExecutionLimits, ExecutionResult
@@ -33,6 +37,13 @@ _SANDBOX_GID = 65532
 _PIDS_LIMIT = 64
 _TMPFS_SIZE_MB = 64
 _DOCKER_CLI_OVERHEAD_SEC = 10.0  # grace period beyond the job timeout for docker CLI startup
+_READ_CHUNK = 64 * 1024
+
+# Every job container carries this label, so a worker that restarts after a
+# crash can remove the containers its predecessor left running. The hostname
+# is the container's own name under Compose, stable across restarts.
+_WORKER_LABEL = "reasoner.sandbox.worker"
+WORKER_ID = os.getenv("SANDBOX_WORKER_ID") or socket.gethostname()
 
 
 def _build_docker_argv(
@@ -49,7 +60,9 @@ def _build_docker_argv(
     cmd = [
         "docker", "run",
         "--name", job_id,
+        "--label", f"{_WORKER_LABEL}={WORKER_ID}",
         "--rm",
+        "--stop-timeout", "1",
         "--network", "none",
         "--read-only",
         "--user", f"{_SANDBOX_UID}:{_SANDBOX_GID}",
@@ -64,7 +77,10 @@ def _build_docker_argv(
     ]
     if seccomp_profile:
         cmd += ["--security-opt", f"seccomp={seccomp_profile}"]
-    cmd += [image, *argv]
+    # The in-container clock: the job dies on time even if this worker does,
+    # which the host-side wait_for cannot promise.
+    seconds = max(1, -(-limits.timeout_ms // 1000))
+    cmd += [image, "timeout", "-s", "KILL", str(seconds), *argv]
     return cmd
 
 
@@ -108,15 +124,12 @@ async def run_in_container(
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        try:
-            stdout_bytes, stderr_bytes = await asyncio.wait_for(
-                proc.communicate(
-                    input=spec.stdin_payload.encode("utf-8") if spec.stdin_payload else None
-                ),
-                timeout=timeout_sec + _DOCKER_CLI_OVERHEAD_SEC,
-            )
-        except TimeoutError:
-            await _force_kill(job_id, proc)
+        payload = spec.stdin_payload.encode("utf-8") if spec.stdin_payload else b""
+        outcome, stdout_bytes, stderr_bytes = await _collect(
+            proc, payload, limits.max_output_bytes, timeout_sec + _DOCKER_CLI_OVERHEAD_SEC,
+            abort=lambda: _force_kill(job_id, proc),
+        )
+        if outcome == "timeout":
             elapsed = int((time.monotonic() - t0) * 1000)
             return ExecutionResult(
                 success=False,
@@ -128,16 +141,21 @@ async def run_in_container(
             )
 
         elapsed = int((time.monotonic() - t0) * 1000)
-        stdout_str = stdout_bytes.decode("utf-8", errors="replace") if stdout_bytes else ""
-        stderr_str = stderr_bytes.decode("utf-8", errors="replace") if stderr_bytes else ""
+        stdout_str = stdout_bytes.decode("utf-8", errors="replace")
+        stderr_str = stderr_bytes.decode("utf-8", errors="replace")
 
-        truncated = False
-        if len(stdout_str) > limits.max_output_bytes:
-            stdout_str = stdout_str[:limits.max_output_bytes]
-            truncated = True
-        if len(stderr_str) > limits.max_output_bytes:
-            stderr_str = stderr_str[:limits.max_output_bytes]
-            truncated = True
+        if outcome == "overflow":
+            # The job was killed at the cap rather than left printing into a
+            # discarded pipe while it holds a slot until the timeout.
+            return ExecutionResult(
+                success=False,
+                stdout=stdout_str,
+                stderr=stderr_str,
+                exit_code=-1,
+                duration_ms=elapsed,
+                truncated=True,
+                policy_version=POLICY_VERSION,
+            )
 
         return ExecutionResult(
             success=proc.returncode == 0,
@@ -145,7 +163,6 @@ async def run_in_container(
             stderr=stderr_str,
             exit_code=proc.returncode if proc.returncode is not None else -1,
             duration_ms=elapsed,
-            truncated=truncated,
             policy_version=POLICY_VERSION,
         )
     except FileNotFoundError:
@@ -163,6 +180,79 @@ async def run_in_container(
             exit_code=-1,
             policy_version=POLICY_VERSION,
         )
+
+
+async def _collect(
+    proc: asyncio.subprocess.Process,
+    payload: bytes,
+    cap: int,
+    timeout: float,
+    abort: Callable[[], Awaitable[None]],
+) -> tuple[str, bytes, bytes]:
+    """Feed stdin and read stdout/stderr, keeping at most ``cap`` bytes of each.
+
+    ``communicate()`` buffered everything the job printed, so a print loop
+    could fill the worker's memory before the timeout. On overflow or
+    timeout ``abort`` kills the job while the readers keep draining (and
+    discarding): a reader that stopped would leave the pipe full, and the
+    process could then never be reaped. Returns
+    ("ok" | "overflow" | "timeout", stdout, stderr).
+    """
+    out, err = bytearray(), bytearray()
+    over = asyncio.Event()
+
+    async def feed() -> None:
+        try:
+            if payload:
+                proc.stdin.write(payload)
+                await proc.stdin.drain()
+        except (BrokenPipeError, ConnectionResetError):
+            pass  # the job exited without reading its input
+        finally:
+            proc.stdin.close()
+
+    async def pump(stream: asyncio.StreamReader, buf: bytearray) -> None:
+        while chunk := await stream.read(_READ_CHUNK):
+            room = cap - len(buf)
+            if len(chunk) > room:
+                over.set()
+            buf += chunk[: max(room, 0)]
+
+    reading = asyncio.gather(feed(), pump(proc.stdout, out), pump(proc.stderr, err))
+    overflow = asyncio.ensure_future(over.wait())
+    done, _ = await asyncio.wait(
+        {reading, overflow}, timeout=timeout, return_when=asyncio.FIRST_COMPLETED
+    )
+    overflow.cancel()
+    if reading not in done:
+        await abort()
+        with contextlib.suppress(Exception):
+            await asyncio.wait_for(reading, timeout=_DOCKER_CLI_OVERHEAD_SEC)
+    else:
+        await proc.wait()
+    outcome = "overflow" if over.is_set() else ("ok" if reading in done else "timeout")
+    return outcome, bytes(out), bytes(err)
+
+
+async def remove_orphaned_containers() -> None:
+    """Remove job containers a crashed predecessor of this worker left running."""
+    try:
+        ps = await asyncio.create_subprocess_exec(
+            "docker", "ps", "-aq", "--filter", f"label={_WORKER_LABEL}={WORKER_ID}",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        ids = (await ps.communicate())[0].decode().split()
+        if ids:
+            rm = await asyncio.create_subprocess_exec(
+                "docker", "rm", "-f", *ids,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            await rm.wait()
+            logger.warning("Removed %d orphaned sandbox container(s)", len(ids))
+    except OSError as exc:
+        degraded("sandbox.orphan_cleanup", None, exc=exc)
 
 
 async def _force_kill(job_id: str, proc: asyncio.subprocess.Process) -> None:

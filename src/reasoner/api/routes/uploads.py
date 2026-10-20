@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from reasoner.api.auth_deps import require_csrf
 from reasoner.api.dependencies import check_rate_limit, get_current_user, require_key_scope
+from reasoner.core.constants_limits import UPLOAD_USER_QUOTA_BYTES
 from reasoner.core.settings import settings
 from reasoner.domain.saas import User
 from reasoner.uploader import (
@@ -17,6 +18,7 @@ from reasoner.uploader import (
     list_uploads,
     save_uploaded_file,
     save_uploaded_files,
+    stored_bytes,
 )
 
 logger = logging.getLogger(__name__)
@@ -83,6 +85,13 @@ async def upload_file(
                     chunks.append(chunk)
                 content = b"".join(chunks)
                 files.append((content, getattr(item, "filename", "unknown")))
+
+        incoming = sum(len(content) for content, _ in files)
+        if stored_bytes(str(user.id)) + incoming > UPLOAD_USER_QUOTA_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail=f"Upload quota of {UPLOAD_USER_QUOTA_BYTES // 2**20}MB per user exceeded",
+            )
 
         if len(files) == 1:
             result = await save_uploaded_file(files[0][0], files[0][1], user_id=str(user.id), force_ocr=force_ocr)

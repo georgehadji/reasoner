@@ -18,6 +18,7 @@ from reasoner.api.auth_deps import require_csrf
 from reasoner.api.dependencies import check_rate_limit, get_watermark_service
 from reasoner.application.services.egress_policy import resolve_egress_policy
 from reasoner.application.services.watermark_service import WatermarkService
+from reasoner.core.constants_limits import MAX_DATA_URL_CHARS
 from reasoner.infrastructure.uploader import MAX_FILE_SIZE
 from reasoner.infrastructure.watermark import data_url as data_url_codec
 from reasoner.infrastructure.watermark.data_url import DataUrlError
@@ -34,7 +35,11 @@ class ProvenanceContentRequest(BaseModel):
     """At least one of `content`/`image` is required."""
 
     content: str | None = Field(None, max_length=_MAX_CONTENT_CHARS)
-    image: str | None = Field(None, description="A data: URL, e.g. 'data:image/png;base64,...'")
+    image: str | None = Field(
+        None,
+        max_length=MAX_DATA_URL_CHARS,
+        description="A data: URL, e.g. 'data:image/png;base64,...'",
+    )
 
     model_config = {"extra": "forbid"}
 

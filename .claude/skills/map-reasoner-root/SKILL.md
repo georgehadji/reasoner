@@ -79,7 +79,7 @@ Several shims emit a `DeprecationWarning` on import: `circuit_breaker`, `excepti
 | File | What it does |
 |------|--------------|
 | `utils/json_safe.py` | `safe_json_loads` with depth limits; `JSONDepthExceededError`. |
-| `documents/vector_store.py` | `DocumentVectorStore` — per-session chunking, Neuro embeddings, cosine retrieval over uploaded files. |
+| `documents/vector_store.py` | `DocumentVectorStore` — per-session chunking, Neuro embeddings, cosine retrieval over uploaded files, owner-checked. Also the research flow's `FileSearchPort`. |
 | `vs_vertical_configs/` | Verbalized Sampling verticals: `radiology_config.py`, `legal_config.py`, `aerospace_config.py`, each setting k and tail thresholds. |
 | `shared/` | Empty package marker. |
 

@@ -1,1 +1,0 @@
-"""Prism integration infrastructure package."""
