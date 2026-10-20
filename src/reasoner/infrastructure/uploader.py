@@ -141,7 +141,7 @@ async def _parse_in_child(kind: str, content: bytes) -> str:
             sys.executable, str(_PARSE_WORKER), kind, str(DOCUMENT_PARSE_MEMORY_LIMIT_BYTES),
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.PIPE,
         )
     except NotImplementedError as exc:
         # A Windows selector loop cannot spawn subprocesses. Dev-only: the
@@ -149,13 +149,18 @@ async def _parse_in_child(kind: str, content: bytes) -> str:
         degraded("upload.parse_subprocess", None, exc=exc)
         return await asyncio.to_thread(PARSERS[kind], content)
     try:
-        out, _ = await proc.communicate(content)
+        out, err = await proc.communicate(content)
     finally:
         if proc.returncode is None:
             proc.kill()
             await proc.wait()
     if proc.returncode != 0:
-        return f"[{kind.upper()} extraction failed: parser exited with {proc.returncode}]"
+        # The traceback's last line ("PdfReadError: ..."), or the exit code
+        # when the child was killed (memory cap) before it could write one.
+        lines = err.decode("utf-8", errors="replace").strip().splitlines()
+        reason = lines[-1][:300] if lines else f"parser exited with {proc.returncode}"
+        logger.warning("%s extraction failed: %s", kind.upper(), reason)
+        return f"[{kind.upper()} extraction failed: {reason}]"
     return out.decode("utf-8", errors="replace")
 
 

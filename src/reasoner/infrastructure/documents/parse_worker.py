@@ -10,8 +10,9 @@ Only the stdlib and the two parsers are imported here: the child must not pay
 for, or depend on, the app's settings and package imports.
 
 Protocol: ``python parse_worker.py <pdf|docx> <memory_limit_bytes>``, file
-bytes on stdin, UTF-8 text on stdout. Parse failures are returned as the
-bracketed notices the uploader already understands, never as a crash.
+bytes on stdin, UTF-8 text on stdout. A parse error exits non-zero with the
+error as the last stderr line; the uploader logs it and turns it into the
+bracketed notice it already understands.
 """
 
 from __future__ import annotations
@@ -47,11 +48,8 @@ def parse_pdf(content: bytes) -> str:
         from pypdf import PdfReader
     except ImportError:
         return "[PDF extraction not available - install pypdf]"
-    try:
-        reader = PdfReader(io.BytesIO(content))
-        return "\n".join(page.extract_text() for page in reader.pages)
-    except Exception as e:
-        return f"[PDF extraction failed: {e}]"
+    reader = PdfReader(io.BytesIO(content))
+    return "\n".join(page.extract_text() for page in reader.pages)
 
 
 def parse_docx(content: bytes) -> str:
@@ -62,11 +60,8 @@ def parse_docx(content: bytes) -> str:
     reason = zip_bomb_reason(content)
     if reason:
         return f"[DOCX extraction failed: refused, archive {reason}]"
-    try:
-        doc = Document(io.BytesIO(content))
-        return "\n".join(p.text for p in doc.paragraphs if p.text.strip())
-    except Exception as e:
-        return f"[DOCX extraction failed: {e}]"
+    doc = Document(io.BytesIO(content))
+    return "\n".join(p.text for p in doc.paragraphs if p.text.strip())
 
 
 PARSERS = {"pdf": parse_pdf, "docx": parse_docx}
