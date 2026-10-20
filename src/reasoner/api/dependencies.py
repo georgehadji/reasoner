@@ -38,7 +38,7 @@ from reasoner.application.services.search_service import SearchService
 from reasoner.application.services.watermark_service import WatermarkService
 from reasoner.auth import AuthenticationError as LegacyAuthError
 from reasoner.core.settings import settings
-from reasoner.domain.api_keys import looks_like_api_key
+from reasoner.domain.api_keys import key_allows, looks_like_api_key
 from reasoner.domain.saas import QuotaResult, SubscriptionTier, User
 from reasoner.infrastructure.auth import get_auth_adapter
 from reasoner.rate_limiter import RateLimitConfig, get_rate_limiter
@@ -167,8 +167,8 @@ async def _load_user_by_id(user_id: UUID) -> User | None:
 async def _resolve_api_key(token: str) -> User:
     """Resolve a Reasoner API key (rsn_*) to its owning user.
 
-    The key's scopes are attached to the returned User, so a key can never act
-    beyond the permissions it was granted.
+    The key's scopes are attached to the returned User. Routes enforce them
+    through ``require_key_scope``. Attaching them alone limits nothing.
     """
     service = _get_api_key_service()
     record = await service.authenticate(token)
@@ -291,6 +291,25 @@ async def get_optional_user(
         return user
     except Exception:
         return None
+
+
+def require_key_scope(scope: str):
+    """Route guard: an API-key caller must hold ``scope``. Returns the user.
+
+    Session and JWT callers always pass, because scopes only narrow what a key
+    may do. Before this guard, scopes were attached to the User and never read,
+    so a default read-only key could mint keys and erase the account
+    (docs/plans/audit-remediation-2026-10-20.md SEC-2).
+    """
+
+    async def guard(request: Request, user: User = Depends(get_current_user)) -> User:
+        if getattr(request.state, "auth_method", None) == "api_key" and not key_allows(
+            user.scopes, scope
+        ):
+            raise HTTPException(status_code=403, detail=f"API key lacks the '{scope}' scope")
+        return user
+
+    return guard
 
 
 async def require_auth_if_legacy_disabled(

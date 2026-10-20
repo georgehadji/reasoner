@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from reasoner.api.dependencies import get_current_user
+from reasoner.api.dependencies import get_current_user, require_key_scope
 from reasoner.application.services.billing_service import BillingService
 from reasoner.core.settings import settings
 from reasoner.domain.saas import SubscriptionTier, User
@@ -29,7 +29,7 @@ async def create_checkout(
     request: Request,
     tier: str,
     provider: str = "stripe",
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_key_scope("write")),
 ):
     """Create a checkout session for upgrading.
 
@@ -66,7 +66,7 @@ async def create_checkout(
 
 @router.post("/portal")
 async def create_portal(
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_key_scope("write")),
 ):
     """Create a Stripe Billing Portal session."""
     service = _get_stripe_service()
