@@ -96,6 +96,9 @@ class RecallChunkResponse(BaseModel):
     source: str
     relevance: float
     cache_tier: str
+    # Learn-time provenance. Without the field, pydantic dropped it and every
+    # chunk failed the recall filter (DAT-4).
+    metadata: dict = Field(default_factory=dict)
 
 
 class RecallResponse(BaseModel):
@@ -421,8 +424,10 @@ class NeuroService:
             ),
             owner=owner,
         )
+        # Metadata first so it cannot overwrite the content keys.
         return [
-            {"content": c.content, "source": c.source, "relevance": c.relevance}
+            {**getattr(c, "metadata", {}), "content": c.content, "source": c.source,
+             "relevance": c.relevance}
             for c in resp.chunks
         ]
 

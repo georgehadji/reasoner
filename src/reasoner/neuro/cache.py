@@ -27,15 +27,21 @@ def cosine_similarity(a: list[float], b: list[float]) -> float:
 
 
 class ContextChunk:
-    def __init__(self, content: str, source: str, relevance: float, cache_tier: str):
+    def __init__(self, content: str, source: str, relevance: float, cache_tier: str,
+                 metadata: dict | None = None):
         self.content = content
         self.source = source
         self.relevance = relevance
         self.cache_tier = cache_tier
+        # Provenance written at learn time (schema_version, run_id, ...). Recall
+        # drops chunks without it, so dropping it here emptied every recall
+        # (docs/plans/audit-remediation-2026-10-20.md DAT-4).
+        self.metadata = metadata or {}
 
     def to_dict(self) -> dict:
         return {"content": self.content, "source": self.source,
-                "relevance": round(self.relevance, 4), "cache_tier": self.cache_tier}
+                "relevance": round(self.relevance, 4), "cache_tier": self.cache_tier,
+                "metadata": self.metadata}
 
 
 class L1Cache:
@@ -136,7 +142,8 @@ class L2Index:
                 scored.append((sim, entry))
 
         scored.sort(key=lambda x: x[0], reverse=True)
-        return [ContextChunk(e["content"], e.get("source", "l2-memory"), s, "L2")
+        return [ContextChunk(e["content"], e.get("source", "l2-memory"), s, "L2",
+                             e.get("metadata"))
                 for s, e in scored[:top_k]]
 
     async def add(self, content: str, source: str, embedding: list[float],

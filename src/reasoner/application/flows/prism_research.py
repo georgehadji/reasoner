@@ -365,7 +365,9 @@ async def _action_scrape(urls: list[str]) -> list[_Citation]:
             results.append(_Citation(
                 url=s.get("url", ""),
                 title=s.get("title", "Scraped content"),
-                snippet=s.get("text", "")[:500],
+                # scrape_url returns "content"; reading "text" made every
+                # snippet empty (docs/plans/audit-remediation-2026-10-20.md DAT-7).
+                snippet=s.get("content", "")[:500],
                 source_type="scraped",
             ))
     except Exception as exc:
