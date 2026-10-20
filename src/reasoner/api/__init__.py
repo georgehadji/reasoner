@@ -8,7 +8,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import asyncio
 import logging
-import uuid
 from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -486,6 +485,7 @@ from reasoner.api.streaming import (
 from reasoner.application.services.pipeline_service import PipelineService
 from reasoner.application.services.preset_service import PresetService
 from reasoner.application.services.search_service import SearchService
+from reasoner.domain.credits import run_reference
 from reasoner.domain.saas import QuotaResult, User
 from reasoner.infrastructure.redis.run_state import _run_state_manager as _run_store
 
@@ -701,7 +701,7 @@ async def run_pipeline(
 
     from reasoner.api.dependencies import reserve_or_402
 
-    reference_id = req.client_run_id or f"run:{uuid.uuid4()}"
+    reference_id = run_reference(req.client_run_id)
 
     if user is None:
         # No account to reserve credits against -- capped separately so
@@ -775,7 +775,7 @@ async def run_followup_pipeline(
         await enforce_anonymous_trial_cap(get_client_ip(request), estimate["estimated_cost_usd"])
 
     await register_run_or_error(req.client_run_id)
-    reference_id = req.client_run_id or f"followup:{uuid.uuid4()}"
+    reference_id = run_reference(req.client_run_id, "followup")
     reserved_credits = await reserve_or_402(
         user_id=str(user.id) if user else None,
         preset=preset,
