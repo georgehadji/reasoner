@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from reasoner.api.auth_deps import require_csrf
 from reasoner.api.dependencies import require_key_scope
 from reasoner.domain.saas import User
-from reasoner.infrastructure.persistence.event_store import EventStore
+from reasoner.infrastructure.persistence.event_store import get_event_store
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +27,10 @@ async def erase_user_data(user: User = Depends(require_key_scope("history:delete
 
     This operation is **irreversible**. A confirmation parameter is required.
     """
-    # Instantiate the event store
-    store = EventStore()
+    # The store the events go to. A bare EventStore() is the SQLite class, so
+    # on the Postgres backend this erased nothing and still reported
+    # "completed" (docs/plans/audit-remediation-2026-10-20.md PER-3).
+    store = get_event_store()
     from reasoner.api.cache import clear_memory_cache
     from reasoner.application.services.data_eraser import UserDataEraser
 

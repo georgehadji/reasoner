@@ -486,6 +486,9 @@ async def track_pipeline_metrics(event: DomainEvent) -> None:
         )
 
 
+_UNPERSISTED_TEXT_FIELDS = ("system_prompt", "user_prompt", "raw_response")
+
+
 async def persist_all_events(event: DomainEvent) -> None:
     """Persist all events to the EventStore for audit trail and replay.
 
@@ -493,9 +496,22 @@ async def persist_all_events(event: DomainEvent) -> None:
     queue-based backpressure, so we call EventStore.save_events directly.
     """
     try:
+        import dataclasses
+
         from reasoner.infrastructure.persistence.event_store import get_event_store
         store = get_event_store()
-        await store.save_events([event])
+        # Stored at version 0: kept for audit, outside replay (get_events reads
+        # version > 0). Publishers stamp version=1 on everything, and these
+        # landed in the run's stream beside RunStream's own 1..n, so
+        # PipelineAggregate raised "version 1 doesn't match expected version 2"
+        # and status and resume broke for every streamed run. The aggregate's
+        # stream has one writer (docs/plans/audit-remediation-2026-10-20.md PER-2).
+        # Prompt and response bodies are not persisted. Every LLM call of every
+        # tenant appended them, often under aggregate "unknown", which erasure
+        # never reaches. Model, tokens and cost stay; live subscribers (tracing)
+        # still get the full event (PER-3).
+        stripped = {f: "" for f in _UNPERSISTED_TEXT_FIELDS if hasattr(event, f)}
+        await store.save_events([dataclasses.replace(event, version=0, **stripped)])
     except Exception as exc:
         logger.warning("EventStore persistence failed for %s: %s", event.event_type.value, exc)
 

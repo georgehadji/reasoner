@@ -128,22 +128,6 @@ def get_pricing(model_id: str) -> ModelPricing:
     return PRICING_DB["_default"]
 
 
-def calculate_model_cost(model_id: str, input_tokens: int, output_tokens: int) -> float:
-    """
-    Calculate cost for a single API call.
-    
-    Args:
-        model_id: Model identifier
-        input_tokens: Number of input tokens used
-        output_tokens: Number of output tokens generated
-    
-    Returns:
-        Cost in USD
-    """
-    pricing = get_pricing(model_id)
-    return pricing.calculate_cost(input_tokens, output_tokens)
-
-
 def format_cost(cost_usd: float) -> str:
     """Format cost in human-readable way."""
     if cost_usd < 0.001:
