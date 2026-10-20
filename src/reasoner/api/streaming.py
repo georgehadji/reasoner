@@ -88,9 +88,8 @@ async def run_stream(
         method=getattr(req, "method", None),
         top_k=getattr(req, "top_k", 2),
         source_type=getattr(req, "source_type", "general"),
-        domain=getattr(req, "domain", None),
-        parallel=not getattr(req, "sequential", False),
-        user_id=user_id,
+        domain=getattr(req, "domain", None), parallel=not getattr(req, "sequential", False),
+        user_id=user_id, metadata={"request": req},  # the full request: DAT-2
     )
 
     queue = asyncio.Queue(maxsize=256)
