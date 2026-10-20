@@ -23,6 +23,7 @@ from reasoner.core.constants import (
     IMAGE_GEN_MAX_IMAGE_COUNT,
     TRUNCATION,
 )
+from reasoner.core.constants_limits import MAX_DATA_URL_CHARS
 from reasoner.core.settings import settings
 from reasoner.presets import is_valid_preset_name, resolve_preset_name
 
@@ -315,7 +316,7 @@ class GenerateImageRequest(BaseModel):
     resolution: str = IMAGE_GEN_DEFAULT_RESOLUTION
     enhance: bool = True
     preview_only: bool = False
-    reference_images: list[str] = []
+    reference_images: list[Annotated[str, StringConstraints(max_length=MAX_DATA_URL_CHARS)]] = []
     # Unbounded here meant one request could fan out across the whole image
     # catalogue in parallel, each model a paid call. Asking for zero (or fewer)
     # images silently "succeeded" with no images, so the floor matters too.

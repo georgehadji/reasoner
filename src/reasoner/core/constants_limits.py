@@ -683,3 +683,18 @@ MAX_EXPRESSION_LENGTH: int = 10000
 EVENT_RETENTION_DAYS: int = 365
 SNAPSHOT_RETENTION_COUNT: int = 3   # reserved — current schema supports only 1 snapshot/aggregate
 COMPACTION_BATCH_SIZE: int = 500
+
+# ═════════════════════════════════════════════════════════════════════
+# REQUEST BODY AND DOCUMENT PARSING LIMITS
+# ═════════════════════════════════════════════════════════════════════
+
+# Default cap on any request body, enforced before the app reads it
+# (api/middleware.BodySizeLimitMiddleware). Sized for the largest JSON body
+# the schemas accept: a run carrying UPLOAD_MAX_FILES attachments of mostly
+# ASCII text. Upload and data-URL routes get larger, derived caps.
+REQUEST_BODY_MAX_BYTES: int = 16 * 1024 * 1024
+# Largest single uploaded file, and a base64 data: URL of one plus its header.
+UPLOAD_MAX_FILE_BYTES: int = 50 * 1024 * 1024
+MAX_DATA_URL_CHARS: int = UPLOAD_MAX_FILE_BYTES * 4 // 3 + 256
+# Address-space cap for the PDF/DOCX parse child process (Linux only).
+DOCUMENT_PARSE_MEMORY_LIMIT_BYTES: int = 1024 * 1024 * 1024

@@ -131,7 +131,9 @@ folders:
 | `search/brave_adapter.py` | Brave Search (web, LLM-context, images, videos). |
 | `search/tavily_adapter.py` | Tavily search + extract. |
 | `scraper.py` | Deep read: fetch page, convert HTML to markdown. |
-| `uploader.py` (24KB) | File upload + text extraction (PDF/TXT/DOCX), encryption at rest, hash index dedupe. |
+| `uploader.py` (24KB) | File upload + text extraction (PDF/TXT/DOCX), encryption at rest, hash index dedupe, extracted-text cache. |
+| `documents/parse_worker.py` | PDF/DOCX parse run as a killable child process (memory-capped on Linux), zip-bomb pre-check. |
+| `documents/index_queue.py` | Bounded background queue for document semantic-search indexing. |
 
 ## watermark/ (image + Layer B)
 
