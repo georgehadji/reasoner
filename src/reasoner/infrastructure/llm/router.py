@@ -92,7 +92,17 @@ async def _try_direct_fallback(
             if not response or not response.strip():
                 logger.warning("Multi-provider fallback %s returned empty — trying next", provider_name)
                 continue
-            metadata: dict[str, Any] = {"model": f"{provider_name}:{provider.model}", "is_fallback": True}
+            # Direct vendors report no usage. Estimate it (~4 chars/token, the
+            # token_cache heuristic) so the executor prices the call: with no
+            # tokens it billed $0 and the spend caps never saw it (BIL-2).
+            metadata: dict[str, Any] = {
+                "model": provider.model,
+                "provider": provider_name,
+                "is_fallback": True,
+                "input_tokens": (len(system_prompt) + len(user_prompt)) // 4,
+                "output_tokens": len(response) // 4,
+                "usage_estimated": True,
+            }
             logger.info("Multi-provider fallback %s succeeded for role '%s'", provider_name, role)
             return response, metadata
         except Exception as e:

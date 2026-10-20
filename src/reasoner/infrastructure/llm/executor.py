@@ -301,6 +301,8 @@ class LLMExecutor:
                         user_prompt=user_prompt,
                         **kwargs,
                     )
+                    # Billed whether or not the checks below reject it.
+                    await self._account_call_cost(state, role, metadata)
                     llm_call_end_time = time.monotonic() # Capture end time for LLM call
                     duration_seconds = llm_call_end_time - llm_call_start_time
 
@@ -496,51 +498,10 @@ class LLMExecutor:
                     role, system_prompt, user_prompt, kwargs, raw, metadata,
                 )
 
-            cost_usd = metadata.get("cost_usd", 0.0)
+            cost_usd = await self._account_call_cost(state, role, metadata)
             input_tokens = metadata.get("input_tokens", 0)
             output_tokens = metadata.get("output_tokens", 0)
             model = metadata.get("model", "unknown")
-
-            # P1.9: If the provider didn't return a real cost, estimate from token counts
-            if cost_usd <= 0 and input_tokens > 0:
-                try:
-                    from reasoner.domain.pricing import calculate_model_cost
-                    estimated = calculate_model_cost(model, input_tokens, output_tokens)
-                    if estimated > 0:
-                        cost_usd = estimated
-                except Exception as exc:
-                    # Leaving cost at 0 is not neutral: total_cost_usd stops
-                    # growing, so the spend ceilings a few lines below never
-                    # fire, and the run reports $0.00 -- which is exactly what
-                    # a cache hit looks like.
-                    degraded(
-                        "executor.cost_estimate",
-                        None,
-                        exc=exc,
-                        state=state,
-                        detail=f"model={model}",
-                    )
-
-            if cost_usd > 0:
-                state.total_cost_usd += cost_usd
-                state.phase_costs[role] = cost_usd
-                # Populate phase_costs_by_key (defined but never written)
-                tracking_key = getattr(state, "_current_phase_key", None)
-                if tracking_key:
-                    prev = state.cost_state.phase_costs_by_key.get(tracking_key, 0.0)
-                    state.cost_state.phase_costs_by_key[tracking_key] = prev + cost_usd
-
-            # Update Prometheus run-cost gauge
-            try:
-                from reasoner.infrastructure.metrics import REASONER_RUN_COST_USD
-                REASONER_RUN_COST_USD.set(state.total_cost_usd)
-            except Exception:
-                pass
-
-            # P1.9: Spend ceilings — stop further LLM calls once one is crossed
-            if cost_usd > 0:
-                await self._enforce_spend_caps(state, cost_usd)
-
             await self._accumulate_tokens(state, role, input_tokens, output_tokens, model)
 
             if self._token_cache and self._caching_enabled and raw and raw.strip():
@@ -724,6 +685,61 @@ class LLMExecutor:
                 yield chunk_or_degraded
                 return
             yield chunk_or_degraded
+
+    async def _account_call_cost(
+        self, state: PipelineState, role: str, metadata: dict[str, Any]
+    ) -> float:
+        """Put one billed call's cost on the run. This is the only place cost enters state.
+
+        It is called from the normal path and from every cascade attempt,
+        accepted or rejected. Cascade calls used to add tokens and no cost, so
+        the coding presets that cascade reported less than they spent and
+        slipped past the spend caps
+        (docs/plans/audit-remediation-2026-10-20.md BIL-2).
+        """
+        cost_usd = metadata.get("cost_usd", 0.0) or 0.0
+        model = metadata.get("model", "unknown")
+
+        # P1.9: If the provider didn't return a real cost, estimate from token counts.
+        # pricing_resolver, not domain.pricing: it resolves registry aliases and
+        # direct-provider ids that domain.pricing prices at the $1/$5 default.
+        if cost_usd <= 0:
+            try:
+                from reasoner.infrastructure.llm.pricing_resolver import call_cost_usd
+                cost_usd = call_cost_usd(metadata)
+            except Exception as exc:
+                # Leaving cost at 0 is not neutral: total_cost_usd stops
+                # growing, so the spend ceilings below never fire, and the
+                # run reports $0.00 -- which is exactly what a cache hit
+                # looks like.
+                degraded(
+                    "executor.cost_estimate",
+                    None,
+                    exc=exc,
+                    state=state,
+                    detail=f"model={model}",
+                )
+
+        if cost_usd > 0:
+            state.total_cost_usd += cost_usd
+            state.phase_costs[role] = cost_usd
+            # Populate phase_costs_by_key (defined but never written)
+            tracking_key = getattr(state, "_current_phase_key", None)
+            if tracking_key:
+                prev = state.cost_state.phase_costs_by_key.get(tracking_key, 0.0)
+                state.cost_state.phase_costs_by_key[tracking_key] = prev + cost_usd
+
+        # Update Prometheus run-cost gauge
+        try:
+            from reasoner.infrastructure.metrics import REASONER_RUN_COST_USD
+            REASONER_RUN_COST_USD.set(state.total_cost_usd)
+        except Exception:
+            pass
+
+        # P1.9: Spend ceilings — stop further LLM calls once one is crossed
+        if cost_usd > 0:
+            await self._enforce_spend_caps(state, cost_usd)
+        return cost_usd
 
     async def _enforce_spend_caps(self, state: PipelineState, cost_usd: float) -> None:
         """Halt the run if this call pushed it past a spend ceiling.
