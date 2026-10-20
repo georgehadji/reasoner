@@ -436,8 +436,14 @@ class TestAPICriticalPhaseErrorHalt:
 
     @pytest.mark.asyncio
     async def test_api_run_halts_on_critical_phase_error(self, api_client, monkeypatch):
+        perspective = json.dumps({"core_analysis": "analysis", "key_insights": []})
         fake_router = FakeRouter({
             "classification": _make_classification_response(),
+            # Empty perspectives fail Phase 2 (MP-1) before the critique this test patches.
+            "constructive": perspective,
+            "destructive": perspective,
+            "systemic": perspective,
+            "minimalist": perspective,
         })
         monkeypatch.setattr(
             "reasoner.llm.ProviderRouter.from_model_ids",

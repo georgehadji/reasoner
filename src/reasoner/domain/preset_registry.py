@@ -1090,6 +1090,16 @@ _REGISTRY: dict[str, dict] = {
         "stress_testing": "glm-5.3-flash",           # inclusionAI (Ant Group) 🇨🇳 — AIME 95.83, GPQA-D 88.27, PinchBench 87.60 agent mode
         "verifier":       "gemini-flash-lite-real", # Google 🇺🇸 — Gemini 3.1 Flash Lite, structured fact-checking
         "post_synthesis_verify": "sonar",  # added v3.5
+        # ── Debate pair (docs/plans/method-flow-gap-remediation-2026-10-18.md, IC-1) ──
+        # expert_1 generates, expert_2 critiques. Unrouted, both fell through to
+        # primary_id and the "debate" was one model reviewing itself. The two must
+        # sit in different blocs and differ from every other slot here.
+        # Prices per M are PRICING_DB. Picks reuse the D0 Delphi shortlist.
+        # [INPUT REQUIRED: product owner to confirm the IC generator/critic picks]
+        #   gpt-oss-120b   🇺🇸 OpenAI   $0.037/$0.170  generator
+        #   mimo-v2.5      🇨🇳 Xiaomi   $0.140/$0.280  critic
+        "expert_1":       "gpt-oss-120b",
+        "expert_2":       "mimo-v2.5",
         },
         "tags": ["budget", "iterative", "critique"],
     },
@@ -1106,6 +1116,15 @@ _REGISTRY: dict[str, dict] = {
         "stress_testing": "grok-4.6",            # xAI 🇺🇸 — AA Intel 60.9 vs 37.6 for 4.3, $2/$6, 500K ctx
         "verifier":       "deepseek-v4-pro",     # DeepSeek 🇨🇳 — strong structured verification
         "post_synthesis_verify": "sonar-pro",  # added v3.5
+        # ── Debate pair (docs/plans/method-flow-gap-remediation-2026-10-18.md, IC-1) ──
+        # See the budget preset: expert_1 generates, expert_2 critiques, in
+        # different blocs and distinct from every other slot. Prices per M are
+        # PRICING_DB.
+        # [INPUT REQUIRED: product owner to confirm the IC generator/critic picks]
+        #   qwen3.7-max         🇨🇳 Qwen     $1.475/$4.425  generator
+        #   mistral-medium-3-5  🇪🇺 Mistral  $1.500/$7.500  critic
+        "expert_1":       "qwen3.7-max",
+        "expert_2":       "mistral-medium-3-5",
         },
         # gpt-5 is this preset's primary_id, so it also serves every role
         # with no explicit routing entry -- classification among them. It

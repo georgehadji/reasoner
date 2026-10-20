@@ -19,7 +19,11 @@ from typing import Any
 
 import reasoner.phases.iterative_critique as ic_phases
 from reasoner.application.flows.base import WorkflowServices
-from reasoner.core.constants import JEV_CRITIC_TIMEOUT_SECONDS, JEV_MAX_STATE_CHARS
+from reasoner.core.constants import (
+    IC_MAX_CONSECUTIVE_DEGRADED,
+    JEV_CRITIC_TIMEOUT_SECONDS,
+    JEV_MAX_STATE_CHARS,
+)
 from reasoner.core.degrade import degraded
 from reasoner.core.ports.decision_port import get_decision_port, jev_mode
 from reasoner.domain.core_types import CriticDimensionScore
@@ -47,27 +51,48 @@ class AdversarialRound:
     generator_response: str = ""
     revised_answer: str = ""
     changes_summary: str = ""
+    # True when the critic returned nothing usable and the scores/flaws below
+    # are a placeholder. Such a round must not feed plateau detection.
+    degraded: bool = False
+
+
+def _trailing_degraded(rounds: list[AdversarialRound]) -> int:
+    n = 0
+    for r in reversed(rounds):
+        if not r.degraded:
+            break
+        n += 1
+    return n
 
 
 def check_convergence(rounds: list[AdversarialRound]) -> tuple[bool, str]:
-    """Returns (converged, reason)."""
+    """Returns (converged, reason). Pure function of the round list.
+
+    Degraded rounds are placeholders, not critic judgements: they are left out
+    of the plateau and stalemate windows, and a run of them ends the debate
+    as ``critic_unavailable`` rather than as a convergence.
+    """
     if not rounds:
         return False, "no_rounds"
 
     current = rounds[-1]
 
-    if current.verdict == "ACCEPT":
+    if current.verdict == "ACCEPT" and not current.degraded:
         return True, "critic_accepted"
+
+    if _trailing_degraded(rounds) >= IC_MAX_CONSECUTIVE_DEGRADED:
+        return True, "critic_unavailable"
 
     if len(rounds) >= MAX_ROUNDS:
         return True, "max_rounds_reached"
 
-    if len(rounds) >= 3:
-        scores = [r.critic_score.total if r.critic_score else 0.0 for r in rounds[-3:] if r.critic_score is not None]
-        if max(scores) - min(scores) < MIN_SCORE_DELTA:
+    real = [r for r in rounds if not r.degraded]
+    if len(real) >= 3:
+        scores = [r.critic_score.total for r in real[-3:] if r.critic_score is not None]
+        if scores and max(scores) - min(scores) < MIN_SCORE_DELTA:
             return True, "score_converged"
 
-        top_flaws = [r.flaws_identified[0]["flaw"] for r in rounds[-STALEMATE_FLAW_REPEAT:]
+        top_flaws = [r.flaws_identified[0]["flaw"] for r in real[-STALEMATE_FLAW_REPEAT:]
                      if r.flaws_identified and r.flaws_identified[0].get("flaw")]
         if len(top_flaws) == STALEMATE_FLAW_REPEAT and len(set(top_flaws)) == 1:
             return True, "stalemate_detected"
@@ -298,6 +323,7 @@ async def _llm_critic_round(state: PipelineState, services: WorkflowServices,
             critic_score=CriticDimensionScore(factuality=5.0, reasoning=5.0, completeness=5.0, helpfulness=5.0),
             flaws_identified=[{"flaw": "Critic produced malformed JSON", "severity": "MEDIUM"}],
             verdict="REVISE",
+            degraded=True,
         )
 
     scores = data.get("scores", {})

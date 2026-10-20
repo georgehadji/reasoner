@@ -51,3 +51,64 @@ def test_a_wrong_shape_scores_zero_instead_of_raising(wrong_shape, caplog):
         "a wrong shape must leave a trace; scoring 0 in silence is the failure "
         "mode this repo tracks as a silent failure"
     )
+
+
+# ── IC-4: degraded critic rounds must not fake convergence ──────────────────
+
+
+def _round(
+    n, *, score=5.0, flaw="Critic produced malformed JSON", degraded=False, verdict="REVISE"
+):
+    from reasoner.application.flows.iterative_critique_phases import AdversarialRound
+    from reasoner.domain.core_types import CriticDimensionScore
+
+    return AdversarialRound(
+        round_number=n,
+        critic_score=CriticDimensionScore(
+            factuality=score, reasoning=score, completeness=score, helpfulness=score
+        ),
+        flaws_identified=[{"flaw": flaw}],
+        verdict=verdict,
+        degraded=degraded,
+    )
+
+
+def test_two_degraded_rounds_stop_as_critic_unavailable():
+    from reasoner.application.flows.iterative_critique_phases import check_convergence
+
+    assert check_convergence([_round(1, degraded=True)]) == (False, "")
+    assert check_convergence([_round(1, degraded=True), _round(2, degraded=True)]) == (
+        True,
+        "critic_unavailable",
+    )
+
+
+def test_identical_placeholder_rounds_are_not_a_plateau():
+    """Three identical synthetic rounds used to read as score_converged."""
+    from reasoner.application.flows.iterative_critique_phases import check_convergence
+
+    # One real round, then placeholders: never score_converged/stalemate.
+    rounds = [_round(1, score=3.0, flaw="real"), _round(2, degraded=True)]
+    assert check_convergence(rounds) == (False, "")
+    rounds.append(_round(3, degraded=True))
+    assert check_convergence(rounds) == (True, "critic_unavailable")
+
+
+def test_plateau_windows_only_see_real_rounds():
+    from reasoner.application.flows.iterative_critique_phases import check_convergence
+
+    # Real scores 3, 6, 9 are not a plateau; a degraded round (5.0) between them
+    # must not be pulled into the window.
+    rounds = [_round(1, score=3.0, flaw="a"), _round(2, score=6.0, flaw="b"),
+              _round(3, degraded=True), _round(4, score=9.0, flaw="c")]
+    assert check_convergence(rounds) == (False, "")
+    # Three real, flat scores with a degraded round between them still converge.
+    rounds = [_round(1, score=6.0, flaw="a"), _round(2, score=6.1, flaw="b"),
+              _round(3, degraded=True), _round(4, score=6.2, flaw="c")]
+    assert check_convergence(rounds) == (True, "score_converged")
+
+
+def test_a_degraded_round_cannot_accept():
+    from reasoner.application.flows.iterative_critique_phases import check_convergence
+
+    assert check_convergence([_round(1, degraded=True, verdict="ACCEPT")]) == (False, "")

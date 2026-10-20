@@ -123,6 +123,11 @@ JEV_CRITIC_TIMEOUT_SECONDS: float = 5.0
 # Bounds what one call costs and how much of a very long problem leaves for a
 # third party; the first 8000 characters carry the routing signal.
 JEV_MAX_STATE_CHARS: int = 8000
+# Iterative Critique: this many critic rounds in a row that return nothing
+# usable (unparseable JSON) end the debate with reason "critic_unavailable".
+# Those rounds carry a synthetic placeholder score, and identical placeholders
+# read as a plateau -- the debate would "converge" on a critic that never spoke.
+IC_MAX_CONSECUTIVE_DEGRADED: int = 2
 # Confidence gate for active mode: below these, jev's verdict is not used and
 # the LLM sub-agents decide. INITIAL VALUES, NOT MEASURED -- nothing yet says
 # how jev's probabilities track its accuracy here. Every decision is logged as
