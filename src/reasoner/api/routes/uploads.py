@@ -7,7 +7,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from reasoner.api.auth_deps import require_csrf
-from reasoner.api.dependencies import check_rate_limit, get_current_user
+from reasoner.api.dependencies import check_rate_limit, get_current_user, require_key_scope
 from reasoner.core.settings import settings
 from reasoner.domain.saas import User
 from reasoner.uploader import (
@@ -27,7 +27,7 @@ router = APIRouter()
 async def upload_file(
     request: Request,
     force_ocr: bool = Query(False, description="Use OCR for images and scanned PDFs"),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_key_scope("write")),
     rate_limit_checked=Depends(check_rate_limit),
     csrf_checked=Depends(require_csrf),
 ):
@@ -126,7 +126,7 @@ async def get_uploaded_file(
 @router.delete("/api/upload/{file_id}")
 async def delete_uploaded_file(
     file_id: str,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_key_scope("write")),
     rate_limit_checked=Depends(check_rate_limit),
 ):
     """Delete an uploaded file."""

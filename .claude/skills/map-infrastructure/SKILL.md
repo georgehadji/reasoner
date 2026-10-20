@@ -131,6 +131,7 @@ folders:
 | `search/brave_adapter.py` | Brave Search (web, LLM-context, images, videos). |
 | `search/tavily_adapter.py` | Tavily search + extract. |
 | `scraper.py` | Deep read: fetch page, convert HTML to markdown. |
+| `safe_fetch.py` | `safe_get`: SSRF-safe GET for untrusted URLs. Pins the checked IP, re-checks every redirect hop, caps the body. Use it for any server-side fetch of a model-, web- or user-supplied URL. |
 | `uploader.py` (24KB) | File upload + text extraction (PDF/TXT/DOCX), encryption at rest, hash index dedupe. |
 | `prism/file_search.py` | `FileSearchPort` over Neuro embeddings and upload sidecars. |
 

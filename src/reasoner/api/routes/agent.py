@@ -18,7 +18,6 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import uuid
 from collections.abc import AsyncIterator
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -41,6 +40,7 @@ from reasoner.application.services.pipeline_service import PipelineService
 from reasoner.application.services.preset_service import PresetService
 from reasoner.application.services.run_metering import RunContext, metered
 from reasoner.core.logging_utils import redacted_errors
+from reasoner.domain.credits import run_reference
 from reasoner.domain.saas import QuotaResult, User
 
 logger = logging.getLogger(__name__)
@@ -159,7 +159,7 @@ async def agent_run(
 
     await register_run_or_error(req.client_run_id)
     preset = req.preset or "auto-budget"
-    reference_id = req.client_run_id or f"run:{uuid.uuid4()}"
+    reference_id = run_reference(req.client_run_id)
     reserved_credits = await reserve_or_402(
         user_id=str(user.id), preset=preset, problem=req.problem, reference_id=reference_id,
     )
@@ -195,7 +195,7 @@ async def agent_run_sync(
 
     await register_run_or_error(req.client_run_id)
     preset = req.preset or "auto-budget"
-    reference_id = req.client_run_id or f"run:{uuid.uuid4()}"
+    reference_id = run_reference(req.client_run_id)
     reserved_credits = await reserve_or_402(
         user_id=str(user.id), preset=preset, problem=req.problem, reference_id=reference_id,
     )
