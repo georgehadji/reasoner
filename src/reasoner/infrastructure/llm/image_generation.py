@@ -30,6 +30,7 @@ from reasoner.core.constants import (
     IMAGE_GEN_ENHANCEMENT_SYSTEM_PROMPT,
     IMAGE_GEN_FALLBACKS,
     IMAGE_GEN_IMAGE_COUNT,
+    IMAGE_GEN_MAX_DOWNLOAD_BYTES,
     IMAGE_GEN_POLICY_REWRITE_SYSTEM_PROMPT,
     IMAGE_GEN_PRESETS,
     IMAGE_GEN_PROMPT_MAX_TOKENS,
@@ -235,21 +236,19 @@ async def _download_image_url(url: str, *, allow_unhinted: bool = False) -> str 
     if not _looks_like_remote_image_url(url, allow_unhinted=allow_unhinted):
         return None
 
-    from reasoner.security.url_validator import is_safe_url
-    if not is_safe_url(url):
-        logger.warning("Blocked unsafe image URL: %s", url)
-        return None
+    from reasoner.infrastructure.safe_fetch import safe_get
 
     try:
-        async with httpx.AsyncClient(timeout=IMAGE_GEN_REMOTE_TIMEOUT_SECONDS, follow_redirects=True) as client:
-            response = await client.get(url)
-            response.raise_for_status()
+        # safe_get follows redirects itself, re-checking each hop.
+        async with httpx.AsyncClient(timeout=IMAGE_GEN_REMOTE_TIMEOUT_SECONDS) as client:
+            response, content = await safe_get(
+                client, url, max_bytes=IMAGE_GEN_MAX_DOWNLOAD_BYTES
+            )
     except Exception as exc:
         logger.warning("Failed to download generated image URL %s: %s", url, exc)
         return None
 
     content_type = response.headers.get("content-type", "").split(";", 1)[0].strip().lower()
-    content = response.content
     if not content:
         return None
     if content_type and not content_type.startswith("image/") and not content.startswith(
