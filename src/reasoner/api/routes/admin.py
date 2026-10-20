@@ -91,6 +91,18 @@ async def replay_dead_letter_events(
     return {"status": "ok", **result}
 
 
+@router.post("/billing/dead-letter/replay")
+async def replay_billing_dead_letter(request: Request, max_count: int = 50):
+    """Replay failed Stripe/PayPal webhooks recorded in the billing dead letter.
+
+    Requires X-Admin-Key header.
+    """
+    _require_admin(request)
+    from reasoner.infrastructure.billing.webhooks import replay_failed_webhooks
+    result = await replay_failed_webhooks(limit=min(max_count, 200))
+    return {"status": "ok", **result}
+
+
 # ── Neuro Lifecycle Maintenance (Phase 1.7) ───────────────────────────────────
 
 

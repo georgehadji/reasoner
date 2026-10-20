@@ -8,7 +8,7 @@ import logging
 import os
 
 import stripe
-from fastapi import Request
+from fastapi import HTTPException, Request
 
 from reasoner.infrastructure.billing.paypal_adapter import PayPalBillingAdapter
 from reasoner.infrastructure.billing.stripe_adapter import StripeBillingAdapter, to_plain
@@ -144,13 +144,44 @@ async def _db_claim_webhook(event_id: str, provider: str) -> bool:
         return True  # DB failed — fall through to Redis guard
 
 
+async def _db_release_webhook(event_id: str, provider: str) -> None:
+    """Undo the claim of an event whose processing failed, so a retry can claim it.
+
+    The claim was written before processing and kept on failure. The handler
+    then returned 200, so the provider stopped retrying, and a manual resend
+    hit the claim and was dropped as a duplicate. A paid customer could stay
+    on FREE with no way to recover it
+    (docs/plans/audit-remediation-2026-10-20.md BIL-4).
+    """
+    pool = await _get_webhook_pool()
+    if pool is None:
+        return
+    try:
+        async with pool.acquire() as conn:
+            await conn.execute(
+                "DELETE FROM processed_webhooks WHERE event_id = $1 AND provider = $2",
+                event_id, provider,
+            )
+    except Exception as exc:
+        logger.warning("Webhook claim release failed for %s/%s: %s", provider, event_id, exc)
+
+
+def _retry_later() -> HTTPException:
+    # A 5xx makes the provider retry; Stripe and PayPal both stop after about
+    # three days, so this is bounded. The failure is already in the dead letter.
+    return HTTPException(status_code=500, detail="Webhook processing failed; retry")
+
+
 async def handle_stripe_webhook(request: Request) -> dict:
     """
     Receive and process Stripe webhook events.
 
     Returns:
-        {"status": "ok"} with HTTP 200 even on processing errors
-        to prevent infinite Stripe retries (Critical Enhancement 4.3).
+        {"status": "ok"} with HTTP 200 when processed or deliberately ignored.
+        A processing failure releases the event's claim and raises 500, so
+        Stripe retries. It used to return 200 to prevent infinite retries
+        (Critical Enhancement 4.3), but Stripe's retries are bounded, and the
+        kept claim made the event unrecoverable (BIL-4).
     """
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature")
@@ -214,7 +245,6 @@ async def handle_stripe_webhook(request: Request) -> dict:
         logger.exception("Stripe webhook processing failed for event %s: %s", event_id, exc)
         # Record the failure durably (metric + dead-letter + event)
         await _record_webhook_failure("stripe", event_type, dict(event), str(exc))
-        # Still return 200 to prevent Stripe retries (Critical Enhancement 4.3)
 
     # Mark completed ONLY after successful DB commit
     if success:
@@ -228,6 +258,8 @@ async def handle_stripe_webhook(request: Request) -> dict:
             await valkey.delete(processing_key)
         except Exception as exc:
             logger.warning("Valkey processing-key delete failed: %s", exc)
+        await _db_release_webhook(event_id, "stripe")
+        raise _retry_later()
 
     return {"status": "ok"}
 
@@ -235,7 +267,9 @@ async def handle_stripe_webhook(request: Request) -> dict:
 async def handle_paypal_webhook(request: Request) -> dict:
     """Receive and process PayPal webhook events.
 
-    Returns {"status": "ok"} with HTTP 200 to prevent PayPal retries.
+    Returns {"status": "ok"} with HTTP 200 when processed or deliberately
+    ignored. A processing failure releases the claim and raises 500 so PayPal
+    retries (BIL-4).
     """
     body_bytes = await request.body()
     try:
@@ -303,5 +337,45 @@ async def handle_paypal_webhook(request: Request) -> dict:
             await valkey.delete(processing_key)
         except Exception as exc:
             logger.warning("Valkey processing-key delete failed: %s", exc)
+        await _db_release_webhook(event_id, "paypal")
+        raise _retry_later()
 
     return {"status": "ok"}
+
+
+async def replay_failed_webhooks(limit: int = 50) -> dict:
+    """Re-run dead-lettered billing webhooks, marking the ones that now succeed.
+
+    Each event is claimed first, like a live delivery, so an event that a
+    provider retry already applied is only marked as replayed, not applied
+    twice. Before this, ``failed_webhook_events`` was written and never read
+    (BIL-4).
+    """
+    repo = await _get_dead_letter_repo()
+    if repo is None:
+        return {"available": False, "replayed": 0, "skipped": 0, "failed": 0}
+
+    from reasoner.application.services.billing_service import BillingService
+
+    adapters = {"stripe": StripeBillingAdapter, "paypal": PayPalBillingAdapter}
+    counts = {"replayed": 0, "skipped": 0, "failed": 0}
+    for failure in await repo.list_failures(unreplayed_only=True, limit=limit):
+        adapter_cls = adapters.get(failure.provider)
+        event_id = (failure.payload or {}).get("id")
+        if adapter_cls is None or not failure.id or not event_id:
+            counts["failed"] += 1
+            continue
+        if not await _db_claim_webhook(event_id, failure.provider):
+            await repo.mark_replayed(failure.id)  # a provider retry applied it
+            counts["skipped"] += 1
+            continue
+        try:
+            await BillingService(adapter_cls()).handle_webhook(failure.payload)
+        except Exception as exc:
+            logger.warning("Replay of %s webhook %s failed: %s", failure.provider, event_id, exc)
+            await _db_release_webhook(event_id, failure.provider)
+            counts["failed"] += 1
+            continue
+        await repo.mark_replayed(failure.id)
+        counts["replayed"] += 1
+    return {"available": True, **counts}
