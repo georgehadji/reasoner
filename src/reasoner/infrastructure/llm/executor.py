@@ -24,7 +24,6 @@ if TYPE_CHECKING:
     from reasoner.infrastructure.llm.ports import DegradedLLMResponse
 
 from reasoner.core.constants import (
-    TRUNCATION,
     TRUNCATION_RETRY_MAX_TOKENS,
     get_token_budget,
 )
@@ -183,19 +182,14 @@ class LLMExecutor:
         # store path below can reference it even when the lookup was skipped
         # (e.g. streaming), which previously raised NameError.
         #
-        # Coding roles: each file has a unique prompt body after the shared
-        # problem prefix, so truncating to PROBLEM chars would produce identical
-        # cache keys for all parallel generate calls and serve the first file's
-        # response for every subsequent file.
-        cache_prompt = (
-            user_prompt
-            if role in (
-                "synthesis", "context_vetting", "primary",
-                "coding_generate", "coding_spec", "coding_review",
-                "coding_tests", "coding_assemble",
-            )
-            else user_prompt[: TRUNCATION.PROBLEM]
-        )
+        # The full prompt, for every role. Keying on its first TRUNCATION.PROBLEM
+        # chars made two prompts that differ only after char 500 (candidates,
+        # sources, the perspective name) share an answer, the same bug the
+        # coding roles had been exempted from one by one. The key also carries
+        # the tenant, so one user's cached critique is never served to another
+        # (docs/plans/audit-remediation-2026-10-20.md DAT-3).
+        cache_prompt = user_prompt
+        cache_tenant = getattr(state, "billing_subject", "") or state.conversation_id or ""
 
         # The cache key must include the system prompt. Without it, two calls
         # sharing (problem, role, model, user_prompt) collide even when their
@@ -218,6 +212,7 @@ class LLMExecutor:
                 phase=cache_phase,
                 model_id=model_id_for_cache,
                 prompt=cache_prompt,
+                agent_id=cache_tenant,
             )
             if cached_response:
                 logger.info(f"[CACHE] HIT for {role} (saved ~{len(cached_response)//4} tokens)")
@@ -339,6 +334,7 @@ class LLMExecutor:
                             prompt=cache_prompt,
                             response=raw,
                             tokens_used=metadata.get("input_tokens", 0) + metadata.get("output_tokens", 0),
+                            agent_id=cache_tenant,
                         )
                     await self._accumulate_tokens(state, role, metadata.get("input_tokens", 0), metadata.get("output_tokens", 0), model_id)
 
@@ -543,13 +539,12 @@ class LLMExecutor:
 
             await self._accumulate_tokens(state, role, input_tokens, output_tokens, model)
 
-            if self._token_cache and self._caching_enabled and raw and raw.strip():
+            # A truncated answer is not cached: it would replay the failure for
+            # every run of this problem within the TTL (DAT-3).
+            truncated = metadata.get("finish_reason") == "length"
+            if (self._token_cache and self._caching_enabled and raw and raw.strip()
+                    and not truncated):
                 model_id = self.router.get(role).model if hasattr(self.router, "get") else "unknown"
-                cache_prompt = (
-                    user_prompt
-                    if role in ("synthesis", "context_vetting", "primary")
-                    else user_prompt[: TRUNCATION.PROBLEM]
-                )
                 await self._token_cache.set(
                     problem=state.problem,
                     phase=cache_phase,
@@ -557,6 +552,7 @@ class LLMExecutor:
                     prompt=cache_prompt,
                     response=raw,
                     tokens_used=input_tokens + output_tokens,
+                    agent_id=cache_tenant,
                 )
 
             # Emit LLMGenerationCompleted event for successful standard call
