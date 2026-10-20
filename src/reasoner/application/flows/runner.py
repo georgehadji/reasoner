@@ -196,6 +196,15 @@ class WorkflowRunner:
                 if quality_result.passed:
                     break
 
+                # The cap is checked only at phase start. A retry of a phase that
+                # tripped it (premium synthesis, "high" effort) kept spending
+                # (docs/plans/audit-remediation-2026-10-20.md BIL-9).
+                if attempt < max_retries and getattr(state, "_spend_cap_exceeded", False):
+                    self.services.log(
+                        name, "Spend cap reached; keeping this attempt, no retry.", state
+                    )
+                    break
+
                 if attempt < max_retries:
                     # Set on every quality retry, not only when the judge had
                     # suggestions: services.call_llm reads its presence as "this
