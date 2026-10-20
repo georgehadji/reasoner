@@ -111,7 +111,9 @@ jobs:
           # HyperGate time-bound fix rewrapped one long condition (-1).
           # 2215: the tier helpers moved into spend_limit_service, which merged one
           # mid-file api/dependencies.py import into the noqa'd block (-1).
-          python scripts/ruff_ratchet.py --max 2215
+          # 2214: method-flow PR1 rewrapped one long line in the Iterative Critique
+          # convergence code (-1).
+          python scripts/ruff_ratchet.py --max 2214
 
       - name: Security scan (bandit)
         run: |
