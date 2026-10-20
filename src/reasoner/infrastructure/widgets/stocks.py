@@ -6,6 +6,7 @@ Provides real-time stock prices using Yahoo Finance.
 
 from __future__ import annotations
 
+import asyncio
 import re
 from typing import Any
 
@@ -76,7 +77,11 @@ class StockWidget(BaseWidget):
         }
 
     async def _fetch_stock_data(self, symbol: str) -> dict[str, Any]:
-        """Fetch stock data from Yahoo Finance."""
+        """Fetch stock data from Yahoo Finance, off the event loop."""
+        return await asyncio.to_thread(self._fetch_stock_data_sync, symbol)
+
+    def _fetch_stock_data_sync(self, symbol: str) -> dict[str, Any]:
+        # yahooquery and yfinance do blocking network I/O.
         # Try yahooquery
         try:
             from yahooquery import Ticker

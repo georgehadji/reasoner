@@ -6,6 +6,7 @@ Evaluates mathematical expressions using asteval (BSD-licensed safe evaluator).
 
 from __future__ import annotations
 
+import asyncio
 import math
 import re
 from typing import Any
@@ -78,7 +79,9 @@ class CalculatorWidget(BaseWidget):
             from asteval import Interpreter
 
             # Create evaluator with math functions
-            evaluator = Interpreter()
+            # minimal: no loops, defs or imports -- an expression needs none,
+            # and a `while True` would spin a thread the timeout cannot stop.
+            evaluator = Interpreter(minimal=True)
             evaluator.symtable.update({
                 'pi': math.pi,
                 'e': math.e,
@@ -95,7 +98,13 @@ class CalculatorWidget(BaseWidget):
                 'ceil': math.ceil,
             })
 
-            result = evaluator.eval(expression)
+            # Off the loop and bounded, like /api/calculate.
+            try:
+                result = await asyncio.wait_for(
+                    asyncio.to_thread(evaluator.eval, expression), timeout=1.0
+                )
+            except TimeoutError:
+                return {'expression': expression, 'error': 'Calculation timed out', 'valid': False}
 
             # asteval returns None on parse/evaluation errors; check error state
             if evaluator.error:
