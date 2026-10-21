@@ -80,11 +80,14 @@ async def _run_and_bill(
     from reasoner.api.schemas import CLIENT_RUN_ID_PATTERN, RunRequest
     from reasoner.api.streaming import run_stream_cached
     from reasoner.application.services.agent_results import summarise
-    from reasoner.application.services.idempotency import register_run
+    from reasoner.application.services.idempotency import register_run, release_run
     from reasoner.application.services.pipeline_service import PipelineService
     from reasoner.application.services.preset_service import PresetService
     from reasoner.application.services.run_metering import RunContext, metered
     from reasoner.application.services.spend_limit_service import resolve_user_tier
+    from reasoner.infrastructure.persistence.pipeline_ownership_repo import (
+        get_pipeline_ownership_repo,
+    )
 
     # Checked before anything is reserved: RunRequest rejects a bad id too, but
     # only after credits are held and the id has been used as a reference.
@@ -108,11 +111,21 @@ async def _run_and_bill(
         source_type=source_type,
         client_run_id=client_run_id,
     )
-    await register_run(client_run_id)
-    reference_id = run_reference(client_run_id)
-    reserved_credits = await reserve_or_402(
-        user_id=str(user.id), preset=preset, problem=problem, reference_id=reference_id,
-    )
+    claim = await register_run(client_run_id, owner_key=str(user.id))
+    try:
+        if client_run_id:
+            # Raises OwnershipConflictError if another caller owns this
+            # pipeline id; refused before any credit is held (SEC-7).
+            await get_pipeline_ownership_repo().set_owner(
+                client_run_id, str(user.id), client_run_id,
+            )
+        reference_id = run_reference(client_run_id)
+        reserved_credits = await reserve_or_402(
+            user_id=str(user.id), preset=preset, problem=problem, reference_id=reference_id,
+        )
+    except BaseException:
+        await release_run(claim)  # the caller may retry with the same id
+        raise
     run_ctx = RunContext(
         preset=preset,
         reference_id=reference_id,
@@ -120,6 +133,7 @@ async def _run_and_bill(
         tier=tier,
         interface=interface,
         reserved_credits=reserved_credits,
+        run_claim=claim,
     )
     stream = run_stream_cached(
         req,
