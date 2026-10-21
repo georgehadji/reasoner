@@ -84,7 +84,7 @@ folders:
 | `credit_repo_postgres.py` / `credit_repo_memory.py` | `CreditRepository` adapters; Postgres locks the balance row (`SELECT … FOR UPDATE`). |
 | `quota_repo_postgres.py` | `QuotaRepository` on asyncpg, transactional writes. |
 | `cached_quota_repo.py` / `cached_subscription_repo.py` | Cache-aside Redis decorators (TTL 60s) with invalidation. |
-| `subscription_repo.py` | Subscription upserts + quota tier sync. |
+| `subscription_repo.py` | Subscription upserts + quota tier sync. Writes take the provider event's time and skip a stale one (`last_event_at`); the user-id fallback never overwrites a row tracking another subscription; `get_user_by_stripe_sub_id` resolves owners. |
 | `billing_deadletter_repo.py` | Durable failed-webhook storage for replay. |
 | `pipeline_ownership_repo.py` | SQLite `PipelineOwnershipPort` adapter + backfill of the legacy JSON store. |
 
@@ -109,8 +109,8 @@ folders:
 | `auth/__init__.py` | `get_auth_adapter` factory — picks by environment. |
 | `auth/supabase_adapter.py` | Production `AuthPort` (JWT validation against Supabase). |
 | `auth/local_adapter.py` | Local JWT signing for dev/tests. |
-| `billing/stripe_adapter.py` / `paypal_adapter.py` | `BillingPort` implementations. |
-| `billing/webhooks.py` | Stripe/PayPal receivers: signature verification, dedup TTL, DB claim, dead-letter on failure. |
+| `billing/stripe_adapter.py` / `paypal_adapter.py` | `BillingPort` implementations. Stripe resolves the owner (customer metadata, subscription metadata, our table) or raises `UnresolvedBillingOwnerError`, never a random user; `updated` re-reads live state; both cancels treat already-cancelled as done. |
+| `billing/webhooks.py` | Stripe/PayPal receivers: signature verification, dedup TTL, DB claim, dead-letter on failure. An unresolved owner is dead-lettered once and acknowledged (no retry loop). |
 | `email/resend_adapter.py` | `EmailPort` via Resend; degrades gracefully without a key. |
 
 ## execution/ — code sandbox

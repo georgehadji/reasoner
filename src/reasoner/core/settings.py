@@ -79,6 +79,9 @@ class Settings:
     OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 
     ADMIN_API_KEY: str | None = os.getenv("ADMIN_API_KEY")
+    # Comma-separated user ids whose interactive (JWT) login carries the admin
+    # scope. The only way to hold it: API keys can never be granted admin.
+    ADMIN_USER_IDS: str = os.getenv("ADMIN_USER_IDS", "")
     REASONER_DEEP_READ_LLM: bool = os.getenv("REASONER_DEEP_READ_LLM", "1") != "0"
 
     # ── Phase Subagent Feature Flags ──

@@ -210,7 +210,15 @@ async def _resolve_auth_token(token: str) -> User:
     if _looks_like_jwt(token):
         adapter: AuthPort = get_auth_adapter()
         service = AuthService(adapter)
-        return await service.authenticate(token)
+        user = await service.authenticate(token)
+        # Interactive login only: an API key never resolves here, so no key can
+        # carry admin (SEC-6).
+        from dataclasses import replace
+
+        from reasoner.domain.api_keys import admin_scopes
+
+        extra = admin_scopes(user.id, settings.ADMIN_USER_IDS)
+        return replace(user, scopes=set(user.scopes) | extra) if extra else user
 
     # Legacy API key path (only if explicitly enabled)
     if settings.ENABLE_LEGACY_API_KEY:

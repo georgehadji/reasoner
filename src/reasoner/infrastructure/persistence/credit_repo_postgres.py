@@ -135,19 +135,34 @@ class PostgresCreditRepository(CreditRepository):
         uid = UUID(str(user_id))
         pool = await self._get_pool()
 
+        try:
+            return await self._record_locked(
+                pool, uid, delta, reason, reference_id, description, allow_overdraft
+            )
+        except asyncpg.UniqueViolationError:
+            # Belt and braces: the lookup runs under the balance lock, so a
+            # racing duplicate normally waits and finds the winner. If one still
+            # collides, the winner's entry is the answer, not a 500
+            # (docs/plans/audit-remediation-2-2026-10-20.md BIL-16).
+            existing = await pool.fetchrow(
+                f"SELECT {_LEDGER_COLUMNS} FROM credit_ledger "
+                "WHERE user_id = $1 AND reference_id = $2",
+                uid,
+                reference_id,
+            )
+            if existing is None:
+                raise
+            return _to_entry(existing)
+
+    async def _record_locked(
+        self, pool, uid: UUID, delta: int, reason: CreditReason,
+        reference_id: str | None, description: str | None, allow_overdraft: bool,
+    ) -> CreditLedgerEntry:
         async with pool.acquire(timeout=10.0) as conn:
             async with conn.transaction():
-                if reference_id is not None:
-                    existing = await conn.fetchrow(
-                        f"SELECT {_LEDGER_COLUMNS} FROM credit_ledger "
-                        "WHERE user_id = $1 AND reference_id = $2",
-                        uid,
-                        reference_id,
-                    )
-                    if existing is not None:
-                        return _to_entry(existing)
-
-                # Lock (or create) the balance row before reading it.
+                # Lock (or create) the balance row first. The duplicate check
+                # below then runs under that lock, so two calls with one
+                # reference serialise instead of both passing the check.
                 await conn.execute(
                     "INSERT INTO user_credits (user_id) VALUES ($1) "
                     "ON CONFLICT (user_id) DO NOTHING",
@@ -157,6 +172,15 @@ class PostgresCreditRepository(CreditRepository):
                     "SELECT balance FROM user_credits WHERE user_id = $1 FOR UPDATE",
                     uid,
                 )
+                if reference_id is not None:
+                    existing = await conn.fetchrow(
+                        f"SELECT {_LEDGER_COLUMNS} FROM credit_ledger "
+                        "WHERE user_id = $1 AND reference_id = $2",
+                        uid,
+                        reference_id,
+                    )
+                    if existing is not None:
+                        return _to_entry(existing)
                 balance = row["balance"]
 
                 if delta < 0 and not allow_overdraft and not can_afford(balance, -delta):
@@ -177,23 +201,17 @@ class PostgresCreditRepository(CreditRepository):
                     spent,
                 )
 
-                try:
-                    entry = await conn.fetchrow(
-                        "INSERT INTO credit_ledger "
-                        "(user_id, delta, balance_after, reason, reference_id, description) "
-                        f"VALUES ($1, $2, $3, $4, $5, $6) RETURNING {_LEDGER_COLUMNS}",
-                        uid,
-                        delta,
-                        balance_after,
-                        reason.value,
-                        reference_id,
-                        description,
-                    )
-                except asyncpg.UniqueViolationError:
-                    # Another transaction inserted the same reference between our
-                    # lookup and insert. Their entry is authoritative.
-                    raise
-
+                entry = await conn.fetchrow(
+                    "INSERT INTO credit_ledger "
+                    "(user_id, delta, balance_after, reason, reference_id, description) "
+                    f"VALUES ($1, $2, $3, $4, $5, $6) RETURNING {_LEDGER_COLUMNS}",
+                    uid,
+                    delta,
+                    balance_after,
+                    reason.value,
+                    reference_id,
+                    description,
+                )
                 return _to_entry(entry)
 
     async def grant_monthly_allowance(
