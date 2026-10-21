@@ -19,6 +19,10 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
   const setAuthLoading = useAppStore((s) => s.setAuthLoading);
 
   useEffect(() => {
+    // Decision Q9: the old shared history database has no owner; clear it.
+    // Before the Supabase check, so deployments without auth clear it too.
+    void clearLegacyHistory().catch(() => {});
+
     if (!supabase) {
       setAuthLoading(false);
       return;
@@ -26,9 +30,6 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Register listener BEFORE any async calls so we don't miss the INITIAL_SESSION
     // event that fires after Supabase finishes processing the URL (including OAuth code exchange).
-    // Decision Q9: the old shared history database has no owner; clear it.
-    void clearLegacyHistory().catch(() => {});
-
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       // Before setUser: the history hook reloads on the user change and must
       // already read this user's database (UI-5).
