@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { AlertTriangle, Check, Copy, Key, Plus, Trash2 } from 'lucide-react';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
@@ -66,7 +66,7 @@ function formatDate(value: string | null): string {
 
 export default function ApiKeysPage() {
   const user = useAppStore((s) => s.user);
-  const router = useRouter();
+  useRequireAuth();
 
   const [keys, setKeys] = useState<ApiKeyRecord[]>([]);
   const [limits, setLimits] = useState<KeyLimits | null>(null);
@@ -108,10 +108,8 @@ export default function ApiKeysPage() {
   // calling the (also setState-ing) `load` from here would do. See
   // https://react.dev/learn/you-might-not-need-an-effect#fetching-data.
   useEffect(() => {
-    if (!user) {
-      router.push('/login');
-      return;
-    }
+    // Wait for the user; useRequireAuth redirects an anonymous visitor.
+    if (!user) return;
     let ignore = false;
     async function loadOnMount() {
       setLoading(true);
@@ -136,7 +134,7 @@ export default function ApiKeysPage() {
     };
     // Same rationale as `load` above for omitting `scopes`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, router]);
+  }, [user]);
 
   if (!user) return null;
 

@@ -487,18 +487,19 @@ export function proxyTopologyUndeclared(): boolean {
  * The rightmost hop was appended by the proxy in front of us.
  */
 export function getClientIp(req: NextRequest): string {
+  const trusted = new Set(
+    (process.env.TRUSTED_PROXIES || '').split(',').map((s) => s.trim()).filter(Boolean),
+  );
   const forwarded = req.headers.get('x-forwarded-for');
   if (forwarded) {
-    const trusted = new Set(
-      (process.env.TRUSTED_PROXIES || '').split(',').map((s) => s.trim()).filter(Boolean),
-    );
     const hops = forwarded.split(',').map((s) => s.trim()).filter(Boolean);
     if (hops.length > 1 && trusted.size === 0) warnUndeclaredProxyTopology(hops.length);
     for (let i = hops.length - 1; i >= 0; i--) {
       if (!trusted.has(hops[i])) return hops[i];
     }
   }
-  return req.headers.get('x-real-ip') || 'unknown';
+  // X-Real-IP is only as trustworthy as the proxy that sets it (UI-11).
+  return (trusted.size > 0 && req.headers.get('x-real-ip')) || 'unknown';
 }
 
 function _evictExpiredRateLimitBuckets(now: number): void {

@@ -33,7 +33,9 @@ import { buildMarkdownFromPhases } from '@/lib/markdown';
 import { saveConversation } from '@/lib/db';
 import { conversationToMessages } from '@/lib/conversation-history';
 import { readSSEStream } from '@/lib/sse-reader';
-import { clearCache, uploadFiles, generateImage, generateImageEnhancement, resumePipelineStream, submitFeedback, fetchGateDecision } from '@/lib/api-client';
+import { AttachmentUploadError, uploadAttachments, type UploadedAttachment } from '@/lib/attachments';
+import { copyToClipboard } from '@/lib/utils';
+import { clearCache, generateImage, generateImageEnhancement, resumePipelineStream, submitFeedback, fetchGateDecision } from '@/lib/api-client';
 import { MethodChoicePrompt, MethodChoiceLoading } from '@/components/chat/MethodChoicePrompt';
 
 // --- Reducer function for managing messages state ---
@@ -277,6 +279,19 @@ export default function ChatPage() {
     dismissIndicator,
   } = useScrollAnchor(scrollContainerRef);
 
+  const copyLastResponse = () => {
+    const last = messages.filter((m) => m.role === 'assistant' && !m.isStreaming).at(-1);
+    if (!last?.content) return;
+    void copyToClipboard(last.content).then((ok) => {
+      if (!ok) {
+        dispatchMessages({
+          type: 'ADD_MESSAGES',
+          payload: [{ id: 'info-copy-' + Date.now(), role: 'info', content: 'Could not copy to the clipboard.' }],
+        });
+      }
+    });
+  };
+
   useKeyboardShortcuts({
     onToggleSidebar: toggleSidebar,
     onShowShortcuts: () => setShortcutsOpen(true),
@@ -289,10 +304,7 @@ export default function ChatPage() {
       const textarea = document.querySelector('textarea');
       textarea?.focus();
     },
-    onCopyLastResponse: () => {
-      const last = messages.filter((m) => m.role === 'assistant' && !m.isStreaming).at(-1);
-      if (last?.content) navigator.clipboard.writeText(last.content);
-    },
+    onCopyLastResponse: copyLastResponse,
     onCommandPalette: () => setCommandPaletteOpen((v) => !v),
   });
 
@@ -349,21 +361,22 @@ export default function ChatPage() {
     }
 
     // Upload attachments before running
-    let uploadedAttachments: { file_id: string; filename: string; mime_type: string; extracted_text: string; size: number }[] = [];
+    let uploadedAttachments: UploadedAttachment[] = [];
     if (attachments.length > 0 && !isImageMode) {
       try {
-        const uploadResult = await uploadFiles(attachments.map((a) => a.file));
-        uploadedAttachments = (uploadResult.files || [])
-          .filter((f) => f.success && f.file_id)
-          .map((f) => ({
-            file_id: f.file_id!,
-            filename: f.filename!,
-            mime_type: f.mime_type || 'application/octet-stream',
-            extracted_text: f.text || '',
-            size: f.size || 0,
-          }));
+        uploadedAttachments = await uploadAttachments(attachments.map((a) => a.file));
       } catch (err) {
+        // Fail before the spend: a billed run never starts on a partial input
+        // set. The text and the attachments stay in the composer for a retry.
         console.error('Attachment upload failed:', err);
+        const names = err instanceof AttachmentUploadError ? err.failedNames.join(', ') : 'attachments';
+        dispatchMessages({
+          type: 'ADD_MESSAGES',
+          payload: [{ id: 'err-upload-' + Date.now(), role: 'error', content: `Could not upload ${names}. Nothing was run; try again.` }],
+        });
+        setComposerText(problem);
+        setRunning(false);
+        return;
       }
     }
 
@@ -1327,10 +1340,7 @@ export default function ChatPage() {
         onToggleNeuro={toggleNeuroPanel}
         onToggleTier={toggleTier}
         tier={tier}
-        onCopyLastResponse={() => {
-          const last = messages.filter((m) => m.role === 'assistant' && !m.isStreaming).at(-1);
-          if (last?.content) navigator.clipboard.writeText(last.content);
-        }}
+        onCopyLastResponse={copyLastResponse}
         recentCommands={recentCommands}
         onRecordCommand={addRecentCommand}
       />
