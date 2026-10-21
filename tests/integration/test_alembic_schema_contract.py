@@ -35,6 +35,7 @@ TABLES = {
     "users", "subscriptions", "usage_quotas", "query_log", "auth_audit_log",
     "account_deletion_log", "events", "events_default", "aggregates", "snapshots",
     "read_models", "user_credits", "credit_ledger", "api_keys", "failed_webhook_events",
+    "upload_usage",
 }
 #: Unique keys behind the repositories' ON CONFLICT targets and idempotency checks.
 UNIQUE_KEYS = {
@@ -46,6 +47,7 @@ UNIQUE_KEYS = {
     ("credit_ledger", ("user_id", "reference_id")),   # the ledger's idempotency key
     ("usage_quotas", ("user_id",)),                   # quota_repo_postgres
     ("api_keys", ("key_hash",)),                      # api_key_repo_postgres
+    ("upload_usage", ("user_id",)),                   # upload_usage_repo
 }
 COLUMNS = {("subscriptions", "stripe_sub_id"), ("subscriptions", "paypal_sub_id")}
 

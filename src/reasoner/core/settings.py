@@ -141,7 +141,9 @@ class Settings:
     )
     DOCUMENT_CHUNK_SIZE: int = int(os.getenv("DOCUMENT_CHUNK_SIZE", "1000"))
     DOCUMENT_CHUNK_OVERLAP: int = int(os.getenv("DOCUMENT_CHUNK_OVERLAP", "200"))
-    DOCUMENT_MAX_CHUNKS_PER_FILE: int = int(os.getenv("DOCUMENT_MAX_CHUNKS_PER_FILE", "500"))
+    # Characters of a document that semantic search indexes (DAT-8, Q8). The
+    # rest is still attached verbatim; the upload is flagged indexed_partially.
+    DOCUMENT_INDEX_MAX_CHARS: int = int(os.getenv("DOCUMENT_INDEX_MAX_CHARS", "1000000"))
     # Multipart upload bounds are enforced before parsing where possible and
     # again while streaming each part.  This prevents request-body and file
     # count exhaustion from reaching the document parsers.

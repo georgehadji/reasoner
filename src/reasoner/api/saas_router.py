@@ -271,12 +271,18 @@ async def delete_account(
     user_uploads: list = []
     try:
         from reasoner.uploader import delete_file, list_uploads
-        user_uploads = list_uploads(user_id=str(user.id))
+        user_uploads = list_uploads(user_id=str(user.id), include_incomplete=True)
         for upload in user_uploads:
             if delete_file(upload["file_id"]):
                 deleted["uploads"] += 1
     except Exception as exc:
         degraded("saas.delete_account.uploads", None, exc=exc, state=_record)
+    try:
+        from reasoner.infrastructure.persistence.upload_usage_repo import get_upload_usage_repo
+
+        await get_upload_usage_repo().forget(str(user.id))
+    except Exception as exc:
+        degraded("saas.delete_account.upload_usage", None, exc=exc, state=_record)
 
     # History files
     try:
