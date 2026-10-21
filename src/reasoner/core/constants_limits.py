@@ -715,3 +715,6 @@ RATE_LIMITER_REDIS_RETRY_SECONDS: float = 30.0
 # had no subscriber for this long, and never more than this many at once.
 WS_REPLAY_TTL_SECONDS: float = 300.0
 WS_MAX_REPLAY_BUFFERS: int = 1000
+
+# History entries kept per user; saving a newer one prunes the oldest (PER-12).
+HISTORY_MAX_ENTRIES_PER_OWNER: int = 500

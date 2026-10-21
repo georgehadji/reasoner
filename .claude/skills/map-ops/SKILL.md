@@ -41,6 +41,7 @@ folders:
 | `migrate_events_sqlite_to_pg.py` | SQLite to PostgreSQL event store migration. |
 | `migrate_encryption_v2.py` | Re-encrypts events missing the v2 envelope or blind index. |
 | `backfill_upload_usage.py` | One-off, after Alembic `20261021_000100`: sets each user's `upload_usage` from the files on disk. Dry run unless `--apply`. |
+| `migrate_history_layout.py` | One-off per deployment: moves flat `history/<id>.json` into owner directories, then writes the `.layout-v2` marker. Dry run unless `--apply`. |
 | `start_all.py` | Server launcher (mirrors `src/reasoner/start_all.py`). |
 | `run_method_tests.py`, `run_3more_tests.py`, `run_batch4.py`, `jury_fix_test.py`, `verify_swaps.py` | Ad-hoc sequential method test runners. |
 | `extract_e1.py`, `re_extract_e1.py`, `extract_run_stream.py`, `move_methods.py`, `cleanup_streaming.py` | One-off refactor helpers; historical. |
