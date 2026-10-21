@@ -10,6 +10,7 @@ import os
 import stripe
 from fastapi import HTTPException, Request
 
+from reasoner.core.constants_limits import WEBHOOK_LEASE_SECONDS
 from reasoner.domain.saas import UnresolvedBillingOwnerError
 from reasoner.infrastructure.billing.paypal_adapter import PayPalBillingAdapter
 from reasoner.infrastructure.billing.stripe_adapter import StripeBillingAdapter, to_plain
@@ -111,13 +112,20 @@ async def _get_webhook_pool():
         dsn = settings.DATABASE_URL.replace("+asyncpg", "")
         _webhook_pool = await asyncpg.create_pool(dsn, min_size=1, max_size=3)
         async with _webhook_pool.acquire() as conn:
+            # Same DDL as migration 20261021_000200: a database the app booted
+            # on before migrations ran must still have the lease columns.
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS processed_webhooks (
                     event_id TEXT NOT NULL,
                     provider TEXT NOT NULL,
                     processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    status TEXT NOT NULL DEFAULT 'done',
+                    claimed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                     PRIMARY KEY (event_id, provider)
-                )
+                );
+                ALTER TABLE processed_webhooks
+                    ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'done',
+                    ADD COLUMN IF NOT EXISTS claimed_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
             """)
     except Exception as exc:
         logger.warning("Webhook DB pool init failed (will rely on Redis dedup): %s", exc)
@@ -126,23 +134,49 @@ async def _get_webhook_pool():
 
 
 async def _db_claim_webhook(event_id: str, provider: str) -> bool:
-    """Attempt to claim a webhook event via DB INSERT. Returns True if claimed (first time)."""
+    """Take a lease on a webhook event. True if this worker should process it.
+
+    The first delivery inserts a 'processing' row. A retry inside the lease is
+    a duplicate. A 'processing' row older than ``WEBHOOK_LEASE_SECONDS`` belongs
+    to a worker that died, so the retry takes it over; a 'done' row is never
+    taken (BIL-21: the claim used to be permanent, so a crash lost the event).
+    """
     pool = await _get_webhook_pool()
     if pool is None:
         return True  # DB unavailable — fall through to Redis guard
     try:
         async with pool.acquire() as conn:
-            result = await conn.execute(
-                "INSERT INTO processed_webhooks (event_id, provider) "
-                "VALUES ($1, $2) ON CONFLICT DO NOTHING",
-                event_id, provider,
+            claimed = await conn.fetchval(
+                "INSERT INTO processed_webhooks (event_id, provider, status, claimed_at) "
+                "VALUES ($1, $2, 'processing', now()) "
+                "ON CONFLICT (event_id, provider) DO UPDATE SET claimed_at = now() "
+                "WHERE processed_webhooks.status = 'processing' "
+                "AND processed_webhooks.claimed_at < now() - make_interval(secs => $3) "
+                "RETURNING 1",
+                event_id, provider, float(WEBHOOK_LEASE_SECONDS),
             )
-            # asyncpg returns "INSERT 0 N" — N=1 means inserted (first time), N=0 means duplicate
-            return result.endswith("1")
+            return claimed is not None
     except Exception as exc:
         logger.warning("Webhook DB claim failed for %s/%s (falling through to Redis): %s",
                        provider, event_id, exc)
         return True  # DB failed — fall through to Redis guard
+
+
+async def _db_complete_webhook(event_id: str, provider: str) -> None:
+    """Mark a processed event done, so no retry can ever take its lease."""
+    pool = await _get_webhook_pool()
+    if pool is None:
+        return
+    try:
+        async with pool.acquire() as conn:
+            await conn.execute(
+                "UPDATE processed_webhooks SET status = 'done', processed_at = now() "
+                "WHERE event_id = $1 AND provider = $2",
+                event_id, provider,
+            )
+    except Exception as exc:
+        # Not fatal: the lease expires and the retry finds Valkey's completed key.
+        logger.warning("Webhook completion mark failed for %s/%s: %s", provider, event_id, exc)
 
 
 async def _db_release_webhook(event_id: str, provider: str) -> None:
@@ -225,6 +259,7 @@ async def handle_stripe_webhook(request: Request) -> dict:
     try:
         if await valkey.get(completed_key):
             logger.info("Stripe webhook deduplicated (already completed): %s", event_id)
+            await _db_complete_webhook(event_id, "stripe")
             return {"status": "ok"}
         # Atomic claim: only one worker succeeds; others see None and bail.
         claimed = await valkey.set(processing_key, "1", nx=True, ex=300)
@@ -260,6 +295,7 @@ async def handle_stripe_webhook(request: Request) -> dict:
             await valkey.delete(processing_key)
         except Exception as exc:
             logger.warning("Valkey completed-key set failed: %s", exc)
+        await _db_complete_webhook(event_id, "stripe")
     else:
         try:
             await valkey.delete(processing_key)
@@ -320,6 +356,7 @@ async def handle_paypal_webhook(request: Request) -> dict:
     try:
         if await valkey.get(completed_key):
             logger.info("PayPal webhook deduplicated (already completed): %s", event_id)
+            await _db_complete_webhook(event_id, "paypal")
             return {"status": "ok"}
         # Atomic claim: only one worker succeeds; others see None and bail.
         claimed = await valkey.set(processing_key, "1", nx=True, ex=300)
@@ -353,6 +390,7 @@ async def handle_paypal_webhook(request: Request) -> dict:
             await valkey.delete(processing_key)
         except Exception as exc:
             logger.warning("Valkey completed-key set failed: %s", exc)
+        await _db_complete_webhook(event_id, "paypal")
     else:
         try:
             await valkey.delete(processing_key)
@@ -397,6 +435,7 @@ async def replay_failed_webhooks(limit: int = 50) -> dict:
             await _db_release_webhook(event_id, failure.provider)
             counts["failed"] += 1
             continue
+        await _db_complete_webhook(event_id, failure.provider)
         await repo.mark_replayed(failure.id)
         counts["replayed"] += 1
     return {"available": True, **counts}

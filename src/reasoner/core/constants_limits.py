@@ -715,3 +715,8 @@ RATE_LIMITER_REDIS_RETRY_SECONDS: float = 30.0
 # had no subscriber for this long, and never more than this many at once.
 WS_REPLAY_TTL_SECONDS: float = 300.0
 WS_MAX_REPLAY_BUFFERS: int = 1000
+
+# A billing webhook claim older than this, and never finished, belongs to a
+# worker that died; the provider's retry may take it over. Must exceed the
+# slowest handler (the Stripe API calls in sync_subscription, ~30 s observed).
+WEBHOOK_LEASE_SECONDS: int = 300
