@@ -17,12 +17,22 @@ from reasoner.domain.saas import Subscription, SubscriptionStatus, SubscriptionT
 
 logger = logging.getLogger(__name__)
 
-#: A write applies unless the row already holds a newer event (BIL-15).
-#: ``{ts}`` is the parameter carrying the event's own time; NULL means unknown.
-_NOT_STALE = (
-    "({ts}::timestamptz IS NULL OR last_event_at IS NULL "
-    "OR last_event_at <= {ts}::timestamptz)"
-)
+# Every write below applies unless the row already holds a newer event
+# (BIL-15): "event time is NULL (unknown) OR no event yet OR last <= event".
+# The SQL is spelled out literally in each statement rather than composed.
+
+_SET_STATUS_SQL = {
+    "stripe_sub_id": (
+        "UPDATE subscriptions SET status = $1, last_event_at = COALESCE($3, last_event_at), "
+        "updated_at = NOW() WHERE stripe_sub_id = $2 AND ($3::timestamptz IS NULL "
+        "OR last_event_at IS NULL OR last_event_at <= $3::timestamptz)"
+    ),
+    "paypal_sub_id": (
+        "UPDATE subscriptions SET status = $1, last_event_at = COALESCE($3, last_event_at), "
+        "updated_at = NOW() WHERE paypal_sub_id = $2 AND ($3::timestamptz IS NULL "
+        "OR last_event_at IS NULL OR last_event_at <= $3::timestamptz)"
+    ),
+}
 
 
 class PostgresSubscriptionRepository:
@@ -155,7 +165,9 @@ class PostgresSubscriptionRepository:
                     current_period_end = $7,
                     last_event_at = COALESCE($9, last_event_at),
                     updated_at = NOW()
-                WHERE id = $8 AND """ + _NOT_STALE.format(ts="$9"),
+                WHERE id = $8 AND ($9::timestamptz IS NULL OR last_event_at IS NULL
+                                   OR last_event_at <= $9::timestamptz)
+                """,
                 str(sub.user_id),
                 sub.tier.value,
                 sub.status.value,
@@ -277,8 +289,7 @@ class PostgresSubscriptionRepository:
     ) -> bool:
         pool = await self._get_pool()
         result = await pool.execute(
-            f"UPDATE subscriptions SET status = $1, last_event_at = COALESCE($3, last_event_at), "
-            f"updated_at = NOW() WHERE {column} = $2 AND " + _NOT_STALE.format(ts="$3"),
+            _SET_STATUS_SQL[column],
             status,
             sub_id,
             event_at,

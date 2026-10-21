@@ -30,6 +30,9 @@ logger = logging.getLogger(__name__)
 _LEDGER_COLUMNS = (
     "id, user_id, delta, balance_after, reason, reference_id, description, created_at"
 )
+_SELECT_BY_REFERENCE = (
+    f"SELECT {_LEDGER_COLUMNS} FROM credit_ledger WHERE user_id = $1 AND reference_id = $2"
+)
 
 
 def _to_entry(row: asyncpg.Record) -> CreditLedgerEntry:
@@ -145,8 +148,7 @@ class PostgresCreditRepository(CreditRepository):
             # collides, the winner's entry is the answer, not a 500
             # (docs/plans/audit-remediation-2-2026-10-20.md BIL-16).
             existing = await pool.fetchrow(
-                f"SELECT {_LEDGER_COLUMNS} FROM credit_ledger "
-                "WHERE user_id = $1 AND reference_id = $2",
+                _SELECT_BY_REFERENCE,
                 uid,
                 reference_id,
             )
@@ -174,8 +176,7 @@ class PostgresCreditRepository(CreditRepository):
                 )
                 if reference_id is not None:
                     existing = await conn.fetchrow(
-                        f"SELECT {_LEDGER_COLUMNS} FROM credit_ledger "
-                        "WHERE user_id = $1 AND reference_id = $2",
+                        _SELECT_BY_REFERENCE,
                         uid,
                         reference_id,
                     )
