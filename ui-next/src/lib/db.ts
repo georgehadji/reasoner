@@ -1,4 +1,4 @@
-import { openDB, DBSchema } from 'idb';
+import { openDB, deleteDB, DBSchema } from 'idb';
 import { Conversation } from './types';
 
 interface ARADB extends DBSchema {
@@ -9,13 +9,36 @@ interface ARADB extends DBSchema {
   };
 }
 
-const DB_NAME = 'ARA_Pipeline_v2';
+// One database per signed-in user (UI-5). A single shared database let user B
+// see user A's conversations on a shared browser after A signed out.
+const LEGACY_DB_NAME = 'ARA_Pipeline_v2';
 const DB_VERSION = 3;
 const STORE_NAME = 'conversations';
 const PAGE_SIZE = 50;
 
+let historyOwner: string | null = null;
+
+function dbName(userId: string | null): string {
+  return `${LEGACY_DB_NAME}_${userId ?? 'anon'}`;
+}
+
+/** Point history at this user's database. Call before the user is published to the store. */
+export function setHistoryOwner(userId: string | null): void {
+  historyOwner = userId;
+}
+
+/** Delete one user's local history: on sign-out (anon) and on account deletion. */
+export async function deleteHistory(userId: string | null): Promise<void> {
+  await deleteDB(dbName(userId));
+}
+
+/** Decision Q9: the pre-UI-5 shared database has no owner, so it is cleared, not migrated. */
+export async function clearLegacyHistory(): Promise<void> {
+  await deleteDB(LEGACY_DB_NAME);
+}
+
 export async function getDB() {
-  return openDB<ARADB>(DB_NAME, DB_VERSION, {
+  return openDB<ARADB>(dbName(historyOwner), DB_VERSION, {
     upgrade(db, oldVersion, _newVersion, transaction) {
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });

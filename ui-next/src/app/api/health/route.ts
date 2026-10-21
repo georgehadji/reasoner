@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getApiBaseUrl, validateUpstreamUrl } from '@/lib/security-server';
+import { getApiBaseUrl, proxyTopologyUndeclared, validateUpstreamUrl } from '@/lib/security-server';
 
 export async function GET() {
   try {
@@ -10,8 +10,10 @@ export async function GET() {
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
-    // The root endpoint is always lightweight — any 2xx-5xx means the backend is alive
-    return new Response(resp.body, { status: resp.status });
+    // The root endpoint is always lightweight — any 2xx-5xx means the backend is alive.
+    // OPS-9: flag an undeclared proxy chain so monitoring sees it.
+    const headers = proxyTopologyUndeclared() ? { 'X-Proxy-Topology': 'undeclared' } : undefined;
+    return new Response(resp.body, { status: resp.status, headers });
   } catch {
     return NextResponse.json(
       { status: 'unhealthy', error: 'Backend unreachable' },

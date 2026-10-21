@@ -14,6 +14,7 @@ Custom React hooks used to query backend web-sockets and fetch APIs.
 - **`useIsDark.ts`**: Resolved dark-mode flag that is safe to branch on during render.  Two traps this closes, both of which shipped:
 - **`useKeyboardShortcuts.ts`**: Command palette: Ctrl/Cmd+K
 - **`usePipelineStream.ts`**: Aborts are user-initiated (Stop button, unmount, a new run superseding the old one). The browser surfaces them as a DOMException named 'AbortError' ("signal is aborted without reason"), which must never reach the UI as a
+- **`useRunController.ts`**: The active run's ticket: one AbortController shared by every stream of the run, its `client_run_id` for the server-side stop, and the conversation id it saves into. A second `begin()` while a run or its gate check is active returns null.
 - **`usePrefersReducedMotion.ts`**: `useReducedMotion()` reads matchMedia during render — `null` on the server, the real value on the client. Branching on it directly is a hydration mismatch, so the switch waits until hydration has landed.
 - **`usePresets.ts`**: Code or resource asset facilitating system functionality.
 - **`useProvenanceCapabilities.ts`**: must gate on this rather than assuming a capability is bound. Fetched once and cached; capabilities don't change within a session.
