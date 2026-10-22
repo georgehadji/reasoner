@@ -16,6 +16,7 @@ Project documentation, architecture decision records (ADRs), mindmaps, and speci
 - **`DESIGN.md`**: Design System: ElevenLabs
 - **`ENHANCEMENT_PLAN.md`**: Reasoner Enhancement & Fix Plan
 - **`ENVIRONMENT.md`**: Environment Variables
+- **`DEPLOY_AUDIT_2_3.md`**: Deploy Runbook for Audits 2 and 3
 - **`HARNESS_ENHANCEMENTS_PLAN.md`**: Reasoner Harness Enhancements — Implementation Plan
 - **`HEALTH_UPLIFT_PLAN.md`**: Reasoner Health Uplift Plan — 6/10 → 9+/10
 - **`MCP.md`**: MCP Server

@@ -16,6 +16,7 @@ folders:
 | `ARCHITECTURE_MINDMAP.md` | Full architecture map. Date and counts are auto-patched post-commit by `scripts/update_mindmap_meta.py`. |
 | `CODEBASE_MINDMAP.md` | Post-refactor codebase layout (v3.0). |
 | `ENVIRONMENT.md` | Every environment variable the app reads. |
+| `DEPLOY_AUDIT_2_3.md` | Deploy runbook for audit 2 and 3: Alembic revisions, backfill scripts, history layout migration, shared `data_dir`, what to announce. |
 | `METHODS.md` | All reasoning methods and what each is for. |
 | `methods_and_presets.md` | Methods-to-presets reference. |
 | `METHOD_COMPARISON.md` | Method comparison guide (Greek). |
