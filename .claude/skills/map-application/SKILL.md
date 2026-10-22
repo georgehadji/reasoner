@@ -23,7 +23,7 @@ Convention: `<method>.py` holds the strategy class (phase sequence); `<method>_p
 
 | File | What it does |
 |------|--------------|
-| `base.py` | `WorkflowStrategy`, `PhaseStep`, `WorkflowServices` interfaces. |
+| `base.py` | `WorkflowStrategy`, `PhaseStep`, `WorkflowServices` interfaces, plus `require_survivors()`: a fan-out phase whose every call failed raises `PhaseError` so `critical` can end the run. |
 | `factory.py` | `WorkflowFactory` — method name to strategy. |
 | `runner.py` | `WorkflowRunner` — executes a strategy with retry/robustness. |
 | `services.py` | `PipelineWorkflowServices` — concrete service bundle handed to flows. |
