@@ -9,6 +9,8 @@ from collections.abc import Awaitable, Callable
 from datetime import UTC
 from typing import Any
 
+import anyio
+
 from reasoner.api.execution.cancel import StreamingConnectionContext
 from reasoner.api.execution.direct import _stream_direct_answer
 from reasoner.api.execution.sse_observer import RunStream
@@ -18,6 +20,7 @@ from reasoner.api.schemas import RunRequest
 from reasoner.application.commands import RunPipelineCommand
 from reasoner.application.orchestrator import PipelineOrchestrator
 from reasoner.application.ports.pipeline_ownership_port import OwnershipConflictError
+from reasoner.application.ports.run_outcome import RunOutcome
 from reasoner.application.services.adaptive_routing import build_adaptive_routing_service
 from reasoner.application.services.pipeline_service import PipelineService
 from reasoner.application.services.preset_service import PresetService
@@ -28,7 +31,8 @@ from reasoner.application.services.spend_limit_service import (
     resolve_user_tier,
 )
 from reasoner.core.constants import TRUNCATION
-from reasoner.core.logging_utils import set_correlation_id
+from reasoner.core.constants_limits import SETTLE_TIMEOUT_SECONDS
+from reasoner.core.logging_utils import redact_capped, set_correlation_id
 from reasoner.domain.models import TaskType
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.infrastructure.llm.router import ProviderRouter
@@ -384,8 +388,12 @@ async def _settle_preflight(
     run_id: str,
     cancel_event: Any,
     stream: RunStream,
-) -> Any | None:
-    """Resolve preset, method and affordability. None when the run stops here."""
+) -> tuple[Any | None, str | None]:
+    """Resolve preset, method and affordability.
+
+    (preflight, None) to go ahead; (None, reason) when the run stops here
+    because it was answered without a pipeline or refused by the caller's plan.
+    """
     preflight = await orchestrator.preflight(req, initial_state, user_id=user_id)
 
     if preflight.gate_reasoning:
@@ -401,7 +409,7 @@ async def _settle_preflight(
         })
 
     if await _answer_without_a_pipeline(preflight, req, run_id, cancel_event, stream):
-        return None
+        return None, "answered without a pipeline"
 
     # Refuse a run the caller's plan cannot pay for. Checked against the preset
     # preflight actually resolved, not the one requested -- auto presets only
@@ -413,9 +421,9 @@ async def _settle_preflight(
             run_id, rejection.cap_type, user_tier.value, preflight.effective_preset_name,
         )
         await stream.rejected(rejection)
-        return None
+        return None, f"refused by plan limit ({rejection.cap_type})"
 
-    return preflight
+    return preflight, None
 
 
 async def _announce_start(
@@ -467,16 +475,13 @@ class PipelineExecutionService:
         sse_emit: Callable[[dict | str], Awaitable[None]],
         user_id: str | None = None,
         initial_state: PipelineState | None = None,
-    ) -> PipelineState | None:
-        """Run one streaming pipeline and return the state it produced.
+    ) -> RunOutcome:
+        """Run one streaming pipeline and say how it ended.
 
-        Returning the state matters: RunPipelineCommandHandler assigns it and
-        hands it to _completion_payload, which reads `state.phase_tokens`.
-        Every path here used to return None against a `-> PipelineState`
-        annotation, so the handler raised AttributeError *after* the client
-        already had its `done` frame -- recording PIPELINE_FAILED instead of
-        PIPELINE_COMPLETED and emitting a spurious trailing `error` frame on
-        every finished web run.
+        The handler matches on the outcome's status. Returning the bare state
+        let a Stop look like a finish (the success block ran) and a refused run
+        look like nothing (None, dereferenced), and before that every path
+        returned None against a `-> PipelineState` annotation.
         """
         req = _request_from_command(command)
         run_id = req.client_run_id or str(uuid.uuid4())
@@ -504,12 +509,12 @@ class PipelineExecutionService:
             user_tier = await resolve_user_tier(
                 user_id, timeout=RUN_TIER_LOOKUP_TIMEOUT_S, use_fallback_cache=False
             )
-            preflight = await _settle_preflight(
+            preflight, stopped_because = await _settle_preflight(
                 orchestrator, req, initial_state, user_id, user_tier,
                 run_id, cancel_event, stream,
             )
             if preflight is None:
-                return None
+                return RunOutcome("rejected", reason=stopped_because)
 
             pipeline, state, emitter, method = _build_run(
                 req, preflight, initial_state, user_id, user_tier, run_id
@@ -521,16 +526,24 @@ class PipelineExecutionService:
             if not await _run_phases(
                 pipeline, state, req, run_id, stream, emitter, cancel_event
             ):
-                return state
+                return RunOutcome("cancelled", state, "stopped by user")
 
             await _finish_run(orchestrator, req, state, user_id, run_id, run_start, stream)
+            return RunOutcome("completed", state)
+        except asyncio.CancelledError:
+            # Disconnect is a normal exit, so its terminal write must survive
+            # the cancellation that is unwinding this task.
+            with anyio.CancelScope(shield=True), anyio.move_on_after(SETTLE_TIMEOUT_SECONDS):
+                await stream.disconnected(state)
+            raise
         except Exception as exc:
             logger.error("Pipeline error for run %s: %s", run_id, exc, exc_info=True)
             await stream.failed(exc, state)
+            return RunOutcome(
+                "failed", state, f"{type(exc).__name__}: {redact_capped(str(exc))[:120]}"
+            )
         finally:
             keepalive.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await keepalive
             await _teardown(conn_context, run_id)
-
-        return state

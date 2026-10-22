@@ -68,6 +68,7 @@ Convention: `<method>.py` holds the strategy class (phase sequence); `<method>_p
 | `email_port.py` | `EmailPort`, `EmailMessage` for event-driven notifications. |
 | `quota_repository.py` | `QuotaRepository`. |
 | `pipeline_ownership_port.py` | `PipelineOwnershipPort`, `OwnershipRecord`, `is_authorized` — who may read/stop/resume a run. |
+| `run_outcome.py` | `RunOutcome` (`completed` / `cancelled` / `failed` / `rejected`) — what `PipelineExecutionPort.execute_run` returns; the command handler matches on it. |
 | `service_protocols.py` | Protocols for `PresetService`, `PipelineService`, `SearchService`, neuro client, telemetry store. |
 
 ## services/ — pipeline, presets, output
