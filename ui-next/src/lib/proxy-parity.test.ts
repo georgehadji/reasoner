@@ -17,6 +17,7 @@ import { csrfExempt } from '../proxy';
 afterEach(() => {
   delete process.env.TRUSTED_PROXIES;
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 
 describe('getClientIp', () => {
@@ -32,10 +33,44 @@ describe('getClientIp', () => {
     expect(getClientIp(req('6.6.6.6, 203.0.113.9, 10.0.0.2, 10.0.0.3'))).toBe('203.0.113.9');
   });
 
-  it('keeps a single hop and the x-real-ip fallback', () => {
+  it('keeps a single hop', () => {
     expect(getClientIp(req('10.0.0.1'))).toBe('10.0.0.1');
+  });
+
+  // UI-11: X-Real-IP is client-writable wherever nothing in front overwrites it.
+  it('ignores x-real-ip unless proxies are declared trusted', () => {
     const bare = new NextRequest('http://localhost/', { headers: { 'x-real-ip': '198.51.100.4' } });
+    expect(getClientIp(bare)).toBe('unknown');
+    process.env.TRUSTED_PROXIES = '10.0.0.2';
     expect(getClientIp(bare)).toBe('198.51.100.4');
+  });
+});
+
+// UI-9: the client refreshed its CSRF token with GET /api/csrf. In production
+// Caddy sends /api/* to FastAPI, which only has POST /api/csrf.
+describe('csrf refresh verb', () => {
+  it('the Next handler accepts POST like the backend', async () => {
+    vi.stubEnv('CSRF_SECRET', 'x'.repeat(48));
+    const route = await import('../app/api/csrf/route');
+    expect(typeof route.POST).toBe('function');
+    const res = await route.POST();
+    expect(typeof (await res.json()).token).toBe('string');
+  });
+
+  it('no client code calls /api/csrf without POST', async () => {
+    const { readdirSync, readFileSync, statSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const files: string[] = [];
+    const walk = (dir: string) => {
+      for (const name of readdirSync(dir)) {
+        const p = join(dir, name);
+        if (statSync(p).isDirectory()) walk(p);
+        else if (/\.(ts|tsx)$/.test(name) && !/\.test\./.test(name)) files.push(p);
+      }
+    };
+    walk(join(__dirname, '..'));
+    const offenders = files.filter((f) => /fetch\(\s*['"`]\/api\/csrf['"`]\s*\)/.test(readFileSync(f, 'utf8')));
+    expect(offenders).toEqual([]);
   });
 });
 

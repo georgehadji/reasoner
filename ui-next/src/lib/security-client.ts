@@ -3,6 +3,7 @@
 import { CSRF_COOKIE, CSRF_HEADER } from './security-constants';
 import { getAuthToken } from './auth';
 import { reportError } from './error-reporting';
+import { useAppStore } from '@/stores/app-store';
 
 export function getCsrfToken(): string | null {
   const match = document.cookie.match(new RegExp('(^| )' + CSRF_COOKIE + '=([^;]+)'));
@@ -15,7 +16,8 @@ export async function fetchWithCsrf(url: string, options: RequestInit = {}): Pro
       const cached = getCsrfToken();
       if (cached) return cached;
     }
-    const resp = await fetch('/api/csrf');
+    // POST: Caddy sends /api/* to FastAPI, which has no GET /api/csrf.
+    const resp = await fetch('/api/csrf', { method: 'POST' });
     if (resp.ok) {
       const data = await resp.json();
       return data.token as string | null;
@@ -37,13 +39,10 @@ export async function fetchWithCsrf(url: string, options: RequestInit = {}): Pro
 
   const resp = await fetch(url, { ...options, headers });
 
-  // Redirect to login on auth failure
-  if (resp.status === 401) {
-    window.location.href = '/login';
-    // Return a never-resolving promise to prevent callers from continuing
-    // while the browser navigates away
-    return new Promise(() => {});
-  }
+  // A 401 is returned like any other status; the transport never navigates.
+  // Public pages must survive it, and a protected page's route guard
+  // (useRequireAuth) redirects once the session is marked expired.
+  if (resp.status === 401) useAppStore.getState().markSessionExpired();
 
   // If CSRF validation failed (stale/invalid token), fetch a fresh one and retry once
   if (resp.status === 403) {
