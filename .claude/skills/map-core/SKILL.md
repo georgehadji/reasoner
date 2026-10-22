@@ -55,7 +55,6 @@ folders:
 | `code_executor.py` | `CodeExecutorPort`, `ExecutionResult`, `ExecutionLimits`. |
 | `credit_repository.py` | `CreditRepository` — credit-ledger persistence contract. |
 | `api_key_repository.py` | `ApiKeyRepository` — user-owned key persistence. |
-| `capability_registry_port.py` | `CapabilityRegistryPort` — model capability profiles (ACR Phase 2). |
 | `routing_constraint_port.py` | `RoutingConstraintPort`, `ConstraintViolation` — accept/reject role→model assignments (ACR Phase 4). |
 | `distributed_state_port.py` | `DistributedStatePort` — atomic ops + Lua (Valkey adapter). |
 | `shared_cache_port.py` | `SharedCachePort` — KV cache with TTL. |

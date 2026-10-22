@@ -10,7 +10,6 @@ Self-healing algorithms and parsing repair protocols for correcting malformed mo
 - **`P1_ERROR_HANDLING_FIXES.md`**: ═══════════════════════════════════════════════════════════════════════════════
 - **`README.md`**: Self-Healing System — Quick Start Guide
 - **`SELF_HEALING_IMPLEMENTATION.md`**: ═══════════════════════════════════════════════════════════════════════════════
-- **`evolution_agent.py`**: EvolutionAgent — orchestrates the five-stage evolution loop (#4).
 - **`instrumentation_diff.txt`**: Code or resource asset facilitating system functionality.
 - **`introspection_engine.py`**: Codebase Introspection Engine
 - **`introspection_report.json`**: Code or resource asset facilitating system functionality.

@@ -29,7 +29,6 @@ folders:
 |------|--------------|
 | `introspection_engine.py` (31KB) | `CodebaseIntrospector` — function inventory with complexity scores, dependency graph, dead code, type-coverage gaps, error-handling gaps → `IntrospectionReport`. |
 | `test_generation_engine.py` (13KB) | `TestGenerationEngine` — writes tests for untested paths, zero-coverage functions first. |
-| `evolution_agent.py` | `EvolutionAgent` — five-stage observe → diagnose → propose → evaluate → promote loop (governed mutation). |
 | `telemetry_exporter.py` | Dumps recent telemetry to `healing_context.json` for the static healing scripts. |
 | `run_healing.py` | Orchestrator wiring the stages into one pipeline (static loop → runtime → evolutionary). |
 

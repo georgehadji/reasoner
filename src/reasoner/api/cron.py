@@ -5,21 +5,7 @@ from __future__ import annotations
 import logging
 import time
 
-from reasoner.core.settings import settings
-from reasoner.infrastructure.persistence.quota_repo_postgres import PostgresQuotaRepository
-
 logger = logging.getLogger(__name__)
-
-
-async def reset_all_quotas_monthly() -> None:
-    """Reset all usage_quotas at month start. Called by external scheduler."""
-    repo = PostgresQuotaRepository(settings.DATABASE_URL)
-    pool = await repo._get_pool()
-    result = await pool.execute(
-        "UPDATE usage_quotas SET used_queries = 0, period_start = date_trunc('month', (NOW() AT TIME ZONE 'UTC')), "
-        "updated_at = (NOW() AT TIME ZONE 'UTC') WHERE period_start < date_trunc('month', (NOW() AT TIME ZONE 'UTC'))"
-    )
-    logger.info("Monthly quota reset complete: %s", result)
 
 
 async def run_neuro_maintenance() -> dict:

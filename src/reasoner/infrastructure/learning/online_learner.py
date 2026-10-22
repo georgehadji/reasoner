@@ -41,7 +41,7 @@ class OnlineLearner:
         sampler: ThompsonSampler | None = None,
         signal_aggregator: QualitySignalAggregator | None = None,
         exploration_policy: ExplorationPolicy | None = None,
-        registry: Any = None,  # CapabilityRegistryPort
+        registry: Any = None,
         batch_size: int = 50,
         export_interval_events: int = 200,
         export_interval_seconds: float = 60.0,

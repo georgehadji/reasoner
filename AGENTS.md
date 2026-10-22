@@ -212,7 +212,6 @@ src/reasoner/
 |   |-- _prism.py
 |   |-- _shared.py
 |   |-- _universal.py
-|   |-- _vs_shared.py
 |-- infrastructure/                # Infrastructure layer
 |   |-- llm/                       # LLM abstraction
 |   |   |-- base.py
@@ -642,7 +641,7 @@ Copy `.env.example` to `.env` and fill in:
 ## 8. Security Considerations
 
 - **Input Sanitization:** All user inputs pass through `reasoner.sanitization.sanitize_for_prompt()` before reaching LLM prompts
-- **Prompt Injection Defense:** Layered filtering in sanitization module + adversarial persuasion defense (`reasoner_persuasion_defense.py`)
+- **Prompt Injection Defense:** Layered filtering in sanitization module
 - **XSS Prevention:** Regex-based `<script>` stripping, HTML tag removal, NFKC normalization in `RunRequest.validate_problem()`
 - **Rate Limiting:** Token-bucket rate limiter per client IP (`rate_limiter.py`); Redis backend available for multi-worker deployments
 - **Authentication:** Token-based auth with scoped permissions (`auth.py`); Supabase JWT primary, local JWT fallback

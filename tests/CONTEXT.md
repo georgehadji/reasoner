@@ -146,7 +146,6 @@ Test configurations and base setup for the Pytest testing framework.
 - **`test_perplexity_search_client.py`**: Code or resource asset facilitating system functionality.
 - **`test_perspective_registry.py`**: Tests for PerspectiveRegistry runtime extensibility.
 - **`test_perspectives_reach_state.py`**: Regression tests: Phase 2 perspectives must actually reach PipelineState.
-- **`test_persuasion_defense.py`**: =============================================================================
 - **`test_phase_span.py`**: Tests for PhaseSpan — observability context manager for pipeline phases.
 - **`test_phase_subagents_base.py`**: Unit tests for PhaseSubAgent base class.
 - **`test_phases_shared.py`**: Tests for shared phase utilities.

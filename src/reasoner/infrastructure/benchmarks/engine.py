@@ -47,7 +47,7 @@ class BenchmarkEngine:
 
     def __init__(
         self,
-        registry: Any = None,  # CapabilityRegistryPort
+        registry: Any = None,
         runner: BenchmarkRunner | None = None,
         budget: dict[str, Any] | None = None,
     ) -> None:
