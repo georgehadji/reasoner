@@ -34,6 +34,7 @@ export async function GET() {
         reasoning: { healthy: false },
         embedding: { healthy: false },
         agents_configured: [],
+        active_tenant_count: 0,
         default_persona: 'default',
         sessions: { hot: 0, warm: 0, cold: 0 },
       });
@@ -57,6 +58,7 @@ export async function GET() {
       reasoning: { healthy: false },
       embedding: { healthy: false },
       agents_configured: [],
+      active_tenant_count: 0,
       default_persona: 'default',
       sessions: { hot: 0, warm: 0, cold: 0 },
     }, { status: 503 });

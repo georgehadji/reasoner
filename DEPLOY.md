@@ -78,7 +78,20 @@ TAVILY_API_KEY=                   # Optional secondary search backend
 
 # ── Optional: Monitoring ──
 SENTRY_DSN=...
+
+# ── Proxies (required behind a load balancer or CDN) ──
+TRUSTED_PROXIES=10.0.0.2,10.0.0.3 # Every proxy hop in front of the app, comma-separated
 ```
+
+**`TRUSTED_PROXIES`.** Both the backend and the Next.js frontend take the client
+address from `X-Forwarded-For`, walking it right to left past the proxies listed
+here. Leave it unset behind a load balancer or CDN and the rightmost hop, the
+proxy itself, becomes "the client": every user then shares one rate-limit
+bucket. In production the frontend logs this once at error level and
+`/api/health` answers with `X-Proxy-Topology: undeclared`. List the address of
+every hop between the internet and the app (CDN egress ranges, the load
+balancer, Caddy). The rate-limit buckets in the Next.js proxy are per Node
+instance; the backend limiter is the shared, authoritative one.
 
 **Never commit `.env`.** It is already in `.gitignore`.
 
@@ -196,6 +209,27 @@ copy one as above and merge the other with the `sqlite3` CLI, for example
 `ATTACH 'other.db' AS o; INSERT OR IGNORE INTO pipeline_owners SELECT * FROM o.pipeline_owners;`.
 Paths can be overridden with `EVENT_STORE_DB_PATH`, `FEEDBACK_DB_PATH`,
 `AUTH_DB_PATH` and `UPLOAD_STORAGE_DIR` in `.env`.
+
+**Shared Neuro data directory (multi-worker or multi-host).** Neuro's L2 index
+already needs every worker to see the same `data_dir`. Account erasure relies on
+it too: when one worker erases a user, it writes an expiring marker under
+`<data_dir>/.erased/`, and the other workers read it to stop serving that user's
+memory and to refuse new writes for it (DAT-13). Workers on different hosts must
+therefore mount the same `data_dir`; with separate directories an erased user's
+memory stays live on the other hosts.
+
+**History layout (PER-12).** History is stored per owner under
+`history/<owner_key>/`. After the first deploy of this version run, once:
+
+```bash
+docker compose exec backend env PYTHONPATH=src python scripts/migrate_history_layout.py          # dry run
+docker compose exec backend env PYTHONPATH=src python scripts/migrate_history_layout.py --apply
+```
+
+Until it has run, the old flat files are still read and erased for their owner.
+Afterwards delete the old per-tag `history/*.jsonl` files: they hold copies of
+every user's entries, nothing reads them, and account erasure no longer touches
+them.
 
 ---
 

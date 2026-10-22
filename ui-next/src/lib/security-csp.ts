@@ -2,7 +2,17 @@ import { REASONER_WS_HOSTS, REASONER_WS_PORTS } from './server-config';
 
 const DEFAULT_WS_URL = 'ws://127.0.0.1:8003/ws';
 
-function buildConnectSrc(wsUrl: string): string {
+/** `new URL(x).origin`, or null for an unset or malformed value. */
+function originOf(raw: string | undefined): string | null {
+  if (!raw) return null;
+  try {
+    return new URL(raw).origin;
+  } catch {
+    return null;
+  }
+}
+
+function buildConnectSrc(wsUrl: string, supabaseUrl?: string, sentryDsn?: string): string {
   const wsOrigins = new Set<string>();
   const addOrigins = (host: string, port: string) => {
     wsOrigins.add(`ws://${host}:${port}`);
@@ -17,14 +27,19 @@ function buildConnectSrc(wsUrl: string): string {
   if (wsUrl) {
     try {
       const u = new URL(wsUrl);
-      const port = u.port || REASONER_WS_PORTS[0];
+      // A URL with no port means the scheme's default, not the dev port.
+      const port = u.port || (u.protocol === 'wss:' ? '443' : '80');
       addOrigins(u.hostname, port);
     } catch {
       // Fall back to the explicit host/port allowlist above.
     }
   }
 
-  return `connect-src 'self' ${[...wsOrigins].join(' ')}`;
+  // Supabase auth (sign-in, sign-up, token refresh) and the Sentry ingest are
+  // browser-to-third-party calls; without them here the browser blocks both.
+  const services = [originOf(supabaseUrl), originOf(sentryDsn)].filter(Boolean);
+
+  return `connect-src 'self' ${[...wsOrigins, ...services].join(' ')}`;
 }
 
 /**
@@ -70,9 +85,13 @@ export function buildContentSecurityPolicy(options?: {
    */
   allowUnsafeEval?: boolean;
   wsUrl?: string;
+  supabaseUrl?: string;
+  sentryDsn?: string;
 }): string {
   const allowUnsafeEval = options?.allowUnsafeEval ?? false;
   const wsUrl = options?.wsUrl ?? process.env.NEXT_PUBLIC_WS_URL ?? DEFAULT_WS_URL;
+  const supabaseUrl = options?.supabaseUrl ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const sentryDsn = options?.sentryDsn ?? process.env.NEXT_PUBLIC_SENTRY_DSN;
   const scriptSrc = allowUnsafeEval
     ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
     : "script-src 'self' 'unsafe-inline'";
@@ -83,7 +102,7 @@ export function buildContentSecurityPolicy(options?: {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
-    buildConnectSrc(wsUrl),
+    buildConnectSrc(wsUrl, supabaseUrl, sentryDsn),
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",

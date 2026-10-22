@@ -8,7 +8,6 @@ from growing uncontrollably.
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from types import SimpleNamespace
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -22,7 +21,6 @@ from reasoner.api.dependencies import (
 )
 from reasoner.api.middleware import _anonymize_ip
 from reasoner.application.services.quota_service import TIER_LIMITS
-from reasoner.core.degrade import degraded
 from reasoner.core.settings import settings
 from reasoner.domain.api_keys import ACCOUNT_DELETE_SCOPE
 from reasoner.domain.saas import User
@@ -140,32 +138,21 @@ async def export_data(
 ):
     """Export all personal data as JSON (GDPR Article 20).
 
-    Critical Enhancement 6.7: capped at 1000 query logs to prevent OOM.
+    One key per store in the user-data registry, so what is exported is what is
+    erased (DAT-10). A store that fails fails the export: a shorter document
+    would look complete.
     """
-    from reasoner.infrastructure.persistence.quota_repo_postgres import PostgresQuotaRepository
-    dsn = settings.DATABASE_URL.replace("+asyncpg", "")
-    repo = PostgresQuotaRepository(dsn, pool_size=2)
-    pool = await repo._get_pool()
+    from reasoner.api.user_data import user_data_stores
+    from reasoner.application.services.data_eraser import UserDataExporter
+    from reasoner.core.exceptions import UserDataExportError
 
-    # Explicit allowlists for GDPR export (SEC-010)
-    PROFILE_FIELDS = ["id", "email", "display_name", "created_at"]
-    SUBSCRIPTION_FIELDS = ["tier", "status", "current_period_end", "stripe_subscription_id"]
-    QUOTA_FIELDS = ["tier", "used_queries", "max_queries", "period_start"]
-    QUERY_FIELDS = ["preset", "method", "tokens_in", "tokens_out", "cost_usd", "timestamp"]
-
-    profile = await pool.fetchrow(
-        f"SELECT {', '.join(PROFILE_FIELDS)} FROM users WHERE id = $1", str(user.id)
-    )
-    subscriptions = await pool.fetch(
-        f"SELECT {', '.join(SUBSCRIPTION_FIELDS)} FROM subscriptions WHERE user_id = $1", str(user.id)
-    )
-    quotas = await pool.fetchrow(
-        f"SELECT {', '.join(QUOTA_FIELDS)} FROM usage_quotas WHERE user_id = $1", str(user.id)
-    )
-    queries = await pool.fetch(
-        f"SELECT {', '.join(QUERY_FIELDS)} FROM query_audit_logs WHERE user_id = $1 ORDER BY timestamp DESC LIMIT 1000",
-        str(user.id),
-    )
+    try:
+        data = await UserDataExporter(user_data_stores()).export(str(user.id))
+    except UserDataExportError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "Export incomplete; please retry.", "stores": exc.details["stores"]},
+        ) from exc
 
     await _log_auth_event(
         user.id, "data_export",
@@ -173,13 +160,7 @@ async def export_data(
         request.headers.get("User-Agent"),
     )
 
-    return {
-        "profile": dict(profile) if profile else {},
-        "subscriptions": [dict(s) for s in subscriptions],
-        "quota": dict(quotas) if quotas else {},
-        "queries": [dict(q) for q in queries],
-        "exported_at": datetime.now(UTC).isoformat(),
-    }
+    return {**data, "exported_at": datetime.now(UTC).isoformat()}
 
 
 @router.post("/account/delete")
@@ -240,99 +221,28 @@ async def delete_account(
             },
         )
 
-    # Phase 2: Atomic DB transaction — audit BEFORE delete
-    async with pool.acquire() as conn:
-        async with conn.transaction():
-            # Write deletion-audit to no-FK table BEFORE user delete
-            await conn.execute(
-                """
-                INSERT INTO account_deletion_log (user_id, ip_address, user_agent)
-                VALUES ($1, $2, $3)
-                """,
-                str(user.id), ip, ua,
-            )
-            # Delete user — CASCADE cleans auth_audit_log, subscriptions, quotas
-            await conn.execute("DELETE FROM users WHERE id = $1", str(user.id))
+    # Phase 2: the deletion log, before any data goes. It is the no-FK record
+    # that refuses this account on every worker (BIL-18), so it must exist
+    # before the sign-in identity can be removed.
+    await pool.execute(
+        "INSERT INTO account_deletion_log (user_id, ip_address, user_agent) VALUES ($1, $2, $3)",
+        str(user.id), ip, ua,
+    )
 
-    deleted = {"db": True, "uploads": 0, "history": 0, "vectors": 0, "cache": 0}
+    # Phase 3: every store in the user-data registry, content first, the users
+    # row and the sign-in identity last (DAT-11). Best-effort per store -- the
+    # log above already committed -- but never silent: whatever could not be
+    # erased is returned to the caller, who is being told their data is gone.
+    from reasoner.api.user_data import user_data_stores
+    from reasoner.application.services.data_eraser import UserDataEraser
 
-    # Phase 3 is best-effort by design -- the user row is already gone and the
-    # transaction has committed -- but "best-effort" was returning
-    # {"status": "deleted"} with a clean 200 whether any of it ran or not. This
-    # is GDPR Article 17: the caller is being told their data is erased.
-    # Whatever could not be erased is recorded here and returned to them.
-    _record = SimpleNamespace(degradations=[])
-
-    # Phase 3: External side-effects (best-effort, AFTER transaction commits)
-    # Uploads
-    # Bound before the try: the vector-store block below iterates user_uploads,
-    # so a failure here raised NameError there and was swallowed by that
-    # block's own handler -- one failure silently costing two erasure phases.
-    user_uploads: list = []
-    try:
-        from reasoner.uploader import delete_file, list_uploads
-        user_uploads = list_uploads(user_id=str(user.id))
-        for upload in user_uploads:
-            if delete_file(upload["file_id"]):
-                deleted["uploads"] += 1
-    except Exception as exc:
-        degraded("saas.delete_account.uploads", None, exc=exc, state=_record)
-
-    # History files
-    try:
-        import json as _json
-
-        from reasoner.api.history import HISTORY_DIR
-        for f in HISTORY_DIR.glob("*.json"):
-            try:
-                data = _json.loads(f.read_text(encoding="utf-8"))
-                if data.get("user_id") == str(user.id):
-                    f.unlink(missing_ok=True)
-                    deleted["history"] += 1
-            except Exception as exc:
-                # An unreadable history file cannot be attributed to a user, so
-                # it cannot be certified as erased either. Skipping it quietly
-                # is how this endpoint leaves the caller's transcripts on disk
-                # and still reports success.
-                degraded(
-                    "saas.delete_account.history_file", None, exc=exc, state=_record
-                )
-    except Exception as exc:
-        degraded("saas.delete_account.history", None, exc=exc, state=_record)
-
-    # Vector store (best-effort)
-    try:
-        from reasoner.documents.vector_store import DocumentVectorStore
-        store = DocumentVectorStore()
-        for upload in user_uploads:
-            try:
-                store.delete_index(upload["file_id"])
-                deleted["vectors"] += 1
-            except Exception as exc:
-                degraded(
-                    "saas.delete_account.vector_index", None, exc=exc, state=_record
-                )
-    except Exception as exc:
-        degraded("saas.delete_account.vectors", None, exc=exc, state=_record)
-
-    # Redis cache keys (best-effort)
-    try:
-        from reasoner.infrastructure.valkey.client import get_valkey_pool
-        redis = get_valkey_pool()
-        pattern = f"user:{user.id}:*"
-        keys = await redis.keys(pattern)
-        if keys:
-            await redis.delete(*keys)
-            deleted["cache"] = len(keys)
-    except Exception as exc:
-        degraded("saas.delete_account.cache", None, exc=exc, state=_record)
-
+    receipt = await UserDataEraser(user_data_stores()).erase(str(user.id))
     return {
         "status": "deleted",
         "user_id": str(user.id),
-        "deleted": deleted,
-        # Empty on a clean run. Non-empty means the account row is gone but
-        # some external store still holds this user's data -- which the caller
-        # has a right to know, and an operator has to finish by hand.
-        "failed": list(_record.degradations),
+        "erased": receipt["erased"],
+        # Empty on a clean run. Non-empty means the account is closed but some
+        # store still holds this user's data -- which the caller has a right to
+        # know, and an operator has to finish by hand.
+        "failed": [f"{f['store']}: {f['error']}" for f in receipt["failed"]],
     }

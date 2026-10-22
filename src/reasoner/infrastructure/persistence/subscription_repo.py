@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import datetime
 from uuid import uuid4
 
 import asyncpg
@@ -15,6 +16,23 @@ import asyncpg
 from reasoner.domain.saas import Subscription, SubscriptionStatus, SubscriptionTier
 
 logger = logging.getLogger(__name__)
+
+# Every write below applies unless the row already holds a newer event
+# (BIL-15): "event time is NULL (unknown) OR no event yet OR last <= event".
+# The SQL is spelled out literally in each statement rather than composed.
+
+_SET_STATUS_SQL = {
+    "stripe_sub_id": (
+        "UPDATE subscriptions SET status = $1, last_event_at = COALESCE($3, last_event_at), "
+        "updated_at = NOW() WHERE stripe_sub_id = $2 AND ($3::timestamptz IS NULL "
+        "OR last_event_at IS NULL OR last_event_at <= $3::timestamptz)"
+    ),
+    "paypal_sub_id": (
+        "UPDATE subscriptions SET status = $1, last_event_at = COALESCE($3, last_event_at), "
+        "updated_at = NOW() WHERE paypal_sub_id = $2 AND ($3::timestamptz IS NULL "
+        "OR last_event_at IS NULL OR last_event_at <= $3::timestamptz)"
+    ),
+}
 
 
 class PostgresSubscriptionRepository:
@@ -96,14 +114,21 @@ class PostgresSubscriptionRepository:
         else:
             logger.warning("Subscription pool belongs to another event loop; not closing it")
 
-    async def upsert_subscription(self, sub: Subscription) -> None:
-        """Idempotently update subscription in Postgres.
+    async def upsert_subscription(
+        self, sub: Subscription, event_at: datetime | None = None
+    ) -> bool:
+        """Idempotently write a subscription. Returns False for a stale event.
 
-        Handles both Stripe and PayPal subscriptions by checking
-        stripe_sub_id, paypal_sub_id, or user_id.
+        A row is matched by its provider id. The user-id fallback adopts the
+        user's latest row only when that row has no id for the incoming
+        provider: overwriting a row that already tracks another subscription
+        lost it, so account deletion could no longer cancel it (BIL-14).
+
+        ``event_at`` is the provider event's own time. A write older than the
+        row's ``last_event_at`` is skipped, so a retried event cannot undo a
+        newer one (BIL-15).
         """
         pool = await self._get_pool()
-        # Try to find existing subscription by any known provider ID
         existing = None
         if sub.stripe_subscription_id:
             existing = await pool.fetchrow(
@@ -116,13 +141,19 @@ class PostgresSubscriptionRepository:
                 sub.paypal_subscription_id,
             )
         if existing is None:
-            existing = await pool.fetchrow(
-                "SELECT id FROM subscriptions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1",
+            latest = await pool.fetchrow(
+                "SELECT id, stripe_sub_id, paypal_sub_id FROM subscriptions "
+                "WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1",
                 str(sub.user_id),
             )
+            tracks_other = latest is not None and (
+                (sub.stripe_subscription_id and latest["stripe_sub_id"])
+                or (sub.paypal_subscription_id and latest["paypal_sub_id"])
+            )
+            existing = None if tracks_other else latest
 
         if existing:
-            await pool.execute(
+            result = await pool.execute(
                 """
                 UPDATE subscriptions
                 SET user_id = $1,
@@ -132,8 +163,10 @@ class PostgresSubscriptionRepository:
                     stripe_customer_id = COALESCE($5, stripe_customer_id),
                     paypal_sub_id = COALESCE($6, paypal_sub_id),
                     current_period_end = $7,
+                    last_event_at = COALESCE($9, last_event_at),
                     updated_at = NOW()
-                WHERE id = $8
+                WHERE id = $8 AND ($9::timestamptz IS NULL OR last_event_at IS NULL
+                                   OR last_event_at <= $9::timestamptz)
                 """,
                 str(sub.user_id),
                 sub.tier.value,
@@ -143,22 +176,34 @@ class PostgresSubscriptionRepository:
                 sub.paypal_subscription_id,
                 sub.current_period_end,
                 existing["id"],
+                event_at,
             )
-        else:
-            await pool.execute(
-                """
-                INSERT INTO subscriptions
-                (user_id, tier, status, stripe_sub_id, stripe_customer_id, paypal_sub_id, current_period_end)
-                VALUES ($1, $2, $3, $4, $5, $6, $7)
-                """,
-                str(sub.user_id),
-                sub.tier.value,
-                sub.status.value,
-                sub.stripe_subscription_id,
-                sub.stripe_customer_id,
-                sub.paypal_subscription_id,
-                sub.current_period_end,
-            )
+            return bool(result.endswith(" 1"))
+        await pool.execute(
+            """
+            INSERT INTO subscriptions
+            (user_id, tier, status, stripe_sub_id, stripe_customer_id, paypal_sub_id,
+             current_period_end, last_event_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            """,
+            str(sub.user_id),
+            sub.tier.value,
+            sub.status.value,
+            sub.stripe_subscription_id,
+            sub.stripe_customer_id,
+            sub.paypal_subscription_id,
+            sub.current_period_end,
+            event_at,
+        )
+        return True
+
+    async def get_user_by_stripe_sub_id(self, stripe_sub_id: str) -> str | None:
+        """The user a Stripe subscription belongs to, from our own table (BIL-13)."""
+        pool = await self._get_pool()
+        user_id = await pool.fetchval(
+            "SELECT user_id FROM subscriptions WHERE stripe_sub_id = $1", stripe_sub_id
+        )
+        return str(user_id) if user_id else None
 
     async def sync_quota_for_subscription(self, sub: Subscription) -> None:
         """Sync quota limits for a subscription without resetting used_queries on update.
@@ -227,23 +272,29 @@ class PostgresSubscriptionRepository:
                             new_max,
                         )
 
-    async def set_subscription_status(self, stripe_sub_id: str, status: str) -> None:
-        """Update subscription status (e.g. past_due, cancelled)."""
-        pool = await self._get_pool()
-        await pool.execute(
-            "UPDATE subscriptions SET status = $1, updated_at = NOW() WHERE stripe_sub_id = $2",
-            status,
-            stripe_sub_id,
-        )
+    async def set_subscription_status(
+        self, stripe_sub_id: str, status: str, event_at: datetime | None = None
+    ) -> bool:
+        """Update subscription status (e.g. past_due, cancelled). False if stale."""
+        return await self._set_status("stripe_sub_id", stripe_sub_id, status, event_at)
 
-    async def set_subscription_status_by_paypal(self, paypal_sub_id: str, status: str) -> None:
-        """Update subscription status by PayPal subscription ID."""
+    async def set_subscription_status_by_paypal(
+        self, paypal_sub_id: str, status: str, event_at: datetime | None = None
+    ) -> bool:
+        """Update subscription status by PayPal subscription ID. False if stale."""
+        return await self._set_status("paypal_sub_id", paypal_sub_id, status, event_at)
+
+    async def _set_status(
+        self, column: str, sub_id: str, status: str, event_at: datetime | None
+    ) -> bool:
         pool = await self._get_pool()
-        await pool.execute(
-            "UPDATE subscriptions SET status = $1, updated_at = NOW() WHERE paypal_sub_id = $2",
+        result = await pool.execute(
+            _SET_STATUS_SQL[column],
             status,
-            paypal_sub_id,
+            sub_id,
+            event_at,
         )
+        return not result.endswith(" 0")
 
     async def get_subscription_by_user(self, user_id: str) -> Subscription | None:
         """Fetch the active subscription for a user."""

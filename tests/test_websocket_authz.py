@@ -158,3 +158,48 @@ async def test_dynamic_subscribe_lookup_error_denied():
 
     assert '"type": "error"' in ws.sent[1]
     assert "pipeline-999" not in manager.subscriptions
+
+
+# RUN-5: `stop` named a pipeline id and cancelled it with no ownership check,
+# while `subscribe` and HTTP /api/stop both checked.
+@pytest.mark.asyncio
+async def test_stop_by_non_owner_does_not_cancel(ownership_repo):
+    from unittest.mock import AsyncMock
+
+    from reasoner.infrastructure.redis import run_state
+
+    await ownership_repo.set_owner("pipeline-stop", "user-a", "pipeline-stop")
+    manager = WebSocketManager()
+    ws = FakeWebSocket()
+    await manager.connect(ws, "conn-6", metadata={"user_id": "user-b"})
+
+    cancel = AsyncMock()
+    with patch.object(run_state._run_state_manager, "request_cancel", cancel):
+        await handle_websocket_message(
+            manager, "conn-6", {"type": "stop", "pipeline_id": "pipeline-stop"}
+        )
+
+    cancel.assert_not_awaited()
+    assert '"type": "error"' in ws.sent[1]
+    assert '"type": "stopped"' not in ws.sent[1]
+
+
+@pytest.mark.asyncio
+async def test_stop_by_owner_cancels(ownership_repo):
+    from unittest.mock import AsyncMock
+
+    from reasoner.infrastructure.redis import run_state
+
+    await ownership_repo.set_owner("pipeline-stop2", "user-a", "pipeline-stop2")
+    manager = WebSocketManager()
+    ws = FakeWebSocket()
+    await manager.connect(ws, "conn-7", metadata={"user_id": "user-a"})
+
+    cancel = AsyncMock()
+    with patch.object(run_state._run_state_manager, "request_cancel", cancel):
+        await handle_websocket_message(
+            manager, "conn-7", {"type": "stop", "pipeline_id": "pipeline-stop2"}
+        )
+
+    cancel.assert_awaited_once_with("pipeline-stop2")
+    assert '"type": "stopped"' in ws.sent[1]

@@ -207,6 +207,16 @@ class ProviderCreditsExhaustedError(ProviderError):
     retryable = False
 
 
+class ValkeyUnavailableError(ReasonerError, ConnectionError):
+    """Valkey failed or timed out recently, or is cooling down after doing so.
+
+    Raised by ``infrastructure.valkey.guarded.GuardedValkey``. A
+    ``ConnectionError`` too, so the existing ``except Exception`` / connection
+    handlers around cache reads keep working unchanged.
+    """
+    retryable = True
+
+
 # ─────────────────────────────────────────────────────────────────────
 # PIPELINE ERRORS
 # ─────────────────────────────────────────────────────────────────────
@@ -242,6 +252,15 @@ class ConfigurationError(ReasonerError):
 class EventStoreCorruptionError(PipelineError):
     """Raised when event store data is inconsistent (e.g. version gaps after compaction)."""
     retryable = False
+
+
+class UserDataExportError(ReasonerError):
+    """A store could not be exported, so the export would be incomplete.
+
+    ``details["stores"]`` names the stores that failed. Retryable: the caller
+    should get the whole export or an error, never a silently shorter one.
+    """
+    retryable = True
 
 
 # ─────────────────────────────────────────────────────────────────────

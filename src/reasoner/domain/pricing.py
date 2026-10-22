@@ -16,6 +16,16 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+# A fallback may cost at most this many times the model it replaces (blended
+# input+output USD per million tokens). Ten is the line the audit drew: 45
+# role/preset pairs sat above it, the worst at 48x. Open question Q3 in
+# docs/plans/audit-remediation-3-2026-10-21.md is whether it should be 3.
+# Lives here, not in core/constants_limits: domain may not import core.
+FALLBACK_MAX_PRICE_RATIO: float = 10.0
+# A free or near-free assigned model is priced at this floor for the ratio, so
+# the first paid fallback is judged against something rather than against zero.
+FALLBACK_PRICE_FLOOR_USD_PER_MTOK: float = 0.3
+
 
 @dataclass(frozen=True)
 class ModelPricing:
@@ -126,6 +136,27 @@ def get_pricing(model_id: str) -> ModelPricing:
     # cannot reach the alias table, and silently defaulting here is what made
     # the spend gate price every preset identically.
     return PRICING_DB["_default"]
+
+
+def blended_usd_per_mtok(pricing: ModelPricing) -> float:
+    """Input plus output price per million tokens: one comparable number per model."""
+    return (pricing.input_per_token + pricing.output_per_token) * 1_000_000
+
+
+def fallback_within_budget(
+    assigned_usd_per_mtok: float,
+    candidate_usd_per_mtok: float,
+    ratio: float = FALLBACK_MAX_PRICE_RATIO,
+) -> bool:
+    """May *candidate* stand in for *assigned* without costing far more?
+
+    Pure specification, enforced twice: the preset contract test checks the
+    declared routing, and ``ProviderRouter._resolve_fallback`` checks the
+    routers built at run time (``build_auto_preset``), which a static test
+    cannot see.
+    """
+    base = max(assigned_usd_per_mtok, FALLBACK_PRICE_FLOOR_USD_PER_MTOK)
+    return candidate_usd_per_mtok <= base * ratio
 
 
 def format_cost(cost_usd: float) -> str:

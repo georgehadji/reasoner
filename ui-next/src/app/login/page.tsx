@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertCircle, Check } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { TIMING } from '@/lib/config';
+import { selectAuthStatus, useAppStore } from '@/stores/app-store';
 import { signInWithEmail, signInWithOAuth, getEnabledOAuthProviders } from '@/lib/auth';
 import type { AuthError } from '@/lib/auth';
 
@@ -76,6 +77,24 @@ function Notice({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * Sends a signed-in user on to `?next=` (or /chat). Covers both a visitor who
+ * arrives already signed in and the moment sign-in completes, so the form does
+ * not navigate on its own.
+ */
+function ForwardWhenSignedIn() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const status = useAppStore(selectAuthStatus);
+  const raw = searchParams.get('next') ?? '';
+  // Same-site paths only: "//host" and "/\host" would leave the origin.
+  const target = /^\/(?![/\\])/.test(raw) ? raw : '/chat';
+  useEffect(() => {
+    if (status === 'authenticated') router.replace(target);
+  }, [status, target, router]);
+  return null;
+}
+
 function LoginMessage() {
   const searchParams = useSearchParams();
   const message = searchParams.get('message');
@@ -104,7 +123,6 @@ export default function LoginPage() {
   const [oauth, setOauth] = useState<Provider | null>(null);
   const oauthTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(oauthTimer.current), []);
-  const router = useRouter();
 
   /* `busy` covers the whole surface; `status`/`oauth` say WHICH control is
      working, so the spinner lands on the button the user actually pressed. */
@@ -120,7 +138,6 @@ export default function LoginPage() {
       // Stay in `success` through the redirect — dropping back to idle would
       // flash an enabled form and read as "nothing happened".
       setStatus('success');
-      router.push('/chat');
     } catch (err) {
       const authErr = err as AuthError;
       setCredentialsRejected(true);
@@ -169,6 +186,7 @@ export default function LoginPage() {
 
         <Suspense fallback={null}>
           <LoginMessage />
+          <ForwardWhenSignedIn />
         </Suspense>
 
         {error && (

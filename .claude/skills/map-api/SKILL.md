@@ -28,10 +28,12 @@ folders:
 | `metrics.py` | Prometheus scrape endpoint + `QueryTimer`. Metric *definitions* live in `reasoner/metrics.py`. |
 | `middleware.py` | `SecurityHeadersMiddleware`, `AuditMiddleware` (IP anonymization, URL sanitizing), `MemoryLimitMiddleware`, `RequestTimeoutMiddleware`. |
 | `phase_executor.py` | Phase→router-role hints and `get_phase_start_models`. Nothing else: `_LEGACY_CRITICAL` (fatality) and `run_phase_with_keepalive` both left in Phase B-1 — fatality is `PhaseStep.critical` alone, keepalives come from `execution/sse_observer.keepalive_ticker`. |
+| `run_admission.py` | `admit_run()` + `Admission` — the one admission sequence (legacy-auth gate, preset-tier gate, anonymous cap, `client_run_id` claim, credit reservation) every HTTP pipeline route calls; `MeteredSSEResponse` releases the hold of a stream the client dropped before its first frame. `tests/architecture/test_run_admission.py` enforces it. MCP tools keep their own sequence. |
 | `run_observability.py` | `CreditSink` + `PrometheusObserver` — concrete bindings for `run_metering.metered()` protocols. |
 | `run_state.py` | Shim → RunStateStore. |
-| `saas_router.py` | `/me`, quota status, data export, account deletion, auth-event logging. |
+| `saas_router.py` | `/me`, quota status, data export, account deletion, auth-event logging. Export and deletion run the `user_data.py` registry. |
 | `schemas.py` | All Pydantic request/response models (`RunRequest`, `FollowupRequest`, `GenerateImageRequest`, …). |
+| `user_data.py` | The user-data registry: `user_data_stores()` (every store, in erase order), `data_stores()` (without `profile`/`identity`), `ACCOUNT_STORE_NAMES`. Export, `/api/account/delete` and `/api/user/data` all iterate it (DAT-10/11). |
 | `sentry.py` | `init_sentry` — error tracking init. |
 | `serializers.py` | Shim → `application/services/serializers.py`. Import from there in new code. |
 | `sse_utils.py` | SSE frame formatting `_event`, WS fan-out `_broadcast_ws`, `_persist_event`. |
@@ -60,7 +62,7 @@ folders:
 | `estimate.py` | `POST /api/estimate` — token/cost/duration estimate without running. |
 | `feedback.py` | Feedback submission + admin stats. |
 | `gate.py` | `POST /api/gate` — HyperGate decision without executing the pipeline. |
-| `gdpr.py` | `erase_user_data`. |
+| `gdpr.py` | `erase_user_data`: the registry's data stores, not the account itself. |
 | `health.py` | `/api/health` — subsystem pass/fail; public response omits internals. |
 | `history.py` | History list/tagged/get/delete/clear. |
 | `images.py` | Image generation with credit reserve/release, auto model select, provenance scrub. |

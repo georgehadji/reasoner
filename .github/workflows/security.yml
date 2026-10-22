@@ -39,7 +39,7 @@ jobs:
       # ran on studio-adopt PRs, so nothing lowered MAX along the way.
       # 98: audit 3 PR 8 deleted the root scratch scripts and scripts/start_all.py,
       # which carried two findings.
-      - run: python scripts/bandit_ratchet.py --max 98
+      - run: python scripts/bandit_ratchet.py --max 95
       - run: python scripts/scan-secrets.py
 
   frontend:

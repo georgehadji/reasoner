@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sized
 from typing import Any, Protocol, runtime_checkable
 
+from reasoner.core.exceptions import PhaseError
 from reasoner.core.ports.code_executor import CodeExecutorPort
 from reasoner.core.ports.llm_port import LLMPort
 from reasoner.domain.pipeline_state import PipelineState
@@ -83,6 +84,24 @@ class PhaseObserver(Protocol):
     async def on_phase_complete(
         self, step: PhaseStep, state: PipelineState, duration: float, result: Any
     ) -> None: ...
+
+
+def require_survivors(
+    items: Sized, errors: list[str], *, phase: int, phase_name: str
+) -> None:
+    """Raise when a fan-out phase produced nothing.
+
+    Zero survivors is an execution failure, not a low score: without the raise
+    the runner counts the phase complete, a ``critical`` flag never fires, and
+    the run keeps paying for later phases that have nothing to work on
+    (docs/plans/audit-remediation-2-2026-10-20.md FLOW-3).
+    """
+    if not len(items):
+        raise PhaseError(
+            f"All {phase_name} calls failed: " + ("; ".join(errors) or "no output"),
+            phase=phase,
+            phase_name=phase_name,
+        )
 
 
 @runtime_checkable

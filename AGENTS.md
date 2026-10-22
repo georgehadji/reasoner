@@ -593,7 +593,7 @@ Copy `.env.example` to `.env` and fill in:
 | `COHERE_RERANK_ENABLED` | Enable Cohere reranking via OpenRouter |
 | `COHERE_RERANK_MODEL` | Rerank model ID (default: cohere/rerank-4-fast) |
 | `DOCUMENT_SEMANTIC_RETRIEVAL_ENABLED` | Opt-in semantic chunking for uploaded files |
-| `DOCUMENT_CHUNK_SIZE` / `DOCUMENT_CHUNK_OVERLAP` / `DOCUMENT_MAX_CHUNKS_PER_FILE` | Chunking params |
+| `DOCUMENT_CHUNK_SIZE` / `DOCUMENT_CHUNK_OVERLAP` / `DOCUMENT_INDEX_MAX_CHARS` | Chunking params; characters indexed per document |
 
 **SaaS Auth**
 | Variable | Purpose |

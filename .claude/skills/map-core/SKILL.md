@@ -21,7 +21,7 @@ folders:
 | `constants_prompts.py` | System prompts + image-generation prompt text, split out to keep large blocks isolated. |
 | `settings.py` (25KB) | `Settings` — the **only** module that reads process env / loads `.env`. |
 | `temperatures.py` | Per-phase temperature + reasoning-effort: `temperature_for`, `reasoning_extra_body`. |
-| `parsing.py` (29KB) | Robust LLM output handling: `extract_json`, `extract_json_list`, reasoning/think-tag stripping, Perplexity citation and provider-artifact stripping, prose-preamble stripping. |
+| `parsing.py` (29KB) | Robust LLM output handling: `extract_json`, `extract_json_list`, reasoning/think-tag stripping, Perplexity citation and provider-artifact stripping, prose-preamble stripping. `coerce_list` / `coerce_verdict` normalise model-written fields (`null` lists, `"Accept"`) at the read site. |
 | `sanitization.py` | `InputSanitizer`, `sanitize_problem`, `sanitize_for_prompt`, `clean_llm_artifacts`, `sanitize_for_logging`. |
 | `propagation_signals.py` | Scores text for self-propagating structure before it becomes long-term memory: `score_propagation_shape`, `PropagationSignal`. Weights imperative structure over the viral lexicon; telemetry only, never a gate. |
 | `exceptions.py` | Full exception taxonomy: `ReasonerError` root, `ErrorCode`, parse/provider/auth/rate-limit/model-not-found families. |

@@ -20,7 +20,6 @@ pytestmark = pytest.mark.unit
 @pytest.fixture(autouse=True)
 def _isolated_upload_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(uploader, "UPLOAD_DIR", tmp_path)
-    monkeypatch.setattr(uploader, "_HASH_INDEX_PATH", tmp_path / ".hash_index.json")
     monkeypatch.setattr(uploader, "_MAGIC_AVAILABLE", False)
     monkeypatch.setattr(settings, "UPLOAD_REQUIRE_MIME_VALIDATION", False)
     monkeypatch.setattr(settings, "CSRF_SECRET", "test-secret-do-not-reuse")

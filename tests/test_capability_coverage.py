@@ -24,12 +24,15 @@ REPO_ROOT = Path(__file__).parent.parent
 SCANNED_FILES = [
     REPO_ROOT / "src/reasoner/api/__init__.py",
     REPO_ROOT / "src/reasoner/api/routes/agent.py",
+    REPO_ROOT / "src/reasoner/api/routes/context.py",
+    REPO_ROOT / "src/reasoner/api/routes/pipelines.py",
     REPO_ROOT / "src/reasoner/api/routes/images.py",
 ]
 
 _ROUTE_DECORATOR = re.compile(r'@(?:app|router)\.(?:get|post|put|delete)\("([^"]+)"')
 _ROUTER_PREFIX = re.compile(r'APIRouter\([^)]*prefix="([^"]+)"')
-_RESERVATION_CALL = re.compile(r"\breserve_or_402\(|\b_reserve_image_credits\(")
+# admit_run() reserves through reserve_or_402; every pipeline route calls it.
+_RESERVATION_CALL = re.compile(r"\breserve_or_402\(|\b_reserve_image_credits\(|\badmit_run\(")
 
 ALL_REGISTERED_ROUTES = frozenset(
     route for policy in CAPABILITY_POLICY.values() for route in policy.routes

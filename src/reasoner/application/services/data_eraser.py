@@ -1,151 +1,76 @@
-"""GDPR user-data erasure service (DM3).
+"""GDPR export and erasure over one ordered registry of stores (DAT-10, DAT-11).
 
-Orchestrates deletion of user data across event store, cache, and neuro memory.
+``UserDataEraser`` and ``UserDataExporter`` iterate the same sequence of
+``UserDataStore`` strategies. Which stores exist, and in what order, is decided
+once, in ``api/user_data.py``; neither class knows about any particular store.
+
+Erasure is best-effort per store but never silent: a store that raises is
+recorded in the receipt, the rest still run, and the receipt is only
+"completed" when every store succeeded. Export is all-or-nothing: a store that
+fails fails the export, because a shorter document would look complete.
 """
 
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from datetime import UTC, datetime
+from typing import Any
 
-from reasoner.infrastructure.persistence.event_store import EventStore
+from reasoner.application.ports.user_data import UserDataStore
+from reasoner.core.degrade import degraded
+from reasoner.core.exceptions import UserDataExportError
 
 logger = logging.getLogger(__name__)
 
 
-from collections.abc import Awaitable, Callable
-
-
 class UserDataEraser:
-    """Application service for GDPR right-to-be-forgotten erasure.
+    """Erase a user from every store, in registry order."""
 
-    Wires together:
-      - Event store: list_aggregates_for_user + delete_aggregate
-      - Cache: evict entries by user_id prefix
-      - Neuro: NeuroService.erase_owner removes every Neuro tenant (L1/L2/L3
-        memory, in-memory and on disk) belonging to the user
-    """
+    def __init__(self, stores: Sequence[UserDataStore]) -> None:
+        self._stores = list(stores)
 
-    def __init__(
-        self,
-        event_store: EventStore,
-        clear_cache_fn: Callable[[], None] | None = None,
-        erase_neuro_fn: Callable[[str], Awaitable[dict]] | None = None,
-    ) -> None:
-        self._event_store = event_store
-        self._clear_cache_fn = clear_cache_fn
-        # Injectable for tests; the production default goes through the
-        # injected MemoryPort (see erase()) so pipeline and erasure share one
-        # view of tenant state without application/ importing neuro.
-        self._erase_neuro_fn = erase_neuro_fn
+    async def erase(self, user_id: str) -> dict[str, Any]:
+        """Returns ``{status, erased: [names], failed: [{store, error}], timestamp}``.
 
-    async def erase(self, user_id: str) -> dict:
-        """Erase all data for *user_id*. Returns an erasure receipt.
-
-        Returns:
-            dict with: deleted_aggregates (int), deleted_pipelines (int),
-                       cache_evicted (bool), neuro_memory_erased (bool),
-                       timestamp (iso), status (str)
+        ``status`` is "completed" only when no store failed; otherwise "partial".
         """
-        deleted_aggregates = 0
-        deleted_pipelines = 0
-        aggregates_error: str | None = None
-
-        # 1. Delete event store aggregates
-        try:
-            aggregate_ids = await self._event_store.list_aggregate_ids_for_user(user_id)
-            for aid in aggregate_ids:
-                await self._event_store.delete_aggregate(aid)
-            deleted_aggregates = len(aggregate_ids)
-            logger.info("GDPR erasure: deleted %d aggregates for user %s", deleted_aggregates, user_id)
-        except Exception as exc:
-            aggregates_error = str(exc)
-            logger.error("GDPR erasure: failed to delete aggregates for user %s: %s", user_id, exc)
-
-        # 2. Evict cache entries for this user
-        cache_evicted = False
-        if self._clear_cache_fn:
+        erased: list[str] = []
+        failed: list[dict[str, str]] = []
+        for store in self._stores:
             try:
-                self._clear_cache_fn()
-                cache_evicted = True
+                await store.erase(str(user_id))
+                erased.append(store.name)
             except Exception as exc:
-                logger.warning("GDPR erasure: cache eviction failed for user %s: %s", user_id, exc)
-
-        # 3. Neuro long-term memory.
-        #
-        # Neuro isolates a signed-in user's data by tenant_key(owner, agent_id)
-        # = "u-{owner}-{agent_id}" -- one tenant per (owner, conversation) pair,
-        # not a single directory per user -- so erasure has to enumerate every
-        # tenant this owner has ever used, in memory and on disk. This used to
-        # import SessionManager, never call it, and fall through with a
-        # "best-effort cache clear" comment: Neuro L1/L2/L3 memory holds the
-        # user's prompts and our responses verbatim, so it survived every
-        # Article 17 erasure while the receipt said "completed".
-        # See neuro.server.NeuroService.erase_owner.
-        neuro_erased = False
-        neuro_error: str | None = None
-        try:
-            erase_neuro = self._erase_neuro_fn
-            if erase_neuro is None:
-                from reasoner.core.ports.memory_port import get_memory_port
-
-                port = get_memory_port()
-                if port is None:
-                    raise RuntimeError(
-                        "memory port is not registered (neuro unavailable); "
-                        "long-term memory could not be erased or verified"
-                    )
-                erase_neuro = port.erase_owner
-
-            neuro_result = await erase_neuro(str(user_id))
-            neuro_erased = bool(neuro_result.get("erased"))
-            if neuro_erased:
-                logger.info(
-                    "GDPR erasure: removed neuro memory for user %s "
-                    "(%d dirs, %d in-memory tenants)",
-                    user_id,
-                    neuro_result.get("dirs_removed", 0),
-                    neuro_result.get("tenants_evicted", 0),
-                )
-            else:
-                neuro_error = neuro_result.get("error") or "neuro erasure reported incomplete"
-        except Exception as exc:
-            neuro_error = str(exc)
-        if neuro_error:
-            logger.warning(
-                "GDPR erasure: neuro memory removal failed for user %s: %s", user_id, neuro_error
-            )
-
-        # Status reflects whether the event-store deletion step itself
-        # succeeded, not whether *some* step (e.g. cache eviction, which is
-        # a performance side-effect, not the data being erased) succeeded.
-        # Previously "completed" could be true purely from cache_evicted
-        # while aggregates_error was set -- the receipt could claim success
-        # while a user's actual pipeline data was never deleted.
-        #
-        # Neuro long-term memory holds the user's prompts and our responses
-        # verbatim. If it survived, the erasure is not complete, whatever else
-        # succeeded -- saying otherwise is a false compliance record.
-        if aggregates_error:
-            status = "failed"
-        elif not neuro_erased:
-            status = "partial"
-        elif deleted_aggregates > 0 or cache_evicted:
-            status = "completed"
-        else:
-            status = "partial"
-
+                degraded(f"user_data.erase.{store.name}", None, exc=exc)
+                failed.append({"store": store.name, "error": str(exc) or type(exc).__name__})
         receipt = {
-            "deleted_aggregates": deleted_aggregates,
-            "deleted_pipelines": deleted_pipelines,
-            "cache_evicted": cache_evicted,
-            "neuro_memory_erased": neuro_erased,
+            "status": "partial" if failed else "completed",
+            "erased": erased,
+            "failed": failed,
             "timestamp": datetime.now(UTC).isoformat(),
-            "status": status,
         }
-        if neuro_error:
-            receipt["neuro_error"] = neuro_error
-        if aggregates_error:
-            receipt["error"] = f"Event store aggregate deletion failed: {aggregates_error}"
         logger.info("GDPR erasure receipt for user %s: %s", user_id, receipt)
         return receipt
+
+
+class UserDataExporter:
+    """Export a user's data from every store, keyed by store name."""
+
+    def __init__(self, stores: Sequence[UserDataStore]) -> None:
+        self._stores = list(stores)
+
+    async def export(self, user_id: str) -> dict[str, Any]:
+        out: dict[str, Any] = {}
+        failed: list[str] = []
+        for store in self._stores:
+            try:
+                out[store.name] = await store.export(str(user_id))
+            except Exception as exc:
+                degraded(f"user_data.export.{store.name}", None, exc=exc)
+                failed.append(store.name)
+        if failed:
+            raise UserDataExportError(
+                f"export incomplete: {', '.join(failed)}", {"stores": failed}
+            )
+        return out

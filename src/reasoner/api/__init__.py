@@ -9,9 +9,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import asyncio
 import logging
 from contextlib import asynccontextmanager
+
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPBearer
 
 from reasoner.core.constants import (
@@ -458,7 +458,6 @@ def _filter_routing(routing: dict[str, str], primary_id: str) -> dict[str, str]:
 # Redis-backed with in-memory fallback (Critical Enhancement 9.1–9.3, 9.7).
 from reasoner.api.auth_deps import optional_auth, require_csrf
 from reasoner.api.dependencies import (
-    check_preset_access_if_authenticated,
     check_quota_if_authenticated,
     check_rate_limit,
     close_tier_lookup,
@@ -469,6 +468,10 @@ from reasoner.api.dependencies import (
     get_search_service,
     require_credits_if_authenticated,
     run_tier_label,
+)
+from reasoner.api.run_admission import MeteredSSEResponse, admit_run
+from reasoner.api.run_admission import (
+    require_auth_if_legacy_disabled as _require_auth_if_legacy_disabled,
 )
 from reasoner.api.schemas import (
     FollowupRequest,
@@ -483,7 +486,6 @@ from reasoner.api.streaming import (
 from reasoner.application.services.pipeline_service import PipelineService
 from reasoner.application.services.preset_service import PresetService
 from reasoner.application.services.search_service import SearchService
-from reasoner.domain.credits import run_reference
 from reasoner.domain.saas import QuotaResult, User
 from reasoner.infrastructure.redis.run_state import _run_state_manager as _run_store
 
@@ -537,6 +539,7 @@ async def _run_stream_with_metrics(
     *,
     reference_id: str,
     reserved_credits: int = 0,
+    started: asyncio.Event | None = None,
 ):
     """Stream a run through the shared metering wrapper.
 
@@ -576,6 +579,7 @@ async def _run_stream_with_metrics(
         tier=tier,
         interface="web",
         reserved_credits=reserved_credits,
+        started=started,
     )
     stream = run_stream_cached(
         req,
@@ -600,6 +604,7 @@ async def _run_followup_stream_with_metrics(
     *,
     reference_id: str,
     reserved_credits: int = 0,
+    started: asyncio.Event | None = None,
 ):
     """Stream a follow-up run through the shared metering wrapper.
 
@@ -636,6 +641,7 @@ async def _run_followup_stream_with_metrics(
         tier=tier,
         interface="web",
         reserved_credits=reserved_credits,
+        started=started,
     )
     stream = run_followup_stream(req, request=request, user_id=user_id)
     async for chunk in metered(
@@ -645,15 +651,6 @@ async def _run_followup_stream_with_metrics(
         PrometheusObserver(tier=tier, preset=preset, interface="web", timer=timer),
     ):
         yield chunk
-
-
-def _require_auth_if_legacy_disabled(user: User | None) -> None:
-    """Backward-compat gate: require auth when legacy API key mode is disabled."""
-    if user is None and not settings.ENABLE_LEGACY_API_KEY:
-        raise HTTPException(
-            status_code=401,
-            detail="Authentication required. Set ENABLE_LEGACY_API_KEY=true for v1 backward compatibility.",
-        )
 
 
 # ── Agent-Facing Endpoints ──────────────────────────────────────
@@ -688,47 +685,18 @@ async def run_pipeline(
 
     Authenticated users get higher rate limits and priority processing.
     """
-    _require_auth_if_legacy_disabled(user)
-    from reasoner.api.idempotency_http import register_run_or_error
-
-    # Before register_run_or_error: a 403'd run must not lock its client_run_id.
     preset = req.preset or "auto-budget"
-    await check_preset_access_if_authenticated(preset, user, request)
-
-    await register_run_or_error(req.client_run_id)
-
-    from reasoner.api.dependencies import reserve_or_402
-
-    reference_id = run_reference(req.client_run_id)
-
-    if user is None:
-        # No account to reserve credits against -- capped separately so
-        # anonymous traffic stays bounded regardless (Phase 2 metering).
-        from reasoner.api.client_ip import get_client_ip
-        from reasoner.application.services.anonymous_trial_policy import (
-            enforce_anonymous_trial_cap,
-        )
-        from reasoner.application.services.estimate_service import estimate_cost
-
-        estimate = await estimate_cost(req.problem, preset)
-        await enforce_anonymous_trial_cap(get_client_ip(request), estimate["estimated_cost_usd"])
-
-    reserved_credits = await reserve_or_402(
-        user_id=str(user.id) if user else None,
-        preset=preset,
-        problem=req.problem,
-        reference_id=reference_id,
+    adm = await admit_run(
+        request, user=user, problem=req.problem, preset=preset, client_run_id=req.client_run_id,
     )
-
-    return StreamingResponse(
+    return MeteredSSEResponse(
         _run_stream_with_metrics(
             req, request, user, preset_service, pipeline_service,
-            reference_id=reference_id, reserved_credits=reserved_credits,
+            reference_id=adm.reference_id, reserved_credits=adm.reserved_credits,
+            started=adm.started,
         ),
-        media_type="text/event-stream",
+        adm,
         headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",
             "X-RateLimit-Limit": str(request.state.rate_limit_info.get("limit_minute")),
             "X-RateLimit-Remaining": str(request.state.rate_limit_info.get("remaining_minute")),
         },
@@ -755,40 +723,19 @@ async def run_followup_pipeline(
     a conversation payload and run unbounded premium pipelines on the operator's
     provider keys behind nothing but the per-IP rate limiter.
     """
-    _require_auth_if_legacy_disabled(user)
-    from reasoner.api.dependencies import reserve_or_402
-    from reasoner.api.idempotency_http import register_run_or_error
-
     preset = req.preset or "auto-budget"
-    await check_preset_access_if_authenticated(preset, user, request)
-
-    if user is None:
-        from reasoner.api.client_ip import get_client_ip
-        from reasoner.application.services.anonymous_trial_policy import (
-            enforce_anonymous_trial_cap,
-        )
-        from reasoner.application.services.estimate_service import estimate_cost
-
-        estimate = await estimate_cost(req.question, preset)
-        await enforce_anonymous_trial_cap(get_client_ip(request), estimate["estimated_cost_usd"])
-
-    await register_run_or_error(req.client_run_id)
-    reference_id = run_reference(req.client_run_id, "followup")
-    reserved_credits = await reserve_or_402(
-        user_id=str(user.id) if user else None,
-        preset=preset,
-        problem=req.question,
-        reference_id=reference_id,
+    adm = await admit_run(
+        request, user=user, problem=req.question, preset=preset,
+        client_run_id=req.client_run_id, kind="followup",
     )
-    return StreamingResponse(
+    return MeteredSSEResponse(
         _run_followup_stream_with_metrics(
             req, request, user,
-            reference_id=reference_id, reserved_credits=reserved_credits,
+            reference_id=adm.reference_id, reserved_credits=adm.reserved_credits,
+            started=adm.started,
         ),
-        media_type="text/event-stream",
+        adm,
         headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",
             "X-RateLimit-Limit": str(request.state.rate_limit_info.get("limit_minute")),
             "X-RateLimit-Remaining": str(request.state.rate_limit_info.get("remaining_minute")),
         },

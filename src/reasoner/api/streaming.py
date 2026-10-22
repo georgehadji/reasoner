@@ -227,34 +227,12 @@ async def run_followup_stream(
         attachments=getattr(req, "attachments", []) or [],
         client_run_id=req.client_run_id,
     )
+    # No learn() here. postflight (via run_stream) is the single memory writer
+    # for a run. This second writer stored every follow-up twice, and when
+    # synthesis was empty it stored the caller-supplied previous_synthesis as
+    # the system's own answer (docs/plans/audit-remediation-2-2026-10-20.md SEC-8).
     async for chunk in run_stream(run_req, initial_state=state, user_id=user_id, request=request):
         yield chunk
-
-    try:
-        from reasoner.core.ports.memory_port import get_memory_port
-
-        port = get_memory_port()
-        if port is not None:
-            await port.learn(
-                prompt=req.question,
-                response=(
-                    state.final_solution.core_solution
-                    if state.final_solution
-                    else state.previous_synthesis
-                ),
-                agent_id=req.conversation_id,
-                owner=user_id,
-                metadata={
-                    "turn_number": state.turn_number,
-                    "preset": req.preset,
-                    "agent_model": state.agent_model,
-                    "type": "followup",
-                },
-            )
-    except Exception as exc:
-        # The conversation's own memory: a failed learn() leaves the next
-        # turn recalling a gap that nobody downstream can see.
-        degraded("streaming.followup_learn", None, exc=exc, state=state)
 
 
 async def run_stream_cached(
