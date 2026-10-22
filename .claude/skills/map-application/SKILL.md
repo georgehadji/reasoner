@@ -99,11 +99,7 @@ Convention: `<method>.py` holds the strategy class (phase sequence); `<method>_p
 | File | What it does |
 |------|--------------|
 | `scorecard_service.py` | Aggregates telemetry into harness-level metrics (read model). |
-| `harness_diagnosis.py` | Ranks harness components by waste/failure. |
 | `harness_guard.py` | Invariant validation for mutations; `get_model_lab`, `check_mutation_invariants`. |
-| `harness_replay.py` | Sandboxed evaluation of a candidate mutation. |
-| `regression_gate.py` | `GateVerdict` — passes only with no solved-case regressions. |
-| `promotion_service.py` | Governed promotion; cost/safety-tier mutations require human approval. |
 | `evidence_service.py` | Epistemic label promotion and evidence bundles. |
 | `feedback_router.py` | Classifies execution failures into repair strategies. |
 

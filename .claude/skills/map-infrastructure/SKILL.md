@@ -35,7 +35,6 @@ folders:
 |------|--------------|
 | `openai_compat.py` | `OpenAICompatibleProvider` and `OpenRouterProvider` — the workhorses. |
 | `direct.py` | Direct SDK wrappers: Anthropic, OpenAI, Google Gemini, generic OpenAI-compatible; `build_fallback_provider`. |
-| `finetuned.py` | `FineTunedProvider` for custom fine-tuned endpoints. |
 | `noop.py` | `NoopProvider` — injected when no API keys are configured so nothing crashes. |
 
 ### llm/constraints/ (ACR Phase 4 — routing invariants)

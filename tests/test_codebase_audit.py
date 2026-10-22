@@ -1,6 +1,6 @@
 """
 CODEBASE AUDIT & SAFE REMEDIATION — Detection Tests
-Findings: F-1 (sanitization), F-2 (L2Index), F-3 (TaggedMemory)
+Findings: F-1 (sanitization), F-2 (L2Index), F-3 (TaggedMemory, removed)
 """
 
 from __future__ import annotations
@@ -74,32 +74,3 @@ class TestL2IndexBoundedGrowth:
                 f"L2Index grew to {len(index.entries)} entries without eviction. "
                 f"Expected max {config.l2_max_entries}."
             )
-
-
-# ═════════════════════════════════════════════════════════════════════
-# F-3: TaggedMemory path traversal
-# ═════════════════════════════════════════════════════════════════════
-
-class TestTaggedMemoryPathTraversal:
-    def test_tag_name_with_path_traversal_is_rejected(self):
-        """
-        TaggedMemory.add() uses the tag directly in a filename.
-        A tag containing '..' can write outside the base directory.
-        """
-        from reasoner.core.memory import TaggedMemory
-
-        with tempfile.TemporaryDirectory() as td:
-            mem = TaggedMemory(base_dir=td)
-
-            malicious_tag = "../../../etc/passwd"
-
-            with pytest.raises(ValueError):
-                mem.add(malicious_tag, {"data": "x"})
-
-    def test_valid_tag_name_is_accepted(self):
-        from reasoner.core.memory import TaggedMemory
-
-        with tempfile.TemporaryDirectory() as td:
-            mem = TaggedMemory(base_dir=td)
-            mem.add("session_001", {"data": "x"})
-            assert mem.count("session_001") == 1

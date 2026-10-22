@@ -10,7 +10,6 @@ Orchestrated prompts, inputs, and validation logic for each of the 8 reasoning p
 - **`_prism.py`**: Code or resource asset facilitating system functionality.
 - **`_shared.py`**: Greek (full Greek and Coptic block for better coverage)
 - **`_universal.py`**: Code or resource asset facilitating system functionality.
-- **`_vs_shared.py`**: Shared Verbalized Sampling (VS) logic and prompts.
 - **`analogical.py`**: Code or resource asset facilitating system functionality.
 - **`article.py`**: ── Retrieval Planning ────────────────────────────────────────────────────────
 - **`bayesian.py`**: Code or resource asset facilitating system functionality.

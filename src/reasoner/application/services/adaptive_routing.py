@@ -67,7 +67,7 @@ class AdaptiveRoutingService:
 
     def __init__(
         self,
-        registry: Any = None,  # CapabilityRegistryPort
+        registry: Any = None,
         scorer: UtilityScorer | None = None,
         resolver: ConstraintResolver | None = None,
         telemetry: Any = None,  # CallTelemetryPort

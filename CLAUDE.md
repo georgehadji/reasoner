@@ -117,7 +117,7 @@ src/reasoner/
 │   ├── hyperagent.py       # HyperGateAgent orchestrator + fast-path regexes
 │   ├── base_sub_agent.py   # Abstract base with LRU caching
 │   └── sub_agents/         # language, complexity, direct, web_detector, method, tiebreaker
-├── phases/                 # 31 method modules + 4 shared helpers (_prism, _shared, _universal, _vs_shared)
+├── phases/                 # 31 method modules + 3 shared helpers (_prism, _shared, _universal)
 ├── subagents/              # Phase sub-agents (enhancement, decomposition, critique, synthesis, search)
 ├── neuro/                  # Long-term memory: L1/L2/L3 tiered cache, compression, sessions
 ├── healing/                # Self-healing: introspection_engine, test_generation_engine
@@ -131,7 +131,7 @@ ui-next/src/
 ├── lib/                    # api-client, db (IndexedDB), types, utils, security, markdown
 └── stores/                 # app-store.ts (Zustand global state with persistence)
 
-tests/                      # pytest suite (<!-- gen:test_files -->409<!-- /gen --> test_*.py files, recursive)
+tests/                      # pytest suite (<!-- gen:test_files -->408<!-- /gen --> test_*.py files, recursive)
 scripts/
 └── update_mindmap_meta.py  # Patches live counts into ARCHITECTURE_MINDMAP.md (run manually — see §10)
 ```

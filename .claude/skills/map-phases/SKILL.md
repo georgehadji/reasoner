@@ -16,7 +16,6 @@ folders:
 | `__init__.py` | Re-exports the prompt surface. |
 | `_shared.py` (12KB) | Cross-method helpers: `detect_language`, `get_language_instruction`, `build_followup_context`, `_wrap_user_input` / `_wrap_external_content` (injection fencing), `HUMANIZATION_RULES`, writing-intent indicators. |
 | `_universal.py` (23KB) | Prompts every pipeline uses: disambiguation, prompt enhancement, classification (Phase 0), decomposition (Phase 1), and the shared synthesis surface. |
-| `_vs_shared.py` | Shared Verbalized Sampling generation prompt + builder. |
 | `_prism.py` | Prism research system prompts in speed / balanced / quality variants. |
 
 ## Method prompt modules

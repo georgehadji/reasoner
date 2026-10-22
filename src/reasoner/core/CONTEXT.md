@@ -18,7 +18,6 @@ The foundational core of the reasoning framework, containing aggregates, state-m
 - **`exec_constants.py`**: Constants for the code execution sandbox (Code-as-Agent-Harness #1).
 - **`health_validator.py`**: ── 1. OpenRouter (gate for Cohere rerank) ──
 - **`logging_utils.py`**: Context variables for log context across async calls
-- **`memory.py`**: TaggedMemory — lightweight categorized conversation history store.
 - **`parsing.py`**: Known provider-injected artifacts that leak into LLM responses.
 - **`perspectives.py`**: Data-driven perspective definitions for Phase 2 (Multi-Perspective Analysis).
 - **`protocol.py`**: Core abstractions for the Reasoner pipeline.

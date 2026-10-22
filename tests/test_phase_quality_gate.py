@@ -158,7 +158,6 @@ def harness(monkeypatch):
     )
 
     monkeypatch.setattr("reasoner.application.flows.factory.WorkflowFactory", _Factory)
-    monkeypatch.setattr("reasoner.core.memory.TaggedMemory", lambda *a, **kw: MagicMock())
     # Layer B appends an "Egress Rewrite" step to every flow when enabled, which
     # would put a second phase through the gate and make these counts depend on a
     # deployment setting rather than on the loop.

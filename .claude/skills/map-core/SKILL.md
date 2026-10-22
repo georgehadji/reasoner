@@ -33,7 +33,6 @@ folders:
 | `evolution_constants.py` | Constants for the governed-mutation Evolution Agent. |
 | `scorecard_constants.py` | Harness Scorecard constants. |
 | `perspectives.py` | Typed `PerspectiveDefinition` data for Phase 2 multi-perspective generation. |
-| `memory.py` | `TaggedMemory` — lightweight tag-indexed conversation history (method/preset/outcome). |
 | `rerank.py` | Cross-encoder reranking (Cohere via OpenRouter or direct) with its own circuit breaker. |
 | `search.py` | Internal web-discovery tool for context enrichment; result filtering (off-topic, low-signal, blob/extension rejects). |
 | `verbalized_sampling.py` | VS primitives: build prompt, parse response, sample, entropy. |
@@ -55,7 +54,6 @@ folders:
 | `code_executor.py` | `CodeExecutorPort`, `ExecutionResult`, `ExecutionLimits`. |
 | `credit_repository.py` | `CreditRepository` — credit-ledger persistence contract. |
 | `api_key_repository.py` | `ApiKeyRepository` — user-owned key persistence. |
-| `capability_registry_port.py` | `CapabilityRegistryPort` — model capability profiles (ACR Phase 2). |
 | `routing_constraint_port.py` | `RoutingConstraintPort`, `ConstraintViolation` — accept/reject role→model assignments (ACR Phase 4). |
 | `distributed_state_port.py` | `DistributedStatePort` — atomic ops + Lua (Valkey adapter). |
 | `shared_cache_port.py` | `SharedCachePort` — KV cache with TTL. |

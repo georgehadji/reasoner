@@ -52,7 +52,6 @@ folders:
 | `uploader.py` | `infrastructure/uploader.py` |
 | `vs_config.py` | `core/vs_config.py` |
 | `widgets.py` | `infrastructure/widgets_legacy.py` |
-| `reasoner_persuasion_defense.py` | `security/persuasion_defense.py` |
 | `reasoner_verbalized_sampling.py` | `core/verbalized_sampling.py` |
 | `reasoner_vs_constants.py` | `core/vs_constants.py` |
 
@@ -63,7 +62,6 @@ Several shims emit a `DeprecationWarning` on import: `circuit_breaker`, `excepti
 | File | What it does |
 |------|--------------|
 | `encryption.py` (16KB) | At-rest authenticated encryption (Fernet / AES-GCM), key derivation, keyed blind indexes so encrypted fields stay searchable; `EncryptionService`, `get_encryption_service`. |
-| `persuasion_defense.py` (39KB) | Hallucination-mitigation and prompt-persuasion defense: `PersuasionTactic`, `FrictionAction`, `ExtractedClaim`, `TaintRecord`, coverage checks. |
 | `url_validator.py` | `is_safe_url` — SSRF guard blocking private ranges, metadata endpoints, internal hostnames. Used by the scraper and image downloaders. |
 
 ## quality/ — phase quality monitoring

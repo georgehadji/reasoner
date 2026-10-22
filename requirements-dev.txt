@@ -11,6 +11,10 @@
 
 -r requirements.txt
 
+# Architecture gate (.importlinter). CI installs it pinned in pr-architecture.yml;
+# this is for scripts/ci-local.sh.
+import-linter>=2.15,<3.0.0
+
 # Testing
 pytest>=9.1.1,<10.0.0
 pytest-asyncio>=1.4.0,<1.5.0

@@ -19,7 +19,7 @@ folders:
 | `billing_router.py` | Stripe/PayPal checkout, portal, subscription, webhook endpoints. |
 | `cache.py` | Two-tier response cache (memory + disk) with pruning; `_cache_key`, `get_cache_stats`, `clear_memory_cache`. |
 | `client_ip.py` | `get_client_ip` — trusted-proxy-aware; only trusts X-Forwarded-For from `TRUSTED_PROXIES`. |
-| `cron.py` | Periodic background jobs: `reset_all_quotas_monthly`, `run_neuro_maintenance`. |
+| `cron.py` | Periodic background jobs: `run_neuro_maintenance`. |
 | `csrf.py` | Stateless double-submit CSRF via HMAC-SHA256; must match the Next.js frontend implementation. |
 | `dependencies.py` (26KB) | SaaS auth DI: resolves API keys/JWTs to users, quota + rate-limit gates, provisioning pool. |
 | `error_handler.py` | Global exception handlers (HTTP, validation, generic); persists errors with request context. `register_error_handlers`. |
