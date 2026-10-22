@@ -117,6 +117,21 @@ class SupabaseAuthAdapter(AuthPort):
             logger.warning("Supabase auth validation failed: %s", exc)
             raise AuthenticationError(f"Auth validation failed: {exc}", status_code=401) from exc
 
+    async def delete_identity(self, user_id: str) -> None:
+        """Delete the Supabase auth user, which also ends its sessions (BIL-18).
+
+        Before this, account deletion left the identity and its JWT valid.
+        This worker's verified-token cache is purged too; other workers'
+        entries expire within ``_CACHE_TTL_SECONDS``.
+        """
+        try:
+            await asyncio.to_thread(self._client.auth.admin.delete_user, user_id)
+        except Exception as exc:
+            if "not found" not in str(exc).lower():
+                raise
+        for key in [k for k, (_, u) in self._cache.items() if str(u.id) == user_id]:
+            del self._cache[key]
+
     async def refresh_session(self, token: str) -> str:
         """Not implemented for server-side validation."""
         raise NotImplementedError("Refresh is handled client-side with Supabase")

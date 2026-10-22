@@ -25,10 +25,15 @@ from fastapi import HTTPException, Request
 from fastapi.responses import StreamingResponse
 from starlette.types import Receive, Scope, Send
 
+from reasoner.application.ports.pipeline_ownership_port import OwnershipConflictError
+from reasoner.application.services.idempotency import release_run
 from reasoner.application.services.run_metering import RunContext, release_unstarted
 from reasoner.core.settings import settings
 from reasoner.domain.credits import run_reference
 from reasoner.domain.saas import User
+from reasoner.infrastructure.persistence.pipeline_ownership_repo import (
+    get_pipeline_ownership_repo,
+)
 
 
 @dataclass(frozen=True)
@@ -41,6 +46,8 @@ class Admission:
     reserved_credits: int
     #: Set by ``metered()`` when the stream starts; see :class:`MeteredSSEResponse`.
     started: asyncio.Event = field(default_factory=asyncio.Event, compare=False)
+    #: The ``client_run_id`` claim, released if the run does not complete.
+    run_claim: str | None = None
 
     def run_context(self, *, tier: str = "anonymous", interface: str = "web") -> RunContext:
         return RunContext(
@@ -51,6 +58,7 @@ class Admission:
             interface=interface,
             reserved_credits=self.reserved_credits,
             started=self.started,
+            run_claim=self.run_claim,
         )
 
 
@@ -99,18 +107,45 @@ async def admit_run(
         estimate = await estimate_cost(problem, preset)
         await enforce_anonymous_trial_cap(get_client_ip(request), estimate["estimated_cost_usd"])
 
-    await idempotency_http.register_run_or_error(client_run_id)
-    reference_id = run_reference(client_run_id, kind)
     user_id = str(user.id) if user else None
-    reserved_credits = await deps.reserve_or_402(
-        user_id=user_id, preset=preset, problem=problem, reference_id=reference_id,
+    claim = await idempotency_http.register_run_or_error(
+        client_run_id, owner_key=user_id or _anonymous_owner_key(request),
     )
+    try:
+        if client_run_id:
+            # The id is the pipeline id: refuse it before any credit is held
+            # if another caller already owns that pipeline (SEC-7).
+            try:
+                await get_pipeline_ownership_repo().set_owner(
+                    client_run_id, user_id, client_run_id,
+                )
+            except OwnershipConflictError as exc:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Run id {client_run_id} is already in use. Choose another id.",
+                ) from exc
+        reference_id = run_reference(client_run_id, kind)
+        reserved_credits = await deps.reserve_or_402(
+            user_id=user_id, preset=preset, problem=problem, reference_id=reference_id,
+        )
+    except BaseException:
+        # Refused after the claim (402, 409, a ledger error): give the id back,
+        # so the documented retry with the same id works (SEC-7).
+        await release_run(claim)
+        raise
     return Admission(
         user_id=user_id,
         preset=preset,
         reference_id=reference_id,
         reserved_credits=reserved_credits,
+        run_claim=claim,
     )
+
+
+def _anonymous_owner_key(request: Request) -> str:
+    from reasoner.api.client_ip import get_client_ip
+
+    return f"anon:{get_client_ip(request)}"
 
 
 class MeteredSSEResponse(StreamingResponse):

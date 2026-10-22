@@ -102,6 +102,9 @@ class RunContext:
     #: first frame never runs ``metered``'s ``finally``, so the HTTP layer reads
     #: this to release that reservation itself.
     started: asyncio.Event | None = None
+    #: The ``client_run_id`` claim (``idempotency.register_run``). Released when
+    #: the run does not complete, so the caller can retry with the same id.
+    run_claim: str | None = None
 
 
 #: Frame types that carry a ``total_cost_usd``. ``done`` is the final figure;
@@ -169,9 +172,11 @@ async def metered(
         ctx.started.set()
     cost_usd = 0.0
     has_error = False
+    completed = False
     try:
         async for frame in stream:
             cost_usd = extract_run_cost(frame) or cost_usd
+            completed = completed or _is_done_frame(frame)
             yield frame
     except Exception:
         has_error = True
@@ -190,6 +195,8 @@ async def metered(
                     "run_metering.settle_timeout", None, exc=exc,
                     detail=f"run {ctx.reference_id} left unsettled (${cost_usd:.6f})",
                 )
+            if not completed:
+                await _release_claim(ctx)
         if observer is not None:
             try:
                 observer.observe(status="error" if has_error else "success")
@@ -215,9 +222,28 @@ async def release_unstarted(sink: SettlementSink, ctx: RunContext) -> None:
     """
     if ctx.started is None or ctx.started.is_set():
         return
-    if ctx.user_id and ctx.reserved_credits > 0:
-        with anyio.CancelScope(shield=True), anyio.move_on_after(SETTLE_TIMEOUT_SECONDS):
+    with anyio.CancelScope(shield=True), anyio.move_on_after(SETTLE_TIMEOUT_SECONDS):
+        if ctx.user_id and ctx.reserved_credits > 0:
             await _true_up(sink, ctx, 0.0)
+        await _release_claim(ctx)
+
+
+def _is_done_frame(frame: str) -> bool:
+    """True for the terminal ``done`` frame: the run completed."""
+    if not frame.startswith(SSE_DATA_PREFIX):
+        return False
+    try:
+        event = json.loads(frame[len(SSE_DATA_PREFIX):])
+    except (ValueError, TypeError):
+        return False
+    return isinstance(event, dict) and event.get("type") == "done"
+
+
+async def _release_claim(ctx: RunContext) -> None:
+    # Module lookup at call time so tests can patch it.
+    from reasoner.application.services import idempotency
+
+    await idempotency.release_run(ctx.run_claim)
 
 
 async def _true_up(sink: SettlementSink, ctx: RunContext, cost_usd: float) -> None:
