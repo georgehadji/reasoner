@@ -17,6 +17,7 @@ from reasoner.api.history import HISTORY_DIR, HistoryEntry, _save_history_entry
 from reasoner.api.schemas import RunRequest
 from reasoner.application.commands import RunPipelineCommand
 from reasoner.application.orchestrator import PipelineOrchestrator
+from reasoner.application.ports.pipeline_ownership_port import OwnershipConflictError
 from reasoner.application.services.adaptive_routing import build_adaptive_routing_service
 from reasoner.application.services.pipeline_service import PipelineService
 from reasoner.application.services.preset_service import PresetService
@@ -66,6 +67,11 @@ def _request_from_command(command: RunPipelineCommand) -> RunRequest:
 async def _claim_ownership(run_id: str, user_id: str | None) -> None:
     try:
         await get_pipeline_ownership_repo().set_owner(run_id, user_id, run_id)
+    except OwnershipConflictError:
+        # Someone else owns this pipeline id. Running would write into their
+        # aggregate, so the run stops here (SEC-7). admit_run refuses this
+        # with a 409 first; this covers callers that skip admission.
+        raise
     except Exception:
         # An ownership-write failure must not abort the run itself, but it does
         # mean the pipeline stays inaccessible (fail closed) until a human

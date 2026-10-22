@@ -123,7 +123,7 @@ jobs:
           # 2204: deleted domain.pricing.calculate_model_cost, dead since BIL-2 (-2).
           # 2202: audit input-limits PR (SEC-4/SEC-5/OPS-5..7/DAT-4) (net -2).
           # 2201: audit billing PR (BIL-3..9) sorted credit_service imports (net -1).
-          python scripts/ruff_ratchet.py --max 2200
+          python scripts/ruff_ratchet.py --max 2199
 
       - name: Security scan (bandit)
         run: |
