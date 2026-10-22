@@ -43,7 +43,7 @@ Convention: `<method>.py` holds the strategy class (phase sequence); `<method>_p
 | `article_adapters.py` (23KB) | Bridges the immutable article `Context` domain to the mutable `PipelineState` phases. |
 | `iterative_critique.py` / `iterative_critique_phases.py` | Generator/critic adversarial loop with `check_convergence`, `MAX_ROUNDS`, stalemate detection. |
 | `augmentation.py` | Shared pre-processing: runs debate + iterative critique in parallel for deep/abstract questions, with caching. |
-| `search_phases.py` (25KB) | Context vetting, result vetting, deep read, evidence validation, YouTube enrichment. |
+| `search_phases.py` (25KB) | Context vetting, result vetting, deep read, evidence validation, YouTube enrichment. Vetting fails closed (`vetting_unverified`, quality `partial`); a deep-read page the injection guard rejects is dropped (`deep_read_rejected`). |
 | `synthesis_phase.py` | `run_synthesis_phase` — final synthesis. |
 | `language_probe_phase.py` | Cross-lingual probe: re-runs synthesis in the native language and judges the delta. |
 | `egress_rewrite_phase.py` | Layer B statistical rewrite of synthesis output (watermark scrubbing), gated by `EgressPolicy`. |

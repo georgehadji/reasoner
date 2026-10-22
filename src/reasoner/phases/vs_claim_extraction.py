@@ -8,6 +8,7 @@ from typing import Any, Protocol
 
 from pydantic import BaseModel, Field
 
+from reasoner.phases._shared import _wrap_external_content
 from reasoner.phases.vs_generation import GenerationCandidate
 from reasoner.vs_config import VSFeatureFlags
 
@@ -41,7 +42,10 @@ async def _extract_claims(text: str, llm_client: _LLMClient | None) -> list[str]
         return fallback
 
     try:
-        prompt = f"Extract factual claims from this text as a JSON list of strings. Return ONLY the JSON list.\nText: {text}"
+        prompt = (
+            "Extract factual claims from this text as a JSON list of strings. "
+            f"Return ONLY the JSON list.\nText: {_wrap_external_content(text)}"
+        )
         raw = await llm_client.generate(user=prompt)
         claims = extract_json_list(raw)
         if not claims:

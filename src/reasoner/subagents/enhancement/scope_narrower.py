@@ -7,6 +7,7 @@ from typing import Any
 
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.parsing import extract_json
+from reasoner.phases._shared import _wrap_user_input
 from reasoner.subagents.base import PhaseSubAgent
 
 SCOPE_SYSTEM = """You are a Scope Narrower. Your ONE JOB is to determine if the problem is too broad or too narrow for a useful answer, and suggest how to refine it.
@@ -38,7 +39,7 @@ class ScopeNarrowerSubAgent(PhaseSubAgent):
     TEMPERATURE = 0.2
 
     def _build_prompt(self, state: PipelineState) -> tuple[str, str]:
-        return (SCOPE_SYSTEM, f"Problem: {state.problem}")
+        return (SCOPE_SYSTEM, f"Problem: {_wrap_user_input(state.problem)}")
 
     def _parse_result(self, raw: str) -> dict[str, Any]:
         try:
