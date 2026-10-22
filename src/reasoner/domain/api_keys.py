@@ -53,6 +53,20 @@ KEY_MANAGE_SCOPE = "key:manage"
 ACCOUNT_DELETE_SCOPE = "account:delete"
 
 
+ADMIN_SCOPE = "admin"
+
+
+def admin_scopes(user_id: object, allowlist: str) -> frozenset[str]:
+    """The admin scope for a user named in the comma-separated ``allowlist``.
+
+    No principal could hold ``admin`` in production, so dead-letter replay,
+    credit grants and the global stop always returned 403
+    (docs/plans/audit-remediation-2-2026-10-20.md SEC-6, Q5: allowlist).
+    """
+    allowed = {part.strip().lower() for part in allowlist.split(",") if part.strip()}
+    return frozenset({ADMIN_SCOPE}) if str(user_id).lower() in allowed else frozenset()
+
+
 def key_allows(granted: frozenset[str] | set[str], required: str) -> bool:
     """Whether a key holding ``granted`` may act where ``required`` is needed.
 

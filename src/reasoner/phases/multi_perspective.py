@@ -64,7 +64,7 @@ def perspective_prompt(state: PipelineState, perspective: str) -> str:
                     f"{claims}\n"
                 )
 
-    return f'{get_language_instruction(state)}\n{followup}{memory_block}\nContext: {json.dumps(context)}{web_block}{premises_block}\n\nAnalyze from {perspective} perspective.\n\nYou MUST return EXACTLY this JSON structure with no additional keys. Put all analysis inside "core_analysis" as a single string (3-6 paragraphs). Label factual claims inline with [VERIFIED], [HYPOTHESIS], or [UNKNOWN].\n\nJSON: {{"perspective": "{perspective}", "core_analysis": "<your detailed analysis with inline epistemic labels>", "key_insights": ["<insight 1>", "<insight 2>", "<insight 3>"]}}'
+    return f'{get_language_instruction(state)}\n{followup}{memory_block}\nContext: {_wrap_external_content(json.dumps(context))}{web_block}{premises_block}\n\nAnalyze from {perspective} perspective.\n\nYou MUST return EXACTLY this JSON structure with no additional keys. Put all analysis inside "core_analysis" as a single string (3-6 paragraphs). Label factual claims inline with [VERIFIED], [HYPOTHESIS], or [UNKNOWN].\n\nJSON: {{"perspective": "{perspective}", "core_analysis": "<your detailed analysis with inline epistemic labels>", "key_insights": ["<insight 1>", "<insight 2>", "<insight 3>"]}}'
 
 CRITIQUE_SYSTEM = "You are an analytical assistant. Score solutions honestly. Output ONLY valid JSON."
 
@@ -107,7 +107,8 @@ def critique_prompt(state: PipelineState, with_hypotheses: bool = False) -> str:
     base = (
         f'{get_language_instruction(state)}\n\n'
         f'Problem: {_wrap_user_input(state.problem)}\n\n'
-        f'Evaluate these candidates:\n{json.dumps(candidates_summary, indent=2)}\n\n'
+        f'Evaluate these candidates:\n'
+        f'{_wrap_external_content(json.dumps(candidates_summary, indent=2))}\n\n'
         f'Score each candidate on ALL four dimensions (0-10 each). '
         f'Provide a "steel_man" (strongest charitable interpretation — best case FOR each candidate) for each.\n\n'
         f'CRITICAL SCORING: If a candidate states confident claims that are factually wrong or unsubstantiated, '
@@ -175,7 +176,8 @@ def stress_test_prompt(state: PipelineState) -> str:
         ]
         seed_block = (
             f'\n\nPRIORITY FAILURE HYPOTHESES (from critique — design at least one '
-            f'scenario that exercises each):\n{json.dumps(seeds, indent=2)}\n'
+            f'scenario that exercises each):\n'
+            f'{_wrap_external_content(json.dumps(seeds, indent=2))}\n'
         )
 
     return (
@@ -185,7 +187,7 @@ def stress_test_prompt(state: PipelineState) -> str:
         f'Test EACH of these solutions under EACH of the optimal, constraint_violation and '
         f'adversarial scenarios (one entry per solution per scenario), and name the '
         f'solution by its "perspective":\n'
-        f'{json.dumps(top_candidates_summary, indent=2)}\n'
+        f'{_wrap_external_content(json.dumps(top_candidates_summary, indent=2))}\n'
         f'{seed_block}\n'
         f'CRITICAL INSTRUCTION: Scenarios MUST be highly specific to the Problem Domain and Task Type. Do NOT generate generic business risks (like supply-chain collapse) unless they directly apply to the specific problem. Describe concrete failure mechanics relevant to the domain.\n'
         f'Do NOT describe LLM processing errors like truncation, formatting issues, length limits, or off-topic responses. '

@@ -76,6 +76,30 @@ def translate_http_status(status: int | None, detail: str, model: str) -> Provid
     return None
 
 
+def is_provider_fault(exc: BaseException) -> bool:
+    """Should this failure count against the provider's circuit breaker?
+
+    The breaker answers "is the provider unhealthy?". A 400 or 422 (oversized
+    prompt, bad parameter, content filter) says the *caller's request* was
+    wrong, so counting it let one user's bad request open ``llm:<model>`` for
+    every tenant on every worker. Those arrive as the residual ``LLMError``
+    that ``translate_http_status`` leaves for statuses it does not map.
+
+    Everything else counts, including errors that look operator-side (402, 401,
+    404): they hit every caller alike, so they are provider health as far as
+    the breaker is concerned. Unknown errors stay conservative.
+
+    ``complete_with_retry`` wraps an exhausted retry loop in a plain
+    ``LLMError`` chained from the last failure, so a bare ``LLMError`` is
+    judged by its cause: three timeouts in a row are a provider fault, a 400
+    with nothing behind it is not.
+    """
+    if type(exc) is LLMError:
+        cause = exc.__cause__
+        return cause is not None and is_provider_fault(cause)
+    return True
+
+
 def _type_name(obj: object) -> str:
     """Deterministic placeholder for a value ``json`` cannot serialise.
 

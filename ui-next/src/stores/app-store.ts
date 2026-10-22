@@ -17,6 +17,16 @@ export interface ComposerAttachment {
 }
 
 export type Tier = 'budget' | 'premium';
+
+export type AuthStatus = 'loading' | 'anonymous' | 'authenticated';
+
+/**
+ * Derived, not stored: `user === null` alone cannot tell "signed out" from
+ * "Supabase has not answered yet", and pages that guessed signed out redirected
+ * on every reload (UI-8).
+ */
+export const selectAuthStatus = (s: Pick<AppState, 'isAuthLoading' | 'user'>): AuthStatus =>
+  s.isAuthLoading ? 'loading' : s.user ? 'authenticated' : 'anonymous';
 export { shallow };
 
 interface AppState {
@@ -70,9 +80,13 @@ interface AppState {
   setUser: (user: SupabaseUser | null) => void;
   setAuthLoading: (loading: boolean) => void;
   logout: () => void;
+  /** A request came back 401: the session is gone, so drop the local user. */
+  markSessionExpired: () => void;
 
   // Subscription (shared cache — single fetch across all components)
   subscription: SubscriptionStatus | null;
+  /** Id of the user `subscription` was fetched for; a different user must refetch. */
+  subscriptionOwner: string | null;
   subscriptionLoading: boolean;
   subscriptionError: string | null;
   fetchSubscription: () => Promise<void>;
@@ -101,6 +115,7 @@ export const useAppStore = create<AppState>()(
 
       // Subscription (shared — single fetch, not persisted)
       subscription: null,
+      subscriptionOwner: null,
       subscriptionLoading: false,
       subscriptionError: null,
 
@@ -177,6 +192,7 @@ export const useAppStore = create<AppState>()(
       setUser: (user) => set({ user, isAuthenticated: !!user }),
       setAuthLoading: (loading) => set({ isAuthLoading: loading }),
       logout: () => set({ user: null, isAuthenticated: false }),
+      markSessionExpired: () => set({ user: null, isAuthenticated: false }),
 
       /** Returns the preset string to send to the API: "auto-budget" or "auto-premium". */
       getAutoPreset: () => `auto-${get().tier}`,
@@ -185,14 +201,21 @@ export const useAppStore = create<AppState>()(
 
       fetchSubscription: async () => {
         if (get().subscriptionLoading) return; // deduplicate concurrent fetches
-        set({ subscriptionLoading: true, subscriptionError: null });
+        const owner = get().user?.id ?? null;
+        // A plan cached for someone else must not show while this user's loads.
+        const stale = get().subscriptionOwner !== owner;
+        set({
+          subscriptionLoading: true,
+          subscriptionError: null,
+          ...(stale ? { subscription: null } : {}),
+        });
         try {
           const res = await apiFetch('/api/billing/subscription');
           if (res.ok) {
             const data: SubscriptionStatus = await res.json();
-            set({ subscription: data, subscriptionLoading: false });
+            set({ subscription: data, subscriptionOwner: owner, subscriptionLoading: false });
           } else {
-            set({ subscription: null, subscriptionLoading: false });
+            set({ subscription: null, subscriptionOwner: owner, subscriptionLoading: false });
           }
         } catch (err) {
           set({

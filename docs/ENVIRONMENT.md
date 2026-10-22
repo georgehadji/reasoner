@@ -80,6 +80,7 @@ user's problem, to TypeSafe.
 | `RATE_LIMIT_PER_HOUR` | `1000` | Per-hour request limit |
 | `RATE_LIMIT_BURST` | `10` | Burst allowance |
 | `ADMIN_API_KEY` | — | Admin endpoint key |
+| `ADMIN_USER_IDS` | — | Comma-separated user ids whose interactive (JWT) login carries the `admin` scope. Production admin routes need it plus `X-Admin-Key`. API keys can never hold admin. |
 | `AUTH_PERSISTENCE_ENABLED` | `false` | Persist auth keys to DB |
 | `AUTH_DB_PATH` | `src/reasoner/auth_keys.db` | SQLite auth DB path. `docker-compose.yml` sets `/app/history/auth_keys.db` (a mounted volume); the in-package default is lost on redeploy |
 | `PRESET_TIER_ENFORCEMENT_ENABLED` | `false` | Return an early HTTP 403 (before credit reservation) when a caller's tier is below the preset's required tier. Premium presets are already refused at runtime either way, as an SSE `PRESET_TIER_REQUIRED` frame after reservation; this flag only changes when and how the refusal surfaces |

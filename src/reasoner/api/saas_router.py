@@ -15,6 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from reasoner.api.dependencies import (
     _get_quota_service,
+    forget_provisioned_user,
     get_current_user,
     get_optional_user,
     require_key_scope,
@@ -262,6 +263,20 @@ async def delete_account(
     # is GDPR Article 17: the caller is being told their data is erased.
     # Whatever could not be erased is recorded here and returned to them.
     _record = SimpleNamespace(degradations=[])
+
+    # The sign-in identity. Left in place, its JWT kept working, and a worker
+    # that had cached the id kept serving it (audit-remediation-2 BIL-18). The
+    # deletion log written above refuses it on every worker even if this
+    # fails, so a failure is reported, not fatal.
+    forget_provisioned_user(user.id)
+    try:
+        from reasoner.infrastructure.auth import get_auth_adapter
+
+        await get_auth_adapter().delete_identity(str(user.id))
+        deleted["identity"] = True
+    except Exception as exc:
+        deleted["identity"] = False
+        degraded("saas.delete_account.identity", None, exc=exc, state=_record)
 
     # Phase 3: External side-effects (best-effort, AFTER transaction commits)
     # Uploads

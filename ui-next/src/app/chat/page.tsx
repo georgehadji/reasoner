@@ -6,6 +6,7 @@ import { useTheme } from 'next-themes';
 import { useAppStore } from '@/stores/app-store';
 
 import { usePipelineStream } from '@/hooks/usePipelineStream';
+import { useRunController, type RunTicket } from '@/hooks/useRunController';
 import { useWebSocketPipeline } from '@/hooks/useWebSocketPipeline';
 import { useServerStatus } from '@/hooks/useServerStatus';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
@@ -32,7 +33,9 @@ import { buildMarkdownFromPhases } from '@/lib/markdown';
 import { saveConversation } from '@/lib/db';
 import { conversationToMessages } from '@/lib/conversation-history';
 import { readSSEStream } from '@/lib/sse-reader';
-import { clearCache, uploadFiles, generateImage, generateImageEnhancement, resumePipelineStream, submitFeedback, fetchGateDecision } from '@/lib/api-client';
+import { AttachmentUploadError, uploadAttachments, type UploadedAttachment } from '@/lib/attachments';
+import { copyToClipboard } from '@/lib/utils';
+import { clearCache, generateImage, generateImageEnhancement, resumePipelineStream, submitFeedback, fetchGateDecision } from '@/lib/api-client';
 import { MethodChoicePrompt, MethodChoiceLoading } from '@/components/chat/MethodChoicePrompt';
 
 // --- Reducer function for managing messages state ---
@@ -213,8 +216,10 @@ export default function ChatPage() {
   const toggleAutoMethodAlways = useAppStore((s) => s.toggleAutoMethodAlways);
 
   const { history, refresh: refreshHistory, remove: removeHistory } = useConversationHistory();
-  const { startRun, startFollowup, stopRun } = usePipelineStream();
+  const { startRun, startFollowup } = usePipelineStream();
   const { connect: wsConnect, disconnect: wsDisconnect, sendStop: wsSendStop, status: wsStatus, lastError: wsLastError } = useWebSocketPipeline();
+  // Owns the active run's ticket: its abort signal, run id and conversation id.
+  const run = useRunController(wsSendStop);
   const serverOnline = useServerStatus();
   const { resolvedTheme, setTheme } = useTheme();
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -231,7 +236,6 @@ export default function ChatPage() {
   // at every site that writes the ref, right below each write.
   const conversationIdRef = useRef<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const clientRunIdRef = useRef<string | null>(null);
 
   // Auto-selected method from HyperGate — populated from the 'start' SSE event.
   const [autoSelectedMethod, setAutoSelectedMethod] = useState<string>(PIPELINE_DEFAULTS.method);
@@ -275,14 +279,24 @@ export default function ChatPage() {
     dismissIndicator,
   } = useScrollAnchor(scrollContainerRef);
 
+  const copyLastResponse = () => {
+    const last = messages.filter((m) => m.role === 'assistant' && !m.isStreaming).at(-1);
+    if (!last?.content) return;
+    void copyToClipboard(last.content).then((ok) => {
+      if (!ok) {
+        dispatchMessages({
+          type: 'ADD_MESSAGES',
+          payload: [{ id: 'info-copy-' + Date.now(), role: 'info', content: 'Could not copy to the clipboard.' }],
+        });
+      }
+    });
+  };
+
   useKeyboardShortcuts({
     onToggleSidebar: toggleSidebar,
     onShowShortcuts: () => setShortcutsOpen(true),
     onStop: () => {
-      if (running) {
-        stopRun();
-        wsSendStop(clientRunIdRef.current || '');
-      }
+      run.stop();
       setRunning(false);
     },
     onClearComposer: () => setComposerText(''),
@@ -290,19 +304,15 @@ export default function ChatPage() {
       const textarea = document.querySelector('textarea');
       textarea?.focus();
     },
-    onCopyLastResponse: () => {
-      const last = messages.filter((m) => m.role === 'assistant' && !m.isStreaming).at(-1);
-      if (last?.content) navigator.clipboard.writeText(last.content);
-    },
+    onCopyLastResponse: copyLastResponse,
     onCommandPalette: () => setCommandPaletteOpen((v) => !v),
   });
 
-  const handleSubmit = useCallback(async (
-    providedText?: string,
+  const submitRun = useCallback(async (
+    ticket: RunTicket,
+    problem: string,
     opts?: { presetOverride?: string; skipGate?: boolean },
   ) => {
-    const problem = (providedText ?? composerText).trim();
-    if (!problem || running) return;
 
     // ── HyperGate confirmation gate ──
     // Ask HyperGate which method it would pick BEFORE running anything. If it's
@@ -330,6 +340,8 @@ export default function ChatPage() {
         }
       }
     }
+    // Stopped while the gate check was in flight: start nothing.
+    if (ticket.abort.signal.aborted) return;
     setPendingChoice(null);
 
     setComposerText('');
@@ -349,21 +361,22 @@ export default function ChatPage() {
     }
 
     // Upload attachments before running
-    let uploadedAttachments: { file_id: string; filename: string; mime_type: string; extracted_text: string; size: number }[] = [];
+    let uploadedAttachments: UploadedAttachment[] = [];
     if (attachments.length > 0 && !isImageMode) {
       try {
-        const uploadResult = await uploadFiles(attachments.map((a) => a.file));
-        uploadedAttachments = (uploadResult.files || [])
-          .filter((f) => f.success && f.file_id)
-          .map((f) => ({
-            file_id: f.file_id!,
-            filename: f.filename!,
-            mime_type: f.mime_type || 'application/octet-stream',
-            extracted_text: f.text || '',
-            size: f.size || 0,
-          }));
+        uploadedAttachments = await uploadAttachments(attachments.map((a) => a.file));
       } catch (err) {
+        // Fail before the spend: a billed run never starts on a partial input
+        // set. The text and the attachments stay in the composer for a retry.
         console.error('Attachment upload failed:', err);
+        const names = err instanceof AttachmentUploadError ? err.failedNames.join(', ') : 'attachments';
+        dispatchMessages({
+          type: 'ADD_MESSAGES',
+          payload: [{ id: 'err-upload-' + Date.now(), role: 'error', content: `Could not upload ${names}. Nothing was run; try again.` }],
+        });
+        setComposerText(problem);
+        setRunning(false);
+        return;
       }
     }
 
@@ -819,8 +832,9 @@ export default function ChatPage() {
             dispatchMessages({ type: 'ADD_MESSAGES', payload: finalErrors.map((err, i) => ({ id: 'err-' + Date.now() + '-' + i, role: 'error', content: err })) });
           }
 
-          // Save conversation to DB
-          const convId = conversationIdRef.current || assistantId;
+          // Save conversation to DB -- into the thread this run started in,
+          // not whichever thread New/Load has opened since (UI-3).
+          const convId = ticket.conversationId || assistantId;
           const historyTurns: ConversationTurn[] = messages
             .filter((m): m is ChatFeedMessage & { role: 'user' | 'assistant' } => m.role === 'user' || m.role === 'assistant')
             .map((m) => ({ role: m.role, content: m.content || '' }));
@@ -840,7 +854,7 @@ export default function ChatPage() {
             duration: totalDuration,
             kind: 'pipeline',
             response_content: buildMarkdownFromPhases(phases),
-            pipeline_id: clientRunIdRef.current || undefined,
+            pipeline_id: ticket.clientRunId || undefined,
           };
           saveConversation(conv).then(refreshHistory).catch(console.error);
           break;
@@ -850,7 +864,7 @@ export default function ChatPage() {
 
     // Generate a client-side run ID so WebSocket can subscribe to the same pipeline
     const clientRunId = 'run-' + (crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`);
-    clientRunIdRef.current = clientRunId;
+    ticket.clientRunId = clientRunId;
 
     try {
       const state = useAppStore.getState();
@@ -859,6 +873,8 @@ export default function ChatPage() {
       wsConnect(clientRunId, () => {});
 
       if (isFollowup) {
+        const followupConvId = conversationIdRef.current || lastAssistantMsg.id;
+        ticket.conversationId = followupConvId;
         const followupReq: RunFollowupRequest = {
           question: problem,
           preset: getAutoPreset(),
@@ -868,7 +884,7 @@ export default function ChatPage() {
           expert: state.isExpert,
           web_search: false,
           smart_search: true,
-          conversation_id: conversationIdRef.current || lastAssistantMsg.id,
+          conversation_id: followupConvId,
           history: messages
             .filter((m): m is ChatFeedMessage & { role: 'user' | 'assistant' } => m.role === 'user' || m.role === 'assistant')
             .map((m) => ({ role: m.role, content: m.content || '' })),
@@ -878,10 +894,11 @@ export default function ChatPage() {
           file_ids: uploadedAttachments.length > 0 ? uploadedAttachments.map((a) => a.file_id) : undefined,
           client_run_id: clientRunId,
         };
-        await startFollowup(followupReq, onEvent);
+        await startFollowup(followupReq, onEvent, ticket.abort.signal);
       } else {
         const newConvId = assistantId;
         conversationIdRef.current = newConvId;
+        ticket.conversationId = newConvId;
         setConversationId(newConvId);
         const req = {
           problem,
@@ -899,7 +916,7 @@ export default function ChatPage() {
           // skip re-running HyperGate so the chosen preset is locked in.
           force_pipeline: !!opts?.presetOverride,
         };
-        await startRun(req, onEvent);
+        await startRun(req, onEvent, ticket.abort.signal);
       }
     } catch (err) {
       if (err instanceof PipelineError && err.status === 429) {
@@ -909,7 +926,6 @@ export default function ChatPage() {
             setShowUpgradeModal(true);
             dispatchMessages({ type: 'UPDATE_MESSAGE', payload: { messageId: assistantId, updates: { isStreaming: false } } });
             wsDisconnect();
-            clientRunIdRef.current = null;
             setRunning(false);
             clearAttachments();
             return;
@@ -941,11 +957,27 @@ export default function ChatPage() {
     } finally {
       dispatchMessages({ type: 'UPDATE_MESSAGE', payload: { messageId: assistantId, updates: { isStreaming: false } } });
       wsDisconnect();
-      clientRunIdRef.current = null;
       setRunning(false);
       clearAttachments();
     }
-  }, [composerText, running, attachments, isImageMode, tier, messages, startRun, startFollowup, wsConnect, wsDisconnect, dispatchMessages, setRunning, setComposerText, clearAttachments, refreshHistory, setCompletedPhases, setErrorPhases, setCurrentPhase, setPhaseDurations, setAutoSelectedMethod, setPhaseOpenMode, isContinuation, getAutoPreset, autoMethodAlways]);
+  }, [attachments, isImageMode, tier, messages, startRun, startFollowup, wsConnect, wsDisconnect, dispatchMessages, setRunning, setComposerText, clearAttachments, refreshHistory, setCompletedPhases, setErrorPhases, setCurrentPhase, setPhaseDurations, setAutoSelectedMethod, setPhaseOpenMode, isContinuation, getAutoPreset, autoMethodAlways]);
+
+  const handleSubmit = useCallback(async (
+    providedText?: string,
+    opts?: { presetOverride?: string; skipGate?: boolean },
+  ) => {
+    const problem = (providedText ?? composerText).trim();
+    if (!problem) return;
+    // Null while a run, or its gate check, is in flight: a second Enter during
+    // the gate check used to start a second run (UI-2).
+    const ticket = run.begin();
+    if (!ticket) return;
+    try {
+      await submitRun(ticket, problem, opts);
+    } finally {
+      run.finish(ticket);
+    }
+  }, [composerText, run, submitRun]);
 
   const handleMethodChoice = useCallback((preset: string) => {
     const choice = pendingChoice;
@@ -960,13 +992,13 @@ export default function ChatPage() {
   }, [pendingChoice, setComposerText]);
 
   const handleStop = useCallback(() => {
-    stopRun();
-    wsSendStop(clientRunIdRef.current || '');
+    run.stop();
     setRunning(false);
     setCurrentPhase(undefined);
-  }, [stopRun, wsSendStop, setRunning, setCurrentPhase]);
+  }, [run, setRunning, setCurrentPhase]);
 
   function handleNew() {
+    if (run.isActive()) handleStop();
     // Dispatch action to clear messages and reset other states managed by parent
     dispatchMessages({ type: 'CLEAR_MESSAGES' });
     setComposerText('');
@@ -982,7 +1014,10 @@ export default function ChatPage() {
   }
 
   async function handleResume(pipelineId: string) {
-    if (running) return;
+    // The resume stream is not in the server's run store, so there is no
+    // run_id to stop it by: aborting this ticket's fetch is what ends it (UI-1).
+    const ticket = run.begin();
+    if (!ticket) return;
     setRunning(true);
     setCompletedPhases([]);
     setErrorPhases([]);
@@ -1045,19 +1080,23 @@ export default function ChatPage() {
     };
 
     try {
-      const body = await resumePipelineStream(pipelineId);
-      await readSSEStream(body, onResumeEvent);
+      const body = await resumePipelineStream(pipelineId, ticket.abort.signal);
+      await readSSEStream(body, onResumeEvent, ticket.abort.signal);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Resume failed';
-      dispatchMessages({ type: 'UPDATE_MESSAGE', payload: { messageId: assistantId, updates: { isStreaming: false } } });
-      dispatchMessages({ type: 'ADD_MESSAGES', payload: [{ id: 'err-' + Date.now(), role: 'error', content: msg }] });
+      if (!ticket.abort.signal.aborted) {
+        const msg = err instanceof Error ? err.message : 'Resume failed';
+        dispatchMessages({ type: 'ADD_MESSAGES', payload: [{ id: 'err-' + Date.now(), role: 'error', content: msg }] });
+      }
     } finally {
+      dispatchMessages({ type: 'UPDATE_MESSAGE', payload: { messageId: assistantId, updates: { isStreaming: false } } });
+      run.finish(ticket);
       setRunning(false);
       setCurrentPhase(undefined);
     }
   }
 
   function handleLoad(conv: Conversation) {
+    if (run.isActive()) handleStop();
     conversationIdRef.current = conv.conversation_id || conv.id;
     setConversationId(conversationIdRef.current);
     const renderedPhases: RenderedPhase[] = conv.phases.map((p, idx) => ({
@@ -1301,10 +1340,7 @@ export default function ChatPage() {
         onToggleNeuro={toggleNeuroPanel}
         onToggleTier={toggleTier}
         tier={tier}
-        onCopyLastResponse={() => {
-          const last = messages.filter((m) => m.role === 'assistant' && !m.isStreaming).at(-1);
-          if (last?.content) navigator.clipboard.writeText(last.content);
-        }}
+        onCopyLastResponse={copyLastResponse}
         recentCommands={recentCommands}
         onRecordCommand={addRecentCommand}
       />

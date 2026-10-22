@@ -12,6 +12,7 @@ import reasoner.phases as phases
 from reasoner.application.flows.base import WorkflowServices
 from reasoner.core.constants import TRUNCATION, YOUTUBE_OEMBED_URL, YOUTUBE_WATCH_BASE_URL
 from reasoner.core.constants_limits import get_token_budget
+from reasoner.core.degrade import degraded
 from reasoner.core.search import (
     _bm25_score,
     _normalize_url,
@@ -24,6 +25,7 @@ from reasoner.infrastructure.search.discovery import (
     get_search_client_for_method,
 )
 from reasoner.parsing import ParseError, extract_json, safe_list
+from reasoner.phases._shared import _wrap_external_content
 from reasoner.sanitization import sanitize_for_prompt
 
 logger = logging.getLogger(__name__)
@@ -71,11 +73,10 @@ async def enrich_problem_with_youtube(state: PipelineState, services: WorkflowSe
         f"YouTube video detected: '{meta['title']}' by {meta['author']}",
         state,
     )
-    enriched = (
-        f"{state.problem}\n\n"
-        f"[YouTube Video Metadata: Title: {meta['title']}, Author: {meta['author']}, Video ID: {meta['video_id']}]"
-    )
-    return enriched
+    # The title and channel name are whatever the uploader typed (SEC-15), so
+    # they go in as untrusted content like any other web-authored text.
+    metadata = f"Title: {meta['title']}, Author: {meta['author']}, Video ID: {meta['video_id']}"
+    return f"{state.problem}\n\n[YouTube Video Metadata]\n{_wrap_external_content(metadata)}"
 
 def _enrich_query(query: str, problem: str) -> str:
     problem_lower = problem.lower()
@@ -307,7 +308,14 @@ async def vet_results(state: PipelineState, results: list[dict], services: Workf
         if flagged_indices:
             services.log("VETTING", f"Flagged issues in {len(flagged_indices)}/{len(results)} results.", state)
     except Exception as e:
-        services.log("VETTING", f"Batch vetting failed ({e}) — all results pass through clean.", state)
+        # Fail closed: a vetter that could not answer has vetted nothing, so
+        # nothing may be reported clean or "good" (SEC-9).
+        degraded("search.vetting", None, exc=e, state=state, detail="results left unvetted")
+        for r in results:
+            r["vetting_unverified"] = True
+        state.context_quality = "partial"
+        state.vetted_context = results
+        return
 
     flagged_count = sum(1 for r in results if r.get("vetting_flags"))
     total = len(results)
@@ -366,6 +374,12 @@ async def run_deep_read_phase(state: PipelineState, services: WorkflowServices, 
             if extracted:
                 for item in extracted:
                     url = item.get("url", "")
+                    # Same rule as the scrape path below: a rejected page is dropped (SEC-10).
+                    try:
+                        item["content"] = sanitize_for_prompt(item.get("content", "") or "")[0]
+                    except ValueError as exc:
+                        degraded("search.deep_read_rejected", None, exc=exc, state=state, detail=str(url))
+                        continue
                     services.log("DEEP_READ", f"Tavily extracted: {item.get('title', url)[:80]}", state)
                     # Store extracted content directly into vetted_context
                     found = next((r for r in state.vetted_context if r.get("url") == url), None)
@@ -380,6 +394,7 @@ async def run_deep_read_phase(state: PipelineState, services: WorkflowServices, 
                             "snippet": (item.get("content", "") or "")[:500],
                             "source": "tavily:extract",
                             "freshness_score": 0.6,
+                            "vetting_unverified": True,
                         })
                 # Only remove URLs that Tavily successfully extracted — remaining
                 # URLs fall through to the per-URL scraping loop.
@@ -421,12 +436,22 @@ async def run_deep_read_phase(state: PipelineState, services: WorkflowServices, 
         url = scraped.get("url")
         title = scraped.get("title", "Unknown")
         if scraped.get("success"):
-            matching_result["deep_content"] = scraped.get("content", "")
+            # A page the injection guard rejects is dropped, not kept raw. The
+            # old fallback stored exactly the rejected text, unvetted, as the
+            # summary (docs/plans/audit-remediation-2-2026-10-20.md SEC-10).
+            try:
+                sanitized_content = sanitize_for_prompt(scraped.get("content", ""))[0]
+            except ValueError as exc:
+                degraded("search.deep_read_rejected", None, exc=exc, state=state, detail=str(url))
+                matching_result["deep_read_rejected"] = True
+                return
+            matching_result["deep_content"] = sanitized_content
             matching_result["deep_title"] = title
+            # Deep-read text never went through vet_results.
+            matching_result["vetting_unverified"] = True
             services.log("DEEP_READ", f"Successfully scraped: {title}", state)
             if use_llm_extraction:
                 try:
-                    sanitized_content = sanitize_for_prompt(scraped.get("content", ""))[0]
                     raw_extraction, _ = await services.call_llm(
                         role="primary",
                         system_prompt=phases.DEEP_READ_SYSTEM,
@@ -442,10 +467,10 @@ async def run_deep_read_phase(state: PipelineState, services: WorkflowServices, 
                     matching_result["extraction_success"] = True
                     services.log("DEEP_READ", f"Extracted summary for: {title}", state)
                 except Exception:
-                    matching_result["summary"] = scraped.get("content", "")[:TRUNCATION.CONTENT]
+                    matching_result["summary"] = sanitized_content[:TRUNCATION.CONTENT]
                     matching_result["extraction_success"] = False
             else:
-                matching_result["summary"] = scraped.get("content", "")[:TRUNCATION.CONTENT]
+                matching_result["summary"] = sanitized_content[:TRUNCATION.CONTENT]
                 matching_result["extraction_success"] = False
         else:
             services.log("DEEP_READ", f"Failed to scrape {url}: {scraped.get('error')}", state)

@@ -49,7 +49,13 @@ UNIQUE_KEYS = {
     ("api_keys", ("key_hash",)),                      # api_key_repo_postgres
     ("upload_usage", ("user_id",)),                   # upload_usage_repo
 }
-COLUMNS = {("subscriptions", "stripe_sub_id"), ("subscriptions", "paypal_sub_id")}
+COLUMNS = {
+    ("subscriptions", "stripe_sub_id"),
+    ("subscriptions", "paypal_sub_id"),
+    # BIL-21: the webhook claim is a lease.
+    ("processed_webhooks", "status"),
+    ("processed_webhooks", "claimed_at"),
+}
 
 
 def _with_db(name: str) -> str:

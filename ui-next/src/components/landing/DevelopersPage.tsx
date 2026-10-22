@@ -356,12 +356,12 @@ export default function DevelopersPage() {
             from curl — there is no second product with its own accounting to reconcile against.
           </Lede>
           <Body>
-            Runs settle after they complete, from the actual cost on the terminal frame. A run that
-            fails costs nothing. Send a{' '}
+            Runs settle after they end, from their actual cost. A run that stops early pays only
+            for the spend it already incurred. Send a{' '}
             <code className="font-mono text-[length:var(--text-sm)] text-[var(--text-2)]">client_run_id</code> on
-            every call: it is both the duplicate-run guard and the credit idempotency key, so a
-            dropped stream is resumed by reconnecting with the same id rather than by paying for
-            the question twice. A pipeline is capped at 600 seconds — set the client timeout above
+            every call: it is the duplicate-run guard, so a repeat of a run in flight or finished
+            gets 409 instead of running twice, and a run that dropped frees its id for a retry.
+            A pipeline is capped at 600 seconds — set the client timeout above
             that, or you will abandon runs you have already paid for.
           </Body>
 

@@ -131,7 +131,7 @@ ui-next/src/
 ├── lib/                    # api-client, db (IndexedDB), types, utils, security, markdown
 └── stores/                 # app-store.ts (Zustand global state with persistence)
 
-tests/                      # pytest suite (<!-- gen:test_files -->377<!-- /gen --> test_*.py files, recursive)
+tests/                      # pytest suite (<!-- gen:test_files -->401<!-- /gen --> test_*.py files, recursive)
 scripts/
 └── update_mindmap_meta.py  # Patches live counts into ARCHITECTURE_MINDMAP.md (run manually — see §10)
 ```
@@ -297,7 +297,7 @@ Cross-lab diversity prevents echo chambers:
 ## 7. Cross-Cutting Concerns
 
 ### Security (Defense in Depth)
-- **Input:** `sanitization.sanitize_for_prompt()` — XSS stripping, null-byte removal, prompt-injection regex, unicode NFKC normalization
+- **Input:** `sanitization.sanitize_for_prompt()` — XSS stripping, null-byte removal, prompt-injection regex matched against an NFKC + casefold copy of the text (the original is kept, so CJK and typographic input is not rewritten)
 - **Auth:** Token-based with scoped permissions (`auth.py`)
 - **Rate limiting:** Token-bucket per client IP (`rate_limiter.py`)
 - **CSRF:** HMAC-SHA256 signed tokens in Next.js API routes and FastAPI `require_csrf`

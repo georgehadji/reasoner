@@ -72,8 +72,10 @@ export async function clearCache() {
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 }
 
-export async function stopPipeline() {
-  await fetchWithCsrf(API.STOP, { method: 'POST' }).catch(() => {});
+/** Stop one run. Never call /api/stop without a run_id: that is the admin
+ *  "stop every user's run", and a 403 for anyone else (UI-4). */
+export async function stopPipeline(runId: string) {
+  await fetchWithCsrf(`${API.STOP}?run_id=${encodeURIComponent(runId)}`, { method: 'POST' }).catch(() => {});
 }
 
 export async function fetchPresets() {
@@ -99,9 +101,12 @@ async function _calculate(expression: string) {
 }
 export const calculate = withWidgetCache(_calculate, (expr: string) => `calc:${expr}`);
 
-export async function resumePipelineStream(pipelineId: string) {
+export async function resumePipelineStream(pipelineId: string, signal?: AbortSignal) {
+  // The signal is what lets Stop end a resumed run (UI-1): it had none, so
+  // Stop only flipped `running` while the billed stream carried on.
   const resp = await fetchWithCsrf(API.PIPELINE_RESUME(pipelineId), {
     method: 'POST',
+    signal,
   });
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
   if (!resp.body) throw new Error('No response body');

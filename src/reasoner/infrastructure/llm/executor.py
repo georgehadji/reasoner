@@ -903,10 +903,12 @@ class LLMExecutor:
         Uses the existing ContextCompressor from reasoner.neuro.compression.
         """
         # Skip compression for roles that don't typically have code
+        # Not "primary", "context_vetting" or "deep_read": they carry the
+        # user's own text, where a "#" line in a fence is content, not a
+        # comment to strip (docs/plans/audit-remediation-2-2026-10-20.md DAT-9).
         code_heavy_roles = {
             "coding_spec", "coding_generate", "coding_review",
-            "coding_tests", "coding_assemble", "primary",
-            "context_vetting", "deep_read",
+            "coding_tests", "coding_assemble",
         }
         if role not in code_heavy_roles:
             return prompt

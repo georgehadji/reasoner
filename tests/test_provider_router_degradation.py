@@ -162,7 +162,7 @@ class TestProviderApiErrorsReachTheFallbackChain:
         from reasoner.infrastructure.llm.providers.openai_compat import _translate
 
         primary = FakeProvider("nousresearch/hermes-4-70b")
-        fallback = FakeProvider("anthropic/claude-sonnet-5")
+        fallback = FakeProvider("meta-llama/llama-4-maverick")
         router = ProviderRouter(primary=primary, fallback_table={"primary": fallback})
 
         attempted: list[str] = []
@@ -185,11 +185,11 @@ class TestProviderApiErrorsReachTheFallbackChain:
                     role="primary", system_prompt="test", user_prompt="test",
                 )
 
-        assert attempted == ["nousresearch/hermes-4-70b", "anthropic/claude-sonnet-5"], (
+        assert attempted == ["nousresearch/hermes-4-70b", "meta-llama/llama-4-maverick"], (
             f"fallback was not attempted after the 404; attempts={attempted}"
         )
         assert result == "fallback answered"
-        assert metadata.get("model") == "anthropic/claude-sonnet-5"
+        assert metadata.get("model") == "meta-llama/llama-4-maverick"
 
     @pytest.mark.asyncio
     async def test_complete_translates_a_provider_404(self):

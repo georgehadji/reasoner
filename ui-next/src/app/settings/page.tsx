@@ -4,8 +4,10 @@ import { useState } from 'react';
 import { useAppStore } from '@/stores/app-store';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useRouter } from 'next/navigation';
+import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { supabase } from '@/lib/supabase';
 import { deleteAccount } from '@/lib/api-client';
+import { deleteHistory } from '@/lib/db';
 import Link from 'next/link';
 import { User, ShieldAlert, ShieldCheck, Database, Key } from 'lucide-react';
 import { SiteHeader } from '@/components/layout/SiteHeader';
@@ -15,14 +17,13 @@ export default function SettingsPage() {
   const user = useAppStore((s) => s.user);
   const logout = useAppStore((s) => s.logout);
   const router = useRouter();
+  const status = useRequireAuth();
   const { subscription } = useSubscription();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
 
-  if (!user) {
-    if (typeof window !== 'undefined') router.push('/login');
-    return null;
-  }
+  // Waits for the session to load before judging; redirects from an effect.
+  if (status !== 'authenticated' || !user) return null;
 
   const handleResetPassword = async () => {
     setLoading(true);
@@ -59,6 +60,9 @@ export default function SettingsPage() {
       setLoading(false);
       return;
     }
+
+    // The account is gone: so is its local history on this browser (UI-5).
+    await deleteHistory(user.id).catch(() => {});
 
     try {
       if (supabase) {
