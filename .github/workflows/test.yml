@@ -123,7 +123,9 @@ jobs:
           # 2204: deleted domain.pricing.calculate_model_cost, dead since BIL-2 (-2).
           # 2202: audit input-limits PR (SEC-4/SEC-5/OPS-5..7/DAT-4) (net -2).
           # 2201: audit billing PR (BIL-3..9) sorted credit_service imports (net -1).
-          python scripts/ruff_ratchet.py --max 2185
+          # 2197: audit storage PR (PER-8..11, DAT-8) rewrote the upload hash index
+          #       and L2 index on utils.atomic_file (net -3).
+          python scripts/ruff_ratchet.py --max 2184
 
       - name: Security scan (bandit)
         run: |
@@ -328,7 +330,7 @@ jobs:
           # 101: data_eraser's Neuro step was `try: pass / except Exception: pass`
           # (a counted swallow that erased nothing); it now calls
           # NeuroService.erase_owner and reports the failure in the receipt.
-          python scripts/silent_failure_ratchet.py --max 101
+          python scripts/silent_failure_ratchet.py --max 100
 
       - name: Dead-code ratchet (vulture, ADVISORY)
         # P-5 (docs/plans/phaseoutput-retirement-2026-09-12.md): advisory for
@@ -338,7 +340,7 @@ jobs:
         # agree -- and in ci-local.sh, move it from `advisory` to `gate`.
         continue-on-error: true
         run: |
-          python scripts/vulture_ratchet.py --max 387
+          python scripts/vulture_ratchet.py --max 389
 
       - name: Run tests
         run: |

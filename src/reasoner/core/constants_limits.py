@@ -753,3 +753,6 @@ GATE_ESTIMATED_COST_USD: float = 0.001
 # worker that died; the provider's retry may take it over. Must exceed the
 # slowest handler (the Stripe API calls in sync_subscription, ~30 s observed).
 WEBHOOK_LEASE_SECONDS: int = 300
+
+# History entries kept per user; saving a newer one prunes the oldest (PER-12).
+HISTORY_MAX_ENTRIES_PER_OWNER: int = 500

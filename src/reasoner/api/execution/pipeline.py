@@ -15,7 +15,7 @@ from reasoner.api.execution.cancel import StreamingConnectionContext
 from reasoner.api.execution.direct import _stream_direct_answer
 from reasoner.api.execution.sse_observer import RunStream
 from reasoner.api.execution.web_search import _stream_web_search_results
-from reasoner.api.history import HISTORY_DIR, HistoryEntry, _save_history_entry
+from reasoner.api.history import HistoryEntry, history_repo
 from reasoner.api.schemas import RunRequest
 from reasoner.application.commands import RunPipelineCommand
 from reasoner.application.orchestrator import PipelineOrchestrator
@@ -327,7 +327,7 @@ def _token_totals(state: PipelineState) -> dict[str, int]:
     }
 
 
-def _record_history(
+async def _record_history(
     req: RunRequest, state: PipelineState, user_id: str | None, tokens: dict
 ) -> None:
     try:
@@ -344,26 +344,9 @@ def _record_history(
             tokens=tokens,
             status="completed" if not state.errors else "error",
         )
-        _save_history_entry(entry)
-        _tag_history(entry)
+        await history_repo().save(entry.model_dump())
     except Exception as e:
         logger.warning(f"Failed to save history: {e}")
-
-
-def _tag_history(entry: HistoryEntry) -> None:
-    try:
-        import re as _re
-
-        from reasoner.core.memory import TaggedMemory
-
-        def _sanitize(s: str | None) -> str:
-            return _re.sub(r"[^a-zA-Z0-9_-]", "_", s or "unknown")
-
-        tagged = TaggedMemory(HISTORY_DIR)
-        tagged.add(f"method_{_sanitize(entry.method)}", entry.model_dump())
-        tagged.add(f"preset_{_sanitize(entry.preset)}", entry.model_dump())
-    except Exception as tag_err:
-        logger.warning(f"Failed to save tagged history: {tag_err}")
 
 
 async def _teardown(conn_context: StreamingConnectionContext, run_id: str) -> None:
@@ -455,7 +438,7 @@ async def _finish_run(
     stream: RunStream,
 ) -> None:
     tokens = _token_totals(state)
-    _record_history(req, state, user_id, tokens)
+    await _record_history(req, state, user_id, tokens)
     await stream.done(state, tokens, time.monotonic() - run_start)
     # Postflight: neuro persist.
     await orchestrator.postflight(state, req, user_id=user_id, run_id=run_id)
