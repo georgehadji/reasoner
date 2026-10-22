@@ -7,6 +7,7 @@ from typing import Any
 
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.parsing import extract_json
+from reasoner.phases._shared import _wrap_user_input
 from reasoner.subagents.base import PhaseSubAgent
 
 AMBIGUITY_SYSTEM = """You are an Ambiguity Detector. Your ONE JOB is to read the user's problem and identify what is unclear, vague, or ambiguous.
@@ -39,7 +40,7 @@ class AmbiguityDetectorSubAgent(PhaseSubAgent):
     TEMPERATURE = 0.2
 
     def _build_prompt(self, state: PipelineState) -> tuple[str, str]:
-        return (AMBIGUITY_SYSTEM, f"Problem: {state.problem}")
+        return (AMBIGUITY_SYSTEM, f"Problem: {_wrap_user_input(state.problem)}")
 
     def _parse_result(self, raw: str) -> dict[str, Any]:
         try:

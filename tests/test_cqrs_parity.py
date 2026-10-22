@@ -73,7 +73,12 @@ async def test_cqrs_handler_produces_state():
     class TestExecutor:
         async def execute_run(self, command, router, sse_emit=None, user_id=None, initial_state=None):
             # For the test, just return a minimal state
-            return PipelineState(problem=command.problem, preset_name=command.preset or "test")
+            from reasoner.application.ports.run_outcome import RunOutcome
+
+            return RunOutcome(
+                "completed",
+                PipelineState(problem=command.problem, preset_name=command.preset or "test"),
+            )
 
     router = ProviderRouter(primary=MagicMock())
     handler = RunPipelineCommandHandler(

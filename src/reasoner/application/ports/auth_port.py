@@ -24,6 +24,15 @@ class AuthPort(Protocol):
         """
         ...
 
+    async def delete_identity(self, user_id: str) -> None:
+        """
+        Delete the provider's identity for *user_id*, so its tokens stop working.
+
+        Called by account deletion. Deleting an identity that is already gone
+        succeeds. Raises on any other provider failure.
+        """
+        ...
+
     async def refresh_session(self, token: str) -> str:
         """
         Refresh an access token if supported by the provider.

@@ -53,11 +53,18 @@ async def test_set_owner_with_none_user_id_is_explicit_anonymous_record(repo):
 
 
 @pytest.mark.asyncio
-async def test_set_owner_upserts_idempotently(repo):
+async def test_set_owner_is_first_writer_wins(repo):
+    """Ownership never moves. This test used to assert the overwrite, which is
+    how a second tenant on the same client_run_id took over the first one's
+    pipeline (docs/plans/audit-remediation-2-2026-10-20.md SEC-7)."""
+    from reasoner.application.ports.pipeline_ownership_port import OwnershipConflictError
+
     await repo.set_owner("pipeline-1", "user-a", "pipeline-1")
-    await repo.set_owner("pipeline-1", "user-b", "pipeline-1")  # overwrite
+    await repo.set_owner("pipeline-1", "user-a", "pipeline-1")  # same owner: no-op
+    with pytest.raises(OwnershipConflictError):
+        await repo.set_owner("pipeline-1", "user-b", "pipeline-1")
     record = await repo.get_owner("pipeline-1")
-    assert record.user_id == "user-b"
+    assert record.user_id == "user-a"
 
 
 @pytest.mark.asyncio

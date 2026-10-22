@@ -206,6 +206,15 @@ def build_web_sources_block(
     return f"\n\n{heading}:\n{body}{tail}\n"
 
 
+_META_TOKEN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/@+\-]{0,95}")
+
+
+def _meta_token(value: object) -> str | None:
+    """*value* if it looks like an id, model id or timestamp; otherwise None."""
+    text = str(value or "").strip()
+    return text if _META_TOKEN.fullmatch(text) else None
+
+
 def build_memory_context(state: PipelineState) -> str:
     """Render recalled long-term memory (Neuro) for injection into a user prompt.
 
@@ -249,13 +258,16 @@ def build_memory_context(state: PipelineState) -> str:
         content = str(chunk.get("content", "")).strip()
         if not content:
             continue
-        meta_bits = [f"source={chunk.get('source') or 'memory'}"]
-        if (run_id := chunk.get("run_id")):
+        # The header sits outside the wrapper, and these fields come from stored
+        # metadata a caller can write, so only identifier-shaped values print
+        # (docs/plans/audit-remediation-2-2026-10-20.md SEC-13).
+        meta_bits = [f"source={_meta_token(chunk.get('source')) or 'memory'}"]
+        if (run_id := _meta_token(chunk.get("run_id"))):
             meta_bits.append(f"run={run_id}")
-        if (model_id := chunk.get("model_id")):
+        if (model_id := _meta_token(chunk.get("model_id"))):
             meta_bits.append(f"model={model_id}")
-        if (created := chunk.get("created_at")):
-            meta_bits.append(str(created))
+        if (created := _meta_token(chunk.get("created_at"))):
+            meta_bits.append(created)
         if isinstance(rel := chunk.get("relevance"), (int, float)):
             meta_bits.append(f"relevance={rel:.2f}")
         header = f"[{i}] " + " · ".join(meta_bits)

@@ -29,15 +29,23 @@ from reasoner.core.settings import settings
 logger = logging.getLogger(__name__)
 
 _TICKET_DOMAIN_SEPARATOR = b"ws-ticket-v1"
+# The ticket is sent as a Sec-WebSocket-Protocol value, which must be an
+# RFC 7230 token. ':' is not a token character: browsers threw SyntaxError in
+# `new WebSocket(url, [ticket])` before connecting. '.' is, and none of the
+# parts (UUID, digits, token_urlsafe, hex) contain it.
+_SEP = "."
+# Drawn once per process. Drawing it per call meant a ticket never verified
+# against the key it was issued with.
+_DEV_FALLBACK_SECRET = secrets.token_bytes(32)
 
 
 def _get_ticket_secret() -> bytes:
     raw = settings.CSRF_SECRET or ""
     if not raw:
         if not settings.CSRF_ENFORCE_BACKEND:
-            # Dev/CI: generate a random in-process secret, same posture as
-            # csrf.py's own fallback. Tickets won't survive a restart.
-            return secrets.token_bytes(32)
+            # Dev/CI: a random in-process secret, same posture as csrf.py's
+            # own fallback. Tickets won't survive a restart.
+            return _DEV_FALLBACK_SECRET
         raise RuntimeError(
             "CSRF_SECRET must be set to issue WebSocket tickets (reused as key "
             "material, domain-separated from CSRF tokens -- do not set a "
@@ -54,9 +62,9 @@ def issue_ticket(user_id: str) -> str:
     secret = _get_ticket_secret()
     expiry = int(time.time()) + settings.WS_TICKET_TTL_SECONDS
     nonce = secrets.token_urlsafe(16)
-    payload = f"{user_id}:{expiry}:{nonce}"
+    payload = f"{user_id}{_SEP}{expiry}{_SEP}{nonce}"
     sig = hmac.new(secret, payload.encode(), hashlib.sha256).hexdigest()
-    return f"{payload}:{sig}"
+    return f"{payload}{_SEP}{sig}"
 
 
 async def redeem_ticket(ticket: str) -> str | None:
@@ -67,22 +75,22 @@ async def redeem_ticket(ticket: str) -> str | None:
     fail open), this gates authentication itself -- "can't verify single-use"
     must mean "reject", not "allow".
     """
-    if not ticket or ticket.count(":") < 3:
+    if not ticket or ticket.count(_SEP) < 3:
         return None
 
-    # Peel from the right so a user_id that happens to contain a colon
+    # Peel from the right so a user_id that happens to contain the separator
     # (not expected today, but not a format guarantee either) still parses.
     try:
-        rest, provided_sig = ticket.rsplit(":", 1)
-        rest, nonce = rest.rsplit(":", 1)
-        user_id, expiry_str = rest.rsplit(":", 1)
+        rest, provided_sig = ticket.rsplit(_SEP, 1)
+        rest, nonce = rest.rsplit(_SEP, 1)
+        user_id, expiry_str = rest.rsplit(_SEP, 1)
     except ValueError:
         return None
     if not user_id or not nonce or not provided_sig:
         return None
 
     secret = _get_ticket_secret()
-    payload = f"{user_id}:{expiry_str}:{nonce}"
+    payload = f"{user_id}{_SEP}{expiry_str}{_SEP}{nonce}"
     expected_sig = hmac.new(secret, payload.encode(), hashlib.sha256).hexdigest()
     if not hmac.compare_digest(provided_sig, expected_sig):
         return None

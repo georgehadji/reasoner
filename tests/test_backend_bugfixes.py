@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import os
 from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import UUID
 
 import pytest
 
@@ -57,24 +56,37 @@ class TestWebSocketCancelPropagation:
     """BUG-002 regression: WebSocket stop must cancel the actual pipeline run."""
 
     @pytest.mark.asyncio
-    async def test_websocket_cancel_uses_same_run_state_manager(self):
+    async def test_websocket_cancel_uses_same_run_state_manager(self, tmp_path):
+        from unittest.mock import patch
+
+        from reasoner.infrastructure.persistence.pipeline_ownership_repo import (
+            PipelineOwnershipRepository,
+        )
         from reasoner.infrastructure.redis.run_state import _run_state_manager
         from reasoner.infrastructure.websocket.manager import handle_websocket_message
 
+        run_id = "test-run-123"
+        # Stop is owner-only (RUN-5); every real run has an ownership record.
+        repo = PipelineOwnershipRepository(db_path=tmp_path / "ownership.db")
+        await repo.set_owner(run_id, "user-a", run_id)
         manager = MagicMock()
         manager.send_to_connection = AsyncMock()
-        run_id = "test-run-123"
+        manager.connection_metadata = {"conn-1": {"user_id": "user-a"}}
 
         # Register run via the same manager that streaming.py uses
         cancel_event = await _run_state_manager.add(run_id, user_id=None)
         assert not cancel_event.is_set()
 
         # Simulate WebSocket stop message
-        await handle_websocket_message(
-            manager,
-            connection_id="conn-1",
-            message={"type": "stop", "pipeline_id": run_id},
-        )
+        with patch(
+            "reasoner.infrastructure.persistence.pipeline_ownership_repo.get_pipeline_ownership_repo",
+            return_value=repo,
+        ):
+            await handle_websocket_message(
+                manager,
+                connection_id="conn-1",
+                message={"type": "stop", "pipeline_id": run_id},
+            )
 
         # Cancel must have propagated to the actual event
         assert cancel_event.is_set()
@@ -160,13 +172,24 @@ class TestStripeAdapterRobustness:
         import stripe
 
         fake_customer = stripe.Customer.construct_from({"id": "cus_123", "metadata": {}}, "sk_test_dummy")
-        with patch("stripe.Customer.retrieve", return_value=fake_customer):
-            with pytest.raises(ValueError, match="Missing reasoner_user_id"):
+        live = stripe.Subscription.construct_from(
+            {"id": "sub_123", "customer": "cus_123", "metadata": {}}, "sk_test_dummy"
+        )
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock
+
+        nobody = SimpleNamespace(get_user_by_stripe_sub_id=AsyncMock(return_value=None))
+        from reasoner.domain.saas import UnresolvedBillingOwnerError
+
+        with patch("stripe.Customer.retrieve", return_value=fake_customer), \
+             patch("stripe.Subscription.retrieve", return_value=live), \
+             patch("reasoner.infrastructure.billing.stripe_adapter._subscription_repo",
+                   return_value=nobody):
+            with pytest.raises(UnresolvedBillingOwnerError):
                 await adapter._handle_subscription_updated(stripe_sub)
 
     @pytest.mark.asyncio
     async def test_handle_subscription_deleted_missing_user_id(self):
-        from reasoner.domain.saas import SubscriptionStatus, SubscriptionTier
         from reasoner.infrastructure.billing.stripe_adapter import StripeBillingAdapter
 
         adapter = StripeBillingAdapter(api_key="sk_test_dummy")
@@ -176,10 +199,17 @@ class TestStripeAdapterRobustness:
         import stripe
 
         fake_customer = stripe.Customer.construct_from({"id": "cus_123", "metadata": {}}, "sk_test_dummy")
-        with patch("stripe.Customer.retrieve", return_value=fake_customer):
-            result = await adapter._handle_subscription_deleted(stripe_sub)
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock
 
-        # Should NOT crash; uses random UUID for user_id
-        assert result.tier == SubscriptionTier.FREE
-        assert result.status == SubscriptionStatus.CANCELLED
-        assert isinstance(result.user_id, UUID)
+        nobody = SimpleNamespace(get_user_by_stripe_sub_id=AsyncMock(return_value=None))
+        from reasoner.domain.saas import UnresolvedBillingOwnerError
+
+        # An unknown owner is a typed "unresolved" result, never a random user:
+        # the random UUID made the cancellation apply to nobody
+        # (docs/plans/audit-remediation-2-2026-10-20.md BIL-13).
+        with patch("stripe.Customer.retrieve", return_value=fake_customer), \
+             patch("reasoner.infrastructure.billing.stripe_adapter._subscription_repo",
+                   return_value=nobody):
+            with pytest.raises(UnresolvedBillingOwnerError):
+                await adapter._handle_subscription_deleted(stripe_sub)

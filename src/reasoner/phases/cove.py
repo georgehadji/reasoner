@@ -100,7 +100,7 @@ def cove_crosscheck_prompt(state: PipelineState) -> str:
     return (
         f'{get_language_instruction(state)}\n\n'
         f'Original Draft:\n{_wrap_external_content(draft)}\n\n'
-        f'Verification Results:\n{json.dumps(answers, indent=2)}\n\n'
+        f'Verification Results:\n{_wrap_external_content(json.dumps(answers, indent=2))}\n\n'
         f'For EACH verification result, determine if the answer contradicts '
         f'the original draft claim. Report any inconsistencies found.\n\n'
         f'Output JSON: {{"inconsistencies": [{{'

@@ -42,11 +42,11 @@ def sot_solve_prompt(state: PipelineState, sub_problem: dict) -> str:
     return (
         f'{get_language_instruction(state)}\n\n'
         f'Original Problem: {_wrap_user_input(state.problem)}\n\n'
-        f'Full Skeleton: {json.dumps(skeleton, indent=2)}\n\n'
+        f'Full Skeleton: {_wrap_external_content(json.dumps(skeleton, indent=2))}\n\n'
         f'YOUR ASSIGNED SUB-PROBLEM:\n'
         f'ID: {sub_problem.get("id", "?")}\n'
         f'Description: {sub_problem.get("description", "")}\n'
-        f'Inputs: {json.dumps(sub_problem.get("inputs", []))}\n'
+        f'Inputs: {_wrap_external_content(json.dumps(sub_problem.get("inputs", [])))}\n'
         f'Expected Output: {sub_problem.get("expected_output", "")}\n\n'
         f'Solve this sub-problem thoroughly. Your solution will be combined with others '
         f'to form the complete answer.\n\n'

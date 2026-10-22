@@ -9,6 +9,7 @@ from reasoner.phases._shared import (
     _followup_context,
     _wrap_external_content,
     _wrap_user_input,
+    build_web_sources_block,
     get_language_instruction,
 )
 
@@ -69,7 +70,7 @@ DECOMPOSITION_SYSTEM = "Decompose problem into sub-problems. JSON only."
 def decomposition_prompt(state: PipelineState) -> str:
     is_jury = "jury" in (state.preset_name or "")
     jury_instr = " Add jury_guidelines." if is_jury else ""
-    web_context = f"\nWeb: {state.web_discovery_results[:TRUNCATION.KEY_INSIGHTS]}" if state.web_discovery_results else ""
+    web_context = build_web_sources_block(state, heading="Web", limit=TRUNCATION.KEY_INSIGHTS)  # wrapped (SEC-11)
     followup = _followup_context(state)
 
     return f'''{get_language_instruction(state)}
@@ -88,7 +89,7 @@ def fusion_prompt(state: PipelineState, language: str) -> str:
     lang_instruction = get_language_instruction(language)
     is_jury = "jury" in (state.preset_name or "")
     jury_instr = " Add jury_guidelines." if is_jury else ""
-    web_context = f"\nWeb: {state.web_discovery_results[:TRUNCATION.KEY_INSIGHTS]}" if state.web_discovery_results else ""
+    web_context = build_web_sources_block(state, heading="Web", limit=TRUNCATION.KEY_INSIGHTS)  # wrapped (SEC-11)
     followup = _followup_context(state)
 
     problem = state.enhanced_problem or state.problem
@@ -262,13 +263,16 @@ CRITICAL VETTING RULES:
 7.  If the text is a high-quality, relevant, and factual source, return an empty list for its flags."""
 
 def cot_detection_prompt(state: PipelineState, retrieved_text: str) -> str:
-    return f'{get_language_instruction(state)}\n\nProblem: {_wrap_user_input(state.problem)}\n\nReview the following retrieved text. Identify ONLY statements that are clearly factually incorrect, unsubstantiated, or overly speculative. Do NOT flag minor simplifications or educational summaries. If no clear issues are found, return an empty list.\n\nRetrieved Text:\n{retrieved_text}\n\nOutput JSON: {{"flags": [{{"statement": "<problematic statement>", "reasoning": "<why it\'s problematic>"}}]}}'
+    return f'{get_language_instruction(state)}\n\nProblem: {_wrap_user_input(state.problem)}\n\nReview the following retrieved text. Identify ONLY statements that are clearly factually incorrect, unsubstantiated, or overly speculative. Do NOT flag minor simplifications or educational summaries. If no clear issues are found, return an empty list.\n\nRetrieved Text:\n{_wrap_external_content(retrieved_text)}\n\nOutput JSON: {{"flags": [{{"statement": "<problematic statement>", "reasoning": "<why it\'s problematic>"}}]}}'
 
 
 def cot_detection_batch_prompt(state: PipelineState, snippets: list[dict]) -> str:
     """Batch vetting prompt — vet multiple search snippets in a single LLM call."""
+    # Each snippet is web-authored, so it is wrapped (CLAUDE.md §5, invariant 4);
+    # unwrapped, a page could address the vetter directly (SEC-9).
     items = "\n\n".join(
-        f'--- Item {s["index"]} ---\nURL: {s.get("url", "N/A")}\nSnippet: {s["text"]}'
+        f'--- Item {s["index"]} ---\n'
+        + _wrap_external_content(f'URL: {s.get("url", "N/A")}\nSnippet: {s["text"]}')
         for s in snippets
     )
     return (

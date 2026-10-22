@@ -414,10 +414,16 @@ class PipelineOrchestrator:
         if port is None:
             return []
         try:
+            # Twice the slots, because the provenance filter below drops some
+            # (HOT session hits, pre-provenance entries). Asking for exactly
+            # the slots let dropped chunks crowd out attributed ones, so an
+            # active user's recall came back empty (PER-10). 20 is the
+            # recall request's own max_results ceiling.
+            wanted = settings.NEURO_CONTEXT_MAX_CHUNKS
             chunks = await port.recall(
                 problem,
                 agent_id=agent_id,
-                max_results=settings.NEURO_CONTEXT_MAX_CHUNKS,
+                max_results=min(wanted * 2, 20),
                 owner=owner,
             )
         except Exception as exc:
@@ -456,6 +462,7 @@ class PipelineOrchestrator:
                 count_propagation_pattern("neuro_recall", len(warnings))
             cleaned.append({**chunk, "content": content})
 
+        cleaned = cleaned[:wanted]
         if dropped_unattributed:
             logger.info(
                 "Neuro recall dropped %d unattributed chunk(s) (schema_version < %d)",

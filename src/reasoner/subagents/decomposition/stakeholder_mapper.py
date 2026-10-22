@@ -7,6 +7,7 @@ from typing import Any
 
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.parsing import extract_json
+from reasoner.phases._shared import _wrap_user_input
 from reasoner.subagents.base import PhaseSubAgent
 
 STAKEHOLDER_SYSTEM = """You are a Stakeholder Mapper. Your ONE JOB is to identify which perspectives, roles, or stakeholders are relevant to this problem.
@@ -39,7 +40,7 @@ class StakeholderMapperSubAgent(PhaseSubAgent):
     TEMPERATURE = 0.3
 
     def _build_prompt(self, state: PipelineState) -> tuple[str, str]:
-        return (STAKEHOLDER_SYSTEM, f"Problem: {state.problem}")
+        return (STAKEHOLDER_SYSTEM, f"Problem: {_wrap_user_input(state.problem)}")
 
     def _parse_result(self, raw: str) -> dict[str, Any]:
         try:

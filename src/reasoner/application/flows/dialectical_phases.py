@@ -9,7 +9,7 @@ from reasoner.application.flows.base import WorkflowServices
 from reasoner.core.degrade import degraded
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.infrastructure.search.discovery import get_search_client_for_method
-from reasoner.parsing import ParseError, extract_json
+from reasoner.parsing import ParseError, coerce_list, extract_json
 
 logger = logging.getLogger(__name__)
 
@@ -67,9 +67,12 @@ async def run_scientific_hypothesize_phase(state: PipelineState, services: Workf
         state=state
     )
     data = extract_json(raw)
-    state.scientific_state["hypotheses"] = data.get("hypotheses", [])
+    state.scientific_state["hypotheses"] = coerce_list(data.get("hypotheses"))
 
 async def run_scientific_test_phase(state: PipelineState, services: WorkflowServices) -> None:
+    if not state.scientific_state.get("hypotheses"):
+        services.log("SCIENTIFIC", "No hypotheses to test; skipping falsification.", state)
+        return
     services.log("SCIENTIFIC", "Running falsification tests...", state)
     raw, _ = await services.call_llm(
         role="scoring",
@@ -90,7 +93,7 @@ async def run_scientific_test_phase(state: PipelineState, services: WorkflowServ
         )
         data = extract_json(raw)
 
-    state.scientific_state["test_results"] = data.get("test_results", [])
+    state.scientific_state["test_results"] = coerce_list(data.get("test_results"))
 
     # Bayesian posterior update
     hypotheses = state.scientific_state.get("hypotheses", [])
@@ -101,7 +104,8 @@ async def run_scientific_test_phase(state: PipelineState, services: WorkflowServ
         hyp_id = hyp.get("id", "")
         tests = [t for t in test_results if isinstance(t, dict) and t.get("hypothesis_id") == hyp_id]
         supported = sum(1 for t in tests if isinstance(t, dict) and t.get("result") == "SUPPORTED")
-        hyp["posterior_probability"] = round(supported / max(len(tests), 1), 2)
+        # No test is no evidence, not evidence against (FLOW-4).
+        hyp["posterior_probability"] = round(supported / len(tests), 2) if tests else None
     state.scientific_state["hypotheses"] = hypotheses
 
 # --- Socratic ---
@@ -115,9 +119,12 @@ async def run_socratic_question_phase(state: PipelineState, services: WorkflowSe
         state=state
     )
     data = extract_json(raw)
-    state.socratic_state["questions"] = data.get("questions", [])
+    state.socratic_state["questions"] = coerce_list(data.get("questions"))
 
 async def run_socratic_answer_phase(state: PipelineState, services: WorkflowServices) -> None:
+    if not state.socratic_state.get("questions"):
+        services.log("SOCRATIC", "No questions to answer; skipping.", state)
+        return
     services.log("SOCRATIC", "Attempting Dialectic answers...", state)
     raw, _ = await services.call_llm(
         role="constructive",
@@ -126,7 +133,7 @@ async def run_socratic_answer_phase(state: PipelineState, services: WorkflowServ
         state=state
     )
     data = extract_json(raw)
-    state.socratic_state["answers"] = data.get("answers", [])
+    state.socratic_state["answers"] = coerce_list(data.get("answers"))
 
 # --- Pre-Mortem ---
 

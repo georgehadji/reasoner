@@ -139,9 +139,11 @@ def extract_terminal_frame(events: Sequence[Mapping[str, Any]]) -> Mapping[str, 
 
     A pipeline that crashed hard emits a reduced ``done`` frame carrying only
     ``type`` and ``errors``, so every key but ``type`` is optional at read time.
+    Only ``done`` counts: the ``end`` frame the handler used to append after it
+    carried no telemetry and shadowed it (RUN-6).
     """
     for event in reversed(events):
-        if event.get("type") in ("done", "end"):
+        if event.get("type") == "done":
             return event
     return {}
 
@@ -188,9 +190,9 @@ def summarise(events: Sequence[Mapping[str, Any]], *, preset: str) -> RunSummary
 
     errors = coerce_string_list(terminal.get("errors"))
     errors += [
-        str(event.get("error", ""))
+        str(event.get("error") or event.get("message"))
         for event in events
-        if event.get("type") == "error" and event.get("error")
+        if event.get("type") == "error" and (event.get("error") or event.get("message"))
     ]
 
     tokens = terminal.get("total_tokens")
