@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime
 
 from reasoner.application.ports.billing_port import BillingPort
 from reasoner.domain.saas import SubscriptionTier
@@ -53,23 +54,29 @@ class BillingService:
             event_type = event.get("event_type", "")
 
         try:
-            await self._apply_webhook(event_type, sub, repo)
+            await self._apply_webhook(event_type, sub, repo, event_time(event))
         finally:
             # Invalidate even on failure: a partial write may have landed, so
             # the cached subscription can no longer be trusted.
             await invalidate_subscription(str(sub.user_id))
 
-    async def _apply_webhook(self, event_type: str, sub, repo) -> None:
-        """Route a webhook event to the matching persistence action."""
+    async def _apply_webhook(self, event_type: str, sub, repo, event_at=None) -> None:
+        """Route a webhook event to the matching persistence action.
+
+        Every write carries the event's own time and is skipped when the row
+        already holds a newer event, so retries and dead-letter replays apply
+        in any order (BIL-15). A skipped write skips its quota sync too.
+        """
         # --- PayPal events ---
         if event_type.startswith("BILLING.SUBSCRIPTION."):
             if event_type == "BILLING.SUBSCRIPTION.CANCELLED":
                 if sub.paypal_subscription_id:
-                    await repo.set_subscription_status_by_paypal(
+                    if await repo.set_subscription_status_by_paypal(
                         sub.paypal_subscription_id,
                         "cancelled",
-                    )
-                    await repo.sync_quota_for_subscription(sub)
+                        event_at,
+                    ):
+                        await repo.sync_quota_for_subscription(sub)
                 return
 
             if event_type == "BILLING.SUBSCRIPTION.SUSPENDED":
@@ -77,6 +84,7 @@ class BillingService:
                     await repo.set_subscription_status_by_paypal(
                         sub.paypal_subscription_id,
                         "past_due",
+                        event_at,
                     )
                 return
 
@@ -85,12 +93,13 @@ class BillingService:
                     await repo.set_subscription_status_by_paypal(
                         sub.paypal_subscription_id,
                         "past_due",
+                        event_at,
                     )
                 return
 
             if event_type == "BILLING.SUBSCRIPTION.ACTIVATED":
-                await repo.upsert_subscription(sub)
-                await repo.sync_quota_for_subscription(sub)
+                if await repo.upsert_subscription(sub, event_at):
+                    await repo.sync_quota_for_subscription(sub)
                 logger.info(
                     "PayPal subscription synced for user %s: tier=%s status=%s",
                     sub.user_id, sub.tier.value, sub.status.value
@@ -104,11 +113,12 @@ class BillingService:
         if event_type == "customer.subscription.deleted":
             # Downgrade to free — update subscription status
             if sub.stripe_subscription_id:
-                await repo.set_subscription_status(
+                if await repo.set_subscription_status(
                     sub.stripe_subscription_id,
                     "cancelled",
-                )
-                await repo.sync_quota_for_subscription(sub)
+                    event_at,
+                ):
+                    await repo.sync_quota_for_subscription(sub)
             return
 
         if event_type == "invoice.payment_failed":
@@ -116,23 +126,25 @@ class BillingService:
                 await repo.set_subscription_status(
                     sub.stripe_subscription_id,
                     "past_due",
+                    event_at,
                 )
             return
 
         if event_type == "invoice.payment_succeeded":
             # Payment succeeded — ensure subscription is active and reset usage for the new period
             if sub.stripe_subscription_id:
-                await repo.set_subscription_status(
+                if await repo.set_subscription_status(
                     sub.stripe_subscription_id,
                     "active",
-                )
-                await repo.sync_quota_for_subscription(sub)
+                    event_at,
+                ):
+                    await repo.sync_quota_for_subscription(sub)
             return
 
         if event_type in ("checkout.session.completed", "customer.subscription.updated"):
             # Upsert subscription and sync quota
-            await repo.upsert_subscription(sub)
-            await repo.sync_quota_for_subscription(sub)
+            if await repo.upsert_subscription(sub, event_at):
+                await repo.sync_quota_for_subscription(sub)
             logger.info(
                 "Stripe subscription synced for user %s: tier=%s status=%s",
                 sub.user_id, sub.tier.value, sub.status.value
@@ -140,3 +152,19 @@ class BillingService:
             return
 
         logger.debug("Unhandled event type: %s", event_type)
+
+
+def event_time(event: dict) -> datetime | None:
+    """When the provider says the event happened: Stripe ``created`` (epoch
+    seconds), PayPal ``create_time`` (ISO-8601). None when absent or unreadable,
+    which applies the write unconditionally, as before."""
+    created = event.get("created")
+    if isinstance(created, (int, float)) and not isinstance(created, bool):
+        return datetime.fromtimestamp(created, tz=UTC)
+    stamp = event.get("create_time")
+    if isinstance(stamp, str):
+        try:
+            return datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    return None

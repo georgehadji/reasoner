@@ -284,7 +284,7 @@ class TestCrossLanguagePreset:
 
     def test_method_extraction(self):
         """Preset names should map to the cross_language method."""
-        from reasoner.domain.preset_core import get_method_from_preset
+        from reasoner.presets import get_method_from_preset
         assert get_method_from_preset("cross-language-budget") == "cross_language"
         assert get_method_from_preset("cross-language-premium") == "cross_language"
 

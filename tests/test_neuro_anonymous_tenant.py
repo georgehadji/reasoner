@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 
 import reasoner.neuro.server as ns
+from reasoner.neuro.config import _agent_dir_name
 from reasoner.neuro.config import NeuroConfig, _apply_defaults
 from reasoner.neuro.server import LearnRequest, RecallRequest
 
@@ -74,4 +75,4 @@ async def test_an_anonymous_conversation_keeps_its_own_tenant(service, tmp_path)
         LearnRequest(prompt="p", response="r", agent_id="conv-1", metadata={}), owner=None
     )
     assert learned.status != "dropped_anonymous"
-    assert "a-conv-1" in _tenants(tmp_path)
+    assert _agent_dir_name("a-conv-1") in _tenants(tmp_path)  # PER-11 digest suffix

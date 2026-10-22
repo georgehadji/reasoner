@@ -280,18 +280,13 @@ async def run_prism_research_phase(
                 existing.snippet = f"{existing.snippet}\n\n{c.snippet}"[:TRUNCATION.CONTENT]
 
         services.log("RESEARCH", f"Action {action} added {added} new citations (total: {len(citations)})", state)
+        # Saved every iteration: a phase timeout cancels this loop, and
+        # citations written only after it ended were all lost
+        # (docs/plans/audit-remediation-2-2026-10-20.md FLOW-9).
+        _store_citations(state, citations, iteration_log)
 
     # Store results in method_state
-    ranked_citations = await _rank_citations(problem, citations)
-    citation_dicts = [
-        {"url": c.url, "title": c.title, "snippet": c.snippet, "source_type": c.source_type}
-        for c in ranked_citations
-    ]
-    state.method_state.set("prism", {
-        **state.method_state.get("prism"),
-        "citations": citation_dicts,
-        "iteration_log": iteration_log,
-    })
+    _store_citations(state, await _rank_citations(problem, citations), iteration_log)
 
     # Emit citations ready event
     state.pending_events.append({
@@ -301,6 +296,19 @@ async def run_prism_research_phase(
     })
 
     services.log("RESEARCH", f"Prism research complete. Total citations: {len(citations)}", state)
+
+
+def _store_citations(
+    state: PipelineState, citations: list[_Citation], iteration_log: list[str]
+) -> None:
+    state.method_state.set("prism", {
+        **(state.method_state.get("prism") or {}),
+        "citations": [
+            {"url": c.url, "title": c.title, "snippet": c.snippet, "source_type": c.source_type}
+            for c in citations
+        ],
+        "iteration_log": iteration_log,
+    })
 
 
 def _build_iteration_prompt(

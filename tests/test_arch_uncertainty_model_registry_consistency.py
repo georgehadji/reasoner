@@ -101,8 +101,8 @@ def test_preset_methods_map_to_flow_strategies() -> None:
     PipelinePreset has no .method field — method is derived from preset name
     via get_method_from_preset()."""
     from reasoner.application.flows.factory import WorkflowFactory
-    from reasoner.domain.preset_core import get_method_from_preset
     from reasoner.domain.preset_registry import PRESETS
+    from reasoner.presets import get_method_from_preset
 
     factory = WorkflowFactory()
 

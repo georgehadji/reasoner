@@ -7,6 +7,7 @@ from typing import Any
 
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.parsing import extract_json
+from reasoner.phases._shared import _wrap_user_input
 from reasoner.subagents.base import PhaseSubAgent
 
 SOURCE_SYSTEM = """You are a Source Evaluator. Your ONE JOB is to evaluate the credibility and relevance of search results for the problem.
@@ -44,7 +45,8 @@ class SourceEvaluatorSubAgent(PhaseSubAgent):
         sources = []
         for r in state.web_discovery_results[:5]:
             sources.append(f"- {r.get('title', 'Untitled')}: {r.get('url', '')}")
-        return (SOURCE_SYSTEM, f"Problem: {state.problem}\n\nSources:\n" + "\n".join(sources))
+        wrapped_problem = _wrap_user_input(state.problem)
+        return (SOURCE_SYSTEM, f"Problem: {wrapped_problem}\n\nSources:\n" + "\n".join(sources))
 
     def _parse_result(self, raw: str) -> dict[str, Any]:
         try:

@@ -67,8 +67,20 @@ class ContextCompressor:
         line_comment, block_start, block_end = self._get_comment_patterns(lang)
         result = []
         in_block = False
+        lines = content.splitlines()
+        # closes_later[i]: a block_end appears after the opener on line i. An
+        # unclosed "/*" opened block mode and dropped everything after it
+        # (docs/plans/audit-remediation-2-2026-10-20.md DAT-9).
+        closes_later = [False] * len(lines)
+        seen_end = False
+        for i in range(len(lines) - 1, -1, -1):
+            stripped = lines[i].strip()
+            opens = bool(block_start) and stripped.startswith(block_start)
+            after_open = stripped[len(block_start):] if opens else stripped
+            closes_later[i] = seen_end or bool(block_end and block_end in after_open)
+            seen_end = seen_end or bool(block_end and block_end in stripped)
 
-        for line in content.splitlines():
+        for i, line in enumerate(lines):
             trimmed = line.strip()
 
             # Block comment skip. startswith, not `in`: a mid-line "/*" --
@@ -78,6 +90,8 @@ class ContextCompressor:
             # and compress() returned "". Losing the tail is a far worse
             # failure than leaving a trailing comment uncompressed.
             if block_start and trimmed.startswith(block_start):
+                if not closes_later[i]:
+                    continue  # unclosed: drop the opener line only, keep the rest
                 in_block = True
             if in_block:
                 if block_end and block_end in trimmed:

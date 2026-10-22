@@ -11,7 +11,12 @@ from uuid import UUID, uuid4
 import stripe
 
 from reasoner.application.ports.billing_port import BillingPort
-from reasoner.domain.saas import Subscription, SubscriptionStatus, SubscriptionTier
+from reasoner.domain.saas import (
+    Subscription,
+    SubscriptionStatus,
+    SubscriptionTier,
+    UnresolvedBillingOwnerError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +53,10 @@ class StripeBillingAdapter(BillingPort):
             success_url=success_url,
             cancel_url=cancel_url,
             client_reference_id=user_id,
+            # The webhook resolvers read this; nothing used to write it, so every
+            # renewal and plan change failed to find its user (BIL-13).
+            metadata={"reasoner_user_id": user_id},
+            subscription_data={"metadata": {"reasoner_user_id": user_id}},
             allow_promotion_codes=True,
             automatic_tax={"enabled": True},
             billing_address_collection="required",
@@ -60,23 +69,16 @@ class StripeBillingAdapter(BillingPort):
         return session.url
 
     async def create_portal_session(self, user_id: str, return_url: str) -> str:
-        # Lookup Stripe customer by user_id (stored in metadata)
-        # NOTE: stripe.Customer.list does not filter by metadata server-side.
-        # We iterate and match locally for correctness.
-        customers = await asyncio.to_thread(
-            stripe.Customer.list,
-            limit=100,
-        )
-        matching = [
-            c for c in map(to_plain, customers.auto_paging_iter())
-            if (c.get("metadata") or {}).get("reasoner_user_id") == user_id
-        ]
-        if not matching:
+        # The customer id stored with the subscription. The old lookup paged
+        # through every Stripe customer for a metadata value nothing ever set,
+        # so the portal always failed (BIL-13).
+        sub = await _subscription_repo().get_subscription_by_user(user_id)
+        if sub is None or not sub.stripe_customer_id:
             raise ValueError(f"No Stripe customer found for user {user_id}")
 
         session = await asyncio.to_thread(
             stripe.billing_portal.Session.create,
-            customer=matching[0]["id"],
+            customer=sub.stripe_customer_id,
             return_url=return_url,
         )
         return session.url
@@ -119,24 +121,48 @@ class StripeBillingAdapter(BillingPort):
         # Subscription object is in subscription field
         sub_id = session.get("subscription")
         stripe_sub = to_plain(await asyncio.to_thread(stripe.Subscription.retrieve, sub_id))
+        if customer := session.get("customer"):
+            await asyncio.to_thread(
+                stripe.Customer.modify, customer, metadata={"reasoner_user_id": user_id}
+            )
         return self._stripe_sub_to_domain(stripe_sub, UUID(user_id))
 
-    async def _customer_user_id(self, customer_id: str | None) -> str | None:
-        customer = to_plain(await asyncio.to_thread(stripe.Customer.retrieve, customer_id))
-        return (customer.get("metadata") or {}).get("reasoner_user_id")
+    async def _resolve_user_id(self, stripe_sub: dict) -> UUID:
+        """Our user for a Stripe subscription (the anti-corruption layer).
+
+        Customer metadata first, then the subscription's own metadata, then our
+        subscriptions table. A database error propagates, so the webhook is
+        retried; only a clean "nobody" raises UnresolvedBillingOwnerError (BIL-13).
+        """
+        customer_id = stripe_sub.get("customer")
+        if customer_id:
+            customer = to_plain(await asyncio.to_thread(stripe.Customer.retrieve, customer_id))
+            if found := (customer.get("metadata") or {}).get("reasoner_user_id"):
+                return UUID(found)
+        if found := (stripe_sub.get("metadata") or {}).get("reasoner_user_id"):
+            return UUID(found)
+        if stripe_sub.get("id") and (
+            found := await _subscription_repo().get_user_by_stripe_sub_id(stripe_sub["id"])
+        ):
+            return UUID(found)
+        raise UnresolvedBillingOwnerError(
+            f"Stripe subscription {stripe_sub.get('id')} (customer {customer_id}) has no known user"
+        )
 
     async def _handle_subscription_updated(self, stripe_sub: dict) -> Subscription:
-        # Lookup user_id from customer metadata
-        user_id = await self._customer_user_id(stripe_sub["customer"])
-        if not user_id:
-            raise ValueError("Missing reasoner_user_id in customer metadata")
-        return self._stripe_sub_to_domain(stripe_sub, UUID(user_id))
+        # Apply the live state, not the payload snapshot: a retried or replayed
+        # event then cannot reinstate a state the subscription has left, even
+        # when two events share a timestamp (BIL-15).
+        if stripe_sub.get("id"):
+            stripe_sub = to_plain(
+                await asyncio.to_thread(stripe.Subscription.retrieve, stripe_sub["id"])
+            )
+        return self._stripe_sub_to_domain(stripe_sub, await self._resolve_user_id(stripe_sub))
 
     async def _handle_subscription_deleted(self, stripe_sub: dict) -> Subscription:
-        user_id = await self._customer_user_id(stripe_sub["customer"])
         return Subscription(
             id=uuid4(),
-            user_id=UUID(user_id) if user_id else uuid4(),
+            user_id=await self._resolve_user_id(stripe_sub),
             tier=SubscriptionTier.FREE,
             status=SubscriptionStatus.CANCELLED,
             stripe_subscription_id=stripe_sub["id"],
@@ -177,11 +203,23 @@ class StripeBillingAdapter(BillingPort):
         return SubscriptionTier.FREE
 
     async def cancel_subscription(self, stripe_subscription_id: str) -> None:
-        """Immediately cancel a Stripe subscription."""
-        await asyncio.to_thread(
-            stripe.Subscription.cancel,
-            stripe_subscription_id,
-        )
+        """Immediately cancel a Stripe subscription. Already gone counts as done.
+
+        Stripe rejects cancelling a cancelled subscription, so account deletion
+        returned 502 forever for a subscription cancelled at Stripe but still
+        live locally (docs/plans/audit-remediation-2-2026-10-20.md BIL-19).
+        """
+        try:
+            current = to_plain(
+                await asyncio.to_thread(stripe.Subscription.retrieve, stripe_subscription_id)
+            )
+            if current.get("status") in ("canceled", "incomplete_expired"):
+                return
+            await asyncio.to_thread(stripe.Subscription.cancel, stripe_subscription_id)
+        except stripe.InvalidRequestError as exc:
+            if getattr(exc, "code", None) == "resource_missing":
+                return
+            raise
 
     async def _handle_payment_failed(self, invoice: dict) -> Subscription:
         # API 2025-03-31 moved the invoice's subscription under
@@ -199,10 +237,9 @@ class StripeBillingAdapter(BillingPort):
         stripe_sub = to_plain(
             await asyncio.to_thread(stripe.Subscription.retrieve, subscription_id)
         )
-        user_id = await self._customer_user_id(stripe_sub.get("customer"))
         return Subscription(
             id=uuid4(),
-            user_id=UUID(user_id) if user_id else uuid4(),
+            user_id=await self._resolve_user_id(stripe_sub),
             tier=SubscriptionTier.FREE,
             status=SubscriptionStatus.PAST_DUE,
             stripe_subscription_id=subscription_id,
@@ -214,3 +251,13 @@ class StripeBillingAdapter(BillingPort):
         if ts is None:
             return None
         return datetime.fromtimestamp(ts, tz=UTC)
+
+
+def _subscription_repo():
+    from reasoner.core.settings import settings
+    from reasoner.infrastructure.persistence.subscription_repo import (
+        PostgresSubscriptionRepository,
+    )
+
+    dsn = settings.DATABASE_URL.replace("+asyncpg", "")
+    return PostgresSubscriptionRepository(dsn, pool_size=10)

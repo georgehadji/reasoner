@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import Any
 
 from reasoner.domain.pipeline_state import PipelineState
+from reasoner.phases._shared import _wrap_external_content, _wrap_user_input
 from reasoner.subagents.base import PhaseSubAgent
 
 CONSENSUS_SYSTEM = """You are a Consensus Mapper. Your ONE JOB is to read all perspective candidates and identify which claims, conclusions, or recommendations appear in ALL of them (or in a strong majority).
@@ -37,9 +38,11 @@ class ConsensusMapperSubAgent(PhaseSubAgent):
         candidates = state.candidates
         candidate_texts = []
         for c in candidates:
-            candidate_texts.append(f"--- {c.perspective.value} ---\n{c.content}")
+            body = _wrap_external_content(c.content)
+            candidate_texts.append(f"--- {c.perspective.value} ---\n{body}")
 
-        user = f"Problem: {state.problem}\n\nCandidates:\n" + "\n\n".join(candidate_texts)
+        wrapped_problem = _wrap_user_input(state.problem)
+        user = f"Problem: {wrapped_problem}\n\nCandidates:\n" + "\n\n".join(candidate_texts)
         return (CONSENSUS_SYSTEM, user)
 
     def _parse_result(self, raw: str) -> dict[str, Any]:
