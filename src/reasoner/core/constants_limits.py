@@ -748,3 +748,8 @@ SETTLE_TIMEOUT_SECONDS: float = 15.0
 # (ANONYMOUS_DAILY_CREDIT_CAP). HyperGate is up to five small LLM calls; one
 # credit each call, so the default cap of 50 allows 50 a day (BIL-17).
 GATE_ESTIMATED_COST_USD: float = 0.001
+
+# A billing webhook claim older than this, and never finished, belongs to a
+# worker that died; the provider's retry may take it over. Must exceed the
+# slowest handler (the Stripe API calls in sync_subscription, ~30 s observed).
+WEBHOOK_LEASE_SECONDS: int = 300

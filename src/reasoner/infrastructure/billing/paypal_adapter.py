@@ -17,6 +17,18 @@ logger = logging.getLogger(__name__)
 
 _PAYPAL_BASE_URL = "https://api-m.{env}.paypal.com"
 
+# Lifecycle event -> the status the subscription ends in. BillingService holds
+# the matching table of writes; tests/test_paypal_events.py pins that the two
+# have the same rows, so an event added to one cannot be missed in the other.
+PAYPAL_EVENT_STATUS: dict[str, SubscriptionStatus] = {
+    "BILLING.SUBSCRIPTION.ACTIVATED": SubscriptionStatus.ACTIVE,
+    "BILLING.SUBSCRIPTION.RE-ACTIVATED": SubscriptionStatus.ACTIVE,
+    "BILLING.SUBSCRIPTION.CANCELLED": SubscriptionStatus.CANCELLED,
+    "BILLING.SUBSCRIPTION.EXPIRED": SubscriptionStatus.CANCELLED,
+    "BILLING.SUBSCRIPTION.SUSPENDED": SubscriptionStatus.PAST_DUE,
+    "BILLING.SUBSCRIPTION.PAYMENT.FAILED": SubscriptionStatus.PAST_DUE,
+}
+
 # verify-webhook-signature request field -> delivery header carrying it.
 _VERIFY_HEADERS = {
     "auth_algo": "paypal-auth-algo",
@@ -125,22 +137,14 @@ class PayPalBillingAdapter(BillingPort):
     async def sync_subscription(self, provider_event: dict) -> Subscription:
         """Sync a PayPal webhook event to domain Subscription.
 
-        Expected events: BILLING.SUBSCRIPTION.ACTIVATED,
-                         BILLING.SUBSCRIPTION.CANCELLED,
-                         BILLING.SUBSCRIPTION.SUSPENDED,
-                         BILLING.SUBSCRIPTION.PAYMENT.FAILED
+        Handles the events in PAYPAL_EVENT_STATUS.
         """
         event_type = provider_event.get("event_type", "")
         resource = provider_event.get("resource", {})
 
-        if event_type == "BILLING.SUBSCRIPTION.ACTIVATED":
-            return self._paypal_sub_to_domain(resource, status=SubscriptionStatus.ACTIVE)
-        elif event_type == "BILLING.SUBSCRIPTION.CANCELLED":
-            return self._paypal_sub_to_domain(resource, status=SubscriptionStatus.CANCELLED)
-        elif event_type == "BILLING.SUBSCRIPTION.SUSPENDED":
-            return self._paypal_sub_to_domain(resource, status=SubscriptionStatus.PAST_DUE)
-        elif event_type == "BILLING.SUBSCRIPTION.PAYMENT.FAILED":
-            return self._paypal_sub_to_domain(resource, status=SubscriptionStatus.PAST_DUE)
+        status = PAYPAL_EVENT_STATUS.get(event_type)
+        if status is not None:
+            return self._paypal_sub_to_domain(resource, status=status)
 
         return Subscription(
             id=uuid4(),

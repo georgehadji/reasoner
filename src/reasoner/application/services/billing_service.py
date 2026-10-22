@@ -3,12 +3,52 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 
 from reasoner.application.ports.billing_port import BillingPort
 from reasoner.domain.saas import SubscriptionTier
 
 logger = logging.getLogger(__name__)
+
+
+async def _paypal_activate(sub, repo, event_at) -> None:
+    # ACTIVATED and RE-ACTIVATED (a payment after a failure) both end active.
+    if await repo.upsert_subscription(sub, event_at):
+        await repo.sync_quota_for_subscription(sub)
+    logger.info(
+        "PayPal subscription synced for user %s: tier=%s status=%s",
+        sub.user_id, sub.tier.value, sub.status.value
+    )
+
+
+async def _paypal_cancel(sub, repo, event_at) -> None:
+    # CANCELLED and EXPIRED (the paid term ran out) both end cancelled.
+    if sub.paypal_subscription_id and await repo.set_subscription_status_by_paypal(
+        sub.paypal_subscription_id, "cancelled", event_at,
+    ):
+        await repo.sync_quota_for_subscription(sub)
+
+
+async def _paypal_past_due(sub, repo, event_at) -> None:
+    if sub.paypal_subscription_id:
+        await repo.set_subscription_status_by_paypal(
+            sub.paypal_subscription_id, "past_due", event_at,
+        )
+
+
+# One row per PayPal lifecycle event. paypal_adapter.PAYPAL_EVENT_STATUS holds
+# the matching event -> status table; tests/test_paypal_events.py pins that the
+# two have the same keys. Each handler is wrapped by the monotonic event guard
+# inside the repository write (BIL-15).
+PAYPAL_HANDLERS: dict[str, Callable[..., Awaitable[None]]] = {
+    "BILLING.SUBSCRIPTION.ACTIVATED": _paypal_activate,
+    "BILLING.SUBSCRIPTION.RE-ACTIVATED": _paypal_activate,
+    "BILLING.SUBSCRIPTION.CANCELLED": _paypal_cancel,
+    "BILLING.SUBSCRIPTION.EXPIRED": _paypal_cancel,
+    "BILLING.SUBSCRIPTION.SUSPENDED": _paypal_past_due,
+    "BILLING.SUBSCRIPTION.PAYMENT.FAILED": _paypal_past_due,
+}
 
 
 class BillingService:
@@ -69,44 +109,11 @@ class BillingService:
         """
         # --- PayPal events ---
         if event_type.startswith("BILLING.SUBSCRIPTION."):
-            if event_type == "BILLING.SUBSCRIPTION.CANCELLED":
-                if sub.paypal_subscription_id:
-                    if await repo.set_subscription_status_by_paypal(
-                        sub.paypal_subscription_id,
-                        "cancelled",
-                        event_at,
-                    ):
-                        await repo.sync_quota_for_subscription(sub)
+            handler = PAYPAL_HANDLERS.get(event_type)
+            if handler is None:
+                logger.debug("Unhandled PayPal event type: %s", event_type)
                 return
-
-            if event_type == "BILLING.SUBSCRIPTION.SUSPENDED":
-                if sub.paypal_subscription_id:
-                    await repo.set_subscription_status_by_paypal(
-                        sub.paypal_subscription_id,
-                        "past_due",
-                        event_at,
-                    )
-                return
-
-            if event_type == "BILLING.SUBSCRIPTION.PAYMENT.FAILED":
-                if sub.paypal_subscription_id:
-                    await repo.set_subscription_status_by_paypal(
-                        sub.paypal_subscription_id,
-                        "past_due",
-                        event_at,
-                    )
-                return
-
-            if event_type == "BILLING.SUBSCRIPTION.ACTIVATED":
-                if await repo.upsert_subscription(sub, event_at):
-                    await repo.sync_quota_for_subscription(sub)
-                logger.info(
-                    "PayPal subscription synced for user %s: tier=%s status=%s",
-                    sub.user_id, sub.tier.value, sub.status.value
-                )
-                return
-
-            logger.debug("Unhandled PayPal event type: %s", event_type)
+            await handler(sub, repo, event_at)
             return
 
         # --- Stripe events ---
