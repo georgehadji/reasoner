@@ -54,6 +54,18 @@ class InputSanitizer:
         re.IGNORECASE | re.MULTILINE,
     )
 
+    @classmethod
+    def looks_like_injection(cls, text: str) -> bool:
+        """Does *text* match the denylist, as the model will read it?
+
+        Matched against an NFKC + casefold copy, because the model reads
+        fullwidth ``ｉｇｎｏｒｅ ｐｒｅｖｉｏｕｓ`` as the ASCII phrase and the
+        patterns are ASCII. Only the verdict comes from the copy; callers keep
+        the original text, so legitimate CJK or typographic input is not
+        rewritten.
+        """
+        return bool(cls._injection_regex.search(unicodedata.normalize("NFKC", text).casefold()))
+
     # Characters to strip
     STRIP_CHARS = "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x0b\x0c\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f"
 
@@ -100,8 +112,7 @@ class InputSanitizer:
         # so that malicious payloads cannot evade detection by exceeding
         # the length limit and getting silently truncated.
         if self.block_injection:
-            injection_match = self._injection_regex.search(sanitized)
-            if injection_match:
+            if self.looks_like_injection(sanitized):
                 # Block the input entirely if injection detected
                 return SanitizationResult(
                     is_valid=False,
@@ -281,7 +292,7 @@ def neutralize_for_replay(
         )
 
     # Report injection patterns without acting on them — see docstring.
-    if InputSanitizer._injection_regex.search(text):
+    if InputSanitizer.looks_like_injection(text):
         warnings.append("Potential prompt injection pattern in replayed text")
 
     sanitizer = InputSanitizer(

@@ -25,6 +25,7 @@ from reasoner.infrastructure.search.discovery import (
     get_search_client_for_method,
 )
 from reasoner.parsing import ParseError, extract_json, safe_list
+from reasoner.phases._shared import _wrap_external_content
 from reasoner.sanitization import sanitize_for_prompt
 
 logger = logging.getLogger(__name__)
@@ -72,11 +73,10 @@ async def enrich_problem_with_youtube(state: PipelineState, services: WorkflowSe
         f"YouTube video detected: '{meta['title']}' by {meta['author']}",
         state,
     )
-    enriched = (
-        f"{state.problem}\n\n"
-        f"[YouTube Video Metadata: Title: {meta['title']}, Author: {meta['author']}, Video ID: {meta['video_id']}]"
-    )
-    return enriched
+    # The title and channel name are whatever the uploader typed (SEC-15), so
+    # they go in as untrusted content like any other web-authored text.
+    metadata = f"Title: {meta['title']}, Author: {meta['author']}, Video ID: {meta['video_id']}"
+    return f"{state.problem}\n\n[YouTube Video Metadata]\n{_wrap_external_content(metadata)}"
 
 def _enrich_query(query: str, problem: str) -> str:
     problem_lower = problem.lower()
