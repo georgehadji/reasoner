@@ -352,7 +352,8 @@ class TestPresetGateOnRunRoutes:
 
             response = await self._post("/api/run", body, PRO)
             assert response.status_code == 200, response.text
-            register.assert_awaited_once_with("run-gated-1")
+            register.assert_awaited_once()
+            assert register.await_args.args == ("run-gated-1",)
 
 
 class TestQuotaEndpointUsesRealTier:

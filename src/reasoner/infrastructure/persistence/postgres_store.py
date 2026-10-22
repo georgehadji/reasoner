@@ -206,8 +206,8 @@ class PostgreSQLEventStore:
                 -- Indexes
                 CREATE INDEX IF NOT EXISTS idx_events_aggregate 
                     ON events(aggregate_id, version);
-                CREATE INDEX IF NOT EXISTS idx_events_type 
-                    ON events USING GIN (payload jsonb_path_ops);
+                -- No idx_events_type: payload is ciphertext since E2EE, and
+                -- recreating it here on every boot undid migration 008.
                 CREATE INDEX IF NOT EXISTS idx_events_timestamp 
                     ON events(timestamp DESC);
                 CREATE INDEX IF NOT EXISTS idx_events_created 

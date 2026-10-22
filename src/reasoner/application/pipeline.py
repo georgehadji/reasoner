@@ -565,6 +565,9 @@ class ReasonerPipeline:
         self._log("CROSS-LANG", f"Pivot: translating problem from {source_lang} to English.", state)
         # Record user's detected language before overwriting state.language.
         state.output_language = source_lang
+        from reasoner.core.sanitization import neutralize_for_replay, sanitize_for_prompt
+
+        blocked: ValueError | None = None
         try:
             translator = get_composite_translator(router=self.router)
             result = await translator.translate(original_problem, target_lang="EN", source_lang=source_lang)
@@ -576,10 +579,19 @@ class ReasonerPipeline:
                 # nothing in state.errors to show for it.
                 raise RuntimeError(result.degraded_reason or "all translators failed")
             translated = result.text or original_problem
+            # The translation is still the user's instruction, now in the
+            # language the injection guard reads. The front door's rule
+            # applies: block, do not neutralise (SEC-12, CLAUDE.md §5).
+            try:
+                translated = sanitize_for_prompt(translated)[0]
+            except ValueError as exc:
+                blocked = exc
+                raise
             state.problem = translated
             if original_enhanced and original_enhanced != original_problem:
                 enh_result = await translator.translate(original_enhanced, target_lang="EN", source_lang=source_lang)
-                state.enhanced_problem = enh_result.text or original_enhanced
+                enhanced = enh_result.text or original_enhanced
+                state.enhanced_problem = neutralize_for_replay(enhanced)[0]
             else:
                 state.enhanced_problem = translated
             # Explicit pivot: set reasoning language to English; get_language_instruction()
@@ -599,6 +611,8 @@ class ReasonerPipeline:
         except Exception as e:
             self._log("CROSS-LANG", f"Translate-in failed ({e}); pivot aborted — reasoning in {source_lang}.", state)
             state.errors.append(f"translation-in error: {e}")
+        if blocked is not None:
+            raise blocked
 
     async def _phase_cross_language_translate_out(self, state: PipelineState) -> None:
         from reasoner.core.constants_limits import LANG_NAME_TO_ISO

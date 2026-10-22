@@ -79,7 +79,7 @@ def coding_spec_prompt(state: PipelineState) -> str:
     # BUG-FIX: TRUNCATION is a TruncationLimits object, not a dict. Use dot notation.
     problem = _wrap_user_input(state.problem[:TRUNCATION.PROBLEM])
     return (
-        f"Coding request:\n{problem}\n\n"
+        f"Coding request:\n{_wrap_user_input(problem)}\n\n"
         "Produce a technical specification as JSON:\n"
         "{\n"
         '  "language": "<primary programming language>",\n'
@@ -135,7 +135,7 @@ def coding_generate_prompt(state: PipelineState, file_spec: dict) -> str:
         ) + build_memory_context(state)
 
     return (
-        f"Original request:\n{problem}\n\n"
+        f"Original request:\n{_wrap_user_input(problem)}\n\n"
         f"Architecture: {arch}\n"
         f"{stack_line}\n\n"
         f"File to implement: {file_spec['path']}\n"

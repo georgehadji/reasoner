@@ -42,6 +42,11 @@ class RunStateStore:
         self._created_at[client_run_id] = _time.monotonic()
         return True  # newly created
 
+    def release(self, client_run_id: str) -> None:
+        """Drop an idempotency claim so the same id can be retried."""
+        self._active_runs.discard(client_run_id)
+        self._created_at.pop(client_run_id, None)
+
     async def add(self, run_id: str, user_id: str | None = None) -> asyncio.Event:
         """Register a new run and return its cancel event."""
         async with self._lock:
