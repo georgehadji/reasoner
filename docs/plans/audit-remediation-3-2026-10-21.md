@@ -737,3 +737,31 @@ all  ──> PR 8 lean                     (last)
 | Q5 | Can `push_to_github.py` and `kill_servers.py` be deleted, or does someone run them by hand? | LEAN-7 |
 | Q6 | How many history entries should each user keep (proposed: 500), and should older ones be deleted or moved to cold storage? | PER-12 |
 | Q7 | Should a cancelled run get its own event type (`PIPELINE_CANCELLED`), or `PIPELINE_FAILED` with `reason="cancelled"`? A new type needs a projection and a Langfuse mapping. | RUN-7 |
+
+---
+
+## 7. As implemented
+
+All eight work packages are merged into `main` as PRs #155 to #162, after the audit-2
+PRs (#144 to #153) they depend on. Open questions Q1 to Q7 were settled with the defaults
+proposed in section 6. Where the code differs from this plan:
+
+| PR | Package | Difference from the plan |
+|----|---------|--------------------------|
+| #155 | PR 1, frontend auth (UI-6 to 10, UI-12) | A real Supabase sign-in against the new CSP was not exercised; the CSP builder is covered by a table-driven test only. |
+| #156 | PR 3, run outcome (RUN-5 to 9) | The completed branch guards `outcome.state` with a `RuntimeError`, not an `assert` (bandit B101). |
+| #157 | PR 4, provider resilience (PRV-1 to 4) | The rate limiter is not on `GuardedValkey`; there is no direct-vendor price table; 45 preset pairs stay over the fallback budget behind a ratchet (`MAX_IMPLICIT_OVER_BUDGET`). |
+| #158 | PR 7, prompt trust (SEC-15, SEC-16) | `neutralize_for_replay` reports a fullwidth override and keeps the text, as its policy says; the YouTube title is covered by a behavioural test, not the scan list. |
+| #159 | PR 5, billing webhooks (BIL-20, BIL-21) | The PayPal adapter's event table changed too. The migration creates `processed_webhooks` (no migration ever had) and revises the merge revision `20261021_000150`. |
+| #160 | PR 6, history (PER-12) | The port gained `delete`; tags are derived from method and preset, so the shared per-tag `*.jsonl` files are no longer written (the old ones still hold every user's entries and need deleting by hand). |
+| #161 | PR 2, data rights (DAT-10 to 13) | `DELETE /api/user/data` erases the registry minus `profile` and `identity` (it needs only a `history:delete` key); the deletion log is written before the registry runs; the erasure marker directory is `<data_dir>/.erased`; `L2Index` has no erase check of its own. |
+| #162 | PR 8, lean (LEAN-7, LEAN-8) | `push_to_github.py` and `kill_servers.py` stay (Q5); `TaggedMemory` is also deleted, once PR 6 left it unused. |
+
+Merging found one problem the plan did not predict: audit-2 PRs #148 and #151 both revised
+migration `20261021_000000`, so `main` had two Alembic heads. Migration `20261021_000150`
+joins them.
+
+Known gaps left open: `delete_aggregate` leaves the `pipeline_owners` rows, so the link from
+an erased user id to pipeline ids survives; `application/handlers/handlers.py::_get_file_history`
+reads a directory that does not exist; `test_watermark_properties::test_code_fence_content_survives_aggressive_normalization`
+(a Hypothesis counterexample in the watermark scrubber) fails on `main`.
