@@ -7,7 +7,7 @@ import logging
 from typing import Any
 
 import reasoner.phases as phases
-from reasoner.application.flows.base import WorkflowServices
+from reasoner.application.flows.base import WorkflowServices, require_survivors
 from reasoner.domain.core_types import (
     CriticDimensionScore,
     CriticScore,
@@ -17,7 +17,7 @@ from reasoner.domain.core_types import (
 )
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.models import ClaimLabel
-from reasoner.parsing import extract_json
+from reasoner.parsing import coerce_list, extract_json
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,7 @@ async def run_jury_generate_phase(state: PipelineState, services: WorkflowServic
         gen_roles = list(JURY_GENERATOR_ROLES)
 
     async def _get_generator(gen_id: str):
-        raw, model = await services.call_llm(
+        raw, meta = await services.call_llm(
             role=gen_id,
             system_prompt=phases.JURY_GENERATOR_SYSTEM,
             user_prompt=phases.jury_generator_prompt(state, gen_id),
@@ -71,7 +71,7 @@ async def run_jury_generate_phase(state: PipelineState, services: WorkflowServic
         # Rescue loop: If data is empty or malformed (empty dict after extraction), try one more time
         if not data:
             services.log("JURY", f"Generator {gen_id} failed JSON extraction, retrying...", state)
-            raw, model = await services.call_llm(
+            raw, meta = await services.call_llm(
                 role=gen_id,
                 system_prompt="You are an analytical assistant. You MUST produce a valid JSON object ONLY. Do not include introductory text or markdown. Output JSON ONLY.",
                 user_prompt=f"Previous attempt failed JSON parsing. Please re-generate the JSON for: {phases.jury_generator_prompt(state, gen_id)}",
@@ -79,24 +79,28 @@ async def run_jury_generate_phase(state: PipelineState, services: WorkflowServic
             )
             data = extract_json(raw)
 
-        return _create_generation_candidate(data, gen_id, model)
+        # call_llm returns its metadata dict, not a model name (FLOW-11).
+        return _create_generation_candidate(data, gen_id, str((meta or {}).get("model", "")))
 
     tasks = [_get_generator(role) for role in gen_roles]
     results = await asyncio.gather(*tasks, return_exceptions=True)
+    failures: list[str] = []
     for i, r in enumerate(results):
         if isinstance(r, Exception):
             role = gen_roles[i]
             msg = f"Jury generator '{role}' failed: {r}"
             services.log("JURY", msg, state)
             state.errors.append(msg)
+            failures.append(msg)
         else:
             state.generation_candidates.append(r)
+    require_survivors(state.generation_candidates, failures, phase=2, phase_name="Generation Pool")
 
 async def run_jury_critique_phase(state: PipelineState, services: WorkflowServices, critic_roles: list[str] | None = None, batch_critique: bool = False) -> None:
     services.log("JURY_CRITIQUE", "Jury critiquing candidates...", state)
 
     async def _get_jury_critique(critic_id: str):
-        raw, _ = await services.call_llm(
+        raw, meta = await services.call_llm(
             role=critic_id,
             system_prompt=phases.JURY_CRITIC_SYSTEM,
             user_prompt=phases.jury_critic_prompt(state),
@@ -105,7 +109,9 @@ async def run_jury_critique_phase(state: PipelineState, services: WorkflowServic
         data = extract_json(raw)
         # Instantiate nested CriticDimensionScore objects
         candidate_scores = {}
-        for gen_id, dims in data.get('candidate_scores', {}).items():
+        for gen_id, dims in (data.get('candidate_scores') or {}).items():
+            if not isinstance(dims, dict):
+                continue
             candidate_scores[gen_id] = CriticDimensionScore(
                 factuality=float(dims.get('factuality') or 0),
                 reasoning=float(dims.get('reasoning') or 0),
@@ -113,9 +119,15 @@ async def run_jury_critique_phase(state: PipelineState, services: WorkflowServic
                 helpfulness=float(dims.get('helpfulness') or 0),
                 confidence_vs_accuracy_penalty=float(dims.get('confidence_vs_accuracy_penalty') or 0.0)
             )
-        data['candidate_scores'] = candidate_scores
-        data['critic_id'] = critic_id
-        return CriticScore(**data)
+        # Built field by field: CriticScore(**data) raised on any key the model
+        # added and on the critic_model it never sends, so every critic failed.
+        return CriticScore(
+            critic_id=critic_id,
+            critic_model=str((meta or {}).get("model", "")),
+            candidate_scores=candidate_scores,
+            ranking=[str(r) for r in coerce_list(data.get("ranking"))],
+            dissenting_note=str(data.get("dissenting_note") or ""),
+        )
 
     if batch_critique:
         services.log("JURY_CRITIQUE", "Running batch critique (single panel critic)...", state)
@@ -126,20 +138,24 @@ async def run_jury_critique_phase(state: PipelineState, services: WorkflowServic
             msg = f"Batch jury critic failed: {exc}"
             services.log("JURY_CRITIQUE", msg, state)
             state.errors.append(msg)
+            require_survivors(state.critic_scores, [msg], phase=3, phase_name="Critic Pool")
     else:
         if not critic_roles:
             critic_roles = list(JURY_CRITIC_ROLES)
 
         tasks = [_get_jury_critique(role) for role in critic_roles]
         results = await asyncio.gather(*tasks, return_exceptions=True)
+        failures: list[str] = []
         for i, r in enumerate(results):
             if isinstance(r, Exception):
                 role = critic_roles[i]
                 msg = f"Jury critic '{role}' failed: {r}"
                 services.log("JURY_CRITIQUE", msg, state)
                 state.errors.append(msg)
+                failures.append(msg)
             else:
                 state.critic_scores.append(r)
+        require_survivors(state.critic_scores, failures, phase=3, phase_name="Critic Pool")
 
 async def run_jury_verify_and_meta_eval_phase(state: PipelineState, services: WorkflowServices) -> None:
     services.log("JURY", "Verifying claims and meta-evaluating critics...", state)

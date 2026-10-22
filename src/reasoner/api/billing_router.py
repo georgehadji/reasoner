@@ -41,6 +41,31 @@ async def create_checkout(
         raise HTTPException(status_code=400, detail=f"Invalid tier: {tier}. Must be one of: free, pro, enterprise.") from exc
 
     app_url = settings.APP_URL
+
+    # One live subscription per user (BIL-14). A paying user changes plan in the
+    # Stripe portal, which prorates (Q4), instead of buying a second plan.
+    from reasoner.domain.saas import CheckoutDecision, checkout_allowed
+    from reasoner.infrastructure.persistence.subscription_repo import PostgresSubscriptionRepository
+
+    existing = await PostgresSubscriptionRepository(
+        settings.DATABASE_URL.replace("+asyncpg", ""), pool_size=10,
+    ).get_subscription_by_user(str(user.id))
+    decision = checkout_allowed(existing, tier_enum)
+    if decision is not CheckoutDecision.ALLOW:
+        portal_url = None
+        if existing is not None and existing.stripe_customer_id:
+            portal_url = await _get_stripe_service().create_portal(
+                str(user.id), f"{app_url}/dashboard"
+            )
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "You already have an active subscription.",
+                "decision": decision.value,
+                "portal_url": portal_url,
+            },
+        )
+
     success_url = f"{app_url}/dashboard?checkout=success&provider={provider}"
     cancel_url = f"{app_url}/pricing?checkout=cancel&provider={provider}"
 

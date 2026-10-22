@@ -7,6 +7,7 @@ from typing import Any
 
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.parsing import extract_json
+from reasoner.phases._shared import _wrap_external_content, _wrap_user_input
 from reasoner.subagents.base import PhaseSubAgent
 
 GAP_SYSTEM = """You are a Gap Identifier. Your ONE JOB is to identify what evidence or information is still MISSING after reviewing search results.
@@ -41,8 +42,10 @@ class GapIdentifierSubAgent(PhaseSubAgent):
     def _build_prompt(self, state: PipelineState) -> tuple[str, str]:
         sources = []
         for r in state.web_discovery_results[:5]:
-            sources.append(f"- {r.get('title', 'Untitled')}: {r.get('snippet', '')}")
-        return (GAP_SYSTEM, f"Problem: {state.problem}\n\nFound Sources:\n" + "\n".join(sources))
+            snippet_block = _wrap_external_content(r.get('snippet', ''))
+            sources.append(f"- {r.get('title', 'Untitled')}: {snippet_block}")
+        wrapped_problem = _wrap_user_input(state.problem)
+        return (GAP_SYSTEM, f"Problem: {wrapped_problem}\n\nFound Sources:\n" + "\n".join(sources))
 
     def _parse_result(self, raw: str) -> dict[str, Any]:
         try:

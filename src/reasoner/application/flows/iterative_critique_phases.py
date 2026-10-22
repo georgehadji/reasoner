@@ -30,7 +30,7 @@ from reasoner.core.degrade import degraded
 from reasoner.core.ports.decision_port import get_decision_port, jev_mode
 from reasoner.domain.core_types import CriticDimensionScore
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.parsing import extract_json
+from reasoner.parsing import coerce_verdict, extract_json
 
 logger = logging.getLogger(__name__)
 
@@ -429,7 +429,7 @@ async def _llm_critic_round(state: PipelineState, services: WorkflowServices,
         critic_model=critic_model,
         critic_score=_parse_critic_dimensions(scores),
         flaws_identified=data.get("flaws_identified", []),
-        verdict=data.get("verdict", "REVISE"),
+        verdict=coerce_verdict(data.get("verdict")) or "REVISE",
     )
 
 

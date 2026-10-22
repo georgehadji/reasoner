@@ -99,7 +99,9 @@ async def test_subscription_updated_reads_metadata_from_a_real_customer(adapter)
         "type": "customer.subscription.updated",
         "data": {"object": _subscription().to_dict()},
     }
-    with patch("stripe.Customer.retrieve", return_value=_customer()):
+    # updated re-reads the live subscription rather than trusting the payload (BIL-15)
+    with patch("stripe.Customer.retrieve", return_value=_customer()), \
+         patch("stripe.Subscription.retrieve", return_value=_subscription()):
         sub = await adapter.sync_subscription(event)
 
     assert str(sub.user_id) == USER
@@ -136,18 +138,16 @@ async def test_payment_failed_finds_the_subscription(adapter, invoice):
     assert sub.status is SubscriptionStatus.PAST_DUE
 
 
-async def test_portal_matches_a_real_customer_by_metadata(adapter):
-    customers = stripe.ListObject.construct_from({
-        "object": "list",
-        "url": "/v1/customers",
-        "has_more": False,
-        "data": [
-            {"id": "cus_other", "object": "customer", "metadata": {}},
-            {"id": "cus_1", "object": "customer", "metadata": {"reasoner_user_id": USER}},
-        ],
-    }, KEY)
+async def test_portal_uses_the_stored_customer_id(adapter):
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    repo = SimpleNamespace(get_subscription_by_user=AsyncMock(
+        return_value=SimpleNamespace(stripe_customer_id="cus_1")
+    ))
     portal = stripe.billing_portal.Session.construct_from({"url": "https://portal.example"}, KEY)
-    with patch("stripe.Customer.list", return_value=customers), \
+    repo_path = "reasoner.infrastructure.billing.stripe_adapter._subscription_repo"
+    with patch(repo_path, return_value=repo), \
          patch("stripe.billing_portal.Session.create", return_value=portal) as create:
         url = await adapter.create_portal_session(USER, "https://app.example")
 

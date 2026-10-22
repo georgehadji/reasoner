@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from typing import Any
 
 import reasoner.phases as phases
 from reasoner.application.flows.base import WorkflowServices
+from reasoner.core.constants_limits import MAX_SOT_SUBPROBLEMS, MAX_TOT_DEPTH
 from reasoner.core.degrade import degraded
 from reasoner.domain.core_types import SolutionCandidate
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.models import PerspectiveType
-from reasoner.parsing import extract_json
+from reasoner.parsing import coerce_list, extract_json
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +92,10 @@ async def run_sot_solve_phase(state: PipelineState, services: WorkflowServices) 
     if not sub_problems:
         state.errors.append("SoT: No sub-problems to solve.")
         return
+    if len(sub_problems) > MAX_SOT_SUBPROBLEMS:
+        msg = f"Skeleton has {len(sub_problems)} sub-problems; solving the first {MAX_SOT_SUBPROBLEMS}."
+        services.log("SoT", msg, state)
+        sub_problems = sub_problems[:MAX_SOT_SUBPROBLEMS]
     semaphore = asyncio.Semaphore(4)
     async def _solve_one(sp: dict) -> dict:
         async with semaphore:
@@ -159,60 +165,96 @@ async def run_tot_decompose_phase(state: PipelineState, services: WorkflowServic
     state.tot_state["decision_points"] = data.get("decision_points", [])
     state.tot_state["current_path"] = []
 
-async def run_tot_generate_phase(state: PipelineState, services: WorkflowServices) -> None:
-    services.log("ToT", "Generating candidate actions...", state)
-    dps = state.tot_state.get("decision_points", [])
-    if not dps:
-        state.errors.append("ToT: No decision points to generate candidates for.")
-        return
-    current_dp = dps[len(state.tot_state.get("current_path", []))]
+_JSON_ONLY_RETRY_SYSTEM = (
+    "You are an analytical assistant. You MUST produce a valid JSON object ONLY. "
+    "Do not include introductory text or markdown. Output JSON ONLY."
+)
+
+
+async def _tot_call(
+    state: PipelineState, services: WorkflowServices, *,
+    role: str, system: str, prompt: str, label: str,
+) -> dict:
     raw, _ = await services.call_llm(
-        role="tot_generate",
-        system_prompt=phases.TOT_GENERATE_SYSTEM,
-        user_prompt=phases.tot_generate_prompt(state, current_dp),
-        state=state
+        role=role, system_prompt=system, user_prompt=prompt, state=state
     )
     try:
-        data = extract_json(raw)
+        return extract_json(raw)
     except Exception:
-        services.log("ToT", "Generate phase failed JSON extraction, retrying...", state)
+        services.log("ToT", f"{label} phase failed JSON extraction, retrying...", state)
         raw, _ = await services.call_llm(
-            role="tot_generate",
-            system_prompt="You are an analytical assistant. You MUST produce a valid JSON object ONLY. Do not include introductory text or markdown. Output JSON ONLY.",
-            user_prompt=f"Previous attempt failed JSON parsing. Please re-generate the JSON for: {phases.tot_generate_prompt(state, current_dp)}",
-            state=state
+            role=role,
+            system_prompt=_JSON_ONLY_RETRY_SYSTEM,
+            user_prompt=(
+                f"Previous attempt failed JSON parsing. Please re-generate the JSON for: {prompt}"
+            ),
+            state=state,
         )
-        data = extract_json(raw)
-    state.tot_state["current_candidates"] = data.get("candidates", [])
+        return extract_json(raw)
+
+
+async def _tot_generate(state: PipelineState, services: WorkflowServices, dp: Any) -> list:
+    data = await _tot_call(
+        state, services, role="tot_generate", system=phases.TOT_GENERATE_SYSTEM,
+        prompt=phases.tot_generate_prompt(state, dp), label="Generate",
+    )
+    return coerce_list(data.get("candidates"))
+
+
+async def _tot_evaluate(state: PipelineState, services: WorkflowServices, candidates: list) -> None:
+    """Score one decision point's candidates and extend the path with the best."""
+    data = await _tot_call(
+        state, services, role="tot_evaluate", system=phases.TOT_EVALUATE_SYSTEM,
+        prompt=phases.tot_evaluate_prompt(state, candidates), label="Evaluate",
+    )
+    state.tot_state.setdefault("evaluations", []).extend(coerce_list(data.get("evaluations")))
+    best = data.get("best_candidate", "")
+    state.tot_state["best_candidate"] = best
+    if best:
+        state.tot_state.setdefault("current_path", []).append(best)
+
+
+def _next_decision_point(state: PipelineState) -> Any:
+    dps = state.tot_state.get("decision_points", [])[:MAX_TOT_DEPTH]
+    depth = len(state.tot_state.get("current_path", []))
+    return dps[depth] if depth < len(dps) else None
+
+
+async def run_tot_generate_phase(state: PipelineState, services: WorkflowServices) -> None:
+    services.log("ToT", "Generating candidate actions...", state)
+    if not state.tot_state.get("decision_points"):
+        state.errors.append("ToT: No decision points to generate candidates for.")
+        return
+    current_dp = _next_decision_point(state)
+    if current_dp is None:
+        return
+    state.tot_state["current_candidates"] = await _tot_generate(state, services, current_dp)
+
 
 async def run_tot_evaluate_phase(state: PipelineState, services: WorkflowServices) -> None:
+    """Evaluate the first decision point, then expand the rest of the tree.
+
+    Only the first decision point was ever expanded, so the "path" held one
+    step whatever the problem (FLOW-6). Each later point now gets its own
+    generate and evaluate round, up to MAX_TOT_DEPTH.
+    """
     services.log("ToT", "Evaluating candidates...", state)
     candidates = state.tot_state.get("current_candidates", [])
     if not candidates:
         state.errors.append("ToT: No candidates to evaluate.")
         return
-    raw, _ = await services.call_llm(
-        role="tot_evaluate",
-        system_prompt=phases.TOT_EVALUATE_SYSTEM,
-        user_prompt=phases.tot_evaluate_prompt(state, candidates),
-        state=state
-    )
-    try:
-        data = extract_json(raw)
-    except Exception:
-        services.log("ToT", "Evaluate phase failed JSON extraction, retrying...", state)
-        raw, _ = await services.call_llm(
-            role="tot_evaluate",
-            system_prompt="You are an analytical assistant. You MUST produce a valid JSON object ONLY. Do not include introductory text or markdown. Output JSON ONLY.",
-            user_prompt=f"Previous attempt failed JSON parsing. Please re-generate the JSON for: {phases.tot_evaluate_prompt(state, candidates)}",
-            state=state
-        )
-        data = extract_json(raw)
-    state.tot_state["evaluations"] = data.get("evaluations", [])
-    state.tot_state["best_candidate"] = data.get("best_candidate", "")
-    best = data.get("best_candidate", "")
-    if best:
-        state.tot_state["current_path"].append(best)
+    state.tot_state["evaluations"] = []
+    await _tot_evaluate(state, services, candidates)
+    while (dp := _next_decision_point(state)) is not None:
+        candidates = await _tot_generate(state, services, dp)
+        if not candidates:
+            dp_id = dp.get("id", "?") if isinstance(dp, dict) else "?"
+            state.errors.append(f"ToT: no candidates for decision point {dp_id}; stopping.")
+            break
+        before = len(state.tot_state.get("current_path", []))
+        await _tot_evaluate(state, services, candidates)
+        if len(state.tot_state.get("current_path", [])) == before:
+            break  # no best candidate chosen; expanding further would loop
 
 async def run_tot_backtrack_phase(state: PipelineState, services: WorkflowServices) -> None:
     services.log("ToT", "Backtracking / finalizing path...", state)
@@ -415,5 +457,5 @@ async def run_sd_implement_phase(state: PipelineState, services: WorkflowService
         perspective=PerspectiveType.CONSTRUCTIVE,
         content=state.self_discover_state.get("final_answer", ""),
         key_insights=[m.get("output", "") for m in state.self_discover_state.get("module_outputs", []) if isinstance(m, dict)],
-        model_used=model,
+        model_used=str((model or {}).get("model", "")),  # call_llm returns its meta dict (FLOW-11)
     ))

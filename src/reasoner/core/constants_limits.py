@@ -715,3 +715,21 @@ RATE_LIMITER_REDIS_RETRY_SECONDS: float = 30.0
 # had no subscriber for this long, and never more than this many at once.
 WS_REPLAY_TTL_SECONDS: float = 300.0
 WS_MAX_REPLAY_BUFFERS: int = 1000
+
+# Count caps on model-driven fan-out. A Semaphore limits speed, not cost: the
+# skeleton or spec model chooses how many calls follow, so the count is capped
+# here (docs/plans/audit-remediation-2-2026-10-20.md FLOW-10).
+MAX_SOT_SUBPROBLEMS: int = 8
+MAX_CODING_FILES: int = 12
+# Decision points Tree-of-Thoughts expands, one generate + evaluate round each.
+MAX_TOT_DEPTH: int = 4
+
+# Upper bound on a run's credit settlement (release + true-up) once the stream
+# ends. Settlement runs shielded from client-disconnect cancellation, so this is
+# what stops a hung ledger call from holding a worker forever.
+SETTLE_TIMEOUT_SECONDS: float = 15.0
+
+# What one anonymous /api/gate call counts against the per-IP daily trial cap
+# (ANONYMOUS_DAILY_CREDIT_CAP). HyperGate is up to five small LLM calls; one
+# credit each call, so the default cap of 50 allows 50 a day (BIL-17).
+GATE_ESTIMATED_COST_USD: float = 0.001

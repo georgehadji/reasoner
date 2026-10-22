@@ -5,11 +5,21 @@ from __future__ import annotations
 import logging
 import time
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from reasoner.api.auth_deps import require_csrf
-from reasoner.api.dependencies import get_current_user, require_key_scope
+from reasoner.api.dependencies import (
+    check_quota_if_authenticated,
+    check_rate_limit,
+    get_current_user,
+    require_credits_if_authenticated,
+    require_key_scope,
+    run_tier_label,
+)
+from reasoner.api.run_admission import MeteredSSEResponse, admit_run
+from reasoner.api.run_observability import CreditSink, PrometheusObserver
 from reasoner.application.queries import GetPipelineStatusQuery
+from reasoner.application.services.run_metering import metered
 from reasoner.auth import Scope
 from reasoner.domain.saas import User
 
@@ -171,18 +181,25 @@ async def resume_pipeline(
 @router.post("/api/pipelines/{pipeline_id}/resume-stream")
 async def resume_pipeline_stream(
     pipeline_id: str,
+    request: Request,
     user: User = Depends(get_current_user),
+    rate_limit_checked=Depends(check_rate_limit),
+    quota=Depends(check_quota_if_authenticated),
+    credits_checked=Depends(require_credits_if_authenticated),
     csrf_checked=Depends(require_csrf),
 ):
-    if not await _check_pipeline_ownership(pipeline_id, user):
-        raise HTTPException(status_code=403, detail="Not authorized to access this pipeline")
     """Resume a pipeline by reconstructing its context and starting a fresh stream.
 
     This is a "resume-as-restart" approach: the pipeline's problem, preset, and
     prior synthesis are recovered from the event store, then a new run is started.
     The original pipeline metadata is returned in the first SSE event.
+
+    A resume is a full, billed run, admitted and metered like ``/api/run``. It
+    reserves the full preset estimate (plan Q3); the true-up then charges what the
+    run actually cost (docs/plans/audit-remediation-2-2026-10-20.md BIL-11).
     """
-    from fastapi.responses import StreamingResponse
+    if not await _check_pipeline_ownership(pipeline_id, user):
+        raise HTTPException(status_code=403, detail="Not authorized to access this pipeline")
 
     from reasoner.api import get_architecture_components
     from reasoner.api.schemas import RunRequest
@@ -220,6 +237,12 @@ async def resume_pipeline_stream(
         client_run_id=pipeline_id,
     )
 
+    # No client_run_id claim: the pipeline id is not a fresh idempotency key,
+    # and each resume gets its own ledger reference under this prefix.
+    adm = await admit_run(
+        request, user=user, problem=problem, preset=preset, kind=f"resume:{pipeline_id}",
+    )
+
     async def stream_with_resume_meta():
         yield _event({
             "type": "resume_meta",
@@ -230,13 +253,15 @@ async def resume_pipeline_stream(
         async for chunk in run_stream(req, user_id=str(user.id)):
             yield chunk
 
-    return StreamingResponse(
-        stream_with_resume_meta(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",
-        },
+    tier = await run_tier_label(user, request)
+    return MeteredSSEResponse(
+        metered(
+            stream_with_resume_meta(),
+            adm.run_context(tier=tier),
+            CreditSink(),
+            PrometheusObserver(tier=tier, preset=preset),
+        ),
+        adm,
     )
 
 

@@ -14,7 +14,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 import reasoner.neuro.server as ns
-from reasoner.neuro.config import NeuroConfig, _apply_defaults
+from reasoner.neuro.config import NeuroConfig, _agent_dir_name, _apply_defaults
 
 
 class _FakeEmbedding:
@@ -111,8 +111,9 @@ def service(tmp_path, monkeypatch):
 
 AGENT = "wiring-test-agent"
 # The `client` fixture is unauthenticated (owner=None), so tenant_key()
-# prefixes its disk directory with "a-" (see test_tenant_key_* above).
-AGENT_DIR = f"a-{AGENT}"
+# prefixes its disk directory with "a-" (see test_tenant_key_* above), and
+# the directory name carries a digest of that key (PER-11).
+AGENT_DIR = _agent_dir_name(f"a-{AGENT}")
 PROMPT = "How does the circuit breaker pick a fallback provider?"
 
 
@@ -794,7 +795,7 @@ def test_concurrent_learns_do_not_lose_l2_index_entries(tmp_path, monkeypatch):
 
     asyncio.run(scenario())
 
-    index_path = tmp_path / "agents" / f"u-{owner}-{agent_id}" / "cache" / "l2" / "index.json"
+    [index_path] = (tmp_path / "agents").glob(f"u-{owner}-{agent_id}-*/cache/l2/index.json")
     entries = json.loads(index_path.read_text())
     assert len(entries) == n_calls, (
         f"expected all {n_calls} concurrent learns to survive in the L2 index, "
