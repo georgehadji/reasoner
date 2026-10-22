@@ -115,7 +115,7 @@ def upgrade() -> None:
     op.execute("""
         CREATE TABLE IF NOT EXISTS events (
             id BIGSERIAL,
-            event_id UUID UNIQUE NOT NULL,
+            event_id UUID NOT NULL,
             event_type VARCHAR(100) NOT NULL,
             aggregate_id VARCHAR(255) NOT NULL,
             aggregate_type VARCHAR(50) NOT NULL DEFAULT 'pipeline',
@@ -143,6 +143,18 @@ def upgrade() -> None:
         CREATE TABLE IF NOT EXISTS events_generic
             PARTITION OF events FOR VALUES IN ('generic');
     """)
+    # Edited after the fact, which a baseline normally never is: as first
+    # written this revision could not run on Postgres at all. An inline
+    # UNIQUE(event_id) on a table partitioned by aggregate_type is rejected
+    # ("unique constraint on partitioned table must include all partitioning
+    # columns"). The dedupe key now matches postgres_store.py, and the default
+    # partition catches aggregate types added later
+    # (docs/plans/audit-remediation-2-2026-10-20.md PER-7).
+    op.execute("CREATE TABLE IF NOT EXISTS events_default PARTITION OF events DEFAULT;")
+    op.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_events_event_id_type "
+        "ON events(event_id, aggregate_type);"
+    )
 
     op.execute("""
         CREATE TABLE IF NOT EXISTS aggregates (
@@ -162,7 +174,8 @@ def upgrade() -> None:
     op.execute("""
         CREATE TABLE IF NOT EXISTS snapshots (
             id BIGSERIAL PRIMARY KEY,
-            aggregate_id VARCHAR(255) NOT NULL,
+            -- UNIQUE: postgres_store upserts with ON CONFLICT (aggregate_id).
+            aggregate_id VARCHAR(255) NOT NULL UNIQUE,
             version INTEGER NOT NULL,
             state JSONB NOT NULL,
             snapshot_type VARCHAR(50) DEFAULT 'full',

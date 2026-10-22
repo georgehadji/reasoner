@@ -4,7 +4,11 @@ import json
 
 from reasoner.core.constants import JSON_ONLY_FOOTER
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.phases._shared import _wrap_user_input, get_language_instruction
+from reasoner.phases._shared import (
+    _wrap_external_content,
+    _wrap_user_input,
+    get_language_instruction,
+)
 
 SD_SELECT_SYSTEM = (
     "You are a meta-reasoning architect. Given a problem, select the reasoning modules "
@@ -44,7 +48,7 @@ def sd_adapt_prompt(state: PipelineState) -> str:
     return (
         f'{get_language_instruction(state)}\n\n'
         f'Problem: {_wrap_user_input(state.problem)}\n\n'
-        f'Selected Modules: {json.dumps(modules, indent=2)}\n\n'
+        f'Selected Modules: {_wrap_external_content(json.dumps(modules, indent=2))}\n\n'
         f'Adapt each selected module into a concrete instruction or prompt '
         f'specific to this problem. The adapted instructions should be actionable '
         f'and clearly define inputs/outputs for each module.\n\n'
@@ -66,7 +70,7 @@ def sd_implement_prompt(state: PipelineState) -> str:
     return (
         f'{get_language_instruction(state)}\n\n'
         f'Problem: {_wrap_user_input(state.problem)}\n\n'
-        f'Adapted Module Instructions: {json.dumps(adapted, indent=2)}\n\n'
+        f'Adapted Module Instructions: {_wrap_external_content(json.dumps(adapted, indent=2))}\n\n'
         f'Execute each module in sequence, passing outputs from one to the next. '
         f'After all modules complete, synthesize their collective output into a '
         f'coherent final answer. Document the contribution of each module.\n\n'

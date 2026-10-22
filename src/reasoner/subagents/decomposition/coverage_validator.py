@@ -7,6 +7,7 @@ from typing import Any
 
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.parsing import extract_json
+from reasoner.phases._shared import _wrap_user_input
 from reasoner.subagents.base import PhaseSubAgent
 
 COVERAGE_SYSTEM = """You are a Coverage Validator. Your ONE JOB is to check whether a given set of sub-problems fully covers the original problem, or if anything is missing.
@@ -38,7 +39,7 @@ class CoverageValidatorSubAgent(PhaseSubAgent):
     TEMPERATURE = 0.2
 
     def _build_prompt(self, state: PipelineState) -> tuple[str, str]:
-        parts = [f"Original Problem: {state.problem}"]
+        parts = [f"Original Problem: {_wrap_user_input(state.problem)}"]
         if state.decomposition and hasattr(state.decomposition, 'sub_problems'):
             parts.append("\nSub-problems:")
             for sp in state.decomposition.sub_problems:

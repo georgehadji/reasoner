@@ -285,6 +285,12 @@ _ROLE_FAMILY: dict[str, str] = {
     "cove_draft": "general",
     "cove_answer": "general",
     "article_cove_answer": "general",
+    # Jury generators each write one complete solution at an untuned
+    # temperature; demanding temperature control would bar gpt-5 and
+    # claude-sonnet for no gain.
+    "generator_1": "general",
+    "generator_2": "general",
+    "generator_3": "general",
     # Critique
     "meta_evaluator": "critique",
     "stress_testing": "critique",
@@ -296,6 +302,7 @@ _ROLE_FAMILY: dict[str, str] = {
     "subagent_critique_counter": "critique",
     "subagent_critique_evidence": "critique",
     "subagent_critique_logic": "critique",
+    "panel_critic": "critique",
     # Verification
     "post_synthesis_verify": "verify",
     "cove_verify": "verify",
@@ -331,6 +338,7 @@ _ROLE_FAMILY: dict[str, str] = {
     # Prose
     "writing_draft": "write",
     "article_humanize": "write",
+    "egress_rewrite": "write",
     # Code
     "coding_generate": "code",
     "sot_solve": "code",
@@ -366,6 +374,7 @@ _FAMILY_PREFIXES: tuple[tuple[str, str], ...] = (
     ("writing_", "write"),
     ("research_", "research"),
     ("expert_", "generate"),
+    ("critic_", "critique"),
 )
 """Prefix → family, tried in order when a role has no explicit mapping.
 

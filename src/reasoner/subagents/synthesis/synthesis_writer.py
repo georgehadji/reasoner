@@ -8,6 +8,7 @@ from typing import Any
 
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.parsing import extract_json
+from reasoner.phases._shared import _wrap_external_content, _wrap_user_input
 from reasoner.subagents.base import PhaseSubAgent
 
 WRITER_SYSTEM = """You are a Synthesis Writer. Your ONE JOB is to write the final answer to the user's problem.
@@ -64,7 +65,7 @@ class SynthesisWriterSubAgent(PhaseSubAgent):
     def _build_prompt(self, state: PipelineState) -> tuple[str, str]:
         # The writer receives pre-built context from the hyper-agent
         ctx = self._context
-        user_parts = [f"Problem: {state.problem}"]
+        user_parts = [f"Problem: {_wrap_user_input(state.problem)}"]
 
         if state.decomposition:
             user_parts.append(f"\nDecomposition:\n{self._fmt_decomposition(state.decomposition)}")
@@ -82,7 +83,8 @@ class SynthesisWriterSubAgent(PhaseSubAgent):
         if state.candidates:
             user_parts.append("\nOriginal Candidates:")
             for c in state.candidates:
-                user_parts.append(f"\n--- {c.perspective.value} ---\n{c.content}")
+                body = _wrap_external_content(c.content)
+                user_parts.append(f"\n--- {c.perspective.value} ---\n{body}")
 
         if state.stress_results:
             user_parts.append(f"\nStress Test Results:\n{self._fmt_stress(state.stress_results)}")
@@ -122,7 +124,7 @@ class SynthesisWriterSubAgent(PhaseSubAgent):
         if hasattr(dec, 'assumptions') and dec.assumptions:
             parts.append("Assumptions:")
             for a in dec.assumptions:
-                parts.append(f"  - {a.text} [{a.label.value}]")
+                parts.append(f"  - {_wrap_external_content(a.text)} [{a.label.value}]")
         if hasattr(dec, 'failure_modes') and dec.failure_modes:
             parts.append("Failure modes:")
             for fm in dec.failure_modes:

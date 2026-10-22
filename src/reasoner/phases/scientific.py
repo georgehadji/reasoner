@@ -4,6 +4,7 @@ import json
 
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.phases._shared import (
+    _wrap_external_content,
     _wrap_user_input,
     build_memory_context,
     build_web_sources_block,
@@ -28,4 +29,4 @@ SCIENTIFIC_TEST_SYSTEM = ("You are an analytical assistant. You MUST produce a v
                           "CRITICAL RULE: Do NOT automatically assume all hypotheses are falsified. You MUST evaluate them logically against common knowledge and any provided context. A hypothesis can be SUPPORTED, WEAKENED, or FALSIFIED.")
 
 def scientific_test_prompt(state: PipelineState) -> str:
-    return f'{get_language_instruction(state)}\n\nHypotheses:\n{json.dumps(state.scientific_state["hypotheses"], indent=2)}\n\nFor each, describe a test and predict the result (SUPPORTED, WEAKENED, FALSIFIED).\n\nOutput JSON: {{"test_results": [{{"hypothesis_id": "H1", "experiment": "...", "result": "..."}}]}}'
+    return f'{get_language_instruction(state)}\n\nHypotheses:\n{_wrap_external_content(json.dumps(state.scientific_state.get("hypotheses", []), indent=2))}\n\nFor each, describe a test and predict the result (SUPPORTED, WEAKENED, FALSIFIED).\n\nOutput JSON: {{"test_results": [{{"hypothesis_id": "H1", "experiment": "...", "result": "..."}}]}}'
