@@ -3,7 +3,8 @@ provider-costing route must declare.
 
 Not a runtime policy engine: today's auth/metering checks are already
 centralized as shared FastAPI dependencies (``require_credits``,
-``check_quota``, ``reserve_or_402``) rather than duplicated per route. What
+``check_quota``, ``reserve_or_402``, and ``api/run_admission.admit_run``,
+which every pipeline route calls) rather than duplicated per route. What
 was missing was a forcing function -- something that fails CI when a new
 costed route is added without wiring one of them in. That's what
 ``CAPABILITY_POLICY`` plus ``tests/test_capability_coverage.py`` (which scans
@@ -54,7 +55,14 @@ CAPABILITY_POLICY: dict[Capability, CapabilityPolicy] = {
         # the per-user credit ledger.
         credit_reason=CreditReason.PIPELINE_RUN,
         rate_limited=True,
-        routes=("/api/run", "/api/run-followup", "/api/agent/run", "/api/agent/run/sync"),
+        routes=(
+            "/api/run",
+            "/api/run-followup",
+            "/api/agent/run",
+            "/api/agent/run/sync",
+            "/api/run-with-context",
+            "/api/pipelines/{pipeline_id}/resume-stream",
+        ),
     ),
     Capability.IMAGE_GENERATE: CapabilityPolicy(
         requires_auth=False,

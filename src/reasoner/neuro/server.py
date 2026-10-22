@@ -758,7 +758,9 @@ class NeuroService:
             if tenants.is_erased(key):
                 return self._dropped_for_erased_owner(key, req)
             async with tenant["index_lock"]:
-                await tenant["l1"].add(content, source=source, embedding=embedding)
+                await tenant["l1"].add(
+                    content, source=source, embedding=embedding, metadata=req.metadata or {}
+                )
                 await tenant["l2"].add(
                     content,
                     source=source,

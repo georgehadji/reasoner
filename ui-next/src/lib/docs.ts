@@ -638,7 +638,7 @@ Authorization: Bearer rsn_live_...
 }
 \`\`\`
 
-\`client_run_id\` is both a duplicate-run guard and the credit idempotency key. Reusing one returns **409** rather than running twice, and the run is never charged twice.
+\`client_run_id\` is a duplicate-run guard, scoped to your account. Reusing the id of a run that is in flight or has completed returns **409** rather than running twice. A run that was refused (402) or stopped before its \`done\` frame frees its id, so you can retry with the same one.
 
 The response is an SSE stream:
 
@@ -719,7 +719,7 @@ Bearer-only variants of the run endpoints, built for programmatic callers. See [
 | 401 | Missing, invalid, or revoked credentials | Check the key; mint a new one |
 | 402 | Credit balance exhausted | Top up, or wait for the monthly grant |
 | 403 | Scope or CSRF failure | Grant the scope the call needs |
-| 409 | Duplicate \`client_run_id\` | Reuse the original run's result |
+| 409 | \`client_run_id\` of a run in flight or finished | Reuse that run's result |
 | 429 | Rate limited | Back off for \`Retry-After\` seconds |
 | 503 | Dependency unavailable | Retry with backoff |
 
@@ -918,14 +918,14 @@ Two endpoints let an agent look before it leaps, both taking the same body as \`
 ## Long runs, timeouts, and retries
 
 - A pipeline is capped at **600 seconds**. Set the client timeout above that — 620s is a sane figure — or you will abandon runs you have already paid for.
-- Always send a \`client_run_id\`. It is both the duplicate-run guard and the credit idempotency key: re-sending the same id returns **409** instead of running twice.
-- If the stream drops mid-run, reconnect with the **same** \`client_run_id\`. Never retry with a fresh one — that is how an agent bills two runs for one question.
-- Runs settle **after** completion, from the actual \`total_cost_usd\` on the \`done\` frame. Failed runs cost nothing.
+- Always send a \`client_run_id\`. It is the duplicate-run guard: re-sending the id of a run that is in flight or has completed returns **409** instead of running twice.
+- If the stream drops mid-run, retry with the **same** \`client_run_id\`. The dropped run frees its id, so the retry runs; a retry while the first is still running gets 409, so you never run two at once.
+- Runs settle **after** they end, from the actual \`total_cost_usd\`. A run that stops early is charged for the spend it already incurred, and the rest of its reservation is released.
 
 | Status | Agent behaviour |
 | --- | --- |
 | 402 | Stop. Credits are exhausted; retrying cannot succeed. |
-| 409 | Reuse the original run's result. Do not re-run. |
+| 409 | The run is still going or already finished. Reuse its result; do not re-run. |
 | 429 | Back off for \`Retry-After\` seconds. Watch \`X-RateLimit-Remaining\` and throttle before you hit the wall. |
 | 503 | Retry with exponential backoff. |
 

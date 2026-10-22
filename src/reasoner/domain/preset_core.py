@@ -44,6 +44,17 @@ _KNOWN_ROUTING_ROLES: frozenset[str] = frozenset({
     "expert_2",
     "expert_3",
     "expert_4",
+    # Jury roles (flows/jury_phases.JURY_*_ROLES). Unlisted, no preset could
+    # route them, so all seven ran on the primary model (FLOW-2).
+    "generator_1",
+    "generator_2",
+    "generator_3",
+    "critic_1",
+    "critic_2",
+    "critic_3",
+    "panel_critic",
+    # Egress rewrite (flows/egress_rewrite_phase.py)
+    "egress_rewrite",
     # Prompt enhancement (opt-in pre-phase)
     "prompt_enhancement",
     # CoVe roles
@@ -130,55 +141,6 @@ _KNOWN_ROUTING_ROLES: frozenset[str] = frozenset({
     "hypergate_method",
     "hypergate_tiebreak",
 })
-
-
-def get_method_from_preset(preset: str) -> str:
-    """Extract method name from preset string."""
-    if "debate" in preset:
-        return "debate"
-    # Must precede any bare "iterative" check: the only presets containing
-    # "iterative" are iterative-critique-{budget,premium}, and the flow is
-    # registered as `iterative_critique`. Returning "iterative" here yielded a
-    # method with no WorkflowFactory strategy behind it.
-    if "iterative" in preset:
-        return "iterative_critique"
-    if "jury" in preset or "orchestrated" in preset:
-        return "jury"
-    if "research" in preset:
-        return "research"
-    if "scientific" in preset:
-        return "scientific"
-    if "socratic" in preset:
-        return "socratic"
-    if "pre-mortem" in preset or "premortem" in preset:
-        return "pre_mortem"
-    if "bayesian" in preset:
-        return "bayesian"
-    if "dialectical" in preset:
-        return "dialectical"
-    if "analogical" in preset:
-        return "analogical"
-    if "delphi" in preset:
-        return "delphi"
-    if "self-discover" in preset:
-        return "self_discover"
-    if "cove" in preset:
-        return "cove"
-    if "brainstorming" in preset:
-        return "brainstorming"
-    if "article" in preset:
-        return "article"
-    if "writing" in preset:
-        return "writing"
-    if "sot" in preset:
-        return "sot"
-    if "tot" in preset:
-        return "tot"
-    if "pot" in preset:
-        return "pot"
-    if "cross-language" in preset or "cross_language" in preset:
-        return "cross_language"
-    return "multi-perspective"
 
 
 def get_preset_price_tier(preset_id: str) -> Literal["budget", "premium", "unknown"]:

@@ -26,6 +26,43 @@ describe('buildContentSecurityPolicy', () => {
    * future change drops 'unsafe-inline' to tighten the policy, this fails —
    * which is the outcome that was missing.
    */
+  /**
+   * UI-6. `connect-src` allowed only 'self' and the WS hosts, so in production
+   * the browser blocked every Supabase auth call (sign-in, sign-up, token
+   * refresh) and the Sentry ingest. A `wss://` URL with no port also got the
+   * dev port 8000 instead of 443.
+   */
+  it('allows the Supabase origin for auth calls', () => {
+    const csp = buildContentSecurityPolicy({
+      wsUrl: 'ws://127.0.0.1:8003/ws',
+      supabaseUrl: 'https://x.supabase.co/',
+    });
+    expect(csp).toMatch(/connect-src [^;]*https:\/\/x\.supabase\.co(?=[ ;]|$)/);
+  });
+
+  it('allows the Sentry ingest origin taken from the DSN', () => {
+    const csp = buildContentSecurityPolicy({
+      wsUrl: 'ws://127.0.0.1:8003/ws',
+      sentryDsn: 'https://key@o123.ingest.sentry.io/456',
+    });
+    expect(csp).toMatch(/connect-src [^;]*https:\/\/o123\.ingest\.sentry\.io(?=[ ;]|$)/);
+  });
+
+  it.each([
+    ['wss://app.example/ws', 'wss://app.example:443'],
+    ['ws://app.example/ws', 'ws://app.example:80'],
+    ['wss://app.example:9443/ws', 'wss://app.example:9443'],
+  ])('gives %s its scheme default port', (wsUrl, expected) => {
+    const csp = buildContentSecurityPolicy({ wsUrl });
+    expect(csp).toContain(expected);
+    expect(csp).not.toContain('app.example:8000');
+  });
+
+  it('ignores a malformed Supabase URL', () => {
+    const csp = buildContentSecurityPolicy({ wsUrl: 'ws://127.0.0.1:8003/ws', supabaseUrl: 'not a url' });
+    expect(csp).toContain("connect-src 'self'");
+  });
+
   it('permits the inline script Next needs to hydrate', () => {
     const csp = buildContentSecurityPolicy({
       wsUrl: 'ws://127.0.0.1:8003/ws',

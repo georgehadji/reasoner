@@ -43,7 +43,7 @@ async def test_a_markdown_upload_is_accepted_and_leaks_no_path(libmagic_says_tex
 
 
 @pytest.mark.asyncio
-async def test_going_over_the_quota_is_413(monkeypatch):
+async def test_going_over_the_quota_is_413(monkeypatch, tmp_path):
     from reasoner.api import dependencies
     from reasoner.api.auth_deps import require_csrf
     from reasoner.api.routes import uploads
@@ -56,11 +56,18 @@ async def test_going_over_the_quota_is_413(monkeypatch):
     app.dependency_overrides[dependencies.get_current_user] = lambda: User(id=uuid4(), email="a@b.c")
     app.dependency_overrides[dependencies.check_rate_limit] = lambda: True
     app.dependency_overrides[require_csrf] = lambda: True
-    monkeypatch.setattr(uploads, "stored_bytes", lambda user_id: UPLOAD_USER_QUOTA_BYTES - 10)
+    from reasoner.infrastructure.persistence.upload_usage_repo import SqliteUploadUsageRepository
+
+    repo = SqliteUploadUsageRepository(tmp_path / "usage.db")
+    monkeypatch.setattr(uploads, "get_upload_usage_repo", lambda: repo)
 
     async def _save(*a, **k):
         saved.append(a)
         return {"success": True}
+
+    user = app.dependency_overrides[dependencies.get_current_user]()
+    app.dependency_overrides[dependencies.get_current_user] = lambda: user
+    await repo.adjust(str(user.id), UPLOAD_USER_QUOTA_BYTES - 10)
 
     monkeypatch.setattr(uploads, "save_uploaded_file", _save)
     transport = httpx.ASGITransport(app=app)

@@ -20,7 +20,7 @@ class DelphiFlow(WorkflowStrategy):
 
     def get_phases(self, state: PipelineState) -> list[PhaseStep]:
         phases = [
-            PhaseStep(2, "Round 1 Estimates", run_delphi_round1_phase, _ser_2),
+            PhaseStep(2, "Round 1 Estimates", run_delphi_round1_phase, _ser_2, critical=True),
             PhaseStep(3, "Aggregation", run_delphi_aggregation_phase, _ser_3),
             PhaseStep(4, "Round 2 Estimates", run_delphi_round2_phase, _ser_4),
             PhaseStep(5, "Convergence Analysis", run_delphi_convergence_phase, _ser_5),

@@ -92,7 +92,32 @@ async def test_tampered_user_id_is_rejected(monkeypatch: pytest.MonkeyPatch) -> 
     assert await ws_ticket.redeem_ticket(forged) is None
 
 
-@pytest.mark.parametrize("garbage", ["", "not-a-ticket", "a:b", "a:b:c"])
+async def test_dev_fallback_secret_is_stable_across_issue_and_redeem(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Without CSRF_SECRET (dev/CI, enforcement off) the fallback key was drawn
+    fresh on every call, so a ticket never verified against its own issuer."""
+    _patch_valkey(monkeypatch, _FakeValkey())
+    monkeypatch.setattr(settings, "CSRF_SECRET", "")
+    monkeypatch.setattr(settings, "CSRF_ENFORCE_BACKEND", False)
+
+    ticket = ws_ticket.issue_ticket("user-42")
+
+    assert await ws_ticket.redeem_ticket(ticket) == "user-42"
+
+
+def test_ticket_is_a_valid_websocket_subprotocol() -> None:
+    """The browser sends the ticket as `new WebSocket(url, [ticket])`, and a
+    subprotocol must be an RFC 7230 token. The old ':' separator is not a
+    token character, so every browser threw SyntaxError before connecting."""
+    tchar = set("!#$%&'*+-.^_`|~0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
+    ticket = ws_ticket.issue_ticket("00000000-0000-4000-8000-000000000de1")
+
+    assert ticket and set(ticket) <= tchar, set(ticket) - tchar
+
+
+@pytest.mark.parametrize("garbage", ["", "not-a-ticket", "a.b", "a.b.c", "a:b:c:d"])
 async def test_malformed_tickets_are_rejected(
     monkeypatch: pytest.MonkeyPatch, garbage: str
 ) -> None:

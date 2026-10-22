@@ -68,7 +68,7 @@ def _patch_billable_run(monkeypatch):
     async def fake_require_credits(user):
         return user
 
-    async def fake_register_run(client_run_id):
+    async def fake_register_run(client_run_id, *, owner_key):
         return None
 
     settled: list[dict] = []
@@ -243,7 +243,7 @@ async def test_reasoner_run_is_idempotent_on_client_run_id(mcp_server, monkeypat
 
     from reasoner.application.services import idempotency as idem
 
-    async def raise_duplicate(client_run_id):
+    async def raise_duplicate(client_run_id, *, owner_key):
         raise idem.RunAlreadyInProgressError(client_run_id)
 
     monkeypatch.setattr(idem, "register_run", raise_duplicate)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+from reasoner.core.constants_limits import TRUNCATION
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.phases._shared import (
     _wrap_external_content,
@@ -29,7 +30,17 @@ def jury_generator_prompt(state: PipelineState, generator_id: str) -> str:
 JURY_CRITIC_SYSTEM = "You are an analytical assistant. Score each candidate against the provided guidelines. Output ONLY valid JSON."
 
 def jury_critic_prompt(state: PipelineState) -> str:
-    candidates_summary = [{"generator_id": c.generator_id, "approach": c.approach_summary} for c in state.generation_candidates]
+    # The solution and claims, not just the approach: critics cannot score
+    # factuality from a one-line summary (FLOW-2).
+    candidates_summary = [
+        {
+            "generator_id": c.generator_id,
+            "approach": c.approach_summary,
+            "solution": c.solution[:TRUNCATION.CONTENT],
+            "key_claims": c.key_claims,
+        }
+        for c in state.generation_candidates
+    ]
     gen_ids = [c.generator_id for c in state.generation_candidates]
     ranking_example = json.dumps(gen_ids)
     return (

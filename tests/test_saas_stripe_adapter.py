@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import stripe
@@ -42,22 +42,28 @@ async def test_create_checkout_session(adapter):
 
 @pytest.mark.asyncio
 async def test_create_portal_session(adapter):
-    # A real StripeObject: a MagicMock answers .get() and hid the stripe 15 break.
-    mock_customer = stripe.Customer.construct_from(
-        {"id": "cus_123", "metadata": {"reasoner_user_id": "user-1"}}, "sk_test_123",
+    """The portal opens on the customer id stored with the subscription; it no
+    longer pages through every Stripe customer for metadata (BIL-13)."""
+    from uuid import uuid4
+
+    from reasoner.domain.saas import Subscription, SubscriptionStatus, SubscriptionTier
+
+    stored = Subscription(
+        id=uuid4(), user_id=uuid4(), tier=SubscriptionTier.PRO,
+        status=SubscriptionStatus.ACTIVE, stripe_customer_id="cus_123",
     )
-
-    mock_customer_list = MagicMock()
-    mock_customer_list.auto_paging_iter = lambda: iter([mock_customer])
-
+    repo = MagicMock()
+    repo.get_subscription_by_user = AsyncMock(return_value=stored)
     mock_portal = MagicMock()
     mock_portal.url = "https://billing.stripe.com/test"
 
-    with patch("stripe.Customer.list", return_value=mock_customer_list) as mock_list, \
+    repo_path = "reasoner.infrastructure.billing.stripe_adapter._subscription_repo"
+    with patch(repo_path, return_value=repo), \
+         patch("stripe.Customer.list") as mock_list, \
          patch("stripe.billing_portal.Session.create", return_value=mock_portal) as mock_create:
         url = await adapter.create_portal_session("user-1", "http://localhost/dashboard")
         assert url == "https://billing.stripe.com/test"
-        mock_list.assert_called_once()
+        mock_list.assert_not_called()
         mock_create.assert_called_once_with(customer="cus_123", return_url="http://localhost/dashboard")
 
 

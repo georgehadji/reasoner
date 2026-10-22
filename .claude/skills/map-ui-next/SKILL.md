@@ -71,7 +71,8 @@ Each route forwards to the backend with CSRF and auth handling. Every entry in `
 
 | File | What it does |
 |------|--------------|
-| `usePipelineStream.ts` | **The SSE run hook** — starts a run, reads frames, exposes `PipelineError`. |
+| `usePipelineStream.ts` | **The SSE run hook** — starts a run or follow-up on the caller's abort signal, reads frames, exposes `PipelineError`. |
+| `useRunController.ts` | **Owns the active run's ticket** (abort signal, `client_run_id`, conversation id). `begin()` refuses a second run, `stop()` aborts and posts `/api/stop?run_id=`. Every run, follow-up and resume in `chat/page.tsx` goes through it. |
 | `useWebSocketPipeline.ts` | WebSocket live updates with connection status and reconnect. |
 | `useConversationHistory.ts` | IndexedDB-backed conversation list. |
 | `useCredits.ts`, `useQuota.ts`, `useSubscription.ts` | Billing and usage reads via SWR. |

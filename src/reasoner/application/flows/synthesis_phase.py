@@ -22,6 +22,7 @@ from reasoner.models import (
 )
 from reasoner.parsing import (
     ParseError,
+    coerce_list,
     extract_json,
     extract_solution_prose,
     parse_evidence_bundles,
@@ -209,9 +210,9 @@ def finalize_solution(raw: str, state: PipelineState, services: WorkflowServices
         return out
 
     # Sanitize action blueprint
-    raw_bp = json_data.get("action_blueprint", [])
+    raw_bp = coerce_list(json_data.get("action_blueprint"))
     clean_bp = []
-    for step in (raw_bp if isinstance(raw_bp, list) else []):
+    for step in raw_bp:
         if isinstance(step, dict):
             if not any(k in step for k in ("step", "action", "time_horizon", "go_criteria", "fallback")):
                 continue
@@ -247,11 +248,13 @@ def finalize_solution(raw: str, state: PipelineState, services: WorkflowServices
             cleaned.append(new_step)
         return cleaned, changed
 
-    critical_insights, insights_changed = _scrub_strings(json_data.get("critical_insights", []))
-    open_questions, questions_changed = _scrub_strings(json_data.get("open_questions", []))
+    critical_insights, insights_changed = _scrub_strings(
+        coerce_list(json_data.get("critical_insights"))
+    )
+    open_questions, questions_changed = _scrub_strings(coerce_list(json_data.get("open_questions")))
     clean_bp, blueprint_changed = _scrub_blueprint_steps(clean_bp)
 
-    all_sources = _coerce_sources(json_data.get("sources", []))
+    all_sources = _coerce_sources(coerce_list(json_data.get("sources")))
     sources = [s for s in all_sources if not s["url"] or _norm_url(s["url"]) in allowed_urls]
     removed_urls = list(dict.fromkeys(
         removed_urls + [s["url"] for s in all_sources if s not in sources]

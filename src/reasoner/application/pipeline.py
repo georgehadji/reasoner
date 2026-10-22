@@ -627,7 +627,11 @@ class ReasonerPipeline:
         self._log("CROSS-LANG", f"Translating output to {target_lang_name} ({target_lang_iso}).", state)
         try:
             translator = get_composite_translator(router=self.router)
-            fs = state.final_solution
+            # Translate a copy and swap it in once: mutating the live solution
+            # left it half translated when a later field failed
+            # (docs/plans/audit-remediation-2-2026-10-20.md FLOW-8).
+            import copy
+            fs = copy.deepcopy(state.final_solution)
 
             async def _t(text: str) -> str:
                 if not text or not text.strip():
@@ -672,6 +676,7 @@ class ReasonerPipeline:
                 if isinstance(src, dict) and "title" in src:
                     src["title"] = await _t(src["title"])
 
+            state.final_solution = fs
             if state.cross_language_state:
                 state.cross_language_state["direction"] = "out"
                 # Record the back-translated synthesis: the SSE payload and any

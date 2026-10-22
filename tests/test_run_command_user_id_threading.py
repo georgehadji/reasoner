@@ -20,6 +20,7 @@ from reasoner.application.ports.pipeline_ownership_port import (
     OwnershipRecord,
     is_authorized,
 )
+from reasoner.application.ports.run_outcome import RunOutcome
 from reasoner.models import PipelineState
 
 
@@ -36,7 +37,9 @@ def _command(user_id: str | None) -> RunPipelineCommand:
 async def test_handler_forwards_user_id_to_executor():
     """The handler must pass command.user_id down to execute_run."""
     executor = MagicMock()
-    executor.execute_run = AsyncMock(return_value=PipelineState(problem="test problem"))
+    executor.execute_run = AsyncMock(
+        return_value=RunOutcome("completed", PipelineState(problem="test problem"))
+    )
 
     handler = RunPipelineCommandHandler(
         llm_router=MagicMock(),
@@ -54,7 +57,9 @@ async def test_handler_forwards_user_id_to_executor():
 async def test_handler_preserves_anonymous_runs():
     """An unauthenticated run still forwards None rather than inventing an owner."""
     executor = MagicMock()
-    executor.execute_run = AsyncMock(return_value=PipelineState(problem="test problem"))
+    executor.execute_run = AsyncMock(
+        return_value=RunOutcome("completed", PipelineState(problem="test problem"))
+    )
 
     handler = RunPipelineCommandHandler(
         llm_router=MagicMock(),

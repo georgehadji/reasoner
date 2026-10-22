@@ -707,11 +707,44 @@ UPLOAD_USER_QUOTA_BYTES: int = 1024 * 1024 * 1024
 # Address-space cap for the PDF/DOCX parse child process (Linux only).
 DOCUMENT_PARSE_MEMORY_LIMIT_BYTES: int = 1024 * 1024 * 1024
 
-# After a Redis error the rate limiter falls back (fail_closed denies) for this
-# long, then the next request re-probes Redis.
-RATE_LIMITER_REDIS_RETRY_SECONDS: float = 30.0
+# After a Valkey error every guarded caller (the rate limiter, the cached
+# repositories, the Redis circuit breaker) falls back for this long without
+# touching the network, then the next request re-probes.
+VALKEY_RETRY_SECONDS: float = 30.0
+RATE_LIMITER_REDIS_RETRY_SECONDS: float = VALKEY_RETRY_SECONDS
+
+# Whole-chain bound for the direct-vendor fallback (up to eight sequential
+# attempts, each with its own LLM_CALL timeout).
+DIRECT_FALLBACK_BUDGET_S: float = 90.0
+
+# Bound on one guarded Valkey operation (infrastructure/valkey/guarded.py). The
+# client's own socket timeout is 2 s, longer than the whole tier-lookup budget.
+VALKEY_OP_TIMEOUT_S: float = 0.2
+
+# Budget granted to the database read inside a subscription lookup. With the
+# cache read and write each bounded by VALKEY_OP_TIMEOUT_S, TIER_LOOKUP_TIMEOUT_S
+# must exceed 2 * VALKEY_OP_TIMEOUT_S + this (tests/test_tier_lookup_valkey_hang.py).
+DB_TIER_QUERY_BUDGET_S: float = 0.5
 
 # WebSocket replay buffers for late joiners: one per run, dropped once it has
 # had no subscriber for this long, and never more than this many at once.
 WS_REPLAY_TTL_SECONDS: float = 300.0
 WS_MAX_REPLAY_BUFFERS: int = 1000
+
+# Count caps on model-driven fan-out. A Semaphore limits speed, not cost: the
+# skeleton or spec model chooses how many calls follow, so the count is capped
+# here (docs/plans/audit-remediation-2-2026-10-20.md FLOW-10).
+MAX_SOT_SUBPROBLEMS: int = 8
+MAX_CODING_FILES: int = 12
+# Decision points Tree-of-Thoughts expands, one generate + evaluate round each.
+MAX_TOT_DEPTH: int = 4
+
+# Upper bound on a run's credit settlement (release + true-up) once the stream
+# ends. Settlement runs shielded from client-disconnect cancellation, so this is
+# what stops a hung ledger call from holding a worker forever.
+SETTLE_TIMEOUT_SECONDS: float = 15.0
+
+# What one anonymous /api/gate call counts against the per-IP daily trial cap
+# (ANONYMOUS_DAILY_CREDIT_CAP). HyperGate is up to five small LLM calls; one
+# credit each call, so the default cap of 50 allows 50 a day (BIL-17).
+GATE_ESTIMATED_COST_USD: float = 0.001
