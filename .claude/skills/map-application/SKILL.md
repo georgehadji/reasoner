@@ -113,7 +113,7 @@ Convention: `<method>.py` holds the strategy class (phase sequence); `<method>_p
 | `spend_limit_service.py` | Resolves and applies per-tier LLM spend ceilings; `SpendRejection`, pre-run estimates. |
 | `anonymous_trial_policy.py` | Daily spend cap for anonymous runs that bypass the credit ledger. |
 | `quota_service.py` | Per-tier query quotas. |
-| `billing_service.py` | Checkout, portal, webhook sync. |
+| `billing_service.py` | Checkout, portal, webhook sync. Passes each event's own time (`event_time`) so repository writes apply in event order; a stale write skips its quota sync. |
 | `auth_service.py` | Thin cached wrapper over `AuthPort`. |
 | `api_key_service.py` | Mint/list/revoke/authenticate user API keys; scope-ceiling rules. |
 | `idempotency.py` | `register_run` — `client_run_id` as duplicate guard and credit idempotency key. |

@@ -37,6 +37,16 @@ os.environ.setdefault("RATE_LIMITER_REDIS_FAILURE_MODE", "fail_open")
 # install a live jev adapter and send real requests to OpenRouter. Tests that
 # exercise jev inject a fake DecisionPort and set the mode themselves.
 os.environ.setdefault("JEV_MODE", "off")
+# The event store (and pipeline ownership, which shares its file) defaulted to
+# src/reasoner/events.db, so the suite wrote into the developer's own store and
+# its rows outlived the run. Ownership is first-writer-wins (SEC-7), so a test
+# with a fixed client_run_id then got 409 on the next run, from a row a random
+# user had claimed last time. One fresh file per process (each xdist worker).
+import tempfile  # noqa: E402
+
+os.environ.setdefault(
+    "EVENT_STORE_DB_PATH", os.path.join(tempfile.mkdtemp(prefix="reasoner-test-"), "events.db"),
+)
 
 import asyncio
 

@@ -35,6 +35,20 @@ class OwnershipRecord:
     run_id: str
 
 
+class OwnershipConflictError(Exception):
+    """*pipeline_id* already belongs to someone else; ownership never moves.
+
+    A caller-chosen ``client_run_id`` is the pipeline id, so two tenants can
+    pick the same one. The old upsert let the second take the first one's
+    pipeline (docs/plans/audit-remediation-2-2026-10-20.md SEC-7). The API
+    maps this to 409.
+    """
+
+    def __init__(self, pipeline_id: str) -> None:
+        self.pipeline_id = pipeline_id
+        super().__init__(f"Pipeline {pipeline_id} belongs to another owner")
+
+
 class PipelineOwnershipPort(Protocol):
     """Port for persisting and querying pipeline ownership."""
 
@@ -49,7 +63,12 @@ class PipelineOwnershipPort(Protocol):
         ...
 
     async def set_owner(self, pipeline_id: str, user_id: str | None, run_id: str) -> None:
-        """Persist (or update) the owner of *pipeline_id*. Idempotent upsert."""
+        """Record *user_id* as the owner of *pipeline_id* if it has none yet.
+
+        First writer wins: calling again with the same owner is a no-op, and a
+        different owner (``None`` included) raises OwnershipConflictError and
+        leaves the record unchanged.
+        """
         ...
 
     async def list_pipeline_ids_for_user(self, user_id: str) -> list[str]:

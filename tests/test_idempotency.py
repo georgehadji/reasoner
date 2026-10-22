@@ -57,8 +57,8 @@ def patched_manager(monkeypatch):
 async def test_blank_id_is_a_no_op(patched_manager):
     fake = patched_manager()
 
-    await register_run(None)
-    await register_run("")
+    await register_run(None, owner_key="u")
+    await register_run("", owner_key="u")
 
     assert fake.register_calls == []
 
@@ -67,9 +67,10 @@ async def test_blank_id_is_a_no_op(patched_manager):
 async def test_a_fresh_id_registers_cleanly(patched_manager):
     fake = patched_manager()
 
-    await register_run("run-1")
+    await register_run("run-1", owner_key="u")
 
-    assert fake.register_calls == ["run-1"]
+    # Scoped to the caller: another tenant's "run-1" is a different claim (SEC-7).
+    assert fake.register_calls == ["u:run-1"]
 
 
 @pytest.mark.asyncio
@@ -77,7 +78,7 @@ async def test_a_duplicate_id_is_rejected(patched_manager):
     patched_manager(registered=True)
 
     with pytest.raises(RunAlreadyInProgressError) as exc_info:
-        await register_run("run-1")
+        await register_run("run-1", owner_key="u")
 
     assert exc_info.value.client_run_id == "run-1"
 
@@ -87,7 +88,7 @@ async def test_a_non_authoritative_store_fails_closed(patched_manager):
     patched_manager(authoritative=False)
 
     with pytest.raises(RunStateUnavailableError) as exc_info:
-        await register_run("run-1")
+        await register_run("run-1", owner_key="u")
 
     assert exc_info.value.retry_after_seconds == 10
 
@@ -97,7 +98,7 @@ async def test_an_unexpected_redis_error_becomes_a_retryable_unavailable(patched
     patched_manager(explode=True)
 
     with pytest.raises(RunStateUnavailableError) as exc_info:
-        await register_run("run-1")
+        await register_run("run-1", owner_key="u")
 
     assert exc_info.value.retry_after_seconds == 5
 
@@ -114,7 +115,7 @@ async def test_http_translator_maps_duplicate_to_409(patched_manager):
     patched_manager(registered=True)
 
     with pytest.raises(HTTPException) as exc_info:
-        await register_run_or_error("run-1")
+        await register_run_or_error("run-1", owner_key="u")
 
     assert exc_info.value.status_code == 409
     assert "run-1" in exc_info.value.detail
@@ -129,7 +130,7 @@ async def test_http_translator_maps_store_outage_to_503_with_retry_after(patched
     patched_manager(authoritative=False)
 
     with pytest.raises(HTTPException) as exc_info:
-        await register_run_or_error("run-1")
+        await register_run_or_error("run-1", owner_key="u")
 
     assert exc_info.value.status_code == 503
     assert exc_info.value.headers["Retry-After"] == "10"
@@ -141,4 +142,4 @@ async def test_http_translator_passes_through_a_clean_registration(patched_manag
 
     patched_manager()
 
-    await register_run_or_error("run-1")  # must not raise
+    await register_run_or_error("run-1", owner_key="u")  # must not raise

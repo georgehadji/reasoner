@@ -4,6 +4,7 @@ Multi-tenant isolation, provider fallback chains, persona modes.
 """
 
 import copy
+import hashlib
 import os
 import re
 from dataclasses import dataclass, field
@@ -355,17 +356,36 @@ def _safe_agent_id(agent_id: str) -> str:
     return _AGENT_ID_RE.sub("", agent_id)[:128] or "default"
 
 
+def _agent_dir_name(agent_id: str) -> str:
+    """One directory per raw agent_id: readable prefix, digest suffix.
+
+    _safe_agent_id alone maps "a.b" and "ab" to the same name, so two tenant
+    keys of one owner shared a directory (PER-11). The digest of the raw id
+    keeps them apart; the sanitized prefix keeps the owner's "u-<uuid>-"
+    prefix at the start, which erase_owner matches on.
+    """
+    digest = hashlib.sha256(agent_id.encode("utf-8")).hexdigest()[:12]
+    return f"{_safe_agent_id(agent_id)[:80]}-{digest}"
+
+
 def get_agent_data_dir(cfg: NeuroConfig, agent_id: str | None = None) -> Path:
     # Membership is tested against the raw id so operator-configured agent
     # names (trusted, from neuro.yaml) keep resolving to their own data_dir.
-    if agent_id and agent_id in cfg.agents:
-        agent_cfg = cfg.agents[agent_id]
-        if agent_cfg.data_dir:
-            return Path(agent_cfg.data_dir)
-        return Path(cfg.data_dir) / "agents" / _safe_agent_id(agent_id)
-    elif agent_id:
-        return Path(cfg.data_dir) / "agents" / _safe_agent_id(agent_id)
-    return Path(cfg.data_dir) / "agents" / "default"
+    if agent_id and agent_id in cfg.agents and cfg.agents[agent_id].data_dir:
+        return Path(cfg.agents[agent_id].data_dir)
+    if not agent_id:
+        return Path(cfg.data_dir) / "agents" / "default"
+    agents = Path(cfg.data_dir) / "agents"
+    path = agents / _agent_dir_name(agent_id)
+    # Migrate on first access: a directory under the old, collision-prone name
+    # is renamed, unless the new one already exists.
+    legacy = agents / _safe_agent_id(agent_id)
+    if not path.exists() and legacy.is_dir() and not legacy.is_symlink():
+        try:
+            legacy.rename(path)
+        except OSError:
+            pass  # another worker renamed it first; path now exists
+    return path
 
 
 def get_persona(cfg: NeuroConfig, persona_name: str | None = None,

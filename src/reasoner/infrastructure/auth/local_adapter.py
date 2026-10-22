@@ -84,5 +84,9 @@ class LocalAuthAdapter(AuthPort):
         except jwt.InvalidTokenError as exc:
             raise AuthenticationError(f"Invalid token: {exc}", status_code=401) from exc
 
+    async def delete_identity(self, user_id: str) -> None:
+        """No identity store: tokens are self-signed. The deletion log refuses
+        them instead (``api/dependencies._ensure_user_in_db``)."""
+
     async def refresh_session(self, token: str) -> str:
         raise NotImplementedError("Local adapter does not support refresh")

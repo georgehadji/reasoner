@@ -13,7 +13,9 @@ from pathlib import Path
 
 import numpy as np
 
+from reasoner.core.degrade import degraded
 from reasoner.neuro.config import CacheConfig, PersonaConfig
+from reasoner.utils.atomic_file import atomic_write_text, locked, read_json_or_quarantine
 
 log = logging.getLogger("neuro.cache")
 
@@ -80,13 +82,18 @@ class L1Cache:
                 scored.append((sim, bundle))
 
         scored.sort(key=lambda x: x[0], reverse=True)
-        return [ContextChunk(b["content"], b.get("source", "l1-cache"), s, "L1")
+        return [ContextChunk(b["content"], b.get("source", "l1-cache"), s, "L1",
+                             b.get("metadata"))
                 for s, b in scored[:top_k]]
 
-    async def add(self, content: str, source: str, embedding: list[float]) -> str:
+    async def add(self, content: str, source: str, embedding: list[float],
+                  metadata: dict | None = None) -> str:
+        # metadata is the learn-time provenance. Without it every L1 hit failed
+        # recall's schema_version filter, yet still took a recall slot (PER-10).
         bundle_id = hashlib.sha256(content.encode()).hexdigest()[:12]
         bundle = {"id": bundle_id, "content": content, "source": source,
-                  "embedding": embedding, "created_at": time.time()}
+                  "embedding": embedding, "metadata": metadata or {},
+                  "created_at": time.time()}
         # bundle_id is a digest of the content, and one id maps to one file --
         # so re-adding identical content must replace, not append. Appending
         # put two entries in self.bundles behind a single file: search()
@@ -114,18 +121,23 @@ class L2Index:
         self.entries: list[dict] = []
         self._load()
 
+    @property
+    def _path(self) -> Path:
+        return self.index_dir / "index.json"
+
+    def _read(self) -> list[dict]:
+        # A corrupt file used to load as [] and the next add saved over it,
+        # wiping the tenant's memory. It is now moved aside instead (PER-10).
+        entries: object
+        entries, quarantined = read_json_or_quarantine(self._path, [])
+        if quarantined:
+            degraded("neuro.l2_index", None, exc=ValueError(f"corrupt {self._path} quarantined"))
+        return entries if isinstance(entries, list) else []
+
     def _load(self):
         self.index_dir.mkdir(parents=True, exist_ok=True)
-        index_file = self.index_dir / "index.json"
-        if index_file.exists():
-            try:
-                self.entries = json.loads(index_file.read_text())
-                log.info(f"L2 index: {len(self.entries)} entries")
-            except Exception as e:
-                log.warning(f"L2 load error: {e}")
-
-    async def _save(self):
-        await asyncio.to_thread((self.index_dir / "index.json").write_text, json.dumps(self.entries, default=str))
+        self.entries = self._read()
+        log.info(f"L2 index: {len(self.entries)} entries")
 
     def search(self, query_embedding: list[float], top_k: int = 5,
                persona: PersonaConfig | None = None) -> list[ContextChunk]:
@@ -149,13 +161,24 @@ class L2Index:
     async def add(self, content: str, source: str, embedding: list[float],
                   metadata: dict = None) -> str:
         entry_id = hashlib.sha256(content.encode()).hexdigest()[:12]
-        self.entries.append({"id": entry_id, "content": content, "source": source,
-                            "embedding": embedding, "metadata": metadata or {},
-                            "created_at": time.time()})
-        # Evict oldest entries if size exceeds limit
-        while len(self.entries) > self.config.l2_max_entries:
-            self.entries.pop(0)
-        await self._save()
+        entry = {"id": entry_id, "content": content, "source": source,
+                 "embedding": embedding, "metadata": metadata or {},
+                 "created_at": time.time()}
+
+        def _merge_and_write() -> list[dict]:
+            # Re-read inside the file lock, so a second worker's (or a second
+            # instance's) entries written since our load are kept, not
+            # overwritten by our stale copy. The id is a content digest, so
+            # re-adding the same content replaces it instead of duplicating.
+            with locked(self._path):
+                entries = [e for e in self._read() if e.get("id") != entry_id]
+                entries.append(entry)
+                # Evict oldest entries if size exceeds limit
+                del entries[: max(0, len(entries) - self.config.l2_max_entries)]
+                atomic_write_text(self._path, json.dumps(entries, default=str))
+            return entries
+
+        self.entries = await asyncio.to_thread(_merge_and_write)
         return entry_id
 
     @property

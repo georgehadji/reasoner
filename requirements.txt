@@ -13,6 +13,8 @@ fastapi>=0.142.2,<0.145.0
 # urlencoded form parsing DoS, Windows UNC SSRF via StaticFiles, HTTPEndpoint arbitrary-attribute
 # method dispatch, quadratic-time Range-header DoS in FileResponse).
 starlette>=1.7.0,<2.0.0
+# Direct import: run_metering shields credit settlement with anyio.CancelScope.
+anyio>=4.0,<5.0
 uvicorn[standard]>=0.54.0,<0.55.0
 python-multipart>=0.0.6,<0.1.0
 

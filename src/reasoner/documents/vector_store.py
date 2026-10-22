@@ -11,6 +11,7 @@ import asyncio
 import json
 import logging
 import math
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -23,35 +24,47 @@ logger = logging.getLogger(__name__)
 # ── Chunking defaults (overridable via settings) ──
 _DEFAULT_CHUNK_SIZE = 1000
 _DEFAULT_CHUNK_OVERLAP = 200
-_MAX_CHUNKS_PER_FILE = 500
 _MAX_TOTAL_RETRIEVE_CHUNKS = 20
 
 
-def _chunk_text(text: str, size: int, overlap: int) -> list[str]:
-    """Split text into overlapping chunks.
+@dataclass(frozen=True)
+class ChunkResult:
+    chunks: list[str]
+    # True when the text was longer than the character budget, so only its
+    # first DOCUMENT_INDEX_MAX_CHARS characters are searchable.
+    truncated: bool
+
+
+def _chunk_text(text: str, size: int, overlap: int, max_chars: int | None = None) -> ChunkResult:
+    """Split the first ``max_chars`` characters of text into overlapping chunks.
+
+    A character budget, not a chunk count (DAT-8, decision Q8): the old
+    500-chunk cap cut a document at a length that depended on the chunk
+    settings and said so only in a log line. The loop also used to emit a
+    last chunk that was a suffix of the one before it; it now stops at the
+    chunk that reaches the end.
 
     Args:
         text: Source text.
         size: Target chunk size in characters.
-        overlap: Overlap between consecutive chunks.
-
-    Returns:
-        List of text chunks.
+        overlap: Overlap between consecutive chunks. Capped at half the
+            size, since an overlap of ``size`` or more would step by one
+            character and embed the budget once per character.
+        max_chars: Character budget; ``settings.DOCUMENT_INDEX_MAX_CHARS``
+            when None.
     """
-    if not text:
-        return []
+    budget = settings.DOCUMENT_INDEX_MAX_CHARS if max_chars is None else max_chars
+    body = text[:budget]
+    step = max(1, size - min(overlap, size // 2))
     chunks: list[str] = []
-    step = max(1, size - overlap)
     idx = 0
-    while idx < len(text):
+    while idx < len(body):
         end = idx + size
-        chunk = text[idx:end]
-        chunks.append(chunk)
-        idx += step
-        if len(chunks) >= _MAX_CHUNKS_PER_FILE:
-            logger.warning("Document exceeded max chunks (%d); truncating.", _MAX_CHUNKS_PER_FILE)
+        chunks.append(body[idx:end])
+        if end >= len(body):
             break
-    return chunks
+        idx += step
+    return ChunkResult(chunks, len(text) > budget)
 
 
 def _cosine_similarity(a: list[float], b: list[float]) -> float:
@@ -119,7 +132,8 @@ class DocumentVectorStore:
 
         size = chunk_size or settings.DOCUMENT_CHUNK_SIZE or _DEFAULT_CHUNK_SIZE
         overlap = chunk_overlap or settings.DOCUMENT_CHUNK_OVERLAP or _DEFAULT_CHUNK_OVERLAP
-        chunks = _chunk_text(text, size, overlap)
+        chunked = _chunk_text(text, size, overlap)
+        chunks = chunked.chunks
         if not chunks:
             return 0
 
@@ -153,22 +167,34 @@ class DocumentVectorStore:
             "chunk_count": len(chunks),
             "chunk_size": size,
             "chunk_overlap": overlap,
+            "truncated": chunked.truncated,
             "chunks": [
                 {"text": chunk, "embedding": emb}
                 for chunk, emb in zip(chunks, embeddings, strict=False)
             ],
         }
 
+        # PER-9: the file may have been deleted while it was being embedded.
+        # Checked before the write and again after it, because delete_file
+        # removes meta.json first: a delete that lands between the two checks
+        # is seen by the second one, so no orphan sidecar outlives its upload.
+        from reasoner.infrastructure.uploader import _get_upload_meta
+
+        if _get_upload_meta(file_id) is None:
+            logger.info("Upload %s was deleted during indexing; not writing vectors", file_id)
+            return 0
+        path = self._sidecar_path(file_id)
         try:
             from reasoner.security.encryption import get_encryption_service
 
             sidecar_json = json.dumps(sidecar, default=str)
             payload = get_encryption_service().encrypt(sidecar_json)
-            self._sidecar_path(file_id).write_text(
-                json.dumps({"encrypted": True, "payload": payload}), encoding="utf-8"
-            )
+            path.write_text(json.dumps({"encrypted": True, "payload": payload}), encoding="utf-8")
         except Exception as exc:
             logger.error("Failed to write vector sidecar for %s: %s", file_id, exc)
+            return 0
+        if _get_upload_meta(file_id) is None:
+            path.unlink(missing_ok=True)
             return 0
 
         logger.info("Indexed %s: %d chunks embedded", file_id, len(chunks))

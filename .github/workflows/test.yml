@@ -123,7 +123,7 @@ jobs:
           # 2204: deleted domain.pricing.calculate_model_cost, dead since BIL-2 (-2).
           # 2202: audit input-limits PR (SEC-4/SEC-5/OPS-5..7/DAT-4) (net -2).
           # 2201: audit billing PR (BIL-3..9) sorted credit_service imports (net -1).
-          python scripts/ruff_ratchet.py --max 2198
+          python scripts/ruff_ratchet.py --max 2192
 
       - name: Security scan (bandit)
         run: |
@@ -367,6 +367,43 @@ jobs:
           # the in-memory limiter, which still enforces limits for the dedicated
           # rate-limiter tests while letting normal requests through.
           RATE_LIMITER_REDIS_FAILURE_MODE: 'fail_open'
+
+  alembic-schema-contract:
+    # `alembic upgrade head` against a real Postgres. The baseline could not
+    # run on Postgres at all and the credit tables existed only in raw .sql,
+    # and nothing noticed, because no job ever applied the migrations
+    # (docs/plans/audit-remediation-2-2026-10-20.md PER-7).
+    name: Alembic schema contract (Postgres 16)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: reasoner_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Run schema contract
+        run: pytest tests/integration/test_alembic_schema_contract.py tests/integration/test_audit2_billing_pg.py -v -m integration -p no:randomly
+        env:
+          PYTHONPATH: ${{ env.PYTHONPATH }}
+          CSRF_ENFORCE_BACKEND: 'false'
+          REASONER_TEST_PG_DSN: postgresql://postgres:test@localhost:5432/reasoner_test
 
   tsc:
     name: TypeScript type check

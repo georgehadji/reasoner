@@ -18,24 +18,26 @@ from reasoner.uploader import UPLOAD_DIR
 
 class TestChunkText:
     def test_empty_text(self):
-        assert _chunk_text("", 100, 20) == []
+        assert _chunk_text("", 100, 20).chunks == []
 
     def test_single_chunk(self):
         text = "hello world"
-        assert _chunk_text(text, 100, 20) == ["hello world"]
+        assert _chunk_text(text, 100, 20).chunks == ["hello world"]
 
     def test_multiple_chunks_with_overlap(self):
         text = "a" * 100
-        chunks = _chunk_text(text, 30, 10)
+        chunks = _chunk_text(text, 30, 10).chunks
         # step = 20; indices: 0, 20, 40, 60, 80 → 5 chunks
         assert len(chunks) == 5
         assert chunks[0] == "a" * 30
         assert chunks[1] == "a" * 30  # overlap 10, so 20-50
 
-    def test_max_chunks_truncation(self):
+    def test_character_budget_truncation(self):
+        # A character budget now, not a 500-chunk cap (DAT-8, decision Q8).
         text = "word " * 2000
-        chunks = _chunk_text(text, 10, 2)
-        assert len(chunks) == 500  # capped at _MAX_CHUNKS_PER_FILE
+        result = _chunk_text(text, 10, 2, max_chars=4000)
+        assert result.truncated is True
+        assert len(result.chunks) == 500  # starts 0, 8, ..., 3992; the last reaches 4000
 
 
 class TestCosineSimilarity:
@@ -76,6 +78,8 @@ class TestDocumentVectorStore:
         store = DocumentVectorStore(embedder=mock_embedder)
 
         file_id = "test-index-001"
+        # index_file refuses a file with no upload record (PER-9).
+        (UPLOAD_DIR / f"{file_id}.meta.json").write_text("{}", encoding="utf-8")
         text = "This is a sample document. It has multiple sentences. " * 10
         count = await store.index_file(file_id, text, chunk_size=50, chunk_overlap=10)
 
