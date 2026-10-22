@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
@@ -11,14 +12,15 @@ from reasoner.api.dependencies import check_rate_limit, get_current_user, requir
 from reasoner.core.constants_limits import UPLOAD_USER_QUOTA_BYTES
 from reasoner.core.settings import settings
 from reasoner.domain.saas import User
+from reasoner.infrastructure.persistence.upload_usage_repo import get_upload_usage_repo
 from reasoner.uploader import (
     MAX_FILE_SIZE,
     delete_file,
+    file_stored_bytes,
     get_file_text,
     list_uploads,
     save_uploaded_file,
     save_uploaded_files,
-    stored_bytes,
 )
 
 logger = logging.getLogger(__name__)
@@ -86,19 +88,30 @@ async def upload_file(
                 content = b"".join(chunks)
                 files.append((content, getattr(item, "filename", "unknown")))
 
+        # Reserve before writing, in one atomic step (PER-8): a check against
+        # a sum read earlier let parallel uploads all pass it.
+        user_id = str(user.id)
+        usage = get_upload_usage_repo()
         incoming = sum(len(content) for content, _ in files)
-        if stored_bytes(str(user.id)) + incoming > UPLOAD_USER_QUOTA_BYTES:
+        if not await usage.reserve(user_id, incoming, UPLOAD_USER_QUOTA_BYTES):
             raise HTTPException(
                 status_code=413,
                 detail=f"Upload quota of {UPLOAD_USER_QUOTA_BYTES // 2**20}MB per user exceeded",
             )
-
-        if len(files) == 1:
-            result = await save_uploaded_file(files[0][0], files[0][1], user_id=str(user.id), force_ocr=force_ocr)
-            return {"success": True, "files": [result]}
-        else:
-            results = await save_uploaded_files(files, user_id=str(user.id), force_ocr=force_ocr)
-            return {"success": True, "files": results}
+        results: list[dict] = []
+        try:
+            if len(files) == 1:
+                results = [await save_uploaded_file(files[0][0], files[0][1], user_id=user_id, force_ocr=force_ocr)]
+            else:
+                results = await save_uploaded_files(files, user_id=user_id, force_ocr=force_ocr)
+        finally:
+            # Settle to what is really on disk: ciphertext and the text
+            # sidecar, nothing for a failed or deduplicated file. The
+            # reservation was the plaintext size, so one upload can overshoot
+            # the cap by its own encryption overhead; the next one is refused.
+            stored = sum(r.get("stored_bytes", 0) for r in results if r.get("success"))
+            await usage.adjust(user_id, stored - incoming)
+        return {"success": True, "files": results}
 
     except HTTPException:
         raise
@@ -139,7 +152,9 @@ async def delete_uploaded_file(
     rate_limit_checked=Depends(check_rate_limit),
 ):
     """Delete an uploaded file."""
+    size = file_stored_bytes(file_id) if re.fullmatch(r"[a-f0-9-]+", file_id) else 0
     success = delete_file(file_id, user_id=str(user.id))
     if not success:
         raise HTTPException(status_code=404, detail="File not found")
+    await get_upload_usage_repo().adjust(str(user.id), -size)
     return {"status": "deleted"}

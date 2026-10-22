@@ -88,6 +88,11 @@ def wired(monkeypatch, tmp_path):
     monkeypatch.setattr(quota_repo_postgres, "PostgresQuotaRepository", _FakeRepo)
     # The real HISTORY_DIR holds this machine's transcripts; glob an empty one.
     monkeypatch.setattr(history_module, "HISTORY_DIR", tmp_path)
+    # DATABASE_URL above is fake, so the upload-usage row lives in SQLite here.
+    from reasoner.infrastructure.persistence import upload_usage_repo
+
+    usage = upload_usage_repo.SqliteUploadUsageRepository(tmp_path / "usage.db")
+    monkeypatch.setattr(upload_usage_repo, "get_upload_usage_repo", lambda: usage)
     return saas_router, pool
 
 

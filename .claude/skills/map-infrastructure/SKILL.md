@@ -83,6 +83,7 @@ folders:
 | `api_key_repo_postgres.py` / `api_key_repo_memory.py` | `ApiKeyRepository` adapters. |
 | `credit_repo_postgres.py` / `credit_repo_memory.py` | `CreditRepository` adapters; Postgres locks the balance row (`SELECT … FOR UPDATE`). |
 | `quota_repo_postgres.py` | `QuotaRepository` on asyncpg, transactional writes. |
+| `upload_usage_repo.py` | Per-user upload bytes (`upload_usage`): atomic `reserve` against the cap, `adjust` to bytes really written, `forget` on account deletion. Postgres when configured, else SQLite in `UPLOAD_DIR` (PER-8). |
 | `cached_quota_repo.py` / `cached_subscription_repo.py` | Cache-aside Redis decorators (TTL 60s) with invalidation. |
 | `subscription_repo.py` | Subscription upserts + quota tier sync. Writes take the provider event's time and skip a stale one (`last_event_at`); the user-id fallback never overwrites a row tracking another subscription; `get_user_by_stripe_sub_id` resolves owners. |
 | `billing_deadletter_repo.py` | Durable failed-webhook storage for replay. |

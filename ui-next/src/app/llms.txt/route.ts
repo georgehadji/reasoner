@@ -70,7 +70,8 @@ Key facts:
 - Image generation runs outside the reasoning pipeline: a prompt-enhancement
   pass, then several image models in parallel across different vendors.
 - Usage is metered in credits: 1,000 credits = $1.00 of model spend, charged
-  after a run completes from its actual cost. Failed runs cost nothing.
+  after a run ends from its actual cost. A run that stops early pays only for
+  the spend it already incurred.
 - Programmatic access uses scoped API keys (rsn_live_*) over a streaming REST API.
 
 ${sections}

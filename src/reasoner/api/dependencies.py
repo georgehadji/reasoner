@@ -11,6 +11,8 @@ from __future__ import annotations
 import hashlib
 import logging
 import re
+import time
+from collections import OrderedDict
 from typing import TYPE_CHECKING
 from uuid import UUID
 
@@ -69,7 +71,20 @@ security = HTTPBearer(auto_error=False)
 # ── User Provisioning Singleton ──
 _user_provision_pool: asyncpg.Pool | None = None
 _user_provision_lock = asyncio.Lock()
-_provisioned_user_ids: set[UUID] = set()
+
+# Ids this worker provisioned recently, with when. Bounded and expiring: the
+# old unbounded set let a deleted account run on any worker that had cached
+# its id (audit-remediation-2 BIL-18). The TTL bounds that window for workers
+# that did not handle the deletion; the one that did forgets the id at once.
+PROVISION_CACHE_TTL_SECONDS = 60.0
+_PROVISION_CACHE_MAX = 10_000
+_provisioned_user_ids: OrderedDict[UUID, float] = OrderedDict()
+_monotonic = time.monotonic
+
+
+def forget_provisioned_user(user_id: UUID) -> None:
+    """Drop *user_id* from this worker's provisioning cache (account deletion)."""
+    _provisioned_user_ids.pop(user_id, None)
 
 
 async def _get_provision_pool() -> asyncpg.Pool:
@@ -90,11 +105,20 @@ async def _ensure_user_in_db(user: User) -> None:
 
     Idempotent upsert — safe to call on every request. Uses an in-memory
     cache to avoid redundant DB writes for already-provisioned users.
+
+    A deleted account is refused with 403 and never re-created: its JWT can
+    outlive the deletion, and the old upsert brought its ``users`` row back.
     """
-    if user.id in _provisioned_user_ids:
+    seen = _provisioned_user_ids.get(user.id)
+    if seen is not None and _monotonic() - seen < PROVISION_CACHE_TTL_SECONDS:
         return
     try:
         pool = await _get_provision_pool()
+        if await pool.fetchval(
+            "SELECT 1 FROM account_deletion_log WHERE user_id = $1 LIMIT 1", str(user.id),
+        ):
+            forget_provisioned_user(user.id)
+            raise HTTPException(status_code=403, detail="This account has been deleted.")
         await pool.execute(
             """
             INSERT INTO users (id, email, display_name, auth_provider, avatar_url, last_login_at)
@@ -112,7 +136,12 @@ async def _ensure_user_in_db(user: User) -> None:
             user.auth_provider,
             user.avatar_url,
         )
-        _provisioned_user_ids.add(user.id)
+        _provisioned_user_ids[user.id] = _monotonic()
+        _provisioned_user_ids.move_to_end(user.id)
+        while len(_provisioned_user_ids) > _PROVISION_CACHE_MAX:
+            _provisioned_user_ids.popitem(last=False)
+    except HTTPException:
+        raise
     except Exception as exc:
         # Log but don't fail the request — auth already succeeded
         logger.warning("User provisioning failed for %s: %s", user.id, exc)
@@ -444,10 +473,9 @@ async def check_rate_limit(
             allowed = False
             info = {"limit_minute": 60, "remaining_minute": 0, "retry_after": 60}
     else:
-        # Anonymous — use IP + User-Agent hash
-        ip = get_client_ip(request)
-        user_agent = request.headers.get("User-Agent", "")
-        client_id = f"{ip}:{hashlib.sha256(user_agent.encode()).hexdigest()[:8]}"
+        # Anonymous — one bucket per address. Mixing in the User-Agent let a
+        # caller rotate it for a fresh bucket (audit-remediation-2 BIL-17).
+        client_id = f"ip:{get_client_ip(request)}"
         try:
             allowed, info = await rate_limiter.is_allowed(client_id)
         except Exception as exc:
@@ -610,7 +638,8 @@ async def require_credits(user: User = Depends(get_current_user)) -> User:
     await _top_up_allowance(service, str(user.id))
     try:
         balance = await service.get_balance(str(user.id))
-    except Exception:
+    except Exception as exc:
+        _refuse_missing_account(exc)
         # A ledger outage must not take the product down; log and let the run
         # through. The run still settles later if the ledger recovers.
         logger.warning("Credit balance lookup failed; allowing run", exc_info=True)
@@ -627,6 +656,19 @@ async def require_credits(user: User = Depends(get_current_user)) -> User:
             },
         )
     return user
+
+
+def _refuse_missing_account(exc: Exception) -> None:
+    """Raise 403 when a ledger write failed because the ``users`` row is gone.
+
+    The ledger tables reference ``users(id)``, so a deleted account's write
+    fails on that foreign key. The ledger fail-open above is for outages; it
+    let a deleted account run unbilled (audit-remediation-2 BIL-18).
+    """
+    import asyncpg
+
+    if isinstance(exc, asyncpg.exceptions.ForeignKeyViolationError):
+        raise HTTPException(status_code=403, detail="Account not found.") from exc
 
 
 async def require_credits_if_authenticated(
@@ -688,7 +730,8 @@ async def reserve_or_402(
         ) from exc
     except HTTPException:
         raise
-    except Exception:
+    except Exception as exc:
+        _refuse_missing_account(exc)
         # A ledger outage must not take the product down -- same posture as
         # require_credits: log and let the run through unreserved. metered()
         # still settles from actual spend once the ledger recovers.
