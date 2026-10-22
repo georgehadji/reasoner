@@ -14,6 +14,9 @@ import { Conversation } from '@/lib/types';
 export function useConversationHistory() {
   const history = useAppStore((s) => s.history);
   const setHistory = useAppStore((s) => s.setHistory);
+  // History is per user (lib/db.ts). Reload when the user changes, or the
+  // previous user's list stays on screen after sign-out (UI-5).
+  const userId = useAppStore((s) => s.user?.id ?? null);
 
   const [page, setPage] = useState<ConversationPage | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -30,7 +33,7 @@ export function useConversationHistory() {
         if (mounted) console.error(err);
       });
     return () => { mounted = false; };
-  }, [setHistory]);
+  }, [setHistory, userId]);
 
   const loadMore = useCallback(async () => {
     if (!page?.nextCursor || loadingMore) return;

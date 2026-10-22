@@ -3,7 +3,11 @@ from __future__ import annotations
 import json
 
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.phases._shared import _wrap_user_input, get_language_instruction
+from reasoner.phases._shared import (
+    _wrap_external_content,
+    _wrap_user_input,
+    get_language_instruction,
+)
 
 BAYESIAN_PRIOR_SYSTEM = "You are an analytical assistant. Elicit prior probability distributions over competing hypotheses. Be explicit about uncertainty. Output ONLY valid JSON."
 
@@ -16,7 +20,7 @@ def bayesian_prior_prompt(state: PipelineState) -> str:
     return (
         f'{get_language_instruction(state)}\n\n'
         f'Problem: {_wrap_user_input(state.problem)}\n\n'
-        f'Sub-problems:\n{json.dumps(sub_problems, indent=2)}\n\n'
+        f'Sub-problems:\n{_wrap_external_content(json.dumps(sub_problems, indent=2))}\n\n'
         f'Identify 2-4 competing hypotheses that could explain or solve this problem. '
         f'Assign prior probability P(H) to each (must sum to approximately 1.0). '
         f'Explain your reasoning for each prior.\n\n'
@@ -31,7 +35,7 @@ def bayesian_likelihood_prompt(state: PipelineState) -> str:
     return (
         f'{get_language_instruction(state)}\n\n'
         f'Problem: {_wrap_user_input(state.problem)}\n\n'
-        f'Hypotheses:\n{json.dumps(hypotheses, indent=2)}\n\n'
+        f'Hypotheses:\n{_wrap_external_content(json.dumps(hypotheses, indent=2))}\n\n'
         f'Identify 3-5 key observations or pieces of evidence relevant to this problem. '
         f'For each observation, assess P(E|H) and P(E|not-H) for each hypothesis.\n\n'
         f'Output JSON: {{"observations": ["<obs 1>"], "likelihoods": [{{"observation": "<obs>", '
@@ -46,8 +50,8 @@ def bayesian_posterior_prompt(state: PipelineState) -> str:
     likelihoods = state.bayesian_state.get("evidence_likelihoods", [])
     return (
         f'{get_language_instruction(state)}\n\n'
-        f'Priors:\n{json.dumps(hypotheses, indent=2)}\n\n'
-        f'Likelihoods:\n{json.dumps(likelihoods, indent=2)}\n\n'
+        f'Priors:\n{_wrap_external_content(json.dumps(hypotheses, indent=2))}\n\n'
+        f'Likelihoods:\n{_wrap_external_content(json.dumps(likelihoods, indent=2))}\n\n'
         f'Apply Bayes rule P(H|E) ∝ P(E|H) × P(H) to compute posterior for each hypothesis '
         f'after observing all evidence. Normalize so posteriors sum to 1.0.\n\n'
         f'Output JSON: {{"posteriors": [{{"hypothesis_id": "H1", "posterior_probability": 0.75, '
@@ -62,8 +66,8 @@ def bayesian_sensitivity_prompt(state: PipelineState) -> str:
     posteriors = state.bayesian_state.get("posteriors", [])
     return (
         f'{get_language_instruction(state)}\n\n'
-        f'Priors:\n{json.dumps(hypotheses, indent=2)}\n\n'
-        f'Posteriors:\n{json.dumps(posteriors, indent=2)}\n\n'
+        f'Priors:\n{_wrap_external_content(json.dumps(hypotheses, indent=2))}\n\n'
+        f'Posteriors:\n{_wrap_external_content(json.dumps(posteriors, indent=2))}\n\n'
         f'For each major prior assumption, assess: if this prior were very different, '
         f'how much would the posterior change? Which assumption is most critical?\n\n'
         f'Output JSON: {{"sensitivity_analysis": [{{"assumption": "<prior assumption>", '

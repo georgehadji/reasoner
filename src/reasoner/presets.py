@@ -9,7 +9,6 @@ from reasoner.domain.preset_core import (
     FOLLOWUP_AGENT_MODELS,
     PipelinePreset,
     build_auto_preset,
-    get_method_from_preset,
     get_preset_price_tier,
     get_preset_tier,
 )

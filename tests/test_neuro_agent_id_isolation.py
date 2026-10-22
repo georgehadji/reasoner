@@ -38,7 +38,10 @@ def test_hostile_agent_id_stays_under_agents_dir(cfg, agent_id, tmp_path):
 
 def test_benign_agent_id_is_preserved(cfg, tmp_path):
     aid = "018f3c9a-7b2e-4d1f-9c8a-1a2b3c4d5e6f"
-    assert get_agent_data_dir(cfg, aid) == tmp_path / "agents" / aid
+    # Readable prefix, then a digest of the raw id (PER-11).
+    path = get_agent_data_dir(cfg, aid)
+    assert path.parent == tmp_path / "agents"
+    assert path.name.startswith(aid + "-")
 
 
 def test_distinct_agents_get_distinct_dirs(cfg):

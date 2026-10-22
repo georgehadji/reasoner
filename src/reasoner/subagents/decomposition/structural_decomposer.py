@@ -7,6 +7,7 @@ from typing import Any
 
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.parsing import extract_json
+from reasoner.phases._shared import _wrap_user_input
 from reasoner.subagents.base import PhaseSubAgent
 
 STRUCTURAL_SYSTEM = """You are a Structural Decomposer. Your ONE JOB is to break the problem into a hierarchical decomposition: WHAT needs to happen, WHY it matters, and HOW to approach it.
@@ -37,7 +38,7 @@ class StructuralDecomposerSubAgent(PhaseSubAgent):
     TEMPERATURE = 0.3
 
     def _build_prompt(self, state: PipelineState) -> tuple[str, str]:
-        return (STRUCTURAL_SYSTEM, f"Problem: {state.problem}")
+        return (STRUCTURAL_SYSTEM, f"Problem: {_wrap_user_input(state.problem)}")
 
     def _parse_result(self, raw: str) -> dict[str, Any]:
         try:

@@ -23,7 +23,7 @@ Convention: `<method>.py` holds the strategy class (phase sequence); `<method>_p
 
 | File | What it does |
 |------|--------------|
-| `base.py` | `WorkflowStrategy`, `PhaseStep`, `WorkflowServices` interfaces. |
+| `base.py` | `WorkflowStrategy`, `PhaseStep`, `WorkflowServices` interfaces, plus `require_survivors()`: a fan-out phase whose every call failed raises `PhaseError` so `critical` can end the run. |
 | `factory.py` | `WorkflowFactory` — method name to strategy. |
 | `runner.py` | `WorkflowRunner` — executes a strategy with retry/robustness. |
 | `services.py` | `PipelineWorkflowServices` — concrete service bundle handed to flows. |
@@ -43,7 +43,7 @@ Convention: `<method>.py` holds the strategy class (phase sequence); `<method>_p
 | `article_adapters.py` (23KB) | Bridges the immutable article `Context` domain to the mutable `PipelineState` phases. |
 | `iterative_critique.py` / `iterative_critique_phases.py` | Generator/critic adversarial loop with `check_convergence`, `MAX_ROUNDS`, stalemate detection. |
 | `augmentation.py` | Shared pre-processing: runs debate + iterative critique in parallel for deep/abstract questions, with caching. |
-| `search_phases.py` (25KB) | Context vetting, result vetting, deep read, evidence validation, YouTube enrichment. |
+| `search_phases.py` (25KB) | Context vetting, result vetting, deep read, evidence validation, YouTube enrichment. Vetting fails closed (`vetting_unverified`, quality `partial`); a deep-read page the injection guard rejects is dropped (`deep_read_rejected`). |
 | `synthesis_phase.py` | `run_synthesis_phase` — final synthesis. |
 | `language_probe_phase.py` | Cross-lingual probe: re-runs synthesis in the native language and judges the delta. |
 | `egress_rewrite_phase.py` | Layer B statistical rewrite of synthesis output (watermark scrubbing), gated by `EgressPolicy`. |
@@ -114,7 +114,7 @@ Convention: `<method>.py` holds the strategy class (phase sequence); `<method>_p
 | `spend_limit_service.py` | Resolves and applies per-tier LLM spend ceilings; `SpendRejection`, pre-run estimates. |
 | `anonymous_trial_policy.py` | Daily spend cap for anonymous runs that bypass the credit ledger. |
 | `quota_service.py` | Per-tier query quotas. |
-| `billing_service.py` | Checkout, portal, webhook sync. |
+| `billing_service.py` | Checkout, portal, webhook sync. Passes each event's own time (`event_time`) so repository writes apply in event order; a stale write skips its quota sync. |
 | `auth_service.py` | Thin cached wrapper over `AuthPort`. |
 | `api_key_service.py` | Mint/list/revoke/authenticate user API keys; scope-ceiling rules. |
 | `idempotency.py` | `register_run` — `client_run_id` as duplicate guard and credit idempotency key. |

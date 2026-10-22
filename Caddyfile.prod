@@ -1,6 +1,8 @@
 # Production Caddyfile with automatic HTTPS
 # Critical Enhancement 5.8: auto_https is ON (default) in production
 # Critical Enhancement 6.x: HSTS and security headers enforced
+# Caddy appends the client to X-Forwarded-For. Put Caddy's address (and any
+# load balancer or CDN in front of it) in TRUSTED_PROXIES; see DEPLOY.md.
 
 yourdomain.com {
     # Redirect HTTP to HTTPS

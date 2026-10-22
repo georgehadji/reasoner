@@ -40,13 +40,15 @@ export function usePipelineStream() {
   useEffect(() => () => { abortControllerRef.current?.abort(); }, []);
 
   const streamEvents = useCallback(
-    async (url: string, body: object, onEvent: (ev: PhaseEvent) => void) => {
+    async (url: string, body: object, onEvent: (ev: PhaseEvent) => void, signal: AbortSignal) => {
       // Abort any in-flight stream before starting a new one. Hold the
-      // controller locally: stopRun() may null the ref while this call is
-      // still awaiting, and a superseding run replaces it outright.
+      // controller locally: a superseding run replaces the ref outright.
+      // `signal` is the run's own (useRunController); Stop aborts through it.
       abortControllerRef.current?.abort();
       const controller = new AbortController();
       abortControllerRef.current = controller;
+      if (signal.aborted) controller.abort();
+      signal.addEventListener('abort', () => controller.abort(), { once: true });
 
       try {
         const resp = await fetchWithCsrf(url, {
@@ -80,24 +82,21 @@ export function usePipelineStream() {
   );
 
   const startRun = useCallback(
-    async (req: RunRequest, onEvent: (ev: PhaseEvent) => void) => {
-      await streamEvents(API.RUN, req, onEvent);
+    async (req: RunRequest, onEvent: (ev: PhaseEvent) => void, signal: AbortSignal) => {
+      await streamEvents(API.RUN, req, onEvent, signal);
     },
     [streamEvents]
   );
 
   const startFollowup = useCallback(
-    async (req: RunFollowupRequest, onEvent: (ev: PhaseEvent) => void) => {
-      await streamEvents(API.RUN_FOLLOWUP, req, onEvent);
+    async (req: RunFollowupRequest, onEvent: (ev: PhaseEvent) => void, signal: AbortSignal) => {
+      await streamEvents(API.RUN_FOLLOWUP, req, onEvent, signal);
     },
     [streamEvents]
   );
 
-  const stopRun = useCallback(() => {
-    abortControllerRef.current?.abort();
-    fetchWithCsrf(API.STOP, { method: 'POST' }).catch(() => {});
-    abortControllerRef.current = null;
-  }, []);
-
-  return { startRun, startFollowup, stopRun };
+  // Stopping is useRunController's job: it aborts the run's signal and stops
+  // the run on the server by run_id. The stop that lived here posted a bare
+  // /api/stop, which is the admin "stop everyone" call (UI-4).
+  return { startRun, startFollowup };
 }

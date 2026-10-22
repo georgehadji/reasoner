@@ -7,7 +7,7 @@ import logging
 from typing import Any
 
 import reasoner.phases as phases
-from reasoner.application.flows.base import WorkflowServices
+from reasoner.application.flows.base import WorkflowServices, require_survivors
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.parsing import ParseError, extract_json
 
@@ -42,9 +42,11 @@ async def run_delphi_round1_phase(state: PipelineState, services: WorkflowServic
     ]
     results = await asyncio.gather(*tasks, return_exceptions=True)
     estimates = []
+    failures: list[str] = []
     for i, result in enumerate(results):
         if isinstance(result, Exception):
             state.errors.append(f"Delphi: Expert {i+1} Round 1 failed: {result}")
+            failures.append(state.errors[-1])
             continue
         raw, _ = result
         try:
@@ -58,6 +60,7 @@ async def run_delphi_round1_phase(state: PipelineState, services: WorkflowServic
         data["expert_id"] = f"expert_{i+1}"
         estimates.append(data)
     state.delphi_state["round_1_estimates"] = estimates
+    require_survivors(estimates, failures, phase=2, phase_name="Round 1 Estimates")
 
 async def run_delphi_aggregation_phase(state: PipelineState, services: WorkflowServices) -> None:
     """Aggregate round 1 estimates: compute median, IQR, identify outlier."""

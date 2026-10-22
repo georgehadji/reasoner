@@ -3,11 +3,11 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
-import os
 import threading
-import time
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+from reasoner.utils.atomic_file import atomic_write_text
 
 if TYPE_CHECKING:
     from reasoner.api.schemas import RunRequest
@@ -181,28 +181,16 @@ async def _save_cache(key: str, events: list[dict]) -> None:
         _MEMORY_CACHE[key] = events.copy()
         _prune_memory_cache_locked()
 
-    # Write to a sibling temp file then rename so that a crash during the
-    # write never leaves a corrupt (partial) JSON file at the target path.
-    # FIX BUG-007: Use unique temp filename per writer to prevent race conditions
-    # on Windows where os.replace() is not atomic. Include PID and timestamp for uniqueness.
-    path = CACHE_DIR / f"{key}.json"
-    # Unique temp file: key.{pid}.{timestamp}.tmp
-    tmp = CACHE_DIR / f"{key}.{os.getpid()}.{int(time.time() * 1000)}.tmp"
+    # A crash during the write never leaves a partial JSON file at the
+    # target path, and each writer has its own temp file (BUG-007): the last
+    # writer wins, but data is never corrupted from interleaved writes.
     try:
-        await asyncio.to_thread(tmp.write_text, json.dumps(events), encoding="utf-8")
-        # On Windows, os.replace() may not be atomic, but with unique temp filenames
-        # we avoid overwriting another writer's temp file. The last writer wins,
-        # but data is never corrupted from interleaved writes.
-        tmp.replace(path)
+        await asyncio.to_thread(atomic_write_text, CACHE_DIR / f"{key}.json", json.dumps(events))
     except OSError:
-        try:
-            tmp.unlink(missing_ok=True)
-        except OSError:
-            pass
         return
     finally:
         # Clean up old temp files (crashed writers) regardless of success
-        for old_tmp in CACHE_DIR.glob(f"{key}.*.tmp"):
+        for old_tmp in CACHE_DIR.glob(f"{key}.json.*.tmp"):
             try:
                 old_tmp.unlink(missing_ok=True)
             except OSError:
