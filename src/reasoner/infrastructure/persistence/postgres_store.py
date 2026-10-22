@@ -943,6 +943,13 @@ class PostgreSQLEventStore:
                     await conn.execute("""
                         DELETE FROM read_models WHERE model_key = $1
                     """, aggregate_id)
+            # Ownership lives in the backend-agnostic SQLite store (see
+            # list_aggregate_ids_for_user), so it is removed outside the
+            # transaction above; a failure here is reported as a failed erase.
+            from reasoner.infrastructure.persistence.pipeline_ownership_repo import (
+                get_pipeline_ownership_repo,
+            )
+            await get_pipeline_ownership_repo().delete_owner(aggregate_id)
             logger.info(f"Aggregate {aggregate_id} and all related data deleted")
         except _AsyncpgError as e:
             logger.error(f"PostgreSQL error deleting aggregate {aggregate_id}: {e}")

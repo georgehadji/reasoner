@@ -476,8 +476,9 @@ class GetHistoryQueryHandler:
     async def handle(self, query: GetHistoryQuery) -> dict[str, Any]:
         """Get search history."""
         if not self.event_store:
-            # Fallback to file-based history
-            return self._get_file_history(query)
+            # History is per-user and lives in the HistoryRepository; this
+            # handler only reads the event store.
+            return {"total": 0, "entries": []}
 
         # Get from event store
         pipelines = await self.event_store.list_pipelines(
@@ -498,28 +499,6 @@ class GetHistoryQueryHandler:
                 }
                 for p in pipelines
             ],
-        }
-
-    def _get_file_history(self, query: GetHistoryQuery) -> dict[str, Any]:
-        """Fallback to file-based history."""
-        import json
-        from pathlib import Path
-
-        history_dir = Path(__file__).parent.parent / "history"
-        entries = []
-
-        for f in history_dir.glob("*.json"):
-            try:
-                data = json.loads(f.read_text(encoding="utf-8"))
-                entries.append(data)
-            except Exception:
-                pass
-
-        entries = sorted(entries, key=lambda x: x.get("timestamp", ""), reverse=True)
-
-        return {
-            "total": len(entries),
-            "entries": entries[query.offset:query.offset + query.limit],
         }
 
 

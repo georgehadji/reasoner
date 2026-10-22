@@ -697,6 +697,12 @@ class EventStore:
                     DELETE FROM snapshots WHERE aggregate_id = ?
                 """, (aggregate_id,))
 
+                # The owner row ties the pipeline to a user_id; erasing the
+                # pipeline without it keeps that link on file.
+                conn.execute("""
+                    DELETE FROM pipeline_owners WHERE pipeline_id = ?
+                """, (aggregate_id,))
+
                 conn.commit()
                 logger.info(f"Aggregate {aggregate_id} and all related data deleted")
             except sqlite3.Error as e:

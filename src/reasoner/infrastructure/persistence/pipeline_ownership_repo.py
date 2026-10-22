@@ -92,6 +92,14 @@ class PipelineOwnershipRepository:
         if await self._conn.run_in_executor(_insert_if_absent) != user_id:
             raise OwnershipConflictError(pipeline_id)
 
+    async def delete_owner(self, pipeline_id: str) -> None:
+        def _delete() -> None:
+            conn = self._conn._get_connection()
+            conn.execute("DELETE FROM pipeline_owners WHERE pipeline_id = ?", (pipeline_id,))
+            conn.commit()
+
+        await self._conn.run_in_executor(_delete)
+
     async def list_pipeline_ids_for_user(self, user_id: str) -> list[str]:
         def _query() -> list[str]:
             rows = self._conn._get_connection().execute(
