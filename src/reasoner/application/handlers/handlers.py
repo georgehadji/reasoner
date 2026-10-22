@@ -219,7 +219,8 @@ class RunPipelineCommandHandler:
 
             match outcome.status:
                 case "completed":
-                    assert outcome.state is not None  # only a rejected run has no state
+                    if outcome.state is None:  # only a rejected run has no state
+                        raise RuntimeError("a completed run must carry its state")
                     # Record completion event. No trailing `end` frame: the
                     # run's own `done` frame is the terminal one, and a later
                     # `end` made agent/MCP results read cost 0 (RUN-6).
