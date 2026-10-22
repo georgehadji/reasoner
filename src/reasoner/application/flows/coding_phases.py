@@ -7,7 +7,8 @@ import logging
 from typing import Any
 
 import reasoner.phases as phases
-from reasoner.application.flows.base import WorkflowServices
+from reasoner.application.flows.base import WorkflowServices, require_survivors
+from reasoner.core.constants_limits import MAX_CODING_FILES
 from reasoner.domain.core_types import SolutionCandidate
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.infrastructure.search.discovery import get_search_client_for_method
@@ -154,6 +155,10 @@ async def run_coding_generate_phase(state: PipelineState, services: WorkflowServ
     if not files_to_generate:
         state.errors.append("CODING: No files in spec — cannot generate.")
         return
+    if len(files_to_generate) > MAX_CODING_FILES:
+        msg = f"Spec lists {len(files_to_generate)} files; generating the first {MAX_CODING_FILES}."
+        services.log("CODING", msg, state)
+        files_to_generate = files_to_generate[:MAX_CODING_FILES]
 
     # Cap concurrent LLM calls to avoid rate-limit exhaustion on premium models.
     # 14 simultaneous calls to claude-sonnet reliably triggers 429s; 4 is safe.
@@ -184,12 +189,18 @@ async def run_coding_generate_phase(state: PipelineState, services: WorkflowServ
     results = await asyncio.gather(*[_generate_one(f) for f in files_to_generate], return_exceptions=True)
 
     generated: list[dict[str, Any]] = []
+    failures: list[str] = []
     for i, res in enumerate(results):
         if isinstance(res, Exception):
+            # A failed file is reported, not stored: "# Error: ..." content was
+            # reviewed and shipped as if it were code (FLOW-10).
             path = files_to_generate[i].get("path", f"file_{i}")
-            generated.append({"path": path, "content": f"# Error: {res}", "language": "", "key_decisions": []})
+            msg = f"CODING: generating {path} failed: {res}"
+            state.errors.append(msg)
+            failures.append(msg)
         else:
             generated.append(res)
+    require_survivors(generated, failures, phase=3, phase_name="Code Generation")
 
     state.coding_state["generated_files"] = generated
 

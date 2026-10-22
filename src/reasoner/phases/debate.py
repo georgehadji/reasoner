@@ -3,7 +3,11 @@ from __future__ import annotations
 import json
 
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.phases._shared import _wrap_user_input, get_language_instruction
+from reasoner.phases._shared import (
+    _wrap_external_content,
+    _wrap_user_input,
+    get_language_instruction,
+)
 
 DEBATE_OPENING_SYSTEM = ("You are an expert debater. You MUST produce a valid JSON object ONLY. "
                            "Do not include any introductory text, concluding remarks, or conversational markdown. "
@@ -36,7 +40,8 @@ DEBATE_JUDGE_SYSTEM = (
 def debate_judge_prompt(state: PipelineState) -> str:
     return (
         f'{get_language_instruction(state)}\n\n'
-        f'Debate Transcript:\n{json.dumps(state.debate_rounds, indent=2)}\n\n'
+        f'Debate Transcript:\n'
+        f'{_wrap_external_content(json.dumps(state.debate_rounds, indent=2))}\n\n'
         f'Score both sides and declare a winner.\n\n'
         f'IMPORTANT: Use exactly "constructive" for Side A (proposition) '
         f'and "destructive" for Side B (opposition) as the perspective field.\n\n'
@@ -76,7 +81,7 @@ def debate_cross_examine_prompt(state: PipelineState, side: str, opponent_claims
         f'{get_language_instruction(state)}\n\n'
         f'Problem: {_wrap_user_input(state.problem)}\n\n'
         f'You are Side {side}. Your opponent made these claims:\n'
-        f'{json.dumps(opponent_claims, indent=2)}\n\n'
+        f'{_wrap_external_content(json.dumps(opponent_claims, indent=2))}\n\n'
         f'Challenge each claim with counter-evidence or logical contradiction.\n\n'
         f'Output JSON: {{"side": "{side}", "challenges": ['
         f'{{"claim": "<claim>", "challenge": "<counter-evidence>", "verdict": "REFUTED|WEAKENED|STANDS"}}]}}'

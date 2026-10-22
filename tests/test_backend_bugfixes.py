@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import os
 from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import UUID
 
 import pytest
 
@@ -160,13 +159,24 @@ class TestStripeAdapterRobustness:
         import stripe
 
         fake_customer = stripe.Customer.construct_from({"id": "cus_123", "metadata": {}}, "sk_test_dummy")
-        with patch("stripe.Customer.retrieve", return_value=fake_customer):
-            with pytest.raises(ValueError, match="Missing reasoner_user_id"):
+        live = stripe.Subscription.construct_from(
+            {"id": "sub_123", "customer": "cus_123", "metadata": {}}, "sk_test_dummy"
+        )
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock
+
+        nobody = SimpleNamespace(get_user_by_stripe_sub_id=AsyncMock(return_value=None))
+        from reasoner.domain.saas import UnresolvedBillingOwnerError
+
+        with patch("stripe.Customer.retrieve", return_value=fake_customer), \
+             patch("stripe.Subscription.retrieve", return_value=live), \
+             patch("reasoner.infrastructure.billing.stripe_adapter._subscription_repo",
+                   return_value=nobody):
+            with pytest.raises(UnresolvedBillingOwnerError):
                 await adapter._handle_subscription_updated(stripe_sub)
 
     @pytest.mark.asyncio
     async def test_handle_subscription_deleted_missing_user_id(self):
-        from reasoner.domain.saas import SubscriptionStatus, SubscriptionTier
         from reasoner.infrastructure.billing.stripe_adapter import StripeBillingAdapter
 
         adapter = StripeBillingAdapter(api_key="sk_test_dummy")
@@ -176,10 +186,17 @@ class TestStripeAdapterRobustness:
         import stripe
 
         fake_customer = stripe.Customer.construct_from({"id": "cus_123", "metadata": {}}, "sk_test_dummy")
-        with patch("stripe.Customer.retrieve", return_value=fake_customer):
-            result = await adapter._handle_subscription_deleted(stripe_sub)
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock
 
-        # Should NOT crash; uses random UUID for user_id
-        assert result.tier == SubscriptionTier.FREE
-        assert result.status == SubscriptionStatus.CANCELLED
-        assert isinstance(result.user_id, UUID)
+        nobody = SimpleNamespace(get_user_by_stripe_sub_id=AsyncMock(return_value=None))
+        from reasoner.domain.saas import UnresolvedBillingOwnerError
+
+        # An unknown owner is a typed "unresolved" result, never a random user:
+        # the random UUID made the cancellation apply to nobody
+        # (docs/plans/audit-remediation-2-2026-10-20.md BIL-13).
+        with patch("stripe.Customer.retrieve", return_value=fake_customer), \
+             patch("reasoner.infrastructure.billing.stripe_adapter._subscription_repo",
+                   return_value=nobody):
+            with pytest.raises(UnresolvedBillingOwnerError):
+                await adapter._handle_subscription_deleted(stripe_sub)

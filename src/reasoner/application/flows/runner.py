@@ -163,6 +163,10 @@ class WorkflowRunner:
         errored = False
         quality_result = None
         for attempt in range(max_retries + 1):
+            # Scoped to this attempt: a retryable failure that a later attempt
+            # recovers from must not still mark the phase failed
+            # (docs/plans/audit-remediation-2-2026-10-20.md FLOW-1).
+            errored = False
             try:
                 timeout = get_phase_timeout(name)
                 async with self.span_factory(step, state):
@@ -247,7 +251,10 @@ class WorkflowRunner:
                 err_type = classify_error(exc)
                 err_msg = f"{type(exc).__name__}: {str(exc)}"
                 run_fatal = is_run_fatal(exc)
-                is_fatal = run_fatal or not is_retryable(exc) or critical
+                will_retry = not run_fatal and is_retryable(exc) and attempt < max_retries
+                # Only the attempt that ends the phase can be fatal; an error
+                # that is about to be retried is reported as recoverable.
+                is_fatal = not will_retry and (run_fatal or not is_retryable(exc) or critical)
 
                 await self._handle_phase_error(step, state, err_msg, is_fatal=is_fatal, exc=exc)
 
@@ -261,7 +268,7 @@ class WorkflowRunner:
                 if run_fatal:
                     return False
 
-                if not is_retryable(exc) or attempt >= max_retries:
+                if not will_retry:
                     if critical: return False
                     break
 

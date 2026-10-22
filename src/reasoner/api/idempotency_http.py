@@ -17,14 +17,15 @@ from reasoner.application.services.idempotency import (
 )
 
 
-async def register_run_or_error(client_run_id: str | None) -> None:
-    """Claim *client_run_id*, or raise the matching HTTPException.
+async def register_run_or_error(client_run_id: str | None, *, owner_key: str) -> str | None:
+    """Claim *client_run_id* for *owner_key*, or raise the matching HTTPException.
 
-    A store outage and a genuine duplicate are distinguished so a caller does
-    not mistake "try again shortly" for "this exact run already happened".
+    Returns the claim (None when no id was given). A store outage and a genuine
+    duplicate are distinguished so a caller does not mistake "try again
+    shortly" for "this exact run already happened".
     """
     try:
-        await register_run(client_run_id)
+        return await register_run(client_run_id, owner_key=owner_key)
     except RunStateUnavailableError as exc:
         raise HTTPException(
             status_code=503,

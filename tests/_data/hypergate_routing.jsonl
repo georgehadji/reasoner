@@ -1,0 +1,62 @@
+{"prompt": "hi", "route": "direct", "note": "very short prompt"}
+{"prompt": "thanks!", "route": "direct", "note": "very short prompt"}
+{"prompt": "What is the capital of France?", "route": "direct"}
+{"prompt": "How many planets are in the solar system?", "route": "direct"}
+{"prompt": "Define photosynthesis", "route": "direct"}
+{"prompt": "What is a mitochondrion?", "route": "direct"}
+{"prompt": "Where is Machu Picchu?", "route": "direct"}
+{"prompt": "Who invented the telephone?", "route": "direct"}
+{"prompt": "Explain quantum entanglement", "route": "direct"}
+{"prompt": "Τι είναι η φωτοσύνθεση;", "route": "direct"}
+{"prompt": "Ποια είναι η πρωτεύουσα της Γαλλίας;", "route": "direct"}
+{"prompt": "Πού είναι το Παρίσι;", "route": "direct"}
+{"prompt": "What is consciousness?", "route": "sub_agents", "note": "deep concept guard"}
+{"prompt": "Who is the president of France?", "route": "sub_agents", "note": "incumbent role is time-bound"}
+{"prompt": "What is the tallest building right now?", "route": "sub_agents", "note": "temporal marker"}
+{"prompt": "Can you tell me what is wrong with my argument?", "route": "sub_agents", "note": "FLOW-5: unanchored 'what is' sent this direct"}
+{"prompt": "I wonder who is right in the free will debate", "route": "sub_agents", "note": "FLOW-5: unanchored 'who is' sent this direct"}
+{"prompt": "What is the best database for a startup?", "route": "sub_agents", "note": "FLOW-5: advice, not a fact"}
+{"prompt": "What is the best way to learn Rust?", "route": "sub_agents", "note": "FLOW-5: advice, not a fact"}
+{"prompt": "How many engineers should I hire for an MVP?", "route": "sub_agents", "note": "FLOW-5: advice, not a fact"}
+{"prompt": "Explain the tradeoffs between Kafka and RabbitMQ", "route": "sub_agents", "note": "FLOW-5: comparison, not a fact"}
+{"prompt": "What is better, React or Vue?", "route": "sub_agents", "note": "FLOW-5: comparison, not a fact"}
+{"prompt": "Postgres vs MySQL: what is faster?", "route": "sub_agents", "note": "FLOW-5: comparison, not a fact"}
+{"prompt": "What is the price of bitcoin right now?", "route": "web_search"}
+{"prompt": "bitcoin price today", "route": "web_search"}
+{"prompt": "Latest news on the Mars mission", "route": "web_search"}
+{"prompt": "What's the weather today in Athens?", "route": "web_search"}
+{"prompt": "live score Real Madrid vs Barcelona", "route": "web_search"}
+{"prompt": "current exchange rate EUR to USD", "route": "web_search"}
+{"prompt": "What is the latest version of Python?", "route": "web_search"}
+{"prompt": "What is the current value of an annuity paying $100 a year?", "route": "sub_agents", "note": "FLOW-5: finance maths, not live data"}
+{"prompt": "How do I calculate the current value of a bond?", "route": "sub_agents", "note": "FLOW-5: finance maths, not live data"}
+{"prompt": "Current cost of capital formula for a startup", "route": "sub_agents", "note": "FLOW-5: a formula, not live data"}
+{"prompt": "Write an article about climate change adaptation", "route": "writing"}
+{"prompt": "Write a blog post about remote work", "route": "writing"}
+{"prompt": "Prepare a report on Q3 sales trends", "route": "writing"}
+{"prompt": "Draft a whitepaper for enterprise buyers on zero trust", "route": "writing"}
+{"prompt": "Compose an explainer on how vaccines work", "route": "writing"}
+{"prompt": "Write an essay.", "route": "writing"}
+{"prompt": "Write an article about the latest AI news", "route": "writing", "note": "writing wins over the realtime pattern"}
+{"prompt": "Write a detailed article about sleep science", "route": "writing", "note": "FLOW-5: a modifier before the noun hid the intent"}
+{"prompt": "Write a report generator in Python that reads CSV files", "route": "sub_agents", "note": "FLOW-5: coding, not writing"}
+{"prompt": "Write a blog post generator CLI", "route": "sub_agents", "note": "FLOW-5: coding, not writing"}
+{"prompt": "Create a paper trading bot for crypto", "route": "sub_agents", "note": "FLOW-5: coding, not writing"}
+{"prompt": "Draft a report template in HTML", "route": "sub_agents", "note": "FLOW-5: coding, not writing"}
+{"prompt": "Write a Python script that produces a PDF report", "route": "sub_agents"}
+{"prompt": "Should we migrate our monolith to microservices?", "route": "sub_agents"}
+{"prompt": "Analyze the risks of entering the Japanese market", "route": "sub_agents"}
+{"prompt": "Design a pricing strategy for a B2B SaaS", "route": "sub_agents"}
+{"prompt": "Compare Kubernetes and Nomad for a 5-person team", "route": "sub_agents"}
+{"prompt": "What are the second-order effects of a 4-day work week?", "route": "sub_agents"}
+{"prompt": "Help me decide between two job offers", "route": "sub_agents"}
+{"prompt": "How should I structure a Series A cap table?", "route": "sub_agents"}
+{"prompt": "Write a research article with citations", "research": true}
+{"prompt": "Explain inflation based on research from the Fed", "research": true}
+{"prompt": "Write an informative essay on bees", "research": true}
+{"prompt": "Γράψε ένα άρθρο με πηγές για τις μέλισσες", "research": true}
+{"prompt": "What is the boiling point of water on Mount Everest?", "research": false, "note": "FLOW-5: 'on <word>' forced every such question to the pipeline"}
+{"prompt": "Thoughts on Python decorators?", "research": false, "note": "FLOW-5: 'on <word>'"}
+{"prompt": "Tell me about photosynthesis", "research": false, "note": "FLOW-5: 'about <word>'"}
+{"prompt": "Σκέψεις για την τεχνητή νοημοσύνη", "research": false, "note": "FLOW-5: Greek 'για την <word>'"}
+{"prompt": "Write a report on Q3 sales as a Python script", "route": "sub_agents", "note": "FLOW-5: the coding signal runs before the writing fast path"}

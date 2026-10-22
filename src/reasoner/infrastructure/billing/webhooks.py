@@ -10,6 +10,7 @@ import os
 import stripe
 from fastapi import HTTPException, Request
 
+from reasoner.domain.saas import UnresolvedBillingOwnerError
 from reasoner.infrastructure.billing.paypal_adapter import PayPalBillingAdapter
 from reasoner.infrastructure.billing.stripe_adapter import StripeBillingAdapter, to_plain
 from reasoner.infrastructure.valkey.client import get_valkey_pool
@@ -241,6 +242,12 @@ async def handle_stripe_webhook(request: Request) -> dict:
         service = BillingService(adapter)
         await service.handle_webhook(event)
         success = True
+    except UnresolvedBillingOwnerError as exc:
+        # No retry can find this owner, so dead-letter it once and acknowledge,
+        # instead of a 500 retry loop that ends in the same place (BIL-13).
+        logger.warning("Stripe webhook %s names no known user: %s", event_id, exc)
+        await _record_webhook_failure("stripe", event_type, dict(event), str(exc))
+        success = True
     except Exception as exc:
         logger.exception("Stripe webhook processing failed for event %s: %s", event_id, exc)
         # Record the failure durably (metric + dead-letter + event)
@@ -328,6 +335,12 @@ async def handle_paypal_webhook(request: Request) -> dict:
         from reasoner.application.services.billing_service import BillingService
         service = BillingService(adapter)
         await service.handle_webhook(event)
+        success = True
+    except UnresolvedBillingOwnerError as exc:
+        # No retry can find this owner, so dead-letter it once and acknowledge,
+        # instead of a 500 retry loop that ends in the same place (BIL-13).
+        logger.warning("PayPal webhook %s names no known user: %s", event_id, exc)
+        await _record_webhook_failure("paypal", event_type, dict(event), str(exc))
         success = True
     except Exception as exc:
         logger.exception("PayPal webhook processing failed for event %s: %s", event_id, exc)

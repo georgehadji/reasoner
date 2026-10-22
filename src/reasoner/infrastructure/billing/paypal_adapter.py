@@ -205,7 +205,12 @@ class PayPalBillingAdapter(BillingPort):
         )
 
     async def cancel_subscription(self, paypal_subscription_id: str) -> None:
-        """Cancel a PayPal subscription immediately."""
+        """Cancel a PayPal subscription immediately. Already gone counts as done.
+
+        PayPal answers 404 for an unknown subscription and 422
+        SUBSCRIPTION_STATUS_INVALID for one already cancelled; both used to fail
+        account deletion with 502 forever (BIL-19).
+        """
         token = await self._get_access_token()
         async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, connect=10.0)) as client:
             resp = await client.post(
@@ -213,6 +218,10 @@ class PayPalBillingAdapter(BillingPort):
                 headers=self._headers(token),
                 json={"reason": "User requested cancellation"},
             )
+            if resp.status_code == 404 or (
+                resp.status_code == 422 and "SUBSCRIPTION_STATUS_INVALID" in resp.text
+            ):
+                return
             resp.raise_for_status()
 
     async def verify_webhook_signature(self, headers: dict, body: str) -> bool:

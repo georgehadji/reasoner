@@ -19,7 +19,7 @@ from pathlib import Path
 import pytest
 
 import reasoner.neuro.server as ns
-from reasoner.neuro.config import NeuroConfig, _apply_defaults, _safe_agent_id
+from reasoner.neuro.config import NeuroConfig, _agent_dir_name, _apply_defaults, _safe_agent_id
 from reasoner.neuro.server import LearnRequest, tenant_key
 
 # Owners are str(user.id) -- always a canonical UUID. erase_owner refuses
@@ -285,7 +285,7 @@ async def test_erase_owner_does_not_touch_owner_differing_in_last_char(service, 
     result = await service.erase_owner(USER_X)
 
     assert result["erased"] is True and result["dirs_removed"] == 1
-    assert _agent_dirs(tmp_path) == {f"u-{other}-conv"}
+    assert _agent_dirs(tmp_path) == {_agent_dir_name(f"u-{other}-conv")}
 
 
 @pytest.mark.asyncio
