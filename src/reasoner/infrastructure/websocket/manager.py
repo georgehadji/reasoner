@@ -561,6 +561,18 @@ async def handle_websocket_message(
     elif msg_type == 'stop':
         pipeline_id = message.get('pipeline_id')
         if pipeline_id:
+            # Same ownership rule as 'subscribe' and HTTP /api/stop: naming a
+            # run id is not enough to cancel someone else's billed run.
+            metadata = manager.connection_metadata.get(connection_id, {})
+            if not await _authorized_for_pipeline(pipeline_id, metadata.get('user_id')):
+                await manager.send_to_connection(
+                    connection_id,
+                    WebSocketMessage(
+                        type='error',
+                        data={'error': 'Not authorized to access this pipeline'},
+                    ),
+                )
+                return
             from reasoner.infrastructure.redis.run_state import _run_state_manager as _run_store
             await _run_store.request_cancel(pipeline_id)
             await manager.send_to_connection(

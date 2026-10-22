@@ -371,8 +371,13 @@ class RedisCircuitBreaker:
             from pathlib import Path
 
             from reasoner.infrastructure.valkey.client import get_valkey_pool
+            from reasoner.infrastructure.valkey.guarded import get_guarded_valkey
 
-            valkey = get_valkey_pool()
+            # Bounded, with a cooldown shared with the cached repositories: a
+            # hung Valkey used to add the 2 s socket timeout to every breaker
+            # call, twice per LLM call (PRV-4). A guarded failure lands in the
+            # existing except handlers below (cached OPEN, else fail-open).
+            valkey = get_guarded_valkey(get_valkey_pool())
             script_path = (
                 Path(__file__).parent / "valkey" / "scripts" / "circuit_breaker.lua"
             )
@@ -486,8 +491,9 @@ class RedisCircuitBreaker:
         self._stats = CircuitBreakerStats()
         try:
             from reasoner.infrastructure.valkey.client import get_valkey_pool
+            from reasoner.infrastructure.valkey.guarded import get_guarded_valkey
 
-            valkey = get_valkey_pool()
+            valkey = get_guarded_valkey(get_valkey_pool())
             await valkey.delete(f"cb:{self.name}")
         except Exception:
             pass

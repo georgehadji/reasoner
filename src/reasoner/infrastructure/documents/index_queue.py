@@ -43,11 +43,28 @@ async def _worker_loop(queue: asyncio.Queue[tuple[str, str]]) -> None:
     while True:
         file_id, text = await queue.get()
         try:
-            await store.index_file(file_id, text)
+            if await store.index_file(file_id, text):
+                await _charge_vectors(file_id)
         except Exception as exc:
             logger.warning("Background document indexing failed for %s: %s", file_id, exc)
         finally:
             queue.task_done()
+
+
+async def _charge_vectors(file_id: str) -> None:
+    """Count the vector sidecar against its owner's upload quota (PER-9).
+
+    It is written after the upload's own reservation has settled, so it is
+    added here; delete_file's size (file_stored_bytes) includes it, so the
+    delete releases it again.
+    """
+    from reasoner.infrastructure.persistence.upload_usage_repo import get_upload_usage_repo
+    from reasoner.infrastructure.uploader import UPLOAD_DIR, _get_upload_meta
+
+    owner = (_get_upload_meta(file_id) or {}).get("user_id")
+    if owner:
+        size = (UPLOAD_DIR / f"{file_id}.vectors.json").stat().st_size
+        await get_upload_usage_repo().adjust(owner, size)
 
 
 def enqueue_index_job(file_id: str, text: str) -> bool:

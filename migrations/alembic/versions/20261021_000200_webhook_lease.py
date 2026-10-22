@@ -1,7 +1,7 @@
 """processed_webhooks: a lease (status, claimed_at) instead of a permanent claim
 
 Revision ID: 20261021_000200
-Revises: 20261021_000001
+Revises: 20261021_000150
 Create Date: 2026-10-21 00:02:00.000000
 
 The webhook claim was written before processing and never expired, so a worker
@@ -19,7 +19,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "20261021_000200"
-down_revision: str | None = "20261021_000001"
+down_revision: str | None = "20261021_000150"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

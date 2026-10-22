@@ -19,7 +19,10 @@ import json
 import logging
 from pathlib import Path
 
-from reasoner.application.ports.pipeline_ownership_port import OwnershipRecord
+from reasoner.application.ports.pipeline_ownership_port import (
+    OwnershipConflictError,
+    OwnershipRecord,
+)
 from reasoner.infrastructure.persistence.event_store_connection import EventStoreConnection
 
 logger = logging.getLogger(__name__)
@@ -66,21 +69,28 @@ class PipelineOwnershipRepository:
         return await self._conn.run_in_executor(_query)
 
     async def set_owner(self, pipeline_id: str, user_id: str | None, run_id: str) -> None:
-        def _upsert() -> None:
+        # Insert if absent, then compare: the old upsert let a second tenant
+        # on the same client_run_id take over the first one's pipeline (SEC-7).
+        def _insert_if_absent() -> str | None:
             conn = self._conn._get_connection()
             conn.execute(
                 """
                 INSERT INTO pipeline_owners (pipeline_id, user_id, run_id)
                 VALUES (?, ?, ?)
-                ON CONFLICT(pipeline_id) DO UPDATE SET
-                    user_id = excluded.user_id,
-                    run_id = excluded.run_id
+                ON CONFLICT(pipeline_id) DO NOTHING
                 """,
                 (pipeline_id, user_id, run_id),
             )
             conn.commit()
+            row = conn.execute(
+                "SELECT user_id FROM pipeline_owners WHERE pipeline_id = ?",
+                (pipeline_id,),
+            ).fetchone()
+            owner: str | None = row["user_id"]
+            return owner
 
-        await self._conn.run_in_executor(_upsert)
+        if await self._conn.run_in_executor(_insert_if_absent) != user_id:
+            raise OwnershipConflictError(pipeline_id)
 
     async def list_pipeline_ids_for_user(self, user_id: str) -> list[str]:
         def _query() -> list[str]:

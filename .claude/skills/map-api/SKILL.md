@@ -28,6 +28,7 @@ folders:
 | `metrics.py` | Prometheus scrape endpoint + `QueryTimer`. Metric *definitions* live in `reasoner/metrics.py`. |
 | `middleware.py` | `SecurityHeadersMiddleware`, `AuditMiddleware` (IP anonymization, URL sanitizing), `MemoryLimitMiddleware`, `RequestTimeoutMiddleware`. |
 | `phase_executor.py` | Phase→router-role hints and `get_phase_start_models`. Nothing else: `_LEGACY_CRITICAL` (fatality) and `run_phase_with_keepalive` both left in Phase B-1 — fatality is `PhaseStep.critical` alone, keepalives come from `execution/sse_observer.keepalive_ticker`. |
+| `run_admission.py` | `admit_run()` + `Admission` — the one admission sequence (legacy-auth gate, preset-tier gate, anonymous cap, `client_run_id` claim, credit reservation) every HTTP pipeline route calls; `MeteredSSEResponse` releases the hold of a stream the client dropped before its first frame. `tests/architecture/test_run_admission.py` enforces it. MCP tools keep their own sequence. |
 | `run_observability.py` | `CreditSink` + `PrometheusObserver` — concrete bindings for `run_metering.metered()` protocols. |
 | `run_state.py` | Shim → RunStateStore. |
 | `saas_router.py` | `/me`, quota status, data export, account deletion, auth-event logging. |

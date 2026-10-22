@@ -192,6 +192,22 @@ class RunStateManager:
         result = await redis.set(f"run:{client_run_id}", "1", nx=True, ex=ttl)
         return result is not None  # True = newly created, False = already exists
 
+    async def release(self, client_run_id: str) -> None:
+        """Drop the claim ``try_register`` took, so a failed run can be retried.
+
+        Raises when Redis cannot be reached in production: the claim then
+        expires at its TTL, which the caller reports as degraded.
+        """
+        from reasoner.core.settings import settings
+
+        try:
+            await self._redis_op(lambda: self._get_redis().delete(f"run:{client_run_id}"))
+        except _RedisUnavailable:
+            if settings.ENVIRONMENT == "production":
+                raise
+        if settings.ENVIRONMENT != "production":
+            self._store().release(client_run_id)
+
     async def add(self, run_id: str, user_id: str | None = None) -> asyncio.Event:
         """Register a new run and return its cancel event."""
         with contextlib.suppress(_RedisUnavailable):

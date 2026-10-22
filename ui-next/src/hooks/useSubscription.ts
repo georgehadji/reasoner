@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useAppStore } from '@/stores/app-store';
-import { shallow } from 'zustand/shallow';
+import { selectAuthStatus, useAppStore } from '@/stores/app-store';
 
 export interface SubscriptionStatus {
   tier: string;
@@ -17,18 +16,24 @@ export interface SubscriptionStatus {
  * Composer, UserMenu) to eliminate duplicate API calls.
  */
 export function useSubscription() {
-  const subscription = useAppStore((s) => s.subscription);
+  const cached = useAppStore((s) => s.subscription);
+  const owner = useAppStore((s) => s.subscriptionOwner);
   const loading = useAppStore((s) => s.subscriptionLoading);
   const error = useAppStore((s) => s.subscriptionError);
   const fetchSubscription = useAppStore((s) => s.fetchSubscription);
+  const status = useAppStore(selectAuthStatus);
+  const userId = useAppStore((s) => s.user?.id ?? null);
 
   useEffect(() => {
-    // Fetch on first mount if never fetched; subsequent mounts are no-ops
-    // because fetchSubscription deduplicates concurrent calls.
-    fetchSubscription();
-  }, [fetchSubscription]);
+    // Signed-in users only: for anonymous visitors the endpoint answers 401,
+    // and there is no plan to show. A new user id refetches, so one account's
+    // plan is never shown to the next. fetchSubscription deduplicates
+    // concurrent calls.
+    if (status === 'authenticated') fetchSubscription();
+  }, [status, userId, fetchSubscription]);
 
   const refresh = () => fetchSubscription();
 
+  const subscription = owner === userId ? cached : null;
   return { subscription, loading, error, refresh };
 }

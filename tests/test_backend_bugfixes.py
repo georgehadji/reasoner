@@ -56,24 +56,37 @@ class TestWebSocketCancelPropagation:
     """BUG-002 regression: WebSocket stop must cancel the actual pipeline run."""
 
     @pytest.mark.asyncio
-    async def test_websocket_cancel_uses_same_run_state_manager(self):
+    async def test_websocket_cancel_uses_same_run_state_manager(self, tmp_path):
+        from unittest.mock import patch
+
+        from reasoner.infrastructure.persistence.pipeline_ownership_repo import (
+            PipelineOwnershipRepository,
+        )
         from reasoner.infrastructure.redis.run_state import _run_state_manager
         from reasoner.infrastructure.websocket.manager import handle_websocket_message
 
+        run_id = "test-run-123"
+        # Stop is owner-only (RUN-5); every real run has an ownership record.
+        repo = PipelineOwnershipRepository(db_path=tmp_path / "ownership.db")
+        await repo.set_owner(run_id, "user-a", run_id)
         manager = MagicMock()
         manager.send_to_connection = AsyncMock()
-        run_id = "test-run-123"
+        manager.connection_metadata = {"conn-1": {"user_id": "user-a"}}
 
         # Register run via the same manager that streaming.py uses
         cancel_event = await _run_state_manager.add(run_id, user_id=None)
         assert not cancel_event.is_set()
 
         # Simulate WebSocket stop message
-        await handle_websocket_message(
-            manager,
-            connection_id="conn-1",
-            message={"type": "stop", "pipeline_id": run_id},
-        )
+        with patch(
+            "reasoner.infrastructure.persistence.pipeline_ownership_repo.get_pipeline_ownership_repo",
+            return_value=repo,
+        ):
+            await handle_websocket_message(
+                manager,
+                connection_id="conn-1",
+                message={"type": "stop", "pipeline_id": run_id},
+            )
 
         # Cancel must have propagated to the actual event
         assert cancel_event.is_set()

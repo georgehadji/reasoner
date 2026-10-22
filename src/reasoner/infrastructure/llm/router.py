@@ -21,8 +21,9 @@ from reasoner.core.constants import (
     ROLE_TIMEOUTS,
     TIMEOUTS,
 )
+from reasoner.core.constants_limits import DIRECT_FALLBACK_BUDGET_S
 from reasoner.core.exceptions import ProviderError
-from reasoner.infrastructure.llm.base import BaseLLMProvider, LLMError
+from reasoner.infrastructure.llm.base import BaseLLMProvider, LLMError, is_provider_fault
 from reasoner.infrastructure.llm.ports import DegradedLLMResponse
 from reasoner.infrastructure.llm.registry import build_provider
 
@@ -62,7 +63,37 @@ async def _try_direct_fallback(
     temperature: float,
     extra_body: dict[str, Any] | None = None,
 ) -> tuple[str, dict[str, Any]] | None:
-    """Try direct API providers when OpenRouter fails.
+    """Try direct API providers when OpenRouter fails, within one overall budget.
+
+    Eight vendors each had their own LLM_CALL timeout, so a bad day could keep
+    a single role waiting for minutes after its own deadline (PRV-3).
+    """
+    try:
+        return await asyncio.wait_for(
+            _walk_direct_fallback_chain(
+                role, system_prompt, user_prompt, original_error,
+                max_tokens, temperature, extra_body,
+            ),
+            timeout=DIRECT_FALLBACK_BUDGET_S,
+        )
+    except TimeoutError:
+        logger.error(
+            "Direct fallback chain for role '%s' exceeded %.0fs; giving up",
+            role, DIRECT_FALLBACK_BUDGET_S,
+        )
+        return None
+
+
+async def _walk_direct_fallback_chain(
+    role: str,
+    system_prompt: str,
+    user_prompt: str,
+    original_error: Exception,
+    max_tokens: int,
+    temperature: float,
+    extra_body: dict[str, Any] | None = None,
+) -> tuple[str, dict[str, Any]] | None:
+    """Try each direct API provider in turn.
 
     Returns (response, metadata) on success, None if all fallbacks fail.
     Only active when MULTI_PROVIDER_FALLBACK_ENABLED is true.
@@ -182,8 +213,12 @@ async def _call_with_circuit(
                 return result
             except asyncio.CancelledError:
                 raise
-            except Exception:
-                await circuit.record_failure()
+            except Exception as exc:
+                # A client-caused error (400/422) is not provider health.
+                if is_provider_fault(exc):
+                    await circuit.record_failure()
+                else:
+                    await circuit.release()
                 raise
             finally:
                 # Restore original extra_body
@@ -234,8 +269,12 @@ async def _call_with_tools_circuit(
                 return result
             except asyncio.CancelledError:
                 raise
-            except Exception:
-                await circuit.record_failure()
+            except Exception as exc:
+                # A client-caused error (400/422) is not provider health.
+                if is_provider_fault(exc):
+                    await circuit.record_failure()
+                else:
+                    await circuit.release()
                 raise
             finally:
                 # Restore original extra_body
@@ -423,7 +462,45 @@ class ProviderRouter:
             candidates.append(explicit)
         if primary is not assigned and primary not in candidates:
             candidates.append(primary)
-        return next((p for p in candidates if p.model != assigned.model), None)
+        return next(
+            (
+                p for p in candidates
+                if p.model != assigned.model and self._affordable_fallback(role, assigned, p)
+            ),
+            None,
+        )
+
+    @staticmethod
+    def _affordable_fallback(
+        role: str, assigned: BaseLLMProvider, candidate: BaseLLMProvider
+    ) -> bool:
+        """PRV-3: skip a fallback that costs far more than the model it replaces.
+
+        A model with no catalogue price (test doubles, new models) is let
+        through: the check exists to catch a known 48x, not to block on a price
+        we do not have.
+        """
+        from reasoner.domain.pricing import (
+            PRICING_DB,
+            blended_usd_per_mtok,
+            fallback_within_budget,
+        )
+        from reasoner.infrastructure.llm.pricing_resolver import get_pricing
+
+        assigned_pricing = get_pricing(assigned.model)
+        candidate_pricing = get_pricing(candidate.model)
+        unpriced = PRICING_DB["_default"]
+        if assigned_pricing is unpriced or candidate_pricing is unpriced:
+            return True
+        assigned_price = blended_usd_per_mtok(assigned_pricing)
+        candidate_price = blended_usd_per_mtok(candidate_pricing)
+        if fallback_within_budget(assigned_price, candidate_price):
+            return True
+        logger.warning(
+            "Role '%s': fallback '%s' ($%.2f/Mtok) is over budget for '%s' ($%.2f/Mtok); skipped",
+            role, candidate.model, candidate_price, assigned.model, assigned_price,
+        )
+        return False
 
     def _timeout_for_role(self, role: str, override: float | None) -> float:
         if override is not None:

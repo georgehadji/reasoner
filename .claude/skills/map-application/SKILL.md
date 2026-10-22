@@ -23,7 +23,7 @@ Convention: `<method>.py` holds the strategy class (phase sequence); `<method>_p
 
 | File | What it does |
 |------|--------------|
-| `base.py` | `WorkflowStrategy`, `PhaseStep`, `WorkflowServices` interfaces. |
+| `base.py` | `WorkflowStrategy`, `PhaseStep`, `WorkflowServices` interfaces, plus `require_survivors()`: a fan-out phase whose every call failed raises `PhaseError` so `critical` can end the run. |
 | `factory.py` | `WorkflowFactory` — method name to strategy. |
 | `runner.py` | `WorkflowRunner` — executes a strategy with retry/robustness. |
 | `services.py` | `PipelineWorkflowServices` — concrete service bundle handed to flows. |
@@ -43,7 +43,7 @@ Convention: `<method>.py` holds the strategy class (phase sequence); `<method>_p
 | `article_adapters.py` (23KB) | Bridges the immutable article `Context` domain to the mutable `PipelineState` phases. |
 | `iterative_critique.py` / `iterative_critique_phases.py` | Generator/critic adversarial loop with `check_convergence`, `MAX_ROUNDS`, stalemate detection. |
 | `augmentation.py` | Shared pre-processing: runs debate + iterative critique in parallel for deep/abstract questions, with caching. |
-| `search_phases.py` (25KB) | Context vetting, result vetting, deep read, evidence validation, YouTube enrichment. |
+| `search_phases.py` (25KB) | Context vetting, result vetting, deep read, evidence validation, YouTube enrichment. Vetting fails closed (`vetting_unverified`, quality `partial`); a deep-read page the injection guard rejects is dropped (`deep_read_rejected`). |
 | `synthesis_phase.py` | `run_synthesis_phase` — final synthesis. |
 | `language_probe_phase.py` | Cross-lingual probe: re-runs synthesis in the native language and judges the delta. |
 | `egress_rewrite_phase.py` | Layer B statistical rewrite of synthesis output (watermark scrubbing), gated by `EgressPolicy`. |
@@ -68,6 +68,7 @@ Convention: `<method>.py` holds the strategy class (phase sequence); `<method>_p
 | `email_port.py` | `EmailPort`, `EmailMessage` for event-driven notifications. |
 | `quota_repository.py` | `QuotaRepository`. |
 | `pipeline_ownership_port.py` | `PipelineOwnershipPort`, `OwnershipRecord`, `is_authorized` — who may read/stop/resume a run. |
+| `run_outcome.py` | `RunOutcome` (`completed` / `cancelled` / `failed` / `rejected`) — what `PipelineExecutionPort.execute_run` returns; the command handler matches on it. |
 | `service_protocols.py` | Protocols for `PresetService`, `PipelineService`, `SearchService`, neuro client, telemetry store. |
 
 ## services/ — pipeline, presets, output

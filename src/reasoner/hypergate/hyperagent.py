@@ -54,7 +54,8 @@ _REALTIME_PATTERNS: list[re.Pattern[str]] = [
     # Price / market data with explicit temporal marker
     re.compile(r"\b(price|rate)\b.{0,30}\b(now|today|right now|currently|live)\b", re.I),
     re.compile(r"\b(now|today|right now|currently|live)\b.{0,30}\b(price|rate)\b", re.I),
-    re.compile(r"\b(current|live|real.?time)\s+(price|rate|exchange rate|value|cost)\b", re.I),
+    # Not "value"/"cost": "current value of a bond" is finance maths (FLOW-5).
+    re.compile(r"\b(current|live|real.?time)\s+(price|rate|exchange rate)\b", re.I),
     # News and recent events
     re.compile(r"\b(latest|breaking|today'?s?|current)\s+(news|headline|update|development)\b", re.I),
     re.compile(r"\bnews\b.{0,20}\b(today|right now|latest|breaking)\b", re.I),
@@ -73,11 +74,21 @@ _REALTIME_PATTERNS: list[re.Pattern[str]] = [
 # Fast-path patterns for simple factual lookups that can be answered directly
 # by a knowledge model (no web search or multi-phase reasoning needed).
 _FACTUAL_PATTERNS: list[re.Pattern[str]] = [
-    re.compile(r"\b(what\s+is|who\s+is|where\s+is|when\s+is|how\s+many|define|explain)\s+(the\s+)?\w+", re.I),
+    # Question words only at the start: "can you tell me what is wrong with
+    # my plan" is not a lookup (FLOW-5). The noun phrases below can sit anywhere.
+    re.compile(r"^\s*(what\s+is|who\s+is|where\s+is|when\s+is|how\s+many|define|explain)\s+(the\s+)?\w+", re.I),
     re.compile(r"\b(capital\s+of|president\s+of|invented)\s+\w+", re.I),
-    re.compile(r"\b(τι\s+είναι|ποιο\s+είναι|ποιος\s+είναι|πού\s+είναι|πότε\s+είναι|πόσα|πόσες|πόσους|ορίζω|εξήγησε)\s+(το\s+|η\s+|ο\s+)?\w+", re.I),
+    re.compile(r"^\s*(τι\s+είναι|ποιο\s+είναι|ποιος\s+είναι|πού\s+είναι|πότε\s+είναι|πόσα|πόσες|πόσους|ορίζω|εξήγησε)\s+(το\s+|η\s+|ο\s+)?\w+", re.I),
     re.compile(r"\b(πρωτεύουσα\s+της|πρόεδρος\s+της|εφεύρε)\s+\w+", re.I),
 ]
+
+# Advice and comparison words: "what is the best database" has no single
+# fact to look up, so it never takes the factual fast path (FLOW-5).
+_ADVICE_MARKER = re.compile(
+    r"\b(best|better|worse|should|vs|versus|tradeoffs?|trade-offs?|compare|comparison"
+    r"|recommend\w*|pros\s+and\s+cons|καλύτερ\w*|πρέπει|σύγκρι\w*)\b",
+    re.I,
+)
 
 # A knowledge model's answer is frozen at its cutoff, so a factual question that
 # names a time ("... right now", "currently", "latest") is never a safe direct
@@ -112,10 +123,10 @@ _DEEP_CONCEPT_PATTERNS: list[re.Pattern[str]] = [
 _RESEARCH_INDICATORS: list[re.Pattern[str]] = [
     re.compile(r"\b(research\s+(article|paper|essay)|informative\s+(article|essay)|academic\s+(article|essay))\b", re.I),
     re.compile(r"\b(with\s+(sources|citations|references)|based\s+on\s+(sources|research|data))\b", re.I),
-    re.compile(r"\b(about|on|regarding|concerning|explaining|analyzing)\s+\w{4,}\b", re.I),
+    # No "about|on <word>" (or Greek "για την <word>"): nearly every question
+    # has one, so the override kept any of them from a direct answer (FLOW-5).
     # Greek
     re.compile(r"\b(έρευνα|μελέτη|ενημερωτικό|με\s+πηγές|με\s+αναφορές)\b", re.I),
-    re.compile(r"\b(για\s+(την|τον|τη|το|τους|τις|τα)\s+\w{4,}|σχετικά\s+με\s+\w{4,})\b", re.I),
 ]
 
 # Hard research indicators — if these appear with creative verbs, treat as research-backed
@@ -128,8 +139,21 @@ _HARD_RESEARCH_INDICATORS: list[re.Pattern[str]] = [
 ]
 
 
+# The document noun must end the clause or lead into its topic, so "write a
+# report generator" and "create a paper trading bot" are not writing (FLOW-5).
+# Up to three modifiers may precede it ("write a detailed 800-word article").
 _WRITING_INTENT = re.compile(
-    r"\b(write|draft|compose|create|prepare|produce)\s+(an?\s+)?(article|essay|blog\s+post|report|explainer|whitepaper|paper)\b",
+    r"\b(write|draft|compose|create|prepare|produce)\s+(an?\s+|the\s+)?(?:[\w-]+\s+){0,3}?"
+    r"(article|essay|blog\s+post|report|explainer|whitepaper|paper)s?"
+    r"(?=\s+(about|on|for|regarding|covering|explaining)\b|\s*[.!?;:,]|\s*$)",
+    re.I,
+)
+
+# Programming words: a writing request that names one is a coding task until
+# the sub-agents say otherwise ("write a report on Q3 sales as a Python script").
+_CODING_SIGNAL = re.compile(
+    r"\b(code|script|function|class|program|cli|api|endpoint|bot|generator|parser"
+    r"|template|regex|sql|html|css|python|javascript|typescript)\b",
     re.I,
 )
 
@@ -151,6 +175,81 @@ def _is_creative_writing(problem: str) -> bool:
     return True
 
 logger = logging.getLogger(__name__)
+
+
+def fast_path(problem: str) -> GateDecision | None:
+    """The regex fast paths, in order; None when none fires.
+
+    Free and deterministic, so tests/_data/hypergate_routing.jsonl can hold
+    them to a labelled corpus without running a sub-agent (FLOW-5).
+    """
+    problem_hash = hashlib.sha256(problem.encode()).hexdigest()
+
+    if len(problem.strip()) < 10:
+        return GateDecision(
+            action="direct", confidence=1.0, reasoning="Very short prompt, assumed direct",
+            complexity="simple"
+        )
+
+    # Fast-path: research-backed writing (articles/essays/blog posts/reports)
+    # Checked first so "write an article about latest news" routes to writing, not web_search.
+    if _WRITING_INTENT.search(problem) and not _CODING_SIGNAL.search(problem):
+        decision = GateDecision(
+            action="pipeline",
+            method="writing",
+            confidence=0.92,
+            reasoning="Detected research-backed writing intent (article/essay/blog/report)",
+            complexity="complex"
+        )
+        logger.info(
+            "HyperGateAgent fast-path: writing-intent hash=%s action=pipeline method=writing",
+            problem_hash[:16],
+        )
+        return decision
+
+    # Fast-path: obvious real-time data queries (prices, live news, weather, scores)
+    if any(p.search(problem) for p in _REALTIME_PATTERNS):
+        decision = GateDecision(
+            action="web_search",
+            method=None,
+            confidence=0.92,
+            reasoning="Detected real-time data query (prices/news/weather/scores)",
+            complexity="simple",
+        )
+        logger.info(
+            "HyperGateAgent fast-path: realtime hash=%s action=web_search",
+            problem_hash[:16],
+        )
+        return decision
+
+    # Fast-path: simple factual lookups (e.g., "What is X?")
+    # Skip if the question contains deep/abstract concepts that need multi-phase
+    # reasoning, or depends on when it is asked (_TEMPORAL_MARKER, _INCUMBENT_ROLE).
+    is_deep_concept = any(p.search(problem) for p in _DEEP_CONCEPT_PATTERNS)
+    is_time_bound = bool(_TEMPORAL_MARKER.search(problem) or _INCUMBENT_ROLE.search(problem))
+    if (
+        any(p.search(problem) for p in _FACTUAL_PATTERNS)
+        and len(problem) < 60
+        and not is_deep_concept
+        and not is_time_bound
+        and not _ADVICE_MARKER.search(problem)
+    ):
+        decision = GateDecision(
+            action="direct",
+            method=None,
+            confidence=0.95,
+            reasoning="Detected simple factual lookup, assumed direct answer",
+            complexity="simple",
+        )
+        logger.info(
+            "HyperGateAgent fast-path: factual-lookup hash=%s action=direct",
+            problem_hash[:16],
+        )
+        return decision
+
+    return None
+
+
 
 # ── Sentinel output used when asyncio.gather returns an exception ─────
 
@@ -202,66 +301,9 @@ class HyperGateAgent:
         """
         problem_hash = hashlib.sha256(problem.encode()).hexdigest()
 
-        if len(problem.strip()) < 10:
-            return GateDecision(
-                action="direct", confidence=1.0, reasoning="Very short prompt, assumed direct",
-                complexity="simple"
-            )
-
-        # Fast-path: research-backed writing (articles/essays/blog posts/reports)
-        # Checked first so "write an article about latest news" routes to writing, not web_search.
-        if _WRITING_INTENT.search(problem):
-            decision = GateDecision(
-                action="pipeline",
-                method="writing",
-                confidence=0.92,
-                reasoning="Detected research-backed writing intent (article/essay/blog/report)",
-                complexity="complex"
-            )
-            logger.info(
-                "HyperGateAgent fast-path: writing-intent hash=%s action=pipeline method=writing",
-                problem_hash[:16],
-            )
-            return decision
-
-        # Fast-path: obvious real-time data queries (prices, live news, weather, scores)
-        if any(p.search(problem) for p in _REALTIME_PATTERNS):
-            decision = GateDecision(
-                action="web_search",
-                method=None,
-                confidence=0.92,
-                reasoning="Detected real-time data query (prices/news/weather/scores)",
-                complexity="simple",
-            )
-            logger.info(
-                "HyperGateAgent fast-path: realtime hash=%s action=web_search",
-                problem_hash[:16],
-            )
-            return decision
-
-        # Fast-path: simple factual lookups (e.g., "What is X?")
-        # Skip if the question contains deep/abstract concepts that need multi-phase
-        # reasoning, or depends on when it is asked (_TEMPORAL_MARKER, _INCUMBENT_ROLE).
-        is_deep_concept = any(p.search(problem) for p in _DEEP_CONCEPT_PATTERNS)
-        is_time_bound = bool(_TEMPORAL_MARKER.search(problem) or _INCUMBENT_ROLE.search(problem))
-        if (
-            any(p.search(problem) for p in _FACTUAL_PATTERNS)
-            and len(problem) < 60
-            and not is_deep_concept
-            and not is_time_bound
-        ):
-            decision = GateDecision(
-                action="direct",
-                method=None,
-                confidence=0.95,
-                reasoning="Detected simple factual lookup, assumed direct answer",
-                complexity="simple",
-            )
-            logger.info(
-                "HyperGateAgent fast-path: factual-lookup hash=%s action=direct",
-                problem_hash[:16],
-            )
-            return decision
+        fast = fast_path(problem)
+        if fast is not None:
+            return fast
 
         # JEV_MODE=active: one typed call to jev, after the free regex fast paths
         # above and before the four LLM calls below. An accepted verdict is the

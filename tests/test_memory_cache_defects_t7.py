@@ -45,9 +45,10 @@ def test_boundary_midline_markers_in_every_shape(text):
 def test_boundary_empty_and_marker_only_input():
     assert smart_compress("", ext="", level="minimal") == ""
     assert smart_compress("/*", ext="", level="minimal") == ""
-    # an unterminated comment that really does start the line still eats the
-    # tail -- that is a genuine unterminated block comment, not a false trigger
-    assert smart_compress("/* open\ncode", ext="", level="minimal") == ""
+    # An unterminated comment no longer eats the tail: only its opener line is
+    # dropped. Compression must not lose content, and the text after an
+    # unclosed "/*" is usually the user's own (audit-remediation-2 DAT-9).
+    assert smart_compress("/* open\ncode", ext="", level="minimal") == "code"
 
 
 def test_no_regression_real_block_comments_are_still_removed():

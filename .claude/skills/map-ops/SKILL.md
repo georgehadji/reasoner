@@ -41,6 +41,7 @@ folders:
 | `capture_article_baseline.py` | Captures and updates the Article pipeline golden baseline. |
 | `migrate_events_sqlite_to_pg.py` | SQLite to PostgreSQL event store migration. |
 | `migrate_encryption_v2.py` | Re-encrypts events missing the v2 envelope or blind index. |
+| `backfill_upload_usage.py` | One-off, after Alembic `20261021_000100`: sets each user's `upload_usage` from the files on disk. Dry run unless `--apply`. |
 | `start_all.py` | Server launcher (mirrors `src/reasoner/start_all.py`). |
 | `run_method_tests.py`, `run_3more_tests.py`, `run_batch4.py`, `jury_fix_test.py`, `verify_swaps.py` | Ad-hoc sequential method test runners. |
 | `extract_e1.py`, `re_extract_e1.py`, `extract_run_stream.py`, `move_methods.py`, `cleanup_streaming.py` | One-off refactor helpers; historical. |
@@ -78,7 +79,9 @@ folders:
 | `alembic/versions/20260929_*_add_account_deletion_log.py` | `account_deletion_log` table (mirrors `005_account_deletion_log.sql`, which Alembic never runs). |
 | `alembic/versions/20261021_*_credits_keys_and_event_constraints.py` | Idempotent, expand-only: `user_credits`, `credit_ledger` (+ unique `(user_id, reference_id)`), Postgres `api_keys`, `failed_webhook_events`, `events_default`, the `events`/`snapshots` unique keys the upserts need, and 008's `DROP INDEX idx_events_type`. Alembic is the schema authority; the raw `.sql` files are reference only. Enforced by `tests/integration/test_alembic_schema_contract.py` (CI job `alembic-schema-contract`, Postgres 16). |
 | `alembic/versions/20261021_000001_subscription_last_event_at.py` | `subscriptions.last_event_at` (webhook ordering guard) and drops the baseline's NOT NULL on `current_period_start`/`_end`, which the repository never wrote, so first-time subscription inserts failed. |
-| `alembic/versions/20261021_000200_webhook_lease.py` | `processed_webhooks.status` / `claimed_at`: the webhook claim is a lease a crashed worker's retry can take after `WEBHOOK_LEASE_SECONDS`. Creates the table when absent (it was made only by the receiver at first use). Current head on this branch. |
+| `alembic/versions/20261021_000100_add_upload_usage.py` | `upload_usage` table behind the upload quota (PER-8). Run `scripts/backfill_upload_usage.py` after it. |
+| `alembic/versions/20261021_000150_merge_heads.py` | Joins `…000001` (billing) and `…000100` (storage), which both revised `…000000`. No schema change. |
+| `alembic/versions/20261021_000200_webhook_lease.py` | `processed_webhooks.status` / `claimed_at`: the webhook claim is a lease a crashed worker's retry can take after `WEBHOOK_LEASE_SECONDS`. Creates the table when absent (it was made only by the receiver at first use). Current head. |
 
 ## sdk/ — published TypeScript client
 

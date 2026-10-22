@@ -17,6 +17,7 @@ from reasoner.application.commands import (
     RunPipelineCommand,
     StopPipelineCommand,
 )
+from reasoner.application.ports.run_outcome import RunOutcome
 from reasoner.application.queries import (
     GetHistoryQuery,
     GetPipelineStatusQuery,
@@ -90,7 +91,7 @@ class PipelineExecutionPort(Protocol):
         sse_emit: Callable[[dict | str], Awaitable[None]],
         user_id: str | None = None,
         initial_state: PipelineState | None = None,
-    ) -> PipelineState:
+    ) -> RunOutcome:
         ...
 
 
@@ -181,7 +182,7 @@ class RunPipelineCommandHandler:
 
             if sse_emit:
                 if self._pipeline_executor:
-                    state = await self._pipeline_executor.execute_run(
+                    outcome = await self._pipeline_executor.execute_run(
                         command, router, sse_emit,
                         user_id=getattr(command, "user_id", None),
                         initial_state=initial_state,
@@ -214,24 +215,32 @@ class RunPipelineCommandHandler:
                     batch_critique_jury=metadata.get("batch_critique_jury", False),
                     augmentation_methods=metadata.get("augmentation_methods"),
                 )
-                state = await pipeline.run(problem=command.problem)
+                outcome = RunOutcome("completed", await pipeline.run(problem=command.problem))
 
-            # Record completion event
-            completion_event = make_event(
-                EventType.PIPELINE_COMPLETED,
-                aggregate_id=command.command_id,
-                version=aggregate.version + 1,
-                **_completion_payload(state, started_at=_started_at),
-            )
-            aggregate.record_event(completion_event)
+            match outcome.status:
+                case "completed":
+                    if outcome.state is None:  # only a rejected run has no state
+                        raise RuntimeError("a completed run must carry its state")
+                    # Record completion event. No trailing `end` frame: the
+                    # run's own `done` frame is the terminal one, and a later
+                    # `end` made agent/MCP results read cost 0 (RUN-6).
+                    completion_event = make_event(
+                        EventType.PIPELINE_COMPLETED,
+                        aggregate_id=command.command_id,
+                        version=aggregate.version + 1,
+                        **_completion_payload(outcome.state, started_at=_started_at),
+                    )
+                    aggregate.record_event(completion_event)
 
-            if sse_emit:
-                await sse_emit({"type": "end", "data": {"synthesis": {"core_solution": "Completed"}}})
-
-            # Persist and publish (RunStream persists on the SSE path; PER-2)
-            if self.event_store and not sse_emit:
-                await self.event_store.save_events([completion_event])
-            await self.event_bus.publish(completion_event)
+                    # Persist and publish (RunStream persists on the SSE path; PER-2)
+                    if self.event_store and not sse_emit:
+                        await self.event_store.save_events([completion_event])
+                    await self.event_bus.publish(completion_event)
+                case "cancelled" | "failed" | "rejected":
+                    # The stream already carried the cause to the client and
+                    # RunStream stored its own terminal event; this tells the
+                    # bus the run is over without calling it a success.
+                    await self._publish_unfinished(aggregate, command, outcome)
 
         except Exception as e:
             from reasoner.core.logging_utils import get_correlation_id, redact_sensitive
@@ -270,8 +279,24 @@ class RunPipelineCommandHandler:
 
             raise
 
-        aggregate.pipeline_state = state
+        aggregate.pipeline_state = outcome.state
         return aggregate
+
+    async def _publish_unfinished(
+        self, aggregate: PipelineAggregate, command: RunPipelineCommand, outcome: RunOutcome
+    ) -> None:
+        from reasoner.core.logging_utils import redact_sensitive
+
+        event = make_event(
+            EventType.PIPELINE_FAILED,
+            aggregate_id=command.command_id,
+            version=aggregate.version + 1,
+            error=redact_sensitive(f"{outcome.status}: {outcome.reason or 'no reason given'}"),
+            phase_at_failure=aggregate.get_last_phase() or "",
+            phases_completed=len(aggregate.state_data.phase_results) if hasattr(aggregate, "state_data") else 0,
+        )
+        aggregate.record_event(event)
+        await self.event_bus.publish(event)
 
 
 class ResumePipelineCommandHandler:
