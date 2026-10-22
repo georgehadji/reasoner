@@ -20,6 +20,8 @@ from reasoner.core.degrade import degraded
 from reasoner.core.settings import settings
 from reasoner.infrastructure.documents import parse_worker
 from reasoner.infrastructure.documents.parse_worker import PARSERS
+from reasoner.utils.atomic_file import atomic_write_text, locked, read_json_or_quarantine
+
 
 # Content-hash deduplication index, scoped per tenant: {user_id: {sha256: file_id}}.
 # Anonymous uploads (user_id is None) are never written here and never
@@ -28,29 +30,37 @@ from reasoner.infrastructure.documents.parse_worker import PARSERS
 # one caller's file_id/existence to another (security-remediation-plan.md
 # Phase 4 item 1: this was previously a single global {sha256: file_id}
 # index shared across every tenant).
-_HASH_INDEX_PATH = Path(__file__).parent / ".upload_hash_index.json"
+#
+# It lives in UPLOAD_DIR beside the files it points at. It used to live in the
+# package directory, which every deploy replaces (PER-8). It only deduplicates;
+# quota usage is in upload_usage_repo, not derived from this file.
+def _hash_index_path() -> Path:
+    return UPLOAD_DIR / ".upload_hash_index.json"
+
 
 def _load_hash_index() -> dict[str, dict[str, str]]:
-    if _HASH_INDEX_PATH.exists():
-        try:
-            index = json.loads(_HASH_INDEX_PATH.read_text(encoding="utf-8"))
-            # Migrate a pre-Phase-4 flat {sha256: file_id} index by discarding
-            # it rather than guessing an owner for old entries -- the first
-            # re-upload of each file simply re-indexes itself under the
-            # correct tenant; no data is lost, only a handful of one-time
-            # re-extractions.
-            if index and not all(isinstance(v, dict) for v in index.values()):
-                return {}
-            return index
-        except (json.JSONDecodeError, OSError):
-            pass
-    return {}
+    index: object
+    index, quarantined = read_json_or_quarantine(_hash_index_path(), {})
+    if quarantined:
+        degraded("upload.hash_index", None, exc=ValueError("corrupt hash index quarantined"))
+    # Migrate a pre-Phase-4 flat {sha256: file_id} index by discarding
+    # it rather than guessing an owner for old entries -- the first
+    # re-upload of each file simply re-indexes itself under the
+    # correct tenant; no data is lost, only a handful of one-time
+    # re-extractions.
+    if not isinstance(index, dict) or not all(isinstance(v, dict) for v in index.values()):
+        return {}
+    return index
 
-def _save_hash_index(index: dict[str, dict[str, str]]) -> None:
-    try:
-        _HASH_INDEX_PATH.write_text(json.dumps(index), encoding="utf-8")
-    except OSError:
-        pass
+
+def _record_hash(user_id: str, content_hash: str, file_id: str) -> None:
+    # Read-modify-write under the lock: two uploads used to each load the
+    # index, and the slower save dropped the faster one's entry.
+    path = _hash_index_path()
+    with locked(path):
+        index = _load_hash_index()
+        index.setdefault(user_id, {})[content_hash] = file_id
+        atomic_write_text(path, json.dumps(index))
 
 logger = logging.getLogger(__name__)
 
@@ -367,13 +377,9 @@ async def save_uploaded_file(
     tenant_hashes = hash_index.get(user_id, {}) if user_id else {}
     existing_id = tenant_hashes.get(content_hash)
     if existing_id:
-        existing_path = UPLOAD_DIR / f"{existing_id}.meta.json"
-        if existing_path.exists():
+        meta = _get_upload_meta(existing_id)
+        if meta is not None and _is_ready(meta):
             logger.info("Deduplicating upload: hash %s matches existing file %s", content_hash[:16], existing_id)
-            try:
-                meta = json.loads(existing_path.read_text(encoding="utf-8"))
-            except (json.JSONDecodeError, OSError):
-                meta = {}
             # Re-extract text for the new upload context (OCR settings may differ)
             text_content = await extract_text(content, filename, force_ocr=force_ocr)
             return {
@@ -386,6 +392,7 @@ async def save_uploaded_file(
                 "user_id": user_id,
                 "deduplicated": True,
                 "provenance_report": None,  # scrubbed (if applicable) on the original upload
+                "stored_bytes": 0,  # nothing new on disk
             }
 
     # Extract extension here so it's available for MIME validation below
@@ -474,7 +481,40 @@ async def save_uploaded_file(
         except Exception as exc:
             logger.warning("Image provenance scrub failed for %s: %s", filename, exc)
 
+    # Detect mime type for the response
+    mime_type = {
+        ".txt": "text/plain",
+        ".md": "text/markdown",
+        ".pdf": "application/pdf",
+        ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".webp": "image/webp",
+    }.get(ext, "application/octet-stream")
+
+    # Commit the record first, compensate on failure (PER-9). meta.json is
+    # written before any content with status "writing", so every file this
+    # upload creates is findable from it, and a failure part-way deletes them
+    # all instead of leaving an orphan content file with no owner record.
+    meta_path = UPLOAD_DIR / f"{file_id}.meta.json"
+    created = (meta_path, file_path, _text_cache_path(file_id))
     try:
+        # Persist ownership metadata. "encrypted": True marks that the
+        # sibling content file is ciphertext -- read paths branch on this
+        # explicit flag rather than guessing from content shape, so files
+        # written before this flag existed (no key, or False) keep reading
+        # as plaintext with no migration step required.
+        meta = {
+            "user_id": user_id,
+            "filename": filename,
+            "mime_type": mime_type,
+            "created_at": str(uuid.uuid4()),
+            "encrypted": True,
+            "status": "writing",
+        }
+        atomic_write_text(meta_path, json.dumps(meta))
+
         # Save file, encrypted at rest (security-remediation-plan.md Phase 4
         # item 5). Extraction below runs on the original plaintext bytes
         # already in memory, not a decrypt round-trip.
@@ -485,90 +525,80 @@ async def save_uploaded_file(
         if not is_extraction_notice(text_content):
             _text_cache_path(file_id).write_bytes(_encrypt_bytes(text_content.encode("utf-8")))
 
-        # Background: index for semantic retrieval if enabled. Bounded queue,
-        # not a raw asyncio.create_task() -- an upload burst can no longer
-        # spawn unbounded concurrent indexing tasks (security-remediation-
-        # plan.md Phase 4 item 4). A full queue drops the job and logs; the
-        # upload above has already succeeded either way.
-        # Extraction error / "OCR unavailable" placeholders are not document
-        # content: don't index them.
-        if file_id and text_content and not is_extraction_notice(text_content):
-            try:
-                if settings.DOCUMENT_SEMANTIC_RETRIEVAL_ENABLED:
-                    from reasoner.infrastructure.documents.index_queue import enqueue_index_job
-                    enqueue_index_job(file_id, text_content)
-            except Exception as e:
-                logger.warning("Background document indexing setup failed for %s: %s", file_id, e)
-
-        # Detect mime type for the response
-        mime_type = {
-            ".txt": "text/plain",
-            ".md": "text/markdown",
-            ".pdf": "application/pdf",
-            ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            ".png": "image/png",
-            ".jpg": "image/jpeg",
-            ".jpeg": "image/jpeg",
-            ".webp": "image/webp",
-        }.get(ext, "application/octet-stream")
-
-        # Persist ownership metadata. "encrypted": True marks that the
-        # sibling content file is ciphertext -- read paths branch on this
-        # explicit flag rather than guessing from content shape, so files
-        # written before this flag existed (no key, or False) keep reading
-        # as plaintext with no migration step required.
-        meta_path = UPLOAD_DIR / f"{file_id}.meta.json"
-        meta_path.write_text(
-            json.dumps({
-                "user_id": user_id,
-                "filename": filename,
-                "mime_type": mime_type,
-                "created_at": str(uuid.uuid4()),
-                "encrypted": True,
-            }),
-            encoding="utf-8",
+        # DAT-8, decision Q8: semantic search covers only the first
+        # DOCUMENT_INDEX_MAX_CHARS characters. Said in the listing and the
+        # response, not only in a log line.
+        indexed_partially = (
+            settings.DOCUMENT_SEMANTIC_RETRIEVAL_ENABLED
+            and len(text_content) > settings.DOCUMENT_INDEX_MAX_CHARS
         )
+        meta["status"] = "ready"
+        meta["indexed_partially"] = indexed_partially
+        atomic_write_text(meta_path, json.dumps(meta))
 
         # Update content-hash index -- only for identified tenants; an
         # anonymous upload is never recorded, so it can never dedupe with
         # (or be matched by) a later upload from anyone.
         if user_id:
-            hash_index.setdefault(user_id, {})[content_hash] = file_id
-            _save_hash_index(hash_index)
-
-        return {
-            "success": True,
-            "file_id": file_id,
-            "filename": filename,
-            "size": len(content),
-            "mime_type": mime_type,
-            "text": text_content,
-            "user_id": user_id,
-            "provenance_report": provenance_report,
-        }
-
+            await asyncio.to_thread(_record_hash, user_id, content_hash, file_id)
     except Exception as e:
         logger.error(f"File upload failed: {e}")
+        for path in created:
+            path.unlink(missing_ok=True)
         return {
             "success": False,
             "error": str(e),
         }
 
+    # Background: index for semantic retrieval if enabled. Bounded queue,
+    # not a raw asyncio.create_task() -- an upload burst can no longer
+    # spawn unbounded concurrent indexing tasks (security-remediation-
+    # plan.md Phase 4 item 4). A full queue drops the job and logs; the
+    # upload above has already succeeded either way. Queued only once
+    # meta.json is "ready", since index_file refuses a file without one.
+    # Extraction error / "OCR unavailable" placeholders are not document
+    # content: don't index them.
+    if text_content and not is_extraction_notice(text_content):
+        try:
+            if settings.DOCUMENT_SEMANTIC_RETRIEVAL_ENABLED:
+                from reasoner.infrastructure.documents.index_queue import enqueue_index_job
+                enqueue_index_job(file_id, text_content)
+        except Exception as e:
+            logger.warning("Background document indexing setup failed for %s: %s", file_id, e)
 
-def stored_bytes(user_id: str) -> int:
-    """Bytes this user's uploads occupy on disk.
+    return {
+        "success": True,
+        "file_id": file_id,
+        "filename": filename,
+        "size": len(content),
+        "mime_type": mime_type,
+        "text": text_content,
+        "user_id": user_id,
+        "provenance_report": provenance_report,
+        "stored_bytes": file_stored_bytes(file_id),
+        "indexed_partially": indexed_partially,
+    }
 
-    shortcut: walks the per-tenant hash index, which a deleted file's id stays
-    in (it then counts 0). Per-process file; upgrade to a DB column if uploads
-    move off the local volume.
-    """
+
+# Every file of an upload that counts toward the user's quota: the content
+# and both sidecars. meta.json is bookkeeping and is not counted.
+_STORED_SUFFIXES = (*sorted(SUPPORTED_EXTENSIONS), ".text.json", ".vectors.json")
+
+
+def file_stored_bytes(file_id: str) -> int:
+    """Bytes one upload occupies on disk, as counted against the quota."""
     total = 0
-    for file_id in _load_hash_index().get(user_id, {}).values():
-        for ext in SUPPORTED_EXTENSIONS:
-            f = UPLOAD_DIR / f"{file_id}{ext}"
-            if f.exists():
-                total += f.stat().st_size
+    for suffix in _STORED_SUFFIXES:
+        try:
+            total += (UPLOAD_DIR / f"{file_id}{suffix}").stat().st_size
+        except FileNotFoundError:
+            pass
     return total
+
+
+def _is_ready(meta: dict) -> bool:
+    # Uploads written before the status field existed are complete.
+    return bool(meta.get("status", "ready") == "ready")
 
 
 def _text_cache_path(file_id: str) -> Path:
@@ -655,44 +685,36 @@ def delete_file(file_id: str, user_id: str | None = None) -> bool:
         if meta is None or meta.get("user_id") != user_id:
             return False
 
+    # meta.json goes first: index_file re-checks it after writing a vector
+    # sidecar, so an indexing job racing this delete removes its own sidecar
+    # instead of leaving an orphan. Works from a bare file_id too, so files
+    # orphaned before PER-9 (no meta.json, no content) can still be cleaned.
     deleted = False
-    # Look for exact file by known extensions instead of globbing
-    for ext in SUPPORTED_EXTENSIONS:
-        f = UPLOAD_DIR / f"{file_id}{ext}"
-        if f.exists():
-            try:
-                f.unlink()
-                deleted = True
-            except Exception as e:
-                logger.error(f"Failed to delete file {file_id}: {e}")
-
-    # Clean up metadata and extracted-text sidecars
-    for sidecar in (UPLOAD_DIR / f"{file_id}.meta.json", _text_cache_path(file_id)):
-        if sidecar.exists():
-            try:
-                sidecar.unlink()
-            except Exception as e:
-                logger.warning(f"Failed to delete {sidecar.name} for {file_id}: {e}")
-
-    # Clean up vector sidecar if present
-    if deleted:
+    paths = [UPLOAD_DIR / f"{file_id}.meta.json"]
+    paths += [UPLOAD_DIR / f"{file_id}{suffix}" for suffix in _STORED_SUFFIXES]
+    for path in paths:
         try:
-            from reasoner.documents.vector_store import DocumentVectorStore
-            store = DocumentVectorStore()
-            store.delete_index(file_id)
-        except Exception as e:
-            logger.warning(f"Failed to delete vector sidecar for {file_id}: {e}")
+            path.unlink()
+            deleted = True
+        except FileNotFoundError:
+            pass
+        except OSError as e:
+            logger.error(f"Failed to delete {path.name} for {file_id}: {e}")
 
     return deleted
 
 
-def list_uploads(user_id: str | None = None) -> list[dict[str, Any]]:
+def list_uploads(
+    user_id: str | None = None, *, include_incomplete: bool = False
+) -> list[dict[str, Any]]:
     """
     List uploaded files.
-    
+
     Args:
         user_id: If provided, filter to this user's uploads
-        
+        include_incomplete: Also list uploads whose meta.json still says
+            "writing" (a crash mid-write). Account deletion must erase those too.
+
     Returns:
         List of file info dictionaries
     """
@@ -704,11 +726,14 @@ def list_uploads(user_id: str | None = None) -> list[dict[str, Any]]:
         meta = _get_upload_meta(file_id)
         if user_id is not None and (meta is None or meta.get("user_id") != user_id):
             continue
+        if meta is not None and not include_incomplete and not _is_ready(meta):
+            continue  # still being written, or a failed write about to be removed
         stat = f.stat()
         files.append({
             "file_id": file_id,
             "filename": meta.get("filename", f.name[12:]) if meta else f.name[12:],
             "size": stat.st_size,
             "created": stat.st_ctime,
+            "indexed_partially": bool(meta and meta.get("indexed_partially")),
         })
     return sorted(files, key=lambda x: x["created"], reverse=True)
