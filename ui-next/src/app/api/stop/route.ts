@@ -21,9 +21,13 @@ export async function POST(req: NextRequest) {
     }
 
     await requireCsrfToken(req);
+    // Only ever a single-run stop (UI-4). Upstream, a bare /api/stop is the
+    // admin "stop every user's run"; the browser has no reason to send it.
+    const runId = req.nextUrl.searchParams.get('run_id');
+    if (!runId) throw new ValidationError('run_id is required');
     const apiBase = validateUpstreamUrl(getApiBaseUrl());
     const headers = sanitizeRequestHeaders(req.headers);
-    const upstream = await fetch(`${apiBase}${API.STOP}`, {
+    const upstream = await fetch(`${apiBase}${API.STOP}?run_id=${encodeURIComponent(runId)}`, {
       method: 'POST',
       headers,
     });

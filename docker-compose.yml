@@ -153,6 +153,11 @@ services:
       # Server-only upstream target; do not expose the root .env to Next.js.
       - API_BASE_URL=https://backend:8000
       - NODE_EXTRA_CA_CERTS=/certs/ca.crt
+      # Addresses of the proxies in front of this container (Caddy, a load
+      # balancer, a CDN), comma-separated. Unset behind a proxy chain, every
+      # user shares one rate-limit bucket; /api/health then answers with
+      # X-Proxy-Topology: undeclared (OPS-9).
+      - TRUSTED_PROXIES=${TRUSTED_PROXIES:-}
     depends_on:
       cert-generator:
         condition: service_completed_successfully

@@ -4,7 +4,11 @@ import json
 
 from reasoner.core.constants import JSON_ONLY_FOOTER
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.phases._shared import _wrap_user_input, get_language_instruction
+from reasoner.phases._shared import (
+    _wrap_external_content,
+    _wrap_user_input,
+    get_language_instruction,
+)
 
 DELPHI_EXPERT_SYSTEM = (
     "You are an independent expert forecaster. Make your estimate without knowing what other experts think. "
@@ -21,7 +25,7 @@ def delphi_round1_prompt(state: PipelineState, expert_num: int) -> str:
         f'{get_language_instruction(state)}\n\n'
         f'You are Expert {expert_num} of 4 independent forecasters.\n\n'
         f'Problem: {_wrap_user_input(state.problem)}\n\n'
-        f'Sub-problems:\n{json.dumps(sub_problems, indent=2)}\n\n'
+        f'Sub-problems:\n{_wrap_external_content(json.dumps(sub_problems, indent=2))}\n\n'
         f'Provide your independent estimate/forecast. If numeric, provide a specific number. '
         f'Explain your reasoning. Do NOT anchor to any consensus — you are working independently.\n\n'
         f'Output JSON: {{"estimate_value": <number or null if qualitative>, '
@@ -42,7 +46,7 @@ def delphi_aggregation_prompt(state: PipelineState) -> str:
         f'{get_language_instruction(state)}\n\n'
         f'Problem: {_wrap_user_input(state.problem)}\n\n'
         f'Expert estimates (anonymous — do not reveal which expert said what in outputs):\n'
-        f'{json.dumps(estimates, indent=2)}\n\n'
+        f'{_wrap_external_content(json.dumps(estimates, indent=2))}\n\n'
         f'Aggregate these estimates. Identify: the central tendency (median or modal theme), '
         f'the spread (range or IQR), and which estimate is most different from the others.\n\n'
         f'Output JSON: {{"median": null, "iqr": null, '
@@ -86,7 +90,7 @@ def delphi_convergence_prompt(state: PipelineState) -> str:
     r2 = state.delphi_state.get("round_2_estimates", [])
     return (
         f'{get_language_instruction(state)}\n\n'
-        f'Round 2 estimates:\n{json.dumps(r2, indent=2)}\n\n'
+        f'Round 2 estimates:\n{_wrap_external_content(json.dumps(r2, indent=2))}\n\n'
         f'Have the experts converged to a consensus? '
         f'Convergence means the estimates are close enough to support a single recommendation.\n\n'
         f'Output JSON: {{"converged": <true or false, a JSON boolean, not a string>, '

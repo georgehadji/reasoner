@@ -24,6 +24,7 @@ folders:
 | `count_importlinter_exceptions.py` | Semantic counter for `.importlinter` `ignore_imports` — the exception ratchet. |
 | `fix_importlinter.py` | Helper for updating that exception list. |
 | `ruff_ratchet.py` | Ratchet for `ruff check src/` violation count. |
+| `backfill_stripe_customer_metadata.py` | One-off: writes `reasoner_user_id` onto Stripe customers named by `subscriptions` rows. Dry run unless `--apply`; never overwrites a different owner. |
 | `mypy_ratchet.py` | Ratchet for `mypy src/reasoner` violation count. |
 | `silent_failure_ratchet.py` | Ratchet for `except Exception` handlers that leave no signal (no raise, no `degraded()`, body only pass/return/sub-WARNING logging). AST-based; `tests/unit/test_silent_failure_detector.py` pins what it counts. |
 | `vulture_ratchet.py` | P-5 dead-code ratchet: `vulture src/` findings except `unused variable` (FastAPI `Depends` params). Tests are not reachability roots, so test-only callers count as dead. **Advisory** (`continue-on-error` in test.yml, `advisory` in ci-local.sh) until the pilot ends. |
@@ -77,8 +78,11 @@ folders:
 | `alembic/versions/20260501_*_add_paypal_and_rename_external_cols.py` | PayPal support, provider-specific column names. |
 | `alembic/versions/20260502_*_add_oauth_columns.py` | `auth_provider` and `avatar_url` on users. |
 | `alembic/versions/20260929_*_add_account_deletion_log.py` | `account_deletion_log` table (mirrors `005_account_deletion_log.sql`, which Alembic never runs). |
+| `alembic/versions/20261021_*_credits_keys_and_event_constraints.py` | Idempotent, expand-only: `user_credits`, `credit_ledger` (+ unique `(user_id, reference_id)`), Postgres `api_keys`, `failed_webhook_events`, `events_default`, the `events`/`snapshots` unique keys the upserts need, and 008's `DROP INDEX idx_events_type`. Alembic is the schema authority; the raw `.sql` files are reference only. Enforced by `tests/integration/test_alembic_schema_contract.py` (CI job `alembic-schema-contract`, Postgres 16). |
+| `alembic/versions/20261021_000001_subscription_last_event_at.py` | `subscriptions.last_event_at` (webhook ordering guard) and drops the baseline's NOT NULL on `current_period_start`/`_end`, which the repository never wrote, so first-time subscription inserts failed. |
 | `alembic/versions/20261021_000100_add_upload_usage.py` | `upload_usage` table behind the upload quota (PER-8). Run `scripts/backfill_upload_usage.py` after it. |
-| `alembic/versions/20261021_*_credits_keys_and_event_constraints.py` | Idempotent, expand-only: `user_credits`, `credit_ledger` (+ unique `(user_id, reference_id)`), Postgres `api_keys`, `failed_webhook_events`, `events_default`, the `events`/`snapshots` unique keys the upserts need, and 008's `DROP INDEX idx_events_type`. Alembic is the schema authority; the raw `.sql` files are reference only. Current head. Enforced by `tests/integration/test_alembic_schema_contract.py` (CI job `alembic-schema-contract`, Postgres 16). |
+| `alembic/versions/20261021_000150_merge_heads.py` | Joins `…000001` (billing) and `…000100` (storage), which both revised `…000000`. No schema change. |
+| `alembic/versions/20261021_000200_webhook_lease.py` | `processed_webhooks.status` / `claimed_at`: the webhook claim is a lease a crashed worker's retry can take after `WEBHOOK_LEASE_SECONDS`. Creates the table when absent (it was made only by the receiver at first use). Current head. |
 
 ## sdk/ — published TypeScript client
 

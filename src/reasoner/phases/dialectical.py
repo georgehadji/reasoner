@@ -3,7 +3,11 @@ from __future__ import annotations
 import json
 
 from reasoner.domain.pipeline_state import PipelineState
-from reasoner.phases._shared import _wrap_user_input, get_language_instruction
+from reasoner.phases._shared import (
+    _wrap_external_content,
+    _wrap_user_input,
+    get_language_instruction,
+)
 
 DIALECTICAL_THESIS_SYSTEM = "You are an analytical assistant. Articulate the strongest possible affirmative position. Be rigorous and committed. Output ONLY valid JSON."
 
@@ -27,7 +31,7 @@ def dialectical_antithesis_prompt(state: PipelineState) -> str:
         f'{get_language_instruction(state)}\n\n'
         f'Problem: {_wrap_user_input(state.problem)}\n\n'
         f'Thesis: {thesis}\n\n'
-        f'Key Commitments: {json.dumps(commitments, indent=2)}\n\n'
+        f'Key Commitments: {_wrap_external_content(json.dumps(commitments, indent=2))}\n\n'
         f'Expose the internal contradictions of this thesis. '
         f'Negate each commitment. Show why this position is untenable.\n\n'
         f'Output JSON: {{"antithesis": "<negation of thesis>", '
@@ -44,7 +48,7 @@ def dialectical_contradictions_prompt(state: PipelineState) -> str:
     return (
         f'{get_language_instruction(state)}\n\n'
         f'Thesis: {thesis}\n\nAntithesis: {antithesis}\n\n'
-        f'Contradictions: {json.dumps(contradictions, indent=2)}\n\n'
+        f'Contradictions: {_wrap_external_content(json.dumps(contradictions, indent=2))}\n\n'
         f'Classify each contradiction: irreconcilable (cannot coexist) vs '
         f'compatible (can resolve at higher conceptual level). '
         f'Identify synthesis candidates — truths from each side worth preserving.\n\n'
@@ -62,8 +66,10 @@ def dialectical_aufhebung_prompt(state: PipelineState) -> str:
         f'Problem: {_wrap_user_input(state.problem)}\n\n'
         f'Thesis: {d.get("thesis", "")}\n'
         f'Antithesis: {d.get("antithesis", "")}\n'
-        f'Compatible contradictions: {json.dumps(d.get("compatible", []), indent=2)}\n'
-        f'Synthesis candidates: {json.dumps(d.get("synthesis_candidates", []), indent=2)}\n\n'
+        f'Compatible contradictions: '
+        f'{_wrap_external_content(json.dumps(d.get("compatible", []), indent=2))}\n'
+        f'Synthesis candidates: '
+        f'{_wrap_external_content(json.dumps(d.get("synthesis_candidates", []), indent=2))}\n\n'
         f'Perform Aufhebung: a qualitatively higher position that transcends both. '
         f'This is NOT a compromise — it must contain genuine novelty.\n\n'
         f'Output JSON: {{"aufhebung": "<higher position>", '

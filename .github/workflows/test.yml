@@ -125,7 +125,7 @@ jobs:
           # 2201: audit billing PR (BIL-3..9) sorted credit_service imports (net -1).
           # 2197: audit storage PR (PER-8..11, DAT-8) rewrote the upload hash index
           #       and L2 index on utils.atomic_file (net -3).
-          python scripts/ruff_ratchet.py --max 2185
+          python scripts/ruff_ratchet.py --max 2174
 
       - name: Security scan (bandit)
         run: |
@@ -401,7 +401,7 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Run schema contract
-        run: pytest tests/integration/test_alembic_schema_contract.py -v -m integration -p no:randomly
+        run: pytest tests/integration/test_alembic_schema_contract.py tests/integration/test_audit2_billing_pg.py -v -m integration -p no:randomly
         env:
           PYTHONPATH: ${{ env.PYTHONPATH }}
           CSRF_ENFORCE_BACKEND: 'false'

@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Any, Protocol
 
 from reasoner.domain.saas import Subscription, SubscriptionTier
+from reasoner.domain.saas import UnresolvedBillingOwnerError as UnresolvedBillingOwnerError
 
 
 class BillingPort(Protocol):

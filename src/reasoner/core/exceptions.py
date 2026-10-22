@@ -207,6 +207,16 @@ class ProviderCreditsExhaustedError(ProviderError):
     retryable = False
 
 
+class ValkeyUnavailableError(ReasonerError, ConnectionError):
+    """Valkey failed or timed out recently, or is cooling down after doing so.
+
+    Raised by ``infrastructure.valkey.guarded.GuardedValkey``. A
+    ``ConnectionError`` too, so the existing ``except Exception`` / connection
+    handlers around cache reads keep working unchanged.
+    """
+    retryable = True
+
+
 # ─────────────────────────────────────────────────────────────────────
 # PIPELINE ERRORS
 # ─────────────────────────────────────────────────────────────────────

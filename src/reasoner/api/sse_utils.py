@@ -59,15 +59,18 @@ async def _broadcast_ws(
         logger.warning("WS broadcast failed for run %s", run_id, exc_info=True)
 
 
-async def _persist_event(event: Any) -> None:
+async def _persist_event(event: Any) -> bool:
     """Persist a domain event to the event store.
 
-    Fire-and-forget: event-store failure must never break the caller.
+    Fire-and-forget: event-store failure must never break the caller. Returns
+    whether the event was stored, so a caller that numbers events (RunStream)
+    advances its version only for events that exist.
     """
     try:
         from reasoner.infrastructure.persistence.event_store import get_event_store
         store = get_event_store()
         await store.save_events([event])
+        return True
     except Exception as e:
         logger.warning(
             "EventStore persistence failed for event %s: %s",
@@ -75,3 +78,4 @@ async def _persist_event(event: Any) -> None:
             str(e),
             exc_info=True,
         )
+        return False

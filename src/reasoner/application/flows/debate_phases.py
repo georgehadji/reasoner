@@ -6,7 +6,7 @@ import asyncio
 import logging
 
 import reasoner.phases as phases
-from reasoner.application.flows.base import WorkflowServices
+from reasoner.application.flows.base import WorkflowServices, require_survivors
 from reasoner.core.constants import TRUNCATION
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.parsing import _parse_critique_scores, extract_json
@@ -41,13 +41,16 @@ async def run_debate_opening_phase(state: PipelineState, services: WorkflowServi
 
     results = await asyncio.gather(_get_opening("A", stance_a), _get_opening("B", stance_b), return_exceptions=True)
     statements = []
+    failures: list[str] = []
     for side, r in zip(["A", "B"], results, strict=True):
         if isinstance(r, Exception):
             msg = f"Debate opening '{side}' failed: {r}"
             services.log("DEBATE", msg, state)
             state.errors.append(msg)
+            failures.append(msg)
         else:
             statements.append(r)
+    require_survivors(statements, failures, phase=2, phase_name="Opening Statements")
     state.debate_rounds.append({"round": 1, "type": "opening", "statements": statements})
 
 async def run_debate_rebuttal_phase(state: PipelineState, services: WorkflowServices) -> None:

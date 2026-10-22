@@ -64,10 +64,14 @@ def harness(monkeypatch):
     router = MagicMock()
     router.describe.return_value = "test-router"
 
-    calls = SimpleNamespace(phase_runs=0, reset=[], monitor=None)
+    calls = SimpleNamespace(
+        phase_runs=0, reset=[], monitor=None, persisted=[], preflight_error=None, block_phase=None
+    )
 
     async def phase_fn(state, services):
         calls.phase_runs += 1
+        if calls.block_phase is not None:
+            await calls.block_phase.wait()
         state.errors.append(f"attempt-{calls.phase_runs}") if False else None
 
     class _Strategy:
@@ -83,6 +87,8 @@ def harness(monkeypatch):
             pass
 
         async def preflight(self, req, initial_state=None, user_id=None):
+            if calls.preflight_error is not None:
+                raise calls.preflight_error
             return SimpleNamespace(
                 action="pipeline",
                 gate_reasoning=None,
@@ -140,7 +146,8 @@ def harness(monkeypatch):
         return SimpleNamespace(value="free")
 
     async def _persist(evt):
-        return None
+        calls.persisted.append(evt)
+        return True
 
     monkeypatch.setattr(mod, "resolve_user_tier", _tier)
     # Event persistence lives in RunStream now, not in the execution module.
@@ -169,6 +176,11 @@ async def _run(mod_calls) -> list[dict]:
 
 
 async def _run_returning_state(mod_calls) -> tuple[list[dict], object]:
+    events, outcome = await _execute(mod_calls)
+    return events, outcome.state
+
+
+async def _execute(mod_calls) -> tuple[list[dict], object]:
     from reasoner.api.execution.pipeline import PipelineExecutionService
 
     events: list[dict] = []
@@ -183,12 +195,12 @@ async def _run_returning_state(mod_calls) -> tuple[list[dict], object]:
         problem="Does the quality gate run?",
         preset="multi-perspective-budget",
     )
-    state = await PipelineExecutionService().execute_run(
+    outcome = await PipelineExecutionService().execute_run(
         command, MagicMock(), sse_emit, user_id=None, initial_state=PipelineState(
             problem="Does the quality gate run?", preset_name="multi-perspective-budget"
         ),
     )
-    return events, state
+    return events, outcome
 
 
 @pytest.mark.asyncio
@@ -280,3 +292,51 @@ async def test_spend_cap_stops_quality_retries(harness, monkeypatch):
 
     assert harness.monitor.attempts == [1]
     assert harness.phase_runs == 1, "no retry once the spend cap has tripped"
+
+
+@pytest.mark.asyncio
+async def test_finished_run_is_a_completed_outcome(harness):
+    _events, outcome = await _execute(harness)
+
+    assert outcome.status == "completed"
+    assert isinstance(outcome.state, PipelineState)
+
+
+@pytest.mark.asyncio
+async def test_preflight_failure_is_a_failed_outcome_with_its_cause(harness):
+    """RUN-8: the state is None here, and the handler used to dereference it."""
+    harness.preflight_error = ValueError("API key OPENROUTER_API_KEY not set")
+
+    events, outcome = await _execute(harness)
+
+    assert outcome.status == "failed"
+    assert outcome.state is None
+    assert "ValueError" in (outcome.reason or "")
+    assert any(e.get("type") == "error" for e in events)
+
+
+@pytest.mark.asyncio
+async def test_disconnect_leaves_a_terminal_event_in_the_store(harness):
+    """RUN-7: CancelledError skipped every terminal write, so the stored run
+    stayed `running` for ever and could be resumed as if it were live."""
+    from reasoner.core.events.domain_events import EventType
+
+    harness.block_phase = asyncio.Event()  # the phase never finishes by itself
+    task = asyncio.ensure_future(_execute(harness))
+    for _ in range(200):
+        await asyncio.sleep(0.01)
+        if harness.phase_runs:
+            break
+    assert harness.phase_runs, "the phase never started"
+
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    terminal = [
+        e for e in harness.persisted
+        if e.event_type in (EventType.PIPELINE_FAILED, EventType.PIPELINE_COMPLETED)
+    ]
+    assert terminal, "no terminal event was persisted on disconnect"
+    assert terminal[-1].event_type == EventType.PIPELINE_FAILED
+    assert "client_disconnected" in terminal[-1].error

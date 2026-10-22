@@ -40,6 +40,24 @@ _GENERATOR_ROLES = {
 }
 
 
+# Role groups that must span blocs (Invariant B), per method. Each group is
+# the set of roles one phase runs side by side as independent voices.
+_PERSPECTIVES = frozenset({"constructive", "destructive", "systemic", "minimalist"})
+_BLOC_GROUPS: dict[str, tuple[frozenset[str], ...]] = {
+    "multi-perspective": (_PERSPECTIVES,),
+    "cross-language": (_PERSPECTIVES,),
+    "subagent": (_PERSPECTIVES,),
+    "debate": (frozenset({"constructive", "destructive", "systemic"}),),
+    "socratic": (frozenset({"constructive", "destructive"}),),
+    "dialectical": (frozenset({"constructive", "destructive"}),),
+    "bayesian": (frozenset({"constructive", "destructive"}),),
+    "jury": (
+        frozenset({"generator_1", "generator_2", "generator_3"}),
+        frozenset({"critic_1", "critic_2", "critic_3"}),
+    ),
+}
+
+
 def target_temperature(role: str) -> float | None:
     """Temperature a role will actually be called with, or None if untuned."""
     if role in PHASE_TEMPERATURES:
@@ -163,12 +181,9 @@ def main() -> int:
                 )
 
         # Invariant B: generator roles span ≥2 blocs, ≤2 of any single bloc.
-        gen_roles: set[str] = set()
-        if preset.method == "multi-perspective":
-            gen_roles = {"constructive", "destructive", "systemic", "minimalist"}
-        elif preset.method == "debate":
-            gen_roles = {"constructive", "destructive", "systemic"}
-        if gen_roles:
+        # Checked per group: the jury critics are a second panel, judged apart
+        # from the generators they score (FLOW-2).
+        for gen_roles in _BLOC_GROUPS.get(preset.method, ()):
             blocs_used: dict[str, list[str]] = {}
             for r in gen_roles:
                 model = preset.routing.get(r) or preset.primary_id

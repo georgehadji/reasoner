@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from enum import Enum
+from enum import Enum, StrEnum
 from uuid import UUID
 
 
@@ -55,6 +55,48 @@ class Subscription:
     stripe_customer_id: str | None = None  # NEW: Store Stripe customer ID (Enhancement 4.4)
     paypal_subscription_id: str | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+
+class UnresolvedBillingOwnerError(Exception):
+    """A provider event names no user we can find.
+
+    Raised by an adapter instead of inventing an owner: the old fallback minted
+    a random UUID, so a cancellation "applied" to nobody and a payment failure
+    wrote quota rows for a user that does not exist. The webhook receiver
+    dead-letters the event once and acknowledges it, because a retry cannot
+    resolve it either (docs/plans/audit-remediation-2-2026-10-20.md BIL-13).
+    """
+
+
+class CheckoutDecision(StrEnum):
+    ALLOW = "allow"
+    USE_PORTAL = "use_portal"   # change plan in the provider's portal (prorated)
+    SAME_PLAN = "same_plan"
+
+
+#: Statuses in which the provider is still billing, or about to.
+LIVE_STATUSES = frozenset({
+    SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIALING, SubscriptionStatus.PAST_DUE,
+})
+
+
+def checkout_allowed(
+    existing: Subscription | None, target: SubscriptionTier
+) -> CheckoutDecision:
+    """Whether a new checkout may start, given the user's latest subscription.
+
+    A second checkout created a second live subscription that overwrote the
+    first one's row, so the first kept billing untracked
+    (docs/plans/audit-remediation-2-2026-10-20.md BIL-14). A user who already
+    pays changes plan in the portal instead (Q4).
+    """
+    if (
+        existing is None
+        or existing.status not in LIVE_STATUSES
+        or existing.tier == SubscriptionTier.FREE
+    ):
+        return CheckoutDecision.ALLOW
+    return CheckoutDecision.SAME_PLAN if existing.tier == target else CheckoutDecision.USE_PORTAL
 
 
 @dataclass(frozen=True)

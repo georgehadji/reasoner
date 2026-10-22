@@ -15,6 +15,7 @@ from uuid import UUID
 from reasoner.application.ports.quota_repository import QuotaRepository
 from reasoner.domain.saas import QuotaResult, SubscriptionTier, UsageQuota
 from reasoner.infrastructure.valkey.client import get_valkey_pool
+from reasoner.infrastructure.valkey.guarded import get_guarded_valkey
 
 logger = logging.getLogger(__name__)
 CACHE_TTL_SECONDS = 60
@@ -25,7 +26,9 @@ class CachedQuotaRepository(QuotaRepository):
 
     def __init__(self, underlying: QuotaRepository):
         self._underlying = underlying
-        self._redis = get_valkey_pool()
+        # Bounded, with a cooldown: a hung Valkey must not spend the caller's
+        # budget before the database is read (PRV-2).
+        self._redis = get_guarded_valkey(get_valkey_pool())
 
     def _cache_key(self, user_id: str) -> str:
         return f"quota:{user_id}"

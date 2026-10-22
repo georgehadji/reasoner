@@ -47,8 +47,10 @@ async def run_research_web_search_phase(
         if settings.PRISM_FILE_SEARCH_ENABLED:
             from reasoner.documents.vector_store import DocumentVectorStore
             file_search = DocumentVectorStore()
+        # "balanced" (6 iterations), not "quality" (25): this runs inside the
+        # phase's timeout, and 25 iterations cannot finish in it (FLOW-9).
         await run_prism_research_phase(
-            state, services, client, mode="quality", file_search=file_search
+            state, services, client, mode="balanced", file_search=file_search
         )
         # Backfill remainder.web_discovery_results from citations for downstream
         # phases that still consume vetted_context

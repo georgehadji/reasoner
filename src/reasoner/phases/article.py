@@ -34,6 +34,11 @@ ARTICLE_RETRIEVAL_SONAR_SYSTEM = (
 )
 
 
+def _json_block(value: object, limit: int) -> str:
+    """A model-written blob, serialised, capped and wrapped (SEC-13)."""
+    return _wrap_external_content(json.dumps(value, indent=2, ensure_ascii=False)[:limit])
+
+
 def article_retrieval_plan_prompt(state: PipelineState) -> str:
     base = (
         f"{get_language_instruction(state)}\n\n"
@@ -102,16 +107,17 @@ def article_draft_prompt(state: PipelineState) -> str:
     argument_map = state.writing_state.get("argument_map", {})
     argument_block = ""
     if isinstance(argument_map, dict) and argument_map.get("central_question"):
-        argument_block = (
-            f"Argument Blueprint (write within this structure):\n"
+        # Model-written (the argument-map phase), so wrapped (SEC-13).
+        argument_block = "Argument Blueprint (write within this structure):\n"
+        argument_block += _wrap_external_content(
             f"  Central question: {argument_map.get('central_question', '')}\n"
             f"  Problem: {argument_map.get('problem', '')}\n"
             f"  Current explanations: {_safe_join_list(argument_map.get('current_explanations', []))}\n"
             f"  Limitations: {_safe_join_list(argument_map.get('limitations', []))}\n"
             f"  New insight: {argument_map.get('new_insight', '')}\n"
             f"  Counterarguments to address: {_safe_join_list(argument_map.get('counterarguments', []))}\n"
-            f"  Implications: {_safe_join_list(argument_map.get('implications', []))}\n\n"
-        )
+            f"  Implications: {_safe_join_list(argument_map.get('implications', []))}"
+        ) + "\n\n"
 
     # ── Inject pre-research insights ──
     pre_research = state.writing_state.get("pre_research_summary", "")
@@ -315,12 +321,12 @@ def article_critic_prompt(state: PipelineState) -> str:
 
     map_block = (
         f"Original Argument Blueprint (verify the draft follows this structure):\n"
-        f"{json.dumps(argument_map, indent=2, ensure_ascii=False)}\n\n"
+        f"{_wrap_external_content(json.dumps(argument_map, indent=2, ensure_ascii=False))}\n\n"
         if argument_map else ""
     )
     fact_block = (
         f"Fact-check findings (note which claims are already flagged):\n"
-        f"{json.dumps(verification, indent=2, ensure_ascii=False)[:2000]}\n\n"
+        f"{_json_block(verification, 2000)}\n\n"
         if verification else ""
     )
 
@@ -403,7 +409,7 @@ def article_developmental_edit_prompt(state: PipelineState) -> str:
 
     map_block = (
         f"Original argument blueprint (maintain this structure):\n"
-        f"{json.dumps(argument_map, indent=2, ensure_ascii=False)[:1500]}\n\n"
+        f"{_json_block(argument_map, 1500)}\n\n"
         if argument_map else ""
     )
 
@@ -501,7 +507,7 @@ def article_final_audit_prompt(state: PipelineState) -> str:
 
     map_block = (
         f"Expected thesis (from argument blueprint):\n"
-        f"{json.dumps(argument_map, indent=2, ensure_ascii=False)[:1000]}\n\n"
+        f"{_json_block(argument_map, 1000)}\n\n"
         if argument_map else ""
     )
 
@@ -512,7 +518,7 @@ def article_final_audit_prompt(state: PipelineState) -> str:
         supported = sum(1 for c in claim_ledger if c.get("status") in ("verified", "supported"))
         ledger_block = (
             f"\nClaim Ledger ({total} total, {supported} supported):\n"
-            f"{json.dumps(claim_ledger[:20], indent=2, ensure_ascii=False)[:2000]}\n\n"
+            f"{_json_block(claim_ledger[:20], 2000)}\n\n"
             f"Use this ledger to inform claim_support and citation_accuracy scores — "
             f"do NOT re-derive claim support impressionistically.\n"
         )
