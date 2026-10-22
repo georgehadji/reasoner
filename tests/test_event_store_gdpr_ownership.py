@@ -67,9 +67,10 @@ async def test_data_eraser_logs_failure_instead_of_reporting_success(
     store: EventStore,
 ):
     """Integration check against the actual GDPR erasure caller: a lookup
-    failure must NOT produce a receipt claiming deleted_aggregates worked,
+    failure must NOT produce a receipt claiming the aggregates were erased,
     and status must say so explicitly."""
     from reasoner.application.services.data_eraser import UserDataEraser
+    from reasoner.infrastructure.persistence.user_data_local import EventsStore
 
     with patch.object(
         store,
@@ -77,27 +78,34 @@ async def test_data_eraser_logs_failure_instead_of_reporting_success(
         new_callable=AsyncMock,
         side_effect=RuntimeError("db is on fire"),
     ):
-        eraser = UserDataEraser(event_store=store)
-        receipt = await eraser.erase("user-a")
+        receipt = await UserDataEraser([EventsStore(lambda: store)]).erase("user-a")
 
-    # deleted_aggregates must be 0, not silently reported as if the (empty)
-    # list from a swallowed error meant "nothing to delete".
-    assert receipt["deleted_aggregates"] == 0
-    assert receipt["status"] == "failed"
-    assert "db is on fire" in receipt["error"]
+    # "events" must not be listed as erased just because the (empty) list from
+    # a swallowed error looked like "nothing to delete".
+    assert receipt["erased"] == []
+    assert receipt["status"] == "partial"
+    assert "db is on fire" in receipt["failed"][0]["error"]
 
 
 @pytest.mark.asyncio
-async def test_receipt_not_falsely_completed_via_cache_eviction_alone(
+async def test_receipt_not_falsely_completed_via_another_stores_success(
     store: EventStore,
 ):
-    """The actual bug this fix targets: status was `"completed" if
-    deleted_aggregates > 0 or cache_evicted else "partial"` -- a successful
-    cache eviction alone could mark the whole erasure "completed" even
-    though the event-store deletion (the user's actual pipeline data) had
-    just failed. Status must reflect the aggregate-deletion outcome, not be
-    rescued by an unrelated successful side-effect."""
+    """The bug this guards: status was `"completed" if deleted_aggregates > 0
+    or cache_evicted else "partial"`, so an unrelated successful side-effect
+    could mark the whole erasure "completed" after the user's actual pipeline
+    data failed to delete. Any failed store keeps the receipt from completing."""
     from reasoner.application.services.data_eraser import UserDataEraser
+    from reasoner.infrastructure.persistence.user_data_local import EventsStore
+
+    class _Fine:
+        name = "valkey"
+
+        async def export(self, user_id):
+            return None
+
+        async def erase(self, user_id):
+            return None
 
     with patch.object(
         store,
@@ -105,32 +113,27 @@ async def test_receipt_not_falsely_completed_via_cache_eviction_alone(
         new_callable=AsyncMock,
         side_effect=RuntimeError("db is on fire"),
     ):
-        eraser = UserDataEraser(event_store=store, clear_cache_fn=lambda: None)
-        receipt = await eraser.erase("user-a")
+        receipt = await UserDataEraser([EventsStore(lambda: store), _Fine()]).erase("user-a")
 
-    assert receipt["cache_evicted"] is True  # the side-effect DID succeed
-    assert receipt["deleted_aggregates"] == 0
-    assert receipt["status"] == "failed"  # must not be "completed"
+    assert receipt["erased"] == ["valkey"]  # the side-effect DID succeed
+    assert receipt["status"] != "completed"
 
 
 @pytest.mark.asyncio
 async def test_receipt_status_completed_on_genuine_success(store: EventStore):
     """Regression guard for the happy path: real deletions still report
-    status="completed" with no error field."""
+    status="completed" with nothing failed."""
     from reasoner.application.services.data_eraser import UserDataEraser
     from reasoner.infrastructure.persistence.pipeline_ownership_repo import (
         PipelineOwnershipRepository,
     )
+    from reasoner.infrastructure.persistence.user_data_local import EventsStore
 
     repo = PipelineOwnershipRepository(db_path=store.db_path)
     await repo.set_owner("p1", "user-a", "p1")
 
-    async def neuro_ok(owner: str) -> dict:
-        return {"erased": True, "dirs_removed": 0, "tenants_evicted": 0, "error": None}
+    receipt = await UserDataEraser([EventsStore(lambda: store)]).erase("user-a")
 
-    eraser = UserDataEraser(event_store=store, erase_neuro_fn=neuro_ok)
-    receipt = await eraser.erase("user-a")
-
-    assert receipt["deleted_aggregates"] == 1
+    assert receipt["erased"] == ["events"]
     assert receipt["status"] == "completed"
-    assert "error" not in receipt
+    assert receipt["failed"] == []

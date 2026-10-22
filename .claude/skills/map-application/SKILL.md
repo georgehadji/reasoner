@@ -69,6 +69,7 @@ Convention: `<method>.py` holds the strategy class (phase sequence); `<method>_p
 | `quota_repository.py` | `QuotaRepository`. |
 | `pipeline_ownership_port.py` | `PipelineOwnershipPort`, `OwnershipRecord`, `is_authorized` — who may read/stop/resume a run. |
 | `run_outcome.py` | `RunOutcome` (`completed` / `cancelled` / `failed` / `rejected`) — what `PipelineExecutionPort.execute_run` returns; the command handler matches on it. |
+| `user_data.py` | `UserDataStore` — `name`, `export(user_id)`, `erase(user_id)`; one place a user's data lives (DAT-10/11). |
 | `history.py` | `HistoryRepository` — a user's run history, every operation scoped to one owner (PER-12). |
 | `service_protocols.py` | Protocols for `PresetService`, `PipelineService`, `SearchService`, neuro client, telemetry store. |
 
@@ -121,7 +122,7 @@ Convention: `<method>.py` holds the strategy class (phase sequence); `<method>_p
 | `idempotency.py` | `register_run` — `client_run_id` as duplicate guard and credit idempotency key. |
 | `ws_ticket.py` | Short-lived single-use WebSocket tickets (HMAC with embedded expiry). |
 | `notification_subscriber.py` | EventBus subscriber sending transactional email on critical SaaS events. |
-| `data_eraser.py` | GDPR erasure across event store, cache, and neuro memory. |
+| `data_eraser.py` | `UserDataEraser` / `UserDataExporter`: run one ordered sequence of `UserDataStore`s (export is all-or-nothing, erase is best-effort per store with a receipt `{status, erased, failed}`) (DAT-10/11). |
 | `audit_service.py` | Publishes query-execution audit events off the hot path. |
 
 ## services/ — misc

@@ -5,6 +5,7 @@ Internal endpoints for recall, audit, and learning.
 
 import asyncio
 import hashlib
+import json
 import logging
 import secrets
 import shutil
@@ -30,6 +31,7 @@ from reasoner.neuro.config import (
 )
 from reasoner.neuro.providers import create_resilient_embedding, create_resilient_reasoning
 from reasoner.neuro.sessions import SessionConfig, SessionManager
+from reasoner.utils.atomic_file import atomic_write_text
 from reasoner.utils.json_safe import safe_json_loads
 
 log = logging.getLogger("neuro.api")
@@ -63,6 +65,9 @@ class NeuroHealthResponse(BaseModel):
     reasoning: dict
     embedding: dict
     agents_configured: list[str]
+    # A count, not the tenant keys: those are "u-<user uuid>-<conversation>" and
+    # this probe is anonymous (DAT-12).
+    active_tenant_count: int = 0
     default_persona: str
     sessions: dict
 
@@ -142,6 +147,9 @@ class TenantManager:
 
     MAX_TENANTS = 100
     IDLE_TTL_SECONDS = 1800  # 30 minutes
+    # How long the shared erasure markers' directory listing is reused. A worker
+    # learns of another worker's erasure within this long (DAT-13).
+    ERASED_CACHE_SECONDS = 1.0
 
     def __init__(self, config: NeuroConfig):
         self.config = config
@@ -159,6 +167,10 @@ class TenantManager:
         #                re-create their memory when it finishes.
         self._erasing: dict[str, asyncio.Event] = {}
         self._erased_until: dict[str, float] = {}
+        # Cross-worker view of the same fact: marker files under
+        # <data_dir>/agents/.erased, read through a short-lived cache.
+        self._marker_cache: dict[str, float] = {}
+        self._marker_cache_at: float | None = None
 
     def _evict_stale_locked(self, now: float) -> int:
         """Evict tenants idle beyond IDLE_TTL_SECONDS. Caller must hold _lock."""
@@ -169,6 +181,64 @@ class TenantManager:
             del self._last_access[k]
             evicted += 1
         return evicted
+
+    def _evict_erased_locked(self) -> None:
+        """Drop tenants another worker has erased (a live marker). Caller holds _lock."""
+        prefixes = tuple(self._markers())
+        if not prefixes:
+            return
+        for k in [k for k in self._tenants if k.startswith(prefixes)]:
+            del self._tenants[k]
+            self._last_access.pop(k, None)
+
+    @property
+    def _marker_dir(self) -> Path:
+        return Path(self.config.data_dir) / ".erased"
+
+    def _write_marker(self, prefix: str) -> None:
+        """Record the erasure where every worker can see it (DAT-13).
+
+        A per-process dict cannot carry a cross-process fact, and layering rules
+        out Valkey here; the L2 index already requires the shared data_dir.
+        """
+        try:
+            self._marker_dir.mkdir(parents=True, exist_ok=True)
+            name = hashlib.sha256(prefix.encode()).hexdigest()[:32]
+            atomic_write_text(
+                self._marker_dir / name,
+                json.dumps({"prefix": prefix, "until": _wall_clock() + self.IDLE_TTL_SECONDS}),
+            )
+        except OSError as exc:
+            # end_erase runs in a finally; failing to publish must not mask the
+            # erasure's own outcome. This worker's in-memory window still holds.
+            log.warning("could not write erasure marker for another worker to see: %s", exc)
+        self._marker_cache_at = None
+
+    def _markers(self) -> dict[str, float]:
+        """Live erasure markers, prefix -> expiry (epoch). Expired ones are swept."""
+        now = time.monotonic()
+        if (
+            self._marker_cache_at is not None
+            and now - self._marker_cache_at < self.ERASED_CACHE_SECONDS
+        ):
+            return self._marker_cache
+        live: dict[str, float] = {}
+        wall = _wall_clock()
+        try:
+            files = list(self._marker_dir.iterdir())
+        except OSError:
+            files = []
+        for f in files:
+            try:
+                marker = json.loads(f.read_text(encoding="utf-8"))
+                if marker["until"] > wall:
+                    live[marker["prefix"]] = marker["until"]
+                else:
+                    f.unlink(missing_ok=True)
+            except (OSError, ValueError, KeyError, TypeError):
+                continue
+        self._marker_cache, self._marker_cache_at = live, now
+        return live
 
     def _evict_lru_locked(self) -> None:
         """Evict the least-recently-used tenant. Caller must hold _lock."""
@@ -193,6 +263,7 @@ class TenantManager:
         async with self._lock:
             # TTL eviction pass
             self._evict_stale_locked(now)
+            self._evict_erased_locked()
 
             if key in self._tenants:
                 self._last_access[key] = now
@@ -283,6 +354,7 @@ class TenantManager:
         for IDLE_TTL_SECONDS, and a retry of the erasure is never blocked by it.
         """
         self._erased_until[prefix] = time.monotonic() + self.IDLE_TTL_SECONDS
+        self._write_marker(prefix)
         self._erasing.pop(prefix).set()
 
     def is_erased(self, key: str | None) -> bool:
@@ -297,7 +369,9 @@ class TenantManager:
         now = time.monotonic()
         for prefix in [p for p, t in self._erased_until.items() if t <= now]:
             del self._erased_until[prefix]
-        return any(key.startswith(p) for p in (*self._erasing, *self._erased_until))
+        return any(
+            key.startswith(p) for p in (*self._erasing, *self._erased_until, *self._markers())
+        )
 
 
 # ─────────────────────────────────────────────
@@ -345,6 +419,13 @@ def require_neuro_key(request: Request) -> None:
     provided = request.headers.get("X-Neuro-Key", "")
     if not secrets.compare_digest(provided, expected):
         raise HTTPException(status_code=403, detail="Neuro access required")
+
+
+def _wall_clock() -> float:
+    """Epoch seconds. Erasure markers are shared between processes, and a
+    monotonic clock is only meaningful inside one, so their expiry is wall
+    time. (Not a latency measurement: those use perf_counter.)"""
+    return datetime.now(UTC).timestamp()
 
 
 def _owned_prefix(owner: str) -> str:
@@ -506,6 +587,34 @@ class NeuroService:
             result["erased"] = True
         return result
 
+    async def export_owner(self, owner: str) -> dict:
+        """Every L2 memory entry of every tenant belonging to *owner* (GDPR Art. 20).
+
+        Keyed by tenant directory name. Embeddings are omitted. A tenant whose
+        index cannot be read raises: a shorter export would look complete.
+        """
+        if not _is_canonical_owner(owner):
+            raise ValueError("owner must be a canonical UUID string")
+        prefix = _owned_prefix(owner)
+        agents_dir = Path(self.config.data_dir) / "agents"
+
+        def read() -> dict:
+            out: dict = {}
+            if not agents_dir.exists():
+                return out
+            for tenant in sorted(agents_dir.iterdir()):
+                if not tenant.name.startswith(prefix) or tenant.is_symlink() or not tenant.is_dir():
+                    continue
+                entries = []
+                for index in sorted(tenant.rglob("index.json")):
+                    for entry in json.loads(index.read_text(encoding="utf-8")):
+                        entries.append({k: entry.get(k) for k in (
+                            "id", "content", "source", "metadata", "created_at")})
+                out[tenant.name] = entries
+            return out
+
+        return await asyncio.to_thread(read)
+
     async def _remove_owner_dirs(self, prefix: str, result: dict) -> list[str]:
         """Delete every <data_dir>/agents/ entry for *prefix*; returns errors."""
         agents_dir = Path(self.config.data_dir) / "agents"
@@ -565,7 +674,8 @@ class NeuroService:
             timestamp=datetime.now(UTC).isoformat(),
             reasoning={**reasoner.status, "healthy": r_ok},
             embedding={**embedder.status, "healthy": e_ok},
-            agents_configured=list(config.agents.keys()) + tenants.active_tenants,
+            agents_configured=list(config.agents.keys()),
+            active_tenant_count=len(tenants.active_tenants),
             default_persona="default",
             sessions=total_sessions,
         )

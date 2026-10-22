@@ -243,12 +243,17 @@ async def test_learn_for_just_erased_owner_is_dropped_with_warning(service, tmp_
 
 
 @pytest.mark.asyncio
-async def test_erase_tombstone_expires(service, tmp_path):
+async def test_erase_tombstone_expires(service, tmp_path, monkeypatch):
     await service.erase_owner(USER_X)
     prefix = f"u-{USER_X}-"
     assert service.tenants.is_erased(f"{prefix}conv1")
 
     service.tenants._erased_until[prefix] -= service.tenants.IDLE_TTL_SECONDS + 1
+    # The tombstone is also a marker file other workers read (DAT-13); it
+    # expires on the wall clock.
+    later = ns._wall_clock() + service.tenants.IDLE_TTL_SECONDS + 1
+    monkeypatch.setattr(ns, "_wall_clock", lambda: later)
+    monkeypatch.setattr(service.tenants, "ERASED_CACHE_SECONDS", 0.0)
 
     assert not service.tenants.is_erased(f"{prefix}conv1")
     await _learn(service, USER_X, "conv1", "back again", "ok")

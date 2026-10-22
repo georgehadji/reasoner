@@ -74,28 +74,17 @@ async def test_persisted_llm_events_carry_no_prompt_text(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_gdpr_erase_uses_the_configured_store(monkeypatch):
-    """PER-3: the route built the SQLite EventStore directly, whatever the backend."""
-    from uuid import uuid4
+    """PER-3: the route built the SQLite EventStore directly, whatever the backend.
+    The registry's `events` store reaches the store through get_event_store()."""
+    from reasoner.api import user_data
 
-    from reasoner.api.routes import gdpr
-    from reasoner.application.services import data_eraser
-    from reasoner.domain.saas import User
-
+    names = {s.name: s for s in user_data.user_data_stores()}
     configured = object()
-    used: list = []
+    monkeypatch.setattr(
+        "reasoner.infrastructure.persistence.event_store._event_store", configured
+    )
 
-    class _Eraser:
-        def __init__(self, store, clear_cache_fn=None):
-            used.append(store)
-
-        async def erase(self, user_id):
-            return {"status": "completed", "deleted_aggregates": 0}
-
-    monkeypatch.setattr(gdpr, "get_event_store", lambda *a, **k: configured)
-    monkeypatch.setattr(data_eraser, "UserDataEraser", _Eraser)
-
-    await gdpr.erase_user_data(User(id=uuid4(), email="a@b.c"))
-    assert used == [configured]
+    assert names["events"]._get_store() is configured
 
 
 def test_a_registry_built_without_a_store_gets_it_later(monkeypatch):
