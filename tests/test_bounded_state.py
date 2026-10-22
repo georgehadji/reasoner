@@ -2,8 +2,8 @@
 
 WS replay buffers were created for every broadcast run and dropped only when
 its last subscriber left, so every SSE-only run leaked one. Langfuse phase
-spans were never removed, and flush() blocked the loop. Every run built a
-TaggedMemory, which re-read every history JSONL file just to append two lines.
+spans were never removed, and flush() blocked the loop. (Every run also built a
+TaggedMemory that re-read the history JSONL files; the class is gone, audit 3 PR 6/8.)
 See docs/plans/audit-remediation-2026-10-20.md, OPS-4.
 """
 
@@ -83,26 +83,3 @@ async def test_a_finished_run_leaves_no_spans_and_flushes_off_the_loop(monkeypat
     assert list(sub._active_traces) == ["run-2"]
     assert list(sub._active_spans) == ["run-2-Phase A"]
     assert flushed_on and flushed_on[0] != threading.main_thread().name
-
-
-def test_appending_history_does_not_read_it(tmp_path, monkeypatch):
-    from reasoner.core.memory import TaggedMemory
-
-    (tmp_path / "method_x.jsonl").write_text('{"old": 1}\n' * 100)
-    monkeypatch.setattr(TaggedMemory, "_load", lambda self: pytest.fail("appending re-read history"))
-    TaggedMemory(tmp_path).add("method_x", {"new": 1})
-    assert (tmp_path / "method_x.jsonl").read_text().count("\n") == 101
-
-
-def test_reads_still_see_appended_entries_and_large_files_rotate(tmp_path, monkeypatch):
-    from reasoner.core.memory import TaggedMemory
-
-    monkeypatch.setattr(TaggedMemory, "MAX_FILE_BYTES", 50)
-    mem = TaggedMemory(tmp_path)
-    for i in range(5):
-        mem.add("preset_y", {"i": i, "pad": "x" * 20})
-
-    assert (tmp_path / "preset_y.jsonl.1").exists()
-    reader = TaggedMemory(tmp_path)
-    assert 0 < reader.count("preset_y") < 5
-    assert reader.get_by_tag("preset_y")[-1]["i"] == 4
