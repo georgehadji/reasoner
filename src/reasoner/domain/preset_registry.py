@@ -159,6 +159,14 @@ _REGISTRY: dict[str, dict] = {
         "method": "jury",
         "primary_id": "qwen3.5-flash",
         "routing": {
+        # ── Flow roles (FLOW-2): these ran on the primary model before ──
+        "generator_1":    "gpt-oss-120b",          # 🇺🇸 OpenAI — $0.037/$0.17
+        "generator_2":    "mistral-small-3.2-24b", # 🇪🇺 Mistral — $0.075/$0.20
+        "generator_3":    "mimo-v2.5",             # 🇨🇳 Xiaomi — $0.14/$0.28
+        "critic_1":       "llama-4-scout",         # 🇺🇸 Meta — $0.10/$0.30
+        "critic_2":       "hy3",                   # 🇨🇳 Tencent — $0.0825/$0.33
+        "critic_3":       "gemma-4-31b",           # 🇺🇸 Google — $0.09/$0.34
+        "panel_critic":   "qwen3-30b-a3b",         # 🇨🇳 Qwen — $0.12/$0.50 (batch mode)
             "synthesis": "llama-4-maverick",  # 🇺🇸 Meta — $0.200/$0.800 per M, 1048K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
@@ -168,12 +176,29 @@ _REGISTRY: dict[str, dict] = {
         "verifier":       "gemini-2.5-flash-lite",   # Google 🇺🇸 — 3.3% HHEM hallucination (3rd best measured), $0.10/$0.40
         "post_synthesis_verify": "sonar",  # added v3.5
         },
+        "fallback_routing": {
+            "generator_1": "hy3",
+            "generator_2": "llama-4-scout",
+            "generator_3": "gemma-4-31b",
+            "critic_1": "qwen3.6-flash",
+            "critic_2": "ministral-3b",
+            "critic_3": "qwen3-30b-a3b",
+            "panel_critic": "llama-4-scout",
+        },
         "tags": ["budget", "governance", "decision-making"],
     },
     "jury-premium": {
         "method": "jury",
         "primary_id": "claude-sonnet",
         "routing": {
+        # ── Flow roles (FLOW-2): these ran on the primary model before ──
+        "generator_1":    "gpt-5",                 # 🇺🇸 OpenAI — $1.25/$10
+        "generator_2":    "qwen3.7-max",           # 🇨🇳 Qwen — $1.475/$4.425
+        "generator_3":    "mistral-large-3",       # 🇪🇺 Mistral — $0.50/$1.50
+        "critic_1":       "gemini-pro-real",       # 🇺🇸 Google — $2/$12
+        "critic_2":       "qwen3-max-thinking",    # 🇨🇳 Qwen — $0.78/$3.90
+        "critic_3":       "nemotron-3-ultra",      # 🇺🇸 NVIDIA — $0.625/$3.125
+        "panel_critic":   "mimo-v2.5-pro",         # 🇨🇳 Xiaomi — $0.435/$0.87 (batch mode)
             "synthesis": "inkling-small",  # 🇺🇸 Thinking Machines — $0.450/$1.200 per M, 524K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-3.7-flash",    # Google 🇺🇸 — AA Intel 56.0 vs 47.7, 1M ctx, $0.375/$1.875 (5.3x cheaper)
@@ -183,6 +208,15 @@ _REGISTRY: dict[str, dict] = {
         "stress_testing": "grok-4.6",             # xAI 🇺🇸 — AA Intel 60.9 vs 37.6 for 4.3, $2/$6, 500K ctx
         "verifier":       "grok-4.3",           # xAI 🇺🇸 — record 78% non-hallucination (AA Omniscience), 1M ctx, same price
         "post_synthesis_verify": "sonar-pro",  # added v3.5
+        },
+        "fallback_routing": {
+            "generator_1": "qwen3-max-thinking",
+            "generator_2": "nemotron-3-ultra",
+            "generator_3": "gemini-pro-real",
+            "critic_1": "mimo-v2.5-pro",
+            "critic_2": "mistral-large-3",
+            "critic_3": "qwen3-max-real",
+            "panel_critic": "nemotron-3-ultra",
         },
         "tags": ["premium", "governance", "decision-making"],
     },
@@ -256,6 +290,9 @@ _REGISTRY: dict[str, dict] = {
         "method": "socratic",
         "primary_id": "qwen3.5-flash",
         "routing": {
+        # ── Flow roles (FLOW-2): these ran on the primary model before ──
+        "constructive":   "gpt-oss-120b",          # 🇺🇸 OpenAI — $0.037/$0.17
+        "destructive":    "mistral-small-3.2-24b", # 🇪🇺 Mistral — $0.075/$0.20
             "synthesis": "llama-4-maverick",  # 🇺🇸 Meta — $0.200/$0.800 per M, 1048K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
@@ -271,6 +308,9 @@ _REGISTRY: dict[str, dict] = {
         "method": "socratic",
         "primary_id": "claude-sonnet",
         "routing": {
+        # ── Flow roles (FLOW-2): these ran on the primary model before ──
+        "constructive":   "gpt-5",                 # 🇺🇸 OpenAI — $1.25/$10
+        "destructive":    "qwen3.7-max",           # 🇨🇳 Qwen — $1.475/$4.425
             "synthesis": "inkling-small",  # 🇺🇸 Thinking Machines — $0.450/$1.200 per M, 524K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-3.7-flash",    # Google 🇺🇸 — AA Intel 56.0 vs 47.7, 1M ctx, $0.375/$1.875 (5.3x cheaper)
@@ -287,6 +327,8 @@ _REGISTRY: dict[str, dict] = {
         "method": "pre_mortem",
         "primary_id": "qwen3.5-flash",
         "routing": {
+        # ── Flow roles (FLOW-2): these ran on the primary model before ──
+        "destructive":    "mistral-small-3.2-24b", # 🇪🇺 Mistral — $0.075/$0.20
             "synthesis": "llama-4-maverick",  # 🇺🇸 Meta — $0.200/$0.800 per M, 1048K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
@@ -302,6 +344,8 @@ _REGISTRY: dict[str, dict] = {
         "method": "pre_mortem",
         "primary_id": "claude-sonnet",
         "routing": {
+        # ── Flow roles (FLOW-2): these ran on the primary model before ──
+        "destructive":    "qwen3.7-max",           # 🇨🇳 Qwen — $1.475/$4.425
             "synthesis": "inkling-small",  # 🇺🇸 Thinking Machines — $0.450/$1.200 per M, 524K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-3.7-flash",    # Google 🇺🇸 — AA Intel 56.0 vs 47.7, 1M ctx, $0.375/$1.875 (5.3x cheaper)
@@ -318,6 +362,9 @@ _REGISTRY: dict[str, dict] = {
         "method": "bayesian",
         "primary_id": "claude-haiku",
         "routing": {
+        # ── Flow roles (FLOW-2): these ran on the primary model before ──
+        "constructive":   "gpt-oss-120b",          # 🇺🇸 OpenAI — $0.037/$0.17
+        "destructive":    "mistral-small-3.2-24b", # 🇪🇺 Mistral — $0.075/$0.20
             "synthesis": "llama-4-maverick",  # 🇺🇸 Meta — $0.200/$0.800 per M, 1048K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
@@ -333,6 +380,9 @@ _REGISTRY: dict[str, dict] = {
         "method": "bayesian",
         "primary_id": "claude-sonnet",
         "routing": {
+        # ── Flow roles (FLOW-2): these ran on the primary model before ──
+        "constructive":   "gpt-5",                 # 🇺🇸 OpenAI — $1.25/$10
+        "destructive":    "qwen3.7-max",           # 🇨🇳 Qwen — $1.475/$4.425
             "synthesis": "inkling-small",  # 🇺🇸 Thinking Machines — $0.450/$1.200 per M, 524K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-3.7-flash",    # Google 🇺🇸 — AA Intel 56.0 vs 47.7, 1M ctx, $0.375/$1.875 (5.3x cheaper)
@@ -349,6 +399,9 @@ _REGISTRY: dict[str, dict] = {
         "method": "dialectical",
         "primary_id": "qwen3.5-flash",
         "routing": {
+        # ── Flow roles (FLOW-2): these ran on the primary model before ──
+        "constructive":   "gpt-oss-120b",          # 🇺🇸 OpenAI — $0.037/$0.17
+        "destructive":    "mistral-small-3.2-24b", # 🇪🇺 Mistral — $0.075/$0.20
             "synthesis": "llama-4-maverick",  # 🇺🇸 Meta — $0.200/$0.800 per M, 1048K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
@@ -364,6 +417,9 @@ _REGISTRY: dict[str, dict] = {
         "method": "dialectical",
         "primary_id": "claude-sonnet",
         "routing": {
+        # ── Flow roles (FLOW-2): these ran on the primary model before ──
+        "constructive":   "gpt-5",                 # 🇺🇸 OpenAI — $1.25/$10
+        "destructive":    "qwen3.7-max",           # 🇨🇳 Qwen — $1.475/$4.425
             "synthesis": "inkling-small",  # 🇺🇸 Thinking Machines — $0.450/$1.200 per M, 524K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-3.7-flash",    # Google 🇺🇸 — AA Intel 56.0 vs 47.7, 1M ctx, $0.375/$1.875 (5.3x cheaper)
@@ -380,6 +436,8 @@ _REGISTRY: dict[str, dict] = {
         "method": "analogical",
         "primary_id": "qwen3.5-flash",
         "routing": {
+        # ── Flow roles (FLOW-2): these ran on the primary model before ──
+        "systemic":       "mimo-v2.5",             # 🇨🇳 Xiaomi — $0.14/$0.28
             "synthesis": "llama-4-maverick",  # 🇺🇸 Meta — $0.200/$0.800 per M, 1048K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
@@ -395,6 +453,8 @@ _REGISTRY: dict[str, dict] = {
         "method": "analogical",
         "primary_id": "claude-sonnet",
         "routing": {
+        # ── Flow roles (FLOW-2): these ran on the primary model before ──
+        "systemic":       "mistral-large-3",       # 🇪🇺 Mistral — $0.50/$1.50
             "synthesis": "inkling-small",  # 🇺🇸 Thinking Machines — $0.450/$1.200 per M, 524K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-3.7-flash",    # Google 🇺🇸 — AA Intel 56.0 vs 47.7, 1M ctx, $0.375/$1.875 (5.3x cheaper)
@@ -659,6 +719,11 @@ _REGISTRY: dict[str, dict] = {
         "method": "subagent",
         "primary_id": "qwen3.5-flash",
         "routing": {
+        # ── Flow roles (FLOW-2): these ran on the primary model before ──
+        "constructive":   "gpt-oss-120b",          # 🇺🇸 OpenAI — $0.037/$0.17
+        "destructive":    "mistral-small-3.2-24b", # 🇪🇺 Mistral — $0.075/$0.20
+        "systemic":       "qwen3.6-flash",         # 🇨🇳 Qwen — $0.1875/$1.125
+        "minimalist":     "gemma-4-31b",           # 🇺🇸 Google — $0.09/$0.34
             "synthesis": "llama-4-maverick",  # 🇺🇸 Meta — $0.200/$0.800 per M, 1048K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":                     "hy3",  # 🇨🇳 Tencent — $0.132/$0.528 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
@@ -679,6 +744,11 @@ _REGISTRY: dict[str, dict] = {
         "method": "subagent",
         "primary_id": "gpt-5",  # 🇺🇸 OpenAI — $1.250/$10.000 per M, 400K ctx (was gemini-pro; one model per phase)
         "routing": {
+        # ── Flow roles (FLOW-2): these ran on the primary model before ──
+        "constructive":   "claude-sonnet",         # 🇺🇸 Anthropic — $2/$10
+        "destructive":    "mistral-large-3",       # 🇪🇺 Mistral — $0.50/$1.50
+        "systemic":       "nemotron-3-ultra",      # 🇺🇸 NVIDIA — $0.625/$3.125
+        "minimalist":     "mimo-v2.5-pro",         # 🇨🇳 Xiaomi — $0.435/$0.87
             "synthesis": "gemini-3.7-flash",  # 🇺🇸 Google — $0.375/$1.875 per M, 1048K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":                  "gemini-2.5-flash",  # 🇺🇸 Google — $0.300/$2.500 per M, 1048K ctx; honours temperature (phase target 0.2) (was claude-sonnet: fixed-temp, silently ran at 1.0)
@@ -934,6 +1004,11 @@ _REGISTRY: dict[str, dict] = {
         "method": "cross-language",
         "primary_id": "qwen3.5-flash",
         "routing": {
+        # ── Flow roles (FLOW-2): these ran on the primary model before ──
+        "constructive":   "gpt-oss-120b",          # 🇺🇸 OpenAI — $0.037/$0.17
+        "destructive":    "mistral-small-3.2-24b", # 🇪🇺 Mistral — $0.075/$0.20
+        "systemic":       "mimo-v2.5",             # 🇨🇳 Xiaomi — $0.14/$0.28
+        "minimalist":     "llama-4-scout",         # 🇺🇸 Meta — $0.10/$0.30
             "synthesis": "llama-4-maverick",  # 🇺🇸 Meta — $0.200/$0.800 per M, 1048K ctx; honours temperature (phase target 0.5) (was gpt-5.6-luna: fixed-temp, silently ran at 1.0)
         # ── Reasoning model assignments (budget, v3.4) ──
         "fusion":         "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
@@ -952,6 +1027,11 @@ _REGISTRY: dict[str, dict] = {
         "method": "cross-language",
         "primary_id": "claude-sonnet",
         "routing": {
+        # ── Flow roles (FLOW-2): these ran on the primary model before ──
+        "constructive":   "gpt-5",                 # 🇺🇸 OpenAI — $1.25/$10
+        "destructive":    "qwen3.7-max",           # 🇨🇳 Qwen — $1.475/$4.425
+        "systemic":       "mistral-large-3",       # 🇪🇺 Mistral — $0.50/$1.50
+        "minimalist":     "nemotron-3-ultra",      # 🇺🇸 NVIDIA — $0.625/$3.125
             "synthesis": "glm-5.2",              # 🇨🇳 Zhipu — cross-bloc final voice, $0.476/$1.496 live (comment said $0.95/$3.00)
         # ── Reasoning model assignments (premium, v3.4) ──
         "deep_read":      "gemini-3.7-flash",    # Google 🇺🇸 — AA Intel 56.0 vs 47.7, 1M ctx, $0.375/$1.875 (5.3x cheaper)

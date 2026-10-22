@@ -47,11 +47,17 @@ def _create_generation_candidate(data: dict[str, Any] | str | list[Any], generat
         approach_summary=str(data.get("approach_summary", ""))
     )
 
+# Routing roles, read by tests/unit/test_flow_roles_are_routed.py: every jury
+# preset must route each one, or it runs on the primary model (FLOW-2).
+JURY_GENERATOR_ROLES: tuple[str, ...] = ("generator_1", "generator_2", "generator_3")
+JURY_CRITIC_ROLES: tuple[str, ...] = ("critic_1", "critic_2", "critic_3")
+JURY_PANEL_CRITIC_ROLE = "panel_critic"
+
 async def run_jury_generate_phase(state: PipelineState, services: WorkflowServices, gen_roles: list[str] | None = None) -> None:
     services.log("JURY", "Generating independent solutions...", state)
 
     if not gen_roles:
-        gen_roles = ["generator_1", "generator_2", "generator_3"]
+        gen_roles = list(JURY_GENERATOR_ROLES)
 
     async def _get_generator(gen_id: str):
         raw, meta = await services.call_llm(
@@ -126,7 +132,7 @@ async def run_jury_critique_phase(state: PipelineState, services: WorkflowServic
     if batch_critique:
         services.log("JURY_CRITIQUE", "Running batch critique (single panel critic)...", state)
         try:
-            panel_score = await _get_jury_critique("panel_critic")
+            panel_score = await _get_jury_critique(JURY_PANEL_CRITIC_ROLE)
             state.critic_scores.append(panel_score)
         except Exception as exc:
             msg = f"Batch jury critic failed: {exc}"
@@ -135,7 +141,7 @@ async def run_jury_critique_phase(state: PipelineState, services: WorkflowServic
             require_survivors(state.critic_scores, [msg], phase=3, phase_name="Critic Pool")
     else:
         if not critic_roles:
-            critic_roles = ["critic_1", "critic_2", "critic_3"]
+            critic_roles = list(JURY_CRITIC_ROLES)
 
         tasks = [_get_jury_critique(role) for role in critic_roles]
         results = await asyncio.gather(*tasks, return_exceptions=True)

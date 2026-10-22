@@ -44,6 +44,17 @@ _KNOWN_ROUTING_ROLES: frozenset[str] = frozenset({
     "expert_2",
     "expert_3",
     "expert_4",
+    # Jury roles (flows/jury_phases.JURY_*_ROLES). Unlisted, no preset could
+    # route them, so all seven ran on the primary model (FLOW-2).
+    "generator_1",
+    "generator_2",
+    "generator_3",
+    "critic_1",
+    "critic_2",
+    "critic_3",
+    "panel_critic",
+    # Egress rewrite (flows/egress_rewrite_phase.py)
+    "egress_rewrite",
     # Prompt enhancement (opt-in pre-phase)
     "prompt_enhancement",
     # CoVe roles
