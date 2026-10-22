@@ -715,3 +715,8 @@ RATE_LIMITER_REDIS_RETRY_SECONDS: float = 30.0
 # had no subscriber for this long, and never more than this many at once.
 WS_REPLAY_TTL_SECONDS: float = 300.0
 WS_MAX_REPLAY_BUFFERS: int = 1000
+
+# Upper bound on a run's credit settlement (release + true-up) once the stream
+# ends. Settlement runs shielded from client-disconnect cancellation, so this is
+# what stops a hung ledger call from holding a worker forever.
+SETTLE_TIMEOUT_SECONDS: float = 15.0
