@@ -94,6 +94,7 @@ folders:
 | File | What it does |
 |------|--------------|
 | `valkey/client.py` | Canonical shared connection pool (`get_valkey_pool`); `get_redis`/`set_redis` kept as deprecated aliases. |
+| `valkey/guarded.py` | `GuardedValkey` / `get_guarded_valkey`: per-operation timeout plus a cooldown after a failure; used by the cached repos and the Redis circuit breaker. |
 | `valkey/cache_adapter.py` / `memory_cache_adapter.py` | `SharedCachePort` adapters (Valkey, in-memory fallback). |
 | `valkey/state_adapter.py` / `memory_state_adapter.py` | `DistributedStatePort` adapters — Lua for token bucket and circuit state. |
 | `redis/client.py` | Older shared Redis pool (superseded by `valkey/client.py`). |
