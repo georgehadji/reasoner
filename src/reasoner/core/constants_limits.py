@@ -725,3 +725,6 @@ SETTLE_TIMEOUT_SECONDS: float = 15.0
 # (ANONYMOUS_DAILY_CREDIT_CAP). HyperGate is up to five small LLM calls; one
 # credit each call, so the default cap of 50 allows 50 a day (BIL-17).
 GATE_ESTIMATED_COST_USD: float = 0.001
+
+# History entries kept per user; saving a newer one prunes the oldest (PER-12).
+HISTORY_MAX_ENTRIES_PER_OWNER: int = 500

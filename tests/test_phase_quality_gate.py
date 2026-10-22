@@ -130,7 +130,11 @@ def harness(monkeypatch):
     )
     monkeypatch.setattr(mod, "check_run_allowed", lambda *a, **kw: None)
     monkeypatch.setattr(mod, "apply_spend_limits", lambda *a, **kw: None)
-    monkeypatch.setattr(mod, "_save_history_entry", lambda entry: None)
+    class _NoHistory:
+        async def save(self, entry):
+            return None
+
+    monkeypatch.setattr(mod, "history_repo", lambda: _NoHistory())
 
     async def _tier(user_id, **kwargs):
         return SimpleNamespace(value="free")

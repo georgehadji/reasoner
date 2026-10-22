@@ -286,32 +286,36 @@ async def delete_account(
     user_uploads: list = []
     try:
         from reasoner.uploader import delete_file, list_uploads
-        user_uploads = list_uploads(user_id=str(user.id))
+        user_uploads = list_uploads(user_id=str(user.id), include_incomplete=True)
         for upload in user_uploads:
             if delete_file(upload["file_id"]):
                 deleted["uploads"] += 1
     except Exception as exc:
         degraded("saas.delete_account.uploads", None, exc=exc, state=_record)
-
-    # History files
     try:
-        import json as _json
+        from reasoner.infrastructure.persistence.upload_usage_repo import get_upload_usage_repo
 
-        from reasoner.api.history import HISTORY_DIR
-        for f in HISTORY_DIR.glob("*.json"):
-            try:
-                data = _json.loads(f.read_text(encoding="utf-8"))
-                if data.get("user_id") == str(user.id):
-                    f.unlink(missing_ok=True)
-                    deleted["history"] += 1
-            except Exception as exc:
-                # An unreadable history file cannot be attributed to a user, so
-                # it cannot be certified as erased either. Skipping it quietly
-                # is how this endpoint leaves the caller's transcripts on disk
-                # and still reports success.
-                degraded(
-                    "saas.delete_account.history_file", None, exc=exc, state=_record
-                )
+        await get_upload_usage_repo().forget(str(user.id))
+    except Exception as exc:
+        degraded("saas.delete_account.upload_usage", None, exc=exc, state=_record)
+
+    # History files: one directory per owner, so erasing is exact (PER-12)
+    try:
+        from reasoner.api.history import history_repo
+
+        erased, unattributed = await history_repo().erase(str(user.id))
+        deleted["history"] += erased
+        if unattributed:
+            # An unreadable flat-layout file cannot be attributed to a user, so
+            # it cannot be certified erased either. Skipping it quietly is how
+            # this endpoint leaves the caller's transcripts on disk and still
+            # reports success.
+            degraded(
+                "saas.delete_account.history_file",
+                None,
+                exc=OSError(f"{unattributed} history file(s) not erased"),
+                state=_record,
+            )
     except Exception as exc:
         degraded("saas.delete_account.history", None, exc=exc, state=_record)
 

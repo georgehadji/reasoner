@@ -68,6 +68,7 @@ Convention: `<method>.py` holds the strategy class (phase sequence); `<method>_p
 | `email_port.py` | `EmailPort`, `EmailMessage` for event-driven notifications. |
 | `quota_repository.py` | `QuotaRepository`. |
 | `pipeline_ownership_port.py` | `PipelineOwnershipPort`, `OwnershipRecord`, `is_authorized` — who may read/stop/resume a run. |
+| `history.py` | `HistoryRepository` — a user's run history, every operation scoped to one owner (PER-12). |
 | `service_protocols.py` | Protocols for `PresetService`, `PipelineService`, `SearchService`, neuro client, telemetry store. |
 
 ## services/ — pipeline, presets, output
