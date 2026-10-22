@@ -62,6 +62,14 @@ class MemoryPort(Protocol):
         """
         ...
 
+    async def export_owner(self, owner: str) -> dict[str, Any]:
+        """Every memory entry of every tenant belonging to *owner* (GDPR Art. 20),
+        keyed by tenant. Embeddings are left out: they are derived, not the
+        user's content. Raises on an unreadable tenant rather than returning a
+        shorter export.
+        """
+        ...
+
 
 # ── Dependency injection for application → neuro boundary ─────────────────
 _MEMORY_PORT: MemoryPort | None = None

@@ -244,6 +244,15 @@ class EventStoreCorruptionError(PipelineError):
     retryable = False
 
 
+class UserDataExportError(ReasonerError):
+    """A store could not be exported, so the export would be incomplete.
+
+    ``details["stores"]`` names the stores that failed. Retryable: the caller
+    should get the whole export or an error, never a silently shorter one.
+    """
+    retryable = True
+
+
 # ─────────────────────────────────────────────────────────────────────
 # UTILITY FUNCTIONS
 # ─────────────────────────────────────────────────────────────────────

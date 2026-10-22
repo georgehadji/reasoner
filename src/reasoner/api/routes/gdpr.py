@@ -9,7 +9,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from reasoner.api.auth_deps import require_csrf
 from reasoner.api.dependencies import require_key_scope
 from reasoner.domain.saas import User
-from reasoner.infrastructure.persistence.event_store import get_event_store
 
 logger = logging.getLogger(__name__)
 
@@ -23,26 +22,24 @@ router = APIRouter(tags=["gdpr"])
     dependencies=[Depends(require_csrf)],
 )
 async def erase_user_data(user: User = Depends(require_key_scope("history:delete"))) -> dict:
-    """Permanently erase all pipeline data, cache entries, and logs for the requesting user.
+    """Permanently erase everything the user produced: runs, uploads, vectors,
+    history, long-term memory, cache keys, usage and billing rows.
 
-    This operation is **irreversible**. A confirmation parameter is required.
+    The same registry as account deletion, minus the account itself (the users
+    row and the sign-in identity), which needs the account-delete scope.
+    This operation is **irreversible**.
     """
-    # The store the events go to. A bare EventStore() is the SQLite class, so
-    # on the Postgres backend this erased nothing and still reported
-    # "completed" (docs/plans/audit-remediation-2026-10-20.md PER-3).
-    store = get_event_store()
-    from reasoner.api.cache import clear_memory_cache
+    from reasoner.api.user_data import data_stores
     from reasoner.application.services.data_eraser import UserDataEraser
 
-    eraser = UserDataEraser(store, clear_cache_fn=clear_memory_cache)
-    receipt = await eraser.erase(user.id)
+    receipt = await UserDataEraser(data_stores()).erase(str(user.id))
 
     if receipt["status"] != "completed":
         logger.warning("GDPR erasure for user %s was partial: %s", user.id, receipt)
+        failed = ", ".join(f["store"] for f in receipt["failed"])
         raise HTTPException(
-            status_code=500,
-            detail=f"Erasure partially completed: deleted {receipt['deleted_aggregates']} aggregates",
+            status_code=500, detail=f"Erasure partially completed; not erased: {failed}"
         )
 
-    logger.info("GDPR erasure completed for user %s: %d aggregates deleted", user.id, receipt["deleted_aggregates"])
+    logger.info("GDPR erasure completed for user %s: %s", user.id, receipt["erased"])
     return receipt

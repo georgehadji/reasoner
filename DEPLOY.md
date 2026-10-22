@@ -197,6 +197,27 @@ copy one as above and merge the other with the `sqlite3` CLI, for example
 Paths can be overridden with `EVENT_STORE_DB_PATH`, `FEEDBACK_DB_PATH`,
 `AUTH_DB_PATH` and `UPLOAD_STORAGE_DIR` in `.env`.
 
+**Shared Neuro data directory (multi-worker or multi-host).** Neuro's L2 index
+already needs every worker to see the same `data_dir`. Account erasure relies on
+it too: when one worker erases a user, it writes an expiring marker under
+`<data_dir>/.erased/`, and the other workers read it to stop serving that user's
+memory and to refuse new writes for it (DAT-13). Workers on different hosts must
+therefore mount the same `data_dir`; with separate directories an erased user's
+memory stays live on the other hosts.
+
+**History layout (PER-12).** History is stored per owner under
+`history/<owner_key>/`. After the first deploy of this version run, once:
+
+```bash
+docker compose exec backend env PYTHONPATH=src python scripts/migrate_history_layout.py          # dry run
+docker compose exec backend env PYTHONPATH=src python scripts/migrate_history_layout.py --apply
+```
+
+Until it has run, the old flat files are still read and erased for their owner.
+Afterwards delete the old per-tag `history/*.jsonl` files: they hold copies of
+every user's entries, nothing reads them, and account erasure no longer touches
+them.
+
 ---
 
 ## Step 3 — Deploy

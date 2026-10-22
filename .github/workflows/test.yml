@@ -125,7 +125,7 @@ jobs:
           # 2201: audit billing PR (BIL-3..9) sorted credit_service imports (net -1).
           # 2197: audit storage PR (PER-8..11, DAT-8) rewrote the upload hash index
           #       and L2 index on utils.atomic_file (net -3).
-          python scripts/ruff_ratchet.py --max 2195
+          python scripts/ruff_ratchet.py --max 2185
 
       - name: Security scan (bandit)
         run: |
@@ -340,7 +340,7 @@ jobs:
         # agree -- and in ci-local.sh, move it from `advisory` to `gate`.
         continue-on-error: true
         run: |
-          python scripts/vulture_ratchet.py --max 389
+          python scripts/vulture_ratchet.py --max 388
 
       - name: Run tests
         run: |

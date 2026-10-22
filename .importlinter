@@ -188,7 +188,6 @@ ignore_imports =
     reasoner.application.services.constraint_resolver -> reasoner.infrastructure.llm.constraints.circuit_state
     reasoner.application.services.constraint_resolver -> reasoner.infrastructure.llm.constraints.concurrency
     reasoner.application.services.constraint_resolver -> reasoner.infrastructure.llm.constraints.no_repeat_lab
-    reasoner.application.services.data_eraser -> reasoner.infrastructure.persistence.event_store
     reasoner.application.services.estimate_service -> reasoner.infrastructure.llm.pricing_resolver
     reasoner.application.services.gate_service -> reasoner.infrastructure.llm.router
     reasoner.application.services.gate_service -> reasoner.infrastructure.metrics
