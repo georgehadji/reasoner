@@ -6,6 +6,7 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { deleteAccount } from '@/lib/api-client';
+import { deleteHistory } from '@/lib/db';
 import Link from 'next/link';
 import { User, ShieldAlert, ShieldCheck, Database, Key } from 'lucide-react';
 import { SiteHeader } from '@/components/layout/SiteHeader';
@@ -59,6 +60,9 @@ export default function SettingsPage() {
       setLoading(false);
       return;
     }
+
+    // The account is gone: so is its local history on this browser (UI-5).
+    await deleteHistory(user.id).catch(() => {});
 
     try {
       if (supabase) {

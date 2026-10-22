@@ -457,6 +457,29 @@ type RateLimitBucket = { count: number; resetAt: number };
 const rateLimitStore = new Map<string, RateLimitBucket>();
 let rateLimitCallCount = 0;
 
+let proxyTopologyWarned = false;
+
+/**
+ * OPS-9. With no TRUSTED_PROXIES, the rightmost hop is taken as the client.
+ * Behind a CDN plus a load balancer that hop is the CDN's edge, so every user
+ * shares one rate-limit bucket. More than one hop in production means a proxy
+ * chain that was never declared: say so once, loudly, and flag it in
+ * /api/health. Requests are not refused; the backend limiter is the real control.
+ */
+function warnUndeclaredProxyTopology(hopCount: number): void {
+  if (proxyTopologyWarned || process.env.NODE_ENV !== 'production') return;
+  proxyTopologyWarned = true;
+  console.error(
+    `X-Forwarded-For has ${hopCount} hops but TRUSTED_PROXIES is unset: rate limits ` +
+      'may key every user to one proxy address. Set TRUSTED_PROXIES (see DEPLOY.md).',
+  );
+}
+
+/** True once a multi-hop X-Forwarded-For arrived in production with no TRUSTED_PROXIES. */
+export function proxyTopologyUndeclared(): boolean {
+  return proxyTopologyWarned;
+}
+
 /**
  * The rightmost X-Forwarded-For hop that is not a trusted proxy, mirroring
  * the backend's api/client_ip.py. The leftmost entry is whatever the client
@@ -470,6 +493,7 @@ export function getClientIp(req: NextRequest): string {
       (process.env.TRUSTED_PROXIES || '').split(',').map((s) => s.trim()).filter(Boolean),
     );
     const hops = forwarded.split(',').map((s) => s.trim()).filter(Boolean);
+    if (hops.length > 1 && trusted.size === 0) warnUndeclaredProxyTopology(hops.length);
     for (let i = hops.length - 1; i >= 0; i--) {
       if (!trusted.has(hops[i])) return hops[i];
     }

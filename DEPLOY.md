@@ -78,7 +78,20 @@ TAVILY_API_KEY=                   # Optional secondary search backend
 
 # ── Optional: Monitoring ──
 SENTRY_DSN=...
+
+# ── Proxies (required behind a load balancer or CDN) ──
+TRUSTED_PROXIES=10.0.0.2,10.0.0.3 # Every proxy hop in front of the app, comma-separated
 ```
+
+**`TRUSTED_PROXIES`.** Both the backend and the Next.js frontend take the client
+address from `X-Forwarded-For`, walking it right to left past the proxies listed
+here. Leave it unset behind a load balancer or CDN and the rightmost hop, the
+proxy itself, becomes "the client": every user then shares one rate-limit
+bucket. In production the frontend logs this once at error level and
+`/api/health` answers with `X-Proxy-Topology: undeclared`. List the address of
+every hop between the internet and the app (CDN egress ranges, the load
+balancer, Caddy). The rate-limit buckets in the Next.js proxy are per Node
+instance; the backend limiter is the shared, authoritative one.
 
 **Never commit `.env`.** It is already in `.gitignore`.
 
