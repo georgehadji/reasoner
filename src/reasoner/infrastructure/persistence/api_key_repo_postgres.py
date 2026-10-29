@@ -132,6 +132,13 @@ class PostgresApiKeyRepository(ApiKeyRepository):
             key_id,
         )
 
+    async def touch_last_run(self, key_id: UUID) -> None:
+        pool = await self._get_pool()
+        await pool.execute(
+            "UPDATE api_keys SET last_run_at = NOW() WHERE id = $1",
+            key_id,
+        )
+
     async def get_owner(self, key_id: UUID) -> UUID | None:
         pool = await self._get_pool()
         return await pool.fetchval(

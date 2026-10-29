@@ -220,6 +220,7 @@ async def _resolve_api_key(token: str) -> User:
         scopes=set(record.scopes),
         auth_provider="api_key",
         avatar_url=owner.avatar_url,
+        api_key_id=record.id,
     )
 
 

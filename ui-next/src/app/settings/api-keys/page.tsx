@@ -30,7 +30,8 @@ interface KeyLimits {
 }
 
 const SCOPE_LABELS: Record<string, string> = {
-  read: 'Run pipelines and read results',
+  read: 'Read results and catalogues',
+  run: 'Start billed runs',
   write: 'Modify settings and clear cache',
   'preset:read': 'List presets and models',
   'history:read': 'Read run history',

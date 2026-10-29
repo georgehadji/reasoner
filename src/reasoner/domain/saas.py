@@ -41,6 +41,9 @@ class User:
     auth_provider: str | None = None
     avatar_url: str | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    #: Set when the caller authenticated with a Reasoner API key, so admission
+    #: can record that this key started a run (audit 5 SEC-19, Q1).
+    api_key_id: UUID | None = None
 
 
 @dataclass(frozen=True)

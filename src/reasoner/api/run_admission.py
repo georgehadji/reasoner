@@ -74,6 +74,36 @@ def require_auth_if_legacy_disabled(user: User | None) -> None:
         )
 
 
+def require_run_scope(request: Request, user: User | None) -> None:
+    """Refuse an API key that lacks the ``run`` scope, and note keys that run.
+
+    Inside admission, not a route ``Depends``, so a new run route cannot forget
+    it (docs/plans/audit-remediation-5-2026-10-29.md SEC-19). Session and JWT
+    callers pass, as with ``require_key_scope``: scopes only narrow keys.
+    """
+    if user is None or getattr(request.state, "auth_method", None) != "api_key":
+        return
+    from reasoner.domain.api_keys import RUN_SCOPE, key_allows
+
+    if not key_allows(user.scopes, RUN_SCOPE):
+        raise HTTPException(status_code=403, detail=f"API key lacks the '{RUN_SCOPE}' scope")
+    record_key_run(user)
+
+
+def record_key_run(user: User) -> None:
+    """Stamp ``last_run_at`` for the caller's key, off the request path."""
+    if getattr(user, "api_key_id", None) is None:
+        return
+    from reasoner.api import dependencies as deps
+
+    try:
+        asyncio.get_running_loop().create_task(
+            deps._get_api_key_service().record_run(user.api_key_id)
+        )
+    except RuntimeError:  # no running loop (sync test context)
+        pass
+
+
 async def admit_run(
     request: Request,
     *,
@@ -93,6 +123,7 @@ async def admit_run(
     from reasoner.api import idempotency_http
 
     require_auth_if_legacy_disabled(user)
+    require_run_scope(request, user)
     await deps.check_preset_access_if_authenticated(preset, user, request)
 
     if user is None:
@@ -178,4 +209,11 @@ class MeteredSSEResponse(StreamingResponse):
             await release_unstarted(CreditSink(), self._admission.run_context())
 
 
-__all__ = ["Admission", "MeteredSSEResponse", "admit_run", "require_auth_if_legacy_disabled"]
+__all__ = [
+    "Admission",
+    "MeteredSSEResponse",
+    "admit_run",
+    "record_key_run",
+    "require_auth_if_legacy_disabled",
+    "require_run_scope",
+]

@@ -58,6 +58,44 @@ def _summary_to_dict(summary) -> dict[str, Any]:
     }
 
 
+async def _enforce_user_rate_limit(user, tier: str) -> None:
+    """The per-user bucket the HTTP routes use; fails closed, as check_rate_limit."""
+    from reasoner.api.dependencies import _get_rate_limiter_instance
+
+    try:
+        allowed, info = await _get_rate_limiter_instance().is_allowed_for_user(
+            f"user:{user.id}", tier=tier
+        )
+    except Exception:
+        allowed, info = False, {"retry_after": 60}
+    if not allowed:
+        retry_after = int(info.get("retry_after") or 60)
+        raise ValueError(f"Rate limit exceeded; retry after {retry_after}s")
+
+
+async def _admit_mcp_caller(ctx, *, preset: str):
+    """Scope, rate limit, quota, credits and plan tier: the HTTP admission steps.
+
+    MCP has no ``Request``, so it cannot use ``api/run_admission.admit_run``;
+    this is that sequence for this door (docs/plans/
+    audit-remediation-5-2026-10-29.md SEC-18). Each check is looked up on the
+    ``dependencies`` module at call time, so tests can patch it.
+    """
+    from reasoner.api import dependencies as deps
+    from reasoner.api.run_admission import record_key_run
+    from reasoner.application.services.spend_limit_service import resolve_user_tier
+    from reasoner.domain.api_keys import RUN_SCOPE
+
+    user = await resolve_caller(ctx, scope=RUN_SCOPE)
+    tier = (await resolve_user_tier(str(user.id))).value
+    await _enforce_user_rate_limit(user, tier)
+    await deps.check_quota(user)
+    await deps.require_credits(user)
+    await deps.check_preset_access(preset, user, None)
+    record_key_run(user)
+    return user, tier
+
+
 async def _run_and_bill(
     ctx,
     *,
@@ -75,7 +113,7 @@ async def _run_and_bill(
     Every stage reuses the exact function the HTTP agent routes call; see
     api/routes/agent.py::_metered_agent_stream for the HTTP-side twin.
     """
-    from reasoner.api.dependencies import check_quota, require_credits, reserve_or_402
+    from reasoner.api.dependencies import reserve_or_402
     from reasoner.api.run_observability import CreditSink, PrometheusObserver
     from reasoner.api.schemas import CLIENT_RUN_ID_PATTERN, RunRequest
     from reasoner.api.streaming import run_stream_cached
@@ -84,7 +122,6 @@ async def _run_and_bill(
     from reasoner.application.services.pipeline_service import PipelineService
     from reasoner.application.services.preset_service import PresetService
     from reasoner.application.services.run_metering import RunContext, metered
-    from reasoner.application.services.spend_limit_service import resolve_user_tier
     from reasoner.infrastructure.persistence.pipeline_ownership_repo import (
         get_pipeline_ownership_repo,
     )
@@ -95,10 +132,7 @@ async def _run_and_bill(
     if client_run_id is not None and not re.fullmatch(CLIENT_RUN_ID_PATTERN, client_run_id):
         raise ValueError(f"client_run_id must match {CLIENT_RUN_ID_PATTERN}")
 
-    user = await resolve_caller(ctx)
-    await check_quota(user)
-    await require_credits(user)
-    tier = (await resolve_user_tier(str(user.id))).value
+    user, tier = await _admit_mcp_caller(ctx, preset=preset)
 
     # Validate, then claim the id, then reserve: the HTTP routes' order. A
     # reservation taken before a RunRequest validation error or a register_run
@@ -229,30 +263,28 @@ def register_tools(mcp) -> None:
         """
         import json
 
-        from reasoner.api.dependencies import check_quota, require_credits, reserve_or_402
+        from reasoner.api.dependencies import reserve_or_402
         from reasoner.api.run_observability import CreditSink, PrometheusObserver
         from reasoner.api.schemas import FollowupRequest
         from reasoner.api.streaming import run_followup_stream
         from reasoner.application.services.agent_results import summarise
         from reasoner.application.services.run_metering import RunContext, metered
-        from reasoner.application.services.spend_limit_service import resolve_user_tier
 
-        user = await resolve_caller(ctx)
-        await check_quota(user)
-        await require_credits(user)
-        tier = (await resolve_user_tier(str(user.id))).value
+        user, tier = await _admit_mcp_caller(ctx, preset=preset)
 
-        reference_id = f"followup:{uuid.uuid4()}"
-        reserved_credits = await reserve_or_402(
-            user_id=str(user.id), preset=preset, problem=question, reference_id=reference_id,
-        )
-
+        # Validate before reserving: a rejected question used to keep its hold,
+        # which nothing released (docs/plans/audit-remediation-5-2026-10-29.md
+        # BIL-27; the BIL-7 fix for reasoner_run).
         req = FollowupRequest(
             question=question,
             conversation_id=conversation_id,
             previous_synthesis=previous_synthesis,
             history=[],
             preset=preset,
+        )
+        reference_id = f"followup:{uuid.uuid4()}"
+        reserved_credits = await reserve_or_402(
+            user_id=str(user.id), preset=preset, problem=req.question, reference_id=reference_id,
         )
         run_ctx = RunContext(
             preset=preset,
@@ -299,7 +331,6 @@ def register_tools(mcp) -> None:
         pipeline. reasoner_estimate and reasoner_presets stay open because
         they spend nothing.
         """
-        from reasoner.api.dependencies import _get_rate_limiter_instance
         from reasoner.application.services.gate_service import decide_route
         from reasoner.application.services.spend_limit_service import resolve_user_tier
 
@@ -307,15 +338,7 @@ def register_tools(mcp) -> None:
         # Five LLM calls per new problem with no limit made this an open spend
         # tap for any key holder. Same per-user bucket as the HTTP routes (BIL-7).
         tier = (await resolve_user_tier(str(user.id))).value
-        try:
-            allowed, info = await _get_rate_limiter_instance().is_allowed_for_user(
-                f"user:{user.id}", tier=tier
-            )
-        except Exception:
-            allowed, info = False, {"retry_after": 60}  # fail closed, as check_rate_limit
-        if not allowed:
-            retry_after = int(info.get("retry_after") or 60)
-            raise ValueError(f"Rate limit exceeded; retry after {retry_after}s")
+        await _enforce_user_rate_limit(user, tier)
         return await decide_route(problem, preset)
 
     @mcp.tool(

@@ -5,9 +5,9 @@ could mint a stronger key, erase the account's data, delete the account and
 open a checkout. CSRF is skipped for keys, so nothing else stood in the way.
 See docs/plans/audit-remediation-2026-10-20.md, SEC-2.
 
-Running pipelines stays allowed with ``read``: the legacy ``Scope.READ``
-documents it as "run pipelines, view history", and the default key exists for
-the agent endpoints.
+Running pipelines needs the ``run`` scope, which default keys hold because the
+default key exists for the agent endpoints. That check lives in admission, not
+on these routes (tests/test_audit5_admission.py, audit 5 SEC-19).
 """
 
 from __future__ import annotations

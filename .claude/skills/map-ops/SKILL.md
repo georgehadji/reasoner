@@ -82,7 +82,8 @@ folders:
 | `alembic/versions/20261021_000001_subscription_last_event_at.py` | `subscriptions.last_event_at` (webhook ordering guard) and drops the baseline's NOT NULL on `current_period_start`/`_end`, which the repository never wrote, so first-time subscription inserts failed. |
 | `alembic/versions/20261021_000100_add_upload_usage.py` | `upload_usage` table behind the upload quota (PER-8). Run `scripts/backfill_upload_usage.py` after it. |
 | `alembic/versions/20261021_000150_merge_heads.py` | Joins `…000001` (billing) and `…000100` (storage), which both revised `…000000`. No schema change. |
-| `alembic/versions/20261021_000200_webhook_lease.py` | `processed_webhooks.status` / `claimed_at`: the webhook claim is a lease a crashed worker's retry can take after `WEBHOOK_LEASE_SECONDS`. Creates the table when absent (it was made only by the receiver at first use). Current head. |
+| `alembic/versions/20261021_000200_webhook_lease.py` | `processed_webhooks.status` / `claimed_at`: the webhook claim is a lease a crashed worker's retry can take after `WEBHOOK_LEASE_SECONDS`. Creates the table when absent (it was made only by the receiver at first use). |
+| `alembic/versions/20261029_000300_api_key_run_scope.py` | Audit 5 SEC-19, Q1 step 1: backfills the `run` scope onto every existing API key and adds `api_keys.last_run_at`. Step 2, 30 days after deploy, removes `run` from keys with neither `write` nor a recorded run. Current head. |
 
 ## sdk/ — published TypeScript client
 

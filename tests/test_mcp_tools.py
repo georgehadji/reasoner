@@ -56,8 +56,9 @@ def _patch_billable_run(monkeypatch):
     from reasoner.api import dependencies as deps
     from reasoner.api import run_observability
     from reasoner.application.services import idempotency as idem
+    from reasoner.domain.api_keys import DEFAULT_SCOPES
 
-    fake_user = type("FakeUser", (), {"id": "mcp-test-user"})()
+    fake_user = type("FakeUser", (), {"id": "mcp-test-user", "scopes": set(DEFAULT_SCOPES)})()
 
     async def fake_resolve(token):
         return fake_user
@@ -313,3 +314,92 @@ async def test_reasoner_gate_is_rate_limited(mcp_server, monkeypatch):
 
     assert result.isError is True
     assert decided == []
+
+
+# ── Audit 5: the run tools share the HTTP admission steps (SEC-18, BIL-27) ──
+
+
+async def test_reasoner_run_refuses_key_without_run_scope(mcp_server, monkeypatch):
+    """SEC-19 over MCP: a key minted without ``run`` is read-only here too."""
+    _patch_billable_run(monkeypatch)
+    from reasoner.api import dependencies as deps
+
+    read_only = type("FakeUser", (), {"id": "mcp-ro-user", "scopes": {"read"}})()
+
+    async def fake_resolve(token):
+        return read_only
+
+    monkeypatch.setattr(deps, "_resolve_auth_token", fake_resolve)
+
+    async with create_connected_server_and_client_session(mcp_server) as session:
+        result = await session.call_tool("reasoner_run", {"problem": "Should we migrate?"})
+
+    assert result.isError is True
+    assert "lacks the 'run' scope" in (result.content[0].text if result.content else "")
+
+
+async def test_reasoner_run_is_rate_limited(mcp_server, monkeypatch):
+    """SEC-18: only reasoner_gate had a per-user bucket; billed runs had none."""
+    settled = _patch_billable_run(monkeypatch)
+    from reasoner.api import dependencies as deps
+
+    class _Limiter:
+        async def is_allowed_for_user(self, client_id, tier):
+            return False, {"retry_after": 7}
+
+    monkeypatch.setattr(deps, "_get_rate_limiter_instance", lambda: _Limiter())
+
+    async with create_connected_server_and_client_session(mcp_server) as session:
+        result = await session.call_tool("reasoner_run", {"problem": "Should we migrate?"})
+
+    assert result.isError is True
+    assert "Rate limit exceeded" in (result.content[0].text if result.content else "")
+    assert settled == []
+
+
+async def test_reasoner_run_applies_the_preset_tier_gate(mcp_server, monkeypatch):
+    """SEC-18: the HTTP routes call check_preset_access; the MCP tools did not."""
+    _patch_billable_run(monkeypatch)
+    from fastapi import HTTPException
+
+    from reasoner.api import dependencies as deps
+
+    seen: list[str] = []
+
+    async def fake_gate(preset, user, request=None):
+        seen.append(preset)
+        raise HTTPException(status_code=403, detail="Preset requires the pro plan")
+
+    monkeypatch.setattr(deps, "check_preset_access", fake_gate)
+
+    async with create_connected_server_and_client_session(mcp_server) as session:
+        result = await session.call_tool(
+            "reasoner_run", {"problem": "Should we migrate?", "preset": "debate-premium"}
+        )
+
+    assert seen == ["debate-premium"]
+    assert result.isError is True
+
+
+async def test_a_rejected_followup_reserves_no_credits(mcp_server, monkeypatch):
+    """BIL-27: FollowupRequest was built after reserve_or_402, so a blank
+    question kept a hold that nothing released."""
+    _patch_billable_run(monkeypatch)
+    from reasoner.api import dependencies as deps
+
+    reserved: list[str] = []
+
+    async def fake_reserve(**kwargs):
+        reserved.append(kwargs["reference_id"])
+        return 24
+
+    monkeypatch.setattr(deps, "reserve_or_402", fake_reserve)
+
+    async with create_connected_server_and_client_session(mcp_server) as session:
+        result = await session.call_tool(
+            "reasoner_followup",
+            {"question": "   ", "conversation_id": "c1", "previous_synthesis": "s"},
+        )
+
+    assert result.isError is True
+    assert reserved == [], "credits were held for a follow-up that never ran"
