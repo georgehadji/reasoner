@@ -27,7 +27,7 @@ Every item keeps the Dependency Rule (CLAUDE.md §1).
     (`set_model_registry_port()`) is the pattern to copy.
 - **Contract 2** (`application -> infrastructure`) was at 50 declared exceptions on 2026-10-22.
   Re-measure with `scripts/count_importlinter_exceptions.py --contract 2` when you cut each branch.
-  No PR adds an `ignore_imports` line. BIL-28 should remove one.
+  No PR adds an `ignore_imports` line.
 - **Ratchets.** Re-measure silent-failure, bandit, vulture, mypy and ruff at branch time. None may
   get worse. A PR that improves one lowers its `--max` in the same PR. Every new `except` block
   logs through `degraded()` or re-raises.
@@ -116,9 +116,7 @@ Every item keeps the Dependency Rule (CLAUDE.md §1).
 | `api/mcp/tools.py` | The same template for the transport that has no `Request` | `_admit_mcp_caller` runs scope, rate limit, quota, credits and preset tier. It is shared by `reasoner_run`, `reasoner_followup` and `reasoner_gate`. |
 | `domain/api_keys.py` | Pure value rules | `RUN_SCOPE` and the `key_allows` implications stay pure functions. |
 | `infrastructure/redis/run_state.py` | Shared state behind the existing facade, with per-key TTLs and a heartbeat | Per-run Valkey keys replace the set-wide TTL. A polling watcher maps a remote cancel flag onto the local `asyncio.Event`. |
-| `core/ports/spend_counter.py` | Port in `core`, adapters in `infrastructure`, injected at the composition roots | `SpendCounter` Protocol; a Valkey adapter (`INCRBYFLOAT`) and an in-memory adapter. |
-| `application/services/spend_limit_service.py` | Functional core | `check_run_allowed` takes `spent_usd` as an argument instead of reading a counter. Its async callers read the port. |
-| `domain/spend_limits.py`, `domain/credits.py` | One source of truth | The monthly USD cap is derived from the tier's credit allowance, so the two cannot disagree again. `clawback_credits()` is a pure function. |
+| `domain/spend_limits.py`, `domain/credits.py` | One source of truth: the ledger | The per-tier monthly USD cap is deleted, because the credit balance already is the monthly limit for every signed-in user. `clawback_credits()` is a pure function. |
 | `application/services/billing_service.py` | Strategy table, as `PAYPAL_HANDLERS` already does | `STRIPE_HANDLERS` replaces the `if` chain and gains refund and dispute entries. |
 | `api/cache.py`, `api/streaming.py` | Specification (one predicate), applied at the call site | `is_replayable(events)` gates both save and replay. Age comes from the file's mtime and a parallel timestamp dict, so the stored format does not change. |
 | `infrastructure/persistence/*_store.py` | Retention by row class, not by a join that cannot match | Version-0 audit rows have their own retention rule, separate from replayable rows. |
@@ -143,8 +141,9 @@ Rejected options:
 - **Writing snapshots to unlock event pruning (PER-15).** `application/handlers/handlers.py:L324`
   and `L456` rebuild aggregates from full history with `load_from_history`, not from snapshots.
   Deleting versioned events would break status and resume for old runs. See Q6.
-- **Making `check_run_allowed` async.** It would change two production call sites and twelve test
-  call sites. Passing `spent_usd` in keeps the function pure, and the tests stay synchronous.
+- **A shared spend counter (`SpendCounter` port plus a Valkey `INCRBYFLOAT` adapter)** for BIL-28,
+  from the first draft. It would share a limit that duplicates the credit balance. Deleting the
+  duplicate costs less and leaves one rule (Q3).
 
 ---
 
@@ -169,7 +168,20 @@ BIL-26 moved to its own PR 10, because its prices wait on decision Q2.
   - This covers `/api/run` and `/api/run-followup` (`api/__init__.py:L689`, `L727`),
     `agent.py:L161`, `L193`, `context.py:L189` and the resume stream (`pipelines.py:L242`), with
     no route edits.
-- **Migration `<ts>_api_key_run_scope`.** Its backfill rule is decision Q1:
+- **Decided rule (Q1, option C: grandfather, measure, then tighten).** It ships in two steps.
+  - **Step 1, in this PR.** Migration `<ts>_api_key_run_scope`:
+    - backfills `run` onto every key, as in option A below, so nothing breaks on deploy;
+    - adds `api_keys.last_run_at TIMESTAMPTZ NULL`;
+    - `_require_run_scope` stamps `last_run_at` for the calling key, through a repo method built
+      the same way as the existing `last_used_at` update (`api_key_repo_postgres.py:L131`).
+    - Test: `test_run_stamps_last_run_at`.
+  - **Step 2, a follow-up migration 30 days after deploy.** Remove `run` from keys that hold
+    neither `write` nor a non-null `last_run_at`. Keys that have actually started runs keep it, and
+    unused read keys lose it. The hole then closes for every key except those whose owners rely
+    on it.
+  - Announce step 2's date with step 1. A key that loses `run` gets a 403 naming the scope, and
+    its owner mints a new key.
+- **The options considered** for the backfill:
   - **Option A, backfill every key:** `UPDATE api_keys SET scopes = array_append(scopes, 'run') WHERE NOT ('run' = ANY(scopes))`.
     No key breaks. But every existing default `{read, preset:read, history:read}` key can still
     start runs, so the hole closes only for keys minted after the deploy.
@@ -221,7 +233,7 @@ BIL-26 moved to its own PR 10, because its prices wait on decision Q2.
 - Migration: `tests/integration/test_api_key_run_scope_backfill.py` against `reasoner-pg-test`
   (:55499), for the backfill rule chosen in Q1.
 
-### PR 10: `fix/audit5-flat-charges` (BIL-26, blocked on decisions Q2 and Q9)
+### PR 10: `fix/audit5-flat-charges` (BIL-26; decisions Q2 and Q9 are proposed in section 5)
 
 Cut after PR 1, because it reuses `_require_run_scope`.
 
@@ -259,16 +271,27 @@ Cut after PR 1, because it reuses `_require_run_scope`.
   - `/api/generate-image` itself: move `L216-224` onto `admit_flat_charge(kind="image")`. That
     also closes the `user is None` gap, because the helper calls the trial cap. Delete
     `_reserve_image_credits` and `_release_image_credits`.
-  - `/api/gate` (decision Q9): the published docs call it free (`ui-next/src/app/llms.txt/route.ts:L52`,
-    `docs.ts:L914`, `DevelopersPage.tsx:L328`), and the chat UI calls it before runs
-    (`chat/page.tsx:L249`). Charging it would roughly double the HyperGate cost of every gated run.
-    **Recommended:** it stays free for authenticated callers and keeps `check_rate_limit`. The
-    anonymous branch at `gate.py:L37-38` stays as it is. If Q9 decides to charge it instead, use
-    `admit_flat_charge(kind="gate", cost_usd=GATE_ESTIMATED_COST_USD)` and update those three
-    docs in the same PR.
-- **`core/constants_limits.py`.** Add `SEARCH_ESTIMATED_COST_USD`,
-  `SMART_SEARCH_ESTIMATED_COST_USD` and `IMAGE_PREVIEW_ESTIMATED_COST_USD`, next to
-  `GATE_ESTIMATED_COST_USD`. Their values are decision Q2.
+  - `/api/gate` (decision Q9): free, with a fair-use daily allowance.
+    - The published docs call it free (`ui-next/src/app/llms.txt/route.ts:L52`, `docs.ts:L914`,
+      `DevelopersPage.tsx:L328`), and the chat UI calls it before runs (`chat/page.tsx:L249`).
+    - Free with no allowance is not safe. At `GATE_ESTIMATED_COST_USD = 0.001`
+      (`constants_limits.py:L750`) and the 1000-per-hour user limit (`settings.py:L62-63`), one
+      free account can spend about $24 a day by varying the problem text so the cache misses.
+    - Add `GATE_FREE_CALLS_PER_DAY = 200` (about $0.20 a day) to `core/constants_limits.py`,
+      counted per user per UTC day in Valkey (`INCR gate:<user>:<YYYY-MM-DD>`, `EXPIRE 90000`).
+      Past it, return 429 with `Retry-After` set to the next UTC midnight.
+    - On a Valkey error, fail open to the hourly rate limit, logged through `degraded()`.
+    - The anonymous branch at `gate.py:L37-38` stays as it is.
+    - Docs: "free, up to 200 calls a day".
+- **`core/constants_limits.py`.** Add these, next to `GATE_ESTIMATED_COST_USD`, using the Q2
+  derivation. Each has a one-line comment with that derivation:
+  - `SEARCH_ESTIMATED_COST_USD = 0.007`;
+  - `SMART_SEARCH_ESTIMATED_COST_USD = 0.022`;
+  - `IMAGE_PREVIEW_ESTIMATED_COST_USD = 0.002`.
+- **Verification step before merge.** Run one `/api/search` against a real OpenRouter key, then
+  read that generation's cost from OpenRouter's generation stats. The cost shows whether the
+  Perplexity request fee is billed through OpenRouter. If it is not, the search constants fall to
+  `0.002` and `0.007`. The PR body records which.
 - **Architecture test** `tests/architecture/test_billed_routes_admitted.py`: an AST scan of
   `api/` that fails when a module calls `smart_search`, `SearchService.search`,
   `enhance_image_prompt`, `generate_images` or `decide_route` from a route function that does not
@@ -280,7 +303,8 @@ Cut after PR 1, because it reuses `_require_run_scope`.
 - `test_image_preview_is_charged`: this fails today.
 - `test_legacy_anonymous_image_hits_trial_cap`: this fails today.
 - `test_failed_search_refunds_hold`.
-- `test_gate_pricing_matches_q9`.
+- `test_gate_free_until_daily_allowance`: call 201 returns 429. This fails today.
+- `test_gate_allowance_fails_open_without_valkey`.
 - The existing image-metering tests (`tests/test_images_metering.py`) pass after repointing from
   `_reserve_image_credits` to `admit_flat_charge`.
 
@@ -350,46 +374,33 @@ each with its own local store, sharing one Valkey fake.
 
 This PR goes after audit-4 PR 1, which changes `CreditSink.settle` and the quota increment.
 
-#### BIL-28: a shared spend counter, and caps derived from the allowance (decision Q3)
+#### BIL-28: the credit balance is the monthly limit (decision Q3)
 
-- **`core/ports/spend_counter.py`.** A `SpendCounter` Protocol with two methods:
-  - `async def get(self, subject: str, period: str) -> float`;
-  - `async def add(self, subject: str, period: str, usd: float) -> float`.
+`apply_spend_limits` sets the monthly cap only when there is a billing subject, that is, a signed-in
+user (`spend_limit_service.py:L200-205`). Every signed-in user also has a credit balance, and
+`require_credits` refuses work once it is exhausted (`dependencies.py:L648-650`,
+`MAX_OVERDRAFT_CREDITS = 0`). So the per-tier monthly USD cap duplicates the ledger, and BIL-28 is
+two limits that disagree. Fix it by deleting the duplicate, not by sharing it.
 
-  Module-level `set_spend_counter_port()` and `spend_counter()` follow the model-registry-port
-  shape.
-- **Adapters:**
-  - `infrastructure/valkey/spend_counter.py`: `INCRBYFLOAT spend:<subject>:<YYYY-MM>`, then
-    `EXPIRE` of 40 days on the first write of a period.
-  - `infrastructure/llm/spend_tracker.py` becomes the in-memory adapter. Its existing functions
-    stay as the implementation, so `tests/unit/test_spend_limits.py` keeps passing.
-  - On a Valkey error the adapter degrades to the in-memory one through `degraded()`. That is
-    today's behaviour, now visible.
-- **Injection.** `api/__init__.py`, `main.py` and `headless.py` each call
-  `set_spend_counter_port(...)`, next to `set_model_registry_port()`.
-- **`spend_limit_service.check_run_allowed(preset_id, tier, billing_subject=None, *, spent_usd=0.0)`.**
-  It stays pure. The import at `L319` goes away; if it is a declared contract-2 exception, delete
-  that line and lower the count.
-  - The two async callers (`api/execution/pipeline.py:L400`, `routes/context.py:L123`) first run
-    `spent = await spend_counter().get(user_id, current_period())`.
-- **`executor.py:L770-775`** uses `await spend_counter().add(...)`, but only when
-  `state.billing_subject` is set.
-  - The anonymous fallback subject (`conversation_id`, `L764`) stays on the in-memory adapter, as
-    today. Otherwise every anonymous conversation would create its own 40-day Valkey key.
-  - The cost is one Valkey round trip per LLM call, next to a call that takes seconds.
-- **`domain/spend_limits.py`.** Derive `monthly_usd` for each paid tier as
-  `credits_to_usd(TIER_MONTHLY_CREDITS[tier]) * MONTHLY_CAP_HEADROOM`, with
-  `MONTHLY_CAP_HEADROOM = 1.2`. `domain -> domain` is legal. Add a test that pins
-  `monthly_usd >= allowance` for every paid tier.
-  - PRO goes from $8.00 to $30.00.
-  - ENTERPRISE goes from $100.00 to $300.00. Its 250,000-credit allowance ($250) is above today's
-    $100 cap, so it has the same contradiction as PRO.
-  - FREE keeps its explicit $0.50, because it also bounds anonymous callers.
-  - All three values are decision Q3.
-- **Existing tests that change.** `tests/unit/test_spend_limits.py:L119-128` records spend through
-  `spend_tracker`, then expects `check_run_allowed(..., subject)` to reject. Those cases now pass
-  `spent_usd=` directly. `tests/unit/test_spend_cap_enforcement.py` moves to the port with the
-  in-memory adapter.
+- **`domain/spend_limits.py`.** Set `monthly_usd = UNLIMITED` for every tier, and delete the
+  three per-tier monthly values and their comments. `per_run_usd` stays: it bounds the overdraft
+  one in-flight run can cause after the balance check.
+- **`spend_limit_service.check_run_allowed`.** Its monthly branch (`L318-332`) now applies only
+  when the operator sets the deployment-wide `SPEND_CAP_MONTHLY_USD`, which defaults to `0.0`,
+  meaning unlimited (`settings.py:L311`).
+  - That global cap still uses the per-worker `spend_tracker`. Its module docstring already names
+    that limit.
+  - Add a `shortcut:` line, and state in `docs/ENVIRONMENT.md` that the effective cap is about
+    `value × workers`.
+- **Not built:** the `SpendCounter` port and its Valkey adapter from the first draft. They would
+  make a duplicate limit shared, when it should be removed.
+- **Residual.** Overdraft is bounded by the number of concurrent runs a user can start, times the
+  per-run cap. The per-user rate limit and PR 1's quota hold both bound that number.
+- **Existing tests that change.**
+  - `tests/unit/test_spend_limits.py:L106-151` and `tests/unit/test_spend_cap_enforcement.py`
+    assert per-tier monthly rejections. Those cases become rejections under a configured global
+    `SPEND_CAP_MONTHLY_USD`.
+  - Add `test_tier_monthly_cap_is_unlimited` and `test_global_monthly_cap_still_applies`.
 
 #### BIL-29: refunds and disputes (decision Q4)
 
@@ -430,9 +441,16 @@ This PR goes after audit-4 PR 1, which changes `CreditSink.settle` and the quota
       re-reads live Stripe state (`stripe_adapter.py:L152-160`) and reinstates `active`. Then set
       the status to `cancelled`, run `sync_quota_for_subscription`, and call `claw_back` for the
       invoice's period.
-    - `charge.dispute.created`: set the status to `past_due`.
-    - `charge.dispute.closed`: when `status == "lost"`, handle it as a full refund. When `won`, set
-      the status back to `active`.
+    - Dispute handling follows Stripe's `status` enum (see Sources):
+    - `charge.dispute.created` with `warning_needs_response` or `warning_under_review`: this is
+      an inquiry, not a chargeback. Change nothing, log through `degraded()`, and raise an
+      operator alert. Refunding at this stage avoids both $15 dispute fees.
+    - `charge.dispute.created` with `needs_response` or `under_review`: set `past_due`.
+    - `charge.dispute.created` that arrives already `lost`: handle it as a lost dispute. There is
+      a community report of a dispute lost at creation that never sent `charge.dispute.closed`.
+    - `charge.dispute.closed` with `lost`: handle it as a full refund.
+    - `charge.dispute.closed` with `won`, `warning_closed` or `prevented`: set the status back to
+      `active`.
   - Every write keeps the `event_at` ordering guard (BIL-15).
 - **PayPal.** `PAYMENT.SALE.*` does not start with `BILLING.SUBSCRIPTION.` (`billing_service.py:L111`),
   so today it falls through into the Stripe chain.
@@ -483,9 +501,9 @@ Quota today runs as a route `Depends(check_quota_if_authenticated)`, outside `ad
 
 **Tests first:** `tests/test_audit5_billing_ledger.py`:
 
-- `test_spend_counter_shared_across_instances`: two app instances share one Valkey fake.
-- `test_pro_cap_not_below_allowance`.
-- `test_check_run_allowed_is_pure`.
+- `test_tier_monthly_cap_is_unlimited`: a PRO user past $8 of spend is not refused. This fails
+  today.
+- `test_global_monthly_cap_still_applies`.
 - `test_full_refund_cancels_and_claws_back_unspent_grant`.
 - `test_partial_refund_changes_nothing`.
 - `test_dispute_lost_claws_back`, `test_dispute_won_restores_active`.
@@ -754,7 +772,7 @@ envelope or a gate inside `_save_cache` would break it.
 ```
 audit-4 PR 1 (settlement) ──► PR 3 billing-ledger   (shares CreditSink.settle, the quota increment, run_metering)
 PR 1 run-admission ─────────► PR 3                  (shares admit_run and _admit_mcp_caller)
-PR 1 run-admission ─────────► PR 10 flat charges    (reuses _require_run_scope; also waits on Q2 and Q9)
+PR 1 run-admission ─────────► PR 10 flat charges    (reuses _require_run_scope; Q2 prices verified before merge)
 PR 2 cross-worker stop ─┐
 PR 4 event retention    │
 PR 5 run cache          ├─ independent of each other and of PR 1
@@ -779,7 +797,7 @@ Estimated size:
 | PR 1 | about 90 lines of code plus 150 of tests, plus a migration |
 | PR 10 | about 100 plus 120 |
 | PR 2 | about 140 plus 180 |
-| PR 3 | about 330 plus 340 |
+| PR 3 | about 260 plus 300 |
 | PR 4 | about 90 plus 120 |
 | PR 5 | about 80 plus 110 |
 | PR 6 | about 30 plus 60 |
@@ -793,28 +811,49 @@ Append to `docs/DEPLOY_AUDIT_2_3.md` under a new "Audit 5" heading, in the same 
 
 | PR | Step |
 |----|------|
-| PR 1 | Run `alembic upgrade head`, which applies the `run` scope backfill. Announce the Q1 outcome. Under option B, say that keys without `write` can no longer start runs, and that a new key with the default scopes can. |
+| PR 1 | Run `alembic upgrade head`, which applies the `run` scope backfill and adds `last_run_at`. Announce the step-2 date: 30 days later, keys that hold neither `write` nor a recorded run lose `run`. |
+| PR 1 + 30 days | Apply the step-2 migration. Before applying, count the keys it would change, and record the count in its PR. |
 | PR 2 | Confirm that Valkey is reachable from every worker. Without it, Stop stays per worker, as today. |
 | PR 3 | Enable `charge.refunded`, `charge.dispute.created` and `charge.dispute.closed` on the Stripe webhook endpoint, and `PAYMENT.SALE.REFUNDED` and `PAYMENT.SALE.REVERSED` on PayPal. |
-| PR 3 | Expect the spend totals to start from zero once they move to Valkey. |
+| PR 3 | If `SPEND_CAP_MONTHLY_USD` is set in production, note that it is still per worker. Per-tier monthly caps no longer exist. |
 | PR 4 | Schedule `POST /api/admin/compaction/run` daily. Run it once by hand, then check the deleted count and the table size. |
 | PR 4 | Alert on `reasoner_compaction_last_success_timestamp` going stale. |
 | PR 5 | Set `RUN_CACHE_MAX_AGE_SECONDS` and `RUN_CACHE_WEB_MAX_AGE_SECONDS` if the defaults do not suit. The v8 key turns every existing entry into a miss once. |
 | PR 7 | Check `TRUSTED_PROXIES` against the real proxy address before deploy, then confirm that resolved client IPs differ between two clients. |
 
-## 5. Decisions needed
+## 5. Decisions (researched 2026-10-29)
 
-| # | Question | Recommendation |
-|---|----------|----------------|
-| Q1 | Key scope for starting runs, and which existing keys get it | **A new `run` scope, in `DEFAULT_SCOPES`.** Requiring `write` instead would break every default key used for agent runs. The backfill is the real trade-off. **Option A**, backfill every key: nothing breaks, but every existing default key can still spend, so the hole closes only for new keys. **Option B**, backfill only keys holding `write`: the hole closes now, and integrations that run with a default key get a 403 naming the missing scope and must mint a new key. Recommended: **B**, announced with the deploy, because the finding is that a leaked read key drains credits, and A leaves every such key in place. |
-| Q2 | Flat prices for search, smart search, image preview and gate | **[INPUT REQUIRED: per-call fees for Brave, Tavily and Perplexity Sonar on the plans in use.]** The repo has no provider pricing for search APIs. The LLM part (smart-search decomposition, the prompt enhancer, HyperGate) can be priced from the model price table that `estimate_service` already uses. |
-| Q3 | Monthly USD cap against the credit allowance | **Derive the cap from the allowance × 1.2 for paid tiers.** PRO goes from $8 to $30, and ENTERPRISE from $100 to $300; both caps sit below today's allowances ($25 and $250). Keep FREE at $0.50, because it also bounds anonymous callers. The alternative, lowering the allowances, changes what customers bought. |
-| Q4 | Refund and dispute policy | **A full refund or a lost dispute cancels and claws back the unspent part of this period's grant. A partial refund changes nothing and is logged. An open dispute sets `past_due`, and a won dispute restores `active`.** |
-| Q5 | Does a failed run use up quota? | **No.** Hold at admission, and give it back when the run settles at zero cost. That matches today's "count only charged runs" behaviour, without the race. |
-| Q6 | Event retention | **Prune version-0 audit rows now.** Leave versioned rows until aggregate loading goes through snapshots (`handlers.py:L324`, `L456` use full history today). That would be a separate plan. |
-| Q7 | Cache limits | **`RUN_CACHE_MAX_EVENTS` stays 200 until event counts of real Article and Writing runs are measured. A larger cap multiplies the 256-entry memory cache. `RUN_CACHE_MAX_AGE_SECONDS=604800` (7 days), `RUN_CACHE_WEB_MAX_AGE_SECONDS=3600`.** |
-| Q8 | Feedback from anonymous users | **Keep it anonymous, now rate-limited and size-capped.** Requiring sign-in would drop landing-page feedback. |
-| Q9 | Charge authenticated `/api/gate` calls? | **No.** The published docs promise it is free, and the chat UI calls it before runs, so a charge would roughly double the HyperGate cost of every gated run. It keeps its rate limit and HyperGate's cache. If it is charged instead, the three docs pages change in PR 10. |
+Each row gives the recommended answer, the evidence behind it, and what would change it.
+Repository facts were read from the code. External facts come from the sources at the end of this
+section, and are marked where those sources disagree. They are still recommendations, so the
+owner confirms each one before its PR is built.
+
+| # | Question | Recommendation | Evidence |
+|---|----------|----------------|----------|
+| Q1 | Key scope for starting runs, and which existing keys get it | **Option C, grandfather then tighten.** Add a `run` scope to `DEFAULT_SCOPES`. Backfill it onto every key now, and record `last_run_at` per key. After 30 days, remove it from keys that hold neither `write` nor a recorded run. | `api_keys` has `last_used_at` but nothing that shows whether a key started runs, so who needs `run` cannot be known today. Option A (backfill all) leaves the hole for every existing key. Option B (only `write` keys) breaks integrations blindly. Vendor practice runs both ways: DeepL leaves existing keys unrestricted, and Atlassian makes users rotate to scoped keys. Zuplo describes notify, monitor adoption, then revoke. C follows that sequence, with data. |
+| Q2 | Flat prices for search, smart search and image preview | **Search $0.007 (7 credits). Smart search $0.022 (22 credits). Image preview $0.002 (2 credits).** Verify against one real OpenRouter generation before merging PR 10. | `/api/search` tries Perplexity `sonar` through OpenRouter first (`discovery.py:L403-430`), at low context (`registry.py:L150`), with up to 2048 output tokens (`discovery.py:L93`). Sonar is $1/$1 per 1M tokens (catalogue, and OpenRouter's page). Perplexity bills a $5 per 1K request fee at low context. OpenRouter's page lists no request fee, so whether OpenRouter passes it on is unconfirmed. Smart search is one Qwen3.5-9B decomposition ($0.10/$0.15 per 1M) plus at most 3 sonar calls (`DEFAULT_MAX_DECOMPOSED_QUERIES = 3`). The preview is one Grok 4.3 call ($1.25/$2.50 per 1M) capped at 512 output tokens. Tavily ($0.008 per basic search) and Brave (about $5 per 1K) are fallbacks, and both stay inside the search price. |
+| Q3 | Monthly USD cap against the credit allowance | **Delete the per-tier monthly USD cap. The credit balance is the monthly limit.** Keep `per_run_usd`, and keep the operator's optional global `SPEND_CAP_MONTHLY_USD`. | The monthly cap applies only to signed-in subjects (`spend_limit_service.py:L200-205`). Every signed-in user also has a balance, and `require_credits` blocks once it is exhausted (`dependencies.py:L648`, `MAX_OVERDRAFT_CREDITS = 0`). Two limits on the same thing disagreed: PRO $8 against $25 of credits, ENTERPRISE $100 against $250. Admin adjustments (`routes/credits.py:L111`) add credits that a derived cap would also block. Deleting the cap removes the need for a shared counter. |
+| Q4 | Refund and dispute policy | **A full refund or a lost dispute cancels at the provider, then claws back the unspent part of the refunded invoice's grant. A partial refund changes nothing and is logged. A formal dispute (`needs_response`, `under_review`) sets `past_due`. An inquiry (`warning_*`) changes nothing and alerts the operator. `won`, `warning_closed` and `prevented` restore `active`.** | Stripe's dispute `status` enum separates inquiries (`warning_*`) from formal disputes. Treating an inquiry as a chargeback would suspend users with no money lost. Refunding at the inquiry stage avoids both $15 dispute fees, and the received fee is not returned even on a win (third-party fee guides citing Stripe; confirm on Stripe's fee page). Wins and losses both count toward the dispute rate, which is why the alert matters. |
+| Q5 | Does a failed run use up quota? | **No.** Hold at admission, and give it back when the run settles at zero cost. | It matches the 2026-09-03 policy that users pay for spend actually incurred (`run_metering.py` docstring), and today's "count only charged runs" behaviour, without the race. |
+| Q6 | Event retention | **Prune version-0 audit rows after `EVENT_RETENTION_DAYS` (365 by default, `settings.py:L386`). Keep versioned rows.** | Version-0 rows sit outside replay (`get_events` reads `version > 0`). Their prompt bodies are already stripped (PER-3). Aggregates rebuild from full history (`handlers.py:L324`, `L456`), so deleting versioned rows would break status and resume. Shortening audit retention below 365 days is possible, but no requirement for it is recorded in the repo. |
+| Q7 | Cache limits | **`RUN_CACHE_MAX_EVENTS` stays 200. `RUN_CACHE_MAX_AGE_SECONDS=604800` (7 days). `RUN_CACHE_WEB_MAX_AGE_SECONDS=3600`.** | A run emits about two events per phase, plus one `text_chunk` per synthesis sentence (`sse_observer.py:L383-392`). The Article method targets 800–1200 words (`ARTICLE_METHOD_SPECIFICATION.md`), about 40–70 sentences. The one recorded article output (`docs/article-test-results.json`) has 671 words in 32 sentences. Typical runs therefore stay under 200. A run past it is now skipped, not stored broken. The only local cache file holds 8 events. |
+| Q8 | Feedback from anonymous users | **Keep it anonymous, now rate-limited, with `rating` typed and `context` capped.** | The route takes no user today (`feedback.py:L32-37`), and `ChatFeed.tsx` sends feedback. Whether `SiteFooter.tsx` posts to the same route was not checked. Requiring sign-in would change a working flow, and the abuse case is volume, which the rate limit and size cap address. |
+| Q9 | Charge authenticated `/api/gate` calls? | **No, but add a fair-use allowance: 200 free calls per user per UTC day, then 429.** | The docs promise it is free (`llms.txt/route.ts:L52`, `docs.ts:L914`, `DevelopersPage.tsx:L328`), and the chat flow calls it before runs (`chat/page.tsx:L249`). Free with no allowance is unsafe: at $0.001 a call (`constants_limits.py:L750`) and the 1000-per-hour limit (`settings.py:L63`), one free account can spend about $24 a day. 200 a day caps it near $0.20 and keeps the docs true with one qualifier. |
+
+### Sources
+
+- Perplexity pricing, request fees by search context size: <https://docs.perplexity.ai/guides/pricing>
+  and <https://www.activepieces.com/blog/perplexity-sonar-api-cost-per-search-2026-guide>
+- OpenRouter `perplexity/sonar` pricing ($1/$1 per 1M; no request fee listed): <https://openrouter.ai/perplexity/sonar/pricing>
+- Tavily credits (1 per basic, 2 per advanced): <https://docs.tavily.com/documentation/api-credits>;
+  per-credit price: <https://apicostcalc.com/tavily.html>
+- Brave Search API, about $5 per 1K (sources disagree): <https://costbench.com/software/ai-search-apis/brave-search-api/>
+- Stripe Dispute object and `status` enum: <https://docs.stripe.com/api/disputes/object>
+- Stripe dispute fees (third party, citing Stripe): <https://redo.com/resources/articles/chargebacks/stripe-chargeback-fees>,
+  <https://www.chargeflow.io/blog/stripe-dispute-fees>
+- A dispute lost at creation with no `closed` event (community report): <https://forge.joomlapolis.com/issues/8815?tab=notes>
+- Scoped-key migration practice: <https://developers.deepl.com/docs/admin/api-key-permissions>,
+  <https://www.resolution.de/?p=82279>, <https://zuplo.com/learning-center/api-key-rotation-lifecycle-management>
 
 ## 6. Verification for every PR
 
@@ -842,7 +881,10 @@ Append to `docs/DEPLOY_AUDIT_2_3.md` under a new "Audit 5" heading, in the same 
   - Stop needs Valkey to work across workers;
   - on a network file system with coarse mtimes, Neuro can still read a turn late, by up to that
     file system's timestamp granularity;
-  - under Q1 option A, existing default keys can still start runs until they are rotated.
+  - for the 30 days between Q1's step 1 and step 2, existing default keys can still start runs;
+  - Q2's search prices assume OpenRouter passes on Perplexity's request fee, until the PR 10
+    verification step confirms or refutes that;
+  - overdraft after the balance check is bounded by concurrent runs times `per_run_usd` (Q3).
 
 ## 8. Changes after independent review (2026-10-29)
 
