@@ -39,11 +39,16 @@ PREFIX_SAMPLE_CHARS = 8
 
 #: Scopes a user may grant to their own keys. Administrative scopes are
 #: deliberately excluded — a user key can never escalate beyond its owner.
+#: Starting a billed run. Default keys hold it, because the default key exists
+#: for the agent endpoints (SEC-2); a key minted without it is read-only
+#: (docs/plans/audit-remediation-5-2026-10-29.md SEC-19).
+RUN_SCOPE = "run"
+
 ASSIGNABLE_SCOPES: frozenset[str] = frozenset(
-    {"read", "write", "preset:read", "history:read", "history:delete"}
+    {"read", "write", "preset:read", "history:read", "history:delete", RUN_SCOPE}
 )
 
-DEFAULT_SCOPES: frozenset[str] = frozenset({"read", "preset:read", "history:read"})
+DEFAULT_SCOPES: frozenset[str] = frozenset({"read", "preset:read", "history:read", RUN_SCOPE})
 
 #: Required by routes that no key may reach, because neither scope is in
 #: ASSIGNABLE_SCOPES. Minting keys and deleting the account need an

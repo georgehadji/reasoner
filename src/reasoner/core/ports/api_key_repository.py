@@ -49,6 +49,10 @@ class ApiKeyRepository(Protocol):
         """Record that the key was just used. Best-effort, never blocking."""
         ...
 
+    async def touch_last_run(self, key_id: UUID) -> None:
+        """Record that the key just started a run. Best-effort, never blocking."""
+        ...
+
     async def get_owner(self, key_id: UUID) -> UUID | None:
         """Return the user id that owns ``key_id``, or None."""
         ...

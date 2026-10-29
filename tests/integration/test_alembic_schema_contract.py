@@ -55,6 +55,8 @@ COLUMNS = {
     # BIL-21: the webhook claim is a lease.
     ("processed_webhooks", "status"),
     ("processed_webhooks", "claimed_at"),
+    # Audit 5 SEC-19, Q1: which keys start runs.
+    ("api_keys", "last_run_at"),
 }
 
 
@@ -150,3 +152,48 @@ async def test_upgrade_is_repeatable():
         _alembic_upgrade(dsn)
         _alembic_upgrade(dsn)
         await _assert_contract(dsn)
+
+
+def _alembic(dsn: str, *args: str) -> None:
+    env = {**os.environ, "DATABASE_URL": dsn.replace("postgresql://", "postgresql+asyncpg://", 1)}
+    result = subprocess.run(
+        [sys.executable, "-m", "alembic", *args],
+        cwd=ROOT, env=env, capture_output=True, text=True, timeout=120,
+    )
+    assert result.returncode == 0, result.stderr[-2000:]
+
+
+async def test_run_scope_is_backfilled_onto_existing_keys():
+    """Audit 5 Q1 step 1: a key minted before the `run` scope existed keeps
+    starting runs after the upgrade, and a key that already has it is not
+    given a second copy."""
+    import asyncpg
+
+    async with _fresh_database() as dsn:
+        _alembic(dsn, "upgrade", "20261021_000200")
+        conn = await asyncpg.connect(dsn)
+        try:
+            user_id = await conn.fetchval(
+                "INSERT INTO users (email) VALUES ('k@example.com') RETURNING id"
+            )
+            await conn.execute(
+                "INSERT INTO api_keys (user_id, name, key_hash, key_prefix, scopes) VALUES "
+                "($1, 'old', 'h-old', 'p', ARRAY['read','preset:read','history:read']), "
+                "($1, 'has', 'h-has', 'p', ARRAY['read','run'])",
+                user_id,
+            )
+        finally:
+            await conn.close()
+
+        _alembic(dsn, "upgrade", "head")
+
+        conn = await asyncpg.connect(dsn)
+        try:
+            rows = {r["name"]: list(r["scopes"]) for r in await conn.fetch(
+                "SELECT name, scopes FROM api_keys"
+            )}
+        finally:
+            await conn.close()
+
+    assert rows["old"].count("run") == 1
+    assert rows["has"].count("run") == 1
