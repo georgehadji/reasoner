@@ -16,8 +16,8 @@
 import-linter>=2.15,<3.0.0
 
 # Testing
-pytest>=9.1.1,<10.0.0
-pytest-asyncio>=1.4.0,<1.5.0
+pytest>=9.2.0,<10.0.0
+pytest-asyncio>=1.4.1,<1.5.0
 pytest-timeout>=2.4.0,<3.0.0
 pytest-xdist>=3.8.0,<4.0.0
 # Randomises test order every run. Added because the T1 order-dependence
@@ -27,7 +27,7 @@ pytest-xdist>=3.8.0,<4.0.0
 # _SHARED_CACHE_PORT leak lived in. A failure here is a real isolation
 # defect; reproduce it with the -p randomly seed printed in the header.
 pytest-randomly>=5.0.0,<6.0.0
-hypothesis>=6.168.5,<7.0.0
+hypothesis>=6.170.14,<7.0.0
 
 # Static analysis
 # Pinned exactly, not ranged: scripts/vulture_ratchet.py compares an exact
