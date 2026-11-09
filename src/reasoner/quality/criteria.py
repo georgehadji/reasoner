@@ -13,12 +13,16 @@ if TYPE_CHECKING:
 @dataclass
 class PhaseQualityResult:
     passed: bool
-    score: float  # 0.0 – 10.0
+    # 0.0-10.0 when something graded the output: the LLM judge, or a rule that
+    # flags a concern (partial context, low idea diversity). None for a clean
+    # rule pass or a phase with no rule -- those check structure, not quality,
+    # and used to report a constant 8.0 or 9.0 that the UI showed as a grade.
+    score: float | None
     reason: str
     suggestions: list[str] = field(default_factory=list)
 
 
-def _ok(score: float = 9.0) -> PhaseQualityResult:
+def _ok(score: float | None = None) -> PhaseQualityResult:
     return PhaseQualityResult(passed=True, score=score, reason="Quality checks passed.")
 
 
@@ -79,7 +83,7 @@ def _check_perspectives(state: PipelineState) -> PhaseQualityResult:
             score=6.5,
             reason=f"{len(thin)}/{len(state.candidates)} perspective(s) are thin but usable.",
         )
-    return _ok(score=9.0)
+    return _ok()
 
 
 def _check_critique(state: PipelineState) -> PhaseQualityResult:
@@ -90,7 +94,7 @@ def _check_critique(state: PipelineState) -> PhaseQualityResult:
         # scores here are the phase honouring its own contract. Failing it
         # ended those runs with no synthesis the moment the quality gate began
         # executing -- see docs/plans/architecture-score-9-remediation-2026-09-09.md A-2.
-        return _ok(score=8.0)
+        return _ok()
     if not state.scores:
         return _fail(
             "Critique produced no scores.",
@@ -119,7 +123,7 @@ def _check_stress_testing(state: PipelineState) -> PhaseQualityResult:
     if not state.top_candidates:
         # Same skip contract, one phase later: run_stress_test_phase returns
         # early with "No top candidates to stress test" (perspective_phases.py:297).
-        return _ok(score=8.0)
+        return _ok()
     if not state.stress_results:
         return _fail(
             "Stress testing produced no results.",
@@ -238,7 +242,7 @@ def _check_context_vetting(state: PipelineState) -> PhaseQualityResult:
             ["Ensure search backend is configured and reachable, or enable knowledge-only fallback."],
             score=4.0,
         )
-    score = 7.0 if quality == "partial" else 9.0
+    score = 7.0 if quality == "partial" else None
     return PhaseQualityResult(
         passed=True,
         score=score,
@@ -265,7 +269,7 @@ def _check_deep_read(state: PipelineState) -> PhaseQualityResult:
             ["Check that LLM extraction step completed and returned non-empty summaries."],
             score=4.0,
         )
-    return _ok(score=9.0)
+    return _ok()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -290,7 +294,7 @@ def _check_brainstorm_generate(state: PipelineState) -> PhaseQualityResult:
                 "diversity may be low (mode collapse not fully escaped)."
             ),
         )
-    return _ok(score=9.0)
+    return _ok()
 
 
 def _check_brainstorm_cluster(state: PipelineState) -> PhaseQualityResult:
@@ -356,7 +360,7 @@ def evaluate_rules(phase_name: str, state: PipelineState) -> PhaseQualityResult:
     """Run rule-based quality check for the given phase. Returns PASS if no rule exists."""
     rule = _RULES.get(phase_name)
     if rule is None:
-        return _ok(score=8.0)
+        return _ok()
     return rule(state)
 
 

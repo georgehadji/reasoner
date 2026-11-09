@@ -192,7 +192,7 @@ class PhaseFailed(DomainEvent):
 class PhaseQualityChecked(DomainEvent):
     """A phase's output was scored by the quality monitor."""
     phase_name: str = ""
-    score: float = 0.0
+    score: float | None = None  # None: checked, not graded (see quality.criteria)
     passed: bool = False
     reason: str = ""
 

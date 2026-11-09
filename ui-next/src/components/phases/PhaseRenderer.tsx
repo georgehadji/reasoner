@@ -86,14 +86,15 @@ function hasRecordedErrors(data: unknown): boolean {
   return Array.isArray(d.errors) && d.errors.length > 0;
 }
 
-function getQuality(data: unknown): { score: number; passed: boolean } | null {
+function getQuality(data: unknown): { score: number | null; passed: boolean } | null {
   if (!data || typeof data !== 'object') return null;
   const d = data as Record<string, unknown>;
   const q = d.quality;
   if (!q || typeof q !== 'object') return null;
   const qr = q as Record<string, unknown>;
-  if (typeof qr.score !== 'number') return null;
-  return { score: qr.score, passed: Boolean(qr.passed) };
+  // null: the phase passed structural checks but nothing graded it.
+  if (qr.score !== null && typeof qr.score !== 'number') return null;
+  return { score: qr.score as number | null, passed: Boolean(qr.passed) };
 }
 
 function getSynthesisSections(data: unknown): {

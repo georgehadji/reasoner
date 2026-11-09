@@ -1447,6 +1447,7 @@
       "ui-next/src/components/phases/CritiqueCard.tsx",
       "ui-next/src/components/phases/PhaseCard.tsx",
       "ui-next/src/components/phases/PhaseRenderer.tsx",
+      "ui-next/src/components/phases/QualityChip.test.tsx",
       "ui-next/src/components/phases/ResearchProgress.tsx",
       "ui-next/src/components/phases/SourceCard.tsx",
       "ui-next/src/components/phases/SynthesisCard.tsx",
