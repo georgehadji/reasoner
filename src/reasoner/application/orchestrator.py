@@ -374,6 +374,25 @@ class PipelineOrchestrator:
         if is_auto and is_article_request(req.problem):
             decision.auto_selected_method = "writing"
 
+        # An auto "writing" run executes ArticleFlow (api/execution/pipeline.py),
+        # so it needs the article preset's router. The writing preset routes
+        # none of the article roles, which then fell to its primary_id.
+        if (
+            is_auto
+            and decision.auto_selected_method == "writing"
+            and not custom_routing
+            and not _acr_applied
+        ):
+            decision.effective_preset_name, decision.router = (
+                self.preset_service.build_auto_router(
+                    "article",
+                    auto_tier,
+                    agent_model=agent_model,
+                    telemetry=self._telemetry_store,
+                    run_id=run_id,
+                )
+            )
+
         # ── Tier-appropriate augmentation methods ──
         # Gate decisions carry augmentation_methods=None by default.
         # Fill in tier-specific defaults so Budget users pay zero extra cost

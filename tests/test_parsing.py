@@ -121,3 +121,36 @@ class TestExtractJson:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+class TestOrphanThinkClose:
+    """qwen3.5-flash narrates "Thinking Process: ..." as plain content and ends it
+    with a bare ``</think>``: no opening tag, so the paired-tag strip missed it and
+    the narration was published as the article (observed 2026-11-09)."""
+
+    NARRATION = (
+        "Thinking Process:\n\n1.  **Analyze the Request:**\n"
+        "    *   Citation format: all [Title](URL) format.\n"
+        "Okay, generating output. </think>\n"
+    )
+
+    def test_strips_narration_before_an_orphan_close(self):
+        from reasoner.core.parsing import strip_reasoning_tags
+
+        assert strip_reasoning_tags(self.NARRATION + "# The Article\n\nBody.") == (
+            "# The Article\n\nBody."
+        )
+
+    def test_json_after_orphan_close_parses(self):
+        # The narration's "[Title](URL)" used to be taken as the start of JSON.
+        assert extract_json(self.NARRATION + '{"outline": ["a"]}') == {"outline": ["a"]}
+
+    def test_paired_tags_still_stripped(self):
+        from reasoner.core.parsing import strip_reasoning_tags
+
+        assert strip_reasoning_tags("<think>plan</think>Answer") == "Answer"
+
+    def test_text_without_tags_is_unchanged(self):
+        from reasoner.core.parsing import strip_reasoning_tags
+
+        assert strip_reasoning_tags("Plain answer.") == "Plain answer."

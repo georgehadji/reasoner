@@ -344,3 +344,28 @@ describe('Markdown builder — phase state types', () => {
     expect(md).toContain('No content for this phase');
   });
 });
+
+describe('buildMarkdownFromPhase — article sources_cited', () => {
+  // The backend sends {title, url} records (article_phases.py); rendering them
+  // as strings printed "[object Object]" once per source (observed 2026-11-09).
+  it('renders {title, url} records as links', () => {
+    const md = buildMarkdownFromPhase(0, 6, 'Style + Copy Edit', {
+      writing_state: {
+        sources_cited: [
+          { title: 'PlanetScale', url: 'https://planetscale.com/blog/n-1' },
+          { title: '', url: 'https://motherduck.com/glossary/query' },
+        ],
+      },
+    });
+    expect(md).not.toContain('[object Object]');
+    expect(md).toContain('- [PlanetScale](https://planetscale.com/blog/n-1)');
+    expect(md).toContain('- [https://motherduck.com/glossary/query](https://motherduck.com/glossary/query)');
+  });
+
+  it('still renders plain-string sources', () => {
+    const md = buildMarkdownFromPhase(0, 6, 'Style + Copy Edit', {
+      writing_state: { sources_cited: ['Merriam-Webster'] },
+    });
+    expect(md).toContain('- Merriam-Webster');
+  });
+});
