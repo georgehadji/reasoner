@@ -27,6 +27,7 @@ from reasoner.core.degrade import degraded
 from reasoner.core.ports.model_registry_port import get_model_registry_port
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.hypergate import HyperGateAgent, jev_router
+from reasoner.hypergate.hyperagent import named_method
 from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.phases._shared import is_article_request
 from reasoner.pipeline import ReasonerPipeline
@@ -371,7 +372,9 @@ class PipelineOrchestrator:
         # Only auto-detect when the preset didn't specify a method.
         # Explicit presets (coding-budget, debate-budget, etc.) must not
         # be overridden by pattern-matching on the user's prompt.
-        if is_auto and is_article_request(req.problem):
+        # A method the user named is not overridden (HyperGate's named-method
+        # fast path already selected it).
+        if is_auto and is_article_request(req.problem) and not named_method(req.problem):
             decision.auto_selected_method = "writing"
 
         # An auto "writing" run executes ArticleFlow (api/execution/pipeline.py),
