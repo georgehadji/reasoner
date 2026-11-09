@@ -1433,6 +1433,7 @@
       "ui-next/src/components/landing/prose.tsx",
       "ui-next/src/components/layout/CONTEXT.md",
       "ui-next/src/components/layout/CommandPalette.clear-cache.test.tsx",
+      "ui-next/src/components/layout/CommandPalette.test.tsx",
       "ui-next/src/components/layout/CommandPalette.tsx",
       "ui-next/src/components/layout/Composer.tsx",
       "ui-next/src/components/layout/NeuroPanel.patterns.test.ts",
