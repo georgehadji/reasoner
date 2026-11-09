@@ -91,6 +91,8 @@ Each route forwards to the backend with CSRF and auth handling. Every entry in `
 | `api-proxy.ts` | `proxyJson` — shared server-side helper for the `/api` routes. |
 | `server-config.ts` | Backend base URL, WebSocket host/port allowlist. |
 | `sse-reader.ts` | `readSSEStream` over a `ReadableStream`. |
+| `http-error.ts` (+ test) | `describeHttpError` — one readable line for a backend error body; a 429 gets its retry time. |
+| `local-host.ts` (+ test) | `isLocalHost`, `useIsLocalHost` — hides sign-in and upgrade prompts when served from this machine. |
 | `markdown.ts` (51KB) | `buildMarkdownFromPhase(s)` — renders backend phase payloads into markdown; paired with an 11KB edge-case test. |
 | `types.ts` | Shared types: `MethodId`, `PhaseEvent`, `Attachment`, provenance types. |
 | `db.ts` | IndexedDB conversation store. |

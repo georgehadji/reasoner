@@ -5,6 +5,7 @@ import { fetchWithCsrf } from '@/lib/security-client';
 import { readSSEStream } from '@/lib/sse-reader';
 import { PhaseEvent, RunRequest, RunFollowupRequest } from '@/lib/types';
 import { API } from '@/lib/config';
+import { describeHttpError } from '@/lib/http-error';
 
 export class PipelineError extends Error {
   status: number;
@@ -31,7 +32,7 @@ function getDevErrorMessage(status: number, text: string): string {
   if (status === 504) {
     return 'Backend unreachable. Run: uvicorn asgi:app --reload';
   }
-  return `HTTP ${status}: ${text.slice(0, 200)}`;
+  return describeHttpError(status, text);
 }
 
 export function usePipelineStream() {
@@ -61,11 +62,12 @@ export function usePipelineStream() {
         if (!resp.ok) {
           const text = await resp.text().catch(() => '');
           const isDev = process.env.NODE_ENV !== 'production';
-          const message = isDev
+          const message = isDev && resp.status === 504
             ? getDevErrorMessage(resp.status, text)
-            : `HTTP ${resp.status}: ${text.slice(0, 200)}`;
-          // eslint-disable-next-line no-console
-          console.error('Pipeline HTTP error:', resp.status, text);
+            : describeHttpError(resp.status, text, resp.headers.get('retry-after'));
+          // A 4xx is the server refusing (limit, auth, validation), not a fault;
+          // console.error made Next's dev overlay pop the raw payload over it.
+          (resp.status >= 500 ? console.error : console.warn)('Pipeline HTTP error:', resp.status, text);
           throw new PipelineError(resp.status, text, message);
         }
         if (!resp.body) throw new Error('No response body');

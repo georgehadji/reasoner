@@ -235,7 +235,7 @@
 @layer base {
   :root {
     /* Font size tokens */
-    --text-2xs: 11px;   /* fine print, badges — 10px was below the readable floor */
+    --text-2xs: 12px;   /* fine print, badges — 10px and then 11px were below the readable floor */
     --text-xs:  13px;   /* captions, labels, tooltips */
     --text-sm:  14px;   /* nav, secondary UI */
     --text-base: 16px;  /* body */
