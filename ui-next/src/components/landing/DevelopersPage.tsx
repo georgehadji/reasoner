@@ -383,7 +383,7 @@ export default function DevelopersPage() {
         <Section id="keys" marker="§7" name="Keys">
           <Heading>One key per agent, scoped down.</Heading>
           <Lede>
-            Keys are minted in settings, shown once, and carry scopes. A default read-only key runs
+            Keys are minted in settings, shown once, and carry scopes. A default key runs
             pipelines and reads the catalogues, which is everything an agent needs and nothing it
             does not. Give each agent its own: revoking one then costs you one agent, and the
             ledger attributes spend per key.

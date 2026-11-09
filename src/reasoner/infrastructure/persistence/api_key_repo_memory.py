@@ -20,6 +20,7 @@ class InMemoryApiKeyRepository(ApiKeyRepository):
 
     def __init__(self) -> None:
         self._keys: dict[UUID, ApiKey] = {}
+        self._last_run: dict[UUID, datetime] = {}
         self._lock = asyncio.Lock()
 
     async def create(
@@ -103,6 +104,11 @@ class InMemoryApiKeyRepository(ApiKeyRepository):
                 revoked_at=record.revoked_at,
                 created_at=record.created_at,
             )
+
+    async def touch_last_run(self, key_id: UUID) -> None:
+        async with self._lock:
+            if key_id in self._keys:
+                self._last_run[key_id] = datetime.now(UTC)
 
     async def get_owner(self, key_id: UUID) -> UUID | None:
         async with self._lock:
