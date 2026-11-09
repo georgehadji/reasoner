@@ -174,9 +174,9 @@ def test_budget_is_cheaper_than_premium(family):
 def test_price_ordering_puts_grok_above_the_cheap_tier():
     """Flat-per-image models must not be mistaken for token-priced bargains."""
     cat = image_catalogue()
-    assert cat["grok-imagine"].price_per_image > cat["flux.2-klein-4b"].price_per_image
-    assert cat["grok-imagine"].price_per_image > cat["krea-2-medium-turbo"].price_per_image
-    assert cat["grok-imagine"].price_per_image > cat["riverflow-v2.5-fast"].price_per_image
+    assert cat["grok-imagine-image-2"].price_per_image > cat["flux.2-klein-4b"].price_per_image
+    assert cat["grok-imagine-image-2"].price_per_image > cat["krea-2-medium-turbo"].price_per_image
+    assert cat["grok-imagine-image-2"].price_per_image > cat["riverflow-v2.5-fast"].price_per_image
 
 
 def test_needs_reference_input_returns_only_image_input_models():
