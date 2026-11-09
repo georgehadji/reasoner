@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 1. Project Overview
 
-**Reasoner** (Adaptive Reasoning Architecture) is a production-grade AI reasoning orchestrator that decomposes complex problems into structured multi-phase pipelines, leverages <!-- gen:models -->212<!-- /gen --> directly registered model aliases (<!-- gen:reasoning_models -->164<!-- /gen --> for reasoning, <!-- gen:image_models -->48<!-- /gen --> for image generation) drawn from a <!-- gen:catalogue -->472<!-- /gen -->-model OpenRouter catalogue, from diverse training ecosystems in parallel, applies independent critique, stress-tests solutions, and synthesizes actionable recommendations with epistemic labeling (`VERIFIED` / `HYPOTHESIS` / `UNKNOWN`).
+**Reasoner** (Adaptive Reasoning Architecture) is a production-grade AI reasoning orchestrator that decomposes complex problems into structured multi-phase pipelines, leverages <!-- gen:models -->203<!-- /gen --> directly registered model aliases (<!-- gen:reasoning_models -->156<!-- /gen --> for reasoning, <!-- gen:image_models -->47<!-- /gen --> for image generation) drawn from a <!-- gen:catalogue -->515<!-- /gen -->-model OpenRouter catalogue, from diverse training ecosystems in parallel, applies independent critique, stress-tests solutions, and synthesizes actionable recommendations with epistemic labeling (`VERIFIED` / `HYPOTHESIS` / `UNKNOWN`).
 
 - **Version:** 2.2 (Python package 2.1.0) | **Python:** 3.12+ | **Frontend:** Next.js 16 / React 19 / TypeScript 5
 
@@ -29,7 +29,7 @@ The three enforcement points must not drift apart: `.importlinter` contract 1 (l
 | Layer | Technology |
 |-------|------------|
 | Runtime | Python 3.12+, FastAPI 0.109+, uvicorn, Pydantic v2, httpx |
-| LLM Routing | OpenRouter (primary, <!-- gen:catalogue -->472<!-- /gen --> catalogued models); <!-- gen:adapters -->8<!-- /gen --> direct adapters (Anthropic, OpenAI and Google as dedicated clients; Mistral, DeepSeek, xAI, Perplexity and Qwen through the OpenAI-compatible table in `providers/direct.py`). Kimi, GLM and MiniMax route via OpenRouter, not directly. Ollama is local and is handled in `registry.build_provider()`, not in the direct-adapter table |
+| LLM Routing | OpenRouter (primary, <!-- gen:catalogue -->515<!-- /gen --> catalogued models); <!-- gen:adapters -->8<!-- /gen --> direct adapters (Anthropic, OpenAI and Google as dedicated clients; Mistral, DeepSeek, xAI, Perplexity and Qwen through the OpenAI-compatible table in `providers/direct.py`). Kimi, GLM and MiniMax route via OpenRouter, not directly. Ollama is local and is handled in `registry.build_provider()`, not in the direct-adapter table |
 | Search | Perplexity Sonar, Brave Search API, Tavily |
 | Database | SQLite (event store), PostgreSQL (asyncpg), aiosqlite |
 | Memory | Neuro L1/L2/L3 tiered cache with embedding search |
@@ -108,7 +108,7 @@ src/reasoner/
 │   └── preset_registry.py  # <!-- gen:presets -->49<!-- /gen --> preset configs with model routing and fallbacks
 ├── infrastructure/         # Adapters implementing Core ports
 │   ├── llm/
-│   │   ├── registry.py     # _MODEL_WHITELIST (<!-- gen:models -->212<!-- /gen --> aliases), _REGISTRY, build_provider()
+│   │   ├── registry.py     # _MODEL_WHITELIST (<!-- gen:models -->203<!-- /gen --> aliases), _REGISTRY, build_provider()
 │   │   ├── router.py       # ProviderRouter: role-based routing, fallback chain
 │   │   └── providers/      # OpenAICompatibleProvider, OpenRouterProvider, etc.
 │   ├── persistence/        # EventStore (SQLite), snapshots, postgres_store

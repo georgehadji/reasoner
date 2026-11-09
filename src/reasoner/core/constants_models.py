@@ -35,7 +35,6 @@ MODEL_RECRAFT_V41_PRO: str = "recraft-v4.1-pro"
 MODEL_RECRAFT_V41_UTILITY: str = "recraft-v4.1-utility"
 MODEL_RECRAFT_V41_UTILITY_PRO: str = "recraft-v4.1-utility-pro"
 # Grok (xAI)
-MODEL_GROK_IMAGINE: str = "grok-imagine"
 # Microsoft
 MODEL_MAI_IMAGE_25: str = "mai-image-2.5"
 MODEL_MAI_IMAGE_25_PRO: str = "mai-image-2.5-pro"
@@ -49,13 +48,9 @@ MODEL_QWEN36_PLUS: str = "qwen3.6-plus"
 MODEL_MINIMAX_M3: str = "minimax-m3"
 MODEL_MINIMAX_M27: str = "minimax-m2.7"
 MODEL_MINIMAX_M25: str = "minimax-m2.5"
-MODEL_MINIMAX_M21: str = "minimax-m2.1"
-MODEL_MINIMAX_M2: str = "minimax-m2"
-MODEL_MINIMAX_M1: str = "minimax-m1"
 # minimax-m2.5-free removed — dead endpoint
 
 # Poolside (temperature-supporting, non-OpenAI, cross-lab diversity)
-MODEL_LAGUNA_XS_21: str = "laguna-xs-2.1"
 
 # Xiaomi — MiMo series (v2.5, Apr 2026)
 MODEL_MIMO_V25_PRO: str = "mimo-v2.5-pro"
@@ -72,7 +67,6 @@ MODEL_MISTRAL_SMALL: str = "mistral-small"
 
 # v3.2 — new ultra-VFM models
 MODEL_STEPFUN_37_FLASH: str = "stepfun-3.7-flash"
-MODEL_NEX_N2_PRO_FREE: str = "nex-n2-pro-free"
 
 # ── Google Gemini (real models, not aliased) ──
 MODEL_GEMINI_PRO_REAL: str = "gemini-pro-real"
@@ -125,16 +119,13 @@ MODEL_DEEPSEEK_V4_PRO: str = "deepseek-v4-pro"
 # Qwen
 MODEL_QWEN37_MAX: str = "qwen3.7-max"
 MODEL_QWEN37_PLUS: str = "qwen3.7-plus"
-MODEL_QWEN3_MAX_THINKING: str = "qwen3-max-thinking"
 MODEL_QWEN36_FLASH: str = "qwen3.6-flash"
 MODEL_QWEN36_35B_A3B: str = "qwen3.6-35b-a3b"
 MODEL_QWEN36_27B: str = "qwen3.6-27b"
-MODEL_QWEN36_MAX_PREVIEW: str = "qwen3.6-max-preview"
 MODEL_QWEN35_27B: str = "qwen3.5-27b"
 MODEL_QWEN35_35B_A3B: str = "qwen3.5-35b-a3b"
 MODEL_QWEN35_122B_A10B: str = "qwen3.5-122b-a10b"
 MODEL_QWEN35_397B_A17B: str = "qwen3.5-397b-a17b"
-MODEL_QWEN3_CODER: str = "qwen3-coder"
 MODEL_QWEN3_CODER_NEXT: str = "qwen3-coder-next"
 MODEL_QWEN3_CODER_FLASH: str = "qwen3-coder-flash"
 MODEL_QWEN3_CODER_30B_A3B: str = "qwen3-coder-30b-a3b"
@@ -175,7 +166,6 @@ MODEL_QIANFAN_OCR_FAST: str = "qianfan-ocr-fast"
 MODEL_LLAMA_33_70B: str = "llama-3.3-70b"
 
 # Arcee AI
-MODEL_ARCEE_TRINITY_LARGE_THINKING: str = "arcee-trinity-large-thinking"
 MODEL_ARCEE_VIRTUOSO_LARGE: str = "arcee-virtuoso-large"
 MODEL_ARCEE_MAESTRO_REASONING: str = "arcee-maestro-reasoning"
 MODEL_ARCEE_CODER_LARGE: str = "arcee-coder-large"
@@ -186,7 +176,6 @@ MODEL_PARETO_CODE: str = "pareto-code"
 MODEL_ELEPHANT_ALPHA: str = "elephant-alpha"
 
 # xAI image
-MODEL_GROK_IMAGINE_QUALITY: str = "grok-imagine"
 MODEL_GROK_IMAGINE_IMAGE_2: str = "grok-imagine-image-2"
 
 # Alibaba image
