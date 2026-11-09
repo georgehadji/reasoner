@@ -127,6 +127,10 @@ JEV_MAX_STATE_CHARS: int = 8000
 # Those rounds carry a synthetic placeholder score, and identical placeholders
 # read as a plateau -- the debate would "converge" on a critic that never spoke.
 IC_MAX_CONSECUTIVE_DEGRADED: int = 2
+# Iterative Critique: the share of the Adversarial Debate phase timeout the
+# debate may plan to use. It stops before a round that, at its average pace,
+# would end past this; the rest is headroom for a round slower than average.
+IC_TIME_BUDGET_FRACTION: float = 0.9
 # Multi-Perspective Phase 3: how many scored candidates go on to stress testing
 # and synthesis, and the hard ceiling on candidates kept in state.
 MP_TOP_K: int = 2
