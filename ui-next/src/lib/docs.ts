@@ -581,13 +581,14 @@ A key can only be granted scopes its owner already has, and administrative scope
 
 | Scope | Grants |
 | --- | --- |
-| \`read\` | Run pipelines, read results |
+| \`read\` | Read results and catalogues |
+| \`run\` | Start billed runs |
 | \`write\` | Modify settings, clear cache |
 | \`preset:read\` | List presets and models |
 | \`history:read\` | Read run history |
 | \`history:delete\` | Delete history entries |
 
-New keys default to read-only (\`read\`, \`preset:read\`, \`history:read\`). Grant more only when something actually needs it.
+New keys default to \`read\`, \`preset:read\`, \`history:read\` and \`run\`. Untick \`run\` for a key that should only read. Grant more only when something actually needs it.
 
 ## Expiry, limits, and rotation
 
@@ -768,7 +769,7 @@ Authorization: Bearer rsn_live_...
 Content-Type: application/json
 \`\`\`
 
-A default read-only key (\`read\`, \`preset:read\`, \`history:read\`) is enough to run pipelines. Give agents nothing more. See [API keys](/docs/api-keys).
+A default key (\`read\`, \`preset:read\`, \`history:read\`, \`run\`) is enough to run pipelines. Give agents nothing more. See [API keys](/docs/api-keys).
 
 ## Run it — sync or streamed
 

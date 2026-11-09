@@ -134,6 +134,21 @@ class ApiKeyService:
             pass
         return record
 
+    async def record_run(self, key_id: UUID) -> None:
+        """Note that ``key_id`` started a run. Never fails the run it describes.
+
+        Feeds the 30-day step that removes ``run`` from keys that never use it
+        (docs/plans/audit-remediation-5-2026-10-29.md, Q1).
+        """
+        try:
+            await self._repository.touch_last_run(key_id)
+        except Exception as exc:
+            # A lost stamp makes step 2 take `run` from a key that uses it, so
+            # it must be visible, unlike the last_used_at touch below.
+            from reasoner.core.degrade import degraded
+
+            degraded("api_keys.record_run", None, exc=exc, detail=f"key={key_id}")
+
     async def _touch(self, key_id: UUID) -> None:
         try:
             await self._repository.touch_last_used(key_id)

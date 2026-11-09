@@ -33,3 +33,22 @@ describe('chat/page.tsx patterns (BUG-002 & BUG-005 regression)', () => {
     expect(src).toContain("useEffect(() => {\n    return () => {\n      if (chunkFlushRafRef.current !== null) {\n        cancelAnimationFrame(chunkFlushRafRef.current);\n        chunkFlushRafRef.current = null;\n      }\n    };\n  }, []);");
   });
 });
+
+describe('chat/page.tsx image-mode errors are shown', () => {
+  // Image mode adds the reply bubble only after prompt enhancement succeeds. An
+  // error before that (a 401 from /api/generate-image when signed out) was sent
+  // as UPDATE_MESSAGE to a bubble that did not exist yet, so the user saw nothing.
+  const start = src.indexOf('// ── Image Generation mode ──');
+  const end = src.indexOf('} finally {', start);
+  const imageBlock = src.slice(start, end);
+
+  it('tracks whether the reply bubble has been added', () => {
+    expect(imageBlock).toContain('let replyAdded = false;');
+    expect(imageBlock).toContain('replyAdded = true;');
+  });
+
+  it('adds the bubble with the error when it does not exist yet', () => {
+    expect(imageBlock).toContain('showImageResult(');
+    expect(src).toMatch(/const showImageResult = \(added: boolean[\s\S]*?type: 'ADD_MESSAGES'[\s\S]*?type: 'UPDATE_MESSAGE'/);
+  });
+});
