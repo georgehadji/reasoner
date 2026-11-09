@@ -9,6 +9,8 @@ Author: DeepSeek TUI — June 2026
 
 from __future__ import annotations
 
+import time
+
 from reasoner.application.flows.base import PhaseStep, WorkflowServices, WorkflowStrategy
 from reasoner.application.flows.iterative_critique_phases import (
     MAX_ROUNDS,
@@ -23,8 +25,14 @@ from reasoner.application.flows.iterative_critique_phases import (
 )
 from reasoner.application.services.serializers import _ser_5
 from reasoner.core.constants import IC_MAX_CONSECUTIVE_DEGRADED
+from reasoner.core.constants_limits import IC_TIME_BUDGET_FRACTION, get_phase_timeout
 from reasoner.core.degrade import degraded
 from reasoner.domain.pipeline_state import PipelineState
+
+# Module-level so tests can drive a fake clock.
+_clock = time.monotonic
+
+_DEBATE_PHASE = "Adversarial Debate"
 
 
 class IterativeCritiqueFlow(WorkflowStrategy):
@@ -32,7 +40,7 @@ class IterativeCritiqueFlow(WorkflowStrategy):
 
     def get_phases(self, state: PipelineState) -> list[PhaseStep]:
         return [
-            PhaseStep(3, "Adversarial Debate", self._run_debate_loop, _ser_5, critical=False),
+            PhaseStep(3, _DEBATE_PHASE, self._run_debate_loop, _ser_5, critical=False),
             PhaseStep(4, "Synthesis", run_synthesis_phase, _ser_5),
         ]
 
@@ -42,8 +50,27 @@ class IterativeCritiqueFlow(WorkflowStrategy):
             state.adversarial_rounds: list[AdversarialRound] = []
 
         round_num = 0
+        # The phase timeout cancels the whole phase, rounds already finished
+        # included. Stop before a round that, at the pace so far, would not
+        # finish inside it, and keep the best answer reached.
+        started = _clock()
+        budget = get_phase_timeout(_DEBATE_PHASE) * IC_TIME_BUDGET_FRACTION
 
         while round_num < MAX_ROUNDS:
+            if round_num:
+                elapsed = _clock() - started
+                if elapsed + elapsed / round_num > budget:
+                    state.adversarial_convergence_round = round_num
+                    state.adversarial_convergence_reason = "time_budget"
+                    state.adversarial_converged = False
+                    services.log(
+                        "IC",
+                        f"Debate stopped after round {round_num}: another round "
+                        f"would not finish inside the "
+                        f"{get_phase_timeout(_DEBATE_PHASE):.0f}s phase limit",
+                        state,
+                    )
+                    break
             round_num += 1
             services.log("IC", f"--- Round {round_num}/{MAX_ROUNDS} ---", state)
 
