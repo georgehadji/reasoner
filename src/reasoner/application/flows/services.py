@@ -113,7 +113,7 @@ class PipelineWorkflowServices(WorkflowServices):
             )
             kwargs["bypass_cache_read"] = True
 
-        return await self._pipeline._call_llm_cached(
+        raw, meta = await self._pipeline._call_llm_cached(
             role=role,
             system_prompt=harden_system_prompt(system_prompt),
             user_prompt=user_prompt,
@@ -121,6 +121,13 @@ class PipelineWorkflowServices(WorkflowServices):
             phase_key=phase_key,
             **kwargs
         )
+        # Leaked reasoning is never an answer. extract_json already drops it,
+        # but prose phases (draft, edits, copy edit) published it verbatim.
+        if isinstance(raw, str):
+            from reasoner.core.parsing import strip_reasoning_tags
+
+            raw = strip_reasoning_tags(raw)
+        return raw, meta
 
     async def run_phase(self, step: PhaseStep, state: PipelineState, **kwargs: Any) -> bool:
         if self._runner is None:
