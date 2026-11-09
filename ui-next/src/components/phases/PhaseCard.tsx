@@ -41,6 +41,8 @@ interface PhaseCardProps {
   compact?: boolean;
   status?: 'idle' | 'active' | 'completed' | 'error' | 'degraded';
   quality?: { score: number | null; passed: boolean } | null;
+  /** What the phase found, in one line; shown while the card is shut. */
+  summary?: string | null;
 }
 
 /* Shared card vocabulary. `--chip-bg` (and `--chip-bg-2`, the step nested
@@ -295,6 +297,7 @@ export const PhaseCard = memo(function PhaseCard({
   compact = false,
   status = 'idle',
   quality,
+  summary,
 }: PhaseCardProps) {
   const [userOpen, setUserOpen] = useState(defaultOpen);
   const open = forceOpen !== null ? forceOpen : userOpen;
@@ -335,6 +338,11 @@ export const PhaseCard = memo(function PhaseCard({
                 <span className="truncate text-[length:var(--text-sm)] font-medium leading-[var(--lh-ui)] tracking-[var(--tracking-base)] text-[var(--text)]">
                   {name}
                 </span>
+                {summary ? (
+                  <span className="min-w-0 truncate text-[length:var(--text-xs)] leading-[var(--lh-ui)] text-[var(--text-subtle)]">
+                    {summary}
+                  </span>
+                ) : null}
                 {duration !== undefined && duration > 0 ? (
                   <span className="nums-tabular inline-flex shrink-0 items-center gap-[var(--space-1)] text-[length:var(--text-2xs)] text-[var(--text-subtle)]">
                     <Timer aria-hidden="true" className={ICON_SM} />

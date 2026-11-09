@@ -11,20 +11,23 @@ import { ClassificationCard } from './ClassificationCard';
 import { CritiqueCard } from './CritiqueCard';
 import { PerspectivesRenderer } from './PerspectivesRenderer';
 import { buildMarkdownFromPhase } from '@/lib/markdown';
+import { isSynthesisPhaseName, summarizePhase } from '@/lib/answer';
 import { copyToClipboard } from '@/lib/utils';
 import { isEnabled } from '@/hooks/useFeatureFlags';
 import { getProvenanceReport } from '@/lib/provenance';
 import { ProvenanceBadge } from '@/components/provenance/ProvenanceBadge';
 
-function isSynthesisPhase(name: string): boolean {
-  return /synthesis|report|theory|conclusion|verdict|redesign|aufhebung|transfer/i.test(name);
-}
+const isSynthesisPhase = isSynthesisPhaseName;
 
 interface PhaseRendererProps {
   phase: RenderedPhase;
   onComplete?: () => void;
   forceOpen?: boolean | null;
   errorPhases?: number[];
+  /** A level-1 row under "How this was reached": shut, one line saying what the phase found. */
+  row?: boolean;
+  /** The answer shown above a finished run's process. */
+  asAnswer?: boolean;
 }
 
 function getTokens(data: unknown): { input?: number; output?: number } | null {
@@ -133,7 +136,7 @@ function getVettedContext(data: unknown): Array<Record<string, unknown>> {
   return context.filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null);
 }
 
-export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, forceOpen = null, errorPhases = [] }: PhaseRendererProps) {
+export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, forceOpen = null, errorPhases = [], row = false, asAnswer = false }: PhaseRendererProps) {
   const { index, phase: phaseNum, name, data } = phase;
   const tokens = getTokens(data);
   const models = getModels(data);
@@ -143,8 +146,8 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
   const synthesisHighlights = getSynthesisHighlights(data);
   const synthesisSections = getSynthesisSections(data);
   const vettedContext = getVettedContext(data);
-  const isCompact = isEnabled('compact-phases') && !isSynthesisPhase(name) && phaseNum !== 0;
-  const defaultOpen = isSynthesisPhase(name) || phaseNum === 0;
+  const isCompact = row || (isEnabled('compact-phases') && !isSynthesisPhase(name) && phaseNum !== 0);
+  const defaultOpen = asAnswer || (!row && (isSynthesisPhase(name) || phaseNum === 0));
   const isSynth = isSynthesisPhase(name);
   const phaseTextClass = isSynth ? TEXT_SIZES.synthesis : TEXT_SIZES.phaseCard;
   const cardStatus: 'error' | 'degraded' | 'completed' = errorPhases.includes(phaseNum)
@@ -152,6 +155,10 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
     : hasRecordedErrors(data)
       ? 'degraded'
       : 'completed';
+  const cardProps = {
+    index, phase: phaseNum, name, tokens, models, subagents, duration, defaultOpen, forceOpen,
+    compact: isCompact, status: cardStatus, quality, summary: row ? summarizePhase(phase) : null,
+  };
 
   // Direct Response / Web Search: render inline without a phase card
   if (name === 'Direct Response' || name === 'Web Search') {
@@ -167,7 +174,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
     ('task_type' in data || 'rationale' in data)
   ) {
     return (
-      <PhaseCard index={index} phase={phaseNum} name={name} tokens={tokens} models={models} subagents={subagents} duration={duration} defaultOpen={defaultOpen} forceOpen={forceOpen} compact={isCompact} status={cardStatus} quality={quality}>
+      <PhaseCard {...cardProps}>
         <ClassificationCard data={data} />
         {onComplete && <CompletionTrigger onComplete={onComplete} />}
       </PhaseCard>
@@ -184,7 +191,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
     scoresArray.length > 0
   ) {
     return (
-      <PhaseCard index={index} phase={phaseNum} name={name} tokens={tokens} models={models} subagents={subagents} duration={duration} defaultOpen={defaultOpen} forceOpen={forceOpen} compact={isCompact} status={cardStatus} quality={quality}>
+      <PhaseCard {...cardProps}>
         <CritiqueCard data={data} />
         {onComplete && <CompletionTrigger onComplete={onComplete} />}
       </PhaseCard>
@@ -195,7 +202,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
   const candidatesArray = data && typeof data === 'object' ? (data as Record<string, unknown>).candidates : undefined;
   if (name === 'Perspectives' && Array.isArray(candidatesArray) && candidatesArray.length > 0) {
     return (
-      <PhaseCard index={index} phase={phaseNum} name={name} tokens={tokens} models={models} subagents={subagents} duration={duration} defaultOpen={defaultOpen} forceOpen={forceOpen} compact={isCompact} status={cardStatus} quality={quality}>
+      <PhaseCard {...cardProps}>
         <PerspectivesRenderer candidates={candidatesArray as Array<{ perspective: string; content: string; key_insights: string[]; model_used?: string }>} />
         {onComplete && <CompletionTrigger onComplete={onComplete} />}
       </PhaseCard>
@@ -210,7 +217,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
   ) {
     const md = buildMarkdownFromPhase(index, phaseNum, name, data, { omitSections: ['vetted_context'], omitHeading: true });
     return (
-      <PhaseCard index={index} phase={phaseNum} name={name} tokens={tokens} models={models} subagents={subagents} duration={duration} defaultOpen={defaultOpen} forceOpen={forceOpen} compact={isCompact} status={cardStatus} quality={quality}>
+      <PhaseCard {...cardProps}>
         {vettedContext.length > 0 && <VettedContextBlock items={vettedContext} />}
         <div className={`markdown-body ${phaseTextClass}`}><MarkdownRenderer>{md}</MarkdownRenderer></div>
         {onComplete && <CompletionTrigger onComplete={onComplete} />}
@@ -226,7 +233,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
   ) {
     const md = buildMarkdownFromPhase(index, phaseNum, name, data, { omitSections: ['vetted_context'], omitHeading: true });
     return (
-      <PhaseCard index={index} phase={phaseNum} name={name} tokens={tokens} models={models} subagents={subagents} duration={duration} defaultOpen={defaultOpen} forceOpen={forceOpen} compact={isCompact} status={cardStatus} quality={quality}>
+      <PhaseCard {...cardProps}>
         {vettedContext.length > 0 && <VettedContextBlock items={vettedContext} />}
         <div className={`markdown-body ${phaseTextClass}`}><MarkdownRenderer>{md}</MarkdownRenderer></div>
         {onComplete && <CompletionTrigger onComplete={onComplete} />}
@@ -251,7 +258,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
       };
 
       return (
-        <PhaseCard index={index} phase={phaseNum} name={name} tokens={tokens} models={models} subagents={subagents} duration={duration} defaultOpen={defaultOpen} forceOpen={forceOpen} compact={isCompact} status={cardStatus} quality={quality}>
+        <PhaseCard {...cardProps}>
           {/* Phase 2: Raw VS ideas */}
           {rawIdeas.length > 0 && clusters.length === 0 && (
             <div className="space-y-2">
@@ -341,7 +348,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
   ) {
     const md = buildMarkdownFromPhase(index, phaseNum, name, data, { omitSections: ['vetted_context'], omitHeading: true });
     return (
-      <PhaseCard index={index} phase={phaseNum} name={name} tokens={tokens} models={models} subagents={subagents} duration={duration} defaultOpen={defaultOpen} forceOpen={forceOpen} compact={isCompact} status={cardStatus} quality={quality}>
+      <PhaseCard {...cardProps}>
         {vettedContext.length > 0 && <VettedContextBlock items={vettedContext} />}
         <div className={`markdown-body ${phaseTextClass}`}><MarkdownRenderer>{md}</MarkdownRenderer></div>
         {onComplete && <CompletionTrigger onComplete={onComplete} />}
@@ -356,14 +363,17 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
     typeof data === 'object' &&
     ('core_solution' in data || 'action_blueprint' in data)
   ) {
-    const md = buildMarkdownFromPhase(index, phaseNum, name, data, {
+    // As the answer, the card's meta strip already names the model.
+    const md = buildMarkdownFromPhase(index, phaseNum, name, asAnswer ? { ...(data as Record<string, unknown>), models: undefined } : data, {
       omitSections: ['critical_insights', 'action_blueprint', 'open_questions', 'sources', 'vetted_context'],
       omitHeading: true,
     });
     const citations = data && typeof data === 'object' ? (data as Record<string, unknown>).citations as Array<{ url: string; title: string; snippet: string; source_type: string }> | undefined : undefined;
     const provenanceReport = getProvenanceReport(data);
     return (
-      <SynthesisCard index={index} phase={phaseNum} name={name} tokens={tokens} models={models} subagents={subagents} duration={duration} highlights={synthesisHighlights} sources={synthesisSections?.sources} citations={citations} defaultOpen>
+      <SynthesisCard index={index} phase={phaseNum} name={name} tokens={tokens} models={models} subagents={subagents} duration={duration} highlights={synthesisHighlights} sources={synthesisSections?.sources} citations={citations} label={asAnswer ? 'Answer' : undefined} defaultOpen>
+        {/* The bottom line first: insights, steps and open questions explain it. */}
+        <div className="mb-[var(--space-4)]"><SynthesisRenderer text={md} /></div>
         {synthesisSections && (
           <div className="mb-4 grid gap-4">
             {synthesisSections.criticalInsights.length > 0 && (
@@ -430,7 +440,6 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
             <ProvenanceBadge report={provenanceReport} />
           </div>
         )}
-        <SynthesisRenderer text={md} />
         {onComplete && <CompletionTrigger onComplete={onComplete} />}
       </SynthesisCard>
     );
@@ -445,7 +454,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
     omitHeading: true,
   });
   return (
-      <PhaseCard index={index} phase={phaseNum} name={name} tokens={tokens} models={models} subagents={subagents} duration={duration} defaultOpen={defaultOpen} forceOpen={forceOpen} compact={isCompact} status={cardStatus} quality={quality}>
+      <PhaseCard {...cardProps}>
       {vettedContext.length > 0 && <VettedContextBlock items={vettedContext} />}
       {isSynth ? (
         <SynthesisRenderer text={md} className={phaseTextClass} />
