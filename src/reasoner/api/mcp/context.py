@@ -36,14 +36,18 @@ def _bearer_token_from_context(ctx) -> str | None:
     return os.environ.get("REASONER_API_KEY")
 
 
-async def resolve_caller(ctx) -> User:
+async def resolve_caller(ctx, *, scope: str | None = None) -> User:
     """Resolve the authenticated User for this tool call.
+
+    With ``scope``, an API key must hold it, as ``require_key_scope`` demands
+    over HTTP; session tokens pass, because scopes only narrow keys.
 
     Raises McpAuthError -- never HTTPException, since this module has no
     FastAPI dependency -- so FastMCP surfaces a clean tool-call error instead
     of a stack trace.
     """
     from reasoner.api.dependencies import _resolve_auth_token
+    from reasoner.domain.api_keys import key_allows, looks_like_api_key
 
     token = _bearer_token_from_context(ctx)
     if not token:
@@ -52,9 +56,13 @@ async def resolve_caller(ctx) -> User:
             "(stdio transport), or send Authorization: Bearer <key> (HTTP transport)."
         )
     try:
-        return await _resolve_auth_token(token)
+        user = await _resolve_auth_token(token)
     except Exception as exc:
         raise McpAuthError("Invalid or expired API key") from exc
+    granted = getattr(user, "scopes", set())
+    if scope and looks_like_api_key(token) and not key_allows(granted, scope):
+        raise McpAuthError(f"API key lacks the '{scope}' scope")
+    return user
 
 
 __all__ = ["McpAuthError", "resolve_caller"]

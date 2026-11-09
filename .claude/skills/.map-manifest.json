@@ -677,6 +677,7 @@
       "migrations/alembic/versions/20260501_003029_add_paypal_and_rename_external_cols.py",
       "migrations/alembic/versions/20260502_001500_add_oauth_columns.py",
       "migrations/alembic/versions/20260929_000000_add_account_deletion_log.py",
+      "migrations/alembic/versions/20261029_000300_api_key_run_scope.py",
       "migrations/alembic/versions/CONTEXT.md",
       "migrations/alembic/versions/df9629e72f17_baseline.py"
     ],
@@ -956,6 +957,7 @@
       "tests/test_article_presets.py",
       "tests/test_article_router.py",
       "tests/test_ast_check.py",
+      "tests/test_audit5_admission.py",
       "tests/test_augmented_article.py",
       "tests/test_auth_concurrency.py",
       "tests/test_auth_deps_rate_limiter.py",
