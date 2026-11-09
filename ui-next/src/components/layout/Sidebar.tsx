@@ -25,7 +25,6 @@ interface SidebarProps {
   conversations: Conversation[];
   onLoad: (conv: Conversation) => void;
   onDelete: (id: string) => void;
-  onClear: () => void;
   onNew: () => void;
   onResume?: (pipelineId: string) => void;
   conversationId?: string | null;
@@ -91,7 +90,6 @@ function SidebarComponent({
   conversations,
   onLoad,
   onDelete,
-  onClear,
   onNew,
   onResume,
   conversationId,
@@ -467,13 +465,6 @@ function SidebarComponent({
         {/* Footer */}
         <div className="border-t border-[var(--border)] p-2">
           <MemoryStatus />
-          <button
-            type="button"
-            onClick={onClear}
-            className="mt-0.5 flex h-10 w-full cursor-pointer items-center rounded-[var(--radius)] px-2 text-left text-[length:var(--text-xs)] leading-[var(--lh-ui)] text-[var(--text-muted)] transition-colors duration-[var(--dur-micro)] ease-[var(--ease-standard)] hover:bg-[var(--sidebar-hover)] hover:text-[var(--text)]"
-          >
-            Clear cache
-          </button>
         </div>
       </aside>
 

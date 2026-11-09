@@ -23,6 +23,8 @@ import { UserMenu } from '@/components/layout/UserMenu';
 import { UpgradeModal } from '@/components/layout/UpgradeModal';
 import { SecurityBadge } from '@/components/layout/SecurityBadge';
 import { PipelineError } from '@/hooks/usePipelineStream';
+import { describeHttpError } from '@/lib/http-error';
+import { useIsLocalHost } from '@/lib/local-host';
 
 import { ChatFeed, ChatFeedMessage, RenderedPhase } from '@/components/chat/ChatFeed';
 import { ChatErrorBoundary } from '@/components/chat/ChatErrorBoundary';
@@ -225,6 +227,7 @@ export default function ChatPage() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const isLocal = useIsLocalHost();
   // REFACTOR: Replace useState with useReducer for messages state
   const [messages, dispatchMessages] = useReducer(messagesReducer, []);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -929,7 +932,9 @@ export default function ChatPage() {
         await startRun(req, onEvent, ticket.abort.signal);
       }
     } catch (err) {
-      if (err instanceof PipelineError && err.status === 429) {
+      // Locally the app runs without sign-in, so "upgrade" has nothing to
+      // offer; the one-line limit message below says what happened instead.
+      if (err instanceof PipelineError && err.status === 429 && !isLocal) {
         try {
           const data = JSON.parse(err.body);
           if (data.detail?.upgrade_url) {
@@ -956,7 +961,7 @@ export default function ChatPage() {
               .join('; ');
             msg = `Validation failed: ${fields}`;
           } else {
-            msg = data.error || data.detail || msg;
+            msg = describeHttpError(err.status, err.body);
           }
         } catch { /* use raw message */ }
       }
@@ -970,7 +975,7 @@ export default function ChatPage() {
       setRunning(false);
       clearAttachments();
     }
-  }, [attachments, isImageMode, tier, messages, startRun, startFollowup, wsConnect, wsDisconnect, dispatchMessages, setRunning, setComposerText, clearAttachments, refreshHistory, setCompletedPhases, setErrorPhases, setCurrentPhase, setPhaseDurations, setAutoSelectedMethod, setPhaseOpenMode, isContinuation, getAutoPreset, autoMethodAlways]);
+  }, [attachments, isImageMode, isLocal, tier, messages, startRun, startFollowup, wsConnect, wsDisconnect, dispatchMessages, setRunning, setComposerText, clearAttachments, refreshHistory, setCompletedPhases, setErrorPhases, setCurrentPhase, setPhaseDurations, setAutoSelectedMethod, setPhaseOpenMode, isContinuation, getAutoPreset, autoMethodAlways]);
 
   const handleSubmit = useCallback(async (
     providedText?: string,
@@ -1129,7 +1134,15 @@ export default function ChatPage() {
   }
 
   async function handleClearCache() {
-    await clearCache();
+    setCommandPaletteOpen(false);
+    if (!window.confirm('Clear the server cache? Every cached answer is deleted for all users.')) return;
+    try {
+      await clearCache();
+      dispatchMessages({ type: 'ADD_MESSAGES', payload: [{ id: 'info-' + Date.now(), role: 'info', content: 'Server cache cleared.' }] });
+    } catch (err) {
+      const reason = err instanceof Error && err.message.includes('403') ? 'the server requires the admin key' : 'the request failed';
+      dispatchMessages({ type: 'ADD_MESSAGES', payload: [{ id: 'err-' + Date.now(), role: 'error', content: `Cache not cleared: ${reason}.` }] });
+    }
   }
 
   const hasMessages = messages.length > 0;
@@ -1162,7 +1175,6 @@ export default function ChatPage() {
         conversations={history}
         onLoad={handleLoad}
         onDelete={removeHistory}
-        onClear={handleClearCache}
         onNew={handleNew}
         onResume={handleResume}
         conversationId={conversationId}
@@ -1227,12 +1239,14 @@ export default function ChatPage() {
                 >
                   Pricing
                 </button>
+                {!isLocal && (
                 <button
                   onClick={() => router.push('/login')}
                   className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-[length:var(--text-sm)] font-medium text-[var(--accent-text)] transition-opacity hover:opacity-90"
                 >
                   Sign In
                 </button>
+                )}
               </>
             )}
             <SecurityBadge className="hidden sm:flex" />
@@ -1351,6 +1365,7 @@ export default function ChatPage() {
         onToggleTier={toggleTier}
         tier={tier}
         onCopyLastResponse={copyLastResponse}
+        onClearCache={handleClearCache}
         recentCommands={recentCommands}
         onRecordCommand={addRecentCommand}
       />
