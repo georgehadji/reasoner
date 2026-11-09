@@ -138,6 +138,19 @@ def resolve_spend_limits(tier: SubscriptionTier | str | None) -> TierSpendLimits
     return limits_for_tier(tier).tightest(global_ceiling())
 
 
+def anonymous_tier() -> SubscriptionTier:
+    """The plan a caller with no account is treated as (settings.ANONYMOUS_TIER).
+
+    FREE by default and for any value that is not a tier, so a typo fails closed.
+    """
+    from reasoner.core.settings import settings
+
+    try:
+        return SubscriptionTier(settings.ANONYMOUS_TIER.strip().lower())
+    except ValueError:
+        return SubscriptionTier.FREE
+
+
 async def resolve_user_tier(
     user_id: str | None,
     *,
@@ -158,7 +171,7 @@ async def resolve_user_tier(
     not write that memory.
     """
     if not user_id:
-        return SubscriptionTier.FREE
+        return anonymous_tier()
     if use_fallback_cache and _fallback_active(user_id):
         return SubscriptionTier.FREE
 
