@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
+import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -617,3 +619,78 @@ class TestImageGenPresets:
         assert "image-gen-premium" in PRESETS
         p = get_preset("image-gen-premium")
         assert p.routing["image_generate"] == "gemini-pro-image"
+
+
+class TestGenerationDeadline:
+    """A 4-image run must finish inside the UI proxy's 120s window.
+
+    Observed 2026-11-09: flux.2-klein-4b stalls to its 90s timeout while the
+    other primaries take 25-76s. Fallbacks only started after every primary had
+    finished and then ran one at a time, so a budget run outlived the proxy and
+    the user only ever saw the "Rendering image" placeholder, then a 504.
+    """
+
+    @staticmethod
+    def _fake(slow: set[str], fail: set[str] = frozenset()):
+        async def _gen(prompt, alias, *args, **kwargs):
+            if alias in slow:
+                await asyncio.sleep(30)
+            if alias in fail:
+                raise ImageGenerationError(f"{alias} failed")
+            return {"success": True, "image_data": f"data:image/png;base64,{alias}", "model_used": alias}
+        return _gen
+
+    @pytest.mark.asyncio
+    async def test_a_stalled_primary_is_hedged_with_a_fallback(self, monkeypatch):
+        import reasoner.infrastructure.llm.image_generation as ig
+
+        monkeypatch.setattr(ig, "IMAGE_GEN_TOTAL_BUDGET_SECONDS", 3.0)
+        monkeypatch.setattr(ig, "IMAGE_GEN_HEDGE_AFTER_SECONDS", 0.2)
+        stalled = IMAGE_GEN_PRESETS["budget"][0]
+        with patch.object(ig, "generate_image_with_model", side_effect=self._fake({stalled})):
+            t0 = time.monotonic()
+            result = await generate_images("a cat", preset="budget", enhance=False, num_images=4)
+
+        assert time.monotonic() - t0 < 2.0
+        assert result["success"] is True
+        assert len(result["images"]) == 4
+        assert stalled not in {img["model_used"] for img in result["images"]}
+
+    @pytest.mark.asyncio
+    async def test_the_whole_run_stops_at_its_budget(self, monkeypatch):
+        import reasoner.infrastructure.llm.image_generation as ig
+
+        monkeypatch.setattr(ig, "IMAGE_GEN_TOTAL_BUDGET_SECONDS", 0.5)
+        monkeypatch.setattr(ig, "IMAGE_GEN_HEDGE_AFTER_SECONDS", 10.0)
+        every = set(IMAGE_GEN_PRESETS["budget"]) | set(IMAGE_GEN_FALLBACKS["budget"])
+        with patch.object(ig, "generate_image_with_model", side_effect=self._fake(every)):
+            t0 = time.monotonic()
+            result = await generate_images("a cat", preset="budget", enhance=False, num_images=4)
+
+        assert time.monotonic() - t0 < 1.5
+        assert result["success"] is False
+
+    @pytest.mark.asyncio
+    async def test_a_failed_primary_starts_its_fallback_at_once(self, monkeypatch):
+        """Not after the slowest primary returns."""
+        import reasoner.infrastructure.llm.image_generation as ig
+
+        monkeypatch.setattr(ig, "IMAGE_GEN_TOTAL_BUDGET_SECONDS", 3.0)
+        monkeypatch.setattr(ig, "IMAGE_GEN_HEDGE_AFTER_SECONDS", 10.0)
+        primaries = IMAGE_GEN_PRESETS["budget"]
+        started: dict[str, float] = {}
+        t0 = time.monotonic()
+
+        async def _gen(prompt, alias, *args, **kwargs):
+            started[alias] = time.monotonic() - t0
+            if alias == primaries[0]:
+                raise ImageGenerationError("fast failure")
+            if alias == primaries[1]:
+                await asyncio.sleep(1.0)
+            return {"success": True, "image_data": f"data:image/png;base64,{alias}", "model_used": alias}
+
+        with patch.object(ig, "generate_image_with_model", side_effect=_gen):
+            result = await generate_images("a cat", preset="budget", enhance=False, num_images=4)
+
+        assert result["success"] is True
+        assert started[IMAGE_GEN_FALLBACKS["budget"][0]] < 0.5

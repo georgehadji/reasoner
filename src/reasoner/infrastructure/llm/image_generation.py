@@ -14,6 +14,7 @@ import copy
 import logging
 import os
 import re
+import time
 from typing import Any
 
 import httpx
@@ -29,6 +30,7 @@ from reasoner.core.constants import (
     IMAGE_GEN_ENHANCEMENT_MODEL,
     IMAGE_GEN_ENHANCEMENT_SYSTEM_PROMPT,
     IMAGE_GEN_FALLBACKS,
+    IMAGE_GEN_HEDGE_AFTER_SECONDS,
     IMAGE_GEN_IMAGE_COUNT,
     IMAGE_GEN_MAX_DOWNLOAD_BYTES,
     IMAGE_GEN_POLICY_REWRITE_SYSTEM_PROMPT,
@@ -36,6 +38,7 @@ from reasoner.core.constants import (
     IMAGE_GEN_PROMPT_MAX_TOKENS,
     IMAGE_GEN_PROMPT_TEMPERATURE,
     IMAGE_GEN_REMOTE_TIMEOUT_SECONDS,
+    IMAGE_GEN_TOTAL_BUDGET_SECONDS,
     OPENROUTER_BASE_URL,
 )
 
@@ -586,11 +589,31 @@ async def _run_generation_attempts(
     resolution: str,
     required_image_count: int = 2,
     reference_images: list[str] | None = None,
+    deadline: float | None = None,
 ) -> tuple[list[dict[str, str]], list[str]]:
-    """Run primary and fallback models until the required image count is met or exhausted."""
-    attempted_aliases = list(model_aliases)
-    tasks = [
-        asyncio.create_task(
+    """Run primaries and fallbacks until enough images arrive or time runs out.
+
+    Fallbacks used to wait until every primary had returned and then ran one
+    at a time, so one stalled model plus a fallback outlived the UI proxy's
+    120s window. Now a failed primary starts the next fallback at once; a
+    primary still running after IMAGE_GEN_HEDGE_AFTER_SECONDS gets a fallback
+    beside it (first to finish fills the slot); and nothing runs past
+    *deadline* (a time.monotonic() value).
+    """
+    loop_start = time.monotonic()
+    if deadline is None:
+        deadline = loop_start + IMAGE_GEN_TOTAL_BUDGET_SECONDS
+    hedge_at = loop_start + IMAGE_GEN_HEDGE_AFTER_SECONDS
+    hedged = False
+    queue = [alias for alias in fallback_aliases if alias not in model_aliases]
+    running: dict[asyncio.Task, str] = {}
+    # Images return in priority order (primaries as listed, then fallbacks in
+    # the order started), as they did when the primaries were gathered.
+    order: dict[str, int] = {}
+
+    def _start(alias: str) -> None:
+        order.setdefault(alias, len(order))
+        task = asyncio.create_task(
             _generate_image_guarded(
                 prompt,
                 alias,
@@ -601,48 +624,49 @@ async def _run_generation_attempts(
             ),
             name=alias,
         )
-        for alias in model_aliases
-    ]
-    results = await asyncio.gather(*tasks, return_exceptions=True)
+        running[task] = alias
+
+    for alias in model_aliases:
+        _start(alias)
 
     images: list[dict[str, str]] = []
     errors: list[str] = []
-    for alias, result in zip(model_aliases, results, strict=False):
-        if isinstance(result, Exception):
-            msg = str(result)
-            logger.warning("Image generation failed with %s: %s", alias, msg)
-            errors.append(f"{alias}: {msg}")
-        elif result.get("success"):
-            images.append({
-                "image_data": result["image_data"],
-                "model_used": result["model_used"],
-            })
-        else:
-            errors.append(f"{alias}: {result.get('error', 'unknown')}")
-
-    if len(images) < required_image_count:
-        for alias in fallback_aliases:
-            if len(images) >= required_image_count:
+    try:
+        while running and len(images) < required_image_count:
+            now = time.monotonic()
+            if now >= deadline:
                 break
-            if alias in attempted_aliases:
-                continue
-            attempted_aliases.append(alias)
-            result = await _generate_image_guarded(
-                prompt,
-                alias,
-                api_key,
-                aspect_ratio=aspect_ratio,
-                resolution=resolution,
-                reference_images=reference_images,
+            wake = deadline if hedged else min(deadline, hedge_at)
+            done, _ = await asyncio.wait(
+                running, timeout=max(0.0, wake - now), return_when=asyncio.FIRST_COMPLETED
             )
-            if result.get("success"):
-                images.append({
-                    "image_data": result["image_data"],
-                    "model_used": result["model_used"],
-                })
-                continue
-            errors.append(f"{alias}: {result.get('error', 'unknown')}")
+            for task in done:
+                alias = running.pop(task)
+                result = task.result()
+                if result.get("success"):
+                    images.append({
+                        "image_data": result["image_data"],
+                        "model_used": result["model_used"],
+                    })
+                    continue
+                error = result.get("error", "unknown")
+                logger.warning("Image generation failed with %s: %s", alias, error)
+                errors.append(f"{alias}: {error}")
+                if queue and len(images) + len(running) < required_image_count:
+                    _start(queue.pop(0))
+            if not hedged and time.monotonic() >= hedge_at:
+                hedged = True
+                for _ in range(min(len(running), len(queue))):
+                    _start(queue.pop(0))
+    finally:
+        for task, alias in running.items():
+            task.cancel()
+            budget = f"{IMAGE_GEN_TOTAL_BUDGET_SECONDS:.0f}s"
+            errors.append(f"{alias}: no image within the {budget} budget")
+        if running:
+            await asyncio.gather(*running, return_exceptions=True)
 
+    images.sort(key=lambda image: order.get(image["model_used"], len(order)))
     return images[:required_image_count], errors
 
 
@@ -805,7 +829,10 @@ async def generate_image_with_model(
             else:
                 raise
     except Exception as exc:
-        raise ImageGenerationError(f"API call failed for {model_alias}: {exc}") from exc
+        # A timeout's str() is empty, which logged "API call failed for X: ".
+        raise ImageGenerationError(
+            f"API call failed for {model_alias}: {exc or type(exc).__name__}"
+        ) from exc
 
     if not response.choices:
         image_candidate = await _generate_image_with_images_api(
@@ -979,6 +1006,8 @@ async def generate_images(
         model_aliases = static_primaries
         fallback_aliases = static_fallbacks
 
+    deadline = time.monotonic() + IMAGE_GEN_TOTAL_BUDGET_SECONDS
+
     # 1. Optional prompt enhancement
     final_prompt = prompt
     enhanced_prompt: str | None = None
@@ -996,10 +1025,15 @@ async def generate_images(
         resolution,
         required_image_count=required_image_count,
         reference_images=reference_images,
+        deadline=deadline,
     )
 
     rewritten_prompt: str | None = None
-    if len(images) < required_image_count and _should_retry_with_policy_safe_prompt(errors):
+    if (
+        len(images) < required_image_count
+        and time.monotonic() < deadline
+        and _should_retry_with_policy_safe_prompt(errors)
+    ):
         rewritten_prompt = await _rewrite_prompt_for_policy_safety(final_prompt, api_key=api_key)
         if rewritten_prompt and rewritten_prompt != final_prompt:
             logger.info("Retrying image generation with policy-safe rewritten prompt.")
@@ -1012,13 +1046,14 @@ async def generate_images(
                 resolution,
                 required_image_count=required_image_count,
                 reference_images=reference_images,
+                deadline=deadline,
             )
             if len(retry_images) >= len(images):
                 images = retry_images
             errors.extend(f"policy-retry::{error}" for error in retry_errors)
 
     # Last-resort hard sanitization retry if still short on images
-    if len(images) < required_image_count:
+    if len(images) < required_image_count and time.monotonic() < deadline:
         hard_sanitized = _heuristic_policy_safe_rewrite(final_prompt)
         tried_prompts = {final_prompt, rewritten_prompt} if rewritten_prompt else {final_prompt}
         if hard_sanitized and hard_sanitized not in tried_prompts:
@@ -1032,6 +1067,7 @@ async def generate_images(
                 resolution,
                 required_image_count=required_image_count,
                 reference_images=reference_images,
+                deadline=deadline,
             )
             if len(retry_images) >= len(images):
                 images = retry_images
