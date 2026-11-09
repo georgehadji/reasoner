@@ -1401,6 +1401,7 @@
       "ui-next/src/components/brand/Logo.tsx",
       "ui-next/src/components/chat/CONTEXT.md",
       "ui-next/src/components/chat/ChatErrorBoundary.tsx",
+      "ui-next/src/components/chat/ChatFeed.empty-reply.test.tsx",
       "ui-next/src/components/chat/ChatFeed.tsx",
       "ui-next/src/components/chat/ChatMessage.tsx",
       "ui-next/src/components/chat/CodeBlock.tsx",
