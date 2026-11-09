@@ -1031,6 +1031,7 @@
       "tests/test_event_types.py",
       "tests/test_exceptions_coverage.py",
       "tests/test_executor_wiring.py",
+      "tests/test_explicit_method_request.py",
       "tests/test_feedback.py",
       "tests/test_file_search_tenancy.py",
       "tests/test_followup_agent.py",

@@ -158,6 +158,47 @@ _CODING_SIGNAL = re.compile(
 )
 
 
+# A method the user names outright ("use the iterative-critique method",
+# "using the Bayesian approach") is the method that runs. The trailing noun is
+# required, so everyday wording ("use research to back this", "should we
+# debate this") never selects a pipeline.
+_NAMED_METHODS: dict[str, str] = {
+    "iterative_critique": r"iterative[\s-]+critique",
+    "multi_perspective": r"multi[\s-]*perspective",
+    "pre_mortem": r"pre[\s-]*mortem",
+    "self_discover": r"self[\s-]+discover",
+    "cove": r"cove|chain[\s-]+of[\s-]+verification",
+    "sot": r"sot|skeleton[\s-]+of[\s-]+thoughts?",
+    "tot": r"tot|tree[\s-]+of[\s-]+thoughts?",
+    "pot": r"pot|program[\s-]+of[\s-]+thoughts?",
+    "debate": r"debate",
+    "scientific": r"scientific",
+    "socratic": r"socratic",
+    "research": r"research",
+    "jury": r"jury",
+    "bayesian": r"bayesian",
+    "dialectical": r"dialectical",
+    "analogical": r"analogical",
+    "delphi": r"delphi",
+    "brainstorming": r"brainstorming",
+}
+_NAMED_METHOD_RE = re.compile(
+    r"\b(?:use|using|with|via|apply|applying|run|running|try|through)\s+"
+    r"(?:the\s+|a\s+|an\s+)?(?P<name>"
+    + "|".join(f"(?P<{key}>{alt})" for key, alt in _NAMED_METHODS.items())
+    + r")\s+(?:method|approach|technique|framework|process|mode|reasoning)\b",
+    re.I,
+)
+
+
+def named_method(problem: str) -> str | None:
+    """The method key the user asked for by name, or None."""
+    match = _NAMED_METHOD_RE.search(problem)
+    if not match:
+        return None
+    return next(key for key in _NAMED_METHODS if match.group(key))
+
+
 def _is_creative_writing(problem: str) -> bool:
     """Return True only for PURE creative tasks (no research needed).
 
@@ -189,6 +230,22 @@ def fast_path(problem: str) -> GateDecision | None:
         return GateDecision(
             action="direct", confidence=1.0, reasoning="Very short prompt, assumed direct",
             complexity="simple"
+        )
+
+    # Fast-path: a method the user named. Before writing intent, so "use the
+    # debate method to plan an article" runs debate.
+    method = named_method(problem)
+    if method:
+        logger.info(
+            "HyperGateAgent fast-path: named-method hash=%s action=pipeline method=%s",
+            problem_hash[:16], method,
+        )
+        return GateDecision(
+            action="pipeline",
+            method=method,
+            confidence=1.0,
+            reasoning="The prompt names this method",
+            complexity="complex",
         )
 
     # Fast-path: research-backed writing (articles/essays/blog posts/reports)
