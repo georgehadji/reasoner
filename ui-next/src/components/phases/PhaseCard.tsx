@@ -40,7 +40,7 @@ interface PhaseCardProps {
   duration?: number;
   compact?: boolean;
   status?: 'idle' | 'active' | 'completed' | 'error' | 'degraded';
-  quality?: { score: number; passed: boolean } | null;
+  quality?: { score: number | null; passed: boolean } | null;
 }
 
 /* Shared card vocabulary. `--chip-bg` (and `--chip-bg-2`, the step nested
@@ -127,8 +127,23 @@ export function ScoreMeter({
   );
 }
 
-export function QualityChip({ quality }: { quality: { score: number; passed: boolean } }) {
+export function QualityChip({ quality }: { quality: { score: number | null; passed: boolean } }) {
   const Icon = quality.passed ? CheckCircle2 : AlertTriangle;
+  // No score means the phase passed structural checks but nothing graded it;
+  // a number here would be invented.
+  if (quality.score == null) {
+    return (
+      <Tooltip text="Structural checks only; this phase was not graded.">
+        <span className={cn(CHIP, 'gap-[var(--space-2)]')}>
+          <Icon
+            aria-hidden="true"
+            className={cn(ICON_SM, quality.passed ? 'text-[var(--text)]' : 'text-[var(--text-muted)]')}
+          />
+          <span className={MICRO_LABEL}>{quality.passed ? 'Checks passed' : 'Checks failed'}</span>
+        </span>
+      </Tooltip>
+    );
+  }
   return (
     <Tooltip text={`Quality score: ${quality.score.toFixed(1)} out of 10`}>
       <span className={cn(CHIP, 'gap-[var(--space-2)]')}>
@@ -160,7 +175,7 @@ export function PhaseMetaStrip({
   models?: string[] | null;
   subagents?: SubagentInfo[] | null;
   duration?: number;
-  quality?: { score: number; passed: boolean } | null;
+  quality?: { score: number | null; passed: boolean } | null;
   className?: string;
 }) {
   const subagentTooltip = subagents
