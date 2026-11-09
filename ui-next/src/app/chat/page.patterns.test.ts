@@ -52,3 +52,14 @@ describe('chat/page.tsx image-mode errors are shown', () => {
     expect(src).toMatch(/const showImageResult = \(added: boolean[\s\S]*?type: 'ADD_MESSAGES'[\s\S]*?type: 'UPDATE_MESSAGE'/);
   });
 });
+
+describe('WebSocket side channel is signed-in only', () => {
+  // A ticket needs an authenticated user (POST /api/websocket/ticket), so an
+  // anonymous run got a 401 and the header dot turned red with "Could not
+  // obtain a connection ticket (401)". The run itself streams over SSE and
+  // Stop has an HTTP fallback, so anonymous runs skip the socket.
+  it('connects only when a user is signed in', () => {
+    expect(src).toMatch(/if \(user\) wsConnect\(clientRunId/);
+    expect(src).not.toMatch(/^\s*wsConnect\(clientRunId/m);
+  });
+});
