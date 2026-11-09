@@ -927,6 +927,7 @@
       "tests/test_agent_run_sync.py",
       "tests/test_agent_tools_contract.py",
       "tests/test_aggregates.py",
+      "tests/test_anonymous_tier.py",
       "tests/test_anonymous_trial_policy.py",
       "tests/test_api_auth_deps.py",
       "tests/test_api_cache_clear.py",
