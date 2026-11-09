@@ -120,7 +120,10 @@ export function CommandPalette({
   if (!isEnabled('command-palette')) return null;
 
   return (
+    // Closed, it stays mounted only to animate out; `inert` keeps its input out
+    // of the Tab order and the accessibility tree, as `pointer-events-none` does not.
     <div
+      inert={!isOpen}
       className={cn(
         'fixed inset-0 z-[400] flex items-start justify-center p-4 pt-[20vh] transition-all duration-[var(--dur-component)]',
         isOpen
