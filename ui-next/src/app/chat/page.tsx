@@ -411,6 +411,17 @@ export default function ChatPage() {
     // ── Image Generation mode ──
     if (isImageMode) {
       const genStart = performance.now();
+      // The reply bubble is added only once prompt enhancement succeeds. A failure
+      // before that (a 401 from /api/generate-image when signed out) used to update
+      // a bubble that did not exist, so the user saw no answer at all.
+      let replyAdded = false;
+      const showImageResult = (added: boolean, updates: Partial<ChatFeedMessage>) => {
+        if (added) {
+          dispatchMessages({ type: 'UPDATE_MESSAGE', payload: { messageId: assistantId, updates } });
+        } else {
+          dispatchMessages({ type: 'ADD_MESSAGES', payload: [{ ...assistantMsg, ...updates }] });
+        }
+      };
       try {
         const basePrompt = clampImagePrompt(problem);
         if (basePrompt.truncated) {
@@ -468,6 +479,7 @@ export default function ChatPage() {
             },
           ],
         });
+        replyAdded = true;
 
         const result = await generateImage(enhancedPrompt, tier, false, referenceImages, tier === 'budget' ? 4 : undefined);
         const genDuration = (performance.now() - genStart) / 1000;
@@ -511,23 +523,21 @@ export default function ChatPage() {
           });
           refreshHistory();
         } else {
-          // Update assistant message with generation failure
-          dispatchMessages({ type: 'UPDATE_MESSAGE', payload: { messageId: assistantId, updates: {
+          showImageResult(replyAdded, {
             content: `**Image generation failed:** ${result.error || 'Unknown error'}`,
             isStreaming: false,
             loadingKind: undefined,
             loadingPrompt: undefined,
-          }}});
+          });
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Image generation failed';
-        // Update assistant message with error
-        dispatchMessages({ type: 'UPDATE_MESSAGE', payload: { messageId: assistantId, updates: {
+        showImageResult(replyAdded, {
           content: `**Error:** ${msg}`,
           isStreaming: false,
           loadingKind: undefined,
           loadingPrompt: undefined,
-        }}});
+        });
       } finally {
         setRunning(false);
         clearAttachments();
