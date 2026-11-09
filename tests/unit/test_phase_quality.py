@@ -120,7 +120,7 @@ def test_perspectives_some_thin():
     state = _State(candidates=[_candidate("A" * 100), _candidate("short")])
     result = evaluate_rules("Perspectives", state)
     assert result.passed
-    assert result.score < 9.0
+    assert result.score is not None and result.score < 9.0
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -208,7 +208,7 @@ def test_synthesis_no_insights_partial_pass():
     state = _State(final_solution=_solution("x" * 150, insights=[]))
     result = evaluate_rules("Synthesis", state)
     assert result.passed
-    assert result.score < 9.0
+    assert result.score is not None and result.score < 9.0
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -247,14 +247,16 @@ def test_final_assembly_fail_short():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Unknown phase — should pass with default score
+# Unknown phase — passes, ungraded
 # ─────────────────────────────────────────────────────────────────────────────
 
-def test_unknown_phase_passes():
+def test_unknown_phase_passes_without_a_score():
+    """No rule means nothing was measured. It used to report 8.0, so every
+    article phase (none has a rule) showed "Quality 8.0/10" (2026-11-09)."""
     state = _State()
     result = evaluate_rules("Some Unknown Phase", state)
     assert result.passed
-    assert result.score == 8.0
+    assert result.score is None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -303,7 +305,7 @@ def test_context_vetting_pass():
     )
     result = evaluate_rules("Context Vetting", state)
     assert result.passed
-    assert result.score == 9.0
+    assert result.score is None
 
 
 def test_context_vetting_fail_empty():

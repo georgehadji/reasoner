@@ -54,6 +54,13 @@ logger = logging.getLogger(__name__)
 #        qwen3.6-flash   0/5 parsed   --      returns ""
 #        qwen3.5-flash   0/5 parsed   --      returns -1.0000000000000002e+308
 #
+#    Re-probed 2026-11-09 after OpenRouter retired both Poolside models (same
+#    five prompts, two problems each, English and Greek -> 10 calls per model):
+#        gemini-2.5-flash-lite 10/10  0.67s median    nemotron-3.5-super 10/10  0.68s
+#        ministral-14b         10/10  0.76s           mimo-v2.6-flash    10/10  1.08s
+#        ling-3.0-tiny         10/10  1.16s           gpt-4o-mini        10/10  1.41s
+#        qwen3.8-flash         10/10  1.69s           muse-ember         10/10  2.12s
+#
 #    The two cheapest models each fail exactly one job. A per-role table can use
 #    them for the four jobs they pass; a single shared role could not, and had
 #    to pay for the strongest model on the easiest task.
@@ -74,9 +81,9 @@ _HYPERGATE_ROLE_MODELS: dict[str, str] = {
     # No two share a served model, which is the whole point: five parallel
     # calls now reach five distinct models across three vendors.
     "hypergate_language": "ministral-3b",     # trivial task, fastest verified
-    "hypergate_complexity": "laguna-xs-2.1",  # passes; second vendor
+    "hypergate_complexity": "gemini-2.5-flash-lite",  # 10/10, 0.67s; second vendor (was laguna-xs-2.1, retired 2026-11)
     "hypergate_direct": "gpt-4o-mini",        # third vendor; ministral-3b fails this
-    "hypergate_web": "laguna-s-2.1",          # passes; distinct from complexity
+    "hypergate_web": "nemotron-3.5-super",    # 10/10, 0.68s; distinct from complexity (was laguna-s-2.1, retired 2026-11)
     "hypergate_method": "ministral-14b",      # hardest task, needs 5/5 model
     # -- Phase 2, runs alone after Phase 1 has returned --
     # Sharing gpt-4o-mini with hypergate_direct is deliberate and safe: the
@@ -104,12 +111,12 @@ _HYPERGATE_ROLE_MODELS: dict[str, str] = {
 # Only 5/5-parsing models appear here: a fallback firing on a job its model
 # cannot do turns a slow failure into a wrong answer.
 _HYPERGATE_ROLE_FALLBACKS: dict[str, str] = {
-    "hypergate_language": "laguna-s-2.1",     # mistralai -> poolside
-    "hypergate_complexity": "gpt-4o-mini",    # poolside  -> openai
-    "hypergate_direct": "laguna-s-2.1",       # openai    -> poolside
-    "hypergate_web": "gpt-4o-mini",           # poolside  -> openai
+    "hypergate_language": "gemini-2.5-flash-lite",  # mistralai -> google
+    "hypergate_complexity": "gpt-4o-mini",    # google    -> openai
+    "hypergate_direct": "gemini-2.5-flash-lite",    # openai    -> google
+    "hypergate_web": "gpt-4o-mini",           # nvidia    -> openai
     "hypergate_method": "gpt-4o-mini",        # mistralai -> openai
-    "hypergate_tiebreak": "laguna-s-2.1",     # openai    -> poolside
+    "hypergate_tiebreak": "gemini-2.5-flash-lite",  # openai    -> google
     "hypergate_subagent": "gpt-4o-mini",      # mistralai -> openai
 }
 

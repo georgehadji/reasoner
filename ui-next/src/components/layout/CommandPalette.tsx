@@ -13,6 +13,7 @@ import {
   Command,
   CreditCard,
   Info,
+  DatabaseZap,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { isEnabled } from '@/hooks/useFeatureFlags';
@@ -36,6 +37,9 @@ interface CommandPaletteProps {
   onToggleTier: () => void;
   tier: string;
   onCopyLastResponse: () => void;
+  /** Server-wide cache clear (DELETE /api/cache). Lives here, not in the
+   *  sidebar footer, so a destructive action is never one stray tap away. */
+  onClearCache?: () => void;
   recentCommands?: string[];
   onRecordCommand?: (id: string) => void;
 }
@@ -51,6 +55,7 @@ export function CommandPalette({
   onToggleTier,
   tier,
   onCopyLastResponse,
+  onClearCache,
   recentCommands = [],
   onRecordCommand,
 }: CommandPaletteProps) {
@@ -71,8 +76,11 @@ export function CommandPalette({
       { id: 'pricing', label: 'View Pricing', icon: <CreditCard className="h-4 w-4" />, action: () => { onClose(); router.push('/pricing'); } },
       { id: 'about', label: 'About Reasoner', icon: <Info className="h-4 w-4" />, action: () => { onClose(); router.push('/about'); } },
       { id: 'settings', label: 'Account Settings', icon: <Command className="h-4 w-4" />, action: () => { onClose(); router.push('/settings'); } },
+      ...(onClearCache
+        ? [{ id: 'clear-cache', label: 'Clear server cache', icon: <DatabaseZap className="h-4 w-4" />, action: onClearCache }]
+        : []),
     ],
-    [onNew, onClearComposer, onToggleTheme, onToggleSidebar, onToggleNeuro, onToggleTier, tier, onCopyLastResponse, router, onClose]
+    [onNew, onClearComposer, onToggleTheme, onToggleSidebar, onToggleNeuro, onToggleTier, tier, onCopyLastResponse, onClearCache, router, onClose]
   );
 
   const filtered = useMemo(() => {

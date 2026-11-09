@@ -26,8 +26,8 @@ export interface TokenCount {
 
 export interface PhaseEvent {
   type: 'start' | 'prompt_enhanced' | 'phase_start' | 'phase_complete' | 'phase_quality' | 'phase_retry' | 'phase_error' | 'error' | 'cancelled' | 'done' | 'agent_start' | 'agent_complete' | 'text_chunk' | 'widget' | 'recall_used' | 'research_step_emitted' | 'research_citations_ready' | 'method_selected';
-  /** phase_quality fields */
-  score?: number;
+  /** phase_quality fields. null: checked but not graded. */
+  score?: number | null;
   passed?: boolean;
   reason?: string;
   attempt?: number;

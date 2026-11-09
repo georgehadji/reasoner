@@ -155,7 +155,7 @@ def test_constraint_accepts_a_cross_bloc_panel():
         {
             "expert_1": "gpt-5.6-terra",       # US
             "expert_2": "gemini-pro-real",     # US
-            "expert_3": "qwen3-max-thinking",  # CN
+            "expert_3": "hy4",                 # CN
             "expert_4": "mistral-large-3",     # EU
         },
         "delphi-premium",
