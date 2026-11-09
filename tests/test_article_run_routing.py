@@ -92,3 +92,17 @@ async def test_custom_routing_is_never_replaced():
 
     assert decision.effective_preset_name == "auto-budget"
     svc.build_auto_router.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_a_named_method_is_not_overridden_by_article_detection():
+    """"use the iterative-critique method to propose what subject to write an
+    article ..." matches the article regex, but the user named the method."""
+    decision, svc = await _preflight(
+        "use the iterative-critique method to propose what subject to write an article on AI",
+        "iterative_critique",
+    )
+
+    assert decision.auto_selected_method == "iterative_critique"
+    assert decision.effective_preset_name == "iterative_critique-budget"
+    assert all(c.args[0] != "article" for c in svc.build_auto_router.call_args_list)
