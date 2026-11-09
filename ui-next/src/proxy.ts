@@ -13,10 +13,14 @@ const HSTS_VALUE = 'max-age=31536000; includeSubDomains; preload';
 // exempt only when they carry one.
 const WEBHOOK_PATHS = ['/api/billing/webhook', '/api/billing/paypal/webhook'];
 const BEARER_ONLY_PREFIX = '/api/agent/';
+// The refresh the client makes after a CSRF 403. Checking it too meant a stale
+// cookie blocked its own replacement until it expired. It changes no state, and
+// the backend's POST /api/csrf is unguarded for the same reason.
+const CSRF_REFRESH_PATH = '/api/csrf';
 
 export function csrfExempt(request: NextRequest): boolean {
   const path = request.nextUrl.pathname;
-  if (WEBHOOK_PATHS.includes(path)) return true;
+  if (WEBHOOK_PATHS.includes(path) || path === CSRF_REFRESH_PATH) return true;
   return (
     path.startsWith(BEARER_ONLY_PREFIX) &&
     /^Bearer\s+\S+/i.test(request.headers.get('authorization') || '')
