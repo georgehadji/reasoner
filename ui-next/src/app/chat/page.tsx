@@ -883,7 +883,9 @@ export default function ChatPage() {
       const state = useAppStore.getState();
       // Connect WebSocket for control (stop) and status only.
       // Phase events come exclusively via SSE to avoid double-processing.
-      wsConnect(clientRunId, () => {});
+      // Signed-in only: its ticket needs a user, so an anonymous run got a 401
+      // and a red "error" dot. Stop falls back to HTTP (useRunController).
+      if (user) wsConnect(clientRunId, () => {});
 
       if (isFollowup) {
         const followupConvId = conversationIdRef.current || lastAssistantMsg.id;
@@ -975,7 +977,7 @@ export default function ChatPage() {
       setRunning(false);
       clearAttachments();
     }
-  }, [attachments, isImageMode, isLocal, tier, messages, startRun, startFollowup, wsConnect, wsDisconnect, dispatchMessages, setRunning, setComposerText, clearAttachments, refreshHistory, setCompletedPhases, setErrorPhases, setCurrentPhase, setPhaseDurations, setAutoSelectedMethod, setPhaseOpenMode, isContinuation, getAutoPreset, autoMethodAlways]);
+  }, [attachments, isImageMode, isLocal, user, tier, messages, startRun, startFollowup, wsConnect, wsDisconnect, dispatchMessages, setRunning, setComposerText, clearAttachments, refreshHistory, setCompletedPhases, setErrorPhases, setCurrentPhase, setPhaseDurations, setAutoSelectedMethod, setPhaseOpenMode, isContinuation, getAutoPreset, autoMethodAlways]);
 
   const handleSubmit = useCallback(async (
     providedText?: string,
