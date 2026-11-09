@@ -996,6 +996,7 @@
       "tests/test_credits.py",
       "tests/test_cross_language.py",
       "tests/test_csrf_clock_jump.py",
+      "tests/test_csrf_token_parity.py",
       "tests/test_data_eraser_neuro_reporting.py",
       "tests/test_db_pool_size.py",
       "tests/test_decompose_json_guard.py",

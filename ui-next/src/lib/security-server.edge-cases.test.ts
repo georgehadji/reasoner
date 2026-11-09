@@ -26,6 +26,7 @@ import {
   readJsonBody,
   sanitizeRequestHeaders,
   sanitizeResponseHeaders,
+  buildCsrfToken,
   generateCsrfToken,
   signCsrfToken,
   verifyCsrfToken,
@@ -518,23 +519,51 @@ describe('CSRF token — validity checks', () => {
     process.env.CSRF_SECRET = 'a-very-long-secret-key-for-testing-csrf!!!';
   });
 
-  it('generated token has expected format', () => {
-    const token = generateCsrfToken();
-    expect(token).toMatch(/^\d+:[0-9a-f]{48}$/);
+  it('generated token has the backend format expiry:nonce:sig16', async () => {
+    const token = await generateCsrfToken();
+    expect(token).toMatch(/^\d+:[0-9a-f]{32}:[0-9a-f]{16}$/);
   });
 
   it('signCsrfToken produces expected format', async () => {
-    const token = generateCsrfToken();
+    const token = await generateCsrfToken();
     const signed = await signCsrfToken(token);
-    expect(signed).toMatch(/^\d+:[0-9a-f]{48}\.[0-9a-f]{64}$/);
+    expect(signed).toMatch(/^\d+:[0-9a-f]{32}:[0-9a-f]{16}\.[0-9a-f]{64}$/);
   });
 
   it('rejects expired token', async () => {
-    // Create a token with an old timestamp
-    const oldToken = `${Math.floor(Date.now() / 1000) - 90000}:${'a'.repeat(48)}`;
-    const isValid = await verifyCsrfToken(oldToken);
-    // Expect false: timestamp expired (CSRF max age is 86400)
-    expect(isValid).toBe(false);
+    const expired = await buildCsrfToken(Math.floor(Date.now() / 1000) - 1, 'a'.repeat(32));
+    expect(await verifyCsrfToken(await signCsrfToken(expired))).toBe(false);
+  });
+
+  it('rejects the old ts:rand format, which the backend cannot verify', async () => {
+    const old = await signCsrfToken(`${Math.floor(Date.now() / 1000)}:${'a'.repeat(48)}`);
+    expect(await verifyCsrfToken(old)).toBe(false);
+  });
+});
+
+// Pinned in tests/test_csrf_token_parity.py too: without Caddy the proxy's
+// cookie is the header the backend verifies, so both must agree on it.
+describe('CSRF token — backend parity vector', () => {
+  const VECTOR =
+    '4102444800:0123456789abcdef0123456789abcdef:377f8b056c36c947' +
+    '.1a58f823bbbdea1de526ce5933cc31aa9f747a57e23b5a3faa6f4032c2114399';
+
+  beforeEach(() => {
+    process.env.CSRF_SECRET = 'test-secret-at-least-32-bytes-long!!';
+  });
+
+  it('mints exactly the backend token for a fixed expiry and nonce', async () => {
+    const token = await buildCsrfToken(4102444800, '0123456789abcdef0123456789abcdef');
+    expect(await signCsrfToken(token)).toBe(VECTOR);
+  });
+
+  it('accepts a backend-minted token', async () => {
+    expect(await verifyCsrfToken(VECTOR)).toBe(true);
+  });
+
+  it('rejects a backend-format token whose payload signature is wrong', async () => {
+    const forged = await signCsrfToken('4102444800:0123456789abcdef0123456789abcdef:0000000000000000');
+    expect(await verifyCsrfToken(forged)).toBe(false);
   });
 
   it('rejects token with invalid timestamp format', async () => {

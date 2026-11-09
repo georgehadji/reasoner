@@ -26,12 +26,40 @@ export const SECURITY_CONSTANTS = {
   rateLimitCleanupModulo: 100,
 };
 
-export function generateCsrfToken(): string {
-  const ts = Math.floor(Date.now() / 1000);
-  const arr = new Uint8Array(24);
-  crypto.getRandomValues(arr);
-  const rand = Array.from(arr, (b) => b.toString(16).padStart(2, '0')).join('');
-  return `${ts}:${rand}`;
+// Tokens use the backend's format (src/reasoner/api/csrf.py), so the cookie this
+// proxy mints is one the backend also accepts. Without Caddy the proxy's token
+// is the X-CSRF-Token the backend verifies; the old `ts:rand` shape failed there
+// and every proxied POST was a 403 with backend CSRF enforcement on.
+// tests/test_csrf_token_parity.py pins the shared vector.
+const PAYLOAD_SIG_HEX_CHARS = 16;
+
+function toHex(bytes: ArrayBuffer | Uint8Array): string {
+  return Array.from(new Uint8Array(bytes), (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function hmacHex(message: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    await getCsrfSecret(),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  return toHex(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(message)));
+}
+
+/** `expiry:nonce:sig16`, where sig16 binds the expiry so it cannot be edited. */
+export async function buildCsrfToken(expiry: number, nonce: string): Promise<string> {
+  const payload = `${expiry}:${nonce}`;
+  const sig = (await hmacHex(payload)).slice(0, PAYLOAD_SIG_HEX_CHARS);
+  return `${payload}:${sig}`;
+}
+
+export async function generateCsrfToken(): Promise<string> {
+  const nonce = new Uint8Array(16);
+  crypto.getRandomValues(nonce);
+  const expiry = Math.floor(Date.now() / 1000) + TIMING.csrfMaxAgeSeconds;
+  return buildCsrfToken(expiry, toHex(nonce));
 }
 
 async function getCsrfSecret(): Promise<ArrayBuffer> {
@@ -48,16 +76,7 @@ async function getCsrfSecret(): Promise<ArrayBuffer> {
 }
 
 export async function signCsrfToken(token: string): Promise<string> {
-  const key = await crypto.subtle.importKey(
-    'raw',
-    await getCsrfSecret(),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(token));
-  const sigHex = Array.from(new Uint8Array(sig), (b) => b.toString(16).padStart(2, '0')).join('');
-  return `${token}.${sigHex}`;
+  return `${token}.${await hmacHex(token)}`;
 }
 
 export async function verifyCsrfToken(signed: string): Promise<boolean> {
@@ -65,15 +84,15 @@ export async function verifyCsrfToken(signed: string): Promise<boolean> {
   if (idx === -1) return false;
   const token = signed.slice(0, idx);
 
-  // Validate embedded timestamp to enforce token max-age
-  const colonIdx = token.indexOf(':');
-  if (colonIdx === -1) return false;
-  const ts = parseInt(token.slice(0, colonIdx), 10);
-  if (!Number.isFinite(ts) || Date.now() / 1000 - ts > TIMING.csrfMaxAgeSeconds) {
-    return false;
-  }
+  // expiry:nonce:sig16, the backend's shape. The embedded expiry is checked
+  // against its own signature, as verify_csrf_token does.
+  const parts = token.split(':');
+  if (parts.length !== 3) return false;
+  const expiry = parseInt(parts[0], 10);
+  if (!Number.isFinite(expiry) || Date.now() / 1000 >= expiry) return false;
 
-  const expected = await signCsrfToken(token);
+  const expectedToken = await buildCsrfToken(expiry, parts[1]);
+  const expected = `${expectedToken}.${await hmacHex(expectedToken)}`;
   if (expected.length !== signed.length) return false;
   let result = 0;
   for (let i = 0; i < signed.length; i++) {
@@ -90,7 +109,7 @@ export async function requireCsrfToken(req: NextRequest): Promise<void> {
 }
 
 export async function generateSignedCsrfToken(): Promise<string> {
-  return signCsrfToken(generateCsrfToken());
+  return signCsrfToken(await generateCsrfToken());
 }
 
 /**

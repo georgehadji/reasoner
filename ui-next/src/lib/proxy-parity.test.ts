@@ -88,6 +88,10 @@ describe('csrfExempt', () => {
     expect(csrfExempt(post('/api/agent/run'))).toBe(false);
   });
 
+  it('exempts the token refresh itself, or a stale cookie could never be replaced', () => {
+    expect(csrfExempt(post('/api/csrf'))).toBe(true);
+  });
+
   it('does not exempt browser routes', () => {
     expect(csrfExempt(post('/api/run', { authorization: 'Bearer x' }))).toBe(false);
     expect(csrfExempt(post('/api/billing/checkout'))).toBe(false);
