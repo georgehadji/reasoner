@@ -19,7 +19,6 @@ from reasoner.core.constants_models import (
     MODEL_GPT5_IMAGE,
     MODEL_GPT5_IMAGE_MINI,
     MODEL_GROK_43,
-    MODEL_GROK_IMAGINE,
     MODEL_GROK_IMAGINE_IMAGE_2,
     MODEL_MAI_IMAGE_25,
     MODEL_MAI_IMAGE_25_PRO,
@@ -632,7 +631,7 @@ IMAGE_GEN_BUDGET_FALLBACK_MODELS: list[str] = [
 # its slot is held by the chat-native gpt-5-image.
 IMAGE_GEN_PREMIUM_MODELS: list[str] = [
     MODEL_GEMINI_PRO_IMAGE, # 🇺🇸 Google — $0.1548, the pro line beats the flash line
-    MODEL_GROK_IMAGINE,     # 🇺🇸 xAI — $0.0100, the quality tier
+    MODEL_GROK_IMAGINE_IMAGE_2, # 🇺🇸 xAI — $0.0100 (its "quality" tier was retired by OpenRouter 2026-11)
     MODEL_GPT5_IMAGE,       # 🇺🇸 OpenAI — $0.0516
     MODEL_RECRAFT_V41_PRO,  # 🇺🇸 Recraft — $0.0649, design-grade
 ]

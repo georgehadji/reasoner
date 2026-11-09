@@ -487,6 +487,11 @@ class Settings:
     # bounded regardless. 50 credits = $0.05/day, enough for a couple of
     # budget-tier trial runs.
     ANONYMOUS_DAILY_CREDIT_CAP: int = int(os.getenv("ANONYMOUS_DAILY_CREDIT_CAP", "50"))
+    # The plan an anonymous caller is treated as: its per-run ceiling and the
+    # preset tiers it may run. "free" unless a local or self-hosted instance
+    # runs without sign-in and wants premium presets; production refuses any
+    # other value at startup (below). An unknown value falls back to free.
+    ANONYMOUS_TIER: str = os.getenv("ANONYMOUS_TIER", "free")
 
     # ── WebSocket Security (Phase 3 metering) ──
     # Ticket validity window. Short by design: the ticket travels via the
@@ -637,6 +642,11 @@ if settings.CSRF_ENFORCE_BACKEND and not settings.CSRF_SECRET:
     )
 
 if settings.ENVIRONMENT == "production":
+    if settings.ANONYMOUS_TIER.strip().lower() != "free":
+        raise RuntimeError(
+            f"ANONYMOUS_TIER={settings.ANONYMOUS_TIER!r} is not permitted in production: "
+            "it would give every caller without an account a paid plan's limits."
+        )
     for secret_name in ("CSRF_SECRET", "ADMIN_API_KEY"):
         secret_value = getattr(settings, secret_name) or ""
         if len(secret_value) < 32:

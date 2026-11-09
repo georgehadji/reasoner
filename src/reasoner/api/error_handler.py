@@ -156,8 +156,15 @@ def _safe_json_response(
     correlation_id: str,
     request: Request | None = None,
     extra: dict[str, Any] | None = None,
+    client_detail: dict[str, Any] | None = None,
+    headers: dict[str, str] | None = None,
 ) -> JSONResponse:
-    """Build a safe JSON error response that doesn't leak internals."""
+    """Build a safe JSON error response that doesn't leak internals.
+
+    *client_detail* is a structured ``HTTPException.detail`` a route wrote for
+    the client (``retry_after``, ``upgrade_url``), so it is sent in every
+    environment; *extra* is diagnostic and stays out of production.
+    """
     from reasoner.core.settings import settings
     env = getattr(settings, "ENVIRONMENT", "development")
 
@@ -174,8 +181,22 @@ def _safe_json_response(
     # In development, include extra detail (validation errors, etc.)
     if env != "production" and extra:
         body["detail"] = extra
+    if client_detail:
+        body["detail"] = client_detail
 
-    return JSONResponse(status_code=status_code, content=body)
+    return JSONResponse(status_code=status_code, content=body, headers=headers)
+
+
+def _split_detail(detail: Any) -> tuple[str, dict[str, Any] | None]:
+    """An HTTPException detail as (one-line message, structured detail or None).
+
+    ``str()`` of a dict detail sent the client a Python repr ("{'error': ...}")
+    that it could neither show nor parse.
+    """
+    if isinstance(detail, dict):
+        message = detail.get("message") or detail.get("error") or detail.get("detail")
+        return str(message or "Request failed"), detail
+    return str(detail), None
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -189,13 +210,18 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
     source = "api"
 
     # Skip logging for routine auth failures and rate limits
+    message, client_detail = _split_detail(exc.detail)
+    headers = getattr(exc, "headers", None)
     if exc.status_code in (401, 403, 429):
-        return _safe_json_response(exc.status_code, str(exc.detail), get_correlation_id(), request)
+        return _safe_json_response(
+            exc.status_code, message, get_correlation_id(), request,
+            client_detail=client_detail, headers=headers,
+        )
 
     _log_error(
         level=level,
         source=source,
-        message=str(exc.detail),
+        message=message,
         request=request,
         status_code=exc.status_code,
         # Headers carry Authorization, X-Admin-Key and session cookies. These
@@ -207,7 +233,10 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
         },
     )
 
-    return _safe_json_response(exc.status_code, str(exc.detail), get_correlation_id(), request)
+    return _safe_json_response(
+        exc.status_code, message, get_correlation_id(), request,
+        client_detail=client_detail, headers=headers,
+    )
 
 
 async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:

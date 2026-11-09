@@ -166,7 +166,7 @@ class TestBrainstormGenerateRules:
         })
         result = evaluate_rules("VS Idea Generation", state)
         assert result.passed
-        assert result.score == 9.0
+        assert result.score is None  # a clean pass is not graded
 
     def test_partial_pass_no_tail(self):
         """Ideas generated but none are tail — diversity warning, still passes."""
@@ -178,14 +178,16 @@ class TestBrainstormGenerateRules:
         })
         result = evaluate_rules("VS Idea Generation", state)
         assert result.passed
-        assert result.score < 9.0
+        assert result.score is not None and result.score < 9.0
 
     def test_pass_score_reflects_tail_presence(self):
         state_with_tail = _State(brainstorming_state={"raw_ideas": [{"probability": 0.05}]})
         state_no_tail = _State(brainstorming_state={"raw_ideas": [{"probability": 0.80}]})
         with_tail = evaluate_rules("VS Idea Generation", state_with_tail)
         no_tail = evaluate_rules("VS Idea Generation", state_no_tail)
-        assert with_tail.score > no_tail.score
+        # The clean pass carries no grade; only the diversity warning does.
+        assert with_tail.score is None
+        assert no_tail.score is not None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
