@@ -414,6 +414,18 @@ function ChatFeedComponent({
         {liveText}
       </div>
       {messages.map((msg, i) => {
+        // A run refused before any reply leaves its streaming placeholder
+        // empty. Rendering it put a Copy button that copied nothing between
+        // the prompt and the error; the error message says all there is.
+        if (
+          msg.role === 'assistant' &&
+          !msg.isStreaming &&
+          !msg.content?.trim() &&
+          !msg.phases?.length &&
+          !msg.images?.length
+        ) {
+          return null;
+        }
         if (msg.role === 'user') {
           return (
             <div
