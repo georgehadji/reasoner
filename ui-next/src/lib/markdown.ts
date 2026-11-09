@@ -1019,7 +1019,11 @@ export function buildMarkdownFromPhase(
     }
     if (Array.isArray(ws.sources_cited) && ws.sources_cited.length) {
       append('**Sources Cited**\n');
-      (ws.sources_cited as string[]).forEach((s) => append(`- ${s}\n`));
+      // The article flow sends {title, url} records; older runs sent strings.
+      (ws.sources_cited as Array<string | { title?: string; url?: string }>).forEach((s) => {
+        if (typeof s === 'string') append(`- ${s}\n`);
+        else if (s?.url) append(`- [${s.title || s.url}](${s.url})\n`);
+      });
       append('\n');
     }
     if (Array.isArray(ws.final_changes) && ws.final_changes.length) {

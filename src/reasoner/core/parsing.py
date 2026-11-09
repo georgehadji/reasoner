@@ -137,6 +137,12 @@ def _strip_reasoning_tags(text: str) -> str:
     """
     text = _THINK_TAG_RE.sub("", text)
     text = _REASONING_TAG_RE.sub("", text)
+    # A close with no opening tag: the model narrated its reasoning as plain
+    # content ("Thinking Process: 1. Analyze...") and closed it with a bare
+    # </think>, as qwen3.5-flash does. Everything before it is narration.
+    _, close, answer = text.rpartition("</think>")
+    if close:
+        text = answer
     return text.strip()
 
 

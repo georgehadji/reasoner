@@ -15,7 +15,6 @@ import { copyToClipboard, cn } from '@/lib/utils';
 import { isEnabled } from '@/hooks/useFeatureFlags';
 import { ManifestationVisuals } from './ManifestationVisuals';
 import { Tooltip } from '@/components/ui/Tooltip';
-import { useAppStore } from '@/stores/app-store';
 
 /* ── Message entrance ──────────────────────────────────────────
    One transition token for every row that lands in the feed, so a
@@ -332,33 +331,21 @@ function MessageActions({
   );
 }
 
-function ContinueButton({ onContinue }: { onContinue?: () => void }) {
-  const user = useAppStore((s) => s.user);
+// Not gated on sign-in: it submits "Continue" through the composer, which an
+// anonymous caller can already do by typing. The server decides who may run.
+export function ContinueButton({ onContinue }: { onContinue?: () => void }) {
   if (!isEnabled('continue-generating') || !onContinue) return null;
-
-  const isDisabled = !user;
-
-  const button = (
-    <button
-      type="button"
-      onClick={onContinue}
-      className="inline-flex min-h-[var(--space-10)] items-center gap-[var(--space-2)] rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface)] px-[var(--space-4)] py-[var(--space-2)] text-[length:var(--text-xs)] font-medium text-[var(--text-subtle)] transition-colors duration-[var(--dur-micro)] hover:border-[var(--border-strong)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-50"
-      disabled={isDisabled}
-    >
-      <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
-      Continue reasoning…
-    </button>
-  );
 
   return (
     <div className="mt-[var(--space-3)] flex justify-center">
-      {isDisabled ? (
-        <Tooltip text="Please sign in to continue your reasoning session.">
-          {button}
-        </Tooltip>
-      ) : (
-        button
-      )}
+      <button
+        type="button"
+        onClick={onContinue}
+        className="inline-flex min-h-[var(--space-10)] items-center gap-[var(--space-2)] rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface)] px-[var(--space-4)] py-[var(--space-2)] text-[length:var(--text-xs)] font-medium text-[var(--text-subtle)] transition-colors duration-[var(--dur-micro)] hover:border-[var(--border-strong)] hover:text-[var(--text)]"
+      >
+        <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+        Continue reasoning…
+      </button>
     </div>
   );
 }
