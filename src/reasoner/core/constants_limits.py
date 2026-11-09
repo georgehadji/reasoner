@@ -562,6 +562,15 @@ IMAGE_GEN_MAX_DOWNLOAD_BYTES: int = 20_000_000
 SAFE_FETCH_MAX_REDIRECTS: int = 3
 SCRAPE_MAX_BYTES: int = 2_000_000
 IMAGE_GEN_COMPLETION_TIMEOUT_SECONDS: float = 90.0
+# The whole request, enhancement and retries included. The Next proxy
+# (ui-next/src/app/api/generate-image/route.ts) aborts at 120s; this leaves room
+# for the provenance scrub and the response itself. Before it existed a single
+# stalled model plus sequential fallbacks ran past the proxy on most budget runs.
+IMAGE_GEN_TOTAL_BUDGET_SECONDS: float = 105.0
+# A primary still running this long gets a fallback started beside it; the
+# first to finish fills the slot. Measured 2026-11-09: healthy budget models
+# answer in 25-76s, flux.2-klein-4b stalls to its 90s timeout.
+IMAGE_GEN_HEDGE_AFTER_SECONDS: float = 45.0
 IMAGE_GEN_PROMPT_MAX_TOKENS: int = 512
 IMAGE_GEN_PROMPT_TEMPERATURE: float = 0.7
 IMAGE_GEN_ENHANCEMENT_MODEL: str = MODEL_GROK_43
