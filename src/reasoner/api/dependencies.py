@@ -312,7 +312,8 @@ async def get_current_user(
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=401, detail=f"Authentication failed: {exc}") from exc
+        logger.warning("Authentication failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=401, detail="Authentication failed") from exc
 
 
 async def get_optional_user(
@@ -353,6 +354,15 @@ def require_key_scope(scope: str):
         return user
 
     return guard
+
+
+async def require_admin_scope(user: User = Depends(get_current_user)) -> User:
+    """Route guard: the caller must hold the admin scope. Returns the user."""
+    from reasoner.auth import Scope
+
+    if Scope.ADMIN.value not in user.scopes:
+        raise HTTPException(status_code=403, detail="Admin scope required")
+    return user
 
 
 async def require_auth_if_legacy_disabled(

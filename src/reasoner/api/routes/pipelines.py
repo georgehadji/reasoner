@@ -12,6 +12,7 @@ from reasoner.api.dependencies import (
     check_quota_if_authenticated,
     check_rate_limit,
     get_current_user,
+    require_admin_scope,
     require_credits_if_authenticated,
     require_key_scope,
     run_tier_label,
@@ -61,8 +62,8 @@ async def _check_pipeline_ownership(pipeline_id: str, user: User) -> bool:
 
 
 @router.get("/api/events/stats")
-async def get_event_stats(user: User = Depends(get_current_user)):
-    """Get event store statistics."""
+async def get_event_stats(user: User = Depends(require_admin_scope)):
+    """Get event store statistics (global counts, so admin only)."""
     try:
         from reasoner.api import get_architecture_components
 
