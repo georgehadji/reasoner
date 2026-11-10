@@ -13,7 +13,7 @@ from reasoner.application.flows.jury_phases import (
     run_jury_weighted_ranking_phase,
 )
 from reasoner.application.flows.synthesis_phase import run_synthesis_phase
-from reasoner.application.services.serializers import _ser_2, _ser_3, _ser_4, _ser_5
+from reasoner.application.services.serializers import _ser_2, _ser_3, _ser_4, _ser_synthesis
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.infrastructure.search.discovery import get_search_client_for_method
 from reasoner.parsing import extract_json
@@ -63,5 +63,5 @@ class JuryFlow(WorkflowStrategy):
             PhaseStep(3, "Critic Pool", run_jury_critique_phase, _ser_3, critical=True),
             PhaseStep(4, "Verification & Meta", run_jury_verify_and_meta_eval_phase, _ser_4),
             PhaseStep(4.5, "Weighted Ranking", run_jury_weighted_ranking_phase, _ser_4),
-            PhaseStep(5, "Synthesis", run_synthesis_phase, _ser_5)
+            PhaseStep(5, "Synthesis", run_synthesis_phase, _ser_synthesis)
         ]

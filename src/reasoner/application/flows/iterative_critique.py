@@ -23,7 +23,7 @@ from reasoner.application.flows.iterative_critique_phases import (
     run_generator_phase,
     run_synthesis_phase,
 )
-from reasoner.application.services.serializers import _ser_5
+from reasoner.application.services.serializers import _ser_5, _ser_synthesis
 from reasoner.core.constants import IC_MAX_CONSECUTIVE_DEGRADED
 from reasoner.core.constants_limits import IC_TIME_BUDGET_FRACTION, get_phase_timeout
 from reasoner.core.degrade import degraded
@@ -41,7 +41,7 @@ class IterativeCritiqueFlow(WorkflowStrategy):
     def get_phases(self, state: PipelineState) -> list[PhaseStep]:
         return [
             PhaseStep(3, _DEBATE_PHASE, self._run_debate_loop, _ser_5, critical=False),
-            PhaseStep(4, "Synthesis", run_synthesis_phase, _ser_5),
+            PhaseStep(4, "Synthesis", run_synthesis_phase, _ser_synthesis),
         ]
 
     async def _run_debate_loop(self, state: PipelineState, services: WorkflowServices) -> None:

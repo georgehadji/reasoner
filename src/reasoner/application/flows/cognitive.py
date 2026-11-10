@@ -23,7 +23,7 @@ from reasoner.application.flows.cognitive_phases import (
     run_tot_generate_phase,
 )
 from reasoner.application.flows.synthesis_phase import run_synthesis_phase
-from reasoner.application.services.serializers import _ser_2, _ser_3, _ser_4, _ser_5
+from reasoner.application.services.serializers import _ser_2, _ser_3, _ser_4, _ser_5, _ser_synthesis
 from reasoner.domain.pipeline_state import PipelineState
 
 
@@ -35,7 +35,7 @@ class CoVEFlow(WorkflowStrategy):
             PhaseStep(3, "Verification", run_cove_verify_phase, _ser_3),
             PhaseStep(4, "Revised Answer", run_cove_answer_phase, _ser_4),
             PhaseStep(5, "Final Revision", run_cove_revise_phase, _ser_5),
-            PhaseStep(6, "Synthesis", run_synthesis_phase, _ser_5)
+            PhaseStep(6, "Synthesis", run_synthesis_phase, _ser_synthesis)
         ]
 
 class SoTFlow(WorkflowStrategy):
@@ -45,7 +45,7 @@ class SoTFlow(WorkflowStrategy):
             PhaseStep(2, "Skeleton", run_sot_skeleton_phase, _ser_2),
             PhaseStep(3, "Solve", run_sot_solve_phase, _ser_3),
             PhaseStep(4, "Assemble", run_sot_assemble_phase, _ser_4),
-            PhaseStep(5, "Synthesis", run_synthesis_phase, _ser_5)
+            PhaseStep(5, "Synthesis", run_synthesis_phase, _ser_synthesis)
         ]
 
 class ToTFlow(WorkflowStrategy):
@@ -56,7 +56,7 @@ class ToTFlow(WorkflowStrategy):
             PhaseStep(3, "Generate", run_tot_generate_phase, _ser_3),
             PhaseStep(4, "Evaluate", run_tot_evaluate_phase, _ser_4),
             PhaseStep(5, "Backtrack", run_tot_backtrack_phase, _ser_5),
-            PhaseStep(6, "Synthesis", run_synthesis_phase, _ser_5)
+            PhaseStep(6, "Synthesis", run_synthesis_phase, _ser_synthesis)
         ]
 
 class PoTFlow(WorkflowStrategy):
@@ -66,7 +66,7 @@ class PoTFlow(WorkflowStrategy):
             PhaseStep(2, "Generate Code", run_pot_generate_phase, _ser_2),
             PhaseStep(3, "Execute", run_pot_execute_phase, _ser_3),
             PhaseStep(4, "Interpret", run_pot_interpret_phase, _ser_4),
-            PhaseStep(5, "Synthesis", run_synthesis_phase, _ser_5)
+            PhaseStep(5, "Synthesis", run_synthesis_phase, _ser_synthesis)
         ]
 
 class SelfDiscoverFlow(WorkflowStrategy):
@@ -76,5 +76,5 @@ class SelfDiscoverFlow(WorkflowStrategy):
             PhaseStep(2, "Select Modules", run_sd_select_phase, _ser_2),
             PhaseStep(3, "Adapt Modules", run_sd_adapt_phase, _ser_3),
             PhaseStep(4, "Implement", run_sd_implement_phase, _ser_4),
-            PhaseStep(5, "Synthesis", run_synthesis_phase, _ser_5)
+            PhaseStep(5, "Synthesis", run_synthesis_phase, _ser_synthesis)
         ]

@@ -9,8 +9,9 @@ carries only ``type``, ``errors``, ``total_tokens``, ``duration``,
 
 * ``core_solution``, ``critical_insights``, ``open_questions`` — together in the
   synthesis payload built by ``_ser_synthesis``.
-* ``citations`` — on their own phase via ``_ser_5``, which emits no
-  ``core_solution``, so they cannot be read off the synthesis payload.
+* ``citations`` — on the synthesis payload for research runs, but also on
+  an earlier phase serialized by ``_ser_5`` when synthesis failed, so they
+  are scanned for separately.
 
 These are pure functions over decoded events so they can be tested without
 importing the FastAPI app, which is expensive.
@@ -77,9 +78,10 @@ def extract_synthesis_payload(events: list[dict]) -> dict:
 def extract_citations(events: list[dict]) -> list[dict]:
     """Find citations, which ride their own phase rather than the synthesis one.
 
-    ``_ser_5`` emits ``{"citations": [...]}`` on a phase carrying no
-    ``core_solution``, so a scan separate from :func:`extract_synthesis_payload`
-    is required. Only web-grounded methods populate this at all.
+    ``_ser_synthesis`` and ``_ser_5`` both emit them, the latter on a phase
+    carrying no ``core_solution``, so a scan separate from
+    :func:`extract_synthesis_payload` is required. Only web-grounded methods
+    populate this at all.
     """
     for event in reversed(events):
         if event.get("type") != "phase_complete":
