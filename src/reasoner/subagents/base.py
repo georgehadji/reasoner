@@ -94,11 +94,11 @@ class PhaseSubAgent(ABC):
             # WorkflowServices.call_llm, so the hardening is applied here too:
             # enhancement subagents read scraped web content, critique subagents
             # read other models' output.
-            from reasoner.phases._shared import harden_system_prompt
+            from reasoner.phases._shared import harden_system_prompt, with_current_date
 
             raw, meta = await router.call(
                 role=self.ROLE,
-                system_prompt=harden_system_prompt(system_prompt),
+                system_prompt=with_current_date(harden_system_prompt(system_prompt)),
                 user_prompt=user_prompt,
                 max_tokens=self.MAX_TOKENS,
                 temperature=self.TEMPERATURE,

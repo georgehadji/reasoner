@@ -18,8 +18,11 @@ import pytest
 
 pytestmark = pytest.mark.unit
 
-# Measured 2026-10-21 at FALLBACK_MAX_PRICE_RATIO = 10 across all presets.
-MAX_IMPLICIT_OVER_BUDGET = 45
+# 45 measured 2026-10-21 at FALLBACK_MAX_PRICE_RATIO = 10 across all presets;
+# 31 left on 2026-11-10, when an iterative-critique-budget run died on one empty
+# reply because its fusion fallback (the grok-4.3 primary, 14x the price) was
+# skipped and nothing else was declared. All 31 now have explicit entries.
+MAX_IMPLICIT_OVER_BUDGET = 0
 
 
 def _pairs():

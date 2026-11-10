@@ -95,7 +95,11 @@ class PipelineWorkflowServices(WorkflowServices):
         # chokepoint for all 29 phase modules — every flows/*.py phase reaches the
         # router through here. Applied at the application layer rather than inside
         # ProviderRouter so prompt semantics stay out of infrastructure.
-        from reasoner.phases._shared import _wrap_external_content, harden_system_prompt
+        from reasoner.phases._shared import (
+            _wrap_external_content,
+            harden_system_prompt,
+            with_current_date,
+        )
 
         # A quality-gate retry of the running phase (runner.run_phase sets the
         # hint, and pops it when the phase ends). Without this the retry sent the
@@ -115,7 +119,7 @@ class PipelineWorkflowServices(WorkflowServices):
 
         raw, meta = await self._pipeline._call_llm_cached(
             role=role,
-            system_prompt=harden_system_prompt(system_prompt),
+            system_prompt=with_current_date(harden_system_prompt(system_prompt)),
             user_prompt=user_prompt,
             state=state,
             phase_key=phase_key,
