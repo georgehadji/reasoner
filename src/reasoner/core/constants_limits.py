@@ -222,8 +222,14 @@ PHASE_TOKEN_BUDGETS: dict[str, int] = {
     "jury_generator": 1536,
     "jury_critic": 1024,
     "jury_verifier": 1024,
-    "iterative_generate": 1536,
-    "iterative_critique": 1024,
+    # Iterative critique. The flow passes these explicitly: its calls run under
+    # the routing roles expert_1/expert_2, which have no entry here, so both
+    # silently got the 1536 default (2026-11-10). A revision is per-flaw
+    # responses plus the complete answer, often from a reasoning model whose
+    # thinking counts against max_tokens; 1536 and its 3072 retry both
+    # truncated live, and a truncated round has no answer to keep.
+    "iterative_generate": 8192,
+    "iterative_critique": 3072,
     "research": 4096,
     "verification": 1024,
     "deep_read": 2048,
