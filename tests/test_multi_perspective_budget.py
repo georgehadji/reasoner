@@ -154,12 +154,6 @@ class TestPresetConfig:
     def test_parallel_perspectives_enabled(self, preset):
         assert preset.parallel_perspectives is True
 
-    @pytest.mark.xfail(
-        reason="Known gap: multi-perspective-budget has no per-role fallback_routing "
-        "(CLAUDE.md's 'fail to cross-lab equivalent' principle) — only 2/48 presets "
-        "define it. See REMEDIATION_PLAN.md unclassified-triage section.",
-        strict=True,
-    )
     def test_fallback_routing_configured(self, preset):
         assert preset.fallback_routing, "Budget preset should define fallback routing"
         assert "constructive" in preset.fallback_routing
