@@ -13,7 +13,7 @@ from reasoner.application.flows.debate_phases import (
     run_debate_rebuttal_phase,
 )
 from reasoner.application.flows.synthesis_phase import run_synthesis_phase
-from reasoner.application.services.serializers import _ser_2, _ser_3, _ser_4, _ser_5
+from reasoner.application.services.serializers import _ser_2, _ser_3, _ser_4, _ser_synthesis
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.infrastructure.search.discovery import get_search_client_for_method
 from reasoner.parsing import extract_json
@@ -75,5 +75,5 @@ class DebateFlow(WorkflowStrategy):
             PhaseStep(3, "Rebuttals", run_debate_rebuttal_phase, _ser_3),
             PhaseStep(4, "Cross-Examination", run_debate_cross_examine_phase, _ser_4),
             PhaseStep(4.5, "Judging", run_debate_judge_phase, _ser_3),
-            PhaseStep(5, "Synthesis", run_synthesis_phase, _ser_5),
+            PhaseStep(5, "Synthesis", run_synthesis_phase, _ser_synthesis),
         ]

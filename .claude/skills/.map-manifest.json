@@ -1213,6 +1213,7 @@
       "tests/unit/test_sanitization_regression.py",
       "tests/unit/test_spend_cap_enforcement.py",
       "tests/unit/test_spend_limits.py",
+      "tests/unit/test_synthesis_step_payload.py",
       "tests/unit/test_token_cache_raw_prompt.py",
       "tests/unit/test_utility_scorer.py",
       "tests/unit/test_vs_critique_hypotheses.py",
