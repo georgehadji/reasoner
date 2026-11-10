@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from datetime import UTC, date, datetime
 
 from reasoner.core.constants import (  # noqa: F401  (DEFAULT_SEARCH_RESULTS/JSON_ONLY_FOOTER re-exported via phases/__init__.py)
     DEFAULT_SEARCH_RESULTS,
@@ -335,6 +336,27 @@ def harden_system_prompt(system_prompt: str, *, sees_external: bool = True) -> s
     if not settings.PROMPT_HARDENING_ENABLED:
         return system_prompt
     return f"{CONTENT_TRUST_RULE}\n\n{PROPAGATION_RESISTANCE_RULE}\n\n{system_prompt}"
+
+
+def _today() -> date:
+    """The current UTC date. Module-level so tests can freeze it."""
+    return datetime.now(UTC).date()
+
+
+def with_current_date(system_prompt: str) -> str:
+    """Append today's date so relative dates resolve against it.
+
+    Without it "next May", "this year" and "recent" resolve against each
+    model's training cutoff: on 2026-11-10 an iterative-critique run planned
+    for a May 2024 Greek election that never existed. Appended after the
+    prompt, not prepended, so the byte-identical hardening prefix stays the
+    shared prompt-cache prefix; the line changes once a day.
+    """
+    return (
+        f"{system_prompt}\n\nToday's date is {_today().isoformat()}. Resolve relative "
+        "dates (next May, this year, recent, upcoming) against it, not against your "
+        "training data."
+    )
 
 
 # ── Humanization Rules ────────────────────────────────────────────────────────
