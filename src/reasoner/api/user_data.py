@@ -63,6 +63,7 @@ def user_data_stores() -> list[UserDataStore]:
         EventsStore,
         HistoryStore,
         NeuroStore,
+        UnsettledRunsStore,
         UploadsStore,
         ValkeyStore,
         VectorsStore,
@@ -77,6 +78,7 @@ def user_data_stores() -> list[UserDataStore]:
         HistoryStore(history_repo),
         NeuroStore(get_memory_port),
         ValkeyStore(get_valkey_pool),
+        UnsettledRunsStore(),
         *pg_user_data_stores(_pg_pool),
         _IdentityStore(),
     ]

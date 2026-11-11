@@ -140,6 +140,24 @@ class ValkeyStore:
             await client.delete(*keys)
 
 
+class UnsettledRunsStore:
+    """Runs served but not yet billed (``unsettled_runs`` in Valkey).
+
+    They carry the account id, so an erasure has to reach them: ``ValkeyStore`` only
+    deletes ``user:<id>:*`` keys and would leave them until the 30-day trim.
+    """
+
+    name = "unsettled_runs"
+
+    async def export(self, user_id: str) -> None:
+        return None  # billing bookkeeping; the ledger store exports the charges
+
+    async def erase(self, user_id: str) -> None:
+        from reasoner.infrastructure.valkey.unsettled_runs import ValkeyUnsettledRunStore
+
+        await ValkeyUnsettledRunStore().erase_user(user_id)
+
+
 class NeuroStore:
     """Long-term memory. Goes through the MemoryPort, so application code never
     imports ``reasoner.neuro``."""

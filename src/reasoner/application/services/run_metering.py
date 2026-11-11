@@ -224,6 +224,8 @@ async def metered(
                 # The interrupted write may or may not have landed; replay is
                 # idempotent on reference_id, so recording it is always safe.
                 await _record_unsettled(sink, ctx, cost_usd, exc)
+                if cost_usd <= 0:
+                    await _release_quota_slot(sink, ctx)  # a free run keeps no slot
             if not completed:
                 await _release_claim(ctx)
         if observer is not None:

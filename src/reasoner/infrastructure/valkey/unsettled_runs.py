@@ -37,3 +37,14 @@ class ValkeyUnsettledRunStore:
 
     async def remove(self, run: UnsettledRun) -> None:
         await get_valkey_pool().zrem(KEY, _member(run))
+
+    async def erase_user(self, user_id: str) -> None:
+        """Drop every entry for one account (data erasure).
+
+        shortcut: scans the whole set. It holds at most 30 days of failed settlements,
+        so it is small; index by user if it ever is not.
+        """
+        client = get_valkey_pool()
+        for member in await client.zrange(KEY, 0, -1):
+            if json.loads(member).get("user_id") == user_id:
+                await client.zrem(KEY, member)
