@@ -427,6 +427,9 @@ class Timeouts:
 # Enforced in streaming.py:run_stream() via asyncio.wait_for.
 # 600s = 10 minutes covers even research-premium with web search;
 # should be generously above the sum of phase timeouts.
+# Neuro tenant directories untouched this long are deleted by the maintenance cron.
+NEURO_TENANT_RETENTION_DAYS: int = 90
+
 PIPELINE_ABSOLUTE_TIMEOUT_SECONDS: float = 600.0
 
 

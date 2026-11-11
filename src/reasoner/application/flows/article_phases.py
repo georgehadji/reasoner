@@ -13,7 +13,7 @@ from reasoner.core.constants import (
 )
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.infrastructure.search.discovery import get_search_client_for_method
-from reasoner.parsing import extract_json
+from reasoner.parsing import coerce_list, extract_json
 
 logger = logging.getLogger(__name__)
 
@@ -183,10 +183,16 @@ async def run_article_adversarial_verify_phase(state: PipelineState, services: W
     data = extract_json(raw)
     state.writing_state["verification"] = data
     state.writing_state["claim_ledger"] = data.get("claim_ledger", [])
-    metrics = data.get("metrics", {})
+    metrics = data.get("metrics")
+    if not isinstance(metrics, dict):
+        metrics = {}
     state.writing_state["metrics"] = metrics
 
-    if metrics.get("claim_support_ratio", 1.0) < ARTICLE_MIN_CLAIM_SUPPORT_RATIO:
+    # A missing or null ratio is unverified, not perfect support.
+    ratio = metrics.get("claim_support_ratio")
+    if not isinstance(ratio, (int, float)) or isinstance(ratio, bool):
+        ratio = 0.0
+    if ratio < ARTICLE_MIN_CLAIM_SUPPORT_RATIO:
         services.log("WRITING", "Low claim support ratio. Identifying gaps.", state)
         state.writing_state["gaps_noted"] = data.get("gaps", [])
 
@@ -209,7 +215,7 @@ async def run_article_outline_phase(state: PipelineState, services: WorkflowServ
         data = {}
 
     state.writing_state["argument_map"] = data.get("argument_map", {})
-    state.writing_state["outline"] = data.get("outline", [])
+    state.writing_state["outline"] = coerce_list(data.get("outline"))
     state.writing_state["suggested_title"] = data.get("suggested_title", "")
     state.writing_state["total_word_count"] = data.get("total_word_count", 0)
     services.log(

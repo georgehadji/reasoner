@@ -157,7 +157,8 @@ def usd_to_credits(cost_usd: float) -> int:
     """
     if cost_usd <= 0:
         return 0
-    return math.ceil(cost_usd * CREDITS_PER_USD)
+    # round() first: float noise (2.007 * 1000 = 2007.0000000000002) must not add a credit.
+    return math.ceil(round(cost_usd * CREDITS_PER_USD, 6))
 
 
 def credits_to_usd(credits: int) -> float:

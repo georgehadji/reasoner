@@ -73,7 +73,7 @@ def strip_prose_preamble(text: str) -> str:
 def extract_json(text: str) -> dict[str, Any]:
     """
     Extract JSON object (dict) from LLM response.
-    Raises ParseError if no object found.
+    Returns {} for empty input; raises ParseError if no object found.
     """
     if not text or not text.strip():
         return {}
@@ -305,6 +305,12 @@ def _parse_strict(text: str) -> Any:
     start_obj = text.find("{")
     if start_obj != -1:
         span = _extract_balanced_structure(text, start_obj, "{", "}")
+        # An array that encloses the first object is the payload, not that object.
+        start_arr = text.find("[")
+        if 0 <= start_arr < start_obj:
+            arr = _extract_balanced_structure(text, start_arr, "[", "]")
+            if arr is not None and start_arr + len(arr) > start_obj:
+                span = arr
         if span is not None:
             candidates.append(span)
     for candidate in candidates:
@@ -771,13 +777,13 @@ def _parse_critique_scores(raw_scores: list[dict]) -> list[CritiqueScore]:
         try:
             out.append(CritiqueScore(
                 perspective=PerspectiveRegistry.coerce(s["perspective"]),
-                logical_consistency=float(s.get("logical_consistency") or 0),
-                evidence_support=float(s.get("evidence_support") or 0),
-                failure_resilience=float(s.get("failure_resilience") or 0),
-                feasibility=float(s.get("feasibility") or 0),
+                logical_consistency=safe_float(s.get("logical_consistency")),
+                evidence_support=safe_float(s.get("evidence_support")),
+                failure_resilience=safe_float(s.get("failure_resilience")),
+                feasibility=safe_float(s.get("feasibility")),
                 bias_flags=s.get("bias_flags") or [],
                 steel_man=s.get("steel_man") or "",
-                confidence_vs_accuracy_penalty=float(s.get("confidence_vs_accuracy_penalty") or 0),
+                confidence_vs_accuracy_penalty=safe_float(s.get("confidence_vs_accuracy_penalty")),
             ))
         except (KeyError, ValueError, TypeError) as exc:
             import logging

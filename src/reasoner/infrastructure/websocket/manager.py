@@ -13,7 +13,9 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import time
+import uuid
 from collections import OrderedDict, deque
 from dataclasses import dataclass
 from typing import Any
@@ -35,6 +37,9 @@ except Exception:
     _METRICS_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
+
+
+WS_BRIDGE_CHANNEL = "reasoner:ws:events"
 
 
 @dataclass
@@ -113,6 +118,11 @@ class WebSocketManager:
 
         # Max events to retain per pipeline for replay
         self._max_replay_events: int = max_replay_events
+
+        # Cross-worker bridge (Valkey pub/sub); off until start_bridge().
+        self._worker_id: str = uuid.uuid4().hex
+        self._bridge_enabled: bool = False
+        self._bridge_task: asyncio.Task | None = None
 
     async def connect(
         self,
@@ -241,8 +251,79 @@ class WebSocketManager:
         self,
         pipeline_id: str,
         message: WebSocketMessage,
+        *,
+        _from_bridge: bool = False,
     ) -> None:
-        """Broadcast message to all subscribers of a pipeline."""
+        """Broadcast message to all subscribers of a pipeline.
+
+        Delivers to this worker's subscribers, then (unless the message came
+        from the bridge) publishes it so other workers deliver to theirs.
+        """
+        await self._deliver_local(pipeline_id, message)
+        if self._bridge_enabled and not _from_bridge:
+            await self._publish(pipeline_id, message)
+
+    async def _publish(self, pipeline_id: str, message: WebSocketMessage) -> None:
+        from reasoner.infrastructure.valkey.client import get_valkey_pool
+
+        try:
+            await get_valkey_pool().publish(
+                WS_BRIDGE_CHANNEL,
+                json.dumps(
+                    {
+                        "origin": self._worker_id,
+                        "pipeline_id": pipeline_id,
+                        "type": message.type,
+                        "data": message.data,
+                    }
+                ),
+            )
+        except Exception as e:
+            logger.warning("WS bridge publish failed; local delivery only: %s", e)
+
+    async def _bridge_loop(self) -> None:
+        import valkey.asyncio as aioredis
+
+        url = os.environ.get("VALKEY_URL") or os.environ["REDIS_URL"]
+        while True:
+            try:
+                # Own client: the shared pool's 2s socket_timeout would kill an idle listen().
+                pubsub = aioredis.from_url(url, decode_responses=True).pubsub()
+                await pubsub.subscribe(WS_BRIDGE_CHANNEL)
+                async for raw in pubsub.listen():
+                    if raw.get("type") != "message":
+                        continue
+                    try:
+                        body = json.loads(raw["data"])
+                        if body["origin"] == self._worker_id:
+                            continue  # already delivered locally
+                        await self.broadcast_to_pipeline(
+                            body["pipeline_id"],
+                            WebSocketMessage(
+                                type=body["type"],
+                                data=body["data"],
+                                pipeline_id=body["pipeline_id"],
+                            ),
+                            _from_bridge=True,
+                        )
+                    except Exception as e:
+                        logger.warning("WS bridge dropped a bad message: %s", e)
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                logger.warning("WS bridge subscriber lost; retrying: %s", e)
+                await asyncio.sleep(2)
+
+    def start_bridge(self) -> None:
+        """Start cross-worker fan-out; no-op without a configured Valkey/Redis."""
+        if self._bridge_task is not None:
+            return
+        if not (os.environ.get("VALKEY_URL") or os.environ.get("REDIS_URL")):
+            return
+        self._bridge_enabled = True
+        self._bridge_task = asyncio.create_task(self._bridge_loop())
+
+    async def _deliver_local(self, pipeline_id: str, message: WebSocketMessage) -> None:
         async with self._lock:
             # Buffer event for late-joining subscribers
             if pipeline_id not in self._replay_buffers:
@@ -600,6 +681,7 @@ async def setup_event_bus_integration() -> None:
     from reasoner.core.events.domain_events import DomainEvent
 
     manager = get_websocket_manager()
+    manager.start_bridge()
 
     @handle_all_events()
     async def broadcast_to_websocket(event: DomainEvent):

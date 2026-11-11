@@ -21,6 +21,14 @@ logger = logging.getLogger(__name__)
 CACHE_TTL_SECONDS = 60
 
 
+async def invalidate_quota(user_id: str) -> None:
+    """Drop a user's cached quota after a write that bypasses this wrapper."""
+    try:
+        await get_guarded_valkey(get_valkey_pool()).delete(f"quota:{user_id}")
+    except Exception as exc:
+        logger.warning("Redis quota cache invalidate failed for %s: %s", user_id, exc)
+
+
 class CachedQuotaRepository(QuotaRepository):
     """Wraps a QuotaRepository with Redis cache-aside."""
 

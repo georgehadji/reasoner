@@ -123,7 +123,7 @@ class PostgresQuotaRepository(QuotaRepository):
 
                 # Increment atomically
                 await conn.execute(
-                    "UPDATE usage_quotas SET used_queries = used_queries + 1, updated_at = (NOW() AT TIME ZONE 'UTC') "
+                    "UPDATE usage_quotas SET used_queries = used_queries + 1, updated_at = NOW() "
                     "WHERE user_id = $1",
                     user_id,
                 )
@@ -134,15 +134,19 @@ class PostgresQuotaRepository(QuotaRepository):
         pool = await self._get_pool()
         await pool.execute(
             "UPDATE usage_quotas SET used_queries = GREATEST(used_queries - 1, 0), "
-            "updated_at = (NOW() AT TIME ZONE 'UTC') WHERE user_id = $1 AND max_queries <> -1",
+            "updated_at = NOW() WHERE user_id = $1 AND max_queries <> -1",
             user_id,
         )
 
     async def reset_monthly(self, user_id: str) -> None:
         pool = await self._get_pool()
         await pool.execute(
-            "UPDATE usage_quotas SET used_queries = 0, period_start = date_trunc('month', (NOW() AT TIME ZONE 'UTC')), "
-            "updated_at = (NOW() AT TIME ZONE 'UTC') WHERE user_id = $1",
+            # Conditional so two requests at month start cannot both reset and wipe
+            # a slot claimed in between; UTC month start as a real timestamptz.
+            "UPDATE usage_quotas SET used_queries = 0, "
+            "period_start = date_trunc('month', NOW() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC', "
+            "updated_at = NOW() WHERE user_id = $1 AND (period_start IS NULL OR "
+            "period_start < date_trunc('month', NOW() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')",
             user_id,
         )
 

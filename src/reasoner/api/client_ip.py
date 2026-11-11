@@ -7,6 +7,8 @@ the direct connection IP.
 
 from __future__ import annotations
 
+import ipaddress
+
 from fastapi import Request
 
 from reasoner.core.settings import settings
@@ -34,7 +36,8 @@ def get_client_ip(request: Request, trusted_proxies: list[str] | None = None) ->
     direct_ip = request.client.host if request.client else "127.0.0.1"
     proxies = trusted_proxies if trusted_proxies is not None else settings.TRUSTED_PROXIES
 
-    if not proxies:
+    # Only a trusted peer may speak for the client: anyone else can send any XFF.
+    if not proxies or not ip_in_networks(direct_ip, proxies):
         return direct_ip
 
     forwarded = request.headers.get("X-Forwarded-For")
@@ -46,8 +49,23 @@ def get_client_ip(request: Request, trusted_proxies: list[str] | None = None) ->
 
     # Walk from rightmost (closest to server) to leftmost (original client)
     for ip in reversed(ips):
-        if ip not in proxies:
+        if not ip_in_networks(ip, proxies):
             return ip
 
     # All IPs in the chain are trusted proxies — fallback to direct connection
     return direct_ip
+
+
+def ip_in_networks(ip: str, entries) -> bool:
+    """Whether ``ip`` equals or falls inside any entry (plain address or CIDR)."""
+    try:
+        addr = ipaddress.ip_address(ip)
+    except ValueError:
+        return ip in entries
+    for entry in entries:
+        try:
+            if addr in ipaddress.ip_network(entry.strip(), strict=False):
+                return True
+        except ValueError:
+            continue
+    return False

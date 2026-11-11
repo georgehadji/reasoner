@@ -71,6 +71,25 @@ set_model_registry_port(RegistryAdapter())
 
 
 @pytest.fixture(autouse=True)
+def no_real_provision_pool(monkeypatch):
+    """The deleted-account lookup fails closed (503) when Postgres is unreachable.
+    Tests that exercise JWT auth have no database, so answer "not deleted";
+    tests of the lookup itself patch _get_provision_pool again."""
+
+    class _Pool:
+        async def fetchval(self, *_a):
+            return None
+
+        async def execute(self, *_a):
+            return None
+
+    async def _pool():
+        return _Pool()
+
+    monkeypatch.setattr("reasoner.api.dependencies._get_provision_pool", _pool)
+
+
+@pytest.fixture(autouse=True)
 async def auto_clean_state():
     """Fixture to reset all global state between tests."""
     # core.rerank latches a module-level failure counter open after 3 failures.

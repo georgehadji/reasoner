@@ -16,7 +16,6 @@ from reasoner.api.auth_deps import require_csrf
 from reasoner.api.dependencies import (
     _get_api_key_service,
     check_rate_limit,
-    get_current_user,
     require_key_scope,
 )
 from reasoner.application.services.api_key_service import MAX_EXPIRY_DAYS, ApiKeyLimitError
@@ -47,7 +46,7 @@ class CreateKeyRequest(BaseModel):
 @router.get("")
 async def list_api_keys(
     include_revoked: bool = False,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_key_scope("read")),
 ):
     """List the caller's API keys. Secrets are never returned."""
     service = _get_api_key_service()

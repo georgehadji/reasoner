@@ -20,6 +20,8 @@ import logging
 import time
 from typing import TYPE_CHECKING, Any
 
+from reasoner.core.constants_limits import PIPELINE_ABSOLUTE_TIMEOUT_SECONDS
+
 if TYPE_CHECKING:
     from reasoner.infrastructure.redis.in_memory import RunStateStore
 
@@ -28,7 +30,10 @@ logger = logging.getLogger(__name__)
 # Redis key names
 ACTIVE_SET = "active_runs"
 CANCELLED_SET = "cancelled_runs"
-TTL_SECONDS = 300  # Auto-cleanup after 5 minutes
+TTL_SECONDS = 300  # Auto-cleanup after 5 minutes (cancelled set)
+# The active set must outlive the longest run, or a global stop issued after it
+# lapses finds an empty set and misses runs still going.
+ACTIVE_TTL_SECONDS = int(PIPELINE_ABSOLUTE_TIMEOUT_SECONDS) + 300
 # Per-run owner key, so /api/stop on any worker can find a run. Outlives the
 # 600s pipeline timeout; remove() deletes it as soon as the run ends.
 OWNER_PREFIX = "run_owner:"
@@ -222,7 +227,7 @@ class RunStateManager:
         redis = self._get_redis()
         await redis.set(f"{OWNER_PREFIX}{run_id}", user_id or "", ex=OWNER_TTL_SECONDS)
         await redis.sadd(ACTIVE_SET, run_id)
-        await redis.expire(ACTIVE_SET, TTL_SECONDS)
+        await redis.expire(ACTIVE_SET, ACTIVE_TTL_SECONDS)
         await redis.expire(CANCELLED_SET, TTL_SECONDS)
 
     async def remove(self, run_id: str) -> None:

@@ -167,7 +167,9 @@ def _seed_state(
     # auto_selected_method None.
     if method == "writing":
         state.task_type = TaskType.TECHNICAL
-        state.decomposition = ["article workflow"]
+        state.decomposition = {
+            "causal_chain": [], "assumptions": [], "failure_modes": [], "critical_sources": [],
+        }
         state.method = "article"
         method = "article"
         logger.info("Article request detected in stream — routing to article method")
@@ -415,6 +417,10 @@ async def _settle_preflight(
     # Refuse a run the caller's plan cannot pay for. Checked against the preset
     # preflight actually resolved, not the one requested -- auto presets only
     # settle on a tier here.
+    if user_id:
+        from reasoner.infrastructure.llm import spend_tracker
+
+        await spend_tracker.refresh(user_id)  # see other workers' monthly spend
     rejection = check_run_allowed(preflight.effective_preset_name, user_tier, user_id)
     if rejection is not None:
         logger.info(

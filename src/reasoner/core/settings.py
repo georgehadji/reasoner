@@ -613,6 +613,13 @@ class Settings:
         """Parse CORS_ORIGINS env var into a list of origin strings."""
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
 
+    @property
+    def effective_allowed_origins(self) -> list[str]:
+        """Origins HTTP CORS and WebSocket Origin checks both enforce."""
+        if self.ENVIRONMENT == "production":
+            return [self.APP_URL] if self.APP_URL else []
+        return self.cors_origins_list
+
 
 settings = Settings()
 

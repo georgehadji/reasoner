@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -70,15 +71,31 @@ async def calculate(
         return {"error": "Internal server error", "valid": False}
 
 
+# shortcut: per-worker TTL cache (each gunicorn worker pays one search per key per
+# window); move to Valkey if the paid-search bill shows it.
+_DISCOVER_TTL_SECONDS = 300
+_DISCOVER_CACHE_MAX = 64
+_discover_cache: dict[tuple[str, str], tuple[float, dict]] = {}
+
+
 @router.get("/api/discover")
 async def discover(
     topic: str = "tech", mode: str = "normal", rate_limit_checked=Depends(check_rate_limit)
 ):
     """Get trending content for a topic (legacy endpoint)."""
     try:
+        from reasoner.infrastructure.widgets_legacy import DISCOVER_TOPICS
         from reasoner.widgets import get_discover_content
 
-        content = await get_discover_content(topic, mode)
+        # Unknown topics already fall back to "tech" downstream; do it here so
+        # arbitrary strings cannot mint cache keys.
+        key = (topic.lower() if topic.lower() in DISCOVER_TOPICS else "tech", mode[:32])
+        hit = _discover_cache.get(key)
+        if hit and time.monotonic() - hit[0] < _DISCOVER_TTL_SECONDS:
+            return hit[1]
+        content = await get_discover_content(*key)
+        if len(_discover_cache) < _DISCOVER_CACHE_MAX or key in _discover_cache:
+            _discover_cache[key] = (time.monotonic(), content)
         return content
     except Exception as e:
         logger.error(f"Discover error: {e}")

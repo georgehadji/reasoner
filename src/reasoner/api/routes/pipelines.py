@@ -77,7 +77,7 @@ async def get_event_stats(user: User = Depends(require_admin_scope)):
 
 @router.get("/api/pipelines")
 async def list_pipelines(
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_key_scope("history:read")),
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
     status: str | None = None,
@@ -124,7 +124,7 @@ async def list_pipelines(
 @router.get("/api/pipelines/{pipeline_id}")
 async def get_pipeline_status(
     pipeline_id: str,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_key_scope("history:read")),
 ):
     """Get pipeline status from event store."""
     if not await _check_pipeline_ownership(pipeline_id, user):

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Awaitable, Callable
+from contextlib import nullcontext
 from datetime import UTC, datetime
 
 from reasoner.application.ports.billing_port import BillingPort
@@ -24,10 +25,16 @@ async def _paypal_activate(sub, repo, event_at) -> None:
 
 async def _paypal_cancel(sub, repo, event_at) -> None:
     # CANCELLED and EXPIRED (the paid term ran out) both end cancelled.
-    if sub.paypal_subscription_id and await repo.set_subscription_status_by_paypal(
+    if not sub.paypal_subscription_id:
+        return
+    if await repo.set_subscription_status_by_paypal(
         sub.paypal_subscription_id, "cancelled", event_at,
     ):
         await repo.sync_quota_for_subscription(sub)
+    else:
+        # No row yet (cancel overtook ACTIVATED) or a newer event holds it; the
+        # repo inserts a cancelled marker only in the first case.
+        await repo.record_paypal_cancel_tombstone(sub, event_at)
 
 
 async def _paypal_past_due(sub, repo, event_at) -> None:
@@ -156,13 +163,17 @@ class BillingService:
         # invoice.payment_succeeded is deliberately unhandled: the adapter gives it no
         # subscription id, and renewal arrives as customer.subscription.updated.
         if event_type in ("checkout.session.completed", "customer.subscription.updated"):
-            if event_type == "checkout.session.completed" and await self._is_duplicate_live(
-                sub, repo
-            ):
-                return
-            # Upsert subscription and sync quota
-            if await repo.upsert_subscription(sub, event_at):
-                await repo.sync_quota_for_subscription(sub)
+            # Serialized per user: two concurrent checkouts otherwise both pass
+            # the duplicate check and both get stored live.
+            lock = getattr(repo, "user_lock", None)
+            async with lock(str(sub.user_id)) if lock else nullcontext():
+                if event_type == "checkout.session.completed" and await self._is_duplicate_live(
+                    sub, repo
+                ):
+                    return
+                # Upsert subscription and sync quota
+                if await repo.upsert_subscription(sub, event_at):
+                    await repo.sync_quota_for_subscription(sub)
             logger.info(
                 "Stripe subscription synced for user %s: tier=%s status=%s",
                 sub.user_id, sub.tier.value, sub.status.value

@@ -331,10 +331,8 @@ app.add_middleware(AuditMiddleware)
 
 # Add CORS middleware — production-aware (Critical Enhancement 6.1.2)
 _env = settings.ENVIRONMENT
-if _env == "production":
-    _allowed_origins = [settings.APP_URL] if settings.APP_URL else []
-else:
-    _allowed_origins = settings.cors_origins_list
+_allowed_origins = settings.effective_allowed_origins
+if _env != "production":
     logger.warning(
         "CORS is in development mode with allow_credentials=True. "
         "Ensure no malicious sites are running on allowed origins: %s",
@@ -969,14 +967,14 @@ if settings.ENABLE_MCP_HTTP:
         logger.warning("ENABLE_MCP_HTTP is set but could not be mounted: %s", exc)
 
 # Mount Metrics endpoint (Critical Enhancement 6.1: restrict by IP)
-from reasoner.api.client_ip import get_client_ip
+from reasoner.api.client_ip import get_client_ip, ip_in_networks
 from reasoner.api.metrics import metrics_endpoint
 
 
 async def _metrics_ip_restricted(request: Request):
-    allowed = {item.strip() for item in settings.METRICS_ALLOWED_IPS.split(",") if item.strip()}
+    allowed = [item.strip() for item in settings.METRICS_ALLOWED_IPS.split(",") if item.strip()]
     client_ip = get_client_ip(request)
-    if not allowed or client_ip not in allowed:
+    if not allowed or not ip_in_networks(client_ip, allowed):
         raise HTTPException(status_code=403, detail="Metrics access denied")
 
 app.add_api_route("/api/metrics", metrics_endpoint, methods=["GET"], dependencies=[Depends(_metrics_ip_restricted)])

@@ -114,13 +114,19 @@ async def _ensure_user_in_db(user: User) -> None:
         return
     import asyncpg
 
+    # Fail closed: an unanswered lookup must not let a deleted account through.
     try:
         pool = await _get_provision_pool()
-        if await pool.fetchval(
+        deleted = await pool.fetchval(
             "SELECT 1 FROM account_deletion_log WHERE user_id = $1 LIMIT 1", str(user.id),
-        ):
-            forget_provisioned_user(user.id)
-            raise HTTPException(status_code=403, detail="This account has been deleted.")
+        )
+    except Exception as exc:
+        logger.warning("Deleted-account check failed for %s: %s", user.id, exc)
+        raise HTTPException(status_code=503, detail="Account status unavailable") from exc
+    if deleted:
+        forget_provisioned_user(user.id)
+        raise HTTPException(status_code=403, detail="This account has been deleted.")
+    try:
         await pool.execute(
             """
             INSERT INTO users (id, email, display_name, auth_provider, avatar_url, last_login_at)

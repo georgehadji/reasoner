@@ -392,7 +392,7 @@ async def save_uploaded_file(
     # Content-hash deduplication -- scoped to this tenant only. Anonymous
     # callers (user_id is None) skip dedup entirely: there's no stable
     # identity to scope a match against.
-    content_hash = hashlib.sha256(content).hexdigest()
+    content_hash = await asyncio.to_thread(lambda: hashlib.sha256(content).hexdigest())
     hash_index = await asyncio.to_thread(_load_hash_index)
     tenant_hashes = hash_index.get(user_id, {}) if user_id else {}
     existing_id = tenant_hashes.get(content_hash)
@@ -420,7 +420,7 @@ async def save_uploaded_file(
 
     # Validate MIME type (defense against extension spoofing)
     if _MAGIC_AVAILABLE:
-        detected_mime = magic.from_buffer(content, mime=True)
+        detected_mime = await asyncio.to_thread(magic.from_buffer, content, mime=True)
         allowed_exts = MIME_TYPE_MAP.get(detected_mime, set())
         if ext not in allowed_exts:
             logger.warning(
@@ -519,7 +519,10 @@ async def save_uploaded_file(
     # written before any content with status "writing", so every file this
     # upload creates is findable from it, and a failure part-way deletes them
     # all instead of leaving an orphan content file with no owner record.
-    meta_path = UPLOAD_DIR / f"{file_id}.meta.json"
+    # Exclusive create: a 12-char id is only 48 bits, so never trust it to be
+    # unused; on collision pick another id instead of overwriting someone's meta.
+    file_id, meta_path = await asyncio.to_thread(_reserve_upload_id)
+    file_path = UPLOAD_DIR / f"{file_id}{ext}"
     created = (meta_path, file_path, _text_cache_path(file_id))
     try:
         # Persist ownership metadata. "encrypted": True marks that the
@@ -539,12 +542,16 @@ async def save_uploaded_file(
         # Save file, encrypted at rest (security-remediation-plan.md Phase 4
         # item 5). Extraction below runs on the original plaintext bytes
         # already in memory, not a decrypt round-trip.
-        file_path.write_bytes(_encrypt_bytes(content))
+        await asyncio.to_thread(lambda: file_path.write_bytes(_encrypt_bytes(content)))
 
         # Extract text
         text_content = await extract_text(content, filename, force_ocr=force_ocr)
         if not is_extraction_notice(text_content):
-            _text_cache_path(file_id).write_bytes(_encrypt_bytes(text_content.encode("utf-8")))
+            await asyncio.to_thread(
+                lambda: _text_cache_path(file_id).write_bytes(
+                    _encrypt_bytes(text_content.encode("utf-8"))
+                )
+            )
 
         # DAT-8, decision Q8: semantic search covers only the first
         # DOCUMENT_INDEX_MAX_CHARS characters. Said in the listing and the
@@ -626,6 +633,19 @@ def _is_ready(meta: dict) -> bool:
 def _text_cache_path(file_id: str) -> Path:
     # ".json" keeps list_uploads from listing it as a file of its own.
     return UPLOAD_DIR / f"{file_id}.text.json"
+
+
+def _reserve_upload_id() -> tuple[str, Path]:
+    """Claim an unused file id by exclusively creating its meta file."""
+    while True:
+        file_id = str(uuid.uuid4())[:12]
+        meta_path = UPLOAD_DIR / f"{file_id}.meta.json"
+        try:
+            with open(meta_path, "x", encoding="utf-8") as fh:
+                fh.write('{"status": "writing"}')
+        except FileExistsError:
+            continue
+        return file_id, meta_path
 
 
 def _get_upload_meta(file_id: str) -> dict | None:

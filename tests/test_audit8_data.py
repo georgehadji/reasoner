@@ -221,7 +221,7 @@ async def test_token_cache_persists_agent_id_so_a_reload_keeps_the_tenant_guard(
     await first.set("p", "ph", "m", prompt, "owner secret", 10, agent_id=UID)
 
     reloaded = TokenAwareCache(cache_dir=tmp_path)
-    near_miss = prompt + " lambda"  # not an exact hit: exercises the semantic scan
+    near_miss = prompt  # exact prompt: only the persisted agent_id separates tenants
 
     assert await reloaded.get("p", "ph", "m", near_miss, agent_id="") is None
     assert await reloaded.get("p", "ph", "m", near_miss, agent_id=UID) == "owner secret"

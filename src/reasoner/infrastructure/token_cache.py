@@ -44,7 +44,7 @@ class CacheEntry:
     access_count: int = 0
     last_accessed: float = field(default_factory=time.time)
     semantic_embedding: list[float] | None = None  # For semantic matching
-    raw_prompt: str = ""  # Stored for Jaccard semantic matching
+    raw_prompt: str = ""  # Kept for the on-disk format and inspection
     agent_id: str = ""  # tenant; the semantic path must not cross it (DAT-3)
 
 
@@ -92,14 +92,12 @@ class TokenAwareCache:
         max_tokens: int = 1_000_000,  # 1M token budget
         ttl_seconds: int = 3600,  # 1 hour default TTL
         cache_dir: Path | None = None,
-        semantic_threshold: float = 0.85,  # 85% similarity for cache hit
         max_entries: int = 1000,
         clock: Clock | None = None,
     ):
         self.max_tokens = max_tokens
         self.ttl_seconds = ttl_seconds
         self.cache_dir = cache_dir
-        self.semantic_threshold = semantic_threshold
         self.max_entries = max_entries
         self._clock: Clock = clock or SystemClock()
 
@@ -198,31 +196,19 @@ class TokenAwareCache:
         """Estimate token count (rough: 1 token ≈ 4 chars)."""
         return len(text) // 4
 
-    @staticmethod
-    def _jaccard_similarity(text_a: str, text_b: str) -> float:
-        """Compute Jaccard similarity between two texts using word sets."""
-        words_a = set(text_a.lower().split())
-        words_b = set(text_b.lower().split())
-        if not words_a or not words_b:
-            return 0.0
-        intersection = len(words_a & words_b)
-        union = len(words_a | words_b)
-        return intersection / union if union > 0 else 0.0
-
     async def get(
         self,
         problem: str,
         phase: str,
         model_id: str,
         prompt: str,
-        semantic_threshold: float = 0.85,
         agent_id: str = "",
     ) -> str | None:
         """
         Get cached response.
 
-        Checks exact match first, then falls back to Jaccard semantic similarity
-        for near-miss prompts within the same problem group.
+        Exact match only: a near-miss prompt is a different question, and a
+        fuzzy hit served one prompt's answer for another.
 
         Returns:
             Cached response if hit, None otherwise
@@ -247,37 +233,6 @@ class TokenAwareCache:
                     entry.access_count += 1
                     entry.last_accessed = self._clock.time()
                     self._entries.move_to_end(key)  # LRU promotion
-                    self._stats.hits += 1
-                    self._stats.total_tokens_saved += entry.tokens_used
-                    return entry.response
-
-            # Check semantic similarity via problem_hash index (O(k) vs O(n))
-            problem_hash = self._compute_problem_hash(problem)
-            for ck in self._problem_index.get(problem_hash, []):
-                entry = self._entries.get(ck)
-                if entry is None or entry.phase != phase or entry.model_id != model_id:
-                    continue
-                # The exact path keys on agent_id and checks TTL; this scan did
-                # neither, so it served another tenant's or an expired answer
-                # (docs/plans/audit-remediation-2026-10-20.md DAT-3).
-                if entry.agent_id != agent_id:
-                    continue
-                if self._clock.time() - entry.created_at > entry.ttl_seconds:
-                    continue
-
-                # Exact prompt match within same problem group (fast path)
-                if entry.prompt_hash == prompt_hash:
-                    entry.access_count += 1
-                    self._entries.move_to_end(ck)  # LRU promotion
-                    entry.last_accessed = self._clock.time()
-                    self._stats.hits += 1
-                    self._stats.total_tokens_saved += entry.tokens_used
-                    return entry.response
-
-                # Jaccard semantic similarity on raw prompts
-                if entry.raw_prompt and self._jaccard_similarity(prompt, entry.raw_prompt) >= semantic_threshold:
-                    entry.access_count += 1
-                    entry.last_accessed = self._clock.time()
                     self._stats.hits += 1
                     self._stats.total_tokens_saved += entry.tokens_used
                     return entry.response

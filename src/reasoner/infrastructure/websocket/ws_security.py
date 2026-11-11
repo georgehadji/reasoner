@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 def is_origin_allowed(origin: str | None) -> bool:
-    """Reuses ``settings.cors_origins_list`` — the same allowlist already
+    """Reuses ``settings.effective_allowed_origins`` — the same allowlist already
     governs HTTP CORS, so WS Origin checking doesn't need a second config
     surface to keep in sync.
 
@@ -28,7 +28,9 @@ def is_origin_allowed(origin: str | None) -> bool:
 
     if not origin:
         return False
-    allowed = settings.cors_origins_list
+    allowed = settings.effective_allowed_origins
+    if not allowed and settings.ENVIRONMENT == "production":
+        return False  # production with no APP_URL: HTTP CORS allows nothing either
     if not allowed:
         # No allowlist configured: match the existing permissive-when-
         # unconfigured posture of HTTP CORS rather than invent a stricter

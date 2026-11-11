@@ -150,14 +150,6 @@ class RunRequest(BaseModel):
             raise ValueError("Invalid characters in problem")
 
         v = re.sub(r"<script[^>]*>.*?</script>", "", v, flags=re.IGNORECASE | re.DOTALL)
-        v = re.sub(r"<[^>]+>", "", v)
-
-        try:
-            import unicodedata
-
-            v = unicodedata.normalize("NFKC", v)
-        except ImportError:
-            pass
 
         dangerous_patterns = [
             r"\{\{.*\}\}",

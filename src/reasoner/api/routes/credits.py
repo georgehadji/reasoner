@@ -13,6 +13,7 @@ from reasoner.api.dependencies import (
     _resolve_user_tier,
     check_rate_limit,
     get_current_user,
+    require_key_scope,
 )
 from reasoner.auth import Scope
 from reasoner.domain.credits import (
@@ -69,7 +70,7 @@ async def get_credits(user: User = Depends(get_current_user)):
 async def get_ledger(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_key_scope("read")),
 ):
     """Return the caller's credit ledger, newest entries first."""
     service = _get_credit_service()
