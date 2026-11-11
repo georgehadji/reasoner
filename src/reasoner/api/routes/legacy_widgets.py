@@ -94,7 +94,8 @@ async def discover(
         if hit and time.monotonic() - hit[0] < _DISCOVER_TTL_SECONDS:
             return hit[1]
         content = await get_discover_content(*key)
-        if len(_discover_cache) < _DISCOVER_CACHE_MAX or key in _discover_cache:
+        cacheable = isinstance(content, dict) and not content.get("error")
+        if cacheable and (len(_discover_cache) < _DISCOVER_CACHE_MAX or key in _discover_cache):
             _discover_cache[key] = (time.monotonic(), content)
         return content
     except Exception as e:

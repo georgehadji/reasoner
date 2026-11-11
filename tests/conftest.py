@@ -107,6 +107,12 @@ async def auto_clean_state():
     # loop-independent, so it runs outside the loop branches below.
     reset_rate_limiter_state()
 
+    # /api/discover keeps a per-worker TTL cache; a result cached by one test
+    # must not answer another test's request.
+    from reasoner.api.routes.legacy_widgets import _discover_cache
+
+    _discover_cache.clear()
+
     # api/__init__.py's lifespan injects a real SharedCachePort on startup
     # and (as of this fix) clears it on shutdown -- but any test that starts
     # the app without a matching clean shutdown, or that ran before this
