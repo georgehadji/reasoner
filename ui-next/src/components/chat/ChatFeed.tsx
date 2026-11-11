@@ -6,6 +6,8 @@ import { ChatMessage, MemoryBadge } from './ChatMessage';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { StreamingMarkdown } from './StreamingMarkdown';
 import { PhaseRenderer } from '@/components/phases/PhaseRenderer';
+import { AnswerFirstRun } from '@/components/phases/AnswerFirstRun';
+import { answerMarkdown, findAnswer } from '@/lib/answer';
 import { ResearchProgress } from '@/components/phases/ResearchProgress';
 import { ErrorMessage } from './ErrorMessage';
 import { WidgetRenderer } from '@/components/widgets/WidgetRenderer';
@@ -223,29 +225,74 @@ function ImageGenerationIndicator({ prompt }: { prompt?: string }) {
   );
 }
 
+const ACTION =
+  'inline-flex min-h-[var(--space-10)] items-center gap-[var(--space-1)] rounded-[var(--radius-sm)] px-[var(--space-2)] transition-colors duration-[var(--dur-micro)] hover:text-[var(--text)]';
+
+/* Icon swap AND label swap — neither the tick nor the accent hue does the
+   work alone. The live region says what landed on the clipboard. */
+function CopyAction({ text, label, ariaLabel, doneLabel }: { text: string; label: string; ariaLabel: string; doneLabel: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopy() {
+    const ok = await copyToClipboard(text);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), TIMING.copiedFeedbackMs);
+    }
+  }
+
+  return (
+    <>
+      <button type="button" onClick={handleCopy} className={ACTION} aria-label={copied ? doneLabel : ariaLabel}>
+        {copied ? (
+          <>
+            <Check className="h-3.5 w-3.5 text-[var(--text)]" aria-hidden="true" /> Copied
+          </>
+        ) : (
+          <>
+            <Copy className="h-3.5 w-3.5" aria-hidden="true" /> {label}
+          </>
+        )}
+      </button>
+      <span role="status" className="sr-only">
+        {copied ? doneLabel : ''}
+      </span>
+    </>
+  );
+}
+
+function downloadMarkdown(text: string, name: string) {
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/markdown;charset=utf-8' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function answerFileName(answer: string): string {
+  const title = /^#{1,2}\s+(.+)$/m.exec(answer)?.[1] ?? 'answer';
+  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
+  return `${slug || 'answer'}.md`;
+}
+
 function MessageActions({
   content,
+  answer,
   tokens,
   cost,
   messageId,
   onFeedback,
 }: {
   content: string;
+  /** The answer alone, when the run has one; the full run stays one click away. */
+  answer?: string;
   tokens?: TokenCount;
   cost?: number;
   messageId?: string;
   onFeedback?: (messageId: string, rating: 'up' | 'down') => void;
 }) {
-  const [copied, setCopied] = useState(false);
   const [feedbackGiven, setFeedbackGiven] = useState<'up' | 'down' | null>(null);
-
-  async function handleCopy() {
-    const ok = await copyToClipboard(content);
-    if (ok) {
-      setCopied(true);
-      setTimeout(() => setCopied(false), TIMING.copiedFeedbackMs);
-    }
-  }
 
   function handleFeedback(rating: 'up' | 'down') {
     if (!messageId || !onFeedback) return;
@@ -258,27 +305,22 @@ function MessageActions({
 
   return (
     <div className="mt-[var(--space-2)] flex flex-wrap items-center justify-center gap-[var(--space-3)] text-[length:var(--text-xs)] text-[var(--text-muted)]">
-      <button
-        type="button"
-        onClick={handleCopy}
-        className="inline-flex min-h-[var(--space-10)] items-center gap-[var(--space-1)] rounded-[var(--radius-sm)] px-[var(--space-2)] transition-colors duration-[var(--dur-micro)] hover:text-[var(--text)]"
-        aria-label={copied ? 'Response copied to clipboard' : 'Copy response'}
-      >
-        {/* Icon swap AND label swap — neither the tick nor the accent hue
-            is doing the work alone. */}
-        {copied ? (
-          <>
-            <Check className="h-3.5 w-3.5 text-[var(--text)]" aria-hidden="true" /> Copied
-          </>
-        ) : (
-          <>
-            <Copy className="h-3.5 w-3.5" aria-hidden="true" /> Copy
-          </>
-        )}
-      </button>
-      <span role="status" className="sr-only">
-        {copied ? 'Response copied to clipboard' : ''}
-      </span>
+      {answer ? (
+        <>
+          <CopyAction text={answer} label="Copy answer" ariaLabel="Copy answer" doneLabel="Answer copied to clipboard" />
+          <CopyAction text={content} label="Copy full run" ariaLabel="Copy full run" doneLabel="Full run copied to clipboard" />
+          <button
+            type="button"
+            onClick={() => downloadMarkdown(answer, answerFileName(answer))}
+            className={ACTION}
+            aria-label="Download answer as Markdown"
+          >
+            <Download className="h-3.5 w-3.5" aria-hidden="true" /> .md
+          </button>
+        </>
+      ) : (
+        <CopyAction text={content} label="Copy" ariaLabel="Copy response" doneLabel="Response copied to clipboard" />
+      )}
 
       {showTokens ? (
         <span className="nums-tabular font-mono text-[length:var(--text-xs)] text-[var(--text-muted)]">
@@ -503,6 +545,8 @@ function ChatFeedComponent({
         const phases = msg.phases || [];
         const visiblePhases = phases.slice(0, visibleCount);
         const forceOpen = phaseOpenMode === 'expand' ? true : phaseOpenMode === 'collapse' ? false : null;
+        // Answer first once the run is done; while it streams, pipeline order.
+        const found = msg.isStreaming ? null : findAnswer(phases);
 
         return (
           <div key={msg.id} className={cn('flex w-full flex-col items-center', ENTER)} style={enterDelay(i)}>
@@ -578,6 +622,15 @@ function ChatFeedComponent({
                 <div className="prose-serif prose-measure">
                   <StreamingMarkdown text={msg.streamingContent} isStreaming={false} />
                 </div>
+              ) : found ? (
+                <AnswerFirstRun
+                  found={found}
+                  phases={phases}
+                  forceOpen={forceOpen}
+                  errorPhases={errorPhases}
+                  duration={msg.duration}
+                  cost={msg.cost}
+                />
               ) : phases.length > 0 ? (
                 <div className="w-full">
                   {visiblePhases.map((phase, idx) => {
@@ -607,6 +660,7 @@ function ChatFeedComponent({
               <>
                 <MessageActions
                   content={msg.isStreaming ? (msg.streamingContent || msg.content) : msg.content}
+                  answer={found ? answerMarkdown(found) : undefined}
                   tokens={msg.isStreaming ? undefined : msg.tokens}
                   cost={msg.isStreaming ? undefined : msg.cost}
                   messageId={msg.id}

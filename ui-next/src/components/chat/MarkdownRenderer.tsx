@@ -2,6 +2,7 @@
 
 import { memo, Suspense, useMemo } from 'react';
 import dynamic from 'next/dynamic';
+import { slugify } from '@/lib/answer';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { EPISTEMIC_TAG, epistemicClassName, remarkEpistemic } from '@/lib/remark-epistemic';
@@ -121,13 +122,4 @@ function extractText(node: React.ReactNode): string {
     return extractText(props?.children);
   }
   return '';
-}
-
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-');
 }

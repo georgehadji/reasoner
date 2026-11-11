@@ -45,6 +45,8 @@ interface SynthesisCardProps {
   highlights?: Array<{ label: string; value: number }> | null;
   sources?: SourceItem[] | null;
   citations?: CitationItem[] | null;
+  /** Replaces "Phase N" when the card is shown as the run's answer. */
+  label?: string;
   layoutHints?: {
     primary_theme_color?: string;
     important_sections?: string[];
@@ -114,6 +116,7 @@ export function SynthesisCard({
   highlights,
   sources,
   citations,
+  label,
   layoutHints,
 }: SynthesisCardProps) {
   const [open, setOpen] = useState(defaultOpen);
@@ -121,6 +124,7 @@ export function SynthesisCard({
   const uid = useId();
   const triggerId = `${uid}-trigger`;
   const panelId = `${uid}-panel`;
+  const answerFirst = label !== undefined;
   const sourcesPanelShown = isEnabled('sources-panel') && !!sources && sources.length > 0;
 
   return (
@@ -145,7 +149,7 @@ export function SynthesisCard({
                 )}
               >
                 <Sparkles aria-hidden="true" className={ICON_SM} />
-                Phase {index + 1}
+                {label ?? `Phase ${index + 1}`}
               </span>
               <span className="truncate text-[length:var(--text-lg)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-snug)] text-[var(--text)]">
                 {name}
@@ -177,66 +181,74 @@ export function SynthesisCard({
         >
           <div className={cn('min-h-0', !open && 'overflow-hidden')} inert={!open}>
             <div className="flow [--flow-space:var(--space-3)] px-[var(--space-4)] pb-[var(--space-4)] pt-[var(--space-1)]">
-              {highlights && highlights.length > 0 && (
-                <section className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--chip-bg,var(--surface-2))] p-[var(--space-3)]">
-                  <h3 className={cn(MICRO_LABEL, 'mb-[var(--space-2)]')}>Synthesis Highlights</h3>
-                  <div className="flex flex-wrap gap-[var(--space-2)]">
-                    {highlights.map((highlight) => (
-                      <div
-                        key={highlight.label}
-                        className={cn(
-                          CHIP,
-                          // --chip-bg-2, not --chip-bg: CHIP already resolves to
-                          // the panel's own tone, so a chip left on it vanished
-                          // into the panel it sits in.
-                          'gap-[var(--space-2)] bg-[var(--chip-bg-2,var(--surface))] text-[length:var(--text-xs)] leading-[var(--lh-ui)] text-[var(--text)]'
-                        )}
-                      >
-                        <ListChecks aria-hidden="true" className={cn(ICON_SM, 'text-[var(--accent)]')} />
-                        <span className="nums-tabular font-semibold">{highlight.value}</span>
-                        <span className="text-[var(--text-2)]">{highlight.label}</span>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              )}
+              {/* As the run's answer the bottom line leads and the sections follow
+                  it directly, so the highlight counts and jump links (a map of a
+                  card read top-down) give way, and sources sit after the text. */}
+              {!answerFirst && (
+                <>
+                {highlights && highlights.length > 0 && (
+                  <section className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--chip-bg,var(--surface-2))] p-[var(--space-3)]">
+                    <h3 className={cn(MICRO_LABEL, 'mb-[var(--space-2)]')}>Synthesis Highlights</h3>
+                    <div className="flex flex-wrap gap-[var(--space-2)]">
+                      {highlights.map((highlight) => (
+                        <div
+                          key={highlight.label}
+                          className={cn(
+                            CHIP,
+                            // --chip-bg-2, not --chip-bg: CHIP already resolves to
+                            // the panel's own tone, so a chip left on it vanished
+                            // into the panel it sits in.
+                            'gap-[var(--space-2)] bg-[var(--chip-bg-2,var(--surface))] text-[length:var(--text-xs)] leading-[var(--lh-ui)] text-[var(--text)]'
+                          )}
+                        >
+                          <ListChecks aria-hidden="true" className={cn(ICON_SM, 'text-[var(--accent)]')} />
+                          <span className="nums-tabular font-semibold">{highlight.value}</span>
+                          <span className="text-[var(--text-2)]">{highlight.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
 
-              {highlights && highlights.length > 0 && (
-                <nav
-                  aria-label="Jump to synthesis section"
-                  className="flex flex-wrap items-center gap-[var(--space-2)]"
-                >
-                  <span className={MICRO_LABEL}>Jump to</span>
-                  {highlights.map((highlight) => {
-                    const anchor = HIGHLIGHT_ANCHORS[highlight.label];
-                    if (!anchor) return null;
-                    // The `sources` highlight counts `data.sources`, but the only
-                    // element carrying id="sources" is the panel below — which is
-                    // behind a flag. Without this the chip is a link to nowhere
-                    // every time the flag is off.
-                    if (anchor === 'sources' && !sourcesPanelShown) return null;
-                    return (
-                      <a
-                        key={highlight.label}
-                        href={`#${anchor}`}
-                        className={cn(
-                          CHIP,
-                          'min-h-[var(--space-8)] gap-[var(--space-1)] bg-[var(--chip-bg-2,var(--surface))] text-[length:var(--text-xs)] font-medium leading-[var(--lh-ui)] text-[var(--text)] transition-colors duration-[var(--dur-micro)] ease-[var(--ease-standard)] hover:bg-[var(--surface-2)]'
-                        )}
-                      >
-                        <CornerDownRight aria-hidden="true" className={ICON_SM} />
-                        {highlight.label}
-                      </a>
-                    );
-                  })}
-                </nav>
-              )}
+                {highlights && highlights.length > 0 && (
+                  <nav
+                    aria-label="Jump to synthesis section"
+                    className="flex flex-wrap items-center gap-[var(--space-2)]"
+                  >
+                    <span className={MICRO_LABEL}>Jump to</span>
+                    {highlights.map((highlight) => {
+                      const anchor = HIGHLIGHT_ANCHORS[highlight.label];
+                      if (!anchor) return null;
+                      // The `sources` highlight counts `data.sources`, but the only
+                      // element carrying id="sources" is the panel below — which is
+                      // behind a flag. Without this the chip is a link to nowhere
+                      // every time the flag is off.
+                      if (anchor === 'sources' && !sourcesPanelShown) return null;
+                      return (
+                        <a
+                          key={highlight.label}
+                          href={`#${anchor}`}
+                          className={cn(
+                            CHIP,
+                            'min-h-[var(--space-8)] gap-[var(--space-1)] bg-[var(--chip-bg-2,var(--surface))] text-[length:var(--text-xs)] font-medium leading-[var(--lh-ui)] text-[var(--text)] transition-colors duration-[var(--dur-micro)] ease-[var(--ease-standard)] hover:bg-[var(--surface-2)]'
+                          )}
+                        >
+                          <CornerDownRight aria-hidden="true" className={ICON_SM} />
+                          {highlight.label}
+                        </a>
+                      );
+                    })}
+                  </nav>
+                )}
 
+                </>
+              )}
+              {answerFirst && <div className="text-[var(--text)]">{children}</div>}
               {sourcesPanelShown && <SourcesPanel sources={sources!} />}
               {citations && citations.length > 0 && <SourceCard citations={citations} />}
               {subagents && subagents.length > 0 && <SubagentStrip subagents={subagents} />}
 
-              <div className="text-[var(--text)]">{children}</div>
+              {!answerFirst && <div className="text-[var(--text)]">{children}</div>}
             </div>
           </div>
         </div>
