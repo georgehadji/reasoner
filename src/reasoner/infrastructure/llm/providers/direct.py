@@ -230,6 +230,8 @@ class OpenAICompatibleDirectProvider(BaseLLMProvider):
         import json
 
         import httpx
+
+        from reasoner.infrastructure.llm.providers.openai_compat import OpenAICompatibleProvider
         payload = {
             "model": self.model,
             "messages": [
@@ -240,18 +242,21 @@ class OpenAICompatibleDirectProvider(BaseLLMProvider):
             "temperature": temperature,
         }
         try:
-            async with httpx.AsyncClient(timeout=httpx.Timeout(TIMEOUTS.LLM_CALL, connect=10.0)) as client:
-                resp = await client.post(
-                    f"{self._base_url}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {self._api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    content=json.dumps(payload),
-                )
-                resp.raise_for_status()
-                data = resp.json()
-                return data["choices"][0]["message"]["content"] or ""
+            # Shared pool: warm connections instead of a TCP+TLS handshake per call.
+            # The pool's own timeout is the primary lane's, so pass this lane's.
+            client = OpenAICompatibleProvider.shared_pool()
+            resp = await client.post(
+                f"{self._base_url}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {self._api_key}",
+                    "Content-Type": "application/json",
+                },
+                content=json.dumps(payload),
+                timeout=httpx.Timeout(TIMEOUTS.LLM_CALL, connect=10.0),
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return data["choices"][0]["message"]["content"] or ""
         except Exception as e:
             raise _translate(self.model, f"{self.model} direct API failed", e) from e
 
