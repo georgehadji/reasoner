@@ -130,6 +130,13 @@ class EventStoreConnection:
         """)
         conn.commit()
         self._migrate_pipeline_owners_nullable(conn)
+        # After the migration: it rebuilds the table and would drop an earlier
+        # index. list_pipeline_ids_for_user filters on user_id for every
+        # GET /api/pipelines, and without this it scans the whole table.
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_pipeline_owners_user ON pipeline_owners(user_id)"
+        )
+        conn.commit()
 
     def _migrate_pipeline_owners_nullable(self, conn: sqlite3.Connection) -> None:
         """Relax pipeline_owners.user_id to nullable (anonymous ownership).
