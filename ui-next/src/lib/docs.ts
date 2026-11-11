@@ -676,7 +676,7 @@ Returns a projected token count and USD range for a problem and preset, without 
 POST /api/gate
 \`\`\`
 
-Returns HyperGate's decision — route, method, and confidence — without executing it. Useful for showing users what will happen before they commit.
+Returns HyperGate's decision — route, method, and confidence — without executing it. Useful for showing users what will happen before they commit. Free up to 200 calls a day per account; past that it returns 429 with \`Retry-After\` set to the next UTC midnight.
 
 ## Catalogue
 
@@ -1033,7 +1033,7 @@ That mounts the MCP server at \`/mcp\` on the same FastAPI app that serves the R
 | --- | --- | --- |
 | \`reasoner_run\` | Paid | Runs a reasoning pipeline. Blocks, and reports progress per phase. |
 | \`reasoner_followup\` | Paid | Continues a conversation with a prior synthesis as context. |
-| \`reasoner_gate\` | Free | Previews routing — direct, web search, or pipeline, and which method — without running it. |
+| \`reasoner_gate\` | Free, 200 calls a day | Previews routing — direct, web search, or pipeline, and which method — without running it. |
 | \`reasoner_estimate\` | Free | Estimates tokens, cost, and duration without running it. |
 | \`reasoner_presets\` | Free | Lists presets with method, description, and primary model. |
 | \`reasoner_health\` | Free | Liveness and dependency status, public detail only. |
