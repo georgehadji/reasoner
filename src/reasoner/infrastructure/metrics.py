@@ -50,6 +50,15 @@ REASONER_QUOTA_EXCEEDED_TOTAL = Counter(
     ["tier"],
 )
 
+# A credit step failed and the run went ahead (or finished) without it: "require_credits"
+# and "reserve" let a run in unreserved, "settle" left a served run unbilled. Each one is
+# money that was not held or not collected (audit 6, finding 4).
+REASONER_CREDIT_FAILOPEN_TOTAL = Counter(
+    "reasoner_credit_failopen_total",
+    "Credit steps that failed open or failed to settle",
+    ["path"],
+)
+
 REASONER_LLM_ERRORS_TOTAL = Counter(
     "reasoner_llm_errors_total",
     "LLM provider errors",

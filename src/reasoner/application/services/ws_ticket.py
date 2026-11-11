@@ -24,6 +24,7 @@ import logging
 import secrets
 import time
 
+from reasoner.core.constant_time import constant_time_equals
 from reasoner.core.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -92,7 +93,7 @@ async def redeem_ticket(ticket: str) -> str | None:
     secret = _get_ticket_secret()
     payload = f"{user_id}{_SEP}{expiry_str}{_SEP}{nonce}"
     expected_sig = hmac.new(secret, payload.encode(), hashlib.sha256).hexdigest()
-    if not hmac.compare_digest(provided_sig, expected_sig):
+    if not constant_time_equals(provided_sig, expected_sig):
         return None
 
     try:

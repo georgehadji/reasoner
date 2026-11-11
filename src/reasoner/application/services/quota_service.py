@@ -9,6 +9,7 @@ Enforces business rules:
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC
 
 from reasoner.application.ports.quota_repository import QuotaRepository
@@ -81,13 +82,22 @@ class QuotaService:
         return QuotaResult(allowed=True, remaining=remaining)
 
     async def increment(self, user_id: str, preset: str = "") -> QuotaResult:
-        """
-        Increment used_queries by 1 after a successful pipeline run.
+        """Take one quota slot, atomically, when a run is admitted (audit 6, finding 3).
 
-        ⚠️ CRITICAL (Enhancement 1.2): This was a no-op stub. Now delegates to repository.
-        Must include idempotency key to prevent double-counting on retries.
+        ``check()`` only reads, so N concurrent runs at 19/20 all passed it and each
+        counted itself at the end: 24/20. This is the claim that makes the limit
+        hard. A denial (``allowed=False``) means the limit was reached; ``remaining
+        == -1`` means an unlimited row, which takes no slot and must not be released.
+        The run gives the slot back with :meth:`release` if it ends up costing nothing.
         """
-        return await self._repository.check_and_increment(user_id, preset=preset)
+        result = await self._repository.check_and_increment(user_id, preset=preset)
+        if not result.allowed and result.retry_after is None:
+            result = replace(result, retry_after=self._seconds_until_month_end())
+        return result
+
+    async def release(self, user_id: str) -> None:
+        """Give back a slot taken by :meth:`increment` for a run that was not billed."""
+        await self._repository.release_slot(user_id)
 
     def _seconds_until_month_end(self) -> int:
         """Rough estimate for Retry-After header."""

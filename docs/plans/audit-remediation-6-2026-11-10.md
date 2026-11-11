@@ -323,3 +323,39 @@ host and error text.
 Anything outside the 11 findings. The audit did not read `phases/`, `hypergate/`, `neuro/`, the LLM router and executor,
 the uploader, the websocket layer, the CSRF implementation or most of the 419 test files; a second audit pass over those
 may add findings.
+
+---
+
+## Round 2 (2026-11-11): the second 13-finding audit
+
+A second audit pass found 13 more issues. They were fixed on branch `fix/audit6-rest`, not committed yet. Numbers below are
+that audit's own numbering.
+
+| # | Finding | What changed |
+|---|---------|--------------|
+| 1 | Release and charge were two ledger writes | `CreditRepository.record_batch` writes both rows in one transaction; `CreditService.true_up_run` uses it; `run_metering._true_up` makes one call. The ledger keys are unchanged (`<ref>:release`, `<ref>`). |
+| 2 | A failed login ran as an anonymous caller | `get_optional_user` notes why it returned None; `admit_run` answers 401 for a rejected credential and 503 with `Retry-After` for a lookup error. No header at all is still anonymous. |
+| 3 | The quota was checked at the start and counted at the end | `admit_run` and both MCP paths claim a slot atomically before the reservation (`claim_quota_slot` -> `QuotaService.increment`). A run that costs nothing, or never starts, gives the slot back (`release_slot`). `CreditSink.settle` and `true_up` no longer count. |
+| 4 | Credit fail-open paths left no trace | Counter `reasoner_credit_failopen_total{path}`, alert `CreditFailOpen`, and a Valkey sorted set `unsettled_runs` written by `CreditSink.record_unsettled`. `POST /api/admin/unsettled-runs/replay` settles them; replay is idempotent on the run's own reference. |
+| 5 | Duplicate subscription rows | Migration `20261110_000400` refuses to run while duplicates exist, then adds partial unique indexes on `stripe_sub_id` and `paypal_sub_id`. `upsert_subscription` retries once on a unique violation. `scripts/check_duplicate_subscriptions.py` lists duplicates first. |
+| 6 | The pipeline list paged the global list, then filtered by owner | The store filters by owner ids before paging and returns a real total. A failed ownership lookup returns an empty list. |
+| 7 | `compare_digest` raised on non-ASCII header text | `core/constant_time.py` encodes both sides to UTF-8; used at every call site. |
+| 8 | The anonymous cap kept counted credits on refusal; `INCRBY` plus `EXPIRE` was not atomic | `SET key 0 EX ttl NX`, then `INCRBY`. The cap returns what it counted and `refund_anonymous_trial` gives it back on a refusal or an unstarted stream. |
+| 9 | Error text leaked | Admin ACR routes return fixed strings. Six `ui-next` proxy routes use `proxyErrorResponse`. Four billing proxy routes return a fixed `detail` (the billing pages read that key). |
+| 10 | The ACR mode switch changed one worker | The route is deleted. The mode is deployment config: set `ACR_MODE` and restart. |
+| 11 | Migrations ran at every start with no lock | `migrations/alembic/env.py` takes a session-level `pg_advisory_lock` around the run. |
+| 12 | `list_uploads` scans every user's files | Only mitigated: the call now runs in a thread so it does not block the event loop. The scan still grows with the whole folder; move to a per-user index past about 10,000 files. |
+| 13 | A failed upload returned 200 | It returns 500 with a fixed message. |
+
+Deviations from the plan above:
+
+- The unsettled-run store is a sorted set, not the plain list D2 named, so entries older than 30 days can be trimmed
+  (they hold a `user_id`).
+- The port lives in `core/ports/unsettled_run_port.py`, not `application/ports/`: an infrastructure adapter may not import
+  `application`.
+- Behaviour change: a pipeline with no recorded owner no longer appears in a non-admin user's list.
+- `.importlinter` contract 2 did not grow (50 ignored imports before and after).
+
+Not verified: no Docker, so the live Postgres checks did not run (concurrent subscription upsert, ledger rollback, the
+advisory-lock test in `tests/integration/test_alembic_schema_contract.py`). Offline `alembic upgrade --sql` renders the new
+migration correctly.

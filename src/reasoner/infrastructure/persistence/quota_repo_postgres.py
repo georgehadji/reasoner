@@ -130,6 +130,14 @@ class PostgresQuotaRepository(QuotaRepository):
 
                 return QuotaResult(allowed=True, remaining=remaining - 1)
 
+    async def release_slot(self, user_id: str) -> None:
+        pool = await self._get_pool()
+        await pool.execute(
+            "UPDATE usage_quotas SET used_queries = GREATEST(used_queries - 1, 0), "
+            "updated_at = (NOW() AT TIME ZONE 'UTC') WHERE user_id = $1 AND max_queries <> -1",
+            user_id,
+        )
+
     async def reset_monthly(self, user_id: str) -> None:
         pool = await self._get_pool()
         await pool.execute(

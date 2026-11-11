@@ -475,15 +475,17 @@ class GetHistoryQueryHandler:
 
     async def handle(self, query: GetHistoryQuery) -> dict[str, Any]:
         """Get search history."""
-        if not self.event_store:
+        if not self.event_store or query.owner_ids is None:
             # History is per-user and lives in the HistoryRepository; this
-            # handler only reads the event store.
+            # handler only reads the event store. Without the caller's own
+            # pipeline ids it would list every user's problems, so it lists none.
             return {"total": 0, "entries": []}
 
         # Get from event store
         pipelines = await self.event_store.list_pipelines(
             limit=query.limit,
             offset=query.offset,
+            aggregate_ids=query.owner_ids,
         )
 
         return {

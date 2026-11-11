@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from collections.abc import Sequence
 from dataclasses import asdict
 from datetime import datetime
 from typing import Any
@@ -581,8 +582,15 @@ class PostgreSQLEventStore:
         limit: int = 50,
         offset: int = 0,
         status: str | None = None,
+        aggregate_ids: Sequence[str] | None = None,
     ) -> list[dict[str, Any]]:
-        """List pipelines with filtering."""
+        """List pipelines with filtering.
+
+        ``aggregate_ids`` limits the list to an owner's pipelines. An empty
+        sequence matches nothing and runs no query; None means all.
+        """
+        if aggregate_ids is not None and not aggregate_ids:
+            return []
         pool = await self._ready()
         pool = self._read_pool if (self.use_read_replica and self._read_pool is not None) else pool
 
@@ -596,6 +604,9 @@ class PostgreSQLEventStore:
             if status:
                 params.append(status)
                 query += f" AND status = ${len(params)}"
+            if aggregate_ids is not None:
+                params.append(list(aggregate_ids))
+                query += f" AND aggregate_id = ANY(${len(params)}::text[])"
 
             params.append(limit)
             query += f" ORDER BY created_at DESC LIMIT ${len(params)}"
@@ -621,6 +632,28 @@ class PostgreSQLEventStore:
                     "updated_at": row["updated_at"].isoformat(),
                 })
             return results
+
+    async def count_pipelines(
+        self,
+        status: str | None = None,
+        aggregate_ids: Sequence[str] | None = None,
+    ) -> int:
+        """Count pipelines matching the same filters as ``list_pipelines``."""
+        if aggregate_ids is not None and not aggregate_ids:
+            return 0
+        pool = await self._ready()
+        pool = self._read_pool if (self.use_read_replica and self._read_pool is not None) else pool
+
+        query = "SELECT COUNT(*) FROM aggregates WHERE aggregate_type = 'pipeline'"
+        params: list[Any] = []
+        if status:
+            params.append(status)
+            query += f" AND status = ${len(params)}"
+        if aggregate_ids is not None:
+            params.append(list(aggregate_ids))
+            query += f" AND aggregate_id = ANY(${len(params)}::text[])"
+        async with pool.acquire(timeout=10.0) as conn:
+            return int(await conn.fetchval(query, *params))
 
     async def search_events(
         self,

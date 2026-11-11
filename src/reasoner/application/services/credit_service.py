@@ -22,6 +22,7 @@ from reasoner.domain.credits import (
     CreditLedgerEntry,
     CreditReason,
     InsufficientCreditsError,
+    LedgerWrite,
     allowance_steps,
     can_afford,
     monthly_allowance,
@@ -177,6 +178,47 @@ class CreditService:
             description=description,
             allow_overdraft=True,
         )
+
+    async def true_up_run(
+        self,
+        user_id: str,
+        reserved_credits: int,
+        cost_usd: float,
+        reference_id: str,
+        preset: str,
+    ) -> list[CreditLedgerEntry]:
+        """Give back a run's reservation and charge its real cost, as one transaction.
+
+        Two ledger rows with the same keys as a separate refund and charge
+        (``<ref>:release`` and ``<ref>``), so statements and replays are unchanged.
+        Written one at a time, a failure between them left the refund in and the
+        charge out: a free run. Here either both rows land or neither does, and a
+        retry with the same ``reference_id`` moves nothing twice.
+
+        The charge allows overdraft (the work is done); a cost that rounds to zero
+        credits writes only the refund.
+        """
+        writes: list[LedgerWrite] = []
+        if reserved_credits > 0:
+            writes.append(LedgerWrite(
+                delta=reserved_credits,
+                reason=CreditReason.REFUND,
+                reference_id=f"{reference_id}:release",
+                description="Unused reservation released",
+                allow_overdraft=True,
+            ))
+        credits = usd_to_credits(cost_usd)
+        if credits > 0:
+            writes.append(LedgerWrite(
+                delta=-credits,
+                reason=CreditReason.PIPELINE_RUN,
+                reference_id=reference_id,
+                description=f"Pipeline run ({preset})",
+                allow_overdraft=True,
+            ))
+        if not writes:
+            return []
+        return await self._repository.record_batch(user_id, writes)
 
 
 __all__ = [

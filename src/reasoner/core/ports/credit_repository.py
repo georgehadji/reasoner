@@ -6,9 +6,15 @@ application layer depends on this protocol only, never on asyncpg.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Protocol, runtime_checkable
 
-from reasoner.domain.credits import CreditBalance, CreditLedgerEntry, CreditReason
+from reasoner.domain.credits import (
+    CreditBalance,
+    CreditLedgerEntry,
+    CreditReason,
+    LedgerWrite,
+)
 
 
 @runtime_checkable
@@ -39,6 +45,24 @@ class CreditRepository(Protocol):
         Raises:
             InsufficientCreditsError: when the charge would breach the overdraft
                 floor and ``allow_overdraft`` is False.
+        """
+        ...
+
+    async def record_batch(
+        self,
+        user_id: str,
+        writes: Sequence[LedgerWrite],
+    ) -> list[CreditLedgerEntry]:
+        """Apply several movements for one user as a single transaction.
+
+        One transaction and one lock on the balance row: either every write lands
+        or none does. Each write keeps its own ``reference_id`` idempotency key and
+        returns its original entry on replay, so a retried batch moves nothing
+        twice. Entries come back in the order of ``writes``.
+
+        Raises:
+            InsufficientCreditsError: when a write breaches the overdraft floor and
+                its ``allow_overdraft`` is False. Nothing is applied.
         """
         ...
 

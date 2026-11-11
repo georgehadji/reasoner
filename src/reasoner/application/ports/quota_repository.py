@@ -27,6 +27,14 @@ class QuotaRepository(Protocol):
         """
         ...
 
+    async def release_slot(self, user_id: str) -> None:
+        """Give back one slot taken by ``check_and_increment``.
+
+        Never goes below zero and does nothing on an unlimited row, which
+        ``check_and_increment`` never counted.
+        """
+        ...
+
     async def reset_monthly(self, user_id: str) -> None:
         """Reset used_queries to 0 and update period_start to current month."""
         ...
