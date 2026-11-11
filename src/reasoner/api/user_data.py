@@ -53,6 +53,7 @@ class _IdentityStore:
 
 
 def user_data_stores() -> list[UserDataStore]:
+    from reasoner.api.error_handler import _get_error_store
     from reasoner.api.history import history_repo
     from reasoner.core.ports.memory_port import get_memory_port
     from reasoner.documents.vector_store import DocumentVectorStore
@@ -60,6 +61,7 @@ def user_data_stores() -> list[UserDataStore]:
     from reasoner.infrastructure.persistence.event_store import get_event_store
     from reasoner.infrastructure.persistence.upload_usage_repo import get_upload_usage_repo
     from reasoner.infrastructure.persistence.user_data_local import (
+        ErrorLogStore,
         EventsStore,
         HistoryStore,
         NeuroStore,
@@ -79,6 +81,7 @@ def user_data_stores() -> list[UserDataStore]:
         NeuroStore(get_memory_port),
         ValkeyStore(get_valkey_pool),
         UnsettledRunsStore(),
+        ErrorLogStore(_get_error_store),
         *pg_user_data_stores(_pg_pool),
         _IdentityStore(),
     ]

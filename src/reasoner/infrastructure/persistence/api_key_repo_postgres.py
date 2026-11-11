@@ -21,6 +21,12 @@ _COLUMNS = (
 )
 
 
+_LIVE_COUNT_SQL = (
+    "SELECT COUNT(*) FROM api_keys WHERE user_id = $1 AND revoked_at IS NULL "
+    "AND (expires_at IS NULL OR expires_at > NOW())"
+)
+
+
 def _to_key(row: asyncpg.Record) -> ApiKey:
     return ApiKey(
         id=row["id"],
@@ -74,18 +80,27 @@ class PostgresApiKeyRepository(ApiKeyRepository):
         key_prefix: str,
         scopes: frozenset[str],
         expires_at: datetime | None = None,
-    ) -> ApiKey:
+        max_live: int | None = None,
+    ) -> ApiKey | None:
         pool = await self._get_pool()
-        row = await pool.fetchrow(
-            "INSERT INTO api_keys (user_id, name, key_hash, key_prefix, scopes, expires_at) "
-            f"VALUES ($1, $2, $3, $4, $5, $6) RETURNING {_COLUMNS}",
-            UUID(str(user_id)),
-            name,
-            key_hash,
-            key_prefix,
-            sorted(scopes),
-            expires_at,
-        )
+        uid = UUID(str(user_id))
+        async with pool.acquire() as conn, conn.transaction():
+            if max_live is not None:
+                # Serialise this user's creates until commit, so N parallel
+                # requests cannot all read "19 live" and all insert.
+                await conn.execute("SELECT pg_advisory_xact_lock(hashtext($1))", str(uid))
+                if await conn.fetchval(_LIVE_COUNT_SQL, uid) >= max_live:
+                    return None
+            row = await conn.fetchrow(
+                "INSERT INTO api_keys (user_id, name, key_hash, key_prefix, scopes, expires_at) "
+                f"VALUES ($1, $2, $3, $4, $5, $6) RETURNING {_COLUMNS}",
+                uid,
+                name,
+                key_hash,
+                key_prefix,
+                sorted(scopes),
+                expires_at,
+            )
         return _to_key(row)
 
     async def get_by_hash(self, key_hash: str) -> ApiKey | None:
@@ -107,11 +122,7 @@ class PostgresApiKeyRepository(ApiKeyRepository):
 
     async def count_live_for_user(self, user_id: str) -> int:
         pool = await self._get_pool()
-        count = await pool.fetchval(
-            "SELECT COUNT(*) FROM api_keys WHERE user_id = $1 AND revoked_at IS NULL "
-            "AND (expires_at IS NULL OR expires_at > NOW())",
-            UUID(str(user_id)),
-        )
+        count = await pool.fetchval(_LIVE_COUNT_SQL, UUID(str(user_id)))
         return int(count or 0)
 
     async def revoke(self, user_id: str, key_id: UUID) -> bool:

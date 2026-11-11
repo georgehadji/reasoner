@@ -238,6 +238,11 @@ REASONER_CRON_HEARTBEAT_TIMESTAMP = Gauge(
     "Unix timestamp of last successful nightly cron run",
 )
 
+REASONER_COMPACTION_LAST_SUCCESS_TIMESTAMP = Gauge(
+    "reasoner_compaction_last_success_timestamp",
+    "Unix timestamp of the last completed event-store compaction",
+)
+
 # Webhook processing failures (Phase 0.1 — billing dead-letter)
 WEBHOOK_PROCESSING_FAILURES = Counter(
     "reasoner_webhook_processing_failures_total",

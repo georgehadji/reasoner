@@ -31,7 +31,8 @@ class InMemoryApiKeyRepository(ApiKeyRepository):
         key_prefix: str,
         scopes: frozenset[str],
         expires_at: datetime | None = None,
-    ) -> ApiKey:
+        max_live: int | None = None,
+    ) -> ApiKey | None:
         record = ApiKey(
             id=uuid4(),
             user_id=UUID(str(user_id)),
@@ -42,6 +43,11 @@ class InMemoryApiKeyRepository(ApiKeyRepository):
             expires_at=expires_at,
         )
         async with self._lock:
+            live = sum(
+                1 for k in self._keys.values() if k.user_id == record.user_id and k.is_usable()
+            )
+            if max_live is not None and live >= max_live:
+                return None
             self._keys[record.id] = record
         return record
 

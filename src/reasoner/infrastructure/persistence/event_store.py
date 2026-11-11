@@ -866,6 +866,46 @@ class EventStore:
 
         return await self._run_in_executor(_count_sync)
 
+    async def prune_audit_events_before(self, cutoff: datetime, batch_size: int = 500) -> int:
+        """Delete version-0 audit rows older than cutoff (audit-5 decision Q6).
+
+        Replay reads only ``version > 0`` (``get_events``), so these rows are
+        never part of an aggregate's history; versioned rows are kept because
+        status and resume rebuild aggregates from full history. Readers of
+        version-0 rows (``get_all_events``, ``get_events_by_type``,
+        ``get_event_stats``) see at most ``EVENT_RETENTION_DAYS`` of them.
+        """
+        cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S")
+
+        def _prune_sync() -> int:
+            conn = self._get_connection()
+            try:
+                cursor = conn.execute(
+                    "DELETE FROM events WHERE id IN (SELECT id FROM events"
+                    " WHERE version = 0 AND created_at < ? ORDER BY created_at ASC LIMIT ?)",
+                    (cutoff_str, batch_size),
+                )
+                conn.commit()
+                return cursor.rowcount
+            except sqlite3.Error as e:
+                conn.rollback()
+                logger.error("prune_audit_events_before failed: %s", e)
+                raise
+
+        return await self._run_in_executor(_prune_sync)
+
+    async def count_eligible_audit_events(self, cutoff: datetime) -> int:
+        """Count version-0 audit rows eligible for pruning (dry-run support)."""
+        cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S")
+
+        def _count_sync() -> int:
+            return self._get_connection().execute(
+                "SELECT COUNT(*) FROM events WHERE version = 0 AND created_at < ?",
+                (cutoff_str,),
+            ).fetchone()[0]
+
+        return await self._run_in_executor(_count_sync)
+
     def close(self) -> None:
         """Close database connection and thread pool.
 

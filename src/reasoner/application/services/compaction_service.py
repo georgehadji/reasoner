@@ -3,12 +3,17 @@
 Decides when to compact (age threshold, batch size, enabled flag) and
 delegates actual deletion to the infrastructure event store. Lives in the
 application layer to keep policy decisions out of infrastructure.
+
+Runs only from ``POST /api/admin/compaction/run``, scheduled by the same
+external cron as neuro-maintenance. It used to run as a lifespan loop in every
+worker, so each one issued the same batches (audit-5 PER-19).
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -34,11 +39,11 @@ class CompactionService:
             dry_run: If True, count eligible rows without deleting.
 
         Returns:
-            {"deleted_events": N, "batches": M}
+            {"deleted_audit_events": A, "deleted_events": N, "batches": M}
         """
         if not settings.COMPACTION_ENABLED:
             logger.info("Compaction disabled (COMPACTION_ENABLED=false)")
-            return {"deleted_events": 0, "batches": 0}
+            return {"deleted_audit_events": 0, "deleted_events": 0, "batches": 0}
 
         cutoff = self._cutoff()
         logger.info(
@@ -51,14 +56,33 @@ class CompactionService:
         if dry_run:
             return await self._count_eligible(cutoff)
 
+        # Two loops, one per row class: a call that pruned both classes could
+        # return up to twice the batch and break the "partial batch = done" test.
+        audit_deleted, audit_batches = await self._drain(
+            self._store.prune_audit_events_before, cutoff
+        )
+        deleted, batches = await self._drain(self._store.prune_events_before, cutoff)
+        logger.info(
+            "Compaction complete: %d audit rows and %d events deleted in %d batches",
+            audit_deleted,
+            deleted,
+            audit_batches + batches,
+        )
+        return {
+            "deleted_audit_events": audit_deleted,
+            "deleted_events": deleted,
+            "batches": audit_batches + batches,
+        }
+
+    async def _drain(
+        self, prune: Callable[..., Awaitable[int]], cutoff: datetime
+    ) -> tuple[int, int]:
+        """Call *prune* in batches until a partial batch. Stops on error, never raises."""
         total_deleted = 0
         batches = 0
         while True:
             try:
-                deleted = await self._store.prune_events_before(
-                    cutoff=cutoff,
-                    batch_size=COMPACTION_BATCH_SIZE,
-                )
+                deleted = await prune(cutoff=cutoff, batch_size=COMPACTION_BATCH_SIZE)
             except Exception as exc:
                 logger.error("Compaction batch %d failed: %s", batches + 1, exc)
                 break
@@ -71,54 +95,13 @@ class CompactionService:
                 break  # last batch was partial — nothing left to prune
 
             await asyncio.sleep(0)  # yield to event loop between batches
+        return total_deleted, batches
 
-        logger.info(
-            "Compaction complete: %d events deleted in %d batches",
-            total_deleted,
-            batches,
-        )
-        return {"deleted_events": total_deleted, "batches": batches}
-
-    async def _count_eligible(self, cutoff: datetime) -> dict[str, int]:
+    async def _count_eligible(self, cutoff: datetime) -> dict[str, Any]:
         if hasattr(self._store, "count_eligible_events"):
-            n = await self._store.count_eligible_events(cutoff)
-            return {"eligible_events": n, "dry_run": True}
+            return {
+                "eligible_audit_events": await self._store.count_eligible_audit_events(cutoff),
+                "eligible_events": await self._store.count_eligible_events(cutoff),
+                "dry_run": True,
+            }
         return {"eligible_events": -1, "dry_run": True, "note": "count not supported by this store"}
-
-
-async def run_nightly_compaction_loop(event_store: Any) -> None:
-    """Background loop that runs compaction once per day at COMPACTION_RUN_HOUR_UTC.
-
-    Designed to run as a long-lived asyncio task from the FastAPI lifespan.
-    Handles asyncio.CancelledError cleanly for graceful shutdown.
-    """
-    service = CompactionService(event_store)
-
-    while True:
-        now = datetime.now(tz=UTC)
-        target_hour = settings.COMPACTION_RUN_HOUR_UTC
-
-        next_run = now.replace(hour=target_hour, minute=0, second=0, microsecond=0)
-        if next_run <= now:
-            next_run += timedelta(days=1)
-
-        sleep_seconds = (next_run - now).total_seconds()
-        logger.info(
-            "Compaction loop sleeping %.0fs until %s UTC",
-            sleep_seconds,
-            next_run.isoformat(),
-        )
-
-        try:
-            await asyncio.sleep(sleep_seconds)
-        except asyncio.CancelledError:
-            logger.info("Compaction loop cancelled during sleep")
-            return
-
-        try:
-            await service.run_once()
-        except asyncio.CancelledError:
-            logger.info("Compaction loop cancelled during run")
-            return
-        except Exception as exc:
-            logger.error("Nightly compaction failed: %s", exc, exc_info=True)

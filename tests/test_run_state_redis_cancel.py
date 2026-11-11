@@ -20,6 +20,7 @@ class _FakeRedis:
     def __init__(self, fail: bool = False):
         self.fail = fail
         self.sets: dict[str, set[str]] = {}
+        self.values: dict[str, str] = {}
 
     def _check(self):
         if self.fail:
@@ -39,6 +40,19 @@ class _FakeRedis:
 
     async def expire(self, key, ttl):
         self._check()
+
+    async def set(self, key, value, ex=None):
+        self._check()
+        self.values[key] = value
+
+    async def get(self, key):
+        self._check()
+        return self.values.get(key)
+
+    async def delete(self, *keys):
+        self._check()
+        for key in keys:
+            self.values.pop(key, None)
 
 
 def _manager(redis: _FakeRedis) -> RunStateManager:

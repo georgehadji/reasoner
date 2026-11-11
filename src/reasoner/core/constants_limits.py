@@ -767,6 +767,21 @@ SETTLE_TIMEOUT_SECONDS: float = 15.0
 # credit each call, so the default cap of 50 allows 50 a day (BIL-17).
 GATE_ESTIMATED_COST_USD: float = 0.001
 
+# A signed-in /api/gate call is free up to this many per UTC day (audit-5
+# decision Q9): about $0.20 a day at GATE_ESTIMATED_COST_USD. Call 201 is a 429.
+GATE_FREE_CALLS_PER_DAY: int = 200
+
+# Flat prices for paid calls that run no pipeline (audit-5 BIL-26, decision Q2).
+# Search: one Perplexity sonar call through OpenRouter ($1/$1 per 1M tokens, up
+# to 2048 output tokens) plus Perplexity's $5/1K low-context request fee.
+# Assumes OpenRouter passes that fee on; not yet checked against a real
+# generation. If it does not, these fall to 0.002 and 0.007.
+SEARCH_ESTIMATED_COST_USD: float = 0.007
+# Smart search: one Qwen3.5-9B decomposition plus at most 3 sonar searches.
+SMART_SEARCH_ESTIMATED_COST_USD: float = 0.022
+# Image preview: one Grok 4.3 prompt rewrite ($1.25/$2.50 per 1M), at most 512 output tokens.
+IMAGE_PREVIEW_ESTIMATED_COST_USD: float = 0.002
+
 # A billing webhook claim older than this, and never finished, belongs to a
 # worker that died; the provider's retry may take it over. Must exceed the
 # slowest handler (the Stripe API calls in sync_subscription, ~30 s observed).

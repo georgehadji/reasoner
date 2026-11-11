@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
@@ -13,74 +12,14 @@ from reasoner.api.dependencies import (
     check_rate_limit,
     require_auth_if_legacy_disabled,
 )
+from reasoner.api.run_admission import admit_flat_charge, close_flat_charge
 from reasoner.api.schemas import GenerateImageRequest
+from reasoner.core.constants_limits import IMAGE_PREVIEW_ESTIMATED_COST_USD
 from reasoner.domain.saas import User
 from reasoner.infrastructure.llm.image_generation import enhance_image_prompt, generate_images
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-
-async def _reserve_image_credits(
-    *, user_id: str, estimated_cost_usd: float, reference_id: str
-) -> int:
-    """Reserve a flat estimate for one image-generation request.
-
-    Not routed through reserve_or_402()/reserve_run_budget() -- those price
-    from problem-text length via estimate_service.estimate_cost(), the
-    wrong model for a fixed-shape image request. Same fail-closed contract:
-    raises via HTTPException(402) on insufficient balance, degrades to an
-    unreserved (but still logged) request on a ledger outage.
-    """
-    if estimated_cost_usd <= 0:
-        return 0
-    from reasoner.api.dependencies import _persistence_is_configured, _require_persistence
-    from reasoner.api.run_observability import CreditSink
-    from reasoner.core.settings import settings
-    from reasoner.domain.credits import InsufficientCreditsError
-
-    if not _persistence_is_configured() and settings.ENVIRONMENT != "production":
-        return 0
-    _require_persistence("Credits")
-
-    try:
-        return await CreditSink().reserve(
-            user_id=user_id,
-            estimated_cost_usd=estimated_cost_usd,
-            reference_id=reference_id,
-            preset="image-generation",
-        )
-    except InsufficientCreditsError as exc:
-        raise HTTPException(
-            status_code=402,
-            detail={
-                "error": "Insufficient credits",
-                "message": (
-                    "Your credit balance can't cover this image generation's estimated cost."
-                ),
-                "required": exc.required,
-                "available": exc.available,
-                "upgrade_url": "/pricing",
-            },
-        ) from exc
-    except HTTPException:
-        raise
-    except Exception:
-        logger.warning("Image credit reservation failed; allowing unreserved", exc_info=True)
-        return 0
-
-
-async def _release_image_credits(user: User | None, credits: int, reference_id: str) -> None:
-    if user is None or credits <= 0:
-        return
-    from reasoner.api.run_observability import CreditSink
-
-    try:
-        await CreditSink().release(
-            user_id=str(user.id), credits=credits, reference_id=f"{reference_id}:release"
-        )
-    except Exception as exc:
-        logger.warning("Image credit release failed for %s: %s", reference_id, exc)
 
 
 def _scrub_generated_images(images: list[dict]) -> list[dict]:
@@ -197,8 +136,14 @@ async def generate_image_endpoint(
         )
 
     if body.preview_only:
+        # One LLM call: charged flat like any other paid call (BIL-26).
+        charge = await admit_flat_charge(
+            request, user=user, cost_usd=IMAGE_PREVIEW_ESTIMATED_COST_USD, kind="image-preview"
+        )
+        served = False
         try:
             enhanced_prompt = await enhance_image_prompt(body.prompt)
+            served = True
             return {
                 "success": True,
                 "images": [],
@@ -208,21 +153,18 @@ async def generate_image_endpoint(
         except Exception as exc:
             logger.error("Image generation endpoint error: %s", exc)
             return {"success": False, "error": "Internal server error"}
+        finally:
+            await close_flat_charge(charge, served=served)
 
-    # Reserved up front (not true-up'd against actual spend -- see the
-    # module comment on estimate_service._IMAGE_COST_PER_IMAGE_USD) so this
-    # route is no longer free to the business regardless of provider cost.
-    # Released in full on any failure below.
-    reserved_credits = 0
-    reservation_ref = f"image:{uuid.uuid4()}"
-    if user is not None:
-        from reasoner.application.services.estimate_service import estimate_image_cost
+    # The hold is the charge (not true-up'd against actual spend -- see the
+    # module comment on estimate_service._IMAGE_COST_PER_IMAGE_USD). Given back
+    # in full on any failure below, a client disconnect included.
+    from reasoner.application.services.estimate_service import estimate_image_cost
 
-        estimated_cost = await estimate_image_cost(body.preset, body.num_images)
-        reserved_credits = await _reserve_image_credits(
-            user_id=str(user.id), estimated_cost_usd=estimated_cost, reference_id=reservation_ref,
-        )
+    estimated_cost = await estimate_image_cost(body.preset, body.num_images)
+    charge = await admit_flat_charge(request, user=user, cost_usd=estimated_cost, kind="image")
 
+    served = False
     try:
         auto_primaries, auto_fallbacks = await _auto_select_models(body, body.num_images)
         result = await generate_images(
@@ -238,11 +180,11 @@ async def generate_image_endpoint(
         )
         if not result.get("success"):
             logger.error("Image generation failed: %s", result.get("error"))
-            await _release_image_credits(user, reserved_credits, reservation_ref)
             return {
                 "success": False,
                 "error": result.get("error", "Unknown error"),
             }
+        served = True
         return {
             "success": True,
             "images": _scrub_generated_images(result["images"]),
@@ -250,12 +192,12 @@ async def generate_image_endpoint(
             "rewritten_prompt": result.get("rewritten_prompt"),
         }
     except HTTPException:
-        await _release_image_credits(user, reserved_credits, reservation_ref)
         raise
     except Exception as exc:
         logger.error("Image generation endpoint error: %s", exc)
-        await _release_image_credits(user, reserved_credits, reservation_ref)
         return {
             "success": False,
             "error": "Internal server error",
         }
+    finally:
+        await close_flat_charge(charge, served=served)

@@ -118,6 +118,9 @@ def _cache_key(req: RunRequest, user_id: str | None = None) -> str:
         "source_type": req.source_type,
         "domain": req.domain,
         "attachments": attachments_key,
+        # file_ids drive prism file search; without them a run over file B
+        # replayed the cached answer about file A.
+        "file_ids": sorted(getattr(req, "file_ids", None) or []),
         "user_id": user_key,
         "v": 7,
     }, sort_keys=True)

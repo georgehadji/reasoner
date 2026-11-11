@@ -236,27 +236,9 @@ async def lifespan(app: FastAPI):
     _token_cache = get_token_cache()
     _cache_cleanup_task = await _token_cache.start_background_cleanup(interval_seconds=300)
 
-    # Background task: nightly event store compaction (P2-A)
-    from reasoner.application.services.compaction_service import run_nightly_compaction_loop
-    from reasoner.infrastructure.persistence.event_store import get_event_store
-    # The store the events go to. Compaction used to build its own Postgres
-    # store whenever DATABASE_URL was set, even with EVENT_STORE_BACKEND=sqlite,
-    # so it could prune a database nothing wrote to (PER-1).
-    _compaction_store = get_event_store()
-    _compaction_task = asyncio.create_task(
-        run_nightly_compaction_loop(_compaction_store),
-        name="event_store_compaction",
-    )
-
     yield
 
     # Cancel background tasks on shutdown (reverse order)
-    _compaction_task.cancel()
-    try:
-        await _compaction_task
-    except asyncio.CancelledError:
-        pass
-
     _cache_cleanup_task.cancel()
     try:
         await _cache_cleanup_task
@@ -469,9 +451,12 @@ from reasoner.api.dependencies import (
     require_credits_if_authenticated,
     run_tier_label,
 )
-from reasoner.api.run_admission import Admission, MeteredSSEResponse, admit_run
 from reasoner.api.run_admission import (
-    require_auth_if_legacy_disabled as _require_auth_if_legacy_disabled,
+    Admission,
+    MeteredSSEResponse,
+    admit_flat_charge,
+    admit_run,
+    close_flat_charge,
 )
 from reasoner.api.schemas import (
     FollowupRequest,
@@ -724,17 +709,31 @@ async def run_followup_pipeline(
 @app.post("/api/search")
 async def search_web(
     req: SearchRequest,
+    request: Request,
     user: User | None = Depends(get_optional_user),
     rate_limit_checked = Depends(check_rate_limit),
     search_service: SearchService = Depends(get_search_service),
 ):
-    _require_auth_if_legacy_disabled(user)
     """
     Advanced web search via multi-backend search pipeline.
     Returns raw discovery results. When smart=True, the query is decomposed
     into focused sub-queries via a lightweight LLM, searched in parallel,
     deduplicated, and grouped.
+
+    Charged flat (BIL-26): every call spends on a paid search provider.
     """
+    from reasoner.core.constants_limits import (
+        SEARCH_ESTIMATED_COST_USD,
+        SMART_SEARCH_ESTIMATED_COST_USD,
+    )
+
+    charge = await admit_flat_charge(
+        request,
+        user=user,
+        cost_usd=SMART_SEARCH_ESTIMATED_COST_USD if req.smart else SEARCH_ESTIMATED_COST_USD,
+        kind="smart-search" if req.smart else "search",
+    )
+    served = False
     try:
         from reasoner.core.search import smart_search
 
@@ -750,6 +749,7 @@ async def search_web(
                 source_type=req.source_type,
                 num_results=req.num_results,
             )
+        served = True
         return {
             "query": req.query,
             "source_type": req.source_type,
@@ -758,6 +758,8 @@ async def search_web(
     except Exception as exc:
         logger.warning(f"Web search failed: {exc}")
         raise HTTPException(status_code=503, detail=f"Search unavailable: {str(exc)}") from exc
+    finally:
+        await close_flat_charge(charge, served=served)
 
 
 @app.delete("/api/cache", dependencies=[Depends(check_rate_limit)])
@@ -814,9 +816,10 @@ async def stop_pipeline(
 
     # If a specific run_id is provided, cancel only that run.
     if run_id:
-        if not _run_store.is_active(run_id):
+        # lookup() also sees runs on other workers (via Redis).
+        active, run_owner = await _run_store.lookup(run_id)
+        if not active:
             return {"status": "not found", "cancelled": []}
-        run_owner = _run_store.get_owner(run_id)
         # If the run has an owner, only that owner (or admin) can cancel it
         if run_owner and (not is_authenticated or str(user.id) != run_owner):
             user_scopes = getattr(user, "scopes", None) or []
@@ -840,7 +843,8 @@ async def stop_pipeline(
                 status_code=403,
                 detail="Admin scope required for global stop",
             )
-        targets = list(_run_store.active_runs)
+        targets = await _run_store.request_cancel_all()
+        return {"status": "stop requested", "cancelled": targets}
 
     for rid in targets:
         await _run_store.request_cancel(rid)

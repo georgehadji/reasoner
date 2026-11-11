@@ -261,8 +261,10 @@ class RequestTimeoutMiddleware(BaseHTTPMiddleware):
         self.timeout_seconds = timeout_seconds
 
     async def dispatch(self, request: Request, call_next):
-        # Skip timeout for SSE endpoints (they're long-running by design)
-        if request.url.path.startswith("/api/run"):
+        # Skip timeout for SSE endpoints (they're long-running by design), and
+        # for /api/agent/run/sync, which runs up to the 600s pipeline timeout:
+        # cutting it at 300s billed the spend so far and returned no result.
+        if request.url.path.startswith(("/api/run", "/api/agent/run")):
             return await call_next(request)
 
         try:

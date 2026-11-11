@@ -29,6 +29,10 @@ logger = logging.getLogger(__name__)
 ACTIVE_SET = "active_runs"
 CANCELLED_SET = "cancelled_runs"
 TTL_SECONDS = 300  # Auto-cleanup after 5 minutes
+# Per-run owner key, so /api/stop on any worker can find a run. Outlives the
+# 600s pipeline timeout; remove() deletes it as soon as the run ends.
+OWNER_PREFIX = "run_owner:"
+OWNER_TTL_SECONDS = 3600
 
 # Lua script for atomic pop-cancelled (9.2)
 # Returns 1 if the run_id was in the cancelled set, 0 otherwise.
@@ -211,11 +215,12 @@ class RunStateManager:
     async def add(self, run_id: str, user_id: str | None = None) -> asyncio.Event:
         """Register a new run and return its cancel event."""
         with contextlib.suppress(_RedisUnavailable):
-            await self._redis_op(lambda: self._add_redis(run_id))
+            await self._redis_op(lambda: self._add_redis(run_id, user_id))
         return await self._store().add(run_id, user_id=user_id)
 
-    async def _add_redis(self, run_id: str) -> None:
+    async def _add_redis(self, run_id: str, user_id: str | None = None) -> None:
         redis = self._get_redis()
+        await redis.set(f"{OWNER_PREFIX}{run_id}", user_id or "", ex=OWNER_TTL_SECONDS)
         await redis.sadd(ACTIVE_SET, run_id)
         await redis.expire(ACTIVE_SET, TTL_SECONDS)
         await redis.expire(CANCELLED_SET, TTL_SECONDS)
@@ -228,6 +233,7 @@ class RunStateManager:
 
     async def _remove_redis(self, run_id: str) -> None:
         redis = self._get_redis()
+        await redis.delete(f"{OWNER_PREFIX}{run_id}")
         await redis.srem(ACTIVE_SET, run_id)
         await redis.srem(CANCELLED_SET, run_id)
 
@@ -288,6 +294,20 @@ class RunStateManager:
     def is_active(self, run_id: str) -> bool:
         """Check if a run is currently active (non-locking, best-effort)."""
         return self._store().is_active(run_id)
+
+    async def lookup(self, run_id: str) -> tuple[bool, str | None]:
+        """``(active, owner)`` for a run on any worker.
+
+        is_active()/get_owner() only see this worker's runs, so /api/stop that
+        landed on another worker answered "not found" and the run kept going.
+        """
+        if self._store().is_active(run_id):
+            return True, self._store().get_owner(run_id)
+        try:
+            owner = await self._redis_op(lambda: self._get_redis().get(f"{OWNER_PREFIX}{run_id}"))
+        except _RedisUnavailable:
+            return False, None
+        return (owner is not None), (owner or None)
 
     def get_owner(self, run_id: str) -> str | None:
         """Return the user_id that owns a run, or None if anonymous/not found."""

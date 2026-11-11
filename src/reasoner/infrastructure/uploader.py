@@ -62,6 +62,26 @@ def _record_hash(user_id: str, content_hash: str, file_id: str) -> None:
         index.setdefault(user_id, {})[content_hash] = file_id
         atomic_write_text(path, json.dumps(index))
 
+
+def _forget_hash(user_id: str, file_id: str) -> None:
+    """Drop *file_id* from the user's dedup entries; drop the user once empty.
+
+    Without this a deleted file -- and an erased account -- kept the user id
+    and a content hash of every upload in the index forever.
+    """
+    path = _hash_index_path()
+    with locked(path):
+        index = _load_hash_index()
+        hashes = index.get(user_id)
+        if not hashes or file_id not in hashes.values():
+            return
+        kept = {h: f for h, f in hashes.items() if f != file_id}
+        if kept:
+            index[user_id] = kept
+        else:
+            del index[user_id]
+        atomic_write_text(path, json.dumps(index))
+
 logger = logging.getLogger(__name__)
 
 
@@ -680,10 +700,10 @@ def delete_file(file_id: str, user_id: str | None = None) -> bool:
         return False
 
     # Ownership check
-    if user_id is not None:
-        meta = _get_upload_meta(file_id)
-        if meta is None or meta.get("user_id") != user_id:
-            return False
+    meta = _get_upload_meta(file_id)
+    if user_id is not None and (meta is None or meta.get("user_id") != user_id):
+        return False
+    owner = (meta or {}).get("user_id")
 
     # meta.json goes first: index_file re-checks it after writing a vector
     # sidecar, so an indexing job racing this delete removes its own sidecar
@@ -701,6 +721,8 @@ def delete_file(file_id: str, user_id: str | None = None) -> bool:
         except OSError as e:
             logger.error(f"Failed to delete {path.name} for {file_id}: {e}")
 
+    if deleted and owner:
+        _forget_hash(owner, file_id)
     return deleted
 
 

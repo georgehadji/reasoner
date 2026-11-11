@@ -138,3 +138,30 @@ async def test_the_pg_stores_are_named_for_the_registry():
     assert [s.name for s in pg_user_data_stores(get_pool)] == [
         "query_log", "credit_ledger", "quota", "subscriptions", "profile",
     ]
+
+
+async def test_api_key_cap_holds_under_parallel_creates():
+    """Audit 7 finding 11: count-then-insert let parallel creates pass the cap."""
+    import asyncio
+
+    import asyncpg
+
+    from reasoner.infrastructure.persistence.api_key_repo_postgres import (
+        PostgresApiKeyRepository,
+    )
+
+    async with _fresh_database() as dsn:
+        _alembic_upgrade(dsn)
+        conn = await asyncpg.connect(dsn)
+        try:
+            user_id = str(await _seed(conn))
+        finally:
+            await conn.close()
+        repo = PostgresApiKeyRepository(dsn, pool_size=10)
+        before = await repo.count_live_for_user(user_id)
+        results = await asyncio.gather(*(
+            repo.create(user_id, f"k{i}", f"h-{uuid4()}", "p", frozenset({"read"}), max_live=5)
+            for i in range(12)
+        ))
+        assert sum(r is not None for r in results) == max(0, 5 - before)
+        assert await repo.count_live_for_user(user_id) == max(5, before)

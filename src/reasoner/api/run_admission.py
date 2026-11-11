@@ -13,14 +13,21 @@ route ``Depends``: ``check_rate_limit``, ``check_quota_if_authenticated``,
 
 The MCP tools keep their own sequence (``api/mcp/tools.py::_run_and_bill``):
 they have no ``Request`` and must raise tool errors, not ``HTTPException``.
+
+Paid calls that run no pipeline (search, image generation, image preview) go
+through :func:`admit_flat_charge` instead (audit-remediation-5 BIL-26).
 """
 
 from __future__ import annotations
 
 import asyncio
+import logging
+import uuid
 from collections.abc import AsyncIterator, Mapping
 from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 
+import anyio
 from fastapi import HTTPException, Request
 from fastapi.responses import StreamingResponse
 from starlette.types import Receive, Scope, Send
@@ -33,12 +40,16 @@ from reasoner.application.services.anonymous_trial_policy import (
 )
 from reasoner.application.services.idempotency import release_run
 from reasoner.application.services.run_metering import RunContext, release_unstarted
+from reasoner.core.constants_limits import GATE_FREE_CALLS_PER_DAY, SETTLE_TIMEOUT_SECONDS
+from reasoner.core.degrade import degraded
 from reasoner.core.settings import settings
 from reasoner.domain.credits import run_reference
 from reasoner.domain.saas import User
 from reasoner.infrastructure.persistence.pipeline_ownership_repo import (
     get_pipeline_ownership_repo,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -224,6 +235,137 @@ async def admit_run(
     )
 
 
+@dataclass(frozen=True)
+class FlatCharge:
+    """A paid call that runs no pipeline. The hold is the charge: there is no
+    true-up, so its reference never ends in ``:reserve`` and the orphan sweeper
+    leaves it alone."""
+
+    user_id: str | None
+    reference_id: str  # "<kind>:<uuid4>"
+    credits: int
+    cost_usd: float
+    #: The ledger was down at admission, so nothing is held. A served call is
+    #: then recorded for the unsettled-run replay, or it would be free for good.
+    unreserved: bool = False
+    anon_charge: AnonymousTrialCharge | None = field(default=None, compare=False)
+
+
+async def admit_flat_charge(
+    request: Request, *, user: User | None, cost_usd: float, kind: str
+) -> FlatCharge:
+    """Admission for a flat-priced paid call, or raise the HTTP error for the first refusal.
+
+    Anonymous callers count against the per-IP trial cap; signed-in callers
+    hold ``cost_usd`` (402 when the balance cannot cover it).
+    """
+    require_credentials_resolved(request, user)
+    require_auth_if_legacy_disabled(user)
+    require_run_scope(request, user)
+    reference_id = f"{kind}:{uuid.uuid4()}"
+    if user is None:
+        from reasoner.api.client_ip import get_client_ip
+
+        anon = await enforce_anonymous_trial_cap(get_client_ip(request), cost_usd)
+        return FlatCharge(None, reference_id, 0, cost_usd, anon_charge=anon)
+    credits = await _reserve_flat(str(user.id), cost_usd, reference_id, kind)
+    return FlatCharge(
+        str(user.id), reference_id, credits or 0, cost_usd, unreserved=credits is None
+    )
+
+
+async def _reserve_flat(user_id: str, cost_usd: float, reference_id: str, kind: str) -> int | None:
+    """Hold ``cost_usd``. Returns None on a ledger outage (fail-open, counted)."""
+    if cost_usd <= 0:
+        return 0
+    from reasoner.api import dependencies as deps
+    from reasoner.api.run_observability import CreditSink, count_credit_failopen
+    from reasoner.domain.credits import InsufficientCreditsError
+
+    if not deps._persistence_is_configured() and settings.ENVIRONMENT != "production":
+        return 0
+    deps._require_persistence("Credits")
+    try:
+        return await CreditSink().reserve(
+            user_id=user_id, estimated_cost_usd=cost_usd, reference_id=reference_id, preset=kind,
+        )
+    except InsufficientCreditsError as exc:
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "error": "Insufficient credits",
+                "message": "Your credit balance can't cover this request's cost.",
+                "required": exc.required,
+                "available": exc.available,
+                "upgrade_url": "/pricing",
+            },
+        ) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        deps._refuse_missing_account(exc)
+        logger.warning("Flat-charge reservation failed; allowing unreserved", exc_info=True)
+        count_credit_failopen("reserve")
+        return None
+
+
+async def close_flat_charge(charge: FlatCharge, *, served: bool) -> None:
+    """Keep the charge of a served call; give back the hold of one that was not.
+
+    Call it from ``finally``. Shielded, so a client disconnect cannot leave the
+    hold debited, and bounded, so a stuck ledger cannot hang the request.
+    """
+    from reasoner.api.run_observability import CreditSink
+
+    with anyio.CancelScope(shield=True), anyio.move_on_after(SETTLE_TIMEOUT_SECONDS):
+        if served:
+            if charge.unreserved and charge.user_id:
+                await CreditSink().record_unsettled(
+                    user_id=charge.user_id,
+                    reference_id=charge.reference_id,
+                    cost_usd=charge.cost_usd,
+                    reserved_credits=0,
+                    preset=charge.reference_id.split(":", 1)[0],
+                    error="flat-charge reservation failed",
+                )
+            return
+        await refund_anonymous_trial(charge.anon_charge)
+        if charge.user_id and charge.credits > 0:
+            try:
+                await CreditSink().release(
+                    user_id=charge.user_id,
+                    credits=charge.credits,
+                    reference_id=f"{charge.reference_id}:release",
+                )
+            except Exception as exc:
+                logger.warning("Flat-charge release failed for %s: %s", charge.reference_id, exc)
+
+
+async def within_gate_allowance(user_id: str) -> bool:
+    """Count one HyperGate preview against the caller's free daily allowance.
+
+    The gate stays free (audit-5 decision Q9) but capped: without a cap one
+    account could spend about $24 a day by varying the problem text. A Valkey
+    error fails open to the hourly rate limit.
+    """
+    from reasoner.infrastructure.valkey.client import get_valkey_pool
+
+    key = f"gate:{user_id}:{datetime.now(UTC):%Y-%m-%d}"
+    try:
+        pool = get_valkey_pool()
+        count = await pool.incr(key)
+        await pool.expire(key, 90_000)
+    except Exception as exc:
+        return degraded("gate.allowance", True, exc=exc)
+    return int(count) <= GATE_FREE_CALLS_PER_DAY
+
+
+def seconds_until_utc_midnight() -> int:
+    now = datetime.now(UTC)
+    midnight = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    return max(1, int((midnight - now).total_seconds()))
+
+
 def _anonymous_owner_key(request: Request) -> str:
     from reasoner.api.client_ip import get_client_ip
 
@@ -265,9 +407,14 @@ class MeteredSSEResponse(StreamingResponse):
 
 __all__ = [
     "Admission",
+    "FlatCharge",
     "MeteredSSEResponse",
+    "admit_flat_charge",
     "admit_run",
+    "close_flat_charge",
     "record_key_run",
     "require_auth_if_legacy_disabled",
     "require_run_scope",
+    "seconds_until_utc_midnight",
+    "within_gate_allowance",
 ]

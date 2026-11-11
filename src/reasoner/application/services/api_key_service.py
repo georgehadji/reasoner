@@ -101,7 +101,12 @@ class ApiKeyService:
             key_prefix=minted.key_prefix,
             scopes=granted,
             expires_at=expires_at,
+            max_live=MAX_KEYS_PER_USER,
         )
+        if record is None:  # lost the race against a parallel create
+            raise ApiKeyLimitError(
+                f"Key limit reached ({MAX_KEYS_PER_USER}). Revoke an existing key first."
+            )
         logger.info("API key %s created for user %s", record.key_prefix, user_id)
         return MintedKey(key=record, plaintext=minted.plaintext)
 

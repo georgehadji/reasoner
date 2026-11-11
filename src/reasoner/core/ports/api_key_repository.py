@@ -21,8 +21,14 @@ class ApiKeyRepository(Protocol):
         key_prefix: str,
         scopes: frozenset[str],
         expires_at: datetime | None = None,
-    ) -> ApiKey:
-        """Persist a new key record and return it."""
+        max_live: int | None = None,
+    ) -> ApiKey | None:
+        """Persist a new key record and return it.
+
+        With *max_live*, returns None instead when the user already has that
+        many live keys. The count and the insert are atomic, so parallel
+        creates cannot all pass the cap.
+        """
         ...
 
     async def get_by_hash(self, key_hash: str) -> ApiKey | None:

@@ -158,6 +158,22 @@ class UnsettledRunsStore:
         await ValkeyUnsettledRunStore().erase_user(user_id)
 
 
+class ErrorLogStore:
+    """The error log (``errors`` in SQLite): user id, request path and
+    traceback per failure. It was in no registry, so erase left it behind."""
+
+    name = "error_log"
+
+    def __init__(self, get_store: Callable[[], Any]) -> None:
+        self._get_store = get_store
+
+    async def export(self, user_id: str) -> list[dict[str, Any]]:
+        return await self._get_store().rows_for_user(user_id)
+
+    async def erase(self, user_id: str) -> None:
+        await self._get_store().forget_user(user_id)
+
+
 class NeuroStore:
     """Long-term memory. Goes through the MemoryPort, so application code never
     imports ``reasoner.neuro``."""

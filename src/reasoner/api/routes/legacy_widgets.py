@@ -50,6 +50,7 @@ async def get_stock(symbol: str = "", rate_limit_checked=Depends(check_rate_limi
 async def calculate(
     req: CalculationRequest,
     csrf_checked=Depends(require_csrf),
+    rate_limit_checked=Depends(check_rate_limit),
 ):
     """Evaluate a mathematical expression (legacy endpoint)."""
     try:

@@ -12,6 +12,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from reasoner.api.client_ip import get_client_ip
 from reasoner.api.dependencies import (
     _get_quota_service,
     get_current_user,
@@ -24,12 +25,14 @@ from reasoner.application.services.quota_service import TIER_LIMITS
 from reasoner.core.settings import settings
 from reasoner.domain.api_keys import ACCOUNT_DELETE_SCOPE
 from reasoner.domain.saas import User
-from reasoner.rate_limiter import RateLimitConfig, get_rate_limiter
+from reasoner.infrastructure.rate_limiter import RateLimitConfig, RateLimiter
 
 router = APIRouter(prefix="/api", tags=["saas"])
 
-# Strict rate limiter for sensitive endpoints (Critical Enhancement 6.4)
-_strict_rate_limiter = get_rate_limiter(
+# Strict rate limiter for sensitive endpoints (Critical Enhancement 6.4). Its
+# own instance: get_rate_limiter() returns the process-wide singleton and
+# ignores a config, so these limits were never applied.
+_strict_rate_limiter = RateLimiter(
     RateLimitConfig(
         requests_per_minute=5,
         requests_per_hour=20,
@@ -40,13 +43,11 @@ _strict_rate_limiter = get_rate_limiter(
 
 async def _check_strict_rate_limit(request: Request):
     """Rate limit sensitive endpoints (export, delete) to prevent DoS."""
-    forwarded = request.headers.get("X-Forwarded-For")
-    if forwarded:
-        ip = forwarded.split(",")[0].strip()
-    else:
-        ip = request.client.host if request.client else "unknown"
+    # get_client_ip honours X-Forwarded-For only from a trusted proxy; the raw
+    # header let any caller pick a fresh IP per request.
     user = getattr(request.state, "user", None)
-    client_id = f"user:{user.id}" if user else f"ip:{ip}"
+    # "strict:" keeps these buckets apart from the global limiter's.
+    client_id = f"strict:user:{user.id}" if user else f"strict:ip:{get_client_ip(request)}"
     allowed, info = await _strict_rate_limiter.is_allowed(client_id)
     if not allowed:
         raise HTTPException(

@@ -382,7 +382,6 @@ class Settings:
 
     # ── Event Store Compaction ──
     COMPACTION_ENABLED: bool = os.getenv("COMPACTION_ENABLED", "true").lower() in ("1", "true", "yes")
-    COMPACTION_RUN_HOUR_UTC: int = int(os.getenv("COMPACTION_RUN_HOUR_UTC", "3"))
     EVENT_RETENTION_DAYS: int = int(os.getenv("EVENT_RETENTION_DAYS", "365"))
     DB_POOL_SIZE: int = int(os.getenv("DB_POOL_SIZE", "50"))
 

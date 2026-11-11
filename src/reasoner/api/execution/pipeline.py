@@ -261,6 +261,23 @@ def _build_runner(
     return runner
 
 
+_CANCEL_POLL_SECONDS = 2.0
+
+
+async def _cancel_requested(run_id: str, cancel_event: Any) -> None:
+    """Return once the run is cancelled on this worker or on any other.
+
+    /api/stop can land on a different gunicorn worker; its flag reaches this
+    one only through Redis, so the local event alone never fired.
+    """
+    while not cancel_event.is_set():
+        try:
+            await asyncio.wait_for(cancel_event.wait(), timeout=_CANCEL_POLL_SECONDS)
+        except TimeoutError:
+            if await _run_store.is_cancelled(run_id):
+                return
+
+
 async def _run_phases(
     pipeline: Any,
     state: PipelineState,
@@ -291,7 +308,7 @@ async def _run_phases(
     # cancels the run task, which propagates into whichever phase coroutine is
     # in flight.
     run_task = asyncio.ensure_future(runner.run(strategy, state))
-    cancel_watch = asyncio.ensure_future(cancel_event.wait())
+    cancel_watch = asyncio.ensure_future(_cancel_requested(run_id, cancel_event))
     try:
         done, _ = await asyncio.wait(
             {run_task, cancel_watch}, return_when=asyncio.FIRST_COMPLETED

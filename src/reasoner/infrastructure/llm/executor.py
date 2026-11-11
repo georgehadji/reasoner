@@ -718,7 +718,8 @@ class LLMExecutor:
 
         if cost_usd > 0:
             state.total_cost_usd += cost_usd
-            state.phase_costs[role] = cost_usd
+            # Accumulate: a role called twice (retry) showed only its last call.
+            state.phase_costs[role] = state.phase_costs.get(role, 0.0) + cost_usd
             # Populate phase_costs_by_key (defined but never written)
             tracking_key = getattr(state, "_current_phase_key", None)
             if tracking_key:

@@ -1083,6 +1083,36 @@ class PostgreSQLEventStore:
             )
             return row["cnt"] if row else 0
 
+    async def prune_audit_events_before(self, cutoff: datetime, batch_size: int = 500) -> int:
+        """Delete version-0 audit rows older than cutoff (audit-5 decision Q6).
+
+        Same CTE-with-LIMIT form as ``prune_events_before`` (partitioned table).
+        Replay reads only ``version > 0``, so versioned rows stay untouched.
+        """
+        async with (await self._ready()).acquire(timeout=10.0) as conn:
+            result = await conn.execute(
+                """
+                WITH to_delete AS (
+                    SELECT id FROM events
+                    WHERE version = 0 AND created_at < $1
+                    ORDER BY created_at ASC
+                    LIMIT $2
+                )
+                DELETE FROM events
+                WHERE id IN (SELECT id FROM to_delete)
+                """,
+                cutoff,
+                batch_size,
+            )
+            return int(result.split()[-1]) if result else 0
+
+    async def count_eligible_audit_events(self, cutoff: datetime) -> int:
+        """Count version-0 audit rows eligible for pruning (dry-run support)."""
+        async with (await self._ready()).acquire(timeout=10.0) as conn:
+            return await conn.fetchval(
+                "SELECT COUNT(*) FROM events WHERE version = 0 AND created_at < $1", cutoff
+            )
+
     async def close(self) -> None:
         """Close connection pools."""
         if self._pool:

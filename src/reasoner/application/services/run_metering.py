@@ -267,11 +267,16 @@ async def release_unstarted(sink: SettlementSink, ctx: RunContext) -> None:
     """
     if ctx.started is None or ctx.started.is_set():
         return
-    with anyio.CancelScope(shield=True), anyio.move_on_after(SETTLE_TIMEOUT_SECONDS):
-        if ctx.user_id and ctx.reserved_credits > 0:
-            await _true_up(sink, ctx, 0.0)
-        await _release_quota_slot(sink, ctx)
-        await _release_claim(ctx)
+    with anyio.CancelScope(shield=True):
+        with anyio.move_on_after(SETTLE_TIMEOUT_SECONDS) as scope:
+            if ctx.user_id and ctx.reserved_credits > 0:
+                await _true_up(sink, ctx, 0.0)
+            await _release_quota_slot(sink, ctx)
+            await _release_claim(ctx)
+        if scope.cancelled_caught:
+            # A timed-out release left the hold debited with no record of it;
+            # replay is idempotent on reference_id, so recording is always safe.
+            await _record_unsettled(sink, ctx, 0.0, TimeoutError("release_unstarted timed out"))
 
 
 def _is_done_frame(frame: str) -> bool:
