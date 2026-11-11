@@ -393,7 +393,7 @@ async def save_uploaded_file(
     # callers (user_id is None) skip dedup entirely: there's no stable
     # identity to scope a match against.
     content_hash = hashlib.sha256(content).hexdigest()
-    hash_index = _load_hash_index()
+    hash_index = await asyncio.to_thread(_load_hash_index)
     tenant_hashes = hash_index.get(user_id, {}) if user_id else {}
     existing_id = tenant_hashes.get(content_hash)
     if existing_id:
@@ -494,7 +494,9 @@ async def save_uploaded_file(
         try:
             from reasoner.infrastructure.watermark.scrubber import ImageMarkScrubber
 
-            outcome = ImageMarkScrubber().scrub(content)
+            # Off the event loop: the chunk/box walk is pure Python over
+            # caller-controlled bytes.
+            outcome = await asyncio.to_thread(ImageMarkScrubber().scrub, content)
             if not outcome.degraded:
                 content = outcome.data
             provenance_report = outcome.to_dict()

@@ -56,6 +56,7 @@ DEFAULT_SCOPES: frozenset[str] = frozenset({"read", "preset:read", "history:read
 #: the account.
 KEY_MANAGE_SCOPE = "key:manage"
 ACCOUNT_DELETE_SCOPE = "account:delete"
+ACCOUNT_EXPORT_SCOPE = "account:export"
 
 
 ADMIN_SCOPE = "admin"

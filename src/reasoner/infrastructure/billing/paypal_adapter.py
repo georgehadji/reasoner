@@ -27,6 +27,9 @@ PAYPAL_EVENT_STATUS: dict[str, SubscriptionStatus] = {
     "BILLING.SUBSCRIPTION.EXPIRED": SubscriptionStatus.CANCELLED,
     "BILLING.SUBSCRIPTION.SUSPENDED": SubscriptionStatus.PAST_DUE,
     "BILLING.SUBSCRIPTION.PAYMENT.FAILED": SubscriptionStatus.PAST_DUE,
+    # A successful retry after a failure; resource.billing_agreement_id is the
+    # subscription id.
+    "PAYMENT.SALE.COMPLETED": SubscriptionStatus.ACTIVE,
 }
 
 # verify-webhook-signature request field -> delivery header carrying it.
@@ -143,6 +146,8 @@ class PayPalBillingAdapter(BillingPort):
         resource = provider_event.get("resource", {})
 
         status = PAYPAL_EVENT_STATUS.get(event_type)
+        if event_type == "PAYMENT.SALE.COMPLETED":
+            resource = {"id": resource.get("billing_agreement_id")}
         if status is not None:
             return self._paypal_sub_to_domain(resource, status=status)
 

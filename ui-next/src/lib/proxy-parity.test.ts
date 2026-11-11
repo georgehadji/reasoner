@@ -25,6 +25,7 @@ describe('getClientIp', () => {
     new NextRequest('http://localhost/api/run', { headers: { 'x-forwarded-for': xff } });
 
   it('ignores a client-supplied leftmost entry', () => {
+    process.env.TRUSTED_PROXIES = '10.0.0.2';
     expect(getClientIp(req('6.6.6.6, 203.0.113.9'))).toBe('203.0.113.9');
   });
 
@@ -34,7 +35,14 @@ describe('getClientIp', () => {
   });
 
   it('keeps a single hop', () => {
+    process.env.TRUSTED_PROXIES = '10.0.0.2';
     expect(getClientIp(req('10.0.0.1'))).toBe('10.0.0.1');
+  });
+
+  // The spoofable-header case: no declared proxy means no header is believed.
+  it('does not trust X-Forwarded-For when TRUSTED_PROXIES is unset', () => {
+    expect(getClientIp(req('203.0.113.9'))).toBe('unknown');
+    expect(getClientIp(req('6.6.6.6, 203.0.113.9'))).toBe('unknown');
   });
 
   // UI-11: X-Real-IP is client-writable wherever nothing in front overwrites it.

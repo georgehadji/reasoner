@@ -18,14 +18,19 @@ injected protocols, so tests exercise the whole path without a ledger.
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import json
 import logging
-from collections.abc import AsyncIterator
-from dataclasses import dataclass
+from collections.abc import AsyncIterator, Callable
+from dataclasses import dataclass, field
 from typing import Protocol
 
 import anyio
 
+from reasoner.application.services.anonymous_trial_policy import (
+    AnonymousTrialCharge,
+    refund_anonymous_trial,
+)
 from reasoner.core.constants_limits import SETTLE_TIMEOUT_SECONDS
 from reasoner.core.degrade import degraded
 
@@ -131,6 +136,45 @@ class RunContext:
     #: Admission took a quota slot for this run (audit 6, finding 3). A run that
     #: ends up costing nothing gives it back; a billed run keeps it.
     quota_slot: bool = False
+    #: Credits counted against an anonymous caller's daily cap at admission; given
+    #: back when the run ends up costing nothing.
+    anon_charge: AnonymousTrialCharge | None = field(default=None, compare=False)
+
+
+@dataclass
+class RunSpend:
+    """Spend the pipeline knows about but has not yet put on a frame.
+
+    ``metered`` bills from ``phase_complete``/``done`` frames, so a run cancelled
+    mid-phase reported nothing and settled at $0 for tokens the providers had
+    billed. The run task registers a live reader of its state's running total.
+    It is read at settle time, not pushed on the way out: on a disconnect the
+    stream cancels the run task without awaiting it (streaming.py), so a figure
+    written in the task's ``finally`` lands after ``metered`` has settled.
+    """
+
+    source: Callable[[], float] | None = None
+
+    def read(self) -> float:
+        if self.source is None:
+            return 0.0
+        try:
+            return float(self.source() or 0.0)
+        except Exception as exc:  # a broken reader must not block settlement
+            degraded("run_metering.spend_reader", None, exc=exc)
+            return 0.0
+
+
+_current_spend: contextvars.ContextVar[RunSpend | None] = contextvars.ContextVar(
+    "run_spend", default=None
+)
+
+
+def track_run_spend(source: Callable[[], float]) -> None:
+    """Let the enclosing :func:`metered` read the run's spend so far. No-op outside one."""
+    spend = _current_spend.get()
+    if spend is not None:
+        spend.source = source
 
 
 #: Frame types that carry a ``total_cost_usd``. ``done`` is the final figure;
@@ -199,15 +243,23 @@ async def metered(
     cost_usd = 0.0
     has_error = False
     completed = False
+    done_with_errors = False
+    spend = RunSpend()
+    _current_spend.set(spend)
     try:
         async for frame in stream:
             cost_usd = extract_run_cost(frame) or cost_usd
-            completed = completed or _is_done_frame(frame)
+            done_errors = _done_has_errors(frame)
+            if done_errors is not None:
+                completed = True
+                done_with_errors = done_errors
             yield frame
     except Exception:
         has_error = True
         raise
     finally:
+        # The run task's own figure covers a run cut off before any cost frame.
+        cost_usd = max(cost_usd, spend.read())
         # A client disconnect cancels this task, and Starlette's anyio scope
         # re-delivers that cancellation at every await, so an unshielded
         # settlement was interrupted and neither the release nor the true-up
@@ -224,9 +276,13 @@ async def metered(
                 # The interrupted write may or may not have landed; replay is
                 # idempotent on reference_id, so recording it is always safe.
                 await _record_unsettled(sink, ctx, cost_usd, exc)
-                if cost_usd <= 0:
-                    await _release_quota_slot(sink, ctx)  # a free run keeps no slot
-            if not completed:
+            if cost_usd <= 0:
+                # Once, here: a free run keeps no slot and none of its trial credits.
+                with anyio.move_on_after(SETTLE_TIMEOUT_SECONDS):
+                    await _release_quota_slot(sink, ctx)
+                    await refund_anonymous_trial(ctx.anon_charge)
+            # A run that failed without spending can be retried under the same id.
+            if not completed or (done_with_errors and cost_usd <= 0):
                 await _release_claim(ctx)
         if observer is not None:
             try:
@@ -243,8 +299,6 @@ async def _finalize(sink: SettlementSink, ctx: RunContext, cost_usd: float) -> N
         # production call site reserves via reserve_run_budget(); this
         # keeps older/uninstrumented callers billed rather than free.
         await _settle(sink, ctx, cost_usd)
-    if cost_usd <= 0:
-        await _release_quota_slot(sink, ctx)
 
 
 async def _release_quota_slot(sink: SettlementSink, ctx: RunContext) -> None:
@@ -279,15 +333,17 @@ async def release_unstarted(sink: SettlementSink, ctx: RunContext) -> None:
             await _record_unsettled(sink, ctx, 0.0, TimeoutError("release_unstarted timed out"))
 
 
-def _is_done_frame(frame: str) -> bool:
-    """True for the terminal ``done`` frame: the run completed."""
+def _done_has_errors(frame: str) -> bool | None:
+    """None for any frame but the terminal ``done``; else whether it reports errors."""
     if not frame.startswith(SSE_DATA_PREFIX):
-        return False
+        return None
     try:
         event = json.loads(frame[len(SSE_DATA_PREFIX):])
     except (ValueError, TypeError):
-        return False
-    return isinstance(event, dict) and event.get("type") == "done"
+        return None
+    if not isinstance(event, dict) or event.get("type") != "done":
+        return None
+    return bool(event.get("errors"))
 
 
 async def _release_claim(ctx: RunContext) -> None:
@@ -400,10 +456,12 @@ async def reserve_run_budget(
 __all__ = [
     "RunContext",
     "RunObserver",
+    "RunSpend",
     "SettlementSink",
     "COST_BEARING_FRAME_TYPES",
     "extract_run_cost",
     "metered",
+    "track_run_spend",
     "release_unstarted",
     "reserve_run_budget",
 ]

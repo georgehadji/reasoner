@@ -37,6 +37,21 @@ async def _paypal_past_due(sub, repo, event_at) -> None:
         )
 
 
+async def _paypal_payment_completed(sub, repo, event_at) -> None:
+    # A successful retry (PAYMENT.SALE.COMPLETED) lifts a past_due subscription.
+    # The event names only the subscription, so the repo returns the stored row.
+    if not sub.paypal_subscription_id:
+        return
+    revived = await repo.reactivate_past_due_by_paypal(sub.paypal_subscription_id, event_at)
+    if revived is not None:
+        from reasoner.infrastructure.persistence.cached_subscription_repo import (
+            invalidate_subscription,
+        )
+
+        await repo.sync_quota_for_subscription(revived)
+        await invalidate_subscription(str(revived.user_id))
+
+
 # One row per PayPal lifecycle event. paypal_adapter.PAYPAL_EVENT_STATUS holds
 # the matching event -> status table; tests/test_paypal_events.py pins that the
 # two have the same keys. Each handler is wrapped by the monotonic event guard
@@ -48,6 +63,7 @@ PAYPAL_HANDLERS: dict[str, Callable[..., Awaitable[None]]] = {
     "BILLING.SUBSCRIPTION.EXPIRED": _paypal_cancel,
     "BILLING.SUBSCRIPTION.SUSPENDED": _paypal_past_due,
     "BILLING.SUBSCRIPTION.PAYMENT.FAILED": _paypal_past_due,
+    "PAYMENT.SALE.COMPLETED": _paypal_payment_completed,
 }
 
 
@@ -108,7 +124,7 @@ class BillingService:
         in any order (BIL-15). A skipped write skips its quota sync too.
         """
         # --- PayPal events ---
-        if event_type.startswith("BILLING.SUBSCRIPTION."):
+        if event_type.startswith(("BILLING.SUBSCRIPTION.", "PAYMENT.SALE.")):
             handler = PAYPAL_HANDLERS.get(event_type)
             if handler is None:
                 logger.debug("Unhandled PayPal event type: %s", event_type)
@@ -140,6 +156,10 @@ class BillingService:
         # invoice.payment_succeeded is deliberately unhandled: the adapter gives it no
         # subscription id, and renewal arrives as customer.subscription.updated.
         if event_type in ("checkout.session.completed", "customer.subscription.updated"):
+            if event_type == "checkout.session.completed" and await self._is_duplicate_live(
+                sub, repo
+            ):
+                return
             # Upsert subscription and sync quota
             if await repo.upsert_subscription(sub, event_at):
                 await repo.sync_quota_for_subscription(sub)
@@ -150,6 +170,30 @@ class BillingService:
             return
 
         logger.debug("Unhandled event type: %s", event_type)
+
+    async def _is_duplicate_live(self, sub, repo) -> bool:
+        """A second checkout completed while another subscription is live.
+
+        Both were billed; the new one is cancelled at the provider and never
+        stored as live, so the user keeps one tracked subscription (BIL-14).
+        """
+        from reasoner.domain.saas import LIVE_STATUSES
+
+        existing = await repo.get_subscription_by_user(str(sub.user_id))
+        if (
+            existing is None
+            or existing.status not in LIVE_STATUSES
+            or existing.tier == SubscriptionTier.FREE
+            or not existing.stripe_subscription_id
+            or existing.stripe_subscription_id == sub.stripe_subscription_id
+        ):
+            return False
+        logger.warning(
+            "User %s already has live subscription %s; cancelling duplicate %s",
+            sub.user_id, existing.stripe_subscription_id, sub.stripe_subscription_id,
+        )
+        await self._port.cancel_subscription(sub.stripe_subscription_id)
+        return True
 
 
 def event_time(event: dict) -> datetime | None:

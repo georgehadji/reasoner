@@ -23,6 +23,8 @@ from pathlib import Path
 from typing import Any
 
 from reasoner.core.ports.clock import Clock, SystemClock
+from reasoner.infrastructure.persistence.history_files import owner_key
+from reasoner.utils.atomic_file import atomic_write_text
 
 logger = logging.getLogger(__name__)
 
@@ -136,6 +138,50 @@ class TokenAwareCache:
         """Compute cache key. agent_id scopes the cache to a user/session."""
         content = f"{agent_id}:{problem}:{phase}:{model_id}:{prompt}"
         return hashlib.sha256(content.encode()).hexdigest()[:32]
+
+    def _entry_path(self, key: str, agent_id: str) -> Path:
+        """Owned entries sit in their owner's directory (erasable as one unit);
+        entries with no tenant stay flat."""
+        assert self.cache_dir is not None
+        folder = self.cache_dir / owner_key(agent_id) if agent_id else self.cache_dir
+        return folder / f"{key}.json"
+
+    def _disk_files(self) -> list[Path]:
+        assert self.cache_dir is not None
+        return [*self.cache_dir.glob("*.json"), *self.cache_dir.glob("u-*/*.json")]
+
+    async def export_owner(self, agent_id: str) -> list[dict[str, Any]]:
+        """Every cached prompt/response stored for this tenant (GDPR export)."""
+        async with self._lock:
+            await self._ensure_loaded()
+            return [
+                {"phase": e.phase, "model_id": e.model_id, "prompt": e.raw_prompt,
+                 "response": e.response, "created_at": e.created_at}
+                for e in self._entries.values() if e.agent_id == agent_id
+            ]
+
+    async def erase_owner(self, agent_id: str) -> int:
+        """Drop this tenant's entries from memory and disk. Returns files left behind.
+
+        Other workers keep their own in-memory copy until it is evicted or
+        expires; the disk copy they reload from is gone.
+        """
+        failed = 0
+        async with self._lock:
+            for key in [k for k, e in self._entries.items() if e.agent_id == agent_id]:
+                await self._evict(key)
+            if self.cache_dir:
+                folder = self.cache_dir / owner_key(agent_id)
+                for f in list(folder.iterdir()) if folder.is_dir() else []:
+                    try:
+                        f.unlink()
+                    except OSError:
+                        failed += 1
+                try:
+                    folder.rmdir()
+                except OSError:
+                    pass
+        return failed
 
     def _compute_prompt_hash(self, prompt: str) -> str:
         """Compute prompt hash for exact matching."""
@@ -331,11 +377,12 @@ class TokenAwareCache:
             key for key, entry in self._entries.items()
             if now - entry.created_at > entry.ttl_seconds
         ]
+        entry_agents = {key: self._entries[key].agent_id for key in expired}
         for key in expired:
             await self._evict(key)
             # Also remove the on-disk JSON file (git#B-18)
             if self.cache_dir:
-                f = self.cache_dir / f"{key}.json"
+                f = self._entry_path(key, entry_agents[key])
                 try:
                     f.unlink(missing_ok=True)
                 except OSError:
@@ -381,7 +428,7 @@ class TokenAwareCache:
 
             # Clear disk cache
             if self.cache_dir:
-                for f in self.cache_dir.glob("*.json"):
+                for f in self._disk_files():
                     try:
                         f.unlink(missing_ok=True)
                     except PermissionError:
@@ -407,7 +454,7 @@ class TokenAwareCache:
         if not self.cache_dir:
             return
 
-        for f in self.cache_dir.glob("*.json"):
+        for f in self._disk_files():
             try:
                 data = json.loads(await asyncio.to_thread(f.read_text))
                 entry = CacheEntry(**data)
@@ -429,7 +476,7 @@ class TokenAwareCache:
         if not self.cache_dir:
             return
 
-        f = self.cache_dir / f"{key}.json"
+        f = self._entry_path(key, entry.agent_id)
         try:
             data = {
                 "key": entry.key,
@@ -444,14 +491,24 @@ class TokenAwareCache:
                 "access_count": entry.access_count,
                 "last_accessed": entry.last_accessed,
                 "raw_prompt": entry.raw_prompt,
+                # Without it a reload lands as agent_id="" and the tenant guard
+                # in get() lets an anonymous caller reach this entry.
+                "agent_id": entry.agent_id,
             }
-            await asyncio.to_thread(f.write_text, json.dumps(data))
+            await asyncio.to_thread(f.parent.mkdir, parents=True, exist_ok=True)
+            await asyncio.to_thread(atomic_write_text, f, json.dumps(data))
         except OSError as exc:
             logger.warning("Failed to persist cache entry %s to disk: %s", key, exc)
 
 
 # Global cache instance
 _cache: TokenAwareCache | None = None
+
+
+def existing_token_cache() -> TokenAwareCache | None:
+    """The process-wide cache if something already built it. Never creates one:
+    get_token_cache() would freeze the configuration of whoever calls first."""
+    return _cache
 
 
 def get_token_cache(

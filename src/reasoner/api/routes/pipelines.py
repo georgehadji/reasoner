@@ -238,6 +238,9 @@ async def resume_pipeline_stream(
     # and each resume gets its own ledger reference under this prefix.
     adm = await admit_run(
         request, user=user, problem=problem, preset=preset, kind=f"resume:{pipeline_id}",
+        # Two concurrent resumes share run_id=pipeline_id, so they would share the
+        # cancel flag and one event stream.
+        exclusive=f"resume:{pipeline_id}",
     )
 
     async def stream_with_resume_meta():

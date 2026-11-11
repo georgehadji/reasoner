@@ -3,12 +3,21 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import time
 from collections.abc import AsyncGenerator
 from typing import Any
 
+from reasoner.core.constants_limits import SEARCH_ESTIMATED_COST_USD
+
 logger = logging.getLogger(__name__)
+
+
+def _event(data: dict[str, Any]) -> str:
+    """One SSE ``data:`` frame. The serializers module never defined this, so the
+    web-search stream died with an ImportError on its first frame."""
+    return f"data: {json.dumps(data, default=str)}\n\n"
 
 
 class SearchCacheEntry:
@@ -108,8 +117,6 @@ class SearchService:
         """
         import time
 
-        from reasoner.application.services.serializers import _event
-
         yield _event({"type": "start"})
 
         if cancel_event and cancel_event.is_set():
@@ -137,6 +144,7 @@ class SearchService:
                 "type": "done",
                 "errors": [],
                 "total_tokens": {"input": 0, "output": 0, "total": 0},
+                "total_cost_usd": SEARCH_ESTIMATED_COST_USD,
                 "duration": duration,
             })
             return
@@ -167,6 +175,7 @@ class SearchService:
             "type": "done",
             "errors": [],
             "total_tokens": {"input": 0, "output": 0, "total": 0},
+            "total_cost_usd": SEARCH_ESTIMATED_COST_USD,
             "duration": duration,
         })
 

@@ -41,9 +41,9 @@ EXPORT_FIELDS: dict[str, tuple[str, ...]] = {
     "credit_ledger": CREDIT_LEDGER_FIELDS,
 }
 
-# A long-lived account can hold more rows than one response should carry
-# (critical enhancement 6.7: capped to prevent OOM).
-EXPORT_ROW_LIMIT = 1000
+# Rows fetched per round trip. The export pages through all of them: a cap
+# would hand back a shorter document that looks complete (GDPR Art. 15/20).
+EXPORT_PAGE_SIZE = 1000
 
 
 class PgUserDataStore:
@@ -68,14 +68,24 @@ class PgUserDataStore:
         pool = await self._get_pool()
         columns = ", ".join(EXPORT_FIELDS[self._table])
         order = f" ORDER BY {self._order_by} DESC" if self._order_by else ""
-        rows = await pool.fetch(
-            f"SELECT {columns} FROM {self._table} WHERE {self._key} = $1{order} "
-            f"LIMIT {EXPORT_ROW_LIMIT}",
-            user_id,
-        )
         if self._one_row:
+            rows = await pool.fetch(
+                f"SELECT {columns} FROM {self._table} WHERE {self._key} = $1{order} LIMIT 1",
+                user_id,
+            )
             return dict(rows[0]) if rows else {}
-        return [dict(r) for r in rows]
+        out: list[dict[str, Any]] = []
+        while True:
+            # A stable total order, or pages could repeat or skip rows.
+            rows = await pool.fetch(
+                f"SELECT {columns} FROM {self._table} WHERE {self._key} = $1"
+                f"{order}{', ' if order else ' ORDER BY '}ctid "
+                f"LIMIT {EXPORT_PAGE_SIZE} OFFSET {len(out)}",
+                user_id,
+            )
+            out.extend(dict(r) for r in rows)
+            if len(rows) < EXPORT_PAGE_SIZE:
+                return out
 
     async def erase(self, user_id: str) -> None:
         pool = await self._get_pool()

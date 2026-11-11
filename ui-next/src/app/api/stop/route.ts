@@ -7,6 +7,7 @@ import {
   requireCsrfToken,
   rateLimit,
   ValidationError,
+  proxyErrorResponse,
 } from '@/lib/security-server';
 import { API } from '@/lib/config';
 
@@ -36,10 +37,6 @@ export async function POST(req: NextRequest) {
       headers: sanitizeResponseHeaders(upstream),
     });
   } catch (err) {
-    if (err instanceof ValidationError) {
-      return NextResponse.json({ error: err.message }, { status: 400 });
-    }
-    const msg = err instanceof Error ? err.message : 'Proxy error';
-    return NextResponse.json({ error: msg }, { status: 502 });
+    return proxyErrorResponse(err, 'Stop');
   }
 }

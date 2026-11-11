@@ -112,6 +112,10 @@ services:
       - EVENT_STORE_DB_PATH=${EVENT_STORE_DB_PATH:-/app/history/events.db}
       - FEEDBACK_DB_PATH=${FEEDBACK_DB_PATH:-/app/history/feedback.db}
       - UPLOAD_STORAGE_DIR=${UPLOAD_STORAGE_DIR:-/app/uploads}
+      # A subdirectory: /app/history also holds the *.db files.
+      - HISTORY_STORAGE_DIR=${HISTORY_STORAGE_DIR:-/app/history/runs}
+      - RUN_CACHE_DIR=${RUN_CACHE_DIR:-/app/cache}
+      - NEURO_DATA_DIR=${NEURO_DATA_DIR:-/app/history/neuro}
       # AUTH_PERSISTENCE_ENABLED=true above: without this the auth DB lands in
       # the package dir and API keys are lost on every redeploy.
       - AUTH_DB_PATH=${AUTH_DB_PATH:-/app/history/auth_keys.db}

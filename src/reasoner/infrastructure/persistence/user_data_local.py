@@ -14,6 +14,7 @@ import asyncio
 from collections.abc import Callable
 from typing import Any
 
+_EXPORT_PAGE = 500
 _UPLOAD_EXPORT_FIELDS = ("file_id", "filename", "size", "created")
 
 
@@ -113,13 +114,56 @@ class HistoryStore:
         self._repo = repo
 
     async def export(self, user_id: str) -> list[dict[str, Any]]:
-        entries, _ = await self._repo().list(user_id, 1000, 0)
-        return entries
+        # Every page: a fixed cap would hand back a shorter export that looks whole.
+        entries: list[dict[str, Any]] = []
+        while True:
+            page, total = await self._repo().list(user_id, _EXPORT_PAGE, len(entries))
+            entries.extend(page)
+            if not page or len(entries) >= total:
+                return entries
 
     async def erase(self, user_id: str) -> None:
         _, failed = await self._repo().erase(user_id)
         if failed:
             raise RuntimeError(f"{failed} history file(s) not erased")
+
+
+class RunCacheStore:
+    """The run-replay cache (``cache/u-*/``): full SSE events, problem and
+    synthesis included. Blocking disk work goes through ``export_fn``/``erase_fn``
+    in a worker thread."""
+
+    name = "run_cache"
+
+    def __init__(self, export_fn: Callable[[str], Any], erase_fn: Callable[[str], int]) -> None:
+        self._export, self._erase = export_fn, erase_fn
+
+    async def export(self, user_id: str) -> Any:
+        return await asyncio.to_thread(self._export, user_id)
+
+    async def erase(self, user_id: str) -> None:
+        failed = await asyncio.to_thread(self._erase, user_id)
+        if failed:
+            raise RuntimeError(f"{failed} run-cache file(s) not erased")
+
+
+class TokenCacheStore:
+    """The LLM response cache (``cache/tokens/u-*/``): raw prompts and responses."""
+
+    name = "token_cache"
+
+    def __init__(self, get_cache: Callable[[], Any]) -> None:
+        self._get_cache = get_cache
+
+    async def export(self, user_id: str) -> Any:
+        cache = self._get_cache()
+        return await cache.export_owner(user_id) if cache else []
+
+    async def erase(self, user_id: str) -> None:
+        cache = self._get_cache()
+        failed = await cache.erase_owner(user_id) if cache else 0
+        if failed:
+            raise RuntimeError(f"{failed} token-cache file(s) not erased")
 
 
 class ValkeyStore:

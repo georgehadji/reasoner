@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from dataclasses import replace
 from datetime import datetime
 from uuid import uuid4
 
@@ -235,6 +236,16 @@ class PostgresSubscriptionRepository:
             SubscriptionTier.PRO: 500,
             SubscriptionTier.ENTERPRISE: -1,
         }
+        # One quota row per user: it follows the user's latest live subscription,
+        # not the event's. A late cancel of an old subscription must not write
+        # FREE over a plan the user still pays for.
+        live_tier = await pool.fetchval(
+            "SELECT tier FROM subscriptions WHERE user_id = $1 "
+            "AND status IN ('active', 'trialing', 'past_due') "
+            "ORDER BY created_at DESC LIMIT 1",
+            str(sub.user_id),
+        )
+        sub = replace(sub, tier=SubscriptionTier(live_tier) if live_tier else SubscriptionTier.FREE)
         new_max = tier_limits[sub.tier]
 
         async with pool.acquire(timeout=10.0) as conn:
@@ -298,6 +309,31 @@ class PostgresSubscriptionRepository:
     ) -> bool:
         """Update subscription status by PayPal subscription ID. False if stale."""
         return await self._set_status("paypal_sub_id", paypal_sub_id, status, event_at)
+
+    async def reactivate_past_due_by_paypal(
+        self, paypal_sub_id: str, event_at: datetime | None = None
+    ) -> Subscription | None:
+        """Flip a past_due PayPal subscription back to active; None if not past_due or stale."""
+        pool = await self._get_pool()
+        row = await pool.fetchrow(
+            "UPDATE subscriptions SET status = 'active', "
+            "last_event_at = COALESCE($2, last_event_at), updated_at = NOW() "
+            "WHERE paypal_sub_id = $1 AND status = 'past_due' AND ($2::timestamptz IS NULL "
+            "OR last_event_at IS NULL OR last_event_at <= $2::timestamptz) "
+            "RETURNING user_id, tier, paypal_sub_id, current_period_end",
+            paypal_sub_id,
+            event_at,
+        )
+        if row is None:
+            return None
+        return Subscription(
+            id=uuid4(),
+            user_id=row["user_id"],
+            tier=SubscriptionTier(row["tier"]),
+            status=SubscriptionStatus.ACTIVE,
+            paypal_subscription_id=row["paypal_sub_id"],
+            current_period_end=row["current_period_end"],
+        )
 
     async def _set_status(
         self, column: str, sub_id: str, status: str, event_at: datetime | None

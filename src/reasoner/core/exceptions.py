@@ -263,6 +263,10 @@ class UserDataExportError(ReasonerError):
     retryable = True
 
 
+class ImageStructureLimitError(ReasonerError, ValueError):
+    """An image has more chunks/boxes/segments than any real file: refused, not walked."""
+
+
 # ─────────────────────────────────────────────────────────────────────
 # UTILITY FUNCTIONS
 # ─────────────────────────────────────────────────────────────────────

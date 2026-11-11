@@ -72,6 +72,23 @@ class RunStream:
         # frames emitted before the phases start and after they finish.
         self.emit, self.keepalive = keepalive_ticker(sse_emit)
 
+    async def continue_history(self) -> None:
+        """Number this run's events after the ones its aggregate already holds.
+
+        A resume reuses the pipeline id as run id. Restarting at 1 appended a
+        second v1..vM sequence, which PipelineAggregate.apply refuses to replay,
+        so the pipeline could never be loaded or resumed again.
+        """
+        from reasoner.infrastructure.persistence.event_store import get_event_store
+
+        try:
+            state = await get_event_store().get_aggregate_state(self.run_id)
+        except Exception as exc:
+            logger.warning("Could not read event history for %s: %s", self.run_id, exc)
+            return
+        if state and (state.get("version") or 0) >= self.event_version:
+            self.event_version = int(state["version"]) + 1
+
     async def both(self, payload: dict) -> None:
         """A client-visible frame goes to the SSE stream and the WS fan-out."""
         self.broadcast(payload)

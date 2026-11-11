@@ -16,8 +16,12 @@ from reasoner.infrastructure.watermark.image.detect import detect_format
 from reasoner.infrastructure.watermark.image.markers import (
     AI_META_HINTS,
     C2PA_MARKERS,
+    MAX_STRUCTURES,
+    cap_findings,
     contains_any,
+    count_actions,
     is_confirmed_c2pa_hit,
+    structure_limit_error,
 )
 
 # Per ISOBMFF/C2PA embedding convention: a 'uuid' box carrying this UUID holds
@@ -25,6 +29,10 @@ from reasoner.infrastructure.watermark.image.markers import (
 XMP_UUID = b"\xbe\x7a\xcf\xcb\x97\xa9\x42\xe8\x9c\x71\x99\x94\x91\xe3\xaf\xac"
 
 _C2PA_BOX_TYPES = (b"jumb", b"c2pa")
+
+
+def _tally(actions: dict[str, int], action: str) -> None:
+    actions[action] = actions.get(action, 0) + 1
 
 
 def supports(data: bytes) -> bool:
@@ -44,6 +52,8 @@ def _parse_boxes(data: bytes, start: int = 0, end: int | None = None) -> list[tu
     boxes: list[tuple[bytes, bytes, int, int]] = []
     pos = start
     while pos + 8 <= end:
+        if len(boxes) >= MAX_STRUCTURES:
+            raise structure_limit_error("ISOBMFF boxes")
         size = struct.unpack(">I", data[pos : pos + 4])[0]
         fourcc = data[pos + 4 : pos + 8]
         header_size = 8
@@ -130,11 +140,13 @@ def inspect(data: bytes) -> ImageInspectReport:
                             MarkFinding(f"meta sub-box {s_name}: {', '.join(hits[:8])}", MarkConfidence.PROBABLE)
                         )
 
+    capped, notes = cap_findings(findings)
     return ImageInspectReport(
         format=fmt,
         has_c2pa=has_c2pa,
         has_ai_metadata=has_ai or has_c2pa,
-        findings=tuple(findings),
+        findings=capped,
+        notes=notes,
     )
 
 
@@ -144,22 +156,22 @@ def strip(data: bytes, *, strip_all_metadata: bool = True) -> tuple[bytes, tuple
     if not boxes:
         raise ValueError(f"not a valid {fmt.value.upper()} (no ISOBMFF boxes)")
 
-    actions: list[str] = []
+    actions: dict[str, int] = {}
     out = bytearray()
 
     for fourcc, payload, _size, _hdr in boxes:
         name = fourcc.decode("latin-1", errors="replace")
 
         if _is_c2pa_box(fourcc):
-            actions.append(f"drop top-level {name} box (C2PA/JUMBF)")
+            _tally(actions, f"drop top-level {name} box (C2PA/JUMBF)")
             continue
 
         if fourcc == b"uuid":
             if payload.startswith(XMP_UUID):
-                actions.append(f"drop top-level {name} box (XMP metadata)")
+                _tally(actions, f"drop top-level {name} box (XMP metadata)")
                 continue
             if strip_all_metadata or contains_any(payload, AI_META_HINTS + C2PA_MARKERS):
-                actions.append(f"drop top-level {name} box (UUID metadata)")
+                _tally(actions, f"drop top-level {name} box (UUID metadata)")
                 continue
 
         if fourcc == b"meta":
@@ -168,18 +180,18 @@ def strip(data: bytes, *, strip_all_metadata: bool = True) -> tuple[bytes, tuple
             for s_fourcc, s_payload, _s_size, _s_hdr in _parse_boxes(payload, start=4):
                 s_name = s_fourcc.decode("latin-1", errors="replace")
                 if _is_c2pa_box(s_fourcc):
-                    actions.append(f"drop meta sub-box {s_name} (C2PA/JUMBF)")
+                    _tally(actions, f"drop meta sub-box {s_name} (C2PA/JUMBF)")
                     continue
                 if s_fourcc == b"uuid":
                     if s_payload.startswith(XMP_UUID):
-                        actions.append(f"drop meta sub-box {s_name} (XMP metadata)")
+                        _tally(actions, f"drop meta sub-box {s_name} (XMP metadata)")
                         continue
                     if strip_all_metadata or contains_any(s_payload, AI_META_HINTS + C2PA_MARKERS):
-                        actions.append(f"drop meta sub-box {s_name} (UUID metadata)")
+                        _tally(actions, f"drop meta sub-box {s_name} (UUID metadata)")
                         continue
                 if s_fourcc in (b"xml ", b"bxml"):
                     if strip_all_metadata or contains_any(s_payload, AI_META_HINTS + C2PA_MARKERS):
-                        actions.append(f"drop meta sub-box {s_name} (XML metadata)")
+                        _tally(actions, f"drop meta sub-box {s_name} (XML metadata)")
                         continue
                 clean_sub.extend(struct.pack(">I", len(s_payload) + 8) + s_fourcc + s_payload)
 
@@ -190,9 +202,9 @@ def strip(data: bytes, *, strip_all_metadata: bool = True) -> tuple[bytes, tuple
         out.extend(struct.pack(">I", len(payload) + 8) + fourcc + payload)
 
     if not actions:
-        actions.append(f"no {fmt.value.upper()} metadata boxes removed (already clean or none matched)")
+        actions[f"no {fmt.value.upper()} metadata boxes removed (already clean or none matched)"] = 1
 
-    return bytes(out), tuple(actions)
+    return bytes(out), count_actions(actions)
 
 
 __all__ = ["supports", "inspect", "strip", "XMP_UUID"]

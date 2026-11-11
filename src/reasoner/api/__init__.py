@@ -483,6 +483,7 @@ from .cache import (
     _cache_key,
     _load_cache,
     _save_cache,
+    clear_disk_cache,
     clear_memory_cache,
 )
 
@@ -783,13 +784,7 @@ async def clear_cache(
 
     if settings.ADMIN_API_KEY and not verify_admin_key(request.headers.get("X-Admin-Key")):
         raise HTTPException(status_code=403, detail="Admin access required")
-    cleared = 0
-    for f in CACHE_DIR.glob("*.json"):
-        try:
-            f.unlink(missing_ok=True)
-            cleared += 1
-        except OSError:
-            pass
+    cleared = clear_disk_cache()
     clear_memory_cache()
     logger.warning(
         "Cache invalidated: %d entries cleared (admin_key_configured=%s)",

@@ -23,7 +23,7 @@ from reasoner.api.dependencies import (
 from reasoner.api.middleware import _anonymize_ip
 from reasoner.application.services.quota_service import TIER_LIMITS
 from reasoner.core.settings import settings
-from reasoner.domain.api_keys import ACCOUNT_DELETE_SCOPE
+from reasoner.domain.api_keys import ACCOUNT_DELETE_SCOPE, ACCOUNT_EXPORT_SCOPE
 from reasoner.domain.saas import User
 from reasoner.infrastructure.rate_limiter import RateLimitConfig, RateLimiter
 
@@ -134,7 +134,7 @@ async def get_quota_status(request: Request, user: User = Depends(get_current_us
 @router.get("/account/export")
 async def export_data(
     request: Request,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_key_scope(ACCOUNT_EXPORT_SCOPE)),
     _: None = Depends(_check_strict_rate_limit),
 ):
     """Export all personal data as JSON (GDPR Article 20).

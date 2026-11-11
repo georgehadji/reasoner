@@ -18,6 +18,7 @@ from typing import Any
 from reasoner.core.ports.file_search_port import FileChunk
 from reasoner.core.settings import settings
 from reasoner.uploader import UPLOAD_DIR
+from reasoner.utils.atomic_file import atomic_write_text
 
 logger = logging.getLogger(__name__)
 
@@ -189,7 +190,7 @@ class DocumentVectorStore:
 
             sidecar_json = json.dumps(sidecar, default=str)
             payload = get_encryption_service().encrypt(sidecar_json)
-            path.write_text(json.dumps({"encrypted": True, "payload": payload}), encoding="utf-8")
+            atomic_write_text(path, json.dumps({"encrypted": True, "payload": payload}))
         except Exception as exc:
             logger.error("Failed to write vector sidecar for %s: %s", file_id, exc)
             return 0

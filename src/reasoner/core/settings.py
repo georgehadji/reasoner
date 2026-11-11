@@ -398,6 +398,9 @@ class Settings:
     FEEDBACK_DB_PATH: str = os.getenv("FEEDBACK_DB_PATH", "")
     EVENT_STORE_DB_PATH: str = os.getenv("EVENT_STORE_DB_PATH", "")
     UPLOAD_STORAGE_DIR: str = os.getenv("UPLOAD_STORAGE_DIR", "")
+    HISTORY_STORAGE_DIR: str = os.getenv("HISTORY_STORAGE_DIR", "")
+    RUN_CACHE_DIR: str = os.getenv("RUN_CACHE_DIR", "")
+    NEURO_DATA_DIR: str = os.getenv("NEURO_DATA_DIR", "")
 
     @property
     def asyncpg_dsn(self) -> str:

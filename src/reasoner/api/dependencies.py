@@ -112,6 +112,8 @@ async def _ensure_user_in_db(user: User) -> None:
     seen = _provisioned_user_ids.get(user.id)
     if seen is not None and _monotonic() - seen < PROVISION_CACHE_TTL_SECONDS:
         return
+    import asyncpg
+
     try:
         pool = await _get_provision_pool()
         if await pool.fetchval(
@@ -142,6 +144,18 @@ async def _ensure_user_in_db(user: User) -> None:
             _provisioned_user_ids.popitem(last=False)
     except HTTPException:
         raise
+    except asyncpg.UniqueViolationError as exc:
+        # users.email is UNIQUE: another account owns this address (or the
+        # provider sent none). Continuing leaves no users row, so credits 403
+        # and key creation fails on its FK.
+        logger.warning("User provisioning email clash for %s: %s", user.id, exc)
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "This email address is already registered to another account.",
+                "code": "email_conflict",
+            },
+        ) from exc
     except Exception as exc:
         # Log but don't fail the request — auth already succeeded
         logger.warning("User provisioning failed for %s: %s", user.id, exc)
@@ -268,6 +282,8 @@ async def _resolve_auth_token(token: str) -> User:
                 id=UUID(bytes=hashlib.sha256(api_key.key_hash.encode()).digest()[:16]),
                 email=f"apikey-{api_key.key_hash[:8]}@internal",
                 display_name=api_key.name,
+                # Admin never rides a key (SEC-6); the rest narrows the key.
+                scopes={s for s in api_key.scopes if s != "admin"},
             )
         except LegacyAuthError as exc:
             raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
@@ -307,7 +323,7 @@ async def get_current_user(
         if not is_api_key:
             await _ensure_user_in_db(user)
         request.state.user = user
-        request.state.auth_method = "api_key" if is_api_key else "bearer"
+        request.state.auth_method = _auth_method(credentials.credentials)
         return user
     except HTTPException:
         raise
@@ -338,7 +354,7 @@ async def get_optional_user(
         if not is_api_key:
             await _ensure_user_in_db(user)
         request.state.user = user
-        request.state.auth_method = "api_key" if is_api_key else "bearer"
+        request.state.auth_method = _auth_method(credentials.credentials)
         return user
     except (HTTPException, LegacyAuthError):
         request.state.auth_failure = "rejected"
@@ -349,8 +365,19 @@ async def get_optional_user(
         return None
 
 
+#: Resolved through a bearer secret (rsn_ key or legacy key): scopes apply.
+KEY_AUTH_METHODS = frozenset({"api_key", "legacy_key"})
+
+
+def _auth_method(token: str) -> str:
+    """How a bearer token authenticated: ``api_key``, ``bearer`` (JWT) or ``legacy_key``."""
+    if looks_like_api_key(token):
+        return "api_key"
+    return "bearer" if _looks_like_jwt(token) else "legacy_key"
+
+
 def require_key_scope(scope: str):
-    """Route guard: an API-key caller must hold ``scope``. Returns the user.
+    """Route guard: a key caller (rsn_ or legacy) must hold ``scope``. Returns the user.
 
     Session and JWT callers always pass, because scopes only narrow what a key
     may do. Before this guard, scopes were attached to the User and never read,
@@ -359,7 +386,7 @@ def require_key_scope(scope: str):
     """
 
     async def guard(request: Request, user: User = Depends(get_current_user)) -> User:
-        if getattr(request.state, "auth_method", None) == "api_key" and not key_allows(
+        if getattr(request.state, "auth_method", None) in KEY_AUTH_METHODS and not key_allows(
             user.scopes, scope
         ):
             raise HTTPException(status_code=403, detail=f"API key lacks the '{scope}' scope")

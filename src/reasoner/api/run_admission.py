@@ -69,6 +69,9 @@ class Admission:
     #: Credits counted against an anonymous caller's daily cap; refunded if the
     #: stream never starts (see :class:`MeteredSSEResponse`).
     anon_charge: AnonymousTrialCharge | None = field(default=None, compare=False)
+    #: A claim that keeps a second concurrent run of the same thing out (resume of one
+    #: pipeline). Unlike ``run_claim`` it is released whether the run completed or not.
+    exclusive_claim: str | None = None
 
     def run_context(self, *, tier: str = "anonymous", interface: str = "web") -> RunContext:
         return RunContext(
@@ -81,6 +84,7 @@ class Admission:
             started=self.started,
             run_claim=self.run_claim,
             quota_slot=self.quota_slot,
+            anon_charge=self.anon_charge,
         )
 
 
@@ -158,6 +162,7 @@ async def admit_run(
     preset: str,
     client_run_id: str | None = None,
     kind: str = "run",
+    exclusive: str | None = None,
 ) -> Admission:
     """Run every admission step, in order, or raise the HTTP error for the first that fails.
 
@@ -181,6 +186,16 @@ async def admit_run(
         # separately (Phase 2 metering).
         from reasoner.api.client_ip import get_client_ip
         from reasoner.application.services.estimate_service import estimate_cost
+        from reasoner.application.services.spend_limit_service import (
+            anonymous_tier,
+            check_run_allowed,
+        )
+
+        # The runtime tier gate refuses a locked preset only after the run has
+        # started, so the cap below was charged and never refunded.
+        rejection = check_run_allowed(preset, anonymous_tier())
+        if rejection is not None:
+            raise HTTPException(status_code=403, detail=rejection.reason)
 
         estimate = await estimate_cost(problem, preset)
         anon_charge = await enforce_anonymous_trial_cap(
@@ -188,12 +203,18 @@ async def admit_run(
         )
 
     user_id = str(user.id) if user else None
+    owner_key = user_id or _anonymous_owner_key(request)
+    claim: str | None = None
+    exclusive_claim: str | None = None
     try:
-        claim = await idempotency_http.register_run_or_error(
-            client_run_id, owner_key=user_id or _anonymous_owner_key(request),
-        )
+        if exclusive is not None:
+            exclusive_claim = await idempotency_http.register_run_or_error(
+                exclusive, owner_key=owner_key,
+            )
+        claim = await idempotency_http.register_run_or_error(client_run_id, owner_key=owner_key)
     except BaseException:
         await refund_anonymous_trial(anon_charge)  # refused: nothing ran
+        await release_run(exclusive_claim)
         raise
     quota_slot = False
     try:
@@ -223,6 +244,7 @@ async def admit_run(
             await deps.release_quota_slot(user)
         await refund_anonymous_trial(anon_charge)
         await release_run(claim)
+        await release_run(exclusive_claim)
         raise
     return Admission(
         user_id=user_id,
@@ -232,6 +254,7 @@ async def admit_run(
         run_claim=claim,
         quota_slot=quota_slot,
         anon_charge=anon_charge,
+        exclusive_claim=exclusive_claim,
     )
 
 
@@ -403,6 +426,8 @@ class MeteredSSEResponse(StreamingResponse):
             await release_unstarted(CreditSink(), ctx)
             if not self._admission.started.is_set():
                 await refund_anonymous_trial(self._admission.anon_charge)
+            with anyio.CancelScope(shield=True):
+                await release_run(self._admission.exclusive_claim)
 
 
 __all__ = [

@@ -250,7 +250,7 @@ async def run_stream_cached(
 
     key = _cache_key(req, user_id=user_id)
     if not req.no_cache:
-        cached = await _load_cache(key)
+        cached = await _load_cache(key, user_id=user_id)
         if cached:
             has_fatal_error = any(ev.get("type") == "done" and ev.get("errors") for ev in cached)
             # Also skip cache replay if any phase had errors — code may have been fixed.
@@ -301,7 +301,7 @@ async def run_stream_cached(
                     collected.append(ev)
                 if ev.get("type") == "done" and not req.no_cache:
                     try:
-                        await _save_cache(key, collected)
+                        await _save_cache(key, collected, user_id=user_id)
                     except Exception as exc:
                         degraded("streaming.cache_save", None, exc=exc)
     finally:

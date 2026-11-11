@@ -5,9 +5,16 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from reasoner.application.ports.history import HistoryRepository
+from reasoner.core.settings import settings
 
-HISTORY_DIR = Path(__file__).parent.parent / "history"
-HISTORY_DIR.mkdir(exist_ok=True)
+# Unset keeps the in-package default for local dev; a deployment points it at a
+# mounted volume, because the package dir is replaced on every redeploy.
+HISTORY_DIR = (
+    Path(settings.HISTORY_STORAGE_DIR)
+    if settings.HISTORY_STORAGE_DIR
+    else Path(__file__).parent.parent / "history"
+)
+HISTORY_DIR.mkdir(parents=True, exist_ok=True)
 
 
 class HistoryEntry(BaseModel):

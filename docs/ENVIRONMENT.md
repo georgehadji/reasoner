@@ -122,6 +122,9 @@ All VS flags are controlled via `VSFeatureFlags` in code; env vars are not yet w
 | `COHERE_RERANK_ENABLED` | `true` | Enable Cohere reranking |
 | `DOCUMENT_SEMANTIC_RETRIEVAL_ENABLED` | `false` | Semantic retrieval for uploads |
 | `UPLOAD_STORAGE_DIR` | — (in-package default) | Upload storage directory. Point this at a mounted volume in production; the installed package dir is replaced on every redeploy |
+| `HISTORY_STORAGE_DIR` | — (in-package `history/`) | Run-history directory (one subdirectory per owner). Keep it off the directory that holds the `*.db` files |
+| `RUN_CACHE_DIR` | — (in-package `cache/`) | Run-replay cache directory. Mount it in production, or a redeploy drops every cached run |
+| `NEURO_DATA_DIR` | — (`~/.neuro`) | Neuro long-term-memory data directory. Mount it in production |
 | `SENTRY_TRACES_SAMPLE_RATE` | `0.1` | Sentry sampling rate |
 | `DEBUG` | `false` | Debug mode |
 | `LOG_LEVEL` | `INFO` | Logging level |

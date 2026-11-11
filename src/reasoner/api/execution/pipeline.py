@@ -24,6 +24,7 @@ from reasoner.application.ports.run_outcome import RunOutcome
 from reasoner.application.services.adaptive_routing import build_adaptive_routing_service
 from reasoner.application.services.pipeline_service import PipelineService
 from reasoner.application.services.preset_service import PresetService
+from reasoner.application.services.run_metering import track_run_spend
 from reasoner.application.services.spend_limit_service import (
     RUN_TIER_LOOKUP_TIMEOUT_S,
     apply_spend_limits,
@@ -493,6 +494,7 @@ class PipelineExecutionService:
         # disconnect (B-13).
         conn_context = StreamingConnectionContext(run_id)
         stream = RunStream(run_id, sse_emit, conn_context.tracked_broadcast)
+        await stream.continue_history()
 
         # Emit immediately so the UI has content to render while preflight
         # (HyperGate LLM calls) completes.
@@ -519,6 +521,10 @@ class PipelineExecutionService:
             pipeline, state, emitter, method = _build_run(
                 req, preflight, initial_state, user_id, user_tier, run_id
             )
+            # Cancelled, failed or disconnected runs end without a cost frame;
+            # the metering wrapper reads the state's running total instead.
+            run_state = state
+            track_run_spend(lambda: run_state.total_cost_usd or 0.0)
             await _announce_start(req, preflight, method, emitter, user_id, stream)
             await _enhance_prompt(req, pipeline, state, stream)
 

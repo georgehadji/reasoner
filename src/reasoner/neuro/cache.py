@@ -106,7 +106,9 @@ class L1Cache:
             self.bundles.sort(key=lambda b: b.get("created_at", 0))
             evicted = self.bundles.pop(0)
             await asyncio.to_thread((self.cache_dir / f"{evicted['id']}.json").unlink, missing_ok=True)
-        await asyncio.to_thread((self.cache_dir / f"{bundle_id}.json").write_text, json.dumps(bundle, default=str))
+        await asyncio.to_thread(
+            atomic_write_text, self.cache_dir / f"{bundle_id}.json", json.dumps(bundle, default=str)
+        )
         return bundle_id
 
     @property

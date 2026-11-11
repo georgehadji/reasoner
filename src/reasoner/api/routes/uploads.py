@@ -156,8 +156,11 @@ async def delete_uploaded_file(
     rate_limit_checked=Depends(check_rate_limit),
 ):
     """Delete an uploaded file."""
-    size = file_stored_bytes(file_id) if re.fullmatch(r"[a-f0-9-]+", file_id) else 0
-    success = delete_file(file_id, user_id=str(user.id))
+    # delete_file takes a file lock on the shared hash index: a worker thread, not the loop.
+    size = 0
+    if re.fullmatch(r"[a-f0-9-]+", file_id):
+        size = await asyncio.to_thread(file_stored_bytes, file_id)
+    success = await asyncio.to_thread(delete_file, file_id, user_id=str(user.id))
     if not success:
         raise HTTPException(status_code=404, detail="File not found")
     await get_upload_usage_repo().adjust(str(user.id), -size)
