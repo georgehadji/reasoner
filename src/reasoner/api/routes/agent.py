@@ -98,7 +98,6 @@ async def _metered_agent_stream(
     preset_service: PresetService,
     pipeline_service: PipelineService,
     *,
-    preset: str,
     interface: str,
     adm: Admission,
 ) -> AsyncIterator[str]:
@@ -130,7 +129,7 @@ async def _metered_agent_stream(
         stream,
         ctx,
         CreditSink(),
-        PrometheusObserver(tier=tier, preset=preset, interface=interface),
+        PrometheusObserver(tier=tier, preset=adm.preset, interface=interface),
     ):
         yield chunk
 
@@ -154,7 +153,7 @@ async def agent_run(
     return MeteredSSEResponse(
         _metered_agent_stream(
             req, request, user, preset_service, pipeline_service,
-            preset=preset, interface="agent_http", adm=adm,
+            interface="agent_http", adm=adm,
         ),
         adm,
     )
@@ -186,7 +185,7 @@ async def agent_run_sync(
     try:
         async for chunk in _metered_agent_stream(
             req, request, user, preset_service, pipeline_service,
-            preset=preset, interface="agent_sync", adm=adm,
+            interface="agent_sync", adm=adm,
         ):
             if chunk.startswith("data: "):
                 try:

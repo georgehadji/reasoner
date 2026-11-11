@@ -88,7 +88,7 @@ async def test_agent_stream_passes_the_claim_and_slot_to_metered():
     ):
         async for _ in agent._metered_agent_stream(
             RunRequest(problem="x"), SimpleNamespace(), USER, None, None,
-            preset="debate-budget", interface="agent_http", adm=_admission(str(USER.id)),
+            interface="agent_http", adm=_admission(str(USER.id)),
         ):
             pass
 

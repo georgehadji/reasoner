@@ -486,7 +486,7 @@ class TestAgentRouteTierLabel:
         ):
             async for _ in agent._metered_agent_stream(
                 SimpleNamespace(), _req(), user, None, None,
-                preset="debate-budget", interface="agent_http", adm=_admission(),
+                interface="agent_http", adm=_admission(),
             ):
                 pass
         assert captured == {"ctx_tier": tier.value, "observer_tier": tier.value}

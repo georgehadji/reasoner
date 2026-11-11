@@ -554,7 +554,7 @@ async def _run_stream_with_metrics(
     from reasoner.logging_utils import set_log_context
 
     tier = await run_tier_label(user, request)
-    preset = req.preset or "auto-budget"
+    preset = adm.preset
     set_log_context(user_id=str(user.id) if user else None, tier=tier, preset=preset)
 
     # Metrics are optional — degrade gracefully if QueryTimer is missing
@@ -613,7 +613,7 @@ async def _run_followup_stream_with_metrics(
     from reasoner.logging_utils import set_log_context
 
     tier = await run_tier_label(user, request)
-    preset = req.preset or "auto-budget"
+    preset = adm.preset
     user_id = str(user.id) if user else None
     set_log_context(user_id=user_id, tier=tier, preset=preset)
 
