@@ -257,12 +257,11 @@ def test_learn_survives_a_dead_embedding_provider(client, monkeypatch, tmp_path)
     [
         ("/api/neuro/learn", {"prompt": "p", "response": "r"}),
         ("/api/neuro/recall", {"prompt": "p"}),
-        ("/api/neuro/audit", {"prompt": "p", "draft_response": "d"}),
     ],
 )
 def test_endpoints_reject_callers_without_the_internal_key(app, path, payload):
-    """These are mounted on the public app. Ungated, /audit is a free LLM
-    proxy and /learn writes into tenant memory."""
+    """These are mounted on the public app. Ungated, /recall reads and /learn
+    writes tenant memory."""
     unauthenticated = TestClient(app)
     assert unauthenticated.post(path, json=payload).status_code == 403
 

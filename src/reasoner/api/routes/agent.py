@@ -15,7 +15,6 @@ used to authenticate against a different, unmetered key store.
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import json
 import logging
@@ -33,13 +32,13 @@ from reasoner.api.dependencies import (
     require_credits_if_authenticated,
     resolve_request_tier,
 )
-from reasoner.api.run_admission import MeteredSSEResponse, admit_run
+from reasoner.api.run_admission import Admission, MeteredSSEResponse, admit_run
 from reasoner.api.run_observability import CreditSink, PrometheusObserver
 from reasoner.api.schemas import RunRequest, RunResult
 from reasoner.application.services.agent_results import summarise
 from reasoner.application.services.pipeline_service import PipelineService
 from reasoner.application.services.preset_service import PresetService
-from reasoner.application.services.run_metering import RunContext, metered
+from reasoner.application.services.run_metering import metered, release_unstarted
 from reasoner.core.logging_utils import redacted_errors
 from reasoner.domain.saas import QuotaResult, User
 
@@ -101,9 +100,7 @@ async def _metered_agent_stream(
     *,
     preset: str,
     interface: str,
-    reference_id: str,
-    reserved_credits: int = 0,
-    started: asyncio.Event | None = None,
+    adm: Admission,
 ) -> AsyncIterator[str]:
     """The one place an agent route turns a request into a billed run.
 
@@ -111,24 +108,17 @@ async def _metered_agent_stream(
     metered through the identical path a streaming caller is -- not a second,
     hand-copied settlement.
 
-    ``reference_id``/``reserved_credits`` come from the caller, which already
-    reserved this run's estimated cost via ``reserve_or_402`` before invoking
-    this generator -- ``agent_run``'s streaming response can't turn a
-    mid-generator exception into a clean 402, so the reservation (and its
-    possible failure) has to happen before the generator starts.
+    ``adm`` comes from the caller, which already reserved this run's estimated
+    cost via ``admit_run`` before invoking this generator -- ``agent_run``'s
+    streaming response can't turn a mid-generator exception into a clean 402,
+    so the reservation (and its possible failure) has to happen before the
+    generator starts. The run context is built from it so metered() also gets
+    the run_claim and quota_slot to give back.
     """
     from reasoner.api.streaming import run_stream_cached
 
     tier = (await resolve_request_tier(request, user)).value
-    ctx = RunContext(
-        preset=preset,
-        reference_id=reference_id,
-        user_id=str(user.id),
-        tier=tier,
-        interface=interface,
-        reserved_credits=reserved_credits,
-        started=started,
-    )
+    ctx = adm.run_context(tier=tier, interface=interface)
     stream = run_stream_cached(
         req,
         request=request,
@@ -164,9 +154,7 @@ async def agent_run(
     return MeteredSSEResponse(
         _metered_agent_stream(
             req, request, user, preset_service, pipeline_service,
-            preset=preset, interface="agent_http",
-            reference_id=adm.reference_id, reserved_credits=adm.reserved_credits,
-            started=adm.started,
+            preset=preset, interface="agent_http", adm=adm,
         ),
         adm,
     )
@@ -195,16 +183,20 @@ async def agent_run_sync(
     )
 
     events: list[dict] = []
-    async for chunk in _metered_agent_stream(
-        req, request, user, preset_service, pipeline_service,
-        preset=preset, interface="agent_sync",
-        reference_id=adm.reference_id, reserved_credits=adm.reserved_credits,
-    ):
-        if chunk.startswith("data: "):
-            try:
-                events.append(json.loads(chunk[6:]))
-            except json.JSONDecodeError:
-                pass
+    try:
+        async for chunk in _metered_agent_stream(
+            req, request, user, preset_service, pipeline_service,
+            preset=preset, interface="agent_sync", adm=adm,
+        ):
+            if chunk.startswith("data: "):
+                try:
+                    events.append(json.loads(chunk[6:]))
+                except json.JSONDecodeError:
+                    pass
+    finally:
+        # No MeteredSSEResponse here: a failure before metered() starts (the
+        # tier lookup) would otherwise keep the hold, the slot and the run id.
+        await release_unstarted(CreditSink(), adm.run_context())
 
     summary = summarise(events, preset=preset)
     return RunResult(

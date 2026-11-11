@@ -509,7 +509,6 @@ async def save_uploaded_file(
             "user_id": user_id,
             "filename": filename,
             "mime_type": mime_type,
-            "created_at": str(uuid.uuid4()),
             "encrypted": True,
             "status": "writing",
         }
