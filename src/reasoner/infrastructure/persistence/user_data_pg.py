@@ -67,24 +67,20 @@ class PgUserDataStore:
     async def export(self, user_id: str) -> Any:
         pool = await self._get_pool()
         columns = ", ".join(EXPORT_FIELDS[self._table])
-        order = f" ORDER BY {self._order_by} DESC" if self._order_by else ""
-        if self._one_row:
-            rows = await pool.fetch(
-                f"SELECT {columns} FROM {self._table} WHERE {self._key} = $1{order} LIMIT 1",
-                user_id,
-            )
-            return dict(rows[0]) if rows else {}
+        order = f" ORDER BY {self._order_by} DESC, ctid" if self._order_by else " ORDER BY ctid"
+        # A stable total order (ctid breaks ties), or pages could repeat or skip rows.
+        query = (
+            f"SELECT {columns} FROM {self._table} WHERE {self._key} = $1{order} "
+            "LIMIT $2 OFFSET $3"
+        )
+        page = 1 if self._one_row else EXPORT_PAGE_SIZE
         out: list[dict[str, Any]] = []
         while True:
-            # A stable total order, or pages could repeat or skip rows.
-            rows = await pool.fetch(
-                f"SELECT {columns} FROM {self._table} WHERE {self._key} = $1"
-                f"{order}{', ' if order else ' ORDER BY '}ctid "
-                f"LIMIT {EXPORT_PAGE_SIZE} OFFSET {len(out)}",
-                user_id,
-            )
+            rows = await pool.fetch(query, user_id, page, len(out))
             out.extend(dict(r) for r in rows)
-            if len(rows) < EXPORT_PAGE_SIZE:
+            if self._one_row:
+                return out[0] if out else {}
+            if len(rows) < page:
                 return out
 
     async def erase(self, user_id: str) -> None:

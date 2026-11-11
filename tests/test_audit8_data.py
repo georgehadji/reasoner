@@ -251,7 +251,6 @@ async def test_token_cache_erase_and_export_cover_one_owner(tmp_path):
 
 
 async def test_pg_export_pages_through_every_row():
-    import re
 
     from reasoner.infrastructure.persistence.user_data_pg import EXPORT_PAGE_SIZE, PgUserDataStore
 
@@ -260,9 +259,8 @@ async def test_pg_export_pages_through_every_row():
              "cost_usd": 0, "created_at": i} for i in range(total)]
 
     class _Pool:
-        async def fetch(self, sql, *args):
-            offset = int(re.search(r"OFFSET (\d+)", sql).group(1))
-            limit = int(re.search(r"LIMIT (\d+)", sql).group(1))
+        async def fetch(self, sql, user_id, limit, offset):
+            assert "LIMIT $2 OFFSET $3" in sql
             return rows[offset:offset + limit]
 
     async def pool():

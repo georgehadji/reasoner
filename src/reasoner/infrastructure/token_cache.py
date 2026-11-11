@@ -142,12 +142,14 @@ class TokenAwareCache:
     def _entry_path(self, key: str, agent_id: str) -> Path:
         """Owned entries sit in their owner's directory (erasable as one unit);
         entries with no tenant stay flat."""
-        assert self.cache_dir is not None
+        if self.cache_dir is None:
+            raise RuntimeError("token cache has no disk directory")
         folder = self.cache_dir / owner_key(agent_id) if agent_id else self.cache_dir
         return folder / f"{key}.json"
 
     def _disk_files(self) -> list[Path]:
-        assert self.cache_dir is not None
+        if self.cache_dir is None:
+            raise RuntimeError("token cache has no disk directory")
         return [*self.cache_dir.glob("*.json"), *self.cache_dir.glob("u-*/*.json")]
 
     async def export_owner(self, agent_id: str) -> list[dict[str, Any]]:
