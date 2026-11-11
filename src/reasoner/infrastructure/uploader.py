@@ -545,9 +545,10 @@ async def save_uploaded_file(
         logger.error(f"File upload failed: {e}")
         for path in created:
             path.unlink(missing_ok=True)
+        # The detail is logged above; exception text carries server paths.
         return {
             "success": False,
-            "error": str(e),
+            "error": "Upload failed",
         }
 
     # Background: index for semantic retrieval if enabled. Bounded queue,

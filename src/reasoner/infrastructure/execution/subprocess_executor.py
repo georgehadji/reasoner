@@ -24,7 +24,6 @@ import os
 import platform
 import sys
 import tempfile
-import textwrap
 import time
 from pathlib import Path
 
@@ -86,12 +85,10 @@ class SubprocessExecutor:
         try:
             tmpdir = Path(tempfile.mkdtemp(prefix="reasoner_exec_"))
             script_path = tmpdir / "script.py"
+            # No dedent: it strips the header's indent only when `code` is also
+            # indented, so any multi-line code left the header lines indented.
             script_path.write_text(
-                textwrap.dedent(f"""\
-                import sys
-                sys.path.insert(0, '')
-                {code}
-                """),
+                f"import sys\nsys.path.insert(0, '')\n{code}\n",
                 encoding="utf-8",
             )
 
