@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { CSRF_HEADER } from './security-constants';
 import { RunRequest } from './types';
 import { REASONER_API_BASE } from './server-config';
@@ -276,6 +276,35 @@ export async function readJsonBody(req: NextRequest, maxBytes = 1024 * 1024): Pr
 
 class ValidationError extends Error {}
 export { ValidationError };
+
+/**
+ * The response a proxy route returns when the upstream call threw.
+ *
+ * Error text from `fetch` carries the upstream host, port and resolver output
+ * (`connect ECONNREFUSED 10.0.3.7:8003`), so it is logged here and never sent
+ * to the browser. Only a ValidationError message is user-facing: the validators
+ * write it for the caller.
+ */
+export function proxyErrorResponse(err: unknown, label: string, upstreamUrl?: string): NextResponse {
+  if (err instanceof ValidationError) {
+    return NextResponse.json({ error: err.message }, { status: 400 });
+  }
+  const msg = err instanceof Error ? err.message : 'Proxy error';
+  const errName = err instanceof Error ? err.constructor.name : 'Unknown';
+  console.error(`${label} proxy error [${errName}] upstream=${upstreamUrl || 'N/A'}:`, msg);
+
+  const lower = msg.toLowerCase();
+  const isConnectionError =
+    err instanceof TypeError ||
+    lower.includes('fetch failed') ||
+    lower.includes('network') ||
+    lower.includes('econnrefused') ||
+    lower.includes('etimedout');
+  if (isConnectionError) {
+    return NextResponse.json({ error: 'Backend unreachable' }, { status: 504 });
+  }
+  return NextResponse.json({ error: 'Proxy error' }, { status: 502 });
+}
 
 // Preset IDs follow the pattern: one or more lowercase alphanumeric / hyphen / underscore tokens.
 // Examples: "auto-budget", "multi-perspective-premium", "research-budget", "web-search".

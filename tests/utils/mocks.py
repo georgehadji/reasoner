@@ -47,8 +47,12 @@ class MockEventStore:
         limit: int = 50,
         offset: int = 0,
         status: str | None = None,
+        aggregate_ids: Any = None,
     ) -> list[dict[str, Any]]:
         return []
+
+    async def count_pipelines(self, status: str | None = None, aggregate_ids: Any = None) -> int:
+        return 0
 
     async def delete_aggregate(self, aggregate_id: str) -> None:
         self.events = [

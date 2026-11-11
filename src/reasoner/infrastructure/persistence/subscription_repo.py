@@ -119,6 +119,21 @@ class PostgresSubscriptionRepository:
     ) -> bool:
         """Idempotently write a subscription. Returns False for a stale event.
 
+        The unique indexes on the provider ids (migration 20261110_000400) make a
+        concurrent insert of the same subscription fail with a unique violation.
+        The row exists by then, so a second pass takes the UPDATE path and the
+        BIL-15 ordering guard decides whether it applies.
+        """
+        try:
+            return await self._upsert_once(sub, event_at)
+        except asyncpg.UniqueViolationError:
+            return await self._upsert_once(sub, event_at)
+
+    async def _upsert_once(
+        self, sub: Subscription, event_at: datetime | None = None
+    ) -> bool:
+        """One select-then-write pass. Returns False for a stale event.
+
         A row is matched by its provider id. The user-id fallback adopts the
         user's latest row only when that row has no id for the incoming
         provider: overwriting a row that already tracks another subscription

@@ -98,6 +98,21 @@ class CreditBalance:
 
 
 @dataclass(frozen=True, slots=True)
+class LedgerWrite:
+    """One movement to apply inside a batch (``CreditRepository.record_batch``).
+
+    Same meaning as the arguments of ``record``: ``reference_id`` is the
+    idempotency key, so a replayed write returns its original entry.
+    """
+
+    delta: int
+    reason: CreditReason
+    reference_id: str | None = None
+    description: str | None = None
+    allow_overdraft: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class CreditLedgerEntry:
     """One append-only movement of credits."""
 

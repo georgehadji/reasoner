@@ -70,6 +70,9 @@ class GetHistoryQuery(Query):
     limit: int = 50
     offset: int = 0
     search: str = ""  # Filter by search term
+    #: The caller's own pipeline ids. None means no caller scope was given, and
+    #: the handler returns nothing rather than every user's problems.
+    owner_ids: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True)

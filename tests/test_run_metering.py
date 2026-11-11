@@ -34,8 +34,11 @@ PHASE_2 = 'data: {"type": "phase_complete", "phase": 2, "total_cost_usd": 0.009}
 class RecordingSink:
     """Test double for SettlementSink -- records, never charges."""
 
-    def __init__(self, fail: bool = False):
+    def __init__(self, fail: bool = False, fail_record: bool = False):
         self.calls: list[dict] = []
+        self.true_up_calls: list[dict] = []
+        self.unsettled: list[dict] = []
+        self.fail_record = fail_record
         self.reserve_calls: list[dict] = []
         self.release_calls: list[dict] = []
         self.fail = fail
@@ -63,12 +66,43 @@ class RecordingSink:
         )
         return 20  # arbitrary fixed reservation for tests that don't care about the exact amount
 
-    async def release(self, *, user_id, credits, reference_id) -> None:
-        self.release_calls.append(
-            {"user_id": user_id, "credits": credits, "reference_id": reference_id}
+    async def true_up(self, *, user_id, reserved_credits, cost_usd, reference_id, preset) -> None:
+        # Mirrors CreditService.true_up_run: one atomic call, two ledger legs.
+        self.true_up_calls.append(
+            {
+                "user_id": user_id,
+                "reserved_credits": reserved_credits,
+                "cost_usd": cost_usd,
+                "reference_id": reference_id,
+                "preset": preset,
+            }
         )
+        if reserved_credits > 0:
+            self.release_calls.append(
+                {"user_id": user_id, "credits": reserved_credits, "reference_id": f"{reference_id}:release"}
+            )
+        if cost_usd > 0:
+            self.calls.append(
+                {"user_id": user_id, "cost_usd": cost_usd, "reference_id": reference_id, "preset": preset}
+            )
         if self.fail:
             raise RuntimeError("ledger unavailable")
+
+    async def record_unsettled(
+        self, *, user_id, reference_id, cost_usd, reserved_credits, preset, error
+    ) -> None:
+        self.unsettled.append(
+            {
+                "user_id": user_id,
+                "reference_id": reference_id,
+                "cost_usd": cost_usd,
+                "reserved_credits": reserved_credits,
+                "preset": preset,
+                "error": error,
+            }
+        )
+        if self.fail_record:
+            raise RuntimeError("valkey down")
 
 
 class RecordingObserver:
@@ -333,18 +367,66 @@ async def test_the_running_cost_used_on_abandonment_is_the_latest_seen():
 
 
 @pytest.mark.asyncio
-async def test_release_failure_does_not_block_settlement():
-    """The release and the settle are independent ledger entries -- one
-    failing (e.g. a transient ledger error) must not silently skip the
-    other and let a real charge go unbilled."""
-    sink = RecordingSink(fail=True)
-    ctx = user_ctx(reserved_credits=20)
+async def test_a_reserved_run_trues_up_in_one_call():
+    """Release and charge go to the ledger together (audit 6, finding 1): one
+    sink call, not two writes that can land half-way."""
+    sink = RecordingSink()
 
-    seen = [f async for f in metered(frames(DONE), ctx, sink)]
+    await _drain(metered(frames(DONE), user_ctx(reserved_credits=20), sink))
+
+    assert sink.true_up_calls == [
+        {
+            "user_id": "user-42",
+            "reserved_credits": 20,
+            "cost_usd": 0.0191,
+            "reference_id": "run-1",
+            "preset": "auto-budget",
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_true_up_failure_is_recorded_for_replay_and_never_reaches_the_caller():
+    sink = RecordingSink(fail=True)
+
+    seen = [f async for f in metered(frames(DONE), user_ctx(reserved_credits=20), sink)]
 
     assert seen == [DONE]
-    assert len(sink.release_calls) == 1  # attempted, even though it raised
-    assert len(sink.calls) == 1  # settle still ran despite the release failing
+    assert len(sink.unsettled) == 1
+    rec = sink.unsettled[0]
+    assert (rec["user_id"], rec["reference_id"], rec["reserved_credits"]) == ("user-42", "run-1", 20)
+    assert rec["cost_usd"] == 0.0191
+
+
+@pytest.mark.asyncio
+async def test_flat_settle_failure_is_recorded_for_replay():
+    sink = RecordingSink(fail=True)
+
+    await _drain(metered(frames(DONE), user_ctx(), sink))  # reserved_credits=0 -> flat settle
+
+    assert len(sink.unsettled) == 1
+    assert sink.unsettled[0]["reserved_credits"] == 0
+
+
+@pytest.mark.asyncio
+async def test_a_failed_unsettled_record_is_swallowed_and_logged_at_error(caplog):
+    sink = RecordingSink(fail=True, fail_record=True)
+
+    with caplog.at_level("ERROR"):
+        seen = [f async for f in metered(frames(DONE), user_ctx(reserved_credits=20), sink)]
+
+    assert seen == [DONE]
+    assert "UNSETTLED RUN NOT RECORDED" in caplog.text
+    assert "reference=run-1" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_nothing_held_and_nothing_owed_records_nothing():
+    sink = RecordingSink(fail=True)
+
+    await _drain(metered(frames(PHASE), user_ctx(), sink))  # no cost frame, no reservation
+
+    assert sink.unsettled == []
 
 
 @pytest.mark.asyncio

@@ -8,7 +8,7 @@ import {
   validateRunRequest,
   extractBearerToken,
   rateLimit,
-  ValidationError,
+  proxyErrorResponse,
   SECURITY_SERVER_HASH,
 } from '@/lib/security-server';
 import { API } from '@/lib/config';
@@ -63,22 +63,6 @@ export async function POST(req: NextRequest) {
       headers: responseHeaders,
     });
   } catch (err) {
-    if (err instanceof ValidationError) {
-      return NextResponse.json({ error: err.message }, { status: 400 });
-    }
-
-    const msg = err instanceof Error ? err.message : 'Proxy error';
-    console.error(`Agent run/sync proxy error upstream=${upstreamUrl || 'N/A'}:`, msg);
-
-    const isConnectionError =
-      err instanceof TypeError ||
-      msg.toLowerCase().includes('fetch failed') ||
-      msg.toLowerCase().includes('econnrefused') ||
-      msg.toLowerCase().includes('etimedout');
-
-    if (isConnectionError) {
-      return NextResponse.json({ error: 'Backend unreachable', detail: msg }, { status: 504 });
-    }
-    return NextResponse.json({ error: msg }, { status: 502 });
+    return proxyErrorResponse(err, 'Agent run/sync', upstreamUrl);
   }
 }

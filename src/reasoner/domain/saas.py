@@ -71,6 +71,11 @@ class UnresolvedBillingOwnerError(Exception):
     """
 
 
+class BillingProvider(StrEnum):
+    STRIPE = "stripe"
+    PAYPAL = "paypal"
+
+
 class CheckoutDecision(StrEnum):
     ALLOW = "allow"
     USE_PORTAL = "use_portal"   # change plan in the provider's portal (prorated)

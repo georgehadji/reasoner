@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 
@@ -117,7 +118,7 @@ async def upload_file(
         raise
     except Exception as e:
         logger.error(f"Upload failed: {e}")
-        return {"success": False, "error": "Internal server error"}
+        raise HTTPException(status_code=500, detail="Internal server error") from e
 
 
 @router.get("/api/uploads")
@@ -128,7 +129,10 @@ async def get_uploads(
     offset: int = Query(0, ge=0),
 ):
     """List uploaded files for the current user with pagination."""
-    all_files = list_uploads(user_id=str(user.id))
+    # shortcut: list_uploads reads one meta.json per file of every user, so cost grows
+    # with the whole folder. Off the event loop for now; move to a per-user index
+    # when the folder passes ~10k files.
+    all_files = await asyncio.to_thread(list_uploads, user_id=str(user.id))
     return {"files": all_files[offset:offset + limit], "total": len(all_files)}
 
 

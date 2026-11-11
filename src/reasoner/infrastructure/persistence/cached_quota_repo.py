@@ -82,6 +82,13 @@ class CachedQuotaRepository(QuotaRepository):
             logger.warning("Redis quota cache invalidate failed: %s", exc)
         return result
 
+    async def release_slot(self, user_id: str) -> None:
+        await self._underlying.release_slot(user_id)
+        try:
+            await self._redis.delete(self._cache_key(user_id))
+        except Exception as exc:
+            logger.warning("Redis quota cache invalidate failed: %s", exc)
+
     async def reset_monthly(self, user_id: str) -> None:
         await self._underlying.reset_monthly(user_id)
         try:

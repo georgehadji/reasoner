@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from collections.abc import Sequence
 from uuid import UUID
 
 import asyncpg
@@ -22,6 +23,7 @@ from reasoner.domain.credits import (
     CreditLedgerEntry,
     CreditReason,
     InsufficientCreditsError,
+    LedgerWrite,
     can_afford,
 )
 
@@ -156,64 +158,113 @@ class PostgresCreditRepository(CreditRepository):
                 raise
             return _to_entry(existing)
 
+    async def record_batch(
+        self, user_id: str, writes: Sequence[LedgerWrite]
+    ) -> list[CreditLedgerEntry]:
+        if not writes:
+            return []
+        if any(w.delta == 0 for w in writes):
+            raise ValueError("Ledger delta must be non-zero.")
+
+        uid = UUID(str(user_id))
+        pool = await self._get_pool()
+        try:
+            async with pool.acquire(timeout=10.0) as conn:
+                async with conn.transaction():
+                    balance = await self._lock_balance(conn, uid)
+                    entries: list[CreditLedgerEntry] = []
+                    for write in writes:
+                        entry, balance = await self._apply_write(conn, uid, balance, write)
+                        entries.append(entry)
+                    return entries
+        except asyncpg.UniqueViolationError:
+            # A racing duplicate of one of these references won. The transaction
+            # rolled back, and each write is idempotent on its own, so replay them
+            # one by one: the winner's entries come back, the rest are applied.
+            return [
+                await self.record(
+                    user_id, w.delta, w.reason, w.reference_id, w.description,
+                    w.allow_overdraft,
+                )
+                for w in writes
+            ]
+
     async def _record_locked(
         self, pool, uid: UUID, delta: int, reason: CreditReason,
         reference_id: str | None, description: str | None, allow_overdraft: bool,
     ) -> CreditLedgerEntry:
         async with pool.acquire(timeout=10.0) as conn:
             async with conn.transaction():
-                # Lock (or create) the balance row first. The duplicate check
-                # below then runs under that lock, so two calls with one
-                # reference serialise instead of both passing the check.
-                await conn.execute(
-                    "INSERT INTO user_credits (user_id) VALUES ($1) "
-                    "ON CONFLICT (user_id) DO NOTHING",
-                    uid,
+                balance = await self._lock_balance(conn, uid)
+                entry, _ = await self._apply_write(
+                    conn, uid, balance,
+                    LedgerWrite(delta, reason, reference_id, description, allow_overdraft),
                 )
-                row = await conn.fetchrow(
-                    "SELECT balance FROM user_credits WHERE user_id = $1 FOR UPDATE",
-                    uid,
-                )
-                if reference_id is not None:
-                    existing = await conn.fetchrow(
-                        _SELECT_BY_REFERENCE,
-                        uid,
-                        reference_id,
-                    )
-                    if existing is not None:
-                        return _to_entry(existing)
-                balance = row["balance"]
+                return entry
 
-                if delta < 0 and not allow_overdraft and not can_afford(balance, -delta):
-                    raise InsufficientCreditsError(required=-delta, available=balance)
+    @staticmethod
+    async def _lock_balance(conn, uid: UUID) -> int:
+        """Lock (or create) the balance row and return the balance.
 
-                balance_after = balance + delta
-                granted = delta if delta > 0 else 0
-                spent = -delta if delta < 0 else 0
+        The duplicate check in ``_apply_write`` then runs under that lock, so two
+        calls with one reference serialise instead of both passing the check.
+        """
+        await conn.execute(
+            "INSERT INTO user_credits (user_id) VALUES ($1) "
+            "ON CONFLICT (user_id) DO NOTHING",
+            uid,
+        )
+        row = await conn.fetchrow(
+            "SELECT balance FROM user_credits WHERE user_id = $1 FOR UPDATE",
+            uid,
+        )
+        return row["balance"]
 
-                await conn.execute(
-                    "UPDATE user_credits SET balance = $2, "
-                    "lifetime_granted = lifetime_granted + $3, "
-                    "lifetime_spent = lifetime_spent + $4, "
-                    "updated_at = NOW() WHERE user_id = $1",
-                    uid,
-                    balance_after,
-                    granted,
-                    spent,
-                )
+    @staticmethod
+    async def _apply_write(
+        conn, uid: UUID, balance: int, write: LedgerWrite
+    ) -> tuple[CreditLedgerEntry, int]:
+        """Apply one write under the balance lock; returns (entry, new balance).
 
-                entry = await conn.fetchrow(
-                    "INSERT INTO credit_ledger "
-                    "(user_id, delta, balance_after, reason, reference_id, description) "
-                    f"VALUES ($1, $2, $3, $4, $5, $6) RETURNING {_LEDGER_COLUMNS}",
-                    uid,
-                    delta,
-                    balance_after,
-                    reason.value,
-                    reference_id,
-                    description,
-                )
-                return _to_entry(entry)
+        A replayed ``reference_id`` returns the original entry and leaves the
+        balance unchanged.
+        """
+        if write.reference_id is not None:
+            existing = await conn.fetchrow(_SELECT_BY_REFERENCE, uid, write.reference_id)
+            if existing is not None:
+                return _to_entry(existing), balance
+
+        delta = write.delta
+        if delta < 0 and not write.allow_overdraft and not can_afford(balance, -delta):
+            raise InsufficientCreditsError(required=-delta, available=balance)
+
+        balance_after = balance + delta
+        granted = delta if delta > 0 else 0
+        spent = -delta if delta < 0 else 0
+
+        await conn.execute(
+            "UPDATE user_credits SET balance = $2, "
+            "lifetime_granted = lifetime_granted + $3, "
+            "lifetime_spent = lifetime_spent + $4, "
+            "updated_at = NOW() WHERE user_id = $1",
+            uid,
+            balance_after,
+            granted,
+            spent,
+        )
+
+        entry = await conn.fetchrow(
+            "INSERT INTO credit_ledger "
+            "(user_id, delta, balance_after, reason, reference_id, description) "
+            f"VALUES ($1, $2, $3, $4, $5, $6) RETURNING {_LEDGER_COLUMNS}",
+            uid,
+            delta,
+            balance_after,
+            write.reason.value,
+            write.reference_id,
+            write.description,
+        )
+        return _to_entry(entry), balance_after
 
     async def grant_monthly_allowance(
         self,

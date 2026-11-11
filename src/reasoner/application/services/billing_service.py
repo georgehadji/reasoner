@@ -137,17 +137,8 @@ class BillingService:
                 )
             return
 
-        if event_type == "invoice.payment_succeeded":
-            # Payment succeeded — ensure subscription is active and reset usage for the new period
-            if sub.stripe_subscription_id:
-                if await repo.set_subscription_status(
-                    sub.stripe_subscription_id,
-                    "active",
-                    event_at,
-                ):
-                    await repo.sync_quota_for_subscription(sub)
-            return
-
+        # invoice.payment_succeeded is deliberately unhandled: the adapter gives it no
+        # subscription id, and renewal arrives as customer.subscription.updated.
         if event_type in ("checkout.session.completed", "customer.subscription.updated"):
             # Upsert subscription and sync quota
             if await repo.upsert_subscription(sub, event_at):

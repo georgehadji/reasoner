@@ -7,7 +7,6 @@ import asyncio
 import hashlib
 import json
 import logging
-import secrets
 import shutil
 import time
 from datetime import UTC, datetime
@@ -18,6 +17,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from reasoner.core.constant_time import constant_time_equals
 from reasoner.core.rerank import rerank_memory_chunks
 from reasoner.core.settings import settings
 from reasoner.neuro.cache import ContextChunk, L1Cache, L2Index, l3_scan
@@ -417,7 +417,7 @@ def require_neuro_key(request: Request) -> None:
     if not expected:
         return
     provided = request.headers.get("X-Neuro-Key", "")
-    if not secrets.compare_digest(provided, expected):
+    if not constant_time_equals(provided, expected):
         raise HTTPException(status_code=403, detail="Neuro access required")
 
 

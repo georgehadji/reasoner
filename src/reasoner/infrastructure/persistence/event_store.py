@@ -11,7 +11,7 @@ import inspect
 import json
 import logging
 import sqlite3
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
@@ -426,21 +426,27 @@ class EventStore:
         limit: int = 50,
         offset: int = 0,
         status: str | None = None,
+        aggregate_ids: Sequence[str] | None = None,
     ) -> list[dict[str, Any]]:
         """
         List pipelines with optional filtering.
-        
+
         Args:
             limit: Maximum number of results
             offset: Number of results to skip
             status: Filter by status
-            
+            aggregate_ids: Only these pipelines (an owner's ids). An empty
+                sequence matches nothing and runs no query; None means all.
+
         Returns:
             List of pipeline dictionaries
-            
+
         Raises:
             sqlite3.Error: If database operation fails
         """
+        if aggregate_ids is not None and not aggregate_ids:
+            return []
+
         def _list_pipelines_sync() -> list[dict[str, Any]]:
             try:
                 conn = self._get_connection()
@@ -449,6 +455,10 @@ class EventStore:
                 if status:
                     query += " AND status = ?"
                     params.append(status)
+                if aggregate_ids is not None:
+                    # One JSON parameter, so the id list has no SQLite variable limit.
+                    query += " AND aggregate_id IN (SELECT value FROM json_each(?))"
+                    params.append(json.dumps(list(aggregate_ids)))
                 query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
                 params.extend([limit, offset])
                 cursor = conn.execute(query, params)
@@ -473,6 +483,29 @@ class EventStore:
                 raise
 
         return await self._run_in_executor(_list_pipelines_sync)
+
+    async def count_pipelines(
+        self,
+        status: str | None = None,
+        aggregate_ids: Sequence[str] | None = None,
+    ) -> int:
+        """Count pipelines matching the same filters as ``list_pipelines``."""
+        if aggregate_ids is not None and not aggregate_ids:
+            return 0
+
+        def _count_pipelines_sync() -> int:
+            conn = self._get_connection()
+            query = "SELECT COUNT(*) FROM aggregates WHERE aggregate_type = 'pipeline'"
+            params: list = []
+            if status:
+                query += " AND status = ?"
+                params.append(status)
+            if aggregate_ids is not None:
+                query += " AND aggregate_id IN (SELECT value FROM json_each(?))"
+                params.append(json.dumps(list(aggregate_ids)))
+            return conn.execute(query, params).fetchone()[0]
+
+        return await self._run_in_executor(_count_pipelines_sync)
 
     async def get_aggregate_state(
         self,

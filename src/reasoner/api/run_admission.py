@@ -26,6 +26,11 @@ from fastapi.responses import StreamingResponse
 from starlette.types import Receive, Scope, Send
 
 from reasoner.application.ports.pipeline_ownership_port import OwnershipConflictError
+from reasoner.application.services.anonymous_trial_policy import (
+    AnonymousTrialCharge,
+    enforce_anonymous_trial_cap,
+    refund_anonymous_trial,
+)
 from reasoner.application.services.idempotency import release_run
 from reasoner.application.services.run_metering import RunContext, release_unstarted
 from reasoner.core.settings import settings
@@ -48,6 +53,11 @@ class Admission:
     started: asyncio.Event = field(default_factory=asyncio.Event, compare=False)
     #: The ``client_run_id`` claim, released if the run does not complete.
     run_claim: str | None = None
+    #: A quota slot was taken at admission; ``metered()`` gives it back if the run costs nothing.
+    quota_slot: bool = False
+    #: Credits counted against an anonymous caller's daily cap; refunded if the
+    #: stream never starts (see :class:`MeteredSSEResponse`).
+    anon_charge: AnonymousTrialCharge | None = field(default=None, compare=False)
 
     def run_context(self, *, tier: str = "anonymous", interface: str = "web") -> RunContext:
         return RunContext(
@@ -59,6 +69,7 @@ class Admission:
             reserved_credits=self.reserved_credits,
             started=self.started,
             run_claim=self.run_claim,
+            quota_slot=self.quota_slot,
         )
 
 
@@ -71,6 +82,30 @@ def require_auth_if_legacy_disabled(user: User | None) -> None:
                 "Authentication required. "
                 "Set ENABLE_LEGACY_API_KEY=true for v1 backward compatibility."
             ),
+        )
+
+
+def require_credentials_resolved(request: Request, user: User | None) -> None:
+    """Refuse a run whose credentials were sent but did not resolve.
+
+    ``get_optional_user`` returns None for a revoked key, an expired token and a
+    database error alike, so with legacy access enabled all three ran anonymously,
+    unreserved and unbilled. Callers who sent nothing are unchanged.
+    """
+    if user is not None:
+        return
+    failure = getattr(request.state, "auth_failure", None)
+    if failure == "rejected":
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or expired credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if failure == "unavailable":
+        raise HTTPException(
+            status_code=503,
+            detail="Authentication is temporarily unavailable. Retry shortly.",
+            headers={"Retry-After": "5"},
         )
 
 
@@ -117,31 +152,39 @@ async def admit_run(
 
     Every refusal comes before the ``client_run_id`` claim, so a 403 or 429 does
     not lock the id, and before the reservation, so a refused run holds no credits.
+    The quota slot is claimed atomically just before the reservation (the claim is
+    the quota 429; ``check_quota_if_authenticated`` is only a cheap early read).
     """
     # Module lookups at call time, not import time, so tests can patch them.
     from reasoner.api import dependencies as deps
     from reasoner.api import idempotency_http
 
+    require_credentials_resolved(request, user)
     require_auth_if_legacy_disabled(user)
     require_run_scope(request, user)
     await deps.check_preset_access_if_authenticated(preset, user, request)
 
+    anon_charge: AnonymousTrialCharge | None = None
     if user is None:
         # No account to reserve credits against, so anonymous spend is capped
         # separately (Phase 2 metering).
         from reasoner.api.client_ip import get_client_ip
-        from reasoner.application.services.anonymous_trial_policy import (
-            enforce_anonymous_trial_cap,
-        )
         from reasoner.application.services.estimate_service import estimate_cost
 
         estimate = await estimate_cost(problem, preset)
-        await enforce_anonymous_trial_cap(get_client_ip(request), estimate["estimated_cost_usd"])
+        anon_charge = await enforce_anonymous_trial_cap(
+            get_client_ip(request), estimate["estimated_cost_usd"]
+        )
 
     user_id = str(user.id) if user else None
-    claim = await idempotency_http.register_run_or_error(
-        client_run_id, owner_key=user_id or _anonymous_owner_key(request),
-    )
+    try:
+        claim = await idempotency_http.register_run_or_error(
+            client_run_id, owner_key=user_id or _anonymous_owner_key(request),
+        )
+    except BaseException:
+        await refund_anonymous_trial(anon_charge)  # refused: nothing ran
+        raise
+    quota_slot = False
     try:
         if client_run_id:
             # The id is the pipeline id: refuse it before any credit is held
@@ -155,13 +198,19 @@ async def admit_run(
                     status_code=409,
                     detail=f"Run id {client_run_id} is already in use. Choose another id.",
                 ) from exc
+        # Atomic claim, before the reservation so a denial holds no credits.
+        quota_slot = await deps.claim_quota_slot(user, preset, request)
         reference_id = run_reference(client_run_id, kind)
         reserved_credits = await deps.reserve_or_402(
             user_id=user_id, preset=preset, problem=problem, reference_id=reference_id,
         )
     except BaseException:
         # Refused after the claim (402, 409, a ledger error): give the id back,
-        # so the documented retry with the same id works (SEC-7).
+        # so the documented retry with the same id works (SEC-7). The quota
+        # slot goes back too: a refused run is not a run.
+        if quota_slot:
+            await deps.release_quota_slot(user)
+        await refund_anonymous_trial(anon_charge)
         await release_run(claim)
         raise
     return Admission(
@@ -170,6 +219,8 @@ async def admit_run(
         reference_id=reference_id,
         reserved_credits=reserved_credits,
         run_claim=claim,
+        quota_slot=quota_slot,
+        anon_charge=anon_charge,
     )
 
 
@@ -206,7 +257,10 @@ class MeteredSSEResponse(StreamingResponse):
         finally:
             from reasoner.api.run_observability import CreditSink
 
-            await release_unstarted(CreditSink(), self._admission.run_context())
+            ctx = self._admission.run_context()
+            await release_unstarted(CreditSink(), ctx)
+            if not self._admission.started.is_set():
+                await refund_anonymous_trial(self._admission.anon_charge)
 
 
 __all__ = [

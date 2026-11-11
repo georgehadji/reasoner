@@ -12,6 +12,7 @@ from reasoner.api.dependencies import (
     check_quota_if_authenticated,
     check_rate_limit,
     get_current_user,
+    require_admin_scope,
     require_credits_if_authenticated,
     require_key_scope,
     run_tier_label,
@@ -61,8 +62,8 @@ async def _check_pipeline_ownership(pipeline_id: str, user: User) -> bool:
 
 
 @router.get("/api/events/stats")
-async def get_event_stats(user: User = Depends(get_current_user)):
-    """Get event store statistics."""
+async def get_event_stats(user: User = Depends(require_admin_scope)):
+    """Get event store statistics (global counts, so admin only)."""
     try:
         from reasoner.api import get_architecture_components
 
@@ -86,39 +87,35 @@ async def list_pipelines(
         from reasoner.api import get_architecture_components
 
         event_store, _ = get_architecture_components()
-        pipelines = await event_store.list_pipelines(
-            limit=limit,
-            offset=offset,
-            status=status,
-        )
-        # Filter to only pipelines owned by the requesting user (unless admin).
-        # Fails closed per pipeline: a lookup error excludes that pipeline
-        # from the list rather than including it.
+        # The owner filter goes into the query, so a page is a page of the
+        # caller's own pipelines. Paging the global list and filtering each row
+        # afterwards returned short or empty pages for a user whose pipelines
+        # sat deep in it, and read one ownership row per pipeline.
+        aggregate_ids: list[str] | None = None
         if not (hasattr(user, "scopes") and Scope.ADMIN.value in user.scopes):
-            from reasoner.application.ports.pipeline_ownership_port import is_authorized
             from reasoner.infrastructure.persistence.pipeline_ownership_repo import (
                 ensure_pipeline_ownership_backfilled,
                 get_pipeline_ownership_repo,
             )
-            user_id_str = str(user.id)
-            await ensure_pipeline_ownership_backfilled()
-            repo = get_pipeline_ownership_repo()
-            filtered = []
-            for p in pipelines:
-                pipeline_id = p.get("aggregate_id", p.get("id", ""))
-                try:
-                    record = await repo.get_owner(pipeline_id)
-                except Exception:
-                    logger.warning(
-                        "Pipeline ownership lookup failed for %s during list; excluding (fail closed)",
-                        pipeline_id,
-                        exc_info=True,
-                    )
-                    continue
-                if is_authorized(record, user_id_str):
-                    filtered.append(p)
-            pipelines = filtered
-        return {"pipelines": pipelines, "total": len(pipelines)}
+            try:
+                await ensure_pipeline_ownership_backfilled()
+                aggregate_ids = await get_pipeline_ownership_repo().list_pipeline_ids_for_user(
+                    str(user.id)
+                )
+            except Exception:
+                logger.warning(
+                    "Pipeline ownership lookup failed during list; returning none (fail closed)",
+                    exc_info=True,
+                )
+                return {"pipelines": [], "total": 0}
+        pipelines = await event_store.list_pipelines(
+            limit=limit,
+            offset=offset,
+            status=status,
+            aggregate_ids=aggregate_ids,
+        )
+        total = await event_store.count_pipelines(status=status, aggregate_ids=aggregate_ids)
+        return {"pipelines": pipelines, "total": total}
     except Exception as e:
         logger.error(f"List pipelines error: {e}")
         raise HTTPException(status_code=500, detail="Internal server error") from e

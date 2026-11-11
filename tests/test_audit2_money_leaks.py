@@ -47,6 +47,17 @@ class _Sink:
         await asyncio.sleep(0)
         self.calls.append(("settle", round(cost_usd, 6), reference_id))
 
+    async def true_up(self, *, user_id, reserved_credits, cost_usd, reference_id, preset) -> None:
+        # The real sink writes both legs in one transaction; the order is release, then charge.
+        await asyncio.sleep(0)
+        if reserved_credits > 0:
+            self.calls.append(("release", reserved_credits, f"{reference_id}:release"))
+        if cost_usd > 0:
+            self.calls.append(("settle", round(cost_usd, 6), reference_id))
+
+    async def record_unsettled(self, **kwargs) -> None:
+        self.calls.append(("unsettled", kwargs["reference_id"]))
+
 
 async def _one_frame_then_hang():
     yield PHASE_FRAME

@@ -33,6 +33,7 @@ import {
   generateSignedCsrfToken,
   rateLimit,
   ValidationError,
+  proxyErrorResponse,
   VALIDATION_LIMITS,
   SECURITY_CONSTANTS,
 } from './security-server';
@@ -568,5 +569,42 @@ describe('CSRF token — backend parity vector', () => {
 
   it('rejects token with invalid timestamp format', async () => {
     expect(await verifyCsrfToken('abc:ff1234.signedpart')).toBe(false);
+  });
+});
+
+describe('proxyErrorResponse', () => {
+  const leaky = 'connect ECONNREFUSED 10.0.3.7:8003';
+
+  beforeEach(() => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  it('never sends the upstream error text to the browser', async () => {
+    const res = proxyErrorResponse(new TypeError(leaky), 'Run', 'http://10.0.3.7:8003/api/run');
+    const body = await res.text();
+
+    expect(res.status).toBe(504);
+    expect(body).not.toContain('10.0.3.7');
+    expect(JSON.parse(body)).toEqual({ error: 'Backend unreachable' });
+  });
+
+  it('answers a non-connection failure with a fixed 502', async () => {
+    const res = proxyErrorResponse(new Error('secret: db password rejected'), 'Run');
+
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({ error: 'Proxy error' });
+  });
+
+  it('keeps a validation message, which the validators write for the caller', async () => {
+    const res = proxyErrorResponse(new ValidationError('problem is required'), 'Run');
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'problem is required' });
+  });
+
+  it('still logs the real cause server-side', () => {
+    proxyErrorResponse(new Error(leaky), 'Run', 'http://x');
+
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('Run proxy error'), leaky);
   });
 });

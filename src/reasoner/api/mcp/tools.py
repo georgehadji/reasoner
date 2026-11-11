@@ -113,7 +113,7 @@ async def _run_and_bill(
     Every stage reuses the exact function the HTTP agent routes call; see
     api/routes/agent.py::_metered_agent_stream for the HTTP-side twin.
     """
-    from reasoner.api.dependencies import reserve_or_402
+    from reasoner.api.dependencies import claim_quota_slot, release_quota_slot, reserve_or_402
     from reasoner.api.run_observability import CreditSink, PrometheusObserver
     from reasoner.api.schemas import CLIENT_RUN_ID_PATTERN, RunRequest
     from reasoner.api.streaming import run_stream_cached
@@ -146,6 +146,7 @@ async def _run_and_bill(
         client_run_id=client_run_id,
     )
     claim = await register_run(client_run_id, owner_key=str(user.id))
+    quota_slot = False
     try:
         if client_run_id:
             # Raises OwnershipConflictError if another caller owns this
@@ -153,11 +154,15 @@ async def _run_and_bill(
             await get_pipeline_ownership_repo().set_owner(
                 client_run_id, str(user.id), client_run_id,
             )
+        # Atomic quota claim, before the reservation (same order as admit_run).
+        quota_slot = await claim_quota_slot(user, preset)
         reference_id = run_reference(client_run_id)
         reserved_credits = await reserve_or_402(
             user_id=str(user.id), preset=preset, problem=problem, reference_id=reference_id,
         )
     except BaseException:
+        if quota_slot:
+            await release_quota_slot(user)
         await release_run(claim)  # the caller may retry with the same id
         raise
     run_ctx = RunContext(
@@ -168,6 +173,7 @@ async def _run_and_bill(
         interface=interface,
         reserved_credits=reserved_credits,
         run_claim=claim,
+        quota_slot=quota_slot,
     )
     stream = run_stream_cached(
         req,
@@ -263,7 +269,7 @@ def register_tools(mcp) -> None:
         """
         import json
 
-        from reasoner.api.dependencies import reserve_or_402
+        from reasoner.api.dependencies import claim_quota_slot, release_quota_slot, reserve_or_402
         from reasoner.api.run_observability import CreditSink, PrometheusObserver
         from reasoner.api.schemas import FollowupRequest
         from reasoner.api.streaming import run_followup_stream
@@ -283,9 +289,16 @@ def register_tools(mcp) -> None:
             preset=preset,
         )
         reference_id = f"followup:{uuid.uuid4()}"
-        reserved_credits = await reserve_or_402(
-            user_id=str(user.id), preset=preset, problem=req.question, reference_id=reference_id,
-        )
+        quota_slot = await claim_quota_slot(user, preset)
+        try:
+            reserved_credits = await reserve_or_402(
+                user_id=str(user.id), preset=preset, problem=req.question,
+                reference_id=reference_id,
+            )
+        except BaseException:
+            if quota_slot:
+                await release_quota_slot(user)
+            raise
         run_ctx = RunContext(
             preset=preset,
             reference_id=reference_id,
@@ -293,6 +306,7 @@ def register_tools(mcp) -> None:
             tier=tier,
             interface="mcp",
             reserved_credits=reserved_credits,
+            quota_slot=quota_slot,
         )
         stream = run_followup_stream(req, user_id=str(user.id))
 

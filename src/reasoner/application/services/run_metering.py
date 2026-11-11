@@ -54,16 +54,6 @@ class SettlementSink(Protocol):
         """
         ...
 
-    async def release(
-        self,
-        *,
-        user_id: str,
-        credits: int,
-        reference_id: str,
-    ) -> None:
-        """Return credits from a reservation that won't be (fully) used."""
-        ...
-
     async def settle(
         self,
         *,
@@ -72,6 +62,39 @@ class SettlementSink(Protocol):
         reference_id: str,
         preset: str,
     ) -> None: ...
+
+    async def true_up(
+        self,
+        *,
+        user_id: str,
+        reserved_credits: int,
+        cost_usd: float,
+        reference_id: str,
+        preset: str,
+    ) -> None:
+        """Release the reservation and charge the real cost as one transaction.
+
+        Either both ledger rows land or neither does, so a failure cannot leave a
+        refunded run with no charge.
+        """
+        ...
+
+    async def record_unsettled(
+        self,
+        *,
+        user_id: str,
+        reference_id: str,
+        cost_usd: float,
+        reserved_credits: int,
+        preset: str,
+        error: str,
+    ) -> None:
+        """Durably note a run whose settlement failed, so it can be replayed."""
+        ...
+
+    async def release_quota_slot(self, *, user_id: str) -> None:
+        """Give back the quota slot admission took, for a run that cost nothing."""
+        ...
 
 
 class RunObserver(Protocol):
@@ -105,6 +128,9 @@ class RunContext:
     #: The ``client_run_id`` claim (``idempotency.register_run``). Released when
     #: the run does not complete, so the caller can retry with the same id.
     run_claim: str | None = None
+    #: Admission took a quota slot for this run (audit 6, finding 3). A run that
+    #: ends up costing nothing gives it back; a billed run keeps it.
+    quota_slot: bool = False
 
 
 #: Frame types that carry a ``total_cost_usd``. ``done`` is the final figure;
@@ -195,6 +221,11 @@ async def metered(
                     "run_metering.settle_timeout", None, exc=exc,
                     detail=f"run {ctx.reference_id} left unsettled (${cost_usd:.6f})",
                 )
+                # The interrupted write may or may not have landed; replay is
+                # idempotent on reference_id, so recording it is always safe.
+                await _record_unsettled(sink, ctx, cost_usd, exc)
+                if cost_usd <= 0:
+                    await _release_quota_slot(sink, ctx)  # a free run keeps no slot
             if not completed:
                 await _release_claim(ctx)
         if observer is not None:
@@ -212,6 +243,20 @@ async def _finalize(sink: SettlementSink, ctx: RunContext, cost_usd: float) -> N
         # production call site reserves via reserve_run_budget(); this
         # keeps older/uninstrumented callers billed rather than free.
         await _settle(sink, ctx, cost_usd)
+    if cost_usd <= 0:
+        await _release_quota_slot(sink, ctx)
+
+
+async def _release_quota_slot(sink: SettlementSink, ctx: RunContext) -> None:
+    """Give back the admission quota slot of a run that was not billed. Never raises."""
+    if not ctx.quota_slot or not ctx.user_id:
+        return
+    try:
+        await sink.release_quota_slot(user_id=ctx.user_id)
+    except Exception as exc:
+        logger.warning(
+            "Quota slot release failed for user %s run %s: %s", ctx.user_id, ctx.reference_id, exc
+        )
 
 
 async def release_unstarted(sink: SettlementSink, ctx: RunContext) -> None:
@@ -225,6 +270,7 @@ async def release_unstarted(sink: SettlementSink, ctx: RunContext) -> None:
     with anyio.CancelScope(shield=True), anyio.move_on_after(SETTLE_TIMEOUT_SECONDS):
         if ctx.user_id and ctx.reserved_credits > 0:
             await _true_up(sink, ctx, 0.0)
+        await _release_quota_slot(sink, ctx)
         await _release_claim(ctx)
 
 
@@ -247,25 +293,27 @@ async def _release_claim(ctx: RunContext) -> None:
 
 
 async def _true_up(sink: SettlementSink, ctx: RunContext, cost_usd: float) -> None:
-    """Release the held reservation, then charge the actual cost.
+    """Give back the held reservation and charge the actual cost, in one transaction.
 
-    Two ledger entries through the existing composable primitives rather
-    than new delta arithmetic -- release is exempt from the same fail-soft
-    handling as settle so one failure doesn't block the other.
+    Two ledger rows (``<ref>:release`` and ``<ref>``) written together: a failure
+    between two separate writes left the refund in and the charge out, a free run.
+    If the transaction fails, neither row lands, so the reservation stays debited
+    (the user pays the estimate, the safe side) and the run is recorded for replay.
     """
     try:
-        await sink.release(
+        await sink.true_up(
             user_id=ctx.user_id or "",
-            credits=ctx.reserved_credits,
-            reference_id=f"{ctx.reference_id}:release",
+            reserved_credits=ctx.reserved_credits,
+            cost_usd=cost_usd,
+            reference_id=ctx.reference_id,
+            preset=ctx.preset,
         )
     except Exception as exc:
         logger.warning(
-            "Reservation release failed for user %s run %s (%d credits): %s",
-            ctx.user_id, ctx.reference_id, ctx.reserved_credits, exc,
+            "Credit true-up failed for user %s run %s (%d reserved, $%.6f): %s",
+            ctx.user_id, ctx.reference_id, ctx.reserved_credits, cost_usd, exc,
         )
-    if cost_usd > 0:
-        await _settle(sink, ctx, cost_usd)
+        await _record_unsettled(sink, ctx, cost_usd, exc)
 
 
 async def _settle(sink: SettlementSink, ctx: RunContext, cost_usd: float) -> None:
@@ -283,6 +331,36 @@ async def _settle(sink: SettlementSink, ctx: RunContext, cost_usd: float) -> Non
             ctx.reference_id,
             cost_usd,
             exc,
+        )
+        await _record_unsettled(sink, ctx, cost_usd, exc)
+
+
+async def _record_unsettled(
+    sink: SettlementSink, ctx: RunContext, cost_usd: float, exc: BaseException
+) -> None:
+    """Note a run that was served but not settled. Never raises.
+
+    The answer is already delivered, so there is nothing to refuse; the record is
+    what makes "reconciled later" true. If the sink cannot store it either, the
+    ERROR line below is the last copy, with every field a replay needs.
+    """
+    if not ctx.user_id or (ctx.reserved_credits <= 0 and cost_usd <= 0):
+        return  # nothing was held and nothing is owed
+    try:
+        await sink.record_unsettled(
+            user_id=ctx.user_id,
+            reference_id=ctx.reference_id,
+            cost_usd=cost_usd,
+            reserved_credits=ctx.reserved_credits,
+            preset=ctx.preset,
+            error=repr(exc),
+        )
+    except Exception as record_exc:
+        logger.error(
+            "UNSETTLED RUN NOT RECORDED (%s): user=%s reference=%s cost_usd=%.6f "
+            "reserved_credits=%d preset=%s error=%s",
+            record_exc, ctx.user_id, ctx.reference_id, cost_usd,
+            ctx.reserved_credits, ctx.preset, exc,
         )
 
 

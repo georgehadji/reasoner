@@ -312,14 +312,22 @@ async def get_current_user(
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=401, detail=f"Authentication failed: {exc}") from exc
+        logger.warning("Authentication failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=401, detail="Authentication failed") from exc
 
 
 async def get_optional_user(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
 ) -> User | None:
-    """Optional authentication — returns None if no valid credentials."""
+    """Optional authentication — returns None if no valid credentials.
+
+    Routes that only personalise (health, gate, neuro owner) treat a failed login
+    as anonymous. A billed run must not: the reason is recorded on
+    ``request.state.auth_failure`` so ``admit_run`` can refuse it. "rejected" is a
+    bad or revoked credential; "unavailable" is anything else, such as a database
+    error while resolving a real key. No credentials sent leaves it unset.
+    """
     if not credentials:
         return None
     if (resolved := getattr(request.state, "user", None)) is not None:
@@ -332,7 +340,12 @@ async def get_optional_user(
         request.state.user = user
         request.state.auth_method = "api_key" if is_api_key else "bearer"
         return user
+    except (HTTPException, LegacyAuthError):
+        request.state.auth_failure = "rejected"
+        return None
     except Exception:
+        logger.warning("Optional authentication unavailable", exc_info=True)
+        request.state.auth_failure = "unavailable"
         return None
 
 
@@ -353,6 +366,15 @@ def require_key_scope(scope: str):
         return user
 
     return guard
+
+
+async def require_admin_scope(user: User = Depends(get_current_user)) -> User:
+    """Route guard: the caller must hold the admin scope. Returns the user."""
+    from reasoner.auth import Scope
+
+    if Scope.ADMIN.value not in user.scopes:
+        raise HTTPException(status_code=403, detail="Admin scope required")
+    return user
 
 
 async def require_auth_if_legacy_disabled(
@@ -644,6 +666,9 @@ async def require_credits(user: User = Depends(get_current_user)) -> User:
         # A ledger outage must not take the product down; log and let the run
         # through. The run still settles later if the ledger recovers.
         logger.warning("Credit balance lookup failed; allowing run", exc_info=True)
+        from reasoner.api.run_observability import count_credit_failopen
+
+        count_credit_failopen("require_credits")
         return user
 
     if balance.is_exhausted:
@@ -737,6 +762,9 @@ async def reserve_or_402(
         # require_credits: log and let the run through unreserved. metered()
         # still settles from actual spend once the ledger recovers.
         logger.warning("Credit reservation failed; allowing run unreserved", exc_info=True)
+        from reasoner.api.run_observability import count_credit_failopen
+
+        count_credit_failopen("reserve")
         return 0
 
 
@@ -862,6 +890,66 @@ async def check_quota(
             },
         )
     return result
+
+
+async def claim_quota_slot(
+    user: User | None, preset: str, request: Request | None = None
+) -> bool:
+    """Take one quota slot for an admitted run; True when a slot is held.
+
+    ``check_quota`` only reads, so concurrent runs at 19/20 all passed it and were
+    counted at the end (audit 6, finding 3). This is the atomic claim: the run that
+    finds the limit reached gets the same 429. ``False`` means no slot is held
+    (anonymous, an unlimited tier, or a quota outage), so nothing is released.
+    """
+    if user is None:
+        return False
+    # Same guard as reserve_or_402: no database configured outside production.
+    if not _persistence_is_configured() and settings.ENVIRONMENT != "production":
+        return False
+    user_tier = await resolve_request_tier(request, user)
+    try:
+        result = await _get_quota_service().increment(str(user.id), preset)
+    except Exception as exc:
+        # Same bounded fail-open as check_quota: an outage must not stop the product,
+        # and it is counted so it can be alerted on.
+        logging.getLogger(__name__).error(
+            "Quota claim failed (%s: %s); the run is admitted uncounted",
+            type(exc).__name__, exc, exc_info=True,
+        )
+        try:
+            from reasoner.metrics import REASONER_QUOTA_CHECK_FAILURES
+
+            REASONER_QUOTA_CHECK_FAILURES.labels(reason=type(exc).__name__).inc()
+        except Exception as metrics_exc:
+            logging.getLogger(__name__).debug("Quota-failure metric not recorded: %s", metrics_exc)
+        return False
+    if not result.allowed:
+        from reasoner.core.ports.metrics_port import count_quota_exceeded
+
+        count_quota_exceeded(getattr(user_tier, "value", str(user_tier)))
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "error": "Quota exceeded",
+                "message": result.reason,
+                "remaining": 0,
+                "retry_after": result.retry_after,
+                "upgrade_url": "/pricing",
+            },
+            headers={"Retry-After": str(result.retry_after or 3600), "X-RateLimit-Remaining": "0"},
+        )
+    return result.remaining != -1
+
+
+async def release_quota_slot(user: User | None) -> None:
+    """Give back a slot taken by :func:`claim_quota_slot` when admission then failed."""
+    if user is None:
+        return
+    try:
+        await _get_quota_service().release(str(user.id))
+    except Exception as exc:
+        logging.getLogger(__name__).warning("Quota slot release failed for %s: %s", user.id, exc)
 
 
 async def check_preset_access(
