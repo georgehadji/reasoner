@@ -20,7 +20,7 @@ from hypothesis import strategies as st
 from reasoner.core.settings import settings
 from reasoner.infrastructure import uploader
 from reasoner.infrastructure.persistence.upload_usage_repo import SqliteUploadUsageRepository
-from reasoner.neuro.cache import L1Cache, L2Index
+from reasoner.neuro.cache import L1Cache, L2Index, read_l2_entries
 from reasoner.neuro.config import CacheConfig, NeuroConfig, get_agent_data_dir
 from reasoner.utils.atomic_file import read_json_or_quarantine
 
@@ -200,7 +200,7 @@ async def test_same_content_learned_twice_is_one_l2_entry(tmp_path):
     await index.add("x", "s", [1.0, 0.0], {"schema_version": 1})
     await index.add("x", "s", [1.0, 0.0], {"schema_version": 1})
     assert index.size == 1
-    assert len(json.loads((tmp_path / "index.json").read_text(encoding="utf-8"))) == 1
+    assert len(read_l2_entries(tmp_path)) == 1
 
 
 async def test_truncated_l2_index_is_quarantined_not_wiped(tmp_path):
