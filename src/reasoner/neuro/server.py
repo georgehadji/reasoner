@@ -1,6 +1,6 @@
 """
 Neuro API Engine
-Internal endpoints for recall, audit, and learning.
+Internal endpoints for recall and learning.
 """
 
 import asyncio
@@ -24,7 +24,6 @@ from reasoner.neuro.cache import ContextChunk, L1Cache, L2Index, l3_scan
 from reasoner.neuro.compression import smart_compress
 from reasoner.neuro.config import (
     NeuroConfig,
-    PersonaConfig,
     get_agent_data_dir,
     get_persona,
     load_config,
@@ -32,7 +31,6 @@ from reasoner.neuro.config import (
 from reasoner.neuro.providers import create_resilient_embedding, create_resilient_reasoning
 from reasoner.neuro.sessions import SessionConfig, SessionManager
 from reasoner.utils.atomic_file import atomic_write_text
-from reasoner.utils.json_safe import safe_json_loads
 
 log = logging.getLogger("neuro.api")
 
@@ -112,23 +110,6 @@ class RecallResponse(BaseModel):
     latency_ms: float
     cache_hits: dict
     agent_id: str | None
-    persona: str
-    provider_used: str
-
-
-class AuditRequest(BaseModel):
-    prompt: str = Field(..., description="The user's original prompt")
-    draft_response: str = Field(..., description="The agent's draft response")
-    agent_id: str | None = Field(None)
-    persona: str | None = Field(None, description="Persona mode override")
-
-
-class AuditResponse(BaseModel):
-    verdict: str
-    confidence: float
-    reason: str
-    enrichment: str | None = None
-    latency_ms: float
     persona: str
     provider_used: str
 
@@ -375,29 +356,6 @@ class TenantManager:
 
 
 # ─────────────────────────────────────────────
-#  Prompts
-# ─────────────────────────────────────────────
-
-BASE_AUDIT_PROMPT = """You are Neuro, a memory coprocessor for reasoning agents.
-Review the agent's draft response against the user's prompt and any memory context.
-
-Respond with EXACTLY this JSON format (no markdown):
-{{
-    "verdict": "PASS|ENRICH|WARN|BLOCK",
-    "confidence": 0.0-1.0,
-    "reason": "brief explanation",
-    "enrichment": "additional context if ENRICH, otherwise null"
-}}"""
-
-
-def build_audit_system_prompt(persona: PersonaConfig) -> str:
-    prompt = BASE_AUDIT_PROMPT
-    if persona.custom_system_prompt:
-        prompt += f"\n\nADDITIONAL INSTRUCTIONS ({persona.name.upper()} MODE):\n{persona.custom_system_prompt}"
-    return prompt
-
-
-# ─────────────────────────────────────────────
 #  Router Factory
 # ─────────────────────────────────────────────
 
@@ -406,8 +364,8 @@ def require_neuro_key(request: Request) -> None:
     """Gate /api/neuro/* to callers holding the shared internal key.
 
     The pipeline reaches these endpoints over loopback, but they are mounted
-    on the public app: ungated, /audit is a free LLM proxy and /learn lets
-    anyone write into a tenant's memory.
+    on the public app: ungated, /learn lets anyone write into a tenant's
+    memory.
 
     An unset key is allowed through so local development works with no
     secrets configured; api/__init__.py refuses to start in production when
@@ -776,40 +734,6 @@ class NeuroService:
             provider_used=embedder.active_label,
         )
 
-    async def audit(self, req: AuditRequest, owner: str | None = None) -> AuditResponse:
-        config, reasoner, tenants = self.config, self.reasoner, self.tenants
-        start = time.perf_counter()
-        persona = get_persona(config, req.persona, req.agent_id)
-        tenant = await tenants.get(tenant_key(owner, req.agent_id))
-
-        system_prompt = build_audit_system_prompt(persona)
-        user_prompt = f"PROMPT:\n{req.prompt}\n\nDRAFT RESPONSE:\n{req.draft_response}"
-
-        try:
-            raw = await reasoner.generate(user_prompt, system=system_prompt)
-            result = safe_json_loads(
-                raw.strip().strip("`").replace("json", "", 1).strip(), max_depth=50
-            )
-            return AuditResponse(
-                verdict=result.get("verdict", "PASS"),
-                confidence=result.get("confidence", 0.5),
-                reason=result.get("reason", ""),
-                enrichment=result.get("enrichment"),
-                latency_ms=round((time.perf_counter() - start) * 1000, 1),
-                persona=persona.name,
-                provider_used=reasoner.active_label,
-            )
-        except Exception as e:
-            log.warning("Audit failed (returning WARN): %s", e)
-            return AuditResponse(
-                verdict="WARN",
-                confidence=0.0,
-                reason=f"Audit parse failed: {e}",
-                latency_ms=round((time.perf_counter() - start) * 1000, 1),
-                persona=persona.name,
-                provider_used=reasoner.active_label,
-            )
-
     @staticmethod
     def _dropped_for_erased_owner(key: str | None, req: LearnRequest) -> LearnResponse:
         log.warning("Dropping learn for erased owner (tenant %s)", key)
@@ -959,10 +883,6 @@ def create_neuro_router(config: NeuroConfig | None = None) -> APIRouter:
     @router.post("/recall", response_model=RecallResponse)
     async def recall(req: RecallRequest, owner: str | None = Depends(_owner)):
         return await service.recall_chunks(req, owner=owner)
-
-    @router.post("/audit", response_model=AuditResponse)
-    async def audit(req: AuditRequest, owner: str | None = Depends(_owner)):
-        return await service.audit(req, owner=owner)
 
     @router.post("/learn")
     async def learn(req: LearnRequest, owner: str | None = Depends(_owner)):

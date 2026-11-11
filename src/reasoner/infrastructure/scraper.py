@@ -5,6 +5,7 @@ Provides deep reading capabilities to fetch full page content and convert to mar
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 import threading
@@ -105,13 +106,12 @@ HTML_TAGS_TO_MARKDOWN = {
     '</ul>': '\n',
     '<ol>': '',
     '</ol>': '\n',
-    '<a href="': '[',
-    '">': '](',
-    '</a>': ')',
-    '<img src="': '![',
-    '" alt="': '](',
-    '">': ')',
 }
+
+# Links need their own pattern. As plain replacements, `">` (the end of any
+# attribute) was a table key: it ate the closing `>` of tags like `<div class="x">`,
+# and the tag-stripper below then deleted everything up to the next real `>`.
+_ANCHOR_RE = re.compile(r'<a\s[^>]*?href="([^"]*)"[^>]*>(.*?)</a>', re.DOTALL | re.IGNORECASE)
 
 
 def _simple_html_to_markdown(html: str) -> str:
@@ -122,6 +122,8 @@ def _simple_html_to_markdown(html: str) -> str:
 
     # Remove HTML comments
     html = re.sub(r'<!--.*?-->', '', html, flags=re.DOTALL)
+
+    html = _ANCHOR_RE.sub(r'[\2](\1)', html)
 
     # Basic tag replacements
     for tag, md in HTML_TAGS_TO_MARKDOWN.items():
@@ -235,7 +237,3 @@ async def scrape_urls(urls: list[str], max_length: int = 10000) -> list[dict[str
             processed_results.append(result)
 
     return processed_results
-
-
-# Need to import asyncio for the gather function
-import asyncio

@@ -469,7 +469,7 @@ from reasoner.api.dependencies import (
     require_credits_if_authenticated,
     run_tier_label,
 )
-from reasoner.api.run_admission import MeteredSSEResponse, admit_run
+from reasoner.api.run_admission import Admission, MeteredSSEResponse, admit_run
 from reasoner.api.run_admission import (
     require_auth_if_legacy_disabled as _require_auth_if_legacy_disabled,
 )
@@ -537,9 +537,7 @@ async def _run_stream_with_metrics(
     preset_service: PresetService,
     pipeline_service: PipelineService,
     *,
-    reference_id: str,
-    reserved_credits: int = 0,
-    started: asyncio.Event | None = None,
+    adm: Admission,
 ):
     """Stream a run through the shared metering wrapper.
 
@@ -556,7 +554,7 @@ async def _run_stream_with_metrics(
     from reasoner.logging_utils import set_log_context
 
     tier = await run_tier_label(user, request)
-    preset = req.preset or "auto-budget"
+    preset = adm.preset
     set_log_context(user_id=str(user.id) if user else None, tier=tier, preset=preset)
 
     # Metrics are optional — degrade gracefully if QueryTimer is missing
@@ -569,18 +567,13 @@ async def _run_stream_with_metrics(
         pass
 
     from reasoner.api.run_observability import CreditSink, PrometheusObserver
-    from reasoner.application.services.run_metering import RunContext, metered
+    from reasoner.application.services.run_metering import metered
 
     user_id = str(user.id) if user else None
-    ctx = RunContext(
-        preset=preset,
-        reference_id=reference_id,
-        user_id=user_id,
-        tier=tier,
-        interface="web",
-        reserved_credits=reserved_credits,
-        started=started,
-    )
+    # From the admission, so metered() also gets the run_claim and quota_slot:
+    # without them a failed run kept its client_run_id (retry 409) and a free
+    # run kept its quota slot.
+    ctx = adm.run_context(tier=tier, interface="web")
     stream = run_stream_cached(
         req,
         request=request,
@@ -602,9 +595,7 @@ async def _run_followup_stream_with_metrics(
     request: Request,
     user: User | None,
     *,
-    reference_id: str,
-    reserved_credits: int = 0,
-    started: asyncio.Event | None = None,
+    adm: Admission,
 ):
     """Stream a follow-up run through the shared metering wrapper.
 
@@ -618,11 +609,11 @@ async def _run_followup_stream_with_metrics(
     share one reference_id.
     """
     from reasoner.api.run_observability import CreditSink, PrometheusObserver
-    from reasoner.application.services.run_metering import RunContext, metered
+    from reasoner.application.services.run_metering import metered
     from reasoner.logging_utils import set_log_context
 
     tier = await run_tier_label(user, request)
-    preset = req.preset or "auto-budget"
+    preset = adm.preset
     user_id = str(user.id) if user else None
     set_log_context(user_id=user_id, tier=tier, preset=preset)
 
@@ -634,15 +625,7 @@ async def _run_followup_stream_with_metrics(
     except (ImportError, AttributeError):
         pass
 
-    ctx = RunContext(
-        preset=preset,
-        reference_id=reference_id,
-        user_id=user_id,
-        tier=tier,
-        interface="web",
-        reserved_credits=reserved_credits,
-        started=started,
-    )
+    ctx = adm.run_context(tier=tier, interface="web")
     stream = run_followup_stream(req, request=request, user_id=user_id)
     async for chunk in metered(
         stream,
@@ -691,9 +674,7 @@ async def run_pipeline(
     )
     return MeteredSSEResponse(
         _run_stream_with_metrics(
-            req, request, user, preset_service, pipeline_service,
-            reference_id=adm.reference_id, reserved_credits=adm.reserved_credits,
-            started=adm.started,
+            req, request, user, preset_service, pipeline_service, adm=adm,
         ),
         adm,
         headers={
@@ -730,9 +711,7 @@ async def run_followup_pipeline(
     )
     return MeteredSSEResponse(
         _run_followup_stream_with_metrics(
-            req, request, user,
-            reference_id=adm.reference_id, reserved_credits=adm.reserved_credits,
-            started=adm.started,
+            req, request, user, adm=adm,
         ),
         adm,
         headers={

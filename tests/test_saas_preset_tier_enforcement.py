@@ -51,6 +51,12 @@ def _as_tier(tier):
     return patch("reasoner.api.dependencies._resolve_user_tier", AsyncMock(return_value=tier))
 
 
+def _admission():
+    from reasoner.api.run_admission import Admission
+
+    return Admission(user_id=None, preset="debate-budget", reference_id="r", reserved_credits=0)
+
+
 @pytest.fixture
 def enforcement_on(monkeypatch):
     monkeypatch.setattr(settings, "PRESET_TIER_ENFORCEMENT_ENABLED", True)
@@ -417,14 +423,11 @@ class TestQueryMetricTierLabel:
             patch("reasoner.api.run_stream_cached", fake_stream),
             patch("reasoner.api.run_followup_stream", fake_stream),
         ):
+            adm = _admission()
             gen = (
-                api._run_stream_with_metrics(
-                    req, None, user, None, None, reference_id="r", reserved_credits=0
-                )
+                api._run_stream_with_metrics(req, None, user, None, None, adm=adm)
                 if stream_fn == "run"
-                else api._run_followup_stream_with_metrics(
-                    req, None, user, reference_id="r", reserved_credits=0
-                )
+                else api._run_followup_stream_with_metrics(req, None, user, adm=adm)
             )
             async for _ in gen:
                 pass
@@ -483,8 +486,7 @@ class TestAgentRouteTierLabel:
         ):
             async for _ in agent._metered_agent_stream(
                 SimpleNamespace(), _req(), user, None, None,
-                preset="debate-budget", interface="agent_http",
-                reference_id="r", reserved_credits=0,
+                interface="agent_http", adm=_admission(),
             ):
                 pass
         assert captured == {"ctx_tier": tier.value, "observer_tier": tier.value}
