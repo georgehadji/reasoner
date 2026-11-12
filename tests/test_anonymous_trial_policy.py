@@ -42,8 +42,20 @@ class _FakeValkey:
             self.expiries[key] = ex
         return True
 
+    async def eval(self, script: str, numkeys: int, key: str, amount: int) -> int:
+        """The refund script's contract: skip a missing key, floor at 0, keep the TTL."""
+        if self.fail:
+            raise ConnectionError("valkey unreachable")
+        if key not in self.store:
+            return -1
+        self.store[key] = max(self.store[key] - int(amount), 0)
+        return self.store[key]
+
     async def exists(self, key: str) -> int:
-        return int(key in self.store)
+        # The key expires right after this answer: midnight UTC between two calls.
+        present = int(key in self.store)
+        self.store.pop(key, None)
+        return present
 
     async def decrby(self, key: str, amount: int) -> int:
         self.store[key] = self.store.get(key, 0) - amount
@@ -152,12 +164,26 @@ async def test_refund_ignores_an_expired_counter(monkeypatch):
     assert client.store == {}  # no negative, TTL-less key
 
 
+async def test_refund_across_midnight_never_creates_a_key(monkeypatch):
+    """exists-then-decrby left a negative, TTL-less key when the day rolled over between them."""
+    client = _FakeValkey()
+    _patch_valkey(monkeypatch, client)
+    charge = await enforce_anonymous_trial_cap("1.2.3.4", estimated_cost_usd=0.04)
+
+    await refund_anonymous_trial(charge)
+    await refund_anonymous_trial(charge)  # a second refund must floor at 0, not go negative
+
+    assert all(v >= 0 for v in client.store.values())
+    client.store.clear()
+    await refund_anonymous_trial(charge)
+    assert client.store == {}
+
+
 async def test_refund_never_raises(monkeypatch):
     client = _FakeValkey()
     _patch_valkey(monkeypatch, client)
     charge = await enforce_anonymous_trial_cap("1.2.3.4", estimated_cost_usd=0.04)
     client.fail = True
-    client.exists = lambda key: (_ for _ in ()).throw(ConnectionError("down"))
 
     await refund_anonymous_trial(charge)
     await refund_anonymous_trial(None)

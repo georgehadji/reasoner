@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from datetime import datetime
 
 import asyncpg
 
@@ -130,12 +131,16 @@ class PostgresQuotaRepository(QuotaRepository):
 
                 return QuotaResult(allowed=True, remaining=remaining - 1)
 
-    async def release_slot(self, user_id: str) -> None:
+    async def release_slot(self, user_id: str, claimed_at: datetime | None = None) -> None:
         pool = await self._get_pool()
+        # period_start > claimed_at means the monthly reset ran after the claim
+        # (SM-M4): the slot is already gone, the new period's count is not ours.
         await pool.execute(
             "UPDATE usage_quotas SET used_queries = GREATEST(used_queries - 1, 0), "
-            "updated_at = NOW() WHERE user_id = $1 AND max_queries <> -1",
-            user_id,
+            "updated_at = NOW() WHERE user_id = $1 AND max_queries <> -1 "
+            "AND ($2::timestamptz IS NULL OR period_start IS NULL "
+            "OR period_start <= $2::timestamptz)",
+            user_id, claimed_at,
         )
 
     async def reset_monthly(self, user_id: str) -> None:

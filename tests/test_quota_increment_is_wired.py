@@ -152,7 +152,7 @@ class _Sink:
     async def true_up(self, **_kw): ...
     async def record_unsettled(self, **_kw): ...
 
-    async def release_quota_slot(self, *, user_id: str) -> None:
+    async def release_quota_slot(self, *, user_id: str, claimed_at=None) -> None:
         self.released.append(user_id)
 
 

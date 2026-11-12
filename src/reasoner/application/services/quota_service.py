@@ -10,9 +10,11 @@ Enforces business rules:
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import UTC
+from datetime import UTC, datetime
+from enum import StrEnum
 
 from reasoner.application.ports.quota_repository import QuotaRepository
+from reasoner.core.state_machine import Machine
 from reasoner.domain.saas import (
     QuotaResult,
     SubscriptionTier,
@@ -23,6 +25,29 @@ TIER_LIMITS: dict[SubscriptionTier, int] = {
     SubscriptionTier.PRO: 500,
     SubscriptionTier.ENTERPRISE: -1,   # unlimited
 }
+
+
+class QuotaSlotState(StrEnum):
+    """One admission's claim on ``usage_quotas.used_queries`` (SM-M4)."""
+
+    UNCLAIMED = "unclaimed"
+    CLAIMED = "claimed"  # check_and_increment took a slot in the current period
+    RELEASED = "released"  # given back inside the period it was claimed in
+    VOIDED = "voided"  # the monthly reset zeroed the count first; nothing left to give back
+
+
+#: The claim itself is SELECT ... FOR UPDATE in ``check_and_increment``; the period
+#: guard on release is the SQL ``period_start <= claimed_at`` in ``release_slot``.
+QUOTA_SLOT_MACHINE = Machine(
+    "quota_slot",
+    {
+        QuotaSlotState.UNCLAIMED: {QuotaSlotState.CLAIMED},
+        QuotaSlotState.CLAIMED: {QuotaSlotState.RELEASED, QuotaSlotState.VOIDED},
+        QuotaSlotState.RELEASED: set(),
+        QuotaSlotState.VOIDED: set(),
+    },
+    initial=QuotaSlotState.UNCLAIMED,
+)
 
 
 class QuotaService:
@@ -50,7 +75,6 @@ class QuotaService:
         quota = await self._repository.get_quota(user_id)
 
         # Auto-reset if we've crossed into a new month
-        from datetime import datetime
         now = datetime.now(UTC)
         current_period_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         # period_start is nullable and no INSERT path sets it, so a row that has
@@ -96,9 +120,13 @@ class QuotaService:
             result = replace(result, retry_after=self._seconds_until_month_end())
         return result
 
-    async def release(self, user_id: str) -> None:
-        """Give back a slot taken by :meth:`increment` for a run that was not billed."""
-        await self._repository.release_slot(user_id)
+    async def release(self, user_id: str, claimed_at: datetime | None = None) -> None:
+        """Give back a slot taken by :meth:`increment` for a run that was not billed.
+
+        Pass the claim time so a release after the month rolled over is a no-op.
+        """
+        QUOTA_SLOT_MACHINE.move(QuotaSlotState.CLAIMED, QuotaSlotState.RELEASED)
+        await self._repository.release_slot(user_id, claimed_at)
 
     def _seconds_until_month_end(self) -> int:
         """Rough estimate for Retry-After header."""

@@ -343,36 +343,23 @@ class PostgresSubscriptionRepository:
                         new_max,
                     )
                 else:
-                    old_tier = row["tier"]
-                    if old_tier != sub.tier.value:
-                        # Tier changed: limits move, usage does not, or a cancel
-                        # would hand out a fresh free allowance. The monthly
-                        # reset owns the period.
-                        await conn.execute(
-                            """
-                            UPDATE usage_quotas
-                            SET tier = $2, max_queries = $3, updated_at = NOW()
-                            WHERE user_id = $1
-                            """,
-                            str(sub.user_id),
-                            sub.tier.value,
-                            new_max,
-                        )
+                    # Limits move, usage does not (or a cancel would hand out a fresh
+                    # free allowance); the monthly reset owns the period. A same-tier
+                    # event still rewrites max_queries (plan metadata change).
+                    await conn.execute(
+                        """
+                        UPDATE usage_quotas
+                        SET tier = $2, max_queries = $3, updated_at = NOW()
+                        WHERE user_id = $1
+                        """,
+                        str(sub.user_id),
+                        sub.tier.value,
+                        new_max,
+                    )
+                    if row["tier"] != sub.tier.value:
                         logger.info(
                             "Quota tier changed for user %s: %s -> %s",
-                            sub.user_id, old_tier, sub.tier.value
-                        )
-                    else:
-                        # Same tier — only update max_queries (e.g. plan metadata change)
-                        await conn.execute(
-                            """
-                            UPDATE usage_quotas
-                            SET tier = $2, max_queries = $3, updated_at = NOW()
-                            WHERE user_id = $1
-                            """,
-                            str(sub.user_id),
-                            sub.tier.value,
-                            new_max,
+                            sub.user_id, row["tier"], sub.tier.value
                         )
 
     async def set_subscription_status(

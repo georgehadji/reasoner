@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, Suspense } from 'react';
+import { useAsyncAction } from '@/hooks/useAsyncAction';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertCircle, Check } from 'lucide-react';
 import { Button } from '@/components/ui';
@@ -108,76 +109,57 @@ function LoginMessage() {
 }
 
 type Provider = 'google' | 'github' | 'apple';
-type Status = 'idle' | 'submitting' | 'success';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const auth = useAsyncAction();
+  const { error } = auth;
+  /* ONE pending action across the email form and every OAuth button (U8). `key`
+     says WHICH control is working, so the spinner lands on the one pressed. */
+  const busy = auth.status === 'pending' || auth.status === 'ok';
+  const oauth = busy && auth.key !== 'email' ? (auth.key as Provider) : null;
+  const submitting = auth.pending && auth.key === 'email';
+  const success = auth.status === 'ok' && auth.key === 'email';
   // An OAuth failure is not a credential failure. `aria-invalid={!!error}`
   // on both fields painted them red and made one message the accessible
-  // description of two inputs — announced twice — for errors that had
+  // description of two inputs � announced twice � for errors that had
   // nothing to do with what the user typed.
-  const [credentialsRejected, setCredentialsRejected] = useState(false);
-  const [status, setStatus] = useState<Status>('idle');
-  const [oauth, setOauth] = useState<Provider | null>(null);
+  const credentialsRejected = auth.status === 'error' && auth.key === 'email';
   const oauthTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(oauthTimer.current), []);
 
-  /* `busy` covers the whole surface; `status`/`oauth` say WHICH control is
-     working, so the spinner lands on the button the user actually pressed. */
-  const busy = status !== 'idle' || oauth !== null;
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setCredentialsRejected(false);
-    setStatus('submitting');
-    try {
-      await signInWithEmail(email, password);
-      // Stay in `success` through the redirect — dropping back to idle would
-      // flash an enabled form and read as "nothing happened".
-      setStatus('success');
-    } catch (err) {
-      const authErr = err as AuthError;
-      setCredentialsRejected(true);
-      setError(authErr.message || 'Login failed');
-      setStatus('idle');
-    }
+    // Stay in `ok` through the redirect � dropping back to idle would flash an
+    // enabled form and read as "nothing happened".
+    await auth.run('email', () => signInWithEmail(email, password), 'Login failed');
   };
 
   const enabledProviders = getEnabledOAuthProviders();
 
-  const handleOAuth = async (provider: Provider) => {
-    setError('');
-    setCredentialsRejected(false);
-    setOauth(provider);
-    // `signInWithOAuth` resolves as soon as it has *started* the redirect, so a
-    // navigation that never lands — pop-up blocked, provider misconfigured,
-    // restored from bfcache — left `oauth` set with nothing to clear it. `busy`
-    // is derived from it, so every control on the page stayed disabled and the
-    // only way out was a manual reload. On the happy path this page is gone
-    // long before the timer fires.
-    clearTimeout(oauthTimer.current);
-    oauthTimer.current = setTimeout(() => {
-      setOauth(null);
-      setError(`${provider} sign-in did not open. Allow pop-ups for this site and try again.`);
-    }, TIMING.oauthRedirectTimeoutMs);
-    try {
-      await signInWithOAuth(provider);
-      // Supabase handles redirect
-    } catch (err) {
-      // A real error beats the timeout's guess, so stand the timer down.
-      clearTimeout(oauthTimer.current);
-      const authErr = err as AuthError | undefined;
-      const msg =
-        typeof authErr?.message === 'string' ? authErr.message
-        : typeof err === 'string' ? err
-        : `${provider} login failed`;
-      setError(msg);
-      setOauth(null);
-    }
-  };
+  const handleOAuth = (provider: Provider) =>
+    auth.run(
+      provider,
+      async () => {
+        // `signInWithOAuth` resolves as soon as it has *started* the redirect, so a
+        // navigation that never lands (pop-up blocked, provider misconfigured) would
+        // leave every control locked. On the happy path this page is gone before the
+        // timer fires; bfcache restore is handled by the hook's `pageshow` reset.
+        clearTimeout(oauthTimer.current);
+        oauthTimer.current = setTimeout(
+          () => auth.reset(`${provider} sign-in did not open. Allow pop-ups for this site and try again.`),
+          TIMING.oauthRedirectTimeoutMs,
+        );
+        try {
+          await signInWithOAuth(provider);
+        } catch (err) {
+          clearTimeout(oauthTimer.current); // a real error beats the timeout's guess
+          throw err;
+        }
+      },
+      `${provider} login failed`,
+    );
 
   return (
     <div className="flex min-h-dvh items-center justify-center px-[var(--gutter)] py-[var(--space-12)]">
@@ -200,7 +182,7 @@ export default function LoginPage() {
           </p>
         )}
 
-        {status === 'success' && (
+        {success && (
           <Notice>Signed in. Taking you to your workspace…</Notice>
         )}
 
@@ -310,10 +292,10 @@ export default function LoginPage() {
             size="lg"
             className="w-full rounded-[var(--radius)] gap-[var(--space-2)]"
             disabled={busy || !email || !password}
-            loading={status === 'submitting'}
-            aria-busy={status === 'submitting'}
+            loading={submitting}
+            aria-busy={submitting}
           >
-            {status === 'success' ? 'Signed in' : status === 'submitting' ? 'Signing in…' : 'Sign In'}
+            {success ? 'Signed in' : submitting ? 'Signing in…' : 'Sign In'}
           </Button>
         </form>
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useAsyncAction } from '@/hooks/useAsyncAction';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, Check, Info } from 'lucide-react';
 import { Button } from '@/components/ui';
@@ -92,25 +93,25 @@ function isValidEmail(email: string): boolean {
 const MIN_PASSWORD = 6;
 
 type Provider = 'google' | 'github' | 'apple';
-type Status = 'idle' | 'submitting' | 'success';
 type FieldErrors = { email?: string; password?: string };
 
 export default function SignupPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
-  const [status, setStatus] = useState<Status>('idle');
-  const [oauth, setOauth] = useState<Provider | null>(null);
   const router = useRouter();
 
-  /* `busy` covers the whole surface; `status`/`oauth` say WHICH control is
-     working, so the spinner lands on the button the user actually pressed. */
-  const busy = status !== 'idle' || oauth !== null;
+  const auth = useAsyncAction();
+  const { error } = auth;
+  /* ONE pending action across the email form and every OAuth button (U8). `key`
+     says WHICH control is working, so the spinner lands on the one pressed. */
+  const busy = auth.status === 'pending' || auth.status === 'ok';
+  const oauth = busy && auth.key !== 'email' ? (auth.key as Provider) : null;
+  const submitting = auth.pending && auth.key === 'email';
+  const success = auth.status === 'ok' && auth.key === 'email';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
 
     /* Validate late (on submit), re-validate early (on change). Validating
        on every keystroke tells someone their email is invalid while they are
@@ -125,38 +126,16 @@ export default function SignupPage() {
     setFieldErrors(next);
     if (next.email || next.password) return;
 
-    setStatus('submitting');
-    try {
-      await signUpWithEmail(email, password);
-      // Stay in `success` through the redirect — dropping back to idle would
-      // flash an enabled form and read as "nothing happened".
-      setStatus('success');
-      router.push('/login?message=check-email');
-    } catch (err) {
-      const authErr = err as AuthError;
-      setError(authErr.message || 'Signup failed');
-      setStatus('idle');
-    }
+    // Stay in `ok` through the redirect � dropping back to idle would flash an
+    // enabled form and read as "nothing happened".
+    const ok = await auth.run('email', () => signUpWithEmail(email, password), 'Signup failed');
+    if (ok) router.push('/login?message=check-email');
   };
 
   const enabledProviders = getEnabledOAuthProviders();
 
-  const handleOAuth = async (provider: Provider) => {
-    setError('');
-    setOauth(provider);
-    try {
-      await signInWithOAuth(provider);
-      // Supabase handles redirect
-    } catch (err) {
-      const authErr = err as AuthError | undefined;
-      const msg =
-        typeof authErr?.message === 'string' ? authErr.message
-        : typeof err === 'string' ? err
-        : `${provider} signup failed`;
-      setError(msg);
-      setOauth(null);
-    }
-  };
+  const handleOAuth = (provider: Provider) =>
+    auth.run(provider, () => signInWithOAuth(provider), `${provider} signup failed`);
 
   return (
     <div className="flex min-h-dvh items-center justify-center px-[var(--gutter)] py-[var(--space-12)]">
@@ -174,7 +153,7 @@ export default function SignupPage() {
           </p>
         )}
 
-        {status === 'success' && (
+        {success && (
           <Notice>Account created. Check your email to confirm it.</Notice>
         )}
 
@@ -312,12 +291,12 @@ export default function SignupPage() {
             size="lg"
             className="w-full rounded-[var(--radius)] gap-[var(--space-2)]"
             disabled={busy || !email || !password}
-            loading={status === 'submitting'}
-            aria-busy={status === 'submitting'}
+            loading={submitting}
+            aria-busy={submitting}
           >
-            {status === 'success'
+            {success
               ? 'Account created'
-              : status === 'submitting'
+              : submitting
                 ? 'Creating account…'
                 : 'Sign Up'}
           </Button>

@@ -23,9 +23,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from enum import StrEnum
 
 import anyio
 from fastapi import HTTPException, Request
@@ -43,6 +44,7 @@ from reasoner.application.services.run_metering import RunContext, release_unsta
 from reasoner.core.constants_limits import GATE_FREE_CALLS_PER_DAY, SETTLE_TIMEOUT_SECONDS
 from reasoner.core.degrade import degraded
 from reasoner.core.settings import settings
+from reasoner.core.state_machine import Machine
 from reasoner.domain.credits import run_reference
 from reasoner.domain.saas import User
 from reasoner.infrastructure.persistence.pipeline_ownership_repo import (
@@ -50,6 +52,58 @@ from reasoner.infrastructure.persistence.pipeline_ownership_repo import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class AdmissionPhase(StrEnum):
+    """Where one ``admit_run`` call stands. ``HELD`` is the hand-off to ``metered()``."""
+
+    ADMITTING = "admitting"
+    HELD = "held"
+    REFUSED = "refused"
+
+
+ADMISSION = Machine(
+    "run_admission",
+    {
+        AdmissionPhase.ADMITTING: {AdmissionPhase.HELD, AdmissionPhase.REFUSED},
+        AdmissionPhase.HELD: set(),
+        AdmissionPhase.REFUSED: set(),
+    },
+    initial=AdmissionPhase.ADMITTING,
+)
+
+
+class AdmissionResource(StrEnum):
+    """What admission can hold before the run starts; each is given back on a refusal."""
+
+    ANON_CHARGE = "anon_charge"
+    EXCLUSIVE_CLAIM = "exclusive_claim"
+    RUN_CLAIM = "run_claim"
+    QUOTA_SLOT = "quota_slot"
+
+
+class _Held:
+    """Resources taken so far, released newest first by one call.
+
+    A refusal used to release each resource by hand, in an except block: one
+    failing (or cancelled) release skipped every later one, leaving a claim held
+    until its TTL. Here every release runs, shielded, whatever the others do.
+    """
+
+    def __init__(self) -> None:
+        self._stack: list[tuple[AdmissionResource, Callable[[], Awaitable[None]]]] = []
+
+    def hold(self, kind: AdmissionResource, release: Callable[[], Awaitable[None]]) -> None:
+        self._stack.append((kind, release))
+
+    async def release_all(self) -> None:
+        with anyio.CancelScope(shield=True):
+            while self._stack:
+                kind, release = self._stack.pop()
+                try:
+                    await release()
+                except Exception:
+                    logger.warning("Admission release of %s failed", kind, exc_info=True)
 
 
 @dataclass(frozen=True)
@@ -180,6 +234,7 @@ async def admit_run(
     require_run_scope(request, user)
     await deps.check_preset_access_if_authenticated(preset, user, request)
 
+    held = _Held()
     anon_charge: AnonymousTrialCharge | None = None
     if user is None:
         # No account to reserve credits against, so anonymous spend is capped
@@ -201,6 +256,9 @@ async def admit_run(
         anon_charge = await enforce_anonymous_trial_cap(
             get_client_ip(request), estimate["estimated_cost_usd"]
         )
+        held.hold(
+            AdmissionResource.ANON_CHARGE, lambda: refund_anonymous_trial(anon_charge)
+        )
 
     user_id = str(user.id) if user else None
     owner_key = user_id or _anonymous_owner_key(request)
@@ -211,10 +269,14 @@ async def admit_run(
             exclusive_claim = await idempotency_http.register_run_or_error(
                 exclusive, owner_key=owner_key,
             )
+            held.hold(
+                AdmissionResource.EXCLUSIVE_CLAIM, lambda: release_run(exclusive_claim)
+            )
         claim = await idempotency_http.register_run_or_error(client_run_id, owner_key=owner_key)
+        held.hold(AdmissionResource.RUN_CLAIM, lambda: release_run(claim))
     except BaseException:
-        await refund_anonymous_trial(anon_charge)  # refused: nothing ran
-        await release_run(exclusive_claim)
+        ADMISSION.move(AdmissionPhase.ADMITTING, AdmissionPhase.REFUSED)
+        await held.release_all()  # refused: nothing ran
         raise
     quota_slot = False
     try:
@@ -232,6 +294,8 @@ async def admit_run(
                 ) from exc
         # Atomic claim, before the reservation so a denial holds no credits.
         quota_slot = await deps.claim_quota_slot(user, preset, request)
+        if quota_slot:
+            held.hold(AdmissionResource.QUOTA_SLOT, lambda: deps.release_quota_slot(user))
         reference_id = run_reference(client_run_id, kind)
         reserved_credits = await deps.reserve_or_402(
             user_id=user_id, preset=preset, problem=problem, reference_id=reference_id,
@@ -240,12 +304,10 @@ async def admit_run(
         # Refused after the claim (402, 409, a ledger error): give the id back,
         # so the documented retry with the same id works (SEC-7). The quota
         # slot goes back too: a refused run is not a run.
-        if quota_slot:
-            await deps.release_quota_slot(user)
-        await refund_anonymous_trial(anon_charge)
-        await release_run(claim)
-        await release_run(exclusive_claim)
+        ADMISSION.move(AdmissionPhase.ADMITTING, AdmissionPhase.REFUSED)
+        await held.release_all()
         raise
+    ADMISSION.move(AdmissionPhase.ADMITTING, AdmissionPhase.HELD)
     return Admission(
         user_id=user_id,
         preset=preset,

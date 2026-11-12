@@ -24,6 +24,7 @@ import logging
 import weakref
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import Protocol
 
 import anyio
@@ -98,8 +99,13 @@ class SettlementSink(Protocol):
         """Durably note a run whose settlement failed, so it can be replayed."""
         ...
 
-    async def release_quota_slot(self, *, user_id: str) -> None:
-        """Give back the quota slot admission took, for a run that cost nothing."""
+    async def release_quota_slot(
+        self, *, user_id: str, claimed_at: datetime | None = None
+    ) -> None:
+        """Give back the quota slot admission took, for a run that cost nothing.
+
+        ``claimed_at`` makes a release after the month reset a no-op (M4).
+        """
         ...
 
 
@@ -140,6 +146,9 @@ class RunContext:
     #: Credits counted against an anonymous caller's daily cap at admission; given
     #: back when the run ends up costing nothing.
     anon_charge: AnonymousTrialCharge | None = field(default=None, compare=False)
+    #: Built right after admission took the quota slot, so this stands in for the
+    #: claim time: a release in a later quota period must not take from that one.
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC), compare=False)
 
 
 @dataclass
@@ -315,7 +324,7 @@ async def _release_quota_slot(sink: SettlementSink, ctx: RunContext) -> None:
     if not ctx.quota_slot or not ctx.user_id:
         return
     try:
-        await sink.release_quota_slot(user_id=ctx.user_id)
+        await sink.release_quota_slot(user_id=ctx.user_id, claimed_at=ctx.created_at)
     except Exception as exc:
         logger.warning(
             "Quota slot release failed for user %s run %s: %s", ctx.user_id, ctx.reference_id, exc

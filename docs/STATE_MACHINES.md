@@ -68,6 +68,35 @@ Still open after Phase 3:
 - **U3:** the resume stream (`handleResume`) does not go through `usePipelineStream`.
 - **Redis:** the B6 Lua scripts were tested with fakes only. `KEEPTTL` needs Redis 6 or later.
 
+## Phase 4 status (2026-11-12)
+
+Every row below is a registered machine in observe mode: an illegal move is
+logged and counted, never refused. The concrete bug each row named is fixed
+except where noted.
+
+| Row | Machine | Fix | Where |
+|---|---|---|---|
+| B5 | `run_admission` | Held resources are released newest-first by one helper; a release that raises or is cancelled no longer skips the rest | `api/run_admission.py` |
+| B8 | `ws_replay` | A complete run is absorbing: later events are dropped and counted, not buffered or fanned out | `infrastructure/websocket/manager.py` |
+| B9 | `neuro_session_tier` | Hot to warm writes temp files, `os.replace`, then unlinks the source, so a session is never in two tiers. `stats` and the listings share one glob | `neuro/sessions.py` |
+| M4 | `quota_slot` | A slot release is a no-op once the quota period has reset after the claim. `RunContext.created_at` carries the claim time. The duplicate UPDATE branches in `sync_quota_for_subscription` are merged | `application/services/quota_service.py`, `run_metering.py`, quota repos |
+| M5 | `anon_trial` | The refund is one Lua script: no key is created, the value floors at 0, `KEEPTTL` | `application/services/anonymous_trial_policy.py` |
+| M6 | `api_key` | `touch_last_used` skips a revoked key | `domain/api_keys.py` (table), `api_key_service.py`, both api key repos |
+| M9 | `ws_ticket` | The WebSocket handshake refuses a ticket whose account is deleted, and fails closed on a lookup error | `application/services/ws_ticket.py`, `api/routes/websocket.py`, `api/dependencies.py` |
+| U2 | `ws.connection` | `connected` clears `lastError`. A failure during reconnect retries until the budget is spent. One connect in flight; the old socket is closed and detached | `ui-next/src/hooks/useWebSocketPipeline.ts` |
+| U4 | `auth` | `logout` lands in `anonymous`, `markSessionExpired` in `expired`. `isAuthenticated` is derived from `user`. `useRequireAuth` redirects on `expired` too | `ui-next/src/stores/app-store.ts`, `hooks/useRequireAuth.ts` |
+| U7 | `useAsyncAction` | Checkout uses the shared hook: one pending action, reset on a bfcache restore. The double checkout was already guarded on the pricing page | `ui-next/src/hooks/useAsyncAction.ts`, `app/pricing/page.tsx`, `components/layout/UpgradeModal.tsx` |
+| U8 | `useAsyncAction` | Login, signup and reset share the hook; email and OAuth cannot both be pending | `ui-next/src/app/{login,signup,reset-password}/page.tsx` |
+| U9 | (status union) | `useQuota` starts `loading`. NeuroPanel has one error per feature. `useCredits` and the API keys list expose a `status` | `ui-next/src/hooks/{useQuota,useCredits}.ts`, `components/layout/NeuroPanel.tsx`, `app/settings/api-keys/page.tsx` |
+
+Not done in Phase 4:
+
+- **M10:** `users.email_verified` has no writer. Deleting it or designing a verification flow is the user's call (plan §5, question 3).
+- **U4:** a 401 in the middle of a run does not stop the run. The auth store has no handle on the run controller.
+- **B8:** a `error` frame is not treated as terminal. A pipeline id reused after completion has its events dropped until the buffer is evicted.
+- **M5:** the refund Lua script was tested against a fake Valkey only.
+- **Tests:** the signup and reset-password pages, NeuroPanel and the API keys page have no test of their own.
+
 ## Registered machines (generated)
 
 Diagrams of every `core.state_machine.Machine`, rewritten by
@@ -90,6 +119,41 @@ stateDiagram-v2
     requested --> erasing
 ```
 
+### `anon_trial` (observe)
+
+```mermaid
+stateDiagram-v2
+    [*] --> absent
+    absent --> counting
+    counting --> counting
+    counting --> expired
+    counting --> over_cap
+    expired --> [*]
+    over_cap --> counting
+    over_cap --> expired
+```
+
+### `api_key` (observe)
+
+```mermaid
+stateDiagram-v2
+    [*] --> live
+    expired --> revoked
+    live --> expired
+    live --> revoked
+    revoked --> [*]
+```
+
+### `neuro_session_tier` (observe)
+
+```mermaid
+stateDiagram-v2
+    [*] --> hot
+    cold --> [*]
+    hot --> warm
+    warm --> cold
+```
+
 ### `pipeline_run` (observe)
 
 ```mermaid
@@ -106,6 +170,29 @@ stateDiagram-v2
     running --> completed
     running --> failed
     running --> running
+```
+
+### `quota_slot` (observe)
+
+```mermaid
+stateDiagram-v2
+    [*] --> unclaimed
+    claimed --> released
+    claimed --> voided
+    released --> [*]
+    unclaimed --> claimed
+    voided --> [*]
+```
+
+### `run_admission` (observe)
+
+```mermaid
+stateDiagram-v2
+    [*] --> admitting
+    admitting --> held
+    admitting --> refused
+    held --> [*]
+    refused --> [*]
 ```
 
 ### `subscription` (enforce)
@@ -156,6 +243,28 @@ stateDiagram-v2
     unpaid --> paused
     unpaid --> trialing
     unpaid --> unpaid
+```
+
+### `ws_replay` (observe)
+
+```mermaid
+stateDiagram-v2
+    [*] --> open
+    complete --> evicted
+    evicted --> [*]
+    open --> complete
+    open --> evicted
+```
+
+### `ws_ticket` (observe)
+
+```mermaid
+stateDiagram-v2
+    [*] --> issued
+    expired --> [*]
+    issued --> expired
+    issued --> redeemed
+    redeemed --> [*]
 ```
 <!-- gen:state-machines:end -->
 

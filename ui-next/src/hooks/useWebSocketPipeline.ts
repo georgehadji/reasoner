@@ -5,13 +5,26 @@ import { PhaseEvent } from '@/lib/types';
 import { API, WS } from '@/lib/config';
 import { REASONER_WS_URL } from '@/lib/server-config';
 import { fetchWithCsrf } from '@/lib/security-client';
+import { defineMachine } from '@/lib/state-machine';
 
 export type ConnectionStatus = 'idle' | 'connecting' | 'connected' | 'disconnected' | 'reconnecting' | 'error';
+
+/** SM-U2. `error` ends one connect(); a failure during a reconnect stays `reconnecting` until the retry budget is spent. */
+const WS_MACHINE = defineMachine<ConnectionStatus>('ws.connection', {
+  idle: ['connecting'],
+  connecting: ['connected', 'reconnecting', 'disconnected', 'error', 'idle'],
+  connected: ['connecting', 'reconnecting', 'disconnected', 'idle'],
+  reconnecting: ['connecting', 'disconnected', 'error', 'idle'],
+  disconnected: ['connecting', 'idle'],
+  error: ['connecting', 'idle'],
+}, 'idle');
 
 export interface ConnectionInfo {
   status: ConnectionStatus;
   lastError: string | null;
 }
+
+type DoConnect = (pipelineId: string, onEvent: (ev: PhaseEvent) => void, isRetry?: boolean) => Promise<void>;
 
 export function useWebSocketPipeline() {
   const wsRef = useRef<WebSocket | null>(null);
@@ -19,10 +32,21 @@ export function useWebSocketPipeline() {
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onEventRef = useRef<((ev: PhaseEvent) => void) | null>(null);
   const pipelineIdRef = useRef<string | null>(null);
-  const doConnectRef = useRef<(pipelineId: string, onEvent: (ev: PhaseEvent) => void) => void>(undefined);
+  const doConnectRef = useRef<DoConnect>(undefined);
+  /** Bumped by every connect, disconnect and unmount; an in-flight doConnect that sees a newer value stops. */
+  const connectSeqRef = useRef(0);
 
   const [status, setStatus] = useState<ConnectionStatus>('idle');
+  const statusRef = useRef<ConnectionStatus>('idle');
   const [lastError, setLastError] = useState<string | null>(null);
+  const lastErrorRef = useRef<string | null>(null);
+
+  /** The one status writer: every change goes through the machine; a no-op move is skipped. */
+  const transition = useCallback((to: ConnectionStatus) => {
+    if (statusRef.current === to) return;
+    statusRef.current = WS_MACHINE.move(statusRef.current, to);
+    setStatus(statusRef.current);
+  }, []);
 
   const clearReconnect = useCallback(() => {
     if (reconnectTimerRef.current) {
@@ -31,44 +55,69 @@ export function useWebSocketPipeline() {
     }
   }, []);
 
-  const lastErrorRef = useRef<string | null>(null);
+  const setError = useCallback((msg: string | null) => {
+    setLastError(msg);
+    lastErrorRef.current = msg;
+  }, []);
 
-  const doConnect = useCallback(async (pipelineId: string, onEvent: (ev: PhaseEvent) => void) => {
+  /** Spends one retry: backoff, `reconnecting`, then connect again. False when the budget is gone. */
+  const scheduleRetry = useCallback((pipelineId: string): boolean => {
+    if (pipelineIdRef.current !== pipelineId || reconnectCountRef.current >= WS.maxReconnectAttempts) return false;
+    reconnectCountRef.current += 1;
+    const delay = WS.baseReconnectDelayMs * Math.pow(2, reconnectCountRef.current - 1);
+    transition('reconnecting');
+    console.debug(`[WebSocket] reconnecting in ${delay}ms (attempt ${reconnectCountRef.current})`);
+    reconnectTimerRef.current = setTimeout(() => {
+      if (onEventRef.current) doConnectRef.current?.(pipelineId, onEventRef.current, true);
+    }, delay);
+    return true;
+  }, [transition]);
+
+  const doConnect = useCallback<DoConnect>(async (pipelineId, onEvent, isRetry = false) => {
     clearReconnect();
+    const seq = ++connectSeqRef.current;
     pipelineIdRef.current = pipelineId;
     onEventRef.current = onEvent;
+
+    // One socket at a time: drop the old one before any await, and detach its
+    // handlers so its late onclose cannot null the new socket or schedule a retry.
+    if (wsRef.current) {
+      const old = wsRef.current;
+      wsRef.current = null;
+      old.onclose = null;
+      old.onmessage = null;
+      old.onerror = null;
+      old.close();
+    }
+    if (!isRetry) transition('connecting');
+
+    // A failed attempt during a reconnect stays in the retry loop; only an
+    // initial connect (or a spent budget) ends in `error`.
+    const fail = (msg: string) => {
+      setError(msg);
+      if (isRetry && scheduleRetry(pipelineId)) return;
+      transition('error');
+    };
 
     // Pre-check: is the backend reachable?
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 3000);
     try {
       const healthResp = await fetchWithCsrf('/api/health', { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (seq !== connectSeqRef.current) return;
       if (!healthResp.ok) {
-        const msg = `Backend returned ${healthResp.status} — cannot establish WebSocket`;
-        setLastError(msg);
-        lastErrorRef.current = msg;
-        setStatus('error');
-        clearTimeout(timeoutId);
+        fail(`Backend returned ${healthResp.status} — cannot establish WebSocket`);
         return;
       }
     } catch {
-      const msg = `Backend unreachable at ${REASONER_WS_URL} — is the server running?`;
-      setLastError(msg);
-      lastErrorRef.current = msg;
-      setStatus('error');
       clearTimeout(timeoutId);
+      if (seq !== connectSeqRef.current) return;
+      fail(`Backend unreachable at ${REASONER_WS_URL} — is the server running?`);
       return;
     }
-    clearTimeout(timeoutId);
-    setLastError(null);
-    lastErrorRef.current = null;
 
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
-    }
-
-    setStatus('connecting');
+    transition('connecting');
 
     // A ticket, not a standing bearer token, travels with the handshake --
     // never in the query string (server access logs, browser history) and
@@ -78,21 +127,18 @@ export function useWebSocketPipeline() {
     let ticket: string;
     try {
       const ticketResp = await fetchWithCsrf(API.WEBSOCKET_TICKET, { method: 'POST' });
+      if (seq !== connectSeqRef.current) return;
       if (!ticketResp.ok) {
-        const msg = `Could not obtain a connection ticket (${ticketResp.status})`;
-        setLastError(msg);
-        lastErrorRef.current = msg;
-        setStatus('error');
+        fail(`Could not obtain a connection ticket (${ticketResp.status})`);
         return;
       }
       ({ ticket } = await ticketResp.json());
     } catch {
-      const msg = 'Could not reach the backend to request a connection ticket';
-      setLastError(msg);
-      lastErrorRef.current = msg;
-      setStatus('error');
+      if (seq !== connectSeqRef.current) return;
+      fail('Could not reach the backend to request a connection ticket');
       return;
     }
+    if (seq !== connectSeqRef.current) return;
 
     const url = `${REASONER_WS_URL}?pipeline_id=${encodeURIComponent(pipelineId)}`;
     const ws = new WebSocket(url, [ticket]);
@@ -100,7 +146,8 @@ export function useWebSocketPipeline() {
 
     ws.onopen = () => {
       reconnectCountRef.current = 0;
-      setStatus('connected');
+      setError(null);
+      transition('connected');
       console.debug('[WebSocket] connected for pipeline:', pipelineId);
     };
 
@@ -123,23 +170,13 @@ export function useWebSocketPipeline() {
     };
 
     ws.onclose = () => {
+      // Superseded or deliberately closed: another connect owns the state now.
+      if (wsRef.current !== ws) return;
       wsRef.current = null;
-      const currentPipelineId = pipelineIdRef.current;
-
       // Only attempt reconnect if we still care about this pipeline
-      if (currentPipelineId === pipelineId && reconnectCountRef.current < WS.maxReconnectAttempts) {
-        reconnectCountRef.current += 1;
-        const delay = WS.baseReconnectDelayMs * Math.pow(2, reconnectCountRef.current - 1);
-        setStatus('reconnecting');
-        console.debug(`[WebSocket] reconnecting in ${delay}ms (attempt ${reconnectCountRef.current})`);
-        reconnectTimerRef.current = setTimeout(() => {
-          if (onEventRef.current) doConnectRef.current?.(pipelineId, onEventRef.current);
-        }, delay);
-      } else {
-        setStatus('disconnected');
-      }
+      if (!scheduleRetry(pipelineId)) transition('disconnected');
     };
-  }, [clearReconnect]);
+  }, [clearReconnect, scheduleRetry, setError, transition]);
 
   useEffect(() => {
     doConnectRef.current = doConnect;
@@ -152,6 +189,7 @@ export function useWebSocketPipeline() {
 
   const disconnect = useCallback(() => {
     clearReconnect();
+    connectSeqRef.current += 1;
     pipelineIdRef.current = null;
     onEventRef.current = null;
     reconnectCountRef.current = 0;
@@ -160,8 +198,8 @@ export function useWebSocketPipeline() {
       wsRef.current.close();
       wsRef.current = null;
     }
-    setStatus('idle');
-  }, [clearReconnect]);
+    transition('idle');
+  }, [clearReconnect, transition]);
 
   const sendStop = useCallback((pipelineId: string) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -174,6 +212,7 @@ export function useWebSocketPipeline() {
   useEffect(() => {
     return () => {
       clearReconnect();
+      connectSeqRef.current += 1;
       // Null these BEFORE close(). close() fires onclose asynchronously, and
       // onclose reconnects whenever pipelineIdRef still matches the socket's
       // pipeline. Clearing the timer first is not enough: onclose runs after

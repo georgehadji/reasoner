@@ -139,7 +139,7 @@ class PostgresApiKeyRepository(ApiKeyRepository):
     async def touch_last_used(self, key_id: UUID) -> None:
         pool = await self._get_pool()
         await pool.execute(
-            "UPDATE api_keys SET last_used_at = NOW() WHERE id = $1",
+            "UPDATE api_keys SET last_used_at = NOW() WHERE id = $1 AND revoked_at IS NULL",
             key_id,
         )
 

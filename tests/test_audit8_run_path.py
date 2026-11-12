@@ -29,7 +29,7 @@ class Sink:
 
     async def record_unsettled(self, **kw) -> None: ...
 
-    async def release_quota_slot(self, *, user_id: str) -> None:
+    async def release_quota_slot(self, *, user_id: str, claimed_at=None) -> None:
         self.slot_releases += 1
 
 

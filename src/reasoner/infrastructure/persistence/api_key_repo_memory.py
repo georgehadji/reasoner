@@ -96,7 +96,7 @@ class InMemoryApiKeyRepository(ApiKeyRepository):
     async def touch_last_used(self, key_id: UUID) -> None:
         async with self._lock:
             record = self._keys.get(key_id)
-            if record is None:
+            if record is None or record.is_revoked:  # a revoked key is final
                 return
             self._keys[key_id] = ApiKey(
                 id=record.id,

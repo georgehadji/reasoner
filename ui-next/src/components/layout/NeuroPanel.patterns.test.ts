@@ -29,7 +29,9 @@ describe('NeuroPanel patterns (BUG-008 regression)', () => {
     // Must check isMounted in catch block
     expect(loadRecentBody).toMatch(/catch\s*\([^)]*\)\s*\{[\s\S]*?if \(!isMounted\.current\) return;/);
 
-    // Must guard setRecentLoading in finally
-    expect(loadRecentBody).toContain('if (isMounted.current) setRecentLoading(false);');
+    // The settled status (ok / error) is written only after an isMounted guard,
+    // and there is no unguarded `finally` left to write it.
+    expect(loadRecentBody).not.toContain('finally');
+    expect(loadRecentBody.indexOf('setRecent(READY)')).toBeGreaterThan(loadRecentBody.indexOf('if (!isMounted.current) return;'));
   });
 });

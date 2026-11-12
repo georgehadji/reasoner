@@ -6,6 +6,7 @@ import { STORAGE_KEYS, LIMITS } from '@/lib/config';
 import { shallow } from 'zustand/shallow';
 import type { SubscriptionStatus } from '@/hooks/useSubscription';
 import { apiFetch } from '@/lib/api-client';
+import { defineMachine } from '@/lib/state-machine';
 
 export interface ComposerAttachment {
   id: string;
@@ -18,15 +19,33 @@ export interface ComposerAttachment {
 
 export type Tier = 'budget' | 'premium';
 
-export type AuthStatus = 'loading' | 'anonymous' | 'authenticated';
+export type AuthStatus = 'loading' | 'anonymous' | 'authenticated' | 'expired';
+
+/** SM-U4. `expired` = a request came back 401 while signed in; the guard sends the user to login. */
+const AUTH = defineMachine<AuthStatus>('auth', {
+  loading: ['anonymous', 'authenticated', 'expired'],
+  anonymous: ['loading', 'authenticated'],
+  authenticated: ['loading', 'anonymous', 'expired'],
+  expired: ['loading', 'anonymous', 'authenticated'],
+}, 'loading');
+
+type AuthFields = Pick<AppState, 'isAuthLoading' | 'user' | 'sessionExpired'>;
 
 /**
  * Derived, not stored: `user === null` alone cannot tell "signed out" from
  * "Supabase has not answered yet", and pages that guessed signed out redirected
  * on every reload (UI-8).
  */
-export const selectAuthStatus = (s: Pick<AppState, 'isAuthLoading' | 'user'>): AuthStatus =>
-  s.isAuthLoading ? 'loading' : s.user ? 'authenticated' : 'anonymous';
+export const selectAuthStatus = (s: AuthFields): AuthStatus =>
+  s.isAuthLoading ? 'loading' : s.user ? 'authenticated' : s.sessionExpired ? 'expired' : 'anonymous';
+
+/** The one auth writer: checks the move and keeps `isAuthenticated` equal to `!!user`. */
+function authPatch(s: AuthFields, patch: Partial<AuthFields>) {
+  const to = selectAuthStatus({ ...s, ...patch });
+  const from = selectAuthStatus(s);
+  if (from !== to) AUTH.move(from, to);
+  return { ...patch, isAuthenticated: !!(patch.user !== undefined ? patch.user : s.user) };
+}
 export { shallow };
 
 interface AppState {
@@ -47,6 +66,8 @@ interface AppState {
   user: SupabaseUser | null;
   isAuthenticated: boolean;
   isAuthLoading: boolean;
+  /** Set by a 401 while signed in; cleared by the next sign-in or an explicit logout. */
+  sessionExpired: boolean;
 
   // Actions
   setRunning: (running: boolean) => void;
@@ -99,6 +120,7 @@ export const useAppStore = create<AppState>()(
       user: null,
       isAuthenticated: false,
       isAuthLoading: true,
+      sessionExpired: false,
 
       // Subscription (shared — single fetch, not persisted)
       subscription: null,
@@ -155,10 +177,13 @@ export const useAppStore = create<AppState>()(
         }),
 
       // Auth actions
-      setUser: (user) => set({ user, isAuthenticated: !!user }),
-      setAuthLoading: (loading) => set({ isAuthLoading: loading }),
-      logout: () => set({ user: null, isAuthenticated: false }),
-      markSessionExpired: () => set({ user: null, isAuthenticated: false }),
+      setUser: (user) =>
+        set((s) => authPatch(s, { user, ...(user ? { sessionExpired: false } : {}) })),
+      setAuthLoading: (loading) => set((s) => authPatch(s, { isAuthLoading: loading })),
+      logout: () => set((s) => authPatch(s, { user: null, sessionExpired: false })),
+      // Only a signed-in session can expire; a 401 for an anonymous visitor is just a 401.
+      markSessionExpired: () =>
+        set((s) => (s.user ? authPatch(s, { user: null, sessionExpired: true }) : s)),
 
       /** Returns the preset string to send to the API: "auto-budget" or "auto-premium". */
       getAutoPreset: () => `auto-${get().tier}`,

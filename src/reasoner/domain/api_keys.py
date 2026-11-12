@@ -22,7 +22,24 @@ import hmac
 import secrets
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from enum import StrEnum
 from uuid import UUID
+
+
+class ApiKeyState(StrEnum):
+    """Derived from ``revoked_at`` and ``expires_at`` (SM-M6), never stored as a column."""
+
+    LIVE = "live"
+    EXPIRED = "expired"
+    REVOKED = "revoked"
+
+
+#: Revoked is final and wins over expired; the machine is built in the application layer.
+API_KEY_TRANSITIONS: dict[ApiKeyState, set[ApiKeyState]] = {
+    ApiKeyState.LIVE: {ApiKeyState.EXPIRED, ApiKeyState.REVOKED},
+    ApiKeyState.EXPIRED: {ApiKeyState.REVOKED},
+    ApiKeyState.REVOKED: set(),
+}
 
 #: Namespace that distinguishes Reasoner keys from OAuth JWTs on the wire.
 KEY_NAMESPACE = "rsn"
@@ -112,6 +129,11 @@ class ApiKey:
         if self.expires_at is None:
             return False
         return (now or datetime.now(UTC)) >= self.expires_at
+
+    def state(self, now: datetime | None = None) -> ApiKeyState:
+        if self.is_revoked:
+            return ApiKeyState.REVOKED
+        return ApiKeyState.EXPIRED if self.is_expired(now) else ApiKeyState.LIVE
 
     def is_usable(self, now: datetime | None = None) -> bool:
         """A key authenticates only while it is neither revoked nor expired."""

@@ -15,15 +15,43 @@ import hashlib
 import inspect
 import json
 import logging
+import os
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from enum import StrEnum
 from pathlib import Path
 
 from reasoner.core.degrade import degraded
+from reasoner.core.state_machine import Machine
 
 log = logging.getLogger("neuro.sessions")
+
+
+class SessionTier(StrEnum):
+    HOT = "hot"
+    WARM = "warm"
+    COLD = "cold"
+
+
+SESSION_TIER = Machine(
+    "neuro_session_tier",
+    {
+        SessionTier.HOT: {SessionTier.WARM},
+        SessionTier.WARM: {SessionTier.COLD},
+        SessionTier.COLD: set(),
+    },
+    initial=SessionTier.HOT,
+)
+
+# The one place that says which file counts as a session of a tier (``stats``
+# and the tier directories below both read it).
+_TIER_SESSION_GLOB: dict[SessionTier, str] = {
+    SessionTier.HOT: "*.jsonl",
+    SessionTier.WARM: "*.json",
+    SessionTier.COLD: "*.jsonl.gz",
+}
 
 
 @dataclass
@@ -70,7 +98,12 @@ class SessionManager:
         self.warm_dir = data_dir / "sessions" / "warm"
         self.cold_dir = data_dir / "sessions" / "cold"
 
-        for d in [self.hot_dir, self.warm_dir, self.cold_dir]:
+        self._tier_dir = {
+            SessionTier.HOT: self.hot_dir,
+            SessionTier.WARM: self.warm_dir,
+            SessionTier.COLD: self.cold_dir,
+        }
+        for d in self._tier_dir.values():
             d.mkdir(parents=True, exist_ok=True)
 
         self._current_session_id: str | None = None
@@ -229,7 +262,7 @@ class SessionManager:
     def get_hot_sessions(self) -> list[dict]:
         """List all hot session files with stats."""
         sessions = []
-        for f in sorted(self.hot_dir.glob("*.jsonl"), reverse=True):
+        for f in sorted(self._tier_files(SessionTier.HOT), reverse=True):
             entries = self._count_entries(f)
             stat = f.stat()
             sessions.append(
@@ -247,7 +280,7 @@ class SessionManager:
     def get_warm_sessions(self) -> list[dict]:
         """List warm (summarized) sessions."""
         sessions = []
-        for f in sorted(self.warm_dir.glob("*.json"), reverse=True):
+        for f in sorted(self._tier_files(SessionTier.WARM), reverse=True):
             try:
                 data = json.loads(f.read_text())
                 sessions.append(
@@ -274,7 +307,7 @@ class SessionManager:
         query_lower = query.lower()
         results = []
 
-        for session_file in sorted(self.hot_dir.glob("*.jsonl"), reverse=True):
+        for session_file in sorted(self._tier_files(SessionTier.HOT), reverse=True):
             try:
                 with open(session_file) as f:
                     for line in f:
@@ -345,7 +378,7 @@ class SessionManager:
         cutoff = datetime.now(UTC) - timedelta(days=self.config.hot_days)
         archived = []
 
-        for session_file in list(self.hot_dir.glob("*.jsonl")):
+        for session_file in list(self._tier_files(SessionTier.HOT)):
             if self._current_session_file and session_file == self._current_session_file:
                 continue
 
@@ -362,9 +395,11 @@ class SessionManager:
                 session_file.unlink()
                 continue
 
-            # Compress raw log to warm (offload gzip to thread)
+            # Compress raw log to warm (offload gzip to thread). Written under a
+            # temp name: the final names only appear via os.replace below.
             gz_path = self.warm_dir / f"{session_id}.jsonl.gz"
-            await asyncio.to_thread(self._write_gzip, gz_path, entries)
+            gz_tmp = gz_path.with_name(gz_path.name + ".tmp")
+            await asyncio.to_thread(self._write_gzip, gz_tmp, entries)
 
             summary_data = {
                 "session_id": session_id,
@@ -396,9 +431,19 @@ class SessionManager:
                     summary_data["summary"] = f"[Auto-summary failed: {str(e)[:50]}]"
 
             summary_path = self.warm_dir / f"{session_id}.json"
-            summary_path.write_text(json.dumps(summary_data, indent=2))
-
-            session_file.unlink()
+            summary_tmp = summary_path.with_name(summary_path.name + ".tmp")
+            try:
+                summary_tmp.write_text(json.dumps(summary_data, indent=2))
+                SESSION_TIER.move(SessionTier.HOT, SessionTier.WARM)
+                os.replace(gz_tmp, gz_path)
+                os.replace(summary_tmp, summary_path)
+                session_file.unlink()
+            except OSError as exc:
+                # Never in two tiers: undo the warm copy and keep the hot one.
+                for leftover in (gz_tmp, summary_tmp, gz_path, summary_path):
+                    leftover.unlink(missing_ok=True)
+                log.error(f"Archive of {session_id} failed, left in hot: {exc}")
+                continue
             # Remove stale count cache entry
             self._counts_cache.pop(str(session_file), None)
             archived.append(summary_data)
@@ -419,11 +464,18 @@ class SessionManager:
 
             session_id = gz_file.stem.replace(".jsonl", "")
             dest = self.cold_dir / gz_file.name
-            gz_file.rename(dest)
-
             summary = self.warm_dir / f"{session_id}.json"
-            if summary.exists():
-                summary.rename(self.cold_dir / summary.name)
+            SESSION_TIER.move(SessionTier.WARM, SessionTier.COLD)
+            try:
+                os.replace(gz_file, dest)
+                if summary.exists():
+                    os.replace(summary, self.cold_dir / summary.name)
+            except OSError as exc:
+                # Never split across tiers: put the archive back where it was.
+                if dest.exists() and not gz_file.exists():
+                    os.replace(dest, gz_file)
+                log.error(f"Cold archive of {session_id} failed, left in warm: {exc}")
+                continue
 
             moved.append(session_id)
             log.info(f"Cold archived: {session_id}")
@@ -437,7 +489,7 @@ class SessionManager:
         """
         all_exchanges = []
 
-        for session_file in sorted(self.hot_dir.glob("*.jsonl"), reverse=True):
+        for session_file in sorted(self._tier_files(SessionTier.HOT), reverse=True):
             entries = self._read_jsonl(session_file)
             exchanges = [e for e in entries if e.get("_type") == "exchange"]
             all_exchanges.extend(exchanges)
@@ -466,7 +518,7 @@ class SessionManager:
         Results are sorted by timestamp descending (newest first).
         """
         all_exchanges: list[dict] = []
-        for session_file in sorted(self.hot_dir.glob("*.jsonl"), reverse=True):
+        for session_file in sorted(self._tier_files(SessionTier.HOT), reverse=True):
             if len(all_exchanges) >= limit + offset:
                 break
             entries = self._read_jsonl(session_file)
@@ -488,9 +540,9 @@ class SessionManager:
     @property
     def stats(self) -> dict:
         """Get session storage stats."""
-        hot_files = list(self.hot_dir.glob("*.jsonl"))
-        warm_files = list(self.warm_dir.glob("*.json"))
-        cold_files = list(self.cold_dir.glob("*.jsonl.gz"))
+        hot_files = self._tier_files(SessionTier.HOT)
+        warm_files = self._tier_files(SessionTier.WARM)
+        cold_files = self._tier_files(SessionTier.COLD)
 
         hot_size = sum(f.stat().st_size for f in hot_files)
         warm_size = sum(f.stat().st_size for f in list(self.warm_dir.glob("*")))
@@ -508,6 +560,9 @@ class SessionManager:
         }
 
     # ── Internal helpers ──
+
+    def _tier_files(self, tier: SessionTier) -> list[Path]:
+        return list(self._tier_dir[tier].glob(_TIER_SESSION_GLOB[tier]))
 
     def _count_entries(self, path: Path) -> int:
         """Return exchange count for a JSONL file, using an in-memory cache."""

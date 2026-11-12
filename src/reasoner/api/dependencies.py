@@ -108,6 +108,23 @@ def _resumes_deletion(request: Request) -> bool:
     return getattr(request.scope.get("route"), "path", None) == ACCOUNT_DELETE_PATH
 
 
+async def account_is_deleted(user_id: str) -> bool:
+    """True when the account has an ``account_deletion_log`` row, in any status.
+
+    For credentials that outlive the HTTP request that minted them (a WebSocket
+    ticket). Raises when the lookup fails: the caller must fail closed, as
+    :func:`_ensure_user_in_db` does. With no database configured outside
+    production there is nothing to look up.
+    """
+    if not _persistence_is_configured() and settings.ENVIRONMENT != "production":
+        return False
+    pool = await _get_provision_pool()
+    status = await pool.fetchval(
+        "SELECT status FROM account_deletion_log WHERE user_id = $1 LIMIT 1", str(user_id),
+    )
+    return bool(status)
+
+
 async def _ensure_user_in_db(user: User, *, resume_deletion: bool = False) -> None:
     """Ensure OAuth user has a row in the local users table.
 

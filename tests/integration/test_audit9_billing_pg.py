@@ -133,3 +133,38 @@ async def test_reset_monthly_is_utc_month_start_conditional_and_keeps_tier_usage
             if PostgresQuotaRepository._pool is not None:
                 await PostgresQuotaRepository._pool.close()
             PostgresQuotaRepository._pool = None
+
+
+async def test_release_after_the_month_reset_does_not_take_from_the_new_month():
+    from datetime import timedelta
+
+    import asyncpg
+
+    from reasoner.infrastructure.persistence.quota_repo_postgres import PostgresQuotaRepository
+
+    async with _fresh_database() as dsn:
+        _alembic_upgrade(dsn)
+        uid = await _user(dsn)
+        repo = PostgresQuotaRepository(dsn, pool_size=2)
+        conn = await asyncpg.connect(dsn)
+        try:
+            await repo.get_quota(uid)  # creates the free row
+            await repo.check_and_increment(uid, "p")  # the run claims in "last month"
+            claimed_at = datetime.now(UTC)
+            await repo.reset_monthly(uid)  # month rolls over: count 0, period_start = this month
+            await repo.check_and_increment(uid, "p")  # a new-month run holds the one slot
+            await conn.execute(
+                "UPDATE usage_quotas SET period_start = $2 WHERE user_id = $1",
+                uid, claimed_at + timedelta(days=1),  # the reset happened after the claim
+            )
+            await repo.release_slot(uid, claimed_at)  # the old run gives back: a no-op
+            q = "SELECT used_queries FROM usage_quotas WHERE user_id = $1"
+            kept = await conn.fetchval(q, uid)
+            await repo.release_slot(uid)  # unguarded call still releases
+            freed = await conn.fetchval(q, uid)
+        finally:
+            await conn.close()
+            if PostgresQuotaRepository._pool is not None:
+                await PostgresQuotaRepository._pool.close()
+                PostgresQuotaRepository._pool = None
+    assert (kept, freed) == (1, 0)

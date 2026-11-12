@@ -141,3 +141,21 @@ async def test_rate_limited_ip_is_rejected_before_ticket_is_checked(
     assert result is None
     ws.close.assert_awaited_once()
     assert ws.close.call_args.kwargs["reason"] == "Too many connection attempts"
+
+
+@pytest.mark.parametrize(
+    "lookup", [AsyncMock(return_value=True), AsyncMock(side_effect=OSError("db down"))]
+)
+async def test_ticket_of_a_deleted_account_is_refused(
+    monkeypatch: pytest.MonkeyPatch, lookup: AsyncMock
+) -> None:
+    monkeypatch.setattr(settings, "CSRF_SECRET", "test-secret-do-not-reuse")
+    from reasoner.api.routes import websocket as ws_routes
+    from reasoner.application.services.ws_ticket import issue_ticket
+
+    monkeypatch.setattr(ws_routes, "account_is_deleted", lookup)
+    headers = {"origin": "https://app.example.com", "sec-websocket-protocol": issue_ticket("user-42")}
+    ws = FakeWebSocket(headers=headers)
+
+    assert await ws_routes._authenticate_and_authorize_handshake(ws) is None
+    assert ws.close.call_args.kwargs["reason"] == "Invalid or expired ticket"

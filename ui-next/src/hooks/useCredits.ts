@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api-client';
 import { API } from '@/lib/config';
+import type { LoadStatus } from './useAsyncAction';
 
 export interface CreditBalance {
   balance: number;
@@ -93,5 +94,6 @@ export function useCredits({ withLedger = false, ledgerLimit = 10 } = {}) {
     };
   }, [withLedger, ledgerLimit]);
 
-  return { credits, ledger, loading, error, refresh };
+  const status: LoadStatus = loading ? 'loading' : error ? 'error' : 'ok';
+  return { credits, ledger, status, loading, error, refresh };
 }

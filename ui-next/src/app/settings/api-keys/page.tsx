@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import type { LoadStatus } from '@/hooks/useAsyncAction';
 import Link from 'next/link';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { AlertTriangle, Check, Copy, Key, Plus, Trash2 } from 'lucide-react';
@@ -71,7 +72,9 @@ export default function ApiKeysPage() {
 
   const [keys, setKeys] = useState<ApiKeyRecord[]>([]);
   const [limits, setLimits] = useState<KeyLimits | null>(null);
-  const [loading, setLoading] = useState(true);
+  // List lifecycle (U9). `error` below stays the message slot for list AND create/revoke/copy.
+  const [status, setStatus] = useState<LoadStatus>('loading');
+  const loading = status === 'loading';
   const [error, setError] = useState('');
 
   const [showForm, setShowForm] = useState(false);
@@ -85,7 +88,7 @@ export default function ApiKeysPage() {
 
   // Exposed for manual re-fetching (e.g. after creating/revoking a key).
   const load = useCallback(async () => {
-    setLoading(true);
+    setStatus('loading');
     setError('');
     try {
       const { keys, limits } = await fetchApiKeysData();
@@ -94,10 +97,10 @@ export default function ApiKeysPage() {
       if (scopes.length === 0 && Array.isArray(limits?.default_scopes)) {
         setScopes(limits.default_scopes);
       }
+      setStatus('ok');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load keys');
-    } finally {
-      setLoading(false);
+      setStatus('error');
     }
     // `scopes` is only read to seed the initial selection; re-running on every
     // scope toggle would refetch the list on each checkbox click.
@@ -113,7 +116,7 @@ export default function ApiKeysPage() {
     if (!user) return;
     let ignore = false;
     async function loadOnMount() {
-      setLoading(true);
+      setStatus('loading');
       setError('');
       try {
         const { keys, limits } = await fetchApiKeysData();
@@ -123,10 +126,11 @@ export default function ApiKeysPage() {
         if (scopes.length === 0 && Array.isArray(limits?.default_scopes)) {
           setScopes(limits.default_scopes);
         }
+        setStatus('ok');
       } catch (err) {
-        if (!ignore) setError(err instanceof Error ? err.message : 'Could not load keys');
-      } finally {
-        if (!ignore) setLoading(false);
+        if (ignore) return;
+        setError(err instanceof Error ? err.message : 'Could not load keys');
+        setStatus('error');
       }
     }
     loadOnMount();
