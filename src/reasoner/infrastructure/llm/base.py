@@ -94,6 +94,16 @@ def is_provider_fault(exc: BaseException) -> bool:
     judged by its cause: three timeouts in a row are a provider fault, a 400
     with nothing behind it is not.
     """
+    # A client-side 400/422 anywhere in the chain (the raw SDK error sits behind
+    # the translated LLMError) is the caller's fault, not the provider's.
+    seen: set[int] = set()
+    link: BaseException | None = exc
+    while link is not None and id(link) not in seen:
+        seen.add(id(link))
+        status = getattr(link, "status_code", None) or getattr(link, "status", None)
+        if status in (400, 422):
+            return False
+        link = link.__cause__
     if type(exc) is LLMError:
         cause = exc.__cause__
         return cause is not None and is_provider_fault(cause)

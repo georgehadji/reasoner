@@ -11,8 +11,10 @@ from reasoner.api.auth_deps import require_csrf
 from reasoner.api.dependencies import (
     _get_credit_service,
     _resolve_user_tier,
+    allowance_permitted,
     check_rate_limit,
     get_current_user,
+    require_key_scope,
 )
 from reasoner.auth import Scope
 from reasoner.domain.credits import (
@@ -52,7 +54,8 @@ async def get_credits(user: User = Depends(get_current_user)):
     tier = await _resolve_user_tier(str(user.id))
 
     try:
-        await service.ensure_monthly_allowance(str(user.id), tier)
+        if allowance_permitted(user, tier):
+            await service.ensure_monthly_allowance(str(user.id), tier)
     except Exception:
         logger.warning("Monthly allowance top-up failed", exc_info=True)
 
@@ -69,7 +72,7 @@ async def get_credits(user: User = Depends(get_current_user)):
 async def get_ledger(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_key_scope("read")),
 ):
     """Return the caller's credit ledger, newest entries first."""
     service = _get_credit_service()

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import type { LoadStatus } from '@/hooks/useAsyncAction';
 import { Brain, Search, BookOpen, Loader2, Zap, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { neuroRecall, neuroLearn, neuroSessions } from '@/lib/api-client';
@@ -27,6 +28,12 @@ interface NeuroPanelProps {
   lastAssistantResponse?: string;
 }
 
+/** One feature's lifecycle and its own error: recall, learn and recent no longer share one (U9). */
+interface Feature { status: LoadStatus; error: string | null }
+const READY: Feature = { status: 'ok', error: null };
+const LOADING: Feature = { status: 'loading', error: null };
+const failed = (error: string): Feature => ({ status: 'error', error });
+
 export function NeuroPanel({ conversationId, lastUserPrompt, lastAssistantResponse }: NeuroPanelProps) {
   const isMounted = useRef(true);
   useEffect(() => {
@@ -39,59 +46,58 @@ export function NeuroPanel({ conversationId, lastUserPrompt, lastAssistantRespon
   // ── Search state ──
   const [query, setQuery] = useState('');
   const [recallResults, setRecallResults] = useState<RecallChunk[]>([]);
-  const [recallLoading, setRecallLoading] = useState(false);
+  const [recall, setRecall] = useState<Feature>(READY);
+  const recallLoading = recall.status === 'loading';
 
   // ── Learn state ──
-  const [learnLoading, setLearnLoading] = useState(false);
+  const [learn, setLearn] = useState<Feature>(READY);
+  const learnLoading = learn.status === 'loading';
   const [learnStatus, setLearnStatus] = useState<string | null>(null);
 
   // ── Recent state ──
   const [recentEntries, setRecentEntries] = useState<SessionEntry[]>([]);
-  const [recentLoading, setRecentLoading] = useState(false);
+  // Starts `loading`: the recent tab fetches on mount, so an empty first render is not "no entries".
+  const [recent, setRecent] = useState<Feature>(LOADING);
+  const recentLoading = recent.status === 'loading';
   const [recentOffset, setRecentOffset] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [expandedEntry, setExpandedEntry] = useState<number | null>(null);
 
-  // ── Shared error state ──
-  const [error, setError] = useState<string | null>(null);
+  // The error shown is the active tab's own.
+  const error = activeTab === 'search' ? (recall.error ?? learn.error) : recent.error;
 
   const handleRecall = useCallback(async () => {
     if (!query.trim()) return;
-    setRecallLoading(true);
-    setError(null);
+    setRecall(LOADING);
     setRecallResults([]);
     try {
       const data = await neuroRecall(query.trim(), conversationId || undefined);
       setRecallResults(data.chunks || []);
+      setRecall(READY);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Recall failed');
-    } finally {
-      setRecallLoading(false);
+      setRecall(failed(err instanceof Error ? err.message : 'Recall failed'));
     }
   }, [query, conversationId]);
 
   const handleLearn = useCallback(async () => {
     if (!lastUserPrompt || !lastAssistantResponse) {
-      setError('No conversation turn available to learn from');
+      setLearn(failed('No conversation turn available to learn from'));
       return;
     }
-    setLearnLoading(true);
-    setError(null);
+    setLearn(LOADING);
     setLearnStatus(null);
     try {
       const data = await neuroLearn(lastUserPrompt, lastAssistantResponse, conversationId || undefined);
       setLearnStatus(data.status === 'ok' ? 'Learned successfully' : `Status: ${data.status}`);
       setTimeout(() => setLearnStatus(null), 3000);
+      setLearn(READY);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Learn failed');
-    } finally {
-      setLearnLoading(false);
+      setLearn(failed(err instanceof Error ? err.message : 'Learn failed'));
     }
   }, [lastUserPrompt, lastAssistantResponse, conversationId]);
 
   const loadRecent = useCallback(async (offset = 0) => {
-    setRecentLoading(true);
-    setError(null);
+    setRecent(LOADING);
     try {
       const data = await neuroSessions(conversationId || undefined, 10, offset);
       if (!isMounted.current) return;
@@ -103,11 +109,10 @@ export function NeuroPanel({ conversationId, lastUserPrompt, lastAssistantRespon
       }
       setHasMore(entries.length === 10);
       setRecentOffset(offset + entries.length);
+      setRecent(READY);
     } catch (err) {
       if (!isMounted.current) return;
-      setError(err instanceof Error ? err.message : 'Failed to load recent memory');
-    } finally {
-      if (isMounted.current) setRecentLoading(false);
+      setRecent(failed(err instanceof Error ? err.message : 'Failed to load recent memory'));
     }
   }, [conversationId]);
 
@@ -120,8 +125,7 @@ export function NeuroPanel({ conversationId, lastUserPrompt, lastAssistantRespon
     if (activeTab !== 'recent') return;
     let ignore = false;
     async function loadInitialPage() {
-      setRecentLoading(true);
-      setError(null);
+      setRecent(LOADING);
       try {
         const data = await neuroSessions(conversationId || undefined, 10, 0);
         if (ignore || !isMounted.current) return;
@@ -129,11 +133,10 @@ export function NeuroPanel({ conversationId, lastUserPrompt, lastAssistantRespon
         setRecentEntries(entries);
         setHasMore(entries.length === 10);
         setRecentOffset(entries.length);
+        setRecent(READY);
       } catch (err) {
         if (ignore || !isMounted.current) return;
-        setError(err instanceof Error ? err.message : 'Failed to load recent memory');
-      } finally {
-        if (!ignore && isMounted.current) setRecentLoading(false);
+        setRecent(failed(err instanceof Error ? err.message : 'Failed to load recent memory'));
       }
     }
     loadInitialPage();
@@ -231,7 +234,7 @@ export function NeuroPanel({ conversationId, lastUserPrompt, lastAssistantRespon
             </div>
           )}
 
-          {recallResults.length === 0 && !recallLoading && query && !error && (
+          {recallResults.length === 0 && !recallLoading && query && !recall.error && (
             <div className="text-[length:var(--text-xs)] text-[var(--text-muted)]">No memory chunks found.</div>
           )}
 

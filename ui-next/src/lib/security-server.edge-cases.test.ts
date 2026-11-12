@@ -6,7 +6,7 @@
  * readJsonBody, rate limiting.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import crypto from 'crypto';
 
 // Polyfill Web Crypto for Node test environment
@@ -33,6 +33,8 @@ import {
   generateSignedCsrfToken,
   rateLimit,
   ValidationError,
+  PayloadTooLargeError,
+  resolveClientIp,
   proxyErrorResponse,
   VALIDATION_LIMITS,
   SECURITY_CONSTANTS,
@@ -376,6 +378,13 @@ describe('CSRF token — cryptography edge cases', () => {
 
 
 describe('rateLimit — edge cases', () => {
+  beforeEach(() => {
+    vi.stubEnv('TRUSTED_PROXIES', '10.255.255.1');
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('allows first request for any action', () => {
     const req = new NextRequest('http://localhost/api/run', {
       headers: { 'x-forwarded-for': '10.0.0.1' },
@@ -492,6 +501,29 @@ describe('readJsonBody — edge cases', () => {
     await expect(readJsonBody(req)).rejects.toThrow('Payload too large');
   });
 
+  it('rejects an oversize content-length before reading the body', async () => {
+    const req = new NextRequest('http://localhost/api/test', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'content-length': '5000000' },
+      body: '{}',
+    });
+    const spy = vi.spyOn(req, 'text');
+    await expect(readJsonBody(req)).rejects.toBeInstanceOf(PayloadTooLargeError);
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('maps malformed JSON to 400 and oversize to 413', async () => {
+    const bad = new NextRequest('http://localhost/api/test', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{not valid',
+    });
+    const err = await readJsonBody(bad).catch((e) => e);
+    expect(err).toBeInstanceOf(ValidationError);
+    expect(proxyErrorResponse(err, 'T').status).toBe(400);
+    expect(proxyErrorResponse(new PayloadTooLargeError('x'), 'T').status).toBe(413);
+  });
+
   it('rejects malformed JSON', async () => {
     const req = new NextRequest('http://localhost/api/test', {
       method: 'POST',
@@ -606,5 +638,23 @@ describe('proxyErrorResponse', () => {
     proxyErrorResponse(new Error(leaky), 'Run', 'http://x');
 
     expect(console.error).toHaveBeenCalledWith(expect.stringContaining('Run proxy error'), leaky);
+  });
+});
+
+
+describe('client IP forwarding', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('ignores X-Forwarded-For when no proxies are trusted', () => {
+    vi.stubEnv('TRUSTED_PROXIES', '');
+    const h = new Headers({ 'x-forwarded-for': '1.2.3.4', 'x-real-ip': '5.6.7.8' });
+    expect(resolveClientIp(h)).toBe('unknown');
+    expect(sanitizeRequestHeaders(h)['X-Forwarded-For']).toBeUndefined();
+  });
+
+  it('forwards the resolved client IP, never the raw inbound header', () => {
+    vi.stubEnv('TRUSTED_PROXIES', '10.0.0.2');
+    const h = new Headers({ 'x-forwarded-for': '6.6.6.6, 203.0.113.9, 10.0.0.2' });
+    expect(sanitizeRequestHeaders(h)['X-Forwarded-For']).toBe('203.0.113.9');
   });
 });

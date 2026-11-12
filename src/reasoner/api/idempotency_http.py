@@ -11,6 +11,7 @@ from __future__ import annotations
 from fastapi import HTTPException
 
 from reasoner.application.services.idempotency import (
+    RunAlreadyFinishedError,
     RunAlreadyInProgressError,
     RunStateUnavailableError,
     register_run,
@@ -33,9 +34,11 @@ async def register_run_or_error(client_run_id: str | None, *, owner_key: str) ->
             headers={"Retry-After": str(exc.retry_after_seconds)},
         ) from exc
     except RunAlreadyInProgressError as exc:
+        finished = isinstance(exc, RunAlreadyFinishedError)
+        state = "already finished" if finished else "already in progress"
         raise HTTPException(
             status_code=409,
-            detail=f"Run {exc.client_run_id} is already in progress",
+            detail=f"Run {exc.client_run_id} is {state}",
         ) from exc
 
 

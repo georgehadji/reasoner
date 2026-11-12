@@ -5,6 +5,7 @@ import {
   sanitizeRequestHeaders,
   sanitizeResponseHeaders,
   rateLimit,
+  proxyErrorResponse,
 } from '@/lib/security-server';
 import { API } from '@/lib/config';
 
@@ -29,7 +30,6 @@ export async function DELETE(req: NextRequest) {
       headers: sanitizeResponseHeaders(upstream),
     });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Proxy error';
-    return NextResponse.json({ error: msg }, { status: 502 });
+    return proxyErrorResponse(err, 'Cache');
   }
 }

@@ -13,12 +13,14 @@ Auth flow (security-remediation-plan.md Phase 3):
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket
 
 from reasoner.api.admin_auth import verify_admin_key
 from reasoner.api.auth_deps import require_csrf
 from reasoner.api.client_ip import get_client_ip
-from reasoner.api.dependencies import get_current_user
+from reasoner.api.dependencies import account_is_deleted, get_current_user
 from reasoner.application.services.ws_ticket import issue_ticket, redeem_ticket
 from reasoner.domain.saas import User
 from reasoner.infrastructure.websocket import get_websocket_manager, websocket_endpoint
@@ -28,6 +30,7 @@ from reasoner.infrastructure.websocket.ws_security import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.post("/api/websocket/ticket")
@@ -63,6 +66,17 @@ async def _authenticate_and_authorize_handshake(websocket: WebSocket) -> str | N
         return None
     user_id = await redeem_ticket(ticket)
     if not user_id:
+        await websocket.close(code=1008, reason="Invalid or expired ticket")
+        return None
+
+    # The ticket is valid for its TTL even if the account was deleted meanwhile.
+    # Fail closed, like the HTTP auth path: an unanswered lookup is a refusal.
+    try:
+        deleted = await account_is_deleted(user_id)
+    except Exception:
+        logger.warning("WS deleted-account check failed for %s; denying", user_id, exc_info=True)
+        deleted = True
+    if deleted:
         await websocket.close(code=1008, reason="Invalid or expired ticket")
         return None
 

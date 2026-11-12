@@ -71,6 +71,25 @@ set_model_registry_port(RegistryAdapter())
 
 
 @pytest.fixture(autouse=True)
+def no_real_provision_pool(monkeypatch):
+    """The deleted-account lookup fails closed (503) when Postgres is unreachable.
+    Tests that exercise JWT auth have no database, so answer "not deleted";
+    tests of the lookup itself patch _get_provision_pool again."""
+
+    class _Pool:
+        async def fetchval(self, *_a):
+            return None
+
+        async def execute(self, *_a):
+            return None
+
+    async def _pool():
+        return _Pool()
+
+    monkeypatch.setattr("reasoner.api.dependencies._get_provision_pool", _pool)
+
+
+@pytest.fixture(autouse=True)
 async def auto_clean_state():
     """Fixture to reset all global state between tests."""
     # core.rerank latches a module-level failure counter open after 3 failures.
@@ -87,6 +106,12 @@ async def auto_clean_state():
     # they assert on. Same shape as the rerank circuit above: sync and
     # loop-independent, so it runs outside the loop branches below.
     reset_rate_limiter_state()
+
+    # /api/discover keeps a per-worker TTL cache; a result cached by one test
+    # must not answer another test's request.
+    from reasoner.api.routes.legacy_widgets import _discover_cache
+
+    _discover_cache.clear()
 
     # api/__init__.py's lifespan injects a real SharedCachePort on startup
     # and (as of this fix) clears it on shutdown -- but any test that starts

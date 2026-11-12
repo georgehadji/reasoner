@@ -7,7 +7,12 @@ Critical Enhancements:
 
 from __future__ import annotations
 
-from reasoner.core.ports.metrics_port import set_degradation_counter, set_quota_exceeded_counter
+from reasoner.core.ports.metrics_port import (
+    set_degradation_counter,
+    set_illegal_transition_counter,
+    set_quota_exceeded_counter,
+    set_unverified_access_counter,
+)
 
 try:
     from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
@@ -238,6 +243,11 @@ REASONER_CRON_HEARTBEAT_TIMESTAMP = Gauge(
     "Unix timestamp of last successful nightly cron run",
 )
 
+REASONER_COMPACTION_LAST_SUCCESS_TIMESTAMP = Gauge(
+    "reasoner_compaction_last_success_timestamp",
+    "Unix timestamp of the last completed event-store compaction",
+)
+
 # Webhook processing failures (Phase 0.1 — billing dead-letter)
 WEBHOOK_PROCESSING_FAILURES = Counter(
     "reasoner_webhook_processing_failures_total",
@@ -331,3 +341,35 @@ set_degradation_counter(lambda site: REASONER_DEGRADATION_TOTAL.labels(site=site
 # infrastructure concretes, so it reaches this counter through the same
 # core-owned hook pattern as the degradation counter above.
 set_quota_exceeded_counter(lambda tier: REASONER_QUOTA_EXCEEDED_TOTAL.labels(tier=tier).inc())
+
+
+# ── Fill core's illegal-transition hook ───────────────────────────────────
+# core.state_machine.Machine counts every illegal move here. While a machine is
+# in observe mode this counter staying at zero for one release is what licenses
+# switching it to enforce (docs/plans/implicit-state-machines-2026-11-11.md §0).
+# Labels are bounded: machine names and state names come from code, never input.
+REASONER_ILLEGAL_TRANSITION_TOTAL = Counter(
+    "reasoner_illegal_transition_total",
+    "State-machine moves the transition table forbids",
+    ["machine", "from_state", "to_state"],
+)
+set_illegal_transition_counter(
+    lambda machine, src, dst: REASONER_ILLEGAL_TRANSITION_TOTAL.labels(
+        machine=machine, from_state=src, to_state=dst
+    ).inc()
+)
+
+
+# ── Fill core's unverified-email hook ─────────────────────────────────────
+# Every gated feature reached by an unverified, non-grandfathered account.
+# Labels are bounded: features come from GatedFeature, outcome is allowed|denied.
+REASONER_UNVERIFIED_ACCESS_TOTAL = Counter(
+    "reasoner_unverified_access_total",
+    "Gated features reached by an account whose email is not verified",
+    ["feature", "outcome"],
+)
+set_unverified_access_counter(
+    lambda feature, outcome: REASONER_UNVERIFIED_ACCESS_TOTAL.labels(
+        feature=feature, outcome=outcome
+    ).inc()
+)

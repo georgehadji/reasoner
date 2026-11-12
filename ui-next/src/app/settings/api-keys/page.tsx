@@ -1,12 +1,15 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import type { LoadStatus } from '@/hooks/useAsyncAction';
 import Link from 'next/link';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { AlertTriangle, Check, Copy, Key, Plus, Trash2 } from 'lucide-react';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
 import { apiFetch } from '@/lib/api-client';
+import { describeHttpError } from '@/lib/http-error';
+import { EmailVerifyBanner } from '@/components/layout/EmailVerifyBanner';
 import { API, TIMING } from '@/lib/config';
 import { useAppStore } from '@/stores/app-store';
 import { cn } from '@/lib/utils';
@@ -71,7 +74,9 @@ export default function ApiKeysPage() {
 
   const [keys, setKeys] = useState<ApiKeyRecord[]>([]);
   const [limits, setLimits] = useState<KeyLimits | null>(null);
-  const [loading, setLoading] = useState(true);
+  // List lifecycle (U9). `error` below stays the message slot for list AND create/revoke/copy.
+  const [status, setStatus] = useState<LoadStatus>('loading');
+  const loading = status === 'loading';
   const [error, setError] = useState('');
 
   const [showForm, setShowForm] = useState(false);
@@ -85,7 +90,7 @@ export default function ApiKeysPage() {
 
   // Exposed for manual re-fetching (e.g. after creating/revoking a key).
   const load = useCallback(async () => {
-    setLoading(true);
+    setStatus('loading');
     setError('');
     try {
       const { keys, limits } = await fetchApiKeysData();
@@ -94,10 +99,10 @@ export default function ApiKeysPage() {
       if (scopes.length === 0 && Array.isArray(limits?.default_scopes)) {
         setScopes(limits.default_scopes);
       }
+      setStatus('ok');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load keys');
-    } finally {
-      setLoading(false);
+      setStatus('error');
     }
     // `scopes` is only read to seed the initial selection; re-running on every
     // scope toggle would refetch the list on each checkbox click.
@@ -113,7 +118,7 @@ export default function ApiKeysPage() {
     if (!user) return;
     let ignore = false;
     async function loadOnMount() {
-      setLoading(true);
+      setStatus('loading');
       setError('');
       try {
         const { keys, limits } = await fetchApiKeysData();
@@ -123,10 +128,11 @@ export default function ApiKeysPage() {
         if (scopes.length === 0 && Array.isArray(limits?.default_scopes)) {
           setScopes(limits.default_scopes);
         }
+        setStatus('ok');
       } catch (err) {
-        if (!ignore) setError(err instanceof Error ? err.message : 'Could not load keys');
-      } finally {
-        if (!ignore) setLoading(false);
+        if (ignore) return;
+        setError(err instanceof Error ? err.message : 'Could not load keys');
+        setStatus('error');
       }
     }
     loadOnMount();
@@ -153,10 +159,9 @@ export default function ApiKeysPage() {
           expires_in_days: expiry ? Number(expiry) : null,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(typeof data?.detail === 'string' ? data.detail : `HTTP ${res.status}`);
-      }
+      const text = await res.text();
+      if (!res.ok) throw new Error(describeHttpError(res.status, text));
+      const data = JSON.parse(text);
       setNewKey(data.key);
       setName('');
       setShowForm(false);
@@ -207,6 +212,7 @@ export default function ApiKeysPage() {
     <div className="flex min-h-screen flex-col bg-[var(--bg)] text-[var(--text)]">
       <SiteHeader />
       <main id="main-content" className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 pt-24">
+        <EmailVerifyBanner />
         <nav className="mb-6 text-[length:var(--text-sm)] text-[var(--text-muted)]">
           <Link href="/settings" className="transition-colors hover:text-[var(--text)]">
             Settings

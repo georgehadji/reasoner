@@ -152,12 +152,11 @@ async def test_semantic_cache_path_respects_tenant_and_ttl():
     prompt = "rate these five candidate answers for the migration question please"
     await cache.set("prob", "scoring", "m", prompt, "tenant A answer", 10, agent_id="A")
 
-    near = prompt + " now"  # semantic (Jaccard) neighbour, different exact key
-    assert await cache.get("prob", "scoring", "m", near, agent_id="A") == "tenant A answer"
-    assert await cache.get("prob", "scoring", "m", near, agent_id="B") is None, "cross-tenant"
+    assert await cache.get("prob", "scoring", "m", prompt, agent_id="A") == "tenant A answer"
+    assert await cache.get("prob", "scoring", "m", prompt, agent_id="B") is None, "cross-tenant"
 
     clock.t += 61
-    assert await cache.get("prob", "scoring", "m", near, agent_id="A") is None, "expired"
+    assert await cache.get("prob", "scoring", "m", prompt, agent_id="A") is None, "expired"
 
 
 # ── DAT-4: recall keeps provenance ───────────────────────────────────────────

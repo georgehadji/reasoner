@@ -74,7 +74,8 @@ async def test_stopped_run_is_not_published_as_completed() -> None:
     )
 
     assert EventType.PIPELINE_COMPLETED not in bus.types
-    assert EventType.PIPELINE_FAILED in bus.types
+    assert EventType.PIPELINE_CANCELLED in bus.types
+    assert EventType.PIPELINE_FAILED not in bus.types
     assert [f for f in frames if f.get("type") == "end"] == []
 
 
@@ -99,4 +100,5 @@ async def test_failed_run_does_not_raise_or_double_report() -> None:
 
     assert EventType.PIPELINE_COMPLETED not in bus.types
     assert EventType.PIPELINE_FAILED in bus.types
+    assert EventType.PIPELINE_CANCELLED not in bus.types
     assert [f for f in frames if f.get("code") == "INTERNAL_ERROR"] == []

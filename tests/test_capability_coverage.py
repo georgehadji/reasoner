@@ -2,7 +2,7 @@
 
 Not a hand-maintained list: this scans the actual FastAPI route source for
 calls into the credit-reservation path (``reserve_or_402``,
-``_reserve_image_credits``) and cross-checks the route each call sits under
+``admit_flat_charge``) and cross-checks the route each call sits under
 against ``core.capabilities.CAPABILITY_POLICY``. A new provider-costing route
 that reserves credits without also registering a ``Capability`` fails this
 test -- that's the actual "impossible to add a costed route without
@@ -32,7 +32,7 @@ SCANNED_FILES = [
 _ROUTE_DECORATOR = re.compile(r'@(?:app|router)\.(?:get|post|put|delete)\("([^"]+)"')
 _ROUTER_PREFIX = re.compile(r'APIRouter\([^)]*prefix="([^"]+)"')
 # admit_run() reserves through reserve_or_402; every pipeline route calls it.
-_RESERVATION_CALL = re.compile(r"\breserve_or_402\(|\b_reserve_image_credits\(|\badmit_run\(")
+_RESERVATION_CALL = re.compile(r"\breserve_or_402\(|\badmit_flat_charge\(|\badmit_run\(")
 
 ALL_REGISTERED_ROUTES = frozenset(
     route for policy in CAPABILITY_POLICY.values() for route in policy.routes
@@ -79,7 +79,7 @@ def test_every_reservation_call_site_has_a_registered_capability() -> None:
     _all_routes, routes_that_reserve = _scan_routes(SCANNED_FILES)
 
     assert routes_that_reserve, (
-        "Scan found zero routes calling reserve_or_402/_reserve_image_credits -- "
+        "Scan found zero routes calling reserve_or_402/admit_flat_charge -- "
         "the scan itself is broken, not that reservation was removed."
     )
 

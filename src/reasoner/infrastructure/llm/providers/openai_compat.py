@@ -209,6 +209,9 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             "api_key": (api_key or "missing").strip(),
             "base_url": base_url,
             "http_client": OpenAICompatibleProvider.shared_pool(),
+            # The router/complete_with_retry own retries; SDK retries stacked
+            # a hidden 3x on every call and bypassed the circuit breaker.
+            "max_retries": 0,
         }
         if default_headers:
             client_kwargs["default_headers"] = default_headers

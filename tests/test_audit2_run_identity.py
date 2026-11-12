@@ -136,7 +136,7 @@ async def _drain(frames, ctx):
 
 
 @pytest.mark.parametrize("frames,released", [
-    ([PHASE_FRAME], True),               # the run stopped before it finished
+    ([PHASE_FRAME], False),              # stopped short but spent money: a retry would bill it again
     ([PHASE_FRAME, DONE_FRAME], False),  # finished: a duplicate must still 409
 ])
 async def test_metered_releases_the_claim_only_when_the_run_did_not_finish(frames, released):

@@ -46,6 +46,12 @@ async def trigger_compaction(request: Request, dry_run: bool = False):
     from reasoner.application.services.compaction_service import CompactionService
     service = CompactionService(store)
     result = await service.run_once(dry_run=dry_run)
+    if not dry_run:
+        import time
+
+        from reasoner.infrastructure.metrics import REASONER_COMPACTION_LAST_SUCCESS_TIMESTAMP
+
+        REASONER_COMPACTION_LAST_SUCCESS_TIMESTAMP.set(int(time.time()))
     return {"status": "ok", **result}
 
 

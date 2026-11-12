@@ -238,6 +238,11 @@ export function sanitizeRequestHeaders(headers: Headers): Record<string, string>
       out[key] = value;
     }
   });
+  // Tell the backend who the caller is, from the trusted-proxy resolution and
+  // never the raw inbound header, so its trial cap and rate limits stop keying
+  // on this host. The backend must list this host in its TRUSTED_PROXIES.
+  const ip = resolveClientIp(headers);
+  if (ip !== 'unknown') out['X-Forwarded-For'] = ip;
   return out;
 }
 
@@ -262,20 +267,33 @@ export function sanitizeResponseHeaders(upstream: Response): Headers {
   return headers;
 }
 
+class ValidationError extends Error {}
+export { ValidationError };
+
+class PayloadTooLargeError extends Error {}
+export { PayloadTooLargeError };
+
 export async function readJsonBody(req: NextRequest, maxBytes = 1024 * 1024): Promise<unknown> {
   const contentType = req.headers.get('content-type') || '';
   if (!contentType.toLowerCase().includes('application/json')) {
-    throw new Error('Invalid content type');
+    throw new ValidationError('Invalid content type');
+  }
+  // Refuse an honest oversize body before buffering it; the post-read check
+  // below still covers chunked bodies that carry no content-length.
+  const declared = Number(req.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    throw new PayloadTooLargeError('Payload too large');
   }
   const text = await req.text();
   if (text.length > maxBytes) {
-    throw new Error('Payload too large');
+    throw new PayloadTooLargeError('Payload too large');
   }
-  return JSON.parse(text);
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new ValidationError('Invalid JSON');
+  }
 }
-
-class ValidationError extends Error {}
-export { ValidationError };
 
 /**
  * The response a proxy route returns when the upstream call threw.
@@ -288,6 +306,9 @@ export { ValidationError };
 export function proxyErrorResponse(err: unknown, label: string, upstreamUrl?: string): NextResponse {
   if (err instanceof ValidationError) {
     return NextResponse.json({ error: err.message }, { status: 400 });
+  }
+  if (err instanceof PayloadTooLargeError) {
+    return NextResponse.json({ error: err.message }, { status: 413 });
   }
   const msg = err instanceof Error ? err.message : 'Proxy error';
   const errName = err instanceof Error ? err.constructor.name : 'Unknown';
@@ -535,19 +556,35 @@ export function proxyTopologyUndeclared(): boolean {
  * The rightmost hop was appended by the proxy in front of us.
  */
 export function getClientIp(req: NextRequest): string {
+  return resolveClientIp(req.headers);
+}
+
+/**
+ * With no TRUSTED_PROXIES nothing in X-Forwarded-For or X-Real-IP is believed:
+ * a directly exposed server would let any caller pick a fresh rate-limit
+ * bucket per request. The key collapses to 'unknown' (one shared bucket)
+ * until the proxy chain is declared. Route handlers expose no peer address.
+ */
+export function resolveClientIp(headers: Headers): string {
   const trusted = new Set(
     (process.env.TRUSTED_PROXIES || '').split(',').map((s) => s.trim()).filter(Boolean),
   );
-  const forwarded = req.headers.get('x-forwarded-for');
+  const forwarded = headers.get('x-forwarded-for');
+  if (trusted.size === 0) {
+    if (forwarded) {
+      const hops = forwarded.split(',').filter((s) => s.trim()).length;
+      if (hops > 1) warnUndeclaredProxyTopology(hops);
+    }
+    return 'unknown';
+  }
   if (forwarded) {
     const hops = forwarded.split(',').map((s) => s.trim()).filter(Boolean);
-    if (hops.length > 1 && trusted.size === 0) warnUndeclaredProxyTopology(hops.length);
     for (let i = hops.length - 1; i >= 0; i--) {
       if (!trusted.has(hops[i])) return hops[i];
     }
   }
   // X-Real-IP is only as trustworthy as the proxy that sets it (UI-11).
-  return (trusted.size > 0 && req.headers.get('x-real-ip')) || 'unknown';
+  return headers.get('x-real-ip') || 'unknown';
 }
 
 function _evictExpiredRateLimitBuckets(now: number): void {

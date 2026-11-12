@@ -196,7 +196,9 @@ class CreditService:
         retry with the same ``reference_id`` moves nothing twice.
 
         The charge allows overdraft (the work is done); a cost that rounds to zero
-        credits writes only the refund.
+        credits writes only the refund. A release is written only if the
+        ``<ref>:reserve`` charge landed (the repository checks in the same
+        transaction); without it there is nothing to give back.
         """
         writes: list[LedgerWrite] = []
         if reserved_credits > 0:
@@ -206,6 +208,7 @@ class CreditService:
                 reference_id=f"{reference_id}:release",
                 description="Unused reservation released",
                 allow_overdraft=True,
+                requires_reference=f"{reference_id}:reserve",
             ))
         credits = usd_to_credits(cost_usd)
         if credits > 0:

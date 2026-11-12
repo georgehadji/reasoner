@@ -8,7 +8,9 @@ They maintain state by applying domain events.
 from __future__ import annotations
 
 import copy
+import logging
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import Any, TypeVar
 
 from reasoner.core.events.domain_events import (
@@ -21,6 +23,7 @@ from reasoner.core.events.domain_events import (
     PhaseCompleted,
     PhaseFailed,
     PhaseStarted,
+    PipelineCancelled,
     PipelineCompleted,
     PipelineFailed,
     PipelineStarted,
@@ -29,8 +32,41 @@ from reasoner.core.events.domain_events import (
     WidgetExecuted,
     WidgetFailed,
 )
+from reasoner.core.ports.metrics_port import count_illegal_transition
+from reasoner.core.state_machine import Machine
 
 T = TypeVar('T')
+logger = logging.getLogger(__name__)
+
+
+class RunLifecycle(StrEnum):
+    """Aggregate status of one pipeline run. Terminal states are absorbing."""
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+_L = RunLifecycle
+# PENDING also reaches a terminal state: the handler records a failure that
+# happened before the run started, and old streams hold terminal-only histories.
+# RUNNING -> RUNNING: a resumed run records a second PipelineStarted.
+PIPELINE_RUN = Machine(
+    "pipeline_run",
+    {
+        _L.PENDING: {_L.RUNNING, _L.COMPLETED, _L.FAILED, _L.CANCELLED},
+        _L.RUNNING: {_L.RUNNING, _L.COMPLETED, _L.FAILED, _L.CANCELLED},
+        _L.COMPLETED: set(),
+        _L.FAILED: set(),
+        _L.CANCELLED: set(),
+    },
+    initial=_L.PENDING,
+)
+
+# Before PipelineCancelled existed, a stop or disconnect was stored as
+# PIPELINE_FAILED with one of these prefixes on `error`. Replay maps them back.
+_LEGACY_CANCEL_PREFIXES = ("cancelled:", "client_disconnected:")
 
 
 class Aggregate:
@@ -134,7 +170,7 @@ class PipelineStateData:
     total_tokens: dict[str, int] = field(default_factory=dict)
     start_time: float = 0.0
     end_time: float = 0.0
-    status: str = "pending"  # pending, running, completed, failed
+    status: str = "pending"  # a RunLifecycle value
 
 
 class PipelineAggregate(Aggregate):
@@ -165,6 +201,8 @@ class PipelineAggregate(Aggregate):
             self._apply_pipeline_completed(event)
         elif isinstance(event, PipelineFailed):
             self._apply_pipeline_failed(event)
+        elif isinstance(event, PipelineCancelled):
+            self._apply_pipeline_cancelled(event)
         elif isinstance(event, ContextFetched):
             self._apply_context_fetched(event)
         elif isinstance(event, ContextVetted):
@@ -176,7 +214,24 @@ class PipelineAggregate(Aggregate):
         elif isinstance(event, StressTestCompleted):
             self._apply_stress_test_completed(event)
 
+    def _can_move(self, target: RunLifecycle) -> bool:
+        """False for an illegal lifecycle event, which is then dropped and counted.
+
+        Never raises: this runs while replaying persisted history, where a late
+        failure after completion must not break loading the run.
+        """
+        current = RunLifecycle(self._state_data.status)
+        if PIPELINE_RUN.can(current, target):
+            return True
+        logger.warning(
+            "pipeline %s: ignoring illegal event %s -> %s", self.aggregate_id, current, target
+        )
+        count_illegal_transition(PIPELINE_RUN.name, current.value, target.value)
+        return False
+
     def _apply_pipeline_started(self, event: PipelineStarted) -> None:
+        if not self._can_move(_L.RUNNING):
+            return
         self._state_data.problem = event.problem
         self._state_data.preset = event.preset
         self._state_data.method = event.method
@@ -229,6 +284,8 @@ class PipelineAggregate(Aggregate):
         )
 
     def _apply_pipeline_completed(self, event: PipelineCompleted) -> None:
+        if not self._can_move(_L.COMPLETED):
+            return
         self._state_data.synthesis = event.solution
         self._state_data.total_tokens = event.total_tokens
         self._state_data.end_time = event.timestamp
@@ -238,10 +295,25 @@ class PipelineAggregate(Aggregate):
         )
 
     def _apply_pipeline_failed(self, event: PipelineFailed) -> None:
+        if event.error.startswith(_LEGACY_CANCEL_PREFIXES):
+            self._mark_cancelled(event.error, event.phase_at_failure, event.timestamp)
+            return
+        if not self._can_move(_L.FAILED):
+            return
         self._state_data.errors.append(f"Pipeline failed: {event.error}")
         self._state_data.end_time = event.timestamp
         self._state_data.status = "failed"
         self._state_data.logs.append(f"Pipeline failed at {event.phase_at_failure}")
+
+    def _apply_pipeline_cancelled(self, event: PipelineCancelled) -> None:
+        self._mark_cancelled(event.reason, event.phase_at_cancel, event.timestamp)
+
+    def _mark_cancelled(self, reason: str, phase: str, timestamp: float = 0.0) -> None:
+        if not self._can_move(_L.CANCELLED):
+            return
+        self._state_data.end_time = timestamp or self._state_data.end_time
+        self._state_data.status = "cancelled"
+        self._state_data.logs.append(f"Pipeline cancelled at {phase}: {reason}")
 
     def _apply_context_fetched(self, event: ContextFetched) -> None:
         self._state_data.logs.append(
@@ -297,6 +369,11 @@ class PipelineAggregate(Aggregate):
     def is_running(self) -> bool:
         """Check if pipeline is still running."""
         return self._state_data.status == "running"
+
+    @property
+    def is_cancelled(self) -> bool:
+        """Check if pipeline was stopped from outside (user stop, disconnect)."""
+        return self._state_data.status == "cancelled"
 
     def can_resume(self) -> bool:
         """Check if pipeline can be resumed from current state."""

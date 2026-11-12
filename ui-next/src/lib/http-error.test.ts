@@ -37,3 +37,22 @@ describe('formatRetryAfter', () => {
     expect(formatRetryAfter(seconds)).toBe(text);
   });
 });
+
+describe('describeHttpError: unverified email', () => {
+  const confirm = 'Confirm your email to unlock your free credits and API keys. Check your inbox for the link.';
+
+  it('a 402 marked email_unverified asks for the confirmation, not money', () => {
+    const body = JSON.stringify({ error: 'Insufficient credits', detail: { email_unverified: true, upgrade_url: '/pricing' } });
+    expect(describeHttpError(402, body)).toBe(confirm);
+  });
+
+  it('a 403 with code email_unverified asks for the confirmation', () => {
+    const body = JSON.stringify({ error: 'Confirm your email address before creating an API key.', detail: { code: 'email_unverified' } });
+    expect(describeHttpError(403, body)).toBe(confirm);
+  });
+
+  it('a plain 402 keeps the server message', () => {
+    const body = JSON.stringify({ error: 'Insufficient credits', detail: { upgrade_url: '/pricing' } });
+    expect(describeHttpError(402, body)).toBe('Insufficient credits');
+  });
+});

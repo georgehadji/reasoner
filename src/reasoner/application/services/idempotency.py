@@ -14,6 +14,7 @@ FastAPI dependency, so an adapter translates these at its own boundary
 from __future__ import annotations
 
 import logging
+import uuid
 
 from reasoner.core.degrade import degraded
 
@@ -40,6 +41,18 @@ class RunAlreadyInProgressError(Exception):
         super().__init__(f"Run {client_run_id} is already in progress")
 
 
+class RunAlreadyFinishedError(RunAlreadyInProgressError):
+    """``client_run_id`` belongs to a run that already ended and kept its claim.
+
+    Still a 409, and still a RunAlreadyInProgressError for callers that do not
+    care which: only the message differs, so a retry is not told the run is live.
+    """
+
+    def __init__(self, client_run_id: str):
+        super().__init__(client_run_id)
+        self.args = (f"Run {client_run_id} already finished",)
+
+
 def claim_key(owner_key: str, client_run_id: str) -> str:
     """The claim for one caller's *client_run_id*.
 
@@ -53,7 +66,9 @@ def claim_key(owner_key: str, client_run_id: str) -> str:
 async def register_run(client_run_id: str | None, *, owner_key: str) -> str | None:
     """Atomically claim *client_run_id* for *owner_key*, or raise if that is not possible.
 
-    Returns the claim, for :func:`release_run`. A None or empty id is a no-op
+    Returns the claim, for :func:`release_run` and :func:`complete_run`. It is the
+    key plus this holder's token, so a late release by an earlier holder cannot
+    free a later holder's claim. A None or empty id is a no-op
     returning None: idempotency is opt-in per request, exactly as it is on
     ``RunRequest.client_run_id`` today.
 
@@ -64,19 +79,29 @@ async def register_run(client_run_id: str | None, *, owner_key: str) -> str | No
 
     from reasoner.infrastructure.redis.run_state import _run_state_manager
 
-    claim = claim_key(owner_key, client_run_id)
+    key = claim_key(owner_key, client_run_id)
+    token = uuid.uuid4().hex
+    finished = False
     try:
         authoritative = await _run_state_manager.is_authoritative()
-        claimed = authoritative and await _run_state_manager.try_register(claim)
+        claimed = authoritative and await _run_state_manager.try_register(key, token=token)
+        finished = authoritative and not claimed and await _run_state_manager.claim_finished(key)
     except Exception as exc:
         logger.warning("Idempotency check failed for %s: %s", client_run_id, exc)
         raise RunStateUnavailableError(retry_after_seconds=5) from exc
 
     if not authoritative:
         raise RunStateUnavailableError(retry_after_seconds=10)
+    if finished:
+        raise RunAlreadyFinishedError(client_run_id)
     if not claimed:
         raise RunAlreadyInProgressError(client_run_id)
-    return claim
+    return f"{key}:{token}"
+
+
+def _split(claim: str) -> tuple[str, str]:
+    key, _, token = claim.rpartition(":")
+    return key, token
 
 
 async def release_run(claim: str | None) -> None:
@@ -85,6 +110,8 @@ async def release_run(claim: str | None) -> None:
     A run refused with 402, or one that failed or was dropped mid-stream, kept
     its claim for the full TTL, so the documented retry got 409 for an hour
     (SEC-7). A completed run keeps its claim: a duplicate of it must still 409.
+    Only the holder's own token releases: a second release, or one from a run
+    that has since been retried, is a no-op.
     Never raises; an unreleased claim expires at its TTL.
     """
     if not claim:
@@ -93,7 +120,7 @@ async def release_run(claim: str | None) -> None:
     from reasoner.infrastructure.redis.run_state import _run_state_manager
 
     try:
-        await _run_state_manager.release(claim)
+        await _run_state_manager.release(*_split(claim))
     except Exception as exc:
         degraded(
             "idempotency.release_run", None, exc=exc,
@@ -101,10 +128,29 @@ async def release_run(claim: str | None) -> None:
         )
 
 
+async def complete_run(claim: str | None) -> None:
+    """Mark a claim finished: it keeps its TTL, and a duplicate is told so.
+
+    Never raises: the claim still blocks the duplicate as "in progress" if this
+    write is lost.
+    """
+    if not claim:
+        return
+
+    from reasoner.infrastructure.redis.run_state import _run_state_manager
+
+    try:
+        await _run_state_manager.complete(*_split(claim))
+    except Exception as exc:
+        degraded("idempotency.complete_run", None, exc=exc, detail=f"claim {claim} left unmarked")
+
+
 __all__ = [
+    "RunAlreadyFinishedError",
     "RunAlreadyInProgressError",
     "RunStateUnavailableError",
     "claim_key",
+    "complete_run",
     "register_run",
     "release_run",
 ]

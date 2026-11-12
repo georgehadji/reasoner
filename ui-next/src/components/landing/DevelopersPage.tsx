@@ -51,7 +51,7 @@ const MCP_TOOLS = [
   {
     name: 'reasoner_gate',
     cost: 'Free',
-    desc: 'Shows how a problem would be routed, without running it.',
+    desc: 'Shows how a problem would be routed, without running it. 200 calls a day.',
   },
   {
     name: 'reasoner_estimate',
@@ -329,7 +329,7 @@ export default function DevelopersPage() {
             returns the route, the method it would use, and a confidence;{' '}
             <code className="font-mono text-[length:var(--text-sm)] text-[var(--text-2)]">POST /api/estimate</code>{' '}
             returns tokens, dollars, and duration. Both take the body you were going to send
-            anyway.
+            anyway. The gate is free up to 200 calls a day per account.
           </Lede>
           <Body>
             The router shares its cache between the two, so a gate call followed by a real run does

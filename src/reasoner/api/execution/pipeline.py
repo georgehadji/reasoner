@@ -24,6 +24,7 @@ from reasoner.application.ports.run_outcome import RunOutcome
 from reasoner.application.services.adaptive_routing import build_adaptive_routing_service
 from reasoner.application.services.pipeline_service import PipelineService
 from reasoner.application.services.preset_service import PresetService
+from reasoner.application.services.run_metering import track_run_spend
 from reasoner.application.services.spend_limit_service import (
     RUN_TIER_LOOKUP_TIMEOUT_S,
     apply_spend_limits,
@@ -166,7 +167,9 @@ def _seed_state(
     # auto_selected_method None.
     if method == "writing":
         state.task_type = TaskType.TECHNICAL
-        state.decomposition = ["article workflow"]
+        state.decomposition = {
+            "causal_chain": [], "assumptions": [], "failure_modes": [], "critical_sources": [],
+        }
         state.method = "article"
         method = "article"
         logger.info("Article request detected in stream — routing to article method")
@@ -261,6 +264,23 @@ def _build_runner(
     return runner
 
 
+_CANCEL_POLL_SECONDS = 2.0
+
+
+async def _cancel_requested(run_id: str, cancel_event: Any) -> None:
+    """Return once the run is cancelled on this worker or on any other.
+
+    /api/stop can land on a different gunicorn worker; its flag reaches this
+    one only through Redis, so the local event alone never fired.
+    """
+    while not cancel_event.is_set():
+        try:
+            await asyncio.wait_for(cancel_event.wait(), timeout=_CANCEL_POLL_SECONDS)
+        except TimeoutError:
+            if await _run_store.is_cancelled(run_id):
+                return
+
+
 async def _run_phases(
     pipeline: Any,
     state: PipelineState,
@@ -291,7 +311,7 @@ async def _run_phases(
     # cancels the run task, which propagates into whichever phase coroutine is
     # in flight.
     run_task = asyncio.ensure_future(runner.run(strategy, state))
-    cancel_watch = asyncio.ensure_future(cancel_event.wait())
+    cancel_watch = asyncio.ensure_future(_cancel_requested(run_id, cancel_event))
     try:
         done, _ = await asyncio.wait(
             {run_task, cancel_watch}, return_when=asyncio.FIRST_COMPLETED
@@ -397,6 +417,10 @@ async def _settle_preflight(
     # Refuse a run the caller's plan cannot pay for. Checked against the preset
     # preflight actually resolved, not the one requested -- auto presets only
     # settle on a tier here.
+    if user_id:
+        from reasoner.infrastructure.llm import spend_tracker
+
+        await spend_tracker.refresh(user_id)  # see other workers' monthly spend
     rejection = check_run_allowed(preflight.effective_preset_name, user_tier, user_id)
     if rejection is not None:
         logger.info(
@@ -476,6 +500,7 @@ class PipelineExecutionService:
         # disconnect (B-13).
         conn_context = StreamingConnectionContext(run_id)
         stream = RunStream(run_id, sse_emit, conn_context.tracked_broadcast)
+        await stream.continue_history()
 
         # Emit immediately so the UI has content to render while preflight
         # (HyperGate LLM calls) completes.
@@ -502,6 +527,10 @@ class PipelineExecutionService:
             pipeline, state, emitter, method = _build_run(
                 req, preflight, initial_state, user_id, user_tier, run_id
             )
+            # Cancelled, failed or disconnected runs end without a cost frame;
+            # the metering wrapper reads the state's running total instead.
+            run_state = state
+            track_run_spend(lambda: run_state.total_cost_usd or 0.0)
             await _announce_start(req, preflight, method, emitter, user_id, stream)
             await _enhance_prompt(req, pipeline, state, stream)
 
@@ -509,6 +538,7 @@ class PipelineExecutionService:
             if not await _run_phases(
                 pipeline, state, req, run_id, stream, emitter, cancel_event
             ):
+                await stream.cancelled(state, "stopped by user")
                 return RunOutcome("cancelled", state, "stopped by user")
 
             await _finish_run(orchestrator, req, state, user_id, run_id, run_start, stream)

@@ -471,6 +471,58 @@ def _update_claude_md(models: int, presets: int) -> bool:
     return True
 
 
+STATE_MACHINES_MD = ROOT / "docs" / "STATE_MACHINES.md"
+_SM_BLOCK_RE = re.compile(
+    r"(<!-- gen:state-machines:start -->\n).*?(<!-- gen:state-machines:end -->)", re.S
+)
+
+
+def _render_state_machines() -> str:
+    """One Mermaid diagram per registered ``core.state_machine.Machine``.
+
+    A module that builds a machine is found by the import string, the same way
+    tests/architecture/test_state_machines.py finds it, so a new machine shows
+    up here with no list to update.
+    """
+    import importlib
+    sys.path.insert(0, str(ROOT / "src"))
+    src = ROOT / "src"
+    own = src / "reasoner" / "core" / "state_machine.py"
+    for path in sorted((src / "reasoner").rglob("*.py")):
+        body = path.read_text(encoding="utf-8", errors="ignore")
+        if path != own and "reasoner.core.state_machine" in body:
+            importlib.import_module(".".join(path.relative_to(src).with_suffix("").parts))
+    from reasoner.core.state_machine import registered_machines
+
+    machines = registered_machines()
+    if not machines:
+        return "_No lifecycle uses `core.state_machine` yet. Phase 3 adds the first ones._\n"
+    parts = []
+    for name, m in sorted(machines.items()):
+        mode = "enforce" if m.enforce else "observe"
+        parts.append(f"### `{name}` ({mode})\n\n```mermaid\n{m.to_mermaid()}\n```\n")
+    return "\n".join(parts)
+
+
+def _update_state_machines_doc() -> bool:
+    """Regenerate the diagram block in docs/STATE_MACHINES.md from the registry.
+
+    Only the text between the markers is derived; the verdict tables around it
+    stay hand-written. The generated-docs-drift gate then covers the diagrams.
+    """
+    if not STATE_MACHINES_MD.exists():
+        return False
+    text = STATE_MACHINES_MD.read_text(encoding="utf-8")
+    if not _SM_BLOCK_RE.search(text):
+        return False
+    new = _SM_BLOCK_RE.sub(lambda m: m.group(1) + _render_state_machines() + m.group(2), text)
+    if new == text:
+        return False
+    STATE_MACHINES_MD.write_text(new, encoding="utf-8")
+    _stage(STATE_MACHINES_MD)
+    return True
+
+
 CAPABILITIES_TS = ROOT / "ui-next" / "src" / "lib" / "capabilities.generated.ts"
 
 
@@ -582,6 +634,9 @@ def main() -> None:
 
     if _update_claude_md(models, presets):
         changed.append("CLAUDE.md")
+
+    if _update_state_machines_doc():
+        changed.append("docs/STATE_MACHINES.md")
 
     if changed:
         print(

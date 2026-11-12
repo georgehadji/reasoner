@@ -37,10 +37,13 @@ function req(url: string, ip: string): Request {
 }
 
 beforeEach(() => {
+  // XFF is only believed when a proxy is declared trusted.
+  vi.stubEnv('TRUSTED_PROXIES', '10.255.255.1');
   vi.resetModules();
 });
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   vi.unstubAllGlobals();
 });
 

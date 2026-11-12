@@ -17,15 +17,20 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from reasoner.core.ports.api_key_repository import ApiKeyRepository
+from reasoner.core.state_machine import Machine
 from reasoner.domain.api_keys import (
+    API_KEY_TRANSITIONS,
     MAX_KEYS_PER_USER,
     ApiKey,
+    ApiKeyState,
     generate_key,
     hash_key,
     normalize_scopes,
 )
 
 logger = logging.getLogger(__name__)
+
+API_KEY_MACHINE = Machine("api_key", API_KEY_TRANSITIONS, initial=ApiKeyState.LIVE)
 
 #: Longest lifetime a user may set on a key.
 MAX_EXPIRY_DAYS = 365
@@ -101,7 +106,12 @@ class ApiKeyService:
             key_prefix=minted.key_prefix,
             scopes=granted,
             expires_at=expires_at,
+            max_live=MAX_KEYS_PER_USER,
         )
+        if record is None:  # lost the race against a parallel create
+            raise ApiKeyLimitError(
+                f"Key limit reached ({MAX_KEYS_PER_USER}). Revoke an existing key first."
+            )
         logger.info("API key %s created for user %s", record.key_prefix, user_id)
         return MintedKey(key=record, plaintext=minted.plaintext)
 
@@ -112,6 +122,7 @@ class ApiKeyService:
         """Revoke a key the caller owns. Returns False when not found."""
         revoked = await self._repository.revoke(user_id, key_id)
         if revoked:
+            API_KEY_MACHINE.move(ApiKeyState.LIVE, ApiKeyState.REVOKED)
             logger.info("API key %s revoked by user %s", key_id, user_id)
         return revoked
 

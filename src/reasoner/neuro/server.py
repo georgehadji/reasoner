@@ -4,6 +4,7 @@ Internal endpoints for recall and learning.
 """
 
 import asyncio
+import gzip
 import hashlib
 import json
 import logging
@@ -430,6 +431,38 @@ def tenant_key(owner: str | None, agent_id: str | None) -> str | None:
     return f"{_owned_prefix(owner)}{agent_id or 'default'}"
 
 
+def _json_or_raw(line: str) -> object:
+    try:
+        return json.loads(line)
+    except json.JSONDecodeError:
+        return {"unparsed": line}  # a torn append is still the owner's text
+
+
+def _read_sessions(tenant: Path) -> dict[str, dict]:
+    """The tenant's session logs by tier: {tier: {file name: entries}}.
+
+    Hot logs are JSONL, warm ones one JSON summary, cold ones gzipped JSONL. An
+    unreadable file raises, like an unreadable index: a shorter export would
+    look complete.
+    """
+    out: dict[str, dict] = {"hot": {}, "warm": {}, "cold": {}}
+    root = tenant / "sessions"
+    for tier in out:
+        for f in sorted((root / tier).glob("*")) if (root / tier).is_dir() else []:
+            if f.is_symlink() or not f.is_file():
+                continue
+            if f.name.endswith(".gz"):
+                text = gzip.decompress(f.read_bytes()).decode("utf-8")
+            else:
+                text = f.read_text(encoding="utf-8")
+            out[tier][f.name] = (
+                [_json_or_raw(line) for line in text.splitlines() if line.strip()]
+                if f.name.endswith((".jsonl", ".jsonl.gz"))
+                else json.loads(text)
+            )
+    return out
+
+
 class NeuroService:
     """Owns the providers, tenants, and memory tiers.
 
@@ -546,7 +579,8 @@ class NeuroService:
         return result
 
     async def export_owner(self, owner: str) -> dict:
-        """Every L2 memory entry of every tenant belonging to *owner* (GDPR Art. 20).
+        """Every L2 memory entry and every session log (hot, warm, cold) of every
+        tenant belonging to *owner* (GDPR Art. 20).
 
         Keyed by tenant directory name. Embeddings are omitted. A tenant whose
         index cannot be read raises: a shorter export would look complete.
@@ -569,7 +603,7 @@ class NeuroService:
                     for entry in read_l2_entries(index_dir):
                         entries.append({k: entry.get(k) for k in (
                             "id", "content", "source", "metadata", "created_at")})
-                out[tenant.name] = entries
+                out[tenant.name] = {"memory": entries, "sessions": _read_sessions(tenant)}
             return out
 
         return await asyncio.to_thread(read)

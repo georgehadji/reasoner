@@ -20,7 +20,6 @@ beforeEach(() => {
     composerText: '',
     attachments: [],
     history: [],
-    activeRun: null,
     recentCommands: [],
     user: null,
     isAuthenticated: false,
@@ -130,69 +129,7 @@ describe('app-store — composer and attachments', () => {
 });
 
 
-describe('app-store — active run management', () => {
-  it('setActiveRun sets the run', () => {
-    useAppStore.getState().setActiveRun({
-      progressId: 'run-1',
-      problem: 'Test',
-      phases: [],
-      errors: [],
-      preset: 'test-preset',
-      autoSelectedMethod: null,
-    });
-    const run = useAppStore.getState().activeRun;
-    expect(run?.progressId).toBe('run-1');
-    expect(run?.problem).toBe('Test');
-  });
-
-  it('addPhaseToActiveRun appends phases', () => {
-    useAppStore.getState().setActiveRun({
-      progressId: 'run-1',
-      problem: 'Test',
-      phases: [],
-      errors: [],
-      preset: 'p',
-      autoSelectedMethod: null,
-    });
-    useAppStore.getState().addPhaseToActiveRun({ phase: 1, name: 'Classify', data: {} });
-    useAppStore.getState().addPhaseToActiveRun({ phase: 2, name: 'Analyze', data: {} });
-    const phases = useAppStore.getState().activeRun?.phases;
-    expect(phases).toHaveLength(2);
-    expect(phases?.[0].name).toBe('Classify');
-    expect(phases?.[1].name).toBe('Analyze');
-  });
-
-  it('addPhaseToActiveRun is no-op when no active run', () => {
-    useAppStore.getState().addPhaseToActiveRun({ phase: 1, name: 'Test', data: {} });
-    expect(useAppStore.getState().activeRun).toBeNull();
-  });
-
-  it('setActiveRunErrors updates errors', () => {
-    useAppStore.getState().setActiveRun({
-      progressId: 'run-1',
-      problem: 'Test',
-      phases: [],
-      errors: [],
-      preset: 'p',
-      autoSelectedMethod: null,
-    });
-    useAppStore.getState().setActiveRunErrors(['Error 1', 'Error 2']);
-    expect(useAppStore.getState().activeRun?.errors).toEqual(['Error 1', 'Error 2']);
-  });
-
-  it('clearActiveRun resets to null', () => {
-    useAppStore.getState().setActiveRun({
-      progressId: 'run-1',
-      problem: 'Test',
-      phases: [],
-      errors: [],
-      preset: 'p',
-      autoSelectedMethod: null,
-    });
-    useAppStore.getState().clearActiveRun();
-    expect(useAppStore.getState().activeRun).toBeNull();
-  });
-
+describe('app-store — running flag', () => {
   it('setRunning updates running flag', () => {
     useAppStore.getState().setRunning(true);
     expect(useAppStore.getState().running).toBe(true);

@@ -73,9 +73,16 @@ class FileHistoryRepository:
 
     def _files(self, owner: str | None) -> list[Path]:
         """The owner's entry files, newest first by modification time."""
+        stamped: list[tuple[float, str]] = []
         try:
             with os.scandir(self._dir(owner)) as scan:
-                stamped = [(e.stat().st_mtime, e.path) for e in scan if e.name.endswith(".json")]
+                for e in scan:
+                    if not e.name.endswith(".json"):
+                        continue
+                    try:
+                        stamped.append((e.stat().st_mtime, e.path))
+                    except FileNotFoundError:
+                        continue  # trimmed by a concurrent save between listing and stat
         except FileNotFoundError:
             return []
         stamped.sort(reverse=True)

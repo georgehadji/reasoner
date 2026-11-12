@@ -49,7 +49,14 @@ export function usePipelineStream() {
       const controller = new AbortController();
       abortControllerRef.current = controller;
       if (signal.aborted) controller.abort();
-      signal.addEventListener('abort', () => controller.abort(), { once: true });
+      const onRunAbort = () => controller.abort();
+      signal.addEventListener('abort', onRunAbort, { once: true });
+      // A stream is only complete once the server said so (done, error or cancelled).
+      let sawTerminal = false;
+      const track = (ev: PhaseEvent) => {
+        if (ev.type === 'done' || ev.type === 'error' || ev.type === 'cancelled') sawTerminal = true;
+        onEvent(ev);
+      };
 
       try {
         const resp = await fetchWithCsrf(url, {
@@ -72,11 +79,13 @@ export function usePipelineStream() {
         }
         if (!resp.body) throw new Error('No response body');
 
-        await readSSEStream(resp.body, onEvent, controller.signal);
+        await readSSEStream(resp.body, track, controller.signal);
+        if (!sawTerminal && !controller.signal.aborted) throw new Error('Stream ended early');
       } catch (err) {
         if (controller.signal.aborted || isAbortError(err)) return;
         throw err;
       } finally {
+        signal.removeEventListener('abort', onRunAbort);
         if (abortControllerRef.current === controller) abortControllerRef.current = null;
       }
     },

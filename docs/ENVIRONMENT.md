@@ -84,6 +84,8 @@ user's problem, to TypeSafe.
 | `AUTH_PERSISTENCE_ENABLED` | `false` | Persist auth keys to DB |
 | `AUTH_DB_PATH` | `src/reasoner/auth_keys.db` | SQLite auth DB path. `docker-compose.yml` sets `/app/history/auth_keys.db` (a mounted volume); the in-package default is lost on redeploy |
 | `PRESET_TIER_ENFORCEMENT_ENABLED` | `false` | Return an early HTTP 403 (before credit reservation) when a caller's tier is below the preset's required tier. Premium presets are already refused at runtime either way, as an SSE `PRESET_TIER_REQUIRED` frame after reservation; this flag only changes when and how the refusal surfaces |
+| `EMAIL_VERIFICATION_MODE` | `observe` | Gate on the FREE monthly credit grant and API key creation for accounts whose email is not verified. `observe` counts them in `reasoner_unverified_access_total` and allows; `enforce` withholds the grant and refuses key creation with 403 `email_unverified`. See `docs/plans/email-verification-2026-11-12.md` |
+| `EMAIL_VERIFICATION_CUTOFF` | — | ISO-8601 UTC time. Accounts created before it skip the gate (grandfathered). Set it in the deploy that switches to `enforce`. A value that does not parse grandfathers nobody and logs an error |
 
 ## CSRF & Security
 
@@ -122,6 +124,9 @@ All VS flags are controlled via `VSFeatureFlags` in code; env vars are not yet w
 | `COHERE_RERANK_ENABLED` | `true` | Enable Cohere reranking |
 | `DOCUMENT_SEMANTIC_RETRIEVAL_ENABLED` | `false` | Semantic retrieval for uploads |
 | `UPLOAD_STORAGE_DIR` | — (in-package default) | Upload storage directory. Point this at a mounted volume in production; the installed package dir is replaced on every redeploy |
+| `HISTORY_STORAGE_DIR` | — (in-package `history/`) | Run-history directory (one subdirectory per owner). Keep it off the directory that holds the `*.db` files |
+| `RUN_CACHE_DIR` | — (in-package `cache/`) | Run-replay cache directory. Mount it in production, or a redeploy drops every cached run |
+| `NEURO_DATA_DIR` | — (`~/.neuro`) | Neuro long-term-memory data directory. Mount it in production |
 | `SENTRY_TRACES_SAMPLE_RATE` | `0.1` | Sentry sampling rate |
 | `DEBUG` | `false` | Debug mode |
 | `LOG_LEVEL` | `INFO` | Logging level |
