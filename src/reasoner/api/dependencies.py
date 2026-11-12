@@ -161,13 +161,15 @@ async def _ensure_user_in_db(user: User, *, resume_deletion: bool = False) -> No
     try:
         await pool.execute(
             """
-            INSERT INTO users (id, email, display_name, auth_provider, avatar_url, last_login_at)
-            VALUES ($1, $2, $3, $4, $5, NOW())
+            INSERT INTO users
+                (id, email, display_name, auth_provider, avatar_url, email_verified, last_login_at)
+            VALUES ($1, $2, $3, $4, $5, $6, NOW())
             ON CONFLICT (id) DO UPDATE SET
                 email = EXCLUDED.email,
                 display_name = EXCLUDED.display_name,
                 auth_provider = EXCLUDED.auth_provider,
                 avatar_url = EXCLUDED.avatar_url,
+                email_verified = EXCLUDED.email_verified,
                 last_login_at = NOW()
             """,
             str(user.id),
@@ -175,6 +177,8 @@ async def _ensure_user_in_db(user: User, *, resume_deletion: bool = False) -> No
             user.display_name,
             user.auth_provider,
             user.avatar_url,
+            # A mirror of the provider's flag; gates read User.email_verified, not this.
+            user.email_verified,
         )
         _provisioned_user_ids[user.id] = _monotonic()
         _provisioned_user_ids.move_to_end(user.id)

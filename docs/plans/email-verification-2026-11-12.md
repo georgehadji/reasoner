@@ -70,7 +70,7 @@ Each step is a small PR. Order matters: read the flag, then mirror it, then obse
    - `LocalAuthAdapter` reads an `email_verified` claim. `create_token(..., email_verified=True)` is the dev default, so local development is never blocked.
    - Tests: one adapter test each for confirmed and not confirmed, with the Supabase response mocked.
 
-2. **Mirror it into the row.**
+2. **Mirror it into the row.** Done 2026-11-12, `tests/integration/test_email_verified_pg.py`. Its first run found that the upsert had always written a `display_name` column no migration created, so provisioning failed on every migrated database; migration `20261112_000700` adds the column.
    - `_ensure_user_in_db` writes `email_verified = EXCLUDED.email_verified` in its existing upsert. That is one column added to one statement; no migration is needed.
    - **No backfill.** A gate reads the flag from the request's `User`, which comes fresh from Supabase on every authentication, not from the row. The row is for admin, analytics and the GDPR export, and it fills in on each user's next login.
    - Test: the live Postgres provisioning test (`tests/integration/`, container on :55499) asserts the column follows the flag in both directions.
