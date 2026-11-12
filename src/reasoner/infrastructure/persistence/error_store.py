@@ -13,6 +13,7 @@ import json
 import logging
 import sqlite3
 import threading
+import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -82,6 +83,7 @@ class ErrorStore:
 
         self._init_db()
         self._prune_old()
+        self._last_prune = time.monotonic()
 
     def _get_executor(self) -> ThreadPoolExecutor:
         """Get or create thread pool executor."""
@@ -178,6 +180,11 @@ class ErrorStore:
 
     def _insert_sync(self, entry: ErrorEntry) -> int:
         """Synchronous insert."""
+        # Retention used to run only at construction, so a worker that stayed
+        # up for weeks kept every expired row until its next restart.
+        if time.monotonic() - self._last_prune > 3600:
+            self._prune_old()
+            self._last_prune = time.monotonic()
         conn = self._get_connection()
         cursor = conn.execute(
             """
@@ -206,6 +213,27 @@ class ErrorStore:
     async def insert(self, entry: ErrorEntry) -> int:
         """Insert an error entry asynchronously."""
         return await self._run_in_executor(self._insert_sync, entry)
+
+    def _rows_for_user_sync(self, user_id: str) -> list[dict[str, Any]]:
+        rows = self._get_connection().execute(
+            "SELECT timestamp, level, source, message, path, method, status_code"
+            " FROM errors WHERE user_id = ? ORDER BY timestamp",
+            (user_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    async def rows_for_user(self, user_id: str) -> list[dict[str, Any]]:
+        """The user's error records, without tracebacks (GDPR export)."""
+        return await self._run_in_executor(self._rows_for_user_sync, user_id)
+
+    def _forget_user_sync(self, user_id: str) -> None:
+        conn = self._get_connection()
+        conn.execute("DELETE FROM errors WHERE user_id = ?", (user_id,))
+        conn.commit()
+
+    async def forget_user(self, user_id: str) -> None:
+        """Remove every error record that names the user (GDPR erase)."""
+        await self._run_in_executor(self._forget_user_sync, user_id)
 
     def _query_sync(
         self,

@@ -27,9 +27,19 @@ class BodySizeLimitMiddleware:
     ``per_path`` maps a path prefix to its limit; the longest prefix wins.
     """
 
-    def __init__(self, app, default_limit: int, per_path: dict[str, int] | None = None):
+    def __init__(
+        self,
+        app,
+        default_limit: int,
+        per_path: dict[str, int] | None = None,
+        anon_per_path: dict[str, int] | None = None,
+    ):
         self.app = app
         self.default_limit = default_limit
+        # Lower cap for a request with no Authorization header, on paths whose
+        # big body only an authenticated caller may send (FastAPI parses the
+        # body before any dependency runs).
+        self.anon_per_path = sorted((anon_per_path or {}).items(), key=lambda kv: -len(kv[0]))
         self.per_path = sorted((per_path or {}).items(), key=lambda kv: -len(kv[0]))
 
     @staticmethod
@@ -42,15 +52,19 @@ class BodySizeLimitMiddleware:
             REQUEST_BODY_MAX_BYTES,
             UPLOAD_MAX_FILE_BYTES,
         )
+
+        slack = 2**20  # JSON envelope and prompt text around the base64 image(s)
         from reasoner.core.settings import settings
 
         return {
             "default_limit": REQUEST_BODY_MAX_BYTES,
             "per_path": {
                 "/api/upload": UPLOAD_MAX_FILE_BYTES * settings.UPLOAD_MAX_FILES + 2**20,
-                "/api/provenance/": MAX_DATA_URL_CHARS + REQUEST_BODY_MAX_BYTES,
-                "/api/generate-image": 4 * MAX_DATA_URL_CHARS + REQUEST_BODY_MAX_BYTES,
+                # Anonymous by design: one image, base64 is 4/3 of the bytes.
+                "/api/provenance/": int(UPLOAD_MAX_FILE_BYTES * 1.4) + slack,
+                "/api/generate-image": 4 * MAX_DATA_URL_CHARS + slack,
             },
+            "anon_per_path": {"/api/generate-image": slack},
         }
 
     def _limit(self, path: str) -> int:
@@ -62,6 +76,9 @@ class BodySizeLimitMiddleware:
             await self.app(scope, receive, send)
             return
         limit = self._limit(scope["path"])
+        if not any(k == b"authorization" for k, _ in scope["headers"]):
+            anon = (n for prefix, n in self.anon_per_path if scope["path"].startswith(prefix))
+            limit = min(limit, next(anon, limit))
         declared = dict(scope["headers"]).get(b"content-length")
         if declared is not None and (not declared.isdigit() or int(declared) > limit):
             await _too_large(scope, receive, send, limit)
@@ -261,8 +278,10 @@ class RequestTimeoutMiddleware(BaseHTTPMiddleware):
         self.timeout_seconds = timeout_seconds
 
     async def dispatch(self, request: Request, call_next):
-        # Skip timeout for SSE endpoints (they're long-running by design)
-        if request.url.path.startswith("/api/run"):
+        # Skip timeout for SSE endpoints (they're long-running by design), and
+        # for /api/agent/run/sync, which runs up to the 600s pipeline timeout:
+        # cutting it at 300s billed the spend so far and returned no result.
+        if request.url.path.startswith(("/api/run", "/api/agent/run")):
             return await call_next(request)
 
         try:

@@ -7,7 +7,7 @@ import {
   rateLimit,
   readJsonBody,
   requireCsrfToken,
-  ValidationError,
+  proxyErrorResponse,
 } from './security-server';
 
 /**
@@ -73,14 +73,6 @@ export async function proxyJson(
       headers: responseHeaders,
     });
   } catch (err) {
-    if (err instanceof ValidationError) {
-      return NextResponse.json({ error: err.message }, { status: 400 });
-    }
-    const message = err instanceof Error ? err.message : 'Proxy error';
-    const isUpstreamConfigError =
-      message.includes('Invalid upstream URL') ||
-      message.includes('disallowed port') ||
-      message.includes('private network');
-    return NextResponse.json({ error: message }, { status: isUpstreamConfigError ? 400 : 502 });
+    return proxyErrorResponse(err, `Proxy ${path}`);
   }
 }

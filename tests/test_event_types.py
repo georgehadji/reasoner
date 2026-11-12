@@ -48,11 +48,11 @@ def test_event_classes_populated() -> None:
     PHASE_RETRIED, which WorkflowRunner had been constructing for months
     against members that did not exist.
     """
-    assert len(PIPELINE_EVENT_CLASSES) == 26
+    assert len(PIPELINE_EVENT_CLASSES) == 27
     assert len(WIDGET_EVENT_CLASSES) == 3
     assert len(MEMORY_EVENT_CLASSES) == 2
     assert len(SAAS_EVENT_CLASSES) == 12
-    assert len(EVENT_CLASSES) == 43
+    assert len(EVENT_CLASSES) == 44
 
 
 def test_every_event_type_has_a_class() -> None:
@@ -151,8 +151,9 @@ def test_all_event_types_map() -> None:
     """ALL_EVENT_TYPES contains all enum values.
 
     41 -> 43 on 2026-09-09: PHASE_QUALITY_CHECKED and PHASE_RETRIED.
+    43 -> 44 on 2026-11-12: PIPELINE_CANCELLED.
     """
-    assert len(ALL_EVENT_TYPES) == 43
+    assert len(ALL_EVENT_TYPES) == 44
     assert ALL_EVENT_TYPES["pipeline_started"] == PipelineEventType.PIPELINE_STARTED
     assert ALL_EVENT_TYPES["widget_detected"] == WidgetEventType.WIDGET_DETECTED
     assert ALL_EVENT_TYPES["memory_stored"] == MemoryEventType.MEMORY_STORED

@@ -25,6 +25,11 @@ export function describeHttpError(status: number, body: string, retryAfterHeader
     : {};
   const serverMessage = typeof data?.error === 'string' ? data.error : '';
 
+  // A FREE grant or key creation withheld until the email is confirmed (403 or 402).
+  if (detail.email_unverified === true || detail.code === 'email_unverified') {
+    return 'Confirm your email to unlock your free credits and API keys. Check your inbox for the link.';
+  }
+
   if (status === 429) {
     const title = typeof detail.error === 'string' ? detail.error : serverMessage || 'Rate limit reached';
     const retry = Number(detail.retry_after ?? retryAfterHeader);

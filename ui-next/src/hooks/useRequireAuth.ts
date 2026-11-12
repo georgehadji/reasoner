@@ -6,7 +6,7 @@ import { selectAuthStatus, useAppStore, type AuthStatus } from '@/stores/app-sto
 
 /**
  * Route guard for pages that need a signed-in user. Redirects only once the
- * session has settled as `anonymous`, and only from an effect, never during
+ * session has settled as `anonymous` or `expired`, and only from an effect, never during
  * render. The page decides it needs a user; the transport never navigates.
  *
  *   const status = useRequireAuth();
@@ -18,7 +18,7 @@ export function useRequireAuth(): AuthStatus {
   const pathname = usePathname() ?? '/';
 
   useEffect(() => {
-    if (status === 'anonymous') {
+    if (status === 'anonymous' || status === 'expired') {
       router.replace(`/login?next=${encodeURIComponent(pathname)}`);
     }
   }, [status, pathname, router]);

@@ -49,9 +49,9 @@ export async function GET(request: NextRequest) {
       headers: sanitizeResponseHeaders(resp),
     });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Proxy error';
+    console.error('Neuro sessions proxy error:', err instanceof Error ? err.message : err);
     return NextResponse.json(
-      { error: msg, entries: [], total: 0 },
+      { error: 'Proxy error', entries: [], total: 0 },
       { status: 502 }
     );
   }

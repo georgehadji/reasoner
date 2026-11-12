@@ -14,7 +14,7 @@ pytestmark = pytest.mark.unit
 
 REQUIRED = {
     "profile", "subscriptions", "quota", "query_log", "credit_ledger",
-    "events", "uploads", "vectors", "history", "valkey", "neuro", "identity",
+    "events", "uploads", "vectors", "history", "valkey", "unsettled_runs", "neuro", "identity",
 }
 
 

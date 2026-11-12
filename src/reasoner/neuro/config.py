@@ -267,7 +267,7 @@ def _parse_config(raw: dict) -> NeuroConfig:
 
 def _apply_defaults(cfg: NeuroConfig) -> NeuroConfig:
     if not cfg.data_dir:
-        cfg.data_dir = str(Path.home() / ".neuro")
+        cfg.data_dir = settings.NEURO_DATA_DIR or str(Path.home() / ".neuro")
     if not cfg.storage.path:
         cfg.storage.path = cfg.data_dir
 

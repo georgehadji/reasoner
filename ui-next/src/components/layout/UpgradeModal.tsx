@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useAsyncAction } from '@/hooks/useAsyncAction';
 import { apiFetch } from '@/lib/api-client';
 import { X, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -23,13 +23,13 @@ function isValidCheckoutUrl(url: string): boolean {
 }
 
 export function UpgradeModal({ open, onClose }: UpgradeModalProps) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const checkout = useAsyncAction();
+  const { error } = checkout;
+  // `ok` = redirect started; stay locked until the page unloads.
+  const loading = checkout.status === 'pending' || checkout.status === 'ok';
 
-  const handleUpgrade = async () => {
-    setError('');
-    setLoading(true);
-    try {
+  const handleUpgrade = () =>
+    checkout.run('pro', async () => {
       const res = await apiFetch('/api/billing/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -48,12 +48,7 @@ export function UpgradeModal({ open, onClose }: UpgradeModalProps) {
         throw new Error('Invalid checkout URL');
       }
       window.location.href = url;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Checkout failed';
-      setError(msg);
-      setLoading(false);
-    }
-  };
+    }, 'Checkout failed');
 
   return (
     <div

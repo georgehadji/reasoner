@@ -76,8 +76,12 @@ async def invalidate_subscription(user_id: str) -> None:
 
     Called after webhook-driven subscription writes. Best-effort: a Redis
     failure only means the change is visible after CACHE_TTL_SECONDS instead
-    of immediately, which must never fail the webhook.
+    of immediately, which must never fail the webhook. Also drops the quota
+    cache: the same writes sync usage_quotas behind it.
     """
+    from reasoner.infrastructure.persistence.cached_quota_repo import invalidate_quota
+
+    await invalidate_quota(user_id)
     try:
         await get_guarded_valkey(get_valkey_pool()).delete(_cache_key(user_id))
     except Exception as exc:

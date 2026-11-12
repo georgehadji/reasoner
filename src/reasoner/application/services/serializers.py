@@ -820,7 +820,8 @@ def _ser_writing_critic(state: PipelineState) -> dict:
 
 
 def _ser_citations(state: PipelineState) -> list[dict]:
-    prism = state.method_state.get("prism") if state.method_state else {}
+    # Only the research flow writes "prism"; any other method_state lacks it.
+    prism = (_get_v(state, "method_state", None) or {}).get("prism") or {}
     return prism.get("citations", [])
 
 
@@ -957,14 +958,19 @@ def _ser_5(state: PipelineState) -> dict:
             "tokens": state.phase_tokens.get("Phase 5: Final Assembly", {"input": 0, "output": 0}),
         }
 
-    base = {}
+    return _ser_run_extras(state)
+
+
+def _ser_run_extras(state: PipelineState) -> dict:
+    """Run-wide data a final phase carries beside its answer: citations, pivot."""
+    extras: dict[str, Any] = {}
     citations = _ser_citations(state)
     if citations:
-        base["citations"] = citations
+        extras["citations"] = citations
     cross_lang = _ser_cross_language(state)
     if cross_lang:
-        base["cross_language"] = cross_lang
-    return base
+        extras["cross_language"] = cross_lang
+    return extras
 
 
 def _ser_egress_rewrite(state: PipelineState) -> dict:
@@ -1101,15 +1107,16 @@ def _ser_synthesis(state: PipelineState) -> dict:
             "claim_labels": clean_labels,
             "premises": premises,
             "evidence": _get_v(fs, "evidence", {}),
+            # Already filtered by synthesis_phase to URLs the run retrieved.
+            "sources": _get_v(fs, "sources", []),
             "meta_audit": meta_audit,
             "layout_hints": _get_v(fs, "layout_hints", {}),
             "tokens": {"input": total_input, "output": total_output},
         }
 
-        # Cross-language metadata
-        cross_lang = _ser_cross_language(state)
-        if cross_lang:
-            result["cross_language"] = cross_lang
+        # Cross-language metadata, and the research flow's Prism citations,
+        # which rode this step's payload while it was serialized by _ser_5.
+        result.update(_ser_run_extras(state))
 
         # Provenance/watermark scrub report (domain.watermark, set in synthesis_phase.py) --
         # written onto state.meta but otherwise never left it; the frontend has
@@ -1154,7 +1161,8 @@ def _ser_synthesis(state: PipelineState) -> dict:
             ),
         }
 
-    return {}
+    # Synthesis produced nothing: still send what the run gathered.
+    return _ser_run_extras(state)
 
 
 # _event is re-exported from sse_utils (imported at top of file).

@@ -2,10 +2,34 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import shutil
 import time
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+
+def _expire_tenant_dir(agent_dir: Path, agents_root: Path, retention_days: int) -> bool:
+    """Delete *agent_dir* if nothing in it changed for *retention_days*. Blocking.
+
+    The path is resolved and must sit inside *agents_root*, and a symlink is
+    never followed, so a planted link cannot point deletion elsewhere.
+    """
+    if agent_dir.is_symlink():
+        return False
+    resolved = agent_dir.resolve()
+    if resolved == agents_root.resolve() or not resolved.is_relative_to(agents_root.resolve()):
+        return False
+    newest = max(
+        (p.lstat().st_mtime for p in resolved.rglob("*") if not p.is_symlink()),
+        default=resolved.stat().st_mtime,
+    )
+    if time.time() - newest < retention_days * 86400:
+        return False
+    shutil.rmtree(resolved)
+    return True
 
 
 async def run_neuro_maintenance() -> dict:
@@ -17,11 +41,10 @@ async def run_neuro_maintenance() -> dict:
     Phase 1.7 fix: wires archive_hot_sessions / archive_warm_to_cold which
     previously had zero callers.
     """
-    result: dict = {"archived_hot": 0, "moved_to_cold": 0, "errors": []}
+    result: dict = {"archived_hot": 0, "moved_to_cold": 0, "expired_tenants": 0, "errors": []}
 
     try:
-        from pathlib import Path
-
+        from reasoner.core.constants_limits import NEURO_TENANT_RETENTION_DAYS
         from reasoner.neuro.config import NeuroConfig, load_config
         from reasoner.neuro.server import get_neuro_service
         from reasoner.neuro.sessions import SessionConfig, SessionManager
@@ -33,9 +56,10 @@ async def run_neuro_maintenance() -> dict:
             logger.info("Neuro maintenance: no agents directory (%s), skipping", agents_dir)
         else:
             tenants = get_neuro_service().tenants
-            for agent_dir in sorted(agents_dir.iterdir()):
-                if not agent_dir.is_dir():
-                    continue
+            entries = await asyncio.to_thread(
+                lambda: sorted(p for p in agents_dir.iterdir() if p.is_dir())
+            )
+            for agent_dir in entries:
                 agent_id = agent_dir.name
                 # This loop opens its own SessionManager, outside the tenant
                 # manager's erase guard: archiving would write warm summaries
@@ -45,6 +69,12 @@ async def run_neuro_maintenance() -> dict:
                     logger.info("Neuro maintenance: skipping erased tenant %s", agent_id)
                     continue
                 try:
+                    if await asyncio.to_thread(
+                        _expire_tenant_dir, agent_dir, agents_dir, NEURO_TENANT_RETENTION_DAYS
+                    ):
+                        result["expired_tenants"] += 1
+                        logger.info("Neuro maintenance: removed idle tenant %s", agent_id)
+                        continue
                     sessions = SessionManager(agent_dir, SessionConfig())
 
                     # Archive hot → warm
@@ -52,7 +82,7 @@ async def run_neuro_maintenance() -> dict:
                     result["archived_hot"] += len(hot_archived)
 
                     # Move warm → cold
-                    cold_moved = sessions.archive_warm_to_cold()
+                    cold_moved = await asyncio.to_thread(sessions.archive_warm_to_cold)
                     result["moved_to_cold"] += len(cold_moved)
 
                 except Exception as exc:

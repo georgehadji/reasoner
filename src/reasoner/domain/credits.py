@@ -98,6 +98,25 @@ class CreditBalance:
 
 
 @dataclass(frozen=True, slots=True)
+class LedgerWrite:
+    """One movement to apply inside a batch (``CreditRepository.record_batch``).
+
+    Same meaning as the arguments of ``record``: ``reference_id`` is the
+    idempotency key, so a replayed write returns its original entry.
+    """
+
+    delta: int
+    reason: CreditReason
+    reference_id: str | None = None
+    description: str | None = None
+    allow_overdraft: bool = False
+    # Skip this write unless an entry with this reference already exists for the
+    # user. A release of a reservation that never landed would otherwise mint
+    # credits (SM-M3).
+    requires_reference: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class CreditLedgerEntry:
     """One append-only movement of credits."""
 
@@ -142,7 +161,8 @@ def usd_to_credits(cost_usd: float) -> int:
     """
     if cost_usd <= 0:
         return 0
-    return math.ceil(cost_usd * CREDITS_PER_USD)
+    # round() first: float noise (2.007 * 1000 = 2007.0000000000002) must not add a credit.
+    return math.ceil(round(cost_usd * CREDITS_PER_USD, 6))
 
 
 def credits_to_usd(credits: int) -> float:

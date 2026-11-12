@@ -22,7 +22,7 @@ router = APIRouter()
 
 @router.get("/api/history")
 async def get_history(
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_key_scope("history:read")),
     limit: int = Query(50, ge=1, le=1000),
     offset: int = Query(0, ge=0),
 ):
@@ -52,7 +52,7 @@ async def get_tagged_history(
 @router.get("/api/history/{entry_id}")
 async def get_history_entry(
     entry_id: str,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_key_scope("history:read")),
 ):
     """Get a specific history entry (must belong to the authenticated user)."""
     entry = await history_repo().get(str(user.id), entry_id)

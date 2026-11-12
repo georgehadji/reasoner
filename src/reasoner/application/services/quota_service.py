@@ -9,9 +9,12 @@ Enforces business rules:
 
 from __future__ import annotations
 
-from datetime import UTC
+from dataclasses import replace
+from datetime import UTC, datetime
+from enum import StrEnum
 
 from reasoner.application.ports.quota_repository import QuotaRepository
+from reasoner.core.state_machine import Machine
 from reasoner.domain.saas import (
     QuotaResult,
     SubscriptionTier,
@@ -22,6 +25,29 @@ TIER_LIMITS: dict[SubscriptionTier, int] = {
     SubscriptionTier.PRO: 500,
     SubscriptionTier.ENTERPRISE: -1,   # unlimited
 }
+
+
+class QuotaSlotState(StrEnum):
+    """One admission's claim on ``usage_quotas.used_queries`` (SM-M4)."""
+
+    UNCLAIMED = "unclaimed"
+    CLAIMED = "claimed"  # check_and_increment took a slot in the current period
+    RELEASED = "released"  # given back inside the period it was claimed in
+    VOIDED = "voided"  # the monthly reset zeroed the count first; nothing left to give back
+
+
+#: The claim itself is SELECT ... FOR UPDATE in ``check_and_increment``; the period
+#: guard on release is the SQL ``period_start <= claimed_at`` in ``release_slot``.
+QUOTA_SLOT_MACHINE = Machine(
+    "quota_slot",
+    {
+        QuotaSlotState.UNCLAIMED: {QuotaSlotState.CLAIMED},
+        QuotaSlotState.CLAIMED: {QuotaSlotState.RELEASED, QuotaSlotState.VOIDED},
+        QuotaSlotState.RELEASED: set(),
+        QuotaSlotState.VOIDED: set(),
+    },
+    initial=QuotaSlotState.UNCLAIMED,
+)
 
 
 class QuotaService:
@@ -49,7 +75,6 @@ class QuotaService:
         quota = await self._repository.get_quota(user_id)
 
         # Auto-reset if we've crossed into a new month
-        from datetime import datetime
         now = datetime.now(UTC)
         current_period_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         # period_start is nullable and no INSERT path sets it, so a row that has
@@ -60,9 +85,10 @@ class QuotaService:
             quota = await self._repository.get_quota(user_id)
 
         # The entitlement tier is a ceiling over the persisted row, not a
-        # synonym for it: invoice.payment_failed demotes a subscription to
-        # past_due (tier -> FREE) without re-syncing max_queries, so the row
-        # can still say 500. -1 on the row means unlimited, not a negative cap.
+        # synonym for it: past_due is a live status (LIVE_STATUSES), so a past-due
+        # subscriber keeps the paid tier while the provider retries; max_queries
+        # on the row is not re-synced on that event and may disagree with the
+        # tier. -1 on the row means unlimited, not a negative cap.
         row_max = limit if quota.max_queries < 0 else quota.max_queries
         effective_max = min(limit, row_max)
 
@@ -81,13 +107,26 @@ class QuotaService:
         return QuotaResult(allowed=True, remaining=remaining)
 
     async def increment(self, user_id: str, preset: str = "") -> QuotaResult:
-        """
-        Increment used_queries by 1 after a successful pipeline run.
+        """Take one quota slot, atomically, when a run is admitted (audit 6, finding 3).
 
-        ⚠️ CRITICAL (Enhancement 1.2): This was a no-op stub. Now delegates to repository.
-        Must include idempotency key to prevent double-counting on retries.
+        ``check()`` only reads, so N concurrent runs at 19/20 all passed it and each
+        counted itself at the end: 24/20. This is the claim that makes the limit
+        hard. A denial (``allowed=False``) means the limit was reached; ``remaining
+        == -1`` means an unlimited row, which takes no slot and must not be released.
+        The run gives the slot back with :meth:`release` if it ends up costing nothing.
         """
-        return await self._repository.check_and_increment(user_id, preset=preset)
+        result = await self._repository.check_and_increment(user_id, preset=preset)
+        if not result.allowed and result.retry_after is None:
+            result = replace(result, retry_after=self._seconds_until_month_end())
+        return result
+
+    async def release(self, user_id: str, claimed_at: datetime | None = None) -> None:
+        """Give back a slot taken by :meth:`increment` for a run that was not billed.
+
+        Pass the claim time so a release after the month rolled over is a no-op.
+        """
+        QUOTA_SLOT_MACHINE.move(QuotaSlotState.CLAIMED, QuotaSlotState.RELEASED)
+        await self._repository.release_slot(user_id, claimed_at)
 
     def _seconds_until_month_end(self) -> int:
         """Rough estimate for Retry-After header."""

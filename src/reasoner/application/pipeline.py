@@ -39,6 +39,7 @@ from reasoner.core.constants import (
     TRUNCATION,
 )
 from reasoner.core.parsing import (
+    coerce_list,
     extract_json,
 )
 from reasoner.core.protocol import TemperatureStrategy
@@ -507,10 +508,12 @@ class ReasonerPipeline:
             detected_lang = lang
         state.language = detected_lang
         state.decomposition = {
-            "causal_chain": data.get("causal_chain", []),
-            "assumptions": data.get("assumptions", []),
-            "failure_modes": data.get("failure_modes", []),
-            "critical_sources": data.get("critical_sources", []),
+            "causal_chain": [
+                c for c in coerce_list(data.get("causal_chain")) if isinstance(c, dict)
+            ],
+            "assumptions": coerce_list(data.get("assumptions")),
+            "failure_modes": coerce_list(data.get("failure_modes")),
+            "critical_sources": coerce_list(data.get("critical_sources")),
         }
         self._log("PHASE-FUSION", f"Task type: {state.task_type.value}, Language: {state.language}", state)
 

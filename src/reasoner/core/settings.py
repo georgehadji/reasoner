@@ -325,6 +325,13 @@ class Settings:
     )
     """Sender address for transactional emails."""
 
+    # ── Email verification (docs/plans/email-verification-2026-11-12.md) ──
+    EMAIL_VERIFICATION_MODE: str = os.getenv("EMAIL_VERIFICATION_MODE", "observe").lower()
+    """observe: count unverified access to gated features and allow it. enforce: refuse it."""
+
+    EMAIL_VERIFICATION_CUTOFF: str | None = os.getenv("EMAIL_VERIFICATION_CUTOFF") or None
+    """ISO-8601 UTC time. Accounts created before it skip the email gate (grandfathered)."""
+
     NOTIFICATION_EMAIL: str | None = os.getenv("NOTIFICATION_EMAIL")
     """Email address to receive admin notifications (webhook failures, spend cap, etc.)."""
 
@@ -382,7 +389,6 @@ class Settings:
 
     # ── Event Store Compaction ──
     COMPACTION_ENABLED: bool = os.getenv("COMPACTION_ENABLED", "true").lower() in ("1", "true", "yes")
-    COMPACTION_RUN_HOUR_UTC: int = int(os.getenv("COMPACTION_RUN_HOUR_UTC", "3"))
     EVENT_RETENTION_DAYS: int = int(os.getenv("EVENT_RETENTION_DAYS", "365"))
     DB_POOL_SIZE: int = int(os.getenv("DB_POOL_SIZE", "50"))
 
@@ -399,6 +405,9 @@ class Settings:
     FEEDBACK_DB_PATH: str = os.getenv("FEEDBACK_DB_PATH", "")
     EVENT_STORE_DB_PATH: str = os.getenv("EVENT_STORE_DB_PATH", "")
     UPLOAD_STORAGE_DIR: str = os.getenv("UPLOAD_STORAGE_DIR", "")
+    HISTORY_STORAGE_DIR: str = os.getenv("HISTORY_STORAGE_DIR", "")
+    RUN_CACHE_DIR: str = os.getenv("RUN_CACHE_DIR", "")
+    NEURO_DATA_DIR: str = os.getenv("NEURO_DATA_DIR", "")
 
     @property
     def asyncpg_dsn(self) -> str:
@@ -610,6 +619,13 @@ class Settings:
     def cors_origins_list(self) -> list[str]:
         """Parse CORS_ORIGINS env var into a list of origin strings."""
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
+
+    @property
+    def effective_allowed_origins(self) -> list[str]:
+        """Origins HTTP CORS and WebSocket Origin checks both enforce."""
+        if self.ENVIRONMENT == "production":
+            return [self.APP_URL] if self.APP_URL else []
+        return self.cors_origins_list
 
 
 settings = Settings()

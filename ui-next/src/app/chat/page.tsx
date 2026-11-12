@@ -24,6 +24,7 @@ import { UpgradeModal } from '@/components/layout/UpgradeModal';
 import { SecurityBadge } from '@/components/layout/SecurityBadge';
 import { PipelineError } from '@/hooks/usePipelineStream';
 import { describeHttpError } from '@/lib/http-error';
+import { EmailVerifyBanner } from '@/components/layout/EmailVerifyBanner';
 import { useIsLocalHost } from '@/lib/local-host';
 
 import { ChatFeed, ChatFeedMessage, RenderedPhase } from '@/components/chat/ChatFeed';
@@ -378,7 +379,7 @@ export default function ChatPage() {
           payload: [{ id: 'err-upload-' + Date.now(), role: 'error', content: `Could not upload ${names}. Nothing was run; try again.` }],
         });
         setComposerText(problem);
-        setRunning(false);
+        if (!run.superseded(ticket)) setRunning(false);
         return;
       }
     }
@@ -542,7 +543,7 @@ export default function ChatPage() {
           loadingPrompt: undefined,
         });
       } finally {
-        setRunning(false);
+        if (!run.superseded(ticket)) setRunning(false);
         clearAttachments();
       }
       return;
@@ -942,8 +943,10 @@ export default function ChatPage() {
           if (data.detail?.upgrade_url) {
             setShowUpgradeModal(true);
             dispatchMessages({ type: 'UPDATE_MESSAGE', payload: { messageId: assistantId, updates: { isStreaming: false } } });
-            wsDisconnect();
-            setRunning(false);
+            if (!run.superseded(ticket)) {
+              wsDisconnect();
+              setRunning(false);
+            }
             clearAttachments();
             return;
           }
@@ -973,11 +976,14 @@ export default function ChatPage() {
       setCurrentPhase(undefined);
     } finally {
       dispatchMessages({ type: 'UPDATE_MESSAGE', payload: { messageId: assistantId, updates: { isStreaming: false } } });
-      wsDisconnect();
-      setRunning(false);
+      // After Stop + a quick resubmit this run is stale: it must not clear the new run's state or WS.
+      if (!run.superseded(ticket)) {
+        wsDisconnect();
+        setRunning(false);
+      }
       clearAttachments();
     }
-  }, [attachments, isImageMode, isLocal, user, tier, messages, startRun, startFollowup, wsConnect, wsDisconnect, dispatchMessages, setRunning, setComposerText, clearAttachments, refreshHistory, setCompletedPhases, setErrorPhases, setCurrentPhase, setPhaseDurations, setAutoSelectedMethod, setPhaseOpenMode, isContinuation, getAutoPreset, autoMethodAlways]);
+  }, [run, attachments, isImageMode, isLocal, user, tier, messages, startRun, startFollowup, wsConnect, wsDisconnect, dispatchMessages, setRunning, setComposerText, clearAttachments, refreshHistory, setCompletedPhases, setErrorPhases, setCurrentPhase, setPhaseDurations, setAutoSelectedMethod, setPhaseOpenMode, isContinuation, getAutoPreset, autoMethodAlways]);
 
   const handleSubmit = useCallback(async (
     providedText?: string,
@@ -1106,9 +1112,12 @@ export default function ChatPage() {
       }
     } finally {
       dispatchMessages({ type: 'UPDATE_MESSAGE', payload: { messageId: assistantId, updates: { isStreaming: false } } });
+      const stale = run.superseded(ticket);
       run.finish(ticket);
-      setRunning(false);
-      setCurrentPhase(undefined);
+      if (!stale) {
+        setRunning(false);
+        setCurrentPhase(undefined);
+      }
     }
   }
 
@@ -1278,6 +1287,7 @@ export default function ChatPage() {
           </div>
         )}
 
+        <EmailVerifyBanner />
         <div
           id="main-content"
           ref={scrollContainerRef}

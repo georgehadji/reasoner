@@ -50,7 +50,12 @@ SYNTHESIS_SYSTEM = (
     "weigh, not as settled facts, and give the generator's pushback its due. A flaw that "
     "was raised and never shown to be fixed belongs in open_questions or lowers the label "
     "of the claim it affects. A debate that stopped without the critic's acceptance has "
-    "not settled the question; say so plainly."
+    "not settled the question; say so plainly.\n\n"
+    "core_solution IS the answer to the problem: the best answer's substance -- its "
+    "concrete recommendations, items and reasoning -- corrected for the flaws that "
+    "were upheld. The critique is not a substitute for the answer. Doubts go in "
+    "open_questions and claim_labels, alongside the answer, never in place of it; a "
+    "core_solution that only lists caveats, next steps or open issues has failed."
 )
 
 # The critic's ACCEPT rule. Rendered into critic_evaluation_prompt below, and
@@ -152,9 +157,9 @@ def generator_revision_prompt(state: PipelineState, flaws, previous_answer: str,
         f'{_wrap_external_content(json.dumps(flaws, indent=2))}\n\n'
         f'For each flaw: state AGREE/DISAGREE, if AGREE explain fix, if DISAGREE provide evidence. '
         f'Then produce COMPLETE revised answer.\n\n'
-        f'Output JSON: {{"flaw_responses": [{{"flaw": "...", "stance": "AGREE|DISAGREE", '
-        f'"response": "..."}}], "revised_answer": "<complete solution>", '
-        f'"changes_summary": "<what changed>", "confidence": 0.0-1.0}}'
+        f'Output JSON, revised_answer first: {{"revised_answer": "<complete solution>", '
+        f'"flaw_responses": [{{"flaw": "...", "stance": "AGREE|DISAGREE", '
+        f'"response": "..."}}], "changes_summary": "<what changed>", "confidence": 0.0-1.0}}'
     )
 
 

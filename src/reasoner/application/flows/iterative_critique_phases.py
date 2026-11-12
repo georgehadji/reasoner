@@ -26,6 +26,7 @@ from reasoner.core.constants import (
     JEV_CRITIC_TIMEOUT_SECONDS,
     JEV_MAX_STATE_CHARS,
 )
+from reasoner.core.constants_limits import get_token_budget
 from reasoner.core.degrade import degraded
 from reasoner.core.ports.decision_port import get_decision_port, jev_mode
 from reasoner.domain.core_types import CriticDimensionScore
@@ -237,6 +238,7 @@ async def run_generator_phase(state: PipelineState, services: WorkflowServices,
         system_prompt=system_prompt,
         user_prompt=user_prompt,
         state=state,
+        max_tokens=get_token_budget("iterative_generate"),
     )
     if result is None:
         raise RuntimeError("Generator LLM returned None")
@@ -402,6 +404,7 @@ async def _llm_critic_round(state: PipelineState, services: WorkflowServices,
         system_prompt=ic_phases.CRITIC_SYSTEM,
         user_prompt=ic_phases.critic_evaluation_prompt(state, answer, round_num),
         state=state,
+        max_tokens=get_token_budget("iterative_critique"),
     )
     if result is None:
         raise RuntimeError("Critic LLM returned None")

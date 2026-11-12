@@ -9,8 +9,23 @@ so the binding exists exactly once.
 from __future__ import annotations
 
 import logging
+import time
+from datetime import datetime
+
+from reasoner.core.ports.unsettled_run_port import UnsettledRun
+from reasoner.infrastructure.valkey.unsettled_runs import ValkeyUnsettledRunStore
 
 logger = logging.getLogger(__name__)
+
+
+def count_credit_failopen(path: str) -> None:
+    """Count a credit step that failed open or failed to settle. Never raises."""
+    try:
+        from reasoner.metrics import REASONER_CREDIT_FAILOPEN_TOTAL
+
+        REASONER_CREDIT_FAILOPEN_TOTAL.labels(path=path).inc()
+    except Exception as exc:
+        logger.warning("Failed to record credit fail-open metric: %s", exc)
 
 
 class CreditSink:
@@ -64,21 +79,73 @@ class CreditSink:
         reference_id: str,
         preset: str,
     ) -> None:
-        from reasoner.api.dependencies import _get_credit_service, _get_quota_service
+        from reasoner.api.dependencies import _get_credit_service
 
+        # The quota slot is taken at admission (admit_run), not counted here: a
+        # count at the end let concurrent runs all pass the check first.
         await _get_credit_service().charge_usd(
             user_id,
             cost_usd=cost_usd,
             reference_id=reference_id,
             description=f"Pipeline run ({preset})",
         )
-        # The one place a run is known to have both succeeded and been billed.
-        # QuotaService.check() deliberately does not increment ("call
-        # increment() separately after a successful pipeline run to avoid
-        # charging for failed runs") but nothing ever called it, so
-        # used_queries never advanced and the query quota could not deny.
-        # After the charge, not before: an unbilled run must not eat a slot.
-        await _get_quota_service().increment(user_id, preset)
+
+    async def true_up(
+        self,
+        *,
+        user_id: str,
+        reserved_credits: int,
+        cost_usd: float,
+        reference_id: str,
+        preset: str,
+    ) -> None:
+        """Release the reservation and charge the real cost in one ledger transaction."""
+        from reasoner.api.dependencies import _get_credit_service
+
+        await _get_credit_service().true_up_run(
+            user_id,
+            reserved_credits=reserved_credits,
+            cost_usd=cost_usd,
+            reference_id=reference_id,
+            preset=preset,
+        )
+
+    async def release_quota_slot(
+        self, *, user_id: str, claimed_at: datetime | None = None
+    ) -> None:
+        from reasoner.api.dependencies import _get_quota_service
+
+        await _get_quota_service().release(user_id, claimed_at)
+
+    async def record_unsettled(
+        self,
+        *,
+        user_id: str,
+        reference_id: str,
+        cost_usd: float,
+        reserved_credits: int,
+        preset: str,
+        error: str,
+    ) -> None:
+        """Store a served-but-unsettled run in Valkey; log it if Valkey is down too."""
+        count_credit_failopen("settle")
+        run = UnsettledRun(
+            user_id=user_id,
+            reference_id=reference_id,
+            cost_usd=cost_usd,
+            reserved_credits=reserved_credits,
+            preset=preset,
+            error=error,
+            recorded_at=time.time(),
+        )
+        try:
+            await ValkeyUnsettledRunStore().record(run)
+        except Exception as exc:
+            logger.error(
+                "UNSETTLED RUN (valkey unavailable: %s): user=%s reference=%s cost_usd=%.6f "
+                "reserved_credits=%d preset=%s error=%s",
+                exc, user_id, reference_id, cost_usd, reserved_credits, preset, error,
+            )
 
 
 class PrometheusObserver:
@@ -106,4 +173,4 @@ class PrometheusObserver:
             logger.warning("Failed to record prometheus query metrics: %s", exc)
 
 
-__all__ = ["CreditSink", "PrometheusObserver"]
+__all__ = ["CreditSink", "PrometheusObserver", "count_credit_failopen"]

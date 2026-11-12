@@ -39,6 +39,7 @@ _GUARDED = [
     ("POST", "/api/account/api-keys", {"json": {"name": "x", "scopes": ["write"]}}),
     ("DELETE", "/api/account/api-keys/k1", {}),
     ("POST", "/api/account/delete", {}),
+    ("GET", "/api/account/export", {}),
     ("DELETE", "/api/user/data", {}),
     ("DELETE", "/api/history/e1", {}),
     ("DELETE", "/api/history", {}),

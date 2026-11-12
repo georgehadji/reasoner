@@ -6,6 +6,7 @@ Implementations may use PostgreSQL, Redis, or a hybrid cache-aside strategy.
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Protocol
 
 from reasoner.domain.saas import QuotaResult, UsageQuota
@@ -24,6 +25,16 @@ class QuotaRepository(Protocol):
 
         This MUST be transactional (SELECT ... FOR UPDATE or equivalent)
         to prevent race conditions under concurrent requests.
+        """
+        ...
+
+    async def release_slot(self, user_id: str, claimed_at: datetime | None = None) -> None:
+        """Give back one slot taken by ``check_and_increment``.
+
+        Never goes below zero and does nothing on an unlimited row, which
+        ``check_and_increment`` never counted. With ``claimed_at`` it does
+        nothing when the monthly reset has run since: that reset already
+        dropped the slot, and releasing would take one from the new month.
         """
         ...
 

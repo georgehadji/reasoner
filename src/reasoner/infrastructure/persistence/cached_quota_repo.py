@@ -21,6 +21,14 @@ logger = logging.getLogger(__name__)
 CACHE_TTL_SECONDS = 60
 
 
+async def invalidate_quota(user_id: str) -> None:
+    """Drop a user's cached quota after a write that bypasses this wrapper."""
+    try:
+        await get_guarded_valkey(get_valkey_pool()).delete(f"quota:{user_id}")
+    except Exception as exc:
+        logger.warning("Redis quota cache invalidate failed for %s: %s", user_id, exc)
+
+
 class CachedQuotaRepository(QuotaRepository):
     """Wraps a QuotaRepository with Redis cache-aside."""
 
@@ -81,6 +89,13 @@ class CachedQuotaRepository(QuotaRepository):
         except Exception as exc:
             logger.warning("Redis quota cache invalidate failed: %s", exc)
         return result
+
+    async def release_slot(self, user_id: str, claimed_at: datetime | None = None) -> None:
+        await self._underlying.release_slot(user_id, claimed_at)
+        try:
+            await self._redis.delete(self._cache_key(user_id))
+        except Exception as exc:
+            logger.warning("Redis quota cache invalidate failed: %s", exc)
 
     async def reset_monthly(self, user_id: str) -> None:
         await self._underlying.reset_monthly(user_id)

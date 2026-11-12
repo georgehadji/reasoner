@@ -62,6 +62,26 @@ def _record_hash(user_id: str, content_hash: str, file_id: str) -> None:
         index.setdefault(user_id, {})[content_hash] = file_id
         atomic_write_text(path, json.dumps(index))
 
+
+def _forget_hash(user_id: str, file_id: str) -> None:
+    """Drop *file_id* from the user's dedup entries; drop the user once empty.
+
+    Without this a deleted file -- and an erased account -- kept the user id
+    and a content hash of every upload in the index forever.
+    """
+    path = _hash_index_path()
+    with locked(path):
+        index = _load_hash_index()
+        hashes = index.get(user_id)
+        if not hashes or file_id not in hashes.values():
+            return
+        kept = {h: f for h, f in hashes.items() if f != file_id}
+        if kept:
+            index[user_id] = kept
+        else:
+            del index[user_id]
+        atomic_write_text(path, json.dumps(index))
+
 logger = logging.getLogger(__name__)
 
 
@@ -372,8 +392,8 @@ async def save_uploaded_file(
     # Content-hash deduplication -- scoped to this tenant only. Anonymous
     # callers (user_id is None) skip dedup entirely: there's no stable
     # identity to scope a match against.
-    content_hash = hashlib.sha256(content).hexdigest()
-    hash_index = _load_hash_index()
+    content_hash = await asyncio.to_thread(lambda: hashlib.sha256(content).hexdigest())
+    hash_index = await asyncio.to_thread(_load_hash_index)
     tenant_hashes = hash_index.get(user_id, {}) if user_id else {}
     existing_id = tenant_hashes.get(content_hash)
     if existing_id:
@@ -400,7 +420,7 @@ async def save_uploaded_file(
 
     # Validate MIME type (defense against extension spoofing)
     if _MAGIC_AVAILABLE:
-        detected_mime = magic.from_buffer(content, mime=True)
+        detected_mime = await asyncio.to_thread(magic.from_buffer, content, mime=True)
         allowed_exts = MIME_TYPE_MAP.get(detected_mime, set())
         if ext not in allowed_exts:
             logger.warning(
@@ -474,7 +494,9 @@ async def save_uploaded_file(
         try:
             from reasoner.infrastructure.watermark.scrubber import ImageMarkScrubber
 
-            outcome = ImageMarkScrubber().scrub(content)
+            # Off the event loop: the chunk/box walk is pure Python over
+            # caller-controlled bytes.
+            outcome = await asyncio.to_thread(ImageMarkScrubber().scrub, content)
             if not outcome.degraded:
                 content = outcome.data
             provenance_report = outcome.to_dict()
@@ -497,7 +519,10 @@ async def save_uploaded_file(
     # written before any content with status "writing", so every file this
     # upload creates is findable from it, and a failure part-way deletes them
     # all instead of leaving an orphan content file with no owner record.
-    meta_path = UPLOAD_DIR / f"{file_id}.meta.json"
+    # Exclusive create: a 12-char id is only 48 bits, so never trust it to be
+    # unused; on collision pick another id instead of overwriting someone's meta.
+    file_id, meta_path = await asyncio.to_thread(_reserve_upload_id)
+    file_path = UPLOAD_DIR / f"{file_id}{ext}"
     created = (meta_path, file_path, _text_cache_path(file_id))
     try:
         # Persist ownership metadata. "encrypted": True marks that the
@@ -509,7 +534,6 @@ async def save_uploaded_file(
             "user_id": user_id,
             "filename": filename,
             "mime_type": mime_type,
-            "created_at": str(uuid.uuid4()),
             "encrypted": True,
             "status": "writing",
         }
@@ -518,12 +542,16 @@ async def save_uploaded_file(
         # Save file, encrypted at rest (security-remediation-plan.md Phase 4
         # item 5). Extraction below runs on the original plaintext bytes
         # already in memory, not a decrypt round-trip.
-        file_path.write_bytes(_encrypt_bytes(content))
+        await asyncio.to_thread(lambda: file_path.write_bytes(_encrypt_bytes(content)))
 
         # Extract text
         text_content = await extract_text(content, filename, force_ocr=force_ocr)
         if not is_extraction_notice(text_content):
-            _text_cache_path(file_id).write_bytes(_encrypt_bytes(text_content.encode("utf-8")))
+            await asyncio.to_thread(
+                lambda: _text_cache_path(file_id).write_bytes(
+                    _encrypt_bytes(text_content.encode("utf-8"))
+                )
+            )
 
         # DAT-8, decision Q8: semantic search covers only the first
         # DOCUMENT_INDEX_MAX_CHARS characters. Said in the listing and the
@@ -545,9 +573,10 @@ async def save_uploaded_file(
         logger.error(f"File upload failed: {e}")
         for path in created:
             path.unlink(missing_ok=True)
+        # The detail is logged above; exception text carries server paths.
         return {
             "success": False,
-            "error": str(e),
+            "error": "Upload failed",
         }
 
     # Background: index for semantic retrieval if enabled. Bounded queue,
@@ -604,6 +633,19 @@ def _is_ready(meta: dict) -> bool:
 def _text_cache_path(file_id: str) -> Path:
     # ".json" keeps list_uploads from listing it as a file of its own.
     return UPLOAD_DIR / f"{file_id}.text.json"
+
+
+def _reserve_upload_id() -> tuple[str, Path]:
+    """Claim an unused file id by exclusively creating its meta file."""
+    while True:
+        file_id = str(uuid.uuid4())[:12]
+        meta_path = UPLOAD_DIR / f"{file_id}.meta.json"
+        try:
+            with open(meta_path, "x", encoding="utf-8") as fh:
+                fh.write('{"status": "writing"}')
+        except FileExistsError:
+            continue
+        return file_id, meta_path
 
 
 def _get_upload_meta(file_id: str) -> dict | None:
@@ -680,10 +722,10 @@ def delete_file(file_id: str, user_id: str | None = None) -> bool:
         return False
 
     # Ownership check
-    if user_id is not None:
-        meta = _get_upload_meta(file_id)
-        if meta is None or meta.get("user_id") != user_id:
-            return False
+    meta = _get_upload_meta(file_id)
+    if user_id is not None and (meta is None or meta.get("user_id") != user_id):
+        return False
+    owner = (meta or {}).get("user_id")
 
     # meta.json goes first: index_file re-checks it after writing a vector
     # sidecar, so an indexing job racing this delete removes its own sidecar
@@ -701,6 +743,8 @@ def delete_file(file_id: str, user_id: str | None = None) -> bool:
         except OSError as e:
             logger.error(f"Failed to delete {path.name} for {file_id}: {e}")
 
+    if deleted and owner:
+        _forget_hash(owner, file_id)
     return deleted
 
 

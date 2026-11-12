@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from collections.abc import Sequence
 from dataclasses import asdict
 from datetime import datetime
 from typing import Any
@@ -374,6 +375,7 @@ class PostgreSQLEventStore:
             PipelineEventType.PIPELINE_STARTED, PipelineEventType.PHASE_STARTED,
             PipelineEventType.PHASE_COMPLETED, PipelineEventType.PHASE_FAILED,
             PipelineEventType.PIPELINE_COMPLETED, PipelineEventType.PIPELINE_FAILED,
+            PipelineEventType.PIPELINE_CANCELLED,
         ):
             return "pipeline"
         elif event_type in (
@@ -400,6 +402,7 @@ class PostgreSQLEventStore:
     ) -> None:
         """Update aggregate state."""
         from reasoner.core.events.domain_events import (
+            PipelineCancelled,
             PipelineCompleted,
             PipelineFailed,
             PipelineStarted,
@@ -417,6 +420,8 @@ class PostgreSQLEventStore:
             status = "completed"
         elif isinstance(event, PipelineFailed):
             status = "failed"
+        elif isinstance(event, PipelineCancelled):
+            status = "cancelled"
 
         # Upsert aggregate. Version only moves forward, and only an event that
         # carries a status ($8) changes it. EXCLUDED.status is never NULL (an
@@ -581,8 +586,15 @@ class PostgreSQLEventStore:
         limit: int = 50,
         offset: int = 0,
         status: str | None = None,
+        aggregate_ids: Sequence[str] | None = None,
     ) -> list[dict[str, Any]]:
-        """List pipelines with filtering."""
+        """List pipelines with filtering.
+
+        ``aggregate_ids`` limits the list to an owner's pipelines. An empty
+        sequence matches nothing and runs no query; None means all.
+        """
+        if aggregate_ids is not None and not aggregate_ids:
+            return []
         pool = await self._ready()
         pool = self._read_pool if (self.use_read_replica and self._read_pool is not None) else pool
 
@@ -596,6 +608,9 @@ class PostgreSQLEventStore:
             if status:
                 params.append(status)
                 query += f" AND status = ${len(params)}"
+            if aggregate_ids is not None:
+                params.append(list(aggregate_ids))
+                query += f" AND aggregate_id = ANY(${len(params)}::text[])"
 
             params.append(limit)
             query += f" ORDER BY created_at DESC LIMIT ${len(params)}"
@@ -621,6 +636,28 @@ class PostgreSQLEventStore:
                     "updated_at": row["updated_at"].isoformat(),
                 })
             return results
+
+    async def count_pipelines(
+        self,
+        status: str | None = None,
+        aggregate_ids: Sequence[str] | None = None,
+    ) -> int:
+        """Count pipelines matching the same filters as ``list_pipelines``."""
+        if aggregate_ids is not None and not aggregate_ids:
+            return 0
+        pool = await self._ready()
+        pool = self._read_pool if (self.use_read_replica and self._read_pool is not None) else pool
+
+        query = "SELECT COUNT(*) FROM aggregates WHERE aggregate_type = 'pipeline'"
+        params: list[Any] = []
+        if status:
+            params.append(status)
+            query += f" AND status = ${len(params)}"
+        if aggregate_ids is not None:
+            params.append(list(aggregate_ids))
+            query += f" AND aggregate_id = ANY(${len(params)}::text[])"
+        async with pool.acquire(timeout=10.0) as conn:
+            return int(await conn.fetchval(query, *params))
 
     async def search_events(
         self,
@@ -1049,6 +1086,36 @@ class PostgreSQLEventStore:
                 cutoff,
             )
             return row["cnt"] if row else 0
+
+    async def prune_audit_events_before(self, cutoff: datetime, batch_size: int = 500) -> int:
+        """Delete version-0 audit rows older than cutoff (audit-5 decision Q6).
+
+        Same CTE-with-LIMIT form as ``prune_events_before`` (partitioned table).
+        Replay reads only ``version > 0``, so versioned rows stay untouched.
+        """
+        async with (await self._ready()).acquire(timeout=10.0) as conn:
+            result = await conn.execute(
+                """
+                WITH to_delete AS (
+                    SELECT id FROM events
+                    WHERE version = 0 AND created_at < $1
+                    ORDER BY created_at ASC
+                    LIMIT $2
+                )
+                DELETE FROM events
+                WHERE id IN (SELECT id FROM to_delete)
+                """,
+                cutoff,
+                batch_size,
+            )
+            return int(result.split()[-1]) if result else 0
+
+    async def count_eligible_audit_events(self, cutoff: datetime) -> int:
+        """Count version-0 audit rows eligible for pruning (dry-run support)."""
+        async with (await self._ready()).acquire(timeout=10.0) as conn:
+            return await conn.fetchval(
+                "SELECT COUNT(*) FROM events WHERE version = 0 AND created_at < $1", cutoff
+            )
 
     async def close(self) -> None:
         """Close connection pools."""

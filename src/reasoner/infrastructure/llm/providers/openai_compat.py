@@ -92,6 +92,35 @@ class OpenAICompatibleProvider(BaseLLMProvider):
     _pool_closed: bool = False
 
     @classmethod
+    def shared_pool(cls) -> httpx.AsyncClient | None:
+        """Return the process-wide httpx pool, creating it on first use (thread-safe).
+
+        Also used by the direct fallback lane, so its calls reuse warm
+        connections instead of paying a TCP+TLS handshake each.
+        """
+        if cls._pool_init_lock is None:
+            cls._pool_init_lock = threading.Lock()
+        with cls._pool_init_lock:
+            if cls._shared_pool is None:
+                # Reset closed flag if we're recreating the pool
+                cls._pool_closed = False
+                try:
+                    import httpx
+                    # Create HTTP client with connection pooling
+                    cls._shared_pool = httpx.AsyncClient(
+                        limits=httpx.Limits(
+                            max_keepalive_connections=20,
+                            max_connections=100,
+                            keepalive_expiry=120.0,
+                        ),
+                        timeout=httpx.Timeout(TIMEOUTS.HTTP_TOTAL, connect=TIMEOUTS.HTTP_CONNECT),
+                    )
+                except ImportError:
+                    # Fallback: if httpx is not available, AsyncOpenAI will create its own pool
+                    pass
+            return cls._shared_pool
+
+    @classmethod
     async def close_shared_pool(cls) -> None:
         """
         Close the shared HTTP connection pool.
@@ -174,34 +203,15 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             self.client = http_client
             return
 
-        # Initialize the shared pool if it doesn't exist (thread-safe)
-        if OpenAICompatibleProvider._pool_init_lock is None:
-            OpenAICompatibleProvider._pool_init_lock = threading.Lock()
-        with OpenAICompatibleProvider._pool_init_lock:
-            if OpenAICompatibleProvider._shared_pool is None:
-                # Reset closed flag if we're recreating the pool
-                OpenAICompatibleProvider._pool_closed = False
-                try:
-                    import httpx
-                    # Create HTTP client with connection pooling
-                    OpenAICompatibleProvider._shared_pool = httpx.AsyncClient(
-                        limits=httpx.Limits(
-                            max_keepalive_connections=20,
-                            max_connections=100,
-                            keepalive_expiry=120.0,
-                        ),
-                        timeout=httpx.Timeout(TIMEOUTS.HTTP_TOTAL, connect=TIMEOUTS.HTTP_CONNECT),
-                    )
-                except ImportError:
-                    # Fallback: if httpx is not available, AsyncOpenAI will create its own pool
-                    pass
-
         # Create a dedicated OpenAI wrapper for this specific key/URL,
         # but share the underlying connection pool.
         client_kwargs: dict[str, Any] = {
             "api_key": (api_key or "missing").strip(),
             "base_url": base_url,
-            "http_client": OpenAICompatibleProvider._shared_pool,
+            "http_client": OpenAICompatibleProvider.shared_pool(),
+            # The router/complete_with_retry own retries; SDK retries stacked
+            # a hidden 3x on every call and bypassed the circuit breaker.
+            "max_retries": 0,
         }
         if default_headers:
             client_kwargs["default_headers"] = default_headers

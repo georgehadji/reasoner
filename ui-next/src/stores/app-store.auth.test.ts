@@ -11,7 +11,7 @@ const someUser = { id: 'u1' } as User;
 
 describe('selectAuthStatus', () => {
   beforeEach(() => {
-    useAppStore.setState({ user: null, isAuthenticated: false, isAuthLoading: true });
+    useAppStore.setState({ user: null, isAuthenticated: false, isAuthLoading: true, sessionExpired: false });
   });
 
   it('is loading until the session has been read, even with no user', () => {
@@ -29,10 +29,28 @@ describe('selectAuthStatus', () => {
     expect(selectAuthStatus(useAppStore.getState())).toBe('authenticated');
   });
 
-  it('markSessionExpired signs the user out locally', () => {
+  it('markSessionExpired signs the user out locally as expired, logout as anonymous', () => {
     useAppStore.getState().setUser(someUser);
     useAppStore.getState().setAuthLoading(false);
     useAppStore.getState().markSessionExpired();
+    expect(selectAuthStatus(useAppStore.getState())).toBe('expired');
+    expect(useAppStore.getState().isAuthenticated).toBe(false);
+    useAppStore.getState().logout();
     expect(selectAuthStatus(useAppStore.getState())).toBe('anonymous');
+  });
+
+  it('SM-U4: a 401 for an anonymous visitor does not become expired', () => {
+    useAppStore.getState().setAuthLoading(false);
+    useAppStore.getState().markSessionExpired();
+    expect(selectAuthStatus(useAppStore.getState())).toBe('anonymous');
+  });
+
+  it('SM-U4: signing in again clears expired', () => {
+    useAppStore.getState().setAuthLoading(false);
+    useAppStore.getState().setUser(someUser);
+    useAppStore.getState().markSessionExpired();
+    useAppStore.getState().setUser(someUser);
+    expect(selectAuthStatus(useAppStore.getState())).toBe('authenticated');
+    expect(useAppStore.getState().isAuthenticated).toBe(true);
   });
 });

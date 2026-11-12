@@ -16,13 +16,21 @@ from reasoner.infrastructure.watermark.image.detect import PNG_SIGNATURE
 from reasoner.infrastructure.watermark.image.markers import (
     AI_META_HINTS,
     C2PA_MARKERS,
+    MAX_STRUCTURES,
+    cap_findings,
     contains_any,
+    count_actions,
     is_confirmed_c2pa_hit,
+    structure_limit_error,
 )
 
 # Private/ancillary chunks sometimes used for JUMBF/C2PA containers.
 _C2PA_CHUNK_TYPES = (b"caBX", b"juMB", b"jumb")
 _TEXT_CHUNK_TYPES = (b"tEXt", b"zTXt", b"iTXt", b"eXIf")
+
+
+def _tally(actions: dict[str, int], action: str) -> None:
+    actions[action] = actions.get(action, 0) + 1
 
 
 def supports(data: bytes) -> bool:
@@ -45,7 +53,11 @@ def inspect(data: bytes) -> ImageInspectReport:
 
     pos = 8
     n = len(data)
+    walked = 0
     while pos + 8 <= n:
+        walked += 1
+        if walked > MAX_STRUCTURES:
+            raise structure_limit_error("PNG chunks")
         length = struct.unpack(">I", data[pos : pos + 4])[0]
         ctype = data[pos + 4 : pos + 8]
         chunk_start = pos + 8
@@ -92,11 +104,12 @@ def inspect(data: bytes) -> ImageInspectReport:
         if truncated
         else ()
     )
+    capped, notes = cap_findings(findings, notes)
     return ImageInspectReport(
         format=ImageFormat.PNG,
         has_c2pa=has_c2pa,
         has_ai_metadata=has_ai or has_c2pa,
-        findings=tuple(findings),
+        findings=capped,
         notes=notes,
     )
 
@@ -106,33 +119,37 @@ def strip(data: bytes, *, strip_all_metadata: bool = True) -> tuple[bytes, tuple
     if not supports(data):
         raise ValueError("not a PNG")
 
-    actions: list[str] = []
+    actions: dict[str, int] = {}
     out = bytearray(PNG_SIGNATURE)
     pos = 8
     n = len(data)
+    walked = 0
     while pos + 8 <= n:
+        walked += 1
+        if walked > MAX_STRUCTURES:
+            raise structure_limit_error("PNG chunks")
         length = struct.unpack(">I", data[pos : pos + 4])[0]
         ctype = data[pos + 4 : pos + 8]
         chunk_start = pos + 8
         chunk_end = chunk_start + length
         if chunk_end + 4 > n:
-            actions.append(f"truncated chunk at offset {pos}; copied remainder verbatim")
+            actions[f"truncated chunk at offset {pos}; copied remainder verbatim"] = 1
             out.extend(data[pos:])
-            return bytes(out), tuple(actions)
+            return bytes(out), count_actions(actions)
         payload = data[chunk_start:chunk_end]
         name = ctype.decode("latin-1", errors="replace")
 
         drop = False
         if ctype in _C2PA_CHUNK_TYPES or ctype.startswith(b"c2"):
             drop = True
-            actions.append(f"drop PNG chunk {name} (C2PA/JUMBF)")
+            _tally(actions, f"drop PNG chunk {name} (C2PA/JUMBF)")
         elif ctype in _TEXT_CHUNK_TYPES:
             if strip_all_metadata:
                 drop = True
-                actions.append(f"drop PNG chunk {name}")
+                _tally(actions, f"drop PNG chunk {name}")
             elif contains_any(payload, AI_META_HINTS + C2PA_MARKERS):
                 drop = True
-                actions.append(f"drop PNG chunk {name} (AI/C2PA markers)")
+                _tally(actions, f"drop PNG chunk {name} (AI/C2PA markers)")
 
         if not drop:
             out.extend(data[pos : chunk_end + 4])
@@ -142,8 +159,8 @@ def strip(data: bytes, *, strip_all_metadata: bool = True) -> tuple[bytes, tuple
         pos = chunk_end + 4
 
     if not actions:
-        actions.append("no PNG metadata chunks removed (already clean or none matched)")
-    return bytes(out), tuple(actions)
+        actions["no PNG metadata chunks removed (already clean or none matched)"] = 1
+    return bytes(out), count_actions(actions)
 
 
 __all__ = ["supports", "inspect", "strip"]

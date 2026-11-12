@@ -366,11 +366,16 @@ async def _action_web_search(
     return results
 
 
+# The URL list is model output, which pages read earlier in the run can steer.
+# Unbounded, one run filled the process-wide scraper pool (100 connections).
+_MAX_SCRAPE_URLS = 5
+
+
 async def _action_scrape(urls: list[str]) -> list[_Citation]:
     from reasoner.scraper import scrape_urls
     results: list[_Citation] = []
     try:
-        scraped = await scrape_urls(urls)
+        scraped = await scrape_urls(urls[:_MAX_SCRAPE_URLS])
         for s in scraped:
             results.append(_Citation(
                 url=s.get("url", ""),

@@ -55,4 +55,18 @@ describe('useQuota', () => {
     expect(result.current.quota?.unlimited).toBe(true);
     expect(result.current.quota?.max).toBeNull();
   });
+
+  it('SM-U9: starts loading, so the first render never looks loaded', async () => {
+    (apiFetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise(() => {}));
+    const { result } = renderHook(() => useQuota());
+    expect(result.current.status).toBe('loading');
+    expect(result.current.loading).toBe(true);
+  });
+
+  it('SM-U9: a failed fetch ends in error, not a silent ok', async () => {
+    (apiFetch as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('down'));
+    const { result } = renderHook(() => useQuota());
+    await waitFor(() => expect(result.current.status).toBe('error'));
+    expect(result.current.loading).toBe(false);
+  });
 });

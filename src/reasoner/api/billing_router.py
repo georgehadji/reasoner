@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from reasoner.api.dependencies import get_current_user, require_key_scope
+from reasoner.api.dependencies import require_key_scope
 from reasoner.application.services.billing_service import BillingService
 from reasoner.core.settings import settings
-from reasoner.domain.saas import SubscriptionTier, User
+from reasoner.domain.saas import BillingProvider, SubscriptionTier, User
 from reasoner.infrastructure.billing.paypal_adapter import PayPalBillingAdapter
 from reasoner.infrastructure.billing.stripe_adapter import StripeBillingAdapter
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/billing", tags=["billing"])
 
 
@@ -28,12 +31,12 @@ def _get_paypal_service() -> BillingService:
 async def create_checkout(
     request: Request,
     tier: str,
-    provider: str = "stripe",
+    provider: BillingProvider = BillingProvider.STRIPE,
     user: User = Depends(require_key_scope("write")),
 ):
     """Create a checkout session for upgrading.
 
-    provider: "stripe" (default) or "paypal"
+    provider: "stripe" (default) or "paypal"; anything else is a 422.
     """
     try:
         tier_enum = SubscriptionTier(tier.lower())
@@ -66,10 +69,10 @@ async def create_checkout(
             },
         )
 
-    success_url = f"{app_url}/dashboard?checkout=success&provider={provider}"
-    cancel_url = f"{app_url}/pricing?checkout=cancel&provider={provider}"
+    success_url = f"{app_url}/dashboard?checkout=success&provider={provider.value}"
+    cancel_url = f"{app_url}/pricing?checkout=cancel&provider={provider.value}"
 
-    if provider.lower() == "paypal":
+    if provider is BillingProvider.PAYPAL:
         service = _get_paypal_service()
     else:
         service = _get_stripe_service()
@@ -84,9 +87,10 @@ async def create_checkout(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Checkout creation failed: {exc}") from exc
+        logger.exception("Checkout creation failed for user %s", user.id)
+        raise HTTPException(status_code=502, detail="Checkout creation failed") from exc
 
-    return {"checkout_url": url, "provider": provider}
+    return {"checkout_url": url, "provider": provider.value}
 
 
 @router.post("/portal")
@@ -101,7 +105,7 @@ async def create_portal(
 
 
 @router.get("/subscription")
-async def get_subscription(user: User = Depends(get_current_user)):
+async def get_subscription(user: User = Depends(require_key_scope("read"))):
     """Get current subscription status from database."""
     from reasoner.core.settings import settings
     from reasoner.infrastructure.persistence.subscription_repo import PostgresSubscriptionRepository

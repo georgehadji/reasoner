@@ -29,6 +29,12 @@ class SubscriptionStatus(str, Enum):
     CANCELLED = "cancelled"
     PAST_DUE = "past_due"
     TRIALING = "trialing"
+    # Stripe states with no access: before the first payment, after retries ran
+    # out, and a paused collection. None is in LIVE_STATUSES, and none is
+    # terminal: each recovers to active on a later event (SM-M1).
+    INCOMPLETE = "incomplete"
+    UNPAID = "unpaid"
+    PAUSED = "paused"
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,6 +47,10 @@ class User:
     auth_provider: str | None = None
     avatar_url: str | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    #: The auth provider has confirmed this address (Supabase ``email_confirmed_at``).
+    #: Read fresh on each authentication; ``users.email_verified`` only mirrors it
+    #: (docs/plans/email-verification-2026-11-12.md).
+    email_verified: bool = False
     #: Set when the caller authenticated with a Reasoner API key, so admission
     #: can record that this key started a run (audit 5 SEC-19, Q1).
     api_key_id: UUID | None = None
@@ -71,10 +81,28 @@ class UnresolvedBillingOwnerError(Exception):
     """
 
 
+class BillingProvider(StrEnum):
+    STRIPE = "stripe"
+    PAYPAL = "paypal"
+
+
 class CheckoutDecision(StrEnum):
     ALLOW = "allow"
     USE_PORTAL = "use_portal"   # change plan in the provider's portal (prorated)
     SAME_PLAN = "same_plan"
+
+
+# ``cancelled`` is terminal per provider subscription id: both providers end a
+# cancelled subscription for good, and a re-subscribe gets a new id. Every other
+# status may move to any other, because provider events arrive out of order and
+# a stricter table would drop real updates. ``last_event_at`` orders events;
+# this table only stops a cancelled row coming back on an equal timestamp.
+# domain cannot import core, so the Machine over this table is built in
+# infrastructure/persistence/subscription_repo.py (SUBSCRIPTION_MACHINE).
+SUBSCRIPTION_TRANSITIONS: dict[SubscriptionStatus, frozenset[SubscriptionStatus]] = {
+    **{s: frozenset(SubscriptionStatus) for s in SubscriptionStatus},
+    SubscriptionStatus.CANCELLED: frozenset(),
+}
 
 
 #: Statuses in which the provider is still billing, or about to.

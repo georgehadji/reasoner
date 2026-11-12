@@ -49,6 +49,13 @@ _REGISTRY: dict[str, dict] = {
         "verifier":       "gemini-2.5-flash-lite",   # Google 🇺🇸 — 3.3% HHEM hallucination (3rd best measured), $0.10/$0.40
         "post_synthesis_verify": "sonar",  # added v3.5
         },
+        # Explicit cheap fallbacks: the primary is the implicit fallback and
+        # costs over FALLBACK_MAX_PRICE_RATIO x these roles, so the router
+        # skipped it and one empty reply failed the phase (2026-11-10).
+        "fallback_routing": {
+            "constructive": "mistral-small-2603",  # EU Mistral -- cross-bloc from CN DeepSeek
+            "meta_evaluator": "mistral-small-2603",  # EU Mistral -- cross-bloc from CN Qwen
+        },
         "tags": ["budget", "balanced"],
     },
     "multi-perspective-ultra-budget": {
@@ -122,6 +129,14 @@ _REGISTRY: dict[str, dict] = {
         "stress_testing": "glm-5.3-flash",
         "verifier":       "gemini-2.5-flash-lite",   # Google 🇺🇸 — 3.3% HHEM hallucination (3rd best measured), $0.10/$0.40
         "post_synthesis_verify": "sonar",  # added v3.5
+        },
+        # Explicit cheap fallbacks: the primary is the implicit fallback and
+        # costs over FALLBACK_MAX_PRICE_RATIO x these roles, so the router
+        # skipped it and one empty reply failed the phase (2026-11-10).
+        "fallback_routing": {
+            "fusion": "mistral-small-2603",  # EU Mistral -- cross-bloc from CN Qwen
+            "meta_evaluator": "mistral-small-2603",  # EU Mistral -- cross-bloc from CN Qwen
+            "scoring": "mistral-small-2603",  # EU Mistral -- cross-bloc from CN DeepSeek
         },
         "tags": ["budget", "argumentative", "robust"],
     },
@@ -234,6 +249,15 @@ _REGISTRY: dict[str, dict] = {
         "verifier":       "gemini-2.5-flash-lite",   # Google 🇺🇸 — 3.3% HHEM hallucination (3rd best measured), $0.10/$0.40
         "post_synthesis_verify": "sonar",  # added v3.5
         },
+        # Explicit cheap fallbacks: the primary is the implicit fallback and
+        # costs over FALLBACK_MAX_PRICE_RATIO x these roles, so the router
+        # skipped it and one empty reply failed the phase (2026-11-10).
+        "fallback_routing": {
+            "fusion": "mistral-small-2603",  # EU Mistral -- cross-bloc from CN Qwen
+            "meta_evaluator": "mistral-small-2603",  # EU Mistral -- cross-bloc from CN Qwen
+            "scoring": "mistral-small-2603",  # EU Mistral -- cross-bloc from CN DeepSeek
+            "verifier": "qwen3.8-flash",  # CN Qwen -- cross-bloc from Google
+        },
         "tags": ["budget", "research", "web-search"],
     },
     "research-premium": {
@@ -267,6 +291,14 @@ _REGISTRY: dict[str, dict] = {
         "stress_testing": "glm-5.3-flash",
         "verifier":       "gemini-2.5-flash-lite",   # Google 🇺🇸 — 3.3% HHEM hallucination (3rd best measured), $0.10/$0.40
         "post_synthesis_verify": "sonar",  # added v3.5
+        },
+        # Explicit cheap fallbacks: the primary is the implicit fallback and
+        # costs over FALLBACK_MAX_PRICE_RATIO x these roles, so the router
+        # skipped it and one empty reply failed the phase (2026-11-10).
+        "fallback_routing": {
+            "fusion": "mistral-small-2603",  # EU Mistral -- cross-bloc from CN DeepSeek
+            "meta_evaluator": "mistral-small-2603",  # EU Mistral -- cross-bloc from CN Qwen
+            "verifier": "qwen3.8-flash",  # CN Qwen -- cross-bloc from Google
         },
         "tags": ["budget", "scientific", "structured"],
     },
@@ -373,6 +405,16 @@ _REGISTRY: dict[str, dict] = {
         "stress_testing": "glm-5.3-flash",
         "verifier":       "gemini-2.5-flash-lite",   # Google 🇺🇸 — 3.3% HHEM hallucination (3rd best measured), $0.10/$0.40
         "post_synthesis_verify": "sonar",  # added v3.5
+        },
+        # Explicit cheap fallbacks: the primary is the implicit fallback and
+        # costs over FALLBACK_MAX_PRICE_RATIO x these roles, so the router
+        # skipped it and one empty reply failed the phase (2026-11-10).
+        "fallback_routing": {
+            "destructive": "qwen3.8-flash",  # CN Qwen -- cross-bloc from Mistral
+            "fusion": "mistral-small-2603",  # EU Mistral -- cross-bloc from CN Qwen
+            "meta_evaluator": "mistral-small-2603",  # EU Mistral -- cross-bloc from CN Qwen
+            "scoring": "mistral-small-2603",  # EU Mistral -- cross-bloc from CN DeepSeek
+            "verifier": "qwen3.8-flash",  # CN Qwen -- cross-bloc from Google
         },
         "tags": ["budget", "analytical", "probabilistic"],
     },
@@ -577,6 +619,12 @@ _REGISTRY: dict[str, dict] = {
         "verifier":       "grok-4.3",           # xAI 🇺🇸 — record 78% non-hallucination (AA Omniscience), 1M ctx, same price
         "post_synthesis_verify": "sonar-pro",  # added v3.5
         },
+        # Explicit cheap fallbacks: the primary is the implicit fallback and
+        # costs over FALLBACK_MAX_PRICE_RATIO x these roles, so the router
+        # skipped it and one empty reply failed the phase (2026-11-10).
+        "fallback_routing": {
+            "cove_revise": "mistral-small-2603",  # EU Mistral -- cross-bloc from CN DeepSeek
+        },
         "tags": ["premium", "verification", "fact-checking"],
     },
     "sot-budget": {
@@ -644,6 +692,13 @@ _REGISTRY: dict[str, dict] = {
         "tot_evaluate":   "qwen3.5-9b",  # 🇨🇳 Qwen — $0.100/$0.150 per M, 262K ctx (was deepseek-v4-flash; one model per phase)
         "verifier":       "grok-4.3",           # xAI 🇺🇸 — record 78% non-hallucination (AA Omniscience), 1M ctx, same price
         "post_synthesis_verify": "sonar-pro",  # added v3.5
+        },
+        # Explicit cheap fallbacks: the primary is the implicit fallback and
+        # costs over FALLBACK_MAX_PRICE_RATIO x these roles, so the router
+        # skipped it and one empty reply failed the phase (2026-11-10).
+        "fallback_routing": {
+            "tot_backtrack": "mistral-small-2603",  # EU Mistral -- cross-bloc from CN DeepSeek
+            "tot_evaluate": "mistral-small-2603",  # EU Mistral -- cross-bloc from CN Qwen
         },
         "tags": ["premium", "problem-solving", "exploration"],
     },
@@ -805,6 +860,12 @@ _REGISTRY: dict[str, dict] = {
         "writing_assemble":  "gpt-5",  # 🇺🇸 OpenAI — $1.250/$10.000 per M, 400K ctx (was claude-sonnet; one model per phase)
         "writing_outline":   "gemini-pro-real",  # 🇺🇸 Google — $2.000/$12.000 per M, 1048K ctx (was claude-sonnet; one model per phase)
         "post_synthesis_verify": "sonar-pro-search",  # 🇺🇸 Perplexity — $3.000/$15.000 per M, 200K ctx (was sonar-pro; one model per phase)
+        },
+        # Explicit cheap fallbacks: the primary is the implicit fallback and
+        # costs over FALLBACK_MAX_PRICE_RATIO x these roles, so the router
+        # skipped it and one empty reply failed the phase (2026-11-10).
+        "fallback_routing": {
+            "primary": "claude-haiku-5.5",  # US Anthropic -- writer, cross-lab from Meta
         },
         "tags": ["premium", "writing", "content-creation"],
     },
@@ -996,6 +1057,9 @@ _REGISTRY: dict[str, dict] = {
         # catch-all). glm-5.3 is CN, cross-bloc from US OpenAI as the
         # routing philosophy requires, and premium-tier.
         "fallback_routing": {
+            "coding_assemble": "mistral-small-2603",  # EU Mistral -- cross-bloc from CN DeepSeek
+            "coding_review": "mistral-small-2603",  # EU Mistral -- cross-bloc from CN Qwen
+            "coding_tests": "mistral-small-2603",  # EU Mistral -- cross-bloc from CN Qwen
             "primary": "glm-5.3",  # CN Zhipu -- cross-bloc from gpt-5
         },
         "tags": ["premium", "coding", "software-development"],
@@ -1065,6 +1129,12 @@ _REGISTRY: dict[str, dict] = {
         "post_synthesis_verify": "sonar",  # added v3.5
         },
         "fallback_routing": {
+            "brainstorm_cluster": "qwen3.8-flash",  # CN Qwen -- cross-bloc from Google
+            "brainstorm_develop": "mistral-small-2603",  # EU Mistral -- cross-bloc from CN Qwen
+            "fusion": "mistral-small-2603",  # EU Mistral -- cross-bloc from CN Qwen
+            "meta_evaluator": "mistral-small-2603",  # EU Mistral -- cross-bloc from CN Qwen
+            "scoring": "mistral-small-2603",  # EU Mistral -- cross-bloc from CN DeepSeek
+            "verifier": "qwen3.8-flash",  # CN Qwen -- cross-bloc from Google
             "primary": "claude-haiku",
         },
         "tags": ["budget", "creative"],
@@ -1180,6 +1250,12 @@ _REGISTRY: dict[str, dict] = {
         #   mimo-v2.5      🇨🇳 Xiaomi   $0.140/$0.280  critic
         "expert_1":       "gpt-oss-120b",
         "expert_2":       "mimo-v2.5",
+        },
+        # Explicit cheap fallbacks: the primary is the implicit fallback and
+        # costs over FALLBACK_MAX_PRICE_RATIO x these roles, so the router
+        # skipped it and one empty reply failed the phase (2026-11-10).
+        "fallback_routing": {
+            "fusion": "mistral-small-2603",  # EU Mistral -- cross-bloc from CN DeepSeek
         },
         "tags": ["budget", "iterative", "critique"],
     },

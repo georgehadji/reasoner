@@ -303,6 +303,7 @@ class LLMExecutor:
 
                     from reasoner.infrastructure.llm.ports import DegradedLLMResponse
                     if isinstance(raw, DegradedLLMResponse):
+                        await self._account_call_cost(state, role, raw.metadata or {})
                         raise RuntimeError(f"Degraded response from {model_id}: {raw.error}")
 
                     if not raw or not raw.strip():
@@ -464,6 +465,8 @@ class LLMExecutor:
                 )
                 await bus.publish(event)
 
+                # Discarded attempts were billed even though the call failed.
+                await self._account_call_cost(state, role, raw.metadata or {})
                 raise RuntimeError(raw.error)
 
             if not raw or not raw.strip():
@@ -583,13 +586,22 @@ class LLMExecutor:
         logger.warning(
             "[EXECUTOR] retrying role=%s at max_tokens=%d after truncation", role, retry_budget,
         )
+        from reasoner.infrastructure.llm.ports import DegradedLLMResponse
         retry_kwargs = {**kwargs, "max_tokens": retry_budget}
         retried_raw, retried_metadata = await self.router.call(
             role=role, system_prompt=system_prompt, user_prompt=user_prompt, **retry_kwargs,
         )
         if not isinstance(retried_raw, str) or not retried_raw.strip():
             # Retry degraded (timeout, provider error) or came back empty —
-            # the truncated original is still the best answer available.
+            # the truncated original is still the best answer available. An
+            # empty-but-billed retry still cost money: add it to the original.
+            if isinstance(retried_metadata, dict):
+                for key in ("cost_usd", "input_tokens", "output_tokens"):
+                    metadata[key] = metadata.get(key, 0) + (retried_metadata.get(key, 0) or 0)
+            if isinstance(retried_raw, DegradedLLMResponse):
+                for key in ("cost_usd", "input_tokens", "output_tokens"):
+                    retried = (retried_raw.metadata or {}).get(key, 0) or 0
+                    metadata[key] = metadata.get(key, 0) + retried
             return raw, metadata
 
         # Fold the wasted first attempt's spend into the total so cost/spend-cap
@@ -718,7 +730,8 @@ class LLMExecutor:
 
         if cost_usd > 0:
             state.total_cost_usd += cost_usd
-            state.phase_costs[role] = cost_usd
+            # Accumulate: a role called twice (retry) showed only its last call.
+            state.phase_costs[role] = state.phase_costs.get(role, 0.0) + cost_usd
             # Populate phase_costs_by_key (defined but never written)
             tracking_key = getattr(state, "_current_phase_key", None)
             if tracking_key:
@@ -770,7 +783,7 @@ class LLMExecutor:
             if monthly > 0:
                 from reasoner.infrastructure.llm import spend_tracker
 
-                total = spend_tracker.record(subject, cost_usd)
+                total = await spend_tracker.record_shared(subject, cost_usd)
                 if total > monthly:
                     await self._halt_on_cap(state, "monthly", monthly, total, subject)
         except Exception:

@@ -7,7 +7,7 @@ import os
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import pool
+from sqlalchemy import pool, text
 from sqlalchemy.engine import Connection
 from sqlalchemy.engine.url import make_url
 from sqlalchemy.ext.asyncio import async_engine_from_config
@@ -39,6 +39,9 @@ def split_sslmode(url: str) -> tuple[str, dict]:
     return stripped.render_as_string(hide_password=False), {"ssl": sslmode}
 
 
+#: Fixed key for the session-level advisory lock that serialises migrations.
+MIGRATION_LOCK_ID = 7_261_000_001
+
 # Alembic Config object
 config = context.config
 
@@ -66,10 +69,24 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
-    context.configure(connection=connection, target_metadata=target_metadata)
-
-    with context.begin_transaction():
-        context.run_migrations()
+    # docker-entrypoint.sh runs `alembic upgrade head` in every container, so a
+    # scale-out or a rolling deploy starts several at once. Two of them applying the
+    # same revision race on the DDL, and CREATE INDEX CONCURRENTLY can leave an
+    # INVALID index behind. A session-level lock (not xact-level: autocommit_block
+    # commits mid-migration) makes the second one wait, then find nothing to do.
+    locked = connection.dialect.name == "postgresql"
+    if locked:
+        connection.execute(text("SELECT pg_advisory_lock(:id)"), {"id": MIGRATION_LOCK_ID})
+        connection.commit()  # end the autobegun transaction; the session lock stays
+    try:
+        context.configure(connection=connection, target_metadata=target_metadata)
+        with context.begin_transaction():
+            context.run_migrations()
+    finally:
+        if locked:
+            connection.commit()  # a failed migration leaves the connection mid-transaction
+            connection.execute(text("SELECT pg_advisory_unlock(:id)"), {"id": MIGRATION_LOCK_ID})
+            connection.commit()
 
 
 async def run_async_migrations() -> None:
