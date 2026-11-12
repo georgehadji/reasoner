@@ -11,6 +11,7 @@ from reasoner.api.auth_deps import require_csrf
 from reasoner.api.dependencies import (
     _get_credit_service,
     _resolve_user_tier,
+    allowance_permitted,
     check_rate_limit,
     get_current_user,
     require_key_scope,
@@ -53,7 +54,8 @@ async def get_credits(user: User = Depends(get_current_user)):
     tier = await _resolve_user_tier(str(user.id))
 
     try:
-        await service.ensure_monthly_allowance(str(user.id), tier)
+        if allowance_permitted(user, tier):
+            await service.ensure_monthly_allowance(str(user.id), tier)
     except Exception:
         logger.warning("Monthly allowance top-up failed", exc_info=True)
 

@@ -81,6 +81,30 @@ def count_illegal_transition(machine: str, src: str, dst: str) -> None:
         logger.warning("illegal-transition metric failed for machine=%s", machine, exc_info=True)
 
 
+_UNVERIFIED_ACCESS_COUNTER: Callable[[str, str], None] | None = None
+
+
+def set_unverified_access_counter(counter: Callable[[str, str], None] | None) -> None:
+    """Install the sink for gated features reached by an unverified email."""
+    global _UNVERIFIED_ACCESS_COUNTER
+    _UNVERIFIED_ACCESS_COUNTER = counter
+
+
+def count_unverified_access(feature: str, outcome: str) -> None:
+    """Record one unverified access (``outcome`` is allowed or denied). Never raises.
+
+    Explaining every hit in observe mode is what licenses enforce
+    (docs/plans/email-verification-2026-11-12.md step 5), so a failure is logged.
+    """
+    counter = _UNVERIFIED_ACCESS_COUNTER
+    if counter is None:
+        return
+    try:
+        counter(feature, outcome)
+    except Exception:
+        logger.warning("unverified-access metric failed for feature=%s", feature, exc_info=True)
+
+
 def count_quota_exceeded(tier: str) -> None:
     """Record one quota-exceeded event. Never raises: metrics must not break a caller."""
     counter = _QUOTA_EXCEEDED_COUNTER

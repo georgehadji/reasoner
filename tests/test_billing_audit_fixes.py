@@ -9,7 +9,7 @@ import json
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi import HTTPException
@@ -21,6 +21,7 @@ from reasoner.domain.saas import SubscriptionTier, User
 from reasoner.infrastructure.persistence.credit_repo_memory import InMemoryCreditRepository
 
 _USER = "12345678-1234-5678-1234-567812345678"
+_VERIFIED = User(id=UUID(_USER), email="u@t.local", email_verified=True)
 
 
 def _frame(payload: dict) -> str:
@@ -91,10 +92,10 @@ async def test_require_credits_tops_up_the_allowance_once_per_tier(monkeypatch):
 
     monkeypatch.setattr(deps, "_resolve_user_tier", fake_tier)
     deps._allowance_checked.clear()
-    await deps._top_up_allowance(_Service(), _USER)
-    await deps._top_up_allowance(_Service(), _USER)
+    await deps._top_up_allowance(_Service(), _VERIFIED)
+    await deps._top_up_allowance(_Service(), _VERIFIED)
     tier["v"] = SubscriptionTier.PRO  # upgraded mid-period
-    await deps._top_up_allowance(_Service(), _USER)
+    await deps._top_up_allowance(_Service(), _VERIFIED)
     assert calls == ["free", "pro"]
 
 

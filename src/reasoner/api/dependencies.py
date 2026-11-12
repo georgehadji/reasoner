@@ -230,8 +230,8 @@ async def _load_user_by_id(user_id: UUID) -> User | None:
     try:
         pool = await _get_provision_pool()
         row = await pool.fetchrow(
-            "SELECT id, email, display_name, auth_provider, avatar_url, created_at "
-            "FROM users WHERE id = $1",
+            "SELECT id, email, display_name, auth_provider, avatar_url, created_at, "
+            "email_verified FROM users WHERE id = $1",
             user_id,
         )
     except Exception as exc:
@@ -240,12 +240,17 @@ async def _load_user_by_id(user_id: UUID) -> User | None:
 
     if row is None:
         return None
+    created_at = row["created_at"]
     return User(
         id=row["id"] if isinstance(row["id"], UUID) else UUID(str(row["id"])),
         email=row["email"],
         display_name=row["display_name"],
         auth_provider=row["auth_provider"],
         avatar_url=row["avatar_url"],
+        # The row mirrors the provider's flag (step 2 of the email-verification
+        # plan); an API key caller has no provider payload, so the row is all there is.
+        email_verified=bool(row["email_verified"]),
+        **({"created_at": created_at} if created_at is not None else {}),
     )
 
 
@@ -277,6 +282,8 @@ async def _resolve_api_key(token: str) -> User:
         auth_provider="api_key",
         avatar_url=owner.avatar_url,
         api_key_id=record.id,
+        created_at=owner.created_at,
+        email_verified=owner.email_verified,
     )
 
 
@@ -326,6 +333,8 @@ async def _resolve_auth_token(token: str) -> User:
                 display_name=api_key.name,
                 # Admin never rides a key (SEC-6); the rest narrows the key.
                 scopes={s for s in api_key.scopes if s != "admin"},
+                # Operator-issued and deprecated, with no address to verify.
+                email_verified=True,
             )
         except LegacyAuthError as exc:
             raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
@@ -696,7 +705,23 @@ def _reset_credit_services() -> None:
 _allowance_checked: set[tuple[str, str, str]] = set()
 
 
-async def _top_up_allowance(service, user_id: str) -> None:
+def allowance_permitted(user: User, tier: SubscriptionTier) -> bool:
+    """Whether *user* may receive this period's allowance.
+
+    Only the FREE grant needs a verified email: a paid tier has a real payer
+    (docs/plans/email-verification-2026-11-12.md step 3).
+    """
+    if tier != SubscriptionTier.FREE:
+        return True
+    from reasoner.application.services.email_verification import (
+        GatedFeature,
+        email_gate_allows,
+    )
+
+    return email_gate_allows(user, GatedFeature.FREE_CREDITS)
+
+
+async def _top_up_allowance(service, user: User) -> None:
     """Grant any monthly allowance still owed before the balance is checked.
 
     The allowance was granted only by ``GET /api/credits``. Accounts used only
@@ -705,11 +730,14 @@ async def _top_up_allowance(service, user_id: str) -> None:
     """
     from reasoner.application.services.credit_service import current_period_key
 
+    user_id = str(user.id)
     try:
         tier = await _resolve_user_tier(user_id)
         key = (user_id, current_period_key(), tier.value)
         if key in _allowance_checked:
             return
+        if not allowance_permitted(user, tier):
+            return  # not cached: the grant lands once the email is verified
         await service.ensure_monthly_allowance(user_id, tier)
         if len(_allowance_checked) > 50_000:  # shortcut: bounded, cleared wholesale
             _allowance_checked.clear()
@@ -727,7 +755,7 @@ async def require_credits(user: User = Depends(get_current_user)) -> User:
     """
     _require_persistence("Credits")
     service = _get_credit_service()
-    await _top_up_allowance(service, str(user.id))
+    await _top_up_allowance(service, user)
     try:
         balance = await service.get_balance(str(user.id))
     except Exception as exc:

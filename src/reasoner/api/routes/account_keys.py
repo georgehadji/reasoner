@@ -19,6 +19,7 @@ from reasoner.api.dependencies import (
     require_key_scope,
 )
 from reasoner.application.services.api_key_service import MAX_EXPIRY_DAYS, ApiKeyLimitError
+from reasoner.application.services.email_verification import GatedFeature, email_gate_allows
 from reasoner.domain.api_keys import (
     ASSIGNABLE_SCOPES,
     DEFAULT_SCOPES,
@@ -72,6 +73,14 @@ async def create_api_key(
     The response contains the only copy of the plaintext key that will ever
     exist — it cannot be recovered afterwards.
     """
+    if not email_gate_allows(user, GatedFeature.API_KEY_CREATE):
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "Confirm your email address before creating an API key.",
+                "code": "email_unverified",
+            },
+        )
     service = _get_api_key_service()
     try:
         minted = await service.create(

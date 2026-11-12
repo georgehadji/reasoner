@@ -11,6 +11,7 @@ from reasoner.core.ports.metrics_port import (
     set_degradation_counter,
     set_illegal_transition_counter,
     set_quota_exceeded_counter,
+    set_unverified_access_counter,
 )
 
 try:
@@ -355,5 +356,20 @@ REASONER_ILLEGAL_TRANSITION_TOTAL = Counter(
 set_illegal_transition_counter(
     lambda machine, src, dst: REASONER_ILLEGAL_TRANSITION_TOTAL.labels(
         machine=machine, from_state=src, to_state=dst
+    ).inc()
+)
+
+
+# ── Fill core's unverified-email hook ─────────────────────────────────────
+# Every gated feature reached by an unverified, non-grandfathered account.
+# Labels are bounded: features come from GatedFeature, outcome is allowed|denied.
+REASONER_UNVERIFIED_ACCESS_TOTAL = Counter(
+    "reasoner_unverified_access_total",
+    "Gated features reached by an account whose email is not verified",
+    ["feature", "outcome"],
+)
+set_unverified_access_counter(
+    lambda feature, outcome: REASONER_UNVERIFIED_ACCESS_TOTAL.labels(
+        feature=feature, outcome=outcome
     ).inc()
 )

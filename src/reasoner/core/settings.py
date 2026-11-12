@@ -325,6 +325,13 @@ class Settings:
     )
     """Sender address for transactional emails."""
 
+    # ── Email verification (docs/plans/email-verification-2026-11-12.md) ──
+    EMAIL_VERIFICATION_MODE: str = os.getenv("EMAIL_VERIFICATION_MODE", "observe").lower()
+    """observe: count unverified access to gated features and allow it. enforce: refuse it."""
+
+    EMAIL_VERIFICATION_CUTOFF: str | None = os.getenv("EMAIL_VERIFICATION_CUTOFF") or None
+    """ISO-8601 UTC time. Accounts created before it skip the email gate (grandfathered)."""
+
     NOTIFICATION_EMAIL: str | None = os.getenv("NOTIFICATION_EMAIL")
     """Email address to receive admin notifications (webhook failures, spend cap, etc.)."""
 

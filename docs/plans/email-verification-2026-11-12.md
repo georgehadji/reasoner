@@ -75,7 +75,11 @@ Each step is a small PR. Order matters: read the flag, then mirror it, then obse
    - **No backfill.** A gate reads the flag from the request's `User`, which comes fresh from Supabase on every authentication, not from the row. The row is for admin, analytics and the GDPR export, and it fills in on each user's next login.
    - Test: the live Postgres provisioning test (`tests/integration/`, container on :55499) asserts the column follows the flag in both directions.
 
-3. **Gate, in observe mode first.**
+3. **Gate, in observe mode first.** Done 2026-11-12, `tests/test_email_verification_gate.py`.
+   - The policy is `application/services/email_verification.py` (`email_gate_allows`). The grant check is `api/dependencies.allowance_permitted`, used by both grant call sites (`_top_up_allowance` and `GET /api/credits`). Key creation is refused in `api/routes/account_keys.py`.
+   - **API key callers:** `_load_user_by_id` now carries `email_verified` and `created_at` from the row, which it used to drop. So a key caller keeps its account's status and signup time. Legacy keys count as verified, since they are operator-issued and have no address.
+   - **No `email_verification` Machine (a change from §2).** The app never writes this state; it only copies the provider's flag, so a transition table would have no move to check. `reasoner_unverified_access_total` is the signal step 5 needs.
+   - **Counting in enforce mode:** a refused grant is not cached, so `GET /api/credits` and `require_credits` count a denied hit on every request until the email is verified. Read the counter as attempts, not users.
    - Add one helper next to the other admission checks: `require_verified_email(user, feature)`. Under a new setting `EMAIL_VERIFICATION_MODE=observe|enforce` (default `observe`):
      - **observe:** it logs and counts `reasoner_unverified_access_total{feature}` and allows the request;
      - **enforce:** it raises a 403 with the code `email_unverified`.
