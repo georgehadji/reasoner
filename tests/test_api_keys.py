@@ -299,3 +299,14 @@ async def test_expiry_is_stored_when_requested(service: ApiKeyService, user_id: 
 async def test_unassignable_scope_is_rejected_at_creation(service: ApiKeyService, user_id: str):
     with pytest.raises(InvalidScopeError):
         await service.create(user_id, name="escalation", scopes={"admin"})
+
+
+@pytest.mark.unit
+async def test_a_touch_after_revoke_does_not_stamp_the_key(service: ApiKeyService, user_id: str):
+    minted = await service.create(user_id, name="ci")
+    assert await service.revoke(user_id, minted.key.id)
+
+    await service._touch(minted.key.id)
+
+    (key,) = await service.list_keys(user_id, include_revoked=True)
+    assert key.last_used_at is None

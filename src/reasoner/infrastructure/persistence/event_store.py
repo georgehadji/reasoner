@@ -11,7 +11,7 @@ import inspect
 import json
 import logging
 import sqlite3
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
@@ -243,6 +243,7 @@ class EventStore:
             PipelineEventType.PHASE_FAILED,
             PipelineEventType.PIPELINE_COMPLETED,
             PipelineEventType.PIPELINE_FAILED,
+            PipelineEventType.PIPELINE_CANCELLED,
         ):
             return "pipeline"
         elif event_type in (
@@ -272,6 +273,7 @@ class EventStore:
     ) -> None:
         """Update aggregate state snapshot."""
         from reasoner.core.events.domain_events import (
+            PipelineCancelled,
             PipelineCompleted,
             PipelineFailed,
             PipelineStarted,
@@ -292,6 +294,8 @@ class EventStore:
             status = "completed"
         elif isinstance(event, PipelineFailed):
             status = "failed"
+        elif isinstance(event, PipelineCancelled):
+            status = "cancelled"
 
         # Build update query
         updates = []
@@ -426,21 +430,27 @@ class EventStore:
         limit: int = 50,
         offset: int = 0,
         status: str | None = None,
+        aggregate_ids: Sequence[str] | None = None,
     ) -> list[dict[str, Any]]:
         """
         List pipelines with optional filtering.
-        
+
         Args:
             limit: Maximum number of results
             offset: Number of results to skip
             status: Filter by status
-            
+            aggregate_ids: Only these pipelines (an owner's ids). An empty
+                sequence matches nothing and runs no query; None means all.
+
         Returns:
             List of pipeline dictionaries
-            
+
         Raises:
             sqlite3.Error: If database operation fails
         """
+        if aggregate_ids is not None and not aggregate_ids:
+            return []
+
         def _list_pipelines_sync() -> list[dict[str, Any]]:
             try:
                 conn = self._get_connection()
@@ -449,6 +459,10 @@ class EventStore:
                 if status:
                     query += " AND status = ?"
                     params.append(status)
+                if aggregate_ids is not None:
+                    # One JSON parameter, so the id list has no SQLite variable limit.
+                    query += " AND aggregate_id IN (SELECT value FROM json_each(?))"
+                    params.append(json.dumps(list(aggregate_ids)))
                 query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
                 params.extend([limit, offset])
                 cursor = conn.execute(query, params)
@@ -473,6 +487,29 @@ class EventStore:
                 raise
 
         return await self._run_in_executor(_list_pipelines_sync)
+
+    async def count_pipelines(
+        self,
+        status: str | None = None,
+        aggregate_ids: Sequence[str] | None = None,
+    ) -> int:
+        """Count pipelines matching the same filters as ``list_pipelines``."""
+        if aggregate_ids is not None and not aggregate_ids:
+            return 0
+
+        def _count_pipelines_sync() -> int:
+            conn = self._get_connection()
+            query = "SELECT COUNT(*) FROM aggregates WHERE aggregate_type = 'pipeline'"
+            params: list = []
+            if status:
+                query += " AND status = ?"
+                params.append(status)
+            if aggregate_ids is not None:
+                query += " AND aggregate_id IN (SELECT value FROM json_each(?))"
+                params.append(json.dumps(list(aggregate_ids)))
+            return conn.execute(query, params).fetchone()[0]
+
+        return await self._run_in_executor(_count_pipelines_sync)
 
     async def get_aggregate_state(
         self,
@@ -830,6 +867,46 @@ class EventStore:
                 (cutoff_str,),
             )
             return cursor.fetchone()[0]
+
+        return await self._run_in_executor(_count_sync)
+
+    async def prune_audit_events_before(self, cutoff: datetime, batch_size: int = 500) -> int:
+        """Delete version-0 audit rows older than cutoff (audit-5 decision Q6).
+
+        Replay reads only ``version > 0`` (``get_events``), so these rows are
+        never part of an aggregate's history; versioned rows are kept because
+        status and resume rebuild aggregates from full history. Readers of
+        version-0 rows (``get_all_events``, ``get_events_by_type``,
+        ``get_event_stats``) see at most ``EVENT_RETENTION_DAYS`` of them.
+        """
+        cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S")
+
+        def _prune_sync() -> int:
+            conn = self._get_connection()
+            try:
+                cursor = conn.execute(
+                    "DELETE FROM events WHERE id IN (SELECT id FROM events"
+                    " WHERE version = 0 AND created_at < ? ORDER BY created_at ASC LIMIT ?)",
+                    (cutoff_str, batch_size),
+                )
+                conn.commit()
+                return cursor.rowcount
+            except sqlite3.Error as e:
+                conn.rollback()
+                logger.error("prune_audit_events_before failed: %s", e)
+                raise
+
+        return await self._run_in_executor(_prune_sync)
+
+    async def count_eligible_audit_events(self, cutoff: datetime) -> int:
+        """Count version-0 audit rows eligible for pruning (dry-run support)."""
+        cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S")
+
+        def _count_sync() -> int:
+            return self._get_connection().execute(
+                "SELECT COUNT(*) FROM events WHERE version = 0 AND created_at < ?",
+                (cutoff_str,),
+            ).fetchone()[0]
 
         return await self._run_in_executor(_count_sync)
 

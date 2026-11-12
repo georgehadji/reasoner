@@ -35,6 +35,7 @@ class Capability(str, Enum):
 
     PIPELINE_RUN = "pipeline.run"
     IMAGE_GENERATE = "image.generate"
+    WEB_SEARCH = "web.search"
     CACHE_INVALIDATE = "cache.invalidate"  # reserved for a later phase
 
 
@@ -69,6 +70,12 @@ CAPABILITY_POLICY: dict[Capability, CapabilityPolicy] = {
         credit_reason=CreditReason.IMAGE_GENERATION,
         rate_limited=True,
         routes=("/api/generate-image",),
+    ),
+    Capability.WEB_SEARCH: CapabilityPolicy(
+        requires_auth=False,  # anonymous callers count against the trial cap
+        credit_reason=CreditReason.WEB_SEARCH,
+        rate_limited=True,
+        routes=("/api/search",),
     ),
 }
 

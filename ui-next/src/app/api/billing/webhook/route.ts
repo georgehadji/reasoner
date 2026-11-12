@@ -23,7 +23,8 @@ export async function POST(req: NextRequest) {
       headers: sanitizeResponseHeaders(upstream),
     });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Proxy error';
-    return NextResponse.json({ detail: msg }, { status: 502 });
+    // The error text names the upstream host; log it here, send a fixed string.
+    console.error('Stripe webhook proxy error:', err instanceof Error ? err.message : err);
+    return NextResponse.json({ detail: 'Billing service unavailable' }, { status: 502 });
   }
 }

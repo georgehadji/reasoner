@@ -23,6 +23,8 @@ from pathlib import Path
 from typing import Any
 
 from reasoner.core.ports.clock import Clock, SystemClock
+from reasoner.infrastructure.persistence.history_files import owner_key
+from reasoner.utils.atomic_file import atomic_write_text
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +44,7 @@ class CacheEntry:
     access_count: int = 0
     last_accessed: float = field(default_factory=time.time)
     semantic_embedding: list[float] | None = None  # For semantic matching
-    raw_prompt: str = ""  # Stored for Jaccard semantic matching
+    raw_prompt: str = ""  # Kept for the on-disk format and inspection
     agent_id: str = ""  # tenant; the semantic path must not cross it (DAT-3)
 
 
@@ -90,14 +92,12 @@ class TokenAwareCache:
         max_tokens: int = 1_000_000,  # 1M token budget
         ttl_seconds: int = 3600,  # 1 hour default TTL
         cache_dir: Path | None = None,
-        semantic_threshold: float = 0.85,  # 85% similarity for cache hit
         max_entries: int = 1000,
         clock: Clock | None = None,
     ):
         self.max_tokens = max_tokens
         self.ttl_seconds = ttl_seconds
         self.cache_dir = cache_dir
-        self.semantic_threshold = semantic_threshold
         self.max_entries = max_entries
         self._clock: Clock = clock or SystemClock()
 
@@ -137,6 +137,52 @@ class TokenAwareCache:
         content = f"{agent_id}:{problem}:{phase}:{model_id}:{prompt}"
         return hashlib.sha256(content.encode()).hexdigest()[:32]
 
+    def _entry_path(self, key: str, agent_id: str) -> Path:
+        """Owned entries sit in their owner's directory (erasable as one unit);
+        entries with no tenant stay flat."""
+        if self.cache_dir is None:
+            raise RuntimeError("token cache has no disk directory")
+        folder = self.cache_dir / owner_key(agent_id) if agent_id else self.cache_dir
+        return folder / f"{key}.json"
+
+    def _disk_files(self) -> list[Path]:
+        if self.cache_dir is None:
+            raise RuntimeError("token cache has no disk directory")
+        return [*self.cache_dir.glob("*.json"), *self.cache_dir.glob("u-*/*.json")]
+
+    async def export_owner(self, agent_id: str) -> list[dict[str, Any]]:
+        """Every cached prompt/response stored for this tenant (GDPR export)."""
+        async with self._lock:
+            await self._ensure_loaded()
+            return [
+                {"phase": e.phase, "model_id": e.model_id, "prompt": e.raw_prompt,
+                 "response": e.response, "created_at": e.created_at}
+                for e in self._entries.values() if e.agent_id == agent_id
+            ]
+
+    async def erase_owner(self, agent_id: str) -> int:
+        """Drop this tenant's entries from memory and disk. Returns files left behind.
+
+        Other workers keep their own in-memory copy until it is evicted or
+        expires; the disk copy they reload from is gone.
+        """
+        failed = 0
+        async with self._lock:
+            for key in [k for k, e in self._entries.items() if e.agent_id == agent_id]:
+                await self._evict(key)
+            if self.cache_dir:
+                folder = self.cache_dir / owner_key(agent_id)
+                for f in list(folder.iterdir()) if folder.is_dir() else []:
+                    try:
+                        f.unlink()
+                    except OSError:
+                        failed += 1
+                try:
+                    folder.rmdir()
+                except OSError:
+                    pass
+        return failed
+
     def _compute_prompt_hash(self, prompt: str) -> str:
         """Compute prompt hash for exact matching."""
         # Cache-key digest only, never a security boundary.
@@ -150,31 +196,19 @@ class TokenAwareCache:
         """Estimate token count (rough: 1 token ≈ 4 chars)."""
         return len(text) // 4
 
-    @staticmethod
-    def _jaccard_similarity(text_a: str, text_b: str) -> float:
-        """Compute Jaccard similarity between two texts using word sets."""
-        words_a = set(text_a.lower().split())
-        words_b = set(text_b.lower().split())
-        if not words_a or not words_b:
-            return 0.0
-        intersection = len(words_a & words_b)
-        union = len(words_a | words_b)
-        return intersection / union if union > 0 else 0.0
-
     async def get(
         self,
         problem: str,
         phase: str,
         model_id: str,
         prompt: str,
-        semantic_threshold: float = 0.85,
         agent_id: str = "",
     ) -> str | None:
         """
         Get cached response.
 
-        Checks exact match first, then falls back to Jaccard semantic similarity
-        for near-miss prompts within the same problem group.
+        Exact match only: a near-miss prompt is a different question, and a
+        fuzzy hit served one prompt's answer for another.
 
         Returns:
             Cached response if hit, None otherwise
@@ -199,37 +233,6 @@ class TokenAwareCache:
                     entry.access_count += 1
                     entry.last_accessed = self._clock.time()
                     self._entries.move_to_end(key)  # LRU promotion
-                    self._stats.hits += 1
-                    self._stats.total_tokens_saved += entry.tokens_used
-                    return entry.response
-
-            # Check semantic similarity via problem_hash index (O(k) vs O(n))
-            problem_hash = self._compute_problem_hash(problem)
-            for ck in self._problem_index.get(problem_hash, []):
-                entry = self._entries.get(ck)
-                if entry is None or entry.phase != phase or entry.model_id != model_id:
-                    continue
-                # The exact path keys on agent_id and checks TTL; this scan did
-                # neither, so it served another tenant's or an expired answer
-                # (docs/plans/audit-remediation-2026-10-20.md DAT-3).
-                if entry.agent_id != agent_id:
-                    continue
-                if self._clock.time() - entry.created_at > entry.ttl_seconds:
-                    continue
-
-                # Exact prompt match within same problem group (fast path)
-                if entry.prompt_hash == prompt_hash:
-                    entry.access_count += 1
-                    self._entries.move_to_end(ck)  # LRU promotion
-                    entry.last_accessed = self._clock.time()
-                    self._stats.hits += 1
-                    self._stats.total_tokens_saved += entry.tokens_used
-                    return entry.response
-
-                # Jaccard semantic similarity on raw prompts
-                if entry.raw_prompt and self._jaccard_similarity(prompt, entry.raw_prompt) >= semantic_threshold:
-                    entry.access_count += 1
-                    entry.last_accessed = self._clock.time()
                     self._stats.hits += 1
                     self._stats.total_tokens_saved += entry.tokens_used
                     return entry.response
@@ -331,11 +334,12 @@ class TokenAwareCache:
             key for key, entry in self._entries.items()
             if now - entry.created_at > entry.ttl_seconds
         ]
+        entry_agents = {key: self._entries[key].agent_id for key in expired}
         for key in expired:
             await self._evict(key)
             # Also remove the on-disk JSON file (git#B-18)
             if self.cache_dir:
-                f = self.cache_dir / f"{key}.json"
+                f = self._entry_path(key, entry_agents[key])
                 try:
                     f.unlink(missing_ok=True)
                 except OSError:
@@ -381,7 +385,7 @@ class TokenAwareCache:
 
             # Clear disk cache
             if self.cache_dir:
-                for f in self.cache_dir.glob("*.json"):
+                for f in self._disk_files():
                     try:
                         f.unlink(missing_ok=True)
                     except PermissionError:
@@ -407,7 +411,7 @@ class TokenAwareCache:
         if not self.cache_dir:
             return
 
-        for f in self.cache_dir.glob("*.json"):
+        for f in self._disk_files():
             try:
                 data = json.loads(await asyncio.to_thread(f.read_text))
                 entry = CacheEntry(**data)
@@ -429,7 +433,7 @@ class TokenAwareCache:
         if not self.cache_dir:
             return
 
-        f = self.cache_dir / f"{key}.json"
+        f = self._entry_path(key, entry.agent_id)
         try:
             data = {
                 "key": entry.key,
@@ -444,14 +448,24 @@ class TokenAwareCache:
                 "access_count": entry.access_count,
                 "last_accessed": entry.last_accessed,
                 "raw_prompt": entry.raw_prompt,
+                # Without it a reload lands as agent_id="" and the tenant guard
+                # in get() lets an anonymous caller reach this entry.
+                "agent_id": entry.agent_id,
             }
-            await asyncio.to_thread(f.write_text, json.dumps(data))
+            await asyncio.to_thread(f.parent.mkdir, parents=True, exist_ok=True)
+            await asyncio.to_thread(atomic_write_text, f, json.dumps(data))
         except OSError as exc:
             logger.warning("Failed to persist cache entry %s to disk: %s", key, exc)
 
 
 # Global cache instance
 _cache: TokenAwareCache | None = None
+
+
+def existing_token_cache() -> TokenAwareCache | None:
+    """The process-wide cache if something already built it. Never creates one:
+    get_token_cache() would freeze the configuration of whoever calls first."""
+    return _cache
 
 
 def get_token_cache(

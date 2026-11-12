@@ -2,7 +2,7 @@
 
 Critical Enhancements:
 - 9.1: cancel_all_active uses Redis Sets (O(1) per member) not SCAN.
-- 9.2: pop_cancelled is atomic via Lua script.
+- 9.2: claim release is owner-checked (compare-and-delete); B7: register clears a stale cancel flag.
 - 9.3: No .decode() — decode_responses=True.
 - 9.7: Graceful fallback to in-memory when Redis is down.
 """
@@ -47,19 +47,13 @@ class TestRunStateManager:
         assert not await run_state_manager.is_cancelled("run-2")
 
     @pytest.mark.asyncio
-    async def test_pop_cancelled_is_atomic(self, run_state_manager):
-        """9.2: pop_cancelled should atomically check and clear."""
+    async def test_register_clears_a_stale_cancel_flag(self, run_state_manager):
+        """B7: a stop that landed after the last run ended must not cancel the next."""
         await run_state_manager.register("run-1")
+        await run_state_manager.unregister("run-1")
         await run_state_manager.cancel("run-1")
-
-        # First pop should return True
-        assert await run_state_manager.pop_cancelled("run-1") is True
-        # Second pop should return False (already cleared)
-        assert await run_state_manager.pop_cancelled("run-1") is False
-
-    @pytest.mark.asyncio
-    async def test_pop_cancelled_nonexistent(self, run_state_manager):
-        assert await run_state_manager.pop_cancelled("run-does-not-exist") is False
+        await run_state_manager.register("run-1")
+        assert not await run_state_manager.is_cancelled("run-1")
 
     @pytest.mark.asyncio
     async def test_cancel_all_active(self, run_state_manager):
@@ -119,7 +113,7 @@ class TestRunStateManager:
             assert run_state_manager.is_active("fallback-run")
 
             await run_state_manager.cancel("fallback-run")
-            assert await run_state_manager.pop_cancelled("fallback-run")
+            assert await run_state_manager.is_cancelled("fallback-run")
         finally:
             run_state_manager._redis = original_redis
             run_state_manager._redis_ok = True

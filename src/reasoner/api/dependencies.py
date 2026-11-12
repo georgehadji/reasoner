@@ -100,7 +100,32 @@ async def _get_provision_pool() -> asyncpg.Pool:
         return _user_provision_pool
 
 
-async def _ensure_user_in_db(user: User) -> None:
+#: The route a half-finished account deletion is resumed through (SM-M7).
+ACCOUNT_DELETE_PATH = "/api/account/delete"
+
+
+def _resumes_deletion(request: Request) -> bool:
+    return getattr(request.scope.get("route"), "path", None) == ACCOUNT_DELETE_PATH
+
+
+async def account_is_deleted(user_id: str) -> bool:
+    """True when the account has an ``account_deletion_log`` row, in any status.
+
+    For credentials that outlive the HTTP request that minted them (a WebSocket
+    ticket). Raises when the lookup fails: the caller must fail closed, as
+    :func:`_ensure_user_in_db` does. With no database configured outside
+    production there is nothing to look up.
+    """
+    if not _persistence_is_configured() and settings.ENVIRONMENT != "production":
+        return False
+    pool = await _get_provision_pool()
+    status = await pool.fetchval(
+        "SELECT status FROM account_deletion_log WHERE user_id = $1 LIMIT 1", str(user_id),
+    )
+    return bool(status)
+
+
+async def _ensure_user_in_db(user: User, *, resume_deletion: bool = False) -> None:
     """Ensure OAuth user has a row in the local users table.
 
     Idempotent upsert — safe to call on every request. Uses an in-memory
@@ -108,26 +133,43 @@ async def _ensure_user_in_db(user: User) -> None:
 
     A deleted account is refused with 403 and never re-created: its JWT can
     outlive the deletion, and the old upsert brought its ``users`` row back.
+    ``resume_deletion`` lets the delete route through for a deletion that is not
+    finished (requested, erasing, partial), so a repeat DELETE can complete it;
+    that path still never provisions the user.
     """
     seen = _provisioned_user_ids.get(user.id)
     if seen is not None and _monotonic() - seen < PROVISION_CACHE_TTL_SECONDS:
         return
+    import asyncpg
+
+    # Fail closed: an unanswered lookup must not let a deleted account through.
     try:
         pool = await _get_provision_pool()
-        if await pool.fetchval(
-            "SELECT 1 FROM account_deletion_log WHERE user_id = $1 LIMIT 1", str(user.id),
-        ):
-            forget_provisioned_user(user.id)
-            raise HTTPException(status_code=403, detail="This account has been deleted.")
+        deleted = await pool.fetchval(
+            "SELECT status FROM account_deletion_log WHERE user_id = $1 LIMIT 1", str(user.id),
+        )
+    except Exception as exc:
+        logger.warning("Deleted-account check failed for %s: %s", user.id, exc)
+        raise HTTPException(status_code=503, detail="Account status unavailable") from exc
+    if deleted:
+        from reasoner.application.services.data_eraser import ERASE_RETRYABLE
+
+        if resume_deletion and deleted in ERASE_RETRYABLE:
+            return
+        forget_provisioned_user(user.id)
+        raise HTTPException(status_code=403, detail="This account has been deleted.")
+    try:
         await pool.execute(
             """
-            INSERT INTO users (id, email, display_name, auth_provider, avatar_url, last_login_at)
-            VALUES ($1, $2, $3, $4, $5, NOW())
+            INSERT INTO users
+                (id, email, display_name, auth_provider, avatar_url, email_verified, last_login_at)
+            VALUES ($1, $2, $3, $4, $5, $6, NOW())
             ON CONFLICT (id) DO UPDATE SET
                 email = EXCLUDED.email,
                 display_name = EXCLUDED.display_name,
                 auth_provider = EXCLUDED.auth_provider,
                 avatar_url = EXCLUDED.avatar_url,
+                email_verified = EXCLUDED.email_verified,
                 last_login_at = NOW()
             """,
             str(user.id),
@@ -135,6 +177,8 @@ async def _ensure_user_in_db(user: User) -> None:
             user.display_name,
             user.auth_provider,
             user.avatar_url,
+            # A mirror of the provider's flag; gates read User.email_verified, not this.
+            user.email_verified,
         )
         _provisioned_user_ids[user.id] = _monotonic()
         _provisioned_user_ids.move_to_end(user.id)
@@ -142,6 +186,18 @@ async def _ensure_user_in_db(user: User) -> None:
             _provisioned_user_ids.popitem(last=False)
     except HTTPException:
         raise
+    except asyncpg.UniqueViolationError as exc:
+        # users.email is UNIQUE: another account owns this address (or the
+        # provider sent none). Continuing leaves no users row, so credits 403
+        # and key creation fails on its FK.
+        logger.warning("User provisioning email clash for %s: %s", user.id, exc)
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "This email address is already registered to another account.",
+                "code": "email_conflict",
+            },
+        ) from exc
     except Exception as exc:
         # Log but don't fail the request — auth already succeeded
         logger.warning("User provisioning failed for %s: %s", user.id, exc)
@@ -174,8 +230,8 @@ async def _load_user_by_id(user_id: UUID) -> User | None:
     try:
         pool = await _get_provision_pool()
         row = await pool.fetchrow(
-            "SELECT id, email, display_name, auth_provider, avatar_url, created_at "
-            "FROM users WHERE id = $1",
+            "SELECT id, email, display_name, auth_provider, avatar_url, created_at, "
+            "email_verified FROM users WHERE id = $1",
             user_id,
         )
     except Exception as exc:
@@ -184,12 +240,17 @@ async def _load_user_by_id(user_id: UUID) -> User | None:
 
     if row is None:
         return None
+    created_at = row["created_at"]
     return User(
         id=row["id"] if isinstance(row["id"], UUID) else UUID(str(row["id"])),
         email=row["email"],
         display_name=row["display_name"],
         auth_provider=row["auth_provider"],
         avatar_url=row["avatar_url"],
+        # The row mirrors the provider's flag (step 2 of the email-verification
+        # plan); an API key caller has no provider payload, so the row is all there is.
+        email_verified=bool(row["email_verified"]),
+        **({"created_at": created_at} if created_at is not None else {}),
     )
 
 
@@ -221,6 +282,8 @@ async def _resolve_api_key(token: str) -> User:
         auth_provider="api_key",
         avatar_url=owner.avatar_url,
         api_key_id=record.id,
+        created_at=owner.created_at,
+        email_verified=owner.email_verified,
     )
 
 
@@ -268,6 +331,10 @@ async def _resolve_auth_token(token: str) -> User:
                 id=UUID(bytes=hashlib.sha256(api_key.key_hash.encode()).digest()[:16]),
                 email=f"apikey-{api_key.key_hash[:8]}@internal",
                 display_name=api_key.name,
+                # Admin never rides a key (SEC-6); the rest narrows the key.
+                scopes={s for s in api_key.scopes if s != "admin"},
+                # Operator-issued and deprecated, with no address to verify.
+                email_verified=True,
             )
         except LegacyAuthError as exc:
             raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
@@ -305,21 +372,29 @@ async def get_current_user(
         # API keys resolve from an existing users row, so re-provisioning would
         # only risk overwriting the real profile with key-derived placeholders.
         if not is_api_key:
-            await _ensure_user_in_db(user)
+            await _ensure_user_in_db(user, resume_deletion=_resumes_deletion(request))
         request.state.user = user
-        request.state.auth_method = "api_key" if is_api_key else "bearer"
+        request.state.auth_method = _auth_method(credentials.credentials)
         return user
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=401, detail=f"Authentication failed: {exc}") from exc
+        logger.warning("Authentication failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=401, detail="Authentication failed") from exc
 
 
 async def get_optional_user(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
 ) -> User | None:
-    """Optional authentication — returns None if no valid credentials."""
+    """Optional authentication — returns None if no valid credentials.
+
+    Routes that only personalise (health, gate, neuro owner) treat a failed login
+    as anonymous. A billed run must not: the reason is recorded on
+    ``request.state.auth_failure`` so ``admit_run`` can refuse it. "rejected" is a
+    bad or revoked credential; "unavailable" is anything else, such as a database
+    error while resolving a real key. No credentials sent leaves it unset.
+    """
     if not credentials:
         return None
     if (resolved := getattr(request.state, "user", None)) is not None:
@@ -330,14 +405,30 @@ async def get_optional_user(
         if not is_api_key:
             await _ensure_user_in_db(user)
         request.state.user = user
-        request.state.auth_method = "api_key" if is_api_key else "bearer"
+        request.state.auth_method = _auth_method(credentials.credentials)
         return user
+    except (HTTPException, LegacyAuthError):
+        request.state.auth_failure = "rejected"
+        return None
     except Exception:
+        logger.warning("Optional authentication unavailable", exc_info=True)
+        request.state.auth_failure = "unavailable"
         return None
 
 
+#: Resolved through a bearer secret (rsn_ key or legacy key): scopes apply.
+KEY_AUTH_METHODS = frozenset({"api_key", "legacy_key"})
+
+
+def _auth_method(token: str) -> str:
+    """How a bearer token authenticated: ``api_key``, ``bearer`` (JWT) or ``legacy_key``."""
+    if looks_like_api_key(token):
+        return "api_key"
+    return "bearer" if _looks_like_jwt(token) else "legacy_key"
+
+
 def require_key_scope(scope: str):
-    """Route guard: an API-key caller must hold ``scope``. Returns the user.
+    """Route guard: a key caller (rsn_ or legacy) must hold ``scope``. Returns the user.
 
     Session and JWT callers always pass, because scopes only narrow what a key
     may do. Before this guard, scopes were attached to the User and never read,
@@ -346,13 +437,22 @@ def require_key_scope(scope: str):
     """
 
     async def guard(request: Request, user: User = Depends(get_current_user)) -> User:
-        if getattr(request.state, "auth_method", None) == "api_key" and not key_allows(
+        if getattr(request.state, "auth_method", None) in KEY_AUTH_METHODS and not key_allows(
             user.scopes, scope
         ):
             raise HTTPException(status_code=403, detail=f"API key lacks the '{scope}' scope")
         return user
 
     return guard
+
+
+async def require_admin_scope(user: User = Depends(get_current_user)) -> User:
+    """Route guard: the caller must hold the admin scope. Returns the user."""
+    from reasoner.auth import Scope
+
+    if Scope.ADMIN.value not in user.scopes:
+        raise HTTPException(status_code=403, detail="Admin scope required")
+    return user
 
 
 async def require_auth_if_legacy_disabled(
@@ -605,7 +705,23 @@ def _reset_credit_services() -> None:
 _allowance_checked: set[tuple[str, str, str]] = set()
 
 
-async def _top_up_allowance(service, user_id: str) -> None:
+def allowance_permitted(user: User, tier: SubscriptionTier) -> bool:
+    """Whether *user* may receive this period's allowance.
+
+    Only the FREE grant needs a verified email: a paid tier has a real payer
+    (docs/plans/email-verification-2026-11-12.md step 3).
+    """
+    if tier != SubscriptionTier.FREE:
+        return True
+    from reasoner.application.services.email_verification import (
+        GatedFeature,
+        email_gate_allows,
+    )
+
+    return email_gate_allows(user, GatedFeature.FREE_CREDITS)
+
+
+async def _top_up_allowance(service, user: User) -> None:
     """Grant any monthly allowance still owed before the balance is checked.
 
     The allowance was granted only by ``GET /api/credits``. Accounts used only
@@ -614,11 +730,14 @@ async def _top_up_allowance(service, user_id: str) -> None:
     """
     from reasoner.application.services.credit_service import current_period_key
 
+    user_id = str(user.id)
     try:
         tier = await _resolve_user_tier(user_id)
         key = (user_id, current_period_key(), tier.value)
         if key in _allowance_checked:
             return
+        if not allowance_permitted(user, tier):
+            return  # not cached: the grant lands once the email is verified
         await service.ensure_monthly_allowance(user_id, tier)
         if len(_allowance_checked) > 50_000:  # shortcut: bounded, cleared wholesale
             _allowance_checked.clear()
@@ -636,7 +755,7 @@ async def require_credits(user: User = Depends(get_current_user)) -> User:
     """
     _require_persistence("Credits")
     service = _get_credit_service()
-    await _top_up_allowance(service, str(user.id))
+    await _top_up_allowance(service, user)
     try:
         balance = await service.get_balance(str(user.id))
     except Exception as exc:
@@ -644,19 +763,42 @@ async def require_credits(user: User = Depends(get_current_user)) -> User:
         # A ledger outage must not take the product down; log and let the run
         # through. The run still settles later if the ledger recovers.
         logger.warning("Credit balance lookup failed; allowing run", exc_info=True)
+        from reasoner.api.run_observability import count_credit_failopen
+
+        count_credit_failopen("require_credits")
         return user
 
     if balance.is_exhausted:
-        raise HTTPException(
-            status_code=402,
-            detail={
-                "error": "Insufficient credits",
-                "message": "Your credit balance is exhausted.",
-                "balance": balance.balance,
-                "upgrade_url": "/pricing",
-            },
+        raise await insufficient_credits(
+            str(user.id), "Your credit balance is exhausted.", balance=balance.balance,
         )
     return user
+
+
+async def insufficient_credits(user_id: str | None, message: str, **extra) -> HTTPException:
+    """The 402 for a credit shortfall.
+
+    Marks ``email_unverified: true`` when the shortfall is the FREE grant the
+    email gate withheld, so the UI shows "confirm your email", not the buy
+    prompt (docs/plans/email-verification-2026-11-12.md step 4). Reads the
+    user's row, which only happens on this already-failing path.
+    """
+    detail = {
+        "error": "Insufficient credits", "message": message, **extra, "upgrade_url": "/pricing",
+    }
+    try:
+        from reasoner.application.services.email_verification import gate_refuses
+
+        user = await _load_user_by_id(UUID(str(user_id))) if user_id else None
+        if (
+            user is not None
+            and gate_refuses(user)
+            and await _resolve_user_tier(str(user.id)) == SubscriptionTier.FREE
+        ):
+            detail["email_unverified"] = True
+    except Exception:
+        logger.warning("Could not tell whether a 402 is an unverified email", exc_info=True)
+    return HTTPException(status_code=402, detail=detail)
 
 
 def _refuse_missing_account(exc: Exception) -> None:
@@ -719,15 +861,11 @@ async def reserve_or_402(
             sink=CreditSink(),
         )
     except InsufficientCreditsError as exc:
-        raise HTTPException(
-            status_code=402,
-            detail={
-                "error": "Insufficient credits",
-                "message": "Your credit balance can't cover this run's estimated cost.",
-                "required": exc.required,
-                "available": exc.available,
-                "upgrade_url": "/pricing",
-            },
+        raise await insufficient_credits(
+            user_id,
+            "Your credit balance can't cover this run's estimated cost.",
+            required=exc.required,
+            available=exc.available,
         ) from exc
     except HTTPException:
         raise
@@ -737,6 +875,9 @@ async def reserve_or_402(
         # require_credits: log and let the run through unreserved. metered()
         # still settles from actual spend once the ledger recovers.
         logger.warning("Credit reservation failed; allowing run unreserved", exc_info=True)
+        from reasoner.api.run_observability import count_credit_failopen
+
+        count_credit_failopen("reserve")
         return 0
 
 
@@ -862,6 +1003,66 @@ async def check_quota(
             },
         )
     return result
+
+
+async def claim_quota_slot(
+    user: User | None, preset: str, request: Request | None = None
+) -> bool:
+    """Take one quota slot for an admitted run; True when a slot is held.
+
+    ``check_quota`` only reads, so concurrent runs at 19/20 all passed it and were
+    counted at the end (audit 6, finding 3). This is the atomic claim: the run that
+    finds the limit reached gets the same 429. ``False`` means no slot is held
+    (anonymous, an unlimited tier, or a quota outage), so nothing is released.
+    """
+    if user is None:
+        return False
+    # Same guard as reserve_or_402: no database configured outside production.
+    if not _persistence_is_configured() and settings.ENVIRONMENT != "production":
+        return False
+    user_tier = await resolve_request_tier(request, user)
+    try:
+        result = await _get_quota_service().increment(str(user.id), preset)
+    except Exception as exc:
+        # Same bounded fail-open as check_quota: an outage must not stop the product,
+        # and it is counted so it can be alerted on.
+        logging.getLogger(__name__).error(
+            "Quota claim failed (%s: %s); the run is admitted uncounted",
+            type(exc).__name__, exc, exc_info=True,
+        )
+        try:
+            from reasoner.metrics import REASONER_QUOTA_CHECK_FAILURES
+
+            REASONER_QUOTA_CHECK_FAILURES.labels(reason=type(exc).__name__).inc()
+        except Exception as metrics_exc:
+            logging.getLogger(__name__).debug("Quota-failure metric not recorded: %s", metrics_exc)
+        return False
+    if not result.allowed:
+        from reasoner.core.ports.metrics_port import count_quota_exceeded
+
+        count_quota_exceeded(getattr(user_tier, "value", str(user_tier)))
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "error": "Quota exceeded",
+                "message": result.reason,
+                "remaining": 0,
+                "retry_after": result.retry_after,
+                "upgrade_url": "/pricing",
+            },
+            headers={"Retry-After": str(result.retry_after or 3600), "X-RateLimit-Remaining": "0"},
+        )
+    return result.remaining != -1
+
+
+async def release_quota_slot(user: User | None) -> None:
+    """Give back a slot taken by :func:`claim_quota_slot` when admission then failed."""
+    if user is None:
+        return
+    try:
+        await _get_quota_service().release(str(user.id))
+    except Exception as exc:
+        logging.getLogger(__name__).warning("Quota slot release failed for %s: %s", user.id, exc)
 
 
 async def check_preset_access(

@@ -10,7 +10,7 @@ from reasoner.application.flows.perspective_phases import (
     run_stress_test_phase,
 )
 from reasoner.application.flows.synthesis_phase import run_synthesis_phase
-from reasoner.application.services.serializers import _ser_2, _ser_3, _ser_4, _ser_5
+from reasoner.application.services.serializers import _ser_2, _ser_3, _ser_4, _ser_synthesis
 from reasoner.domain.pipeline_state import PipelineState
 
 
@@ -41,5 +41,5 @@ class MultiPerspectiveFlow(WorkflowStrategy):
         if state.complexity != "simple":
             phases.append(PhaseStep(4, "Stress Testing", run_stress_test_phase, _ser_4))
 
-        phases.append(PhaseStep(5, "Synthesis", run_synthesis_phase, _ser_5))
+        phases.append(PhaseStep(5, "Synthesis", run_synthesis_phase, _ser_synthesis))
         return phases

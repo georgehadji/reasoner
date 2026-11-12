@@ -119,19 +119,30 @@ class ContainerExecutionSandbox:
                 blocked_reason=f"sandbox_error_{response.status_code}",
             )
 
-        data = response.json()
-        return ExecutionResult(
-            success=data["success"],
-            stdout=data["stdout"],
-            stderr=data["stderr"],
-            exit_code=data["exit_code"],
-            timed_out=data["timed_out"],
-            duration_ms=data["duration_ms"],
-            truncated=data["truncated"],
-            blocked=data["blocked"],
-            blocked_reason=data["blocked_reason"],
-            policy_version=data["policy_version"],
-        )
+        try:
+            data = response.json()
+            return ExecutionResult(
+                success=data["success"],
+                stdout=data["stdout"],
+                stderr=data["stderr"],
+                exit_code=data["exit_code"],
+                timed_out=data["timed_out"],
+                duration_ms=data["duration_ms"],
+                truncated=data["truncated"],
+                blocked=data["blocked"],
+                blocked_reason=data["blocked_reason"],
+                policy_version=data["policy_version"],
+            )
+        except (ValueError, KeyError, TypeError):
+            # The port contract says run() never raises, so a malformed reply is a failed run.
+            logger.error("Sandbox worker returned a malformed reply: %s", response.text[:500])
+            return ExecutionResult(
+                success=False,
+                stderr="Sandbox worker returned a malformed reply",
+                exit_code=-1,
+                blocked=True,
+                blocked_reason="sandbox_malformed_reply",
+            )
 
     async def health_check(self) -> bool:
         """TTL-cached so callers can check before every construction without

@@ -15,6 +15,10 @@ from __future__ import annotations
 import asyncio
 import time as _time
 
+CLAIM_DONE = "done"
+# Holder token for callers that do not pass one (tests, single-holder use). Not a secret.
+_ANONYMOUS_HOLDER = "1"
+
 
 class RunStateStore:
     """
@@ -31,21 +35,36 @@ class RunStateStore:
         self._cancel_events: dict[str, asyncio.Event] = {}
         self._active_runs: set[str] = set()
         self._run_owners: dict[str, str | None] = {}
+        self._claim_tokens: dict[str, str] = {}
         self._created_at: dict[str, float] = {}
         self._lock = asyncio.Lock()
 
-    def try_register(self, client_run_id: str, ttl: int = 3600) -> bool:
+    def try_register(
+        self, client_run_id: str, ttl: int = 3600, token: str = _ANONYMOUS_HOLDER
+    ) -> bool:
         """Check-and-register for idempotency (C2). Non-atomic under concurrency."""
         if client_run_id in self._active_runs:
             return False  # already registered
         self._active_runs.add(client_run_id)
+        self._claim_tokens[client_run_id] = token
         self._created_at[client_run_id] = _time.monotonic()
         return True  # newly created
 
-    def release(self, client_run_id: str) -> None:
-        """Drop an idempotency claim so the same id can be retried."""
+    def release(self, client_run_id: str, token: str) -> None:
+        """Drop an idempotency claim so the same id can be retried; only its holder's token does."""
+        if self._claim_tokens.get(client_run_id) != token:
+            return
+        self._claim_tokens.pop(client_run_id, None)
         self._active_runs.discard(client_run_id)
         self._created_at.pop(client_run_id, None)
+
+    def complete(self, client_run_id: str, token: str) -> None:
+        """Mark the holder's claim finished (the Redis twin is SET KEEPTTL)."""
+        if self._claim_tokens.get(client_run_id) == token:
+            self._claim_tokens[client_run_id] = CLAIM_DONE
+
+    def claim_finished(self, client_run_id: str) -> bool:
+        return self._claim_tokens.get(client_run_id) == CLAIM_DONE
 
     async def add(self, run_id: str, user_id: str | None = None) -> asyncio.Event:
         """Register a new run and return its cancel event."""
@@ -66,6 +85,7 @@ class RunStateStore:
             self._cancel_events.pop(rid, None)
             self._active_runs.discard(rid)
             self._run_owners.pop(rid, None)
+            self._claim_tokens.pop(rid, None)
             self._created_at.pop(rid, None)
         if len(self._cancel_events) > self._MAX_ENTRIES:
             over = len(self._cancel_events) - self._MAX_ENTRIES
@@ -133,6 +153,7 @@ class RunStateStore:
             self._cancel_events.clear()
             self._active_runs.clear()
             self._run_owners.clear()
+            self._claim_tokens.clear()
 
 
 # Module-level singleton — shared across the API layer.

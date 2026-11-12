@@ -79,7 +79,7 @@ class AnthropicDirectProvider(BaseLLMProvider):
             # exactly the path that only runs during an upstream outage —
             # i.e. when call volume through it is highest.
             async with AsyncAnthropic(
-                api_key=self._api_key, timeout=TIMEOUTS.LLM_CALL
+                api_key=self._api_key, timeout=TIMEOUTS.LLM_CALL, max_retries=0
             ) as client:
                 response = await client.messages.create(
                     model=self.model,
@@ -145,7 +145,7 @@ class OpenAIDirectProvider(BaseLLMProvider):
                 kwargs["temperature"] = temperature
             # See AnthropicDirectProvider.complete on why this is a context manager.
             async with openai.AsyncOpenAI(
-                api_key=self._api_key, timeout=TIMEOUTS.LLM_CALL
+                api_key=self._api_key, timeout=TIMEOUTS.LLM_CALL, max_retries=0
             ) as client:
                 response = await client.chat.completions.create(**kwargs)
             return response.choices[0].message.content or ""
@@ -230,6 +230,8 @@ class OpenAICompatibleDirectProvider(BaseLLMProvider):
         import json
 
         import httpx
+
+        from reasoner.infrastructure.llm.providers.openai_compat import OpenAICompatibleProvider
         payload = {
             "model": self.model,
             "messages": [
@@ -240,18 +242,21 @@ class OpenAICompatibleDirectProvider(BaseLLMProvider):
             "temperature": temperature,
         }
         try:
-            async with httpx.AsyncClient(timeout=httpx.Timeout(TIMEOUTS.LLM_CALL, connect=10.0)) as client:
-                resp = await client.post(
-                    f"{self._base_url}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {self._api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    content=json.dumps(payload),
-                )
-                resp.raise_for_status()
-                data = resp.json()
-                return data["choices"][0]["message"]["content"] or ""
+            # Shared pool: warm connections instead of a TCP+TLS handshake per call.
+            # The pool's own timeout is the primary lane's, so pass this lane's.
+            client = OpenAICompatibleProvider.shared_pool()
+            resp = await client.post(
+                f"{self._base_url}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {self._api_key}",
+                    "Content-Type": "application/json",
+                },
+                content=json.dumps(payload),
+                timeout=httpx.Timeout(TIMEOUTS.LLM_CALL, connect=10.0),
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return data["choices"][0]["message"]["content"] or ""
         except Exception as e:
             raise _translate(self.model, f"{self.model} direct API failed", e) from e
 

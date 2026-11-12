@@ -48,6 +48,9 @@ UNIQUE_KEYS = {
     ("usage_quotas", ("user_id",)),                   # quota_repo_postgres
     ("api_keys", ("key_hash",)),                      # api_key_repo_postgres
     ("upload_usage", ("user_id",)),                   # upload_usage_repo
+    # Audit 6 finding 5: one row per provider subscription id (partial indexes).
+    ("subscriptions", ("stripe_sub_id",)),            # subscription_repo.upsert_subscription
+    ("subscriptions", ("paypal_sub_id",)),
 }
 COLUMNS = {
     ("subscriptions", "stripe_sub_id"),
@@ -197,3 +200,29 @@ async def test_run_scope_is_backfilled_onto_existing_keys():
 
     assert rows["old"].count("run") == 1
     assert rows["has"].count("run") == 1
+
+
+async def test_a_second_upgrade_waits_for_the_migration_lock():
+    """Audit 6, finding 11: every container runs `alembic upgrade head` at start.
+
+    A second one must block while the first holds the lock, not race it. Held here
+    by a plain connection using the key env.py uses.
+    """
+    import asyncpg
+
+    lock_id = 7_261_000_001  # MIGRATION_LOCK_ID in migrations/alembic/env.py
+    async with _fresh_database() as dsn:
+        holder = await asyncpg.connect(dsn)
+        try:
+            await holder.execute("SELECT pg_advisory_lock($1)", lock_id)
+            env = {**os.environ, "DATABASE_URL": dsn.replace("postgresql://", "postgresql+asyncpg://", 1)}
+            with pytest.raises(subprocess.TimeoutExpired):
+                subprocess.run(
+                    [sys.executable, "-m", "alembic", "upgrade", "head"],
+                    cwd=ROOT, env=env, capture_output=True, text=True, timeout=8,
+                )
+            await holder.execute("SELECT pg_advisory_unlock($1)", lock_id)
+        finally:
+            await holder.close()
+        _alembic_upgrade(dsn)  # released: it now runs to the end
+        await _assert_contract(dsn)

@@ -282,8 +282,7 @@ class TestBug003ErrorMessageSanitization:
             else:
                 del app.dependency_overrides[check_rate_limit]
 
-        assert response.status_code == 200
-        data = response.json()
-        assert data.get("success") is False
-        assert secret not in data.get("error", "")
-        assert "Internal server error" in data.get("error", "")
+        # Audit 6 finding 13: a failed upload is a 500, not a 200 with success=false.
+        assert response.status_code == 500
+        assert secret not in response.text
+        assert "Internal server error" in response.json().get("error", "")

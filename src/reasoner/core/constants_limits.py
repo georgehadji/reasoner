@@ -222,8 +222,14 @@ PHASE_TOKEN_BUDGETS: dict[str, int] = {
     "jury_generator": 1536,
     "jury_critic": 1024,
     "jury_verifier": 1024,
-    "iterative_generate": 1536,
-    "iterative_critique": 1024,
+    # Iterative critique. The flow passes these explicitly: its calls run under
+    # the routing roles expert_1/expert_2, which have no entry here, so both
+    # silently got the 1536 default (2026-11-10). A revision is per-flaw
+    # responses plus the complete answer, often from a reasoning model whose
+    # thinking counts against max_tokens; 1536 and its 3072 retry both
+    # truncated live, and a truncated round has no answer to keep.
+    "iterative_generate": 8192,
+    "iterative_critique": 3072,
     "research": 4096,
     "verification": 1024,
     "deep_read": 2048,
@@ -421,6 +427,9 @@ class Timeouts:
 # Enforced in streaming.py:run_stream() via asyncio.wait_for.
 # 600s = 10 minutes covers even research-premium with web search;
 # should be generously above the sum of phase timeouts.
+# Neuro tenant directories untouched this long are deleted by the maintenance cron.
+NEURO_TENANT_RETENTION_DAYS: int = 90
+
 PIPELINE_ABSOLUTE_TIMEOUT_SECONDS: float = 600.0
 
 
@@ -760,6 +769,21 @@ SETTLE_TIMEOUT_SECONDS: float = 15.0
 # (ANONYMOUS_DAILY_CREDIT_CAP). HyperGate is up to five small LLM calls; one
 # credit each call, so the default cap of 50 allows 50 a day (BIL-17).
 GATE_ESTIMATED_COST_USD: float = 0.001
+
+# A signed-in /api/gate call is free up to this many per UTC day (audit-5
+# decision Q9): about $0.20 a day at GATE_ESTIMATED_COST_USD. Call 201 is a 429.
+GATE_FREE_CALLS_PER_DAY: int = 200
+
+# Flat prices for paid calls that run no pipeline (audit-5 BIL-26, decision Q2).
+# Search: one Perplexity sonar call through OpenRouter ($1/$1 per 1M tokens, up
+# to 2048 output tokens) plus Perplexity's $5/1K low-context request fee.
+# Assumes OpenRouter passes that fee on; not yet checked against a real
+# generation. If it does not, these fall to 0.002 and 0.007.
+SEARCH_ESTIMATED_COST_USD: float = 0.007
+# Smart search: one Qwen3.5-9B decomposition plus at most 3 sonar searches.
+SMART_SEARCH_ESTIMATED_COST_USD: float = 0.022
+# Image preview: one Grok 4.3 prompt rewrite ($1.25/$2.50 per 1M), at most 512 output tokens.
+IMAGE_PREVIEW_ESTIMATED_COST_USD: float = 0.002
 
 # A billing webhook claim older than this, and never finished, belongs to a
 # worker that died; the provider's retry may take it over. Must exceed the

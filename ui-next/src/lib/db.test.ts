@@ -54,4 +54,20 @@ describe('loadConversationsPage', () => {
       'next',
     );
   });
+
+  it('does not end a page inside a run of equal timestamps', async () => {
+    const PAGE = 50; // mirrors PAGE_SIZE in db.ts
+    const rows = Array.from({ length: PAGE + 2 }, (_, n) => ({
+      key: n < PAGE - 1 ? 1000 - n : 500, // last 3 rows tie on 500
+      value: { id: `c${n}` },
+    }));
+    const at = (n: number): unknown =>
+      n < rows.length ? { ...rows[n], continue: async () => at(n + 1) } : null;
+    mocked.openCursor.mockResolvedValueOnce(at(0));
+
+    const page = await loadConversationsPage();
+
+    expect(page.items).toHaveLength(PAGE + 2);
+    expect(page.nextCursor).toBe(500);
+  });
 });

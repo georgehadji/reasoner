@@ -136,7 +136,9 @@ export async function loadConversationsPage(
 
   let cursorResult = await index.openCursor(range, direction);
 
-  while (cursorResult && results.length < PAGE_SIZE) {
+  // The index is non-unique and the next page starts strictly after lastCursor, so
+  // a page must not end inside a run of equal timestamps: finish the run.
+  while (cursorResult && (results.length < PAGE_SIZE || cursorResult.key === lastCursor)) {
     results.push(cursorResult.value as Conversation);
     lastCursor = cursorResult.key;
     cursorResult = await cursorResult.continue();

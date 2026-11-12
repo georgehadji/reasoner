@@ -6,6 +6,8 @@ import asyncio
 import json
 import logging
 import os
+from contextvars import ContextVar
+from datetime import datetime
 
 import stripe
 from fastapi import HTTPException, Request
@@ -133,6 +135,17 @@ async def _get_webhook_pool():
     return _webhook_pool
 
 
+# The lease this task holds, by (provider, event_id): the ``claimed_at`` its claim
+# wrote. complete/release act only on that exact lease, so a worker whose lease
+# expired and was taken over cannot finish or delete the new owner's row (SM-M2).
+# Per-task by design: a ContextVar, never a module dict shared between requests.
+_lease_owner: ContextVar[dict[tuple[str, str], datetime]] = ContextVar("webhook_lease_owner")
+
+
+def _own_lease(event_id: str, provider: str) -> datetime | None:
+    return _lease_owner.get({}).get((provider, event_id))
+
+
 async def _db_claim_webhook(event_id: str, provider: str) -> bool:
     """Take a lease on a webhook event. True if this worker should process it.
 
@@ -152,9 +165,11 @@ async def _db_claim_webhook(event_id: str, provider: str) -> bool:
                 "ON CONFLICT (event_id, provider) DO UPDATE SET claimed_at = now() "
                 "WHERE processed_webhooks.status = 'processing' "
                 "AND processed_webhooks.claimed_at < now() - make_interval(secs => $3) "
-                "RETURNING 1",
+                "RETURNING claimed_at",
                 event_id, provider, float(WEBHOOK_LEASE_SECONDS),
             )
+            if claimed is not None:
+                _lease_owner.set({**_lease_owner.get({}), (provider, event_id): claimed})
             return claimed is not None
     except Exception as exc:
         logger.warning("Webhook DB claim failed for %s/%s (falling through to Redis): %s",
@@ -171,8 +186,9 @@ async def _db_complete_webhook(event_id: str, provider: str) -> None:
         async with pool.acquire() as conn:
             await conn.execute(
                 "UPDATE processed_webhooks SET status = 'done', processed_at = now() "
-                "WHERE event_id = $1 AND provider = $2",
-                event_id, provider,
+                "WHERE event_id = $1 AND provider = $2 AND status = 'processing' "
+                "AND ($3::timestamptz IS NULL OR claimed_at = $3)",
+                event_id, provider, _own_lease(event_id, provider),
             )
     except Exception as exc:
         # Not fatal: the lease expires and the retry finds Valkey's completed key.
@@ -194,11 +210,29 @@ async def _db_release_webhook(event_id: str, provider: str) -> None:
     try:
         async with pool.acquire() as conn:
             await conn.execute(
-                "DELETE FROM processed_webhooks WHERE event_id = $1 AND provider = $2",
-                event_id, provider,
+                "DELETE FROM processed_webhooks WHERE event_id = $1 AND provider = $2 "
+                "AND status = 'processing' AND ($3::timestamptz IS NULL OR claimed_at = $3)",
+                event_id, provider, _own_lease(event_id, provider),
             )
     except Exception as exc:
         logger.warning("Webhook claim release failed for %s/%s: %s", provider, event_id, exc)
+
+
+async def _db_webhook_is_done(event_id: str, provider: str) -> bool:
+    """True only when the event's row is 'done'. A failed claim also means a live lease."""
+    pool = await _get_webhook_pool()
+    if pool is None:
+        return False
+    try:
+        async with pool.acquire() as conn:
+            status = await conn.fetchval(
+                "SELECT status FROM processed_webhooks WHERE event_id = $1 AND provider = $2",
+                event_id, provider,
+            )
+        return status == "done"
+    except Exception as exc:
+        logger.warning("Webhook status read failed for %s/%s: %s", provider, event_id, exc)
+        return False
 
 
 def _retry_later() -> HTTPException:
@@ -425,7 +459,10 @@ async def replay_failed_webhooks(limit: int = 50) -> dict:
             counts["failed"] += 1
             continue
         if not await _db_claim_webhook(event_id, failure.provider):
-            await repo.mark_replayed(failure.id)  # a provider retry applied it
+            # Replayed only if a provider retry finished it; a live lease means
+            # nothing has been applied yet, so the dead letter must stay open.
+            if await _db_webhook_is_done(event_id, failure.provider):
+                await repo.mark_replayed(failure.id)
             counts["skipped"] += 1
             continue
         try:

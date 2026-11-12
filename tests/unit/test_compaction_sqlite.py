@@ -109,3 +109,41 @@ async def test_prune_multiple_aggregates_independent(store):
     # from_version=-1 → version > -1 → all versions including 0
     remaining_b = await store.get_events("agg-B", from_version=-1)
     assert len(remaining_b) == 3  # untouched
+
+
+# ── Version-0 audit rows (audit-5 decision Q6) ─────────────────────────────
+# prune_events_before above still deletes only snapshot-covered rows; the
+# version-0 audit rows the bus persists for every event are pruned here.
+
+_FUTURE = timedelta(days=1)
+
+
+@pytest.mark.asyncio
+async def test_audit_rows_pruned_without_snapshot(store):
+    await store.save_events([_make_event(f"audit-{i}", 0) for i in range(3)])
+
+    deleted = await store.prune_audit_events_before(cutoff=datetime.now(tz=UTC) + _FUTURE)
+
+    assert deleted == 3
+    assert await store.count_eligible_audit_events(datetime.now(tz=UTC) + _FUTURE) == 0
+
+
+@pytest.mark.asyncio
+async def test_audit_prune_respects_batch_size_and_cutoff(store):
+    await store.save_events([_make_event(f"audit-b{i}", 0) for i in range(5)])
+
+    assert await store.prune_audit_events_before(
+        cutoff=datetime.now(tz=UTC) - _FUTURE
+    ) == 0
+    assert await store.prune_audit_events_before(
+        cutoff=datetime.now(tz=UTC) + _FUTURE, batch_size=2
+    ) == 2
+
+
+@pytest.mark.asyncio
+async def test_versioned_rows_kept_and_replay_unaffected(store):
+    await store.save_events([_make_event("run-1", i) for i in range(4)])
+
+    await store.prune_audit_events_before(cutoff=datetime.now(tz=UTC) + _FUTURE)
+
+    assert [e.version for e in await store.get_events("run-1")] == [1, 2, 3]

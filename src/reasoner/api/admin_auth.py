@@ -13,10 +13,9 @@ underreach for at least one call site.
 
 from __future__ import annotations
 
-import secrets
-
 from fastapi import HTTPException, Request
 
+from reasoner.core.constant_time import constant_time_equals
 from reasoner.core.settings import settings
 
 
@@ -29,7 +28,7 @@ def verify_admin_key(provided: str | None) -> bool:
     admin_key = settings.ADMIN_API_KEY or ""
     if not admin_key:
         return False
-    return secrets.compare_digest(provided or "", admin_key)
+    return constant_time_equals(provided or "", admin_key)
 
 
 def require_admin_key(request: Request) -> None:

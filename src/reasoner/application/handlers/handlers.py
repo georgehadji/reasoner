@@ -287,14 +287,27 @@ class RunPipelineCommandHandler:
     ) -> None:
         from reasoner.core.logging_utils import redact_sensitive
 
-        event = make_event(
-            EventType.PIPELINE_FAILED,
-            aggregate_id=command.command_id,
-            version=aggregate.version + 1,
-            error=redact_sensitive(f"{outcome.status}: {outcome.reason or 'no reason given'}"),
-            phase_at_failure=aggregate.get_last_phase() or "",
-            phases_completed=len(aggregate.state_data.phase_results) if hasattr(aggregate, "state_data") else 0,
-        )
+        reason = redact_sensitive(f"{outcome.status}: {outcome.reason or 'no reason given'}")
+        phase = aggregate.get_last_phase() or ""
+        phases_completed = len(aggregate.state_data.phase_results) if hasattr(aggregate, "state_data") else 0
+        if outcome.status == "cancelled":
+            event = make_event(
+                EventType.PIPELINE_CANCELLED,
+                aggregate_id=command.command_id,
+                version=aggregate.version + 1,
+                reason=reason,
+                phase_at_cancel=phase,
+                phases_completed=phases_completed,
+            )
+        else:
+            event = make_event(
+                EventType.PIPELINE_FAILED,
+                aggregate_id=command.command_id,
+                version=aggregate.version + 1,
+                error=reason,
+                phase_at_failure=phase,
+                phases_completed=phases_completed,
+            )
         aggregate.record_event(event)
         await self.event_bus.publish(event)
 
@@ -475,15 +488,17 @@ class GetHistoryQueryHandler:
 
     async def handle(self, query: GetHistoryQuery) -> dict[str, Any]:
         """Get search history."""
-        if not self.event_store:
+        if not self.event_store or query.owner_ids is None:
             # History is per-user and lives in the HistoryRepository; this
-            # handler only reads the event store.
+            # handler only reads the event store. Without the caller's own
+            # pipeline ids it would list every user's problems, so it lists none.
             return {"total": 0, "entries": []}
 
         # Get from event store
         pipelines = await self.event_store.list_pipelines(
             limit=query.limit,
             offset=query.offset,
+            aggregate_ids=query.owner_ids,
         )
 
         return {

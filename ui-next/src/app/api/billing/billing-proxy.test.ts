@@ -37,10 +37,13 @@ function req(url: string, ip: string): Request {
 }
 
 beforeEach(() => {
+  // XFF is only believed when a proxy is declared trusted.
+  vi.stubEnv('TRUSTED_PROXIES', '10.255.255.1');
   vi.resetModules();
 });
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   vi.unstubAllGlobals();
 });
 
@@ -85,5 +88,25 @@ describe.each([
     // Without this, a limiter keyed on nothing would pass the test above while
     // letting one abusive caller lock every customer out of checkout.
     expect(other.status).not.toBe(429);
+  }, 20_000);
+});
+
+describe.each([
+  ['checkout', './checkout/route', 'http://localhost:3000/api/billing/checkout?tier=pro', '10.0.4.1'],
+  ['portal', './portal/route', 'http://localhost:3000/api/billing/portal', '10.0.4.2'],
+])('/api/billing/%s upstream failure', (_name, modulePath, url, ip) => {
+  it('sends a fixed message, not the upstream error text', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      throw new TypeError('connect ECONNREFUSED 10.0.3.7:8003');
+    }));
+    const { POST } = await import(modulePath);
+
+    const res = await POST(req(url, ip));
+    const body = await res.text();
+
+    expect(res.status).toBe(502);
+    expect(body).not.toContain('10.0.3.7');
+    expect(JSON.parse(body)).toEqual({ detail: 'Billing service unavailable' });
   }, 20_000);
 });

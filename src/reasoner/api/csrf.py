@@ -13,6 +13,7 @@ import hmac
 import secrets
 import time
 
+from reasoner.core.constant_time import constant_time_equals
 from reasoner.core.settings import settings
 
 # Token validity window in seconds (24 hours)
@@ -69,7 +70,7 @@ def verify_csrf_token(signed: str) -> bool:
     expected_sig = hmac.new(_CSRF_SECRET, token.encode("utf-8"), hashlib.sha256).hexdigest()
 
     # Constant-time comparison to prevent timing attacks
-    if not hmac.compare_digest(provided_sig, expected_sig):
+    if not constant_time_equals(provided_sig, expected_sig):
         return False
 
     # Validate embedded signed expiry to enforce token max-age
@@ -79,7 +80,7 @@ def verify_csrf_token(signed: str) -> bool:
         expected_payload_sig = hmac.new(
             _CSRF_SECRET, payload.encode(), hashlib.sha256
         ).hexdigest()[:16]
-        if not secrets.compare_digest(sig, expected_payload_sig):
+        if not constant_time_equals(sig, expected_payload_sig):
             return False
         return int(time.time()) < int(expiry)
     except (ValueError, IndexError):

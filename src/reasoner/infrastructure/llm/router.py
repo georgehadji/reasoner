@@ -62,6 +62,7 @@ async def _try_direct_fallback(
     max_tokens: int,
     temperature: float,
     extra_body: dict[str, Any] | None = None,
+    assigned: BaseLLMProvider | None = None,
 ) -> tuple[str, dict[str, Any]] | None:
     """Try direct API providers when OpenRouter fails, within one overall budget.
 
@@ -72,7 +73,7 @@ async def _try_direct_fallback(
         return await asyncio.wait_for(
             _walk_direct_fallback_chain(
                 role, system_prompt, user_prompt, original_error,
-                max_tokens, temperature, extra_body,
+                max_tokens, temperature, extra_body, assigned,
             ),
             timeout=DIRECT_FALLBACK_BUDGET_S,
         )
@@ -92,6 +93,7 @@ async def _walk_direct_fallback_chain(
     max_tokens: int,
     temperature: float,
     extra_body: dict[str, Any] | None = None,
+    assigned: BaseLLMProvider | None = None,
 ) -> tuple[str, dict[str, Any]] | None:
     """Try each direct API provider in turn.
 
@@ -110,6 +112,10 @@ async def _walk_direct_fallback_chain(
     for provider_name in _FALLBACK_PROVIDER_CHAIN:
         try:
             provider = build_fallback_provider(provider_name)
+            if assigned is not None and not ProviderRouter._affordable_fallback(
+                role, assigned, provider
+            ):
+                continue
             logger.warning(
                 "Multi-provider fallback: trying %s for role '%s' after: %s",
                 provider_name, role, original_error,
@@ -673,6 +679,15 @@ class ProviderRouter:
         assigned = self.get(role)
         effective_timeout = self._timeout_for_role(role, timeout_seconds)
         fallback: BaseLLMProvider | None = self._resolve_fallback(role, assigned)
+        # Spend of attempts whose answer was thrown away (empty body): billed by
+        # the provider, so it rides on whatever this call finally returns.
+        discarded: dict[str, float] = {"cost_usd": 0.0, "input_tokens": 0, "output_tokens": 0}
+
+        def _carry(meta: dict[str, Any]) -> dict[str, Any]:
+            for key, spent in discarded.items():
+                if spent:
+                    meta[key] = (meta.get(key, 0) or 0) + spent
+            return meta
 
         async def _execute_call(provider: BaseLLMProvider, is_fallback: bool = False):
             provider = _per_call(provider)
@@ -684,8 +699,13 @@ class ProviderRouter:
                     single_attempt=is_fallback,
                 )
                 if not response or not response.strip():
+                    spent = self._build_metadata(actual_provider, response or "")
+                    for key in discarded:
+                        value = spent.get(key, 0)
+                        if isinstance(value, (int, float)):
+                            discarded[key] += value
                     raise LLMError(f"Empty response from {provider.model} for role={role}")
-                return response, self._build_metadata(actual_provider, response)
+                return response, _carry(self._build_metadata(actual_provider, response))
             except TimeoutError as exc:
                 if is_fallback:
                     logger.error(
@@ -695,12 +715,13 @@ class ProviderRouter:
                     direct = await _try_direct_fallback(
                         role, system_prompt, user_prompt, original_error=exc,
                         max_tokens=max_tokens, temperature=temperature, extra_body=extra_body,
+                        assigned=assigned,
                     )
                     if direct:
-                        return direct
+                        return direct[0], _carry(direct[1])
                     return DegradedLLMResponse(
                         text="", error=f"{provider.model} timed out — primary and fallback both failed",
-                        metadata={"model": provider.model},
+                        metadata=_carry({"model": provider.model}),
                     ), {}
                 logger.warning(
                     "Role '%s' provider '%s' timed out after %.0fs — retrying with fallback '%s'",
@@ -713,7 +734,7 @@ class ProviderRouter:
                 else:
                     return DegradedLLMResponse(
                         text="", error=f"{assigned.model} timed out — no fallback",
-                        metadata={"model": assigned.model},
+                        metadata=_carry({"model": assigned.model}),
                     ), {}
             # P2 (docs/plans/root-cause-remediation-2026-09-07.md): ProviderError,
             # not LLMError. LLMError was one leaf of a four-tree taxonomy, so
@@ -731,12 +752,13 @@ class ProviderRouter:
                     direct = await _try_direct_fallback(
                         role, system_prompt, user_prompt, original_error=exc,
                         max_tokens=max_tokens, temperature=temperature, extra_body=extra_body,
+                        assigned=assigned,
                     )
                     if direct:
-                        return direct
+                        return direct[0], _carry(direct[1])
                     return DegradedLLMResponse(
                         text="", error=str(exc),
-                        metadata={"model": provider.model},
+                        metadata=_carry({"model": provider.model}),
                     ), {}
                 logger.warning(
                     "Role '%s' provider '%s' failed (%s) — retrying with fallback '%s'",
@@ -749,7 +771,7 @@ class ProviderRouter:
                 else:
                     return DegradedLLMResponse(
                         text="", error=str(exc),
-                        metadata={"model": assigned.model},
+                        metadata=_carry({"model": assigned.model}),
                     ), {}
 
         async def _execute_stream(provider: BaseLLMProvider, is_fallback: bool = False):
@@ -844,6 +866,7 @@ class ProviderRouter:
                     direct = await _try_direct_fallback(
                         role, system_prompt, user_prompt, original_error=failure,
                         max_tokens=max_tokens, temperature=temperature, extra_body=extra_body,
+                        assigned=assigned,
                     )
                     if direct:
                         # _try_direct_fallback returns (text, metadata); this

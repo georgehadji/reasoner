@@ -16,8 +16,12 @@ from reasoner.infrastructure.watermark.image.detect import JPEG_SOI
 from reasoner.infrastructure.watermark.image.markers import (
     AI_META_HINTS,
     C2PA_MARKERS,
+    MAX_STRUCTURES,
+    cap_findings,
     contains_any,
+    count_actions,
     is_confirmed_c2pa_hit,
+    structure_limit_error,
 )
 
 _APP11_JUMBF = 0xEB  # APP11: JUMBF/C2PA common
@@ -26,6 +30,10 @@ _RESTART_LO, _RESTART_HI = 0xD0, 0xD7
 _MARKER_SOI, _MARKER_EOI, _MARKER_SOS, _MARKER_COM = 0xD8, 0xD9, 0xDA, 0xFE
 _APPN_LO, _APPN_HI = 0xE0, 0xEF
 _APP0_JFIF = 0xE0
+
+
+def _tally(actions: dict[str, int], action: str) -> None:
+    actions[action] = actions.get(action, 0) + 1
 
 
 def supports(data: bytes) -> bool:
@@ -46,6 +54,7 @@ def inspect(data: bytes) -> ImageInspectReport:
     has_ai = False
     i = 2
     n = len(data)
+    walked = 0
     while i + 2 <= n:
         if data[i] != 0xFF:
             i += 1
@@ -56,6 +65,9 @@ def inspect(data: bytes) -> ImageInspectReport:
             break
         marker = data[i]
         i += 1
+        walked += 1
+        if walked > MAX_STRUCTURES:
+            raise structure_limit_error("JPEG segments")
         if marker in (_MARKER_SOI, _MARKER_EOI):
             continue
         if marker == _MARKER_SOS:  # entropy-coded scan follows -- stop scanning
@@ -100,7 +112,8 @@ def inspect(data: bytes) -> ImageInspectReport:
         format=ImageFormat.JPEG,
         has_c2pa=has_c2pa,
         has_ai_metadata=has_ai or has_c2pa,
-        findings=tuple(findings),
+        findings=cap_findings(findings)[0],
+        notes=cap_findings(findings)[1],
     )
 
 
@@ -114,10 +127,11 @@ def strip(data: bytes, *, strip_all_metadata: bool = True) -> tuple[bytes, tuple
     if not supports(data):
         raise ValueError("not a JPEG")
 
-    actions: list[str] = []
+    actions: dict[str, int] = {}
     out = bytearray(data[:2])  # SOI
     i = 2
     n = len(data)
+    walked = 0
     while i + 2 <= n:
         if data[i] != 0xFF:
             i += 1
@@ -128,6 +142,9 @@ def strip(data: bytes, *, strip_all_metadata: bool = True) -> tuple[bytes, tuple
             break
         marker = data[i]
         i += 1
+        walked += 1
+        if walked > MAX_STRUCTURES:
+            raise structure_limit_error("JPEG segments")
 
         if marker == _MARKER_EOI:
             out.extend(bytes([0xFF, _MARKER_EOI]))
@@ -142,7 +159,7 @@ def strip(data: bytes, *, strip_all_metadata: bool = True) -> tuple[bytes, tuple
                 break
             out.extend(bytes([0xFF, _MARKER_SOS]))
             out.extend(data[i:])
-            actions.append("preserved entropy-coded scan (SOS->EOF)")
+            actions["preserved entropy-coded scan (SOS->EOF)"] = 1
             break
 
         if i + 2 > n:
@@ -150,7 +167,7 @@ def strip(data: bytes, *, strip_all_metadata: bool = True) -> tuple[bytes, tuple
         seglen = struct.unpack(">H", data[i : i + 2])[0]
         if seglen < 2 or i + seglen > n:
             out.extend(data[i - 2 :])
-            actions.append("truncated segment; copied remainder")
+            actions["truncated segment; copied remainder"] = 1
             break
         payload = data[i + 2 : i + seglen]
         next_i = i + seglen
@@ -160,18 +177,18 @@ def strip(data: bytes, *, strip_all_metadata: bool = True) -> tuple[bytes, tuple
         if _APPN_LO <= marker <= _APPN_HI:
             if marker == _APP11_JUMBF:
                 drop = True
-                actions.append("drop APP11 (C2PA/JUMBF)")
+                _tally(actions, "drop APP11 (C2PA/JUMBF)")
             elif strip_all_metadata and marker != _APP0_JFIF:
                 drop = True
-                actions.append(f"drop APP{marker - 0xE0}")
+                _tally(actions, f"drop APP{marker - 0xE0}")
             elif contains_any(payload, AI_META_HINTS + C2PA_MARKERS):
                 drop = True
-                actions.append(f"drop APP{marker - 0xE0} (AI/C2PA markers)")
+                _tally(actions, f"drop APP{marker - 0xE0} (AI/C2PA markers)")
             else:
                 keep = True
         elif marker == _MARKER_COM:
             drop = True
-            actions.append("drop COM comment")
+            _tally(actions, "drop COM comment")
         else:
             keep = True
 
@@ -181,8 +198,8 @@ def strip(data: bytes, *, strip_all_metadata: bool = True) -> tuple[bytes, tuple
         i = next_i
 
     if not actions:
-        actions.append("no JPEG APP segments removed")
-    return bytes(out), tuple(actions)
+        actions["no JPEG APP segments removed"] = 1
+    return bytes(out), count_actions(actions)
 
 
 __all__ = ["supports", "inspect", "strip"]

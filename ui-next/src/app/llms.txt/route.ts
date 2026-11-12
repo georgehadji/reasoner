@@ -51,7 +51,7 @@ Reasoner is callable as a tool, not only readable as a website. Start here:
 - \`GET ${SITE.url}/openapi.json\`: the full schema for every endpoint.
 - \`POST ${SITE.url}/api/gate\` and \`POST ${SITE.url}/api/estimate\`: free
   calls that report which method would run and what it would cost, before the
-  one that bills.
+  one that bills. The gate is free up to 200 calls a day per account.
 
 Key facts:
 - ${CAPABILITIES.methods} reasoning methods (multi-perspective, debate, jury, research, scientific,

@@ -46,6 +46,12 @@ async def trigger_compaction(request: Request, dry_run: bool = False):
     from reasoner.application.services.compaction_service import CompactionService
     service = CompactionService(store)
     result = await service.run_once(dry_run=dry_run)
+    if not dry_run:
+        import time
+
+        from reasoner.infrastructure.metrics import REASONER_COMPACTION_LAST_SUCCESS_TIMESTAMP
+
+        REASONER_COMPACTION_LAST_SUCCESS_TIMESTAMP.set(int(time.time()))
     return {"status": "ok", **result}
 
 
@@ -97,6 +103,24 @@ async def replay_billing_dead_letter(request: Request, max_count: int = 50):
     from reasoner.infrastructure.billing.webhooks import replay_failed_webhooks
     result = await replay_failed_webhooks(limit=min(max_count, 200))
     return {"status": "ok", **result}
+
+
+@router.post("/unsettled-runs/replay")
+async def replay_unsettled_runs(request: Request, max_count: int = 50):
+    """Settle runs that were served but could not be billed (audit 6, finding 4).
+
+    Safe to repeat: each replay uses the run's original ledger reference.
+    Requires X-Admin-Key header.
+    """
+    _require_admin(request)
+    from reasoner.api.dependencies import _get_credit_service
+    from reasoner.application.services.unsettled_run_replay_service import (
+        UnsettledRunReplayService,
+    )
+    from reasoner.infrastructure.valkey.unsettled_runs import ValkeyUnsettledRunStore
+
+    service = UnsettledRunReplayService(ValkeyUnsettledRunStore(), _get_credit_service())
+    return {"status": "ok", **await service.replay(limit=min(max_count, 200))}
 
 
 # ── Neuro Lifecycle Maintenance (Phase 1.7) ───────────────────────────────────
@@ -176,7 +200,7 @@ async def acr_leaderboard(
         }
     except Exception as exc:
         logger.exception("ACR leaderboard query failed for role '%s'", role)
-        raise HTTPException(status_code=500, detail=f"Leaderboard query failed: {exc}") from exc
+        raise HTTPException(status_code=500, detail="Leaderboard query failed") from exc
 
 
 @router.get("/acr/profile/{model_id}")
@@ -211,23 +235,9 @@ async def acr_profile(request: Request, model_id: str):
         }
     except Exception as exc:
         logger.exception("ACR profile query failed for model '%s'", model_id)
-        raise HTTPException(status_code=500, detail=f"Profile query failed: {exc}") from exc
+        raise HTTPException(status_code=500, detail="Profile query failed") from exc
 
 
-@router.post("/acr/mode")
-async def acr_set_mode(request: Request, mode: str):
-    """Switch ACR operating mode: shadow, advisory, or adaptive.
-
-    Requires X-Admin-Key header.
-    """
-    _require_admin(request)
-    valid_modes = {"shadow", "advisory", "adaptive"}
-    if mode not in valid_modes:
-        raise HTTPException(status_code=400, detail=f"Invalid mode. Choose from: {', '.join(sorted(valid_modes))}")
-    # Mode change applies to the next pipeline run via settings at runtime
-    import os as _os
-    _os.environ["ACR_MODE"] = mode
-    # Also update the live settings singleton
-    from reasoner.core.settings import settings as app_settings
-    app_settings.ACR_MODE = mode
-    return {"status": "ok", "mode": mode}
+# There is deliberately no route to switch ACR_MODE. The old POST /acr/mode changed
+# one gunicorn worker's settings and left the others on the old mode. The mode is
+# deployment config: set ACR_MODE and restart, so every worker agrees.

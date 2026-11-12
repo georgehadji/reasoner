@@ -28,17 +28,22 @@ logger = logging.getLogger(__name__)
 _aug_cache: OrderedDict[str, dict[str, Any]] = OrderedDict()
 
 
-def _make_cache_key(problem: str) -> str:
-    """Derive a stable cache key from the problem text."""
-    return hashlib.sha256(problem.strip().lower().encode()).hexdigest()
+def _make_cache_key(problem: str, methods: list[str]) -> str:
+    """Derive a stable cache key from the problem text and the methods run.
+
+    Methods are in the key so a budget tier's (smaller) result is never
+    replayed to a premium run.
+    """
+    material = problem.strip().lower() + "\0" + ",".join(sorted(methods))
+    return hashlib.sha256(material.encode()).hexdigest()
 
 
-def _get_cached(problem: str) -> dict[str, Any] | None:
+def _get_cached(problem: str, methods: list[str]) -> dict[str, Any] | None:
     """Check L1 cache for a prior augmentation result.
 
     Returns None on miss, or the cached insights dict on hit.
     """
-    key = _make_cache_key(problem)
+    key = _make_cache_key(problem, methods)
     if key in _aug_cache:
         entry = _aug_cache.pop(key)
         _aug_cache[key] = entry  # Move to end (LRU bump)
@@ -54,7 +59,7 @@ def _get_cached(problem: str) -> dict[str, Any] | None:
     return None
 
 
-def _set_cache(problem: str, insights: dict[str, str], summary: str) -> None:
+def _set_cache(problem: str, methods: list[str], insights: dict[str, str], summary: str) -> None:
     """Store augmentation results in L1 (and optionally L2) cache.
 
     Busted on follow-up turns by the caller (turn_number > 1 skips cache entirely).
@@ -62,7 +67,7 @@ def _set_cache(problem: str, insights: dict[str, str], summary: str) -> None:
     from reasoner.core.settings import settings
     if not settings.AUGMENTATION_CACHE_ENABLED:
         return
-    key = _make_cache_key(problem)
+    key = _make_cache_key(problem, methods)
     entry = {"insights": insights, "summary": summary, "_ts": time.time()}
     _aug_cache[key] = entry
     # Evict oldest if over capacity
@@ -240,7 +245,7 @@ async def run_augmentation(
     # entry was already depth-confirmed when it was stored.
     is_first_turn = getattr(state, "turn_number", 1) <= 1
     if is_first_turn and settings.AUGMENTATION_CACHE_ENABLED:
-        if cached := _get_cached(state.problem):
+        if cached := _get_cached(state.problem, methods):
             state.writing_state["pre_research_insights"] = cached["insights"]
             state.writing_state["pre_research_summary"] = cached["summary"]
             log("AUGMENT", "Cache hit — reused prior augmentation results", state)
@@ -270,7 +275,8 @@ async def run_augmentation(
             return method, raw
         except Exception as exc:
             logger.warning("Augmentation method '%s' failed: %s", method, exc)
-            return method, f"[Failed: {exc}]"
+            # Exception type only: the message can carry provider internals.
+            return method, f"[Failed: {type(exc).__name__}]"
 
     # Run augmentation methods in parallel
     tasks = [_run_one(m) for m in methods]
@@ -292,8 +298,10 @@ async def run_augmentation(
     state.writing_state["pre_research_summary"] = "\n\n".join(summary_parts)
 
     # ── Cache the results for future identical questions ──
-    if is_first_turn:
-        _set_cache(state.problem, insights, state.writing_state["pre_research_summary"])
+    # Only a full result: caching a failed method skipped it for this question
+    # for a whole TTL after one provider blip.
+    if is_first_turn and len(summary_parts) == len(methods):
+        _set_cache(state.problem, methods, insights, state.writing_state["pre_research_summary"])
 
     log(
         "AUGMENT",

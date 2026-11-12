@@ -54,7 +54,8 @@ SAFE_FUNCTIONS = {
     'min': min,
     'max': max,
     'sum': sum,
-    'pow': pow,
+    # No 'pow': it bypassed the ** size guard below, so pow(3, 400000000)
+    # ran for minutes holding the GIL (the 1s timeout cannot stop a thread).
 }
 
 # Safe constants
@@ -99,6 +100,11 @@ def _safe_eval_expr(node: ast.AST, depth: int = 0) -> Any:
                 raise SafeExpressionError("Exponent too large")
             if abs(left) > 10000 and abs(right) > 10:
                 raise SafeExpressionError("Result would be too large")
+            # Nested powers, ((9999**1000)**10)**10..., passed both checks
+            # above while the digit count grew 10x per level.
+            ints = isinstance(left, int) and isinstance(right, int)
+            if ints and left.bit_length() * abs(right) > 100_000:
+                raise SafeExpressionError("Result would be too large")
         return SAFE_OPERATORS[op_type](left, right)
     elif isinstance(node, ast.UnaryOp):
         operand = _safe_eval_expr(node.operand, depth + 1)
@@ -133,7 +139,7 @@ def calculate_expression(expression: str) -> dict[str, Any]:
     Supports:
     - Basic arithmetic: +, -, *, /
     - Exponents: **
-    - Functions: abs, round, min, max, sum, pow
+    - Functions: abs, round, min, max, sum
     - Constants: pi, e
     
     Security: Uses AST parsing instead of eval() to prevent code injection.

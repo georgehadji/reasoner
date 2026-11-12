@@ -6,7 +6,7 @@ import {
   sanitizeResponseHeaders,
   rateLimit,
   requireCsrfToken,
-  ValidationError,
+  proxyErrorResponse,
   SECURITY_SERVER_HASH,
 } from '@/lib/security-server';
 import { API } from '@/lib/config';
@@ -53,27 +53,6 @@ export async function POST(
       headers: sanitizeResponseHeaders(upstream),
     });
   } catch (err) {
-    if (err instanceof ValidationError) {
-      return NextResponse.json({ error: err.message }, { status: 400 });
-    }
-
-    const msg = err instanceof Error ? err.message : 'Proxy error';
-    const errName = err instanceof Error ? err.constructor.name : 'Unknown';
-
-    console.error(`Proxy error [${errName}] upstream=${upstreamUrl || 'N/A'}:`, msg);
-
-    // Connection-level errors (network, DNS, timeout) -> 504 Gateway Timeout
-    const isConnectionError =
-      err instanceof TypeError ||
-      msg.toLowerCase().includes('fetch failed') ||
-      msg.toLowerCase().includes('network') ||
-      msg.toLowerCase().includes('econnrefused') ||
-      msg.toLowerCase().includes('etimedout');
-
-    if (isConnectionError) {
-      return NextResponse.json({ error: 'Backend unreachable', detail: msg }, { status: 504 });
-    }
-
-    return NextResponse.json({ error: msg }, { status: 502 });
+    return proxyErrorResponse(err, 'Resume stream', upstreamUrl);
   }
 }
