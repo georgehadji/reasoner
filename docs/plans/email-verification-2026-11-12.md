@@ -42,7 +42,7 @@ Why this choice:
 **UNKNOWN, needs the user:**
 
 - **"Confirm email" is off** in the Supabase project's Auth settings (the user's answer, 2026-11-12). Supabase still sends the confirmation email, but it gives a session at once, so an unconfirmed address can use the app straight away and gets the 500 free credits a month. Throwaway signups are a live credit-farming path today, which makes step 3 the point of this plan. Turning the setting on is the other option: it blocks the first login until the link is clicked, with no code change, but it also stops new users from trying the app before they confirm. This plan keeps it off and gates only the credit grant and API keys.
-- **INFERENCE:** the Python `supabase-auth` user model has the same `email_confirmed_at` field as the JS one. The package is not installed in this checkout, so check it before step 1.
+- **VERIFIED (2026-11-12):** the Python `supabase-auth` 2.32.0 user model (`supabase_auth/types.py`, the version in `requirements.lock.txt`) has `email_confirmed_at: Optional[datetime]` and `created_at: datetime`, read from the released wheel.
 - **HYPOTHESIS:** OAuth signups (Google, GitHub) come back with `email_confirmed_at` set when the provider vouches for the address. Check this against a real OAuth login before you rely on it.
 
 ## 2. The machine
@@ -106,9 +106,14 @@ Each step is a small PR. Order matters: read the flag, then mirror it, then obse
    - **Runs are not gated, but in practice they stop.** An unverified user gets no free credits, so their first run returns 402 (insufficient credits). For an unverified user, that 402 must show the verify banner ("Confirm your email to get your 500 free credits"), not the buy-credits prompt. The backend adds `email_unverified: true` to the 402 body so the UI can tell the two apart.
    - Tests (vitest): the banner shows only when unverified, Resend cannot double-send, the 403 code shows the banner, and a 402 with `email_unverified` shows the banner instead of the buy prompt.
 
-5. **Enforce.**
-   - After one release in which `reasoner_unverified_access_total` has been read and each hit explained, set `EMAIL_VERIFICATION_MODE=enforce`.
-   - Set `EMAIL_VERIFICATION_CUTOFF` in the same deploy. Accounts that already exist keep their credits and keys; only accounts created after it must verify.
+5. **Enforce.** Prepared 2026-11-12; the switch itself is a production setting and has not been made.
+   - **Done:** `docker-compose.yml` passes both settings through (`EMAIL_VERIFICATION_MODE` defaults to `observe`, the cutoff to empty), and `.env.example` documents them.
+   - **Checklist before the switch:**
+     1. PR #199 is merged and deployed in observe mode for one release.
+     2. `reasoner_unverified_access_total` has been read for that release, split by `feature` and `outcome`. Each hit is explained. Hits from OAuth signups mean the OAuth HYPOTHESIS in section 1 is false: stop and fix the adapter first.
+     3. In the `users` table, `email_verified` is `true` for the accounts you know have confirmed. If no row is ever `true`, the flag is not being read: stop.
+   - **The switch, in one deploy:** set `EMAIL_VERIFICATION_MODE=enforce` and `EMAIL_VERIFICATION_CUTOFF` to the deploy time in ISO-8601 UTC, for example `2026-12-01T00:00:00Z`. Accounts created before the cutoff keep their credits and keys; only accounts created after it must verify. Check the startup log for `EMAIL_VERIFICATION_CUTOFF=... is not ISO-8601`: a cutoff that does not parse grandfathers nobody.
+   - **Rollback:** set `EMAIL_VERIFICATION_MODE=observe`. No data changes, and a withheld grant is not cached, so the next request grants it.
 
 ## 4. Open questions for the user
 
