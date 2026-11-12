@@ -94,7 +94,7 @@ was run and no bug was reproduced. Line numbers are from `fix/audit7` at `70f605
 | M7 | **Account deletion** | `account_deletion_log` (no status, no unique index) | active, subs cancelled, logged, erased, gone | A partial erase leaves the account permanently refused with data still in place, and no retry. A repeat call writes a second log row. A crash after the cancel and before the log leaves the account usable with no plan. |
 | M8 | **Upload usage** | `upload_usage.bytes`, plus `meta.json` | reserved, stored, settled, deleted | The settle in `finally` is not shielded from cancellation, so a disconnect leaks the reservation. Delete then adjust is not atomic. |
 | M9 | **WS ticket** | HMAC plus Valkey NX | issued, redeemed, expired | A deleted account's ticket still redeems within its TTL. |
-| M10 | **Email verification** | `users.email_verified` | — | Has no writer. A dead column, not a machine; flag it for deletion or design. |
+| M10 | **Email verification** | `users.email_verified` | — | Has no writer. A dead column, not a machine. The user chose a design: `docs/plans/email-verification-2026-11-12.md`. |
 
 ### 1.3 Frontend (`ui-next/src`)
 

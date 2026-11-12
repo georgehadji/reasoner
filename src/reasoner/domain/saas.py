@@ -47,6 +47,10 @@ class User:
     auth_provider: str | None = None
     avatar_url: str | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    #: The auth provider has confirmed this address (Supabase ``email_confirmed_at``).
+    #: Read fresh on each authentication; ``users.email_verified`` only mirrors it
+    #: (docs/plans/email-verification-2026-11-12.md).
+    email_verified: bool = False
     #: Set when the caller authenticated with a Reasoner API key, so admission
     #: can record that this key started a run (audit 5 SEC-19, Q1).
     api_key_id: UUID | None = None
