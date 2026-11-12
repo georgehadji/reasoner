@@ -375,6 +375,7 @@ class PostgreSQLEventStore:
             PipelineEventType.PIPELINE_STARTED, PipelineEventType.PHASE_STARTED,
             PipelineEventType.PHASE_COMPLETED, PipelineEventType.PHASE_FAILED,
             PipelineEventType.PIPELINE_COMPLETED, PipelineEventType.PIPELINE_FAILED,
+            PipelineEventType.PIPELINE_CANCELLED,
         ):
             return "pipeline"
         elif event_type in (
@@ -401,6 +402,7 @@ class PostgreSQLEventStore:
     ) -> None:
         """Update aggregate state."""
         from reasoner.core.events.domain_events import (
+            PipelineCancelled,
             PipelineCompleted,
             PipelineFailed,
             PipelineStarted,
@@ -418,6 +420,8 @@ class PostgreSQLEventStore:
             status = "completed"
         elif isinstance(event, PipelineFailed):
             status = "failed"
+        elif isinstance(event, PipelineCancelled):
+            status = "cancelled"
 
         # Upsert aggregate. Version only moves forward, and only an event that
         # carries a status ($8) changes it. EXCLUDED.status is never NULL (an

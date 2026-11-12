@@ -181,18 +181,27 @@ class RunStream:
             phases_completed=len(state.phase_durations),
         )
 
-    async def disconnected(self, state: PipelineState | None) -> None:
-        """The stream was cancelled mid-run (client gone, or the absolute timeout).
+    async def cancelled(self, state: PipelineState | None, reason: str) -> None:
+        """Store that the run was stopped from outside; the client frame is sent by the caller.
 
-        Nobody is reading, so only the store hears of it: without a terminal
-        event the aggregate stays `running` and the run looks resumable.
+        Without a terminal event the aggregate stays `running` and the run looks
+        resumable. A stop is not a failure, so it has its own event.
         """
         phase = getattr(state, "_current_phase_key", "unknown") if state else "unknown"
         await self.persist(
-            EventType.PIPELINE_FAILED,
-            error="client_disconnected: the stream was cancelled (disconnect or absolute timeout)",
-            phase_at_failure=phase,
+            EventType.PIPELINE_CANCELLED,
+            reason=reason,
+            phase_at_cancel=phase,
             phases_completed=len(state.phase_durations) if state else 0,
+        )
+
+    async def disconnected(self, state: PipelineState | None) -> None:
+        """The stream was cancelled mid-run (client gone, or the absolute timeout).
+
+        Nobody is reading, so only the store hears of it.
+        """
+        await self.cancelled(
+            state, "client_disconnected: the stream was cancelled (disconnect or absolute timeout)"
         )
 
     async def failed(self, exc: BaseException, state: PipelineState | None) -> None:

@@ -334,8 +334,10 @@ async def test_disconnect_leaves_a_terminal_event_in_the_store(harness):
 
     terminal = [
         e for e in harness.persisted
-        if e.event_type in (EventType.PIPELINE_FAILED, EventType.PIPELINE_COMPLETED)
+        if e.event_type in (
+            EventType.PIPELINE_FAILED, EventType.PIPELINE_COMPLETED, EventType.PIPELINE_CANCELLED
+        )
     ]
     assert terminal, "no terminal event was persisted on disconnect"
-    assert terminal[-1].event_type == EventType.PIPELINE_FAILED
-    assert "client_disconnected" in terminal[-1].error
+    assert terminal[-1].event_type == EventType.PIPELINE_CANCELLED
+    assert "client_disconnected" in terminal[-1].reason

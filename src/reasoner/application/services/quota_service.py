@@ -61,9 +61,10 @@ class QuotaService:
             quota = await self._repository.get_quota(user_id)
 
         # The entitlement tier is a ceiling over the persisted row, not a
-        # synonym for it: invoice.payment_failed demotes a subscription to
-        # past_due (tier -> FREE) without re-syncing max_queries, so the row
-        # can still say 500. -1 on the row means unlimited, not a negative cap.
+        # synonym for it: past_due is a live status (LIVE_STATUSES), so a past-due
+        # subscriber keeps the paid tier while the provider retries; max_queries
+        # on the row is not re-synced on that event and may disagree with the
+        # tier. -1 on the row means unlimited, not a negative cap.
         row_max = limit if quota.max_queries < 0 else quota.max_queries
         effective_max = min(limit, row_max)
 

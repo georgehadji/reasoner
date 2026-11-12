@@ -56,10 +56,13 @@ class InMemoryCreditRepository(CreditRepository):
             raise ValueError("Ledger delta must be non-zero.")
 
         async with self._lock:
-            return self._apply(
+            entry = self._apply(
                 str(user_id),
                 LedgerWrite(delta, reason, reference_id, description, allow_overdraft),
             )
+            if entry is None:  # record() never sets requires_reference, so this cannot skip
+                raise RuntimeError("ledger write was skipped without a precondition")
+            return entry
 
     async def record_batch(
         self, user_id: str, writes: Sequence[LedgerWrite]
@@ -73,7 +76,7 @@ class InMemoryCreditRepository(CreditRepository):
             balance_before = self._balances.get(key)
             entries_before = list(self._entries.get(key, []))
             try:
-                return [self._apply(key, w) for w in writes]
+                return [e for w in writes if (e := self._apply(key, w)) is not None]
             except Exception:
                 if balance_before is None:
                     self._balances.pop(key, None)
@@ -82,14 +85,22 @@ class InMemoryCreditRepository(CreditRepository):
                 self._entries[key] = entries_before
                 raise
 
-    def _apply(self, key: str, write: LedgerWrite) -> CreditLedgerEntry:
-        """Apply one write. The caller holds ``self._lock``."""
+    def _apply(self, key: str, write: LedgerWrite) -> CreditLedgerEntry | None:
+        """Apply one write. The caller holds ``self._lock``.
+
+        None means skipped: ``requires_reference`` has no entry.
+        """
         entries = self._entries.setdefault(key, [])
 
         if write.reference_id is not None:
             for entry in entries:
                 if entry.reference_id == write.reference_id:
                     return entry
+
+        if write.requires_reference is not None and not any(
+            e.reference_id == write.requires_reference for e in entries
+        ):
+            return None
 
         current = self._balances.get(key) or CreditBalance(user_id=UUID(key))
         delta = write.delta

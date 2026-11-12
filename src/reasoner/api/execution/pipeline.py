@@ -538,6 +538,7 @@ class PipelineExecutionService:
             if not await _run_phases(
                 pipeline, state, req, run_id, stream, emitter, cancel_event
             ):
+                await stream.cancelled(state, "stopped by user")
                 return RunOutcome("cancelled", state, "stopped by user")
 
             await _finish_run(orchestrator, req, state, user_id, run_id, run_start, stream)

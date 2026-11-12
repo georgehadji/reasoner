@@ -120,7 +120,7 @@ async def test_f5_active_set_ttl_covers_pipeline_timeout():
 
     assert rs.ACTIVE_TTL_SECONDS > PIPELINE_ABSOLUTE_TIMEOUT_SECONDS
     redis = MagicMock()
-    for m in ("set", "sadd", "expire"):
+    for m in ("set", "srem", "sadd", "expire"):
         setattr(redis, m, AsyncMock())
     store = rs.RunStateManager.__new__(rs.RunStateManager)
     store._get_redis = lambda: redis

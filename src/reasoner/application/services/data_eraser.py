@@ -15,13 +15,47 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 from datetime import UTC, datetime
+from enum import StrEnum
 from typing import Any
 
 from reasoner.application.ports.user_data import UserDataStore
 from reasoner.core.degrade import degraded
 from reasoner.core.exceptions import UserDataExportError
+from reasoner.core.state_machine import Machine
 
 logger = logging.getLogger(__name__)
+
+
+class DeletionStatus(StrEnum):
+    """``account_deletion_log.status``: how far an account's erasure got (SM-M7)."""
+
+    REQUESTED = "requested"  # subscriptions cancelled, log row written, nothing erased
+    ERASING = "erasing"
+    ERASED = "erased"
+    PARTIAL = "partial"  # some store failed; a repeat DELETE re-runs the erase
+
+
+# ERASING -> ERASING: a retry after a crash mid-erase (the process died before it
+# could record erased or partial).
+ACCOUNT_DELETION = Machine(
+    "account_deletion",
+    {
+        DeletionStatus.REQUESTED: {DeletionStatus.ERASING},
+        DeletionStatus.ERASING: {
+            DeletionStatus.ERASING, DeletionStatus.ERASED, DeletionStatus.PARTIAL,
+        },
+        DeletionStatus.PARTIAL: {DeletionStatus.ERASING},
+        DeletionStatus.ERASED: set(),
+    },
+    initial=DeletionStatus.REQUESTED,
+    enforce=True,
+)
+
+#: A deletion that is not finished. The account stays refused for normal use,
+#: but a repeat DELETE may resume it.
+ERASE_RETRYABLE = frozenset(
+    {DeletionStatus.REQUESTED, DeletionStatus.ERASING, DeletionStatus.PARTIAL}
+)
 
 
 class UserDataEraser:

@@ -41,14 +41,6 @@ interface AppState {
   composerText: string;
   attachments: ComposerAttachment[];
   history: Conversation[];
-  activeRun: {
-    progressId: string;
-    problem: string;
-    phases: Array<{ phase: number; name: string; data: unknown }>;
-    errors: string[];
-    preset: string;
-    autoSelectedMethod: string | null;
-  } | null;
   recentCommands: string[];
 
   // Auth
@@ -69,10 +61,6 @@ interface AppState {
   removeAttachment: (id: string) => void;
   clearAttachments: () => void;
   setHistory: (history: Conversation[]) => void;
-  setActiveRun: (run: AppState['activeRun']) => void;
-  addPhaseToActiveRun: (phase: { phase: number; name: string; data: unknown }) => void;
-  setActiveRunErrors: (errors: string[]) => void;
-  clearActiveRun: () => void;
   getAutoPreset: () => string;
   addRecentCommand: (id: string) => void;
 
@@ -105,7 +93,6 @@ export const useAppStore = create<AppState>()(
       composerText: '',
       attachments: [],
       history: [],
-      activeRun: null,
       recentCommands: [],
 
       // Auth defaults
@@ -161,27 +148,6 @@ export const useAppStore = create<AppState>()(
           return { attachments: [] };
         }),
       setHistory: (history) => set({ history }),
-      setActiveRun: (activeRun) => set({ activeRun }),
-
-      addPhaseToActiveRun: (phase) =>
-        set((state) => {
-          if (!state.activeRun) return state;
-          return {
-            activeRun: {
-              ...state.activeRun,
-              phases: [...state.activeRun.phases, phase],
-            },
-          };
-        }),
-
-      setActiveRunErrors: (errors) =>
-        set((state) => {
-          if (!state.activeRun) return state;
-          return { activeRun: { ...state.activeRun, errors } };
-        }),
-
-      clearActiveRun: () => set({ activeRun: null }),
-
       addRecentCommand: (id) =>
         set((state) => {
           const next = [id, ...state.recentCommands.filter((c) => c !== id)].slice(0, LIMITS.maxRecentCommands);
@@ -215,11 +181,11 @@ export const useAppStore = create<AppState>()(
             const data: SubscriptionStatus = await res.json();
             set({ subscription: data, subscriptionOwner: owner, subscriptionLoading: false });
           } else {
-            set({ subscription: null, subscriptionOwner: owner, subscriptionLoading: false });
+            // Keep the last good plan: a failed load is not "free".
+            set({ subscriptionLoading: false, subscriptionError: `Subscription request failed (${res.status})` });
           }
         } catch (err) {
           set({
-            subscription: null,
             subscriptionLoading: false,
             subscriptionError: err instanceof Error ? err.message : 'Failed to fetch subscription',
           });

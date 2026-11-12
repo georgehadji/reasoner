@@ -243,6 +243,7 @@ class EventStore:
             PipelineEventType.PHASE_FAILED,
             PipelineEventType.PIPELINE_COMPLETED,
             PipelineEventType.PIPELINE_FAILED,
+            PipelineEventType.PIPELINE_CANCELLED,
         ):
             return "pipeline"
         elif event_type in (
@@ -272,6 +273,7 @@ class EventStore:
     ) -> None:
         """Update aggregate state snapshot."""
         from reasoner.core.events.domain_events import (
+            PipelineCancelled,
             PipelineCompleted,
             PipelineFailed,
             PipelineStarted,
@@ -292,6 +294,8 @@ class EventStore:
             status = "completed"
         elif isinstance(event, PipelineFailed):
             status = "failed"
+        elif isinstance(event, PipelineCancelled):
+            status = "cancelled"
 
         # Build update query
         updates = []

@@ -58,10 +58,13 @@ export function useRunController(sendWsStop: (runId: string) => void) {
     }
   }, []);
 
+  /** True when another run has begun since `ticket` ended: its late cleanup must not touch that run. */
+  const superseded = useCallback((ticket: RunTicket) => ticketRef.current !== null && ticketRef.current !== ticket, []);
+
   const isActive = useCallback(() => ticketRef.current !== null, []);
 
   // Leaving the page stops the run rather than leaving it streaming unseen.
   useEffect(() => stop, [stop]);
 
-  return useMemo(() => ({ begin, finish, stop, isActive }), [begin, finish, stop, isActive]);
+  return useMemo(() => ({ begin, finish, stop, isActive, superseded }), [begin, finish, stop, isActive, superseded]);
 }

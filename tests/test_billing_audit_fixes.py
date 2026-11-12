@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
@@ -196,6 +197,7 @@ async def test_replay_applies_dead_letters_once(monkeypatch):
     monkeypatch.setenv("STRIPE_SECRET_KEY", "sk_test_123")
     monkeypatch.setattr(webhooks, "_get_dead_letter_repo", repo)
     monkeypatch.setattr(webhooks, "_db_claim_webhook", claim)
+    monkeypatch.setattr(webhooks, "_db_webhook_is_done", AsyncMock(return_value=True))
     monkeypatch.setattr(BillingService, "handle_webhook", handle)
 
     result = await webhooks.replay_failed_webhooks()

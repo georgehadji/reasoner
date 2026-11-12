@@ -11,11 +11,14 @@ ERROR log with the same fields, which is the last record there is.
 from __future__ import annotations
 
 import json
+import logging
 import time
 from dataclasses import asdict
 
 from reasoner.core.ports.unsettled_run_port import UnsettledRun
 from reasoner.infrastructure.valkey.client import get_valkey_pool
+
+logger = logging.getLogger(__name__)
 
 KEY = "unsettled_runs"
 RETENTION_SECONDS = 30 * 24 * 3600
@@ -29,7 +32,14 @@ class ValkeyUnsettledRunStore:
     async def record(self, run: UnsettledRun) -> None:
         client = get_valkey_pool()
         await client.zadd(KEY, {_member(run): run.recorded_at})
-        await client.zremrangebyscore(KEY, 0, time.time() - RETENTION_SECONDS)
+        dropped = await client.zremrangebyscore(KEY, 0, time.time() - RETENTION_SECONDS)
+        if dropped:
+            # By design (GDPR): the trim stays, but a dropped entry is an unsettled
+            # run nobody replayed, so say how many.
+            logger.warning(
+                "unsettled_runs: dropped %d entries older than %d days without replay",
+                dropped, RETENTION_SECONDS // 86400,
+            )
 
     async def list_pending(self, limit: int) -> list[UnsettledRun]:
         members = await get_valkey_pool().zrange(KEY, 0, max(0, limit - 1))

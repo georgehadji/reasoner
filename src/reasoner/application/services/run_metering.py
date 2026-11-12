@@ -21,6 +21,7 @@ import asyncio
 import contextvars
 import json
 import logging
+import weakref
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
 from typing import Protocol
@@ -238,6 +239,9 @@ async def metered(
     first phase completed -- still releases the whole reservation, because
     ``cost_usd`` stays 0.0 and :func:`_true_up` skips the settle.
     """
+    # release_unstarted already gave the claim and quota slot back: this
+    # settlement must not release them a second time.
+    released = ctx.started is not None and ctx.started in _unstarted_released
     if ctx.started is not None:
         ctx.started.set()
     cost_usd = 0.0
@@ -276,14 +280,19 @@ async def metered(
                 # The interrupted write may or may not have landed; replay is
                 # idempotent on reference_id, so recording it is always safe.
                 await _record_unsettled(sink, ctx, cost_usd, exc)
-            if cost_usd <= 0:
+            if cost_usd <= 0 and not released:
                 # Once, here: a free run keeps no slot and none of its trial credits.
                 with anyio.move_on_after(SETTLE_TIMEOUT_SECONDS):
                     await _release_quota_slot(sink, ctx)
                     await refund_anonymous_trial(ctx.anon_charge)
-            # A run that failed without spending can be retried under the same id.
-            if not completed or (done_with_errors and cost_usd <= 0):
-                await _release_claim(ctx)
+            # Only a run that spent nothing can be retried under the same id: a
+            # run that spent and stopped short keeps its claim, or the retry
+            # would bill the same work again.
+            if not released:
+                if cost_usd <= 0 and (not completed or done_with_errors):
+                    await _release_claim(ctx)
+                else:  # kept: a duplicate is told the run finished, not that it is live
+                    await _complete_claim(ctx)
         if observer is not None:
             try:
                 observer.observe(status="error" if has_error else "success")
@@ -313,6 +322,11 @@ async def _release_quota_slot(sink: SettlementSink, ctx: RunContext) -> None:
         )
 
 
+# Events of contexts release_unstarted has settled. Not `started` itself:
+# callers read that to decide whether the stream ever ran.
+_unstarted_released: weakref.WeakSet[asyncio.Event] = weakref.WeakSet()
+
+
 async def release_unstarted(sink: SettlementSink, ctx: RunContext) -> None:
     """Release the reservation of a stream that never started.
 
@@ -327,6 +341,7 @@ async def release_unstarted(sink: SettlementSink, ctx: RunContext) -> None:
                 await _true_up(sink, ctx, 0.0)
             await _release_quota_slot(sink, ctx)
             await _release_claim(ctx)
+        _unstarted_released.add(ctx.started)
         if scope.cancelled_caught:
             # A timed-out release left the hold debited with no record of it;
             # replay is idempotent on reference_id, so recording is always safe.
@@ -351,6 +366,12 @@ async def _release_claim(ctx: RunContext) -> None:
     from reasoner.application.services import idempotency
 
     await idempotency.release_run(ctx.run_claim)
+
+
+async def _complete_claim(ctx: RunContext) -> None:
+    from reasoner.application.services import idempotency
+
+    await idempotency.complete_run(ctx.run_claim)
 
 
 async def _true_up(sink: SettlementSink, ctx: RunContext, cost_usd: float) -> None:

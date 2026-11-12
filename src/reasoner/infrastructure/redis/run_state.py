@@ -7,7 +7,8 @@ storage when Redis is unavailable (Critical Enhancement 9.7).
 
 Critical Enhancements:
 - 9.1: Uses Redis Sets (O(1) per op) instead of SCAN iteration (O(N)).
-- 9.2: pop_cancelled uses atomic Lua script instead of non-atomic GET+DELETE.
+- 9.2: an idempotency claim is released and completed by Lua compare-and-set on
+  the holder's token, never by an unconditional DEL.
 - 9.3: No .decode() — Redis client uses decode_responses=True.
 - 9.7: Circuit-breaker-style fallback to in-memory on Redis failure.
 """
@@ -39,14 +40,23 @@ ACTIVE_TTL_SECONDS = int(PIPELINE_ABSOLUTE_TIMEOUT_SECONDS) + 300
 OWNER_PREFIX = "run_owner:"
 OWNER_TTL_SECONDS = 3600
 
-# Lua script for atomic pop-cancelled (9.2)
-# Returns 1 if the run_id was in the cancelled set, 0 otherwise.
-_POP_CANCELLED_LUA = """
-local was_member = redis.call('SISMEMBER', KEYS[1], ARGV[1])
-if was_member == 1 then
-    redis.call('SREM', KEYS[1], ARGV[1])
+# Owner-checked claim release (9.2): delete only if the key still holds this
+# holder's token. A stale release from an earlier run must not free a later
+# holder's claim.
+_RELEASE_CLAIM_LUA = """
+if redis.call('GET', KEYS[1]) == ARGV[1] then
+    return redis.call('DEL', KEYS[1])
 end
-return was_member
+return 0
+"""
+
+# Mark the holder's claim finished, keeping its TTL, so a retry of a run that
+# already ended is told so instead of "in progress".
+_COMPLETE_CLAIM_LUA = """
+if redis.call('GET', KEYS[1]) == ARGV[1] then
+    return redis.call('SET', KEYS[1], ARGV[2], 'KEEPTTL')
+end
+return 0
 """
 
 
@@ -69,7 +79,6 @@ class RunStateManager:
         self._redis_last_fail: float = 0.0
         self._redis_cooldown_seconds: float = 5.0
         self._lock = asyncio.Lock()
-        self._pop_cancelled_sha: str | None = None
 
     def _get_redis(self) -> Any:
         """Lazy-load Redis client."""
@@ -77,13 +86,6 @@ class RunStateManager:
             from reasoner.infrastructure.valkey.client import get_valkey_pool
             self._redis = get_valkey_pool()
         return self._redis
-
-    async def _ensure_lua(self) -> None:
-        """Load the atomic pop-cancelled Lua script once."""
-        if self._pop_cancelled_sha is not None:
-            return
-        redis = self._get_redis()
-        self._pop_cancelled_sha = await redis.script_load(_POP_CANCELLED_LUA)
 
     def _should_try_redis(self) -> bool:
         """Circuit-breaker style: don't hammer Redis if it's down."""
@@ -168,7 +170,7 @@ class RunStateManager:
 
         return False
 
-    async def try_register(self, client_run_id: str, ttl: int = 3600) -> bool:
+    async def try_register(self, client_run_id: str, ttl: int = 3600, token: str = "1") -> bool:
         """Atomically register a run. Returns True if newly created, False if already exists.
 
         Uses Redis SET NX for atomic check-and-register (C2).
@@ -182,40 +184,72 @@ class RunStateManager:
 
         if not self._redis_ok:
             if not is_prod:
-                return self._get_fallback().try_register(client_run_id, ttl)
+                return self._get_fallback().try_register(client_run_id, ttl, token)
             raise RuntimeError(
                 "RunStateManager is in fallback mode — try_register() cannot guarantee "
                 "atomic idempotency. Call is_authoritative() first and respond 503 when "
                 "it returns False."
             )
         try:
-            return await self._redis_op(lambda: self._try_register_redis(client_run_id, ttl))
+            return await self._redis_op(lambda: self._try_register_redis(client_run_id, ttl, token))
         except _RedisUnavailable:
             if not is_prod:
-                return self._get_fallback().try_register(client_run_id, ttl)
+                return self._get_fallback().try_register(client_run_id, ttl, token)
             raise
 
-    async def _try_register_redis(self, client_run_id: str, ttl: int) -> bool:
+    async def _try_register_redis(self, client_run_id: str, ttl: int, token: str) -> bool:
         redis = self._get_redis()
         # SET NX returns None if key already exists (not created)
-        result = await redis.set(f"run:{client_run_id}", "1", nx=True, ex=ttl)
+        result = await redis.set(f"run:{client_run_id}", token, nx=True, ex=ttl)
         return result is not None  # True = newly created, False = already exists
 
-    async def release(self, client_run_id: str) -> None:
+    async def release(self, client_run_id: str, token: str) -> None:
         """Drop the claim ``try_register`` took, so a failed run can be retried.
 
+        Only the holder's ``token`` releases it: a stale release is a no-op.
         Raises when Redis cannot be reached in production: the claim then
         expires at its TTL, which the caller reports as degraded.
         """
         from reasoner.core.settings import settings
 
         try:
-            await self._redis_op(lambda: self._get_redis().delete(f"run:{client_run_id}"))
+            await self._redis_op(
+                lambda: self._get_redis().eval(
+                    _RELEASE_CLAIM_LUA, 1, f"run:{client_run_id}", token
+                )
+            )
         except _RedisUnavailable:
             if settings.ENVIRONMENT == "production":
                 raise
         if settings.ENVIRONMENT != "production":
-            self._store().release(client_run_id)
+            self._store().release(client_run_id, token)
+
+    async def complete(self, client_run_id: str, token: str) -> None:
+        """Mark the holder's claim finished, keeping its TTL. Raises like ``release``."""
+        from reasoner.core.settings import settings
+        from reasoner.infrastructure.redis.in_memory import CLAIM_DONE
+
+        try:
+            await self._redis_op(
+                lambda: self._get_redis().eval(
+                    _COMPLETE_CLAIM_LUA, 1, f"run:{client_run_id}", token, CLAIM_DONE
+                )
+            )
+        except _RedisUnavailable:
+            if settings.ENVIRONMENT == "production":
+                raise
+        if settings.ENVIRONMENT != "production":
+            self._store().complete(client_run_id, token)
+
+    async def claim_finished(self, client_run_id: str) -> bool:
+        """True when the claim's run ended and ``complete`` marked it."""
+        from reasoner.infrastructure.redis.in_memory import CLAIM_DONE
+
+        try:
+            value = await self._redis_op(lambda: self._get_redis().get(f"run:{client_run_id}"))
+        except _RedisUnavailable:
+            return self._store().claim_finished(client_run_id)
+        return value == CLAIM_DONE
 
     async def add(self, run_id: str, user_id: str | None = None) -> asyncio.Event:
         """Register a new run and return its cancel event."""
@@ -226,6 +260,10 @@ class RunStateManager:
     async def _add_redis(self, run_id: str, user_id: str | None = None) -> None:
         redis = self._get_redis()
         await redis.set(f"{OWNER_PREFIX}{run_id}", user_id or "", ex=OWNER_TTL_SECONDS)
+        # A stop that landed after the previous run with this id ended (resume
+        # reuses the id) must not cancel this one: only a stop made while it
+        # is registered counts.
+        await redis.srem(CANCELLED_SET, run_id)
         await redis.sadd(ACTIVE_SET, run_id)
         await redis.expire(ACTIVE_SET, ACTIVE_TTL_SECONDS)
         await redis.expire(CANCELLED_SET, TTL_SECONDS)
@@ -359,29 +397,6 @@ class RunStateManager:
     async def _is_cancelled_redis(self, run_id: str) -> bool:
         redis = self._get_redis()
         return await redis.sismember(CANCELLED_SET, run_id)
-
-    async def pop_cancelled(self, run_id: str) -> bool:
-        """Atomically check and clear cancellation flag (9.2: Lua script)."""
-        try:
-            return await self._redis_op(lambda: self._pop_cancelled_redis(run_id))
-        except _RedisUnavailable:
-            pass
-        event = await self._store().get_cancel_event(run_id)
-        if event is not None and event.is_set():
-            event.clear()
-            return True
-        return False
-
-    async def _pop_cancelled_redis(self, run_id: str) -> bool:
-        redis = self._get_redis()
-        await self._ensure_lua()
-        result = await redis.evalsha(
-            self._pop_cancelled_sha,  # type: ignore[arg-type]
-            1,
-            CANCELLED_SET,
-            run_id,
-        )
-        return bool(result)
 
     async def cancel_all_active(self) -> int:
         """Cancel all currently active runs. Returns count."""

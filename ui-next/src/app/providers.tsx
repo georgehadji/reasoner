@@ -37,7 +37,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
       if (event === 'SIGNED_OUT') {
         // The next person on this browser starts with no cached plan and no
         // leftover anonymous history.
-        useAppStore.setState({ subscription: null, history: [] });
+        useAppStore.setState({ subscription: null, subscriptionError: null, history: [] });
         void deleteHistory(null).catch(() => {});
       }
       setUser(session?.user ?? null);

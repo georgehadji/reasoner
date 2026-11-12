@@ -22,6 +22,7 @@ class PipelineEventType(str, Enum):
     PHASE_RETRIED = "phase_retried"
     PIPELINE_COMPLETED = "pipeline_completed"
     PIPELINE_FAILED = "pipeline_failed"
+    PIPELINE_CANCELLED = "pipeline_cancelled"
     PERSPECTIVE_GENERATED = "perspective_generated"
     CANDIDATE_SCORED = "candidate_scored"
     STRESS_TEST_COMPLETED = "stress_test_completed"
@@ -115,6 +116,7 @@ class DomainEvent:
             PipelineEventType.PHASE_FAILED,
             PipelineEventType.PIPELINE_COMPLETED,
             PipelineEventType.PIPELINE_FAILED,
+            PipelineEventType.PIPELINE_CANCELLED,
             SaaSEventType.PAYMENT_SUCCEEDED,
             SaaSEventType.PAYMENT_FAILED,
             SaaSEventType.SUBSCRIPTION_CREATED,
@@ -223,6 +225,20 @@ class PipelineFailed(DomainEvent):
     """Pipeline execution failed."""
     error: str = ""
     phase_at_failure: str = ""
+    phases_completed: int = 0
+
+
+@dataclass(frozen=True)
+class PipelineCancelled(DomainEvent):
+    """The run was stopped from outside: the user pressed stop, the client hung
+    up, or the absolute timeout fired. Not a failure of the run itself.
+
+    Before this event existed both were stored as PIPELINE_FAILED with a
+    "cancelled:" / "client_disconnected:" prefix on `error`; the aggregate still
+    reads those prefixes as cancelled when it replays an old stream.
+    """
+    reason: str = ""
+    phase_at_cancel: str = ""
     phases_completed: int = 0
 
 
@@ -470,6 +486,7 @@ PIPELINE_EVENT_CLASSES: dict[PipelineEventType, type[DomainEvent]] = {
     PipelineEventType.PHASE_RETRIED: PhaseRetried,
     PipelineEventType.PIPELINE_COMPLETED: PipelineCompleted,
     PipelineEventType.PIPELINE_FAILED: PipelineFailed,
+    PipelineEventType.PIPELINE_CANCELLED: PipelineCancelled,
     PipelineEventType.CONTEXT_FETCHED: ContextFetched,
     PipelineEventType.CONTEXT_VETTED: ContextVetted,
     PipelineEventType.SOURCE_ADDED: SourceAdded,

@@ -6,11 +6,12 @@ import asyncio
 import logging
 import re
 
+import anyio
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from reasoner.api.auth_deps import require_csrf
 from reasoner.api.dependencies import check_rate_limit, require_key_scope
-from reasoner.core.constants_limits import UPLOAD_USER_QUOTA_BYTES
+from reasoner.core.constants_limits import SETTLE_TIMEOUT_SECONDS, UPLOAD_USER_QUOTA_BYTES
 from reasoner.core.settings import settings
 from reasoner.domain.saas import User
 from reasoner.infrastructure.persistence.upload_usage_repo import get_upload_usage_repo
@@ -130,8 +131,11 @@ async def upload_file(
         # reservation (early exit, framing overhead) is released. The
         # reservation was the plaintext size, so one upload can overshoot
         # the cap by its own encryption overhead; the next one is refused.
+        # Shielded: a client disconnect cancels this task and the scope re-raises
+        # at every await, which skipped the settle and leaked the reservation (SM-M8).
         if reserved:
-            await usage.adjust(user_id, stored - reserved)
+            with anyio.CancelScope(shield=True), anyio.move_on_after(SETTLE_TIMEOUT_SECONDS):
+                await usage.adjust(user_id, stored - reserved)
 
 
 async def _reserve_quota(usage, user_id: str, nbytes: int) -> None:
@@ -184,5 +188,6 @@ async def delete_uploaded_file(
     success = await asyncio.to_thread(delete_file, file_id, user_id=str(user.id))
     if not success:
         raise HTTPException(status_code=404, detail="File not found")
-    await get_upload_usage_repo().adjust(str(user.id), -size)
+    with anyio.CancelScope(shield=True), anyio.move_on_after(SETTLE_TIMEOUT_SECONDS):
+        await get_upload_usage_repo().adjust(str(user.id), -size)
     return {"status": "deleted"}

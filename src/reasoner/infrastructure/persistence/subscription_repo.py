@@ -15,24 +15,54 @@ from uuid import uuid4
 
 import asyncpg
 
-from reasoner.domain.saas import Subscription, SubscriptionStatus, SubscriptionTier
+from reasoner.core.state_machine import Machine
+from reasoner.domain.saas import (
+    SUBSCRIPTION_TRANSITIONS,
+    Subscription,
+    SubscriptionStatus,
+    SubscriptionTier,
+)
 
 logger = logging.getLogger(__name__)
 
 # Every write below applies unless the row already holds a newer event
 # (BIL-15): "event time is NULL (unknown) OR no event yet OR last <= event".
 # The SQL is spelled out literally in each statement rather than composed.
+#
+# The same writes also obey SUBSCRIPTION_MACHINE (SM-M1): a cancelled row cannot
+# be revived, even by an event with an equal timestamp. The guard passes a stored
+# status the machine does not know (legacy data), so it never blocks old rows.
+_KNOWN_STATUSES = [s.value for s in SubscriptionStatus]
+SUBSCRIPTION_MACHINE = Machine(
+    "subscription", SUBSCRIPTION_TRANSITIONS, initial=SubscriptionStatus.ACTIVE, enforce=True
+)
+
+
+def statuses_that_may_become(target: str) -> list[str]:
+    """Stored statuses a row may hold when it moves to ``target``: the SQL guard's input.
+
+    An unknown ``target`` allows every known status, and the guard lets an
+    unknown stored value through, so data already stored never blocks a write.
+    """
+    try:
+        dst = SubscriptionStatus(target)
+    except ValueError:
+        return list(_KNOWN_STATUSES)
+    # A repeated status (a re-delivered cancel) is a no-op, not a move.
+    return [s.value for s in SubscriptionStatus if s == dst or SUBSCRIPTION_MACHINE.can(s, dst)]
 
 _SET_STATUS_SQL = {
     "stripe_sub_id": (
         "UPDATE subscriptions SET status = $1, last_event_at = COALESCE($3, last_event_at), "
         "updated_at = NOW() WHERE stripe_sub_id = $2 AND ($3::timestamptz IS NULL "
-        "OR last_event_at IS NULL OR last_event_at <= $3::timestamptz)"
+        "OR last_event_at IS NULL OR last_event_at <= $3::timestamptz) "
+        "AND (status = ANY($4::text[]) OR NOT status = ANY($5::text[]))"
     ),
     "paypal_sub_id": (
         "UPDATE subscriptions SET status = $1, last_event_at = COALESCE($3, last_event_at), "
         "updated_at = NOW() WHERE paypal_sub_id = $2 AND ($3::timestamptz IS NULL "
-        "OR last_event_at IS NULL OR last_event_at <= $3::timestamptz)"
+        "OR last_event_at IS NULL OR last_event_at <= $3::timestamptz) "
+        "AND (status = ANY($4::text[]) OR NOT status = ANY($5::text[]))"
     ),
 }
 
@@ -159,7 +189,7 @@ class PostgresSubscriptionRepository:
             )
         if existing is None:
             latest = await pool.fetchrow(
-                "SELECT id, stripe_sub_id, paypal_sub_id FROM subscriptions "
+                "SELECT id, stripe_sub_id, paypal_sub_id, status FROM subscriptions "
                 "WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1",
                 str(sub.user_id),
             )
@@ -167,7 +197,10 @@ class PostgresSubscriptionRepository:
                 (sub.stripe_subscription_id and latest["stripe_sub_id"])
                 or (sub.paypal_subscription_id and latest["paypal_sub_id"])
             )
-            existing = None if tracks_other else latest
+            # A cancelled row is terminal (SM-M1): adopting a PayPal cancel
+            # tombstone would rewrite it live and stop it guarding its id.
+            cancelled = latest is not None and latest["status"] == "cancelled"
+            existing = None if tracks_other or cancelled else latest
 
         if existing:
             result = await pool.execute(
@@ -184,6 +217,7 @@ class PostgresSubscriptionRepository:
                     updated_at = NOW()
                 WHERE id = $8 AND ($9::timestamptz IS NULL OR last_event_at IS NULL
                                    OR last_event_at <= $9::timestamptz)
+                  AND (status = ANY($10::text[]) OR NOT status = ANY($11::text[]))
                 """,
                 str(sub.user_id),
                 sub.tier.value,
@@ -194,6 +228,8 @@ class PostgresSubscriptionRepository:
                 sub.current_period_end,
                 existing["id"],
                 event_at,
+                statuses_that_may_become(sub.status.value),
+                _KNOWN_STATUSES,
             )
             return bool(result.endswith(" 1"))
         await pool.execute(
@@ -385,6 +421,8 @@ class PostgresSubscriptionRepository:
             status,
             sub_id,
             event_at,
+            statuses_that_may_become(status),
+            _KNOWN_STATUSES,
         )
         return not result.endswith(" 0")
 

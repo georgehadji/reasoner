@@ -110,6 +110,10 @@ class LedgerWrite:
     reference_id: str | None = None
     description: str | None = None
     allow_overdraft: bool = False
+    # Skip this write unless an entry with this reference already exists for the
+    # user. A release of a reservation that never landed would otherwise mint
+    # credits (SM-M3).
+    requires_reference: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

@@ -7,7 +7,11 @@ Critical Enhancements:
 
 from __future__ import annotations
 
-from reasoner.core.ports.metrics_port import set_degradation_counter, set_quota_exceeded_counter
+from reasoner.core.ports.metrics_port import (
+    set_degradation_counter,
+    set_illegal_transition_counter,
+    set_quota_exceeded_counter,
+)
 
 try:
     from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
@@ -336,3 +340,20 @@ set_degradation_counter(lambda site: REASONER_DEGRADATION_TOTAL.labels(site=site
 # infrastructure concretes, so it reaches this counter through the same
 # core-owned hook pattern as the degradation counter above.
 set_quota_exceeded_counter(lambda tier: REASONER_QUOTA_EXCEEDED_TOTAL.labels(tier=tier).inc())
+
+
+# ── Fill core's illegal-transition hook ───────────────────────────────────
+# core.state_machine.Machine counts every illegal move here. While a machine is
+# in observe mode this counter staying at zero for one release is what licenses
+# switching it to enforce (docs/plans/implicit-state-machines-2026-11-11.md §0).
+# Labels are bounded: machine names and state names come from code, never input.
+REASONER_ILLEGAL_TRANSITION_TOTAL = Counter(
+    "reasoner_illegal_transition_total",
+    "State-machine moves the transition table forbids",
+    ["machine", "from_state", "to_state"],
+)
+set_illegal_transition_counter(
+    lambda machine, src, dst: REASONER_ILLEGAL_TRANSITION_TOTAL.labels(
+        machine=machine, from_state=src, to_state=dst
+    ).inc()
+)

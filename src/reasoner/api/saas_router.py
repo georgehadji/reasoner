@@ -224,10 +224,27 @@ async def delete_account(
 
     # Phase 2: the deletion log, before any data goes. It is the no-FK record
     # that refuses this account on every worker (BIL-18), so it must exist
-    # before the sign-in identity can be removed.
+    # before the sign-in identity can be removed. One row per user: a repeat
+    # DELETE reads its status and resumes from it (SM-M7). The log write stays
+    # after the provider cancel above on purpose: a failed cancel is a 502 that
+    # leaves the account usable.
+    from reasoner.application.services.data_eraser import ACCOUNT_DELETION, DeletionStatus
+
+    prior = await pool.fetch(
+        "SELECT status FROM account_deletion_log WHERE user_id = $1", str(user.id),
+    )
+    status = DeletionStatus(prior[0]["status"]) if prior else DeletionStatus.REQUESTED
+    if status is DeletionStatus.ERASED:
+        return {"status": "deleted", "user_id": str(user.id), "erased": [], "failed": []}
     await pool.execute(
-        "INSERT INTO account_deletion_log (user_id, ip_address, user_agent) VALUES ($1, $2, $3)",
+        "INSERT INTO account_deletion_log (user_id, ip_address, user_agent, status) "
+        "VALUES ($1, $2, $3, 'requested') ON CONFLICT (user_id) DO NOTHING",
         str(user.id), ip, ua,
+    )
+    status = ACCOUNT_DELETION.move(status, DeletionStatus.ERASING)
+    await pool.execute(
+        "UPDATE account_deletion_log SET status = $2 WHERE user_id = $1",
+        str(user.id), status.value,
     )
 
     # Phase 3: every store in the user-data registry, content first, the users
@@ -238,6 +255,14 @@ async def delete_account(
     from reasoner.application.services.data_eraser import UserDataEraser
 
     receipt = await UserDataEraser(user_data_stores()).erase(str(user.id))
+    status = ACCOUNT_DELETION.move(
+        status, DeletionStatus.PARTIAL if receipt["failed"] else DeletionStatus.ERASED,
+    )
+    # Store names only: the error text of a failed store may carry user data.
+    await pool.execute(
+        "UPDATE account_deletion_log SET status = $2, detail = $3 WHERE user_id = $1",
+        str(user.id), status.value, ", ".join(f["store"] for f in receipt["failed"]) or None,
+    )
     return {
         "status": "deleted",
         "user_id": str(user.id),

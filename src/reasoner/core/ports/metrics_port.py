@@ -56,6 +56,31 @@ def set_quota_exceeded_counter(counter: Callable[[str], None] | None) -> None:
     _QUOTA_EXCEEDED_COUNTER = counter
 
 
+#: Set by `infrastructure.metrics` at import. None means "nobody is counting".
+_ILLEGAL_TRANSITION_COUNTER: Callable[[str, str, str], None] | None = None
+
+
+def set_illegal_transition_counter(counter: Callable[[str, str, str], None] | None) -> None:
+    """Install the sink for illegal state-machine moves. Accepts None so a test can reset."""
+    global _ILLEGAL_TRANSITION_COUNTER
+    _ILLEGAL_TRANSITION_COUNTER = counter
+
+
+def count_illegal_transition(machine: str, src: str, dst: str) -> None:
+    """Record one illegal move. Never raises: metrics must not break a caller.
+
+    This counter decides when an observing machine may start enforcing (zero
+    for one release), so a failure to count is logged, not swallowed.
+    """
+    counter = _ILLEGAL_TRANSITION_COUNTER
+    if counter is None:
+        return
+    try:
+        counter(machine, src, dst)
+    except Exception:
+        logger.warning("illegal-transition metric failed for machine=%s", machine, exc_info=True)
+
+
 def count_quota_exceeded(tier: str) -> None:
     """Record one quota-exceeded event. Never raises: metrics must not break a caller."""
     counter = _QUOTA_EXCEEDED_COUNTER

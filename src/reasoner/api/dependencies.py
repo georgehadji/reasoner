@@ -100,7 +100,15 @@ async def _get_provision_pool() -> asyncpg.Pool:
         return _user_provision_pool
 
 
-async def _ensure_user_in_db(user: User) -> None:
+#: The route a half-finished account deletion is resumed through (SM-M7).
+ACCOUNT_DELETE_PATH = "/api/account/delete"
+
+
+def _resumes_deletion(request: Request) -> bool:
+    return getattr(request.scope.get("route"), "path", None) == ACCOUNT_DELETE_PATH
+
+
+async def _ensure_user_in_db(user: User, *, resume_deletion: bool = False) -> None:
     """Ensure OAuth user has a row in the local users table.
 
     Idempotent upsert — safe to call on every request. Uses an in-memory
@@ -108,6 +116,9 @@ async def _ensure_user_in_db(user: User) -> None:
 
     A deleted account is refused with 403 and never re-created: its JWT can
     outlive the deletion, and the old upsert brought its ``users`` row back.
+    ``resume_deletion`` lets the delete route through for a deletion that is not
+    finished (requested, erasing, partial), so a repeat DELETE can complete it;
+    that path still never provisions the user.
     """
     seen = _provisioned_user_ids.get(user.id)
     if seen is not None and _monotonic() - seen < PROVISION_CACHE_TTL_SECONDS:
@@ -118,12 +129,16 @@ async def _ensure_user_in_db(user: User) -> None:
     try:
         pool = await _get_provision_pool()
         deleted = await pool.fetchval(
-            "SELECT 1 FROM account_deletion_log WHERE user_id = $1 LIMIT 1", str(user.id),
+            "SELECT status FROM account_deletion_log WHERE user_id = $1 LIMIT 1", str(user.id),
         )
     except Exception as exc:
         logger.warning("Deleted-account check failed for %s: %s", user.id, exc)
         raise HTTPException(status_code=503, detail="Account status unavailable") from exc
     if deleted:
+        from reasoner.application.services.data_eraser import ERASE_RETRYABLE
+
+        if resume_deletion and deleted in ERASE_RETRYABLE:
+            return
         forget_provisioned_user(user.id)
         raise HTTPException(status_code=403, detail="This account has been deleted.")
     try:
@@ -327,7 +342,7 @@ async def get_current_user(
         # API keys resolve from an existing users row, so re-provisioning would
         # only risk overwriting the real profile with key-derived placeholders.
         if not is_api_key:
-            await _ensure_user_in_db(user)
+            await _ensure_user_in_db(user, resume_deletion=_resumes_deletion(request))
         request.state.user = user
         request.state.auth_method = _auth_method(credentials.credentials)
         return user

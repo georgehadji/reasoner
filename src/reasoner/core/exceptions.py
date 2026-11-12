@@ -267,6 +267,15 @@ class ImageStructureLimitError(ReasonerError, ValueError):
     """An image has more chunks/boxes/segments than any real file: refused, not walked."""
 
 
+class InvalidTransitionError(ReasonerError):
+    """A lifecycle was asked to move along an edge its transition table forbids.
+
+    Raised only by an enforcing ``core.state_machine.Machine``; an observing one
+    logs and counts instead. ``details`` carries ``machine``, ``from`` and ``to``.
+    """
+    retryable = False
+
+
 # ─────────────────────────────────────────────────────────────────────
 # UTILITY FUNCTIONS
 # ─────────────────────────────────────────────────────────────────────
