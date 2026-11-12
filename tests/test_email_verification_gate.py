@@ -175,3 +175,43 @@ async def test_user_loaded_from_the_row_keeps_verified_and_signup_time(monkeypat
     monkeypatch.setattr(deps, "_get_provision_pool", pool)
     user = await deps._load_user_by_id(uid)
     assert (user.email_verified, user.created_at) == (True, OLD)
+
+
+# ── The 402 tells "confirm your email" from "buy credits" (step 4) ───────────
+
+@pytest.mark.parametrize(
+    ("setting", "tier", "verified", "marked"),
+    [
+        ("enforce", SubscriptionTier.FREE, False, True),
+        ("observe", SubscriptionTier.FREE, False, False),  # the grant still happens
+        ("enforce", SubscriptionTier.PRO, False, False),  # paid: a real shortfall
+        ("enforce", SubscriptionTier.FREE, True, False),
+    ],
+)
+async def test_402_marks_a_withheld_free_grant(mode, monkeypatch, setting, tier, verified, marked):
+    mode(setting)
+    user = _user(verified=verified)
+
+    async def load(_uid):
+        return user
+
+    async def resolve(_uid):
+        return tier
+
+    monkeypatch.setattr(deps, "_load_user_by_id", load)
+    monkeypatch.setattr(deps, "_resolve_user_tier", resolve)
+    exc = await deps.insufficient_credits(str(user.id), "short", required=5, available=0)
+    assert exc.status_code == 402
+    assert exc.detail["required"] == 5 and exc.detail["upgrade_url"] == "/pricing"
+    assert exc.detail.get("email_unverified", False) is marked
+
+
+async def test_402_is_still_a_402_when_the_lookup_fails(mode, monkeypatch):
+    mode("enforce")
+
+    async def boom(_uid):
+        raise RuntimeError("db down")
+
+    monkeypatch.setattr(deps, "_load_user_by_id", boom)
+    exc = await deps.insufficient_credits(str(uuid4()), "short")
+    assert exc.status_code == 402 and "email_unverified" not in exc.detail

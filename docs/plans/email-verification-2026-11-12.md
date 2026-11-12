@@ -94,7 +94,11 @@ Each step is a small PR. Order matters: read the flag, then mirror it, then obse
      - Reading your own data.
    - Tests: each gated feature gets one test for observe (allowed and counted) and one for enforce (403 `email_unverified`).
 
-4. **UI.**
+4. **UI.** Done 2026-11-12. Tests: `ui-next/src/components/layout/EmailVerifyBanner.test.tsx`, `ui-next/src/lib/http-error.test.ts`, and the 402 cases in `tests/test_email_verification_gate.py`.
+   - **402:** every 402 is built by `api/dependencies.insufficient_credits`. It reads the user's row only on that already-failing path, and adds `email_unverified: true` when the gate refuses and the tier is FREE. A lookup failure still returns a plain 402.
+   - **The chat had no buy prompt for a 402**, only a one-line error, so there was nothing to replace. `describeHttpError` turns `email_unverified` (on a 402 or a 403) into "Confirm your email to unlock your free credits and API keys". The chat, the stream hook and the API keys page all get that line. The keys page used to show "HTTP 403" for any error whose detail was an object.
+   - **The banner** reads `user.email_confirmed_at` from the Supabase user the store already holds, so no new store field is needed. It is mounted on the chat page and on the API keys page.
+   - **Not checked in a browser:** showing the banner needs a real unconfirmed Supabase sign-in.
    - `signUpWithEmail` passes `options: { emailRedirectTo: window.location.origin + '/chat' }`, so the link returns to the app instead of the Supabase Site URL. `detectSessionInUrl` already finishes the sign-in, so no callback route is needed.
    - The auth store keeps `emailVerified` from the Supabase session's `user.email_confirmed_at`.
    - A small banner component (tokens only, `role="status"`) shows for signed-in unverified users. It has a **Resend** button that calls `supabase.auth.resend({ type: 'signup', email })` through the existing `useAsyncAction` hook (one pending send, bfcache safe). Supabase rate-limits resends.

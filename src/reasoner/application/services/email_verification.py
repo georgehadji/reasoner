@@ -45,6 +45,27 @@ def parse_cutoff(raw: str | None) -> datetime | None:
     return cutoff if cutoff.tzinfo else cutoff.replace(tzinfo=UTC)
 
 
+def _settings_defaults(mode: str | None, cutoff: datetime | None) -> tuple[str, datetime | None]:
+    if mode is not None and cutoff is not None:
+        return mode, cutoff
+    from reasoner.core.settings import settings
+
+    return (
+        settings.EMAIL_VERIFICATION_MODE if mode is None else mode,
+        parse_cutoff(settings.EMAIL_VERIFICATION_CUTOFF) if cutoff is None else cutoff,
+    )
+
+
+def gate_refuses(user: User, *, mode: str | None = None, cutoff: datetime | None = None) -> bool:
+    """True when the gate would refuse *user* now. Counts nothing (a read for 402 bodies)."""
+    if user.email_verified:
+        return False
+    mode, cutoff = _settings_defaults(mode, cutoff)
+    if cutoff is not None and user.created_at < cutoff:
+        return False
+    return mode == ENFORCE
+
+
 def email_gate_allows(
     user: User,
     feature: GatedFeature,
@@ -58,11 +79,7 @@ def email_gate_allows(
     """
     if user.email_verified:
         return True
-    if mode is None or cutoff is None:
-        from reasoner.core.settings import settings
-
-        mode = settings.EMAIL_VERIFICATION_MODE if mode is None else mode
-        cutoff = parse_cutoff(settings.EMAIL_VERIFICATION_CUTOFF) if cutoff is None else cutoff
+    mode, cutoff = _settings_defaults(mode, cutoff)
     if cutoff is not None and user.created_at < cutoff:
         return True
     allowed = mode != ENFORCE

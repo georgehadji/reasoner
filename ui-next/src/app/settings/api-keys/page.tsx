@@ -8,6 +8,8 @@ import { AlertTriangle, Check, Copy, Key, Plus, Trash2 } from 'lucide-react';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
 import { apiFetch } from '@/lib/api-client';
+import { describeHttpError } from '@/lib/http-error';
+import { EmailVerifyBanner } from '@/components/layout/EmailVerifyBanner';
 import { API, TIMING } from '@/lib/config';
 import { useAppStore } from '@/stores/app-store';
 import { cn } from '@/lib/utils';
@@ -157,10 +159,9 @@ export default function ApiKeysPage() {
           expires_in_days: expiry ? Number(expiry) : null,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(typeof data?.detail === 'string' ? data.detail : `HTTP ${res.status}`);
-      }
+      const text = await res.text();
+      if (!res.ok) throw new Error(describeHttpError(res.status, text));
+      const data = JSON.parse(text);
       setNewKey(data.key);
       setName('');
       setShowForm(false);
@@ -211,6 +212,7 @@ export default function ApiKeysPage() {
     <div className="flex min-h-screen flex-col bg-[var(--bg)] text-[var(--text)]">
       <SiteHeader />
       <main id="main-content" className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 pt-24">
+        <EmailVerifyBanner />
         <nav className="mb-6 text-[length:var(--text-sm)] text-[var(--text-muted)]">
           <Link href="/settings" className="transition-colors hover:text-[var(--text)]">
             Settings

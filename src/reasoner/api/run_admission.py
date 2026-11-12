@@ -375,15 +375,11 @@ async def _reserve_flat(user_id: str, cost_usd: float, reference_id: str, kind: 
             user_id=user_id, estimated_cost_usd=cost_usd, reference_id=reference_id, preset=kind,
         )
     except InsufficientCreditsError as exc:
-        raise HTTPException(
-            status_code=402,
-            detail={
-                "error": "Insufficient credits",
-                "message": "Your credit balance can't cover this request's cost.",
-                "required": exc.required,
-                "available": exc.available,
-                "upgrade_url": "/pricing",
-            },
+        raise await deps.insufficient_credits(
+            user_id,
+            "Your credit balance can't cover this request's cost.",
+            required=exc.required,
+            available=exc.available,
         ) from exc
     except HTTPException:
         raise

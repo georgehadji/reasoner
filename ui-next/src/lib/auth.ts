@@ -109,9 +109,25 @@ export async function signInWithOAuth(provider: 'google' | 'github' | 'apple') {
 
 export async function signUpWithEmail(email: string, password: string) {
   const client = guardSupabase();
-  const { data, error } = await client.auth.signUp({ email, password });
+  const { data, error } = await client.auth.signUp({
+    email,
+    password,
+    // The confirmation link returns to the app, not the Supabase Site URL;
+    // detectSessionInUrl finishes the sign-in there.
+    options: { emailRedirectTo: `${window.location.origin}/chat` },
+  });
   if (error) throw toAuthError(error);
   return data;
+}
+
+export async function resendConfirmation(email: string) {
+  const client = guardSupabase();
+  const { error } = await client.auth.resend({
+    type: 'signup',
+    email,
+    options: { emailRedirectTo: `${window.location.origin}/chat` },
+  });
+  if (error) throw toAuthError(error);
 }
 
 export async function signOut() {

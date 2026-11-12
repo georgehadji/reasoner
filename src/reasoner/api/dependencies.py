@@ -769,16 +769,36 @@ async def require_credits(user: User = Depends(get_current_user)) -> User:
         return user
 
     if balance.is_exhausted:
-        raise HTTPException(
-            status_code=402,
-            detail={
-                "error": "Insufficient credits",
-                "message": "Your credit balance is exhausted.",
-                "balance": balance.balance,
-                "upgrade_url": "/pricing",
-            },
+        raise await insufficient_credits(
+            str(user.id), "Your credit balance is exhausted.", balance=balance.balance,
         )
     return user
+
+
+async def insufficient_credits(user_id: str | None, message: str, **extra) -> HTTPException:
+    """The 402 for a credit shortfall.
+
+    Marks ``email_unverified: true`` when the shortfall is the FREE grant the
+    email gate withheld, so the UI shows "confirm your email", not the buy
+    prompt (docs/plans/email-verification-2026-11-12.md step 4). Reads the
+    user's row, which only happens on this already-failing path.
+    """
+    detail = {
+        "error": "Insufficient credits", "message": message, **extra, "upgrade_url": "/pricing",
+    }
+    try:
+        from reasoner.application.services.email_verification import gate_refuses
+
+        user = await _load_user_by_id(UUID(str(user_id))) if user_id else None
+        if (
+            user is not None
+            and gate_refuses(user)
+            and await _resolve_user_tier(str(user.id)) == SubscriptionTier.FREE
+        ):
+            detail["email_unverified"] = True
+    except Exception:
+        logger.warning("Could not tell whether a 402 is an unverified email", exc_info=True)
+    return HTTPException(status_code=402, detail=detail)
 
 
 def _refuse_missing_account(exc: Exception) -> None:
@@ -841,15 +861,11 @@ async def reserve_or_402(
             sink=CreditSink(),
         )
     except InsufficientCreditsError as exc:
-        raise HTTPException(
-            status_code=402,
-            detail={
-                "error": "Insufficient credits",
-                "message": "Your credit balance can't cover this run's estimated cost.",
-                "required": exc.required,
-                "available": exc.available,
-                "upgrade_url": "/pricing",
-            },
+        raise await insufficient_credits(
+            user_id,
+            "Your credit balance can't cover this run's estimated cost.",
+            required=exc.required,
+            available=exc.available,
         ) from exc
     except HTTPException:
         raise

@@ -24,6 +24,7 @@ import { UpgradeModal } from '@/components/layout/UpgradeModal';
 import { SecurityBadge } from '@/components/layout/SecurityBadge';
 import { PipelineError } from '@/hooks/usePipelineStream';
 import { describeHttpError } from '@/lib/http-error';
+import { EmailVerifyBanner } from '@/components/layout/EmailVerifyBanner';
 import { useIsLocalHost } from '@/lib/local-host';
 
 import { ChatFeed, ChatFeedMessage, RenderedPhase } from '@/components/chat/ChatFeed';
@@ -1286,6 +1287,7 @@ export default function ChatPage() {
           </div>
         )}
 
+        <EmailVerifyBanner />
         <div
           id="main-content"
           ref={scrollContainerRef}
