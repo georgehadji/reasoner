@@ -49,6 +49,11 @@ jobs:
         # generator stamps "today" on every run, so a same-content PR opened
         # yesterday and merged today would otherwise fail on the date alone,
         # which is not drift.
+        env:
+          # The state-machine census imports reasoner.api.run_admission, which
+          # loads settings; settings refuse to load without CSRF_SECRET unless
+          # backend CSRF is off, as in every other CI job.
+          CSRF_ENFORCE_BACKEND: 'false'
         run: |
           python scripts/update_mindmap_meta.py
           # `git diff HEAD`, not `git diff`: the generator `git add`s what it
