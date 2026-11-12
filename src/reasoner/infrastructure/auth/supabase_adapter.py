@@ -12,6 +12,8 @@ import hashlib
 import logging
 import time
 from collections import OrderedDict
+from dataclasses import replace
+from datetime import UTC, datetime
 from uuid import UUID
 
 import jwt
@@ -21,6 +23,21 @@ from reasoner.auth import AuthenticationError
 from reasoner.domain.saas import User
 
 logger = logging.getLogger(__name__)
+
+
+def _as_datetime(value: object) -> datetime | None:
+    """A Supabase timestamp, as a datetime or an ISO string, or None when absent.
+
+    A naive value is taken as UTC, so it compares with aware cutoffs.
+    """
+    if isinstance(value, str) and value:
+        try:
+            value = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    if not isinstance(value, datetime):
+        return None
+    return value if value.tzinfo else value.replace(tzinfo=UTC)
 
 
 class SupabaseAuthAdapter(AuthPort):
@@ -102,7 +119,10 @@ class SupabaseAuthAdapter(AuthPort):
                     or supabase_user.user_metadata.get("picture")
                 )
 
-            return User(
+            # The real signup time. Without it every account looks new, which the
+            # email-verification grandfather rule (created_at < cutoff) relies on.
+            created_at = _as_datetime(getattr(supabase_user, "created_at", None))
+            user = User(
                 id=user_id,
                 email=supabase_user.email or "",
                 display_name=supabase_user.user_metadata.get("full_name")
@@ -110,7 +130,10 @@ class SupabaseAuthAdapter(AuthPort):
                 else None,
                 auth_provider=provider,
                 avatar_url=avatar_url,
+                email_verified=_as_datetime(getattr(supabase_user, "email_confirmed_at", None))
+                is not None,
             )
+            return user if created_at is None else replace(user, created_at=created_at)
         except AuthenticationError:
             raise
         except Exception as exc:

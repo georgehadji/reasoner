@@ -33,6 +33,13 @@ const nextConfig: NextConfig = {
   // even behind a CDN or nginx — it is the floor when nothing else terminates.
   compress: true,
 
+  // /api/:path* runs through proxy.ts, so Next buffers request bodies for it
+  // and truncates past 10MB by default. Match the backend's /api/upload ceiling:
+  // UPLOAD_MAX_FILE_BYTES (50MB) x UPLOAD_MAX_FILES (10) + 1MB of multipart framing.
+  experimental: {
+    proxyClientMaxBodySize: '501mb',
+  },
+
   // Client source maps stay off in production: they roughly double what the
   // browser can be asked to download and publish readable app source. Server
   // stack traces are unaffected.

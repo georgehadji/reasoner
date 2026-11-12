@@ -30,7 +30,7 @@ async def _drain(gen) -> list[str]:
 
 @pytest.fixture
 def no_cache_read(monkeypatch):
-    async def _empty(_key):
+    async def _empty(_key, user_id=None):
         return None
 
     monkeypatch.setattr(streaming, "_load_cache", _empty)
@@ -69,7 +69,7 @@ async def test_a_bad_event_does_not_stop_the_ones_after_it(
         yield "data: {not json at all}\n\n"
         yield 'data: {"type": "done"}\n\n'
 
-    async def _capture(_key, events):
+    async def _capture(_key, events, user_id=None):
         saved.append(events)
 
     monkeypatch.setattr(streaming, "run_stream", _mixed_stream)
@@ -87,7 +87,7 @@ async def test_a_failed_cache_write_is_reported(monkeypatch, caplog, no_cache_re
     async def _stream(*args, **kwargs):
         yield 'data: {"type": "done"}\n\n'
 
-    async def _boom(_key, _events):
+    async def _boom(_key, _events, user_id=None):
         raise OSError("cache volume is read-only")
 
     monkeypatch.setattr(streaming, "run_stream", _stream)
@@ -106,7 +106,7 @@ async def test_a_clean_run_reports_nothing(monkeypatch, caplog, no_cache_read):
     async def _stream(*args, **kwargs):
         yield 'data: {"type": "done"}\n\n'
 
-    async def _ok(_key, _events):
+    async def _ok(_key, _events, user_id=None):
         return None
 
     monkeypatch.setattr(streaming, "run_stream", _stream)

@@ -23,9 +23,11 @@ import hmac
 import logging
 import secrets
 import time
+from enum import StrEnum
 
 from reasoner.core.constant_time import constant_time_equals
 from reasoner.core.settings import settings
+from reasoner.core.state_machine import Machine
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +37,25 @@ _TICKET_DOMAIN_SEPARATOR = b"ws-ticket-v1"
 # `new WebSocket(url, [ticket])` before connecting. '.' is, and none of the
 # parts (UUID, digits, token_urlsafe, hex) contain it.
 _SEP = "."
+
+
+class WsTicketState(StrEnum):
+    """HMAC proves issued and unexpired; Valkey ``SET NX`` proves redeemed (SM-M9)."""
+
+    ISSUED = "issued"
+    REDEEMED = "redeemed"
+    EXPIRED = "expired"
+
+
+WS_TICKET_MACHINE = Machine(
+    "ws_ticket",
+    {
+        WsTicketState.ISSUED: {WsTicketState.REDEEMED, WsTicketState.EXPIRED},
+        WsTicketState.REDEEMED: set(),
+        WsTicketState.EXPIRED: set(),
+    },
+    initial=WsTicketState.ISSUED,
+)
 # Drawn once per process. Drawing it per call meant a ticket never verified
 # against the key it was issued with.
 _DEV_FALLBACK_SECRET = secrets.token_bytes(32)
@@ -101,6 +122,7 @@ async def redeem_ticket(ticket: str) -> str | None:
     except ValueError:
         return None
     if int(time.time()) >= expiry:
+        WS_TICKET_MACHINE.move(WsTicketState.ISSUED, WsTicketState.EXPIRED)
         return None
 
     try:
@@ -120,6 +142,7 @@ async def redeem_ticket(ticket: str) -> str | None:
         logger.warning("WS ticket replay attempt detected (nonce already redeemed)")
         return None
 
+    WS_TICKET_MACHINE.move(WsTicketState.ISSUED, WsTicketState.REDEEMED)
     return user_id
 
 

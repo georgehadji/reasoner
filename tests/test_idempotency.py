@@ -30,12 +30,15 @@ class FakeRunStateManager:
             raise ConnectionError("redis unreachable")
         return self.authoritative
 
-    async def try_register(self, client_run_id: str) -> bool:
+    async def try_register(self, client_run_id: str, token: str = "1") -> bool:
         self.register_calls.append(client_run_id)
         if self.registered:
             return False
         self.registered = True
         return True
+
+    async def claim_finished(self, client_run_id: str) -> bool:
+        return False
 
 
 @pytest.fixture

@@ -1,4 +1,4 @@
-"""Tests for TokenAwareCache semantic (Jaccard) matching."""
+"""Tests for TokenAwareCache exact-match retrieval (no fuzzy hits)."""
 
 from __future__ import annotations
 
@@ -7,32 +7,8 @@ import pytest
 from reasoner.token_cache import TokenAwareCache
 
 
-class TestJaccardSimilarity:
-    """Unit tests for the static Jaccard helper."""
-
-    def test_identical_texts(self):
-        assert TokenAwareCache._jaccard_similarity("hello world", "hello world") == 1.0
-
-    def test_completely_different(self):
-        assert TokenAwareCache._jaccard_similarity("abc def", "xyz uvw") == 0.0
-
-    def test_partial_overlap(self):
-        # hello world foo bar -> 4 unique words
-        # set A = {hello, world, foo}, set B = {hello, world, bar}
-        # intersection = 2, union = 4 -> 2/4 = 0.5
-        sim = TokenAwareCache._jaccard_similarity("hello world foo", "hello world bar")
-        assert sim == pytest.approx(0.5, rel=1e-3)
-
-    def test_empty_texts(self):
-        assert TokenAwareCache._jaccard_similarity("", "hello") == 0.0
-        assert TokenAwareCache._jaccard_similarity("hello", "") == 0.0
-
-    def test_case_insensitive(self):
-        assert TokenAwareCache._jaccard_similarity("Hello World", "hello world") == 1.0
-
-
 class TestSemanticGet:
-    """Integration tests for semantic cache retrieval."""
+    """Integration tests for cache retrieval."""
 
     @pytest.fixture
     def cache(self):
@@ -58,7 +34,7 @@ class TestSemanticGet:
         assert result == "Quantum computing uses qubits..."
 
     @pytest.mark.asyncio
-    async def test_semantic_near_miss(self, cache):
+    async def test_near_miss_prompt_is_a_miss(self, cache):
         await cache.set(
             problem="Explain quantum computing",
             phase="synthesis",
@@ -67,15 +43,14 @@ class TestSemanticGet:
             response="Use the sorted() function or .sort() method...",
             tokens_used=100,
         )
-        # Same problem, very similar prompt -> Jaccard > 0.85
-        # "how to sort a list in python language" shares 7/8 words -> Jaccard = 0.875
+        # Same problem, 7/8 words shared: still a different prompt, so a miss.
         result = await cache.get(
             problem="Explain quantum computing",
             phase="synthesis",
             model_id="gpt-4o",
             prompt="how to sort a list in python language",
         )
-        assert result == "Use the sorted() function or .sort() method..."
+        assert result is None
 
     @pytest.mark.asyncio
     async def test_semantic_miss_different_problem(self, cache):
@@ -130,25 +105,5 @@ class TestSemanticGet:
             phase="synthesis",
             model_id="gpt-4o",
             prompt="How do I bake sourdough bread?",
-        )
-        assert result is None
-
-    @pytest.mark.asyncio
-    async def test_custom_threshold(self, cache):
-        await cache.set(
-            problem="Explain quantum computing",
-            phase="synthesis",
-            model_id="gpt-4o",
-            prompt="What is quantum computing?",
-            response="Quantum computing uses qubits...",
-            tokens_used=100,
-        )
-        # With threshold=1.0, only exact match works
-        result = await cache.get(
-            problem="Explain quantum computing",
-            phase="synthesis",
-            model_id="gpt-4o",
-            prompt="What is quantum computing exactly?",
-            semantic_threshold=1.0,
         )
         assert result is None

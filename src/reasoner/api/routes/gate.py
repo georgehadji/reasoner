@@ -7,20 +7,22 @@ full run. Shares HyperGateAgent's own L1/L2 cache, so a subsequent
 
 Stays anonymous for the landing page, but an anonymous call costs up to five
 LLM calls, so it counts against the same per-IP daily cap as an anonymous run
-(docs/plans/audit-remediation-2-2026-10-20.md BIL-17).
+(docs/plans/audit-remediation-2-2026-10-20.md BIL-17). Signed-in calls are free
+up to GATE_FREE_CALLS_PER_DAY a day (audit-5 decision Q9).
 """
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from reasoner.api.auth_deps import require_csrf
 from reasoner.api.client_ip import get_client_ip
 from reasoner.api.dependencies import check_rate_limit, get_optional_user
+from reasoner.api.run_admission import seconds_until_utc_midnight, within_gate_allowance
 from reasoner.api.schemas import RunRequest
 from reasoner.application.services.anonymous_trial_policy import enforce_anonymous_trial_cap
 from reasoner.application.services.gate_service import decide_route
-from reasoner.core.constants_limits import GATE_ESTIMATED_COST_USD
+from reasoner.core.constants_limits import GATE_ESTIMATED_COST_USD, GATE_FREE_CALLS_PER_DAY
 from reasoner.domain.saas import User
 
 router = APIRouter()
@@ -36,4 +38,10 @@ async def gate_decision(
     """Return HyperGate's routing decision for a problem, without running it."""
     if user is None:
         await enforce_anonymous_trial_cap(get_client_ip(request), GATE_ESTIMATED_COST_USD)
+    elif not await within_gate_allowance(str(user.id)):
+        raise HTTPException(
+            status_code=429,
+            detail=f"Free routing previews are limited to {GATE_FREE_CALLS_PER_DAY} a day.",
+            headers={"Retry-After": str(seconds_until_utc_midnight())},
+        )
     return await decide_route(req.problem, req.preset)

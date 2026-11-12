@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, Suspense } from 'react';
+import { useAsyncAction } from '@/hooks/useAsyncAction';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, Check, Info } from 'lucide-react';
 import { Button } from '@/components/ui';
@@ -35,20 +36,20 @@ const FIELD_ERROR =
 
 const MIN_PASSWORD = 6;
 
-type Status = 'idle' | 'submitting' | 'success';
-
 function ResetPasswordForm() {
   const [password, setPassword] = useState('');
-  const [status, setStatus] = useState<Status>('idle');
-  const [error, setError] = useState('');
+  const auth = useAsyncAction();
+  const { error } = auth;
   const [fieldError, setFieldError] = useState('');
   const router = useRouter();
 
-  const busy = status !== 'idle';
+  const submitting = auth.pending;
+  const success = auth.status === 'ok';
+  const busy = submitting || success;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    auth.reset();
 
     /* Validate late (on submit), re-validate early (on change) — telling
        someone their password is too short while they are still typing it is
@@ -60,27 +61,22 @@ function ResetPasswordForm() {
     setFieldError('');
 
     if (!supabase) {
-      setError('Authentication is not configured');
+      auth.reset('Authentication is not configured');
       return;
     }
 
-    setStatus('submitting');
-    try {
-      const { error: supaError } = await supabase.auth.updateUser({
-        password: password,
-      });
-      if (supaError) throw supaError;
-
-      // Password updated successfully, redirect to login. Stay in `success`
-      // through the redirect — dropping back to idle would flash an enabled
-      // form and read as "nothing happened".
-      setStatus('success');
-      router.push('/login?message=password-updated');
-    } catch (err) {
-      const authErr = err as AuthError;
-      setError(authErr.message || 'Failed to update password');
-      setStatus('idle');
-    }
+    const client = supabase; // narrowed above; a closure would lose it
+    // Stay in `ok` through the redirect — dropping back to idle would flash an
+    // enabled form and read as "nothing happened".
+    const ok = await auth.run(
+      'reset',
+      async () => {
+        const { error: supaError } = await client.auth.updateUser({ password });
+        if (supaError) throw supaError;
+      },
+      'Failed to update password',
+    );
+    if (ok) router.push('/login?message=password-updated');
   };
 
   return (
@@ -96,7 +92,7 @@ function ResetPasswordForm() {
         </p>
       )}
 
-      {status === 'success' && (
+      {success && (
         <p
           role="status"
           className="flex items-start gap-[var(--space-2)] rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-2)] px-[var(--space-3)] py-[var(--space-3)] text-[length:var(--text-sm)] leading-[var(--lh-ui)] text-[var(--text-2)]"
@@ -147,10 +143,10 @@ function ResetPasswordForm() {
         size="lg"
         className="w-full rounded-[var(--radius)] gap-[var(--space-2)]"
         disabled={busy || !password}
-        loading={status === 'submitting'}
-        aria-busy={status === 'submitting'}
+        loading={submitting}
+        aria-busy={submitting}
       >
-        {status === 'success' ? 'Password updated' : status === 'submitting' ? 'Updating…' : 'Update Password'}
+        {success ? 'Password updated' : submitting ? 'Updating…' : 'Update Password'}
       </Button>
     </form>
   );

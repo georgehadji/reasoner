@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
+import { useAsyncAction } from '@/hooks/useAsyncAction';
 import Link from 'next/link';
 import { apiFetch } from '@/lib/api-client';
 import { Check, X, CreditCard, Mail } from 'lucide-react';
@@ -65,24 +66,14 @@ function isValidCheckoutUrl(url: string): boolean {
 }
 
 export default function PricingPage() {
-  const [loadingTier, setLoadingTier] = useState<string | null>(null);
+  // One action at a time across every tier/provider button (U7).
+  const checkout = useAsyncAction();
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
-  const [error, setError] = useState('');
-  // Navigate straight from the handler rather than staging the URL in state and
-  // letting an effect perform it. Routing it through state made a repeat click
-  // silently do nothing: setState with an Object.is-equal value bails out, so
-  // returning via bfcache (which restores state and does not re-run effects) and
-  // clicking the same tier again re-set the identical URL, the effect never
-  // re-fired, and the button span forever because setLoadingTier(null) only runs
-  // in the catch. A checkout redirect is a genuine event-handler side effect.
-  const navigateToCheckout = useCallback((url: string) => {
-    window.location.href = url;
-  }, []);
-
-  const handleUpgrade = async (tier: string, provider: 'stripe' | 'paypal') => {
-    setError('');
-    setLoadingTier(`${tier}:${provider}`);
-    try {
+  const error = checkout.error;
+  // `ok` means the redirect has started: keep the buttons locked until the page unloads.
+  const locked = checkout.status === 'pending' || checkout.status === 'ok';
+  const handleUpgrade = (tier: string, provider: 'stripe' | 'paypal') =>
+    checkout.run(`${tier}:${provider}`, async () => {
       const res = await apiFetch(
         `/api/billing/checkout?tier=${encodeURIComponent(tier)}&provider=${provider}`,
         { method: 'POST' }
@@ -96,16 +87,12 @@ export default function PricingPage() {
       if (!url || typeof url !== 'string' || !isValidCheckoutUrl(url)) {
         throw new Error('Invalid checkout URL received');
       }
-      navigateToCheckout(url);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Checkout failed';
-      setError(msg);
-      setLoadingTier(null);
-    }
-  };
+      // A checkout redirect is a genuine event-handler side effect; do it here, not via state.
+      window.location.href = url;
+    }, 'Checkout failed');
 
   const isLoading = (tier: string, provider: 'stripe' | 'paypal') =>
-    loadingTier === `${tier}:${provider}`;
+    checkout.pending && checkout.key === `${tier}:${provider}`;
 
   return (
     <div className="flex min-h-screen flex-col bg-[var(--bg)] text-[var(--text)]">
@@ -192,7 +179,7 @@ export default function PricingPage() {
                     <>
                       <button
                         onClick={() => handleUpgrade(plan.tier, 'stripe')}
-                        disabled={!!loadingTier}
+                        disabled={locked}
                         className="flex w-full items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-[var(--accent)] py-2.5 font-medium text-[var(--accent-text)] transition-all hover:opacity-90 disabled:opacity-40"
                         aria-busy={isLoading(plan.tier, 'stripe')}
                       >
@@ -214,7 +201,7 @@ export default function PricingPage() {
                       </div>
                       <button
                         onClick={() => handleUpgrade(plan.tier, 'paypal')}
-                        disabled={!!loadingTier}
+                        disabled={locked}
                         className="flex w-full items-center justify-center gap-2 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface-2)] py-2.5 font-medium text-[var(--text)] transition-all hover:bg-[var(--surface-3)] disabled:opacity-40"
                         aria-busy={isLoading(plan.tier, 'paypal')}
                       >
@@ -240,7 +227,7 @@ export default function PricingPage() {
                   ) : (
                     <button
                       onClick={() => setSelectedTier(plan.tier)}
-                      disabled={!!loadingTier}
+                      disabled={locked}
                       className={`w-full rounded-[var(--radius-lg)] py-2.5 font-medium transition-all disabled:opacity-40 ${
                         plan.highlighted
                           ? 'bg-[var(--accent)] text-[var(--accent-text)] hover:opacity-90'

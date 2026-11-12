@@ -164,7 +164,7 @@ def test_account_deletion_log_revision_matches_raw_sql_columns():
     rev_src = next(
         Path(r.path).read_text(encoding="utf-8")
         for r in script.walk_revisions()
-        if "account_deletion_log" in Path(r.path).read_text(encoding="utf-8")
+        if "CREATE TABLE IF NOT EXISTS account_deletion_log" in Path(r.path).read_text(encoding="utf-8")
     )
     for column in ("id UUID PRIMARY KEY", "user_id UUID NOT NULL", "deleted_at TIMESTAMPTZ NOT NULL", "ip_address TEXT", "user_agent TEXT"):
         assert column in raw and column in rev_src

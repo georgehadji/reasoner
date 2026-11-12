@@ -9,6 +9,7 @@ capability `WatermarkService.capabilities()` doesn't actually bind.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -19,6 +20,7 @@ from reasoner.api.dependencies import check_rate_limit, get_watermark_service
 from reasoner.application.services.egress_policy import resolve_egress_policy
 from reasoner.application.services.watermark_service import WatermarkService
 from reasoner.core.constants_limits import MAX_DATA_URL_CHARS
+from reasoner.core.exceptions import ImageStructureLimitError
 from reasoner.infrastructure.uploader import MAX_FILE_SIZE
 from reasoner.infrastructure.watermark import data_url as data_url_codec
 from reasoner.infrastructure.watermark.data_url import DataUrlError
@@ -89,7 +91,12 @@ async def inspect(
         result["text"] = service.inspect_text(body.content).to_dict()
     if body.image is not None:
         _mime_type, data = _decode_image(body.image)
-        result["image"] = service.inspect_image(data).to_dict()
+        # A thread, not the loop: the chunk/box walk is pure Python over caller bytes.
+        try:
+            report = await asyncio.to_thread(service.inspect_image, data)
+        except ImageStructureLimitError as exc:
+            raise HTTPException(status_code=422, detail=f"Image refused: {exc}") from exc
+        result["image"] = report.to_dict()
     return result
 
 
@@ -107,7 +114,7 @@ async def scrub(
         result["text"] = service.scrub_text(body.content, policy).to_dict()
     if body.image is not None:
         mime_type, data = _decode_image(body.image)
-        outcome = service.scrub_image(data, policy)
+        outcome = await asyncio.to_thread(service.scrub_image, data, policy)
         result["image"] = {
             **outcome.to_dict(),
             "image": data_url_codec.to_data_url(mime_type, outcome.data),

@@ -387,8 +387,8 @@ class TestUploadEndpointOCR:
 
     def test_upload_batch_with_force_ocr(self):
         """Batch upload with ?force_ocr=true should pass force_ocr=True."""
-        with patch("reasoner.api.routes.uploads.save_uploaded_files", new_callable=AsyncMock) as mock_save:
-            mock_save.return_value = [
+        with patch("reasoner.api.routes.uploads.save_uploaded_file", new_callable=AsyncMock) as mock_save:
+            mock_save.side_effect = [
                 {
                     "success": True,
                     "file_id": "abc123",
@@ -416,5 +416,5 @@ class TestUploadEndpointOCR:
                 ],
             )
             assert response.status_code == 200
-            mock_save.assert_awaited_once()
-            assert mock_save.call_args.kwargs.get("force_ocr") is True
+            assert mock_save.await_count == 2
+            assert all(c.kwargs.get("force_ocr") is True for c in mock_save.call_args_list)

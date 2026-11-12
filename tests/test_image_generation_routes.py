@@ -8,6 +8,22 @@ from reasoner.api.schemas import GenerateImageRequest
 from reasoner.core.constants import IMAGE_GEN_MAX_IMAGE_COUNT
 
 
+@pytest.fixture(autouse=True)
+def _no_credit_ledger(monkeypatch):
+    """These tests pin the provider call; credit admission is covered by
+    tests/test_images_metering.py."""
+    from reasoner.api.run_admission import FlatCharge
+
+    async def admit(request, *, user, cost_usd, kind):
+        return FlatCharge(None, f"{kind}:test", 0, cost_usd)
+
+    async def close(charge, *, served):
+        return None
+
+    monkeypatch.setattr(images, "admit_flat_charge", admit)
+    monkeypatch.setattr(images, "close_flat_charge", close)
+
+
 @pytest.mark.parametrize("num_images", [0, -1, IMAGE_GEN_MAX_IMAGE_COUNT + 1])
 def test_num_images_outside_the_allowed_range_is_rejected(num_images):
     """Each image is a paid provider call fanned out in parallel — bound the fan-out."""

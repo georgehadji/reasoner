@@ -77,7 +77,7 @@ async def get_event_stats(user: User = Depends(require_admin_scope)):
 
 @router.get("/api/pipelines")
 async def list_pipelines(
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_key_scope("history:read")),
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
     status: str | None = None,
@@ -124,7 +124,7 @@ async def list_pipelines(
 @router.get("/api/pipelines/{pipeline_id}")
 async def get_pipeline_status(
     pipeline_id: str,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_key_scope("history:read")),
 ):
     """Get pipeline status from event store."""
     if not await _check_pipeline_ownership(pipeline_id, user):
@@ -238,6 +238,9 @@ async def resume_pipeline_stream(
     # and each resume gets its own ledger reference under this prefix.
     adm = await admit_run(
         request, user=user, problem=problem, preset=preset, kind=f"resume:{pipeline_id}",
+        # Two concurrent resumes share run_id=pipeline_id, so they would share the
+        # cancel flag and one event stream.
+        exclusive=f"resume:{pipeline_id}",
     )
 
     async def stream_with_resume_meta():

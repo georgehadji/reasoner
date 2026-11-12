@@ -29,6 +29,12 @@ from reasoner.phases.direct import (
 logger = logging.getLogger(__name__)
 
 
+def _with_extra_cost(meta: dict[str, Any], extra_usd: float) -> dict[str, Any]:
+    if extra_usd <= 0:
+        return meta
+    return {**meta, "cost_usd": call_cost_usd(meta) + extra_usd}
+
+
 async def _call_with_model_fallback(
     router: ProviderRouter,
     models: tuple[str, ...],
@@ -46,6 +52,8 @@ async def _call_with_model_fallback(
     from reasoner.infrastructure.llm.registry import build_provider
 
     last_error: Exception | None = None
+    # Spend on attempts that produced no usable answer is still owed to the provider.
+    wasted_usd = 0.0
     for model_id in models:
         try:
             temp_router = ProviderRouter(primary=build_provider(model_id), verbose=False)
@@ -57,7 +65,8 @@ async def _call_with_model_fallback(
                 temperature=temperature,
             )
             if isinstance(response, str) and response.strip():
-                return response, meta
+                return response, _with_extra_cost(meta, wasted_usd)
+            wasted_usd += call_cost_usd(meta)
             last_error = RuntimeError(f"empty response from {model_id}")
         except Exception as exc:
             last_error = exc
@@ -76,7 +85,7 @@ async def _call_with_model_fallback(
     if not isinstance(response, str):
         # DegradedLLMResponse — every provider in the chain failed.
         raise RuntimeError(getattr(response, "error", "all providers failed") or "all providers failed")
-    return response, meta
+    return response, _with_extra_cost(meta, wasted_usd)
 
 
 async def _stream_direct_answer(

@@ -6,6 +6,8 @@ GET  /api/admin/feedback-stats — admin-only feedback statistics
 
 from __future__ import annotations
 
+import json
+
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
@@ -17,6 +19,7 @@ from reasoner.domain.saas import User
 from reasoner.infrastructure.persistence.feedback_store import FeedbackEntry, FeedbackStore
 
 router = APIRouter()
+_MAX_CONTEXT_BYTES = 4096
 _feedback_store = FeedbackStore()
 
 
@@ -34,8 +37,14 @@ async def submit_feedback(
     req: FeedbackRequest,
     request: Request,
     csrf_checked=Depends(require_csrf),
+    rate_limit_checked=Depends(check_rate_limit),
 ):
-    """Submit feedback for a pipeline run."""
+    """Submit feedback for a pipeline run.
+
+    Stays anonymous: the ui-next proxy forwards it for signed-out visitors too.
+    """
+    if req.context is not None and len(json.dumps(req.context, default=str)) > _MAX_CONTEXT_BYTES:
+        raise HTTPException(status_code=422, detail="context too large (max 4 KB)")
     entry = FeedbackEntry(
         conversation_id=req.conversation_id,
         message_id=req.message_id,

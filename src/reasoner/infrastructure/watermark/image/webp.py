@@ -19,11 +19,19 @@ from reasoner.infrastructure.watermark.image.detect import WEBP_RIFF, WEBP_SIG, 
 from reasoner.infrastructure.watermark.image.markers import (
     AI_META_HINTS,
     C2PA_MARKERS,
+    MAX_STRUCTURES,
+    cap_findings,
     contains_any,
+    count_actions,
     is_confirmed_c2pa_hit,
+    structure_limit_error,
 )
 
 _METADATA_FLAG_BITS: dict[bytes, int] = {b"ICCP": 0x20, b"EXIF": 0x08, b"XMP ": 0x04}
+
+
+def _tally(actions: dict[str, int], action: str) -> None:
+    actions[action] = actions.get(action, 0) + 1
 
 
 def supports(data: bytes) -> bool:
@@ -49,6 +57,8 @@ def _walk_chunks(data: bytes) -> tuple[list[tuple[bytes, bytes, bytes]], tuple[s
     pos = 12
     n = len(data)
     while pos + 8 <= n:
+        if len(chunks) >= MAX_STRUCTURES:
+            raise structure_limit_error("WebP chunks")
         fourcc = data[pos : pos + 4]
         length = struct.unpack("<I", data[pos + 4 : pos + 8])[0]
         payload_start = pos + 8
@@ -94,8 +104,8 @@ def inspect(data: bytes) -> ImageInspectReport:
         format=ImageFormat.WEBP,
         has_c2pa=has_c2pa,
         has_ai_metadata=has_ai or has_c2pa,
-        findings=tuple(findings),
-        notes=notes,
+        findings=cap_findings(findings)[0],
+        notes=(*notes, *cap_findings(findings)[1]),
     )
 
 
@@ -106,7 +116,7 @@ def strip(data: bytes, *, strip_all_metadata: bool = True) -> tuple[bytes, tuple
     if notes:
         raise ValueError("malformed WebP: " + "; ".join(notes))
 
-    actions: list[str] = []
+    actions: dict[str, int] = {}
     kept: list[tuple[bytes, bytes, bytes]] = []
     removed_flags = 0
 
@@ -116,7 +126,7 @@ def strip(data: bytes, *, strip_all_metadata: bool = True) -> tuple[bytes, tuple
             drop = strip_all_metadata or bool(contains_any(payload, AI_META_HINTS + C2PA_MARKERS))
         if drop:
             name = fourcc.decode("latin-1", errors="replace")
-            actions.append(f"drop WebP chunk {name}")
+            _tally(actions, f"drop WebP chunk {name}")
             removed_flags |= _METADATA_FLAG_BITS.get(fourcc, 0)
         else:
             kept.append((fourcc, payload, padding))
@@ -131,8 +141,8 @@ def strip(data: bytes, *, strip_all_metadata: bool = True) -> tuple[bytes, tuple
         body.extend(padding if len(payload) & 1 else b"")
 
     if not actions:
-        actions.append("no WebP metadata chunks removed (already clean or none matched)")
-    return WEBP_RIFF + struct.pack("<I", len(body)) + bytes(body), tuple(actions)
+        actions["no WebP metadata chunks removed (already clean or none matched)"] = 1
+    return WEBP_RIFF + struct.pack("<I", len(body)) + bytes(body), count_actions(actions)
 
 
 __all__ = ["supports", "inspect", "strip"]

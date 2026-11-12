@@ -6,7 +6,7 @@ exported but not erased, or erased by one route and skipped by another (DAT-10,
 DAT-11). `tests/architecture/test_user_data_registry.py` pins which stores exist.
 
 Order is the contract:
-  1. content stores (events, vectors, uploads, history, neuro, valkey), which
+  1. content stores (events, vectors, uploads, history, neuro, run and token caches, valkey), which
      need the user id or the upload ids and key on nothing in Postgres;
   2. the Postgres rows, dependants first, the ``users`` row (`profile`) last;
   3. `identity`, the sign-in account, after everything keyed on the user id.
@@ -53,6 +53,8 @@ class _IdentityStore:
 
 
 def user_data_stores() -> list[UserDataStore]:
+    from reasoner.api.cache import erase_owner_cache, export_owner_cache
+    from reasoner.api.error_handler import _get_error_store
     from reasoner.api.history import history_repo
     from reasoner.core.ports.memory_port import get_memory_port
     from reasoner.documents.vector_store import DocumentVectorStore
@@ -60,15 +62,19 @@ def user_data_stores() -> list[UserDataStore]:
     from reasoner.infrastructure.persistence.event_store import get_event_store
     from reasoner.infrastructure.persistence.upload_usage_repo import get_upload_usage_repo
     from reasoner.infrastructure.persistence.user_data_local import (
+        ErrorLogStore,
         EventsStore,
         HistoryStore,
         NeuroStore,
+        RunCacheStore,
+        TokenCacheStore,
         UnsettledRunsStore,
         UploadsStore,
         ValkeyStore,
         VectorsStore,
     )
     from reasoner.infrastructure.persistence.user_data_pg import pg_user_data_stores
+    from reasoner.infrastructure.token_cache import existing_token_cache
     from reasoner.infrastructure.valkey.client import get_valkey_pool
 
     return [
@@ -77,8 +83,11 @@ def user_data_stores() -> list[UserDataStore]:
         UploadsStore(uploader, get_upload_usage_repo),
         HistoryStore(history_repo),
         NeuroStore(get_memory_port),
+        RunCacheStore(export_owner_cache, erase_owner_cache),
+        TokenCacheStore(existing_token_cache),
         ValkeyStore(get_valkey_pool),
         UnsettledRunsStore(),
+        ErrorLogStore(_get_error_store),
         *pg_user_data_stores(_pg_pool),
         _IdentityStore(),
     ]

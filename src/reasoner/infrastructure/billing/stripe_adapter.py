@@ -184,12 +184,27 @@ class StripeBillingAdapter(BillingPort):
             "canceled": SubscriptionStatus.CANCELLED,
             "past_due": SubscriptionStatus.PAST_DUE,
             "trialing": SubscriptionStatus.TRIALING,
+            # No access until paid, but recoverable: cancelled is terminal, and
+            # these come back to active (SM-M1).
+            "incomplete": SubscriptionStatus.INCOMPLETE,
+            "unpaid": SubscriptionStatus.UNPAID,
+            "paused": SubscriptionStatus.PAUSED,
+            "incomplete_expired": SubscriptionStatus.CANCELLED,
         }
+        raw_status = sub_dict.get("status")
+        status = status_map.get(raw_status)
+        if status is None:
+            # A status Stripe added after this map. Cancelling would be terminal
+            # and would drop a payer; past_due keeps the tier and recovers on the
+            # next recognised event.
+            logger.warning("Unknown Stripe subscription status %r on %s; treating as past_due",
+                           raw_status, sub_dict.get("id"))
+            status = SubscriptionStatus.PAST_DUE
         return Subscription(
             id=uuid4(),
             user_id=user_id,
             tier=tier,
-            status=status_map.get(sub_dict.get("status"), SubscriptionStatus.CANCELLED),
+            status=status,
             stripe_subscription_id=sub_dict.get("id"),
             stripe_customer_id=sub_dict.get("customer"),
             current_period_end=self._timestamp_to_datetime(period_end),

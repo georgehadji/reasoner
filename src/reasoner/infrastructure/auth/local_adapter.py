@@ -48,6 +48,7 @@ class LocalAuthAdapter(AuthPort):
         display_name: str | None = None,
         expires_in_hours: int = 24,
         scopes: list[str] | None = None,
+        email_verified: bool = True,
     ) -> str:
         """Create a local JWT for testing."""
         now = datetime.now(UTC)
@@ -56,6 +57,7 @@ class LocalAuthAdapter(AuthPort):
             "email": email,
             "name": display_name,
             "scopes": scopes or [],
+            "email_verified": email_verified,
             "iat": now,
             "exp": now + timedelta(hours=expires_in_hours),
             "iss": "reasoner-local",
@@ -78,6 +80,9 @@ class LocalAuthAdapter(AuthPort):
                 email=payload.get("email", ""),
                 display_name=payload.get("name"),
                 scopes=set(payload.get("scopes", [])),
+                # A dev token without the claim (older tokens) counts as verified,
+                # so local development is never blocked by the email gate.
+                email_verified=bool(payload.get("email_verified", True)),
             )
         except jwt.ExpiredSignatureError as exc:
             raise AuthenticationError("Token has expired", status_code=401) from exc

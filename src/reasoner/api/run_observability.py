@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import time
+from datetime import datetime
 
 from reasoner.core.ports.unsettled_run_port import UnsettledRun
 from reasoner.infrastructure.valkey.unsettled_runs import ValkeyUnsettledRunStore
@@ -109,10 +110,12 @@ class CreditSink:
             preset=preset,
         )
 
-    async def release_quota_slot(self, *, user_id: str) -> None:
+    async def release_quota_slot(
+        self, *, user_id: str, claimed_at: datetime | None = None
+    ) -> None:
         from reasoner.api.dependencies import _get_quota_service
 
-        await _get_quota_service().release(user_id)
+        await _get_quota_service().release(user_id, claimed_at)
 
     async def record_unsettled(
         self,

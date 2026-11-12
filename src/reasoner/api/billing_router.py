@@ -6,7 +6,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from reasoner.api.dependencies import get_current_user, require_key_scope
+from reasoner.api.dependencies import require_key_scope
 from reasoner.application.services.billing_service import BillingService
 from reasoner.core.settings import settings
 from reasoner.domain.saas import BillingProvider, SubscriptionTier, User
@@ -105,7 +105,7 @@ async def create_portal(
 
 
 @router.get("/subscription")
-async def get_subscription(user: User = Depends(get_current_user)):
+async def get_subscription(user: User = Depends(require_key_scope("read"))):
     """Get current subscription status from database."""
     from reasoner.core.settings import settings
     from reasoner.infrastructure.persistence.subscription_repo import PostgresSubscriptionRepository

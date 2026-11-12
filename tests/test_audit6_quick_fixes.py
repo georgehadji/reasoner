@@ -65,9 +65,11 @@ def test_acr_mode_route_is_gone():
 
 class _Item:
     filename = "a.txt"
+    _data = b"abc"
 
     async def read(self, _size):
-        return b""
+        data, self._data = self._data, b""
+        return data
 
 
 @pytest.mark.asyncio

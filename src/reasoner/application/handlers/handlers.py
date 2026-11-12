@@ -287,14 +287,27 @@ class RunPipelineCommandHandler:
     ) -> None:
         from reasoner.core.logging_utils import redact_sensitive
 
-        event = make_event(
-            EventType.PIPELINE_FAILED,
-            aggregate_id=command.command_id,
-            version=aggregate.version + 1,
-            error=redact_sensitive(f"{outcome.status}: {outcome.reason or 'no reason given'}"),
-            phase_at_failure=aggregate.get_last_phase() or "",
-            phases_completed=len(aggregate.state_data.phase_results) if hasattr(aggregate, "state_data") else 0,
-        )
+        reason = redact_sensitive(f"{outcome.status}: {outcome.reason or 'no reason given'}")
+        phase = aggregate.get_last_phase() or ""
+        phases_completed = len(aggregate.state_data.phase_results) if hasattr(aggregate, "state_data") else 0
+        if outcome.status == "cancelled":
+            event = make_event(
+                EventType.PIPELINE_CANCELLED,
+                aggregate_id=command.command_id,
+                version=aggregate.version + 1,
+                reason=reason,
+                phase_at_cancel=phase,
+                phases_completed=phases_completed,
+            )
+        else:
+            event = make_event(
+                EventType.PIPELINE_FAILED,
+                aggregate_id=command.command_id,
+                version=aggregate.version + 1,
+                error=reason,
+                phase_at_failure=phase,
+                phases_completed=phases_completed,
+            )
         aggregate.record_event(event)
         await self.event_bus.publish(event)
 

@@ -46,7 +46,7 @@ async def resolve_caller(ctx, *, scope: str | None = None) -> User:
     FastAPI dependency -- so FastMCP surfaces a clean tool-call error instead
     of a stack trace.
     """
-    from reasoner.api.dependencies import _resolve_auth_token
+    from reasoner.api.dependencies import _ensure_user_in_db, _resolve_auth_token
     from reasoner.domain.api_keys import key_allows, looks_like_api_key
 
     token = _bearer_token_from_context(ctx)
@@ -59,6 +59,14 @@ async def resolve_caller(ctx, *, scope: str | None = None) -> User:
         user = await _resolve_auth_token(token)
     except Exception as exc:
         raise McpAuthError("Invalid or expired API key") from exc
+    if not looks_like_api_key(token):
+        # Same deleted-account refusal as HTTP: a JWT outlives the deletion.
+        from fastapi import HTTPException
+
+        try:
+            await _ensure_user_in_db(user)
+        except HTTPException as exc:
+            raise McpAuthError(str(exc.detail)) from exc
     granted = getattr(user, "scopes", set())
     if scope and looks_like_api_key(token) and not key_allows(granted, scope):
         raise McpAuthError(f"API key lacks the '{scope}' scope")

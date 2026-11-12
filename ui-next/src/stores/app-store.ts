@@ -6,6 +6,7 @@ import { STORAGE_KEYS, LIMITS } from '@/lib/config';
 import { shallow } from 'zustand/shallow';
 import type { SubscriptionStatus } from '@/hooks/useSubscription';
 import { apiFetch } from '@/lib/api-client';
+import { defineMachine } from '@/lib/state-machine';
 
 export interface ComposerAttachment {
   id: string;
@@ -18,15 +19,33 @@ export interface ComposerAttachment {
 
 export type Tier = 'budget' | 'premium';
 
-export type AuthStatus = 'loading' | 'anonymous' | 'authenticated';
+export type AuthStatus = 'loading' | 'anonymous' | 'authenticated' | 'expired';
+
+/** SM-U4. `expired` = a request came back 401 while signed in; the guard sends the user to login. */
+const AUTH = defineMachine<AuthStatus>('auth', {
+  loading: ['anonymous', 'authenticated', 'expired'],
+  anonymous: ['loading', 'authenticated'],
+  authenticated: ['loading', 'anonymous', 'expired'],
+  expired: ['loading', 'anonymous', 'authenticated'],
+}, 'loading');
+
+type AuthFields = Pick<AppState, 'isAuthLoading' | 'user' | 'sessionExpired'>;
 
 /**
  * Derived, not stored: `user === null` alone cannot tell "signed out" from
  * "Supabase has not answered yet", and pages that guessed signed out redirected
  * on every reload (UI-8).
  */
-export const selectAuthStatus = (s: Pick<AppState, 'isAuthLoading' | 'user'>): AuthStatus =>
-  s.isAuthLoading ? 'loading' : s.user ? 'authenticated' : 'anonymous';
+export const selectAuthStatus = (s: AuthFields): AuthStatus =>
+  s.isAuthLoading ? 'loading' : s.user ? 'authenticated' : s.sessionExpired ? 'expired' : 'anonymous';
+
+/** The one auth writer: checks the move and keeps `isAuthenticated` equal to `!!user`. */
+function authPatch(s: AuthFields, patch: Partial<AuthFields>) {
+  const to = selectAuthStatus({ ...s, ...patch });
+  const from = selectAuthStatus(s);
+  if (from !== to) AUTH.move(from, to);
+  return { ...patch, isAuthenticated: !!(patch.user !== undefined ? patch.user : s.user) };
+}
 export { shallow };
 
 interface AppState {
@@ -41,20 +60,14 @@ interface AppState {
   composerText: string;
   attachments: ComposerAttachment[];
   history: Conversation[];
-  activeRun: {
-    progressId: string;
-    problem: string;
-    phases: Array<{ phase: number; name: string; data: unknown }>;
-    errors: string[];
-    preset: string;
-    autoSelectedMethod: string | null;
-  } | null;
   recentCommands: string[];
 
   // Auth
   user: SupabaseUser | null;
   isAuthenticated: boolean;
   isAuthLoading: boolean;
+  /** Set by a 401 while signed in; cleared by the next sign-in or an explicit logout. */
+  sessionExpired: boolean;
 
   // Actions
   setRunning: (running: boolean) => void;
@@ -69,10 +82,6 @@ interface AppState {
   removeAttachment: (id: string) => void;
   clearAttachments: () => void;
   setHistory: (history: Conversation[]) => void;
-  setActiveRun: (run: AppState['activeRun']) => void;
-  addPhaseToActiveRun: (phase: { phase: number; name: string; data: unknown }) => void;
-  setActiveRunErrors: (errors: string[]) => void;
-  clearActiveRun: () => void;
   getAutoPreset: () => string;
   addRecentCommand: (id: string) => void;
 
@@ -105,13 +114,13 @@ export const useAppStore = create<AppState>()(
       composerText: '',
       attachments: [],
       history: [],
-      activeRun: null,
       recentCommands: [],
 
       // Auth defaults
       user: null,
       isAuthenticated: false,
       isAuthLoading: true,
+      sessionExpired: false,
 
       // Subscription (shared — single fetch, not persisted)
       subscription: null,
@@ -161,27 +170,6 @@ export const useAppStore = create<AppState>()(
           return { attachments: [] };
         }),
       setHistory: (history) => set({ history }),
-      setActiveRun: (activeRun) => set({ activeRun }),
-
-      addPhaseToActiveRun: (phase) =>
-        set((state) => {
-          if (!state.activeRun) return state;
-          return {
-            activeRun: {
-              ...state.activeRun,
-              phases: [...state.activeRun.phases, phase],
-            },
-          };
-        }),
-
-      setActiveRunErrors: (errors) =>
-        set((state) => {
-          if (!state.activeRun) return state;
-          return { activeRun: { ...state.activeRun, errors } };
-        }),
-
-      clearActiveRun: () => set({ activeRun: null }),
-
       addRecentCommand: (id) =>
         set((state) => {
           const next = [id, ...state.recentCommands.filter((c) => c !== id)].slice(0, LIMITS.maxRecentCommands);
@@ -189,10 +177,13 @@ export const useAppStore = create<AppState>()(
         }),
 
       // Auth actions
-      setUser: (user) => set({ user, isAuthenticated: !!user }),
-      setAuthLoading: (loading) => set({ isAuthLoading: loading }),
-      logout: () => set({ user: null, isAuthenticated: false }),
-      markSessionExpired: () => set({ user: null, isAuthenticated: false }),
+      setUser: (user) =>
+        set((s) => authPatch(s, { user, ...(user ? { sessionExpired: false } : {}) })),
+      setAuthLoading: (loading) => set((s) => authPatch(s, { isAuthLoading: loading })),
+      logout: () => set((s) => authPatch(s, { user: null, sessionExpired: false })),
+      // Only a signed-in session can expire; a 401 for an anonymous visitor is just a 401.
+      markSessionExpired: () =>
+        set((s) => (s.user ? authPatch(s, { user: null, sessionExpired: true }) : s)),
 
       /** Returns the preset string to send to the API: "auto-budget" or "auto-premium". */
       getAutoPreset: () => `auto-${get().tier}`,
@@ -215,11 +206,11 @@ export const useAppStore = create<AppState>()(
             const data: SubscriptionStatus = await res.json();
             set({ subscription: data, subscriptionOwner: owner, subscriptionLoading: false });
           } else {
-            set({ subscription: null, subscriptionOwner: owner, subscriptionLoading: false });
+            // Keep the last good plan: a failed load is not "free".
+            set({ subscriptionLoading: false, subscriptionError: `Subscription request failed (${res.status})` });
           }
         } catch (err) {
           set({
-            subscription: null,
             subscriptionLoading: false,
             subscriptionError: err instanceof Error ? err.message : 'Failed to fetch subscription',
           });

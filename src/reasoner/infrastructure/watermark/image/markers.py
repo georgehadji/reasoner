@@ -6,6 +6,7 @@ Marker tables ported from the researched watermarks-remover project
 
 from __future__ import annotations
 
+from reasoner.core.exceptions import ImageStructureLimitError
 from reasoner.core.ports.watermark_port import MarkFinding
 from reasoner.domain.watermark.marks import MarkConfidence
 
@@ -58,6 +59,30 @@ def is_confirmed_c2pa_hit(hits: list[str]) -> bool:
     return any(h.lower() in ("c2pa", "contentcredentials", "jumb", "contentauth") for h in hits)
 
 
+# Real PNG/AVIF/HEIC files hold tens to a few thousand chunks or boxes. A
+# 40 MB file of empty ones is ~3M, and the walk is pure Python on anonymous input.
+MAX_STRUCTURES = 100_000
+MAX_FINDINGS = 200
+
+
+def structure_limit_error(what: str) -> ImageStructureLimitError:
+    """The domain error for a file with more chunks/boxes than any real image."""
+    return ImageStructureLimitError(f"too many {what} (limit {MAX_STRUCTURES})")
+
+
+def count_actions(actions: dict[str, int]) -> tuple[str, ...]:
+    """One line per distinct action, with its count: the report stays small
+    however many chunks the file has."""
+    return tuple(a if n == 1 else f"{a} (x{n})" for a, n in actions.items())
+
+
+def cap_findings(findings: list, notes: tuple[str, ...] = ()) -> tuple[tuple, tuple[str, ...]]:
+    if len(findings) <= MAX_FINDINGS:
+        return tuple(findings), notes
+    omitted = len(findings) - MAX_FINDINGS
+    return tuple(findings[:MAX_FINDINGS]), (*notes, f"{omitted} further findings omitted")
+
+
 def finding(description: str, confidence: MarkConfidence) -> MarkFinding:
     return MarkFinding(description=description, confidence=confidence)
 
@@ -68,4 +93,9 @@ __all__ = [
     "contains_any",
     "is_confirmed_c2pa_hit",
     "finding",
+    "MAX_STRUCTURES",
+    "ImageStructureLimitError",
+    "structure_limit_error",
+    "count_actions",
+    "cap_findings",
 ]

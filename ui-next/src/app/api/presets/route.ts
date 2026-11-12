@@ -4,6 +4,7 @@ import {
   validateUpstreamUrl,
   sanitizeRequestHeaders,
   sanitizeResponseHeaders,
+  proxyErrorResponse,
 } from '@/lib/security-server';
 import { API } from '@/lib/config';
 
@@ -19,8 +20,6 @@ export async function GET(req: NextRequest) {
       headers: sanitizeResponseHeaders(upstream),
     });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Proxy error';
-    const isValidationError = msg.includes('Invalid upstream URL') || msg.includes('disallowed port') || msg.includes('private network');
-    return NextResponse.json({ error: msg }, { status: isValidationError ? 400 : 502 });
+    return proxyErrorResponse(err, 'Presets');
   }
 }

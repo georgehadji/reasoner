@@ -250,7 +250,7 @@ async def run_stream_cached(
 
     key = _cache_key(req, user_id=user_id)
     if not req.no_cache:
-        cached = await _load_cache(key)
+        cached = await _load_cache(key, user_id=user_id)
         if cached:
             has_fatal_error = any(ev.get("type") == "done" and ev.get("errors") for ev in cached)
             # Also skip cache replay if any phase had errors — code may have been fixed.
@@ -274,6 +274,7 @@ async def run_stream_cached(
     MAX_COLLECTED_EVENTS = 200  # cap in-memory buffer (v3.4)
     collected: list[dict] = []
     _collect_failed = False
+    truncated = False
     gen = run_stream(
         req,
         request=request,
@@ -299,9 +300,11 @@ async def run_stream_cached(
                     continue
                 if len(collected) < MAX_COLLECTED_EVENTS:
                     collected.append(ev)
-                if ev.get("type") == "done" and not req.no_cache:
+                else:
+                    truncated = True  # a replay missing events (incl. done) is worse than no cache
+                if ev.get("type") == "done" and not req.no_cache and not truncated:
                     try:
-                        await _save_cache(key, collected)
+                        await _save_cache(key, collected, user_id=user_id)
                     except Exception as exc:
                         degraded("streaming.cache_save", None, exc=exc)
     finally:

@@ -43,13 +43,14 @@ export function useConversationHistory() {
       setPage((prev) =>
         prev ? { items: [...prev.items, ...next.items], nextCursor: next.nextCursor } : next,
       );
-      setHistory([...history, ...next.items]);
+      // Current store state, not the render-time closure: a row deleted while this was in flight stays gone.
+      setHistory([...useAppStore.getState().history, ...next.items]);
     } catch (e) {
       console.error(e);
     } finally {
       setLoadingMore(false);
     }
-  }, [page, loadingMore, setHistory, history]);
+  }, [page, loadingMore, setHistory]);
 
   const refresh = async () => {
     const firstPage = await loadConversationsPage();

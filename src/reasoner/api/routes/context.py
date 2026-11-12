@@ -120,6 +120,10 @@ async def run_with_context(
     # gates, so it applies them itself.
     user_id = str(user.id) if user else None
     tier = await resolve_request_tier(request, user) if user else SubscriptionTier.FREE
+    if user_id:
+        from reasoner.infrastructure.llm import spend_tracker
+
+        await spend_tracker.refresh(user_id)  # see other workers' monthly spend
     rejection = check_run_allowed(effective_preset, tier, user_id)
     if rejection is not None:
         raise HTTPException(

@@ -112,7 +112,7 @@ class WorkflowRunner:
             # Calling self.run_phase here would execute the runner's retry and
             # quality layer even with the flag off.
             success = await self.services.run_phase(step, state)
-            if not success and step.critical:
+            if not success and (step.critical or getattr(state, "_run_fatal", False)):
                 break
         return state
 
@@ -266,6 +266,7 @@ class WorkflowRunner:
                 # run spends its whole budget of wall-clock to produce a
                 # synthesis over nothing and still reports success.
                 if run_fatal:
+                    state._run_fatal = True  # read by run(): a non-critical phase must not carry on
                     return False
 
                 if not will_retry:

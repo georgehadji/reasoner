@@ -353,6 +353,10 @@ def register_tools(mcp) -> None:
         # tap for any key holder. Same per-user bucket as the HTTP routes (BIL-7).
         tier = (await resolve_user_tier(str(user.id))).value
         await _enforce_user_rate_limit(user, tier)
+        from reasoner.api.run_admission import within_gate_allowance
+
+        if not await within_gate_allowance(str(user.id)):
+            raise ValueError("Daily free routing-preview allowance used; retry after UTC midnight")
         return await decide_route(problem, preset)
 
     @mcp.tool(

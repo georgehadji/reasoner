@@ -175,19 +175,23 @@ class PostgresCreditRepository(CreditRepository):
                     entries: list[CreditLedgerEntry] = []
                     for write in writes:
                         entry, balance = await self._apply_write(conn, uid, balance, write)
-                        entries.append(entry)
+                        if entry is not None:
+                            entries.append(entry)
                     return entries
         except asyncpg.UniqueViolationError:
             # A racing duplicate of one of these references won. The transaction
             # rolled back, and each write is idempotent on its own, so replay them
             # one by one: the winner's entries come back, the rest are applied.
-            return [
-                await self.record(
-                    user_id, w.delta, w.reason, w.reference_id, w.description,
-                    w.allow_overdraft,
-                )
-                for w in writes
-            ]
+            out: list[CreditLedgerEntry] = []
+            for w in writes:
+                if w.requires_reference is None:
+                    out.append(await self.record(
+                        user_id, w.delta, w.reason, w.reference_id, w.description,
+                        w.allow_overdraft,
+                    ))
+                else:  # keep the precondition: a one-write batch re-checks it
+                    out.extend(await self.record_batch(user_id, [w]))
+            return out
 
     async def _record_locked(
         self, pool, uid: UUID, delta: int, reason: CreditReason,
@@ -200,6 +204,8 @@ class PostgresCreditRepository(CreditRepository):
                     conn, uid, balance,
                     LedgerWrite(delta, reason, reference_id, description, allow_overdraft),
                 )
+                if entry is None:  # record() never sets requires_reference, so this cannot skip
+                    raise RuntimeError("ledger write was skipped without a precondition")
                 return entry
 
     @staticmethod
@@ -223,16 +229,20 @@ class PostgresCreditRepository(CreditRepository):
     @staticmethod
     async def _apply_write(
         conn, uid: UUID, balance: int, write: LedgerWrite
-    ) -> tuple[CreditLedgerEntry, int]:
+    ) -> tuple[CreditLedgerEntry | None, int]:
         """Apply one write under the balance lock; returns (entry, new balance).
 
         A replayed ``reference_id`` returns the original entry and leaves the
-        balance unchanged.
+        balance unchanged. A write whose ``requires_reference`` has no entry is
+        skipped: (None, balance).
         """
         if write.reference_id is not None:
             existing = await conn.fetchrow(_SELECT_BY_REFERENCE, uid, write.reference_id)
             if existing is not None:
                 return _to_entry(existing), balance
+        if write.requires_reference is not None:
+            if await conn.fetchrow(_SELECT_BY_REFERENCE, uid, write.requires_reference) is None:
+                return None, balance
 
         delta = write.delta
         if delta < 0 and not write.allow_overdraft and not can_afford(balance, -delta):

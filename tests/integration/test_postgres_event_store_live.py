@@ -111,3 +111,24 @@ async def test_a_late_event_does_not_reopen_a_completed_run():
         row = await _aggregate_row(store, run)
         assert row["status"] == "completed"
         assert row["current_version"] == 5
+
+
+@pytest.mark.asyncio
+async def test_audit_rows_pruned_and_versioned_rows_kept():
+    """Audit-5 decision Q6: version-0 audit rows age out; replayable rows stay."""
+    from datetime import UTC, datetime, timedelta
+
+    async with _store() as store:
+        from reasoner.core.events.domain_events import PipelineEventType as T
+
+        run = f"run-{uuid.uuid4().hex[:8]}"
+        await store.save_events([_event(T.PIPELINE_STARTED, run, 1, problem="p", preset="x")])
+        await store.save_events([_event(T.PHASE_COMPLETED, run, 0, phase_name="audit")])
+        future = datetime.now(tz=UTC) + timedelta(days=1)
+
+        assert await store.count_eligible_audit_events(future) >= 1
+        while await store.prune_audit_events_before(future, batch_size=500):
+            pass
+
+        assert await store.count_eligible_audit_events(future) == 0
+        assert [e.version for e in await store.get_events(run)] == [1]

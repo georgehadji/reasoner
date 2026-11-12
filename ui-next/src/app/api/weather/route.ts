@@ -4,13 +4,14 @@ import {
   validateUpstreamUrl,
   sanitizeRequestHeaders,
   sanitizeResponseHeaders,
+  proxyErrorResponse,
 } from '@/lib/security-server';
 import { API } from '@/lib/config';
 
 export async function GET(req: NextRequest) {
   try {
     const location = req.nextUrl.searchParams.get('location');
-    if (!location || location.length > 100 || !/[\p{L}\p{N}\s,.\-]+/u.test(location)) {
+    if (!location || location.length > 100 || !/^[\p{L}\p{N}\s,.\-]+$/u.test(location)) {
       return NextResponse.json({ error: 'Invalid location parameter' }, { status: 400 });
     }
 
@@ -26,7 +27,6 @@ export async function GET(req: NextRequest) {
       headers: sanitizeResponseHeaders(upstream),
     });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Proxy error';
-    return NextResponse.json({ error: msg }, { status: 502 });
+    return proxyErrorResponse(err, 'Weather');
   }
 }
