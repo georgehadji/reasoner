@@ -66,7 +66,7 @@ function ResetPasswordForm() {
     }
 
     const client = supabase; // narrowed above; a closure would lose it
-    // Stay in `ok` through the redirect — dropping back to idle would flash an
+    // Stay in `ok` through the redirect â€” dropping back to idle would flash an
     // enabled form and read as "nothing happened".
     const ok = await auth.run(
       'reset',

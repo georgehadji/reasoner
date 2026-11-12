@@ -126,7 +126,7 @@ export default function SignupPage() {
     setFieldErrors(next);
     if (next.email || next.password) return;
 
-    // Stay in `ok` through the redirect — dropping back to idle would flash an
+    // Stay in `ok` through the redirect â€” dropping back to idle would flash an
     // enabled form and read as "nothing happened".
     const ok = await auth.run('email', () => signUpWithEmail(email, password), 'Signup failed');
     if (ok) router.push('/login?message=check-email');

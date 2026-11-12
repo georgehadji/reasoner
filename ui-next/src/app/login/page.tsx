@@ -123,7 +123,7 @@ export default function LoginPage() {
   const success = auth.status === 'ok' && auth.key === 'email';
   // An OAuth failure is not a credential failure. `aria-invalid={!!error}`
   // on both fields painted them red and made one message the accessible
-  // description of two inputs — announced twice — for errors that had
+  // description of two inputs â€” announced twice â€” for errors that had
   // nothing to do with what the user typed.
   const credentialsRejected = auth.status === 'error' && auth.key === 'email';
   const oauthTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -131,7 +131,7 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Stay in `ok` through the redirect — dropping back to idle would flash an
+    // Stay in `ok` through the redirect â€” dropping back to idle would flash an
     // enabled form and read as "nothing happened".
     await auth.run('email', () => signInWithEmail(email, password), 'Login failed');
   };
