@@ -21,7 +21,7 @@ from pydantic import BaseModel, Field
 from reasoner.core.constant_time import constant_time_equals
 from reasoner.core.rerank import rerank_memory_chunks
 from reasoner.core.settings import settings
-from reasoner.neuro.cache import ContextChunk, L1Cache, L2Index, l3_scan
+from reasoner.neuro.cache import ContextChunk, L1Cache, L2Index, l3_scan, read_l2_entries
 from reasoner.neuro.compression import smart_compress
 from reasoner.neuro.config import (
     NeuroConfig,
@@ -598,8 +598,9 @@ class NeuroService:
                 if not tenant.name.startswith(prefix) or tenant.is_symlink() or not tenant.is_dir():
                     continue
                 entries = []
-                for index in sorted(tenant.rglob("index.json")):
-                    for entry in json.loads(index.read_text(encoding="utf-8")):
+                index_dirs = {p.parent for name in ("index.json", "index.jsonl") for p in tenant.rglob(name)}
+                for index_dir in sorted(index_dirs):
+                    for entry in read_l2_entries(index_dir):
                         entries.append({k: entry.get(k) for k in (
                             "id", "content", "source", "metadata", "created_at")})
                 out[tenant.name] = {"memory": entries, "sessions": _read_sessions(tenant)}
@@ -812,7 +813,7 @@ class NeuroService:
         #
         # Best-effort: a dead embedding provider must not fail the ingest.
         #
-        # index_lock: L2Index.add() rewrites index.json wholesale from an
+        # index_lock: L2Index.add() used to rewrite index.json wholesale from an
         # in-memory snapshot taken before the write is handed to a thread --
         # concurrent same-tenant learns raced two such writes with nothing
         # serializing them, and a slower-finishing thread with an earlier

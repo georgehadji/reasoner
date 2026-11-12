@@ -14,6 +14,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 import reasoner.neuro.server as ns
+from reasoner.neuro.cache import read_l2_entries
 from reasoner.neuro.config import NeuroConfig, _agent_dir_name, _apply_defaults
 
 
@@ -128,9 +129,9 @@ def test_learn_indexes_the_exchange_into_l1_and_l2(client, tmp_path):
     )
     assert resp.status_code == 200
 
-    index = tmp_path / "agents" / AGENT_DIR / "cache" / "l2" / "index.json"
-    assert index.exists(), "/learn did not write the L2 index"
-    entries = json.loads(index.read_text())
+    index_dir = tmp_path / "agents" / AGENT_DIR / "cache" / "l2"
+    assert (index_dir / "index.jsonl").exists(), "/learn did not write the L2 index"
+    entries = read_l2_entries(index_dir)
     assert len(entries) == 1
     assert entries[0]["embedding"], "L2 entry stored without an embedding"
 
@@ -794,8 +795,8 @@ def test_concurrent_learns_do_not_lose_l2_index_entries(tmp_path, monkeypatch):
 
     asyncio.run(scenario())
 
-    [index_path] = (tmp_path / "agents").glob(f"u-{owner}-{agent_id}-*/cache/l2/index.json")
-    entries = json.loads(index_path.read_text())
+    [index_path] = (tmp_path / "agents").glob(f"u-{owner}-{agent_id}-*/cache/l2/index.jsonl")
+    entries = read_l2_entries(index_path.parent)
     assert len(entries) == n_calls, (
         f"expected all {n_calls} concurrent learns to survive in the L2 index, "
         f"found {len(entries)} -- concurrent writers clobbered each other"
