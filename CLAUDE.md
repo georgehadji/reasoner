@@ -382,7 +382,9 @@ Semantic landmarks. Real alt text. WCAG 2.2 AA.
 
 ## Budgets (see .github/workflows/quality.yml, currently advisory)
 LCP <= 2.0s and CLS <= 0.05 lab; field targets LCP <= 2.5s / INP <= 200ms / CLS <= 0.1 at p75.
-Max 2 font families, 4 weights, self-hosted woff2.
+Max 2 text families (display + body) plus 1 monospace for code and data, 4 weights,
+self-hosted woff2. Only the text families preload; the mono loads below the fold. This
+matches `spec/art-direction.md` §4 (Piazzolla, Public Sans, Inconsolata).
 
 ## Hook wiring is not in git
 
