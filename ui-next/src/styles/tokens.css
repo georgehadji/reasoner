@@ -236,3 +236,101 @@
     --shadow-lg:    var(--shadow-float);
   }
 }
+
+/* ============================================================
+   SITE WORLD — "The product performs" · charcoal and sage
+   (spec/art-direction.md, adopted 2026-11-13; replaces Overprint)
+
+   Scoped to `.site`, the root class of every marketing page, so the
+   app screens keep their tokens until their own run. Inside `.site`
+   the app's role names are remapped, so shared components (buttons,
+   links, epistemic marks) take the new world without knowing it.
+
+   One theme: the site is charcoal in both colour schemes. Sage is the
+   one accent: the primary action and the active state of a control.
+
+   CONTRAST (WCAG, computed 2026-11-13) on --site-bg #1C1C1C /
+   --site-surface #262626 / --site-surface-2 #303030:
+     --site-ink    #F1F1EF  15.07 / 13.38 / 11.67
+     --site-muted  #A3A49F   6.79 /  6.03 /  5.26
+     --site-accent #8FA68E   6.50 /  5.77 /  5.04  (#1C1C1C on it: 6.50)
+     verified #6CC4C0 8.35 · hypothesis #E0A458 7.81 · unknown #C9C9C3 10.25
+   On --site-field #C8C5BA: ink #1C1C1C 9.86, --site-field-muted 5.23.
+   ============================================================ */
+
+@layer base {
+  .site {
+    color-scheme: dark;
+
+    --site-bg:        #1C1C1C;
+    --site-surface:   #262626;
+    --site-surface-2: #303030;
+    --site-ink:       #F1F1EF;
+    --site-muted:     #A3A49F;
+    --site-accent:    #8FA68E;
+    --site-accent-hover: #A5B9A4;
+    --site-accent-ink:   #1C1C1C;
+    --site-field:     #C8C5BA;
+    --site-field-ink: #1C1C1C;
+    --site-field-muted: #4A4943;  /* 6.3 on --site-field */
+    --site-line:      rgb(241 241 239 / 0.14);
+
+    /* Five type steps. Interface text inside data-ui fragments sits at
+       --site-small; nothing on the page is set smaller. */
+    --site-small:   clamp(0.8125rem, 0.79rem + 0.1vw, 0.875rem);
+    --site-body:    clamp(1.0625rem, 1rem + 0.25vw, 1.1875rem);
+    --site-lead:    clamp(1.25rem, 1.1rem + 0.7vw, 1.625rem);
+    --site-head:    clamp(2rem, 1.3rem + 3.2vw, 4rem);
+    --site-display: clamp(2.75rem, 1.4rem + 5.2vw, 7rem);
+
+    --site-lh-display: 0.92;
+    --site-lh-head:    1;
+    --site-lh-body:    1.5;
+    --site-track-display: -0.04em;
+
+    /* One radius, one pair of margins. */
+    --site-radius: 6px;
+    --site-margin: clamp(1.25rem, 3vw, 2.5rem);
+    --site-max:    90rem;
+
+    /* Layout lengths the blueprints name. */
+    --site-field-h:  90svh;
+    --site-stack-h:  62svh;
+    --site-hero-h:   100svh;
+    --site-fragment: 30rem;     /* hero / pinned fragment width */
+    --site-dialog:   27.5rem;   /* create dialog width */
+    --site-tab:      9.5rem;    /* agenda tab column */
+    --site-band-gap: 0.25rem;
+    --site-tile-gap: 0.5rem;
+    --site-statement-h: 80vh;
+    --site-statement-h-phone: 46svh;
+    --site-sticky-top:  14vh;
+    --site-footer-gap:  30svh;
+    --site-footer-gap-phone: 20svh;
+
+    /* App roles, remapped. */
+    --bg:            var(--site-bg);
+    --surface:       var(--site-surface);
+    --surface-hover: var(--site-surface-2);
+    --surface-2:     var(--site-surface-2);
+    --surface-3:     var(--site-surface-2);
+    --text:          var(--site-ink);
+    --text-2:        var(--site-ink);
+    --text-muted:    var(--site-muted);
+    --text-subtle:   var(--site-muted);
+    --border:        var(--site-line);
+    --border-strong: rgb(241 241 239 / 0.40);
+    --accent:        var(--site-accent);
+    --accent-hover:  var(--site-accent-hover);
+    --accent-text:   var(--site-accent-ink);
+    --accent-dim:    rgb(143 166 142 / 0.16);
+    --ok:            #6CC4C0;
+    --warn:          #E0A458;
+    --unknown:       #C9C9C3;
+    --ink-pink:      transparent;  /* Overprint drum: off in this world */
+    --grain-opacity: 0;
+
+    background: var(--site-bg);
+    color: var(--site-ink);
+  }
+}

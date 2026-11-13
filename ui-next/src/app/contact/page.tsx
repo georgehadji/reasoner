@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { PILOT_DRAFT_KEY } from '@/lib/pilot-draft';
 import { AlertCircle, Check } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { SiteHeader } from '@/components/layout/SiteHeader';
@@ -107,6 +108,18 @@ export default function ContactPage() {
     const wanted = new URLSearchParams(window.location.search).get('topic')?.toLowerCase();
     const match = TOPICS.find((t) => t.toLowerCase() === wanted);
     if (match && topicRef.current) topicRef.current.value = match;
+
+    // The landing page's pilot dialog hands its draft over in sessionStorage,
+    // not the URL, so a problem description never lands in a log or history.
+    try {
+      const draft = sessionStorage.getItem(PILOT_DRAFT_KEY);
+      if (!draft) return;
+      sessionStorage.removeItem(PILOT_DRAFT_KEY);
+      const field = formRef.current?.elements.namedItem('message');
+      if (field instanceof HTMLTextAreaElement && !field.value) field.value = draft;
+    } catch {
+      /* storage blocked: the form simply starts empty */
+    }
   }, []);
 
   const clearError = (field: FieldName) => {

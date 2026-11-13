@@ -1,108 +1,92 @@
-# Art Direction — Reasoner · OVERPRINT
+# Art direction — "The product performs"
 
-**Status:** adopted 2026-11-13, replacing the "Apparatus" direction (warm-tan ground,
-hueless accent, Piazzolla + Public Sans). The old document is in git history at
-`f4d282d6:spec/art-direction.md`. Its measurements of the run data (§0 there) still
-hold and still matter: epistemic labels are dense in Phase 2 and sparse in synthesis.
-
-Tokens: `ui-next/src/styles/tokens.css`. Gate: `node scripts/check-contrast.mjs`.
-
----
+Adopted 2026-11-13. Replaces Overprint (two riso inks on newsprint), which is retired.
+Dealt by the taste-skill draw (`.taste-skill/direction.json`, seed 2138486423), direction
+`product-performs`, chosen over `sentence-as-layout` and `quiet-instrument` because Reasoner's
+proof is its own output: a run record anyone can handle on the page.
 
 ## 1. The idea
 
-The site is **printed, not painted**: a two-drum risograph pass on newsprint.
+> On this page, **one real Reasoner run** becomes **the working fragments the visitor
+> handles**: its claim labels switch on and off, its critic's score sheet answers the
+> pointer, its routing refuses labs when Western-only is on.
 
-- **Federal blue** (`--ink-blue`, `#1F3FBF`) is the working ink. It carries every
-  link and primary control.
-- **Fluorescent pink** (`--ink-pink`, `#FF4F9A`) is the second drum. It is a fill
-  only: plates, registration offsets, the signature.
-- Where they overlap they make **violet** (`--ink-overlap`, `#6438A0`).
+Competitor test: another AI product cannot put a cross-lab critique table and per-claim
+verified / hypothesis / unknown labels from its own captured run on its page. Every
+fragment's content comes from `ui-next/src/lib/demo-record.ts` (captured 2026-08-17),
+`lib/sectors.ts`, or `lib/capabilities.generated.ts`. Nothing is typed by hand except copy.
 
-Why print: the product's claim is that answers come from models of different labs
-that are run separately and never merged. A riso pass is literally that: separate
-drums, run separately, that never land exactly on top of each other. The
-misregistration is not decoration; it is the product's shape.
+**The live thing:** the hero's "Answer only / With the record" switch.
 
-## 2. Signature — the plates never register
+## 2. Composition
 
-Each Phase 2 perspective (`components/phases/PerspectivesRenderer.tsx`) is printed
-on its own pink plate (`.misregister` in `globals.css`). The landing page's image
-exhibit, which also carried it, was cut in the 2026-11-13 repositioning. Each item in a run of four gets a different offset, in a
-different direction. On load the plates settle once, from 3x offset to 1x, under
-`--dur-scene`. They never reach zero. Under `prefers-reduced-motion` they render at
-rest.
+- No navigation bar on the home page: logo top-left, one text link ("Open the app") top-right.
+- Hero: two halves meeting at 50%, the right one tone lighter. Left: the headline anchored
+  bottom-left, one sentence, one button. Right: the live fragment at interface size.
+- Sections never repeat a neighbour's layout. Each is a blueprint from the sheet:
+  critique (input half / output half), labs (large names on tiles, heading tile in the
+  accent), sectors (tabs over banded review sheet), pilot (pinned fragment changing state),
+  capabilities (giant command list), own claims (narrow labelled list), start (create dialog
+  already open on an accent field), footer (one quiet line).
+- Fragments are cropped interface, marked `data-ui`, never in a browser or device frame.
+  Inside `data-ui` the product's conventions apply: 1px control borders, small radii,
+  uppercase epistemic marks, a shadow only on the open dialog.
 
-This is the one orchestrated moment per page the banlist allows.
+## 3. Colour — charcoal and sage
 
-## 3. Global print layer
+The dealt "black and crimson" palette was redrawn: near-black with one crimson accent is
+the banlist's "near-black background with a single acid-green or vermilion accent".
 
-Applied in `globals.css`, so every route picks it up with no call-site change:
+| Role | Token | Value |
+|---|---|---|
+| Ground | `--site-bg` | `#1C1C1C` |
+| Lighter half, tiles, panels | `--site-surface` / `--site-surface-2` | `#262626` / `#303030` |
+| Ink | `--site-ink` | `#F1F1EF` |
+| Secondary ink | `--site-muted` | `#A3A49F` |
+| Accent: the one button, active controls, two fields | `--site-accent` | `#8FA68E` |
+| Light field (critique output half) | `--site-field` | `#C8C5BA` |
+| Verified / hypothesis / unknown | `--ok` / `--warn` / `--unknown` | `#6CC4C0` / `#E0A458` / `#C9C9C3` |
 
-| Move | Rule |
-|---|---|
-| Grain | `body::after`, fixed SVG noise, `--grain-opacity` (0.07 / 0.06), multiplied on newsprint, screened on carbon. `pointer-events: none`, hidden in print. |
-| Overprinted headings | `h1.font-display`, `h2.font-display`, `.overprint`: ink with the pink drum offset `0.05em 0.035em` under it. |
-| Expanded display | `.font-display` runs Archivo's `wdth` axis: 100% below 48rem, 112% to 80rem, 125% above. `hyphens: auto` so a long word never breaks mid-letter or pushes the page sideways. |
-| Plate corners | Radius 2 / 3 / 4 / 6px. Trimmed sheet, not app card. Not zero (banlist item 4). Pills stay round. |
-| Floating layers | `--shadow-float` is a hard 4px ink offset, not a blur. Print has no soft shadows. |
+The site is charcoal in both colour schemes. Epistemic labels keep their carrier (solid /
+dashed / dotted rule) so they survive monochrome print. Every text pair clears AA; the lowest is the accent on `--site-surface-2` at 5.04:1
+(figures in tokens.css).
 
 ## 4. Type
 
-All OFL, all via `next/font/google` (see `ui-next/src/app/fonts.ts`).
+- Display: **League Spartan 700**, tracking -0.04em, sentence case, two lines at most.
+- Text: **Figtree 400 / 600**, leading 1.5. Body copy 17–19px, never below 13px.
+- Mono: **Inconsolata**, code and citations inside fragments only.
+- Five steps: `--site-small`, `--site-body`, `--site-lead`, `--site-head`, `--site-display`.
 
-| Role | Face | Utility |
-|---|---|---|
-| Display | **Archivo**, variable `wght` + `wdth` | `font-display` |
-| Body + UI | **Atkinson Hyperlegible Next**, variable `wght` | `font-sans` (default) |
-| Code, model IDs, tables | **Inconsolata** (unchanged, not preloaded) | `font-mono` |
+Fonts swapped app-wide in `ui-next/src/app/fonts.ts` (the app keeps its own colours until its
+run). Budget: two text families plus one mono, three weights, self-hosted by next/font.
 
-Atkinson was drawn so that `I l 1` and `O 0` never collide. A reader checking model
-IDs and figures is who that serves. Archivo expanded is wide poster type that
-survives a two-ink print.
+## 5. Motion
 
-`font-serif` is gone. The old utility was renamed to `font-display` at every call site.
-The `.prose-serif` class name survives and already sets sans.
+One loud moment: each headline line rises from behind its baseline (900ms, second line
+110ms later), then the sentence and button fade up. Around it: one-time section entrances
+(`Reveal.tsx`, armed only by script and only when motion is allowed), feedback on every
+control, the pinned pilot fragment changing state. All of it collapses under
+`prefers-reduced-motion`.
 
-## 5. Colour
+## 6. Where it lives
 
-Light is the base (newsprint, `#F1F3F0`, cool on purpose: the banlist forbids
-cream + serif + clay). Dark is carbon stock (`#121318`) with both drums lifted.
+- Tokens: `ui-next/src/styles/tokens.css`, block "SITE WORLD", scoped to `.site`, which
+  remaps the app's role names so shared components follow.
+- Layer: `ui-next/src/app/globals.css`, block "Site world" (Overprint ornaments off, masked
+  headline, reveals, `.site-button`, `.site-link`).
+- Components: `ui-next/src/components/site/`.
 
-**Hue is no longer reserved for data.** That reverses the previous commitment, and
-PRODUCT.md is updated to match. The epistemic labels lean on their carrier first
-(`.epistemic-*`: solid / dashed / dotted left rule) and their ink second:
+## 7. Status
 
-| Label | Light | Dark | Why this ink |
-|---|---|---|---|
-| VERIFIED | teal `#00656A` | `#4FC7C2` | riso teal, clear of both drums |
-| HYPOTHESIS | violet `#6438A0` | `#B79AF0` | the overlap ink: two drums, not settled |
-| UNKNOWN | ochre `#735400` | `#D9B24A` | riso yellow, darkened to read |
-| Danger | `#B3122E` | `#FF7A7A` | `--red`, unchanged role |
-
-Rules:
-- `--ink-pink` is **never text on newsprint** (2.75:1). Use `--ink-pink-text`
-  (`#B8155C`, AA everywhere). Ink on a pink fill uses `--text` (6.04:1).
-- All text inks clear AA on all nine grounds in both themes; `--text-subtle` no
-  longer carries a ground restriction. `check-contrast.mjs`: 164 pairs pass.
-- Values ship as hex: `lib/canvas-fx.ts` paints mid-grey for anything else.
-- The dark palette exists in five places (two in `tokens.css`, three
-  `.invert-band` blocks in `globals.css`). Edit all five.
-
-## 6. Removed
-
-- The two radial "light" gradients behind the landing image grid and
-  `ReviewHandoff`. Soft glows belong to the painted world, and both bled 8% past the
-  viewport, which caused sideways scroll at 1024px.
-
-## 7. Open
-
-- **Taste check by a human.** Look at `/` and `/chat` for ten seconds in both themes.
-  The two levers if it is too loud: `--grain-opacity`, and the heading offset in
-  `h1.font-display` (`0.05em 0.035em`).
-- **HYPOTHESIS violet equals `--ink-overlap`.** Deliberate, as described above, but a
-  HYPOTHESIS mark next to a violet overlap area could be misread. The dashed carrier
-  is what separates them.
-- **Not yet reworked for print:** composition of `/pricing`, `/settings`,
-  `/dashboard` and the chat shell. They take the new tokens, type and corners, but
-  their layouts are the previous ones.
+- Done: home page (`components/landing/LandingPage.tsx`). Inspector: 0 FAIL at 1440 / 768 /
+  390 (`.taste-skill/after/`).
+- Defended warnings: no photographs or footage (software with no photography; its pictures
+  are its interface fragments); the critique heading sits at the foot of its section by
+  design; on a phone the live fragment comes before the button; the critic's input
+  excerpts are quoted material in secondary ink.
+- Next: roll `.site` and the components to the marketing pages (/how-it-works,
+  /capabilities, /developers, /security, /privacy, /pricing, /contact, /for/[sector], /about),
+  replacing `SiteHeader` / `SiteFooter` there. Then the app screens as their own run.
+- Sample content to confirm: the pilot example problems in `PilotPinned.tsx` and
+  `PilotDialog.tsx` are illustrations, not client work.
