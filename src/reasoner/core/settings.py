@@ -335,6 +335,9 @@ class Settings:
     NOTIFICATION_EMAIL: str | None = os.getenv("NOTIFICATION_EMAIL")
     """Email address to receive admin notifications (webhook failures, spend cap, etc.)."""
 
+    CONTACT_EMAIL: str | None = os.getenv("CONTACT_EMAIL") or None
+    """Inbox for /contact form submissions. Falls back to NOTIFICATION_EMAIL; with neither, the form returns 503."""
+
     # ── Scraping ──
     SCRAPE_USER_AGENT: str = os.getenv(
         "SCRAPE_USER_AGENT",

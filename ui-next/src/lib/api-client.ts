@@ -234,6 +234,20 @@ export async function deleteAccount(): Promise<{ status: string; user_id?: strin
   return data;
 }
 
+/** Send the /contact form. Rejects on any non-2xx, so the form never shows success for a dropped message. */
+export async function submitContact(payload: {
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+}) {
+  return fetchJSON<{ status: string }>(API.CONTACT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function submitFeedback(payload: {
   conversation_id: string;
   message_id: string;

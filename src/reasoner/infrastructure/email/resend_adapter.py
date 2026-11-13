@@ -58,6 +58,8 @@ class ResendEmailAdapter:
         }
         if message.html_body:
             payload["html"] = message.html_body
+        if message.reply_to:
+            payload["reply_to"] = message.reply_to
 
         try:
             async with httpx.AsyncClient(timeout=httpx.Timeout(10.0, connect=5.0)) as client:

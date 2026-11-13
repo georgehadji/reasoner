@@ -221,6 +221,7 @@ export const API = {
   SEARCH: '/api/search',
   UPLOAD: '/api/upload',
   FEEDBACK: '/api/feedback',
+  CONTACT: '/api/contact',
   ACCOUNT_DELETE: '/api/account/delete',
   QUOTA: '/api/quota',
   CREDITS: '/api/credits',

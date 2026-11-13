@@ -5,6 +5,7 @@ import { AlertCircle, Check } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
+import { submitContact } from '@/lib/api-client';
 
 /* Field chrome — the same constants the auth screens use. Focus is deliberately
    louder than hover: hover only firms the border, focus firms it AND adds the
@@ -35,6 +36,9 @@ const FIELD_ERROR =
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
+
+/* `?topic=pilot` (the landing page's pilot CTA) preselects the matching option. */
+const TOPICS = ['Pilot', 'Billing Issue', 'Technical Support', 'Feature Request', 'Other'] as const;
 
 type FieldName = 'name' | 'email' | 'message';
 type FieldErrors = Partial<Record<FieldName, string>>;
@@ -76,9 +80,12 @@ function FieldMessage({ id, children }: { id: string; children: React.ReactNode 
 export default function ContactPage() {
   const [submitted, setSubmitted] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
 
   const formRef = useRef<HTMLFormElement>(null);
   const successRef = useRef<HTMLDivElement>(null);
+  const topicRef = useRef<HTMLSelectElement>(null);
   // Both halves of this swap unmount whatever had focus, dropping a keyboard
   // user at <body>. `everSubmitted` is what keeps the return trip from firing
   // on first paint, when `submitted` is false because nothing has happened yet
@@ -94,6 +101,14 @@ export default function ContactPage() {
     if (everSubmitted.current) focusField(formRef.current, 'name');
   }, [submitted]);
 
+  // Read once on mount rather than via useSearchParams, which would force a
+  // Suspense boundary around a page that otherwise renders statically.
+  useEffect(() => {
+    const wanted = new URLSearchParams(window.location.search).get('topic')?.toLowerCase();
+    const match = TOPICS.find((t) => t.toLowerCase() === wanted);
+    if (match && topicRef.current) topicRef.current.value = match;
+  }, []);
+
   const clearError = (field: FieldName) => {
     setErrors((prev) => {
       if (!prev[field]) return prev;
@@ -103,10 +118,12 @@ export default function ContactPage() {
     });
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (sending) return;
     const form = e.currentTarget;
-    const found = validate(new FormData(form));
+    const data = new FormData(form);
+    const found = validate(data);
     setErrors(found);
     // Focus the first field that failed. `noValidate` turns off the browser's
     // own "go here and fix this", so without this the errors appear below the
@@ -116,8 +133,22 @@ export default function ContactPage() {
       focusField(form, firstInvalid);
       return;
     }
-    // Placeholder for actual form submission logic
-    setSubmitted(true);
+    setSendError(null);
+    setSending(true);
+    try {
+      await submitContact({
+        name: String(data.get('name') ?? '').trim(),
+        email: String(data.get('email') ?? '').trim(),
+        subject: String(data.get('subject') ?? 'Other'),
+        message: String(data.get('message') ?? '').trim(),
+      });
+      setSubmitted(true);
+    } catch {
+      // The fields are uncontrolled and stay mounted, so nothing typed is lost.
+      setSendError('Your message was not sent. Check your connection and try again.');
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -156,6 +187,7 @@ export default function ContactPage() {
               onClick={() => {
                 setSubmitted(false);
                 setErrors({});
+                setSendError(null);
               }}
             >
               Send another message
@@ -212,11 +244,10 @@ export default function ContactPage() {
                   mobile, keyboard type-ahead for free, and cannot drift out of
                   sync with the theme — `color-scheme` on :root already tells the
                   browser how to paint the option list in dark mode. */}
-              <select id="subject" name="subject" className={FIELD} defaultValue="Billing Issue">
-                <option>Billing Issue</option>
-                <option>Technical Support</option>
-                <option>Feature Request</option>
-                <option>Other</option>
+              <select ref={topicRef} id="subject" name="subject" className={FIELD} defaultValue="Billing Issue">
+                {TOPICS.map((topic) => (
+                  <option key={topic}>{topic}</option>
+                ))}
               </select>
             </div>
 
@@ -236,8 +267,16 @@ export default function ContactPage() {
               {errors.message && <FieldMessage id="message-error">{errors.message}</FieldMessage>}
             </div>
 
-            <Button type="submit" size="lg" className="w-full rounded-[var(--radius)]">
-              Send Message
+            {sendError && <FieldMessage id="send-error">{sendError}</FieldMessage>}
+
+            <Button
+              type="submit"
+              size="lg"
+              className="w-full rounded-[var(--radius)]"
+              disabled={sending}
+              aria-describedby={sendError ? 'send-error' : undefined}
+            >
+              {sending ? 'Sending…' : 'Send Message'}
             </Button>
           </form>
         )}
