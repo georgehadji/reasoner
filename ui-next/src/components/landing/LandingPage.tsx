@@ -1,12 +1,12 @@
 import Link from 'next/link';
 import { Logo } from '@/components/brand/Logo';
+import { SiteFooter } from '@/components/layout/SiteFooter';
 import { CommandList } from '@/components/site/CommandList';
 import { CritiqueSplit } from '@/components/site/CritiqueSplit';
 import { HeroRecord } from '@/components/site/HeroRecord';
 import { LabBoard } from '@/components/site/LabBoard';
 import { PilotDialog } from '@/components/site/PilotDialog';
 import { PilotPinned } from '@/components/site/PilotPinned';
-import { QuietFooter } from '@/components/site/QuietFooter';
 import { Reveal } from '@/components/site/Reveal';
 import { ReviewAgenda } from '@/components/site/ReviewAgenda';
 
@@ -56,7 +56,10 @@ export default function LandingPage() {
           <Link href="/" aria-label="Reasoner home" className="absolute left-[var(--site-margin)] top-[var(--space-8)] z-10">
             <Logo showWordmark size={24} />
           </Link>
-          <div className="flex flex-col justify-end px-[var(--site-margin)] pb-[var(--space-12)] pt-[var(--space-12)] lg:pb-[var(--space-10)]">
+          <Link href="/chat" className="site-link absolute right-[var(--site-margin)] top-[var(--space-8)] text-[length:var(--site-small)]">
+            Open the app
+          </Link>
+          <div className="flex flex-col justify-end px-[var(--site-margin)] pb-[var(--space-12)] pt-[var(--space-24)] lg:pb-[var(--space-10)] lg:pt-[var(--space-12)]">
             <div>
               <h1 className="font-display text-[length:var(--site-display)] leading-[var(--site-lh-display)]">
                 <span className="site-line">
@@ -84,10 +87,7 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <div className="relative order-first flex items-center justify-center bg-[var(--site-surface)] px-[var(--site-margin)] pb-[var(--space-10)] pt-[var(--space-24)] lg:order-none lg:pt-[var(--space-10)]">
-            <Link href="/chat" className="site-link absolute right-[var(--site-margin)] top-[var(--space-8)] text-[length:var(--site-small)]">
-              Open the app
-            </Link>
+          <div className="flex items-center justify-center bg-[var(--site-surface)] px-[var(--site-margin)] py-[var(--space-10)]">
             <HeroRecord />
           </div>
         </header>
@@ -124,7 +124,7 @@ export default function LandingPage() {
         <PilotDialog />
       </main>
 
-      <QuietFooter />
+      <SiteFooter />
     </div>
   );
 }

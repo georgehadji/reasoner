@@ -989,6 +989,41 @@
   }
 }
 
+/* Site world: an inverted band on a marketing page flips to the pale
+   concrete field with dark ink (spec/art-direction.md §3), not to the
+   app's carbon. Unlayered and more specific than the three blocks above
+   so it wins in every theme. Contrast on #C8C5BA / #D4D1C7 / #BEBBAF:
+   ink 9.86+, muted 5.01+, accent 5.09+, labels 4.55+. */
+:root .site .invert-band,
+:root:not(.light) .site .invert-band,
+:root.dark .site .invert-band {
+  color-scheme: light;
+  --bg:            #C8C5BA;
+  --surface:       #D4D1C7;
+  --surface-hover: #BEBBAF;
+  --surface-2:     #BEBBAF;
+  --surface-3:     #BEBBAF;
+  --text:          #1C1C1C;
+  --text-2:        #1C1C1C;
+  --text-muted:    #454540;
+  --text-subtle:   #454540;
+  --border:        rgb(28 28 28 / 0.16);
+  --border-strong: rgb(28 28 28 / 0.45);
+  --accent:        #2F4A30;
+  --accent-hover:  #1C1C1C;
+  --accent-text:   #F1F1EF;
+  --accent-dim:    rgb(47 74 48 / 0.12);
+  --ok:            #124F4C;
+  --warn:          #6A420C;
+  --unknown:       #3A3A35;
+  --site-ink:      #1C1C1C;
+  --site-muted:    #454540;
+  --site-line:     rgb(28 28 28 / 0.16);
+  --ink-pink:      transparent;
+  background: var(--bg);
+  color: var(--text);
+}
+
 /* ============================================================
    Overprint — the print layer. See spec/art-direction.md.
 

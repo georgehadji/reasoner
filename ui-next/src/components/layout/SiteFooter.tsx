@@ -1,79 +1,50 @@
 import Link from 'next/link';
-import { Logo } from '@/components/brand/Logo';
 import { SITE } from '@/lib/site';
-import { SecurityBadge } from './SecurityBadge';
 
-const LINKS = {
-  Product: [
-    { label: 'Capabilities', href: '/capabilities' },
-    { label: 'How it works', href: '/how-it-works' },
-    { label: 'About', href: '/about' },
-    { label: 'Pricing', href: '/pricing' },
-    { label: 'Developers', href: '/developers' },
-    { label: 'Docs', href: '/docs' },
-    { label: 'FAQ', href: '/faq' },
-    { label: 'Changelog', href: '/changelog' },
-    { label: 'Status', href: '/status' },
-  ],
-  Legal: [
-    { label: 'Privacy', href: '/privacy' },
-    { label: 'Security', href: '/security' },
-    { label: 'Sub-processors', href: '/subprocessors' },
-    { label: 'Terms', href: '/terms' },
-    { label: 'Contact', href: '/contact' },
-  ],
-};
+/**
+ * A single quiet line instead of a footer block (spec/art-direction.md):
+ * what this is at the left, the links in the middle, the year and the
+ * operator at the right. No logo, no columns, no rule above it. On a phone
+ * the three parts stack on the left margin.
+ */
+const LINKS = [
+  { label: 'Capabilities', href: '/capabilities' },
+  { label: 'How it works', href: '/how-it-works' },
+  { label: 'Pricing', href: '/pricing' },
+  { label: 'Developers', href: '/developers' },
+  { label: 'Docs', href: '/docs' },
+  { label: 'FAQ', href: '/faq' },
+  { label: 'About', href: '/about' },
+  { label: 'Changelog', href: '/changelog' },
+  { label: 'Status', href: '/status' },
+  { label: 'Security', href: '/security' },
+  { label: 'Sub-processors', href: '/subprocessors' },
+  { label: 'Terms', href: '/terms' },
+  { label: 'Privacy', href: '/privacy' },
+  { label: 'Contact', href: '/contact' },
+];
+
+const LINK =
+  'inline-flex min-h-[var(--space-8)] items-center text-[var(--text)] underline-offset-4 transition-colors duration-[var(--dur-micro)] hover:underline';
 
 export function SiteFooter() {
   return (
-    <footer className="border-t border-[var(--border)] bg-[var(--bg)]">
-      <div className="mx-auto max-w-6xl px-6 py-16">
-        <div className="grid gap-12 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Brand */}
-          <div className="lg:col-span-2">
-            <div className="flex items-center gap-3">
-              <Logo showWordmark size={22} />
-              <SecurityBadge />
-            </div>
-            <p className="mt-4 max-w-sm text-[length:var(--text-sm)] leading-relaxed text-[var(--text)]">
-              Advanced Reasoning Architecture. Multi-method pipelines with verified, auditable
-              outputs.
-            </p>
-          </div>
-
-          {/* Links */}
-          {Object.entries(LINKS).map(([group, items]) => (
-            <div key={group}>
-              <div className="mb-4 text-[length:var(--text-xs)] font-semibold uppercase tracking-widest text-[var(--text)]">
-                {group}
-              </div>
-              <ul className="flex flex-col">
-                {items.map(({ label, href }) => (
-                  <li key={href}>
-                    {/* 40px hit area (WCAG 2.5.5) built from padding, not a
-                        visible box, so the column still reads as a tight list.
-                        The old rule set hover to the same value as rest, so
-                        there was no hover feedback at all. */}
-                    <Link
-                      href={href}
-                      className="inline-flex min-h-[var(--space-10)] items-center text-[length:var(--text-sm)] leading-[var(--lh-ui)] text-[var(--text-muted)] transition-colors duration-[var(--dur-micro)] hover:text-[var(--accent)]"
-                    >
-                      {label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
+    <footer className="mt-[var(--space-24)] grid gap-[var(--space-2)] px-[var(--gutter)] pb-[var(--space-8)] text-[length:var(--text-sm)] leading-[var(--lh-ui)] text-[var(--text-muted)] lg:grid-cols-[1fr_auto_1fr] lg:items-baseline lg:gap-[var(--space-8)]">
+      <p>{SITE.name}, a reasoning record</p>
+      <nav aria-label="Footer">
+        <ul className="flex max-w-[48rem] list-none flex-wrap gap-x-[var(--space-6)] lg:justify-center">
+          {LINKS.map(({ label, href }) => (
+            <li key={href}>
+              <Link href={href} className={LINK}>
+                {label}
+              </Link>
+            </li>
           ))}
-        </div>
-
-        <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-[var(--border)] pt-8 text-[length:var(--text-xs)] text-[var(--text-2)] sm:flex-row">
-          <p>
-            © {new Date().getFullYear()} {SITE.name}, operated by {SITE.legalName}.
-          </p>
-          <p>Built for critical decisions.</p>
-        </div>
-      </div>
+        </ul>
+      </nav>
+      <p className="lg:text-right">
+        © {new Date().getFullYear()} {SITE.name}, operated by {SITE.legalName}
+      </p>
     </footer>
   );
 }

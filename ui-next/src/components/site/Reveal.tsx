@@ -15,7 +15,11 @@ export function Reveal() {
     if (typeof IntersectionObserver === 'undefined') return;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
-    const targets = Array.from(document.querySelectorAll<HTMLElement>('[data-reveal]'));
+    // Explicit targets, plus every section of a marketing page that does not
+    // mark its own parts.
+    const targets = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-reveal], .site main section:not(:has([data-reveal]))'),
+    );
     const io = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {

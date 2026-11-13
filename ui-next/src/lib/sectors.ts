@@ -8,7 +8,16 @@
  * verified is `to-confirm` with an [INPUT REQUIRED] note, never a guess.
  */
 
+import type { MethodId } from './types';
+
 export type ReviewStatus = 'available' | 'not-available' | 'to-confirm';
+
+/** A method as the page names it; `hint` keys its description in
+ *  lib/method-hints.tsx where one exists. */
+export interface SectorMethod {
+  name: string;
+  hint?: MethodId;
+}
 
 export interface ReviewItem {
   question: string;
@@ -20,11 +29,13 @@ export interface ReviewItem {
 export interface Sector {
   slug: string;
   name: string;
-  /** The reviewer's gating question; the page's h1. */
+  /** The reviewer's gating question, the page's lead sentence. */
   gate: string;
   use: string;
   /** Real `method` values in preset_registry.py. */
-  methods: string;
+  methods: readonly SectorMethod[];
+  /** Run on Western-only routing (US and EU labs only). */
+  westernOnly?: boolean;
   /** The line it does not cross, stated up front. */
   limit: string;
   review: ReviewItem[];
@@ -82,7 +93,7 @@ const RETENTION: ReviewItem = {
   question: 'Can we run with nothing stored?',
   status: 'not-available',
   answer:
-    'Not yet. Runs are stored so you can return to them. Stored data can be deleted on request.',
+    'Not yet. Runs are stored so you can return to them. You can erase them at any time, or delete the account from settings.',
   href: '/privacy',
 };
 
@@ -128,7 +139,8 @@ export const SECTORS: readonly Sector[] = [
     name: 'Defence and security',
     gate: 'Can it run where our information is allowed to go?',
     use: 'Structured adversarial analysis of plans: red-team a course of action, or run a pre-mortem on why it failed.',
-    methods: 'Debate · Pre-Mortem · Dialectical, on Western-only routing',
+    methods: [{ name: 'Debate', hint: 'debate' }, { name: 'Pre-Mortem', hint: 'pre-mortem' }, { name: 'Dialectical', hint: 'dialectical' }],
+    westernOnly: true,
     limit: 'Analysis for the people who decide. It does not decide.',
     review: [SELF_HOST, AIR_GAP, WESTERN_ONLY, SUBPROCESSORS, RESIDENCY, SOC2],
   },
@@ -137,7 +149,7 @@ export const SECTORS: readonly Sector[] = [
     name: 'Healthcare operations',
     gate: 'Will it pass our information-governance review?',
     use: 'Staffing, procurement and incident root-cause analysis. Morbidity and mortality reviews as pre-mortem or Socratic questioning. Comparing guidelines with cited sources.',
-    methods: 'Pre-Mortem · Socratic · Research',
+    methods: [{ name: 'Pre-Mortem', hint: 'pre-mortem' }, { name: 'Socratic', hint: 'socratic' }, { name: 'Research', hint: 'research' }],
     limit: 'Not for diagnosis or treatment decisions. Do not enter patient data.',
     review: [
       DATA_AGREEMENTS,
@@ -157,7 +169,12 @@ export const SECTORS: readonly Sector[] = [
     name: 'Research and teaching',
     gate: 'Will our IT security review approve it for research data?',
     use: 'Research design and peer-review support: generate hypotheses and try to disprove them, update beliefs on evidence, teach critical thinking by questioning.',
-    methods: 'Scientific · Bayesian · Socratic · Research',
+    methods: [
+      { name: 'Scientific', hint: 'scientific' },
+      { name: 'Bayesian', hint: 'bayesian' },
+      { name: 'Socratic', hint: 'socratic' },
+      { name: 'Research', hint: 'research' },
+    ],
     limit: 'A reviewer’s second reader, not a replacement for one.',
     review: [TRAINING, RETENTION, SUBPROCESSORS, ENCRYPTION, SELF_HOST, RUN_RECORD],
   },
@@ -166,7 +183,7 @@ export const SECTORS: readonly Sector[] = [
     name: 'Legal and compliance',
     gate: 'Can we keep client confidences while we use it?',
     use: 'Stress-test an argument against opposing counsel’s likely positions, run a pre-mortem on contract risk, and look for gaps against a regulation.',
-    methods: 'Debate · Jury · Pre-Mortem',
+    methods: [{ name: 'Debate', hint: 'debate' }, { name: 'Jury', hint: 'jury' }, { name: 'Pre-Mortem', hint: 'pre-mortem' }],
     limit: 'Not legal advice. Check every citation before it leaves the firm.',
     review: [TRAINING, RETENTION, SUBPROCESSORS, ENCRYPTION, SELF_HOST, RUN_RECORD],
   },
@@ -175,7 +192,7 @@ export const SECTORS: readonly Sector[] = [
     name: 'Aerospace and engineering',
     gate: 'Can controlled technical data stay under our control?',
     use: 'Design reviews, failure-mode analysis in the style of an FMEA, and critique of requirements before they are frozen.',
-    methods: 'Pre-Mortem · Iterative Critique',
+    methods: [{ name: 'Pre-Mortem', hint: 'pre-mortem' }, { name: 'Iterative Critique' }],
     limit:
       'Does not replace certified safety analysis. Do not enter export-controlled (ITAR or EAR) technical data into the hosted service.',
     review: [SELF_HOST, AIR_GAP, WESTERN_ONLY, SUBPROCESSORS, RESIDENCY],
@@ -185,7 +202,7 @@ export const SECTORS: readonly Sector[] = [
     name: 'Government and policy',
     gate: 'Can we explain in public how an output was reached?',
     use: 'Policy options analysis, structured expert consensus, and stress-testing scenarios before they are published.',
-    methods: 'Delphi · Dialectical',
+    methods: [{ name: 'Delphi', hint: 'delphi' }, { name: 'Dialectical', hint: 'dialectical' }],
     limit: 'Options and their weaknesses, not a recommendation to adopt.',
     review: [RUN_RECORD, WESTERN_ONLY, SUBPROCESSORS, RESIDENCY, SOC2, RETENTION],
   },

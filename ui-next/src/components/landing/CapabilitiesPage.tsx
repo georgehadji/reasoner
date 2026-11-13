@@ -118,7 +118,7 @@ const PROSE_TELLS = [
 
 export default function CapabilitiesPage() {
   return (
-    <div className="min-h-dvh bg-[var(--bg)] text-[var(--text)]">
+    <div className="site min-h-dvh bg-[var(--bg)] text-[var(--text)]">
       <SiteHeader />
 
       <main id="main-content">
@@ -162,7 +162,7 @@ export default function CapabilitiesPage() {
 
           <dl className="mt-[var(--space-10)] grid gap-[var(--space-6)] sm:grid-cols-2">
             <div className="border-t border-[var(--border)] pt-[var(--space-4)]">
-              <dt className="epistemic-hypothesis pl-[var(--space-3)] font-sans text-[length:var(--text-2xs)] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)]">
+              <dt className="epistemic-hypothesis pl-[var(--space-3)] font-sans text-[length:var(--text-2xs)] font-semibold leading-[var(--lh-ui)]">
                 Hypothesis
               </dt>
               <dd className="mt-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
@@ -171,7 +171,7 @@ export default function CapabilitiesPage() {
               </dd>
             </div>
             <div className="border-t border-[var(--border)] pt-[var(--space-4)]">
-              <dt className="epistemic-verified pl-[var(--space-3)] font-sans text-[length:var(--text-2xs)] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)]">
+              <dt className="epistemic-verified pl-[var(--space-3)] font-sans text-[length:var(--text-2xs)] font-semibold leading-[var(--lh-ui)]">
                 Verified
               </dt>
               <dd className="mt-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">

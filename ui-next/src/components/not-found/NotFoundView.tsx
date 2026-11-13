@@ -70,7 +70,7 @@ export function NotFoundView() {
   });
 
   return (
-    <div className="flex min-h-dvh flex-col bg-[var(--bg)] text-[var(--text)]">
+    <div className="site flex min-h-dvh flex-col bg-[var(--bg)] text-[var(--text)]">
       <SiteHeader />
 
       <main
@@ -91,13 +91,13 @@ export function NotFoundView() {
         {/* ── 1. Verdict ─────────────────────────────────────────── */}
         <div className="animate-phase-reveal" style={stagger(0)}>
           <div className="flex flex-wrap items-center gap-3">
-            <span className="font-mono text-[length:var(--text-2xs)] uppercase tracking-[var(--tracking-label)] text-[var(--text-subtle)]">
+            <span className="font-mono text-[length:var(--text-2xs)] text-[var(--text-subtle)]">
               Error 404
             </span>
             <span aria-hidden="true" className="h-px w-6 bg-[var(--border-strong)]" />
             {/* The dotted rule is the one a synthesis card uses for a claim it
                 cannot verify, so the label means the same thing here. */}
-            <span className="epistemic-unknown pl-2.5 font-mono text-[length:var(--text-2xs)] font-semibold uppercase tracking-[var(--tracking-label)]">
+            <span className="epistemic-unknown pl-2.5 font-mono text-[length:var(--text-2xs)] font-semibold">
               Unknown
             </span>
           </div>
@@ -119,7 +119,7 @@ export function NotFoundView() {
           style={stagger(1)}
         >
           <div className="flex items-center justify-between gap-4 border-b border-[var(--border)] px-4 py-2.5">
-            <span className="font-mono text-[length:var(--text-2xs)] uppercase tracking-[var(--tracking-label)] text-[var(--text-muted)]">
+            <span className="font-mono text-[length:var(--text-2xs)] text-[var(--text-muted)]">
               Requested
             </span>
             <span className="font-mono text-[length:var(--text-2xs)] font-semibold text-[var(--red)]">
@@ -144,7 +144,7 @@ export function NotFoundView() {
           >
             <h2
               id="did-you-mean"
-              className="font-mono text-[length:var(--text-2xs)] uppercase tracking-[var(--tracking-label)] text-[var(--text-muted)]"
+              className="font-mono text-[length:var(--text-2xs)] text-[var(--text-muted)]"
             >
               Closest match
             </h2>
@@ -241,7 +241,7 @@ export function NotFoundView() {
         >
           <h2
             id="destinations"
-            className="font-mono text-[length:var(--text-2xs)] uppercase tracking-[var(--tracking-label)] text-[var(--text-muted)]"
+            className="font-mono text-[length:var(--text-2xs)] text-[var(--text-muted)]"
           >
             Where people usually go
           </h2>

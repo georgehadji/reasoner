@@ -8,6 +8,7 @@ import { Lock, Menu, X } from 'lucide-react';
 import { UserMenu } from './UserMenu';
 import { Logo } from '@/components/brand/Logo';
 import { SecurityModal } from './SecurityModal';
+import { Reveal } from '@/components/site/Reveal';
 import { Button } from '@/components/ui/Button';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { cn } from '@/lib/utils';
@@ -88,6 +89,8 @@ export function SiteHeader() {
           : 'bg-transparent',
       )}
     >
+      {/* Arms section entrances on every marketing page (renders nothing). */}
+      <Reveal />
       <div className="mx-auto flex h-[var(--space-16)] max-w-[var(--width-wide)] items-center justify-between gap-[var(--space-3)] px-[var(--gutter)]">
         {/* Logo */}
         <Link
@@ -99,7 +102,7 @@ export function SiteHeader() {
         </Link>
 
         {/* Desktop nav */}
-        <nav aria-label="Main" className="hidden items-center gap-[var(--space-1)] md:flex">
+        <nav aria-label="Main" className="hidden items-center gap-[var(--space-1)] lg:flex">
           {NAV_LINKS.map(({ label, href }) => {
             const active = isActivePath(pathname, href);
             return (
@@ -173,7 +176,7 @@ export function SiteHeader() {
             aria-label="Open navigation menu"
             aria-expanded={menuOpen}
             aria-controls="site-nav-drawer"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius)] text-[var(--text-muted)] transition-colors duration-[var(--dur-micro)] ease-[var(--ease-standard)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] md:hidden"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius)] text-[var(--text-muted)] transition-colors duration-[var(--dur-micro)] ease-[var(--ease-standard)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] lg:hidden"
           >
             <Menu className="h-5 w-5" aria-hidden="true" />
           </button>

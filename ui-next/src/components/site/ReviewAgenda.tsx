@@ -2,20 +2,14 @@
 
 import Link from 'next/link';
 import { useId, useState } from 'react';
-import { REVIEW_STATUS_LABEL, SECTORS, type ReviewStatus } from '@/lib/sectors';
+import { SECTORS } from '@/lib/sectors';
+import { StatusBands } from './StatusBands';
 
 /**
  * Sector tabs over a banded review sheet. Each tab is one sector; its bands
  * are the questions that sector's reviewer asks before a pilot can start,
- * each with its status. The status carries three signals (word, rule style,
- * ink) so it survives monochrome printing.
+ * each with its status.
  */
-const STATUS_RULE: Record<ReviewStatus, string> = {
-  available: 'epistemic-verified',
-  'to-confirm': 'epistemic-unknown',
-  'not-available': 'border-l-2 border-[var(--site-muted)] text-[var(--site-muted)]',
-};
-
 export function ReviewAgenda() {
   const [slug, setSlug] = useState(SECTORS[0].slug);
   const sector = SECTORS.find((s) => s.slug === slug) ?? SECTORS[0];
@@ -77,26 +71,11 @@ export function ReviewAgenda() {
             {sector.use} <strong className="font-semibold">{sector.limit}</strong>
           </p>
 
-          <ul key={slug} className="mt-[var(--space-8)] list-none space-y-[var(--site-band-gap)] [animation:site-fade_var(--dur-component)_var(--ease-entrance)_both]">
-            {sector.review.map(({ question, status, answer }, i) => (
-              <li
-                key={question}
-                className={`grid gap-[var(--space-2)] rounded-[var(--site-radius)] px-[var(--space-5)] py-[var(--space-4)] lg:grid-cols-[var(--site-tab)_minmax(0,1fr)] lg:gap-[var(--space-6)] ${
-                  i % 2 ? 'bg-[var(--site-surface-2)]' : 'bg-[var(--site-surface)]'
-                }`}
-              >
-                <span className={`${STATUS_RULE[status]} self-start pl-[var(--space-2)] text-[length:var(--site-small)] font-semibold`}>
-                  {REVIEW_STATUS_LABEL[status]}
-                </span>
-                <span>
-                  <span className="block text-[length:var(--site-body)] font-semibold leading-[var(--lh-ui)]">{question}</span>
-                  <span className="mt-[var(--space-1)] block text-[length:var(--site-small)] leading-[var(--site-lh-body)] text-[var(--site-muted)]">
-                    {answer}
-                  </span>
-                </span>
-              </li>
-            ))}
-          </ul>
+          <StatusBands
+            key={slug}
+            items={sector.review.map(({ question, status, answer }) => ({ title: question, status, detail: answer }))}
+            className="mt-[var(--space-8)] [animation:site-fade_var(--dur-component)_var(--ease-entrance)_both]"
+          />
 
           <Link href={`/for/${sector.slug}`} className="site-link mt-[var(--space-6)] inline-block text-[length:var(--site-body)] font-semibold">
             The full review sheet for {sector.name.toLowerCase()}

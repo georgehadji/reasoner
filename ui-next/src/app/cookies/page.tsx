@@ -3,7 +3,7 @@ import { SiteFooter } from '@/components/layout/SiteFooter';
 
 export default function CookiesPage() {
   return (
-    <div className="flex min-h-dvh flex-col bg-[var(--bg)] text-[var(--text)]">
+    <div className="site flex min-h-dvh flex-col bg-[var(--bg)] text-[var(--text)]">
       <SiteHeader />
       <main className="mx-auto max-w-3xl px-4 py-16 flex-1 w-full">
       <h1 className="font-display text-[length:var(--text-4xl)] font-bold mb-8">Cookie Policy</h1>

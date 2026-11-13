@@ -1,57 +1,45 @@
 'use client';
 
 import { useState } from 'react';
-import { useAsyncAction } from '@/hooks/useAsyncAction';
 import Link from 'next/link';
+import { useAsyncAction } from '@/hooks/useAsyncAction';
 import { apiFetch } from '@/lib/api-client';
-import { Check, X, CreditCard, Mail } from 'lucide-react';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
+import { CreditCalculator } from '@/components/site/CreditCalculator';
+import { CREDITS_PER_USD, TIER_CREDITS } from '@/lib/credits';
 
-// Two self-serve plans. Enterprise stays a real, billable tier in the
-// backend (SubscriptionTier.ENTERPRISE, Stripe/PayPal price IDs, spend
-// ceilings) — it's just not sold off a fixed-price card here. Volume and
-// custom-deployment terms are negotiated, so it's a "contact us" link
-// below the cards instead of a third self-serve plan.
-const plans = [
+/**
+ * /pricing in the site world "The product performs" (spec/art-direction.md).
+ * Order: the meter, live (how far each plan's credits go) → the three plans
+ * → when you are charged → the meter's public endpoint.
+ *
+ * Credit figures mirror src/reasoner/domain/credits.py via lib/credits.ts.
+ * Prices are owner decisions and stay [INPUT REQUIRED]. Enterprise is a
+ * real tier in the backend but sold on agreed terms, so it links to contact.
+ */
+
+const PLAN_DETAIL: Record<string, { price: string; includes: string }> = {
+  free: { price: '[INPUT REQUIRED: Free plan price]', includes: 'Budget presets and web search.' },
+  pro: { price: '[INPUT REQUIRED: Pro plan price]', includes: 'Budget and Premium presets, Neuro memory, deep research.' },
+  enterprise: { price: 'Agreed with you', includes: 'Self-hosted deployment, service levels and volume terms.' },
+};
+
+/** CreditReason in domain/credits.py, split by _CREDIT_REASONS. */
+const LEDGER_IN = ['signup_bonus', 'monthly_grant', 'purchase', 'refund', 'admin_adjustment'] as const;
+const LEDGER_OUT = ['pipeline_run', 'web_search', 'image_generation'] as const;
+
+/** GET /api/credits/pricing, as the backend returns it. */
+const PRICING_RESPONSE = JSON.stringify(
   {
-    name: 'Free',
-    tier: 'free',
-    // Figures are owner decisions (PRODUCT.md: pricing and limits undecided).
-    // Backend grants credits, not queries: TIER_MONTHLY_CREDITS in domain/credits.py.
-    price: '[INPUT REQUIRED: Free plan price]',
-    period: '',
-    queries: '[INPUT REQUIRED: Free plan monthly allowance]',
-    features: [
-      'Budget routing presets',
-      'Basic web search',
-      '[INPUT REQUIRED: Free plan support level]',
-    ],
-    notIncluded: [
-      'Premium models',
-      'Advanced analytics',
-    ],
+    credits_per_usd: CREDITS_PER_USD,
+    usd_per_credit: 1 / CREDITS_PER_USD,
+    tier_monthly_allowance: Object.fromEntries(TIER_CREDITS.map((t) => [t.tier, t.credits])),
+    reasons: ['signup_bonus', 'monthly_grant', 'purchase', 'admin_adjustment', 'refund', 'pipeline_run', 'image_generation', 'web_search'],
   },
-  {
-    name: 'Pro',
-    tier: 'pro',
-    price: '[INPUT REQUIRED: Pro plan price]',
-    period: '',
-    queries: '[INPUT REQUIRED: Pro plan monthly allowance]',
-    features: [
-      'All routing presets (Budget + Premium)',
-      'Advanced multi-model consensus',
-      'Deep research & iterative RAG',
-      'Neuro memory & embedding search',
-      '[INPUT REQUIRED: Pro plan support level]',
-    ],
-    notIncluded: [
-      'Custom model deployments',
-      'Dedicated infrastructure',
-    ],
-    highlighted: true,
-  },
-];
+  null,
+  2,
+);
 
 function isValidCheckoutUrl(url: string): boolean {
   try {
@@ -66,11 +54,16 @@ function isValidCheckoutUrl(url: string): boolean {
   }
 }
 
+const BODY = 'text-[length:var(--site-body)] leading-[var(--site-lh-body)]';
+const HEAD = 'font-display text-[length:var(--site-head)] leading-[var(--site-lh-head)]';
+const CAP = 'border-b border-[var(--site-line)] px-[var(--space-4)] py-[var(--space-3)] font-semibold';
+const PAY =
+  'inline-flex min-h-[var(--space-10)] items-center justify-center rounded-[var(--radius)] px-[var(--space-4)] font-semibold transition-colors duration-[var(--dur-micro)] disabled:opacity-40';
+
 export default function PricingPage() {
   // One action at a time across every tier/provider button (U7).
   const checkout = useAsyncAction();
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
-  const error = checkout.error;
   // `ok` means the redirect has started: keep the buttons locked until the page unloads.
   const locked = checkout.status === 'pending' || checkout.status === 'ok';
   const handleUpgrade = (tier: string, provider: 'stripe' | 'paypal') =>
@@ -96,174 +89,235 @@ export default function PricingPage() {
     checkout.pending && checkout.key === `${tier}:${provider}`;
 
   return (
-    <div className="flex min-h-dvh flex-col bg-[var(--bg)] text-[var(--text)]">
+    <div className="site flex min-h-dvh flex-col bg-[var(--bg)] text-[var(--text)]">
       <SiteHeader />
-      <main className="flex-1">
-        {/* ── Masthead ───────────────────────────────────────────
-            Left-aligned, not a centred hero, and no label above the h1. */}
-        <header className="mx-auto w-full max-w-[var(--width-wide)] px-[var(--gutter)] pb-[var(--section-y)] pt-[var(--space-48)]">
-          <div>
-            <div className="min-w-0">
-              <h1 className="max-w-[20ch] text-balance font-display text-[length:var(--text-4xl)] font-normal leading-[var(--lh-display)] sm:text-[length:var(--text-6xl)] tracking-[var(--tracking-tight)] text-[var(--text)]">
-                Simple, transparent pricing.
-              </h1>
-              <p className="prose-measure mt-[var(--space-6)] text-[length:var(--text-2xl)] leading-[var(--lh-body)] text-[var(--text-2)]">
-                Start free. Scale with confidence. No hidden fees.
+
+      <main id="main-content" className="flex-1">
+        {/* ── Hero: statement left, the live meter right ── */}
+        <header className="grid min-h-[var(--site-hero-h)] lg:grid-cols-2">
+          <div className="flex flex-col justify-end px-[var(--site-margin)] pb-[var(--space-12)] pt-[var(--space-32)] lg:pb-[var(--space-16)]">
+            <h1 className="font-display text-[length:var(--site-display)] leading-[var(--site-lh-display)]">
+              <span className="site-line">
+                <span>Pay only for</span>
+              </span>
+              <span className="site-line">
+                <span>what ran.</span>
+              </span>
+            </h1>
+            <div className="site-after-headline">
+              <p className="mt-[var(--space-8)] max-w-[44ch] text-[length:var(--site-lead)] leading-[var(--site-lh-body)]">
+                Every plan is a monthly allowance of credits. 1,000 credits are $1.00 of model spend,
+                charged after each run from what it actually cost.
               </p>
+              <div className="mt-[var(--space-8)] flex flex-wrap items-center gap-x-[var(--space-8)] gap-y-[var(--space-4)]">
+                <Link href="/chat" className="site-button">
+                  Start free
+                </Link>
+                <a href="#plans" className={`site-link ${BODY}`}>
+                  Compare plans
+                </a>
+              </div>
             </div>
+          </div>
+
+          <div className="flex items-center justify-center bg-[var(--site-surface)] px-[var(--site-margin)] py-[var(--space-16)] lg:pt-[var(--space-24)]">
+            <CreditCalculator />
           </div>
         </header>
 
-        <div className="mx-auto w-full max-w-[var(--width-wide)] px-[var(--gutter)] pb-[var(--section-y)]">
-        {error && (
-          <div className="mx-auto mb-6 max-w-lg rounded-[var(--radius)] bg-[var(--red-bg)] p-3 text-[length:var(--text-sm)] text-[var(--red)]" role="alert">
-            <div className="flex items-center gap-2">
-              <X className="h-4 w-4 shrink-0" />
-              {error}
+        {/* ── Plans: heading left, the plan sheet right ── */}
+        <section
+          id="plans"
+          aria-labelledby="plans-h"
+          className="mx-auto grid w-full max-w-[var(--site-max)] gap-[var(--space-12)] px-[var(--site-margin)] py-[var(--space-24)] lg:grid-cols-12"
+        >
+          <div className="lg:col-span-4">
+            <h2 id="plans-h" className={HEAD}>
+              <span className="block">Three plans,</span>
+              <span className="block">one meter.</span>
+            </h2>
+            <p className={`mt-[var(--space-6)] max-w-[36ch] ${BODY}`}>
+              The allowance tops up at the start of each billing period. Card payments go through
+              Stripe; PayPal works too.
+            </p>
+          </div>
+
+          <figure data-ui data-reveal className="min-w-0 rounded-[var(--radius-lg)] border border-[var(--site-line)] bg-[var(--site-surface)] lg:col-span-8">
+            <figcaption className={CAP}>Plans</figcaption>
+            {checkout.error && (
+              <p role="alert" className="border-b border-[var(--site-line)] px-[var(--space-4)] py-[var(--space-3)] text-[var(--red)]">
+                {checkout.error}
+              </p>
+            )}
+            <ul className="list-none">
+              {TIER_CREDITS.map(({ tier, name, credits }) => {
+                const { price, includes } = PLAN_DETAIL[tier];
+                return (
+                  <li
+                    key={tier}
+                    className="grid gap-[var(--space-3)] border-b border-[var(--site-line)] px-[var(--space-4)] py-[var(--space-5)] last:border-b-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start"
+                  >
+                    <div className="min-w-0">
+                      <p className="flex flex-wrap items-baseline gap-x-[var(--space-3)]">
+                        <span className="font-display text-[length:var(--site-lead)]">{name}</span>
+                        <span className="nums-tabular text-[var(--site-accent)]">
+                          {credits.toLocaleString('en-US')} credits a month
+                        </span>
+                      </p>
+                      <p className="mt-[var(--space-1)]">{price}</p>
+                      <p className="mt-[var(--space-1)] text-[var(--site-muted)]">{includes}</p>
+                    </div>
+
+                    <div className="flex flex-wrap gap-[var(--space-2)] sm:justify-end">
+                      {tier === 'free' && (
+                        <Link href="/chat" className={`${PAY} border border-[var(--site-line)] hover:bg-[var(--site-surface-2)]`}>
+                          Start free
+                        </Link>
+                      )}
+                      {tier === 'enterprise' && (
+                        <Link href="/contact?topic=enterprise" className={`${PAY} border border-[var(--site-line)] hover:bg-[var(--site-surface-2)]`}>
+                          Talk to us
+                        </Link>
+                      )}
+                      {tier === 'pro' &&
+                        (selectedTier === 'pro' ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleUpgrade('pro', 'stripe')}
+                              disabled={locked}
+                              aria-busy={isLoading('pro', 'stripe')}
+                              className={`${PAY} bg-[var(--site-accent)] text-[var(--site-accent-ink)] hover:opacity-90`}
+                            >
+                              {isLoading('pro', 'stripe') ? 'Opening…' : 'Pay by card'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleUpgrade('pro', 'paypal')}
+                              disabled={locked}
+                              aria-busy={isLoading('pro', 'paypal')}
+                              className={`${PAY} border border-[var(--site-line)] hover:bg-[var(--site-surface-2)]`}
+                            >
+                              {isLoading('pro', 'paypal') ? 'Opening…' : 'PayPal'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedTier(null)}
+                              className={`${PAY} text-[var(--site-muted)] hover:text-[var(--site-ink)]`}
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedTier('pro')}
+                            disabled={locked}
+                            className={`${PAY} bg-[var(--site-accent)] text-[var(--site-accent-ink)] hover:opacity-90`}
+                          >
+                            Upgrade to Pro
+                          </button>
+                        ))}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </figure>
+        </section>
+
+        {/* ── When you are charged: light field, ledger left, statement right ── */}
+        <section id="charged" aria-labelledby="charged-h" className="bg-[var(--site-field)] text-[var(--site-field-ink)]">
+          <div className="mx-auto grid w-full max-w-[var(--site-max)] gap-[var(--space-12)] px-[var(--site-margin)] py-[var(--space-24)] lg:grid-cols-12 lg:items-center">
+            <figure
+              data-ui
+              data-reveal
+              className="order-last min-h-[var(--site-fragment-min-h)] w-full min-w-0 rounded-[var(--radius-lg)] bg-[var(--site-bg)] text-[var(--site-ink)] lg:order-none lg:col-span-6"
+            >
+              <figcaption className={CAP}>Why a ledger entry exists</figcaption>
+              <div className="grid grid-cols-2 gap-[var(--space-4)] p-[var(--space-4)]">
+                {(
+                  [
+                    ['Adds credits', LEDGER_IN],
+                    ['Spends credits', LEDGER_OUT],
+                  ] as const
+                ).map(([title, reasons]) => (
+                  <div key={title}>
+                    <p className="text-[var(--site-muted)]">{title}</p>
+                    <ul className="mt-[var(--space-2)] list-none space-y-[var(--space-1)]">
+                      {reasons.map((r) => (
+                        <li key={r}>
+                          <code className="font-mono">{r}</code>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+              <p className="border-t border-[var(--site-line)] px-[var(--space-4)] py-[var(--space-3)] text-[var(--site-muted)]">
+                Append-only: each entry keeps its amount, reason and the balance after it.
+              </p>
+            </figure>
+
+            <div className="lg:col-span-5 lg:col-start-8">
+              <h2 id="charged-h" className={HEAD}>
+                <span className="block">Charged after</span>
+                <span className="block">the run.</span>
+              </h2>
+              <div className={`mt-[var(--space-6)] max-w-[44ch] space-y-[var(--space-4)] ${BODY}`}>
+                <p>
+                  A run that fails before any model is called costs nothing, and so does an answer from
+                  the cache. Charges round up to whole credits.
+                </p>
+                <p>
+                  Every charge carries an idempotency key, so a retried request cannot charge twice. If a
+                  run takes the balance to zero, the next one waits until the allowance tops up.
+                </p>
+              </div>
             </div>
           </div>
-        )}
+        </section>
 
-        <div className="mx-auto grid max-w-3xl grid-cols-1 gap-6 sm:grid-cols-2">
-          {plans.map((plan) => (
-            /* Elevation is a tone, not a shadow: --surface lifts 1.12:1 off
-               --bg, which is 3x the old step. The recommended tier is marked
-               by ground and border weight alone — no ring, no shadow, and no
-               cursor-following wash. */
-            <div
-              key={plan.name}
-              className={`relative flex flex-col rounded-[var(--radius-lg)] border p-6 ${
-                plan.highlighted
-                  ? 'border-[var(--border-strong)] bg-[var(--surface)]'
-                  : 'border-[var(--border)] bg-[var(--surface-2)]'
-              }`}
-            >
-              {plan.highlighted && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-[var(--accent)] px-3 py-0.5 text-[length:var(--text-xs)] font-semibold text-[var(--accent-text)]">
-                  Recommended
-                </div>
-              )}
-
-              <div className="mb-4">
-                <h2 className="text-[length:var(--text-lg)] font-semibold text-[var(--text)]">{plan.name}</h2>
-                <div className="mt-2 flex items-baseline gap-1">
-                  <span className="text-[length:var(--text-4xl)] font-bold text-[var(--text)]">{plan.price}</span>
-                  <span className="text-[length:var(--text-sm)] text-[var(--text-muted)]">{plan.period}</span>
-                </div>
-                <p className="mt-1 text-[length:var(--text-sm)] text-[var(--text-muted)]">{plan.queries}</p>
-              </div>
-
-              <ul className="mb-4 flex-1 space-y-2.5 text-left text-[length:var(--text-sm)] text-[var(--text-2)]">
-                {plan.features.map((f) => (
-                  <li key={f} className="flex items-start gap-2.5">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent)]" />
-                    <span>{f}</span>
-                  </li>
-                ))}
-                {plan.notIncluded?.map((f) => (
-                  <li key={f} className="flex items-start gap-2.5 text-[var(--text-subtle)]">
-                    <X className="mt-0.5 h-4 w-4 shrink-0" />
-                    <span className="line-through">{f}</span>
-                  </li>
-                ))}
-              </ul>
-
-              {plan.tier !== 'free' && (
-                <div className="space-y-2">
-                  {selectedTier === plan.tier ? (
-                    <>
-                      <button
-                        onClick={() => handleUpgrade(plan.tier, 'stripe')}
-                        disabled={locked}
-                        className="flex w-full items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-[var(--accent)] py-2.5 font-medium text-[var(--accent-text)] transition-all hover:opacity-90 disabled:opacity-40"
-                        aria-busy={isLoading(plan.tier, 'stripe')}
-                      >
-                        {isLoading(plan.tier, 'stripe') ? (
-                          'Loading…'
-                        ) : (
-                          <>
-                            <CreditCard className="h-4 w-4" />
-                            Pay with Card
-                          </>
-                        )}
-                      </button>
-                      {/* Payment method badges */}
-                      <div className="flex items-center justify-center gap-2 text-[length:var(--text-2xs)] text-[var(--text-subtle)]">
-                        <span className="rounded border border-[var(--border)] px-1.5 py-0.5">Visa</span>
-                        <span className="rounded border border-[var(--border)] px-1.5 py-0.5">Mastercard</span>
-                        <span className="rounded border border-[var(--border)] px-1.5 py-0.5">Apple Pay</span>
-                        <span className="rounded border border-[var(--border)] px-1.5 py-0.5">Google Pay</span>
-                      </div>
-                      <button
-                        onClick={() => handleUpgrade(plan.tier, 'paypal')}
-                        disabled={locked}
-                        className="flex w-full items-center justify-center gap-2 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface-2)] py-2.5 font-medium text-[var(--text)] transition-all hover:bg-[var(--surface-3)] disabled:opacity-40"
-                        aria-busy={isLoading(plan.tier, 'paypal')}
-                      >
-                        {isLoading(plan.tier, 'paypal') ? (
-                          'Loading…'
-                        ) : (
-                          <>
-                            {/* PayPal icon SVG */}
-                            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
-                              <path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.983 5.05-4.349 6.797-8.647 6.797h-2.19c-.524 0-.968.382-1.05.9l-1.12 7.106zm14.146-14.42a3.35 3.35 0 0 0-.607-.541c-1.027-.707-2.503-1.023-4.19-1.023h-5.533c-.468 0-.868.334-.94.8l-1.828 11.597a.493.493 0 0 0 .488.572h3.968c.34 0 .63-.246.687-.583l.404-2.56a.684.684 0 0 1 .687-.583h1.737c3.62 0 5.958-1.758 6.723-5.445.317-1.575.154-2.89-.596-3.834z" />
-                            </svg>
-                            PayPal
-                          </>
-                        )}
-                      </button>
-                      <button
-                        onClick={() => setSelectedTier(null)}
-                        className="w-full py-1 text-[length:var(--text-xs)] text-[var(--text-muted)] hover:text-[var(--text)]"
-                      >
-                        Cancel
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      onClick={() => setSelectedTier(plan.tier)}
-                      disabled={locked}
-                      className={`w-full rounded-[var(--radius-lg)] py-2.5 font-medium transition-all disabled:opacity-40 ${
-                        plan.highlighted
-                          ? 'bg-[var(--accent)] text-[var(--accent-text)] hover:opacity-90'
-                          : 'border border-[var(--border)] bg-[var(--surface-2)] text-[var(--text)] hover:bg-[var(--surface-3)]'
-                      }`}
-                    >
-                      Upgrade
-                    </button>
-                  )}
-                </div>
-              )}
-              {plan.tier === 'free' && (
-                <button
-                  disabled
-                  className="w-full cursor-default rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface-2)] py-2.5 font-medium text-[var(--text-muted)]"
-                >
-                  Current Plan
-                </button>
-              )}
+        {/* ── The meter's public endpoint ── */}
+        <section
+          id="meter"
+          aria-labelledby="meter-h"
+          className="mx-auto grid w-full max-w-[var(--site-max)] gap-[var(--space-12)] px-[var(--site-margin)] py-[var(--space-24)] lg:grid-cols-12"
+        >
+          <div className="lg:col-span-5">
+            <h2 id="meter-h" className={HEAD}>
+              <span className="block">Read the meter</span>
+              <span className="block">yourself.</span>
+            </h2>
+            <p className={`mt-[var(--space-6)] max-w-[44ch] ${BODY}`}>
+              The rate and every allowance are public, with no key, so a client can show costs before
+              anyone signs in. Your balance and ledger are on the API too.
+            </p>
+            <div className="mt-[var(--space-8)] flex flex-wrap items-center gap-x-[var(--space-8)] gap-y-[var(--space-4)]">
+              <Link href="/docs/credits" className="site-button">
+                Read how credits work
+              </Link>
+              <Link href="/contact?topic=enterprise" className={`site-link ${BODY}`}>
+                Ask about Enterprise
+              </Link>
             </div>
-          ))}
-        </div>
+          </div>
 
-        {/* Enterprise — custom terms, not a fixed self-serve price */}
-        <div className="mx-auto mt-8 max-w-3xl rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)] px-6 py-4 text-center">
-          <p className="text-[length:var(--text-sm)] text-[var(--text)]">
-            <span className="font-semibold">Need more than Pro?</span>{' '}
-            <span className="text-[var(--text-muted)]">
-              Custom model integrations, self-hosted deployment, SLAs, and volume pricing.
-            </span>
-          </p>
-          <Link
-            href="/contact?topic=enterprise"
-            className="mt-2 inline-flex items-center gap-1.5 text-[length:var(--text-sm)] font-medium text-[var(--accent)] hover:underline"
+          <figure
+            data-ui
+            data-reveal
+            className="flex min-h-[var(--site-fragment-min-h)] w-full min-w-0 flex-col self-end rounded-[var(--radius-lg)] border border-[var(--site-line)] bg-[var(--site-surface)] lg:col-span-6 lg:col-start-7"
           >
-            <Mail className="h-4 w-4" />
-            Contact us for Enterprise
-          </Link>
-        </div>
-        </div>
+            <figcaption className={CAP}>
+              <code className="font-mono">GET /api/credits/pricing</code>
+            </figcaption>
+            <pre className="flex-1 overflow-x-auto px-[var(--space-4)] py-[var(--space-4)] font-mono leading-[var(--site-lh-body)]">
+              <code>{PRICING_RESPONSE}</code>
+            </pre>
+          </figure>
+        </section>
       </main>
+
       <SiteFooter />
     </div>
   );

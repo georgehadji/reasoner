@@ -13,7 +13,7 @@ function fillAndSend() {
   fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Ada Lovelace' } });
   fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'ada@example.com' } });
   fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Scope a pilot.' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Send Message' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
 }
 
 beforeEach(() => {
@@ -30,7 +30,7 @@ describe('contact form', () => {
     mocked.submitContact.mockResolvedValue({ status: 'sent' });
     render(<ContactPage />);
     fillAndSend();
-    expect(await screen.findByRole('heading', { name: 'Message Sent' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Message sent.' })).toBeTruthy();
     expect(mocked.submitContact).toHaveBeenCalledWith({
       name: 'Ada Lovelace',
       email: 'ada@example.com',
@@ -44,7 +44,7 @@ describe('contact form', () => {
     render(<ContactPage />);
     fillAndSend();
     expect(await screen.findByText(/your message was not sent/i)).toBeTruthy();
-    expect(screen.queryByRole('heading', { name: 'Message Sent' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Message sent.' })).toBeNull();
     expect((screen.getByLabelText('Message') as HTMLTextAreaElement).value).toBe('Scope a pilot.');
   });
 

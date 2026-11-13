@@ -298,6 +298,7 @@
     --site-stack-h:  62svh;
     --site-hero-h:   100svh;
     --site-fragment: 30rem;     /* hero / pinned fragment width */
+    --site-fragment-min-h: 14rem; /* shortest cropped fragment: reads as a picture, not a chip */
     --site-dialog:   27.5rem;   /* create dialog width */
     --site-tab:      9.5rem;    /* agenda tab column */
     --site-band-gap: 0.25rem;

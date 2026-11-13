@@ -88,7 +88,7 @@ function Claim({ tone, children }: { tone: 'verified' | 'hypothesis'; children: 
         tone === 'verified' ? 'epistemic-verified' : 'epistemic-hypothesis'
       }`}
     >
-      <p className="font-sans text-[length:var(--text-xs)] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)]">
+      <p className="font-sans text-[length:var(--text-xs)] font-semibold leading-[var(--lh-ui)]">
         {tone === 'verified' ? 'Verified' : 'Hypothesis'}
       </p>
       <p className="mt-[var(--space-2)] text-[length:var(--text-base)] leading-[var(--lh-body)] text-[var(--text-muted)]">
@@ -143,7 +143,7 @@ const FIGURES = [
 
 export default function AboutPage() {
   return (
-    <div className="min-h-dvh bg-[var(--bg)] text-[var(--text)]">
+    <div className="site min-h-dvh bg-[var(--bg)] text-[var(--text)]">
       <SiteHeader />
 
       <main id="main-content">
@@ -263,10 +263,10 @@ export default function AboutPage() {
           <dl className="mt-[var(--space-12)] grid grid-cols-2 gap-[var(--space-6)] border-y border-[var(--border)] py-[var(--space-8)] sm:grid-cols-4">
             {FIGURES.map(({ value, label }) => (
               <div key={label}>
-                <dt className="nums-tabular font-mono text-[length:var(--text-2xl)] font-medium leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)]">
+                <dt className="nums-tabular font-display text-[length:var(--text-2xl)] font-medium leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)]">
                   {value.toLocaleString('en-US')}
                 </dt>
-                <dd className="mt-[var(--space-1)] font-sans text-[length:var(--text-xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
+                <dd className="mt-[var(--space-1)] font-sans text-[length:var(--text-xs)] font-medium leading-[var(--lh-ui)] text-[var(--text-muted)]">
                   {label}
                 </dd>
               </div>
@@ -305,7 +305,7 @@ export default function AboutPage() {
                 <dd className="mt-[var(--space-2)] text-[length:var(--text-base)] leading-[var(--lh-body)] text-[var(--text-muted)]">
                   {detail}
                 </dd>
-                <dd className="mt-[var(--space-2)] font-mono text-[length:var(--text-2xs)] leading-[var(--lh-body)] text-[var(--accent)]">
+                <dd className="mt-[var(--space-2)] font-sans text-[length:var(--text-sm)] leading-[var(--lh-body)] text-[var(--accent)]">
                   {cost}
                 </dd>
               </div>

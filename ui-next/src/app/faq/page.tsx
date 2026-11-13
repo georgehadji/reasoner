@@ -29,7 +29,7 @@ export const metadata: Metadata = {
  */
 export default function FAQPage() {
   return (
-    <div className="flex min-h-dvh flex-col bg-[var(--bg)] text-[var(--text)]">
+    <div className="site flex min-h-dvh flex-col bg-[var(--bg)] text-[var(--text)]">
       <JsonLd
         data={[
           faqSchema(FAQS),

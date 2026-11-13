@@ -27,7 +27,7 @@ function formatDate(iso: string): string {
 
 export default function ChangelogPage() {
   return (
-    <div className="flex min-h-dvh flex-col bg-[var(--bg)] text-[var(--text)]">
+    <div className="site flex min-h-dvh flex-col bg-[var(--bg)] text-[var(--text)]">
       <SiteHeader />
 
       <main className="mx-auto w-full max-w-[var(--width-content)] flex-1 px-[var(--gutter)] py-[var(--space-24)]">
@@ -49,7 +49,7 @@ export default function ChangelogPage() {
               />
               <time
                 dateTime={entry.date}
-                className="font-mono text-[length:var(--text-xs)] uppercase tracking-[var(--tracking-label)] text-[var(--text-subtle)]"
+                className="font-sans text-[length:var(--text-sm)] text-[var(--text-subtle)]"
               >
                 {formatDate(entry.date)}
               </time>

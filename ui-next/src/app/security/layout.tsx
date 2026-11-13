@@ -4,11 +4,11 @@ import { absoluteUrl } from '@/lib/site';
 export const metadata: Metadata = {
   title: 'Security',
   description:
-    'How Reasoner protects your data: AES-256-GCM at rest, TLS 1.3 in transit, prompt-injection defence, scoped API keys, retention controls, and vulnerability disclosure.',
+    'How Reasoner protects your data, control by control: encryption at rest and in transit, scoped API keys, an audit log, self-hosting, and how to report a vulnerability. Each with its status.',
   alternates: { canonical: absoluteUrl('/security') },
   openGraph: {
     title: 'Security — Reasoner',
-    description: 'Encryption, retention controls, and defence in depth.',
+    description: 'Every security control, with its status.',
     url: absoluteUrl('/security'),
     type: 'website',
   },

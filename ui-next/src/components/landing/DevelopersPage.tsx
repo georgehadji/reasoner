@@ -128,7 +128,7 @@ const CURL = `curl -s https://reasoner.app/api/agent/run/sync \\
 function Code({ children, label }: { children: string; label: string }) {
   return (
     <figure className="mt-[var(--space-8)]">
-      <figcaption className="font-sans text-[length:var(--text-2xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
+      <figcaption className="font-sans text-[length:var(--text-2xs)] font-medium leading-[var(--lh-ui)] text-[var(--text-muted)]">
         {label}
       </figcaption>
       <pre className="mt-[var(--space-3)] overflow-x-auto border border-[var(--border)] bg-[var(--surface)] p-[var(--space-6)] font-mono text-[length:var(--text-xs)] leading-[var(--lh-body)] text-[var(--text-2)]">
@@ -140,7 +140,7 @@ function Code({ children, label }: { children: string; label: string }) {
 
 export default function DevelopersPage() {
   return (
-    <div className="min-h-dvh bg-[var(--bg)] text-[var(--text)]">
+    <div className="site min-h-dvh bg-[var(--bg)] text-[var(--text)]">
       <SiteHeader />
 
       <main id="main-content">
@@ -191,7 +191,7 @@ export default function DevelopersPage() {
                   <span className="font-mono text-[length:var(--text-md)] leading-[var(--lh-ui)] text-[var(--text)]">
                     {name}
                   </span>
-                  <span className="font-sans text-[length:var(--text-2xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-subtle)]">
+                  <span className="font-sans text-[length:var(--text-2xs)] font-medium leading-[var(--lh-ui)] text-[var(--text-subtle)]">
                     {cost}
                   </span>
                 </dt>

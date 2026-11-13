@@ -47,7 +47,7 @@ export const FAQS: readonly FaqEntry[] = [
   },
   {
     q: 'Is my data used for training?',
-    a: 'No. Your queries and results are not used to train models. We do not yet publish a fixed retention period or offer self-serve zero-retention mode — both are on our roadmap. Contact us to request export or deletion in the meantime. Data is encrypted with AES-256-GCM at rest and TLS 1.3 in transit.',
+    a: 'No. Your queries and results are not used to train or fine-tune models. Runs, uploads and their search index are encrypted before storage, and connections use HTTPS. You can export or erase your data, or delete your account from settings; the privacy page lists every store. A fixed retention period and a zero-retention mode are not available yet.',
   },
   {
     q: 'Can I cancel my subscription?',

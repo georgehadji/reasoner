@@ -83,9 +83,37 @@ control, the pinned pilot fragment changing state. All of it collapses under
   390 (`.taste-skill/after/`).
 - Defended warnings: no photographs or footage (software with no photography; its pictures
   are its interface fragments); the critique heading sits at the foot of its section by
-  design; on a phone the live fragment comes before the button; the critic's input
+  design; the critic's input
   excerpts are quoted material in secondary ink.
-- Next: roll `.site` and the components to the marketing pages (/how-it-works,
+- Phone hero (2026-11-14): headline, sentence and button first, the live fragment after, so the
+  h1 is on the first screen. The inspector walks at most 11 screens after the fold; at 390px the
+  home page is about 13.6 screens, so `#start` is never scrolled into view there and reports a
+  blank gap. Visitors do reach it; this is a measurement limit, not an empty section.
+- /security rebuilt (2026-11-14): controls sheet with a status filter, request path, Compose
+  file, security.txt as served. Inspector: 0 FAIL at 1440 / 768 / 390 (`.taste-skill/pages/security/`).
+  The site header now switches to the drawer below `lg`: at 768px the six links and the actions
+  ran past the right edge.
+- /privacy rebuilt (2026-11-14): the store registry (`lib/user-data-stores.ts`, mirrored from
+  `api/user_data.py`) with a live "erase my data / delete my account" preview, export and
+  erasure receipt fragments. Removed a "last updated" that printed today's date and an
+  AES-256-GCM claim the body contradicted. Inspector: 0 FAIL at 1440 / 768 / 390.
+- /pricing rebuilt (2026-11-14): live "how far a month goes" meter (`lib/credits.ts`, mirrored
+  from `domain/credits.py`), plan sheet with the Stripe / PayPal checkout kept, ledger reasons,
+  `GET /api/credits/pricing` as served. Prices stay [INPUT REQUIRED]. Inspector: 0 FAIL.
+- /contact rebuilt (2026-11-14): form beside the email it becomes (format from
+  `routes/contact.py`, updates as you type), FAQ shortcuts, security.txt, the route's 200 / 503
+  answers. Dropped an unbacked "reply within 24 hours". Inspector: 0 FAIL.
+- /for/[sector] rebuilt (2026-11-14): sector name as the headline, the reviewer's gating
+  question as the lead, a printable review sheet as the hero fragment (status per question,
+  `PrintButton`), every answer as `StatusBands`, the reachable providers, the captured run
+  record on the field, and the pilot with the sector's methods (`SectorMethod` hints from
+  `METHOD_HINTS_DATA`). Defence is marked Western-only. Inspector: 0 FAIL on all six sectors.
+- Rolled out (2026-11-13, tokens and chrome only): `.site` on every marketing page root,
+  `SiteFooter` is now the quiet line, inverted bands flip to the concrete field, uppercase
+  micro-labels and prose mono removed, `Reveal` mounted in `SiteHeader`. Their layouts are
+  still the old ones and each fails the inspector 3–9 times (no pictures, thin rules,
+  headlines over two lines, off-centre columns, too little motion).
+- Next: rebuild each marketing page's composition from blueprints (/how-it-works,
   /capabilities, /developers, /security, /privacy, /pricing, /contact, /for/[sector], /about),
   replacing `SiteHeader` / `SiteFooter` there. Then the app screens as their own run.
 - Sample content to confirm: the pilot example problems in `PilotPinned.tsx` and

@@ -92,7 +92,7 @@ export const SECONDARY_CTA =
 
 /** The label above an epistemic or status rule (globals.css .epistemic-*). */
 export const LABEL_TAG =
-  'pl-[var(--space-3)] font-sans text-[length:var(--text-2xs)] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)]';
+  'pl-[var(--space-3)] font-sans text-[length:var(--text-sm)] font-semibold leading-[var(--lh-ui)]';
 
 /** The single primary action on every persuasion page. */
 export function PilotCta() {
