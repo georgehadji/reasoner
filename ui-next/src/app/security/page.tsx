@@ -21,7 +21,21 @@ const CARDS: Card[] = [
     icon: Database,
     title: 'Data Privacy',
     items: [
-      { done: true, label: 'No Training', desc: 'Your data is never used to train or fine-tune any model.' },
+      {
+        done: true,
+        label: 'No training by us',
+        desc: (
+          <>
+            We do not use your data to train or fine-tune models. Each model provider has its own
+            terms; see{' '}
+            <Link href="/subprocessors" className="underline hover:text-[var(--accent)]">
+              Sub-processors
+            </Link>
+            . [INPUT REQUIRED: which providers may retain or train on API traffic, and does our
+            OpenRouter account enforce a no-training setting?]
+          </>
+        ),
+      },
       { done: true, label: 'Ownership', desc: 'You retain full ownership of your inputs, queries, and generated insights.' },
       {
         done: true,
@@ -46,16 +60,27 @@ const CARDS: Card[] = [
     icon: Lock,
     title: 'Encryption',
     items: [
-      { done: true, label: 'At Rest', desc: 'Stored data is encrypted using AES-256-GCM.' },
-      { done: true, label: 'In Transit', desc: 'All connections are protected via TLS 1.3.' },
-      { done: true, label: 'Key Management', desc: 'Keys are rotated and isolated per the process documented in our encryption architecture.' },
+      {
+        done: true,
+        label: 'At rest',
+        desc: 'Run state, problem text and API key metadata are encrypted at the field level: Fernet (AES-128-CBC with HMAC) by default, AES-256-GCM when enabled. [INPUT REQUIRED: which format production uses]',
+      },
+      {
+        done: true,
+        label: 'In transit',
+        desc: 'Connections use HTTPS with HSTS. Model calls leave our servers over TLS and are decrypted by the router and the model provider, so this is not end-to-end encryption.',
+      },
+      {
+        done: true,
+        label: 'Key rotation',
+        desc: 'A new key is added in front of the old ones; existing data stays readable and new data uses the new key.',
+      },
     ],
   },
   {
     icon: Server,
     title: 'Infrastructure',
     items: [
-      { done: true, label: 'Zero-Trust internal network', desc: 'Every internal service call is authenticated and encrypted, independent of the network perimeter.' },
       {
         done: false,
         label: 'SOC 2 Type II',
@@ -69,7 +94,11 @@ const CARDS: Card[] = [
           </>
         ),
       },
-      { done: true, label: 'Network Isolation', desc: 'Runs inside a private network with restricted egress/ingress.' },
+      {
+        done: false,
+        label: 'Hosting and network controls',
+        desc: '[INPUT REQUIRED: hosting provider, region, and network isolation in production]',
+      },
     ],
   },
   {
@@ -77,8 +106,9 @@ const CARDS: Card[] = [
     title: 'Identity & Access',
     items: [
       { done: false, label: 'SSO (SAML 2.0 / OIDC)', desc: 'Okta, Azure AD, and Google Workspace support is planned, not yet available.' },
-      { done: true, label: 'RBAC', desc: 'Role-based access control for teams and organizations.' },
-      { done: true, label: 'Audit Logs', desc: 'Every access is logged.' },
+      { done: true, label: 'Scoped API keys', desc: 'Each API key carries its own permission scopes.' },
+      { done: false, label: 'Team roles', desc: 'Not available. Accounts are individual; there are no organisation roles yet.' },
+      { done: true, label: 'Audit log', desc: 'Sign-in and account events are logged with time, IP address and user agent. Individual reads of your data are not logged.' },
     ],
   },
 ];
@@ -99,8 +129,9 @@ export default function SecurityPage() {
                 Security &amp; Trust
               </h1>
               <p className="prose-measure mt-[var(--space-6)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-2)]">
-                We do not train on your data, we encrypt it end to end, and we log every access.
-                Here is exactly what that means today — and what is still on the roadmap.
+                What is in place today, what is not, and what we still have to confirm. A tick means
+                it is built; a clock means it is not available or not yet confirmed.
+
               </p>
             </div>
           </div>
@@ -142,8 +173,9 @@ export default function SecurityPage() {
             Where your data goes
           </h2>
           <p className="prose-measure mt-[var(--space-3)] text-[length:var(--text-sm)] leading-[var(--lh-body)] text-[var(--text-muted)]">
-            Requests are routed to model providers to generate a response. We do not sell your data,
-            and no provider we route to trains on API traffic by default. Full list on{' '}
+            To answer, your request is sent through OpenRouter to one or more of the model providers
+            below, each under its own terms. We do not sell your data. Full list, with each
+            provider&rsquo;s privacy policy, on{' '}
             <Link href="/subprocessors" className="underline hover:text-[var(--accent)]">
               Sub-processors
             </Link>
@@ -166,9 +198,9 @@ export default function SecurityPage() {
             Self-hosting
           </h2>
           <p className="prose-measure mt-[var(--space-3)] text-[length:var(--text-sm)] leading-[var(--lh-body)] text-[var(--text-muted)]">
-            If data residency is a hard requirement, run Reasoner in your own infrastructure with your
-            own Postgres and Valkey using the published Docker stack. Nothing leaves your network
-            except the model calls you configure.
+            The full stack (API, Postgres, Valkey) runs from one Docker Compose file, so it can run
+            inside your own infrastructure; then only the model calls you configure leave your
+            network. [INPUT REQUIRED: is self-hosting offered to customers, and on what licence?]
           </p>
         </section>
 

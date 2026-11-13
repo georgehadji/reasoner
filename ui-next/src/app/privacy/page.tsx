@@ -44,13 +44,15 @@ export default function PrivacyPage() {
             <section>
               <h3 className="text-[length:var(--text-2xl)] font-bold mb-6 text-[var(--text)]">2. Encryption & Security</h3>
               <p className="mb-4">
-                <strong>Encryption at Rest:</strong> All sensitive data, including pipeline snapshots, history, and 
-                authentication metadata, is encrypted using industry-standard <strong>AES-256-GCM</strong> before storage.
+                <strong>Encryption at Rest:</strong> Pipeline state, problem text and API key metadata are
+                encrypted at the field level before storage: Fernet (AES-128-CBC with HMAC) by default,
+                AES-256-GCM when enabled.
               </p>
               <p>
-                <strong>Encryption in Transit:</strong> Every request is protected via <strong>TLS 1.3</strong>. 
-                Our internal architecture utilizes a <strong>Zero-Trust</strong> network where all inter-service 
-                communication is authenticated and encrypted via an internal PKI.
+                <strong>Encryption in Transit:</strong> Connections use HTTPS with HSTS. To generate a
+                response, requests are sent over TLS to our model router and the model providers listed on
+                the Sub-processors page, which decrypt them to process them. This is not end-to-end
+                encryption.
               </p>
             </section>
 
@@ -97,7 +99,7 @@ export default function PrivacyPage() {
                   <EyeOff className="h-5 w-5 text-[var(--accent)] shrink-0" />
                   <div>
                     <p className="text-[length:var(--text-sm)] font-bold text-[var(--text)]">No Training</p>
-                    <p className="text-[length:var(--text-xs)]">Your data is never used for training.</p>
+                    <p className="text-[length:var(--text-xs)]">We do not use your data to train models. Model providers have their own terms; see Sub-processors.</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
