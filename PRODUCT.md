@@ -17,6 +17,11 @@ cost if it is wrong.
 - **Individual power users.** They already have a chatbot and want something better than
   it for hard problems, and will pay per run to get it.
 
+**Landing-page focus (2026-11-13):** regulated and high-stakes buyers who must defend an
+answer to someone else: defence and security, healthcare operations (never clinical),
+research and teaching, legal and compliance, aerospace and engineering, government and
+policy. The pitch is auditability, not better answers. Sold through paid pilots.
+
 Developers consuming the HTTP API, MCP server or TypeScript SDK exist as a surface
 (`docs/`, `developers/`, `capabilities/`, `src/reasoner/api/mcp/`, `sdk/typescript/`)
 but were not confirmed as a primary audience. Treat them as secondary until stated

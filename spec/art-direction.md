@@ -26,9 +26,9 @@ misregistration is not decoration; it is the product's shape.
 
 ## 2. Signature — the plates never register
 
-Each Phase 2 perspective (`components/phases/PerspectivesRenderer.tsx`) and each lab
-plate on the landing image exhibit is printed on its own pink plate (`.misregister`
-in `globals.css`). Each item in a run of four gets a different offset, in a
+Each Phase 2 perspective (`components/phases/PerspectivesRenderer.tsx`) is printed
+on its own pink plate (`.misregister` in `globals.css`). The landing page's image
+exhibit, which also carried it, was cut in the 2026-11-13 repositioning. Each item in a run of four gets a different offset, in a
 different direction. On load the plates settle once, from 3x offset to 1x, under
 `--dur-scene`. They never reach zero. Under `prefers-reduced-motion` they render at
 rest.
