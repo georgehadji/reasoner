@@ -14,7 +14,9 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-_FENCED_CODE_RE = re.compile(r"```.*?```|~~~.*?~~~", re.DOTALL)
+# CommonMark: the closing fence is at least as long as the opening one, and an
+# unclosed fence runs to the end of the text ("``````" opens; "```" does not close).
+_FENCED_CODE_RE = re.compile(r"(`{3,}|~{3,}).*?(?:\1|\Z)", re.DOTALL)
 _INLINE_CODE_RE = re.compile(r"`[^`\n]+`")
 _URL_RE = re.compile(r"https?://[^\s\)\]<>\"']+")
 # Mirrors the link-extraction convention already used in

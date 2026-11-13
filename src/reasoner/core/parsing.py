@@ -181,6 +181,11 @@ def extract_json_any(text: str) -> Any:
     if len(text) > MAX_INPUT_LENGTH:
         text = text[:MAX_INPUT_LENGTH]
 
+    # Valid JSON has no reasoning tags outside its strings, so try it untouched
+    # first: stripping would cut {"note": "a </think> b"} at the tag.
+    strict = _parse_strict(text.strip())
+    if strict is not None:
+        return strict
     text = _strip_reasoning_tags(text.strip())
     # Strict first. The citation, "Sources:" and artifact strippers below also
     # match inside JSON strings, so they ran on valid output and corrupted it:
