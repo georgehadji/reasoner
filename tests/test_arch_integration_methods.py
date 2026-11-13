@@ -90,7 +90,7 @@ class TestAllMethodsComplete:
 
     @pytest.mark.parametrize("method, preset_id", _METHOD_PRESETS)
     @pytest.mark.asyncio
-    @pytest.mark.timeout(240)
+    @pytest.mark.timeout(600)
     async def test_method_produces_synthesis(self, method, preset_id):
         problem = _PROBLEMS.get(method, "What is 2+2? Explain your reasoning.")
         router = _build_router(preset_id)
@@ -126,7 +126,7 @@ class TestAllMethodsTracksTokens:
 
     @pytest.mark.parametrize("method, preset_id", _METHOD_PRESETS)
     @pytest.mark.asyncio
-    @pytest.mark.timeout(240)
+    @pytest.mark.timeout(600)
     async def test_method_tracks_tokens(self, method, preset_id):
         problem = _PROBLEMS.get(method, "What is 2+2? Explain your reasoning.")
         router = _build_router(preset_id)
@@ -159,7 +159,7 @@ class TestAllMethodsStateInvariants:
         ("delphi", "delphi-budget"),
     ])
     @pytest.mark.asyncio
-    @pytest.mark.timeout(240)
+    @pytest.mark.timeout(600)
     async def test_method_state_populated(self, method, preset_id):
         problem = _PROBLEMS.get(method, "Explain your reasoning process.")
         router = _build_router(preset_id)
@@ -200,7 +200,7 @@ class TestAllMethodsDecomposition:
 
     @pytest.mark.parametrize("method, preset_id", _METHOD_PRESETS)
     @pytest.mark.asyncio
-    @pytest.mark.timeout(240)
+    @pytest.mark.timeout(600)
     async def test_method_has_decomposition(self, method, preset_id):
         problem = _PROBLEMS.get(method, "Explain your reasoning process.")
         router = _build_router(preset_id)
@@ -224,7 +224,7 @@ class TestAllMethodsEpistemicLabeling:
 
     @pytest.mark.parametrize("method, preset_id", _METHOD_PRESETS)
     @pytest.mark.asyncio
-    @pytest.mark.timeout(240)
+    @pytest.mark.timeout(600)
     async def test_method_labels_claims(self, method, preset_id):
         problem = _PROBLEMS.get(method, "Explain your reasoning process.")
         router = _build_router(preset_id)

@@ -37,7 +37,8 @@ on:
 jobs:
   live:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # Run 43388103240 reached 61% of the budget filter in 45 minutes.
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -81,7 +82,9 @@ jobs:
           # `INTERNALERROR> KeyError: <WorkerController gw7>`.
           #
           # No --timeout: the per-test markers own that, and pytest-timeout's
-          # marker beats the CLI flag anyway. Full-pipeline tests are at 300s.
+          # marker beats the CLI flag anyway. Full-pipeline tests are at 600s;
+          # the slowest that passed took 277s on 2026-11-13, and 180s and 240s
+          # markers cut off runs whose every model call had succeeded.
           #
           # Inputs reach the script through env: above, never by template
           # interpolation into this block, so a -k expression cannot become
