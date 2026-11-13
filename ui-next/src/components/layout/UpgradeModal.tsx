@@ -1,9 +1,10 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { useAsyncAction } from '@/hooks/useAsyncAction';
 import { apiFetch } from '@/lib/api-client';
 import { X, Lock } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/Button';
 
 interface UpgradeModalProps {
   open: boolean;
@@ -50,83 +51,77 @@ export function UpgradeModal({ open, onClose }: UpgradeModalProps) {
       window.location.href = url;
     }, 'Checkout failed');
 
+  /* A modal <dialog> traps Tab, closes on Escape and returns focus to whatever
+     opened it. Same pattern as SiteHeader's drawer and ChatFeed's lightbox. */
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const el = dialogRef.current;
+    if (!el) return;
+    if (open && !el.open) el.showModal();
+    if (!open && el.open) el.close();
+  }, [open]);
+
   return (
-    <div
-      className={cn(
-        'fixed inset-0 z-50 flex items-center justify-center px-4 transition-all duration-[var(--dur-component)]',
-        open ? 'bg-[var(--scrim)] opacity-100' : 'bg-transparent opacity-0 pointer-events-none',
-      )}
-      role="dialog"
-      aria-modal="true"
-      // Kept mounted for the exit transition; inert removes it from tab order and the a11y tree.
-      inert={!open}
+    // No `display` utility on the <dialog>: it would override the UA's display:none while closed.
+    <dialog
+      ref={dialogRef}
       aria-labelledby="upgrade-title"
       aria-describedby="upgrade-desc"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+      onClose={onClose}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      className="m-0 h-full max-h-none w-full max-w-none border-0 bg-[var(--scrim)] p-0 text-[var(--text)]"
     >
       <div
-        className={cn(
-          'w-full max-w-[var(--width-form)] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[var(--shadow-lg)] transition-all duration-[var(--dur-component)]',
-          open ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-4 opacity-0 scale-95',
-        )}
+        className="flex h-full items-center justify-center px-[var(--space-4)]"
+        onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       >
-        <div className="mb-4 flex items-center justify-between">
-          <h2 id="upgrade-title" className="text-[length:var(--text-xl)] font-bold text-[var(--text)]">
-            Upgrade to Pro
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-[var(--radius)] p-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
-            aria-label="Close upgrade modal"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        <p id="upgrade-desc" className="mb-6 text-[var(--text-2)]">
-          You&apos;ve reached your free tier limit. Upgrade to Pro to unlock all premium presets.
-        </p>
-
-        {error && (
-          <div className="mb-4 rounded-[var(--radius)] bg-[var(--red-bg)] p-3 text-[length:var(--text-sm)] text-[var(--red)]" role="alert">
-            {error}
+        <div className="animate-phase-reveal w-full max-w-[var(--width-form)] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-[var(--space-6)] shadow-[var(--shadow-lg)]">
+          <div className="mb-[var(--space-4)] flex items-center justify-between">
+            <h2 id="upgrade-title" className="text-[length:var(--text-xl)] font-bold text-[var(--text)]">
+              Upgrade to Pro
+            </h2>
+            <button
+              type="button"
+              onClick={onClose}
+              className="-mr-[var(--space-3)] flex h-11 w-11 items-center justify-center rounded-[var(--radius)] text-[var(--text-muted)] transition-colors duration-[var(--dur-micro)] ease-[var(--ease-standard)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
+              aria-label="Close upgrade dialog"
+            >
+              <X className="h-5 w-5" aria-hidden="true" />
+            </button>
           </div>
-        )}
 
-        <div className="mb-6 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-2)] p-4">
-          <div className="flex items-center gap-2 text-[length:var(--text-sm)] font-medium text-[var(--text)]">
-            <Lock className="h-4 w-4 text-[var(--accent)]" />
-            Pro Plan — [INPUT REQUIRED: Pro plan price]
+          <p id="upgrade-desc" className="mb-[var(--space-6)] text-[var(--text-2)]">
+            You&apos;ve reached your free tier limit. Upgrade to Pro to unlock all premium presets.
+          </p>
+
+          {error && (
+            <div className="mb-[var(--space-4)] rounded-[var(--radius)] bg-[var(--red-bg)] p-[var(--space-3)] text-[length:var(--text-sm)] text-[var(--red)]" role="alert">
+              {error}
+            </div>
+          )}
+
+          <div className="mb-[var(--space-6)] rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-2)] p-[var(--space-4)]">
+            <div className="flex items-center gap-[var(--space-2)] text-[length:var(--text-sm)] font-medium text-[var(--text)]">
+              <Lock className="h-4 w-4 text-[var(--accent)]" aria-hidden="true" />
+              Pro Plan — [INPUT REQUIRED: Pro plan price]
+            </div>
+            <ul className="mt-[var(--space-2)] space-y-[var(--space-1)] text-[length:var(--text-sm)] text-[var(--text-muted)]">
+              <li>[INPUT REQUIRED: Pro plan monthly allowance]</li>
+              <li>All premium presets</li>
+              <li>[INPUT REQUIRED: Pro plan support level]</li>
+            </ul>
           </div>
-          <ul className="mt-2 space-y-1 text-[length:var(--text-sm)] text-[var(--text-muted)]">
-            <li>[INPUT REQUIRED: Pro plan monthly allowance]</li>
-            <li>All premium presets</li>
-            <li>[INPUT REQUIRED: Pro plan support level]</li>
-          </ul>
-        </div>
 
-        <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={handleUpgrade}
-            disabled={loading}
-            className="flex-1 rounded-[var(--radius)] bg-[var(--accent)] py-2.5 text-[var(--accent-text)] font-medium transition-opacity hover:opacity-90 disabled:opacity-40"
-            aria-busy={loading}
-          >
-            {loading ? 'Loading…' : 'Upgrade Now'}
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-1 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-2)] py-2.5 text-[var(--text)] font-medium transition-colors hover:bg-[var(--surface-3)]"
-          >
-            Maybe Later
-          </button>
+          <div className="flex gap-[var(--space-3)]">
+            <Button type="button" onClick={handleUpgrade} loading={loading} className="flex-1 rounded-[var(--radius)]">
+              Upgrade Now
+            </Button>
+            <Button type="button" variant="secondary" onClick={onClose} className="flex-1 rounded-[var(--radius)]">
+              Maybe Later
+            </Button>
+          </div>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }
