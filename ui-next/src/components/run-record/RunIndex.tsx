@@ -1,21 +1,21 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { RUN } from '@/lib/demo-record';
+import { RUN, RUN_MODELS } from '@/lib/demo-record';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 
 /**
- * The record's table of contents, and the pipeline diagram, and the only
- * timing chart on the page — one element doing all three jobs.
+ * /how-it-works' hero fragment (data-ui): the captured run's header, and its
+ * five phases as a contents list and a timing chart in one.
  *
- * Each phase's bar is as wide as its share of the run's wall clock, so the
- * shape of the strip is a fact about this run: generating four positions took
- * longer than everything except critique. The bars fill in sequence at those
- * same proportions when the strip is first seen. That is the whole animation
- * budget of the page, and it is spent on data.
+ * Each bar is that phase's seconds against the slowest phase, so the shape is
+ * a fact about this run. The bars fill in sequence at the run's own
+ * proportions (compressed to ~2.2s) when first seen; reduced motion shows
+ * them filled.
  */
 
 const TOTAL_SECONDS = RUN.phases.reduce((sum, phase) => sum + phase.seconds, 0);
+const MAX_SECONDS = Math.max(...RUN.phases.map((phase) => phase.seconds));
 
 /** Real seconds compressed to a watchable ~2.2s, proportions untouched. */
 const TIME_SCALE = 2200 / TOTAL_SECONDS;
@@ -56,54 +56,56 @@ export function RunIndex() {
   }, [reduced]);
 
   return (
-    <nav
+    <figure
       ref={ref}
-      aria-label="Contents of the run"
-      className="border-y border-[var(--border)]"
+      data-ui
+      className="w-full rounded-[var(--radius-lg)] border border-[var(--site-line)] bg-[var(--site-bg)] text-[var(--site-ink)] lg:max-w-[var(--site-fragment)]"
     >
-      <ol
-        role="list"
-        className="mx-auto flex w-full max-w-[var(--width-wide)] list-none flex-col px-[var(--gutter)] sm:flex-row"
-        style={{ gap: 'var(--space-4)' }}
-      >
-        {RUN.phases.map((phase, i) => (
-          <li
-            key={phase.id}
-            className="min-w-0 py-[var(--space-4)]"
-            /* Column width is the phase's share of the run — the strip is a
-               timing chart the moment it has more than one item in a row. */
-            style={{ flex: `${phase.seconds} 1 0%` }}
-          >
-            <a
-              href={`#${phase.id}`}
-              className="group block focus-visible:outline-none"
-            >
-              <span
-                aria-hidden="true"
-                className="block h-[3px] w-full overflow-hidden bg-[var(--border)]"
-              >
-                <span
-                  className="block h-full origin-left bg-[var(--accent)]"
-                  style={{
-                    transform: started ? 'scaleX(1)' : 'scaleX(0)',
-                    transitionProperty: 'transform',
-                    transitionTimingFunction: 'linear',
-                    transitionDuration: reduced ? '0ms' : `${phase.seconds * TIME_SCALE}ms`,
-                    transitionDelay: reduced ? '0ms' : `${OFFSETS[i] * TIME_SCALE}ms`,
-                  }}
-                />
-              </span>
+      <div className="flex flex-wrap items-center justify-between gap-[var(--space-3)] border-b border-[var(--site-line)] px-[var(--space-4)] py-[var(--space-3)]">
+        <span className="font-semibold">One captured run</span>
+        <span className="text-[var(--site-muted)] nums-tabular">{RUN.capturedOn}</span>
+      </div>
+      <p className="border-b border-[var(--site-line)] px-[var(--space-4)] py-[var(--space-3)]">
+        {RUN.question}
+      </p>
 
-              <span className="mt-[var(--space-3)] block font-sans text-[length:var(--text-xs)] font-medium leading-[var(--lh-ui)] text-[var(--text-2)] transition-colors duration-[var(--dur-micro)] group-hover:text-[var(--accent)]">
-                {phase.name}
-              </span>
-              <span className="nums-tabular mt-[var(--space-1)] block font-mono text-[length:var(--text-2xs)] leading-[var(--lh-ui)] text-[var(--text-subtle)]">
-                {phase.seconds.toFixed(1)}s
-              </span>
-            </a>
-          </li>
-        ))}
-      </ol>
-    </nav>
+      <nav aria-label="Phases of the run">
+        <ol className="list-none">
+          {RUN.phases.map((phase, i) => (
+            <li key={phase.id} className="border-b border-[var(--site-line)]">
+              <a
+                href={`#${phase.id}`}
+                className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)_auto] items-center gap-[var(--space-3)] px-[var(--space-4)] py-[var(--space-3)] hover:bg-[var(--site-surface)]"
+              >
+                <span>{phase.name}</span>
+                <span aria-hidden="true" className="block h-[var(--space-2)] overflow-hidden rounded-full bg-[var(--site-surface)]">
+                  <span
+                    className="block h-full origin-left rounded-full bg-[var(--site-accent)]"
+                    style={{
+                      width: `${(phase.seconds / MAX_SECONDS) * 100}%`,
+                      transform: started ? 'scaleX(1)' : 'scaleX(0)',
+                      transitionProperty: 'transform',
+                      transitionTimingFunction: 'linear',
+                      transitionDuration: reduced ? '0ms' : `${phase.seconds * TIME_SCALE}ms`,
+                      transitionDelay: reduced ? '0ms' : `${OFFSETS[i] * TIME_SCALE}ms`,
+                    }}
+                  />
+                </span>
+                <span className="text-right text-[var(--site-muted)] nums-tabular">{phase.seconds.toFixed(1)}s</span>
+              </a>
+            </li>
+          ))}
+        </ol>
+      </nav>
+
+      <figcaption className="flex flex-wrap items-center justify-between gap-[var(--space-3)] px-[var(--space-4)] py-[var(--space-3)] text-[var(--site-muted)] nums-tabular">
+        <span>
+          {RUN_MODELS.length} models · <code>{RUN.preset}</code>
+        </span>
+        <span>
+          {RUN.ledger.seconds.toFixed(1)}s · ${RUN.ledger.costUsd.toFixed(4)}
+        </span>
+      </figcaption>
+    </figure>
   );
 }

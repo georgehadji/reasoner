@@ -108,6 +108,12 @@ control, the pinned pilot fragment changing state. All of it collapses under
   `PrintButton`), every answer as `StatusBands`, the reachable providers, the captured run
   record on the field, and the pilot with the sector's methods (`SectorMethod` hints from
   `METHOD_HINTS_DATA`). Defence is marked Western-only. Inspector: 0 FAIL on all six sectors.
+- /how-it-works rebuilt (2026-11-14): one captured run walked phase by phase, each phase's
+  real output as a fragment (sources with cited/read, the four positions, critic scores with
+  kept/pruned and bias flags, stress tests, the synthesis toggle, the API call and ledger).
+  `RunIndex` is now the hero (timing chart + contents); the synthesis reads inside a scrolling
+  reader capped by `--site-reader-h`. Dropped the "Terms" block: /security owns those claims.
+  The rail's "N VERIFIED" counted every label kind; it now counts each kind. Inspector: 0 FAIL.
 - Rolled out (2026-11-13, tokens and chrome only): `.site` on every marketing page root,
   `SiteFooter` is now the quiet line, inverted bands flip to the concrete field, uppercase
   micro-labels and prose mono removed, `Reveal` mounted in `SiteHeader`. Their layouts are

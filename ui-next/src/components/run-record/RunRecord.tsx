@@ -1,502 +1,312 @@
 import Link from 'next/link';
-import type { ReactNode } from 'react';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
-import { CAPABILITIES, PROVIDERS } from '@/lib/capabilities.generated';
-import { RUN, RUN_MODELS } from '@/lib/demo-record';
+import { CAPABILITIES } from '@/lib/capabilities.generated';
+import { RUN, RUN_MODELS, SCORE_AXES } from '@/lib/demo-record';
 import { ApparatusToggle } from './ApparatusToggle';
 import { RunIndex } from './RunIndex';
-import { ScoreMatrix } from './ScoreMatrix';
 import { Marks } from './Segments';
 
 /**
- * This page is one real run of the product, laid out as the record that
- * run produced.
+ * /how-it-works in the site world "The product performs" (spec/art-direction.md).
  *
- * The reasoning behind the form: Reasoner's output is not an answer, it is an
- * answer plus the argument, the scores, and the dissent. The home page states
- * that in prose; this page proves it with an artifact, and cannot be reused by
- * any product that has no such artifact. So the section names here are the
- * pipeline's own phase names, the figures are counted from `demo-record.ts`,
- * and the only two rounded shapes on the page are the things you can operate.
+ * One real run of the product, walked phase by phase. Each section shows that
+ * phase's actual output as an interface fragment: the sources it read, the
+ * four positions, the critic's scores, the stress tests, the labelled answer,
+ * and the JSON it comes back as. Every figure is counted from
+ * lib/demo-record.ts, a capture of the production pipeline.
  *
- * A server component on purpose — the page is a document. The three client
- * islands are the two that need state (the apparatus toggle, the timing strip)
- * and the shared site header.
+ * A server component on purpose: the page is a document. The client islands
+ * are the timing chart and the record toggle.
  */
 
-const SOURCE_URLS = new Set(RUN.sources.map((source) => source.url));
-const CITED_FROM_SWEEP = RUN.citations.filter((citation) => SOURCE_URLS.has(citation.url)).length;
+const CITED_URLS = new Set(RUN.citations.map((citation) => citation.url));
+const CITED_FROM_SWEEP = RUN.sources.filter((source) => CITED_URLS.has(source.url)).length;
 const PERSPECTIVE_MODELS = RUN.phases.find((phase) => phase.id === 'positions')?.models ?? [];
 const PRUNED = RUN.scores.filter((score) => !score.retained);
 
-/** Facts with a document behind them in this repo — nothing aspirational. */
-const TERMS: Array<{ term: string; detail: string }> = [
-  {
-    term: 'Source-available',
-    detail:
-      'Read the code under a Business Source License. It converts to Apache-2.0 in 2030.',
-  },
-  {
-    term: 'Self-hostable',
-    detail: 'A full Docker stack against your own Postgres and Valkey. Your keys, your infrastructure.',
-  },
-  {
-    term: 'Encrypted at rest and in transit',
-    detail: 'Session and memory data is encrypted on both legs.',
-  },
-  {
-    term: 'Not training data',
-    detail: 'We do not train on your conversations. They stay private by default.',
-  },
-];
+const BODY = 'text-[length:var(--site-body)] leading-[var(--site-lh-body)]';
+const HEAD = 'font-display text-[length:var(--site-head)] leading-[var(--site-lh-head)]';
+const CAP = 'border-b border-[var(--site-line)] px-[var(--space-4)] py-[var(--space-3)] font-semibold';
+const FIGURE = 'w-full min-w-0 rounded-[var(--radius-lg)] border border-[var(--site-line)]';
+const SECTION = 'mx-auto grid w-full max-w-[var(--site-max)] gap-[var(--space-12)] px-[var(--site-margin)] py-[var(--space-24)] lg:grid-cols-12 lg:items-center';
 
-/* ── Section chrome ───────────────────────────────────────────────── */
-
-/**
- * A section of the record: a marginal label that stays with you while you read
- * it, and the content column. The margin is the one structural irregularity on
- * the page and it earns its place — five phases deep into a record you should
- * never have to scroll up to find out which one you are in.
- */
-function Section({
-  id,
-  marker,
-  name,
-  children,
-}: {
-  id?: string;
-  marker: string;
-  name: string;
-  children: ReactNode;
-}) {
+/** A section heading set as two lines, the house rule for every headline. */
+function Heading({ id, lines }: { id: string; lines: [string, string] }) {
   return (
-    <section
-      id={id}
-      className="mx-auto w-full max-w-[var(--width-wide)] scroll-mt-[var(--space-20)] px-[var(--gutter)] py-[var(--section-y)]"
-    >
-      <div className="grid gap-[var(--space-6)] lg:grid-cols-[9rem_minmax(0,1fr)] lg:gap-[var(--space-12)]">
-        <div className="lg:sticky lg:top-[var(--space-24)] lg:self-start">
-          <p className="nums-tabular font-mono text-[length:var(--text-xs)] text-[var(--accent)]">
-            {marker}
-          </p>
-          <p className="mt-[var(--space-1)] font-sans text-[length:var(--text-xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
-            {name}
-          </p>
-        </div>
-        <div className="min-w-0">{children}</div>
-      </div>
-    </section>
+    <h2 id={id} className={HEAD}>
+      <span className="block">{lines[0]}</span>
+      <span className="block">{lines[1]}</span>
+    </h2>
   );
 }
-
-function Lede({ children }: { children: ReactNode }) {
-  return (
-    <p className="prose-measure text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-2)]">
-      {children}
-    </p>
-  );
-}
-
-/** Run metadata, set as a document header sets it: label, value, aligned. */
-function MetaRow({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-[var(--space-1)] border-t border-[var(--border)] py-[var(--space-3)] sm:flex-row sm:gap-[var(--space-6)]">
-      <dt className="w-[7rem] shrink-0 font-sans text-[length:var(--text-2xs)] uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-subtle)]">
-        {label}
-      </dt>
-      <dd className="min-w-0 font-mono text-[length:var(--text-xs)] leading-[var(--lh-body)] text-[var(--text-2)]">
-        {children}
-      </dd>
-    </div>
-  );
-}
-
-/* ── Page ─────────────────────────────────────────────────────────── */
 
 export default function RunRecord() {
   return (
-    <div className="site min-h-dvh bg-[var(--bg)] text-[var(--text)]">
+    <div className="site flex min-h-dvh flex-col bg-[var(--bg)] text-[var(--text)]">
       <SiteHeader />
 
-      <main id="main-content">
-        {/* ── Masthead ───────────────────────────────────────────
-            Left-aligned and stated in nouns and verbs. The claim a
-            centred display line would make here is instead made by the
-            document that follows it. */}
-        <header className="mx-auto w-full max-w-[var(--width-wide)] px-[var(--gutter)] pb-[var(--section-y)] pt-[var(--space-32)]">
-          <div className="grid gap-[var(--space-12)] lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-[var(--space-16)]">
-            <div>
-              <p className="font-sans text-[length:var(--text-xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--accent)]">
-                How it works
+      <main id="main-content" className="flex-1">
+        {/* ── Hero: the claim (left), the run's header and timing (right) ── */}
+        <header className="grid min-h-[var(--site-hero-h)] lg:grid-cols-2">
+          <div className="flex flex-col justify-end px-[var(--site-margin)] pb-[var(--space-12)] pt-[var(--space-32)] lg:pb-[var(--space-16)]">
+            <h1 className="font-display text-[length:var(--site-display)] leading-[var(--site-lh-display)]">
+              <span className="site-line">
+                <span>One run,</span>
+              </span>
+              <span className="site-line">
+                <span>start to finish.</span>
+              </span>
+            </h1>
+            <div className="site-after-headline">
+              <p className="mt-[var(--space-8)] max-w-[40ch] text-[length:var(--site-lead)] leading-[var(--site-lh-body)]">
+                A real question through every phase: evidence, four opposed positions, a critic,
+                stress tests and an answer with each claim labelled.
               </p>
-
-              <h1 className="mt-[var(--space-6)] max-w-[16ch] font-display text-[length:var(--text-5xl)] font-normal leading-[var(--lh-display)] tracking-[var(--tracking-tight)] text-[var(--text)]">
-                One run, with nothing left out.
-              </h1>
-
-              <p className="prose-measure mt-[var(--space-8)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-2)]">
-                Reasoner puts a question through evidence search, four opposed positions written in
-                parallel by models from competing labs, independent scoring, adversarial stress
-                tests, and a synthesis whose claims are labelled VERIFIED, HYPOTHESIS, or UNKNOWN.
+              <p className={`mt-[var(--space-4)] max-w-[52ch] ${BODY}`}>
+                Captured on {RUN.capturedOn} from the production pipeline. Nothing below is a mockup,
+                and nothing the run threw away is hidden.
               </p>
-
-              <p className="prose-measure mt-[var(--space-4)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
-                The rest of this page is one complete run of that pipeline — its sources, its
-                scores, the two positions it threw away, and what it cost. It is a capture of the
-                production code path, not a mockup.
-              </p>
-
-              <div className="mt-[var(--space-10)] flex flex-wrap items-center gap-[var(--space-4)]">
-                <Link
-                  href="/chat"
-                  className="btn-lift flex min-h-[var(--space-12)] items-center rounded-[var(--radius)] bg-[var(--accent)] px-[var(--space-8)] font-sans text-[length:var(--text-base)] font-semibold leading-[var(--lh-ui)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)]"
-                >
+              <div className="mt-[var(--space-8)] flex flex-wrap items-center gap-x-[var(--space-8)] gap-y-[var(--space-4)]">
+                <Link href="/chat" className="site-button">
                   Run your own question
                 </Link>
-                <Link
-                  href="/docs"
-                  className="link-smooth flex min-h-[var(--space-12)] items-center font-sans text-[length:var(--text-base)] font-medium leading-[var(--lh-ui)] text-[var(--text-2)] underline decoration-[var(--border-strong)] underline-offset-4 hover:text-[var(--text)]"
-                >
-                  Read the docs
-                </Link>
+                <a href="#synthesis" className={`site-link ${BODY}`}>
+                  Skip to the answer
+                </a>
               </div>
             </div>
+          </div>
 
-            {/* The run's header block. Sets the register before a word of
-                marketing copy has to: this is a record with a provenance. */}
-            <dl className="h-fit border-b border-[var(--border)] lg:mt-[var(--space-2)]">
-              <MetaRow label="Question">{RUN.question}</MetaRow>
-              <MetaRow label="Preset">{RUN.preset}</MetaRow>
-              <MetaRow label="Captured">{RUN.capturedOn}, production pipeline</MetaRow>
-              <MetaRow label="Models">{RUN_MODELS.length} across competing labs</MetaRow>
-              <MetaRow label="Wall clock">{RUN.ledger.seconds.toFixed(1)}s</MetaRow>
-              <MetaRow label="Cost">
-                ${RUN.ledger.costUsd.toFixed(4)} · {RUN.ledger.tokensTotal.toLocaleString('en-US')}{' '}
-                tokens
-              </MetaRow>
-            </dl>
+          <div className="flex items-center justify-center bg-[var(--site-surface)] px-[var(--site-margin)] py-[var(--space-16)] lg:pt-[var(--space-24)]">
+            <RunIndex />
           </div>
         </header>
 
-        <RunIndex />
-
-        {/* ── Finding ────────────────────────────────────────────
-            The record's result, presented before its working — the
-            order a report is read in, not the order it was produced
-            in. The toggle is the product's argument in one control. */}
-        <Section id="synthesis" marker="§5" name="Synthesis">
-          <h2 className="font-display text-[length:var(--text-3xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-snug)] text-[var(--text)]">
-            The finding, and what stands behind it.
-          </h2>
-          <div className="mt-[var(--space-6)]">
-            <Lede>
-              This is what the run returned. Presented first, ahead of its own working — the way a
-              report is read rather than the way it is produced. Take the record away and the words
-              are unchanged; what you lose is every means of checking them.
-            </Lede>
+        {/* ── Evidence ── */}
+        <section id="evidence" aria-labelledby="evidence-h" className={`${SECTION} scroll-mt-[var(--space-20)]`}>
+          <div className="lg:col-span-5">
+            <Heading id="evidence-h" lines={['It reads', 'before it writes.']} />
+            <p className={`mt-[var(--space-6)] max-w-[44ch] ${BODY}`}>
+              The search returned {RUN.sources.length} sources in {RUN.phases[0].seconds.toFixed(1)}s,
+              all read before a single position was written. {CITED_FROM_SWEEP} of them are cited in
+              the final answer, each linked from the claim it supports.
+            </p>
           </div>
-          <div className="mt-[var(--space-10)]">
+          <figure data-ui data-reveal className={`${FIGURE} bg-[var(--site-surface)] lg:col-span-6 lg:col-start-7`}>
+            <figcaption className={CAP}>Sources, in the order they came back</figcaption>
+            <ol className="list-none">
+              {RUN.sources.map((source) => (
+                <li
+                  key={source.url}
+                  className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-baseline gap-[var(--space-3)] border-b border-[var(--site-line)] px-[var(--space-4)] py-[var(--space-3)] last:border-b-0"
+                >
+                  <span className="text-[var(--site-muted)] nums-tabular">{source.index}</span>
+                  <span className="min-w-0">
+                    <a href={source.url} target="_blank" rel="noopener noreferrer" className="site-link">
+                      {source.title}
+                    </a>
+                    <span className="block truncate text-[var(--site-muted)]">{source.domain}</span>
+                  </span>
+                  <span className={CITED_URLS.has(source.url) ? 'font-semibold text-[var(--site-accent)]' : 'text-[var(--site-muted)]'}>
+                    {CITED_URLS.has(source.url) ? 'Cited' : 'Read'}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </figure>
+        </section>
+
+        {/* ── Positions: light field ── */}
+        <section id="positions" aria-labelledby="positions-h" className="scroll-mt-[var(--space-20)] bg-[var(--site-field)] text-[var(--site-field-ink)]">
+          <div className={SECTION}>
+            <figure
+              data-ui
+              data-reveal
+              className={`${FIGURE} order-last bg-[var(--site-bg)] text-[var(--site-ink)] lg:order-none lg:col-span-6`}
+            >
+              <figcaption className={CAP}>Four positions, written in parallel</figcaption>
+              <ul className="list-none">
+                {RUN.positions.map((position) => (
+                  <li key={position.id} className="border-b border-[var(--site-line)] px-[var(--space-4)] py-[var(--space-4)] last:border-b-0">
+                    <p className="font-semibold capitalize">{position.id}</p>
+                    {position.insights[0] && <p className="mt-[var(--space-1)]">{position.insights[0]}</p>}
+                    <p className="mt-[var(--space-2)] text-[var(--site-muted)]">
+                      <Marks segments={position.excerpt} />
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </figure>
+            <div className="lg:col-span-5 lg:col-start-8">
+              <Heading id="positions-h" lines={['Four positions,', 'blind to each other.']} />
+              <p className={`mt-[var(--space-6)] max-w-[44ch] ${BODY}`}>
+                Constructive builds the case, destructive attacks it, systemic follows the
+                second-order effects, minimalist argues for doing less. They run at the same time on
+                models from different labs ({PERSPECTIVE_MODELS.join(', ')}), and none sees the
+                others, so none can quietly agree. All four go to the critic.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Critique ── */}
+        <section id="adjudication" aria-labelledby="adjudication-h" className={`${SECTION} scroll-mt-[var(--space-20)]`}>
+          <div className="lg:col-span-5">
+            <Heading id="adjudication-h" lines={['A critic', 'scores them.']} />
+            <p className={`mt-[var(--space-6)] max-w-[44ch] ${BODY}`}>
+              A model from a different lab scores each position on four axes, then applies penalties.
+              {' '}{PRUNED.length} of the {RUN.scores.length} were pruned, including one that reached the
+              conclusion the run ends up publishing: it stated it further than its evidence went.
+              Agreeing with the outcome is not what keeps a position.
+            </p>
+          </div>
+          <figure data-ui data-reveal className={`${FIGURE} bg-[var(--site-surface)] lg:col-span-6 lg:col-start-7`}>
+            <figcaption className={CAP}>Scores out of 10, after penalties</figcaption>
+            <ul className="list-none">
+              {RUN.scores.map((score) => (
+                <li key={score.position} className="border-b border-[var(--site-line)] px-[var(--space-4)] py-[var(--space-4)] last:border-b-0">
+                  <div className="flex items-baseline justify-between gap-[var(--space-3)]">
+                    <span className="font-semibold capitalize">{score.position}</span>
+                    <span className="flex items-baseline gap-[var(--space-3)] nums-tabular">
+                      <span className={score.retained ? 'font-semibold text-[var(--site-accent)]' : 'text-[var(--site-muted)]'}>
+                        {score.retained ? 'Kept' : 'Pruned'}
+                      </span>
+                      <span className="font-display text-[length:var(--site-lead)]">{score.total.toFixed(1)}</span>
+                    </span>
+                  </div>
+                  <p className="mt-[var(--space-1)] text-[var(--site-muted)] nums-tabular">
+                    {SCORE_AXES.map(({ key, label }) => `${label} ${score[key]}`).join(' · ')}
+                  </p>
+                  {score.biasFlags.length > 0 && <p className="mt-[var(--space-1)]">Bias flag: {score.biasFlags.join('; ')}</p>}
+                </li>
+              ))}
+            </ul>
+          </figure>
+        </section>
+
+        {/* ── Stress: light field ── */}
+        <section id="stress" aria-labelledby="stress-h" className="scroll-mt-[var(--space-20)] bg-[var(--site-field)] text-[var(--site-field-ink)]">
+          <div className={SECTION}>
+            <figure
+              data-ui
+              data-reveal
+              className={`${FIGURE} order-last bg-[var(--site-bg)] text-[var(--site-ink)] lg:order-none lg:col-span-6`}
+            >
+              <figcaption className={CAP}>Adversarial tests on what survived</figcaption>
+              <ul className="list-none">
+                {RUN.stress.map((test, i) => (
+                  <li key={i} className="border-b border-[var(--site-line)] px-[var(--space-4)] py-[var(--space-4)] last:border-b-0">
+                    <div className="flex items-baseline justify-between gap-[var(--space-3)]">
+                      <span className="capitalize">{test.scenario}</span>
+                      <span className="font-display text-[length:var(--site-lead)] nums-tabular">
+                        {Math.round(test.survivalRate * 100)}%
+                      </span>
+                    </div>
+                    <span aria-hidden="true" className="mt-[var(--space-2)] block h-[var(--space-2)] overflow-hidden rounded-full bg-[var(--site-surface)]">
+                      <span className="block h-full rounded-full bg-[var(--site-accent)]" style={{ width: `${test.survivalRate * 100}%` }} />
+                    </span>
+                    <p className="mt-[var(--space-3)] text-[var(--site-muted)]">
+                      {test.failureMode || 'This test returned a rate with no prose. Shown as it came back.'}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </figure>
+            <div className="lg:col-span-5 lg:col-start-8">
+              <Heading id="stress-h" lines={['Then it is', 'attacked.']} />
+              <p className={`mt-[var(--space-6)] max-w-[44ch] ${BODY}`}>
+                What survives critique is run against adversarial scenarios. Each test reports how
+                much of the position held, and the failure it found. Both tests from this run are
+                shown as they came back.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Synthesis ── */}
+        <section
+          id="synthesis"
+          aria-labelledby="synthesis-h"
+          className="mx-auto grid w-full max-w-[var(--site-max)] scroll-mt-[var(--space-20)] gap-[var(--space-12)] px-[var(--site-margin)] py-[var(--space-24)] lg:grid-cols-12"
+        >
+          <div className="lg:col-span-4">
+            <Heading id="synthesis-h" lines={['The answer,', 'with its record.']} />
+            <p className={`mt-[var(--space-6)] max-w-[40ch] ${BODY}`}>
+              Each claim carries a label: verified, hypothesis or unknown. Switch the record off and
+              the words are unchanged; what goes is every means of checking them.
+            </p>
+          </div>
+          <div data-reveal className="min-w-0 lg:col-span-8">
             <ApparatusToggle />
           </div>
-        </Section>
+        </section>
 
-        {/* ── §1 Evidence ───────────────────────────────────────── */}
-        <Section id="evidence" marker="§1" name="Evidence Search">
-          <h2 className="font-display text-[length:var(--text-2xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-snug)] text-[var(--text)]">
-            What the run read first.
-          </h2>
-          <div className="mt-[var(--space-4)]">
-            <Lede>
-              The sweep returned {RUN.sources.length} sources in{' '}
-              {RUN.phases[0].seconds.toFixed(1)}s — every one of them read before a single position
-              was written. {CITED_FROM_SWEEP} of the {RUN.citations.length} URLs the synthesis ends
-              up citing came back from this list, and each is linked from the finding above.
-            </Lede>
-          </div>
-
-          <ol role="list" className="mt-[var(--space-8)] list-none">
-            {RUN.sources.map((source) => (
-              <li
-                key={source.url}
-                className="flex gap-[var(--space-4)] border-t border-[var(--border)] py-[var(--space-4)] last:border-b"
-              >
-                <span className="nums-tabular w-[2ch] shrink-0 font-mono text-[length:var(--text-xs)] text-[var(--text-subtle)]">
-                  {source.index}
-                </span>
-                <span className="min-w-0">
-                  <a
-                    href={source.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="link-smooth block text-[length:var(--text-base)] leading-[var(--lh-subhead)] text-[var(--text-2)] underline decoration-[var(--border-strong)] underline-offset-4 hover:text-[var(--accent)]"
-                  >
-                    {source.title}
-                  </a>
-                  <span className="mt-[var(--space-1)] block truncate font-mono text-[length:var(--text-2xs)] text-[var(--text-subtle)]">
-                    {source.domain}
-                  </span>
-                </span>
-              </li>
-            ))}
-          </ol>
-        </Section>
-
-        {/* ── §2 Positions ──────────────────────────────────────── */}
-        <Section id="positions" marker="§2" name="Perspectives">
-          <h2 className="font-display text-[length:var(--text-2xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-snug)] text-[var(--text)]">
-            Four positions, written against each other.
-          </h2>
-          <div className="mt-[var(--space-4)]">
-            <Lede>
-              Constructive builds the case, destructive attacks it, systemic follows the
-              second-order effects, minimalist argues for doing less. They run in parallel on models
-              from different labs, so none of them can quietly agree with the others. Not one of
-              them is the answer — all four go to the critic.
-            </Lede>
-          </div>
-
-          <p className="mt-[var(--space-6)] font-mono text-[length:var(--text-2xs)] leading-[var(--lh-body)] text-[var(--text-subtle)]">
-            Generated by {PERSPECTIVE_MODELS.join(' · ')}
-          </p>
-
-          <div className="mt-[var(--space-8)] grid gap-x-[var(--space-10)] gap-y-[var(--space-8)] md:grid-cols-2">
-            {RUN.positions.map((position) => (
-              <article key={position.id} className="border-t border-[var(--border)] pt-[var(--space-4)]">
-                <h3 className="font-sans text-[length:var(--text-xs)] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text)]">
-                  {position.id}
-                </h3>
-                <p className="mt-[var(--space-3)] text-[length:var(--text-sm)] leading-[var(--lh-body)] text-[var(--text-muted)]">
-                  <Marks segments={position.excerpt} />
-                </p>
-                {position.insights[0] && (
-                  <p className="mt-[var(--space-4)] border-l-2 border-[var(--accent-dim)] pl-[var(--space-3)] font-sans text-[length:var(--text-xs)] leading-[var(--lh-body)] text-[var(--text-2)]">
-                    {position.insights[0]}
-                  </p>
-                )}
-              </article>
-            ))}
-          </div>
-        </Section>
-
-        {/* ── §3 Adjudication ───────────────────────────────────── */}
-        <Section id="adjudication" marker="§3" name="Critique &amp; Pruning">
-          <h2 className="font-display text-[length:var(--text-2xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-snug)] text-[var(--text)]">
-            Scored by a model with no stake in the answer.
-          </h2>
-          <div className="mt-[var(--space-4)]">
-            <Lede>
-              {PRUNED.length} of the {RUN.scores.length} positions were pruned here — including one
-              that had reached the same conclusion the run eventually publishes, and was cut anyway
-              for stating it further than its evidence went. Agreeing with the outcome is not what
-              gets a position kept.
-            </Lede>
-          </div>
-
-          <div className="mt-[var(--space-10)]">
-            <ScoreMatrix />
-          </div>
-        </Section>
-
-        {/* ── §4 Stress ─────────────────────────────────────────── */}
-        <Section id="stress" marker="§4" name="Stress Testing">
-          <h2 className="font-display text-[length:var(--text-2xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-snug)] text-[var(--text)]">
-            Then it is attacked.
-          </h2>
-          <div className="mt-[var(--space-4)]">
-            <Lede>
-              What survived critique gets run against adversarial scenarios. The phase reports a
-              survival rate and, where it has one, the failure mode it found. Both tests from this
-              run are below, printed as they came back.
-            </Lede>
-          </div>
-
-          <div className="mt-[var(--space-8)]">
-            {RUN.stress.map((test, i) => (
-              <div key={i} className="border-t border-[var(--border)] py-[var(--space-6)] last:border-b">
-                <div className="flex items-baseline gap-[var(--space-4)]">
-                  <span className="nums-tabular font-mono text-[length:var(--text-2xl)] leading-[var(--lh-tight)] text-[var(--text)]">
-                    {Math.round(test.survivalRate * 100)}%
-                  </span>
-                  <span className="font-sans text-[length:var(--text-2xs)] uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-subtle)]">
-                    survival · {test.scenario}
-                  </span>
-                </div>
-
-                <span
-                  aria-hidden="true"
-                  className="mt-[var(--space-3)] block h-[3px] w-full max-w-[var(--measure-tight)] bg-[var(--border)]"
-                >
-                  <span
-                    className="block h-full bg-[var(--accent)]"
-                    style={{ width: `${test.survivalRate * 100}%` }}
-                  />
-                </span>
-
-                <p className="prose-measure mt-[var(--space-4)] text-[length:var(--text-sm)] leading-[var(--lh-body)] text-[var(--text-muted)]">
-                  {test.failureMode || (
-                    <span className="text-[var(--text-subtle)]">
-                      This test returned a rate with no accompanying prose. Shown as it came back
-                      rather than filled in.
-                    </span>
-                  )}
-                </p>
-              </div>
-            ))}
-          </div>
-        </Section>
-
-        {/* ── Ledger ────────────────────────────────────────────── */}
-        <Section marker="§0" name="Ledger">
-          <h2 className="font-display text-[length:var(--text-2xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-snug)] text-[var(--text)]">
-            What the record cost.
-          </h2>
-          <div className="mt-[var(--space-4)]">
-            <Lede>
-              Every run reports its own consumption. This one — five phases, {RUN_MODELS.length}{' '}
-              models, {RUN.sources.length} sources, {RUN.scores.length} scored positions — came to
-              less than a third of a cent.
-            </Lede>
-          </div>
-
-          <dl className="nums-tabular mt-[var(--space-8)] grid gap-[var(--space-6)] sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              { term: 'Wall clock', value: `${RUN.ledger.seconds.toFixed(1)}s` },
-              /* Locale pinned: a bare toLocaleString() follows the SERVER's
-                 locale, which turned 10,297 into "10.297" on a Greek host. */
-              { term: 'Tokens in', value: RUN.ledger.tokensIn.toLocaleString('en-US') },
-              { term: 'Tokens out', value: RUN.ledger.tokensOut.toLocaleString('en-US') },
-              { term: 'Cost', value: `$${RUN.ledger.costUsd.toFixed(4)}` },
-            ].map(({ term, value }) => (
-              <div key={term} className="border-t border-[var(--border)] pt-[var(--space-3)]">
-                <dt className="font-sans text-[length:var(--text-2xs)] uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-subtle)]">
-                  {term}
-                </dt>
-                <dd className="mt-[var(--space-2)] font-mono text-[length:var(--text-xl)] leading-[var(--lh-tight)] text-[var(--text)]">
-                  {value}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </Section>
-
-        {/* ── Interface ─────────────────────────────────────────── */}
-        <Section marker="API" name="Interface">
-          <h2 className="font-display text-[length:var(--text-2xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-snug)] text-[var(--text)]">
-            The record comes back as JSON.
-          </h2>
-          <div className="mt-[var(--space-4)]">
-            <Lede>
-              Everything on this page — sources, positions, per-axis scores, bias flags, survival
-              rates, the token ledger — is a field in the run response. A typed SDK, a documented
-              HTTP API, and an MCP server so an agent can call Reasoner as a tool. Scoped, revocable
-              keys; no dashboard click-through to get a first response.
-            </Lede>
-          </div>
-
-          <pre className="mt-[var(--space-8)] overflow-x-auto border border-[var(--border)] bg-[var(--surface)] p-[var(--space-6)] font-mono text-[length:var(--text-xs)] leading-[var(--lh-body)] text-[var(--text-2)]">
-            <code>{`curl https://reasoner.app/api/agent/run/sync \\
-  -H "Authorization: Bearer $REASONER_API_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '{"problem": "${RUN.question}",
-       "preset": "${RUN.preset}"}'
-
-# → { "synthesis": …, "scores": [ … ], "stress_tests": [ … ],
-#     "sources": [ … ], "total_cost_usd": ${RUN.ledger.costUsd.toFixed(4)} }`}</code>
-          </pre>
-
-          {/* A plain list, not a <dl>: the figure and its label are one phrase
-              here ("31 reasoning methods"), and a description list would need a
-              <dt> that repeats the visible label to a screen reader. */}
-          <ul
-            role="list"
-            className="nums-tabular mt-[var(--space-8)] flex list-none flex-wrap gap-x-[var(--space-8)] gap-y-[var(--space-4)]"
-          >
-            {[
-              { term: 'reasoning methods', value: CAPABILITIES.methods },
-              { term: 'tuned presets', value: CAPABILITIES.presets },
-              { term: 'routable models', value: `${CAPABILITIES.routableModels}+` },
-              { term: 'direct provider adapters', value: CAPABILITIES.providerAdapters },
-            ].map(({ term, value }) => (
-              <li key={term} className="flex items-baseline gap-[var(--space-2)]">
-                <span className="font-mono text-[length:var(--text-lg)] leading-[var(--lh-tight)] text-[var(--text)]">
-                  {value}
-                </span>
-                <span className="font-sans text-[length:var(--text-xs)] leading-[var(--lh-ui)] text-[var(--text-muted)]">
-                  {term}
-                </span>
-              </li>
-            ))}
-          </ul>
-
-          <p className="mt-[var(--space-6)] font-sans text-[length:var(--text-xs)] leading-[var(--lh-body)] text-[var(--text-subtle)]">
-            Direct adapters: {PROVIDERS.join(', ')}. Everything else routes through OpenRouter.{' '}
-            <Link
-              href="/developers"
-              className="link-smooth underline underline-offset-4 hover:text-[var(--text-2)]"
-            >
-              The developer surface
-            </Link>
-            .
-          </p>
-        </Section>
-
-        {/* ── Terms ─────────────────────────────────────────────── */}
-        <Section marker="—" name="Terms">
-          <h2 className="font-display text-[length:var(--text-2xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-snug)] text-[var(--text)]">
-            Where your data sits.
-          </h2>
-
-          <dl className="mt-[var(--space-8)]">
-            {TERMS.map(({ term, detail }) => (
-              <div
-                key={term}
-                className="flex flex-col gap-[var(--space-1)] border-t border-[var(--border)] py-[var(--space-4)] last:border-b sm:flex-row sm:gap-[var(--space-8)]"
-              >
-                <dt className="w-[14rem] shrink-0 font-sans text-[length:var(--text-sm)] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
-                  {term}
-                </dt>
-                <dd className="prose-measure text-[length:var(--text-base)] leading-[var(--lh-body)] text-[var(--text-muted)]">
-                  {detail}
-                </dd>
-              </div>
-            ))}
-          </dl>
-
-          <p className="mt-[var(--space-6)] font-sans text-[length:var(--text-xs)] leading-[var(--lh-body)] text-[var(--text-subtle)]">
-            <Link href="/security" className="link-smooth underline underline-offset-4 hover:text-[var(--text-2)]">
-              Security detail
-            </Link>{' '}
-            ·{' '}
-            <Link href="/privacy" className="link-smooth underline underline-offset-4 hover:text-[var(--text-2)]">
-              Privacy
-            </Link>{' '}
-            ·{' '}
-            <Link href="/subprocessors" className="link-smooth underline underline-offset-4 hover:text-[var(--text-2)]">
-              Sub-processors
-            </Link>
-          </p>
-        </Section>
-
-        {/* ── Close ─────────────────────────────────────────────── */}
-        <section className="mx-auto w-full max-w-[var(--width-wide)] px-[var(--gutter)] py-[var(--section-y)]">
-          <div className="grid gap-[var(--space-8)] lg:grid-cols-[9rem_minmax(0,1fr)] lg:gap-[var(--space-12)]">
-            <div />
-            <div>
-              <h2 className="prose-measure font-display text-[length:var(--text-3xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-snug)] text-[var(--text)]">
-                Your question gets the same treatment.
-              </h2>
-              <p className="prose-measure mt-[var(--space-4)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
-                Same phases, same scoring, same record at the end — and a decision you can hand to
-                someone else with the working attached.
-              </p>
-              <Link
-                href="/chat"
-                className="btn-lift mt-[var(--space-10)] inline-flex min-h-[var(--space-12)] items-center rounded-[var(--radius)] bg-[var(--accent)] px-[var(--space-8)] font-sans text-[length:var(--text-base)] font-semibold leading-[var(--lh-ui)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)]"
-              >
-                Run your own question
+        {/* ── Interface ── */}
+        <section id="api" aria-labelledby="api-h" className={SECTION}>
+          <div className="lg:col-span-5">
+            <Heading id="api-h" lines={['It comes back', 'as JSON.']} />
+            <p className={`mt-[var(--space-6)] max-w-[44ch] ${BODY}`}>
+              Everything on this page is a field in the run response: sources, positions, scores,
+              bias flags, survival rates and the token count. Call it over HTTP, from the TypeScript
+              SDK, or as a tool through the MCP server. {CAPABILITIES.methods} reasoning methods,{' '}
+              {CAPABILITIES.presets} presets, {CAPABILITIES.routableModels}+ models.
+            </p>
+            <div className="mt-[var(--space-8)] flex flex-wrap items-center gap-x-[var(--space-8)] gap-y-[var(--space-4)]">
+              <Link href="/developers" className={`site-link ${BODY}`}>
+                For developers
+              </Link>
+              <Link href="/docs" className={`site-link ${BODY}`}>
+                Read the docs
               </Link>
             </div>
+          </div>
+          <figure data-ui data-reveal className={`${FIGURE} flex flex-col bg-[var(--site-surface)] lg:col-span-6 lg:col-start-7`}>
+            <figcaption className={CAP}>The same run, over the API</figcaption>
+            <pre className="flex-1 overflow-x-auto px-[var(--space-4)] py-[var(--space-4)] font-mono leading-[var(--site-lh-body)]">
+              <code>{`curl https://reasoner.app/api/agent/run/sync \\
+  -H "Authorization: Bearer $REASONER_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"problem": "Should a 12-person startup …",
+       "preset": "${RUN.preset}"}'
+
+# → { "synthesis": …, "scores": [ … ],
+#     "stress_tests": [ … ], "sources": [ … ],
+#     "total_cost_usd": ${RUN.ledger.costUsd.toFixed(4)} }`}</code>
+            </pre>
+            <dl className="grid grid-cols-2 border-t border-[var(--site-line)] nums-tabular sm:grid-cols-4">
+              {[
+                { term: 'Wall clock', value: `${RUN.ledger.seconds.toFixed(1)}s` },
+                /* Locale pinned: a bare toLocaleString() follows the SERVER's
+                   locale, which turned 10,297 into "10.297" on a Greek host. */
+                { term: 'Tokens in', value: RUN.ledger.tokensIn.toLocaleString('en-US') },
+                { term: 'Tokens out', value: RUN.ledger.tokensOut.toLocaleString('en-US') },
+                { term: 'Cost', value: `$${RUN.ledger.costUsd.toFixed(4)}` },
+              ].map(({ term, value }) => (
+                <div key={term} className="px-[var(--space-4)] py-[var(--space-3)]">
+                  <dt className="text-[var(--site-muted)]">{term}</dt>
+                  <dd className="font-semibold">{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </figure>
+        </section>
+
+        {/* ── Close ── */}
+        <section aria-labelledby="close-h" className="mx-auto w-full max-w-[var(--site-max)] px-[var(--site-margin)] pb-[var(--space-24)]">
+          <Heading id="close-h" lines={['Your question,', 'same treatment.']} />
+          <p className={`mt-[var(--space-6)] max-w-[52ch] ${BODY}`}>
+            The same phases, the same scoring and the same record at the end: a decision you can hand
+            to someone else with the working attached. {RUN_MODELS.length} models answered this one for
+            ${RUN.ledger.costUsd.toFixed(4)}.
+          </p>
+          <div className="mt-[var(--space-8)] flex flex-wrap items-center gap-x-[var(--space-8)] gap-y-[var(--space-4)]">
+            <Link href="/chat" className="site-button">
+              Run your own question
+            </Link>
+            <Link href="/security" className={`site-link ${BODY}`}>
+              Where your data goes
+            </Link>
           </div>
         </section>
       </main>
