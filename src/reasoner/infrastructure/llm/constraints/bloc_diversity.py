@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 
+from reasoner.core import model_policy
 from reasoner.core.ports.routing_constraint_port import (
     ConstraintViolation,
 )
@@ -90,8 +91,11 @@ class BlocDiversityConstraint:
             bloc = role_bloc.get(role)
             if bloc:
                 gen_role_counts[bloc] += 1
+        # Western-only runs have one EU lab, so lab diversity forces a US
+        # majority in 4-voice groups: allow 3 (scripts/validate_presets.py).
+        cap = 3 if model_policy.allowed_blocs() is not None else 2
         for bloc, count in gen_role_counts.items():
-            if count > 2:
+            if count > cap:
                 # Find the roles assigned to this bloc
                 bloc_roles = [r for r in _GENERATOR_ROLES
                               if role_bloc.get(r) == bloc]
@@ -101,7 +105,7 @@ class BlocDiversityConstraint:
                     model_id=proposed.get(bloc_roles[0], "") if bloc_roles else "",
                     reason=(
                         f"Bloc '{bloc}' holds {count} generator roles "
-                        f"(max 2): {', '.join(bloc_roles)}"
+                        f"(max {cap}): {', '.join(bloc_roles)}"
                     ),
                     severity="hard",
                 ))

@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import Annotated, Any
 
-from pydantic import BaseModel, Field, StringConstraints, field_validator
+from pydantic import BaseModel, Field, StringConstraints, field_validator, model_validator
 
 from reasoner.core.constants import (
     DEFAULT_PRESET,
@@ -24,8 +24,32 @@ from reasoner.core.constants import (
     TRUNCATION,
 )
 from reasoner.core.constants_limits import MAX_DATA_URL_CHARS
+from reasoner.core.model_policy import WESTERN_BLOCS
 from reasoner.core.settings import settings
+from reasoner.domain.preset_core import is_western_preset, western_variant
 from reasoner.presets import is_valid_preset_name, resolve_preset_name
+
+_AUTO_PRESET = re.compile(r"^auto-(western-)?(budget|premium)$")
+
+
+def _western_preset(preset: str, western_only: bool, named_models: list[str]) -> str:
+    """Map a ``western_only`` request to the Western twin of its preset.
+
+    A Western-only run refuses any non-US/EU model the caller names here, as a
+    422, rather than failing mid-run when build_provider refuses it.
+    """
+    if western_only:
+        preset = western_variant(preset)
+        if not _AUTO_PRESET.match(preset) and not is_valid_preset_name(preset):
+            raise ValueError(f"No Western-only variant of preset: {preset}")
+    if is_western_preset(preset) and named_models:
+        from reasoner.core.ports.model_registry_port import get_model_registry_port
+
+        port = get_model_registry_port()
+        bad = sorted(m for m in named_models if port.bloc_of(m) not in WESTERN_BLOCS)
+        if bad:
+            raise ValueError(f"A Western-only run cannot use non-US/EU models: {bad}")
+    return preset
 
 # An upload id (uploader.py: uuid4 prefix). The format check keeps a path such
 # as "../x" from ever reaching the sidecar lookup.
@@ -133,8 +157,17 @@ class RunRequest(BaseModel):
     )
     file_ids: list[FileId] = Field(default_factory=list, max_length=settings.UPLOAD_MAX_FILES)
     client_run_id: str | None = Field(default=None, pattern=CLIENT_RUN_ID_PATTERN)
+    # Run on the preset's Western-only twin (US/EU models only).
+    western_only: bool = False
 
     model_config = {"extra": "forbid"}
+
+    @model_validator(mode="after")
+    def _apply_western_only(self) -> RunRequest:
+        self.preset = _western_preset(
+            self.preset, self.western_only, list((self.routing or {}).values())
+        )
+        return self
 
     @field_validator("problem")
     @classmethod
@@ -180,7 +213,7 @@ class RunRequest(BaseModel):
     @field_validator("preset")
     @classmethod
     def validate_preset(cls, v: str) -> str:
-        if v.startswith("auto-") and v.split("-", 1)[1] in ("budget", "premium"):
+        if _AUTO_PRESET.match(v):
             return v
         if not is_valid_preset_name(v):
             raise ValueError(f"Invalid preset: {v}")
@@ -224,8 +257,16 @@ class FollowupRequest(BaseModel):
     )
     file_ids: list[FileId] = Field(default_factory=list, max_length=settings.UPLOAD_MAX_FILES)
     client_run_id: str | None = Field(default=None, pattern=CLIENT_RUN_ID_PATTERN)
+    # Run on the preset's Western-only twin (US/EU models only).
+    western_only: bool = False
 
     model_config = {"extra": "forbid"}
+
+    @model_validator(mode="after")
+    def _apply_western_only(self) -> FollowupRequest:
+        named = [self.agent_model] if self.agent_model else []
+        self.preset = _western_preset(self.preset, self.western_only, named)
+        return self
 
     @field_validator("agent_model")
     @classmethod

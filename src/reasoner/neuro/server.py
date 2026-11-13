@@ -18,6 +18,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from reasoner.core import model_policy
 from reasoner.core.constant_time import constant_time_equals
 from reasoner.core.rerank import rerank_memory_chunks
 from reasoner.core.settings import settings
@@ -28,6 +29,7 @@ from reasoner.neuro.config import (
     get_agent_data_dir,
     get_persona,
     load_config,
+    western_embedding_config,
 )
 from reasoner.neuro.providers import create_resilient_embedding, create_resilient_reasoning
 from reasoner.neuro.sessions import SessionConfig, SessionManager
@@ -477,7 +479,14 @@ class NeuroService:
         self.config = config or load_config()
         self.reasoner = create_resilient_reasoning(self.config.reasoning)
         self.embedder = create_resilient_embedding(self.config.embedding)
+        self.embedder_western = create_resilient_embedding(
+            western_embedding_config(self.config.embedding)
+        )
         self.tenants = TenantManager(self.config)
+
+    def _embedder_for(self, agent_id: str | None):
+        """Western memory stores are embedded by OpenAI only (core/model_policy.py)."""
+        return self.embedder_western if model_policy.is_western_memory(agent_id) else self.embedder
 
     # ── MemoryPort ────────────────────────────────────────────────────────
     async def recall(
@@ -676,7 +685,7 @@ class NeuroService:
     async def recall_chunks(
         self, req: RecallRequest, owner: str | None = None
     ) -> RecallResponse:
-        config, embedder, tenants = self.config, self.embedder, self.tenants
+        config, embedder, tenants = self.config, self._embedder_for(req.agent_id), self.tenants
         start = time.perf_counter()
         persona = get_persona(config, req.persona, req.agent_id)
         key = tenant_key(owner, req.agent_id)
@@ -777,7 +786,7 @@ class NeuroService:
         )
 
     async def ingest(self, req: LearnRequest, owner: str | None = None) -> LearnResponse:
-        embedder, tenants = self.embedder, self.tenants
+        embedder, tenants = self._embedder_for(req.agent_id), self.tenants
         key = tenant_key(owner, req.agent_id)
         if key is None:
             # An anonymous run with no conversation has no tenant of its own;

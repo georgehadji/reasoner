@@ -34,6 +34,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "src"))
 
+from reasoner.core.model_policy import WESTERN_TAG  # noqa: E402
 from reasoner.domain.preset_registry import _REGISTRY as PRESETS  # noqa: E402
 from reasoner.infrastructure.llm.constraints.bloc_diversity import (  # noqa: E402
     _GENERATOR_ROLES,
@@ -108,9 +109,12 @@ def test_delphi_experts_span_blocs(preset_id):
 
     known = {b: rs for b, rs in blocs.items() if b != "OTHER"}
     assert len(known) >= 2, f"{preset_id}: expert panel spans <2 known blocs ({blocs})"
-    dominant = {b: rs for b, rs in known.items() if len(rs) > 2}
+    # Western-only presets have one EU lab, so a US majority is allowed
+    # (scripts/validate_presets.py, same rule).
+    cap = 3 if WESTERN_TAG in PRESETS[preset_id].get("tags", []) else 2
+    dominant = {b: rs for b, rs in known.items() if len(rs) > cap}
     assert not dominant, (
-        f"{preset_id}: bloc(s) dominate the expert panel {dominant}; max 2 per bloc"
+        f"{preset_id}: bloc(s) dominate the expert panel {dominant}; max {cap} per bloc"
     )
 
 

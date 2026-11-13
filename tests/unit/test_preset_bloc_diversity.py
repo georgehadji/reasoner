@@ -22,6 +22,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "src"))
 
+from reasoner.core.model_policy import WESTERN_TAG  # noqa: E402
 from reasoner.domain.preset_registry import _REGISTRY as PRESETS  # noqa: E402
 from reasoner.infrastructure.llm.registry import _REGISTRY as _REGISTRY_MODELS  # noqa: E402
 from reasoner.infrastructure.llm.registry import bloc_of  # noqa: E402
@@ -74,10 +75,13 @@ def test_generation_spans_multiple_blocs(preset_id):
         f"{preset_id}: generator roles span <2 known blocs ({blocs}); "
         f"generation must be cross-bloc"
     )
-    dominant = {b: rs for b, rs in known.items() if len(rs) > 2}
+    # Western-only presets have one EU lab, so lab diversity forces a US
+    # majority in 4-voice groups (scripts/validate_presets.py, same rule).
+    cap = 3 if WESTERN_TAG in preset.get("tags", []) else 2
+    dominant = {b: rs for b, rs in known.items() if len(rs) > cap}
     assert not dominant, (
         f"{preset_id}: bloc(s) dominate generation {dominant}; "
-        f"max 2 generator roles per bloc"
+        f"max {cap} generator roles per bloc"
     )
 
 
@@ -146,6 +150,9 @@ def test_article_critique_roles_are_cross_bloc(preset_id):
         # slot, or replace this entry with a comment explaining why premium's
         # critic stays US.
         ("article-premium", "draft_vs_critic"),
+        # Inherited: both slots are US in article-premium, and the Western
+        # generator keeps US slots. Fixing article-premium fixes this too.
+        ("article-western-premium", "draft_vs_critic"),
     })
 
     routing = PRESETS[preset_id].get("routing", {})

@@ -21,7 +21,7 @@ from reasoner.core.constants import (
 )
 from reasoner.core.ports.model_registry_port import get_model_registry_port
 from reasoner.core.ports.shared_cache_port import get_shared_cache_port
-from reasoner.domain.preset_core import build_auto_preset
+from reasoner.domain.preset_core import build_auto_preset, is_western_preset
 from reasoner.hypergate import GateDecision, HyperGateAgent, jev_router
 from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.presets import get_preset_price_tier
@@ -305,7 +305,9 @@ async def decide_route(problem: str, preset: str) -> dict[str, Any]:
         )
 
     def _with_preset(method: str | None) -> str | None:
-        return build_auto_preset(method, tier) if method else None
+        # The gate runs outside a run, so it reads the request, not the run policy.
+        western = is_western_preset(raw_preset)
+        return build_auto_preset(method, tier, western=western) if method else None
 
     alternatives = [
         {**alt, "preset": _with_preset(alt.get("method"))}

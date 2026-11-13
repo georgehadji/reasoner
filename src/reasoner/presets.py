@@ -7,6 +7,7 @@ preset data moved to reasoner.domain.preset_registry.
 from reasoner.domain.preset_core import (
     _KNOWN_ROUTING_ROLES,
     FOLLOWUP_AGENT_MODELS,
+    FOLLOWUP_AGENT_MODELS_WESTERN,
     PipelinePreset,
     build_auto_preset,
     get_preset_price_tier,
@@ -173,6 +174,7 @@ __all__ = [
     "get_preset_price_tier",
     "build_auto_preset",
     "FOLLOWUP_AGENT_MODELS",
+    "FOLLOWUP_AGENT_MODELS_WESTERN",
     "get_preset",
     "is_valid_preset_name",
     "resolve_preset_name",

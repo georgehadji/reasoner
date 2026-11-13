@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from reasoner.infrastructure.llm.base import BaseLLMProvider
 
+from reasoner.core import model_policy
 from reasoner.core.constants import (
     DEFAULT_OLLAMA_URL,
     MODEL_CLAUDE_SONNET,
@@ -572,6 +573,13 @@ Available models:
   {available}"""
         )
     cfg = _REGISTRY[model_id]
+
+    # Western-only runs: the single choke point for every model a run touches.
+    if not model_policy.is_allowed(bloc_of(model_id)):
+        raise model_policy.ModelNotAllowedError(
+            f"Model {model_id!r} (bloc {bloc_of(model_id)}) is not allowed in this run "
+            f"(allowed: {sorted(model_policy.allowed_blocs() or ())})"
+        )
 
     # xAI direct routing logic
     is_xai = _prefers_direct_key(model_id) == "XAI_API_KEY"

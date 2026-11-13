@@ -199,10 +199,14 @@ async def run_followup_stream(
     req: FollowupRequest, request=None, user_id: str | None = None
 ) -> AsyncGenerator[str, None]:
     """Run the full Reasoner pipeline for a follow-up question with conversation context."""
-    from reasoner.presets import FOLLOWUP_AGENT_MODELS
+    from reasoner.domain.preset_core import is_western_preset
+    from reasoner.presets import FOLLOWUP_AGENT_MODELS, FOLLOWUP_AGENT_MODELS_WESTERN
 
     tier = get_preset_price_tier(req.preset)
-    agent_model = req.agent_model or FOLLOWUP_AGENT_MODELS.get(tier)
+    defaults = (
+        FOLLOWUP_AGENT_MODELS_WESTERN if is_western_preset(req.preset) else FOLLOWUP_AGENT_MODELS
+    )
+    agent_model = req.agent_model or defaults.get(tier)
     if agent_model:
         logger.info("Follow-up tier=%s -> agent_model=%s", tier, agent_model)
 

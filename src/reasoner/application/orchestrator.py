@@ -22,6 +22,7 @@ from reasoner.application.ports.service_protocols import (
     SearchServiceProtocol,
     TelemetryStoreProtocol,
 )
+from reasoner.core import model_policy
 from reasoner.core.constants import DEFAULT_CLI_PRESET, GATE_TIMEOUT_SECONDS
 from reasoner.core.degrade import degraded
 from reasoner.core.ports.model_registry_port import get_model_registry_port
@@ -444,7 +445,7 @@ class PipelineOrchestrator:
             wanted = settings.NEURO_CONTEXT_MAX_CHUNKS
             chunks = await port.recall(
                 problem,
-                agent_id=agent_id,
+                agent_id=model_policy.memory_agent_id(agent_id),
                 max_results=min(wanted * 2, 20),
                 owner=owner,
             )
@@ -562,7 +563,9 @@ class PipelineOrchestrator:
                 await port.learn(
                     prompt=getattr(req, "problem", ""),
                     response=synthesis_text,
-                    agent_id=getattr(state, "conversation_id", None),
+                    agent_id=model_policy.memory_agent_id(
+                        getattr(state, "conversation_id", None)
+                    ),
                     owner=user_id,
                     metadata={
                         # ── Provenance (WP5.1) ──

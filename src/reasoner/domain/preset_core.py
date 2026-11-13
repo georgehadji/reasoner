@@ -6,7 +6,7 @@ import os
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal
 
-from reasoner.core.constants_models import MODEL_GROK_43, MODEL_KIMI_K2_6
+from reasoner.core.constants_models import MODEL_GROK_43, MODEL_KIMI_K2_6, MODEL_MISTRAL_SMALL
 
 # Removed ProviderRouter and _REGISTRY imports to restore domain purity.
 # Validation logic will be moved to an application service.
@@ -200,23 +200,52 @@ _METHOD_TO_SLUG: dict[str, str] = {
 }
 
 
-def build_auto_preset(method: str, tier: str = "budget") -> str:
+def western_variant(preset_id: str) -> str:
+    """The Western-only twin of a preset id: ``debate-budget`` -> ``debate-western-budget``.
+
+    ``auto`` and ``auto-<tier>`` map to ``auto-western-<tier>``.
+    """
+    if is_western_preset(preset_id):
+        return preset_id
+    if preset_id == "auto":
+        return "auto-western-budget"
+    head, _, tier = preset_id.rpartition("-")
+    return f"{head}-western-{tier}"
+
+
+def is_western_preset(preset_id: str) -> bool:
+    """True for a Western-only preset id (generated ones and ``auto-western-*``).
+
+    core.model_policy.run_blocs applies the same id rule; domain may not import it.
+    """
+    return "-western-" in preset_id
+
+
+def build_auto_preset(method: str, tier: str = "budget", western: bool = False) -> str:
     """Build a preset name from method classifier output."""
     safe_tier = tier if tier in ("budget", "premium") else "budget"
     slug = _METHOD_TO_SLUG.get(method, "multi-perspective")
     candidate = f"{slug}-{safe_tier}"
+    if western:
+        candidate = western_variant(candidate)
     # Belt-and-suspenders: confirm it actually exists in the registry.
     # We avoid a circular import by doing a late import of is_valid_preset_name.
     from reasoner.domain.preset_registry import PRESETS
     if candidate in PRESETS:
         return candidate
-    return f"multi-perspective-{safe_tier}"
+    return f"multi-perspective-western-{safe_tier}" if western else f"multi-perspective-{safe_tier}"
 
 
 # Agent model used for follow-up synthesis / classification / decomposition.
 # This ensures a consistent conversational persona across all methods.
 FOLLOWUP_AGENT_MODELS: dict[str, str] = {
     "budget": MODEL_KIMI_K2_6,
+    "premium": MODEL_GROK_43,
+}
+
+# Western-only runs: the budget default (Kimi) is a Chinese model.
+FOLLOWUP_AGENT_MODELS_WESTERN: dict[str, str] = {
+    "budget": MODEL_MISTRAL_SMALL,
     "premium": MODEL_GROK_43,
 }
 

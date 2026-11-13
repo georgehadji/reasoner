@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from reasoner.core import model_policy
 from reasoner.core.constants import DEFAULT_MAX_TOKENS, DEFAULT_TEMPERATURE
 from reasoner.core.constants_limits import TIMEOUTS
 from reasoner.core.exceptions import ProviderError
@@ -275,6 +276,15 @@ _FALLBACK_PROVIDER_REGISTRY: dict[str, type[BaseLLMProvider]] = {
     "qwen": OpenAICompatibleDirectProvider,
 }
 
+# Bloc of each direct vendor, for Western-only runs (core.model_policy). These
+# providers are built here, not through registry.build_provider, so they need
+# their own check.
+_FALLBACK_PROVIDER_BLOC: dict[str, str] = {
+    "anthropic": "US", "openai": "US", "google": "US", "xai": "US", "perplexity": "US",
+    "mistral": "EU",
+    "deepseek": "CN", "qwen": "CN",
+}
+
 
 def build_fallback_provider(name: str) -> BaseLLMProvider:
     """Build a fallback provider by name."""
@@ -283,6 +293,12 @@ def build_fallback_provider(name: str) -> BaseLLMProvider:
     cls = _FALLBACK_PROVIDER_REGISTRY.get(name)
     if cls is None:
         raise ValueError(f"Unknown fallback provider: {name}. Options: {list(_FALLBACK_PROVIDER_REGISTRY.keys())}")
+
+    bloc = _FALLBACK_PROVIDER_BLOC.get(name, "OTHER")
+    if not model_policy.is_allowed(bloc):
+        raise model_policy.ModelNotAllowedError(
+            f"Fallback provider {name!r} (bloc {bloc}) is not allowed in this run"
+        )
 
     # Map provider name → env var for API key
     key_env = {

@@ -51,7 +51,8 @@ async def ui_status():
 async def api_presets() -> dict[str, Any]:
     """Return all presets with public metadata.
 
-    Only names, descriptions, and methods are exposed.
+    Only names, descriptions, primary model and tags (``western-only`` marks
+    the US/EU tier) are exposed.
     No API keys or routing tables are included.
     """
     return {
@@ -60,6 +61,7 @@ async def api_presets() -> dict[str, Any]:
                 "name": preset.name,
                 "description": preset.description,
                 "primary_id": preset.primary_id,
+                "tags": list(preset.tags),
             }
             for preset_id, preset in PRESETS.items()
         }
