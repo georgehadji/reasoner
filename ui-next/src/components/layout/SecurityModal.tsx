@@ -82,8 +82,8 @@ export function SecurityModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
                 <h4 className="font-semibold text-[var(--text-2)] mb-1 uppercase tracking-wider text-[length:var(--text-2xs)]">Data Privacy</h4>
                 <h5 className="font-bold text-[var(--text)] text-[length:var(--text-sm)] mb-1">Data Privacy</h5>
                 <p className="text-[length:var(--text-xs)] text-[var(--text-2)] leading-relaxed">
-                  Zero-Training Guarantee. We never train models on your data. GDPR data subject
-                  rights (export, deletion) supported on request.
+                  Your queries and results are not used by us to train models; each model provider
+                  has its own terms. Delete your account from settings; export and erase are in the API.
                 </p>
               </div>
             </section>
@@ -96,9 +96,9 @@ export function SecurityModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
                 <h4 className="font-semibold text-[var(--text-2)] mb-1 uppercase tracking-wider text-[length:var(--text-2xs)]">Encryption</h4>
                 <h5 className="font-bold text-[var(--text)] text-[length:var(--text-sm)] mb-1">Encryption</h5>
                 <p className="text-[length:var(--text-xs)] text-[var(--text-2)] leading-relaxed">
-                  E2EE in transit and at rest using AES-256-GCM.
+                  Stored data is encrypted per field at rest; connections use HTTPS with HSTS.
                   <br />
-                  <span className="italic text-[var(--text-muted)] text-[length:var(--text-2xs)]">All data is encrypted in transit and at rest.</span>
+                  <span className="italic text-[var(--text-muted)] text-[length:var(--text-2xs)]">Not end-to-end: the model provider decrypts a request to answer it.</span>
                 </p>
               </div>
             </section>
@@ -125,9 +125,9 @@ export function SecurityModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
               </div>
               <div>
                 <h4 className="font-semibold text-[var(--text-2)] mb-1 uppercase tracking-wider text-[length:var(--text-2xs)]">Governance</h4>
-                <h5 className="font-bold text-[var(--text)] text-[length:var(--text-sm)] mb-1">Audit Logs & Retention</h5>
+                <h5 className="font-bold text-[var(--text)] text-[length:var(--text-sm)] mb-1">Audit Log</h5>
                 <p className="text-[length:var(--text-xs)] text-[var(--text-2)] leading-relaxed">
-                  Comprehensive audit trails for all actions. Configurable data retention policies to meet legal requirements.
+                  Sign-in and account events are logged with time, IP address and user agent. Configurable retention is not available yet.
                 </p>
               </div>
             </section>
@@ -138,9 +138,9 @@ export function SecurityModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
               </div>
               <div>
                 <h4 className="font-semibold text-[var(--text-2)] mb-1 uppercase tracking-wider text-[length:var(--text-2xs)]">Network</h4>
-                <h5 className="font-bold text-[var(--text)] text-[length:var(--text-sm)] mb-1">Zero-Trust Architecture</h5>
+                <h5 className="font-bold text-[var(--text)] text-[length:var(--text-sm)] mb-1">Authenticated Requests</h5>
                 <p className="text-[length:var(--text-xs)] text-[var(--text-2)] leading-relaxed">
-                  All inter-component communication is authenticated and encrypted via internal PKI. No plaintext data on the wire.
+                  Every API route checks a session token or a scoped API key; browser requests carry a signed CSRF token.
                 </p>
               </div>
             </section>

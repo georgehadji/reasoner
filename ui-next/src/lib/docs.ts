@@ -1101,9 +1101,8 @@ Uploaded documents are treated as untrusted data, never as instructions. Text in
 
 ## Your data
 
-- **Encryption** — AES-256-GCM at rest, TLS 1.3 in transit.
-- **Retention** — configurable in [Settings](/settings): keep forever, 30 days, 7 days, or 24 hours.
-- **Zero-retention mode** — queries and results are not persisted at all. Use it for sensitive research; note that history and Neuro memory are unavailable for those runs by definition.
+- **Encryption** — run state, problem text and API key metadata are encrypted per field at rest (Fernet by default, AES-256-GCM when enabled); HTTPS with HSTS in transit. Not end-to-end: the model provider decrypts a request to answer it.
+- **Retention** — runs are kept so you can return to them, until you erase your data or delete the account. A fixed retention period and a zero-retention mode are not available yet.
 - **Neuro memory** — long-term recall is tenant-isolated per account and can be cleared at any time.
 
 ## GDPR

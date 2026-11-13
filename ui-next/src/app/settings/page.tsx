@@ -146,9 +146,9 @@ export default function SettingsPage() {
             <div className="flex items-start gap-3 rounded-lg bg-[var(--surface-2)] p-4 border border-[var(--border)]">
               <ShieldCheck className="h-5 w-5 text-[var(--text)] shrink-0 mt-0.5" />
               <div>
-                <p className="text-[length:var(--text-sm)] font-semibold text-[var(--text)]">Encryption Active</p>
+                <p className="text-[length:var(--text-sm)] font-semibold text-[var(--text)]">Encryption</p>
                 <p className="text-[length:var(--text-xs)] text-[var(--text-muted)] leading-relaxed mt-1">
-                  All your data is currently protected with AES-256-GCM encryption at rest and TLS 1.3 in transit.
+                  Stored runs, uploads and their search index are encrypted per field at rest, and connections use HTTPS with HSTS. This is not end-to-end: the model provider decrypts a request to answer it.
                 </p>
               </div>
             </div>
