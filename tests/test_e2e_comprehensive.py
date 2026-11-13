@@ -240,7 +240,7 @@ class TestPresetSpecificRouting:
     @pytest.mark.parametrize("preset_id", [
         "multi-perspective-budget",
         "multi-perspective-premium",
-        "iterative-budget",
+        "iterative-critique-budget",
         "debate-budget",
         "scientific-budget",
         "socratic-budget",

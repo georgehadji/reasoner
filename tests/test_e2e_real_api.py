@@ -28,7 +28,7 @@ SIMPLE_PROBLEM = "What is the capital of France and why is it historically signi
 
 METHOD_PRESETS = [
     ("multi_perspective", "multi-perspective-budget"),
-    ("iterative", "iterative-budget"),
+    ("iterative", "iterative-critique-budget"),
     ("debate", "debate-budget"),
     ("scientific", "scientific-budget"),
     ("socratic", "socratic-budget"),
@@ -44,10 +44,17 @@ METHOD_PRESETS = [
 
 @pytest_asyncio.fixture(scope="module")
 async def client():
-    async with httpx.AsyncClient(
-        transport=ASGITransport(app=api.app), base_url="http://test"
-    ) as c:
-        yield c
+    # These requests are anonymous, and /api/run refuses anonymous callers
+    # (401) unless legacy access is on, so every run failed in ~1s. Settings
+    # are baked at import, so patch the object, as test_e2e_comprehensive does.
+    from reasoner.core.settings import settings
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(settings, "ENABLE_LEGACY_API_KEY", True)
+        async with httpx.AsyncClient(
+            transport=ASGITransport(app=api.app), base_url="http://test"
+        ) as c:
+            yield c
 
 
 class TestRealAPIRunStream:
