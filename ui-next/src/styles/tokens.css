@@ -1,32 +1,41 @@
 /* ============================================================
-   tokens.css — Reasoner colour system
+   tokens.css — Reasoner colour system · OVERPRINT
 
-   Hue is a data channel. It is spent on epistemic status
-   (--ok / --warn / --unknown) and on danger (--red). It is spent
-   nowhere on brand: --accent is achromatic by decision, not by
-   omission. Five chromatic roles do not fit on one wheel once the
-   ground family and danger are spoken for; four do. If the site
-   ever needs a brand hue, it is one value change here — the token
-   survives so the ~213 accent call sites never have to be touched.
+   The site is printed, not painted: two riso inks on newsprint.
+   --ink-blue (federal blue) is the interactive ink and carries every
+   link and primary control. --ink-pink (fluorescent pink) is the
+   second drum: fills, registration marks, the offset layer of the
+   signature. Where the two overlap they make --ink-overlap.
+
+   The four perspectives of a run are printed as offset ink layers
+   that never come into register. That is the picture of the product:
+   models from different labs that do not converge. See
+   spec/art-direction.md.
+
+   Hue is no longer reserved for data. The epistemic labels therefore
+   lean on their solid / dashed / dotted carrier (globals.css
+   .epistemic-*) first and on ink second; their inks are drawn from
+   the riso set (teal, the overlap violet, ochre) and kept clear of
+   both brand drums.
+
+   --ink-pink IS A FILL, NEVER TEXT ON NEWSPRINT. It measures 2.75:1
+   on --bg. Text in pink uses --ink-pink-text. Ink on a pink fill
+   uses --text (6.04:1).
 
    VALUES ARE HEX ON PURPOSE. lib/canvas-fx.ts returns mid-grey for
-   any token that is not 6-char hex, silently, with no test. The
-   oklch() spec in each comment is the authoring record; the hex is
-   what ships.
+   any token that is not 6-char hex, silently.
 
-   CONTRAST: every ink is annotated against --bg / --surface /
-   --surface-2 / --surface-3, and LEGAL names the grounds it clears
-   AA on. The previous system annotated against --bg only and shipped
-   seven sub-AA pairs — see spec/art-direction.md §0.
+   CONTRAST: inks are annotated against --bg / --surface /
+   --surface-2 / --surface-3. All text inks clear AA on every ground,
+   including the sidebar ramp, in both themes.
 
    LIGHT IS THE BASE. An unclassed render — SSR before next-themes,
    print, an embed — must be light.
 
    The dark block is written TWICE on purpose: a media query and a
    class selector cannot share a declaration list. EDIT BOTH.
-   The .invert-band blocks in globals.css are a THIRD and FOURTH
-   copy. EDIT THOSE TOO — the band redefines --accent because a band
-   that swapped only the greys would drop its links below AA.
+   The .invert-band blocks in globals.css are a THIRD, FOURTH and
+   FIFTH copy. EDIT THOSE TOO.
 
    Verify with: node scripts/check-contrast.mjs
    ============================================================ */
@@ -35,208 +44,136 @@
   :root {
     color-scheme: light;
 
-    /* ---- Grounds. Hue 55 at C 0.006–0.013: a green-grey proofing
-       stock. Chosen because the two conventional neutral casts are
-       taken — warm tan (the borrowed one, ~40deg) and blue slate
-       (every dev-tools product).
+    /* ---- Grounds. Cool newsprint, not cream: the banlist forbids the
+       cream + serif + clay combination, and riso stock is grey-white. */
+    --bg:             #F1F3F0;
+    --surface:        #FBFCFA;  /* 1.09:1 lift over --bg */
+    --surface-hover:  #F6F7F4;
+    --surface-2:      #E8EBE6;
+    --surface-3:      #DEE2DC;
 
-       HONEST NOTE: three of four independently-generated directions
-       landed in hue 152–168. Read that as a gap in the market, or as
-       where "not warm, not blue" mechanically lands. A human has to
-       look at this on screen and decide which. If it reads as an
-       escape rather than a decision, change 158 across the grounds
-       and ink and re-run check-contrast.mjs — nothing else moves.
+    --sidebar-bg:     #EAEDE8;
+    --sidebar-hover:  #E1E5DF;
+    --sidebar-active: #D7DCD5;
+    --sidebar-field:  #FDFEFC;
 
-       --bg drops from oklch 0.977 (ivory) to 0.950. That buys a card
-       lift of 1.12:1 where the old #FFFFFF-on-#FCF8F6 was 1.05:1 —
-       3x the step, so elevation becomes a tone and --shadow-lg can
-       leave containers. It is NOT enough for a boundary (3:1), so
-       --border-strong still carries WCAG 1.4.11. Do not claim
-       otherwise.                                                ---- */
-    --bg:             #F2EEEA;  /* oklch(0.950 0.006 55) */
-    --surface:        #FDFAF9;  /* oklch(0.988 0.004 55) — 1.12:1 lift over --bg */
-    --surface-hover:  #F6F3F2;  /* oklch(0.968 0.005 55) */
-    --surface-2:      #ECE6E2;  /* oklch(0.928 0.008 55) */
-    --surface-3:      #E4DCD8;  /* oklch(0.900 0.010 55) */
-
-    /* Sidebar keeps its own ramp: hover/active must move toward
-       contrast in BOTH themes, which --surface-hover cannot do.
-       Unlike the previous system these are no longer within one unit
-       per channel of --surface-2/-3 — the rail is a real ground now. */
-    --sidebar-bg:     #EEE8E3;  /* oklch(0.934 0.009 55) */
-    --sidebar-hover:  #E8E0DA;  /* oklch(0.910 0.011 55) */
-    --sidebar-active: #DFD6D1;  /* oklch(0.884 0.013 55) */
-    --sidebar-field:  #FFFDFC;  /* oklch(0.995 0.003 55) — inset field on the rail */
-
-    /* ---- Ink. Same hue as the ground at ~2x chroma: ink is the
-       ground concentrated, never a foreign grey.
+    /* ---- Ink. Riso black runs slightly blue.
        Annotated   bg / surface / surface-2 / surface-3          ---- */
-    --text:        #1B1511;  /* 15.62  17.43  14.62  13.40  AAA — LEGAL: all grounds */
-    --text-2:      #4D443F;  /*  8.09   9.03   7.57   6.94  AAA — LEGAL: all grounds */
-    --text-muted:  #645B56;  /*  5.65   6.30   5.29   4.85  AA  — LEGAL: all grounds,
-                                 worst case --sidebar-active 4.60 */
-    --text-subtle: #6D645F;  /*  4.93   5.50   4.61   4.23
-                                 LEGAL: --bg, --surface, --surface-hover, --surface-2,
-                                 --sidebar-bg, --sidebar-field.
-                                 NOT legal on --surface-3 (4.23), --sidebar-hover (4.38),
-                                 --sidebar-active (4.01). Use --text-muted there.
-                                 Nine grounds cannot carry four AA ink steps in light
-                                 mode. The old system pretended otherwise and shipped
-                                 five failures; this one declares the restriction. */
+    --text:        #121318;  /* 16.62  18.03  15.42  14.15  AAA */
+    --text-2:      #3A3D47;  /*  9.71  10.53   9.01   8.26  AAA */
+    --text-muted:  #4F535E;  /*  6.89   7.47   6.39   5.86  AA  */
+    --text-subtle: #5A5E69;  /*  5.81   6.30   5.39   4.94  AA — worst --sidebar-active 4.66 */
 
-    /* ---- Borders: alpha of the opposite ground, never a grey token.
-       Recorded failure worth keeping: rgba(160,160,160,0.10) was tried
-       and is invisible on both grounds — a mid grey at low alpha
-       resolves toward whichever ground it sits on.
+    --border:        rgb(18 19 24 / 0.14);  /* decorative separators only */
+    --border-strong: rgb(18 19 24 / 0.49);  /* WCAG 1.4.11 — see check-contrast.mjs */
 
-       The alphas below are SOLVED for 3:1, which the old values were
-       not: rgb(19 18 17 / 0.26) measured 1.80:1 on --surface, i.e. it
-       failed the exact criterion its own comment cited.          ---- */
-    --border:        rgb(27 21 17 / 0.14);  /* 1.34:1 — decorative separators only */
-    --border-strong: rgb(27 21 17 / 0.49);  /* 3.30 surface · 3.21 bg · 3.14 surface-2 — WCAG 1.4.11.
-                                               Raised from the spec's 0.47, which measured
-                                               2.98 on --surface-2 and missed 3:1. */
+    /* ---- The two drums. ---- */
+    --ink-blue:      #1F3FBF;  /*  7.46   8.09   6.92   6.35  AA  */
+    --ink-pink:      #FF4F9A;  /* FILL ONLY — 2.75 on --bg */
+    --ink-pink-text: #B8155C;  /*  5.70   6.18   5.29   4.85  AA  */
+    --ink-overlap:   #6438A0;  /* blue over pink */
 
-    /* ---- Interactive role. Achromatic BY DECISION. See header.
-       An ink-filled CTA measures 11.74:1 against its own label —
-       ~1.8x the contrast of the coral it replaces (6.54:1), so the
-       most important control on every page gets louder, not quieter.
-
-       Links carry a 1px underline at 0.14em offset: with no hue,
-       WCAG 1.4.1 requires a second channel. ~33 call sites, applied
-       in migration step 6.                                      ---- */
-    --accent:       #3C332E;  /* oklch(0.330 0.016 55) — 10.52:1 on --bg */
-    --accent-hover: #271F1A;  /* oklch(0.245 0.015 55) — 13.95:1 on --bg */
-    --accent-text:  #FDFAF9;  /* 11.74:1 on --accent */
-    --accent-dim:   rgb(60 51 46 / 0.09);
+    /* ---- Interactive role = the blue drum. */
+    --accent:       #1F3FBF;  /* = --ink-blue; hex so check-contrast and canvas-fx can read it */
+    --accent-hover: #17309A;
+    --accent-text:  #FBFCFA;  /* 8.09:1 on --accent */
+    --accent-dim:   rgb(31 63 191 / 0.10);
 
     /* ---- Epistemic labels — VERIFIED / HYPOTHESIS / UNKNOWN.
-       These tokens do nothing else, and as of this system that is
-       TRUE: operational status (server online, quota, phase result)
-       is ink plus a shape, never one of these three. Enforcing that
-       is migration step 6; until then ~53 non-epistemic uses remain.
+       Carrier first (solid / dashed / dotted), ink second.
+       HYPOTHESIS takes the overlap violet: two inks, not settled. */
+    --ok:      #00656A;  /* teal   6.13  6.65  5.69  5.22  AA */
+    --warn:    #6438A0;  /* violet 7.20  7.80  6.68  6.13  AA */
+    --unknown: #735400;  /* ochre  6.28  6.81  5.82  5.34  AA */
 
-       The ladder is ink density, not a hue set: confidence is a
-       scalar so it is encoded as one. Solved to 6.40 / 5.20 / 4.60
-       on --surface-3, the worst ground they render on, which
-       produces a monotone 7.46 / 6.03 / 5.32 on --bg.
+    /* ---- Danger. */
+    --red:        #B3122E;  /* 6.18  6.71  5.74  5.26  AA */
+    --red-bg:     rgb(179 18 46 / 0.08);
+    --red-border: rgb(179 18 46 / 0.22);
 
-       Green/amber/grey is the default confidence palette and is
-       deliberately not used. Hue separation is 46deg (ok–warn) and
-       92deg (warn–unknown); luminance separation is 1.24:1 and
-       1.12:1. That is NOT enough on its own and this system does not
-       pretend it is — solid / dashed / dotted on .epistemic-* in
-       globals.css is the carrier. Do not restyle those rules.
+    /* ---- Elevation. Print has no soft shadows; floating layers get a
+       hard offset plate in ink instead of a blur. */
+    --shadow:       0 1px 0 rgb(18 19 24 / 0.10), 0 6px 18px -10px rgb(18 19 24 / 0.22);
+    --shadow-float: 4px 4px 0 rgb(18 19 24 / 0.90);
 
-       OPEN TASTE CALL: --warn at hue 315 (plum) for HYPOTHESIS breaks
-       the amber convention hard. The alternative that keeps everything
-       else is hue 85 (ochre), which costs ~15deg of clearance from the
-       ground family and re-imports a warm residue.               ---- */
-    --ok:      #2E449F;  /* oklch(0.424 0.150 269)  7.46  8.32  6.98  6.40  AAA */
-    --warn:    #7B4193;  /* oklch(0.482 0.140 315)  6.03  6.73  5.65  5.18  AA  */
-    --unknown: #2A6376;  /* oklch(0.465 0.068 223)  5.79  6.47  5.44  4.97  AA
-                            Darkened from the spec's #2C697D, which measured 4.33 on
-                            --sidebar-active and failed AA. Still the quietest rung:
-                            5.79 sits below --warn's 6.03, so the density ladder holds.
-                            No longer byte-identical to --text-muted, which is what
-                            made an UNKNOWN dot indistinguishable from muted chrome.
-                            It sits at the same LIGHTNESS as --text-muted by design
-                            (it is the quietest rung) and is separated by 65deg of
-                            hue and 5x the chroma. */
+    /* Riso grain over the whole page. Multiplied, so it darkens. */
+    --grain-opacity: 0.07;
+    --grain-blend:   multiply;
 
-    /* ---- Danger. The one hue outside the epistemic set. A failed
-       request is not a low-confidence claim and the two must never be
-       confusable: 25deg is >=70deg from every epistemic hue.     ---- */
-    --red:        #AF2A2D;  /* oklch(0.500 0.170 25)  5.71  6.37  5.34  4.90  AA */
-    --red-bg:     rgb(175 42 45 / 0.08);
-    --red-border: rgb(175 42 45 / 0.22);
-
-    /* ---- Elevation. --shadow-float is for floating layers only —
-       Tooltip, CommandPalette, UserMenu, modals, Composer, ChatFeed
-       popovers — where a 1.12:1 lift cannot say "above unknown
-       ground". Containers use tone, not shadow.                 ---- */
-    --shadow:       0 1px 2px rgb(27 21 17 / 0.05), 0 8px 24px -12px rgb(27 21 17 / 0.18);
-    --shadow-float: 0 2px 4px rgb(27 21 17 / 0.04), 0 24px 56px -20px rgb(27 21 17 / 0.22);
-
-    --glass-bg:      rgb(253 250 249 / 0.80);
-    --glass-bg-soft: rgb(253 250 249 / 0.66);
+    --glass-bg:      rgb(251 252 250 / 0.88);
+    --glass-bg-soft: rgb(251 252 250 / 0.72);
 
     /* Scrim darkens in BOTH themes, so it is deliberately not derived
        from --text or --bg (either would invert). */
-    --scrim:   rgb(18 14 12 / 0.55);
-    --overlay: rgb(18 14 12 / 0.72);
+    --scrim:   rgb(10 11 15 / 0.55);
+    --overlay: rgb(10 11 15 / 0.72);
 
-    /* ---- DEPRECATED. Retained so this step ships alone with zero
-       call-site churn. Values re-derived achromatic so nothing coral
-       survives. Removal is migration step 3 (ornament) and step 6.
-         --accent-2     2 uses   -> Composer secondary control
-         --accent-2-dim 3 uses   -> Composer secondary control
-         --shadow-lg   11 uses   -> rename to --shadow-float at call sites
-       --accent-glow is GONE: its three utility classes (.text-glow,
-       .glow-hover, .btn-glow) had zero .tsx callers and its four live
-       hover sites were a grey haze once --accent went achromatic.
-       --text-small had 0 var() uses and is simply gone.          ---- */
-    --accent-2:     #89807B;
-    --accent-2-dim: rgb(137 128 123 / 0.12);
+    /* ---- DEPRECATED aliases, kept so call sites need no churn. */
+    --accent-2:     var(--ink-pink-text);
+    --accent-2-dim: rgb(255 79 154 / 0.14);
     --shadow-lg:    var(--shadow-float);
 
     --background: var(--bg);
     --foreground: var(--text);
   }
 
-  /* System preference — an explicit .light choice must win over it. */
+  /* System preference — an explicit .light choice must win over it.
+     Dark is carbon stock: the same two drums, lifted to read on black. */
   @media (prefers-color-scheme: dark) {
     :root:not(.light) {
       color-scheme: dark;
 
-      --bg:             #1A1614;  /* oklch(0.205 0.009 55) */
-      --surface:        #24201C;  /* oklch(0.245 0.010 55) — 1.11:1 lift */
-      --surface-hover:  #1F1B17;  /* oklch(0.225 0.010 55) */
-      --surface-2:      #2F2925;  /* oklch(0.285 0.011 55) */
-      --surface-3:      #39332E;  /* oklch(0.325 0.012 55) */
+      --bg:             #121318;
+      --surface:        #1B1D23;
+      --surface-hover:  #16181D;
+      --surface-2:      #23262D;
+      --surface-3:      #2C2F37;
 
-      --sidebar-bg:     #15110F;  /* oklch(0.183 0.009 55) — rail recedes below --bg */
-      --sidebar-hover:  #25201D;  /* oklch(0.250 0.011 55) */
-      --sidebar-active: #342E29;  /* oklch(0.305 0.012 55) */
-      --sidebar-field:  #25201D;  /* oklch(0.250 0.011 55) */
+      --sidebar-bg:     #0D0E12;
+      --sidebar-hover:  #1C1E24;
+      --sidebar-active: #282B33;
+      --sidebar-field:  #1C1E24;
 
       /*             bg / surface / surface-2 / surface-3 */
-      --text:        #FAF1EC;  /* 16.25  14.64  12.92  11.24  AAA — LEGAL: all */
-      --text-2:      #C9BFB9;  /* 10.01   9.02   7.96   6.92  AAA — LEGAL: all */
-      --text-muted:  #A59B95;  /*  6.65   5.99   5.29   4.60  AA  — LEGAL: all */
-      --text-subtle: #98908B;  /*  5.76   5.19   4.58   3.98
-                                  NOT legal on --surface-3 or --sidebar-active (4.28).
-                                  Same restriction as light. Use --text-muted there. */
+      --text:        #EEF0EA;  /* 16.15  14.67  13.19  11.66  AAA */
+      --text-2:      #BEC2CC;  /* 10.40   9.45   8.49   7.51  AAA */
+      --text-muted:  #A2A7B2;  /*  7.69   6.98   6.28   5.55  AA  */
+      --text-subtle: #9196A2;  /*  6.26   5.69   5.11   4.52  AA  */
 
-      --border:        rgb(250 241 236 / 0.13);  /* 1.47:1 */
-      --border-strong: rgb(250 241 236 / 0.38);  /* 3.29 surface · 3.31 bg · 3.16 surface-2 — WCAG 1.4.11.
-                                                    0.36 measured 2.98 on --surface-2 after the hue
-                                                    rotation and missed 3:1. */
+      --border:        rgb(238 240 234 / 0.13);
+      --border-strong: rgb(238 240 234 / 0.40);
 
-      --accent:       #D4C9C3;  /* oklch(0.845 0.016 55) — 11.18:1 on --bg */
-      --accent-hover: #E6DDD8;  /* oklch(0.905 0.013 55) — 13.53:1 on --bg */
-      --accent-text:  #1A1614;  /* 11.18:1 on --accent */
-      --accent-dim:   rgb(212 201 195 / 0.13);
+      --ink-blue:      #93A6FF;  /* 8.07  7.33  6.59  5.83 */
+      --ink-pink:      #FF5FA5;  /* 6.57 on --bg — legal as text here */
+      --ink-pink-text: #FF7DB5;  /* 7.82  7.10  6.38  5.64 */
+      --ink-overlap:   #B79AF0;
 
-      --ok:      #A2B9FA;  /* oklch(0.793 0.095 269)  9.26  8.35  7.37  6.41  AAA */
-      --warn:    #CE90EA;  /* oklch(0.747 0.140 315)  7.51  6.77  5.97  5.19  AAA */
-      --unknown: #6AA6BC;  /* oklch(0.693 0.070 223)  6.65  6.00  5.29  4.60  AA  */
+      --accent:       #93A6FF;  /* = --ink-blue */
+      --accent-hover: #B0BEFF;
+      --accent-text:  #121318;  /* 8.07:1 on --accent */
+      --accent-dim:   rgb(147 166 255 / 0.14);
 
-      --red:        #FB7D76;  /* oklch(0.733 0.154 25)  7.08  6.38  5.63  4.90  AAA */
-      --red-bg:     rgb(251 125 118 / 0.10);
-      --red-border: rgb(251 125 118 / 0.26);
+      --ok:      #4FC7C2;  /* 9.08  8.25  7.41  6.55 */
+      --warn:    #B79AF0;  /* 7.86  7.13  6.41  5.67 */
+      --unknown: #D9B24A;  /* 9.20  8.36  7.51  6.64 */
 
-      --shadow:       0 1px 2px rgb(0 0 0 / 0.40), 0 8px 24px -12px rgb(0 0 0 / 0.70);
-      --shadow-float: 0 2px 4px rgb(0 0 0 / 0.45), 0 24px 56px -20px rgb(0 0 0 / 0.80);
+      --red:        #FF7A7A;  /* 7.35  6.67  6.00  5.30 */
+      --red-bg:     rgb(255 122 122 / 0.10);
+      --red-border: rgb(255 122 122 / 0.26);
 
-      --glass-bg:      rgb(36 32 28 / 0.78);
-      --glass-bg-soft: rgb(36 32 28 / 0.62);
+      --shadow:       0 1px 0 rgb(0 0 0 / 0.40), 0 6px 18px -10px rgb(0 0 0 / 0.70);
+      --shadow-float: 4px 4px 0 rgb(147 166 255 / 0.55);
+
+      --grain-opacity: 0.06;
+      --grain-blend:   screen;
+
+      --glass-bg:      rgb(27 29 35 / 0.86);
+      --glass-bg-soft: rgb(27 29 35 / 0.70);
       --scrim:         rgb(0 0 0 / 0.68);
       --overlay:       rgb(0 0 0 / 0.80);
 
-      /* DEPRECATED — see light block */
-      --accent-2:     #A59B95;
-      --accent-2-dim: rgb(165 155 149 / 0.12);
+      --accent-2:     var(--ink-pink-text);
+      --accent-2-dim: rgb(255 95 165 / 0.16);
       --shadow-lg:    var(--shadow-float);
     }
   }
@@ -246,49 +183,56 @@
   :root.dark {
     color-scheme: dark;
 
-    --bg:             #1A1614;
-    --surface:        #24201C;
-    --surface-hover:  #1F1B17;
-    --surface-2:      #2F2925;
-    --surface-3:      #39332E;
+    --bg:             #121318;
+    --surface:        #1B1D23;
+    --surface-hover:  #16181D;
+    --surface-2:      #23262D;
+    --surface-3:      #2C2F37;
 
-    --sidebar-bg:     #15110F;
-    --sidebar-hover:  #25201D;
-    --sidebar-active: #342E29;
-    --sidebar-field:  #25201D;
+    --sidebar-bg:     #0D0E12;
+    --sidebar-hover:  #1C1E24;
+    --sidebar-active: #282B33;
+    --sidebar-field:  #1C1E24;
 
-    --text:        #FAF1EC;
-    --text-2:      #C9BFB9;
-    --text-muted:  #A59B95;
-    --text-subtle: #98908B;
+    --text:        #EEF0EA;
+    --text-2:      #BEC2CC;
+    --text-muted:  #A2A7B2;
+    --text-subtle: #9196A2;
 
-    --border:        rgb(250 241 236 / 0.13);
-    --border-strong: rgb(250 241 236 / 0.38);
+    --border:        rgb(238 240 234 / 0.13);
+    --border-strong: rgb(238 240 234 / 0.40);
 
-    --accent:       #D4C9C3;
-    --accent-hover: #E6DDD8;
-    --accent-text:  #1A1614;
-    --accent-dim:   rgb(212 201 195 / 0.13);
+    --ink-blue:      #93A6FF;
+    --ink-pink:      #FF5FA5;
+    --ink-pink-text: #FF7DB5;
+    --ink-overlap:   #B79AF0;
 
-    --ok:      #A2B9FA;
-    --warn:    #CE90EA;
-    --unknown: #6AA6BC;
+    --accent:       #93A6FF;  /* = --ink-blue */
+    --accent-hover: #B0BEFF;
+    --accent-text:  #121318;
+    --accent-dim:   rgb(147 166 255 / 0.14);
 
-    --red:        #FB7D76;
-    --red-bg:     rgb(251 125 118 / 0.10);
-    --red-border: rgb(251 125 118 / 0.26);
+    --ok:      #4FC7C2;
+    --warn:    #B79AF0;
+    --unknown: #D9B24A;
 
-    --shadow:       0 1px 2px rgb(0 0 0 / 0.40), 0 8px 24px -12px rgb(0 0 0 / 0.70);
-    --shadow-float: 0 2px 4px rgb(0 0 0 / 0.45), 0 24px 56px -20px rgb(0 0 0 / 0.80);
+    --red:        #FF7A7A;
+    --red-bg:     rgb(255 122 122 / 0.10);
+    --red-border: rgb(255 122 122 / 0.26);
 
-    --glass-bg:      rgb(36 32 28 / 0.78);
-    --glass-bg-soft: rgb(36 32 28 / 0.62);
+    --shadow:       0 1px 0 rgb(0 0 0 / 0.40), 0 6px 18px -10px rgb(0 0 0 / 0.70);
+    --shadow-float: 4px 4px 0 rgb(147 166 255 / 0.55);
+
+    --grain-opacity: 0.06;
+    --grain-blend:   screen;
+
+    --glass-bg:      rgb(27 29 35 / 0.86);
+    --glass-bg-soft: rgb(27 29 35 / 0.70);
     --scrim:         rgb(0 0 0 / 0.68);
     --overlay:       rgb(0 0 0 / 0.80);
 
-    /* DEPRECATED — see light block */
-    --accent-2:     #A59B95;
-    --accent-2-dim: rgb(165 155 149 / 0.12);
+    --accent-2:     var(--ink-pink-text);
+    --accent-2-dim: rgb(255 95 165 / 0.16);
     --shadow-lg:    var(--shadow-float);
   }
 }

@@ -51,7 +51,7 @@ export function Section({
 
 export function Heading({ children }: { children: ReactNode }) {
   return (
-    <h2 className="font-serif text-[length:var(--text-2xl)] sm:text-[length:var(--text-4xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)]">
+    <h2 className="font-display text-[length:var(--text-2xl)] sm:text-[length:var(--text-4xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)]">
       {children}
     </h2>
   );

@@ -102,7 +102,7 @@ export function NotFoundView() {
             </span>
           </div>
 
-          <h1 className="mt-6 font-serif text-[length:var(--text-4xl)] leading-[var(--lh-display)] tracking-[var(--tracking-tight)] text-[var(--text)]">
+          <h1 className="mt-6 font-display text-[length:var(--text-4xl)] leading-[var(--lh-display)] tracking-[var(--tracking-tight)] text-[var(--text)]">
             This address returns nothing we can verify.
           </h1>
 

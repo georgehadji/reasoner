@@ -82,7 +82,7 @@ export default async function DocPage({ params }: DocParams) {
 
           <article>
             <header className="mb-10 border-b border-[var(--border)] pb-8">
-              <h1 className="font-serif text-[length:var(--text-4xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)]">{doc.title}</h1>
+              <h1 className="font-display text-[length:var(--text-4xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)]">{doc.title}</h1>
               <p className="prose-measure mt-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-2)]">
                 {doc.description}
               </p>

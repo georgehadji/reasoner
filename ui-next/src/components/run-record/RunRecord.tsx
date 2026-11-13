@@ -131,7 +131,7 @@ export default function RunRecord() {
                 How it works
               </p>
 
-              <h1 className="mt-[var(--space-6)] max-w-[16ch] font-serif text-[length:var(--text-5xl)] font-normal leading-[var(--lh-display)] tracking-[var(--tracking-tight)] text-[var(--text)]">
+              <h1 className="mt-[var(--space-6)] max-w-[16ch] font-display text-[length:var(--text-5xl)] font-normal leading-[var(--lh-display)] tracking-[var(--tracking-tight)] text-[var(--text)]">
                 One run, with nothing left out.
               </h1>
 
@@ -186,7 +186,7 @@ export default function RunRecord() {
             order a report is read in, not the order it was produced
             in. The toggle is the product's argument in one control. */}
         <Section id="synthesis" marker="§5" name="Synthesis">
-          <h2 className="font-serif text-[length:var(--text-3xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-snug)] text-[var(--text)]">
+          <h2 className="font-display text-[length:var(--text-3xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-snug)] text-[var(--text)]">
             The finding, and what stands behind it.
           </h2>
           <div className="mt-[var(--space-6)]">
@@ -203,7 +203,7 @@ export default function RunRecord() {
 
         {/* ── §1 Evidence ───────────────────────────────────────── */}
         <Section id="evidence" marker="§1" name="Evidence Search">
-          <h2 className="font-serif text-[length:var(--text-2xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-snug)] text-[var(--text)]">
+          <h2 className="font-display text-[length:var(--text-2xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-snug)] text-[var(--text)]">
             What the run read first.
           </h2>
           <div className="mt-[var(--space-4)]">
@@ -244,7 +244,7 @@ export default function RunRecord() {
 
         {/* ── §2 Positions ──────────────────────────────────────── */}
         <Section id="positions" marker="§2" name="Perspectives">
-          <h2 className="font-serif text-[length:var(--text-2xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-snug)] text-[var(--text)]">
+          <h2 className="font-display text-[length:var(--text-2xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-snug)] text-[var(--text)]">
             Four positions, written against each other.
           </h2>
           <div className="mt-[var(--space-4)]">
@@ -281,7 +281,7 @@ export default function RunRecord() {
 
         {/* ── §3 Adjudication ───────────────────────────────────── */}
         <Section id="adjudication" marker="§3" name="Critique &amp; Pruning">
-          <h2 className="font-serif text-[length:var(--text-2xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-snug)] text-[var(--text)]">
+          <h2 className="font-display text-[length:var(--text-2xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-snug)] text-[var(--text)]">
             Scored by a model with no stake in the answer.
           </h2>
           <div className="mt-[var(--space-4)]">
@@ -300,7 +300,7 @@ export default function RunRecord() {
 
         {/* ── §4 Stress ─────────────────────────────────────────── */}
         <Section id="stress" marker="§4" name="Stress Testing">
-          <h2 className="font-serif text-[length:var(--text-2xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-snug)] text-[var(--text)]">
+          <h2 className="font-display text-[length:var(--text-2xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-snug)] text-[var(--text)]">
             Then it is attacked.
           </h2>
           <div className="mt-[var(--space-4)]">
@@ -348,7 +348,7 @@ export default function RunRecord() {
 
         {/* ── Ledger ────────────────────────────────────────────── */}
         <Section marker="§0" name="Ledger">
-          <h2 className="font-serif text-[length:var(--text-2xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-snug)] text-[var(--text)]">
+          <h2 className="font-display text-[length:var(--text-2xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-snug)] text-[var(--text)]">
             What the record cost.
           </h2>
           <div className="mt-[var(--space-4)]">
@@ -382,7 +382,7 @@ export default function RunRecord() {
 
         {/* ── Interface ─────────────────────────────────────────── */}
         <Section marker="API" name="Interface">
-          <h2 className="font-serif text-[length:var(--text-2xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-snug)] text-[var(--text)]">
+          <h2 className="font-display text-[length:var(--text-2xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-snug)] text-[var(--text)]">
             The record comes back as JSON.
           </h2>
           <div className="mt-[var(--space-4)]">
@@ -443,7 +443,7 @@ export default function RunRecord() {
 
         {/* ── Terms ─────────────────────────────────────────────── */}
         <Section marker="—" name="Terms">
-          <h2 className="font-serif text-[length:var(--text-2xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-snug)] text-[var(--text)]">
+          <h2 className="font-display text-[length:var(--text-2xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-snug)] text-[var(--text)]">
             Where your data sits.
           </h2>
 
@@ -483,7 +483,7 @@ export default function RunRecord() {
           <div className="grid gap-[var(--space-8)] lg:grid-cols-[9rem_minmax(0,1fr)] lg:gap-[var(--space-12)]">
             <div />
             <div>
-              <h2 className="prose-measure font-serif text-[length:var(--text-3xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-snug)] text-[var(--text)]">
+              <h2 className="prose-measure font-display text-[length:var(--text-3xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-snug)] text-[var(--text)]">
                 Your question gets the same treatment.
               </h2>
               <p className="prose-measure mt-[var(--space-4)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">

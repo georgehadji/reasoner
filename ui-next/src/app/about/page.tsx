@@ -53,7 +53,7 @@ function Section({
 
 function Heading({ children }: { children: ReactNode }) {
   return (
-    <h2 className="font-serif text-[length:var(--text-3xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-snug)] text-[var(--text)]">
+    <h2 className="font-display text-[length:var(--text-3xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-snug)] text-[var(--text)]">
       {children}
     </h2>
   );
@@ -154,7 +154,7 @@ export default function AboutPage() {
         <header className="mx-auto w-full max-w-[var(--width-wide)] px-[var(--gutter)] pb-[var(--section-y)] pt-[var(--space-32)]">
           <div className="grid gap-[var(--space-12)] lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:items-start lg:gap-[var(--space-16)]">
             <div>
-              <h1 className="max-w-[16ch] text-balance font-serif text-[length:var(--text-6xl)] font-normal leading-[var(--lh-display)] tracking-[var(--tracking-tight)] text-[var(--text)]">
+              <h1 className="max-w-[16ch] text-balance font-display text-[length:var(--text-6xl)] font-normal leading-[var(--lh-display)] tracking-[var(--tracking-tight)] text-[var(--text)]">
                 Nothing here asks to be believed.
               </h1>
 

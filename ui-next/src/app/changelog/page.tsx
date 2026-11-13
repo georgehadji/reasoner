@@ -32,7 +32,7 @@ export default function ChangelogPage() {
 
       <main className="mx-auto w-full max-w-[var(--width-content)] flex-1 px-[var(--gutter)] py-[var(--space-24)]">
         <header className="mb-[var(--space-16)]">
-          <h1 className="font-serif text-[length:var(--text-4xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)] md:text-[length:var(--text-5xl)]">
+          <h1 className="font-display text-[length:var(--text-4xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)] md:text-[length:var(--text-5xl)]">
             Changelog
           </h1>
           <p className="prose-measure mt-[var(--space-4)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
@@ -53,7 +53,7 @@ export default function ChangelogPage() {
               >
                 {formatDate(entry.date)}
               </time>
-              <h2 className="mt-[var(--space-2)] font-serif text-[length:var(--text-xl)] font-semibold leading-[var(--lh-subhead)] text-[var(--text)]">
+              <h2 className="mt-[var(--space-2)] font-display text-[length:var(--text-xl)] font-semibold leading-[var(--lh-subhead)] text-[var(--text)]">
                 {entry.title}
               </h2>
               <p className="prose-measure mt-[var(--space-2)] text-[length:var(--text-base)] leading-[var(--lh-body)] text-[var(--text-muted)]">

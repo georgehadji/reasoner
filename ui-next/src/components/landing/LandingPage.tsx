@@ -181,7 +181,7 @@ export default function LandingPage() {
               {/* The mechanism, direct. No eyebrow needed — the claim reads
                   on its own and the product's own output (right column)
                   teaches what it means. */}
-              <h1 className="max-w-[18ch] text-balance font-serif text-[length:var(--text-6xl)] font-normal leading-[var(--lh-display)] lg:text-[length:var(--text-7xl)] tracking-[var(--tracking-tight)] text-[var(--text)]">
+              <h1 className="max-w-[18ch] text-balance font-display text-[length:var(--text-6xl)] font-normal leading-[var(--lh-display)] lg:text-[length:var(--text-7xl)] tracking-[var(--tracking-tight)] text-[var(--text)]">
                 Models that disagree, on the record.
               </h1>
             </div>
@@ -480,7 +480,7 @@ export default function LandingPage() {
             {/* One step up from the shared Heading (34pt): this section leads
                 the page's exhibits and the display size is what makes the
                 two-column split read as a masthead rather than as a caption. */}
-            <h2 className="font-serif text-[length:var(--text-4xl)] sm:text-[length:var(--text-6xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)]">
+            <h2 className="font-display text-[length:var(--text-4xl)] sm:text-[length:var(--text-6xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)]">
               Every prompt goes to four labs at once.
             </h2>
             <p className="text-[length:var(--text-2xl)] leading-[var(--lh-body)] text-[var(--text-2)]">
@@ -492,18 +492,6 @@ export default function LandingPage() {
           </div>
 
           <figure className="relative mt-[var(--space-10)]">
-            {/* The light the tilt implies. Four plates leaning back off a
-                shared vanishing point need a source above them, or the
-                rotation reads as a rendering glitch rather than as an object
-                being lit. Static gradient on an existing theme token — no
-                canvas, no loop, nothing to pause off-screen. Painted first
-                and never given a z-index: the plates are opaque and come
-                later in the DOM, so they cover it without a stacking
-                context being invented for the section. */}
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-x-[-8%] top-[10%] h-[55%] bg-[radial-gradient(ellipse_at_top,var(--accent-dim),transparent_70%)]"
-            />
 
             <p className="font-mono text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
               &ldquo;{SHOWCASE_PROMPT}&rdquo;
@@ -544,7 +532,7 @@ export default function LandingPage() {
                     decoding="async"
                     fetchPriority="low"
                     sizes="(max-width: 768px) 45vw, 30vw"
-                    className="aspect-square w-full border border-[var(--border)] object-cover saturate-[0.9] transition-[filter,border-color] duration-[var(--dur-component)] ease-[var(--ease-standard)] group-hover:border-[var(--border-strong)] group-hover:saturate-100"
+                    className="misregister aspect-square w-full border border-[var(--border)] object-cover saturate-[0.9] transition-[filter,border-color] duration-[var(--dur-component)] ease-[var(--ease-standard)] group-hover:border-[var(--border-strong)] group-hover:saturate-100"
                   />
                   <p className="mt-[var(--space-3)] font-sans text-[length:var(--text-md)] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
                     {lab}

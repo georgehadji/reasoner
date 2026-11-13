@@ -26,7 +26,9 @@ export function PerspectivesRenderer({ candidates }: { candidates: Candidate[] }
         const marks = extractEpistemicMarks(c.content);
         const model = c.model_used ? c.model_used.split('/').pop() : '';
         return (
-          <article key={i} className="grid grid-cols-1 gap-[var(--space-4)] lg:grid-cols-[1fr_auto]">
+          // .misregister: each position prints on its own pink plate,
+          // offset differently, never in register with the others.
+          <article key={i} className="misregister grid grid-cols-1 gap-[var(--space-4)] border border-[var(--border-strong)] bg-[var(--surface)] p-[var(--space-4)] lg:grid-cols-[1fr_auto]">
             <div className="min-w-0">
               <h4 className="mb-[var(--space-2)] text-[length:var(--text-sm)] font-semibold capitalize text-[var(--text)]">
                 {c.perspective}

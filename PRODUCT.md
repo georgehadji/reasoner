@@ -93,8 +93,9 @@ date, availability commitments, uptime or latency numbers.
 - `spec/banlist.md` is binding on every visual decision.
 - **`docs/DESIGN.md` is not this product's design system.** It documents ElevenLabs and
   is reference material only. Nothing in it governs Reasoner.
-- Hue is a data channel, spent on epistemic status and on danger. `--accent` is
-  achromatic by decision, not by omission.
+- The site is a two-ink riso print: federal blue is the interactive ink, fluorescent
+  pink the second drum. Epistemic status is carried by rule pattern first and ink
+  second, so hue is no longer reserved for data (changed 2026-11-13).
 - Claims are labeled VERIFIED, INFERENCE, HYPOTHESIS or UNKNOWN. Anything not verifiable
   in this repository is written as `[INPUT REQUIRED: <question>]` rather than guessed.
 

@@ -95,7 +95,7 @@ export default function SecurityPage() {
         <header className="mx-auto w-full max-w-[var(--width-content)] px-[var(--gutter)] pb-[var(--space-16)] pt-[var(--space-48)]">
           <div>
             <div className="min-w-0">
-              <h1 className="font-serif text-[length:var(--text-4xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)] md:text-[length:var(--text-5xl)]">
+              <h1 className="font-display text-[length:var(--text-4xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)] md:text-[length:var(--text-5xl)]">
                 Security &amp; Trust
               </h1>
               <p className="prose-measure mt-[var(--space-6)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-2)]">
@@ -114,7 +114,7 @@ export default function SecurityPage() {
               className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-[var(--space-8)]"
             >
               <Icon className="mb-[var(--space-6)] h-7 w-7 text-[var(--accent)]" aria-hidden="true" />
-              <h2 className="font-serif text-[length:var(--text-xl)] font-semibold leading-[var(--lh-subhead)] text-[var(--text)]">
+              <h2 className="font-display text-[length:var(--text-xl)] font-semibold leading-[var(--lh-subhead)] text-[var(--text)]">
                 {title}
               </h2>
               <ul className="mt-[var(--space-4)] space-y-[var(--space-4)]">
@@ -138,7 +138,7 @@ export default function SecurityPage() {
         </div>
 
         <section className="mt-[var(--space-16)] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-[var(--space-8)]">
-          <h2 className="font-serif text-[length:var(--text-xl)] font-semibold leading-[var(--lh-subhead)] text-[var(--text)]">
+          <h2 className="font-display text-[length:var(--text-xl)] font-semibold leading-[var(--lh-subhead)] text-[var(--text)]">
             Where your data goes
           </h2>
           <p className="prose-measure mt-[var(--space-3)] text-[length:var(--text-sm)] leading-[var(--lh-body)] text-[var(--text-muted)]">
@@ -162,7 +162,7 @@ export default function SecurityPage() {
         </section>
 
         <section className="mt-[var(--space-8)] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-[var(--space-8)]">
-          <h2 className="font-serif text-[length:var(--text-xl)] font-semibold leading-[var(--lh-subhead)] text-[var(--text)]">
+          <h2 className="font-display text-[length:var(--text-xl)] font-semibold leading-[var(--lh-subhead)] text-[var(--text)]">
             Self-hosting
           </h2>
           <p className="prose-measure mt-[var(--space-3)] text-[length:var(--text-sm)] leading-[var(--lh-body)] text-[var(--text-muted)]">
@@ -173,7 +173,7 @@ export default function SecurityPage() {
         </section>
 
         <section className="mt-[var(--space-8)] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-[var(--space-8)]">
-          <h2 className="font-serif text-[length:var(--text-xl)] font-semibold leading-[var(--lh-subhead)] text-[var(--text)]">
+          <h2 className="font-display text-[length:var(--text-xl)] font-semibold leading-[var(--lh-subhead)] text-[var(--text)]">
             Report a vulnerability
           </h2>
           <p className="prose-measure mt-[var(--space-3)] text-[length:var(--text-sm)] leading-[var(--lh-body)] text-[var(--text-muted)]">
@@ -190,7 +190,7 @@ export default function SecurityPage() {
 
         <section className="mt-[var(--space-16)] rounded-[var(--radius-lg)] border border-[var(--border-strong)] bg-[var(--surface)] p-[var(--space-12)] text-center">
           <ShieldAlert className="mx-auto mb-[var(--space-6)] h-10 w-10 text-[var(--accent)]" aria-hidden="true" />
-          <h2 className="font-serif text-[length:var(--text-2xl)] font-semibold text-[var(--text)]">
+          <h2 className="font-display text-[length:var(--text-2xl)] font-semibold text-[var(--text)]">
             Questions?
           </h2>
           <p className="prose-measure mx-auto mt-[var(--space-4)] text-[length:var(--text-sm)] leading-[var(--lh-body)] text-[var(--text-muted)]">

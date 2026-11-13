@@ -10,7 +10,7 @@ export default function PrivacyPage() {
       <SiteHeader />
       <main className="mx-auto max-w-4xl px-6 py-20 flex-1 w-full">
         <header className="mb-12 border-b border-[var(--border)] pb-12">
-          <h1 className="text-[length:var(--text-4xl)] md:text-[length:var(--text-5xl)] font-bold mb-4 tracking-tight">Privacy Policy</h1>
+          <h1 className="font-display text-[length:var(--text-4xl)] md:text-[length:var(--text-5xl)] font-bold mb-4 tracking-tight">Privacy Policy</h1>
           <p className="text-[var(--text-muted)] text-[length:var(--text-lg)]">Last updated: {lastUpdated}</p>
         </header>
 

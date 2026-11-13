@@ -6,7 +6,7 @@ export default function CookiesPage() {
     <div className="flex min-h-dvh flex-col bg-[var(--bg)] text-[var(--text)]">
       <SiteHeader />
       <main className="mx-auto max-w-3xl px-4 py-16 flex-1 w-full">
-      <h1 className="text-[length:var(--text-4xl)] font-bold mb-8">Cookie Policy</h1>
+      <h1 className="font-display text-[length:var(--text-4xl)] font-bold mb-8">Cookie Policy</h1>
       <div className="prose prose-invert max-w-none text-[var(--text-2)]">
         <p className="mb-4">Last updated: {new Date().toLocaleDateString()}</p>
         

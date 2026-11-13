@@ -43,15 +43,6 @@ const SEVERITY_CLASS: Record<string, string> = {
 export function ReviewHandoff() {
   return (
     <figure className="relative mt-[var(--space-10)]">
-      {/* The light the plates are lit by. Same static gradient on the same
-          token as the image grid — no canvas, no loop, nothing to pause when
-          it scrolls out of view. Painted first and never given a z-index: the
-          plates are opaque and come later in the DOM, so they cover it
-          without a stacking context having to be invented here. */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-[-8%] top-[4%] h-[55%] bg-[radial-gradient(ellipse_at_top,var(--accent-dim),transparent_70%)]"
-      />
 
       <p className="relative font-mono text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
         &ldquo;{CODE_SHOWCASE_REQUEST}&rdquo;

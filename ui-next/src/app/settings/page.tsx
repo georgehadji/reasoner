@@ -86,7 +86,7 @@ export default function SettingsPage() {
             pitch, so there is nothing genuine to put in one. */}
         <header className="mx-auto w-full max-w-3xl px-[var(--gutter)] pb-[var(--space-8)] pt-[var(--space-48)]">
           <div>
-            <h1 className="min-w-0 font-serif text-[length:var(--text-3xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)]">
+            <h1 className="min-w-0 font-display text-[length:var(--text-3xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)]">
               Account settings.
             </h1>
           </div>

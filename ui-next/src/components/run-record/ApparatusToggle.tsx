@@ -36,7 +36,7 @@ function SynthesisBlocks({ blocks, withRecord }: { blocks: Block[]; withRecord: 
             return (
               <h4
                 key={i}
-                className="mt-[var(--space-6)] font-serif text-[length:var(--text-base)] font-semibold leading-[var(--lh-subhead)] text-[var(--text)]"
+                className="mt-[var(--space-6)] font-display text-[length:var(--text-base)] font-semibold leading-[var(--lh-subhead)] text-[var(--text)]"
               >
                 {block.text}
               </h4>

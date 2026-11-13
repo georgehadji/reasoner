@@ -132,7 +132,7 @@ export default function ContactPage() {
         id="main-content"
         className="mx-auto w-full max-w-[var(--width-content)] flex-1 px-[var(--gutter)] py-[var(--section-y)] pt-[calc(var(--space-16)+var(--section-y))]"
       >
-        <h1 className="mb-[var(--space-8)] text-[length:var(--text-4xl)] font-bold">Contact Support</h1>
+        <h1 className="font-display mb-[var(--space-8)] text-[length:var(--text-4xl)] font-bold">Contact Support</h1>
 
         {submitted ? (
           /* Success. Tick + heading + sentence carry the meaning; the tint is

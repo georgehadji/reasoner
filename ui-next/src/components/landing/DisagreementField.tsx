@@ -97,13 +97,13 @@ export function DisagreementField() {
 
     /* Read from the cascade rather than hardcoding, so the toggle, the system
        preference, and the forced-colors override all reach the canvas. */
-    let neutral = '96,105,99';
-    let accent = '47,56,50';
+    let neutral = '90,94,105';
+    let accent = '31,63,191';
     let alpha = ALPHA_LIGHT;
 
     const readTheme = () => {
-      neutral = readChannels(root, '--text-subtle', '#6D645F');
-      accent = readChannels(root, '--accent', '#3C332E');
+      neutral = readChannels(root, '--text-subtle', '#5A5E69');
+      accent = readChannels(root, '--accent', '#1F3FBF');
       alpha = root.classList.contains('dark') ? ALPHA_DARK : ALPHA_LIGHT;
     };
 
