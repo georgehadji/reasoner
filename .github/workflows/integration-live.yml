@@ -37,8 +37,10 @@ on:
 jobs:
   live:
     runs-on: ubuntu-latest
-    # Run 43388103240 reached 61% of the budget filter in 45 minutes.
-    timeout-minutes: 120
+    # Run 43388103240 reached 61% of the budget filter in 45 minutes; run
+    # 43399471185 reached 97% in 120. --session-timeout below stops pytest
+    # 20 minutes before this, leaving room for the last 600s test to finish.
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -86,6 +88,10 @@ jobs:
           # the slowest that passed took 277s on 2026-11-13, and 180s and 240s
           # markers cut off runs whose every model call had succeeded.
           #
+          # --session-timeout ends the session cleanly, so pytest still prints
+          # its failure summary and writes the XML. When the job limit killed
+          # run 43399471185 instead, both were lost and no failure had a reason.
+          #
           # Inputs reach the script through env: above, never by template
           # interpolation into this block, so a -k expression cannot become
           # a command. (Do not write an empty GitHub expression in a comment
@@ -102,6 +108,7 @@ jobs:
             -n "${WORKERS}" --dist loadscope \
             --tb=short \
             --junitxml=integration-live.xml \
+            --session-timeout=7800 \
             "$@"
 
       - name: Upload results

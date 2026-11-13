@@ -32,9 +32,11 @@ COMPLEX_PROBLEM = (
     "deployment velocity, and operational cost."
 )
 
-# All budget presets across every method
+# All budget presets across every method. Western twins are left out: each
+# is a full pipeline run (up to ~400s), and 25 more would push the lane past
+# its job limit. test_e2e_real_pipeline still makes one real call per twin.
 BUDGET_PRESETS = sorted(
-    [pid for pid in PRESETS if pid.endswith("-budget")]
+    pid for pid in PRESETS if pid.endswith("-budget") and "-western-" not in pid
 )
 
 # A subset of budget presets for quick smoke tests
@@ -66,7 +68,7 @@ class TestBudgetPresetSmoke:
 
     @pytest.mark.parametrize("preset_id", SMOKE_BUDGET_PRESETS)
     @pytest.mark.asyncio
-    @pytest.mark.timeout(120)
+    @pytest.mark.timeout(600)
     async def test_smoke_runs_to_completion(self, preset_id):
         _, router = build_router(preset_id)
         pipeline = ReasonerPipeline(
@@ -178,7 +180,7 @@ class TestBudgetPresetTokenTracking:
 
     @pytest.mark.parametrize("preset_id", SMOKE_BUDGET_PRESETS)
     @pytest.mark.asyncio
-    @pytest.mark.timeout(120)
+    @pytest.mark.timeout(600)
     async def test_token_usage_is_non_negative(self, preset_id):
         _, router = build_router(preset_id)
         pipeline = ReasonerPipeline(

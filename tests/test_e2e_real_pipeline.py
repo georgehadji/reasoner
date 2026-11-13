@@ -26,7 +26,7 @@ SIMPLE_PROBLEM = "What is the capital of France and why is it historically signi
 
 METHOD_PRESETS = [
     ("multi_perspective", "multi-perspective-budget"),
-    ("iterative", "iterative-budget"),
+    ("iterative", "iterative-critique-budget"),
     ("debate", "debate-budget"),
     ("scientific", "scientific-budget"),
     ("socratic", "socratic-budget"),
