@@ -395,9 +395,8 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                 # without response_format instead of failing the whole phase.
                 if response_format is not None:
                     message = str(exc).lower()
-                    # OpenRouter answers 404 "No endpoints found ... Filter by
-                    # Parameters" when every host lacks response_format (Llama 4
-                    # Scout on DeepInfra lists only structured_outputs).
+                    # OpenRouter 404s "Filter by Parameters" when no host supports
+                    # response_format (e.g. Llama 4 Scout on DeepInfra).
                     if (
                         getattr(exc, "status_code", None) == 400
                         or "response_format" in message
