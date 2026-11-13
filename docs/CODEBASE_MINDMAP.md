@@ -543,4 +543,4 @@ python main.py --problem "..." --preset debate-premium
 | **Frontend Pages** | 12 |
 | **Domain Events** | 18 |
 
-*For detailed method reference, see `docs/AGENTS.md`. For architectural decisions, see `docs/ARCHITECTURE_MINDMAP.md`.*
+*For detailed method reference, see `docs/AGENTS.md`. For architectural decisions, see `ARCHITECTURE_MINDMAP.md`.*

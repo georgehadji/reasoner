@@ -61,7 +61,7 @@ const TOPICS = [
 
 export default function HelpPage() {
   return (
-    <div className="flex min-h-screen flex-col bg-[var(--bg)] text-[var(--text)]">
+    <div className="flex min-h-dvh flex-col bg-[var(--bg)] text-[var(--text)]">
       <JsonLd
         data={breadcrumbSchema([
           { name: 'Home', path: '/' },

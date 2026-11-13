@@ -22,7 +22,6 @@ folders:
 | `ci-local.sh` | Local mirror of the GitHub Actions gates. Run before pushing. |
 | `check_no_registry_bypass.py` | CI guard: `application/`, `domain/`, `core/` must not import `infrastructure.llm.registry` directly. |
 | `count_importlinter_exceptions.py` | Semantic counter for `.importlinter` `ignore_imports` — the exception ratchet. |
-| `fix_importlinter.py` | Helper for updating that exception list. |
 | `ruff_ratchet.py` | Ratchet for `ruff check src/` violation count. |
 | `backfill_stripe_customer_metadata.py` | One-off: writes `reasoner_user_id` onto Stripe customers named by `subscriptions` rows. Dry run unless `--apply`; never overwrites a different owner. |
 | `mypy_ratchet.py` | Ratchet for `mypy src/reasoner` violation count. |
@@ -44,8 +43,6 @@ folders:
 | `backfill_upload_usage.py` | One-off, after Alembic `20261021_000100`: sets each user's `upload_usage` from the files on disk. Dry run unless `--apply`. |
 | `migrate_history_layout.py` | One-off per deployment: moves flat `history/<id>.json` into owner directories, then writes the `.layout-v2` marker. Dry run unless `--apply`. |
 | `start_all.py` | Server launcher (mirrors `src/reasoner/start_all.py`). |
-| `run_method_tests.py`, `run_3more_tests.py`, `run_batch4.py`, `jury_fix_test.py`, `verify_swaps.py` | Ad-hoc sequential method test runners. |
-| `extract_e1.py`, `re_extract_e1.py`, `extract_run_stream.py`, `move_methods.py`, `cleanup_streaming.py` | One-off refactor helpers; historical. |
 
 ## .githooks/ and .github/workflows/
 

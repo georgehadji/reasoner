@@ -109,6 +109,7 @@
     background-color: var(--bg);
     color: var(--text);
     min-height: 100vh;
+    min-height: 100dvh; /* mobile vh is the large viewport; vh stays as fallback */
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -334,7 +335,9 @@
     /* Content widths. --measure is the important one: line length, not
        font size, is what makes long text tiring, and 66–75 characters
        is where the eye stops losing its place on the return sweep. */
-    --measure:       68ch;   /* running prose */
+    /* ch is the width of "0"; Public Sans averages ~1.28 characters per ch,
+       so 68ch measured ~87 characters a line. 56ch lands at ~72. */
+    --measure:       56ch;   /* running prose */
     --measure-tight: 54ch;   /* lead paragraphs, captions, pull quotes */
     --width-content: 46rem;  /* article column */
     --width-chat:    48rem;  /* conversation column — wider than prose so a

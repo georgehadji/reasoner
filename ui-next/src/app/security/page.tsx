@@ -85,7 +85,7 @@ const CARDS: Card[] = [
 
 export default function SecurityPage() {
   return (
-    <div className="flex min-h-screen flex-col bg-[var(--bg)] text-[var(--text)]">
+    <div className="flex min-h-dvh flex-col bg-[var(--bg)] text-[var(--text)]">
       <SiteHeader />
 
       <main className="flex-1">

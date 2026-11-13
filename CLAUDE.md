@@ -342,10 +342,6 @@ Cross-lab diversity prevents echo chambers:
 
 *For complete architectural analysis see `ARCHITECTURE_MINDMAP.md`. For dependency graph see `graphify-out/GRAPH_REPORT.md`.*
 
-## Workspace CONTEXT.md Map
-
-To easily navigate the codebase, explore directory structures, and understand file roles, please refer to the root [CONTEXT.md](CONTEXT.md) file. This file contains a complete hierarchical map and points to individual `CONTEXT.md` files detailing the contents and functioning of every single folder in the project.
-
 <!-- studio-pipeline -->
 # Studio operating rules (adopted design pipeline)
 

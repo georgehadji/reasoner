@@ -155,7 +155,7 @@ const TERMS = [
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
+    <div className="min-h-dvh bg-[var(--bg)] text-[var(--text)]">
       <SiteHeader />
 
       <main id="main-content">

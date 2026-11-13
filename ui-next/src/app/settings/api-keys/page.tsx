@@ -209,7 +209,7 @@ export default function ApiKeysPage() {
   const atLimit = Boolean(limits && keys.length >= limits.max_keys);
 
   return (
-    <div className="flex min-h-screen flex-col bg-[var(--bg)] text-[var(--text)]">
+    <div className="flex min-h-dvh flex-col bg-[var(--bg)] text-[var(--text)]">
       <SiteHeader />
       <main id="main-content" className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 pt-24">
         <EmailVerifyBanner />

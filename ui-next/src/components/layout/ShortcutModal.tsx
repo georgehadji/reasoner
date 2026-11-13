@@ -27,6 +27,11 @@ export function ShortcutModal({ isOpen, onClose }: ShortcutModalProps) {
         'fixed inset-0 z-[300] flex items-center justify-center p-4 transition-all duration-[var(--dur-component)]',
         isOpen ? 'bg-[var(--scrim)] opacity-100' : 'bg-transparent opacity-0 pointer-events-none',
       )}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Keyboard shortcuts"
+      // Kept mounted for the exit transition; inert removes it from tab order and the a11y tree.
+      inert={!isOpen}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}

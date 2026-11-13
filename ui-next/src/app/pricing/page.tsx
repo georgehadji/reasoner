@@ -17,32 +17,33 @@ const plans = [
   {
     name: 'Free',
     tier: 'free',
-    price: '$0',
-    period: 'forever',
-    queries: '20 queries / month',
+    // Figures are owner decisions (PRODUCT.md: pricing and limits undecided).
+    // Backend grants credits, not queries: TIER_MONTHLY_CREDITS in domain/credits.py.
+    price: '[INPUT REQUIRED: Free plan price]',
+    period: '',
+    queries: '[INPUT REQUIRED: Free plan monthly allowance]',
     features: [
       'Budget routing presets',
       'Basic web search',
-      'Community support',
+      '[INPUT REQUIRED: Free plan support level]',
     ],
     notIncluded: [
       'Premium models',
       'Advanced analytics',
-      'Priority support',
     ],
   },
   {
     name: 'Pro',
     tier: 'pro',
-    price: '$12',
-    period: '/ month',
-    queries: '500 queries / month',
+    price: '[INPUT REQUIRED: Pro plan price]',
+    period: '',
+    queries: '[INPUT REQUIRED: Pro plan monthly allowance]',
     features: [
       'All routing presets (Budget + Premium)',
       'Advanced multi-model consensus',
       'Deep research & iterative RAG',
       'Neuro memory & embedding search',
-      'Priority email support',
+      '[INPUT REQUIRED: Pro plan support level]',
     ],
     notIncluded: [
       'Custom model deployments',
@@ -95,7 +96,7 @@ export default function PricingPage() {
     checkout.pending && checkout.key === `${tier}:${provider}`;
 
   return (
-    <div className="flex min-h-screen flex-col bg-[var(--bg)] text-[var(--text)]">
+    <div className="flex min-h-dvh flex-col bg-[var(--bg)] text-[var(--text)]">
       <SiteHeader />
       <main className="flex-1">
         {/* ── Masthead ───────────────────────────────────────────
@@ -168,7 +169,7 @@ export default function PricingPage() {
                 {plan.notIncluded?.map((f) => (
                   <li key={f} className="flex items-start gap-2.5 text-[var(--text-subtle)]">
                     <X className="mt-0.5 h-4 w-4 shrink-0" />
-                    <span className="line-through opacity-60">{f}</span>
+                    <span className="line-through">{f}</span>
                   </li>
                 ))}
               </ul>

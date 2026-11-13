@@ -6,7 +6,7 @@ export default function PrivacyPage() {
   const lastUpdated = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
   return (
-    <div className="flex min-h-screen flex-col bg-[var(--bg)] text-[var(--text)]">
+    <div className="flex min-h-dvh flex-col bg-[var(--bg)] text-[var(--text)]">
       <SiteHeader />
       <main className="mx-auto max-w-4xl px-6 py-20 flex-1 w-full">
         <header className="mb-12 border-b border-[var(--border)] pb-12">
