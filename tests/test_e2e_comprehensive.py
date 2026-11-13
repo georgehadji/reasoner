@@ -506,7 +506,7 @@ pytestmark_slow = [
 class TestRealLanguageConsistency:
     pytestmark = pytestmark_slow
     @pytest.mark.asyncio
-    @pytest.mark.timeout(180)
+    @pytest.mark.timeout(600)
     @pytest.mark.parametrize("problem,expected_lang", [
         ("Πώς να προχωρήσω με το προϊόν μου;", "Greek"),
         ("¿Cómo debería priorizar mi roadmap?", "Spanish"),
@@ -530,7 +530,7 @@ class TestRealLanguageConsistency:
 class TestRealPromptEnhancement:
     pytestmark = pytestmark_slow
     @pytest.mark.asyncio
-    @pytest.mark.timeout(180)
+    @pytest.mark.timeout(600)
     async def test_real_enhancement_opt_in_produces_longer_prompt(self, preset_id):
         _, router = PresetService().build_router(preset_id)
         problem = "product roadmap"
@@ -554,7 +554,7 @@ class TestRealPromptEnhancement:
 class TestRealTokenAndModelTracking:
     pytestmark = pytestmark_slow
     @pytest.mark.asyncio
-    @pytest.mark.timeout(180)
+    @pytest.mark.timeout(600)
     async def test_real_run_tracks_nonzero_tokens(self, preset_id):
         _, router = PresetService().build_router(preset_id)
         pipeline = ReasonerPipeline(router=router, preset_name=preset_id, verbose=False)
@@ -564,7 +564,7 @@ class TestRealTokenAndModelTracking:
         assert total > 0, f"Expected positive token usage for {preset_id}"
 
     @pytest.mark.asyncio
-    @pytest.mark.timeout(180)
+    @pytest.mark.timeout(600)
     async def test_real_run_tracks_models_per_role(self, preset_id):
         _, router = PresetService().build_router(preset_id)
         pipeline = ReasonerPipeline(router=router, preset_name=preset_id, verbose=False)

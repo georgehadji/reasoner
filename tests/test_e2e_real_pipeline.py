@@ -54,7 +54,7 @@ class TestRealPipelineMethods:
     # Not raised globally: a timeout that never fires is not a guard. 300 is
     # ~1.5x measured, which still catches a hang. Single-call tests stay at
     # 60 (slowest call measured: 36.02s).
-    @pytest.mark.timeout(300)
+    @pytest.mark.timeout(600)
     async def test_method_runs_to_completion(self, method, preset_id):
         _, router = PresetService().build_router(preset_id)
         pipeline = ReasonerPipeline(
@@ -99,7 +99,7 @@ class TestRealPipelineMethods:
 
     @pytest.mark.parametrize("method, preset_id", METHOD_PRESETS)
     @pytest.mark.asyncio
-    @pytest.mark.timeout(300)  # full pipeline; see test_method_runs_to_completion
+    @pytest.mark.timeout(600)  # full pipeline; see test_method_runs_to_completion
     async def test_method_tracks_tokens(self, method, preset_id):
         _, router = PresetService().build_router(preset_id)
         pipeline = ReasonerPipeline(

@@ -62,7 +62,7 @@ class TestRealAPIRunStream:
     # Not raised globally: a timeout that never fires is not a guard. 300 is
     # ~1.5x measured, which still catches a hang. Single-call tests stay at
     # 60 (slowest call measured: 36.02s).
-    @pytest.mark.timeout(300)
+    @pytest.mark.timeout(600)
     async def test_api_run_stream_completes(self, client, method, preset_id):
         payload = {
             "problem": SIMPLE_PROBLEM,

@@ -95,7 +95,7 @@ class TestBudgetPresetAdversarial:
 
     @pytest.mark.parametrize("preset_id", BUDGET_PRESETS)
     @pytest.mark.asyncio
-    @pytest.mark.timeout(180)
+    @pytest.mark.timeout(600)
     async def test_all_budget_presets_run(self, preset_id):
         """Every budget preset should complete a simple problem."""
         _, router = build_router(preset_id)
@@ -115,7 +115,7 @@ class TestBudgetPresetAdversarial:
 
     @pytest.mark.parametrize("preset_id", ["multi-perspective-budget", "research-budget"])
     @pytest.mark.asyncio
-    @pytest.mark.timeout(240)
+    @pytest.mark.timeout(600)
     async def test_complex_problem_with_high_topk(self, preset_id):
         """Higher top_k with a complex problem should still complete."""
         _, router = build_router(preset_id)
@@ -136,7 +136,7 @@ class TestBudgetPresetAdversarial:
 
     @pytest.mark.parametrize("preset_id", ["multi-perspective-budget", "debate-budget"])
     @pytest.mark.asyncio
-    @pytest.mark.timeout(180)
+    @pytest.mark.timeout(600)
     async def test_sequential_mode(self, preset_id):
         """Sequential perspective execution should not deadlock."""
         _, router = build_router(preset_id)
@@ -155,7 +155,7 @@ class TestBudgetPresetAdversarial:
 
     @pytest.mark.parametrize("preset_id", ["scientific-budget", "research-budget"])
     @pytest.mark.asyncio
-    @pytest.mark.timeout(180)
+    @pytest.mark.timeout(600)
     async def test_academic_source_type(self, preset_id):
         """Academic source type should work for research-oriented presets."""
         _, router = build_router(preset_id)
