@@ -82,6 +82,18 @@ _FACTUAL_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"\b(πρωτεύουσα\s+της|πρόεδρος\s+της|εφεύρε)\s+\w+", re.I),
 ]
 
+# A question about Reasoner itself. It holds nothing to reason about, so in the
+# pipeline the perspectives analysed their own output-format rules instead.
+# Anchored at both ends: "what can you do about my failing build" is a request.
+_SELF_QUESTION = re.compile(
+    r"^\s*(what\s+(can|could)\s+you\s+do|what\s+do\s+you\s+do|who\s+are\s+you|what\s+are\s+you"
+    r"|how\s+(can|could)\s+you\s+help(\s+me)?"
+    r"|τι\s+μπορείς\s+να\s+κάνεις|τι\s+κάνεις|ποιος\s+είσαι|τι\s+είσαι"
+    r"|πώς\s+μπορείς\s+να\s+(με\s+)?βοηθήσεις)"
+    r"(\s+(for\s+me|για\s+μένα))?\s*[?;.!]*\s*$",
+    re.I,
+)
+
 # Advice and comparison words: "what is the best database" has no single
 # fact to look up, so it never takes the factual fast path (FLOW-5).
 _ADVICE_MARKER = re.compile(
@@ -230,6 +242,12 @@ def fast_path(problem: str) -> GateDecision | None:
         return GateDecision(
             action="direct", confidence=1.0, reasoning="Very short prompt, assumed direct",
             complexity="simple"
+        )
+
+    if _SELF_QUESTION.match(problem):
+        return GateDecision(
+            action="direct", confidence=1.0, reasoning="Question about Reasoner itself",
+            complexity="simple",
         )
 
     # Fast-path: a method the user named. Before writing intent, so "use the
