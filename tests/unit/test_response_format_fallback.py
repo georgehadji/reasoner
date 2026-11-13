@@ -1,9 +1,4 @@
-"""A model whose only hosts lack response_format is retried without it.
-
-Live run 43444508034: article-budget failed because OpenRouter filtered out
-every Llama 4 Scout endpoint ("Filter by Parameters" -> 404 No endpoints
-found). DeepInfra lists structured_outputs but not response_format.
-"""
+"""Parameter-filter 404 retries without response_format (live run 43444508034)."""
 
 from __future__ import annotations
 
