@@ -23,6 +23,7 @@ from reasoner.application.queries import (
     GetPipelineStatusQuery,
     ListPresetsQuery,
 )
+from reasoner.core import model_policy
 from reasoner.core.aggregates.pipeline import PipelineAggregate
 from reasoner.core.events.domain_events import EventType, make_event
 from reasoner.core.logging_utils import redacted_errors
@@ -116,6 +117,20 @@ class RunPipelineCommandHandler:
         self._pipeline_executor = pipeline_executor
 
     async def handle(
+        self,
+        command: RunPipelineCommand,
+        sse_emit: Callable[[dict], Awaitable[None]] | None = None,
+        initial_state: PipelineState | None = None,
+    ) -> PipelineAggregate:
+        """Execute pipeline command, optionally emitting SSE events.
+
+        A Western-only preset restricts every model the run builds, preflight
+        included, to US/EU blocs (core/model_policy.py).
+        """
+        with model_policy.restrict_blocs(model_policy.run_blocs(command.preset)):
+            return await self._handle(command, sse_emit, initial_state)
+
+    async def _handle(
         self,
         command: RunPipelineCommand,
         sse_emit: Callable[[dict], Awaitable[None]] | None = None,

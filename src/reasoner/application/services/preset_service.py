@@ -6,7 +6,9 @@ import logging
 import os
 from typing import Any
 
+from reasoner.core import model_policy
 from reasoner.core.ports.model_registry_port import get_model_registry_port
+from reasoner.domain.preset_core import is_western_preset, western_variant
 from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.presets import build_auto_preset, build_custom_router, get_preset
 
@@ -29,8 +31,10 @@ class PresetService:
 
     def resolve(self, raw_preset: str) -> tuple[str, bool, str]:
         is_auto = raw_preset.startswith("auto")
-        auto_tier = raw_preset.split("-", 1)[1] if is_auto and "-" in raw_preset else "budget"
+        auto_tier = raw_preset.rsplit("-", 1)[1] if is_auto and "-" in raw_preset else "budget"
         gate_preset_name = f"multi-perspective-{auto_tier}" if is_auto else raw_preset
+        if is_auto and is_western_preset(raw_preset):
+            gate_preset_name = western_variant(gate_preset_name)
         return gate_preset_name, is_auto, auto_tier
 
     def filter_routing(self, routing: dict[str, str], primary_id: str) -> dict[str, str]:
@@ -111,7 +115,8 @@ class PresetService:
             for role in _AGENT_MODEL_ROLES:
                 filtered_routing[role] = agent_model
 
-        method = preset_method or (preset_name.rsplit("-", 1)[0] if "-" in preset_name else preset_name)
+        base_name = preset_name.rsplit("-", 1)[0] if "-" in preset_name else preset_name
+        method = preset_method or base_name.removesuffix("-western")
 
         router = ProviderRouter.from_model_ids(
             primary_id=preset.primary_id,
@@ -134,7 +139,10 @@ class PresetService:
         run_id: str = "",
     ) -> tuple[str, ProviderRouter]:
         """Build a router for an auto-selected method."""
-        effective_preset_name = build_auto_preset(method, tier)
+        # The run's bloc restriction is set before preflight (RunPipelineCommandHandler).
+        effective_preset_name = build_auto_preset(
+            method, tier, western=model_policy.allowed_blocs() is not None
+        )
         preset = get_preset(effective_preset_name)
         filtered_routing = self.filter_routing(preset.routing, preset.primary_id)
         if agent_model:

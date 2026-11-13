@@ -6,7 +6,7 @@ import { EXAMPLE_PROMPTS, LIMITS, TIMING, API } from '@/lib/config';
 import { cn } from '@/lib/utils';
 import { isEnabled } from '@/hooks/useFeatureFlags';
 import { useSubscription } from '@/hooks/useSubscription';
-import { ArrowUp, Sparkles, Plus, X, FileText, Image as ImageIcon, Upload, Lock, Square } from 'lucide-react';
+import { ArrowUp, Sparkles, Plus, X, FileText, Image as ImageIcon, Upload, Lock, Square, ShieldCheck } from 'lucide-react';
 import { Tooltip } from '@/components/ui/Tooltip';
 
 interface ComposerProps {
@@ -88,6 +88,8 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
   const removeAttachment = useAppStore((s) => s.removeAttachment);
   const tier = useAppStore((s) => s.tier);
   const toggleTier = useAppStore((s) => s.toggleTier);
+  const westernOnly = useAppStore((s) => s.westernOnly);
+  const toggleWesternOnly = useAppStore((s) => s.toggleWesternOnly);
   const isImageMode = useAppStore((s) => s.isImageMode);
   const toggleImageMode = useAppStore((s) => s.toggleImageMode);
   const hasContent = composerText.trim().length > 0 || attachments.length > 0;
@@ -157,10 +159,10 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
 
   useEffect(() => {
     if (!isEnabled('cost-transparency')) return;
-    const preset = tier === 'premium' ? 'auto-premium' : 'auto-budget';
+    const preset = `auto-${westernOnly ? 'western-' : ''}${tier === 'premium' ? 'premium' : 'budget'}`;
     const timer = setTimeout(() => fetchEstimate(composerText, preset), TIMING.estimateDebounceMs);
     return () => clearTimeout(timer);
-  }, [composerText, tier, fetchEstimate]);
+  }, [composerText, tier, westernOnly, fetchEstimate]);
 
   function autoResize() {
     const el = textareaRef.current;
@@ -253,6 +255,23 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
           aria-label="Attach files"
         >
           <Plus className="h-5 w-5" aria-hidden="true" />
+        </button>
+      </Tooltip>
+    );
+  }
+
+  function WesternToggle() {
+    return (
+      <Tooltip text={westernOnly ? 'Western-only: US and EU models' : 'Use only US and EU models'}>
+        <button
+          type="button"
+          onClick={toggleWesternOnly}
+          className={cn(TOGGLE_BASE, westernOnly ? TOGGLE_ON : TOGGLE_OFF)}
+          aria-pressed={westernOnly}
+        >
+          {westernOnly && <ActiveDot />}
+          <ShieldCheck className="h-3 w-3" aria-hidden="true" />
+          Western
         </button>
       </Tooltip>
     );
@@ -423,6 +442,7 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
         </div>
         <div className="flex items-center gap-[var(--space-1)]">
           <TierToggle />
+          <WesternToggle />
           <ImageModeToggle />
           <ActionButton />
         </div>

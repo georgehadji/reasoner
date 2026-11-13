@@ -56,6 +56,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from reasoner.application.orchestrator import PipelineOrchestrator
 from reasoner.application.services.adaptive_routing import build_adaptive_routing_service
 from reasoner.application.services.preset_service import PresetService
+from reasoner.core import model_policy
 from reasoner.core.constants import (
     DIRECT_ANSWER_MAX_TOKENS,
     DIRECT_ANSWER_TEMPERATURE,
@@ -113,6 +114,12 @@ def cmd_list_models() -> None:
 # ─────────────────────────────────────────────────────────────────────
 
 async def main(args: argparse.Namespace) -> None:
+    # Western-only presets restrict every model the run builds (core/model_policy.py).
+    with model_policy.restrict_blocs(model_policy.run_blocs(getattr(args, "preset", None))):
+        await _main(args)
+
+
+async def _main(args: argparse.Namespace) -> None:
     if args.list_presets:
         print_presets_summary()
         return

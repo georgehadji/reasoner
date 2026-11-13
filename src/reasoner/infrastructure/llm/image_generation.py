@@ -408,10 +408,16 @@ async def _resolve_first_image_candidate(node: Any) -> str | None:
 
 def _resolve_model_config(alias: str) -> dict[str, Any]:
     """Resolve a model alias to its full registry configuration."""
-    from reasoner.infrastructure.llm.registry import _REGISTRY
+    from reasoner.core import model_policy
+    from reasoner.infrastructure.llm.registry import _REGISTRY, bloc_of
 
     if alias not in _REGISTRY:
         raise ValueError(f"Unknown image generation model alias: {alias}")
+    # Image calls bypass build_provider, so the Western-only check runs here too.
+    if not model_policy.is_allowed(bloc_of(alias)):
+        raise model_policy.ModelNotAllowedError(
+            f"Image model {alias!r} (bloc {bloc_of(alias)}) is not allowed in this run"
+        )
     return _REGISTRY[alias]
 
 

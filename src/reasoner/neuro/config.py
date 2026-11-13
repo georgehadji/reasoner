@@ -341,6 +341,25 @@ def _apply_defaults(cfg: NeuroConfig) -> NeuroConfig:
     return cfg
 
 
+# Western-only runs (core/model_policy.py): the default embedders, Qwen and
+# BGE-M3, are Chinese models.
+WESTERN_EMBEDDING_MODEL = "openai/text-embedding-3-small"
+
+
+def western_embedding_config(base: ResilientProviderConfig) -> ResilientProviderConfig:
+    """OpenAI embeddings with no fallback, for the Western memory stores."""
+    return ResilientProviderConfig(
+        primary=ProviderConfig(
+            provider="openrouter",
+            model=WESTERN_EMBEDDING_MODEL,
+            api_key=os.environ.get("OPENROUTER_API_KEY", ""),
+            api_base=OPENROUTER_BASE_URL,
+        ),
+        circuit_breaker_threshold=base.circuit_breaker_threshold,
+        circuit_breaker_cooldown=base.circuit_breaker_cooldown,
+    )
+
+
 _AGENT_ID_RE = re.compile(r"[^A-Za-z0-9_-]")
 
 

@@ -51,6 +51,8 @@ export { shallow };
 interface AppState {
   running: boolean;
   tier: Tier;
+  /** Run on Western-only presets (US/EU models only). */
+  westernOnly: boolean;
   isExpert: boolean;
   isImageMode: boolean;
   /** When true, skip the HyperGate method-confirmation picker and always auto-route. */
@@ -72,6 +74,7 @@ interface AppState {
   // Actions
   setRunning: (running: boolean) => void;
   toggleTier: () => void;
+  toggleWesternOnly: () => void;
   toggleExpert: () => void;
   toggleImageMode: () => void;
   toggleAutoMethodAlways: () => void;
@@ -106,6 +109,7 @@ export const useAppStore = create<AppState>()(
     (set, get) => ({
       running: false,
       tier: 'budget',
+      westernOnly: false,
       isExpert: false,
       isImageMode: false,
       autoMethodAlways: false,
@@ -132,6 +136,7 @@ export const useAppStore = create<AppState>()(
 
       toggleTier: () =>
         set((state) => ({ tier: state.tier === 'budget' ? 'premium' : 'budget' })),
+      toggleWesternOnly: () => set((state) => ({ westernOnly: !state.westernOnly })),
 
       toggleExpert: () => set((state) => ({ isExpert: !state.isExpert })),
       toggleImageMode: () => set((state) => ({ isImageMode: !state.isImageMode })),
@@ -185,8 +190,8 @@ export const useAppStore = create<AppState>()(
       markSessionExpired: () =>
         set((s) => (s.user ? authPatch(s, { user: null, sessionExpired: true }) : s)),
 
-      /** Returns the preset string to send to the API: "auto-budget" or "auto-premium". */
-      getAutoPreset: () => `auto-${get().tier}`,
+      /** The preset to send: "auto-<tier>", or "auto-western-<tier>" when Western-only is on. */
+      getAutoPreset: () => `auto-${get().westernOnly ? 'western-' : ''}${get().tier}`,
 
       // ── Subscription (shared cache — single fetch across all components) ──
 
@@ -224,6 +229,7 @@ export const useAppStore = create<AppState>()(
         const s = (persistedState || {}) as Record<string, unknown>;
         return {
           tier: s.tier === 'premium' ? 'premium' : 'budget',
+          westernOnly: typeof s.westernOnly === 'boolean' ? s.westernOnly : false,
           isExpert: typeof s.isExpert === 'boolean' ? s.isExpert : false,
           sidebarCollapsed: typeof s.sidebarCollapsed === 'boolean' ? s.sidebarCollapsed : false,
           autoMethodAlways: typeof s.autoMethodAlways === 'boolean' ? s.autoMethodAlways : false,
@@ -236,6 +242,7 @@ export const useAppStore = create<AppState>()(
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         tier: state.tier,
+        westernOnly: state.westernOnly,
         isExpert: state.isExpert,
         sidebarCollapsed: state.sidebarCollapsed,
         recentCommands: state.recentCommands,

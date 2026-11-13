@@ -43,6 +43,7 @@ from typing import Any
 
 from reasoner.application.orchestrator import PipelineOrchestrator
 from reasoner.application.services.adaptive_routing import build_adaptive_routing_service
+from reasoner.core import model_policy
 from reasoner.domain.pipeline_state import PipelineState
 
 logger = logging.getLogger(__name__)
@@ -120,6 +121,17 @@ async def ask(
     --routing JSON via argparse's own validation, etc.) — no swallowing here;
     the host app decides how to surface errors.
     """
+    # Western-only presets restrict every model the run builds (core/model_policy.py).
+    with model_policy.restrict_blocs(model_policy.run_blocs(preset)):
+        return await _ask(problem, preset, routing, **overrides)
+
+
+async def _ask(
+    problem: str,
+    preset: str | None = None,
+    routing: str | None = None,
+    **overrides: Any,
+) -> HeadlessResult:
     from reasoner.core.constants import DIRECT_ANSWER_MAX_TOKENS, DIRECT_ANSWER_TEMPERATURE
     from reasoner.main import parse_args
     from reasoner.presets import get_preset
