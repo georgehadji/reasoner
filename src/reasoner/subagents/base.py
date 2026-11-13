@@ -92,7 +92,7 @@ class PhaseSubAgent(ABC):
             # Propagation resistance (docs/MIND_VIRUS_MITIGATION.md M1/M2).
             # Subagents reach the router directly instead of through
             # WorkflowServices.call_llm, so the hardening is applied here too:
-            # enhancement subagents read scraped web content, critique subagents
+            # enhancement subagents read scraped web content, synthesis subagents
             # read other models' output.
             from reasoner.phases._shared import harden_system_prompt, with_current_date
 

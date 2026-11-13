@@ -9,8 +9,8 @@ impossible to diagnose in production.
 import logging
 from unittest.mock import mock_open, patch
 
-# Canonical module: the `reasoner.pricing` shim re-exports via `import *`, which
-# does not expose underscore-prefixed names. Import the private helper directly.
+# Canonical module: a shim re-exporting via `import *` would
+# not expose underscore-prefixed names. Import the private helper directly.
 from reasoner.domain.pricing import _load_openrouter_pricing
 
 

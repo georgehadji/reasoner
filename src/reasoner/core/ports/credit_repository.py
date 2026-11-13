@@ -7,6 +7,7 @@ application layer depends on this protocol only, never on asyncpg.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import datetime
 from typing import Protocol, runtime_checkable
 
 from reasoner.domain.credits import (
@@ -73,6 +74,15 @@ class CreditRepository(Protocol):
         offset: int = 0,
     ) -> list[CreditLedgerEntry]:
         """Return ledger entries newest-first."""
+        ...
+
+    async def list_orphaned_reservations(
+        self,
+        older_than: datetime,
+        limit: int = 100,
+    ) -> list[CreditLedgerEntry]:
+        """Return ``<ref>:reserve`` entries made before ``older_than`` that have no
+        ``<ref>`` (settlement) and no ``<ref>:release`` sibling, oldest first."""
         ...
 
     async def grant_monthly_allowance(

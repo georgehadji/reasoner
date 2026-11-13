@@ -140,6 +140,15 @@ async def trigger_neuro_maintenance(request: Request):
     return {"status": "ok", **result}
 
 
+@router.post("/cron/orphan-reservations")
+async def trigger_reservation_sweep(request: Request):
+    """Release credit holds of runs that died before settling. Requires X-Admin-Key."""
+    _require_admin(request)
+    from reasoner.api.cron import run_reservation_sweep
+
+    return {"status": "ok", **await run_reservation_sweep()}
+
+
 # ── ACR (Adaptive Capability Router) Admin —───────────────────────────────────
 
 

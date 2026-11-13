@@ -129,6 +129,25 @@ class InMemoryCreditRepository(CreditRepository):
         entries.append(entry)
         return entry
 
+    async def list_orphaned_reservations(
+        self, older_than: datetime, limit: int = 100
+    ) -> list[CreditLedgerEntry]:
+        async with self._lock:
+            found = []
+            for entries in self._entries.values():
+                refs = {e.reference_id for e in entries}
+                for e in entries:
+                    ref = e.reference_id or ""
+                    base = ref.removesuffix(":reserve")
+                    if (
+                        ref.endswith(":reserve")
+                        and e.created_at < older_than
+                        and base not in refs
+                        and f"{base}:release" not in refs
+                    ):
+                        found.append(e)
+        return sorted(found, key=lambda e: e.created_at)[:limit]
+
     async def grant_monthly_allowance(
         self,
         user_id: str,

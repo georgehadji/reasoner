@@ -20,7 +20,7 @@ from datetime import datetime
 from typing import Any
 
 from aiocircuitbreaker import CircuitBreaker  # New import
-from tenacity import retry, stop_after_attempt, wait_exponential  # New import
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential  # New import
 
 try:
     import asyncpg
@@ -49,6 +49,13 @@ from reasoner.core.events.domain_events import (
 )
 from reasoner.core.ports.crypto_port import EncryptionPort
 from reasoner.security.encryption import get_encryption_service
+
+# Only transient connectivity failures are worth retrying. Anything else
+# (CircuitBreakerError, TypeError from serialization, encryption errors) fails
+# the same way every time, so retrying only delays the caller.
+_TRANSIENT_DB_ERRORS: tuple[type[BaseException], ...] = (OSError, TimeoutError)
+if asyncpg is not None:
+    _TRANSIENT_DB_ERRORS += (asyncpg.PostgresConnectionError, asyncpg.InterfaceError)
 
 logger = logging.getLogger(__name__)
 
@@ -276,7 +283,12 @@ class PostgreSQLEventStore:
                     EXECUTE FUNCTION update_updated_at_column();
             """)
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=8), reraise=True)
+    @retry(
+        retry=retry_if_exception_type(_TRANSIENT_DB_ERRORS),
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=8),
+        reraise=True,
+    )
     async def save_events(self, events: list[DomainEvent]) -> None:
         """
         Save events atomically.
@@ -701,7 +713,12 @@ class PostgreSQLEventStore:
                 for row in rows
             ]
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=8), reraise=True)
+    @retry(
+        retry=retry_if_exception_type(_TRANSIENT_DB_ERRORS),
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=8),
+        reraise=True,
+    )
     async def save_snapshot(
         self,
         aggregate_id: str,
@@ -1056,11 +1073,35 @@ class PostgreSQLEventStore:
             # asyncpg returns "DELETE N" string
             deleted = int(result.split()[-1]) if result else 0
 
+            # Nothing saves snapshots, so the pass above never matches. Delete
+            # versioned history of terminal aggregates past the cutoff; version-0
+            # audit rows are left to prune_audit_events_before.
+            if deleted < batch_size:
+                result = await conn.execute(
+                    """
+                    WITH to_delete AS (
+                        SELECT e.id
+                        FROM events e
+                        INNER JOIN aggregates a ON a.aggregate_id = e.aggregate_id
+                        WHERE a.status IN ('completed', 'failed', 'cancelled')
+                          AND a.updated_at < $1
+                          AND e.version > 0
+                        ORDER BY e.created_at ASC
+                        LIMIT $2
+                    )
+                    DELETE FROM events
+                    WHERE id IN (SELECT id FROM to_delete)
+                    """,
+                    cutoff,
+                    batch_size - deleted,
+                )
+                deleted += int(result.split()[-1]) if result else 0
+
             # Clean up terminal aggregates with no remaining events
             await conn.execute(
                 """
                 DELETE FROM aggregates
-                WHERE status IN ('completed', 'failed')
+                WHERE status IN ('completed', 'failed', 'cancelled')
                   AND updated_at < $1
                   AND NOT EXISTS (
                       SELECT 1 FROM events

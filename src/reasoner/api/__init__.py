@@ -202,6 +202,9 @@ async def lifespan(app: FastAPI):
         from reasoner.core.search import set_build_provider
         from reasoner.infrastructure.llm.registry import RegistryAdapter, build_provider
         set_build_provider(build_provider)
+        from reasoner.api.dependencies import _get_credit_service
+        from reasoner.application.services.billing_service import set_credit_service_provider
+        set_credit_service_provider(_get_credit_service)
         set_model_registry_port(RegistryAdapter())
         from reasoner.infrastructure.valkey import inject_shared_cache_port
         await inject_shared_cache_port()

@@ -324,7 +324,7 @@ async def admit_run(
 class FlatCharge:
     """A paid call that runs no pipeline. The hold is the charge: there is no
     true-up, so its reference never ends in ``:reserve`` and the orphan sweeper
-    leaves it alone."""
+    (``CreditService.release_orphaned_reservations``) leaves it alone."""
 
     user_id: str | None
     reference_id: str  # "<kind>:<uuid4>"

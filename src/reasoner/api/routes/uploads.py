@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import re
 
 import anyio
@@ -11,11 +12,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from reasoner.api.auth_deps import require_csrf
 from reasoner.api.dependencies import check_rate_limit, require_key_scope
+from reasoner.api.run_admission import admit_flat_charge, close_flat_charge
+from reasoner.application.services.estimate_service import estimate_upload_cost
 from reasoner.core.constants_limits import SETTLE_TIMEOUT_SECONDS, UPLOAD_USER_QUOTA_BYTES
 from reasoner.core.settings import settings
 from reasoner.domain.saas import User
 from reasoner.infrastructure.persistence.upload_usage_repo import get_upload_usage_repo
 from reasoner.uploader import (
+    IMAGE_EXTENSIONS,
     MAX_FILE_SIZE,
     delete_file,
     file_stored_bytes,
@@ -42,6 +46,8 @@ async def upload_file(
     reserved = 0  # total bytes reserved against the quota
     consumed = 0  # plaintext bytes of files read so far
     stored = 0
+    charge = None
+    served = False
     try:
         # Reject oversized multipart bodies before Starlette parses them into
         # memory/tempfiles.  Per-file streaming checks below remain required
@@ -85,6 +91,16 @@ async def upload_file(
                 detail=f"Too many files. Maximum: {settings.UPLOAD_MAX_FILES}",
             )
 
+        # Images are described by a billed vision call (force_ocr routes to local OCR).
+        n_described = 0 if force_ocr else sum(
+            os.path.splitext(getattr(f, "filename", "") or "")[1].lower() in IMAGE_EXTENSIONS
+            for f in raw_files
+        )
+        if n_described:
+            charge = await admit_flat_charge(
+                request, user=user, cost_usd=estimate_upload_cost(n_described), kind="upload"
+            )
+
         # One file in memory at a time: read (size-guarded), save, drop.
         results: list[dict] = []
         for item in raw_files:
@@ -118,6 +134,7 @@ async def upload_file(
             )
             stored += results[-1].get("stored_bytes", 0) if results[-1].get("success") else 0
             del content
+        served = True
         return {"success": True, "files": results}
 
     except HTTPException:
@@ -126,6 +143,8 @@ async def upload_file(
         logger.error(f"Upload failed: {e}")
         raise HTTPException(status_code=500, detail="Internal server error") from e
     finally:
+        if charge is not None:
+            await close_flat_charge(charge, served=served)
         # Settle to what is really on disk: ciphertext and the text sidecar,
         # nothing for a failed or deduplicated file; any unconsumed
         # reservation (early exit, framing overhead) is released. The

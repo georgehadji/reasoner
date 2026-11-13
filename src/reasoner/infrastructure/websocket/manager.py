@@ -42,6 +42,8 @@ logger = logging.getLogger(__name__)
 
 
 WS_BRIDGE_CHANNEL = "reasoner:ws:events"
+# A stalled client must not hold its send lock (or the heartbeat) indefinitely.
+WS_SEND_TIMEOUT_S = 5.0
 
 
 class ReplayState(StrEnum):
@@ -409,7 +411,7 @@ class WebSocketManager:
         conn_lock = self._connection_locks.setdefault(connection_id, asyncio.Lock())
         async with conn_lock:
             try:
-                await websocket.send_text(message.to_json())
+                await asyncio.wait_for(websocket.send_text(message.to_json()), WS_SEND_TIMEOUT_S)
             except Exception as e:
                 logger.error(f"Send error to {connection_id}: {e}")
                 self.disconnect(connection_id)
@@ -498,7 +500,9 @@ class WebSocketManager:
                             websocket = self.active_connections[connection_id]
                         conn_lock = self._connection_locks.setdefault(connection_id, asyncio.Lock())
                         async with conn_lock:
-                            await websocket.send_json({'type': 'ping'})
+                            await asyncio.wait_for(
+                                websocket.send_json({'type': 'ping'}), WS_SEND_TIMEOUT_S
+                            )
                     except Exception:
                         self.disconnect(connection_id)
 

@@ -8,11 +8,11 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from reasoner.api.auth_deps import require_csrf
 from reasoner.api.dependencies import check_rate_limit
-from reasoner.api.schemas import SuggestionRequestModel
+from reasoner.api.schemas import SuggestionRequestModel, sanitize_strings_deep
 from reasoner.application.commands import ExecuteWidgetCommand
 from reasoner.infrastructure.llm.registry import list_models
 from reasoner.presets import PRESETS
@@ -33,6 +33,11 @@ class ExecuteWidgetRequest(BaseModel):
     params: dict[str, Any] = Field(default_factory=dict)
     auto_detect: bool = True
     query: str = ""
+
+    @field_validator("params")
+    @classmethod
+    def sanitize_params(cls, v: dict[str, Any]) -> dict[str, Any]:
+        return sanitize_strings_deep(v)
 
 
 @router.get("/api/ui/status")

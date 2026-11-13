@@ -8,9 +8,20 @@ from contextlib import nullcontext
 from datetime import UTC, datetime
 
 from reasoner.application.ports.billing_port import BillingPort
+from reasoner.application.services.credit_service import CreditService
+from reasoner.domain.credits import CreditReason
 from reasoner.domain.saas import SubscriptionTier
 
 logger = logging.getLogger(__name__)
+
+# Injected at API startup (api/__init__.py): application code may not import api/,
+# and the credit service's repository choice lives there.
+_credit_service_provider: Callable[[], CreditService] | None = None
+
+
+def set_credit_service_provider(provider: Callable[[], CreditService] | None) -> None:
+    global _credit_service_provider
+    _credit_service_provider = provider
 
 
 async def _paypal_activate(sub, repo, event_at) -> None:
@@ -117,13 +128,17 @@ class BillingService:
             event_type = event.get("event_type", "")
 
         try:
-            await self._apply_webhook(event_type, sub, repo, event_time(event))
+            await self._apply_webhook(
+                event_type, sub, repo, event_time(event), (event.get("data") or {}).get("object")
+            )
         finally:
             # Invalidate even on failure: a partial write may have landed, so
             # the cached subscription can no longer be trusted.
             await invalidate_subscription(str(sub.user_id))
 
-    async def _apply_webhook(self, event_type: str, sub, repo, event_at=None) -> None:
+    async def _apply_webhook(
+        self, event_type: str, sub, repo, event_at=None, payload: dict | None = None
+    ) -> None:
         """Route a webhook event to the matching persistence action.
 
         Every write carries the event's own time and is skipped when the row
@@ -149,6 +164,10 @@ class BillingService:
                     event_at,
                 ):
                     await repo.sync_quota_for_subscription(sub)
+            return
+
+        if event_type in ("charge.refunded", "charge.dispute.created"):
+            await self._claw_back(event_type, sub, repo, event_at, payload or {})
             return
 
         if event_type == "invoice.payment_failed":
@@ -181,6 +200,35 @@ class BillingService:
             return
 
         logger.debug("Unhandled event type: %s", event_type)
+
+    async def _claw_back(self, event_type: str, sub, repo, event_at, obj: dict) -> None:
+        """A refund or dispute takes back the credits the money bought.
+
+        The ledger row is keyed ``dispute:<id>`` / ``refund:<charge id>`` so a
+        replayed event moves nothing twice, and overdraws: the credits may
+        already be spent. A dispute, or a charge refunded in full, also puts the
+        subscription past_due. shortcut: a second partial refund on one charge
+        reuses the key and is not clawed back; key on the refund id if that matters.
+        """
+        is_dispute = event_type == "charge.dispute.created"
+        cents = obj.get("amount") if is_dispute else obj.get("amount_refunded")
+        key = f"{'dispute' if is_dispute else 'refund'}:{obj.get('id')}"
+        if _credit_service_provider is None:
+            logger.error("No credit service wired; %s (user %s) not clawed back", key, sub.user_id)
+        elif cents and cents > 0:
+            await _credit_service_provider().charge_usd(
+                str(sub.user_id),
+                cost_usd=cents / 100,
+                reference_id=key,
+                reason=CreditReason.ADMIN_ADJUSTMENT,
+                description=f"Chargeback adjustment ({event_type})",
+            )
+        if is_dispute or obj.get("refunded"):
+            existing = await repo.get_subscription_by_user(str(sub.user_id))
+            if existing is not None and existing.stripe_subscription_id:
+                await repo.set_subscription_status(
+                    existing.stripe_subscription_id, "past_due", event_at
+                )
 
     async def _is_duplicate_live(self, sub, repo) -> bool:
         """A second checkout completed while another subscription is live.

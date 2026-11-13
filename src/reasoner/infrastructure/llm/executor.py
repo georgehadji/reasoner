@@ -391,11 +391,7 @@ class LLMExecutor:
                 )
                 await bus.publish(event)
 
-                return DegradedLLMResponse(
-                    text="",
-                    error=f"All cascading models failed for role={role}: {last_error}",
-                    metadata={},
-                ), {}
+                raise RuntimeError(f"All cascading models failed for role={role}: {last_error}") from last_error
             else:
                 logger.error(f"Unknown error in cascading for role={role}")
                 # Emit LLMGenerationCompleted event for unknown cascading error
@@ -419,11 +415,7 @@ class LLMExecutor:
                 )
                 await bus.publish(event)
 
-                return DegradedLLMResponse(
-                    text="",
-                    error=f"Unknown error in cascading for role={role}",
-                    metadata={},
-                ), {}
+                raise RuntimeError(f"Unknown error in cascading for role={role}")
 
         else: # No cascading routing, use standard routing
             logger.info(f"[CACHE] MISS for {role}")
@@ -614,85 +606,6 @@ class LLMExecutor:
         if retried_metadata["truncated"]:
             _record_truncation(role, retried_metadata.get("model", model))
         return retried_raw, retried_metadata
-
-    async def execute_stream(
-        self,
-        role: str,
-        system_prompt: str,
-        user_prompt: str,
-        state: PipelineState,
-        phase_key: str | None = None,
-        **kwargs: Any,
-    ) -> AsyncIterator[str | DegradedLLMResponse]:
-        """Streaming variant of execute. Yields chunks as they arrive.
-
-        NOTE: Caching, token accumulation, and cascading are not yet fully
-        implemented for streaming.
-        """
-        # Imported here (matching the local-import pattern used by the other
-        # methods in this class) so the degraded-response branches below can
-        # construct/isinstance-check it. Without this the name is undefined in
-        # this function's scope -> NameError whenever a stream degrades.
-        from reasoner.infrastructure.llm.ports import DegradedLLMResponse
-
-        if "max_tokens" not in kwargs:
-            kwargs["max_tokens"] = get_token_budget(role)
-
-        if self._caching_enabled:
-            logger.warning("Caching is currently not supported for streaming LLM calls.")
-
-        cascading_models = self.cascading_routing.get(role)
-        if cascading_models:
-            last_error: Exception | None = None
-            for model_id in cascading_models:
-                try:
-                    from reasoner.infrastructure.llm.registry import build_provider
-                    temp_router = ProviderRouter(primary=build_provider(model_id), verbose=False)
-                    full_response_content = []
-                    async for chunk_or_degraded in temp_router.call(
-                        role="primary",
-                        system_prompt=system_prompt,
-                        user_prompt=user_prompt,
-                        stream=True,
-                        **kwargs,
-                    ):
-                        if isinstance(chunk_or_degraded, DegradedLLMResponse):
-                            raise RuntimeError(f"Degraded streaming response from {model_id}: {chunk_or_degraded.error}")
-                        full_response_content.append(chunk_or_degraded)
-                        yield chunk_or_degraded
-
-                    final_response_str = "".join(full_response_content)
-                    if not final_response_str or not final_response_str.strip():
-                        raise RuntimeError(f"Empty streaming response from {model_id} for role={role}")
-                    return
-                except Exception as exc:
-                    last_error = exc
-                    logger.warning(f"[CASCADING STREAM] Model '{model_id}' failed for role '{role}': {exc}")
-            if last_error:
-                yield DegradedLLMResponse(
-                    text="",
-                    error=f"All cascading streaming models failed for role={role}: {last_error}",
-                    metadata={},
-                )
-            else:
-                yield DegradedLLMResponse(
-                    text="",
-                    error=f"Unknown error in streaming cascading for role={role}",
-                    metadata={},
-                )
-            return
-
-        async for chunk_or_degraded in self.router.call(
-            role=role,
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            stream=True,
-            **kwargs,
-        ):
-            if isinstance(chunk_or_degraded, DegradedLLMResponse):
-                yield chunk_or_degraded
-                return
-            yield chunk_or_degraded
 
     async def _account_call_cost(
         self, state: PipelineState, role: str, metadata: dict[str, Any]

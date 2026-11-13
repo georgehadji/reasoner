@@ -49,7 +49,6 @@ folders:
 | `search_port.py` | `SearchServicePort`. |
 | `file_search_port.py` | `FileSearchPort`, `FileChunk` — semantic search over uploaded chunks. |
 | `memory_port.py` | `MemoryPort` + setter/getter; neuro package provides the adapter. |
-| `circuit_breaker_port.py` | `CircuitBreakerPort`, `CircuitBreakerConfig`, `ProviderRegistryPort`. |
 | `crypto_port.py` | `EncryptionPort`, `CipherSuite` — at-rest encryption. |
 | `code_executor.py` | `CodeExecutorPort`, `ExecutionResult`, `ExecutionLimits`. |
 | `credit_repository.py` | `CreditRepository` — credit-ledger persistence contract. |

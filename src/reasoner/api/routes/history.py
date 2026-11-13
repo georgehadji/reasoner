@@ -12,7 +12,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from reasoner.api.auth_deps import require_csrf
-from reasoner.api.dependencies import get_current_user, require_key_scope
+from reasoner.api.dependencies import require_key_scope
 from reasoner.api.history import history_repo
 from reasoner.domain.saas import User
 
@@ -37,7 +37,7 @@ async def get_history(
 @router.get("/api/history/tagged")
 async def get_tagged_history(
     tag: str,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_key_scope("history:read")),
     limit: int = Query(20, ge=1, le=1000),
 ):
     """Get history entries by tag for the authenticated user."""

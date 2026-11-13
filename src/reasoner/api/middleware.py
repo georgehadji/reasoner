@@ -36,7 +36,7 @@ class BodySizeLimitMiddleware:
     ):
         self.app = app
         self.default_limit = default_limit
-        # Lower cap for a request with no Authorization header, on paths whose
+        # Lower cap for a request with no plausible bearer token, on paths whose
         # big body only an authenticated caller may send (FastAPI parses the
         # body before any dependency runs).
         self.anon_per_path = sorted((anon_per_path or {}).items(), key=lambda kv: -len(kv[0]))
@@ -76,7 +76,7 @@ class BodySizeLimitMiddleware:
             await self.app(scope, receive, send)
             return
         limit = self._limit(scope["path"])
-        if not any(k == b"authorization" for k, _ in scope["headers"]):
+        if not _plausibly_authenticated(scope["headers"]):
             anon = (n for prefix, n in self.anon_per_path if scope["path"].startswith(prefix))
             limit = min(limit, next(anon, limit))
         declared = dict(scope["headers"]).get(b"content-length")
@@ -106,6 +106,22 @@ class BodySizeLimitMiddleware:
             await self.app(scope, counted_receive, guarded_send)
         except _BodyTooLargeError:
             pass
+
+
+def _plausibly_authenticated(headers) -> bool:
+    """A bearer token shaped like an API key or a JWT.
+
+    Shape only: this runs before auth and cannot hit the key store per request.
+    A forged but well-shaped token still gets the large cap, but must then
+    pass real auth; junk ("Authorization: x") no longer buys it. shortcut:
+    shape check, upgrade to key-store verification if shaped-junk abuse shows up.
+    """
+    from reasoner.domain.api_keys import looks_like_api_key
+
+    auth = next((v for k, v in headers if k == b"authorization"), b"").decode("latin-1")
+    scheme, _, token = auth.partition(" ")
+    token = token.strip()
+    return scheme.lower() == "bearer" and (looks_like_api_key(token) or token.count(".") == 2)
 
 
 async def _too_large(scope, receive, send, limit: int) -> None:

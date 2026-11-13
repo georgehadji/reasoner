@@ -17,7 +17,7 @@ pytestmark = pytest.mark.unit
 
 API_DIR = Path(__file__).resolve().parents[2] / "src" / "reasoner" / "api"
 
-PAID = {"smart_search", "enhance_image_prompt", "generate_images", "decide_route"}
+PAID = {"smart_search", "enhance_image_prompt", "generate_images", "decide_route", "save_uploaded_file"}
 #: ``search_service.search(...)`` -- the attribute alone would match ``re.search``.
 PAID_METHODS = {("search_service", "search")}
 ADMISSION = {"admit_run", "admit_flat_charge", "_admit_mcp_caller", "within_gate_allowance"}

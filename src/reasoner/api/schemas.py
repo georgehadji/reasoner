@@ -340,6 +340,22 @@ class FollowupRequest(BaseModel):
         return cleaned
 
 
+def sanitize_strings_deep(value: Any) -> Any:
+    """sanitize_for_prompt over every string in a JSON-like value (dict keys excluded).
+
+    Raises ValueError on an injection match, which pydantic turns into a 422.
+    """
+    from reasoner.sanitization import sanitize_for_prompt
+
+    if isinstance(value, str):
+        return sanitize_for_prompt(value)[0]
+    if isinstance(value, dict):
+        return {k: sanitize_strings_deep(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [sanitize_strings_deep(v) for v in value]
+    return value
+
+
 class GenerateImageRequest(BaseModel):
     """Request model for image generation."""
 
@@ -371,7 +387,11 @@ class GenerateImageRequest(BaseModel):
         if len(v) > 4000:
             # Enforce a hard limit to avoid request rejection downstream.
             v = v[:4000]
-        return v
+        # The prompt reaches the enhancer LLM: same channel, same blocking rule.
+        from reasoner.sanitization import sanitize_for_prompt
+
+        v, _ = sanitize_for_prompt(v)
+        return v.strip()
 
     @field_validator("preset")
     @classmethod
@@ -436,7 +456,8 @@ class ContextAnalysisRequest(BaseModel):
     def validate_context_length(cls, v: list) -> list:
         if len(v) > 100:
             raise ValueError("Context list cannot exceed 100 items")
-        return v
+        # state.vetted_context is rendered into the synthesis prompt.
+        return sanitize_strings_deep(v)
 
     @field_validator("method")
     @classmethod

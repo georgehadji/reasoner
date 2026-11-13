@@ -760,13 +760,9 @@ async def require_credits(user: User = Depends(get_current_user)) -> User:
         balance = await service.get_balance(str(user.id))
     except Exception as exc:
         _refuse_missing_account(exc)
-        # A ledger outage must not take the product down; log and let the run
-        # through. The run still settles later if the ledger recovers.
-        logger.warning("Credit balance lookup failed; allowing run", exc_info=True)
-        from reasoner.api.run_observability import count_credit_failopen
-
-        count_credit_failopen("require_credits")
-        return user
+        # Fail closed: an unreadable ledger must not hand out free runs.
+        logger.error("Credit balance lookup failed; refusing run", exc_info=True)
+        raise HTTPException(status_code=503, detail="Credits are temporarily unavailable.") from exc
 
     if balance.is_exhausted:
         raise await insufficient_credits(
@@ -871,14 +867,9 @@ async def reserve_or_402(
         raise
     except Exception as exc:
         _refuse_missing_account(exc)
-        # A ledger outage must not take the product down -- same posture as
-        # require_credits: log and let the run through unreserved. metered()
-        # still settles from actual spend once the ledger recovers.
-        logger.warning("Credit reservation failed; allowing run unreserved", exc_info=True)
-        from reasoner.api.run_observability import count_credit_failopen
-
-        count_credit_failopen("reserve")
-        return 0
+        # Fail closed, same as require_credits: no reservation, no run.
+        logger.error("Credit reservation failed; refusing run", exc_info=True)
+        raise HTTPException(status_code=503, detail="Credits are temporarily unavailable.") from exc
 
 
 # ── Pipeline & Preset Services ──

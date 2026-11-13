@@ -1050,12 +1050,11 @@ async def generate_images(
                 api_key,
                 aspect_ratio,
                 resolution,
-                required_image_count=required_image_count,
+                required_image_count=required_image_count - len(images),
                 reference_images=reference_images,
                 deadline=deadline,
             )
-            if len(retry_images) >= len(images):
-                images = retry_images
+            images.extend(retry_images)
             errors.extend(f"policy-retry::{error}" for error in retry_errors)
 
     # Last-resort hard sanitization retry if still short on images
@@ -1071,12 +1070,11 @@ async def generate_images(
                 api_key,
                 aspect_ratio,
                 resolution,
-                required_image_count=required_image_count,
+                required_image_count=required_image_count - len(images),
                 reference_images=reference_images,
                 deadline=deadline,
             )
-            if len(retry_images) >= len(images):
-                images = retry_images
+            images.extend(retry_images)
             errors.extend(f"hard-sanitize-retry::{error}" for error in retry_errors)
 
     if len(images) < required_image_count:

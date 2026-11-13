@@ -161,7 +161,10 @@ async def generate_image_endpoint(
     # in full on any failure below, a client disconnect included.
     from reasoner.application.services.estimate_service import estimate_image_cost
 
-    estimated_cost = await estimate_image_cost(body.preset, body.num_images)
+    # _auto_select_models may pick the premium tier when no preset was sent, so
+    # only an explicit budget preset is priced as budget.
+    priced_preset = body.preset if "preset" in body.model_fields_set else "premium"
+    estimated_cost = await estimate_image_cost(priced_preset, body.num_images)
     charge = await admit_flat_charge(request, user=user, cost_usd=estimated_cost, kind="image")
 
     served = False

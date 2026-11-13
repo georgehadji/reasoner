@@ -17,6 +17,8 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+_PERSIST_TIMEOUT_S = 5.0
+
 
 def _event(data: dict) -> str:
     """Format a Python dict as a single SSE ``data:`` frame."""
@@ -69,7 +71,8 @@ async def _persist_event(event: Any) -> bool:
     try:
         from reasoner.infrastructure.persistence.event_store import get_event_store
         store = get_event_store()
-        await store.save_events([event])
+        # Bounded: a stalled store must not stall the run, which awaits this inline.
+        await asyncio.wait_for(store.save_events([event]), timeout=_PERSIST_TIMEOUT_S)
         return True
     except Exception as e:
         logger.warning(
