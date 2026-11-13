@@ -543,8 +543,7 @@
       "src/reasoner/infrastructure/widgets/registry.py",
       "src/reasoner/infrastructure/widgets/stocks.py",
       "src/reasoner/infrastructure/widgets/video_search.py",
-      "src/reasoner/infrastructure/widgets/weather.py",
-      "src/reasoner/infrastructure/widgets_legacy.py"
+      "src/reasoner/infrastructure/widgets/weather.py"
     ]
   },
   "map-neuro-healing": {
@@ -730,8 +729,7 @@
       "src/reasoner/suggestions.py",
       "src/reasoner/token_cache.py",
       "src/reasoner/uploader.py",
-      "src/reasoner/vs_config.py",
-      "src/reasoner/widgets.py"
+      "src/reasoner/vs_config.py"
     ],
     "src/reasoner/documents": [
       "src/reasoner/documents/vector_store.py"

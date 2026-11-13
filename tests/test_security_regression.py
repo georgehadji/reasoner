@@ -225,7 +225,7 @@ class TestBug003ErrorMessageSanitization:
     def test_calculate_error_is_generic(self):
         """Calculate route errors must not leak internals."""
         secret = "SECRET_CALC_PATH"
-        with patch("reasoner.widgets.calculate_expression") as mock_calc:
+        with patch("reasoner.api.routes.legacy_widgets.calculate_expression") as mock_calc:
             mock_calc.side_effect = RuntimeError(secret)
             response = client.post("/api/calculate", json={"expression": "1+1"})
         assert response.status_code == 200
@@ -237,7 +237,7 @@ class TestBug003ErrorMessageSanitization:
     def test_discover_error_is_generic(self):
         """Discover route errors must not leak internals."""
         secret = "SECRET_DISCOVER_PATH"
-        with patch("reasoner.widgets.get_discover_content") as mock_disc:
+        with patch("reasoner.api.routes.legacy_widgets._run") as mock_disc:
             mock_disc.side_effect = RuntimeError(secret)
             response = client.get("/api/discover", params={"topic": "tech"})
         assert response.status_code == 200

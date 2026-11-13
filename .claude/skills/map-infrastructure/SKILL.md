@@ -160,8 +160,7 @@ folders:
 |------|--------------|
 | `widgets/protocol.py` | `Widget`, `BaseWidget`, `WidgetType`, `WidgetResult`, `WidgetDetectionResult` — the port. |
 | `widgets/registry.py` | `WidgetRegistry`: discovery, execution, lifecycle, default registrations. |
-| `widgets/weather.py`, `stocks.py`, `calculator.py`, `discover.py`, `image_search.py`, `video_search.py` | Individual widgets (Open-Meteo, Yahoo Finance, asteval, trending, multi-backend media search). |
-| `widgets_legacy.py` (21KB) | Older monolithic widget engine with its own safe-expression evaluator. |
+| `widgets/weather.py`, `stocks.py`, `calculator.py`, `discover.py`, `image_search.py`, `video_search.py` | Individual widgets (Open-Meteo, Yahoo Finance, AST-whitelist calculator also serving `/api/calculate`, trending, multi-backend media search). |
 | `websocket/manager.py` (22KB) | `WebSocketManager`, sessions, event-bus integration, pipeline authorization. |
 | `websocket/ws_security.py` | Pre-accept Origin validation and per-IP connect rate limiting. |
 | `observability/langfuse_subscriber.py` | Maps `LLMGenerationCompleted` events to Langfuse traces. |

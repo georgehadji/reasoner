@@ -18,6 +18,7 @@ from fastapi import FastAPI
 from reasoner.api import dependencies
 from reasoner.api.auth_deps import require_csrf
 from reasoner.api.routes import legacy_widgets, widgets
+from reasoner.infrastructure.widgets.stocks import StockWidget
 
 
 class _Limiter:
@@ -36,19 +37,22 @@ def client(monkeypatch):
     app.include_router(widgets.router)
     app.dependency_overrides[dependencies.get_optional_user] = lambda: None
     app.dependency_overrides[require_csrf] = lambda: True
-    monkeypatch.setattr("reasoner.widgets.get_stock_data", lambda s: {"symbol": s})
-    monkeypatch.setattr("reasoner.widgets.get_weather_data", _weather)
-    monkeypatch.setattr("reasoner.widgets.get_discover_content", _discover)
+    monkeypatch.setattr(legacy_widgets, "_run", _fake_run)
     transport = httpx.ASGITransport(app=app)
     return httpx.AsyncClient(transport=transport, base_url="http://t")
 
 
-async def _weather(location):
-    return {"location": location}
+_REAL_RUN = legacy_widgets._run
 
 
-async def _discover(topic, mode):
-    return {"results": []}
+async def _fake_run(name, params):
+    return {
+        "stocks": lambda: {"symbol": params.get("symbol")},
+        "weather": lambda: {
+            "location": params.get("location"), "current": {}, "forecast": [], "source": "t"
+        },
+        "discover": lambda: {"results": []},
+    }[name]()
 
 
 @pytest.mark.asyncio
@@ -76,11 +80,12 @@ async def test_a_slow_stock_fetch_does_not_block_the_loop(client, monkeypatch):
     limiter = _Limiter(allow=10)
     monkeypatch.setattr(dependencies, "_get_rate_limiter_instance", lambda: limiter)
 
-    def _slow(symbol):
+    def _slow(self, symbol):
         time.sleep(0.6)  # yahooquery doing blocking network I/O
-        return {"symbol": symbol}
+        return {}
 
-    monkeypatch.setattr("reasoner.widgets.get_stock_data", _slow)
+    monkeypatch.setattr(legacy_widgets, "_run", _REAL_RUN)
+    monkeypatch.setattr(StockWidget, "_fetch_stock_data_sync", _slow)
     gaps: list[float] = []
 
     async def ticker():
@@ -102,7 +107,6 @@ async def test_a_slow_stock_fetch_does_not_block_the_loop(client, monkeypatch):
 async def test_a_looping_expression_is_refused_not_run():
     from reasoner.infrastructure.widgets.calculator import CalculatorWidget
 
-    pytest.importorskip("asteval")
     start = time.monotonic()
     result = await CalculatorWidget()._execute_impl({"expression": "x = 0\nwhile True: x += 1"})
     assert time.monotonic() - start < 3

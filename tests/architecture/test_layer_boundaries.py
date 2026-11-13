@@ -238,8 +238,8 @@ ALLOWED_INFRASTRUCTURE_ERRORS: dict[str, str] = {
         "image lane has no domain error tree yet",
     "infrastructure/watermark/data_url.py::DataUrlError":
         "ValueError subclass, local input validation",
-    "infrastructure/widgets_legacy.py::SafeExpressionError":
-        "legacy widget sandbox, scheduled for deletion",
+    "infrastructure/widgets/calculator.py::SafeExpressionError":
+        "calculator sandbox control flow; caught inside calculate_expression",
     # Defined only in the ImportError branch, as a stand-in for
     # asyncpg.PostgresError when asyncpg is absent. Without it the `except`
     # clauses would have to name bare Exception and would swallow KeyError,
