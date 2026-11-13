@@ -70,7 +70,7 @@ export function NotFoundView() {
   });
 
   return (
-    <div className="flex min-h-screen flex-col bg-[var(--bg)] text-[var(--text)]">
+    <div className="flex min-h-dvh flex-col bg-[var(--bg)] text-[var(--text)]">
       <SiteHeader />
 
       <main

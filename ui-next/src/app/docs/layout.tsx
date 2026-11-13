@@ -7,7 +7,7 @@ import { SiteFooter } from '@/components/layout/SiteFooter';
  */
 export default function DocsLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen flex-col bg-[var(--bg)] text-[var(--text)]">
+    <div className="flex min-h-dvh flex-col bg-[var(--bg)] text-[var(--text)]">
       <SiteHeader />
       <div className="flex-1 pt-16">{children}</div>
       <SiteFooter />

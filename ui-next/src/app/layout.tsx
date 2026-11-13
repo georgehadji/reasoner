@@ -90,7 +90,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     // hydrates, so the server markup and the client DOM intentionally disagree on
     // this one element. Without it React logs a hydration mismatch on every load.
     <html lang="en" className={`${fontVariables} antialiased`} suppressHydrationWarning>
-      <body className="min-h-screen bg-[var(--bg)] text-[var(--text)] flex flex-col">
+      <body className="min-h-dvh bg-[var(--bg)] text-[var(--text)] flex flex-col">
         <JsonLd data={[organizationSchema(), websiteSchema(), softwareApplicationSchema()]} />
         <a href="#main-content" className="skip-link">
           Skip to main content
