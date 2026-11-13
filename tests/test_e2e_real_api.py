@@ -51,6 +51,10 @@ async def client():
 
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(settings, "ENABLE_LEGACY_API_KEY", True)
+        # Anonymous callers default to the free plan, whose $0.07 per-run cap
+        # refuses research-budget (~$0.073) with 403. This tests streaming, not
+        # pricing, so run as pro.
+        mp.setattr(settings, "ANONYMOUS_TIER", "pro")
         async with httpx.AsyncClient(
             transport=ASGITransport(app=api.app), base_url="http://test"
         ) as c:
