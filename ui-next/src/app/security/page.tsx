@@ -198,9 +198,10 @@ export default function SecurityPage() {
             Self-hosting
           </h2>
           <p className="prose-measure mt-[var(--space-3)] text-[length:var(--text-sm)] leading-[var(--lh-body)] text-[var(--text-muted)]">
-            The full stack (API, Postgres, Valkey) runs from one Docker Compose file, so it can run
-            inside your own infrastructure; then only the model calls you configure leave your
-            network. [INPUT REQUIRED: is self-hosting offered to customers, and on what licence?]
+            The code is source-available under the Business Source License 1.1, which permits
+            self-hosting and converts to Apache-2.0 in 2030. The full stack (API, Postgres, Valkey)
+            runs from one Docker Compose file inside your own infrastructure; then only the model
+            calls you configure leave your network.
           </p>
         </section>
 

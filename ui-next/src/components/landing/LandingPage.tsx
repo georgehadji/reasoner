@@ -1,11 +1,21 @@
 import Link from 'next/link';
 import { DisagreementField } from '@/components/landing/DisagreementField';
-import { Aside, Body, Heading, Lede, Section } from '@/components/landing/prose';
+import {
+  Aside,
+  Body,
+  Heading,
+  LABEL_TAG,
+  Lede,
+  PilotCta,
+  SECONDARY_CTA,
+  Section,
+} from '@/components/landing/prose';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
 import { LogoLoop } from '@/components/ui/LogoLoop';
 import { CAPABILITIES, MARQUEE_LABS } from '@/lib/capabilities.generated';
 import { CLAIM_SPECIMENS } from '@/lib/demo-record';
+import { SECTORS } from '@/lib/sectors';
 
 /**
  * The home page, positioned for buyers who have to defend an answer to
@@ -79,50 +89,6 @@ const AUDIT_POINTS = [
     term: 'The run stays on the record',
     detail:
       'Each run is stored as a log of events: every phase, which model wrote it, and what the critic scored. Whoever signs off can read how the answer was built.',
-  },
-];
-
-/**
- * Sector rows. Methods are real `method` values in preset_registry.py.
- * `limit` is the boundary stated up front, which is what a regulated reader
- * looks for first.
- */
-const SECTORS = [
-  {
-    name: 'Defence and security',
-    use: 'Structured adversarial analysis of plans: red-team a course of action, or run a pre-mortem on why it failed.',
-    methods: 'Debate · Pre-Mortem · Dialectical, on Western-only routing',
-    limit: 'Analysis for the people who decide. It does not decide.',
-  },
-  {
-    name: 'Healthcare operations',
-    use: 'Staffing, procurement and incident root-cause analysis. Morbidity and mortality reviews as pre-mortem or Socratic questioning. Comparing guidelines with cited sources.',
-    methods: 'Pre-Mortem · Socratic · Research',
-    limit: 'Not for diagnosis or treatment decisions. Do not enter patient data.',
-  },
-  {
-    name: 'Research and teaching',
-    use: 'Research design and peer-review support: generate hypotheses and try to disprove them, update beliefs on evidence, teach critical thinking by questioning.',
-    methods: 'Scientific · Bayesian · Socratic · Research',
-    limit: 'A reviewer’s second reader, not a replacement for one.',
-  },
-  {
-    name: 'Legal and compliance',
-    use: 'Stress-test an argument against opposing counsel’s likely positions, run a pre-mortem on contract risk, and look for gaps against a regulation.',
-    methods: 'Debate · Jury · Pre-Mortem',
-    limit: 'Not legal advice.',
-  },
-  {
-    name: 'Aerospace and engineering',
-    use: 'Design reviews, failure-mode analysis in the style of an FMEA, and critique of requirements before they are frozen.',
-    methods: 'Pre-Mortem · Iterative Critique',
-    limit: 'Does not replace certified safety analysis.',
-  },
-  {
-    name: 'Government and policy',
-    use: 'Policy options analysis, structured expert consensus, and stress-testing scenarios before they are published.',
-    methods: 'Delphi · Dialectical',
-    limit: 'Options and their weaknesses, not a recommendation to adopt.',
   },
 ];
 
@@ -213,30 +179,10 @@ const CLAIM_RULE: Record<string, string> = {
 
 const INLINE_LINK =
   'link-smooth text-[var(--accent)] underline decoration-[var(--border-strong)] underline-offset-4 hover:text-[var(--accent-hover)]';
-const PRIMARY_CTA =
-  'btn-lift group flex min-h-[var(--space-12)] items-center gap-[var(--space-2)] rounded-[var(--radius)] bg-[var(--accent)] px-[var(--space-8)] font-sans text-[length:var(--text-md)] font-semibold leading-[var(--lh-ui)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)]';
-const SECONDARY_CTA =
-  'link-smooth flex min-h-[var(--space-12)] items-center font-sans text-[length:var(--text-md)] font-medium leading-[var(--lh-ui)] text-[var(--text-2)] underline decoration-[var(--border-strong)] underline-offset-4 hover:text-[var(--text)]';
 const TERM =
   'font-sans text-[length:var(--text-md)] font-semibold leading-[var(--lh-ui)] text-[var(--text)]';
 const DETAIL =
   'mt-[var(--space-1)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]';
-const LABEL_TAG =
-  'pl-[var(--space-3)] font-sans text-[length:var(--text-2xs)] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)]';
-
-function PilotCta() {
-  return (
-    <Link href="/contact?topic=pilot" className={PRIMARY_CTA}>
-      Scope a pilot
-      <span
-        aria-hidden="true"
-        className="transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
-      >
-        &rarr;
-      </span>
-    </Link>
-  );
-}
 
 /* ── Page ─────────────────────────────────────────────────────────── */
 
@@ -378,7 +324,7 @@ export default function LandingPage() {
           </Lede>
 
           <dl className="mt-[var(--space-10)] divide-y divide-[var(--border)] border-y border-[var(--border)]">
-            {SECTORS.map(({ name, use, methods, limit }) => (
+            {SECTORS.map(({ slug, name, use, methods, limit }) => (
               <div
                 key={name}
                 className="grid gap-[var(--space-2)] py-[var(--space-6)] lg:grid-cols-[minmax(0,14rem)_minmax(0,1fr)] lg:gap-[var(--space-8)]"
@@ -396,6 +342,12 @@ export default function LandingPage() {
                   <p className="mt-[var(--space-2)] text-[length:var(--text-sm)] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
                     {limit}
                   </p>
+                  <Link
+                    href={`/for/${slug}`}
+                    className="link-smooth mt-[var(--space-3)] inline-flex font-sans text-[length:var(--text-sm)] font-semibold leading-[var(--lh-ui)] text-[var(--accent)] hover:text-[var(--accent-hover)]"
+                  >
+                    What your reviewer will ask<span className="sr-only">: {name}</span>
+                  </Link>
                 </dd>
               </div>
             ))}

@@ -84,3 +84,27 @@ export function Aside({ href, children }: { href: string; children: ReactNode })
     </Link>
   );
 }
+
+export const PRIMARY_CTA =
+  'btn-lift group flex min-h-[var(--space-12)] items-center gap-[var(--space-2)] rounded-[var(--radius)] bg-[var(--accent)] px-[var(--space-8)] font-sans text-[length:var(--text-md)] font-semibold leading-[var(--lh-ui)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)]';
+export const SECONDARY_CTA =
+  'link-smooth flex min-h-[var(--space-12)] items-center font-sans text-[length:var(--text-md)] font-medium leading-[var(--lh-ui)] text-[var(--text-2)] underline decoration-[var(--border-strong)] underline-offset-4 hover:text-[var(--text)]';
+
+/** The label above an epistemic or status rule (globals.css .epistemic-*). */
+export const LABEL_TAG =
+  'pl-[var(--space-3)] font-sans text-[length:var(--text-2xs)] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)]';
+
+/** The single primary action on every persuasion page. */
+export function PilotCta() {
+  return (
+    <Link href="/contact?topic=pilot" className={PRIMARY_CTA}>
+      Scope a pilot
+      <span
+        aria-hidden="true"
+        className="transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
+      >
+        &rarr;
+      </span>
+    </Link>
+  );
+}
