@@ -58,6 +58,8 @@ export function UpgradeModal({ open, onClose }: UpgradeModalProps) {
       )}
       role="dialog"
       aria-modal="true"
+      // Kept mounted for the exit transition; inert removes it from tab order and the a11y tree.
+      inert={!open}
       aria-labelledby="upgrade-title"
       aria-describedby="upgrade-desc"
       onClick={(e) => {
@@ -85,7 +87,7 @@ export function UpgradeModal({ open, onClose }: UpgradeModalProps) {
         </div>
 
         <p id="upgrade-desc" className="mb-6 text-[var(--text-2)]">
-          You&apos;ve reached your free tier limit. Upgrade to Pro for 500 queries/month and unlock all premium presets.
+          You&apos;ve reached your free tier limit. Upgrade to Pro to unlock all premium presets.
         </p>
 
         {error && (
@@ -97,12 +99,12 @@ export function UpgradeModal({ open, onClose }: UpgradeModalProps) {
         <div className="mb-6 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-2)] p-4">
           <div className="flex items-center gap-2 text-[length:var(--text-sm)] font-medium text-[var(--text)]">
             <Lock className="h-4 w-4 text-[var(--accent)]" />
-            Pro Plan — $12/month
+            Pro Plan — [INPUT REQUIRED: Pro plan price]
           </div>
           <ul className="mt-2 space-y-1 text-[length:var(--text-sm)] text-[var(--text-muted)]">
-            <li>500 queries per month</li>
+            <li>[INPUT REQUIRED: Pro plan monthly allowance]</li>
             <li>All premium presets</li>
-            <li>Priority support</li>
+            <li>[INPUT REQUIRED: Pro plan support level]</li>
           </ul>
         </div>
 

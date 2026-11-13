@@ -32,7 +32,7 @@ export function Tooltip({ text, children, as: Component = 'span', side = 'top' }
 
   return (
     <Component className="group relative inline-block">
-      <span tabIndex={0} aria-describedby={id} className="rounded-[var(--radius-sm)] outline-none">
+      <span tabIndex={0} aria-describedby={id} className="rounded-[var(--radius-sm)]">
         {children}
       </span>
       <span

@@ -61,7 +61,7 @@ export function ReviewHandoff() {
           listing that must not need a scrollbar, whereas the findings
           reflow to whatever they are given. gap-0 because the overlap
           below IS the gap. */}
-      <div className="relative mt-[var(--space-6)] grid items-start gap-[var(--space-6)] lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:gap-0">
+      <div className="relative mt-[var(--space-6)] grid grid-cols-[minmax(0,1fr)] items-start gap-[var(--space-6)] lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:gap-0">
         {/* ── The file, as written ───────────────────────────── */}
         <div className="plate-reveal card-hover group border border-[var(--border)] bg-[var(--surface)] hover:border-[var(--border-strong)]">
           <div className="flex items-baseline justify-between gap-[var(--space-4)] border-b border-[var(--border)] px-[var(--space-5)] py-[var(--space-3)]">
