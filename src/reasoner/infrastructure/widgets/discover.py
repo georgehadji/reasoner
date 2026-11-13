@@ -9,6 +9,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from reasoner.core.degrade import degraded
 from reasoner.infrastructure.widgets.protocol import BaseWidget, WidgetType
 
 
@@ -134,5 +135,7 @@ class DiscoverWidget(BaseWidget):
         try:
             client, _ = await get_search_client()
             return await client.search(query, num_results=5)
-        except Exception:
-            return []
+        except Exception as exc:
+            # An empty list is what "this query has no results" looks like too, so
+            # a search backend that is down renders as a topic with nothing in it.
+            return degraded("widgets.search_web", [], exc=exc)

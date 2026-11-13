@@ -5,7 +5,7 @@ Security Tests - Verify security fixes work correctly.
 
 import pytest
 
-from reasoner.widgets import calculate_expression
+from reasoner.infrastructure.widgets.calculator import calculate_expression
 
 
 class TestSafeExpressionEvaluator:

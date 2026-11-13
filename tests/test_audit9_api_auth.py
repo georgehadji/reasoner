@@ -112,7 +112,7 @@ async def test_discover_is_cached_and_topic_normalized():
 
     lw._discover_cache.clear()
     fake = AsyncMock(return_value={"results": [1]})
-    with patch("reasoner.widgets.get_discover_content", fake):
+    with patch.object(lw, "_run", fake):
         await lw.discover(topic="tech", mode="normal")
         await lw.discover(topic="TECH", mode="normal")
         await lw.discover(topic="not-a-topic", mode="normal")

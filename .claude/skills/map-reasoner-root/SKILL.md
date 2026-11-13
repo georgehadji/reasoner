@@ -50,7 +50,6 @@ folders:
 | `token_cache.py` | `infrastructure/token_cache.py` |
 | `uploader.py` | `infrastructure/uploader.py` |
 | `vs_config.py` | `core/vs_config.py` |
-| `widgets.py` | `infrastructure/widgets_legacy.py` |
 | `reasoner_verbalized_sampling.py` | `core/verbalized_sampling.py` |
 | `reasoner_vs_constants.py` | `core/vs_constants.py` |
 

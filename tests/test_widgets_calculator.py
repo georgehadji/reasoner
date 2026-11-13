@@ -79,11 +79,10 @@ class TestCalculatorWidget:
         assert result["result"] == 1024
 
     @pytest.mark.asyncio
-    async def test_caret_is_bitwise_xor_not_power(self, widget):
-        """BUG: '^' is bitwise XOR in Python, not power. Users may expect power."""
+    async def test_caret_is_refused_not_answered_as_xor(self, widget):
+        """'^' is XOR in Python; a user typing 2 ^ 10 means power, so a silent 8 is wrong."""
         result = await widget._execute_impl({"expression": "2 ^ 10"})
-        assert result["valid"] is True
-        assert result["result"] == 8  # 2 XOR 10 = 8, not 1024
+        assert result["valid"] is False
 
     def test_format_result_integer(self, widget):
         assert widget._format_result(42.0) == "42"

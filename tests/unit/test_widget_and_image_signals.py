@@ -2,11 +2,8 @@
 
 P5, docs/plans/root-cause-remediation-2026-09-07.md.
 
-- ``_has_yahooquery``/``_has_yfinance`` had lost the import they were meant to
-  test, leaving ``try: return True``. Every machine therefore reported both
-  libraries present, the "Demo Mode" branch of ``get_stock_data`` became
-  unreachable, and a missing dependency surfaced as an ImportError from inside
-  the quote lookup instead of the message that names it.
+- A missing quote library surfaced as an ImportError from inside the quote
+  lookup instead of the message that names it.
 - ``search_web`` returned ``[]`` for a dead backend, which is also exactly what
   a query with no results returns.
 - ``_generate_image_guarded`` returned ``str(exc)`` and nothing else. At the
@@ -16,31 +13,24 @@ P5, docs/plans/root-cause-remediation-2026-09-07.md.
 
 from __future__ import annotations
 
-import importlib.util
 import logging
+import sys
 
 import pytest
 
-from reasoner.infrastructure import widgets_legacy
 from reasoner.infrastructure.llm import image_generation
+from reasoner.infrastructure.widgets.discover import DiscoverWidget
+from reasoner.infrastructure.widgets.stocks import StockWidget
 
 
 def test_a_missing_finance_library_is_reported_as_missing(monkeypatch):
-    monkeypatch.setattr(importlib.util, "find_spec", lambda _name: None)
+    """Neither quote library importable: the error names them, not an ImportError."""
+    monkeypatch.setitem(sys.modules, "yahooquery", None)
+    monkeypatch.setitem(sys.modules, "yfinance", None)
 
-    assert widgets_legacy._has_yahooquery() is False
-    assert widgets_legacy._has_yfinance() is False
+    result = StockWidget()._fetch_stock_data_sync("AAPL")
 
-
-def test_get_stock_data_can_still_reach_demo_mode(monkeypatch):
-    """The branch the broken stubs made unreachable."""
-    monkeypatch.setattr(widgets_legacy, "_has_yahooquery", lambda: False)
-    monkeypatch.setattr(widgets_legacy, "_has_yfinance", lambda: False)
-
-    result = widgets_legacy.get_stock_data("AAPL")
-
-    assert result["source"] == "Demo Mode"
-    assert "yahooquery" in result["note"]
+    assert "yahooquery" in result["error"]
 
 
 @pytest.mark.asyncio
@@ -53,7 +43,7 @@ async def test_a_dead_search_backend_is_not_an_empty_topic(monkeypatch, caplog):
     monkeypatch.setattr(discovery, "get_search_client", _boom)
 
     with caplog.at_level(logging.WARNING):
-        results = await widgets_legacy.search_web("anything")
+        results = await DiscoverWidget()._search_web("anything")
 
     assert results == [], "the widget must still render"
     assert any("widgets.search_web" in r.message for r in caplog.records), (

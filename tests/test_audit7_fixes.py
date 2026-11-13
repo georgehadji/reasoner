@@ -206,15 +206,19 @@ async def test_key_cap_holds_under_parallel_creates():
 # ── Finding 1: calculator exponent DoS ──────────────────────────────────────
 
 
-@pytest.mark.parametrize("expr", ["pow(3, 2000000)", "9**9**9", "10**200000"])
+@pytest.mark.parametrize(
+    "expr",
+    # The last one is the nested-power case asteval let through (2.9s holding the GIL).
+    ["pow(3, 2000000)", "9**9**9", "10**200000", "(((9999**1000)**10)**10)**10"],
+)
 def test_calculator_rejects_huge_powers(expr):
-    from reasoner.infrastructure.widgets_legacy import calculate_expression
+    from reasoner.infrastructure.widgets.calculator import calculate_expression
 
     assert calculate_expression(expr)["valid"] is False
 
 
 def test_calculator_keeps_normal_powers():
-    from reasoner.infrastructure.widgets_legacy import calculate_expression
+    from reasoner.infrastructure.widgets.calculator import calculate_expression
 
     assert calculate_expression("2**10")["result"] == 1024
 
