@@ -93,6 +93,8 @@ user's problem, to TypeSafe.
 |---|---|---|
 | `CSRF_SECRET` | — | HMAC secret for CSRF tokens |
 | `CSRF_ENFORCE_BACKEND` | `true` | Require CSRF on state-changing ops |
+| `TRUSTED_PROXIES` | — | Comma-separated proxy IPs/CIDRs whose `X-Forwarded-For` is believed. Required when `ENVIRONMENT=production`: startup is refused when empty, because every client behind the proxy would share one rate-limit and anonymous-trial bucket |
+| `ALLOW_NO_TRUSTED_PROXIES` | — | `true` lets production start with `TRUSTED_PROXIES` empty. Only for a deployment with no proxy in front |
 
 ## VS (Verbalized Sampling)
 

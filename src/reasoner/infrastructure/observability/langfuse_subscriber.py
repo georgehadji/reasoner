@@ -7,6 +7,7 @@ Subscribes to LLMGenerationCompleted events and maps them to Langfuse traces.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import os
 from typing import Any
@@ -36,6 +37,13 @@ from reasoner.core.events.domain_events import LLMGenerationCompleted
 from reasoner.metrics import OBSERVABILITY_EVENTS_DROPPED_TOTAL  # New import
 
 logger = logging.getLogger(__name__)
+
+def _redact(text: Any) -> str:
+    """Length + hash instead of user text. Traces carry no user_id, so they cannot
+    be erased per user (GDPR); raw prompts/problem/solution are never exported."""
+    t = "" if text is None else str(text)
+    return f"[redacted len={len(t)} sha256={hashlib.sha256(t.encode('utf-8')).hexdigest()[:12]}]"
+
 
 # Global Langfuse client instance
 _langfuse_client = None
@@ -89,14 +97,14 @@ class LangfuseSubscriber:
         # Create or retrieve trace
         if trace_id not in self._active_traces:
             self._active_traces[trace_id] = _langfuse_client.trace(
-                _CreateTrace(id=trace_id, name=f"Pipeline: {trace_id}", metadata={"problem": ""})
+                _CreateTrace(id=trace_id, name=f"Pipeline: {trace_id}", metadata={"problem": _redact("")})
             )
             logger.debug(f"Langfuse: Created trace {trace_id}")
 
         # Create or retrieve span for the phase
         if span_id not in self._active_spans:
             self._active_spans[span_id] = self._active_traces[trace_id].span(
-                _CreateSpan(id=span_id, name=f"Phase: {event.phase_name}", input={"system_prompt": event.system_prompt, "user_prompt": event.user_prompt})
+                _CreateSpan(id=span_id, name=f"Phase: {event.phase_name}", input={"system_prompt": _redact(event.system_prompt), "user_prompt": _redact(event.user_prompt)})
             )
             logger.debug(f"Langfuse: Created span {span_id}")
 
@@ -107,11 +115,11 @@ class LangfuseSubscriber:
                     name=f"LLM Call: {event.model_name}",
                     model=event.model_name,
                     input={
-                        "system_prompt": event.system_prompt,
-                        "user_prompt": event.user_prompt,
+                        "system_prompt": _redact(event.system_prompt),
+                        "user_prompt": _redact(event.user_prompt),
                     },
                     output={
-                        "raw_response": event.raw_response,
+                        "raw_response": _redact(event.raw_response),
                     },
                     usage={
                         "promptTokens": event.prompt_tokens,
@@ -134,7 +142,7 @@ class LangfuseSubscriber:
             logger.debug(f"Langfuse: Created generation {generation.id}")
             generation.update(_UpdateGeneration(
                 output={
-                    "raw_response": event.raw_response,
+                    "raw_response": _redact(event.raw_response),
                 },
                 usage={
                     "promptTokens": event.prompt_tokens,
@@ -165,7 +173,7 @@ class LangfuseSubscriber:
         trace_id = event.aggregate_id
         if trace_id not in self._active_traces:
             self._active_traces[trace_id] = _langfuse_client.trace(
-                _CreateTrace(id=trace_id, name=f"Pipeline: {trace_id}", metadata={"problem": event.problem, "preset": event.preset, "method": event.method})
+                _CreateTrace(id=trace_id, name=f"Pipeline: {trace_id}", metadata={"problem": _redact(event.problem), "preset": event.preset, "method": event.method})
             )
             logger.debug(f"Langfuse: Initialized trace {trace_id} from PipelineStarted event.")
 
@@ -175,7 +183,7 @@ class LangfuseSubscriber:
         if trace_id in self._active_traces:
             self._active_traces[trace_id].update(
                 name=f"Pipeline: {trace_id} (Completed)",
-                output=event.solution,
+                output=_redact(event.solution),
                 metadata={
                     "total_tokens": event.total_tokens,
                     "total_duration_seconds": event.total_duration_seconds,

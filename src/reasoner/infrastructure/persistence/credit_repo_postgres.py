@@ -13,6 +13,7 @@ import asyncio
 import logging
 import os
 from collections.abc import Sequence
+from datetime import datetime
 from uuid import UUID
 
 import asyncpg
@@ -120,6 +121,24 @@ class PostgresCreditRepository(CreditRepository):
             UUID(str(user_id)),
             max(1, min(limit, 200)),
             max(0, offset),
+        )
+        return [_to_entry(r) for r in rows]
+
+    async def list_orphaned_reservations(
+        self, older_than: datetime, limit: int = 100
+    ) -> list[CreditLedgerEntry]:
+        pool = await self._get_pool()
+        # 8 == len(":reserve"): strip it to get the run's own reference.
+        rows = await pool.fetch(
+            "SELECT r.id, r.user_id, r.delta, r.balance_after, r.reason, r.reference_id, "
+            "r.description, r.created_at FROM credit_ledger r "
+            "WHERE r.reference_id LIKE '%:reserve' AND r.created_at < $1 "
+            "AND NOT EXISTS (SELECT 1 FROM credit_ledger s WHERE s.user_id = r.user_id "
+            "AND s.reference_id IN (left(r.reference_id, -8), "
+            "left(r.reference_id, -8) || ':release')) "
+            "ORDER BY r.created_at LIMIT $2",
+            older_than,
+            max(1, min(limit, 500)),
         )
         return [_to_entry(r) for r in rows]
 

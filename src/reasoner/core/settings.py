@@ -671,3 +671,12 @@ if settings.ENVIRONMENT == "production":
             )
     if settings.JWT_SECRET_KEY and len(settings.JWT_SECRET_KEY) < 32:
         raise RuntimeError("JWT_SECRET_KEY must be at least 32 characters in production.")
+    # Without trusted proxies every caller behind the load balancer shares its
+    # IP, so per-IP rate limits and the anonymous trial cap act on one bucket.
+    if not settings.TRUSTED_PROXIES and os.getenv("ALLOW_NO_TRUSTED_PROXIES", "").lower() not in (
+        "1", "true", "yes",
+    ):
+        raise RuntimeError(
+            "TRUSTED_PROXIES must be set in production (comma-separated proxy IPs/CIDRs). "
+            "Set ALLOW_NO_TRUSTED_PROXIES=true only if the app is exposed with no proxy in front."
+        )

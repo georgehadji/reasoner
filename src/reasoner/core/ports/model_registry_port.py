@@ -1,6 +1,6 @@
 """Port interface for model registry — infrastructure provides concrete implementation.
 
-Follows the same shape as ``circuit_breaker_port.py``: the core layer defines the
+Standard hexagonal shape: the core layer defines the
 port, the infrastructure layer provides the adapter. Application/domain layers
 depend on this port, never on ``infrastructure.llm.registry`` directly.
 

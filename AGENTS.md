@@ -289,18 +289,6 @@ src/reasoner/
 |   |   |-- context_enricher.py
 |   |   |-- hyper_agent.py
 |   |   |-- scope_narrower.py
-|   |-- decomposition/
-|   |   |-- coverage_validator.py
-|   |   |-- hyper_agent.py
-|   |   |-- stakeholder_mapper.py
-|   |   |-- structural_decomposer.py
-|   |-- critique/
-|   |   |-- bias_critique.py
-|   |   |-- counterfactual.py
-|   |   |-- evidence_critique.py
-|   |   |-- hyper_agent.py
-|   |   |-- logic_critique.py
-|   |-- search/
 |   |-- synthesis/
 |-- neuro/                         # Long-term memory system
 |   |-- server.py                  # Neuro API router (Recall, Learn endpoints)
@@ -331,7 +319,6 @@ src/reasoner/
     |-- exceptions.py              # Custom exceptions
     |-- sanitization.py            # Input sanitization / prompt-injection defense
     |-- token_cache.py             # Token-aware caching
-    |-- pricing.py                 # Cost estimation
     |-- suggestions.py             # Smart search suggestions
     |-- logging_utils.py           # Safe logging filter (redacts secrets)
     |-- widgets.py                 # Legacy widget helpers

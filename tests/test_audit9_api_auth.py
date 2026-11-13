@@ -51,10 +51,19 @@ async def test_anonymous_generate_image_big_body_refused_but_authed_passes():
     body = b"x" * (2 * 2**20)
     anon = await _post(_limits_app(), "/api/generate-image", body)
     authed = await _post(
-        _limits_app(), "/api/generate-image", body, headers={"Authorization": "Bearer t"}
+        _limits_app(), "/api/generate-image", body, headers={"Authorization": "Bearer a.b.c"}
     )
     assert anon.status_code == 413
     assert authed.status_code == 200
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("junk", ["x", "Bearer t", "Basic a.b.c", "Bearer"])
+async def test_junk_authorization_header_does_not_lift_the_anon_cap(junk):
+    resp = await _post(
+        _limits_app(), "/api/generate-image", b"x" * (2 * 2**20), headers={"Authorization": junk}
+    )
+    assert resp.status_code == 413
 
 
 # 2. read scopes --------------------------------------------------------------
@@ -66,6 +75,7 @@ async def test_anonymous_generate_image_big_body_refused_but_authed_passes():
     [
         ("routes.history", "get_history", "history:read"),
         ("routes.history", "get_history_entry", "history:read"),
+        ("routes.history", "get_tagged_history", "history:read"),
         ("routes.pipelines", "list_pipelines", "history:read"),
         ("routes.pipelines", "get_pipeline_status", "history:read"),
         ("routes.credits", "get_ledger", "read"),

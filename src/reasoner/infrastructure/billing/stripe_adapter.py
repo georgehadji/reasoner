@@ -95,6 +95,8 @@ class StripeBillingAdapter(BillingPort):
             return await self._handle_subscription_deleted(data)
         elif event_type == "invoice.payment_failed":
             return await self._handle_payment_failed(data)
+        elif event_type in ("charge.refunded", "charge.dispute.created"):
+            return await self._handle_chargeback(event_type, data)
 
         # Return a no-op subscription for unhandled events
         return Subscription(
@@ -259,6 +261,24 @@ class StripeBillingAdapter(BillingPort):
             status=SubscriptionStatus.PAST_DUE,
             stripe_subscription_id=subscription_id,
             stripe_customer_id=stripe_sub.get("customer"),
+        )
+
+    async def _handle_chargeback(self, event_type: str, obj: dict) -> Subscription:
+        """Resolve the customer a refunded charge or a dispute belongs to.
+
+        Only the owner is needed; BillingService applies the ledger and status.
+        A dispute names its charge, not its customer.
+        """
+        customer_id = obj.get("customer")
+        if not customer_id and event_type == "charge.dispute.created" and obj.get("charge"):
+            charge = to_plain(await asyncio.to_thread(stripe.Charge.retrieve, obj["charge"]))
+            customer_id = charge.get("customer")
+        return Subscription(
+            id=uuid4(),
+            user_id=await self._resolve_user_id({"customer": customer_id}),
+            tier=SubscriptionTier.FREE,
+            status=SubscriptionStatus.PAST_DUE,
+            stripe_customer_id=customer_id,
         )
 
     def _timestamp_to_datetime(self, ts: int | None):

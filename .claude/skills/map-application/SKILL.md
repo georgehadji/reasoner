@@ -101,7 +101,6 @@ Convention: `<method>.py` holds the strategy class (phase sequence); `<method>_p
 | `scorecard_service.py` | Aggregates telemetry into harness-level metrics (read model). |
 | `harness_guard.py` | Invariant validation for mutations; `get_model_lab`, `check_mutation_invariants`. |
 | `evidence_service.py` | Epistemic label promotion and evidence bundles. |
-| `feedback_router.py` | Classifies execution failures into repair strategies. |
 
 ## services/ — billing, quota, auth, metering
 

@@ -8,7 +8,6 @@ Core-level abstract interfaces defining adapters for low-level platform features
 ## Files
 - **`__init__.py`**: Port interfaces for hexagonal architecture.
 - **`api_key_repository.py`**: Port: persistence contract for user-owned API keys.
-- **`circuit_breaker_port.py`**: Port interface for circuit breaker — infrastructure provides concrete implementation.
 - **`code_executor.py`**: Core port for code execution — Hexagonal DDD port layer.
 - **`credit_repository.py`**: Port: persistence contract for the credit ledger.
 - **`crypto_port.py`**: Port interface for at-rest encryption — infrastructure/security provides the adapter.

@@ -11,6 +11,7 @@ import time
 from typing import Any
 
 from reasoner.core.ports.distributed_state_port import DistributedStatePort
+from reasoner.infrastructure.valkey.memory_cache_adapter import sweep
 
 
 class InMemoryStateAdapter:
@@ -36,11 +37,13 @@ class InMemoryStateAdapter:
                 return False
         expires_at = time.monotonic() + ttl if ttl is not None else None
         self._store[key] = (value, expires_at)
+        sweep(self._store)
         return True
 
     async def set_ex(self, key: str, value: str, ttl: int) -> None:
         expires_at = time.monotonic() + ttl
         self._store[key] = (value, expires_at)
+        sweep(self._store)
 
     async def get(self, key: str) -> str | None:
         entry = self._store.get(key)

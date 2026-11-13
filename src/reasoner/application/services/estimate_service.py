@@ -121,4 +121,14 @@ async def estimate_image_cost(preset: str, num_images: int) -> float:
     return round(per_image * max(num_images, 0), 4)
 
 
-__all__ = ["estimate_cost", "estimate_image_cost"]
+# One vision call per image the uploader describes. Flat: the call's real cost
+# is not surfaced to true up against, so it sits above typical vision pricing.
+_UPLOAD_IMAGE_DESCRIBE_COST_USD = 0.01
+
+
+def estimate_upload_cost(num_described_images: int) -> float:
+    """Flat estimate for an upload: only images sent to the vision model cost anything."""
+    return round(_UPLOAD_IMAGE_DESCRIBE_COST_USD * max(num_described_images, 0), 4)
+
+
+__all__ = ["estimate_cost", "estimate_image_cost", "estimate_upload_cost"]

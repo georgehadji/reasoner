@@ -702,11 +702,16 @@ class EventStore:
             PipelineOwnershipRepository,
         )
         repo = PipelineOwnershipRepository(db_path=self.db_path)
+        # Bound to this store's own file (the global repo may point elsewhere),
+        # so it is closed here instead of leaking one connection per call.
         try:
-            await repo.backfill_from_json()
-        except Exception as exc:
-            logger.warning("Pipeline ownership backfill failed during GDPR lookup: %s", exc)
-        return await repo.list_pipeline_ids_for_user(user_id)
+            try:
+                await repo.backfill_from_json()
+            except Exception as exc:
+                logger.warning("Pipeline ownership backfill failed during GDPR lookup: %s", exc)
+            return await repo.list_pipeline_ids_for_user(user_id)
+        finally:
+            repo.close()
 
     async def delete_aggregate(self, aggregate_id: str) -> None:
         """
@@ -827,11 +832,33 @@ class EventStore:
                 )
                 deleted = cursor.rowcount
 
+                # Nothing saves snapshots, so the snapshot-covered pass above
+                # never matches. Terminal aggregates past the cutoff are done
+                # (no resume), so their versioned history is expendable.
+                # Version-0 audit rows are left to prune_audit_events_before.
+                if deleted < batch_size:
+                    deleted += conn.execute(
+                        """
+                        DELETE FROM events
+                        WHERE id IN (
+                            SELECT e.id
+                            FROM events e
+                            INNER JOIN aggregates a ON a.aggregate_id = e.aggregate_id
+                            WHERE a.status IN ('completed', 'failed', 'cancelled')
+                              AND a.updated_at < ?
+                              AND e.version > 0
+                            ORDER BY e.created_at ASC
+                            LIMIT ?
+                        )
+                        """,
+                        (cutoff_str, batch_size - deleted),
+                    ).rowcount
+
                 # Clean up terminal aggregates with no remaining events
                 conn.execute(
                     """
                     DELETE FROM aggregates
-                    WHERE status IN ('completed', 'failed')
+                    WHERE status IN ('completed', 'failed', 'cancelled')
                       AND updated_at < ?
                       AND NOT EXISTS (
                           SELECT 1 FROM events

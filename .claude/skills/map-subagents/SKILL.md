@@ -1,6 +1,6 @@
 ---
 name: map-subagents
-description: Folder map of src/reasoner/subagents — intra-phase PhaseSubAgents grouped by phase (enhancement, decomposition, critique, search, synthesis), each with a HyperAgent that fans out in parallel. Use when adding or tuning a phase sub-agent.
+description: Folder map of src/reasoner/subagents — intra-phase PhaseSubAgents grouped by phase (enhancement, synthesis), each with a HyperAgent that fans out in parallel. Use when adding or tuning a phase sub-agent.
 folders:
   - src/reasoner/subagents
 ---
@@ -25,34 +25,6 @@ folders:
 | `ambiguity_detector.py` | What is unclear or vague in the problem statement. |
 | `context_enricher.py` | What context is missing. |
 | `scope_narrower.py` | Is the problem too broad, and how to narrow it. |
-
-## decomposition/ (Phase 1)
-
-| File | What it does |
-|------|--------------|
-| `hyper_agent.py` | `DecompositionHyperAgent` — three parallel sub-agents into one decomposition. |
-| `structural_decomposer.py` | Hierarchical what/why/how breakdown. |
-| `stakeholder_mapper.py` | Relevant perspectives and stakeholders. |
-| `coverage_validator.py` | Do the sub-problems cover the original problem completely. |
-
-## critique/ (Phase 3)
-
-| File | What it does |
-|------|--------------|
-| `hyper_agent.py` | `CritiqueHyperAgent` — four parallel critique dimensions, synthesizes 0-10 scores. |
-| `logic_critique.py` | Formal fallacies and structural flaws. |
-| `evidence_critique.py` | Source/evidence quality and reliability. |
-| `bias_critique.py` | Cognitive biases and framing effects. |
-| `counterfactual.py` | "What if the opposite were true?" per candidate. |
-
-## search/ (research methods)
-
-| File | What it does |
-|------|--------------|
-| `hyper_agent.py` | `SearchHyperAgent` — three parallel search sub-agents. |
-| `query_generator.py` | Diverse web-search queries. |
-| `source_evaluator.py` | Credibility and relevance of results. |
-| `gap_identifier.py` | Evidence still missing after a search round. |
 
 ## synthesis/ (Phase 5/6)
 

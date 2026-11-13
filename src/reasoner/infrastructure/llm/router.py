@@ -68,7 +68,12 @@ async def _try_direct_fallback(
 
     Eight vendors each had their own LLM_CALL timeout, so a bad day could keep
     a single role waiting for minutes after its own deadline (PRV-3).
+
+    Caller-side failures (400/422, content policy) would fail identically on
+    every vendor, so they are not re-billed across the chain.
     """
+    if not is_provider_fault(original_error):
+        return None
     try:
         return await asyncio.wait_for(
             _walk_direct_fallback_chain(

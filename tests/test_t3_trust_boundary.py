@@ -477,3 +477,55 @@ class TestContextAnalysisProblemIsSanitised:
     def test_context_item_cap_still_enforced(self):
         with pytest.raises(ValueError):
             ContextAnalysisRequest(problem="ok", context=[{"a": "b"}] * 101)
+
+
+class TestContextImageWidgetTextIsSanitised:
+    """context items, image prompts and widget params reach prompts unsanitised."""
+
+    def test_context_string_injection_rejected_nested(self):
+        with pytest.raises(ValueError):
+            ContextAnalysisRequest(problem="ok", context=[{"a": {"b": ["x", _INJECTION]}}])
+
+    def test_context_clean_values_survive(self):
+        ctx = [{"title": "t", "n": 3, "tags": ["a", "b"]}]
+        assert ContextAnalysisRequest(problem="ok", context=ctx).context == ctx
+
+    def test_image_prompt_injection_rejected(self):
+        from reasoner.api.schemas import GenerateImageRequest
+
+        with pytest.raises(ValueError):
+            GenerateImageRequest(prompt=_INJECTION)
+        assert GenerateImageRequest(prompt="a red fox").prompt == "a red fox"
+
+    def test_widget_params_injection_rejected(self):
+        from reasoner.api.routes.widgets import ExecuteWidgetRequest
+
+        with pytest.raises(ValueError):
+            ExecuteWidgetRequest(params={"q": [_INJECTION]})
+        assert ExecuteWidgetRequest(params={"q": "weather"}).params == {"q": "weather"}
+
+
+class TestLangfuseExportsNoRawUserText:
+    """Traces carry no user_id so they cannot be erased per user: no raw text."""
+
+    @pytest.mark.asyncio
+    async def test_pipeline_events_are_redacted(self):
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock
+
+        from reasoner.infrastructure.observability import langfuse_subscriber as ls
+
+        client = MagicMock()
+        secret = "my-secret-problem"
+        with (
+            patch.object(ls, "_is_langfuse_enabled", True),
+            patch.object(ls, "_langfuse_client", client),
+            patch.object(ls, "_CreateTrace", lambda **kw: kw),
+            patch.object(ls, "_setup_langfuse", lambda: None),
+        ):
+            sub = ls.LangfuseSubscriber()
+            await sub.handle_pipeline_started(
+                SimpleNamespace(aggregate_id="t1", problem=secret, preset="p", method="m")
+            )
+        assert secret not in repr(client.trace.call_args)
+        assert "redacted" in repr(client.trace.call_args)

@@ -32,6 +32,23 @@ def _expire_tenant_dir(agent_dir: Path, agents_root: Path, retention_days: int) 
     return True
 
 
+async def run_reservation_sweep() -> dict:
+    """Release credit reservations of runs that died before settling.
+
+    A reservation older than the pipeline's absolute timeout plus a margin
+    cannot belong to a live run.
+    """
+    from datetime import UTC, datetime, timedelta
+
+    from reasoner.api.dependencies import _get_credit_service
+    from reasoner.core.constants_limits import PIPELINE_ABSOLUTE_TIMEOUT_SECONDS
+
+    cutoff = datetime.now(UTC) - timedelta(seconds=PIPELINE_ABSOLUTE_TIMEOUT_SECONDS + 600)
+    released = await _get_credit_service().release_orphaned_reservations(cutoff)
+    logger.info("Reservation sweep: released=%d", released)
+    return {"released": released}
+
+
 async def run_neuro_maintenance() -> dict:
     """Run neuro lifecycle maintenance: archive hot→warm→cold sessions.
 

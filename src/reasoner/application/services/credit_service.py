@@ -223,6 +223,27 @@ class CreditService:
             return []
         return await self._repository.record_batch(user_id, writes)
 
+    async def release_orphaned_reservations(self, older_than: datetime, limit: int = 100) -> int:
+        """Give back reservations whose run died before settling; returns how many.
+
+        ``true_up_run`` at zero cost writes only ``<ref>:release``, idempotently,
+        so a sweep that races a late settlement moves nothing twice.
+        """
+        released = 0
+        for entry in await self._repository.list_orphaned_reservations(older_than, limit):
+            try:
+                await self.true_up_run(
+                    str(entry.user_id),
+                    reserved_credits=-entry.delta,
+                    cost_usd=0,
+                    reference_id=(entry.reference_id or "").removesuffix(":reserve"),
+                    preset="orphan-sweep",
+                )
+                released += 1
+            except Exception:
+                logger.warning("Orphan release failed: %s", entry.reference_id, exc_info=True)
+        return released
+
 
 __all__ = [
     "CreditService",

@@ -22,7 +22,6 @@ The main Python package containing the Reasoner framework architecture.
 - **`phases.py`**: Backward-compatible shim — all content moved to reasoner.phases package
 - **`pipeline.py`**: backward-compat shim — real module: reasoner.application.pipeline
 - **`presets.py`**: Re-export PRESETS as a dict for backward compatibility with main.py
-- **`pricing.py`**: backward-compat shim — real module: reasoner.domain.pricing
 - **`rate_limiter.py`**: backward-compat shim — real module: reasoner.infrastructure.rate_limiter
 - **`reasoner_verbalized_sampling.py`**: backward-compat shim — real module: reasoner.core.verbalized_sampling
 - **`reasoner_vs_constants.py`**: backward-compat shim — real module: reasoner.core.vs_constants

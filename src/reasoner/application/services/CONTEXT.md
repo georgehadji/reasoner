@@ -24,7 +24,6 @@ Application-specific services for rendering, routing decisions, and context form
 - **`estimate_service.py`**: Cost/duration estimation, shared by the HTTP and MCP adapters.
 - **`event_emission_service.py`**: ── Contextvar for per-run emitter injection ─────────────────────────
 - **`evidence_service.py`**: EvidenceService — epistemic label promotion and provenance tracking.
-- **`feedback_router.py`**: Default routing table: failure_type → RepairStrategy
 - **`gate_service.py`**: HyperGate routing decision, shared by the HTTP and MCP adapters.
 - **`harness_guard.py`**: Mapping of model aliases → training ecosystem (lab).
 - **`health_service.py`**: Memory check

@@ -150,6 +150,8 @@ class TenantManager:
         #                already in flight when the user was erased cannot
         #                re-create their memory when it finishes.
         self._erasing: dict[str, asyncio.Event] = {}
+        # key -> future of the tenant being built (first touch), see get().
+        self._building: dict[str, asyncio.Future] = {}
         self._erased_until: dict[str, float] = {}
         # Cross-worker view of the same fact: marker files under
         # <data_dir>/agents/.erased, read through a short-lived cache.
@@ -253,30 +255,38 @@ class TenantManager:
                 self._last_access[key] = now
                 return self._tenants[key]
 
-            # LRU cap: evict oldest if at capacity
-            if len(self._tenants) >= self.MAX_TENANTS:
-                self._evict_lru_locked()
+            # First touch: one caller builds, concurrent callers for the same
+            # tenant await its future. The build runs outside self._lock so
+            # disk IO for one tenant never blocks lookups of the others.
+            pending = self._building.get(key)
+            if pending is None:
+                pending = self._building[key] = asyncio.get_running_loop().create_future()
+                builder = True
+            else:
+                builder = False
 
+        if not builder:
+            # None means an erasure discarded the build: look up again.
+            return await pending or await self.get(agent_id)
+
+        try:
             data_dir = get_agent_data_dir(self.config, agent_id)
             l1_dir = data_dir / "cache" / "l1"
             l2_dir = data_dir / "cache" / "l2"
 
-            for d in [l1_dir, l2_dir]:
-                d.mkdir(parents=True, exist_ok=True)
-
             # L1Cache/L2Index.__init__ each do a synchronous glob+read of their
-            # tenant's cache dir (_load()); done inline this blocks the whole
-            # event loop -- not just this coroutine -- for every worker
-            # request, for as long as we hold self._lock above. Offload the
-            # construction to a thread so first-touch of a new tenant never
-            # stalls the process.
-            l1, l2, sessions = await asyncio.to_thread(
-                lambda: (
+            # tenant's cache dir (_load()), so construction is offloaded to a
+            # thread: first-touch of a new tenant never stalls the event loop.
+            def _build() -> tuple:
+                for d in (l1_dir, l2_dir):
+                    d.mkdir(parents=True, exist_ok=True)
+                return (
                     L1Cache(l1_dir, self.config.cache),
                     L2Index(l2_dir, self.config.cache),
                     SessionManager(data_dir, SessionConfig()),
                 )
-            )
+
+            l1, l2, sessions = await asyncio.to_thread(_build)
             tenant = {
                 "data_dir": data_dir,
                 "l1": l1,
@@ -286,9 +296,30 @@ class TenantManager:
                 # of it for why.
                 "index_lock": asyncio.Lock(),
             }
-            self._tenants[key] = tenant
-            self._last_access[key] = now
-            return tenant
+            async with self._lock:
+                # An erasure that began during the build must not see this
+                # tenant resurrected from files it is deleting.
+                if self._erasing_event(key) is None:
+                    if len(self._tenants) >= self.MAX_TENANTS:
+                        self._evict_lru_locked()
+                    self._tenants[key] = tenant
+                    self._last_access[key] = time.monotonic()
+                    erased = False
+                else:
+                    erased = True
+        except BaseException as exc:
+            self._building.pop(key, None)
+            pending.set_exception(
+                exc if isinstance(exc, Exception) else RuntimeError("tenant build cancelled")
+            )
+            pending.exception()  # mark retrieved when nobody else awaits
+            raise
+        self._building.pop(key, None)
+        if erased:
+            pending.set_result(None)
+            return await self.get(agent_id)
+        pending.set_result(tenant)
+        return tenant
 
     def _erasing_event(self, key: str) -> asyncio.Event | None:
         for prefix, event in self._erasing.items():

@@ -41,7 +41,6 @@ folders:
 | `parsing.py` | `core/parsing.py` |
 | `phases.py` | `phases/_shared.py` and friends |
 | `pipeline.py` | `application/pipeline.py` |
-| `pricing.py` | `domain/pricing.py` |
 | `rate_limiter.py` | `infrastructure/rate_limiter.py` |
 | `renderer.py` | `infrastructure/renderer.py`, itself a shim to `application/services/renderers` |
 | `sanitization.py` | `core/sanitization.py` |
