@@ -13,7 +13,6 @@ folders:
 
 | File | What it covers |
 |------|----------------|
-| `ARCHITECTURE_MINDMAP.md` | Full architecture map. Date and counts are auto-patched post-commit by `scripts/update_mindmap_meta.py`. |
 | `CODEBASE_MINDMAP.md` | Post-refactor codebase layout (v3.0). |
 | `ENVIRONMENT.md` | Every environment variable the app reads. |
 | `DEPLOY_AUDIT_2_3.md` | Deploy runbook for audit 2 and 3: Alembic revisions, backfill scripts, history layout migration, shared `data_dir`, what to announce. |
@@ -24,7 +23,6 @@ folders:
 | `VS.md` | Verbalized Sampling architecture. |
 | `prompting.md` | Prompting guide with per-method examples. |
 | `DESIGN.md`, `Color Palette.txt`, `Temperature Values.txt` | Design system, palette, recommended per-phase temperatures. |
-| `SETUP_MINDMAP.md` | Setup walkthrough. |
 
 ## adr/ — architecture decision records
 
@@ -69,6 +67,8 @@ folders:
 | `plans/ensemble-diversity-measurement.md` | Its build plan (D0–D8). D0 (fix Delphi expert routing) is independently shippable; the rest builds measured pairwise divergence behind `RoutingConstraintPort`, shipped soft as observability. |
 | `AUDIT_REPORT.md`, `architecture-audit-2026-06-02.md`, `architecture-audit-finale-2026-06-02.md` | Earlier audits. |
 | `bug_hunt_report.md` | Precision bug hunt. |
+
+`audits/` also holds the one-off root reports moved there on 2026-11-13 (`ARCH_SCORE_9.5_PLAN.md`, `CI_FIX_PLAN.md`, `SSOT_FIX_PLAN.md`, `bug_hunt_report.md`, the two `ARCH*AUDIT*V2*` reports, and others). `research/` holds third-party design notes (`DESIGN-CURSOR.md`, `DESIGN-EXPO.md`, `DESIGN-HASHICORP.md`, `BACKGROUND-FX.md`, `HUMANIZER.md`); `spec/` and `tokens.css` are binding, these are not.
 
 ## plans/ — implementation plans (historical intent)
 
