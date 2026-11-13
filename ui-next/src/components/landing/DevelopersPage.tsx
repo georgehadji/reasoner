@@ -149,12 +149,7 @@ export default function DevelopersPage() {
             know whether this is callable and what comes back, and §1
             answers both in the first screen after it. */}
         <header className="mx-auto w-full max-w-[var(--width-wide)] px-[var(--gutter)] pb-[var(--section-y)] pt-[var(--space-48)]">
-          <div className="grid gap-[var(--space-6)] lg:grid-cols-[9rem_minmax(0,1fr)] lg:gap-[var(--space-12)]">
-            <div>
-              <p className="mt-[var(--space-1)] font-sans text-[length:var(--text-2xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
-                Developers
-              </p>
-            </div>
+          <div>
             <div className="min-w-0">
               <h1 className="max-w-[20ch] text-balance font-serif text-[length:var(--text-4xl)] font-normal leading-[var(--lh-display)] sm:text-[length:var(--text-6xl)] tracking-[var(--tracking-tight)] text-[var(--text)]">
                 An answer your code can act on.
@@ -173,7 +168,7 @@ export default function DevelopersPage() {
         {/* ── §1 MCP ────────────────────────────────────────────
             Leads because it is the shortest path from nothing to a
             working call: a config block, no client code. */}
-        <Section id="mcp" marker="§1" name="MCP">
+        <Section id="mcp">
           <Heading>If your host speaks MCP, there is no client to write.</Heading>
           <Lede>
             Reasoner ships a Model Context Protocol server. Claude Desktop, Claude Code, and most
@@ -217,7 +212,7 @@ export default function DevelopersPage() {
         </Section>
 
         {/* ── §2 HTTP ───────────────────────────────────────────── */}
-        <Section id="http" marker="§2" name="HTTP">
+        <Section id="http">
           <Heading>Or one POST, and one JSON body back.</Heading>
           <Lede>
             The HTTP surface is the same pipeline through a different door.{' '}
@@ -256,7 +251,7 @@ export default function DevelopersPage() {
             surface and reasoner.headless.ask() — and headless goes
             through the same parser, so a flag documented for one is
             true of the other. */}
-        <Section id="cli" marker="§3" name="Command line">
+        <Section id="cli">
           <Heading>Or no network at all.</Heading>
           <Lede>
             The same pipeline runs from a shell. A scheduled job, a CI step, or a batch over a
@@ -289,7 +284,7 @@ export default function DevelopersPage() {
         </Section>
 
         {/* ── §4 Discovery ──────────────────────────────────────── */}
-        <Section id="discovery" marker="§4" name="Discovery">
+        <Section id="discovery">
           <Heading>Fetch the tool definition rather than copying one.</Heading>
           <Lede>
             A hand-copied tool schema is a schema that will drift. Ours is generated from the same
@@ -320,7 +315,7 @@ export default function DevelopersPage() {
         </Section>
 
         {/* ── §5 Before you spend ───────────────────────────────── */}
-        <Section id="preview" marker="§5" name="Preview">
+        <Section id="preview">
           <Heading>Two free calls before the one that bills.</Heading>
           <Lede>
             A reasoning run costs real money and takes real time, so both facts are available
@@ -348,7 +343,7 @@ export default function DevelopersPage() {
         </Section>
 
         {/* ── §6 Billing and retries ────────────────────────────── */}
-        <Section id="metering" marker="§6" name="Metering">
+        <Section id="metering">
           <Heading>Same billing through every door.</Heading>
           <Lede>
             MCP and HTTP are two adapters onto one application layer. A run started from Claude
@@ -380,7 +375,7 @@ export default function DevelopersPage() {
         </Section>
 
         {/* ── §7 Keys ───────────────────────────────────────────── */}
-        <Section id="keys" marker="§7" name="Keys">
+        <Section id="keys">
           <Heading>One key per agent, scoped down.</Heading>
           <Lede>
             Keys are minted in settings, shown once, and carry scopes. A default key runs
@@ -408,8 +403,7 @@ export default function DevelopersPage() {
 
         {/* ── Close ─────────────────────────────────────────────── */}
         <section className="mx-auto w-full max-w-[var(--width-wide)] px-[var(--gutter)] py-[var(--section-y)]">
-          <div className="grid gap-[var(--space-6)] lg:grid-cols-[9rem_minmax(0,1fr)] lg:gap-[var(--space-12)]">
-            <div aria-hidden="true" />
+          <div>
             <div className="min-w-0">
               <Heading>Delegate the calls you would not trust one model with.</Heading>
               <Lede>

@@ -313,12 +313,9 @@ export default function LandingPage() {
         </Section>
 
         {/* ── Writing ────────────────────────────────────────────
-            Runs without a marginal column, like Images. The nine-step
-            list IS the label: a 9rem track repeating the word "writing"
-            beside an ordered sequence of named phases spends a ninth of
-            the measure saying what the reader can already see. The two
-            sections that keep their markers are the ones whose content
-            does not announce itself.
+            The nine-step list IS the label: nothing above the heading
+            repeats the word "writing" beside an ordered sequence of named
+            phases the reader can already see.
 
             The one section on this page written to a reader with money
             at stake, because this is the one capability people are paid
@@ -459,10 +456,8 @@ export default function LandingPage() {
         </Section>
 
         {/* ── Images ─────────────────────────────────────────────
-            Runs without a marginal column. The four images ARE the
-            argument here, and the 9rem label track was costing them a
-            ninth of the measure to repeat a word the heading already
-            says. 2x2 rather than 4-up: at this width four-across shrinks
+            The four images ARE the argument here and take the full
+            measure. 2x2 rather than 4-up: at this width four-across shrinks
             each plate below the size where a house style actually reads,
             which is the entire point of showing four.
 
@@ -479,19 +474,9 @@ export default function LandingPage() {
             and turns a claim about how the run is composed into a spec
             sheet a competitor can shop against. */}
         <Section id="images">
-          {/* The name of the capability, since nothing else here says it.
-              Dropping the marginal column bought the plates the full measure
-              but cost the section its label, and a reader arriving at four
-              photographs under a heading about labs has been shown the
-              product without being told what it is. Same 8pt uppercase spec
-              the marginal column uses, so it is the page's own label idiom
-              moved inline rather than a second one invented for this
-              section. */}
-          <p className="font-sans text-[length:var(--text-2xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
-            Image generation
-          </p>
-
-          <div className="mt-[var(--space-6)] grid gap-x-[var(--space-12)] gap-y-[var(--space-6)] lg:grid-cols-2 lg:items-end">
+          {/* No label above the heading: the lede names the capability
+              ("reference images, five aspect ratios") in its second line. */}
+          <div className="grid gap-x-[var(--space-12)] gap-y-[var(--space-6)] lg:grid-cols-2 lg:items-end">
             {/* One step up from the shared Heading (34pt): this section leads
                 the page's exhibits and the display size is what makes the
                 two-column split read as a masthead rather than as a caption. */}
@@ -630,11 +615,8 @@ export default function LandingPage() {
         </Section>
 
         {/* ── Code ──────────────────────────────────────────────
-            Was three sentences and a §2 marker. The marker went with
-            the marginal column: Ideation above it dropped its own in
-            an earlier pass, so a lone §2 was numbering a sequence that
-            no longer existed, and the exhibit wanted the 9rem back.
-            Labelled inline instead, the same way Images is.
+            Was three sentences and a §2 marker. Markers and labels are
+            gone site-wide; the heading names the section.
 
             THE WEDGE, and the only reason this section exists. Every
             coding assistant on the market ships code that the model
@@ -683,13 +665,7 @@ export default function LandingPage() {
             fall back to letting an LLM narrate an execution it did not
             perform (flows/services.py:26-43). */}
         <Section id="code">
-          <p className="font-sans text-[length:var(--text-2xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
-            Code generation
-          </p>
-
-          <div className="mt-[var(--space-6)]">
-            <Heading>Written by one lab. Attacked by another.</Heading>
-          </div>
+          <Heading>Written by one lab. Attacked by another.</Heading>
 
           {/* "Most assistants", not "every assistant". The claim is about the
               default arrangement, which is fair and checkable; an absolute
@@ -751,7 +727,7 @@ export default function LandingPage() {
             Install, the six tool names, idempotency and status codes
             belong at /developers and /docs/mcp. This section makes the
             case and hands off. */}
-        <Section id="agents" marker="§4" name="Agents">
+        <Section id="agents">
           <Heading>Your agent does not have to take a model&rsquo;s word for it.</Heading>
           <Lede>
             Ask one model and you get prose, plus the job of deciding how much of it to believe.
@@ -834,7 +810,7 @@ export default function LandingPage() {
         </Section>
 
         {/* ── Terms ─────────────────────────────────────────────── */}
-        <Section name="Terms">
+        <Section>
           <Heading>Where your data sits.</Heading>
           <dl className="mt-[var(--space-8)] grid gap-x-[var(--space-8)] gap-y-[var(--space-5)] sm:grid-cols-2">
             {TERMS.map(({ term, detail }) => (
@@ -872,8 +848,7 @@ export default function LandingPage() {
 
         {/* ── Close ─────────────────────────────────────────────── */}
         <section className="mx-auto w-full max-w-[var(--width-wide)] px-[var(--gutter)] py-[var(--section-y)]">
-          <div className="grid gap-[var(--space-6)] lg:grid-cols-[9rem_minmax(0,1fr)] lg:gap-[var(--space-12)]">
-            <div aria-hidden="true" />
+          <div>
             <div className="min-w-0">
               <Heading>Ask it something you would check by hand.</Heading>
               <Lede>

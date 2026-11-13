@@ -12,28 +12,17 @@ import type { ReactNode } from 'react';
  */
 
 /**
- * Shares the run record's marginal-label idiom so the pages read as one
- * document. Sections are separated by the §n marker and --section-y
- * whitespace alone — no rule between them. A line reads as a wall between
- * unrelated blocks; a page of these is one argument in parts, and the
- * marker's number is what says "new part," not a border.
+ * Sections are separated by --section-y whitespace alone — no rule between
+ * them, and no label above the heading. A line reads as a wall between
+ * unrelated blocks, and a label repeats what the heading already says; the
+ * heading is what says "new part."
  */
 export function Section({
   id,
-  marker,
-  name,
   tone,
   children,
 }: {
   id?: string;
-  /**
-   * Omit both to drop the marginal column and run the content across the
-   * full measure. The band does that: it is already set apart by its own
-   * ground, so a marker labelling it is the second device doing the first
-   * device's job, and the four stages would rather have the 9rem.
-   */
-  marker?: string;
-  name?: string;
   /**
    * `invert` runs the section against the page's ground, dark on the ivory
    * theme and ivory on the dark one, and takes it full-bleed. A band that
@@ -44,34 +33,12 @@ export function Section({
   tone?: 'invert';
   children: ReactNode;
 }) {
-  const labelled = marker !== undefined || name !== undefined;
-
   const inner = (
     <section
       id={id}
       className="mx-auto w-full max-w-[var(--width-wide)] scroll-mt-[var(--space-20)] px-[var(--gutter)] py-[var(--section-y)]"
     >
-      <div
-        className={
-          labelled
-            ? 'grid gap-[var(--space-6)] lg:grid-cols-[9rem_minmax(0,1fr)] lg:gap-[var(--space-12)]'
-            : ''
-        }
-      >
-        {labelled ? (
-          /* Parks alongside the section it labels, so the marker stays
-             visible for as long as the section it names is. */
-          <div className="lg:sticky lg:top-[var(--space-24)] lg:self-start">
-            {marker ? (
-              <p className="nums-tabular font-mono text-[length:var(--text-2xs)] text-[var(--accent)]">{marker}</p>
-            ) : null}
-            <p className="mt-[var(--space-1)] font-sans text-[length:var(--text-2xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
-              {name}
-            </p>
-          </div>
-        ) : null}
-        <div className="min-w-0">{children}</div>
-      </div>
+      <div className="min-w-0">{children}</div>
     </section>
   );
 

@@ -90,16 +90,10 @@ export default function SecurityPage() {
 
       <main className="flex-1">
         {/* ── Masthead ───────────────────────────────────────────
-            Same marginal-marker idiom as /about, /capabilities and
-            /pricing: a left-aligned label column, not a centred hero
-            with an icon plate. */}
+            Left-aligned, not a centred hero with an icon plate, and no
+            label above the h1. */}
         <header className="mx-auto w-full max-w-[var(--width-content)] px-[var(--gutter)] pb-[var(--space-16)] pt-[var(--space-48)]">
-          <div className="grid gap-[var(--space-6)] lg:grid-cols-[9rem_minmax(0,1fr)] lg:gap-[var(--space-12)]">
-            <div>
-              <p className="mt-[var(--space-1)] font-sans text-[length:var(--text-xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
-                Security
-              </p>
-            </div>
+          <div>
             <div className="min-w-0">
               <h1 className="font-serif text-[length:var(--text-4xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)] md:text-[length:var(--text-5xl)]">
                 Security &amp; Trust

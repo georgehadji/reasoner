@@ -42,15 +42,9 @@ export default function FAQPage() {
       <SiteHeader />
       <main id="main-content" className="flex-1">
         {/* ── Masthead ───────────────────────────────────────────
-            Same marginal-marker idiom as /about, /capabilities,
-            /pricing and /security: a left-aligned label column. */}
+            Left-aligned, no label above the h1; the heading names the page. */}
         <header className="mx-auto w-full max-w-[var(--width-content)] px-[var(--gutter)] pb-[var(--space-12)] pt-[var(--space-48)]">
-          <div className="grid gap-[var(--space-6)] lg:grid-cols-[9rem_minmax(0,1fr)] lg:gap-[var(--space-12)]">
-            <div>
-              <p className="mt-[var(--space-1)] font-sans text-[length:var(--text-xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
-                FAQ
-              </p>
-            </div>
+          <div>
             <div className="min-w-0">
               <h1 className="font-serif text-[length:var(--text-4xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)]">
                 Frequently asked questions.

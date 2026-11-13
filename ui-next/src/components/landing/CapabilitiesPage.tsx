@@ -128,12 +128,7 @@ export default function CapabilitiesPage() {
             straight into a §. The job of this block is to say what kind
             of document follows, and then get out of the way of §1. */}
         <header className="mx-auto w-full max-w-[var(--width-wide)] px-[var(--gutter)] pb-[var(--section-y)] pt-[var(--space-48)]">
-          <div className="grid gap-[var(--space-6)] lg:grid-cols-[9rem_minmax(0,1fr)] lg:gap-[var(--space-12)]">
-            <div>
-              <p className="mt-[var(--space-1)] font-sans text-[length:var(--text-2xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
-                Capabilities
-              </p>
-            </div>
+          <div>
             <div className="min-w-0">
               <h1 className="max-w-[20ch] text-balance font-serif text-[length:var(--text-4xl)] font-normal leading-[var(--lh-display)] sm:text-[length:var(--text-6xl)] tracking-[var(--tracking-tight)] text-[var(--text)]">
                 Eight mechanisms, and what holds each one.
@@ -152,7 +147,7 @@ export default function CapabilitiesPage() {
         {/* ── §1 Hallucination ──────────────────────────────────
             Leads the page because it is the only deterministic
             guarantee on it. */}
-        <Section id="hallucination" marker="§1" name="Hallucination">
+        <Section id="hallucination">
           <Heading>A model cannot vouch for itself.</Heading>
           <Lede>
             Most products ask a model whether it is confident and print the answer. Reasoner does
@@ -190,7 +185,7 @@ export default function CapabilitiesPage() {
         </Section>
 
         {/* ── §2 Bias ───────────────────────────────────────────── */}
-        <Section id="bias" marker="§2" name="Bias">
+        <Section id="bias">
           <Heading>Scored by a model from a different bloc.</Heading>
           <Lede>
             Cross-lab is not enough. Two labs in the same country share an ideological prior, so
@@ -232,7 +227,7 @@ export default function CapabilitiesPage() {
             infrastructure/llm/image_generation.py (fallback
             hand-off, policy rewrite, retry). The family call is the
             only judgement here that a model makes. */}
-        <Section id="image-making" marker="§3" name="Image making">
+        <Section id="image-making">
           <Heading>No house model, and no favourite lab.</Heading>
           <Lede>
             An image prompt is read for what it is asking for — a logo, a photograph, a poster, an
@@ -279,7 +274,7 @@ export default function CapabilitiesPage() {
         </Section>
 
         {/* ── §4 Propagation ────────────────────────────────────── */}
-        <Section id="propagation" marker="§4" name="Propagation">
+        <Section id="propagation">
           <Heading>An idea does not get to spread itself here.</Heading>
           <Lede>
             Systems that pass work between models have a failure mode a single model does not.
@@ -316,7 +311,7 @@ export default function CapabilitiesPage() {
             comment and tests/test_site_capabilities_sync.py. Do not add a
             paragraph here without adding its detector to
             scripts/update_mindmap_meta.py first. */}
-        <Section id="sycophancy" marker="§5" name="Sycophancy">
+        <Section id="sycophancy">
           <Heading>It is not built to be agreed with.</Heading>
           <Lede>
             Assistants trained on human approval learn that agreement scores well. Across five
@@ -384,7 +379,7 @@ export default function CapabilitiesPage() {
             publication voice matching. style_brief is populated by tests
             only, there is no API field for it, and §5 on this page says a
             tone control is not something we intend to sell. */}
-        <Section id="voice" marker="§6" name="Voice">
+        <Section id="voice">
           <Heading>A model cannot hear how it sounds.</Heading>
           <Lede>
             Machine prose has a fingerprint, and the model producing it is the last thing able to
@@ -437,7 +432,7 @@ export default function CapabilitiesPage() {
         </Section>
 
         {/* ── §7 Research ───────────────────────────────────────── */}
-        <Section id="research" marker="§7" name="Research">
+        <Section id="research">
           <Heading>It searches like a researcher, not a search box.</Heading>
           <Lede>
             A single query returns what the query deserved. Reasoner runs an agentic loop that
@@ -482,7 +477,7 @@ export default function CapabilitiesPage() {
         </Section>
 
         {/* ── §8 Methods ────────────────────────────────────────── */}
-        <Section id="methods" marker="§8" name="Methods">
+        <Section id="methods">
           <Heading>{CAPABILITIES.methods} methods. Not {CAPABILITIES.methods} prompts.</Heading>
           <Lede>
             Named reasoning techniques are usually sold as instructions bolted onto one chat
@@ -515,8 +510,7 @@ export default function CapabilitiesPage() {
 
         {/* ── Close ─────────────────────────────────────────────── */}
         <section className="mx-auto w-full max-w-[var(--width-wide)] px-[var(--gutter)] py-[var(--section-y)]">
-          <div className="grid gap-[var(--space-6)] lg:grid-cols-[9rem_minmax(0,1fr)] lg:gap-[var(--space-12)]">
-            <div aria-hidden="true" />
+          <div>
             <div className="min-w-0">
               <Heading>Ask it something you would check by hand.</Heading>
               <Lede>

@@ -26,8 +26,8 @@ import { SITE } from '@/lib/site';
  * fails when a marketing number is hand-edited, which is checkable, rather
  * than a founding scene, which is not. Same rule as everything else here.
  *
- * Shares the marginal-§n idiom and the Section/Heading/Lede/Body helpers
- * with LandingPage so the two read as one document. The helpers are copied
+ * Shares the Section/Heading/Lede/Body helpers with LandingPage so the two
+ * read as one document. The helpers are copied
  * rather than imported: importing them would pull the whole landing module
  * into this route's bundle for four six-line functions.
  */
@@ -36,13 +36,9 @@ import { SITE } from '@/lib/site';
 
 function Section({
   id,
-  marker,
-  name,
   children,
 }: {
   id?: string;
-  marker: string;
-  name: string;
   children: ReactNode;
 }) {
   return (
@@ -50,17 +46,7 @@ function Section({
       id={id}
       className="mx-auto w-full max-w-[var(--width-wide)] scroll-mt-[var(--space-20)] px-[var(--gutter)] py-[var(--section-y)]"
     >
-      <div className="grid gap-[var(--space-6)] lg:grid-cols-[9rem_minmax(0,1fr)] lg:gap-[var(--space-12)]">
-        <div className="lg:sticky lg:top-[var(--space-24)] lg:self-start">
-          <p className="nums-tabular font-mono text-[length:var(--text-xs)] text-[var(--accent)]">
-            {marker}
-          </p>
-          <p className="mt-[var(--space-1)] font-sans text-[length:var(--text-xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
-            {name}
-          </p>
-        </div>
-        <div className="min-w-0">{children}</div>
-      </div>
+      <div className="min-w-0">{children}</div>
     </section>
   );
 }
@@ -191,7 +177,7 @@ export default function AboutPage() {
         </header>
 
         {/* ── §1 ─────────────────────────────────────────────── */}
-        <Section id="problem" marker="§1" name="The problem">
+        <Section id="problem">
           <Heading>It stopped being possible to unsee.</Heading>
           <Lede>
             Ask a model something hard and it answers in the same calm register every time. The
@@ -215,7 +201,7 @@ export default function AboutPage() {
         </Section>
 
         {/* ── §2 ─────────────────────────────────────────────── */}
-        <Section id="origin" marker="§2" name="Where it started">
+        <Section id="origin">
           <Heading>We did not trust ourselves either.</Heading>
           <Lede>
             The honest version of this section is not a founding anecdote. It is a test file.
@@ -239,7 +225,7 @@ export default function AboutPage() {
         </Section>
 
         {/* ── §3 ─────────────────────────────────────────────── */}
-        <Section id="mechanism" marker="§3" name="What it does">
+        <Section id="mechanism">
           <Heading>Disagreement is the product, not a defect to smooth over.</Heading>
           <Lede>
             Most systems treat models arguing as noise to resolve before it reaches you. Here it is
@@ -303,7 +289,7 @@ export default function AboutPage() {
         </Section>
 
         {/* ── §4 ─────────────────────────────────────────────── */}
-        <Section id="commitments" marker="§4" name="Commitments">
+        <Section id="commitments">
           <Heading>Every one of these costs something.</Heading>
           <Lede>
             A value you can hold for free is not a value, it is a slogan. These four are in the
@@ -328,7 +314,7 @@ export default function AboutPage() {
         </Section>
 
         {/* ── §5 ─────────────────────────────────────────────── */}
-        <Section id="unfinished" marker="§5" name="What we owe you">
+        <Section id="unfinished">
           <Heading>The part that is not finished.</Heading>
 
           <Claim tone="hypothesis">
@@ -348,7 +334,7 @@ export default function AboutPage() {
         </Section>
 
         {/* ── §6 ─────────────────────────────────────────────── */}
-        <Section id="who" marker="§6" name="Who">
+        <Section id="who">
           <Heading>We read the paper before we write the code.</Heading>
           <Lede>
             Before the mind-virus defences existed in code, they existed as a research note: the
@@ -370,7 +356,7 @@ export default function AboutPage() {
         </Section>
 
         {/* ── Close ──────────────────────────────────────────── */}
-        <Section id="start" marker="§7" name="Start">
+        <Section id="start">
           <Heading>Ask it something you would check by hand.</Heading>
           <Lede>
             Not a trivia question &mdash; the kind where being confidently wrong would actually cost
