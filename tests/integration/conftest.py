@@ -71,7 +71,12 @@ def test_timeout() -> int:
 async def csrf_token(base_url: str) -> str:
     """Fetch a fresh CSRF token from the running backend (session-scoped)."""
     async with httpx.AsyncClient(timeout=httpx.Timeout(10)) as client:
-        r = await client.post(f"{base_url}/api/csrf")
+        try:
+            r = await client.post(f"{base_url}/api/csrf")
+        except httpx.ConnectError:
+            # integration-live starts no server; skip like test_load.py does
+            # rather than error every case.
+            pytest.skip(f"No Reasoner backend at {base_url} (set REASONER_TEST_URL)")
         assert r.status_code == 200, f"CSRF endpoint returned {r.status_code}: {r.text}"
         return r.json()["token"]
 
