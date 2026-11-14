@@ -99,7 +99,7 @@ export function DocMarkdown({ children }: { children: string }) {
             </pre>
           ),
           table: ({ children: c }) => (
-            <div role="region" aria-label="Table" tabIndex={0} data-ui data-reveal className={FRAME}>
+            <div tabIndex={0} data-ui data-reveal className={FRAME}>
               <table className="w-full border-collapse text-left text-[length:var(--site-small)]">{c}</table>
             </div>
           ),

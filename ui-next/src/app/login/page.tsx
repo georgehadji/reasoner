@@ -162,7 +162,7 @@ export default function LoginPage() {
     );
 
   return (
-    <div className="flex min-h-dvh items-center justify-center px-[var(--gutter)] py-[var(--space-12)]">
+    <main id="main-content" className="flex min-h-dvh items-center justify-center px-[var(--gutter)] py-[var(--space-12)]">
       <div className="flex w-full max-w-[var(--width-form)] flex-col gap-[var(--space-5)] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-[var(--space-8)] shadow-[var(--shadow)]">
         <h1 className="font-display text-[length:var(--text-2xl)] font-bold text-[var(--text)]">Sign In</h1>
 
@@ -311,6 +311,6 @@ export default function LoginPage() {
           </span>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

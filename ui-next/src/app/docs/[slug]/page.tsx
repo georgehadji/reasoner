@@ -93,7 +93,7 @@ export default async function DocPage({ params }: DocParams) {
         ]}
       />
       <div className="mx-auto grid w-full max-w-[var(--site-max)] gap-[var(--space-12)] px-[var(--site-margin)] pb-[var(--space-24)] pt-[var(--space-32)] lg:grid-cols-12">
-        <aside className="hidden lg:col-span-3 lg:block">
+        <aside aria-label="Guides" className="hidden lg:col-span-3 lg:block">
           <div className="sticky top-[var(--site-sticky-top)]">
             <DocsSidebar activeSlug={doc.slug} />
           </div>
@@ -157,7 +157,7 @@ export default async function DocPage({ params }: DocParams) {
           )}
         </main>
 
-        <aside className="hidden xl:col-span-3 xl:block">
+        <aside aria-label="On this page" className="hidden xl:col-span-3 xl:block">
           <div className="sticky top-[var(--site-sticky-top)]">
             <OnThisPage sections={sections} id="on-this-page" />
           </div>

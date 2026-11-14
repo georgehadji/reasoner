@@ -263,7 +263,7 @@ export default function RunRecord() {
           </div>
           <figure data-ui data-reveal className={`${FIGURE} flex flex-col bg-[var(--site-surface)] lg:col-span-6 lg:col-start-7`}>
             <figcaption className={CAP}>The same run, over the API</figcaption>
-            <pre className="flex-1 overflow-x-auto px-[var(--space-4)] py-[var(--space-4)] font-mono leading-[var(--site-lh-body)]">
+            <pre tabIndex={0} className="flex-1 overflow-x-auto px-[var(--space-4)] py-[var(--space-4)] font-mono leading-[var(--site-lh-body)]">
               <code>{`curl https://reasoner.app/api/agent/run/sync \\
   -H "Authorization: Bearer $REASONER_API_KEY" \\
   -H "Content-Type: application/json" \\

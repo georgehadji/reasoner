@@ -311,7 +311,7 @@ export default function PricingPage() {
             <figcaption className={CAP}>
               <code className="font-mono">GET /api/credits/pricing</code>
             </figcaption>
-            <pre className="flex-1 overflow-x-auto px-[var(--space-4)] py-[var(--space-4)] font-mono leading-[var(--site-lh-body)]">
+            <pre tabIndex={0} className="flex-1 overflow-x-auto px-[var(--space-4)] py-[var(--space-4)] font-mono leading-[var(--site-lh-body)]">
               <code>{PRICING_RESPONSE}</code>
             </pre>
           </figure>

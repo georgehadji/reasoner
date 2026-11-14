@@ -47,10 +47,10 @@ export default function SecurityPage() {
           headline={
             <h1 className="font-display text-[length:var(--site-display)] leading-[var(--site-lh-display)]">
               <span className="site-line">
-                <span>Security, as</span>
+                <span>Security,</span>
               </span>
               <span className="site-line">
-                <span>it stands.</span>
+                <span>as it stands.</span>
               </span>
             </h1>
           }
@@ -138,7 +138,7 @@ export default function SecurityPage() {
               <figcaption className="border-b border-[var(--site-line)] px-[var(--space-4)] py-[var(--space-3)] font-semibold">
                 docker-compose.yml
               </figcaption>
-              <pre className="overflow-x-auto px-[var(--space-4)] py-[var(--space-4)] font-mono leading-[var(--site-lh-body)]">
+              <pre tabIndex={0} className="overflow-x-auto px-[var(--space-4)] py-[var(--space-4)] font-mono leading-[var(--site-lh-body)]">
                 <code>
                   <span className="text-[var(--site-muted)]">$ </span>docker compose up -d{'\n\n'}
                   {COMPOSE_SERVICES.map(([name, image]) => (
@@ -200,7 +200,7 @@ export default function SecurityPage() {
                 /.well-known/security.txt
               </a>
             </figcaption>
-            <pre className="flex-1 overflow-x-auto px-[var(--space-4)] py-[var(--space-4)] font-mono leading-[var(--site-lh-body)]">
+            <pre tabIndex={0} className="flex-1 overflow-x-auto px-[var(--space-4)] py-[var(--space-4)] font-mono leading-[var(--site-lh-body)]">
               <code>{securityTxtLines().join('\n')}</code>
             </pre>
           </figure>

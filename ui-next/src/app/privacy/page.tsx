@@ -176,7 +176,7 @@ export default function PrivacyPage() {
               <figcaption className={CAP}>
                 <code className="font-mono">GET /api/account/export</code>
               </figcaption>
-              <pre className={PRE}>
+              <pre tabIndex={0} className={PRE}>
                 <code>
                   {'{\n'}
                   {USER_DATA_STORES.map((s, i) => (
@@ -195,7 +195,7 @@ export default function PrivacyPage() {
                 <code className="font-mono">DELETE /api/user/data</code>
                 <span className="font-normal text-[var(--site-muted)]">, the receipt</span>
               </figcaption>
-              <pre className={PRE}>
+              <pre tabIndex={0} className={PRE}>
                 <code>
                   {'{\n  "status": "completed",\n  "erased": [\n'}
                   {ERASED_BY_DATA_DELETE.map((name, i) => (

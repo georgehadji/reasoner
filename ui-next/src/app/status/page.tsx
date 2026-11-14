@@ -165,7 +165,7 @@ export default function StatusPage() {
               <figcaption className={CAP}>
                 <code className="font-mono">GET /api/health</code>, the public shape
               </figcaption>
-              <pre className="overflow-x-auto px-[var(--space-4)] py-[var(--space-4)] font-mono leading-[var(--site-lh-body)]">
+              <pre tabIndex={0} className="overflow-x-auto px-[var(--space-4)] py-[var(--space-4)] font-mono leading-[var(--site-lh-body)]">
                 <code>{RESPONSE}</code>
               </pre>
             </figure>

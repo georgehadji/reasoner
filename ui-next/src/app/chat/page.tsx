@@ -1290,6 +1290,7 @@ export default function ChatPage() {
         <EmailVerifyBanner />
         <div
           id="main-content"
+          role="main"
           ref={scrollContainerRef}
           className="relative flex-1 overflow-y-auto scroll-smooth scrollbar-gray"
           style={{
