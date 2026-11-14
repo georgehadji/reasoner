@@ -1,5 +1,6 @@
 /**
- * Credit figures as the backend defines them, for the pricing page.
+ * Credit figures as the backend defines them, for the pricing, signup, FAQ
+ * and about pages, the credit calculator and the dashboard.
  *
  * CREDITS_PER_USD and the monthly allowances mirror
  * src/reasoner/domain/credits.py (CREDITS_PER_USD, TIER_MONTHLY_CREDITS),

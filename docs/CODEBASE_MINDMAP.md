@@ -420,7 +420,6 @@ Problem Input
      ├─ <Composer> (input + presets)
      └─ <Modals>
         ├─ <ShortcutModal>
-        ├─ <SecurityModal>
         ├─ <UpgradeModal>
         └─ <NeuroPanel>
 ```
