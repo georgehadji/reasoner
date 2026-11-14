@@ -5,12 +5,16 @@ export async function GET() {
   try {
     const apiBase = validateUpstreamUrl(getApiBaseUrl());
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000);
-    const resp = await fetch(`${apiBase}/`, {
+    // The backend's first Postgres probe may take up to 5s to open its pool.
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+    // /api/health, not the root: /status reads `status` and `checks`, which the
+    // root (a link list) never had, so the page read "Service disruption" while
+    // the backend was up. It answers 200 even when unhealthy, so callers that
+    // only test `resp.ok` for liveness read it as before.
+    const resp = await fetch(`${apiBase}/api/health`, {
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
-    // The root endpoint is always lightweight — any 2xx-5xx means the backend is alive.
     // OPS-9: flag an undeclared proxy chain so monitoring sees it.
     const headers = proxyTopologyUndeclared() ? { 'X-Proxy-Topology': 'undeclared' } : undefined;
     return new Response(resp.body, { status: resp.status, headers });

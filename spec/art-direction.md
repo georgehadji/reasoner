@@ -158,6 +158,14 @@ control, the pinned pilot fragment changing state. All of it collapses under
   source and is replaced by the licence's one restriction (no hosted resale); the metadata
   promised billing and liability sections that do not exist. Jurisdiction and effective date
   are `[INPUT REQUIRED]`. Inspector: 0 FAIL.
+- /status rebuilt (2026-11-14): "Checked as you load it." beside the live `GET /api/health`
+  panel, which lists the six checks in every state (checking, answered, no answer) so it keeps
+  its height. Sections say what each check really tests (`lib/status-checks.ts`, mirrored from
+  `health_service.py`), how the one-word verdict is chosen, the public response shape, and
+  what the page does not publish. Corrected: the `/api/health` proxy asked the backend root,
+  which has no `status` field, so the page read "Service disruption" while the API was up; it
+  now asks `/api/health` (route test added). Also said plainly: the cache check always reports
+  OK and the billing check only confirms a Stripe key is set. Inspector: 0 FAIL.
 - Site chrome simplified (2026-11-14, Maeda's laws of simplicity): the header lost its theme
   toggle (a `.site` page is charcoal in both schemes; `/settings` still passes `themeToggle`),
   its "Secure" badge (/security makes that case), and its glass and shadow when scrolled (now a
