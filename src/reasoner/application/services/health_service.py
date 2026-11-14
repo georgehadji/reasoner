@@ -8,7 +8,9 @@ argument instead.
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import os
 import sys
 from datetime import UTC, datetime
 from typing import Any
@@ -18,11 +20,61 @@ logger = logging.getLogger(__name__)
 
 def _failed(check: str, status: str, exc: Exception, is_admin: bool) -> dict[str, Any]:
     """A failed probe. The exception text goes to the log and to admins only:
-    `GET /api/health` is public, and driver errors can name hosts, ports or DSNs."""
-    logger.warning("health check %s failed: %s", check, exc)
+    `GET /api/health` is public, and driver errors can name hosts, ports or DSNs.
+    Callers log the failure themselves, so each handler carries its own signal."""
     return {"status": status, "reason": str(exc)} if is_admin else {"status": status}
 
 _health_postgres_pool = None
+
+# Per-probe cap. useServerStatus aborts at 3s; probes run in parallel.
+_PROBE_TIMEOUT_S = 2.0
+
+
+async def _probe_postgres(database_url: str | None, is_admin: bool) -> dict[str, Any]:
+    if not database_url:
+        return {"status": "ok", "reason": "not configured"}
+    global _health_postgres_pool  # noqa: PLW0603
+    try:
+        if _health_postgres_pool is None:
+            import asyncpg
+
+            dsn = database_url.replace("+asyncpg", "")
+            _health_postgres_pool = await asyncio.wait_for(
+                asyncpg.create_pool(dsn, min_size=1, max_size=2),
+                timeout=_PROBE_TIMEOUT_S,
+            )
+        await asyncio.wait_for(
+            _health_postgres_pool.fetchval("SELECT 1"), timeout=_PROBE_TIMEOUT_S
+        )
+        # Deliberately NO reasoner_postgres_pool_* gauges from this pool: it is a
+        # private probe pool (min 1, max 2), not a serving pool. The app's real
+        # pools live inside each Postgres repository (DB_POOL_SIZE connections
+        # each), so a gauge fed from here read ~1 permanently and drove
+        # PostgresPoolLow/PostgresPoolExhaustion on a number unrelated to load.
+        return {"status": "ok"}
+    except Exception as e:
+        _health_postgres_pool = None
+        logger.warning("health check postgres failed: %s", e)
+        return _failed("postgres", "error", e, is_admin)
+
+
+async def _probe_valkey(is_admin: bool) -> dict[str, Any]:
+    # Canonical VALKEY_URL; falls back to REDIS_URL for backward compat.
+    if not (os.environ.get("VALKEY_URL") or os.environ.get("REDIS_URL", "")):
+        return {"status": "ok", "reason": "not configured"}
+    try:
+        from reasoner.infrastructure.valkey.client import get_valkey_pool
+
+        valkey_client = get_valkey_pool()
+        await asyncio.wait_for(valkey_client.ping(), timeout=_PROBE_TIMEOUT_S)
+        from reasoner.infrastructure.metrics import REASONER_VALKEY_POOL_SIZE
+
+        pool_info = valkey_client.connection_pool.max_connections
+        REASONER_VALKEY_POOL_SIZE.set(pool_info or 0)
+        return {"status": "ok"}
+    except Exception as e:
+        logger.warning("health check valkey failed: %s", e)
+        return _failed("valkey", "error", e, is_admin)
 
 
 async def check_health(
@@ -82,50 +134,14 @@ async def check_health(
         **({"files": cache_file_count} if is_admin and cache_file_count is not None else {}),
     }
 
-    # Postgres check
-    if not settings.DATABASE_URL:
-        health["checks"]["postgres"] = {"status": "ok", "reason": "not configured"}
-    else:
-        global _health_postgres_pool  # noqa: PLW0603
-        try:
-            if _health_postgres_pool is None:
-                import asyncio
-
-                import asyncpg
-                dsn = settings.DATABASE_URL.replace("+asyncpg", "")
-                _health_postgres_pool = await asyncio.wait_for(
-                    asyncpg.create_pool(dsn, min_size=1, max_size=2),
-                    timeout=5.0,
-                )
-            await _health_postgres_pool.fetchval("SELECT 1")
-            health["checks"]["postgres"] = {"status": "ok"}
-            # Deliberately NO reasoner_postgres_pool_* gauges from this pool: it is a
-            # private probe pool (min 1, max 2), not a serving pool. The app's real
-            # pools live inside each Postgres repository (DB_POOL_SIZE connections
-            # each), so a gauge fed from here read ~1 permanently and drove
-            # PostgresPoolLow/PostgresPoolExhaustion on a number unrelated to load.
-        except Exception as e:
-            health["checks"]["postgres"] = _failed("postgres", "error", e, is_admin)
-            _health_postgres_pool = None
-
-    # Valkey check (canonical; falls back to REDIS_URL for backward compat)
-    import os
-    _valkey_url = os.environ.get("VALKEY_URL") or os.environ.get("REDIS_URL", "")
-    if not _valkey_url:
-        health["checks"]["valkey"] = {"status": "ok", "reason": "not configured"}
-    else:
-        try:
-            import asyncio
-
-            from reasoner.infrastructure.valkey.client import get_valkey_pool
-            valkey_client = get_valkey_pool()
-            await asyncio.wait_for(valkey_client.ping(), timeout=5.0)
-            health["checks"]["valkey"] = {"status": "ok"}
-            from reasoner.infrastructure.metrics import REASONER_VALKEY_POOL_SIZE
-            pool_info = valkey_client.connection_pool.max_connections
-            REASONER_VALKEY_POOL_SIZE.set(pool_info or 0)
-        except Exception as e:
-            health["checks"]["valkey"] = _failed("valkey", "error", e, is_admin)
+    # Network probes run concurrently, each capped at _PROBE_TIMEOUT_S, so the
+    # whole check stays under the UI's 3s liveness timeout even when both
+    # dependencies are down. Run in sequence with 5s caps, a down Postgres and
+    # Valkey took ~6s and the UI showed a running backend as "Offline".
+    health["checks"]["postgres"], health["checks"]["valkey"] = await asyncio.gather(
+        _probe_postgres(settings.DATABASE_URL, is_admin),
+        _probe_valkey(is_admin),
+    )
 
     # Stripe check
     try:
@@ -134,6 +150,7 @@ async def check_health(
         else:
             health["checks"]["stripe"] = {"status": "ok", "reason": "not configured"}
     except Exception as e:
+        logger.warning("health check stripe failed: %s", e)
         health["checks"]["stripe"] = _failed("stripe", "warning", e, is_admin)
 
     # Determine overall status

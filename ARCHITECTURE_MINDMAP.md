@@ -351,7 +351,6 @@ ui-next/src/
 │   │
 │   ├── layout/                # Layout components
 │   │   ├── Composer.tsx       # Input composer area
-│   │   ├── PhaseTimeline.tsx  # Phase progress timeline
 │   │   ├── Sidebar.tsx        # Navigation sidebar
 │   │   ├── ShortcutModal.tsx  # Keyboard shortcuts modal
 │   │   └── [other layout]
@@ -1311,7 +1310,7 @@ App (Providers)
 │  │  │        ├─ ClassificationCard
 │  │  │        ├─ CritiqueCard
 │  │  │        └─ SynthesisCard
-│  │  ├─ PhaseTimeline (progress indicator)
+│  │  ├─ RunProgress (live run card)
 │  │  └─ Composer (input)
 │  └─ Modals
 │     ├─ ShortcutModal

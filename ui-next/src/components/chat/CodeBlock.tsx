@@ -2,11 +2,10 @@
 
 import { useState, useMemo } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus, vs } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Check, Copy } from 'lucide-react';
 import { TIMING } from '@/lib/config';
 import { copyToClipboard } from '@/lib/utils';
-import { useIsDark } from '@/hooks/useIsDark';
 
 /**
  * Heavily-lazy loaded syntax-highlighted code block.
@@ -21,11 +20,9 @@ export function CodeBlock({
   language: string;
 }) {
   const [copied, setCopied] = useState(false);
-  // Was `theme === 'dark'`, which is false for every system-dark visitor —
-  // `theme` stays the literal "system" until someone picks explicitly, so
-  // code blocks rendered the light palette on a dark page.
-  const { isDark } = useIsDark();
-  const codeStyle = useMemo(() => (isDark ? vscDarkPlus : vs), [isDark]);
+  // Always the dark palette: every page that renders markdown is `.site`,
+  // charcoal in both colour schemes, so a light system scheme no longer means
+  // a light page.
   const customStyle = useMemo(() => ({ margin: 0, padding: '1em', background: 'transparent', fontSize: '0.85em' }), []);
 
   async function handleCopy() {
@@ -58,8 +55,11 @@ export function CodeBlock({
       </div>
       <SyntaxHighlighter
         language={language}
-        style={codeStyle}
+        style={vscDarkPlus}
         customStyle={customStyle}
+        // Long lines scroll sideways; keyboard users need to reach the scroller (WCAG 2.1.1).
+        tabIndex={0}
+        aria-label={`${language || 'Code'} code`}
       >
         {code}
       </SyntaxHighlighter>

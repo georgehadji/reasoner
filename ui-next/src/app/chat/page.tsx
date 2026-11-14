@@ -2,7 +2,6 @@
 
 import { useState, useRef, useCallback, useReducer, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useTheme } from 'next-themes';
 import { useAppStore } from '@/stores/app-store';
 
 import { usePipelineStream } from '@/hooks/usePipelineStream';
@@ -17,7 +16,6 @@ import { Composer } from '@/components/layout/Composer';
 import { ShortcutModal } from '@/components/layout/ShortcutModal';
 import { CommandPalette } from '@/components/layout/CommandPalette';
 import { Tooltip } from '@/components/ui/Tooltip';
-import { PhaseTimeline } from '@/components/layout/PhaseTimeline';
 import { UserMenu } from '@/components/layout/UserMenu';
 import { UpgradeModal } from '@/components/layout/UpgradeModal';
 import { PipelineError } from '@/hooks/usePipelineStream';
@@ -27,9 +25,8 @@ import { useIsLocalHost } from '@/lib/local-host';
 
 import { ChatFeed, ChatFeedMessage, RenderedPhase } from '@/components/chat/ChatFeed';
 import { ChatErrorBoundary } from '@/components/chat/ChatErrorBoundary';
-import { PipelineSkeleton } from '@/components/chat/PipelineSkeleton';
 import { PhaseEvent, Conversation, RunFollowupRequest, ConversationTurn, GateResponse } from '@/lib/types';
-import { METHOD_PHASES, METHOD_DESCRIPTIONS, LIMITS, PIPELINE_DEFAULTS } from '@/lib/config';
+import { METHOD_PHASES, LIMITS, PIPELINE_DEFAULTS } from '@/lib/config';
 import { buildMarkdownFromPhases } from '@/lib/markdown';
 import { saveConversation } from '@/lib/db';
 import { conversationToMessages } from '@/lib/conversation-history';
@@ -171,6 +168,7 @@ function cleanDisplayPrompt(prompt: string): string {
 }
 
 const CONTINUATION_RE = /\b(continue|cont\.?|keep going|more|expand|elaborate|extend|add more|next (step|section|part)|again|revise|rewrite|improve|same topic|build on|follow up)\b/i;
+const isContinuation = (text: string) => CONTINUATION_RE.test(text);
 
 function clampImagePrompt(prompt: string) {
   const trimmed = prompt.trim();
@@ -222,7 +220,6 @@ export default function ChatPage() {
   // Owns the active run's ticket: its abort signal, run id and conversation id.
   const run = useRunController(wsSendStop);
   const serverOnline = useServerStatus();
-  const { resolvedTheme, setTheme } = useTheme();
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -242,17 +239,13 @@ export default function ChatPage() {
   // Auto-selected method from HyperGate — populated from the 'start' SSE event.
   const [autoSelectedMethod, setAutoSelectedMethod] = useState<string>(PIPELINE_DEFAULTS.method);
 
-  const [completedPhases, setCompletedPhases] = useState<number[]>([]);
   const [errorPhases, setErrorPhases] = useState<number[]>([]);
-  const [currentPhase, setCurrentPhase] = useState<number | undefined>(undefined);
-  const [phaseDurations, setPhaseDurations] = useState<Record<number, number>>({});
   const [phaseOpenMode, setPhaseOpenMode] = useState<'auto' | 'expand' | 'collapse'>('auto');
 
   // HyperGate method-confirmation gate — set while /api/gate is in flight,
   // and when it returns a low-confidence decision needing user input.
   const [gateChecking, setGateChecking] = useState(false);
   const [pendingChoice, setPendingChoice] = useState<{ problem: string; decision: GateResponse } | null>(null);
-  const phaseStartTimesRef = useRef<Record<number, number>>({});
   const chunkBufferRef = useRef('');
   const chunkFlushRafRef = useRef<number | null>(null);
 
@@ -266,8 +259,6 @@ export default function ChatPage() {
     };
   }, []);
 
-  const isContinuation = (text: string) => CONTINUATION_RE.test(text);
-
   const findLastAssistant = (msgs: ChatFeedMessage[]) => {
     for (let i = msgs.length - 1; i >= 0; i--) {
       if (msgs[i].role === 'assistant' && !msgs[i].isStreaming) return msgs[i];
@@ -276,7 +267,6 @@ export default function ChatPage() {
   };
 
   const {
-    scrollToBottom,
     showNewContentIndicator,
     dismissIndicator,
   } = useScrollAnchor(scrollContainerRef);
@@ -349,13 +339,9 @@ export default function ChatPage() {
     setComposerText('');
     setRunning(true);
     // Resetting state that's managed by the parent component's state, not in the reducer
-    setCompletedPhases([]);
     setErrorPhases([]);
-    setCurrentPhase(undefined);
-    setPhaseDurations({});
     setAutoSelectedMethod(PIPELINE_DEFAULTS.method);
     setPhaseOpenMode('auto');
-    phaseStartTimesRef.current = {};
     chunkBufferRef.current = '';
     if (chunkFlushRafRef.current !== null) {
       cancelAnimationFrame(chunkFlushRafRef.current);
@@ -403,6 +389,7 @@ export default function ChatPage() {
       content: '',
       phases: [],
       isStreaming: true,
+      startedAt: Date.now(),
       currentPhaseName: undefined,
       loadingKind: undefined,
       loadingPrompt: undefined,
@@ -553,6 +540,8 @@ export default function ChatPage() {
 
     let phases: RenderedPhase[] = [];
     let finalErrors: string[] = [];
+    // `done` lists every run error, including one an `error` frame already showed.
+    const shownErrors = new Set<string>();
     let finalTokens = { input: 0, output: 0, total: 0 };
     // Track the method discovered from the 'start' event within this run
     let runMethod = PIPELINE_DEFAULTS.method;
@@ -561,30 +550,35 @@ export default function ChatPage() {
     const onEvent = (ev: PhaseEvent) => {
       // Dispatch actions to the reducer based on event type
       switch (ev.type) {
-        case 'start':
+        case 'start': {
           if (ev.auto_selected_method) {
             runMethod = ev.auto_selected_method;
             setAutoSelectedMethod(ev.auto_selected_method);
           }
+          const startMethod = ev.auto_selected_method || ev.method;
+          if (startMethod) {
+            dispatchMessages({ type: 'UPDATE_MESSAGE', payload: { messageId: assistantId, updates: { method: startMethod } } });
+          }
           break;
+        }
         case 'method_selected':
+          // The run card's header carries the gate's choice and reason; it no
+          // longer lands in the feed as a separate "Using: …" line.
           if (ev.action === 'pipeline' && ev.method) {
-            const prettyMethod = ev.method.replace(/_/g, '-').replace(/\b\w/g, (l: string) => l.toUpperCase());
             const alts = (ev.alternatives || [])
               .map((a) => a.method.replace(/_/g, '-').replace(/\b\w/g, (l: string) => l.toUpperCase()))
               .join(', ');
-            const lowConfidence = typeof ev.confidence === 'number' && ev.confidence < 0.7;
-            const content = [
-              `Using: ${prettyMethod}${ev.reasoning ? ` — ${ev.reasoning}` : ''}`,
+            const classified = typeof ev.confidence === 'number' && ev.confidence > 0;
+            const lowConfidence = classified && (ev.confidence as number) < 0.7;
+            // Zero confidence means the gate could not classify; its reasoning
+            // is then an internal fallback note, not a reason.
+            const methodNote = [
+              classified && ev.reasoning ? ev.reasoning : null,
               lowConfidence && alts ? `Also considered: ${alts}` : null,
-            ].filter(Boolean).join(' · ');
+            ].filter(Boolean).join(' · ') || undefined;
             dispatchMessages({
-              type: 'ADD_MESSAGES',
-              payload: [{
-                id: 'info-method-' + Date.now(),
-                role: 'info',
-                content,
-              }],
+              type: 'UPDATE_MESSAGE',
+              payload: { messageId: assistantId, updates: { method: ev.method, methodNote } },
             });
           }
           break;
@@ -606,10 +600,8 @@ export default function ChatPage() {
             const methodPhases = getMethodPhases(runMethod);
             const displayName = ev.name || methodPhases.find((p) => p.id === ev.phase)?.name || '';
             const startModels = Array.isArray(ev.models) ? (ev.models as string[]) : undefined;
-            phaseStartTimesRef.current[ev.phase] = performance.now();
-            setCurrentPhase(ev.phase);
             // Update the assistant message to show current phase and models
-            dispatchMessages({ type: 'UPDATE_MESSAGE', payload: { messageId: assistantId, updates: { currentPhaseName: displayName, phaseModels: startModels } } });
+            dispatchMessages({ type: 'UPDATE_MESSAGE', payload: { messageId: assistantId, updates: { currentPhase: ev.phase, currentPhaseName: displayName, phaseModels: startModels } } });
           }
           break;
         case 'agent_start':
@@ -668,15 +660,6 @@ export default function ChatPage() {
               data: phaseData,
             };
             phases = [...phases, renderedPhase];
-            const serverDuration = typeof (phaseData as Record<string, unknown>).duration === 'number'
-              ? (phaseData as Record<string, unknown>).duration as number
-              : undefined;
-            const durationMs = serverDuration !== undefined
-              ? serverDuration * 1000
-              : performance.now() - (phaseStartTimesRef.current[phaseNum] ?? performance.now());
-            setPhaseDurations((prev) => ({ ...prev, [phaseNum]: durationMs / 1000 }));
-            setCompletedPhases((prev) => (prev.includes(phaseNum) ? prev : [...prev, phaseNum]));
-            setCurrentPhase(undefined);
 
             const phaseModels = (phaseData as Record<string, unknown>).models as string[] | undefined;
             
@@ -684,6 +667,7 @@ export default function ChatPage() {
             const phaseCompleteUpdates: Partial<ChatFeedMessage> = {
               content: buildMarkdownFromPhases(phases),
               phases: [...phases],
+              currentPhase: undefined,
               currentPhaseName: undefined,
             };
             if (displayName === 'Synthesis') {
@@ -733,10 +717,13 @@ export default function ChatPage() {
         case 'phase_error':
           if (typeof ev.phase === 'number') {
             setErrorPhases((prev) => (prev.includes(ev.phase!) ? prev : [...prev, ev.phase!]));
-            setCurrentPhase(undefined);
           }
           break;
         case 'error': {
+          // A non-critical phase failed: the run carries on to synthesis, and
+          // `done` lists the error. Ending the stream here hid a live run.
+          if (ev.fatal === false) break;
+          shownErrors.add(ev.message || 'Pipeline error');
           // Flush any remaining buffered text before stopping
           if (chunkFlushRafRef.current !== null) {
             cancelAnimationFrame(chunkFlushRafRef.current);
@@ -757,7 +744,6 @@ export default function ChatPage() {
             errorRetryable: ev.retryable ?? null,
             errorRetryAfter: ev.retry_after ?? null,
           }] });
-          setCurrentPhase(undefined);
           break;
         }
         case 'recall_used':
@@ -802,7 +788,6 @@ export default function ChatPage() {
           }
           // Add a cancellation message
           dispatchMessages({ type: 'ADD_MESSAGES', payload: [{ id: 'info-' + Date.now(), role: 'error', content: ev.message || 'Stopped by user' }] });
-          setCurrentPhase(undefined);
           break;
         }
         case 'done': {
@@ -819,7 +804,6 @@ export default function ChatPage() {
           finalErrors = ev.errors || [];
           finalTokens = ev.total_tokens || { input: 0, output: 0, total: 0 };
           const totalDuration = ev.duration;
-          setCurrentPhase(undefined);
 
           const finalContent = buildMarkdownFromPhases(phases);
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -841,7 +825,7 @@ export default function ChatPage() {
           
           if (finalErrors.length > 0) {
             // Add error messages if any
-            dispatchMessages({ type: 'ADD_MESSAGES', payload: finalErrors.map((err, i) => ({ id: 'err-' + Date.now() + '-' + i, role: 'error', content: err })) });
+            dispatchMessages({ type: 'ADD_MESSAGES', payload: finalErrors.filter((err) => !shownErrors.has(err)).map((err, i) => ({ id: 'err-' + Date.now() + '-' + i, role: 'error', content: err })) });
           }
 
           // Save conversation to DB -- into the thread this run started in,
@@ -971,7 +955,6 @@ export default function ChatPage() {
       // Update assistant message with connection error
       dispatchMessages({ type: 'UPDATE_MESSAGE', payload: { messageId: assistantId, updates: { isStreaming: false } } });
       dispatchMessages({ type: 'ADD_MESSAGES', payload: [{ id: 'err-' + Date.now(), role: 'error', content: msg }] });
-      setCurrentPhase(undefined);
     } finally {
       dispatchMessages({ type: 'UPDATE_MESSAGE', payload: { messageId: assistantId, updates: { isStreaming: false } } });
       // After Stop + a quick resubmit this run is stale: it must not clear the new run's state or WS.
@@ -981,7 +964,7 @@ export default function ChatPage() {
       }
       clearAttachments();
     }
-  }, [run, attachments, isImageMode, isLocal, user, tier, messages, startRun, startFollowup, wsConnect, wsDisconnect, dispatchMessages, setRunning, setComposerText, clearAttachments, refreshHistory, setCompletedPhases, setErrorPhases, setCurrentPhase, setPhaseDurations, setAutoSelectedMethod, setPhaseOpenMode, isContinuation, getAutoPreset, autoMethodAlways]);
+  }, [run, attachments, isImageMode, isLocal, user, tier, messages, startRun, startFollowup, wsConnect, wsDisconnect, dispatchMessages, setRunning, setComposerText, clearAttachments, refreshHistory, setErrorPhases, setAutoSelectedMethod, setPhaseOpenMode, getAutoPreset, autoMethodAlways]);
 
   const handleSubmit = useCallback(async (
     providedText?: string,
@@ -1015,21 +998,16 @@ export default function ChatPage() {
   const handleStop = useCallback(() => {
     run.stop();
     setRunning(false);
-    setCurrentPhase(undefined);
-  }, [run, setRunning, setCurrentPhase]);
+  }, [run, setRunning]);
 
   function handleNew() {
     if (run.isActive()) handleStop();
     // Dispatch action to clear messages and reset other states managed by parent
     dispatchMessages({ type: 'CLEAR_MESSAGES' });
     setComposerText('');
-    setCompletedPhases([]);
     setErrorPhases([]);
-    setCurrentPhase(undefined);
-    setPhaseDurations({});
     setAutoSelectedMethod(PIPELINE_DEFAULTS.method);
     setPhaseOpenMode('auto');
-    phaseStartTimesRef.current = {};
     conversationIdRef.current = null;
     setConversationId(null);
   }
@@ -1040,10 +1018,7 @@ export default function ChatPage() {
     const ticket = run.begin();
     if (!ticket) return;
     setRunning(true);
-    setCompletedPhases([]);
     setErrorPhases([]);
-    setCurrentPhase(undefined);
-    setPhaseDurations({});
 
     const assistantId = 'a-resume-' + Date.now();
     const assistantMsg: ChatFeedMessage = {
@@ -1052,18 +1027,21 @@ export default function ChatPage() {
       content: '',
       phases: [],
       isStreaming: true,
+      // A resumed run keeps the method its conversation was loaded with.
+      method: autoSelectedMethod,
+      startedAt: Date.now(),
     };
     dispatchMessages({ type: 'ADD_MESSAGES', payload: [assistantMsg] });
 
     let resumePhases: RenderedPhase[] = [];
     let resumeErrors: string[] = [];
+    const shownResumeErrors = new Set<string>();
 
     const onResumeEvent = (ev: PhaseEvent) => {
       switch (ev.type) {
         case 'phase_start':
           if (typeof ev.phase === 'number') {
-            setCurrentPhase(ev.phase);
-            dispatchMessages({ type: 'UPDATE_MESSAGE', payload: { messageId: assistantId, updates: { currentPhaseName: ev.name } } });
+            dispatchMessages({ type: 'UPDATE_MESSAGE', payload: { messageId: assistantId, updates: { currentPhase: ev.phase, currentPhaseName: ev.name } } });
           }
           break;
         case 'phase_complete':
@@ -1075,18 +1053,17 @@ export default function ChatPage() {
               data: ev.data ?? {},
             };
             resumePhases = [...resumePhases, renderedPhase];
-            setCompletedPhases((prev) => (prev.includes(ev.phase!) ? prev : [...prev, ev.phase!]));
-            setCurrentPhase(undefined);
-            dispatchMessages({ type: 'UPDATE_MESSAGE', payload: { messageId: assistantId, updates: { content: buildMarkdownFromPhases(resumePhases), phases: [...resumePhases], currentPhaseName: undefined } } });
+            dispatchMessages({ type: 'UPDATE_MESSAGE', payload: { messageId: assistantId, updates: { content: buildMarkdownFromPhases(resumePhases), phases: [...resumePhases], currentPhase: undefined, currentPhaseName: undefined } } });
           }
           break;
         case 'phase_error':
           if (typeof ev.phase === 'number') {
             setErrorPhases((prev) => (prev.includes(ev.phase!) ? prev : [...prev, ev.phase!]));
-            setCurrentPhase(undefined);
           }
           break;
         case 'error':
+          if (ev.fatal === false) break; // non-critical phase; the run goes on
+          shownResumeErrors.add(ev.message || 'Resume error');
           dispatchMessages({ type: 'UPDATE_MESSAGE', payload: { messageId: assistantId, updates: { isStreaming: false } } });
           dispatchMessages({ type: 'ADD_MESSAGES', payload: [{ id: 'err-' + Date.now(), role: 'error', content: ev.message || 'Resume error' }] });
           break;
@@ -1094,7 +1071,7 @@ export default function ChatPage() {
           resumeErrors = ev.errors || [];
           dispatchMessages({ type: 'UPDATE_MESSAGE', payload: { messageId: assistantId, updates: { content: buildMarkdownFromPhases(resumePhases), phases: [...resumePhases], isStreaming: false, currentPhaseName: undefined } } });
           if (resumeErrors.length > 0) {
-            dispatchMessages({ type: 'ADD_MESSAGES', payload: resumeErrors.map((err, i) => ({ id: 'err-' + Date.now() + '-' + i, role: 'error', content: err })) });
+            dispatchMessages({ type: 'ADD_MESSAGES', payload: resumeErrors.filter((err) => !shownResumeErrors.has(err)).map((err, i) => ({ id: 'err-' + Date.now() + '-' + i, role: 'error', content: err })) });
           }
           break;
       }
@@ -1114,7 +1091,6 @@ export default function ChatPage() {
       run.finish(ticket);
       if (!stale) {
         setRunning(false);
-        setCurrentPhase(undefined);
       }
     }
   }
@@ -1123,23 +1099,13 @@ export default function ChatPage() {
     if (run.isActive()) handleStop();
     conversationIdRef.current = conv.conversation_id || conv.id;
     setConversationId(conversationIdRef.current);
-    const renderedPhases: RenderedPhase[] = conv.phases.map((p, idx) => ({
-      index: idx,
-      phase: p.phase,
-      name: p.name,
-      data: p.data,
-    }));
     const loadedMessages = conversationToMessages(conv, buildMarkdownFromPhases) as ChatFeedMessage[];
     // Dispatch action to set loaded messages
     dispatchMessages({ type: 'SET_MESSAGES', payload: loadedMessages });
     
-    // Restore the method so PhaseTimeline shows the right phases for loaded conversations
+    // Restore the method so a resumed run's card shows the right phases
     setAutoSelectedMethod(conv.method || PIPELINE_DEFAULTS.method);
-    setCompletedPhases(renderedPhases.map((p) => p.phase));
     setErrorPhases([]);
-    setCurrentPhase(undefined);
-    setPhaseDurations({});
-    phaseStartTimesRef.current = {};
   }
 
   async function handleClearCache() {
@@ -1266,27 +1232,8 @@ export default function ChatPage() {
           </div>
         </header>
 
-        {hasMessages && activeAssistantMsg && (
-          <div>
-            <div className="px-4 pt-2 text-[length:var(--text-xs)] text-[var(--text-muted)]">
-              <Tooltip text={METHOD_DESCRIPTIONS[autoSelectedMethod.replace(/_/g, '-')] || ''}>
-                <span className="cursor-help">
-                  Method: <span className="text-[var(--text)]">{autoSelectedMethod.replace(/_/g, '-').replace(/\b\w/g, (l) => l.toUpperCase())}</span>
-                </span>
-              </Tooltip>
-            </div>
-            <PhaseTimeline
-            method={autoSelectedMethod}
-            currentPhase={currentPhase}
-            completedPhases={completedPhases}
-            errorPhases={errorPhases}
-            phaseDurations={phaseDurations}
-            onExpandAll={() => setPhaseOpenMode('expand')}
-            onCollapseAll={() => setPhaseOpenMode('collapse')}
-          />
-          </div>
-        )}
-
+        {/* No header method label or phase rail: the run card in the feed
+            (RunProgress) names the method once it is known and shows the steps. */}
         <EmailVerifyBanner />
         <div
           id="main-content"
@@ -1302,9 +1249,6 @@ export default function ChatPage() {
             <>
               <ChatErrorBoundary fallback={<div className="p-4 text-[var(--red)]">Display error. Please refresh.</div>}>
                 <>
-                  {activeAssistantMsg && activeAssistantMsg.phases?.length === 0 && activeAssistantMsg.isStreaming && (
-                    <PipelineSkeleton method={autoSelectedMethod} />
-                  )}
                   <ChatFeed
                     messages={messages}
                     onScrollToBottom={dismissIndicator}
@@ -1320,6 +1264,11 @@ export default function ChatPage() {
             </>
           ) : (
             <>
+              <Composer running={running} onSubmit={() => handleSubmit()} onStop={handleStop} centered />
+              {/* Below the composer, as in the follow-up branch: the scroll
+                  anchor pins this container to the bottom whenever content
+                  mounts, so a prompt above the composer was scrolled out of
+                  view and Enter looked like it did nothing. */}
               {gateChecking && <MethodChoiceLoading />}
               {pendingChoice && (
                 <MethodChoicePrompt
@@ -1330,7 +1279,6 @@ export default function ChatPage() {
                   onCancel={handleMethodChoiceCancel}
                 />
               )}
-              <Composer running={running} onSubmit={() => handleSubmit()} onStop={handleStop} centered />
             </>
           )}
         </div>
@@ -1369,10 +1317,6 @@ export default function ChatPage() {
         onClose={() => setCommandPaletteOpen(false)}
         onNew={handleNew}
         onClearComposer={() => setComposerText('')}
-        // Toggling the class directly added `.dark` while next-themes' own
-        // `.light` stayed put, so nothing changed and the stored preference
-        // desynchronised. Go through next-themes.
-        onToggleTheme={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
         onToggleSidebar={toggleSidebar}
         onToggleNeuro={toggleNeuroPanel}
         onToggleTier={toggleTier}

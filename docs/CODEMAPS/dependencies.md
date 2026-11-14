@@ -358,7 +358,7 @@ app/chat/page.tsx
   ├─ hooks/useConversationHistory
   ├─ components/ChatFeed
   ├─ components/Composer
-  ├─ components/PhaseTimeline
+  ├─ components/chat/RunProgress
   └─ stores/app-store (Zustand)
 ```
 

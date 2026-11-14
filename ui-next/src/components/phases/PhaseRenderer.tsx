@@ -357,7 +357,9 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
   }
 
   // Synthesis
+  // A row stays one line even for synthesis: the full card is the answer's job.
   if (
+    !row &&
     isSynthesisPhase(name) &&
     data &&
     typeof data === 'object' &&
