@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
 import { ArgumentSection as Section, BODY, CAP, FIGURE, HEAD, ROW } from '@/components/site/ArgumentSection';
@@ -27,13 +28,14 @@ function utc(iso: string): Date {
   return new Date(`${iso}T00:00:00Z`);
 }
 
-function formatDate(iso: string, long = false): string {
-  return utc(iso).toLocaleDateString('en-US', {
-    month: long ? 'long' : 'short',
-    day: 'numeric',
-    ...(long ? { year: 'numeric' } : {}),
-    timeZone: 'UTC',
-  });
+/** "Nov 13" */
+function shortDate(iso: string): string {
+  return utc(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+}
+
+/** "November 13, 2026" */
+function longDate(iso: string): string {
+  return utc(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 }
 
 /** Entries grouped by month, newest first, keeping CHANGELOG's order. */
@@ -56,19 +58,21 @@ function chunks(items: ChangelogEntry[], size = 5): ChangelogEntry[][] {
 }
 
 function range(part: ChangelogEntry[]): string {
-  const first = formatDate(part[0].date);
-  const last = formatDate(part[part.length - 1].date);
+  const first = shortDate(part[0].date);
+  const last = shortDate(part[part.length - 1].date);
   return first === last ? first : `${first} to ${last}`;
 }
 
-function Entry({ entry }: { entry: ChangelogEntry }) {
+/** `heading`: false in the hero, where an h3 would sit under the h1 with no h2 between. */
+function Entry({ entry, heading = true }: { entry: ChangelogEntry; heading?: boolean }) {
+  const Title = heading ? 'h3' : 'p';
   return (
     <li className={ROW}>
       <p className="flex flex-wrap items-baseline justify-between gap-x-[var(--space-3)] text-[var(--site-muted)]">
-        <time dateTime={entry.date}>{formatDate(entry.date)}</time>
+        <time dateTime={entry.date}>{shortDate(entry.date)}</time>
         <code className="font-mono">{entry.commit}</code>
       </p>
-      <h3 className="mt-[var(--space-1)] font-semibold">{entry.title}</h3>
+      <Title className="mt-[var(--space-1)] font-semibold">{entry.title}</Title>
       <p className="mt-[var(--space-1)] max-w-[60ch]">{entry.description}</p>
     </li>
   );
@@ -76,6 +80,8 @@ function Entry({ entry }: { entry: ChangelogEntry }) {
 
 export default function ChangelogPage() {
   const [latest] = CHANGELOG;
+  // The hero shows the latest entry; with none there is no page to render.
+  if (!latest) notFound();
   const months = byMonth(CHANGELOG);
 
   return (
@@ -114,9 +120,9 @@ export default function ChangelogPage() {
               data-ui
               className="w-full rounded-[var(--radius-lg)] border border-[var(--site-line)] bg-[var(--site-bg)] lg:max-w-[var(--site-fragment)]"
             >
-              <figcaption className={CAP}>Latest, {formatDate(latest.date, true)}</figcaption>
+              <figcaption className={CAP}>Latest, {longDate(latest.date)}</figcaption>
               <ul className="list-none">
-                <Entry entry={latest} />
+                <Entry entry={latest} heading={false} />
               </ul>
             </figure>
           </div>

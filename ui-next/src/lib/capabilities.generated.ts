@@ -33,7 +33,7 @@ export const MARQUEE_LABS = ['Anthropic', 'OpenAI', 'Google', 'Mistral', 'DeepSe
  * company a request may reach. Local Ollama models are excluded. Drives the
  * /subprocessors list.
  */
-export const MODEL_VENDORS = ['anthropic', 'black-forest-labs', 'bytedance-seed', 'cohere', 'deepseek', 'google', 'inclusionai', 'krea', 'meta', 'meta-llama', 'microsoft', 'minimax', 'mistralai', 'moonshotai', 'morph', 'nousresearch', 'nvidia', 'openai', 'perplexity', 'qwen', 'recraft', 'sakana', 'sourceful', 'stepfun', 'tencent', 'thinkingmachines', 'upstage', 'x-ai', 'xiaomi', 'z-ai'] as const;
+export const MODEL_VENDORS = ['anthropic', 'black-forest-labs', 'bytedance-seed', 'cohere', 'deepseek', 'google', 'inclusionai', 'krea', 'meta', 'microsoft', 'minimax', 'mistralai', 'moonshotai', 'morph', 'nousresearch', 'nvidia', 'openai', 'perplexity', 'qwen', 'recraft', 'sakana', 'sourceful', 'stepfun', 'tencent', 'thinkingmachines', 'upstage', 'x-ai', 'xiaomi', 'z-ai'] as const;
 
 /**
  * Sycophancy controls that are actually present in the code, per commit.

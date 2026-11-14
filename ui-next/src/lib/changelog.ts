@@ -54,7 +54,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: '2026-08-29',
     title: 'Critique scores in the app',
-    description: 'The critique phase shows its score table on /chat, the same table /how-it-works uses.',
+    description: 'The critique phase shows its score table on /chat.',
     commit: '80e36b8d',
   },
   {

@@ -162,7 +162,7 @@ control, the pinned pilot fragment changing state. All of it collapses under
   of our servers, then every model maker a run can reach, the direct fallbacks with their
   privacy policies, and the services around the model call (search, sign-in, payments, email,
   error reports). Corrected: the page said its list "cannot go stale" yet named only the eight
-  direct fallback adapters; every call goes through OpenRouter first, which reaches 30 makers.
+  direct fallback adapters; every call goes through OpenRouter first, which reaches 29 makers.
   The makers now come from `MODEL_VENDORS`, generated into `capabilities.generated.ts` by
   `scripts/update_mindmap_meta.py`. Three pages said every provider was listed "with its
   privacy policy"; only the direct fallbacks have one linked, so that phrase is gone. Host

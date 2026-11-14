@@ -279,21 +279,25 @@ _CURATED_MARQUEE_LABS: dict[str, str] = {
 }
 
 
+#: OpenRouter slugs that name the same company as another slug. Without this
+#: the /subprocessors count reads one company twice.
+_VENDOR_SAME_COMPANY: dict[str, str] = {"meta-llama": "meta"}
+
+
 def _model_vendors() -> list[str]:
-    """Every OpenRouter vendor slug a registered model belongs to, sorted.
+    """Every company a registered model belongs to, by OpenRouter slug, sorted.
 
     The /subprocessors page lists these: each is a company a request may
     reach. Local Ollama models carry no vendor prefix and send nothing out,
     so they fall away; ``openrouter/`` is OpenRouter's own router, listed on
     that page in its own right.
     """
-    return sorted(
-        {
-            model.split("/", 1)[0]
-            for model in _whitelist_model_ids()
-            if "/" in model and not model.startswith("openrouter/")
-        }
+    slugs = (
+        model.split("/", 1)[0]
+        for model in _whitelist_model_ids()
+        if "/" in model and not model.startswith("openrouter/")
     )
+    return sorted({_VENDOR_SAME_COMPANY.get(slug, slug) for slug in slugs})
 
 
 def _marquee_lab_names() -> list[str]:
