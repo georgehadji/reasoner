@@ -57,6 +57,9 @@ export function CodeBlock({
         language={language}
         style={vscDarkPlus}
         customStyle={customStyle}
+        // Long lines scroll sideways; keyboard users need to reach the scroller (WCAG 2.1.1).
+        tabIndex={0}
+        aria-label={`${language || 'Code'} code`}
       >
         {code}
       </SyntaxHighlighter>

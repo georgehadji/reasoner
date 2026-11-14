@@ -225,7 +225,7 @@ export function buildMarkdownFromPhase(
   }
   // ── State Objects (dispatched via lookup) ──
   // OPTIMIZATION: Skip all 11 state blocks if none are present (common for Perspectives/Classification phases)
-  const _STATE_KEYS = ['cove_state','pre_mortem_state','bayesian_state','dialectical_state','analogical_state','sot_state','tot_state','pot_state','self_discover_state','delphi_state','writing_state','debate_rounds'];
+  const _STATE_KEYS = ['cove_state','pre_mortem_state','bayesian_state','dialectical_state','analogical_state','sot_state','tot_state','pot_state','self_discover_state','delphi_state','writing_state','debate_rounds','coding_state'];
   if (_STATE_KEYS.some(k => (d as Record<string, unknown>)[k] !== undefined)) {
 
   // ── CoVE state ──
@@ -362,8 +362,10 @@ export function buildMarkdownFromPhase(
         if (typeof c === 'string') {
           append(`- ${c}\n`);
         } else if (typeof c === 'object' && c !== null) {
-          const cp = c.checkpoint || c.text || c.validation_metric || 'Checkpoint';
-          append(`- ${cp}${c.target ? ` (Target: ${c.target})` : ''}\n`);
+          // phases/pre_mortem.py asks for {milestone, go_nogo_criterion}.
+          const cp = c.milestone || c.checkpoint || c.text || c.validation_metric || 'Checkpoint';
+          const gate = c.go_nogo_criterion ? `: ${c.go_nogo_criterion}` : '';
+          append(`- ${cp}${gate}${c.target ? ` (Target: ${c.target})` : ''}\n`);
         }
       });
       append('\n');
@@ -704,6 +706,30 @@ export function buildMarkdownFromPhase(
       append('**Caveats**\n');
       (pot.caveats as string[]).forEach((c) => append(`- ${c}\n`));
       append('\n');
+    }
+  }
+  // ── Coding: Final Assembly's files are the run's answer ──
+  if (d.coding_state && typeof d.coding_state === 'object') {
+    const cs = d.coding_state as Record<string, unknown>;
+    if (typeof cs.readme === 'string' && cs.readme.trim()) append(cs.readme + '\n\n');
+    if (Array.isArray(cs.final_files)) {
+      for (const f of cs.final_files as Array<Record<string, unknown>>) {
+        if (typeof f.content !== 'string' || !f.content.trim()) continue;
+        const lang = typeof f.language === 'string' && f.language ? f.language : typeof cs.language === 'string' ? cs.language : '';
+        // A fence longer than any backtick run in the code, so the code cannot close it.
+        const longest = Math.max(0, ...(f.content.match(/`+/g) ?? []).map((r) => r.length));
+        const fence = '`'.repeat(Math.max(3, longest + 1));
+        const body = f.content.endsWith('\n') ? f.content : f.content + '\n';
+        append(`**${String(f.path || 'file')}**\n${fence}${lang}\n${body}${fence}\n\n`);
+      }
+    }
+    for (const [key, title] of [['fixes_applied', 'Fixes Applied'], ['known_limitations', 'Known Limitations']] as const) {
+      const items = cs[key];
+      if (Array.isArray(items) && items.length) {
+        append(`**${title}**\n`);
+        items.forEach((s) => append(`- ${String(s)}\n`));
+        append('\n');
+      }
     }
   }
   // ── Self-Discover state ──
