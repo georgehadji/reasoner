@@ -200,6 +200,14 @@ control, the pinned pilot fragment changing state. All of it collapses under
   which has no `status` field, so the page read "Service disruption" while the API was up; it
   now asks `/api/health` (route test added). Also said plainly: the cache check always reports
   OK and the billing check only confirms a Stripe key is set. Inspector: 0 FAIL.
+- 404 rebuilt (2026-11-14): "No page at this address." beside the request as a run would show
+  it: the address quoted back (sanitised, attacker-chosen), the status, an UNKNOWN verdict, and
+  the closest routes with their match scores from `lib/route-suggestions.ts`. Then the featured
+  routes and a way to report a broken link. Corrected: the old list was headed "Where people
+  usually go", which no data backs. The error pages said "We've been notified and are looking
+  into it"; the client only attempts a report, so that sentence is gone, and `error.tsx` now has
+  an `h1` and the `main-content` target. Inspector: 0 FAIL with `few-pictures` allowed (a 404
+  has nothing to picture but the request); axe clean at 320 and 1440.
 - Site chrome simplified (2026-11-14, Maeda's laws of simplicity): the header lost its theme
   toggle (a `.site` page is charcoal in both schemes; `/settings` still passes `themeToggle`),
   its "Secure" badge (/security makes that case), and its glass and shadow when scrolled (now a
