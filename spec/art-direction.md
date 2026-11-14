@@ -143,6 +143,13 @@ control, the pinned pilot fragment changing state. All of it collapses under
   which takes CSRF, not a bearer key (now `/api/agent/run` and `/run/sync`); Neuro Memory
   "can be cleared at any time" became "erased with your data through the API". Inspector:
   0 FAIL.
+- /cookies rebuilt (2026-11-14): "One cookie, and why." beside the CSRF cookie set out the way
+  a browser's storage panel shows it, then how the token travels, every browser-storage key,
+  and what is absent. Names and lifetimes import from `security-constants.ts`, `config.ts`
+  and `pilot-draft.ts`. Claims corrected: "Last updated" printed today's date on every visit
+  (now an `[INPUT REQUIRED]` effective date); sign-in was described as a cookie, but supabase-js
+  keeps the session in localStorage; theme and sidebar were "cookies", both are localStorage.
+  Inspector: 0 FAIL.
 - Rolled out (2026-11-13, tokens and chrome only): `.site` on every marketing page root,
   `SiteFooter` is now the quiet line, inverted bands flip to the concrete field, uppercase
   micro-labels and prose mono removed, `Reveal` mounted in `SiteHeader`. Their layouts are
