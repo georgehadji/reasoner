@@ -67,7 +67,7 @@ export function ReviewHandoff() {
           {/* The scroller is INSIDE the plate, never on it. overflow on the
               transformed element forces transform-style back to flat and
               kills the tilt for the whole column. */}
-          <pre className="overflow-x-auto px-[var(--space-5)] py-[var(--space-4)]">
+          <pre tabIndex={0} className="overflow-x-auto px-[var(--space-5)] py-[var(--space-4)]">
             <code className="block font-mono text-[length:var(--text-md)] leading-[1.7]">
               {CODE_SHOWCASE_FILE.lines.map(({ n, text, flagged }) => (
                 <span key={n} className="flex gap-[var(--space-4)]">

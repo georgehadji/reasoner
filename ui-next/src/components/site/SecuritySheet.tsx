@@ -128,7 +128,7 @@ export function SecuritySheet({ headline, lede }: { headline: ReactNode; lede: R
           <div className="site-after-headline">{lede}</div>
         </div>
 
-        <div className="flex items-center justify-center bg-[var(--site-surface)] px-[var(--site-margin)] py-[var(--space-16)] lg:pt-[var(--space-32)]">
+        <div className="flex min-w-0 items-center justify-center bg-[var(--site-surface)] px-[var(--site-margin)] py-[var(--space-16)] lg:pt-[var(--space-32)]">
           <figure
             data-ui
             className="w-full rounded-[var(--radius-lg)] border border-[var(--site-line)] bg-[var(--site-bg)] lg:max-w-[var(--site-fragment)]"
@@ -138,6 +138,7 @@ export function SecuritySheet({ headline, lede }: { headline: ReactNode; lede: R
               <span className="text-[var(--site-muted)] nums-tabular">{ALL_ROWS.length} in total</span>
             </div>
 
+            <div tabIndex={0} className="overflow-x-auto">
             <table className="w-full border-collapse nums-tabular">
               <thead className="text-[var(--site-muted)]">
                 <tr>
@@ -173,6 +174,7 @@ export function SecuritySheet({ headline, lede }: { headline: ReactNode; lede: R
                 ))}
               </tbody>
             </table>
+            </div>
 
             <figcaption className="border-t border-[var(--site-line)] px-[var(--space-4)] py-[var(--space-3)]">
               <span className="text-[var(--site-muted)]">Show in the sheet below</span>

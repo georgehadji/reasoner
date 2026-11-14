@@ -209,7 +209,7 @@ export default function FAQPage() {
           figure={
             <figure data-ui className={FIGURE}>
               <figcaption className={CAP}>One streamed run</figcaption>
-              <pre className="overflow-x-auto px-[var(--space-4)] py-[var(--space-4)] font-mono leading-[var(--site-lh-body)]">
+              <pre tabIndex={0} className="overflow-x-auto px-[var(--space-4)] py-[var(--space-4)] font-mono leading-[var(--site-lh-body)]">
                 <code>{REQUEST}</code>
               </pre>
               <p className={FOOT}>Out of credits, the next run returns HTTP 402.</p>

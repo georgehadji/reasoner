@@ -283,6 +283,7 @@ function DashboardContent() {
 
 export default function DashboardPage() {
   return (
+    <main id="main-content">
     <Suspense fallback={
       <div className="mx-auto max-w-5xl px-4 py-8">
         <div className="mb-6 h-8 w-48 animate-pulse rounded bg-[var(--surface-3)]" />
@@ -296,5 +297,6 @@ export default function DashboardPage() {
     }>
       <DashboardContent />
     </Suspense>
+    </main>
   );
 }

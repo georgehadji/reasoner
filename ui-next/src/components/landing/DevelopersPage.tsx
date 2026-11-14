@@ -146,7 +146,7 @@ export default function DevelopersPage() {
               className="w-full min-w-0 rounded-[var(--radius-lg)] border border-[var(--site-line)] bg-[var(--site-bg)] lg:max-w-[var(--site-fragment)]"
             >
               <figcaption className={CAP}>One call, one result</figcaption>
-              <pre className={PRE}>
+              <pre tabIndex={0} className={PRE}>
                 <code>{CURL}</code>
               </pre>
             </figure>
@@ -161,7 +161,7 @@ export default function DevelopersPage() {
           figure={
             <figure data-ui className={FIGURE}>
               <figcaption className={CAP}>Host MCP config</figcaption>
-              <pre className={`border-b border-[var(--site-line)] ${PRE}`}>
+              <pre tabIndex={0} className={`border-b border-[var(--site-line)] ${PRE}`}>
                 <code>{MCP_CONFIG}</code>
               </pre>
               <p className="border-b border-[var(--site-line)] px-[var(--space-4)] py-[var(--space-3)] font-semibold">
@@ -231,7 +231,7 @@ export default function DevelopersPage() {
           figure={
             <figure data-ui className={`${FIGURE} flex flex-col`}>
               <figcaption className={CAP}>Headless</figcaption>
-              <pre className={`flex-1 ${PRE}`}>
+              <pre tabIndex={0} className={`flex-1 ${PRE}`}>
                 <code>{CLI}</code>
               </pre>
             </figure>

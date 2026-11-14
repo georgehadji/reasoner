@@ -37,7 +37,6 @@ export function PilotDialog() {
 
       <form
         data-ui
-        role="dialog"
         aria-labelledby={titleId}
         onSubmit={(e) => {
           e.preventDefault();

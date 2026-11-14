@@ -224,7 +224,7 @@ export default function ContactPage() {
                     <Slot value={draft.email} empty="your address" />
                   </dd>
                 </dl>
-                <pre className={PRE}>
+                <pre tabIndex={0} className={PRE}>
                   <code>
                     From: <Slot value={draft.name} empty="your name" /> &lt;
                     <Slot value={draft.email} empty="your address" />
@@ -408,7 +408,7 @@ export default function ContactPage() {
                   /.well-known/security.txt
                 </a>
               </figcaption>
-              <pre className={PRE}>
+              <pre tabIndex={0} className={PRE}>
                 <code>{securityTxtLines().join('\n')}</code>
               </pre>
             </figure>
@@ -453,7 +453,7 @@ export default function ContactPage() {
             <figcaption className={CAP}>
               <code className="font-mono">POST /api/contact</code>
             </figcaption>
-            <pre className={PRE}>
+            <pre tabIndex={0} className={PRE}>
               <code>
                 {'200  {"status": "sent"}\n\n503  {"detail": "Contact form is not configured"}\n503  {"detail": "Message could not be sent"}'}
               </code>

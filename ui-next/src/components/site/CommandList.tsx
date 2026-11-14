@@ -93,10 +93,7 @@ export function CommandList() {
                 <span className="block font-display text-[length:var(--site-head)] leading-[var(--site-lh-head)]">{c.name}</span>
                 {on && (
                   <span className="mt-[var(--space-2)] block max-w-[60ch] text-[length:var(--site-body)] leading-[var(--site-lh-body)]">
-                    {c.detail}{' '}
-                    <Link href={c.href} className="font-semibold underline underline-offset-4">
-                      Read more<span className="sr-only">: {c.name}</span>
-                    </Link>
+                    {c.detail}
                   </span>
                 )}
               </li>
@@ -108,6 +105,14 @@ export function CommandList() {
             </li>
           )}
         </ul>
+        {/* Outside the listbox: an option's contents are flattened, so a link inside one cannot be reached. */}
+        {rows[sel] && (
+          <p className="mt-[var(--space-6)] text-[length:var(--site-body)] leading-[var(--site-lh-body)]">
+            <Link href={rows[sel].href} className="site-link font-semibold text-current">
+              Read more: {rows[sel].name}
+            </Link>
+          </p>
+        )}
       </div>
     </section>
   );
