@@ -81,3 +81,53 @@ def test_choke_point_counts_detection_and_reroute(monkeypatch):
     monkeypatch.setattr(settings, "STAKES_POLICY_MODE", "active")
     HyperGateAgent._apply_stakes("What is the max dosage of ibuprofen?", _d("direct"))
     assert seen == [("detected", "health", "regex"), ("rerouted", "direct", "")]
+
+
+# ── model detector (plan §1.3) ──────────────────────────────────────────
+
+
+def _ctx(domain="legal", confidence=0.9, error=None):
+    from reasoner.hypergate.models import HyperContext, SubAgentOutput
+
+    def out(result, conf=0.9, err=None):
+        return SubAgentOutput("x", result, conf, "", 0, 0, "m", 0.0, err)
+
+    return HyperContext(
+        problem="p", lang_output=out({}), complexity_output=out({}),
+        direct_output=out({}), web_output=out({}), method_output=out({}),
+        stakes_output=out({"domain": domain}, confidence, error),
+    )
+
+
+@pytest.mark.parametrize("domain,conf,err,exp", [
+    ("legal", 0.9, None, StakesDomain.LEGAL),
+    ("health", 0.5, None, StakesDomain.NONE),      # below threshold
+    ("legal", 0.9, "boom", StakesDomain.NONE),     # detector failed
+    ("astrology", 0.9, None, StakesDomain.NONE),   # unknown domain
+])
+def test_model_stakes_reads_the_detector(domain, conf, err, exp):
+    from reasoner.hypergate.hyperagent import HyperGateAgent
+
+    assert HyperGateAgent._model_stakes(_ctx(domain, conf, err)) is exp
+
+
+def test_detector_parse_failure_is_none():
+    from reasoner.hypergate.sub_agents.stakes_detector import StakesDetectorSubAgent
+
+    r = StakesDetectorSubAgent()._parse_result("not json")
+    assert r["domain"] == "none" and r["confidence"] == 0.0
+
+
+def test_model_domain_reroutes_when_regex_misses(monkeypatch):
+    from reasoner.core.settings import settings
+    from reasoner.hypergate.hyperagent import HyperGateAgent
+
+    monkeypatch.setattr(settings, "STAKES_POLICY_MODE", "active")
+    problem = "my landlord keeps my deposit, what now"  # no regex hit expected
+    out = HyperGateAgent._apply_stakes(problem, _d("direct"), StakesDomain.LEGAL)
+    assert out.action == "pipeline" and out.stakes["source"] == "llm"
+
+
+def test_to_dict_still_strips_method_names_with_stakes_output():
+    d = _ctx().to_dict()
+    assert "stakes" not in str(d.keys())

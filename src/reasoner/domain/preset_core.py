@@ -139,6 +139,7 @@ _KNOWN_ROUTING_ROLES: frozenset[str] = frozenset({
     "hypergate_direct",
     "hypergate_web",
     "hypergate_method",
+    "hypergate_stakes",
     "hypergate_tiebreak",
 })
 

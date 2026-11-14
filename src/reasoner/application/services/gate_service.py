@@ -77,14 +77,18 @@ logger = logging.getLogger(__name__)
 # on this deployment's own histogram: 16.1s mean over 10 calls with 6 failures,
 # against a 6s per-attempt timeout. Nothing in the repo ever justified it.
 _HYPERGATE_ROLE_MODELS: dict[str, str] = {
-    # -- the five that run concurrently in Phase 1 --
-    # No two share a served model, which is the whole point: five parallel
-    # calls now reach five distinct models across three vendors.
+    # -- the six that run concurrently in Phase 1 --
+    # No two share a served model, which is the whole point: parallel
+    # calls reach distinct models across three vendors.
     "hypergate_language": "ministral-3b",     # trivial task, fastest verified
     "hypergate_complexity": "gemini-2.5-flash-lite",  # 10/10, 0.67s; second vendor (was laguna-xs-2.1, retired 2026-11)
     "hypergate_direct": "gpt-4o-mini",        # third vendor; ministral-3b fails this
     "hypergate_web": "nemotron-3.5-super",    # 10/10, 0.68s; distinct from complexity (was laguna-s-2.1, retired 2026-11)
     "hypergate_method": "ministral-14b",      # hardest task, needs 5/5 model
+    # Sixth Phase-1 role. Unmeasured: gemini-2.5-flash is a stronger sibling of the
+    # flash-lite used for complexity, but shares no served model with the others.
+    # Re-measure parse rate on the eval set (plan §6) before relying on it.
+    "hypergate_stakes": "gemini-2.5-flash",
     # -- Phase 2, runs alone after Phase 1 has returned --
     # Sharing gpt-4o-mini with hypergate_direct is deliberate and safe: the
     # tie-breaker only fires once Phase 1 is complete, so the two are never in
@@ -116,6 +120,7 @@ _HYPERGATE_ROLE_FALLBACKS: dict[str, str] = {
     "hypergate_direct": "gemini-2.5-flash-lite",    # openai    -> google
     "hypergate_web": "gpt-4o-mini",           # nvidia    -> openai
     "hypergate_method": "gpt-4o-mini",        # mistralai -> openai
+    "hypergate_stakes": "gpt-4o-mini",        # google    -> openai
     "hypergate_tiebreak": "gemini-2.5-flash-lite",  # openai    -> google
     "hypergate_subagent": "gpt-4o-mini",      # mistralai -> openai
 }

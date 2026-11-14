@@ -21,6 +21,7 @@ from reasoner.core.constants import (
     HYPERGATE_DIRECT_THRESHOLD,
     HYPERGATE_METHOD_THRESHOLD,
     HYPERGATE_WEB_THRESHOLD,
+    STAKES_MODEL_MIN_CONFIDENCE,
 )
 from reasoner.domain.stakes import StakesDomain, StakesProfile
 from reasoner.hypergate import jev_router
@@ -33,6 +34,7 @@ from reasoner.hypergate.sub_agents import (
     DirectDetectorSubAgent,
     LanguageDetectorSubAgent,
     MethodClassifierSubAgent,
+    StakesDetectorSubAgent,
     TieBreakerSubAgent,
     WebSearchDetectorSubAgent,
 )
@@ -349,6 +351,7 @@ class HyperGateAgent:
         self._direct = DirectDetectorSubAgent()
         self._web = WebSearchDetectorSubAgent()
         self._method = MethodClassifierSubAgent()
+        self._stakes = StakesDetectorSubAgent()
         self._tiebreaker = TieBreakerSubAgent()
 
     # ── Public API (same signature as GateAgent.decide) ──────────────
@@ -362,20 +365,32 @@ class HyperGateAgent:
         The single choke point for the stakes policy: every route below (fast
         paths, jev, sub-agents, tiebreaker) passes through it.
         """
-        decision = await self._decide(problem)
-        return self._apply_stakes(problem, decision)
+        decision, model_domain = await self._decide(problem)
+        return self._apply_stakes(problem, decision, model_domain)
 
     @staticmethod
-    def _apply_stakes(problem: str, decision: GateDecision) -> GateDecision:
+    def _apply_stakes(
+        problem: str,
+        decision: GateDecision,
+        model_domain: StakesDomain = StakesDomain.NONE,
+    ) -> GateDecision:
         from reasoner.core.settings import settings
 
         mode = settings.STAKES_POLICY_MODE
         if mode not in ("shadow", "active") or named_method(problem):
             return decision  # off, a typo, or a method the user chose
+        # The regex is the floor: a hit counts even when the detector failed or
+        # said "none". The detector only adds what the regex missed.
         domain = match_stakes(problem)
+        source = "regex"
+        if domain is StakesDomain.NONE:
+            domain, source = model_domain, "llm"
         if domain is StakesDomain.NONE:
             return decision
-        profile = StakesProfile(domain=domain, confidence=1.0, source="regex")
+        profile = StakesProfile(
+            domain=domain, confidence=1.0 if source == "regex" else STAKES_MODEL_MIN_CONFIDENCE,
+            source=source,
+        )
         rerouted = apply_stakes_policy(decision, profile)
         from reasoner.core.ports.metrics_port import count_stakes
 
@@ -392,12 +407,13 @@ class HyperGateAgent:
             update={"stakes": profile.to_dict()}
         )
 
-    async def _decide(self, problem: str) -> GateDecision:
+    async def _decide(self, problem: str) -> tuple[GateDecision, StakesDomain]:
+        """The decision, plus the domain the stakes detector named (NONE if it did not run)."""
         problem_hash = hashlib.sha256(problem.encode()).hexdigest()
 
         fast = fast_path(problem)
         if fast is not None:
-            return fast
+            return fast, StakesDomain.NONE
 
         # JEV_MODE=active: one typed call to jev, after the free regex fast paths
         # above and before the four LLM calls below. An accepted verdict is the
@@ -413,9 +429,10 @@ class HyperGateAgent:
                 attempt.decision.method,
                 attempt.decision.confidence,
             )
-            return attempt.decision
+            return attempt.decision, StakesDomain.NONE
 
         ctx = await self._run_phase1(problem)
+        model_domain = self._model_stakes(ctx)
         decision = self._synthesize(ctx)
 
         if decision is None:
@@ -430,9 +447,22 @@ class HyperGateAgent:
             decision.confidence,
         )
 
-        return decision
+        return decision, model_domain
 
-    # ── Phase 1: all 5 sub-agents in parallel ────────────────────────
+    @staticmethod
+    def _model_stakes(ctx: HyperContext) -> StakesDomain:
+        """The detector's domain, or NONE when it failed, is unsure, or named nothing."""
+        out = ctx.stakes_output
+        if not isinstance(out, SubAgentOutput) or out.error:
+            return StakesDomain.NONE
+        if out.confidence < STAKES_MODEL_MIN_CONFIDENCE:
+            return StakesDomain.NONE
+        try:
+            return StakesDomain(out.result.get("domain", "none"))
+        except ValueError:
+            return StakesDomain.NONE
+
+    # ── Phase 1: all 6 sub-agents in parallel ────────────────────────
 
     async def _run_phase1(self, problem: str) -> HyperContext:
         inp = SubAgentInput(problem=problem, agent_name="phase1")
@@ -442,6 +472,7 @@ class HyperGateAgent:
             self._direct.execute(inp, self.router),
             self._web.execute(inp, self.router),
             self._method.execute(inp, self.router),
+            self._stakes.execute(inp, self.router),
             return_exceptions=True,
         )
 
@@ -451,12 +482,13 @@ class HyperGateAgent:
                 return _failed_output(name, res)
             return res
 
-        lang_out, cpx_out, dir_out, web_out, mth_out = (
+        lang_out, cpx_out, dir_out, web_out, mth_out, stk_out = (
             _unwrap(results[0], "language_detector"),
             _unwrap(results[1], "complexity_estimator"),
             _unwrap(results[2], "direct_detector"),
             _unwrap(results[3], "web_detector"),
             _unwrap(results[4], "method_classifier"),
+            _unwrap(results[5], "stakes_detector"),
         )
         return HyperContext(
             problem=problem,
@@ -465,6 +497,7 @@ class HyperGateAgent:
             direct_output=dir_out,
             web_output=web_out,
             method_output=mth_out,
+            stakes_output=stk_out,
         )
 
     # ── Synthesis (pure Python, no LLM) ─────────────────────────────

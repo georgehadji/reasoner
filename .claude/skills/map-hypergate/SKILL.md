@@ -29,6 +29,7 @@ folders:
 | `complexity_estimator.py` | simple / medium / complex reasoning-depth estimate. |
 | `direct_detector.py` | Can this be answered without a pipeline? Holds `_CREATIVE_PATTERNS`. |
 | `web_detector.py` | Does this need real-time/recent info only web search can give? |
+| `stakes_detector.py` | Is this a health, legal or financial question? Sixth Phase-1 call (role `hypergate_stakes`); backs up the regex, can only add a domain, never remove one. |
 | `method_classifier.py` (8.5KB) | Picks the reasoning method using the opaque B–U letter taxonomy. Owns `_TAXONOMY` + `_DESCRIPTIONS` → `CATEGORY_LIST`, the single source the TieBreaker also renders. |
 | `tie_breaker.py` | Resolves conflicts / all-low-confidence; sees the full `HyperContext`; validates action + method. |
 | `image_model_selector.py` | On-demand only (image endpoint): maps an image prompt to capability family + cost tier. Not part of the parallel five. |

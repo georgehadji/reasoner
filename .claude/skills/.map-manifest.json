@@ -459,6 +459,7 @@
       "src/reasoner/hypergate/sub_agents/image_model_selector.py",
       "src/reasoner/hypergate/sub_agents/language_detector.py",
       "src/reasoner/hypergate/sub_agents/method_classifier.py",
+      "src/reasoner/hypergate/sub_agents/stakes_detector.py",
       "src/reasoner/hypergate/sub_agents/tie_breaker.py",
       "src/reasoner/hypergate/sub_agents/web_detector.py"
     ]

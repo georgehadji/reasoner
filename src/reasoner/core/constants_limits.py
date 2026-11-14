@@ -146,6 +146,7 @@ HYPERGATE_MAX_TOKENS_LANGUAGE: int = 80
 HYPERGATE_MAX_TOKENS_COMPLEXITY: int = 80
 HYPERGATE_MAX_TOKENS_DIRECT: int = 100
 HYPERGATE_MAX_TOKENS_WEB: int = 100
+HYPERGATE_MAX_TOKENS_STAKES: int = 100
 HYPERGATE_MAX_TOKENS_METHOD: int = 128
 HYPERGATE_MAX_TOKENS_TIEBREAK: int = 200
 # On-demand only (image generation), NOT part of the Phase-1 parallel gather.
@@ -367,6 +368,9 @@ ANSWERABILITY_CAVEAT_UNVERIFIED_SHARE = 0.4
 ANSWERABILITY_REFER_UNVERIFIED_SHARE = 0.75
 # Critic disagreement (1 - share agreeing on the top candidate) that counts as a split.
 ANSWERABILITY_DISAGREEMENT = 0.5
+# Provisional (plan §6): the lowest detector confidence that counts as a high-stakes
+# hit. Below it the regex alone decides. Tune against the eval harness.
+STAKES_MODEL_MIN_CONFIDENCE = 0.6
 
 def get_quality_judge_threshold(preset_name: str) -> float:
     """Return the minimum score required to pass quality evaluation."""
